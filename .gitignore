@@ -50,3 +50,12 @@ coverage/
 **/build/
 **/.flutter-plugins
 **/.flutter-plugins-dependencies
+
+.angular
+
+# Next.js
+.next
+out
+
+vite.config.*.timestamp*
+vitest.config.*.timestamp*

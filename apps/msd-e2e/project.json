@@ -1,0 +1,10 @@
+{
+  "name": "msd-e2e",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/msd-e2e/src",
+  "tags": [],
+  "implicitDependencies": ["msd"],
+  "// targets": "to see all targets run: nx show project msd-e2e --web",
+  "targets": {}
+}
