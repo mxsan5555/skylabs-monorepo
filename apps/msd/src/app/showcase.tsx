@@ -24,6 +24,9 @@ import {
   PrimaryTab,
   Icon,
   FilledIconButton,
+  List,
+  ListItem,
+  Divider,
   SkyBadgeReact,
 } from '@skylabs-monorepo/shared-ui/react';
 
@@ -131,6 +134,35 @@ export function Showcase() {
             </TextButton>
           </div>
         </Dialog>
+      </section>
+
+      <section className="showcase__card">
+        <h2>List</h2>
+
+        <List>
+          <ListItem>Fruits</ListItem>
+          <Divider />
+          <ListItem>Apple</ListItem>
+          <ListItem>Banana</ListItem>
+          <ListItem>
+            <div slot="headline">Cucumber</div>
+            <div slot="supporting-text">
+              Cucumbers are long green fruits that are just as long as this
+              multi-line description
+            </div>
+          </ListItem>
+          <ListItem
+            type="link"
+            href="https://google.com/search?q=buy+kiwis&tbm=shop"
+            target="_blank"
+          >
+            <div slot="headline">Shop for Kiwis</div>
+            <div slot="supporting-text">
+              This will link you out in a new tab
+            </div>
+            <Icon slot="end">open_in_new</Icon>
+          </ListItem>
+        </List>
       </section>
     </main>
   );

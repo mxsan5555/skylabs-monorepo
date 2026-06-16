@@ -85,4 +85,31 @@
       </div>
     </md-dialog>
   </section>
+
+  <section class="showcase__card">
+    <h2>List</h2>
+
+    <md-list>
+      <md-list-item> Fruits </md-list-item>
+      <md-divider></md-divider>
+      <md-list-item> Apple </md-list-item>
+      <md-list-item> Banana </md-list-item>
+      <md-list-item>
+        <div slot="headline">Cucumber</div>
+        <div slot="supporting-text">
+          Cucumbers are long green fruits that are just as long as this
+          multi-line description
+        </div>
+      </md-list-item>
+      <md-list-item
+        type="link"
+        href="https://google.com/search?q=buy+kiwis&tbm=shop"
+        target="_blank"
+      >
+        <div slot="headline">Shop for Kiwis</div>
+        <div slot="supporting-text">This will link you out in a new tab</div>
+        <md-icon slot="end">open_in_new</md-icon>
+      </md-list-item>
+    </md-list>
+  </section>
 </main>
