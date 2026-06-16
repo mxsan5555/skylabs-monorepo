@@ -1,0 +1,88 @@
+<main class="showcase">
+  <header class="showcase__bar">
+    <div class="showcase__title">
+      <h1>mera-driver</h1>
+      <sky-badge variant="primary">M3</sky-badge>
+    </div>
+    <label class="showcase__toggle">
+      <span>{{ mode() === 'dark' ? 'Dark' : 'Light' }}</span>
+      <md-switch
+        [selected]="mode() === 'dark'"
+        (change)="toggleMode()"
+      ></md-switch>
+    </label>
+  </header>
+
+  <section class="showcase__card">
+    <h2>Buttons</h2>
+    <div class="showcase__row">
+      <md-filled-button>Filled</md-filled-button>
+      <md-filled-tonal-button>Tonal</md-filled-tonal-button>
+      <md-elevated-button>Elevated</md-elevated-button>
+      <md-outlined-button>Outlined</md-outlined-button>
+      <md-text-button>Text</md-text-button>
+      <md-filled-icon-button aria-label="Add to favorites">
+        <md-icon aria-hidden="true">favorite</md-icon>
+      </md-filled-icon-button>
+    </div>
+  </section>
+
+  <section class="showcase__card">
+    <h2>Selection</h2>
+    <div class="showcase__row">
+      <label class="showcase__inline">
+        <md-checkbox checked></md-checkbox> Checkbox
+      </label>
+      <label class="showcase__inline">
+        <md-radio name="demo" value="a" checked></md-radio> Radio A
+      </label>
+      <label class="showcase__inline">
+        <md-radio name="demo" value="b"></md-radio> Radio B
+      </label>
+    </div>
+    <md-chip-set>
+      <md-assist-chip label="Assist"></md-assist-chip>
+      <md-filter-chip label="Filter" selected></md-filter-chip>
+      <md-filter-chip label="Another"></md-filter-chip>
+    </md-chip-set>
+  </section>
+
+  <section class="showcase__card">
+    <h2>Inputs</h2>
+    <div class="showcase__row">
+      <md-outlined-text-field label="Outlined" value="Hello">
+      </md-outlined-text-field>
+      <md-filled-text-field label="Filled" placeholder="Type here">
+      </md-filled-text-field>
+    </div>
+    <md-slider value="50" ticks labeled aria-label="Demo value"></md-slider>
+  </section>
+
+  <section class="showcase__card">
+    <h2>Tabs &amp; Progress</h2>
+    <md-tabs>
+      <md-primary-tab>Overview</md-primary-tab>
+      <md-primary-tab>Activity</md-primary-tab>
+      <md-primary-tab>Settings</md-primary-tab>
+    </md-tabs>
+    <div class="showcase__row">
+      <md-linear-progress value="0.6"></md-linear-progress>
+      <md-circular-progress value="0.6"></md-circular-progress>
+    </div>
+  </section>
+
+  <section class="showcase__card">
+    <h2>Dialog</h2>
+    <md-filled-button (click)="dialog.show()">Open dialog</md-filled-button>
+    <md-dialog #dialog>
+      <div slot="headline">Themed dialog</div>
+      <form slot="content" id="demo-form" method="dialog">
+        This dialog and every control on this page share mera-driver's blue M3
+        theme.
+      </form>
+      <div slot="actions">
+        <md-text-button form="demo-form" value="ok">Got it</md-text-button>
+      </div>
+    </md-dialog>
+  </section>
+</main>

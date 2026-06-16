@@ -8,12 +8,10 @@ describe('App', () => {
     }).compileComponents();
   });
 
-  it('should render title', async () => {
+  it('should render the showcase title', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain(
-      'Welcome mera-driver',
-    );
+    expect(compiled.querySelector('h1')?.textContent).toContain('mera-driver');
   });
 });

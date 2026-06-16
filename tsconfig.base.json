@@ -2,6 +2,7 @@
   "compileOnSave": false,
   "compilerOptions": {
     "rootDir": ".",
+    "baseUrl": ".",
     "sourceMap": true,
     "declaration": false,
     "moduleResolution": "node",
@@ -13,7 +14,16 @@
     "lib": ["es2020", "dom"],
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
-    "paths": {}
+    "paths": {
+      "@skylabs-monorepo/shared-ui": ["packages/shared-ui/src/index.ts"],
+      "@skylabs-monorepo/shared-ui/react": ["packages/shared-ui/src/react.ts"],
+      "@skylabs-monorepo/shared-ui/testing": [
+        "packages/shared-ui/src/testing/index.ts"
+      ],
+      "@skylabs-monorepo/shared-ui/theme.css": [
+        "packages/shared-ui/src/theme/base.css"
+      ]
+    }
   },
   "exclude": ["node_modules", "tmp"]
 }

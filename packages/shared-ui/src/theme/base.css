@@ -1,0 +1,43 @@
+/**
+ * Shared base styles for Material 3 web components.
+ *
+ * Color tokens (--md-sys-color-*) are intentionally NOT defined here — each app
+ * loads its own brand theme CSS. This file only sets cross-app defaults:
+ * the icon font, fonts, the M3 type scale family, and a page baseline that
+ * uses the active theme's surface/on-surface tokens.
+ */
+
+/* Self-hosted Material Symbols Outlined — the M3 icon set used by <md-icon>.
+   Installed locally (no runtime CDN request); the font file is bundled by
+   each app's build. */
+@import 'material-symbols/outlined.css';
+
+:root {
+  /* M3 reference fonts. Apps load the actual Roboto webfont via <link>. */
+  --md-ref-typeface-brand: 'Roboto', system-ui, sans-serif;
+  --md-ref-typeface-plain: 'Roboto', system-ui, sans-serif;
+
+  --md-sys-typescale-body-medium-font: 'Roboto', system-ui, sans-serif;
+  --md-sys-typescale-label-large-font: 'Roboto', system-ui, sans-serif;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Roboto', system-ui, sans-serif;
+  background-color: var(--md-sys-color-background, #fff);
+  color: var(--md-sys-color-on-background, #1a1c19);
+}
+
+/* Material Symbols baseline so <md-icon> renders ligature names. */
+.material-symbols-outlined {
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+}
