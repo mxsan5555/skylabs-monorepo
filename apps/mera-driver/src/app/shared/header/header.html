@@ -1,0 +1,21 @@
+<header class="app-header">
+  <a routerLink="/" class="app-header__brand">mera-driver</a>
+
+  <nav class="app-header__nav" aria-label="Primary">
+    <a
+      routerLink="/"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+      >Home</a
+    >
+    <a routerLink="/blog" routerLinkActive="active">Blog</a>
+    <a routerLink="/contact" routerLinkActive="active">Contact</a>
+    <a routerLink="/showcase" routerLinkActive="active">Showcase</a>
+  </nav>
+
+  @if (auth.isAuthenticated()) {
+    <md-text-button (click)="auth.signOut()">Log out</md-text-button>
+  } @else {
+    <md-filled-button (click)="goSignIn()">Sign in</md-filled-button>
+  }
+</header>

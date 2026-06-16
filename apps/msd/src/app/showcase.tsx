@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import './app.css';
 import {
   applyTheme,
   type ThemeMode,
@@ -45,6 +46,7 @@ export function Showcase() {
 
   return (
     <main className="showcase">
+      <title>Component showcase · MSD</title>
       <header className="showcase__bar">
         <div className="showcase__title">
           <h1>msd</h1>

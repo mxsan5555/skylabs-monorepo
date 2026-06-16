@@ -1,1 +1,4 @@
-/* You can add global styles to this file, and also import other style files */
+/* Global app styles. The app-shell and auth-screen layout classes come from
+   @skylabs-monorepo/shared-ui/layout.css (imported in main.tsx). M3 theme
+   tokens come from the loaded theme (also main.tsx). Add msd-only global
+   overrides here. */

@@ -1,0 +1,199 @@
+/**
+ * Shared app-layout styles: the app shell (header/footer) and the auth screens.
+ * Identical across apps and driven entirely by --md-sys-color-* tokens, so each
+ * app inherits its own brand palette. Load it once per app:
+ *
+ *   // msd (Vite) — main.tsx
+ *   import '@skylabs-monorepo/shared-ui/layout.css';
+ *
+ *   // mera-driver (Angular) — project.json build "styles"
+ *   "packages/shared-ui/src/theme/layout.css"
+ *
+ * Page-specific styles stay in each app/page.
+ */
+
+/* App shell: header / scrollable content / footer. */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface, #fafdfb);
+}
+
+.app-header__brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--md-sys-color-primary);
+}
+
+.app-header__nav {
+  display: flex;
+  gap: 16px;
+  margin-right: auto;
+}
+
+.app-header__nav a {
+  text-decoration: none;
+  color: var(--md-sys-color-on-surface, #1a1c19);
+}
+
+.app-header__nav a.active {
+  color: var(--md-sys-color-primary);
+  font-weight: 600;
+}
+
+.app-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  color: var(--md-sys-color-on-surface-variant, #43483e);
+  font-size: 0.875rem;
+}
+
+/* Auth screens (sign-in, otp). Layout follows the design reference; all colors
+   come from the active M3 theme. */
+.auth-layout {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  background-color: var(--md-sys-color-background);
+}
+
+.auth-layout__inner {
+  width: 100%;
+  max-width: 420px;
+  padding: 24px 16px 48px;
+}
+
+.auth-screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.auth-brand__logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  display: grid;
+  place-items: center;
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  --md-icon-size: 36px;
+}
+
+.auth-brand__title {
+  margin: 4px 0 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-background);
+}
+
+.auth-brand__subtitle {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Non-interactive pill showing where the code was sent (semantic span, not a
+   chip — it is display-only, so it must not be announced as a button). */
+.auth-destination {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  font-size: 0.875rem;
+  font-weight: 600;
+  --md-icon-size: 18px;
+}
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 20px;
+  background-color: var(--md-sys-color-surface-container);
+}
+
+.auth-card h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--md-sys-color-on-surface);
+}
+
+.auth-card > p {
+  margin: 0 0 4px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.auth-field,
+.otp-field,
+.auth-submit,
+.auth-google {
+  width: 100%;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.875rem;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background-color: var(--md-sys-color-outline-variant);
+}
+
+.auth-note {
+  margin: 4px 0 0;
+  text-align: center;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.875rem;
+}
+
+.otp-back {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+}
+
+.otp-resend {
+  margin: 4px 0 0;
+  text-align: center;
+  color: var(--md-sys-color-on-surface);
+  font-size: 0.875rem;
+}
+
+.otp-muted {
+  color: var(--md-sys-color-on-surface-variant);
+}

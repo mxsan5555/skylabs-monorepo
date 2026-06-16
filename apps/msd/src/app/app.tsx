@@ -1,12 +1,15 @@
-import './app.css';
-import { Route, Routes } from 'react-router-dom';
-import Showcase from './showcase';
+import { AuthProvider } from '../auth/auth-context';
+import { AppRoutes } from './routes';
 
+/**
+ * Root component: app-wide providers wrap the route tree. Add more providers
+ * (query client, theme switcher, error boundary) here as the app grows.
+ */
 export function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Showcase />} />
-    </Routes>
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   );
 }
 

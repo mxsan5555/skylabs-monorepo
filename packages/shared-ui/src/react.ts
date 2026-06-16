@@ -71,8 +71,9 @@ import { MdOutlinedTextField } from '@material/web/textfield/outlined-text-field
 // Extras
 import { MdDivider } from '@material/web/divider/divider.js';
 
-// Custom in-house element
+// Custom in-house elements
 import { SkyBadge } from './components/sky-badge/sky-badge.js';
+import { SkyCard } from './components/sky-card/sky-card.js';
 
 const inputEvents = { onInput: 'input', onChange: 'change' } as const;
 const dialogEvents = {
@@ -158,8 +159,9 @@ export const OutlinedTextField = createComponent({ react: React, tagName: 'md-ou
 // Extras
 export const Divider = createComponent({ react: React, tagName: 'md-divider', elementClass: MdDivider });
 
-// Custom in-house component
+// Custom in-house components
 export const SkyBadgeReact = createComponent({ react: React, tagName: 'sky-badge', elementClass: SkyBadge });
+export const SkyCardReact = createComponent({ react: React, tagName: 'sky-card', elementClass: SkyCard });
 
 // Re-export theme helpers for convenience in React apps.
 export * from './theme/apply-theme.js';

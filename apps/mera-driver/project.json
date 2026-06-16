@@ -21,6 +21,7 @@
         ],
         "styles": [
           "packages/shared-ui/src/theme/base.css",
+          "packages/shared-ui/src/theme/layout.css",
           "apps/mera-driver/src/assets/theme/index.css",
           "apps/mera-driver/src/styles.css"
         ]

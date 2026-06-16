@@ -8,6 +8,7 @@ import * as ReactDOM from 'react-dom/client';
 import '@skylabs-monorepo/shared-ui';
 import { applyTheme } from '@skylabs-monorepo/shared-ui';
 import '@skylabs-monorepo/shared-ui/theme.css';
+import '@skylabs-monorepo/shared-ui/layout.css';
 import './assets/theme/index.css';
 
 import App from './app/app';

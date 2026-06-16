@@ -1,13 +1,14 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
-import { RouterModule } from '@angular/router';
-import { Showcase } from './showcase/showcase';
+import { Component } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
 
+/**
+ * Root shell. Renders the routed layout/pages via <router-outlet>. App-wide
+ * providers live in app.config.ts.
+ */
 @Component({
-  imports: [RouterModule, Showcase],
+  imports: [RouterOutlet],
   selector: 'md-root',
   templateUrl: './app.html',
   styleUrl: './app.css',
-  // Required so Angular accepts the Material Web <md-*> custom elements.
-  schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class App {}

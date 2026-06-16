@@ -10,7 +10,8 @@
     ".": "./src/index.ts",
     "./react": "./src/react.ts",
     "./testing": "./src/testing/index.ts",
-    "./theme.css": "./src/theme/base.css"
+    "./theme.css": "./src/theme/base.css",
+    "./layout.css": "./src/theme/layout.css"
   },
   "peerDependencies": {
     "@lit/react": "^1.0.7",

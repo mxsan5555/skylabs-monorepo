@@ -22,6 +22,9 @@
       ],
       "@skylabs-monorepo/shared-ui/theme.css": [
         "packages/shared-ui/src/theme/base.css"
+      ],
+      "@skylabs-monorepo/shared-ui/layout.css": [
+        "packages/shared-ui/src/theme/layout.css"
       ]
     }
   },
