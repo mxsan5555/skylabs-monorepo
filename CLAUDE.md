@@ -61,6 +61,78 @@ If pages render unstyled or an import 500s in dev, it's almost always a **stale
 - **SEO**: per-route `<title>` (React 19 hoists `<title>`/`<meta>`; Angular uses the route `title`), default `<meta name="description">` in each `index.html`, `noindex` on auth pages.
 - Tag projects in `project.json` (`type:app|lib`, `scope:<domain>`) and enforce boundaries in `nx.json`.
 
+## Auth & roles (RBAC)
+
+After sign-in (OTP) the user lands on the **account console** (`/account`), an admin
+layout shown for every persona. The same layout serves every role — what each persona
+sees and can open is driven by **roles**.
+
+### Role definitions
+
+| Role | msd (massage deals) | mera-driver (driver booking) |
+|------|--------------------|-----------------------------|
+| Base user | `user` | `customer` or `driver` |
+| Staff | `admin`, `marketing`, `sales` | `admin`, `marketing`, `sales` |
+| Type definition | `apps/msd/src/types/index.ts` | `apps/mera-driver/src/app/models/index.ts` |
+| Default on login | `['user']` | `['customer']` |
+
+### Auth files
+
+| Concern | msd | mera-driver |
+|---------|-----|-------------|
+| Auth state | `auth/auth-context.tsx` (React Context + useState) | `core/auth/auth.service.ts` (Angular signals) |
+| Token storage | `auth/auth-storage.ts` | inside `auth.service.ts` |
+| Auth route guard | `auth/require-auth.tsx` (`<RequireAuth>`) | `core/auth/auth.guard.ts` (`authGuard`) |
+| Role route guard | `auth/require-role.tsx` (`<RequireRole>`) | `core/auth/role.guard.ts` (`roleGuard`) |
+| HTTP token injection | _(not yet — no API calls)_ | `core/auth/auth.interceptor.ts` |
+| Menu config | `app/admin/menu.ts` | `app/admin/menu.ts` |
+| Sidebar (role filter) | `app/admin/sidebar.tsx` | `app/admin/sidebar/sidebar.ts` |
+
+### localStorage keys
+
+| Key | App | Holds |
+|-----|-----|-------|
+| `msd_auth_token` | msd | Bearer token |
+| `msd_auth_roles` | msd | `UserRole[]` (JSON) |
+| `mera_auth_token` | mera-driver | Bearer token |
+| `mera_auth_roles` | mera-driver | `UserRole[]` (JSON) |
+
+### Route protection
+
+| Route | msd guard | mera-driver guard | Allowed roles |
+|-------|-----------|-------------------|---------------|
+| `/account/*` (all) | `<RequireAuth>` | `canActivate: [authGuard]` | any authenticated |
+| `/account/dashboard` | _(none extra)_ | _(none extra)_ | all roles |
+| `/account/profile` | _(none extra)_ | _(none extra)_ | all roles |
+| `/account/deals` | `<RequireRole roles={['admin']}>` | — | `admin` |
+| `/account/bookings` | — | `roleGuard`, `data.roles: ['admin']` | `admin` |
+| `/account/promotions` | `<RequireRole roles={['marketing']}>` | `roleGuard`, `data.roles: ['marketing']` | `marketing` |
+| `/account/sales` | `<RequireRole roles={['sales']}>` | `roleGuard`, `data.roles: ['sales']` | `sales` |
+
+### How it works
+
+1. **The user carries `roles: UserRole[]`.** Real roles come from the backend JWT later;
+   until then they're stored in localStorage and can be swapped with the sidebar
+   **"View as (demo)"** switcher to preview each persona. Remove the switcher once the
+   backend assigns roles.
+
+2. **Show / hide nav items by role** — one config drives the sidebar. Each item lists the
+   roles allowed to see it; the sidebar filters by the user's roles.
+   - To add a sidebar item: add `{ label, icon, to, roles: [...] }` to `ADMIN_MENU`.
+
+3. **Protect the route** (don't rely on the hidden menu alone) — guard the route to the
+   same roles. A user lacking the role is redirected to `/account/profile`.
+   - React: `<RequireRole roles={['admin']}><Page/></RequireRole>`
+   - Angular: `canActivate: [roleGuard], data: { roles: ['admin'] }`
+
+4. **Security boundary**: these guards are **UX only**. When the per-app Express API
+   exists, **every request must re-check the role from the JWT** server-side. Never gate
+   sensitive data on the frontend alone.
+
+To add a role-gated section: add a `MenuItem` with its `roles` (controls visibility) +
+a route with the matching `RequireRole`/`roleGuard` (controls access). Same role list in
+both places.
+
 ## Stack (this workspace — overrides global defaults)
 
 - Web: React 19 + Vite (msd), Angular 21 (mera-driver), TypeScript, Tailwind (mera-driver), Material 3 via `shared-ui`.
@@ -71,6 +143,7 @@ If pages render unstyled or an import 500s in dev, it's almost always a **stale
 ## Adding things
 
 - **New page**: create `apps/<app>/src/app/pages/<name>/`, add it to the route table (`routes.tsx` / `app.routes.ts`) under the right layout; protect with `RequireAuth` (React) / `canActivate: [authGuard]` (Angular).
+- **New console (account/admin) page**: put it under `pages/account/`, render it inside `AdminPage` (centered title + subtitle), route it under the `AdminLayout` area, and add a `MenuItem` to `ADMIN_MENU` with its `roles`. Gate it with `RequireRole`/`roleGuard` (see Auth & roles above).
 - **New shared component**: add to `packages/shared-ui/src/components/` + barrel; add a React wrapper in `src/react.ts`.
 - **New app/lib**: `npx nx g @nx/react:app`, `@nx/angular:app`, `@nx/express:app`, or `@nx/js:lib`. Apps under `apps/`, shared code under `packages/`.
 

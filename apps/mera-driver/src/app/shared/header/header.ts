@@ -20,4 +20,8 @@ export class Header {
   protected goSignIn(): void {
     this.router.navigate(['/sign-in']);
   }
+
+  protected goAccount(): void {
+    this.router.navigate(['/account']);
+  }
 }

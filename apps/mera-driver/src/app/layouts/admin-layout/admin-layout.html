@@ -1,0 +1,24 @@
+<div class="admin-layout" [class.is-collapsed]="collapsed()">
+  <md-sidebar></md-sidebar>
+  <div class="admin-main">
+    <div class="admin-topbar">
+      <md-icon-button
+        [attr.aria-label]="collapsed() ? 'Show sidebar' : 'Hide sidebar'"
+        (click)="toggle()"
+      >
+        <md-icon aria-hidden="true">dock_to_right</md-icon>
+      </md-icon-button>
+      <nav aria-label="Breadcrumb">
+        <ol class="admin-breadcrumb">
+          <li>Account</li>
+          @if (currentLabel()) {
+            <li aria-current="page">{{ currentLabel() }}</li>
+          }
+        </ol>
+      </nav>
+    </div>
+    <main class="admin-content">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>

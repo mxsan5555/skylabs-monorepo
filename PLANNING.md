@@ -40,22 +40,68 @@ share UI but **not** backends, databases, or business logic.
 - **Auth (in-house)**: JWT · phone/email OTP (SMS/email provider) · Google OAuth.
 - **Tooling**: Nx 22.7.5 (npm) · ESLint · Vitest / Angular unit-test · GitHub Actions.
 
+## Access control (RBAC)
+
+One account/admin console (shown after login) serves every persona; **roles**
+decide what each sees and can open.
+
+### Roles per app
+
+| App | Roles | Type definition |
+|-----|-------|----------------|
+| msd | `user`, `admin`, `marketing`, `sales` | `apps/msd/src/types/index.ts` |
+| mera-driver | `customer`, `driver`, `admin`, `marketing`, `sales` | `apps/mera-driver/src/app/models/index.ts` |
+
+### What each role sees (sidebar menu)
+
+| Menu item | msd roles | mera-driver roles |
+|-----------|-----------|-------------------|
+| Dashboard | all | all |
+| My Account | all | all |
+| Deals | `admin` | — |
+| Bookings | — | `admin` |
+| Promotions | `marketing` | `marketing` |
+| Sales | `sales` | `sales` |
+
+Menu config: `apps/<app>/src/app/admin/menu.ts` — add `{ label, icon, to, roles: [...] }` to `ADMIN_MENU`.
+
+### Auth file map
+
+| Concern | msd | mera-driver |
+|---------|-----|-------------|
+| Auth state + roles | `auth/auth-context.tsx` (React Context) | `core/auth/auth.service.ts` (signals) |
+| Auth route guard | `auth/require-auth.tsx` | `core/auth/auth.guard.ts` |
+| Role route guard | `auth/require-role.tsx` | `core/auth/role.guard.ts` |
+| HTTP token injection | _(planned with API)_ | `core/auth/auth.interceptor.ts` |
+
+### How access is controlled
+
+- **Visibility**: the sidebar is built from one role-aware menu config — items list
+  the roles allowed to see them, and the sidebar filters by the user's roles.
+- **Access**: routes are guarded to the same roles (`RequireRole` / `roleGuard`);
+  lacking the role redirects to the profile.
+- **Boundary**: guards are UX only — each API must re-check the role from the JWT on
+  every request once backends exist. See `CLAUDE.md` → "Auth & roles (RBAC)" for full detail.
+
 ## Conventions (summary)
 
 - Pages are framework-native and app-local; reuse at the component level only.
 - WCAG 2.2 AA accessibility and basic SEO (per-route titles, meta description,
   noindex on auth) are baseline requirements, not afterthoughts.
+- One source of truth for repeated UI (shared `layout.css`, config-driven menus and
+  forms); no abstraction before real duplication appears.
 - Keep it simple: no shared backend, no premium services where a free/in-house
-  option works, no abstraction before real duplication appears.
+  option works.
 
 ## Roadmap
 
 1. **Foundation** — M3 design system + theming + app scaffolding ✅
 2. **Auth screens** — sign-in, OTP (both apps) ✅
-3. **Content pages** — home ✅, then contact, blog, blog-detail, blog-category 🔜
-4. **Account/admin** — user profile, logout, admin panel 🔜
-5. **Backends** — `apps/msd-api`, `apps/mera-driver-api` (Express + Postgres + Prisma + OpenAPI) ⏳ deferred until pages need real data
-6. **Auth integration** — wire OTP/Google to real endpoints once backends exist ⏳
-7. **Hardening** — tests, error tracking, CI gates, deployment ⏳
+3. **Account/admin console** — role-based admin layout + My Account (profile + address CRUD) + role gating ✅
+4. **Content pages** — home ✅, then contact, blog, blog-detail, blog-category 🔜
+5. **Account extras** — logout from console, admin/marketing/sales feature pages 🔜
+6. **Backends** — `apps/msd-api`, `apps/mera-driver-api` (Express + Postgres + Prisma + OpenAPI) ⏳ deferred until pages need real data
+7. **Auth integration** — wire OTP/Google + real roles to the backend (replace mock token + demo role switcher) ⏳
+8. **Hardening** — tests, error tracking, CI gates, deployment ⏳
 
-Current focus: **frontend pages first** (step 3), backends deferred.
+Current focus: **frontend pages first** (step 4), backends deferred.

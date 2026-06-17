@@ -38,7 +38,7 @@ export function Otp() {
   const verify = () => {
     // Real verification will call the auth API; for now accept any code.
     signIn('mock-token');
-    navigate('/');
+    navigate('/account');
   };
 
   return (

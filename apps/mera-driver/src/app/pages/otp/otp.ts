@@ -47,7 +47,7 @@ export class Otp implements OnInit, OnDestroy {
   protected verify(): void {
     // Real verification will call the auth API; for now accept any code.
     this.auth.signIn('mock-token');
-    this.router.navigate(['/']);
+    this.router.navigate(['/account']);
   }
 
   protected resend(): void {

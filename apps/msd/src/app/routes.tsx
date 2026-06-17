@@ -1,17 +1,21 @@
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { PublicLayout } from './layouts/public-layout';
 import { AuthLayout } from './layouts/auth-layout';
+import { AdminLayout } from './layouts/admin-layout';
+import { RequireAuth } from '../auth/require-auth';
+import { RequireRole } from '../auth/require-role';
 import Home from './pages/home/home';
 import NotFound from './pages/not-found/not-found';
 import Showcase from './showcase';
 import SignIn from './pages/sign-in/sign-in';
 import Otp from './pages/otp/otp';
+import Profile from './pages/account/profile';
+import { Dashboard, Deals, Promotions, Sales } from './pages/account/role-pages';
 
 /**
- * Central route table. Pages added next (sign-in, otp, contact, blog,
- * blog-detail, blog-category, admin, profile) slot in here — public ones as
- * children of PublicLayout, protected ones wrapped in <RequireAuth>, and
- * sign-in/otp under a future AuthLayout.
+ * Central route table. Public pages use PublicLayout, auth screens use
+ * AuthLayout, and the signed-in console uses AdminLayout (role-filtered).
+ * Role-specific pages are wrapped in <RequireRole>.
  */
 export function AppRoutes() {
   return (
@@ -22,10 +26,48 @@ export function AppRoutes() {
         {/* Catch-all 404, inside the shell so it keeps header/footer. */}
         <Route path="*" element={<NotFound />} />
       </Route>
+
       {/* Auth screens use a minimal centered shell (no header/footer). */}
       <Route element={<AuthLayout />}>
         <Route path="/sign-in" element={<SignIn />} />
         <Route path="/otp" element={<Otp />} />
+      </Route>
+
+      {/* Authenticated console (after login / "My account"). */}
+      <Route
+        element={
+          <RequireAuth>
+            <AdminLayout />
+          </RequireAuth>
+        }
+      >
+        <Route path="/account" element={<Navigate to="/account/profile" replace />} />
+        <Route path="/account/dashboard" element={<Dashboard />} />
+        <Route path="/account/profile" element={<Profile />} />
+        <Route
+          path="/account/deals"
+          element={
+            <RequireRole roles={['admin']}>
+              <Deals />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/account/promotions"
+          element={
+            <RequireRole roles={['marketing']}>
+              <Promotions />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/account/sales"
+          element={
+            <RequireRole roles={['sales']}>
+              <Sales />
+            </RequireRole>
+          }
+        />
       </Route>
     </Routes>
   );

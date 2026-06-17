@@ -92,6 +92,64 @@ Shared backend infrastructure (error handling, auth middleware, the Zod→OpenAP
 setup) can move into a `packages/api-core` lib later **if** real duplication appears —
 not up front. Domain code never gets shared between the two APIs.
 
+## Auth & RBAC — file reference
+
+Both apps implement auth independently (no shared auth package). The patterns are identical
+in intent; the implementation is framework-native.
+
+### Auth files
+
+| Concern | msd (`apps/msd/src/`) | mera-driver (`apps/mera-driver/src/app/`) |
+|---------|----------------------|------------------------------------------|
+| Auth state + roles | `auth/auth-context.tsx` | `core/auth/auth.service.ts` |
+| Token persistence | `auth/auth-storage.ts` | inside `auth.service.ts` |
+| Auth route guard | `auth/require-auth.tsx` | `core/auth/auth.guard.ts` |
+| Role route guard | `auth/require-role.tsx` | `core/auth/role.guard.ts` |
+| HTTP token injection | _(none yet — no API)_ | `core/auth/auth.interceptor.ts` |
+| Menu config (RBAC) | `app/admin/menu.ts` | `app/admin/menu.ts` |
+| Sidebar (role filter) | `app/admin/sidebar.tsx` | `app/admin/sidebar/sidebar.ts` |
+| Domain types / roles | `types/index.ts` | `models/index.ts` |
+
+### Role definitions
+
+| App | Roles | Default on login |
+|-----|-------|-----------------|
+| msd | `user \| admin \| marketing \| sales` | `['user']` |
+| mera-driver | `customer \| driver \| admin \| marketing \| sales` | `['customer']` |
+
+### localStorage keys
+
+| Key | App | Holds |
+|-----|-----|-------|
+| `msd_auth_token` | msd | Bearer token (string) |
+| `msd_auth_roles` | msd | `UserRole[]` (JSON) |
+| `mera_auth_token` | mera-driver | Bearer token (string) |
+| `mera_auth_roles` | mera-driver | `UserRole[]` (JSON) |
+
+### Route protection map
+
+| Route | msd | mera-driver | Allowed roles |
+|-------|-----|-------------|---------------|
+| `/account/*` | `<RequireAuth>` wraps `<AdminLayout>` | `canActivate: [authGuard]` on `/account` | any authenticated |
+| `/account/dashboard` | open (inside auth area) | open (inside auth area) | all |
+| `/account/profile` | open (inside auth area) | open (inside auth area) | all |
+| `/account/deals` | `<RequireRole roles={['admin']}>` | — | `admin` |
+| `/account/bookings` | — | `roleGuard`, `data.roles: ['admin']` | `admin` |
+| `/account/promotions` | `<RequireRole roles={['marketing']}>` | `roleGuard`, `data.roles: ['marketing']` | `marketing` |
+| `/account/sales` | `<RequireRole roles={['sales']}>` | `roleGuard`, `data.roles: ['sales']` | `sales` |
+
+### Key implementation differences
+
+| Aspect | msd (React) | mera-driver (Angular) |
+|--------|-------------|----------------------|
+| State mechanism | React Context + `useState` | `signal()` + `computed()` |
+| Auth guard style | JSX wrapper `<RequireAuth>` | `canActivate: [authGuard]` |
+| Role guard style | JSX wrapper `<RequireRole roles={[...]}>` | `canActivate: [roleGuard], data: { roles: [...] }` |
+| HTTP token attachment | _(add interceptor when API is built)_ | `authInterceptor` on `HttpClient` ✅ |
+
+> Guards are **UX only**. Once backends exist, every API endpoint must re-check the
+> role from the JWT server-side — the frontend guard is not the security boundary.
+
 ## Where the upcoming pages go
 
 `sign-in`, `otp`, `home`, `contact`, `blog`, `blog-detail`, `blog-category`,

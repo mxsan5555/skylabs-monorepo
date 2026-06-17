@@ -1,0 +1,57 @@
+<aside class="admin-sidebar">
+  <div class="admin-sidebar__brand">
+    <span class="admin-sidebar__logo">
+      <md-icon aria-hidden="true">directions_car</md-icon>
+    </span>
+    <span>
+      <div class="admin-sidebar__brand-name">mera-driver</div>
+      <div class="admin-sidebar__brand-sub">Driver console</div>
+    </span>
+  </div>
+
+  <input
+    class="admin-sidebar__search"
+    type="search"
+    placeholder="Search…"
+    aria-label="Search"
+  />
+
+  <nav class="admin-sidebar__nav" aria-label="Console">
+    @for (group of groups(); track group.label) {
+      <div class="admin-nav-group">
+        <p class="admin-nav-group__label">{{ group.label }}</p>
+        @for (item of group.items; track item.to) {
+          <a
+            class="admin-nav-item"
+            [routerLink]="item.to"
+            routerLinkActive="active"
+          >
+            <md-icon aria-hidden="true">{{ item.icon }}</md-icon>
+            {{ item.label }}
+          </a>
+        }
+      </div>
+    }
+  </nav>
+
+  <div class="admin-roleswitch">
+    <label for="role-switch">View as (demo)</label>
+    <select
+      id="role-switch"
+      [value]="roles()[0]"
+      (change)="setRole($any($event.target).value)"
+    >
+      @for (r of allRoles; track r) {
+        <option [value]="r">{{ r }}</option>
+      }
+    </select>
+  </div>
+
+  <div class="admin-sidebar__user">
+    <span class="admin-sidebar__avatar">{{ initial() }}</span>
+    <span class="admin-sidebar__user-info">
+      <div class="admin-sidebar__user-name">{{ account.profile().name }}</div>
+      <div class="admin-sidebar__user-mail">{{ account.profile().email }}</div>
+    </span>
+  </div>
+</aside>

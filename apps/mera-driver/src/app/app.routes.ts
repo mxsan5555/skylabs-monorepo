@@ -1,6 +1,9 @@
 import { Routes } from '@angular/router';
 import { PublicLayout } from './layouts/public-layout/public-layout';
 import { AuthLayout } from './layouts/auth-layout/auth-layout';
+import { AdminLayout } from './layouts/admin-layout/admin-layout';
+import { authGuard } from './core/auth/auth.guard';
+import { roleGuard } from './core/auth/role.guard';
 
 /**
  * Route table.
@@ -33,6 +36,51 @@ export const appRoutes: Routes = [
         path: '',
         title: 'Verify your phone · mera-driver',
         loadComponent: () => import('./pages/otp/otp').then((m) => m.Otp),
+      },
+    ],
+  },
+  {
+    // Authenticated console (after login / "My account").
+    path: 'account',
+    component: AdminLayout,
+    canActivate: [authGuard],
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'profile' },
+      {
+        path: 'dashboard',
+        title: 'Dashboard · mera-driver',
+        loadComponent: () =>
+          import('./pages/account/role-pages').then((m) => m.Dashboard),
+      },
+      {
+        path: 'profile',
+        title: 'My Account · mera-driver',
+        loadComponent: () =>
+          import('./pages/account/profile/profile').then((m) => m.Profile),
+      },
+      {
+        path: 'bookings',
+        title: 'Bookings · mera-driver',
+        canActivate: [roleGuard],
+        data: { roles: ['admin'] },
+        loadComponent: () =>
+          import('./pages/account/role-pages').then((m) => m.Bookings),
+      },
+      {
+        path: 'promotions',
+        title: 'Promotions · mera-driver',
+        canActivate: [roleGuard],
+        data: { roles: ['marketing'] },
+        loadComponent: () =>
+          import('./pages/account/role-pages').then((m) => m.Promotions),
+      },
+      {
+        path: 'sales',
+        title: 'Sales · mera-driver',
+        canActivate: [roleGuard],
+        data: { roles: ['sales'] },
+        loadComponent: () =>
+          import('./pages/account/role-pages').then((m) => m.Sales),
       },
     ],
   },

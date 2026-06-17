@@ -24,7 +24,12 @@ export function Header() {
       </nav>
 
       {isAuthenticated ? (
-        <TextButton onClick={signOut}>Log out</TextButton>
+        <>
+          <FilledButton onClick={() => navigate('/account')}>
+            My account
+          </FilledButton>
+          <TextButton onClick={signOut}>Log out</TextButton>
+        </>
       ) : (
         <FilledButton onClick={() => navigate('/sign-in')}>Sign in</FilledButton>
       )}

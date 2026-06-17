@@ -197,3 +197,354 @@
 .otp-muted {
   color: var(--md-sys-color-on-surface-variant);
 }
+
+/* ------------------------------------------------------------------ *
+ * Admin / account console: sidebar + centered content. Reused for every
+ * role (user/admin/marketing/sales). Themed by --md-sys-color-* tokens.
+ * ------------------------------------------------------------------ */
+.admin-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 264px 1fr;
+  background-color: var(--md-sys-color-surface-container-lowest, #fff);
+}
+
+.admin-layout.is-collapsed {
+  grid-template-columns: 0 1fr;
+}
+
+/* Sidebar */
+.admin-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 12px;
+  border-right: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface, #fafdfb);
+}
+
+.admin-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 4px;
+}
+
+.admin-sidebar__logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  --md-icon-size: 22px;
+  flex: none;
+}
+
+.admin-sidebar__brand-name {
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--md-sys-color-on-surface);
+}
+
+.admin-sidebar__brand-sub {
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.admin-sidebar__search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface-container-low, #f3f4f9);
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.admin-sidebar__nav {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-nav-group__label {
+  padding: 0 8px;
+  margin: 0 0 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.admin-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  margin-bottom: 2px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  text-decoration: none;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: left;
+  --md-icon-size: 20px;
+}
+
+.admin-nav-item:hover {
+  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+}
+
+.admin-nav-item.active {
+  background-color: var(--md-sys-color-secondary-container, #d7e3ff);
+  color: var(--md-sys-color-on-secondary-container, #101c2b);
+  font-weight: 600;
+}
+
+.admin-sidebar__user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-top: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+}
+
+.admin-sidebar__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background-color: var(--md-sys-color-primary-container, #cee5ff);
+  color: var(--md-sys-color-on-primary-container, #001d33);
+  font-weight: 700;
+  flex: none;
+}
+
+.admin-sidebar__user-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.admin-sidebar__user-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-sidebar__user-mail {
+  font-size: 0.72rem;
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-roleswitch {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px 0;
+}
+
+.admin-roleswitch label {
+  font-size: 0.68rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.admin-roleswitch select {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface-container-low, #f3f4f9);
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+/* Main column */
+.admin-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.admin-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+}
+
+.admin-breadcrumb {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.admin-breadcrumb li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-breadcrumb li + li::before {
+  content: '\203A'; /* › separator, decorative */
+  color: var(--md-sys-color-outline, #74796d);
+}
+
+.admin-breadcrumb li[aria-current] {
+  color: var(--md-sys-color-on-surface);
+  font-weight: 600;
+}
+
+.admin-content {
+  flex: 1;
+  padding: 32px 20px 64px;
+  overflow-y: auto;
+}
+
+/* Centered page with headline + subheadline */
+.admin-page {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.admin-page__head {
+  text-align: center;
+}
+
+.admin-page__title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+.admin-page__subtitle {
+  margin: 6px 0 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Account / profile content */
+.account-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 16px;
+  background-color: var(--md-sys-color-surface-container, #eef1f6);
+}
+
+.account-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-card__head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--md-sys-color-on-surface);
+}
+
+.account-fields {
+  display: grid;
+  gap: 14px;
+}
+
+.account-fields md-outlined-text-field,
+.account-fields md-filled-text-field {
+  width: 100%;
+}
+
+.address-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.address-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface, #fafdfb);
+}
+
+.address-card__label {
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+}
+
+.address-card__lines {
+  margin-top: 2px;
+  font-size: 0.9rem;
+  color: var(--md-sys-color-on-surface-variant);
+  line-height: 1.4;
+}
+
+.address-card__actions {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+
+.address-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.address-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.address-form md-outlined-text-field {
+  width: 100%;
+}
+
+.address-form .span-2 {
+  grid-column: 1 / -1;
+}
+
+.address-form__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
