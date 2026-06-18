@@ -1,5 +1,7 @@
-import { useRef, useState } from 'react';
-import './app.css';
+import { useEffect, useRef, useState } from 'react';
+import './showcase.css';
+// Opt-in: registers <swiper-container> / <swiper-slide> for the carousel demos.
+import '@skylabs-monorepo/shared-ui/carousel';
 import {
   applyTheme,
   type ThemeMode,
@@ -30,6 +32,43 @@ import {
   SkyBadgeReact,
 } from '@skylabs-monorepo/shared-ui/react';
 
+/** A Swiper Element instance once registered (has the imperative init API). */
+type SwiperEl = HTMLElement & {
+  initialize: () => void;
+  [key: string]: unknown;
+};
+
+/**
+ * Apply Swiper params that are OBJECTS (e.g. `pagination: { type: 'fraction' }`).
+ *
+ * Flat params (slides-per-view, loop, …) work fine as JSX attributes, but React
+ * doesn't reliably merge nested `pagination-*` attributes into the pagination
+ * object before Swiper auto-initializes. So for object params we render the
+ * container with `init="false"`, assign the params as properties, then call
+ * `initialize()` — Swiper's documented escape hatch. `params` must be a stable
+ * (module-scope) reference so this runs once.
+ */
+function useSwiperParams(params: Record<string, unknown>) {
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = ref.current as SwiperEl | null;
+    if (!el) return;
+    Object.assign(el, params);
+    el.initialize();
+  }, [params]);
+  return ref;
+}
+
+// Object-param configs for demos 8 and 9 (see useSwiperParams above).
+const PAGINATION_DYNAMIC = {
+  loop: true,
+  pagination: { dynamicBullets: true },
+};
+const PAGINATION_FRACTION = {
+  navigation: true,
+  pagination: { type: 'fraction' },
+};
+
 /**
  * Demo page for msd. Every control here is a Material 3 web component coming
  * from @skylabs-monorepo/shared-ui, themed by msd's own (green) palette. The
@@ -46,6 +85,22 @@ export function Showcase() {
     setMode(next);
     applyTheme(next);
   };
+
+  // Demos 8 & 9 use object params, applied imperatively (see useSwiperParams).
+  const dynamicRef = useSwiperParams(PAGINATION_DYNAMIC);
+  const fractionRef = useSwiperParams(PAGINATION_FRACTION);
+
+  // Demo slides. `auto` adds a fixed width so `slides-per-view="auto"` works.
+  const slideNums = [1, 2, 3, 4, 5, 6, 7, 8];
+  const slides = (auto = false) =>
+    slideNums.map((n) => (
+      <swiper-slide
+        key={n}
+        className={auto ? 'demo-slide demo-slide--auto' : 'demo-slide'}
+      >
+        {n}
+      </swiper-slide>
+    ));
 
   return (
     <main className="showcase">
@@ -163,6 +218,98 @@ export function Showcase() {
             <Icon slot="end">open_in_new</Icon>
           </ListItem>
         </List>
+      </section>
+
+      <section className="showcase__card">
+        <h2>Carousel (Swiper Element)</h2>
+
+        <h3 className="demo-carousel__label">1. Default</h3>
+        <swiper-container
+          className="demo-carousel"
+          navigation="true"
+          pagination="true"
+        >
+          {slides()}
+        </swiper-container>
+
+        <h3 className="demo-carousel__label">2. Scrollbar</h3>
+        <swiper-container className="demo-carousel" scrollbar="true">
+          {slides()}
+        </swiper-container>
+
+        <h3 className="demo-carousel__label">3. Space between</h3>
+        <swiper-container
+          className="demo-carousel"
+          slides-per-view="3"
+          space-between="30"
+        >
+          {slides()}
+        </swiper-container>
+
+        <h3 className="demo-carousel__label">4. Slides per view: auto</h3>
+        <swiper-container
+          className="demo-carousel"
+          slides-per-view="auto"
+          space-between="16"
+        >
+          {slides(true)}
+        </swiper-container>
+
+        <h3 className="demo-carousel__label">5. Scroll container (free mode)</h3>
+        <swiper-container
+          className="demo-carousel"
+          slides-per-view="auto"
+          space-between="16"
+          free-mode="true"
+          scrollbar="true"
+        >
+          {slides(true)}
+        </swiper-container>
+
+        <h3 className="demo-carousel__label">6. Infinite loop</h3>
+        <swiper-container
+          className="demo-carousel"
+          loop="true"
+          navigation="true"
+          slides-per-view="3"
+          space-between="16"
+        >
+          {slides()}
+        </swiper-container>
+
+        <h3 className="demo-carousel__label">7. Grab cursor</h3>
+        <swiper-container
+          className="demo-carousel"
+          grab-cursor="true"
+          slides-per-view="3"
+          space-between="16"
+        >
+          {slides()}
+        </swiper-container>
+
+        <h3 className="demo-carousel__label">8. Pagination: dynamic</h3>
+        <swiper-container ref={dynamicRef} className="demo-carousel" init="false">
+          {slides()}
+        </swiper-container>
+
+        <h3 className="demo-carousel__label">9. Pagination: fraction</h3>
+        <swiper-container
+          ref={fractionRef}
+          className="demo-carousel"
+          init="false"
+        >
+          {slides()}
+        </swiper-container>
+
+        <h3 className="demo-carousel__label">10. Centered + auto</h3>
+        <swiper-container
+          className="demo-carousel"
+          slides-per-view="auto"
+          centered-slides="true"
+          space-between="16"
+        >
+          {slides(true)}
+        </swiper-container>
       </section>
     </main>
   );

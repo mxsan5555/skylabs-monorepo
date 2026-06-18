@@ -31,7 +31,15 @@ src/
 ```
 Consumed as: `@skylabs-monorepo/shared-ui` (register elements),
 `@skylabs-monorepo/shared-ui/react` (React wrappers),
+`@skylabs-monorepo/shared-ui/carousel` (opt-in Swiper Element registration),
 `@skylabs-monorepo/shared-ui/theme.css`.
+
+**Carousel** uses Swiper's own web components (`<swiper-container>`/`<swiper-slide>`)
+rather than a custom `sky-carousel` — Swiper Element already is the cross-framework
+component, and slide content is app-specific. `src/carousel.ts` only calls Swiper's
+`register()` (opt-in, separate entry); brand theming is one line in `theme/base.css`
+(`--swiper-theme-color` → `--md-sys-color-primary`). Apps compose carousels locally
+with raw tags. See `CLAUDE.md` → "Carousel (Swiper Element)".
 
 ### `apps/msd` — React (Vite, port 4200)
 ```
@@ -45,8 +53,7 @@ src/
     routes.tsx      Central route table
     layouts/        App shells (public-layout; auth/admin layouts later)
     components/      App-specific UI that knows the router/auth (header, footer)
-    pages/          One folder per page (home, not-found, …)
-    showcase.tsx    Component showcase (kept)
+    pages/          One folder per page (home, not-found, showcase, …); each owns its .css
 ```
 
 ### `apps/mera-driver` — Angular (standalone, port 4400)
@@ -61,8 +68,7 @@ src/
     models/         Domain models
     layouts/        App shells (public-layout; auth/admin layouts later)
     shared/         App-specific UI (header, footer)
-    pages/          One folder per page (home, not-found, …)
-    showcase/       Component showcase (kept)
+    pages/          One folder per page (home, not-found, showcase, …); each owns its files
 ```
 
 ### `apps/msd-api` and `apps/mera-driver-api` — Express + TypeScript (planned)

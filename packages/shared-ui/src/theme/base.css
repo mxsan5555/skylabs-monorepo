@@ -21,6 +21,15 @@
   --md-sys-typescale-label-large-font: 'Roboto', system-ui, sans-serif;
 }
 
+/* Carousel (Swiper Element) brand color. Swiper injects
+   `:host { --swiper-theme-color: #007aff }` into its own shadow root, which beats
+   an inherited :root value — so we override it on the host element itself with
+   !important. Then pagination bullets, the scrollbar drag, and navigation arrows
+   inherit each app's brand (msd green / mera-driver blue) automatically. */
+swiper-container {
+  --swiper-theme-color: var(--md-sys-color-primary, #3a693c) !important;
+}
+
 html,
 body {
   margin: 0;

@@ -1,5 +1,7 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal } from '@angular/core';
 import { applyTheme, type ThemeMode } from '@skylabs-monorepo/shared-ui';
+// Opt-in: registers <swiper-container> / <swiper-slide> for the carousel demos.
+import '@skylabs-monorepo/shared-ui/carousel';
 
 /**
  * Demo page for mera-driver. Every control is a Material 3 web component from
@@ -15,6 +17,9 @@ import { applyTheme, type ThemeMode } from '@skylabs-monorepo/shared-ui';
 })
 export class Showcase {
   readonly mode = signal<ThemeMode>('light');
+
+  /** Demo slides for the carousel section. */
+  readonly slides = [1, 2, 3, 4, 5, 6, 7, 8];
 
   toggleMode(): void {
     const next: ThemeMode = this.mode() === 'light' ? 'dark' : 'light';

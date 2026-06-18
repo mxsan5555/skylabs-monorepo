@@ -60,3 +60,37 @@
 .showcase__row:last-child {
   margin-bottom: 0;
 }
+
+/* --- Carousel (Swiper Element) demos --- */
+.demo-carousel__label {
+  margin: 20px 0 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface-variant, #424940);
+}
+
+.demo-carousel {
+  display: block;
+  width: 100%;
+  /* Room below the slides for pagination bullets / the scrollbar. */
+  padding-bottom: 28px;
+}
+
+.demo-slide {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+  border-radius: 12px;
+  background-color: var(--md-sys-color-primary-container, #b9f0bb);
+  color: var(--md-sys-color-on-primary-container, #00210a);
+  font-size: 1.1rem;
+  font-weight: 600;
+  user-select: none;
+}
+
+/* Fixed width so `slides-per-view="auto"` and centered/free-mode demos work. */
+.demo-slide--auto {
+  width: 200px;
+}

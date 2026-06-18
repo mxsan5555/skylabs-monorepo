@@ -112,4 +112,118 @@
       </md-list-item>
     </md-list>
   </section>
+
+  <section class="showcase__card">
+    <h2>Carousel (Swiper Element)</h2>
+
+    <h3 class="demo-carousel__label">1. Default</h3>
+    <swiper-container class="demo-carousel" navigation="true" pagination="true">
+      @for (n of slides; track n) {
+        <swiper-slide class="demo-slide">{{ n }}</swiper-slide>
+      }
+    </swiper-container>
+
+    <h3 class="demo-carousel__label">2. Scrollbar</h3>
+    <swiper-container class="demo-carousel" scrollbar="true">
+      @for (n of slides; track n) {
+        <swiper-slide class="demo-slide">{{ n }}</swiper-slide>
+      }
+    </swiper-container>
+
+    <h3 class="demo-carousel__label">3. Space between</h3>
+    <swiper-container
+      class="demo-carousel"
+      slides-per-view="3"
+      space-between="30"
+    >
+      @for (n of slides; track n) {
+        <swiper-slide class="demo-slide">{{ n }}</swiper-slide>
+      }
+    </swiper-container>
+
+    <h3 class="demo-carousel__label">4. Slides per view: auto</h3>
+    <swiper-container
+      class="demo-carousel"
+      slides-per-view="auto"
+      space-between="16"
+    >
+      @for (n of slides; track n) {
+        <swiper-slide class="demo-slide demo-slide--auto">{{ n }}</swiper-slide>
+      }
+    </swiper-container>
+
+    <h3 class="demo-carousel__label">5. Scroll container (free mode)</h3>
+    <swiper-container
+      class="demo-carousel"
+      slides-per-view="auto"
+      space-between="16"
+      free-mode="true"
+      scrollbar="true"
+    >
+      @for (n of slides; track n) {
+        <swiper-slide class="demo-slide demo-slide--auto">{{ n }}</swiper-slide>
+      }
+    </swiper-container>
+
+    <h3 class="demo-carousel__label">6. Infinite loop</h3>
+    <swiper-container
+      class="demo-carousel"
+      loop="true"
+      navigation="true"
+      slides-per-view="3"
+      space-between="16"
+    >
+      @for (n of slides; track n) {
+        <swiper-slide class="demo-slide">{{ n }}</swiper-slide>
+      }
+    </swiper-container>
+
+    <h3 class="demo-carousel__label">7. Grab cursor</h3>
+    <swiper-container
+      class="demo-carousel"
+      grab-cursor="true"
+      slides-per-view="3"
+      space-between="16"
+    >
+      @for (n of slides; track n) {
+        <swiper-slide class="demo-slide">{{ n }}</swiper-slide>
+      }
+    </swiper-container>
+
+    <h3 class="demo-carousel__label">8. Pagination: dynamic</h3>
+    <swiper-container
+      class="demo-carousel"
+      loop="true"
+      pagination="true"
+      pagination-dynamic-bullets="true"
+    >
+      @for (n of slides; track n) {
+        <swiper-slide class="demo-slide">{{ n }}</swiper-slide>
+      }
+    </swiper-container>
+
+    <h3 class="demo-carousel__label">9. Pagination: fraction</h3>
+    <swiper-container
+      class="demo-carousel"
+      navigation="true"
+      pagination="true"
+      pagination-type="fraction"
+    >
+      @for (n of slides; track n) {
+        <swiper-slide class="demo-slide">{{ n }}</swiper-slide>
+      }
+    </swiper-container>
+
+    <h3 class="demo-carousel__label">10. Centered + auto</h3>
+    <swiper-container
+      class="demo-carousel"
+      slides-per-view="auto"
+      centered-slides="true"
+      space-between="16"
+    >
+      @for (n of slides; track n) {
+        <swiper-slide class="demo-slide demo-slide--auto">{{ n }}</swiper-slide>
+      }
+    </swiper-container>
+  </section>
 </main>

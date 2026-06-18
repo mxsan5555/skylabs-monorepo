@@ -17,6 +17,9 @@
     "paths": {
       "@skylabs-monorepo/shared-ui": ["packages/shared-ui/src/index.ts"],
       "@skylabs-monorepo/shared-ui/react": ["packages/shared-ui/src/react.ts"],
+      "@skylabs-monorepo/shared-ui/carousel": [
+        "packages/shared-ui/src/carousel.ts"
+      ],
       "@skylabs-monorepo/shared-ui/testing": [
         "packages/shared-ui/src/testing/index.ts"
       ],

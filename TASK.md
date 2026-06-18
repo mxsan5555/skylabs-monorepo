@@ -89,6 +89,9 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] Dummy role pages (Dashboard + admin/marketing/sales) demonstrating gating
 - [x] Review pass: semantic breadcrumb (`<ol>` + `aria-current`) & address list (`<ul>/<li>`), config-driven address form, stable React account-store callbacks
 
+### Components (shared-ui)
+- [x] Carousel via Swiper Element (opt-in `/carousel` entry, brand-themed via `--swiper-theme-color`); raw `<swiper-container>`/`<swiper-slide>` in both apps, all 10 features demoed in each showcase — 2026-06
+
 ### Quality passes
 - [x] Accessibility: landmarks, labelled controls, `aria-hidden` icons, `autocomplete`, semantic destination pill, breadcrumb/list semantics
 - [x] SEO: per-route titles, default meta description, `noindex` on auth pages

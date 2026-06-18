@@ -24,6 +24,7 @@ export default defineConfig(() => ({
       entry: {
         index: 'src/index.ts',
         react: 'src/react.ts',
+        carousel: 'src/carousel.ts',
       },
       formats: ['es'],
     },
@@ -36,6 +37,7 @@ export default defineConfig(() => ({
         /^lit($|\/)/,
         /^@lit\//,
         /^@material\/web($|\/)/,
+        /^swiper($|\/)/,
       ],
     },
   },

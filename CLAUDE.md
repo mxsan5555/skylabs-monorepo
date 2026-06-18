@@ -53,6 +53,24 @@ If pages render unstyled or an import 500s in dev, it's almost always a **stale
 - Custom in-house components live in `packages/shared-ui/src/components/` (e.g. `sky-badge`, `sky-card`), written in LIT **without decorators** for cross-framework source compatibility.
 - Icons: self-hosted Material Symbols Outlined (the `material-symbols` package, imported in `theme/base.css`). Use `<md-icon>name</md-icon>` and `aria-hidden="true"` when decorative.
 
+### Carousel (Swiper Element)
+
+We do **not** wrap carousels in a custom component — Swiper already ships
+framework-agnostic web components (`<swiper-container>` / `<swiper-slide>`), and
+slide content is app-specific, so a wrapper would add surface for no reuse.
+
+- **Opt-in registration**: `import '@skylabs-monorepo/shared-ui/carousel';` once on a
+  page/component that uses a carousel (separate entry so Swiper's bundle isn't in the
+  base bundle). Then use raw `<swiper-container>` / `<swiper-slide>` tags.
+- **React (msd)**: tags work in JSX; `apps/msd/src/types/swiper-elements.d.ts` types them.
+- **Angular (mera-driver)**: the component needs `schemas: [CUSTOM_ELEMENTS_SCHEMA]`.
+- **Theming is automatic**: `theme/base.css` maps `--swiper-theme-color` to
+  `--md-sys-color-primary`, so pagination/scrollbar/arrows match each app's brand.
+- **Features are attributes** (`slides-per-view="auto"`, `space-between`, `loop`,
+  `pagination`, `pagination-type="fraction"`, `scrollbar`, `centered-slides`, …). For
+  object params (custom breakpoints) use `init="false"` + property assignment +
+  `el.initialize()`. See the showcase in each app for all 10 demoed features.
+
 ## Conventions
 
 - **Pages live in each app**, never as shared web components. Reuse happens at the component level (`shared-ui`) and as app-local logic. Compose pages from `shared-ui` pieces.

@@ -97,7 +97,7 @@ export const appRoutes: Routes = [
         path: 'showcase',
         title: 'Component showcase · mera-driver',
         loadComponent: () =>
-          import('./showcase/showcase').then((m) => m.Showcase),
+          import('./pages/showcase/showcase').then((m) => m.Showcase),
       },
       {
         // Catch-all 404, inside the shell so it keeps header/footer.

@@ -6,7 +6,7 @@ import { RequireAuth } from '../auth/require-auth';
 import { RequireRole } from '../auth/require-role';
 import Home from './pages/home/home';
 import NotFound from './pages/not-found/not-found';
-import Showcase from './showcase';
+import Showcase from './pages/showcase/showcase';
 import SignIn from './pages/sign-in/sign-in';
 import Otp from './pages/otp/otp';
 import Profile from './pages/account/profile';
