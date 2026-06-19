@@ -24,7 +24,9 @@ Presentational only. No routing, no data, no auth.
 ```
 src/
   material/      Material Web (M3) element registration (all 15 groups)
-  components/    Custom LIT components (sky-badge, sky-card, …)
+  components/    Custom LIT components (sky-badge, sky-card, sky-product-card,
+                 sky-image-card, sky-category-card, sky-info-card, sky-accordion
+                 (+ sky-accordion-item) — compose M3 inside)
   react/ (react.ts)  Typed React wrappers for the above
   theme/         applyTheme(), base.css (self-hosted Material Symbols + Roboto)
   testing/       installMaterialJsdomPolyfills() for app unit tests

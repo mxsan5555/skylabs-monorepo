@@ -91,6 +91,9 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 
 ### Components (shared-ui)
 - [x] Carousel via Swiper Element (opt-in `/carousel` entry, brand-themed via `--swiper-theme-color`); raw `<swiper-container>`/`<swiper-slide>` in both apps, all 10 features demoed in each showcase — 2026-06
+- [x] Card components: `sky-product-card` (stars/score, outlined variant, favorite), `sky-image-card`, `sky-category-card`, `sky-info-card` — LIT + M3 inside, React wrappers + raw Angular tags, responsive + `align` + semantic/a11y, demoed in both showcases — 2026-06
+- [x] Accordion: `sky-accordion` (+ `single` mode) + `sky-accordion-item` (card panel, rotating md-icon chevron, `aria-expanded`/region, `variant`, `level`) — React wrappers + raw Angular tags, demoed in both showcases — 2026-06
+- [x] Showcase now demos every M3 group with full features: chips (4 types), icon buttons (+toggle), FAB/extended/branded, selection (checkbox/radio/switch), text fields (icons, prefix/suffix, supporting, types, textarea, counter, validation), select, slider (continuous/discrete/range), menu (+submenu, popover), tabs (primary/secondary), progress (linear/circular/indeterminate/four-color), ripple, list (start/end slots) — 2026-06
 
 ### Quality passes
 - [x] Accessibility: landmarks, labelled controls, `aria-hidden` icons, `autocomplete`, semantic destination pill, breadcrumb/list semantics

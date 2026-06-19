@@ -28,47 +28,289 @@
   </section>
 
   <section class="showcase__card">
-    <h2>Selection</h2>
-    <div class="showcase__row">
-      <label class="showcase__inline">
-        <md-checkbox checked></md-checkbox> Checkbox
-      </label>
-      <label class="showcase__inline">
-        <md-radio name="demo" value="a" checked></md-radio> Radio A
-      </label>
-      <label class="showcase__inline">
-        <md-radio name="demo" value="b"></md-radio> Radio B
-      </label>
-    </div>
+    <h2>Chips</h2>
     <md-chip-set>
-      <md-assist-chip label="Assist"></md-assist-chip>
+      <md-assist-chip label="Assist">
+        <md-icon slot="icon" aria-hidden="true">event</md-icon>
+      </md-assist-chip>
       <md-filter-chip label="Filter" selected></md-filter-chip>
-      <md-filter-chip label="Another"></md-filter-chip>
+      <md-filter-chip label="Another filter"></md-filter-chip>
+      <md-input-chip label="Input"></md-input-chip>
+      <md-suggestion-chip label="Suggestion"></md-suggestion-chip>
     </md-chip-set>
   </section>
 
   <section class="showcase__card">
-    <h2>Inputs</h2>
+    <h2>Icon buttons</h2>
     <div class="showcase__row">
-      <md-outlined-text-field label="Outlined" value="Hello">
-      </md-outlined-text-field>
-      <md-filled-text-field label="Filled" placeholder="Type here">
-      </md-filled-text-field>
+      <md-icon-button aria-label="Settings">
+        <md-icon>settings</md-icon>
+      </md-icon-button>
+      <md-filled-icon-button aria-label="Favorite">
+        <md-icon>favorite</md-icon>
+      </md-filled-icon-button>
+      <md-filled-tonal-icon-button aria-label="Bookmark">
+        <md-icon>bookmark</md-icon>
+      </md-filled-tonal-icon-button>
+      <md-outlined-icon-button aria-label="Share">
+        <md-icon>share</md-icon>
+      </md-outlined-icon-button>
+      <md-filled-icon-button aria-label="Toggle favorite" toggle>
+        <md-icon>favorite_border</md-icon>
+        <md-icon slot="selected">favorite</md-icon>
+      </md-filled-icon-button>
     </div>
-    <md-slider value="50" ticks labeled aria-label="Demo value"></md-slider>
   </section>
 
   <section class="showcase__card">
-    <h2>Tabs &amp; Progress</h2>
-    <md-tabs>
-      <md-primary-tab>Overview</md-primary-tab>
-      <md-primary-tab>Activity</md-primary-tab>
-      <md-primary-tab>Settings</md-primary-tab>
-    </md-tabs>
+    <h2>FAB &amp; extended FAB</h2>
     <div class="showcase__row">
-      <md-linear-progress value="0.6"></md-linear-progress>
-      <md-circular-progress value="0.6"></md-circular-progress>
+      <md-fab size="small" aria-label="Add">
+        <md-icon slot="icon">add</md-icon>
+      </md-fab>
+      <md-fab aria-label="Edit" variant="primary">
+        <md-icon slot="icon">edit</md-icon>
+      </md-fab>
+      <md-fab size="large" aria-label="Navigate">
+        <md-icon slot="icon">navigation</md-icon>
+      </md-fab>
+      <md-fab label="Compose" variant="primary">
+        <md-icon slot="icon">edit</md-icon>
+      </md-fab>
+      <md-branded-fab label="Create" aria-label="Create">
+        <md-icon slot="icon">add</md-icon>
+      </md-branded-fab>
     </div>
+  </section>
+
+  <section class="showcase__card">
+    <h2>Selection</h2>
+    <div class="showcase__row">
+      <label class="showcase__inline">
+        <md-checkbox checked></md-checkbox> Checked
+      </label>
+      <label class="showcase__inline">
+        <md-checkbox indeterminate></md-checkbox> Indeterminate
+      </label>
+      <label class="showcase__inline">
+        <md-checkbox></md-checkbox> Unchecked
+      </label>
+    </div>
+    <div class="showcase__row" role="radiogroup" aria-label="Plan">
+      <label class="showcase__inline">
+        <md-radio name="plan" value="a" checked></md-radio> Basic
+      </label>
+      <label class="showcase__inline">
+        <md-radio name="plan" value="b"></md-radio> Pro
+      </label>
+      <label class="showcase__inline">
+        <md-radio name="plan" value="c"></md-radio> Max
+      </label>
+    </div>
+    <div class="showcase__row">
+      <label class="showcase__inline"><md-switch></md-switch> Off</label>
+      <label class="showcase__inline"><md-switch selected></md-switch> On</label>
+      <label class="showcase__inline">
+        <md-switch selected icons></md-switch> With icons
+      </label>
+    </div>
+  </section>
+
+  <section class="showcase__card">
+    <h2>Text fields</h2>
+    <div class="fields-grid">
+      <md-filled-text-field label="Filled" value="Hello"></md-filled-text-field>
+      <md-outlined-text-field
+        label="Outlined"
+        placeholder="Type here"
+      ></md-outlined-text-field>
+      <md-outlined-text-field label="With icons" placeholder="Search">
+        <md-icon slot="leading-icon" aria-hidden="true">search</md-icon>
+        <md-icon slot="trailing-icon" aria-hidden="true">close</md-icon>
+      </md-outlined-text-field>
+      <md-filled-text-field
+        label="Amount"
+        type="number"
+        prefix-text="$"
+        suffix-text=".00"
+      ></md-filled-text-field>
+      <md-outlined-text-field
+        label="Email"
+        type="email"
+        supporting-text="We'll never share it"
+      ></md-outlined-text-field>
+      <md-filled-text-field
+        label="Password"
+        type="password"
+        value="secret"
+      ></md-filled-text-field>
+      <md-outlined-text-field
+        label="Bio (textarea)"
+        type="textarea"
+        rows="3"
+      ></md-outlined-text-field>
+      <md-filled-text-field
+        label="With counter"
+        maxlength="20"
+        value="Count me"
+      ></md-filled-text-field>
+      <md-outlined-text-field
+        label="Required"
+        required
+        error
+        error-text="This field is required"
+      ></md-outlined-text-field>
+    </div>
+  </section>
+
+  <section class="showcase__card">
+    <h2>Select</h2>
+    <div class="showcase__row">
+      <md-filled-select label="Filled" value="apple">
+        <md-select-option value="apple">
+          <div slot="headline">Apple</div>
+        </md-select-option>
+        <md-select-option value="banana">
+          <div slot="headline">Banana</div>
+        </md-select-option>
+        <md-select-option value="cherry">
+          <div slot="headline">Cherry</div>
+        </md-select-option>
+      </md-filled-select>
+      <md-outlined-select label="Outlined" value="banana">
+        <md-select-option value="apple">
+          <div slot="headline">Apple</div>
+        </md-select-option>
+        <md-select-option value="banana">
+          <div slot="headline">Banana</div>
+        </md-select-option>
+        <md-select-option value="cherry">
+          <div slot="headline">Cherry</div>
+        </md-select-option>
+      </md-outlined-select>
+    </div>
+  </section>
+
+  <section class="showcase__card">
+    <h2>Slider</h2>
+    <p class="demo-label">Continuous</p>
+    <md-slider value="50" aria-label="Continuous value"></md-slider>
+    <p class="demo-label">Discrete (ticks + labeled)</p>
+    <md-slider
+      value="3"
+      min="0"
+      max="10"
+      step="1"
+      ticks
+      labeled
+      aria-label="Discrete value"
+    ></md-slider>
+    <p class="demo-label">Range</p>
+    <md-slider
+      range
+      [valueStart]="20"
+      [valueEnd]="70"
+      aria-label="Range value"
+    ></md-slider>
+  </section>
+
+  <section class="showcase__card">
+    <h2>Menu</h2>
+    <span class="menu-anchor-wrap">
+      <md-filled-button id="mera-menu-anchor" (click)="menuOpen.set(!menuOpen())">
+        Open menu
+      </md-filled-button>
+      <md-menu
+        anchor="mera-menu-anchor"
+        positioning="popover"
+        [open]="menuOpen()"
+        (closed)="menuOpen.set(false)"
+      >
+        <md-menu-item>
+          <div slot="headline">Profile</div>
+        </md-menu-item>
+        <md-menu-item>
+          <div slot="headline">Settings</div>
+        </md-menu-item>
+        <md-divider role="separator"></md-divider>
+        <md-sub-menu>
+          <md-menu-item slot="item">
+            <div slot="headline">More tools</div>
+            <md-icon slot="end" aria-hidden="true">chevron_right</md-icon>
+          </md-menu-item>
+          <md-menu slot="menu">
+            <md-menu-item>
+              <div slot="headline">Import</div>
+            </md-menu-item>
+            <md-menu-item>
+              <div slot="headline">Export</div>
+            </md-menu-item>
+          </md-menu>
+        </md-sub-menu>
+        <md-divider role="separator"></md-divider>
+        <md-menu-item>
+          <div slot="headline">Sign out</div>
+        </md-menu-item>
+      </md-menu>
+    </span>
+  </section>
+
+  <section class="showcase__card">
+    <h2>Tabs</h2>
+    <p class="demo-label">Primary</p>
+    <md-tabs>
+      <md-primary-tab>
+        <md-icon slot="icon" aria-hidden="true">dashboard</md-icon>
+        Overview
+      </md-primary-tab>
+      <md-primary-tab>
+        <md-icon slot="icon" aria-hidden="true">timeline</md-icon>
+        Activity
+      </md-primary-tab>
+      <md-primary-tab>
+        <md-icon slot="icon" aria-hidden="true">settings</md-icon>
+        Settings
+      </md-primary-tab>
+    </md-tabs>
+    <p class="demo-label">Secondary</p>
+    <md-tabs>
+      <md-secondary-tab>Flights</md-secondary-tab>
+      <md-secondary-tab>Hotels</md-secondary-tab>
+      <md-secondary-tab>Cars</md-secondary-tab>
+    </md-tabs>
+  </section>
+
+  <section class="showcase__card">
+    <h2>Progress</h2>
+    <p class="demo-label">Linear</p>
+    <div class="progress-stack">
+      <md-linear-progress value="0.6" aria-label="Determinate"></md-linear-progress>
+      <md-linear-progress
+        indeterminate
+        aria-label="Indeterminate"
+      ></md-linear-progress>
+    </div>
+    <p class="demo-label">Circular</p>
+    <div class="showcase__row">
+      <md-circular-progress value="0.6" aria-label="Determinate"></md-circular-progress>
+      <md-circular-progress
+        indeterminate
+        aria-label="Indeterminate"
+      ></md-circular-progress>
+      <md-circular-progress
+        indeterminate
+        four-color
+        aria-label="Four color"
+      ></md-circular-progress>
+    </div>
+  </section>
+
+  <section class="showcase__card">
+    <h2>Ripple</h2>
+    <button type="button" class="ripple-surface">
+      <md-ripple></md-ripple>
+      Press me
+    </button>
   </section>
 
   <section class="showcase__card">
@@ -88,18 +330,19 @@
 
   <section class="showcase__card">
     <h2>List</h2>
-
     <md-list>
-      <md-list-item> Fruits </md-list-item>
+      <md-list-item>
+        <md-icon slot="start" aria-hidden="true">label</md-icon>
+        <div slot="headline">Default with start icon</div>
+      </md-list-item>
       <md-divider></md-divider>
-      <md-list-item> Apple </md-list-item>
-      <md-list-item> Banana </md-list-item>
       <md-list-item>
         <div slot="headline">Cucumber</div>
         <div slot="supporting-text">
           Cucumbers are long green fruits that are just as long as this
           multi-line description
         </div>
+        <md-icon slot="end" aria-hidden="true">check</md-icon>
       </md-list-item>
       <md-list-item
         type="link"
@@ -108,9 +351,75 @@
       >
         <div slot="headline">Shop for Kiwis</div>
         <div slot="supporting-text">This will link you out in a new tab</div>
-        <md-icon slot="end">open_in_new</md-icon>
+        <md-icon slot="end" aria-hidden="true">open_in_new</md-icon>
       </md-list-item>
     </md-list>
+  </section>
+
+  <section class="showcase__card">
+    <h2>Cards</h2>
+    <div class="cards-grid">
+      <sky-product-card
+        image="https://picsum.photos/seed/spa/600/400"
+        image-alt="Massage therapy"
+        badge="Popular Gift"
+        favorite
+        eyebrow="Just Relax Spa"
+        heading="Enjoy a 90-minute VIP facial and body massage package"
+        location="Center City East, Philadelphia"
+        distance="11 mi"
+        rating="4.7"
+        reviews="783"
+        original-price="$220"
+        price="$159"
+        discount="-28%"
+        price-note="$119.25 with code SUMMER"
+      ></sky-product-card>
+      <sky-product-card
+        variant="outlined"
+        image="https://picsum.photos/seed/grandhotel/600/400"
+        image-alt="The Grand Hotel at night"
+        favorite
+        tag="Hotel"
+        tag-icon="hotel"
+        heading="The Grand Hotel at the Grand Canyon"
+        location="Tusayan, United States"
+        score="8.5"
+        score-label="Very Good"
+        reviews="4798"
+        price-prefix="Starting from"
+        original-price="$215"
+        price="$172"
+      ></sky-product-card>
+      <sky-image-card
+        image="https://picsum.photos/seed/cottages/600/800"
+        image-alt="Children playing in a cottage garden"
+        label="Cottages"
+        href="#cottages"
+      ></sky-image-card>
+      <sky-category-card
+        image="https://picsum.photos/seed/losangeles/600/600"
+        image-alt="Los Angeles hills"
+        heading="Los Angeles"
+        subheading="4,781 properties"
+        href="#los-angeles"
+      ></sky-category-card>
+      <sky-info-card
+        align="center"
+        icon="support_agent"
+        heading="Trusted 24/7 customer service you can rely on"
+        subheading="We're always here to help"
+      ></sky-info-card>
+    </div>
+  </section>
+
+  <section class="showcase__card">
+    <h2>Accordion</h2>
+    <sky-accordion>
+      <sky-accordion-item header="Accordion 1" open>{{ lorem }}</sky-accordion-item>
+      <sky-accordion-item header="Accordion 2" open>{{ lorem }}</sky-accordion-item>
+      <sky-accordion-item header="Accordion Actions">{{ lorem }}</sky-accordion-item>
+    </sky-accordion>
   </section>
 
   <section class="showcase__card">

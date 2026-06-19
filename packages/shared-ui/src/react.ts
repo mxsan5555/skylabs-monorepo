@@ -74,6 +74,12 @@ import { MdDivider } from '@material/web/divider/divider.js';
 // Custom in-house elements
 import { SkyBadge } from './components/sky-badge/sky-badge.js';
 import { SkyCard } from './components/sky-card/sky-card.js';
+import { SkyProductCard } from './components/sky-product-card/sky-product-card.js';
+import { SkyImageCard } from './components/sky-image-card/sky-image-card.js';
+import { SkyCategoryCard } from './components/sky-category-card/sky-category-card.js';
+import { SkyInfoCard } from './components/sky-info-card/sky-info-card.js';
+import { SkyAccordion } from './components/sky-accordion/sky-accordion.js';
+import { SkyAccordionItem } from './components/sky-accordion/sky-accordion-item.js';
 
 const inputEvents = { onInput: 'input', onChange: 'change' } as const;
 const dialogEvents = {
@@ -162,6 +168,12 @@ export const Divider = createComponent({ react: React, tagName: 'md-divider', el
 // Custom in-house components
 export const SkyBadgeReact = createComponent({ react: React, tagName: 'sky-badge', elementClass: SkyBadge });
 export const SkyCardReact = createComponent({ react: React, tagName: 'sky-card', elementClass: SkyCard });
+export const SkyProductCardReact = createComponent({ react: React, tagName: 'sky-product-card', elementClass: SkyProductCard, events: { onFavorite: 'favorite' } });
+export const SkyImageCardReact = createComponent({ react: React, tagName: 'sky-image-card', elementClass: SkyImageCard });
+export const SkyCategoryCardReact = createComponent({ react: React, tagName: 'sky-category-card', elementClass: SkyCategoryCard });
+export const SkyInfoCardReact = createComponent({ react: React, tagName: 'sky-info-card', elementClass: SkyInfoCard });
+export const SkyAccordionReact = createComponent({ react: React, tagName: 'sky-accordion', elementClass: SkyAccordion });
+export const SkyAccordionItemReact = createComponent({ react: React, tagName: 'sky-accordion-item', elementClass: SkyAccordionItem, events: { onToggle: 'toggle' } });
 
 // Re-export theme helpers for convenience in React apps.
 export * from './theme/apply-theme.js';

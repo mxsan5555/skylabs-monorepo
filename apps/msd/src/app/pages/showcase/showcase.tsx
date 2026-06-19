@@ -10,6 +10,8 @@ import {
   OutlinedButton,
   TextButton,
   ElevatedButton,
+  Fab,
+  BrandedFab,
   Switch,
   Checkbox,
   Radio,
@@ -19,18 +21,41 @@ import {
   ChipSet,
   AssistChip,
   FilterChip,
+  InputChip,
+  SuggestionChip,
   Slider,
   LinearProgress,
   CircularProgress,
   Tabs,
   PrimaryTab,
+  SecondaryTab,
   Icon,
+  IconButton,
   FilledIconButton,
+  FilledTonalIconButton,
+  OutlinedIconButton,
   List,
   ListItem,
   Divider,
+  Menu,
+  MenuItem,
+  SubMenu,
+  Ripple,
+  FilledSelect,
+  OutlinedSelect,
+  SelectOption,
   SkyBadgeReact,
+  SkyProductCardReact,
+  SkyImageCardReact,
+  SkyCategoryCardReact,
+  SkyInfoCardReact,
+  SkyAccordionReact,
+  SkyAccordionItemReact,
 } from '@skylabs-monorepo/shared-ui/react';
+
+const LOREM =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse ' +
+  'malesuada lacus ex, sit amet blandit leo lobortis eget.';
 
 /** A Swiper Element instance once registered (has the imperative init API). */
 type SwiperEl = HTMLElement & {
@@ -76,6 +101,7 @@ const PAGINATION_FRACTION = {
  */
 export function Showcase() {
   const [mode, setMode] = useState<ThemeMode>('light');
+  const [menuOpen, setMenuOpen] = useState(false);
   const dialogRef = useRef<
     HTMLElement & { show: () => void; close: () => void }
   >(null);
@@ -131,45 +157,258 @@ export function Showcase() {
       </section>
 
       <section className="showcase__card">
-        <h2>Selection</h2>
-        <div className="showcase__row">
-          <label className="showcase__inline">
-            <Checkbox checked /> Checkbox
-          </label>
-          <label className="showcase__inline">
-            <Radio name="demo" value="a" checked /> Radio A
-          </label>
-          <label className="showcase__inline">
-            <Radio name="demo" value="b" /> Radio B
-          </label>
-        </div>
+        <h2>Chips</h2>
         <ChipSet>
-          <AssistChip label="Assist" />
+          <AssistChip label="Assist">
+            <Icon slot="icon" aria-hidden="true">event</Icon>
+          </AssistChip>
           <FilterChip label="Filter" selected />
-          <FilterChip label="Another" />
+          <FilterChip label="Another filter" />
+          <InputChip label="Input" />
+          <SuggestionChip label="Suggestion" />
         </ChipSet>
       </section>
 
       <section className="showcase__card">
-        <h2>Inputs</h2>
+        <h2>Icon buttons</h2>
         <div className="showcase__row">
-          <OutlinedTextField label="Outlined" value="Hello" />
-          <FilledTextField label="Filled" placeholder="Type here" />
+          <IconButton aria-label="Settings">
+            <Icon>settings</Icon>
+          </IconButton>
+          <FilledIconButton aria-label="Favorite">
+            <Icon>favorite</Icon>
+          </FilledIconButton>
+          <FilledTonalIconButton aria-label="Bookmark">
+            <Icon>bookmark</Icon>
+          </FilledTonalIconButton>
+          <OutlinedIconButton aria-label="Share">
+            <Icon>share</Icon>
+          </OutlinedIconButton>
+          <FilledIconButton aria-label="Toggle favorite" toggle>
+            <Icon>favorite_border</Icon>
+            <Icon slot="selected">favorite</Icon>
+          </FilledIconButton>
         </div>
-        <Slider value={50} ticks labeled aria-label="Demo value" />
       </section>
 
       <section className="showcase__card">
-        <h2>Tabs &amp; Progress</h2>
-        <Tabs>
-          <PrimaryTab>Overview</PrimaryTab>
-          <PrimaryTab>Activity</PrimaryTab>
-          <PrimaryTab>Settings</PrimaryTab>
-        </Tabs>
+        <h2>FAB &amp; extended FAB</h2>
         <div className="showcase__row">
-          <LinearProgress value={0.6} />
-          <CircularProgress value={0.6} />
+          <Fab size="small" aria-label="Add">
+            <Icon slot="icon">add</Icon>
+          </Fab>
+          <Fab aria-label="Edit" variant="primary">
+            <Icon slot="icon">edit</Icon>
+          </Fab>
+          <Fab size="large" aria-label="Navigate">
+            <Icon slot="icon">navigation</Icon>
+          </Fab>
+          <Fab label="Compose" variant="primary">
+            <Icon slot="icon">edit</Icon>
+          </Fab>
+          <BrandedFab label="Create" aria-label="Create">
+            <Icon slot="icon">add</Icon>
+          </BrandedFab>
         </div>
+      </section>
+
+      <section className="showcase__card">
+        <h2>Selection</h2>
+        <div className="showcase__row">
+          <label className="showcase__inline">
+            <Checkbox checked /> Checked
+          </label>
+          <label className="showcase__inline">
+            <Checkbox indeterminate /> Indeterminate
+          </label>
+          <label className="showcase__inline">
+            <Checkbox /> Unchecked
+          </label>
+        </div>
+        <div className="showcase__row" role="radiogroup" aria-label="Plan">
+          <label className="showcase__inline">
+            <Radio name="plan" value="a" checked /> Basic
+          </label>
+          <label className="showcase__inline">
+            <Radio name="plan" value="b" /> Pro
+          </label>
+          <label className="showcase__inline">
+            <Radio name="plan" value="c" /> Max
+          </label>
+        </div>
+        <div className="showcase__row">
+          <label className="showcase__inline">
+            <Switch /> Off
+          </label>
+          <label className="showcase__inline">
+            <Switch selected /> On
+          </label>
+          <label className="showcase__inline">
+            <Switch selected icons /> With icons
+          </label>
+        </div>
+      </section>
+
+      <section className="showcase__card">
+        <h2>Text fields</h2>
+        <div className="fields-grid">
+          <FilledTextField label="Filled" value="Hello" />
+          <OutlinedTextField label="Outlined" placeholder="Type here" />
+          <OutlinedTextField label="With icons" placeholder="Search">
+            <Icon slot="leading-icon" aria-hidden="true">search</Icon>
+            <Icon slot="trailing-icon" aria-hidden="true">close</Icon>
+          </OutlinedTextField>
+          <FilledTextField
+            label="Amount"
+            type="number"
+            prefixText="$"
+            suffixText=".00"
+          />
+          <OutlinedTextField
+            label="Email"
+            type="email"
+            supportingText="We'll never share it"
+          />
+          <FilledTextField label="Password" type="password" value="secret" />
+          <OutlinedTextField label="Bio (textarea)" type="textarea" rows={3} />
+          <FilledTextField label="With counter" maxLength={20} value="Count me" />
+          <OutlinedTextField
+            label="Required"
+            required
+            error
+            errorText="This field is required"
+          />
+        </div>
+      </section>
+
+      <section className="showcase__card">
+        <h2>Select</h2>
+        <div className="showcase__row">
+          <FilledSelect label="Filled" value="apple">
+            <SelectOption value="apple">
+              <div slot="headline">Apple</div>
+            </SelectOption>
+            <SelectOption value="banana">
+              <div slot="headline">Banana</div>
+            </SelectOption>
+            <SelectOption value="cherry">
+              <div slot="headline">Cherry</div>
+            </SelectOption>
+          </FilledSelect>
+          <OutlinedSelect label="Outlined" value="banana">
+            <SelectOption value="apple">
+              <div slot="headline">Apple</div>
+            </SelectOption>
+            <SelectOption value="banana">
+              <div slot="headline">Banana</div>
+            </SelectOption>
+            <SelectOption value="cherry">
+              <div slot="headline">Cherry</div>
+            </SelectOption>
+          </OutlinedSelect>
+        </div>
+      </section>
+
+      <section className="showcase__card">
+        <h2>Slider</h2>
+        <p className="demo-label">Continuous</p>
+        <Slider value={50} aria-label="Continuous value" />
+        <p className="demo-label">Discrete (ticks + labeled)</p>
+        <Slider value={3} min={0} max={10} step={1} ticks labeled aria-label="Discrete value" />
+        <p className="demo-label">Range</p>
+        <Slider range valueStart={20} valueEnd={70} aria-label="Range value" />
+      </section>
+
+      <section className="showcase__card">
+        <h2>Menu</h2>
+        <span className="menu-anchor-wrap">
+          <FilledButton
+            id="msd-menu-anchor"
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            Open menu
+          </FilledButton>
+          <Menu
+            anchor="msd-menu-anchor"
+            open={menuOpen}
+            positioning="popover"
+            onClosed={() => setMenuOpen(false)}
+          >
+            <MenuItem>
+              <div slot="headline">Profile</div>
+            </MenuItem>
+            <MenuItem>
+              <div slot="headline">Settings</div>
+            </MenuItem>
+            <Divider role="separator" />
+            <SubMenu>
+              <MenuItem slot="item">
+                <div slot="headline">More tools</div>
+                <Icon slot="end" aria-hidden="true">chevron_right</Icon>
+              </MenuItem>
+              <Menu slot="menu">
+                <MenuItem>
+                  <div slot="headline">Import</div>
+                </MenuItem>
+                <MenuItem>
+                  <div slot="headline">Export</div>
+                </MenuItem>
+              </Menu>
+            </SubMenu>
+            <Divider role="separator" />
+            <MenuItem>
+              <div slot="headline">Sign out</div>
+            </MenuItem>
+          </Menu>
+        </span>
+      </section>
+
+      <section className="showcase__card">
+        <h2>Tabs</h2>
+        <p className="demo-label">Primary</p>
+        <Tabs>
+          <PrimaryTab>
+            <Icon slot="icon" aria-hidden="true">dashboard</Icon>
+            Overview
+          </PrimaryTab>
+          <PrimaryTab>
+            <Icon slot="icon" aria-hidden="true">timeline</Icon>
+            Activity
+          </PrimaryTab>
+          <PrimaryTab>
+            <Icon slot="icon" aria-hidden="true">settings</Icon>
+            Settings
+          </PrimaryTab>
+        </Tabs>
+        <p className="demo-label">Secondary</p>
+        <Tabs>
+          <SecondaryTab>Flights</SecondaryTab>
+          <SecondaryTab>Hotels</SecondaryTab>
+          <SecondaryTab>Cars</SecondaryTab>
+        </Tabs>
+      </section>
+
+      <section className="showcase__card">
+        <h2>Progress</h2>
+        <p className="demo-label">Linear</p>
+        <div className="progress-stack">
+          <LinearProgress value={0.6} aria-label="Determinate" />
+          <LinearProgress indeterminate aria-label="Indeterminate" />
+        </div>
+        <p className="demo-label">Circular</p>
+        <div className="showcase__row">
+          <CircularProgress value={0.6} aria-label="Determinate" />
+          <CircularProgress indeterminate aria-label="Indeterminate" />
+          <CircularProgress indeterminate fourColor aria-label="Four color" />
+        </div>
+      </section>
+
+      <section className="showcase__card">
+        <h2>Ripple</h2>
+        <button type="button" className="ripple-surface">
+          <Ripple />
+          Press me
+        </button>
       </section>
 
       <section className="showcase__card">
@@ -193,18 +432,19 @@ export function Showcase() {
 
       <section className="showcase__card">
         <h2>List</h2>
-
         <List>
-          <ListItem>Fruits</ListItem>
+          <ListItem>
+            <Icon slot="start" aria-hidden="true">label</Icon>
+            <div slot="headline">Default with start icon</div>
+          </ListItem>
           <Divider />
-          <ListItem>Apple</ListItem>
-          <ListItem>Banana</ListItem>
           <ListItem>
             <div slot="headline">Cucumber</div>
             <div slot="supporting-text">
               Cucumbers are long green fruits that are just as long as this
               multi-line description
             </div>
+            <Icon slot="end" aria-hidden="true">check</Icon>
           </ListItem>
           <ListItem
             type="link"
@@ -215,9 +455,81 @@ export function Showcase() {
             <div slot="supporting-text">
               This will link you out in a new tab
             </div>
-            <Icon slot="end">open_in_new</Icon>
+            <Icon slot="end" aria-hidden="true">open_in_new</Icon>
           </ListItem>
         </List>
+      </section>
+
+      <section className="showcase__card">
+        <h2>Cards</h2>
+        <div className="cards-grid">
+          <SkyProductCardReact
+            image="https://picsum.photos/seed/spa/600/400"
+            imageAlt="Massage therapy"
+            badge="Popular Gift"
+            favorite
+            eyebrow="Just Relax Spa"
+            heading="Enjoy a 90-minute VIP facial and body massage package"
+            location="Center City East, Philadelphia"
+            distance="11 mi"
+            rating={4.7}
+            reviews={783}
+            originalPrice="$220"
+            price="$159"
+            discount="-28%"
+            priceNote="$119.25 with code SUMMER"
+          />
+          <SkyProductCardReact
+            variant="outlined"
+            image="https://picsum.photos/seed/grandhotel/600/400"
+            imageAlt="The Grand Hotel at night"
+            favorite
+            tag="Hotel"
+            tagIcon="hotel"
+            heading="The Grand Hotel at the Grand Canyon"
+            location="Tusayan, United States"
+            score={8.5}
+            scoreLabel="Very Good"
+            reviews={4798}
+            pricePrefix="Starting from"
+            originalPrice="$215"
+            price="$172"
+          />
+          <SkyImageCardReact
+            image="https://picsum.photos/seed/cottages/600/800"
+            imageAlt="Children playing in a cottage garden"
+            label="Cottages"
+            href="#cottages"
+          />
+          <SkyCategoryCardReact
+            image="https://picsum.photos/seed/losangeles/600/600"
+            imageAlt="Los Angeles hills"
+            heading="Los Angeles"
+            subheading="4,781 properties"
+            href="#los-angeles"
+          />
+          <SkyInfoCardReact
+            align="center"
+            icon="support_agent"
+            heading="Trusted 24/7 customer service you can rely on"
+            subheading="We're always here to help"
+          />
+        </div>
+      </section>
+
+      <section className="showcase__card">
+        <h2>Accordion</h2>
+        <SkyAccordionReact>
+          <SkyAccordionItemReact header="Accordion 1" open>
+            {LOREM}
+          </SkyAccordionItemReact>
+          <SkyAccordionItemReact header="Accordion 2" open>
+            {LOREM}
+          </SkyAccordionItemReact>
+          <SkyAccordionItemReact header="Accordion Actions">
+            {LOREM}
+          </SkyAccordionItemReact>
+        </SkyAccordionReact>
       </section>
 
       <section className="showcase__card">

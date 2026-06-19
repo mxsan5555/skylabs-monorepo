@@ -51,6 +51,14 @@ If pages render unstyled or an import 500s in dev, it's almost always a **stale
 - **React (msd)** uses typed wrappers: `import { FilledButton } from '@skylabs-monorepo/shared-ui/react';`
 - **Angular (mera-driver)** uses raw `<md-*>` tags; any component using them needs `schemas: [CUSTOM_ELEMENTS_SCHEMA]`.
 - Custom in-house components live in `packages/shared-ui/src/components/` (e.g. `sky-badge`, `sky-card`), written in LIT **without decorators** for cross-framework source compatibility.
+- **Card components** (compose M3 web components inside, themed by `--md-sys-color-*`, primitive props → same usage in React/Angular):
+  - `sky-product-card` — listing card (image, badge, favorite, rating **stars** via `rating`+`reviews` _or_ a **score badge** via `score`+`score-label`, price/discount); `variant="outlined"` for the bordered look.
+  - `sky-image-card` — full-bleed image with overlay `label` (+ optional `href`, `ratio`).
+  - `sky-category-card` — rounded image + `heading`/`subheading` (+ optional `href`).
+  - `sky-info-card` — surface card with an illustration (`media` slot) or `icon` + `heading`/`subheading`.
+  - React: `SkyProductCardReact`, `SkyImageCardReact`, `SkyCategoryCardReact`, `SkyInfoCardReact`. Angular: raw `<sky-*-card>` tags.
+- **Accordion** (`sky-accordion` + `sky-accordion-item`): expandable card panels with a rotating `md-icon` chevron. Each header is one accessible trigger (`aria-expanded`/`aria-controls`); collapsed bodies are `hidden`. `sky-accordion single` keeps only one item open. React: `SkyAccordionReact`/`SkyAccordionItemReact`; Angular: raw `<sky-accordion>`/`<sky-accordion-item>`.
+  - All cards are **fluid** (fill their container — wrap them in a responsive grid/flex), support **`align="left|center|right"`**, and are **semantic + accessible by default**: `figure`/`figcaption` (image & category), `article` + `h3`/`p`, `<img alt>`, `href` renders one labelled stretched link, and `aria` on the rating and favorite button.
 - Icons: self-hosted Material Symbols Outlined (the `material-symbols` package, imported in `theme/base.css`). Use `<md-icon>name</md-icon>` and `aria-hidden="true"` when decorative.
 
 ### Carousel (Swiper Element)
