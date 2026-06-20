@@ -8,6 +8,10 @@ import {
   PrimaryTab,
   Icon,
 } from '@skylabs-monorepo/shared-ui/react';
+import {
+  sendMailOtp,
+  sendMobileOtp,
+} from '../../../api/auth';
 
 type Method = 'email' | 'phone';
 
@@ -20,6 +24,14 @@ export function SignIn() {
   const navigate = useNavigate();
   const [method, setMethod] = useState<Method>('phone');
   const [value, setValue] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const validateEmail = (value: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  };
+  const validatePhone = (value: string) => {
+    return /^[6-9]\d{9}$/.test(value);
+  };
 
   const isPhone = method === 'phone';
 
@@ -27,13 +39,55 @@ export function SignIn() {
     const index = (event.target as HTMLElement & { activeTabIndex: number })
       .activeTabIndex;
     setMethod(index === 1 ? 'phone' : 'email');
+    setValue('');
+    setError('');
   };
-
+  // fake navigation to otp page
   const sendOtp = () => {
     navigate('/otp', {
       state: { destination: value || (isPhone ? '4564' : 'you@email.com'), method },
     });
   };
+
+  // const sendOtp = async () => {
+  //   if (!value.trim()) {
+  //     setError(
+  //       isPhone
+  //         ? 'Phone number is required'
+  //         : 'Email is required',
+  //     );
+  //     return;
+  //   }
+  //   if (isPhone && !validatePhone(value)) {
+  //     setError('Enter a valid Indian mobile number');
+  //     return;
+  //   }
+  //   if (!isPhone && !validateEmail(value)) {
+  //     setError('Enter a valid email address');
+  //     return;
+  //   }
+  //   try {
+  //     setLoading(true);
+
+  //     if (method === 'email') {
+  //       await sendMailOtp(value);
+  //     } else {
+  //       await sendMobileOtp(value);
+  //     }
+
+  //     navigate('/otp', {
+  //       state: {
+  //         destination: value,
+  //         method,
+  //       },
+  //     });
+
+  //   } catch (error) {
+  //     console.error('OTP send failed:', error);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   return (
     <div className="auth-screen">
@@ -75,17 +129,43 @@ export function SignIn() {
           type={isPhone ? 'tel' : 'email'}
           autocomplete={isPhone ? 'tel' : 'email'}
           value={value}
-          onInput={(event: Event) =>
-            setValue((event.target as HTMLInputElement).value)
-          }
+          // onInput={(event: Event) =>
+          //   setValue((event.target as HTMLInputElement).value)
+          // }
+          onInput={(event: Event) => {
+            const target = event.target as HTMLInputElement & {
+              value: string;
+            };
+
+            let input = target.value;
+
+            if (isPhone) {
+              input = input.replace(/\D/g, '');
+
+              if (input.length > 0 && !/[6-9]/.test(input[0])) {
+                setError(
+                  'Enter a valid Indian mobile number',
+                );
+                input = '';
+              } else {
+                setError('');
+              }
+
+              input = input.slice(0, 10);
+              target.value = input;
+            }
+
+            setValue(input);
+          }}
         >
           <Icon slot="leading-icon" aria-hidden="true">
             {isPhone ? 'call' : 'mail'}
           </Icon>
         </OutlinedTextField>
+        {error && <p className="auth-error">{error}</p>}
 
-        <FilledButton className="auth-submit" onClick={sendOtp}>
-          Send OTP
+        <FilledButton className="auth-submit" onClick={sendOtp} disabled={loading}>
+          {loading ? 'Sending...' : 'Send OTP'}
         </FilledButton>
       </div>
 

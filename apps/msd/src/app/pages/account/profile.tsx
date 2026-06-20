@@ -37,7 +37,8 @@ const ADDRESS_FIELDS: { key: keyof Draft; label: string; span2?: boolean }[] = [
 const value = (e: Event) => (e.target as HTMLInputElement).value;
 
 /** My Account: edit email/phone and manage saved addresses (full CRUD). */
-export function Profile() {
+export function Profile() 
+{
   const {
     profile,
     addresses,

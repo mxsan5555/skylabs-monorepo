@@ -8,6 +8,12 @@ import {
   TextButton,
 } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '../../../auth/auth-context';
+import {
+  sendMailOtp,
+  sendMobileOtp,
+  verifyMailOtp,
+  verifyMobileOtp,
+} from '../../../api/auth';
 
 const RESEND_SECONDS = 24;
 
@@ -40,6 +46,45 @@ export function Otp() {
     signIn('mock-token');
     navigate('/account');
   };
+
+  // const verify = async () => {
+  //   try {
+  //     const method = (location.state as any)?.method;
+  //     const destination = (location.state as any)?.destination;
+
+  //     if (method === 'email') {
+  //       await verifyMailOtp(destination, code);
+  //     } else {
+  //       await verifyMobileOtp(destination, code);
+  //     }
+
+  //     signIn('real-token'); // later backend token
+  //     navigate('/account');
+
+  //   } catch (error) {
+  //     console.error('OTP verification failed:', error);
+  //   }
+  // };
+
+
+  const resendOtp = async () => {
+    try {
+      const method = (location.state as any)?.method;
+      const destination = (location.state as any)?.destination;
+
+      if (method === 'email') {
+        await sendMailOtp(destination);
+      } else {
+        await sendMobileOtp(destination);
+      }
+
+      setSeconds(RESEND_SECONDS);
+
+    } catch (error) {
+      console.error('Resend OTP failed:', error);
+    }
+  };
+
 
   return (
     <div className="auth-screen otp-screen">
@@ -91,7 +136,10 @@ export function Otp() {
         {seconds > 0 ? (
           <span className="otp-muted">Resend in {seconds}s</span>
         ) : (
-          <TextButton onClick={() => setSeconds(RESEND_SECONDS)}>
+          // <TextButton onClick={() => setSeconds(RESEND_SECONDS)}>
+          //   Resend code
+          // </TextButton>
+          <TextButton onClick={resendOtp}>
             Resend code
           </TextButton>
         )}

@@ -5,11 +5,18 @@ import type { UserRole } from '../../types';
  * Each item declares which roles may see it; the sidebar filters by the signed-in
  * user's roles, so one layout serves user / admin / marketing / sales.
  */
+// export interface MenuItem {
+//   label: string;
+//   icon: string;
+//   to: string;
+//   roles: UserRole[];
+// }
 export interface MenuItem {
   label: string;
   icon: string;
-  to: string;
+  to?: string;
   roles: UserRole[];
+  children?: MenuItem[];
 }
 
 export interface MenuGroup {
@@ -25,6 +32,21 @@ export const ADMIN_MENU: MenuGroup[] = [
     items: [
       { label: 'Dashboard', icon: 'dashboard', to: '/account/dashboard', roles: EVERYONE },
       { label: 'My Account', icon: 'person', to: '/account/profile', roles: EVERYONE },
+      {label: 'Master Data', icon: 'award_star', roles: EVERYONE, children: [
+          {
+            label: 'Categories',
+            icon: 'category',
+            to: '/master-data/categories',
+            roles: EVERYONE,
+          },
+          {
+            label: 'Sub Categories',
+            icon: 'list',
+            to: '/master-data/sub-categories',
+            roles: EVERYONE,
+          },
+        ],
+      },
     ],
   },
   {

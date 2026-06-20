@@ -11,6 +11,8 @@ import SignIn from './pages/sign-in/sign-in';
 import Otp from './pages/otp/otp';
 import Profile from './pages/account/profile';
 import { Dashboard, Deals, Promotions, Sales } from './pages/account/role-pages';
+import { Categories } from './pages/master/categories/categories';
+import { AddCategory } from './pages/master/categories/add-category';
 
 /**
  * Central route table. Public pages use PublicLayout, auth screens use
@@ -44,6 +46,8 @@ export function AppRoutes() {
         <Route path="/account" element={<Navigate to="/account/profile" replace />} />
         <Route path="/account/dashboard" element={<Dashboard />} />
         <Route path="/account/profile" element={<Profile />} />
+        <Route path="/master-data/categories" element={<Categories />} />
+        <Route path="/master-data/categories/add" element={<AddCategory />} />
         <Route
           path="/account/deals"
           element={

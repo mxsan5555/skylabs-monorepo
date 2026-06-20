@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom';
-import { Icon } from '@skylabs-monorepo/shared-ui/react';
+import { Icon, List, ListItem, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '../../auth/auth-context';
 import { useAccount } from '../../account/account-context';
 import { ALL_ROLES, type UserRole } from '../../types';
 import { ADMIN_MENU } from './menu';
+import { useState } from 'react';
 
 /**
  * Console sidebar: brand, (dummy) search, role-filtered navigation, and the
@@ -14,6 +15,7 @@ export function Sidebar() {
   const { roles, setRoles } = useAuth();
   const { profile } = useAccount();
   const initial = profile.name.charAt(0).toUpperCase();
+  const [masterDataOpen, setMasterDataOpen] = useState(false);
 
   return (
     <aside className="admin-sidebar">
@@ -43,12 +45,56 @@ export function Sidebar() {
           return (
             <div className="admin-nav-group" key={group.label}>
               <p className="admin-nav-group__label">{group.label}</p>
-              {items.map((item) => (
+              {/* {items.map((item) => (
                 <NavLink key={item.to} to={item.to} className="admin-nav-item">
                   <Icon aria-hidden="true">{item.icon}</Icon>
                   {item.label}
                 </NavLink>
-              ))}
+              ))} */}
+
+              {items.map((item) => {
+  if (item.children) {
+    return (
+      <div key={item.label}>
+        <div
+          className="admin-nav-item"
+          onClick={() => setMasterDataOpen(!masterDataOpen)}
+        >
+          <Icon aria-hidden="true">{item.icon}</Icon>
+
+          <span>{item.label}</span>
+
+          <Icon aria-hidden="true">
+            {masterDataOpen ? 'expand_less' : 'expand_more'}
+          </Icon>
+        </div>
+
+        {masterDataOpen &&
+          item.children.map((child) => (
+            <NavLink
+              key={child.to}
+              to={child.to!}
+              className="admin-nav-item "
+            >
+              <Icon aria-hidden="true">{child.icon}</Icon>
+              {child.label}
+            </NavLink>
+          ))}
+      </div>
+    );
+  }
+
+  return (
+    <NavLink
+      key={item.to}
+      to={item.to!}
+      className="admin-nav-item"
+    >
+      <Icon aria-hidden="true">{item.icon}</Icon>
+      {item.label}
+    </NavLink>
+  );
+})}
             </div>
           );
         })}

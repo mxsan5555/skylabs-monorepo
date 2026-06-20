@@ -8,7 +8,7 @@
 
 import { AUTH_TOKEN_KEY } from '../auth/auth-storage';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? '/api';
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'https://donated-blast-government-guide.trycloudflare.com/api';
 
 function authHeaders(): Record<string, string> {
   const token =
