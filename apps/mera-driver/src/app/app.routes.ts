@@ -94,6 +94,17 @@ export const appRoutes: Routes = [
         loadComponent: () => import('./pages/home/home').then((m) => m.Home),
       },
       {
+        path: 'blog',
+        title: 'Blog · mera-driver',
+        loadComponent: () => import('./pages/blog/blog').then((m) => m.Blog),
+      },
+      {
+        path: 'blog/:slug',
+        // Title is set per-article by the component (it knows the slug).
+        loadComponent: () =>
+          import('./pages/blog-detail/blog-detail').then((m) => m.BlogDetail),
+      },
+      {
         path: 'showcase',
         title: 'Component showcase · mera-driver',
         loadComponent: () =>

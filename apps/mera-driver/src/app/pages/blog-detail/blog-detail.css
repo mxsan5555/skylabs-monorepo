@@ -1,0 +1,124 @@
+.post {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+
+.post--missing {
+  text-align: center;
+}
+
+.post__crumb a,
+.post__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--md-sys-color-primary, #1175bc);
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+.post__crumb a:hover,
+.post__back:hover {
+  text-decoration: underline;
+}
+
+.post__crumb md-icon,
+.post__back md-icon {
+  --md-icon-size: 18px;
+}
+
+.post__header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.post__header h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 4vw, 2.25rem);
+  line-height: 1.2;
+  color: var(--md-sys-color-on-surface, #191c1f);
+}
+
+.post__meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: var(--md-sys-color-on-surface-variant, #42474e);
+}
+
+.post__read {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.post__read md-icon {
+  --md-icon-size: 16px;
+}
+
+.post__cover {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 14px;
+  display: block;
+  margin: 8px 0 24px;
+  background-color: var(--md-sys-color-surface-variant, #dde2e8);
+}
+
+.post__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--md-sys-color-on-surface, #191c1f);
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.post__body h2 {
+  margin: 12px 0 0;
+  font-size: 1.35rem;
+  color: var(--md-sys-color-on-surface, #191c1f);
+}
+
+.post__body ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.post__body blockquote {
+  margin: 8px 0;
+  padding: 8px 16px;
+  border-left: 4px solid var(--md-sys-color-primary, #1175bc);
+  color: var(--md-sys-color-on-surface-variant, #42474e);
+  font-style: italic;
+}
+
+.post__footer {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--md-sys-color-outline-variant, #c2c7ce);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.post__tags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
