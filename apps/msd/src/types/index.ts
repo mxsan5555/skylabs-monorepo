@@ -40,13 +40,26 @@ export interface BlogCategory {
   name: string;
 }
 
+/** A block of article body content. Maps cleanly to a CMS/API block model. */
+export type BlogBlock =
+  | { type: 'paragraph'; text: string }
+  | { type: 'heading'; text: string }
+  | { type: 'list'; items: string[] }
+  | { type: 'quote'; text: string };
+
 export interface BlogPost {
   id: string;
   slug: string;
   title: string;
   excerpt: string;
   categorySlug: string;
-  publishedAt: string;
+  publishedAt: string; // ISO date
+  coverImage: string;
+  imageAlt: string;
+  author: string;
+  readMinutes: number;
+  tags: string[];
+  body: BlogBlock[];
 }
 
 export interface Paginated<T> {
@@ -54,4 +67,19 @@ export interface Paginated<T> {
   total: number;
   page: number;
   pageSize: number;
+}
+
+export type BlogSort = 'newest' | 'oldest' | 'title';
+export type ReadingBucket = 'any' | 'short' | 'long';
+
+/** Blog list query — mirrors the future `GET /posts?...` request. */
+export interface BlogQuery {
+  search?: string;
+  sort?: BlogSort;
+  categories?: string[];
+  reading?: ReadingBucket;
+  authors?: string[];
+  tags?: string[];
+  page?: number;
+  pageSize?: number;
 }

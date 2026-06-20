@@ -15,8 +15,6 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 
 ### Content pages — both apps (`pages/` + route)
 - [ ] Contact page
-- [ ] Blog (list + categories nav)
-- [ ] Blog detail
 - [ ] Blog category (filtered list)
 
 ### Account & admin — both apps (remaining)
@@ -81,6 +79,7 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] OTP (code field, verify, resend countdown, back)
 - [x] 404 / not-found (inside shell)
 - [x] Component showcase (kept)
+- [x] Blog list (paginated `?page` previews via `sky-card`/`sky-badge`/M3 buttons) + blog detail (block-rendered body, tags, SEO title/description) — static `blog` data/service that mirrors the future API; composed only from shared-ui — 2026-06
 
 ### Account & admin console (both apps)
 - [x] Role-based admin layout (full-height sidebar + collapsible toggle + breadcrumb + centered content), shown after login / "My account" — 2026-06

@@ -7,6 +7,8 @@ import { RequireRole } from '../auth/require-role';
 import Home from './pages/home/home';
 import NotFound from './pages/not-found/not-found';
 import Showcase from './pages/showcase/showcase';
+import Blog from './pages/blog/blog';
+import BlogDetail from './pages/blog-detail/blog-detail';
 import SignIn from './pages/sign-in/sign-in';
 import Otp from './pages/otp/otp';
 import Profile from './pages/account/profile';
@@ -22,6 +24,8 @@ export function AppRoutes() {
     <Routes>
       <Route element={<PublicLayout />}>
         <Route path="/" element={<Home />} />
+        <Route path="/blog" element={<Blog />} />
+        <Route path="/blog/:slug" element={<BlogDetail />} />
         <Route path="/showcase" element={<Showcase />} />
         {/* Catch-all 404, inside the shell so it keeps header/footer. */}
         <Route path="*" element={<NotFound />} />
