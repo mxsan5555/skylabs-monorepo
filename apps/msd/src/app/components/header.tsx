@@ -21,6 +21,8 @@ export function Header() {
         <NavLink to="/blog">Blog</NavLink>
         <NavLink to="/contact">Contact</NavLink>
         <NavLink to="/showcase">Showcase</NavLink>
+        <NavLink to="/beauty&spa">Beauty & Spa</NavLink>
+        <NavLink to="/summerdeals">Summer Deals</NavLink>
       </nav>
 
       {isAuthenticated ? (

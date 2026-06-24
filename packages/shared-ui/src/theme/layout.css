@@ -581,3 +581,34 @@
   height: 450px; 
   object-fit: cover;
 }
+
+/* footer */
+.footer-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 40px;
+}
+
+.footer-column h3 {
+  margin: 0 0 12px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.footer-column md-list {
+  background: transparent;
+  padding: 0;
+}
+
+.footer-column md-list-item {
+  --md-list-item-container-height: 40px;
+}
+
+.footer-bottom {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  text-align: center;
+}
+.app-footer {
+  padding: 40px 32px 20px;
+}
