@@ -11,6 +11,26 @@
   gap: 28px;
 }
 
+/* --- Hero Slider --- */
+.home__slider {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--md-sys-color-outline-variant, #c2c7ce);
+}
+
+.home__carousel {
+  display: block;
+  width: 100%;
+}
+
+.home__slide-img {
+  display: block;
+  width: 100%;
+  height: 400px;
+  object-fit: cover;
+}
+
+/* --- Original Hero --- */
 .home__hero {
   display: flex;
   flex-direction: column;
@@ -37,6 +57,7 @@
   margin-top: 8px;
 }
 
+/* --- Cards --- */
 .home__cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

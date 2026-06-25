@@ -1,4 +1,4 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, inject } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 
@@ -17,11 +17,18 @@ export class Header {
   protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
+  /** Profile dropdown menu state. */
+  protected readonly profileMenuOpen = signal(false);
+
   protected goSignIn(): void {
     this.router.navigate(['/sign-in']);
   }
 
   protected goAccount(): void {
     this.router.navigate(['/account']);
+  }
+
+  protected goDashboard(): void {
+    this.router.navigate(['/account/dashboard']);
   }
 }

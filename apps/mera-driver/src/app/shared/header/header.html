@@ -1,22 +1,68 @@
 <header class="app-header">
-  <a routerLink="/" class="app-header__brand">mera-driver</a>
+  <!-- Brand: Logo icon + name -->
+  <a routerLink="/" class="app-header__brand">
+    <span class="app-header__logo">
+      <md-icon aria-hidden="true">directions_car</md-icon>
+    </span>
+    mera-driver
+  </a>
 
+  <!-- Primary Navigation -->
   <nav class="app-header__nav" aria-label="Primary">
     <a
       routerLink="/"
       routerLinkActive="active"
       [routerLinkActiveOptions]="{ exact: true }"
-      >Home</a
-    >
+    >Home</a>
     <a routerLink="/blog" routerLinkActive="active">Blog</a>
     <a routerLink="/contact" routerLinkActive="active">Contact</a>
     <a routerLink="/showcase" routerLinkActive="active">Showcase</a>
   </nav>
 
-  @if (auth.isAuthenticated()) {
-    <md-filled-button (click)="goAccount()">My account</md-filled-button>
-    <md-text-button (click)="auth.signOut()">Log out</md-text-button>
-  } @else {
-    <md-filled-button (click)="goSignIn()">Sign in</md-filled-button>
-  }
+  <!-- Right side: Auth actions -->
+  <div class="app-header__actions">
+    @if (auth.isAuthenticated()) {
+      <!-- Notification bell -->
+      <md-icon-button aria-label="Notifications">
+        <md-icon>notifications</md-icon>
+      </md-icon-button>
+
+      <!-- User profile menu -->
+      <span class="app-header__menu-anchor">
+        <md-icon-button
+          id="header-user-menu-anchor"
+          aria-label="User menu"
+          (click)="profileMenuOpen.set(!profileMenuOpen())"
+        >
+          <md-icon>account_circle</md-icon>
+        </md-icon-button>
+
+        <md-menu
+          anchor="header-user-menu-anchor"
+          positioning="popover"
+          [open]="profileMenuOpen()"
+          (closed)="profileMenuOpen.set(false)"
+        >
+          <md-menu-item (click)="goAccount()">
+            <md-icon slot="start">person</md-icon>
+            <div slot="headline">My Account</div>
+          </md-menu-item>
+          <md-menu-item (click)="goDashboard()">
+            <md-icon slot="start">dashboard</md-icon>
+            <div slot="headline">Dashboard</div>
+          </md-menu-item>
+          <md-divider role="separator"></md-divider>
+          <md-menu-item (click)="auth.signOut()">
+            <md-icon slot="start">logout</md-icon>
+            <div slot="headline">Log out</div>
+          </md-menu-item>
+        </md-menu>
+      </span>
+    } @else {
+      <md-filled-button (click)="goSignIn()">
+        <md-icon slot="icon">login</md-icon>
+        Sign in
+      </md-filled-button>
+    }
+  </div>
 </header>

@@ -27,39 +27,187 @@
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 12px 20px;
+  padding: 10px 24px;
   border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
   background-color: var(--md-sys-color-surface, #fafdfb);
 }
 
 .app-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 1.25rem;
   font-weight: 700;
   text-decoration: none;
   color: var(--md-sys-color-primary);
 }
 
+.app-header__logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  --md-icon-size: 22px;
+  flex: none;
+}
+
 .app-header__nav {
   display: flex;
-  gap: 16px;
+  gap: 4px;
   margin-right: auto;
 }
 
 .app-header__nav a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   text-decoration: none;
+  color: var(--md-sys-color-on-surface-variant, #43483e);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  --md-icon-size: 20px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.app-header__nav a:hover {
+  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
   color: var(--md-sys-color-on-surface, #1a1c19);
 }
 
 .app-header__nav a.active {
-  color: var(--md-sys-color-primary);
+  background-color: var(--md-sys-color-secondary-container, #d7e3ff);
+  color: var(--md-sys-color-on-secondary-container, #101c2b);
   font-weight: 600;
 }
 
+.app-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-header__menu-anchor {
+  position: relative;
+}
+
 .app-footer {
-  padding: 16px 20px;
+  padding: 0;
   border-top: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface-container, #eef1f6);
   color: var(--md-sys-color-on-surface-variant, #43483e);
   font-size: 0.875rem;
+}
+
+.app-footer__top {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  gap: 32px;
+  padding: 40px 24px 32px;
+}
+
+.app-footer__brand-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.app-footer__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--md-sys-color-primary);
+}
+
+.app-footer__logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  --md-icon-size: 22px;
+  flex: none;
+}
+
+.app-footer__tagline {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.9rem;
+}
+
+.app-footer__col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.app-footer__col-title {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--md-sys-color-on-surface);
+}
+
+.app-footer__links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.app-footer__links a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--md-sys-color-on-surface-variant, #43483e);
+  padding: 4px 0;
+  --md-icon-size: 18px;
+  transition: color 0.2s;
+}
+
+.app-footer__links a:hover {
+  color: var(--md-sys-color-primary);
+}
+
+.app-footer__contact {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.app-footer__contact span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  --md-icon-size: 18px;
+  color: var(--md-sys-color-on-surface-variant, #43483e);
+}
+
+.app-footer__bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+}
+
+.app-footer__copy {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.app-footer__social {
+  display: flex;
+  gap: 4px;
 }
 
 /* Auth screens (sign-in, otp). Layout follows the design reference; all colors

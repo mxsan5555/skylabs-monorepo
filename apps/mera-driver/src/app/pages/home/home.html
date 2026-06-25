@@ -1,4 +1,23 @@
 <div class="home">
+  <!-- Hero Slider -->
+  <section class="home__slider">
+    <swiper-container
+      class="home__carousel"
+      loop="true"
+      navigation="true"
+      pagination="true"
+      pagination-dynamic-bullets="true"
+      autoplay-delay="4000"
+      autoplay-disable-on-interaction="false"
+    >
+      @for (slide of slides; track slide.image) {
+        <swiper-slide>
+          <img [src]="slide.image" [alt]="slide.imageAlt" class="home__slide-img" />
+        </swiper-slide>
+      }
+    </swiper-container>
+  </section>
+
   <section class="home__hero">
     <sky-badge variant="primary">mera-driver</sky-badge>
     <h1>Welcome to mera-driver</h1>

@@ -4,7 +4,7 @@ import {
   computed,
   inject,
 } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { AccountService } from '../../core/account/account.service';
 import { ALL_ROLES, type UserRole } from '../../models';
@@ -27,9 +27,20 @@ import { ADMIN_MENU } from '../menu';
 export class Sidebar {
   private readonly auth = inject(AuthService);
   protected readonly account = inject(AccountService);
+  protected readonly router = inject(Router);
 
   protected readonly roles = this.auth.roles;
   protected readonly allRoles = ALL_ROLES;
+  protected masterOpen = false;
+
+  constructor() {
+    this.masterOpen = this.router.url.includes('/master/');
+  }
+
+  protected isDropdownActive(item: any): boolean {
+    if (!item.children) return false;
+    return item.children.some((child: any) => this.router.url === child.to);
+  }
 
   protected readonly groups = computed(() =>
     ADMIN_MENU.map((g) => ({

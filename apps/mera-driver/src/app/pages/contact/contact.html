@@ -1,0 +1,142 @@
+<div class="max-w-5xl mx-auto py-12 px-6">
+  
+  <!-- Page Header -->
+  <header class="text-center mb-10">
+    <h1 class="text-4xl font-bold text-gray-900 mb-2">Business Inquiry</h1>
+    <p class="text-lg text-gray-600 max-w-xl mx-auto">Get in touch with our corporate team to discuss partnerships, integrations, or fleet accounts.</p>
+  </header>
+
+  <!-- Hero Banner Image -->
+  <div class="w-full mb-10 overflow-hidden rounded-2xl">
+    <img 
+      src="contact_support_banner.png" 
+      alt="Contact Support Team" 
+      class="w-full h-48 md:h-64 object-cover"
+    />
+  </div>
+
+  <!-- Main Content Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+    
+    <!-- Info Section (Left Column) -->
+    <div class="md:col-span-5">
+      <sky-card variant="outlined" class="p-6 h-full block">
+        <h2 class="text-2xl font-semibold text-gray-900 mb-3">Corporate Office</h2>
+        <p class="text-sm text-gray-600 mb-6 leading-relaxed">Contact our business development department directly or submit the inquiry form for a formal proposal.</p>
+        
+        <md-list class="bg-transparent p-0">
+          <md-list-item>
+            <md-icon slot="start">business</md-icon>
+            <div slot="headline">Mera Driver HQ</div>
+            <div slot="supporting-text">Connaught Place, New Delhi, India</div>
+          </md-list-item>
+          
+          <md-divider class="my-2"></md-divider>
+
+          <md-list-item>
+            <md-icon slot="start">phone</md-icon>
+            <div slot="headline">Business Hotline</div>
+            <div slot="supporting-text">+91 98765 43210</div>
+          </md-list-item>
+          
+          <md-divider class="my-2"></md-divider>
+
+          <md-list-item>
+            <md-icon slot="start">email</md-icon>
+            <div slot="headline">Corporate Email</div>
+            <div slot="supporting-text">business@meradriver.com</div>
+          </md-list-item>
+          
+          <md-divider class="my-2"></md-divider>
+
+          <md-list-item>
+            <md-icon slot="start">schedule</md-icon>
+            <div slot="headline">Inquiry Desk Hours</div>
+            <div slot="supporting-text">Monday - Friday (10:00 AM - 5:00 PM)</div>
+          </md-list-item>
+        </md-list>
+      </sky-card>
+    </div>
+
+    <!-- Form Section (Right Column) -->
+    <div class="md:col-span-7">
+      <sky-card variant="outlined" class="p-6 h-full block">
+        
+        @if (isSuccess()) {
+          <div class="flex flex-col items-center text-center py-10 px-4">
+            <md-icon class="text-green-600 text-6xl mb-6">check_circle</md-icon>
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">Inquiry Submitted!</h2>
+            <p class="text-gray-600 max-w-sm mb-8 leading-relaxed text-sm">Thank you. Your business inquiry has been recorded successfully. Our team will review your details and connect with you within 1 business day.</p>
+            <md-filled-button (click)="resetSuccess()" class="self-center">
+              <md-icon slot="icon">arrow_back</md-icon>
+              Submit Another Inquiry
+            </md-filled-button>
+          </div>
+        } @else {
+          <h2 class="text-2xl font-semibold text-gray-900 mb-4">Submit Partnership Inquiry</h2>
+          <div class="flex flex-col gap-5">
+            
+            <!-- Full Name -->
+            <md-outlined-text-field class="w-full" label="Full Name" placeholder="e.g. Rahul Verma" [value]="name()" (input)="onInputName($event)" [error]="!!nameError()"  [errorText]="nameError()" required >
+              <md-icon slot="leading-icon">person</md-icon>
+            </md-outlined-text-field>
+
+            <!-- Company Name -->
+            <md-outlined-text-field class="w-full" label="Company / Organization" placeholder="e.g. Skylabs Technologies" [value]="company()" (input)="onInputCompany($event)" [error]="!!companyError()"  [errorText]="companyError()" required >
+              <md-icon slot="leading-icon">domain</md-icon>
+            </md-outlined-text-field>
+
+            <!-- Email Address -->
+            <md-outlined-text-field class="w-full" label="Official Email Address" placeholder="e.g. business@skylabs.com" type="email" [value]="email()" (input)="onInputEmail($event)" [error]="!!emailError()" [errorText]="emailError()" required>
+              <md-icon slot="leading-icon">email</md-icon>
+            </md-outlined-text-field>
+
+            <!-- Phone Number -->
+            <md-outlined-text-field class="w-full" label="Contact Number" placeholder="e.g. 9876543210" type="tel" maxlength="10"  [value]="phone()"  (input)="onInputPhone($event)" [error]="!!phoneError()" [errorText]="phoneError()"
+              required
+            >
+              <md-icon slot="leading-icon">phone</md-icon>
+            </md-outlined-text-field>
+
+            <!-- Purpose of Inquiry -->
+            <md-outlined-select class="w-full" label="Purpose of Inquiry" menu-positioning="fixed" [value]="subject()" (change)="onSelectSubject($event)"  required
+            >
+              <md-icon slot="leading-icon">help_outline</md-icon>
+              <md-select-option value="corporate">
+                <div slot="headline">Corporate Tie-ups / Accounts</div>
+              </md-select-option>
+              <md-select-option value="partnership">
+                <div slot="headline">Driver Recruitment Partnerships</div>
+              </md-select-option>
+              <md-select-option value="integration">
+                <div slot="headline">API Access & System Integration</div>
+              </md-select-option>
+              <md-select-option value="fleet">
+                <div slot="headline">Fleet Management Services</div>
+              </md-select-option>
+              <md-select-option value="other">
+                <div slot="headline">General Business Inquiry</div>
+              </md-select-option>
+            </md-outlined-select>
+
+            <!-- Message Textarea -->
+            <md-outlined-text-field class="w-full" label="Inquiry / Requirement Details" placeholder="Please describe your business requirements..." type="textarea" rows="4" [value]="message()" (input)="onInputMessage($event)" [error]="!!messageError()" [errorText]="messageError()"
+              required
+            >
+              <md-icon slot="leading-icon">chat</md-icon>
+            </md-outlined-text-field>
+
+            <!-- Action Button -->
+            <md-filled-button (click)="submitForm()" [disabled]="isSubmitting()" class="self-start mt-2" >
+              <md-icon slot="icon">send</md-icon>
+              {{ isSubmitting() ? 'Submitting...' : 'Submit Inquiry' }}
+            </md-filled-button>
+
+          </div>
+        }
+
+      </sky-card>
+    </div>
+
+  </div>
+</div>

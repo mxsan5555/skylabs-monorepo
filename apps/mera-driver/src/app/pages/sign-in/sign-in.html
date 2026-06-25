@@ -33,7 +33,9 @@
         type="tel"
         autocomplete="tel"
         [value]="value"
-        (input)="value = $any($event.target).value"
+        (input)="onInput($any($event.target).value)"
+        [error]="!!phoneError()"
+        [errorText]="phoneError()"
       >
         <md-icon slot="leading-icon" aria-hidden="true">call</md-icon>
       </md-outlined-text-field>
@@ -44,7 +46,9 @@
         type="email"
         autocomplete="email"
         [value]="value"
-        (input)="value = $any($event.target).value"
+        (input)="onInput($any($event.target).value)"
+        [error]="!!emailError()"
+        [errorText]="emailError()"
       >
         <md-icon slot="leading-icon" aria-hidden="true">mail</md-icon>
       </md-outlined-text-field>
@@ -57,7 +61,7 @@
 
   <div class="auth-divider"><span>or continue with</span></div>
 
-  <md-outlined-button class="auth-google">
+  <md-outlined-button class="auth-google" (click)="continueWithGoogle()">
     <md-icon slot="icon" aria-hidden="true">language</md-icon>
     Continue with Google
   </md-outlined-button>

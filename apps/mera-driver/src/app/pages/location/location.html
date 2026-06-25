@@ -1,0 +1,129 @@
+<div class="viewport-container">
+  
+  <!-- Sticky Header Bar -->
+  <header class="header-bar">
+    <div class="header-left">
+      <md-icon-button aria-label="Go back to dashboard" (click)="goBack()">
+        <md-icon>arrow_back</md-icon>
+      </md-icon-button>
+      
+      <div class="brand-info">
+        <h1 class="brand-title">Mera Driver</h1>
+        <p class="brand-subtitle">Location Picker Portal</p>
+      </div>
+      
+      <!-- Autocomplete Input -->
+      <div class="search-container">
+        <div class="search-bar-paper">
+          <md-icon class="search-bar-icon">search</md-icon>
+          <input 
+            type="text" 
+            class="search-bar-input" 
+            placeholder="Search destination by area or city" 
+            [value]="searchQuery()"
+            (input)="onSearchInputChange($event)"
+          />
+          <div class="search-bar-divider"></div>
+          <md-icon-button aria-label="Use current location" (click)="handleUseCurrentLocation()" class="search-bar-gps">
+            <md-icon>my_location</md-icon>
+          </md-icon-button>
+        </div>
+
+        <!-- Suggestions Dropdown using md-list -->
+        @if (showSuggestions() && suggestions().length > 0) {
+          <md-list class="suggestions-dropdown">
+            @for (place of suggestions(); track place.placeId) {
+              <md-list-item (click)="selectLocation(place)" type="button">
+                <md-icon slot="start">location_on</md-icon>
+                <div slot="headline">{{ place.name }}</div>
+                <div slot="supporting-text">{{ place.address }}</div>
+              </md-list-item>
+            }
+
+
+
+
+
+
+
+
+
+
+
+            
+          </md-list>
+        }
+      </div>
+    </div>
+
+    <!-- Saved Places Quick Select Buttons -->
+    <div class="saved-chips-container">
+      <md-outlined-button (click)="selectSavedLocation(savedHome())">
+        <md-icon slot="icon">home</md-icon>
+        Home
+      </md-outlined-button>
+      <md-outlined-button (click)="selectSavedLocation(savedOffice())">
+        <md-icon slot="icon">work</md-icon>
+        Office
+      </md-outlined-button>
+    </div>
+  </header>
+
+  <!-- Error Notification Bar -->
+  @if (apiError()) {
+    <div class="error-bar">
+      <div class="error-content">
+        <md-icon>warning</md-icon>
+        <span><strong>Google API Error:</strong> {{ apiError() }}</span>
+      </div>
+      <md-icon-button (click)="apiError.set(null)">
+        <md-icon>close</md-icon>
+      </md-icon-button>
+    </div>
+  }
+
+  <!-- Map Content Area -->
+  <div class="map-wrapper">
+    <!-- Google Maps Element Reference -->
+    <div #mapContainer class="map-container"></div>
+
+    <!-- Floating Overlay Card -->
+    <sky-card class="floating-overlay-card">
+      <div class="card-content-box">
+        
+        <!-- Current/Confirmed Address Info -->
+        <div class="address-row">
+          <md-icon class="address-icon">my_location</md-icon>
+          <div class="address-details">
+            <span class="address-label">Confirmed Destination</span>
+            <span class="address-text" [title]="address()">{{ address() }}</span>
+            
+            <div class="coordinates-row">
+              <span class="coordinate-badge">Lat: {{ position()[0].toFixed(5) }}</span>
+              <span class="coordinate-badge">Lng: {{ position()[1].toFixed(5) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Save Address Actions -->
+        <div class="card-actions-divider">
+          <md-text-button (click)="saveCurrentLocation('home')">
+            <md-icon slot="icon">home</md-icon>
+            Save as Home
+          </md-text-button>
+          <md-text-button (click)="saveCurrentLocation('office')">
+            <md-icon slot="icon">work</md-icon>
+            Save as Office
+          </md-text-button>
+        </div>
+
+        <!-- Primary Confirm Action Button -->
+        <md-filled-button class="action-button-full" (click)="handleConfirmLocation()">
+          Confirm Destination
+        </md-filled-button>
+
+      </div>
+    </sky-card>
+  </div>
+
+</div>

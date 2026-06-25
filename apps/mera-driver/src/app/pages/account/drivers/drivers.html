@@ -1,0 +1,83 @@
+<md-admin-page
+  title="Driver Registry"
+  subtitle="Manage and view registered drivers (Loaded dynamically from static JSON data)."
+>
+  <div class="drivers-layout">
+    <!-- Form Panel -->
+    <sky-card variant="outlined" class="drivers-layout__form-card">
+      <div class="drivers-form">
+        <h2 class="drivers-form__title">Register New Driver</h2>
+        
+        <md-outlined-text-field
+          label="Full Name"
+          [value]="inputName()"
+          (input)="onNameInput($event)"
+          placeholder="e.g. Rahul Verma"
+        >
+          <md-icon slot="leading-icon">person</md-icon>
+        </md-outlined-text-field>
+
+        <md-outlined-text-field
+          label="Phone Number"
+          [value]="inputPhone()"
+          (input)="onPhoneInput($event)"
+          placeholder="e.g. 9876543210"
+        >
+          <md-icon slot="leading-icon">phone</md-icon>
+        </md-outlined-text-field>
+
+        <md-outlined-text-field
+          label="Vehicle Details"
+          [value]="inputVehicle()"
+          (input)="onVehicleInput($event)"
+          placeholder="e.g. Hyundai Accent (Sedan)"
+        >
+          <md-icon slot="leading-icon">local_taxi</md-icon>
+        </md-outlined-text-field>
+
+        <md-filled-button (click)="addDriver()">
+          <md-icon slot="icon">person_add</md-icon>
+          Register Driver
+        </md-filled-button>
+      </div>
+    </sky-card>
+
+    <!-- List Panel -->
+    <div class="drivers-layout__list-area">
+      <h2 class="drivers-list-title">Registered Drivers ({{ drivers().length }})</h2>
+      
+      @if (drivers().length > 0) {
+        <div class="drivers-grid">
+          @for (d of drivers(); track d.phone) {
+            <sky-card variant="outlined" class="driver-card">
+              <div class="driver-card__body">
+                <div class="driver-card__header">
+                  <div class="driver-card__avatar">
+                    <md-icon>local_taxi</md-icon>
+                  </div>
+                  <div>
+                    <h3 class="driver-card__name">{{ d.name }}</h3>
+                    <p class="driver-card__vehicle">{{ d.vehicle }}</p>
+                  </div>
+                </div>
+                
+                <md-divider class="driver-card__divider"></md-divider>
+                
+                <div class="driver-card__info">
+                  <md-icon class="driver-card__info-icon">phone</md-icon>
+                  <span class="driver-card__info-text">{{ d.phone }}</span>
+                </div>
+              </div>
+            </sky-card>
+          }
+        </div>
+      } @else {
+        <div class="drivers-empty">
+          <md-icon class="drivers-empty__icon">no_accounts</md-icon>
+          <p class="drivers-empty__title">No drivers registered</p>
+          <p class="drivers-empty__text">Add driver details on the left to register a new driver.</p>
+        </div>
+      }
+    </div>
+  </div>
+</md-admin-page>

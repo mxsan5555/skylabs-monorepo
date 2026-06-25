@@ -17,6 +17,12 @@ import { roleGuard } from './core/auth/role.guard';
  */
 export const appRoutes: Routes = [
   {
+    path: 'location',
+    title: 'Select Location · mera-driver',
+    loadComponent: () =>
+      import('./pages/location/location').then((m) => m.Location),
+  },
+  {
     path: 'sign-in',
     component: AuthLayout,
     children: [
@@ -59,6 +65,30 @@ export const appRoutes: Routes = [
           import('./pages/account/profile/profile').then((m) => m.Profile),
       },
       {
+        path: 'drivers',
+        title: 'Drivers · mera-driver',
+        loadComponent: () =>
+          import('./pages/account/drivers/drivers').then((m) => m.Drivers),
+      },
+
+      {
+        path: 'master',
+        pathMatch: 'full',
+        redirectTo: 'master/category',
+      },
+      {
+        path: 'master/category',
+        title: 'Category · mera-driver',
+        loadComponent: () =>
+          import('./pages/account/category/category').then((m) => m.Category),
+      },
+      {
+        path: 'master/subcategory',
+        title: 'Subcategory · mera-driver',
+        loadComponent: () =>
+          import('./pages/account/subcategory/subcategory').then((m) => m.Subcategory),
+      },
+      {
         path: 'bookings',
         title: 'Bookings · mera-driver',
         canActivate: [roleGuard],
@@ -97,6 +127,11 @@ export const appRoutes: Routes = [
         path: 'blog',
         title: 'Blog · mera-driver',
         loadComponent: () => import('./pages/blog/blog').then((m) => m.Blog),
+      },
+      {
+        path: 'contact',
+        title: 'Contact Us · mera-driver',
+        loadComponent: () => import('./pages/contact/contact').then((m) => m.Contact),
       },
       {
         path: 'blog/:slug',

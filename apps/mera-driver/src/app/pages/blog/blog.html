@@ -4,72 +4,109 @@
     <p>Travel tips, safety guides, and stories from the road.</p>
   </header>
 
-  <ul class="blog__grid">
-    @for (p of items(); track p.id) {
-      <li>
-        <sky-card variant="outlined">
-          <article class="post-card">
-            <img
-              class="post-card__img"
-              [src]="p.coverImage"
-              [alt]="p.imageAlt"
-              width="800"
-              height="480"
-              loading="lazy"
-            />
-            <div class="post-card__body">
-              <sky-badge variant="secondary">{{
-                blog.categoryName(p.categorySlug)
-              }}</sky-badge>
-              <h2 class="post-card__title">
-                <a [routerLink]="['/blog', p.slug]">{{ p.title }}</a>
-              </h2>
-              <p class="post-card__excerpt">{{ p.excerpt }}</p>
-              <p class="post-card__meta">
-                <time [attr.datetime]="p.publishedAt">{{
-                  p.publishedAt | date: 'mediumDate'
-                }}</time>
-                <span aria-hidden="true">·</span>
-                <span class="post-card__read">
-                  <md-icon aria-hidden="true">schedule</md-icon>{{ p.readMinutes }}
-                  min read
-                </span>
-              </p>
-            </div>
-          </article>
-        </sky-card>
-      </li>
-    }
-  </ul>
-
-  @if (totalPages() > 1) {
-    <nav class="pagination" aria-label="Blog pages">
-      <md-outlined-button [disabled]="page() <= 1" (click)="goTo(page() - 1)">
-        <md-icon slot="icon" aria-hidden="true">chevron_left</md-icon>
-        Previous
-      </md-outlined-button>
-      <ul class="pagination__pages">
-        @for (n of pageNumbers(); track n) {
-          <li>
-            @if (n === page()) {
-              <md-filled-button aria-current="page" [attr.aria-label]="'Page ' + n">{{
-                n
-              }}</md-filled-button>
-            } @else {
-              <md-text-button [attr.aria-label]="'Page ' + n" (click)="goTo(n)">{{
-                n
-              }}</md-text-button>
-            }
-          </li>
-        }
-      </ul>
-      <md-outlined-button
-        [disabled]="page() >= totalPages()"
-        (click)="goTo(page() + 1)"
+  <div class="blog__layout">
+    <!-- Filters Sidebar -->
+    <aside class="blog__sidebar">
+      <md-outlined-select
+        label="Category"
+        [value]="selectedCategory()"
+        (change)="onCategoryChange($event)"
       >
-        Next
-        <md-icon slot="icon" aria-hidden="true">chevron_right</md-icon>
-      </md-outlined-button>
-    </nav>
-  }
+        <md-select-option value="">All Categories</md-select-option>
+        @for (c of categories; track c.id) {
+          <md-select-option [value]="c.slug">{{ c.name }}</md-select-option>
+        }
+      </md-outlined-select>
+
+      <md-outlined-select
+        label="Sort By"
+        [value]="selectedSort()"
+        (change)="onSortChange($event)"
+      >
+        <md-select-option value="newest">Newest First</md-select-option>
+        <md-select-option value="oldest">Oldest First</md-select-option>
+        <md-select-option value="title">Alphabetical</md-select-option>
+      </md-outlined-select>
+    </aside>
+
+    <!-- Blog Posts Content -->
+    <div class="blog__content-area">
+      @if (items().length > 0) {
+        <ul class="blog__grid">
+          @for (p of items(); track p.id) {
+            <li>
+              <sky-card variant="outlined">
+                <article class="post-card">
+                  <img
+                    class="post-card__img"
+                    [src]="p.coverImage"
+                    [alt]="p.imageAlt"
+                    width="800"
+                    height="480"
+                    loading="lazy"
+                  />
+                  <div class="post-card__body">
+                    <sky-badge variant="secondary">{{
+                      blog.categoryName(p.categorySlug)
+                    }}</sky-badge>
+                    <h2 class="post-card__title">
+                      <a [routerLink]="['/blog', p.slug]">{{ p.title }}</a>
+                    </h2>
+                    <p class="post-card__excerpt">{{ p.excerpt }}</p>
+                    <p class="post-card__meta">
+                      <time [attr.datetime]="p.publishedAt">{{
+                        p.publishedAt | date: 'mediumDate'
+                      }}</time>
+                      <span aria-hidden="true">·</span>
+                      <span class="post-card__read">
+                        <md-icon aria-hidden="true">schedule</md-icon>{{ p.readMinutes }}
+                        min read
+                      </span>
+                    </p>
+                  </div>
+                </article>
+              </sky-card>
+            </li>
+          }
+        </ul>
+      } @else {
+        <div class="blog__empty">
+          <md-icon class="blog__empty-icon" aria-hidden="true">search_off</md-icon>
+          <p class="blog__empty-title">No articles found</p>
+          <p class="blog__empty-text">Try selecting a different category.</p>
+        </div>
+      }
+
+      @if (totalPages() > 1) {
+        <nav class="pagination" aria-label="Blog pages">
+          <md-outlined-button [disabled]="page() <= 1" (click)="goTo(page() - 1)">
+            <md-icon slot="icon" aria-hidden="true">chevron_left</md-icon>
+            Previous
+          </md-outlined-button>
+          <ul class="pagination__pages">
+            @for (n of pageNumbers(); track n) {
+              <li>
+                @if (n === page()) {
+                  <md-filled-button aria-current="page" [attr.aria-label]="'Page ' + n">{{
+                    n
+                  }}</md-filled-button>
+                } @else {
+                  <md-text-button [attr.aria-label]="'Page ' + n" (click)="goTo(n)">{{
+                    n
+                  }}</md-text-button>
+                }
+              </li>
+            }
+          </ul>
+          <md-outlined-button
+            [disabled]="page() >= totalPages()"
+            (click)="goTo(page() + 1)"
+          >
+            Next
+            <md-icon slot="icon" aria-hidden="true">chevron_right</md-icon>
+          </md-outlined-button>
+        </nav>
+      }
+    </div>
+  </div>
 </main>

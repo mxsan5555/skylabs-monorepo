@@ -1,0 +1,98 @@
+<footer class="app-footer">
+  <!-- Top section: Brand + Links + Contact -->
+  <div class="app-footer__top">
+    <!-- Brand column -->
+    <div class="app-footer__brand-col">
+      <a routerLink="/" class="app-footer__brand">
+        <span class="app-footer__logo">
+          <md-icon aria-hidden="true">directions_car</md-icon>
+        </span>
+        mera-driver
+      </a>
+      <p class="app-footer__tagline">Your ride, your way.</p>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="app-footer__col">
+      <h3 class="app-footer__col-title">Quick Links</h3>
+      <nav class="app-footer__links" aria-label="Footer navigation">
+        <a routerLink="/">
+          <md-icon aria-hidden="true">home</md-icon>
+          Home
+        </a>
+        <a routerLink="/blog">
+          <md-icon aria-hidden="true">article</md-icon>
+          Blog
+        </a>
+        <a routerLink="/contact">
+          <md-icon aria-hidden="true">mail</md-icon>
+          Contact
+        </a>
+        <a routerLink="/showcase">
+          <md-icon aria-hidden="true">widgets</md-icon>
+          Showcase
+        </a>
+      </nav>
+    </div>
+
+    <!-- Account Links -->
+    <div class="app-footer__col">
+      <h3 class="app-footer__col-title">Account</h3>
+      <nav class="app-footer__links" aria-label="Account links">
+        <a routerLink="/sign-in">
+          <md-icon aria-hidden="true">login</md-icon>
+          Sign In
+        </a>
+        <a routerLink="/account/profile">
+          <md-icon aria-hidden="true">person</md-icon>
+          My Profile
+        </a>
+        <a routerLink="/account/dashboard">
+          <md-icon aria-hidden="true">dashboard</md-icon>
+          Dashboard
+        </a>
+      </nav>
+    </div>
+
+    <!-- Contact Info -->
+    <div class="app-footer__col">
+      <h3 class="app-footer__col-title">Get in Touch</h3>
+      <div class="app-footer__contact">
+        <span>
+          <md-icon aria-hidden="true">mail</md-icon>
+          support&#64;meradriver.com
+        </span>
+        <span>
+          <md-icon aria-hidden="true">phone</md-icon>
+          +91 98765 43210
+        </span>
+        <span>
+          <md-icon aria-hidden="true">location_on</md-icon>
+          New Delhi, India
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Divider -->
+  <md-divider></md-divider>
+
+  <!-- Bottom bar: Copyright + Social icons -->
+  <div class="app-footer__bottom">
+    <span class="app-footer__copy">© {{ year }} mera-driver. All rights reserved.</span>
+    <div class="app-footer__social">
+      <md-icon-button aria-label="Facebook">
+        <md-icon>group</md-icon>
+      </md-icon-button>
+      <md-icon-button aria-label="Twitter">
+        <md-icon>tag</md-icon>
+      </md-icon-button>
+      <md-icon-button aria-label="Instagram">
+        <md-icon>photo_camera</md-icon>
+      </md-icon-button>
+      <md-icon-button aria-label="YouTube">
+        <md-icon>play_circle</md-icon>
+      </md-icon-button>
+    </div>
+  </div>
+</footer>
