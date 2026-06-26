@@ -10,6 +10,34 @@ import { FormsModule } from '@angular/forms';
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class Contact {
+  // FAQ signals
+  protected readonly faqs = signal([
+    {
+      id: 1,
+      question: 'How do corporate cab services work?',
+      answer: 'Corporate clients get a dedicated dashboard to manage employee rides, set custom approval hierarchies, schedule recurring routes, and access monthly consolidated invoicing. You can start the setup process by filling out the form above.',
+      open: false
+    },
+    {
+      id: 2,
+      question: 'What is the average timeline for API key deployment?',
+      answer: 'Standard API credentials are generated within 24 hours. For advanced routing algorithms and custom fleet integrations, our developer relations team will collaborate with your engineering team to guide you from sandbox to production in 3-5 business days.',
+      open: false
+    },
+    {
+      id: 3,
+      question: 'Is there a dedicated helpline for corporate fleet support?',
+      answer: 'Yes. All corporate contracts include 24/7 dedicated telephone support and live fleet monitoring to resolve any on-road dispatch issues instantly.',
+      open: false
+    },
+    {
+      id: 4,
+      question: 'Can we customize the driver selection and vehicle types?',
+      answer: 'Absolutely. Our platform allows corporate accounts to set specific vehicle class rules (e.g. EV-only, premium sedans) and prioritize top-rated driver tiers based on employee roles or distance categories.',
+      open: false
+    }
+  ]);
+
   // Form signals
   protected readonly name = signal<string>('');
   protected readonly company = signal<string>('');
@@ -58,6 +86,7 @@ export class Contact {
   protected onSelectSubject(event: Event): void {
     this.subject.set((event.target as HTMLSelectElement).value || 'corporate');
   }
+
 
   protected onInputMessage(event: Event): void {
     this.message.set((event.target as HTMLTextAreaElement).value || '');
@@ -141,5 +170,14 @@ export class Contact {
 
   protected resetSuccess(): void {
     this.isSuccess.set(false);
+  }
+
+  protected toggleFaq(id: number): void {
+    this.faqs.update((list) =>
+      list.map((item) => ({
+        ...item,
+        open: item.id === id ? !item.open : false
+      }))
+    );
   }
 }

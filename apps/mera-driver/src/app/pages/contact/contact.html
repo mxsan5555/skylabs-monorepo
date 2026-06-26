@@ -1,142 +1,262 @@
-<div class="max-w-5xl mx-auto py-12 px-6">
+<div class="max-w-5xl mx-auto py-8 px-6 flex flex-col gap-8">
   
-  <!-- Page Header -->
-  <header class="text-center mb-10">
-    <h1 class="text-4xl font-bold text-gray-900 mb-2">Business Inquiry</h1>
-    <p class="text-lg text-gray-600 max-w-xl mx-auto">Get in touch with our corporate team to discuss partnerships, integrations, or fleet accounts.</p>
-  </header>
-
-  <!-- Hero Banner Image -->
-  <div class="w-full mb-10 overflow-hidden rounded-2xl">
-    <img 
-      src="contact_support_banner.png" 
-      alt="Contact Support Team" 
-      class="w-full h-48 md:h-64 object-cover"
-    />
+  <!-- Breadcrumb Section -->
+  <div class="flex items-center gap-1 text-sm bg-gray-50/50 p-2 px-4 border border-gray-100/50 self-start">
+    <a href="/" class="no-underline">
+      <md-text-button>Home</md-text-button>
+    </a>
+    <md-icon class="text-gray-400 text-sm">chevron_right</md-icon>
+    <md-text-button disabled class="opacity-70">Contact Us</md-text-button>
   </div>
 
-  <!-- Main Content Grid -->
-  <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+  <!-- Flat Partnership Inquiry Form Layout -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
     
-    <!-- Info Section (Left Column) -->
-    <div class="md:col-span-5">
-      <sky-card variant="outlined" class="p-6 h-full block">
-        <h2 class="text-2xl font-semibold text-gray-900 mb-3">Corporate Office</h2>
-        <p class="text-sm text-gray-600 mb-6 leading-relaxed">Contact our business development department directly or submit the inquiry form for a formal proposal.</p>
-        
-        <md-list class="bg-transparent p-0">
-          <md-list-item>
-            <md-icon slot="start">business</md-icon>
-            <div slot="headline">Mera Driver HQ</div>
-            <div slot="supporting-text">Connaught Place, New Delhi, India</div>
-          </md-list-item>
-          
-          <md-divider class="my-2"></md-divider>
-
-          <md-list-item>
-            <md-icon slot="start">phone</md-icon>
-            <div slot="headline">Business Hotline</div>
-            <div slot="supporting-text">+91 98765 43210</div>
-          </md-list-item>
-          
-          <md-divider class="my-2"></md-divider>
-
-          <md-list-item>
-            <md-icon slot="start">email</md-icon>
-            <div slot="headline">Corporate Email</div>
-            <div slot="supporting-text">business@meradriver.com</div>
-          </md-list-item>
-          
-          <md-divider class="my-2"></md-divider>
-
-          <md-list-item>
-            <md-icon slot="start">schedule</md-icon>
-            <div slot="headline">Inquiry Desk Hours</div>
-            <div slot="supporting-text">Monday - Friday (10:00 AM - 5:00 PM)</div>
-          </md-list-item>
-        </md-list>
-      </sky-card>
+    <!-- Left Column: Support Vector Image Only (50% width) -->
+    <div class="lg:col-span-6 flex items-center justify-center p-4">
+      <img 
+        src="contact_vector_support.png" 
+        alt="Customer Support Vector Illustration" 
+        class="w-[90%] md:w-[80%] lg:w-full h-auto max-h-[520px] object-contain"
+      />
     </div>
 
-    <!-- Form Section (Right Column) -->
-    <div class="md:col-span-7">
-      <sky-card variant="outlined" class="p-6 h-full block">
-        
-        @if (isSuccess()) {
-          <div class="flex flex-col items-center text-center py-10 px-4">
-            <md-icon class="text-green-600 text-6xl mb-6">check_circle</md-icon>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Inquiry Submitted!</h2>
-            <p class="text-gray-600 max-w-sm mb-8 leading-relaxed text-sm">Thank you. Your business inquiry has been recorded successfully. Our team will review your details and connect with you within 1 business day.</p>
-            <md-filled-button (click)="resetSuccess()" class="self-center">
-              <md-icon slot="icon">arrow_back</md-icon>
-              Submit Another Inquiry
-            </md-filled-button>
-          </div>
-        } @else {
-          <h2 class="text-2xl font-semibold text-gray-900 mb-4">Submit Partnership Inquiry</h2>
-          <div class="flex flex-col gap-5">
-            
-            <!-- Full Name -->
-            <md-outlined-text-field class="w-full" label="Full Name" placeholder="e.g. Rahul Verma" [value]="name()" (input)="onInputName($event)" [error]="!!nameError()"  [errorText]="nameError()" required >
-              <md-icon slot="leading-icon">person</md-icon>
-            </md-outlined-text-field>
+    <!-- Right Column: Interactive Form Hub (50% width) -->
+    <div #inquiryFormContainer class="lg:col-span-6 flex flex-col justify-center relative">
+      @if (isSubmitting()) {
+        <md-linear-progress indeterminate class="absolute top-0 left-0 right-0 w-full z-10"></md-linear-progress>
+      }
+      @if (isSuccess()) {
+        <div class="flex flex-col items-center text-center py-10">
+          <md-icon class="text-green-600 text-6xl mb-4">check_circle</md-icon>
+          <h2 class="text-2xl font-bold text-gray-900 mb-2">Inquiry Submitted!</h2>
+          <p class="text-gray-500 max-w-sm mb-8 leading-relaxed text-sm">
+            Thank you. Your business inquiry has been recorded successfully. Our team will connect with you within 1 business day.
+          </p>
+          <md-filled-button (click)="resetSuccess()" class="self-center">
+            <md-icon slot="icon">arrow_back</md-icon>
+            Submit Another Inquiry
+          </md-filled-button>
+        </div>
+      } @else {
+        <h2 class="text-2xl font-semibold text-gray-900 mb-4">Submit Partnership Inquiry</h2>
 
-            <!-- Company Name -->
-            <md-outlined-text-field class="w-full" label="Company / Organization" placeholder="e.g. Skylabs Technologies" [value]="company()" (input)="onInputCompany($event)" [error]="!!companyError()"  [errorText]="companyError()" required >
-              <md-icon slot="leading-icon">domain</md-icon>
-            </md-outlined-text-field>
+        <div class="flex flex-col gap-4">
+          <!-- Full Name -->
+          <md-outlined-text-field
+            class="w-full"
+            label="Full Name"
+            placeholder="e.g. Rahul Verma"
+            [value]="name()"
+            (input)="onInputName($event)"
+            [error]="!!nameError()"
+            [errorText]="nameError()"
+            required
+          >
+            <md-icon slot="leading-icon">person</md-icon>
+          </md-outlined-text-field>
 
+          <!-- Company Name -->
+          <md-outlined-text-field
+            class="w-full"
+            label="Company / Organization"
+            placeholder="e.g. Skylabs Technologies"
+            [value]="company()"
+            (input)="onInputCompany($event)"
+            [error]="!!companyError()"
+            [errorText]="companyError()"
+            required
+          >
+            <md-icon slot="leading-icon">domain</md-icon>
+          </md-outlined-text-field>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <!-- Email Address -->
-            <md-outlined-text-field class="w-full" label="Official Email Address" placeholder="e.g. business@skylabs.com" type="email" [value]="email()" (input)="onInputEmail($event)" [error]="!!emailError()" [errorText]="emailError()" required>
+            <md-outlined-text-field
+              class="w-full"
+              label="Official Email"
+              placeholder="e.g. business@skylabs.com"
+              type="email"
+              [value]="email()"
+              (input)="onInputEmail($event)"
+              [error]="!!emailError()"
+              [errorText]="emailError()"
+              required
+            >
               <md-icon slot="leading-icon">email</md-icon>
             </md-outlined-text-field>
 
             <!-- Phone Number -->
-            <md-outlined-text-field class="w-full" label="Contact Number" placeholder="e.g. 9876543210" type="tel" maxlength="10"  [value]="phone()"  (input)="onInputPhone($event)" [error]="!!phoneError()" [errorText]="phoneError()"
+            <md-outlined-text-field
+              class="w-full"
+              label="Contact Number"
+              placeholder="e.g. 9876543210"
+              type="tel"
+              maxlength="10"
+              [value]="phone()"
+              (input)="onInputPhone($event)"
+              [error]="!!phoneError()"
+              [errorText]="phoneError()"
               required
             >
               <md-icon slot="leading-icon">phone</md-icon>
             </md-outlined-text-field>
+          </div>
 
-            <!-- Purpose of Inquiry -->
-            <md-outlined-select class="w-full" label="Purpose of Inquiry" menu-positioning="fixed" [value]="subject()" (change)="onSelectSubject($event)"  required
+          <!-- Purpose of Inquiry -->
+          <md-outlined-select
+            class="w-full"
+            label="Purpose of Inquiry"
+            menu-positioning="absolute"
+            [value]="subject()"
+            (change)="onSelectSubject($event)"
+            required
+          >
+            <md-icon slot="leading-icon">help_outline</md-icon>
+            <md-select-option value="corporate">
+              <div slot="headline">Corporate Tie-ups / Accounts</div>
+            </md-select-option>
+            <md-select-option value="partnership">
+              <div slot="headline">Driver Recruitment Partnerships</div>
+            </md-select-option>
+            <md-select-option value="integration">
+              <div slot="headline">API Access & System Integration</div>
+            </md-select-option>
+            <md-select-option value="fleet">
+              <div slot="headline">Fleet Management Services</div>
+            </md-select-option>
+            <md-select-option value="other">
+              <div slot="headline">General Business Inquiry</div>
+            </md-select-option>
+          </md-outlined-select>
+
+          <!-- Message Textarea -->
+          <md-outlined-text-field
+            class="w-full"
+            label="Requirement Details"
+            placeholder="Describe your business requirements..."
+            type="textarea"
+            rows="4"
+            [value]="message()"
+            (input)="onInputMessage($event)"
+            [error]="!!messageError()"
+            [errorText]="messageError()"
+            required
+          >
+            <md-icon slot="leading-icon">chat</md-icon>
+          </md-outlined-text-field>
+
+          <!-- Action Button & Privacy Lock -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2">
+            <md-filled-button
+              (click)="submitForm()"
+              [disabled]="isSubmitting()"
+              class="self-start"
             >
-              <md-icon slot="leading-icon">help_outline</md-icon>
-              <md-select-option value="corporate">
-                <div slot="headline">Corporate Tie-ups / Accounts</div>
-              </md-select-option>
-              <md-select-option value="partnership">
-                <div slot="headline">Driver Recruitment Partnerships</div>
-              </md-select-option>
-              <md-select-option value="integration">
-                <div slot="headline">API Access & System Integration</div>
-              </md-select-option>
-              <md-select-option value="fleet">
-                <div slot="headline">Fleet Management Services</div>
-              </md-select-option>
-              <md-select-option value="other">
-                <div slot="headline">General Business Inquiry</div>
-              </md-select-option>
-            </md-outlined-select>
-
-            <!-- Message Textarea -->
-            <md-outlined-text-field class="w-full" label="Inquiry / Requirement Details" placeholder="Please describe your business requirements..." type="textarea" rows="4" [value]="message()" (input)="onInputMessage($event)" [error]="!!messageError()" [errorText]="messageError()"
-              required
-            >
-              <md-icon slot="leading-icon">chat</md-icon>
-            </md-outlined-text-field>
-
-            <!-- Action Button -->
-            <md-filled-button (click)="submitForm()" [disabled]="isSubmitting()" class="self-start mt-2" >
               <md-icon slot="icon">send</md-icon>
               {{ isSubmitting() ? 'Submitting...' : 'Submit Inquiry' }}
             </md-filled-button>
-
+            
+            <div class="flex items-center gap-1.5 text-xs text-gray-500">
+              <md-icon class="text-gray-400 text-sm">lock</md-icon>
+              <span>Your information is secure & private</span>
+            </div>
           </div>
-        }
-
-      </sky-card>
+        </div>
+      }
     </div>
 
+  </div>
+
+  <!-- Bottom Row: Coordinates & Map side-by-side (6*6 Grid) -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-12 mt-12 pt-12 border-t border-gray-100">
+    
+    <!-- Corporate Details (6/12) -->
+    <div class="flex flex-col gap-4">
+      <div>
+        <h2 class="text-2xl font-semibold text-gray-900 mb-2">Corporate Office</h2>
+        <p class="text-sm text-gray-600 leading-relaxed">
+          Contact our business development team for partnerships, integrations, or fleet accounts.
+        </p>
+      </div>
+
+      <!-- Quick Coordinates List (Pure M3) -->
+      <md-list class="bg-transparent p-0">
+        <md-list-item>
+          <md-icon slot="start">business</md-icon>
+          <div slot="headline">Mera Driver HQ</div>
+          <div slot="supporting-text">Connaught Place, New Delhi, India</div>
+        </md-list-item>
+
+        <md-list-item>
+          <md-icon slot="start">phone</md-icon>
+          <div slot="headline">Business Hotline</div>
+          <div slot="supporting-text">+91 98765 43210</div>
+        </md-list-item>
+
+        <md-list-item>
+          <md-icon slot="start">email</md-icon>
+          <div slot="headline">Corporate Email</div>
+          <div slot="supporting-text">business@meradriver.com</div>
+        </md-list-item>
+
+        <md-list-item>
+          <md-icon slot="start">schedule</md-icon>
+          <div slot="headline">Inquiry Desk Hours</div>
+          <div slot="supporting-text">Monday - Friday (10:00 AM - 5:00 PM)</div>
+        </md-list-item>
+      </md-list>
+    </div>
+
+    <!-- Office Location Map (6/12) -->
+    <div class="flex flex-col gap-4">
+      <div>
+        <h2 class="text-2xl font-semibold text-gray-900 mb-2">Location Map</h2>
+        <p class="text-sm text-gray-600 leading-relaxed">
+          Click below to view our location on interactive maps.
+        </p>
+      </div>
+
+      <iframe 
+        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7008.2120651821115!2d77.34102709999999!3d28.56657855!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x390ce5b7d4af0dc1%3A0xc370dee296269b66!2sArun%20Vihar%2C%20Sector%2037%2C%20Noida%2C%20Uttar%20Pradesh%20201303!5e0!3m2!1sen!2sin!4v1782389958130!5m2!1sen!2sin" 
+        class="w-full h-[320px] border-0" 
+        allowfullscreen="" 
+        loading="lazy" 
+        referrerpolicy="strict-origin-when-cross-origin"
+      ></iframe>
+    </div>
+
+  </div>
+
+  <!-- Frequently Asked Questions -->
+  <div class="flex flex-col gap-6 mt-6 border-t border-gray-100 pt-10">
+    <div class="flex flex-col gap-2 text-center max-w-xl mx-auto">
+      <span class="text-xs font-bold uppercase tracking-wider text-blue-600 font-semibold">Got Questions?</span>
+      <h2 class="text-3xl font-extrabold text-gray-900 tracking-tight">Frequently Asked Questions</h2>
+      <p class="text-sm text-gray-500 leading-relaxed">Quick answers to common questions about our corporate plans, APIs, and services.</p>
+    </div>
+    
+    <div class="max-w-3xl w-full mx-auto mt-4 flex flex-col gap-3">
+      @for (faq of faqs(); track faq.id) {
+        <div class="border border-gray-200 bg-white">
+          <!-- Accordion Header Button -->
+          <button 
+            type="button" 
+            (click)="toggleFaq(faq.id)" 
+            class="w-full flex items-center justify-between gap-4 p-4 border-none bg-transparent hover:bg-gray-50 cursor-pointer text-left font-medium text-gray-800 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+          >
+            <span>{{ faq.question }}</span>
+            <md-icon class="transition-transform duration-200" [class.rotate-180]="faq.open">expand_more</md-icon>
+          </button>
+          
+          <!-- Accordion Content Panel -->
+          @if (faq.open) {
+            <div class="p-4 pt-0 border-t border-gray-100 mt-2 pt-4">
+              <p class="m-0 leading-relaxed text-sm text-gray-600">{{ faq.answer }}</p>
+            </div>
+          }
+        </div>
+      }
+    </div>
   </div>
 </div>

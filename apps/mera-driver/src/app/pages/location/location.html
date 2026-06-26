@@ -1,37 +1,37 @@
-<div class="viewport-container">
+<div class="flex flex-col h-screen w-full overflow-hidden relative bg-slate-50">
   
   <!-- Sticky Header Bar -->
-  <header class="header-bar">
-    <div class="header-left">
+  <header class="flex items-center justify-between gap-2 p-2 px-3 sm:gap-4 sm:p-3 sm:px-6 bg-white border-b border-slate-200 z-10 shadow-sm shrink-0">
+    <div class="flex items-center gap-3 flex-1 min-w-0">
       <md-icon-button aria-label="Go back to dashboard" (click)="goBack()">
         <md-icon>arrow_back</md-icon>
       </md-icon-button>
       
-      <div class="brand-info">
-        <h1 class="brand-title">Mera Driver</h1>
-        <p class="brand-subtitle">Location Picker Portal</p>
+      <div class="mr-3 shrink-0 hidden sm:block">
+        <h1 class="text-sm font-extrabold text-slate-900 leading-none m-0">Mera Driver</h1>
+        <p class="text-[10px] text-slate-500 m-0 mt-0.5">Location Picker Portal</p>
       </div>
       
       <!-- Autocomplete Input -->
-      <div class="search-container">
-        <div class="search-bar-paper">
-          <md-icon class="search-bar-icon">search</md-icon>
+      <div class="relative w-full max-w-[380px]">
+        <div class="flex items-center bg-[#f0f4f9] border border-slate-300 rounded-[28px] py-0.5 pl-4 pr-1 shadow-sm w-full box-border transition-all duration-200 focus-within:bg-white focus-within:shadow-md focus-within:border-[#1175bc]">
+          <md-icon class="[--md-icon-size:20px] text-slate-500 mr-2">search</md-icon>
           <input 
             type="text" 
-            class="search-bar-input" 
+            class="flex-1 border-none outline-none bg-transparent text-sm text-slate-900 py-2 min-w-0 placeholder-slate-400" 
             placeholder="Search destination by area or city" 
             [value]="searchQuery()"
             (input)="onSearchInputChange($event)"
           />
-          <div class="search-bar-divider"></div>
-          <md-icon-button aria-label="Use current location" (click)="handleUseCurrentLocation()" class="search-bar-gps">
+          <div class="w-px h-6 bg-slate-300 mx-1"></div>
+          <md-icon-button aria-label="Use current location" (click)="handleUseCurrentLocation()" class="[--md-icon-button-icon-color:#1175bc]">
             <md-icon>my_location</md-icon>
           </md-icon-button>
         </div>
 
         <!-- Suggestions Dropdown using md-list -->
         @if (showSuggestions() && suggestions().length > 0) {
-          <md-list class="suggestions-dropdown">
+          <md-list class="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-[999] max-h-[200px] overflow-y-auto">
             @for (place of suggestions(); track place.placeId) {
               <md-list-item (click)="selectLocation(place)" type="button">
                 <md-icon slot="start">location_on</md-icon>
@@ -39,25 +39,13 @@
                 <div slot="supporting-text">{{ place.address }}</div>
               </md-list-item>
             }
-
-
-
-
-
-
-
-
-
-
-
-            
           </md-list>
         }
       </div>
     </div>
 
     <!-- Saved Places Quick Select Buttons -->
-    <div class="saved-chips-container">
+    <div class="flex items-center gap-2">
       <md-outlined-button (click)="selectSavedLocation(savedHome())">
         <md-icon slot="icon">home</md-icon>
         Home
@@ -71,8 +59,8 @@
 
   <!-- Error Notification Bar -->
   @if (apiError()) {
-    <div class="error-bar">
-      <div class="error-content">
+    <div class="bg-red-50 border-b border-red-200 p-3 px-6 flex items-center justify-between z-10 shrink-0">
+      <div class="flex items-center gap-3 text-red-800 text-xs font-semibold">
         <md-icon>warning</md-icon>
         <span><strong>Google API Error:</strong> {{ apiError() }}</span>
       </div>
@@ -83,30 +71,30 @@
   }
 
   <!-- Map Content Area -->
-  <div class="map-wrapper">
+  <div class="flex-1 relative overflow-hidden z-1">
     <!-- Google Maps Element Reference -->
-    <div #mapContainer class="map-container"></div>
+    <div #mapContainer class="w-full h-full"></div>
 
     <!-- Floating Overlay Card -->
-    <sky-card class="floating-overlay-card">
-      <div class="card-content-box">
+    <sky-card class="absolute bottom-6 left-6 z-10 w-[calc(100%-48px)] max-w-[360px] rounded-2xl shadow-xl max-[600px]:left-1/2 max-[600px]:-translate-x-1/2 max-[600px]:bottom-4 max-[600px]:w-[calc(100%-32px)]">
+      <div class="flex flex-col gap-4 p-4">
         
         <!-- Current/Confirmed Address Info -->
-        <div class="address-row">
-          <md-icon class="address-icon">my_location</md-icon>
-          <div class="address-details">
-            <span class="address-label">Confirmed Destination</span>
-            <span class="address-text" [title]="address()">{{ address() }}</span>
+        <div class="flex items-start gap-3">
+          <md-icon class="text-slate-500 mt-0.5">my_location</md-icon>
+          <div class="flex-1 min-w-0">
+            <span class="text-[9px] font-bold uppercase text-slate-500 tracking-wider block">Confirmed Destination</span>
+            <span class="text-sm font-semibold text-slate-900 mt-1 leading-normal overflow-hidden text-ellipsis line-clamp-2" [title]="address()">{{ address() }}</span>
             
-            <div class="coordinates-row">
-              <span class="coordinate-badge">Lat: {{ position()[0].toFixed(5) }}</span>
-              <span class="coordinate-badge">Lng: {{ position()[1].toFixed(5) }}</span>
+            <div class="flex gap-2 mt-2">
+              <span class="bg-slate-100 border border-slate-200 rounded-md px-1.5 py-0.5 font-mono text-[10px] text-slate-600">Lat: {{ position()[0].toFixed(5) }}</span>
+              <span class="bg-slate-100 border border-slate-200 rounded-md px-1.5 py-0.5 font-mono text-[10px] text-slate-600">Lng: {{ position()[1].toFixed(5) }}</span>
             </div>
           </div>
         </div>
 
         <!-- Quick Save Address Actions -->
-        <div class="card-actions-divider">
+        <div class="border-t border-slate-100 pt-3 flex gap-3 justify-end">
           <md-text-button (click)="saveCurrentLocation('home')">
             <md-icon slot="icon">home</md-icon>
             Save as Home
@@ -118,7 +106,7 @@
         </div>
 
         <!-- Primary Confirm Action Button -->
-        <md-filled-button class="action-button-full" (click)="handleConfirmLocation()">
+        <md-filled-button class="w-full [--md-filled-button-container-shape:10px]" (click)="handleConfirmLocation()">
           Confirm Destination
         </md-filled-button>
 

@@ -185,3 +185,21 @@
   margin: 4px 0 0;
   font-size: 0.9rem;
 }
+
+/* --- Toolbar (search) --- */
+.blog__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.blog__search {
+  flex: 1 1 220px;
+  margin: 0;
+}
+
+.blog__search md-outlined-text-field {
+  width: 100%;
+}

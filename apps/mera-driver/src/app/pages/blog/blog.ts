@@ -3,6 +3,7 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   computed,
   inject,
+  signal,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -24,6 +25,7 @@ import type { BlogSort } from '../../models';
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class Blog {
+  protected readonly view = signal<'grid' | 'list'>('grid');
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   protected readonly blog = inject(BlogService);
@@ -52,8 +54,17 @@ export class Blog {
     },
   );
 
+  private readonly querySearch = toSignal(
+    this.route.queryParamMap.pipe(map((p) => p.get('search') || '')),
+    {
+      initialValue:
+        this.route.snapshot.queryParamMap.get('search') || '',
+    },
+  );
+
   protected readonly selectedCategory = computed(() => this.queryCategory());
   protected readonly selectedSort = computed(() => this.querySort());
+  protected readonly searchQuery = computed(() => this.querySearch());
 
   protected readonly categories = this.blog.categoryList();
 
@@ -61,10 +72,12 @@ export class Blog {
     const rawPage = Math.max(1, this.queryPage());
     const cat = this.selectedCategory();
     const s = this.selectedSort() as BlogSort;
+    const q = this.searchQuery();
     const res = this.blog.queryPosts({
       page: rawPage,
       categories: cat ? [cat] : [],
       sort: s,
+      search: q,
     });
 
     const total = res.total;
@@ -74,6 +87,7 @@ export class Blog {
         page: limit,
         categories: cat ? [cat] : [],
         sort: s,
+        search: q,
       });
     }
     return res;
@@ -116,6 +130,15 @@ export class Blog {
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { sort: target.value === 'newest' ? null : target.value, page: null },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  protected onSearchInput(event: Event): void {
+    const target = event.target as any;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { search: target.value || null, page: null },
       queryParamsHandling: 'merge',
     });
   }

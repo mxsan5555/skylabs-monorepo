@@ -24,7 +24,6 @@ interface SearchResult {
     FormsModule
   ],
   templateUrl: './location.html',
-  styleUrl: './location.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class Location implements OnInit {

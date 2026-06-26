@@ -31,36 +31,77 @@
 
     <!-- Blog Posts Content -->
     <div class="blog__content-area">
+      <div class="blog__toolbar">
+        <form
+          class="blog__search"
+          role="search"
+          (submit)="$event.preventDefault()"
+        >
+          <md-outlined-text-field
+            label="Search posts"
+            [value]="searchQuery()"
+            (input)="onSearchInput($event)"
+          >
+            <md-icon slot="leading-icon" aria-hidden="true">search</md-icon>
+          </md-outlined-text-field>
+        </form>
+        <div class="flex items-center gap-2" role="group" aria-label="View">
+          @if (view() === 'grid') {
+            <md-filled-tonal-button aria-pressed="true" (click)="view.set('grid')">
+              <md-icon slot="icon" aria-hidden="true">grid_view</md-icon>
+              Grid
+            </md-filled-tonal-button>
+            <md-outlined-button aria-pressed="false" (click)="view.set('list')">
+              <md-icon slot="icon" aria-hidden="true">view_list</md-icon>
+              List
+            </md-outlined-button>
+          } @else {
+            <md-outlined-button aria-pressed="false" (click)="view.set('grid')">
+              <md-icon slot="icon" aria-hidden="true">grid_view</md-icon>
+              Grid
+            </md-outlined-button>
+            <md-filled-tonal-button aria-pressed="true" (click)="view.set('list')">
+              <md-icon slot="icon" aria-hidden="true">view_list</md-icon>
+              List
+            </md-filled-tonal-button>
+          }
+        </div>
+      </div>
+
       @if (items().length > 0) {
-        <ul class="blog__grid">
+        <ul [class]="view() === 'grid' ? 'blog__grid' : 'flex flex-col gap-6 list-none p-0 m-0'">
           @for (p of items(); track p.id) {
-            <li>
-              <sky-card variant="outlined">
-                <article class="post-card">
+            <li class="h-full">
+              <sky-card variant="outlined" class="block h-full">
+                <article [class]="view() === 'grid' ? 'post-card' : 'post-card flex flex-col sm:flex-row gap-6 p-4 relative h-full'">
                   <img
-                    class="post-card__img"
+                    [class]="view() === 'grid' ? 'post-card__img' : 'post-card__img w-full sm:w-[240px] h-auto aspect-[16/10] object-cover rounded-lg bg-gray-100 block flex-shrink-0'"
                     [src]="p.coverImage"
                     [alt]="p.imageAlt"
                     width="800"
                     height="480"
                     loading="lazy"
                   />
-                  <div class="post-card__body">
+                  <div [class]="view() === 'grid' ? 'post-card__body' : 'post-card__body flex flex-col items-start gap-2 flex-grow'">
                     <sky-badge variant="secondary">{{
                       blog.categoryName(p.categorySlug)
                     }}</sky-badge>
-                    <h2 class="post-card__title">
-                      <a [routerLink]="['/blog', p.slug]">{{ p.title }}</a>
+                    <h2 [class]="view() === 'grid' ? 'post-card__title' : 'post-card__title text-lg font-semibold m-0 leading-tight'">
+                      <a [routerLink]="['/blog', p.slug]" [class]="view() === 'grid' ? '' : 'text-gray-900 no-underline after:absolute after:inset-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 focus-visible:rounded-xl'">{{ p.title }}</a>
                     </h2>
-                    <p class="post-card__excerpt">{{ p.excerpt }}</p>
-                    <p class="post-card__meta">
+                    <p [class]="view() === 'grid' ? 'post-card__excerpt' : 'post-card__excerpt text-sm text-gray-600 m-0 line-clamp-3'">{{ p.excerpt }}</p>
+                    <p [class]="view() === 'grid' ? 'post-card__meta' : 'post-card__meta text-xs text-gray-500 mt-auto flex items-center gap-1.5 m-0 pt-2'">
                       <time [attr.datetime]="p.publishedAt">{{
                         p.publishedAt | date: 'mediumDate'
                       }}</time>
                       <span aria-hidden="true">·</span>
-                      <span class="post-card__read">
-                        <md-icon aria-hidden="true">schedule</md-icon>{{ p.readMinutes }}
-                        min read
+                      <span [class]="view() === 'grid' ? 'post-card__read' : 'inline-flex items-center gap-1'">
+                        <md-icon aria-hidden="true" [class]="view() === 'grid' ? '' : 'text-sm'" style="--md-icon-size: 14px;">schedule</md-icon>
+                        @if (view() === 'grid') {
+                          {{ p.readMinutes }} min read
+                        } @else {
+                          <span>{{ p.readMinutes }} min read</span>
+                        }
                       </span>
                     </p>
                   </div>
