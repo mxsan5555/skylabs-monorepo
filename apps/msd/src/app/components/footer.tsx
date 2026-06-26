@@ -18,8 +18,8 @@ export function Footer() {
             <ListItem href='about-us'>About Us</ListItem>
             <ListItem href='faqs'>FAQ's</ListItem>
             <ListItem href='list-your-business'>List Your Business</ListItem>
-            <ListItem href='contact-us'>Contact Us</ListItem>
-            <ListItem href='rss'>RSS</ListItem>
+            <ListItem href='/contact'>Contact</ListItem>
+            <ListItem href='/blog'>Blog</ListItem>
           </List>
         </div>
 

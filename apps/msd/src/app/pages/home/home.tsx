@@ -18,30 +18,18 @@ import spa4 from '../../../assets/imgs/spa4.webp';
 import spa5 from '../../../assets/imgs/spa5.avif';
 import spa6 from '../../../assets/imgs/spa6.webp';
 import spa7 from '../../../assets/imgs/spa7.jfif';
-// type SwiperEl = HTMLElement & {
-//   initialize: () => void;
-//   [key: string]: unknown;
-// };
-// function useSwiperParams(params: Record<string, unknown>) {
-//   const ref = useRef<HTMLElement>(null);
-//   useEffect(() => {
-//     const el = ref.current as SwiperEl | null;
-//     if (!el) return;
-//     Object.assign(el, params);
-//     el.initialize();
-//   }, [params]);
-//   return ref;
-// }
+import { spas } from '../../data/spas';
+
 /**
  * Sample landing page. Demonstrates a page composed from shared-ui components
  * and themed by msd's palette. Real content/data arrives with the blog/contact
  * pages and the backend.
  */
+
 export function Home() {
   const navigate = useNavigate();
   const slideImages = [spa1, spa2, spa3, spa4, spa5, spa6, spa7];
-  // Demo slides. `auto` adds a fixed width so `slides-per-view="auto"` works.
-  // const slideNums = [1, 2, 3, 4, 5, 6, 7, 8];
+
   const slides = () =>
     slideImages.map((img, index) => (
       <swiper-slide key={index}>
@@ -54,10 +42,8 @@ export function Home() {
     ));
   return (
     <div className="home">
-      <section >
-        {/* <h2>Carousel (Swiper Element)</h2> */}
 
-        {/* <h3 className="demo-carousel__label">1. Default</h3> */}
+      <section >
         <swiper-container
           className="demo-carousel"
           navigation="true"
@@ -67,74 +53,31 @@ export function Home() {
         </swiper-container>
       </section>
 
+
+
       <section className="showcase__card">
         <h2>Cards</h2>
-        <div className="cards-grid">
-          <SkyProductCardReact
-            image="https://picsum.photos/seed/spa/600/400"
-            imageAlt="Massage therapy"
-            badge="Popular Gift"
-            favorite
-            eyebrow="Just Relax Spa"
-            heading="Enjoy a 90-minute VIP facial and body massage package"
-            location="Center City East, Philadelphia"
-            distance="11 mi"
-            rating={4.7}
-            reviews={783}
-            originalPrice="$220"
-            price="$159"
-            discount="-28%"
-            priceNote="$119.25 with code SUMMER"
-          />
-          <SkyProductCardReact
-            variant="outlined"
-            image="https://picsum.photos/seed/grandhotel/600/400"
-            imageAlt="The Grand Hotel at night"
-            favorite
-            tag="Hotel"
-            tagIcon="hotel"
-            heading="The Grand Hotel at the Grand Canyon"
-            location="Tusayan, United States"
-            score={8.5}
-            scoreLabel="Very Good"
-            reviews={4798}
-            pricePrefix="Starting from"
-            originalPrice="$215"
-            price="$172"
-          />
-          <SkyProductCardReact
-            image="https://picsum.photos/seed/noidaspa1/600/400"
-            imageAlt="Luxury spa in Noida"
-            badge="Top Rated"
-            favorite
-            eyebrow="Aroma Wellness Spa"
-            heading="Full Body Massage & Aromatherapy Session"
-            location="Sector 18, Noida, Uttar Pradesh"
-            distance="3.2 km"
-            rating={4.8}
-            reviews={542}
-            originalPrice="₹3,500"
-            price="₹2,499"
-            discount="-29%"
-            priceNote="Weekend Special Offer"
-          />
 
-          <SkyProductCardReact
-            image="https://picsum.photos/seed/noidaspa2/600/400"
-            imageAlt="Premium spa in Noida"
-            badge="Couple Package"
-            favorite
-            eyebrow="Royal Thai Spa"
-            heading="Couple Spa Therapy with Steam & Jacuzzi"
-            location="Sector 62, Noida, Uttar Pradesh"
-            distance="5.8 km"
-            rating={4.6}
-            reviews={389}
-            originalPrice="₹5,000"
-            price="₹3,799"
-            discount="-24%"
-            priceNote="Free Herbal Tea Included"
-          />
+        <div className="cards-grid">
+          {spas.map((spa) => (
+            <SkyProductCardReact
+              key={spa.id}
+              image={spa.image}
+              imageAlt={spa.imageAlt}
+              badge={spa.badge}
+              favorite
+              eyebrow={spa.eyebrow}
+              heading={spa.heading}
+              location={spa.location}
+              distance={spa.distance}
+              rating={spa.rating}
+              reviews={spa.reviews}
+              originalPrice={spa.originalPrice}
+              price={spa.price}
+              discount={spa.discount}
+              priceNote={spa.priceNote}
+            />
+          ))}
           <SkyInfoCardReact
             align="center"
             icon="support_agent"

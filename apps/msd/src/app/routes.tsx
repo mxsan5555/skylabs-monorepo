@@ -15,7 +15,7 @@ import Profile from './pages/account/profile';
 import { Dashboard, Deals, Promotions, Sales } from './pages/account/role-pages';
 import { Categories } from './pages/master/categories/categories';
 import { AddCategory } from './pages/master/categories/add-category';
-
+import Search from './pages/search/search';
 /**
  * Central route table. Public pages use PublicLayout, auth screens use
  * AuthLayout, and the signed-in console uses AdminLayout (role-filtered).
@@ -31,6 +31,7 @@ export function AppRoutes() {
         <Route path="/showcase" element={<Showcase />} />
         {/* Catch-all 404, inside the shell so it keeps header/footer. */}
         <Route path="*" element={<NotFound />} />
+        <Route path="/search" element={<Search />} />
       </Route>
 
       {/* Auth screens use a minimal centered shell (no header/footer). */}

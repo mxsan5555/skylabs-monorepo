@@ -612,3 +612,32 @@
 .app-footer {
   padding: 40px 32px 20px;
 }
+
+/* search-bar css */
+
+.blog__search {
+  position: relative;
+  flex: 1;
+}
+
+.search-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 100%;
+  background: var(--md-sys-color-surface-container, #eef2ea);
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.search-suggestion {
+  padding: 12px 16px;
+  cursor: pointer;
+}
+
+.search-suggestion:hover {
+  background: #c4c7c5;
+}

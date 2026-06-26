@@ -82,6 +82,7 @@
 .view-toggle {
   display: inline-flex;
   gap: 8px;
+   margin-top: 18px;
 }
 
 /* --- Results --- */

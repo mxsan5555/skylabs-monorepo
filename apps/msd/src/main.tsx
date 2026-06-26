@@ -18,11 +18,15 @@ applyTheme('light');
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement,
 );
-
+console.log(
+  'API KEY:',
+  import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+);
 root.render(
   <StrictMode>
     <BrowserRouter>
       <App />
+
     </BrowserRouter>
   </StrictMode>,
 );
