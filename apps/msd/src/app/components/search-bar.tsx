@@ -78,6 +78,8 @@ export function SearchBar() {
                     }}
                 >
                     Near Me
+                    {/* 
+                    <Icon>near_me</Icon> */}
                 </FilledButton>
             </div>
         </>

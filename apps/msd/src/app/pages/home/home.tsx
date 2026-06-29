@@ -4,10 +4,7 @@ import {
   OutlinedButton,
   SkyCardReact,
   SkyBadgeReact,
-  Slider,
   SkyProductCardReact,
-  SkyImageCardReact,
-  SkyCategoryCardReact,
   SkyInfoCardReact,
 } from '@skylabs-monorepo/shared-ui/react';
 import './home.css';
@@ -19,7 +16,7 @@ import spa5 from '../../../assets/imgs/spa5.avif';
 import spa6 from '../../../assets/imgs/spa6.webp';
 import spa7 from '../../../assets/imgs/spa7.jfif';
 import { spas } from '../../data/spas';
-
+import { SearchBar } from '../../components/search-bar';
 /**
  * Sample landing page. Demonstrates a page composed from shared-ui components
  * and themed by msd's palette. Real content/data arrives with the blog/contact
@@ -42,6 +39,9 @@ export function Home() {
     ));
   return (
     <div className="home">
+      <section>
+        <SearchBar />
+      </section>
 
       <section >
         <swiper-container

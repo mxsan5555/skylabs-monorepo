@@ -1,5 +1,19 @@
+
+.search__toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.search-page__header {
+  flex: 1;
+}
+
 .search-view-toggle {
-    display: inline-flex;
-    gap: 8px;
-    margin-top: 18px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }

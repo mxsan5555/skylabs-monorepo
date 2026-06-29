@@ -1,13 +1,10 @@
 import { useSearchParams } from 'react-router-dom';
 import { SkyProductCardReact } from '@skylabs-monorepo/shared-ui/react';
 import { spas } from '../../data/spas';
-import {
-    FilledTonalButton,
-    OutlinedButton,
-    Icon,
-} from '@skylabs-monorepo/shared-ui/react';
+import { FilledTonalButton, OutlinedButton, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import { useEffect, useMemo, useState } from 'react';
 import './search.css';
+import { SearchBar } from '../../components/search-bar';
 
 function getDistance(
     lat1: number,
@@ -180,51 +177,56 @@ export function Search() {
     return (
 
         <>
+            <div className="home">
+                <section>
+                    <SearchBar />
+                </section>
 
-            <div className="search-page">
-                <div className="search__toolbar">
-                    <div className="search-page__header">
-                        {/* <h1>{query}</h1>
-                <p>{filteredSpas.length} spas found</p> */}
+                <div className="search-page">
+                    <div className="search__toolbar">
+                        <div className="search-page__header">
+                            <h2>{query || "Nearby Spas"}</h2>
+                            <p>{filteredSpas.length} spas found</p>
+                        </div>
+                        <div className="search-view-toggle" role="group" aria-label="View">
+                            {viewButton('grid', 'grid_view', 'Grid')}
+                            {viewButton('list', 'view_list', 'List')}
+                        </div>
                     </div>
-                    <div className="search-view-toggle" role="group" aria-label="View">
-                        {viewButton('grid', 'grid_view', 'Grid')}
-                        {viewButton('list', 'view_list', 'List')}
-                    </div>
+
+                    {filteredSpas.length === 0 ? (
+                        <div className="search-empty">
+                            <h2>No spas found</h2>
+                            <p>Try another city or spa name.</p>
+                        </div>
+                    ) : (
+                        <div className="home">
+                            <section className="showcase__card">
+                                <div className={`cards-grid cards--${view}`}>
+                                    {filteredSpas.map((spa) => (
+                                        <SkyProductCardReact
+                                            key={spa.id}
+                                            image={spa.image}
+                                            imageAlt={spa.imageAlt}
+                                            badge={spa.badge}
+                                            favorite
+                                            eyebrow={spa.eyebrow}
+                                            heading={spa.heading}
+                                            location={spa.location}
+                                            distance={spa.distance}
+                                            rating={spa.rating}
+                                            reviews={spa.reviews}
+                                            originalPrice={spa.originalPrice}
+                                            price={spa.price}
+                                            discount={spa.discount}
+                                            priceNote={spa.priceNote}
+                                        />
+                                    ))}
+                                </div>
+                            </section>
+                        </div>
+                    )}
                 </div>
-
-                {filteredSpas.length === 0 ? (
-                    <div className="search-empty">
-                        <h2>No spas found</h2>
-                        <p>Try another city or spa name.</p>
-                    </div>
-                ) : (
-                    <div className="home">
-                        <section className="showcase__card">
-                            <div className={`cards-grid cards--${view}`}>
-                                {filteredSpas.map((spa) => (
-                                    <SkyProductCardReact
-                                        key={spa.id}
-                                        image={spa.image}
-                                        imageAlt={spa.imageAlt}
-                                        badge={spa.badge}
-                                        favorite
-                                        eyebrow={spa.eyebrow}
-                                        heading={spa.heading}
-                                        location={spa.location}
-                                        distance={spa.distance}
-                                        rating={spa.rating}
-                                        reviews={spa.reviews}
-                                        originalPrice={spa.originalPrice}
-                                        price={spa.price}
-                                        discount={spa.discount}
-                                        priceNote={spa.priceNote}
-                                    />
-                                ))}
-                            </div>
-                        </section>
-                    </div>
-                )}
             </div>
         </>
     );
