@@ -14,6 +14,7 @@ import {
   verifyMailOtp,
   verifyMobileOtp,
 } from '../../../api/auth';
+import { copy } from '../../../copy/copy';
 
 const RESEND_SECONDS = 24;
 
@@ -25,7 +26,9 @@ const RESEND_SECONDS = 24;
 export function Otp() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn } = useAuth();
+  const { signIn, setRoles } = useAuth();
+  const user = (location.state as any)?.user;
+  const [error, setError] = useState('');
 
   const destination =
     (location.state as { destination?: string } | null)?.destination ?? '4564';
@@ -41,54 +44,51 @@ export function Otp() {
     return () => clearInterval(timer);
   }, []);
 
-  const verify = () => {
-    // Real verification will call the auth API; for now accept any code.
-    signIn('mock-token');
-    navigate('/account');
-  };
-
-  // const verify = async () => {
-  //   try {
-  //     const method = (location.state as any)?.method;
-  //     const destination = (location.state as any)?.destination;
-
-  //     if (method === 'email') {
-  //       await verifyMailOtp(destination, code);
-  //     } else {
-  //       await verifyMobileOtp(destination, code);
-  //     }
-
-  //     signIn('real-token'); // later backend token
-  //     navigate('/account');
-
-  //   } catch (error) {
-  //     console.error('OTP verification failed:', error);
-  //   }
+  // const verify = () => {
+  //   // Real verification will call the auth API; for now accept any code.
+  //   signIn('mock-token');
+  //   navigate('/account');
   // };
+  const verify = () => {
+  if (!user) return;
+
+  setError('');
+
+  if (code !== user.otp) {
+    setError(copy.errors.invalidOtp);
+    return;
+  }
+
+  signIn('mock-token');
+setRoles([user.role]);
+  switch (user.role) {
+    case 'admin':
+      navigate('/account/deals');
+      break;
+
+    case 'marketing':
+      navigate('/account/promotions');
+      break;
+
+    case 'sales':
+      navigate('/account/sales');
+      break;
+
+    default:
+      navigate('/account');
+  }
+};
 
 
-  const resendOtp = async () => {
-    try {
-      const method = (location.state as any)?.method;
-      const destination = (location.state as any)?.destination;
-
-      if (method === 'email') {
-        await sendMailOtp(destination);
-      } else {
-        await sendMobileOtp(destination);
-      }
-
-      setSeconds(RESEND_SECONDS);
-
-    } catch (error) {
-      console.error('Resend OTP failed:', error);
-    }
+  const resendOtp = () => {
+    console.log("Resend OTP:", user?.otp);
+    setSeconds(RESEND_SECONDS);
   };
 
 
   return (
     <div className="auth-screen otp-screen">
-      <title>Verify your phone · MSD</title>
+      <title>{copy.otp.pageTitle}</title>
       <IconButton
         className="otp-back"
         aria-label="Go back"
@@ -101,8 +101,8 @@ export function Otp() {
         <div className="auth-brand__logo">
           <Icon aria-hidden="true">sms</Icon>
         </div>
-        <h1 className="auth-brand__title">Verify your phone</h1>
-        <p className="auth-brand__subtitle">We sent a 6-digit code to</p>
+        <h1 className="auth-brand__title">{copy.otp.title}</h1>
+        <p className="auth-brand__subtitle">{copy.otp.subtitle}</p>
         <span className="auth-destination">
           <Icon aria-hidden="true">call</Icon>
           {destination}
@@ -110,12 +110,12 @@ export function Otp() {
       </div>
 
       <div className="auth-card">
-        <h2>Enter the code</h2>
-        <p>The code expires in a few minutes.</p>
+        <h2>{copy.otp.enterCode}</h2>
+        <p>{copy.otp.codeExpiry}</p>
 
         <OutlinedTextField
           className="otp-field"
-          label="6-digit code"
+          label={copy.otp.codeLabel}
           type="text"
           inputMode="numeric"
           autocomplete="one-time-code"
@@ -132,7 +132,7 @@ export function Otp() {
       </div>
 
       <p className="otp-resend">
-        Didn’t receive the code?{' '}
+        {copy.otp.resendQuestion}{' '}
         {seconds > 0 ? (
           <span className="otp-muted">Resend in {seconds}s</span>
         ) : (

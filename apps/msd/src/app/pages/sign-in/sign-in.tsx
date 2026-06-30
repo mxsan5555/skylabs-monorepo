@@ -1,18 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  FilledButton,
-  OutlinedButton,
-  OutlinedTextField,
-  Tabs,
-  PrimaryTab,
-  Icon,
-} from '@skylabs-monorepo/shared-ui/react';
-import {
-  sendMailOtp,
-  sendMobileOtp,
-} from '../../../api/auth';
-
+import { FilledButton, OutlinedButton, OutlinedTextField, Tabs, PrimaryTab, Icon, } from '@skylabs-monorepo/shared-ui/react';
+import { sendMailOtp, sendMobileOtp, } from '../../../api/auth';
+import { copy } from '../../../copy/copy';
+import { users } from '../../data/users';
 type Method = 'email' | 'phone';
 
 /**
@@ -43,51 +34,37 @@ export function SignIn() {
     setError('');
   };
   // fake navigation to otp page
-  const sendOtp = () => {
-    navigate('/otp', {
-      state: { destination: value || (isPhone ? '4564' : 'you@email.com'), method },
-    });
-  };
-
-  // const sendOtp = async () => {
-  //   if (!value.trim()) {
-  //     setError(
-  //       isPhone
-  //         ? 'Phone number is required'
-  //         : 'Email is required',
-  //     );
-  //     return;
-  //   }
-  //   if (isPhone && !validatePhone(value)) {
-  //     setError('Enter a valid Indian mobile number');
-  //     return;
-  //   }
-  //   if (!isPhone && !validateEmail(value)) {
-  //     setError('Enter a valid email address');
-  //     return;
-  //   }
-  //   try {
-  //     setLoading(true);
-
-  //     if (method === 'email') {
-  //       await sendMailOtp(value);
-  //     } else {
-  //       await sendMobileOtp(value);
-  //     }
-
-  //     navigate('/otp', {
-  //       state: {
-  //         destination: value,
-  //         method,
-  //       },
-  //     });
-
-  //   } catch (error) {
-  //     console.error('OTP send failed:', error);
-  //   } finally {
-  //     setLoading(false);
-  //   }
+  // const sendOtp = () => {
+  //   navigate('/otp', {
+  //     state: { destination: value || (isPhone ? '4564' : 'you@email.com'), method },
+  //   });
   // };
+
+ const sendOtp = () => {
+  const user = users.find((u) =>
+    isPhone ? u.mobile === value : u.email === value
+  );
+
+  if (!user) {
+    setError(
+      isPhone ? copy.errors.invalidPhone : copy.errors.invalidEmail
+    );
+    return;
+  }
+
+  // MOCK OTP "SEND"
+  console.log("Mock OTP:", user.otp);
+
+  navigate('/otp', {
+    state: {
+      user,
+      method,
+      destination: value,
+    },
+  });
+};
+
+
 
   return (
     <div className="auth-screen">
@@ -101,8 +78,8 @@ export function SignIn() {
       </div>
 
       <div className="auth-card">
-        <h2>Sign in</h2>
-        <p>Enter your details to receive a one-time code.</p>
+        <h2>{copy.signIn.title}</h2>
+        <p>{copy.signIn.subtitle}</p>
 
         <Tabs
           className="auth-tabs"
@@ -125,7 +102,7 @@ export function SignIn() {
 
         <OutlinedTextField
           className="auth-field"
-          label={isPhone ? 'Phone number' : 'Email'}
+          label={isPhone ? copy.signIn.phoneLabel : copy.signIn.emailLabel}
           type={isPhone ? 'tel' : 'email'}
           autocomplete={isPhone ? 'tel' : 'email'}
           value={value}
@@ -143,9 +120,7 @@ export function SignIn() {
               input = input.replace(/\D/g, '');
 
               if (input.length > 0 && !/[6-9]/.test(input[0])) {
-                setError(
-                  'Enter a valid Indian mobile number',
-                );
+                setError(copy.errors.invalidPhone);
                 input = '';
               } else {
                 setError('');
@@ -165,22 +140,22 @@ export function SignIn() {
         {error && <p className="auth-error">{error}</p>}
 
         <FilledButton className="auth-submit" onClick={sendOtp} disabled={loading}>
-          {loading ? 'Sending...' : 'Send OTP'}
+          {loading ? copy.signIn.sending : copy.signIn.sendOtp}
         </FilledButton>
       </div>
 
       <div className="auth-divider">
-        <span>or continue with</span>
+        <span>{copy.signIn.continueWith}</span>
       </div>
 
       <OutlinedButton className="auth-google">
         <Icon slot="icon" aria-hidden="true">
           language
         </Icon>
-        Continue with Google
+        {copy.signIn.continueWithGoogle}
       </OutlinedButton>
 
-      <p className="auth-note">New users are registered automatically.</p>
+      <p className="auth-note">{copy.signIn.newUserNote}</p>
     </div>
   );
 }

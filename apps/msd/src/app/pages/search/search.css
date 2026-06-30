@@ -17,3 +17,12 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+.search-page__header h2 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.search-page__header p {
+  margin: 4px 0 0;
+  color: #666;
+}
