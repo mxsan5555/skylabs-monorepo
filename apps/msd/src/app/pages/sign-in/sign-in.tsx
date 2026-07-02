@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedButton, OutlinedTextField, Tabs, PrimaryTab, Icon, } from '@skylabs-monorepo/shared-ui/react';
-import { sendMailOtp, sendMobileOtp, } from '../../../api/auth';
 import { copy } from '../../../copy/copy';
 import { users } from '../../data/users';
 type Method = 'email' | 'phone';
@@ -33,36 +32,31 @@ export function SignIn() {
     setValue('');
     setError('');
   };
-  // fake navigation to otp page
-  // const sendOtp = () => {
-  //   navigate('/otp', {
-  //     state: { destination: value || (isPhone ? '4564' : 'you@email.com'), method },
-  //   });
-  // };
 
- const sendOtp = () => {
-  const user = users.find((u) =>
-    isPhone ? u.mobile === value : u.email === value
-  );
 
-  if (!user) {
-    setError(
-      isPhone ? copy.errors.invalidPhone : copy.errors.invalidEmail
+  const sendOtp = () => {
+    const user = users.find((u) =>
+      isPhone ? u.mobile === value : u.email === value
     );
-    return;
-  }
 
-  // MOCK OTP "SEND"
-  console.log("Mock OTP:", user.otp);
+    if (!user) {
+      setError(
+        isPhone ? copy.errors.invalidPhone : copy.errors.invalidEmail
+      );
+      return;
+    }
 
-  navigate('/otp', {
-    state: {
-      user,
-      method,
-      destination: value,
-    },
-  });
-};
+    // MOCK OTP "SEND"
+    console.log("Mock OTP:", user.otp);
+
+    navigate('/otp', {
+      state: {
+        user,
+        method,
+        destination: value,
+      },
+    });
+  };
 
 
 
@@ -106,9 +100,8 @@ export function SignIn() {
           type={isPhone ? 'tel' : 'email'}
           autocomplete={isPhone ? 'tel' : 'email'}
           value={value}
-          // onInput={(event: Event) =>
-          //   setValue((event.target as HTMLInputElement).value)
-          // }
+
+
           onInput={(event: Event) => {
             const target = event.target as HTMLInputElement & {
               value: string;

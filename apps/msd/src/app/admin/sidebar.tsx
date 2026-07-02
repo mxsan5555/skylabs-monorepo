@@ -53,48 +53,48 @@ export function Sidebar() {
               ))} */}
 
               {items.map((item) => {
-  if (item.children) {
-    return (
-      <div key={item.label}>
-        <div
-          className="admin-nav-item"
-          onClick={() => setMasterDataOpen(!masterDataOpen)}
-        >
-          <Icon aria-hidden="true">{item.icon}</Icon>
+                if (item.children) {
+                  return (
+                    <div key={item.label}>
+                      <div
+                        className="admin-nav-item"
+                        onClick={() => setMasterDataOpen(!masterDataOpen)}
+                      >
+                        <Icon aria-hidden="true">{item.icon}</Icon>
 
-          <span>{item.label}</span>
+                        <span>{item.label}</span>
 
-          <Icon aria-hidden="true">
-            {masterDataOpen ? 'expand_less' : 'expand_more'}
-          </Icon>
-        </div>
+                        <Icon aria-hidden="true">
+                          {masterDataOpen ? 'expand_less' : 'expand_more'}
+                        </Icon>
+                      </div>
 
-        {masterDataOpen &&
-          item.children.map((child) => (
-            <NavLink
-              key={child.to}
-              to={child.to!}
-              className="admin-nav-item "
-            >
-              <Icon aria-hidden="true">{child.icon}</Icon>
-              {child.label}
-            </NavLink>
-          ))}
-      </div>
-    );
-  }
+                      {masterDataOpen &&
+                        item.children.map((child) => (
+                          <NavLink
+                            key={child.to}
+                            to={child.to!}
+                            className="admin-nav-item "
+                          >
+                            <Icon aria-hidden="true">{child.icon}</Icon>
+                            {child.label}
+                          </NavLink>
+                        ))}
+                    </div>
+                  );
+                }
 
-  return (
-    <NavLink
-      key={item.to}
-      to={item.to!}
-      className="admin-nav-item"
-    >
-      <Icon aria-hidden="true">{item.icon}</Icon>
-      {item.label}
-    </NavLink>
-  );
-})}
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to!}
+                    className="admin-nav-item"
+                  >
+                    <Icon aria-hidden="true">{item.icon}</Icon>
+                    {item.label}
+                  </NavLink>
+                );
+              })}
             </div>
           );
         })}

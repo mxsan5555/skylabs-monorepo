@@ -19,6 +19,8 @@ export function Header() {
       <nav className="app-header__nav" aria-label="Primary">
         <NavLink to="/">Home</NavLink>
         <NavLink to="/showcase">Showcase</NavLink>
+        <NavLink to="/summer-deals">Summer Deals</NavLink>
+        <NavLink to="/beauty&spa">Beauty & Spa</NavLink>
       </nav>
       <div className="desktop-actions">
         {isAuthenticated ? (
@@ -68,6 +70,24 @@ export function Header() {
             }}
           >
             <div slot="headline">Showcase</div>
+          </MenuItem>
+
+          <MenuItem
+            onClick={() => {
+              navigate('/summer-deals');
+              setMenuOpen(false);
+            }}
+          >
+            <div slot="headline">Summer Deals</div>
+          </MenuItem>
+
+          <MenuItem
+            onClick={() => {
+              navigate('/beauty&spa');
+              setMenuOpen(false);
+            }}
+          >
+            <div slot="headline">Beauty & Spa</div>
           </MenuItem>
 
           <MenuItem
