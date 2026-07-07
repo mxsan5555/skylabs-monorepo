@@ -96,7 +96,7 @@ export function SignIn() {
 
         <OutlinedTextField
           className="auth-field"
-          label={isPhone ? copy.signIn.phoneLabel : copy.signIn.emailLabel}
+          data-testid={isPhone ? 'phone-input' : 'email-input'}
           type={isPhone ? 'tel' : 'email'}
           autocomplete={isPhone ? 'tel' : 'email'}
           value={value}

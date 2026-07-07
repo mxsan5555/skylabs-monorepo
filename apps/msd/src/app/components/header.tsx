@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { FilledButton, TextButton, IconButton, Icon, Menu, MenuItem, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '../../auth/auth-context';
 import { useState } from 'react';
+import { SearchBar } from './search-bar';
 /**
  * App header: brand, primary nav, and auth action. App-specific (it knows the
  * router and auth), so it lives in the app, not in shared-ui.
@@ -21,7 +22,24 @@ export function Header() {
         <NavLink to="/showcase">Showcase</NavLink>
         <NavLink to="/summer-deals">Summer Deals</NavLink>
         <NavLink to="/beauty&spa">Beauty & Spa</NavLink>
+
       </nav>
+      <div className="header-search">
+        <SearchBar />
+      </div>
+      <div className="header-nearme">
+        <FilledButton
+          className="nearme-btn"
+          onClick={() => navigate("/search?nearMe=true")}
+        >
+          <Icon slot="icon">near_me</Icon>
+
+          <span className="nearme-text">
+            Near Me
+          </span>
+
+        </FilledButton>
+      </div>
       <div className="desktop-actions">
         {isAuthenticated ? (
           <>

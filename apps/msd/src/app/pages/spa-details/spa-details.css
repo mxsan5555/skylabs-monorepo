@@ -1,0 +1,161 @@
+.spa-details {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 48px 24px 64px;
+}
+
+.spa-details__breadcrumb {
+  margin-bottom: 32px;
+}
+
+.spa-details__breadcrumb a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--md-sys-color-primary, #3a693c);
+  font-weight: 600;
+  transition: .3s;
+}
+
+.spa-details__breadcrumb a:hover {
+  opacity: .75;
+}
+
+.spa-details__hero {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 48px;
+  align-items: start;
+  /* #f8f8f8 */
+  background: #fff;
+  border-radius: 24px;
+  padding: 32px;
+
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, .08);
+}
+
+.spa-details__image {
+  width: 100%;
+  height: 500px;
+  object-fit: cover;
+  display: block;
+}
+
+.spa-details__content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.spa-details__content h1 {
+  margin: 0;
+  font-size: 2.2rem;
+  line-height: 1.2;
+}
+
+.spa-details__content h3 {
+  margin: 0;
+  color: #666;
+  font-weight: 500;
+}
+
+.spa-details__info {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  background: #f8f8f8;
+  padding: 20px;
+  border-radius: 16px;
+}
+
+.spa-details__info p {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 15px;
+}
+
+.spa-details__price {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.old-price {
+  text-decoration: line-through;
+  color: #888;
+  font-size: 18px;
+}
+
+.new-price {
+  font-size: 34px;
+  font-weight: 700;
+  color: #2e7d32;
+}
+
+.price-note {
+  margin: 0;
+  color: #2e7d32;
+  font-weight: 600;
+}
+
+.spa-details__button {
+  margin-top: 8px;
+}
+
+.spa-details__button>* {
+  width: 100%;
+}
+
+.spa-details--missing {
+  text-align: center;
+  padding: 80px 24px;
+}
+
+@media (max-width:768px) {
+
+  .spa-details {
+    padding: 24px 16px 40px;
+  }
+
+  .spa-details__hero {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: 20px;
+  }
+
+  .spa-details__image {
+    height: 280px;
+  }
+
+  .spa-details__content h1 {
+    font-size: 30px;
+  }
+
+  .new-price {
+    font-size: 28px;
+  }
+
+  .spa-details__price {
+    gap: 12px;
+  }
+
+}
+
+.spa-details__image-wrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+.spa-details__badge {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+}

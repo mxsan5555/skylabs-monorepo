@@ -1,14 +1,3 @@
-// {
-//   "errors": {
-//     "emailRequired": "Email is required.",
-//     "phoneRequired": "Phone number is required.",
-//     "invalidEmail": "Enter a valid email address.",
-//     "invalidPhone": "Enter a valid Indian mobile number.",
-//     "otpRequired": "OTP is required.",
-//     "invalidOtp": "Invalid OTP."
-//   }
-// }
-
 export const copy = {
   signIn: {
     title: 'Sign in',

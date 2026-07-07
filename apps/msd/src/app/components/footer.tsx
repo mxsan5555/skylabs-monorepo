@@ -7,8 +7,8 @@ export function Footer() {
         <div className="footer-column">
           <h3><Icon>help_center</Icon>Help Center</h3>
           <List>
-            <ListItem href='how-to-pay'>How to Pay</ListItem>
-            <ListItem href='delivery-info'>Delivery Info</ListItem>
+            <ListItem href='/how-to-pay'>How to Pay</ListItem>
+            <ListItem href='/delivery-info'>Delivery Info</ListItem>
             <ListItem href="/faqs">FAQs</ListItem>
             <ListItem href="/contact">Contact Support</ListItem>
           </List>
@@ -17,8 +17,8 @@ export function Footer() {
         <div className="footer-column">
           <h3> <Icon>chart_data</Icon>Customer Information</h3>
           <List>
-            <ListItem href='about-us'>About Us</ListItem>
-            <ListItem href='list-your-business'>List Your Business</ListItem>
+            <ListItem href='/about-us'>About Us</ListItem>
+            <ListItem href='/list-your-business'>List Your Business</ListItem>
             <ListItem href='/contact'>Contact</ListItem>
             <ListItem href='/blog'>Blog</ListItem>
           </List>
@@ -27,9 +27,9 @@ export function Footer() {
         <div className="footer-column">
           <h3> <Icon>privacy_tip</Icon>Security & privacy</h3>
           <List>
-            <ListItem href='terms-of-use'>Term's of Use</ListItem>
-            <ListItem href='privacy-policy'>Privacy Policy</ListItem>
-            <ListItem href='return-policy'>Return/Refund Policy</ListItem>
+            <ListItem href='/terms-of-use'>Terms of Use</ListItem>
+            <ListItem href='/privacy-policy'>Privacy Policy</ListItem>
+            <ListItem href='/return-policy'>Return/Refund Policy</ListItem>
           </List>
         </div>
 

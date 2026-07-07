@@ -70,17 +70,6 @@ export function SearchBar() {
                         )}
 
                 </div>
-                <FilledButton
-                    onClick={() => {
-                        setSearch("");
-                        setShowSuggestions(false);
-                        navigate("/search?nearMe=true");
-                    }}
-                >
-                    Near Me
-                    {/* 
-                    <Icon>near_me</Icon> */}
-                </FilledButton>
             </div>
         </>
     );

@@ -21,13 +21,37 @@ export function Contact() {
       <main className="contact-page">
 
         {/* Hero */}
-        <section className="contact-hero">
-          <span className="contact-hero__badge">
-            <Icon>support_agent</Icon>
-            {copy.contact.hero.badge}
-          </span>
+        <section className="contact-header">
           <h1>{copy.contact.hero.title}</h1>
           <p>{copy.contact.hero.description}</p>
+        </section>
+
+        <section className="contact-cards">
+          <div className="contact-card">
+            <div className="icon-box">
+              <Icon>call</Icon>
+            </div>
+            <h3>{copy.contact.info.phoneTitle}</h3>
+            <p>{copy.contact.info.phone}</p>
+          </div>
+          <div className="contact-card">
+            <div className="icon-box">
+              <Icon>mail</Icon>
+            </div>
+            <h3>{copy.contact.info.emailTitle}</h3>
+            <p>{copy.contact.info.email}</p>
+          </div>
+          <div className="contact-card">
+            <div className="icon-box">
+              <Icon>location_on</Icon>
+            </div>
+            <h3>{copy.contact.info.visitTitle}</h3>
+            <p>
+              {copy.contact.info.visitAddress[0]}
+              <br />
+              {copy.contact.info.visitAddress[1]}
+            </p>
+          </div>
         </section>
 
         {/* Form + Contact Info */}
@@ -130,6 +154,10 @@ export function Contact() {
           {/* Contact Information */}
           <aside className="contact-info">
             <h2>{copy.contact.info.title}</h2>
+            <p className="contact-info-text">
+              We're available Monday to Saturday.
+              Feel free to reach us anytime.
+            </p>
             <div className="info-item">
               <div className="icon-box">
                 <Icon>location_on</Icon>
@@ -201,46 +229,6 @@ export function Contact() {
             />
           </div>
         </section>
-
-        {/* <section className="showcase">
-
-          <div className="contact-card">
-            <div className="icon-box">
-              <Icon>call</Icon>
-            </div>
-
-            <h3>Call Us</h3>
-
-            <p>Speak directly with our support team.</p>
-
-            <span>+91 98765 43210</span>
-          </div>
-
-          <div className="contact-card">
-            <div className="icon-box">
-              <Icon>mail</Icon>
-            </div>
-
-            <h3>Email Us</h3>
-
-            <p>Send us your questions anytime.</p>
-
-            <span>support@msd.com</span>
-          </div>
-
-          <div className="contact-card">
-            <div className="icon-box">
-              <Icon>location_on</Icon>
-            </div>
-
-            <h3>Visit Us</h3>
-
-            <p>Come experience our wellness center.</p>
-
-            <span>DLF Phase 4, Gurugram</span>
-          </div>
-
-        </section> */}
       </main>
     </div>
   );

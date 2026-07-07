@@ -1,10 +1,10 @@
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { SkyProductCardReact } from '@skylabs-monorepo/shared-ui/react';
 import { spas } from '../../data/spas';
 import { FilledTonalButton, OutlinedButton, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import { useEffect, useMemo, useState } from 'react';
 import './search.css';
-import { SearchBar } from '../../components/search-bar';
+
 
 function getDistance(
     lat1: number,
@@ -178,9 +178,6 @@ export function Search() {
 
         <>
             <div className="home">
-                <section>
-                    <SearchBar />
-                </section>
 
                 <div className="search-page">
                     <div className="search__toolbar">
@@ -204,23 +201,32 @@ export function Search() {
                             <section className="showcase__card">
                                 <div className={`cards-grid cards--${view}`}>
                                     {filteredSpas.map((spa) => (
-                                        <SkyProductCardReact
+                                        <Link
                                             key={spa.id}
-                                            image={spa.image}
-                                            imageAlt={spa.imageAlt}
-                                            badge={spa.badge}
-                                            favorite
-                                            eyebrow={spa.eyebrow}
-                                            heading={spa.heading}
-                                            location={spa.location}
-                                            distance={spa.distance}
-                                            rating={spa.rating}
-                                            reviews={spa.reviews}
-                                            originalPrice={spa.originalPrice}
-                                            price={spa.price}
-                                            discount={spa.discount}
-                                            priceNote={spa.priceNote}
-                                        />
+                                            to={`/spa/${spa.id}`}
+                                            style={{
+                                                textDecoration: 'none',
+                                                color: 'inherit',
+                                                display: 'block',
+                                            }}
+                                        >
+                                            <SkyProductCardReact
+                                                image={spa.image}
+                                                imageAlt={spa.imageAlt}
+                                                badge={spa.badge}
+                                                favorite
+                                                eyebrow={spa.eyebrow}
+                                                heading={spa.heading}
+                                                location={spa.location}
+                                                distance={spa.distance}
+                                                rating={spa.rating}
+                                                reviews={spa.reviews}
+                                                originalPrice={spa.originalPrice}
+                                                price={spa.price}
+                                                discount={spa.discount}
+                                                priceNote={spa.priceNote}
+                                            />
+                                        </Link>
                                     ))}
                                 </div>
                             </section>

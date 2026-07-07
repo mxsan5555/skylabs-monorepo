@@ -17,6 +17,7 @@ import { Categories } from './pages/master/categories/categories';
 import { AddCategory } from './pages/master/categories/add-category';
 import Search from './pages/search/search';
 import Contact from './pages/contact/contact';
+import { SpaDetails } from './pages/spa-details/spa-details';
 /**
  * Central route table. Public pages use PublicLayout, auth screens use
  * AuthLayout, and the signed-in console uses AdminLayout (role-filtered).
@@ -34,6 +35,7 @@ export function AppRoutes() {
         <Route path="*" element={<NotFound />} />
         <Route path="/search" element={<Search />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/spa/:id" element={<SpaDetails />} />
       </Route>
 
       {/* Auth screens use a minimal centered shell (no header/footer). */}

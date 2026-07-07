@@ -16,7 +16,8 @@ import spa5 from '../../../assets/imgs/spa5.avif';
 import spa6 from '../../../assets/imgs/spa6.webp';
 import spa7 from '../../../assets/imgs/spa7.jfif';
 import { spas } from '../../data/spas';
-import { SearchBar } from '../../components/search-bar';
+import { Link } from 'react-router-dom';
+// import { SearchBar } from '../../components/search-bar';
 /**
  * Sample landing page. Demonstrates a page composed from shared-ui components
  * and themed by msd's palette. Real content/data arrives with the blog/contact
@@ -39,9 +40,6 @@ export function Home() {
     ));
   return (
     <div className="home">
-      <section>
-        <SearchBar />
-      </section>
 
       <section >
         <swiper-container
@@ -60,23 +58,28 @@ export function Home() {
 
         <div className="cards-grid">
           {spas.map((spa) => (
-            <SkyProductCardReact
+            <Link
               key={spa.id}
-              image={spa.image}
-              imageAlt={spa.imageAlt}
-              badge={spa.badge}
-              favorite
-              eyebrow={spa.eyebrow}
-              heading={spa.heading}
-              location={spa.location}
-              distance={spa.distance}
-              rating={spa.rating}
-              reviews={spa.reviews}
-              originalPrice={spa.originalPrice}
-              price={spa.price}
-              discount={spa.discount}
-              priceNote={spa.priceNote}
-            />
+              to={`/spa/${spa.id}`}
+              style={{ textDecoration: 'none', color: 'inherit' }}
+            >
+              <SkyProductCardReact
+                image={spa.image}
+                imageAlt={spa.imageAlt}
+                badge={spa.badge}
+                favorite
+                eyebrow={spa.eyebrow}
+                heading={spa.heading}
+                location={spa.location}
+                distance={spa.distance}
+                rating={spa.rating}
+                reviews={spa.reviews}
+                originalPrice={spa.originalPrice}
+                price={spa.price}
+                discount={spa.discount}
+                priceNote={spa.priceNote}
+              />
+            </Link>
           ))}
           <SkyInfoCardReact
             align="center"
