@@ -64,7 +64,7 @@ export function Home() {
               style={{ textDecoration: 'none', color: 'inherit' }}
             >
               <SkyProductCardReact
-                image={spa.image}
+                image={spa.image[0]}
                 imageAlt={spa.imageAlt}
                 badge={spa.badge}
                 favorite

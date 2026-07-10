@@ -12,7 +12,7 @@ import { findMenuItem } from '../admin/menu';
  * the profile.
  */
 export function AdminLayout() {
-  const [collapsed, setCollapsed] = useState(false);
+const [collapsed, setCollapsed] = useState( window.innerWidth <= 768);
   const location = useLocation();
   const current = findMenuItem(location.pathname);
 
@@ -22,12 +22,17 @@ export function AdminLayout() {
         <Sidebar />
         <div className="admin-main">
           <div className="admin-topbar">
-            <IconButton
-              aria-label={collapsed ? 'Show sidebar' : 'Hide sidebar'}
-              onClick={() => setCollapsed((c) => !c)}
-            >
-              <Icon aria-hidden="true">dock_to_right</Icon>
-            </IconButton>
+           <IconButton
+  aria-label={collapsed ? 'Show sidebar' : 'Hide sidebar'}
+  onClick={() => {
+    setCollapsed((c) => {
+      console.log("Current:", c, "Next:", !c);
+      return !c;
+    });
+  }}
+>
+ <Icon>dock_to_right</Icon>
+</IconButton>
             <nav aria-label="Breadcrumb">
               <ol className="admin-breadcrumb">
                 <li>Account</li>

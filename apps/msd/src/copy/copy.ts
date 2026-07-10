@@ -77,4 +77,101 @@ export const copy = {
         'Visit our wellness center or use the map below to plan your journey.',
     },
   },
+  footer: {
+    brand: {
+      icon: 'spa',
+      name: 'MSD',
+    },
+
+    company: {
+      title: 'About Company',
+      description:
+        'Discover the best spa, salon and wellness deals near you. Book instantly and enjoy premium experiences at unbeatable prices.',
+      stats: [
+        { value: '50+', label: 'Partners' },
+        { value: '20+', label: 'Cities' },
+        { value: '24×7', label: 'Support' },
+      ],
+    },
+
+    columns: [
+      {
+        title: 'Help Center',
+        icon: 'help_center',
+        links: [
+          { label: 'How to Pay', href: '/how-to-pay' },
+          { label: 'Delivery Info', href: '/delivery-info' },
+          { label: 'FAQs', href: '/faqs' },
+          { label: 'Contact Support', href: '/contact' },
+        ],
+      },
+      {
+        title: 'Customer Information',
+        icon: 'chart_data',
+        links: [
+          { label: 'About Us', href: '/about-us' },
+          { label: 'List Your Business', href: '/list-your-business' },
+          { label: 'Contact', href: '/contact' },
+          { label: 'Blog', href: '/blog' },
+        ],
+      },
+      {
+        title: 'Security & Privacy',
+        icon: 'privacy_tip',
+        links: [
+          { label: 'Terms of Use', href: '/terms-of-use' },
+          { label: 'Privacy Policy', href: '/privacy-policy' },
+          { label: 'Return / Refund Policy', href: '/return-policy' },
+        ],
+      },
+    ],
+
+    download: {
+      title: 'Download App',
+      buttons: [
+        {
+          icon: 'smartphone',
+          label: 'Google Play',
+        },
+        {
+          icon: 'phone_iphone',
+          label: 'App Store',
+        },
+      ],
+    },
+
+    social: [
+      {
+        icon: 'mobile_chat',
+        ariaLabel: 'Facebook',
+      },
+      {
+        icon: 'photo_camera',
+        ariaLabel: 'Instagram',
+      },
+      {
+        icon: 'alternate_email',
+        ariaLabel: 'Twitter',
+      },
+      {
+        icon: 'smart_display',
+        ariaLabel: 'YouTube',
+      },
+    ],
+
+    bottomLinks: [
+      {
+        label: 'Privacy',
+        href: '/privacy-policy',
+      },
+      {
+        label: 'Terms',
+        href: '/terms-of-use',
+      },
+      {
+        label: 'Cookies',
+        href: '/cookies',
+      },
+    ],
+  }
 };
