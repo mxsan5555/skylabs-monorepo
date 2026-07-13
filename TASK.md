@@ -9,9 +9,26 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 
 ## In progress
 
-- _(none — next up: Content pages → contact, then the blog set)_
+- _(none)_
 
 ## Backlog
+
+### MSD — Consumer storefront (pages + shell)
+- [x] Improved web header: logo, responsive nav, search bar, cart badge, auth buttons, mobile hamburger drawer — 2026-07-12
+- [x] SEO/GEO/AEO footer: brand column, quick links, category links, support, newsletter opt-in, trust badges, legal bar — 2026-07-12
+- [x] `content.json`: single file for all static copy across all consumer pages — 2026-07-12
+- [x] Static data: `deals.ts` (15 deals), `categories.ts` (5 categories + subcategories) — 2026-07-12
+- [x] CartContext + WishlistContext (localStorage-backed React contexts) — 2026-07-12
+- [x] Home page: hero + search, featured deals carousel, category grid, hot right now carousel, gift cards CTA, per-category horizontal carousels (Massage, Facial, Nails, Spas, Wellness), welcome offer CTA — 2026-07-12
+- [x] Search / Explore page (`/explore`): 5 filter chips (Price, Suggested, Category, Features, Distance) with Dialogs, list/grid/map view toggle, real-time client-side filtering — 2026-07-12
+- [x] Category page (`/category/:slug`): breadcrumb, hero, subcategory Tabs, sort FilterChips, responsive deal grid — 2026-07-12
+- [x] Deal detail page (`/deal/:id`): breadcrumb, gallery with thumbnails, info panel (provider, rating, price, CTA, features), Accordion (What's Included / How to Use / Cancellation), related deals carousel, JSON-LD LocalBusiness schema — 2026-07-12
+- [x] Cart page (`/cart`): items with qty controls, order summary, gift card input, auth-aware checkout redirect — 2026-07-12
+- [x] Wishlist page (`/wishlist`, RequireAuth): saved deals grid, empty state, add-to-cart action — 2026-07-12
+- [x] Checkout page (`/checkout`, RequireAuth): 3-step flow (Details → Date & Time → Payment) with LinearProgress indicator, success screen — 2026-07-12
+- [x] New type definitions: Deal, Category, Subcategory, CartItem, WishlistItem, SearchFilter, SearchView, PriceLevel, CheckoutStep, DealSort — 2026-07-12
+- [x] Routes: added /explore, /category/:slug, /deal/:id, /cart, /wishlist (RequireAuth), /checkout (RequireAuth) to PublicLayout — 2026-07-12
+- [x] Wired CartProvider + WishlistProvider in main.tsx — 2026-07-12
 
 ### Content pages — both apps (`pages/` + route)
 - [ ] Contact page

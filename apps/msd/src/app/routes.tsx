@@ -13,21 +13,48 @@ import SignIn from './pages/sign-in/sign-in';
 import Otp from './pages/otp/otp';
 import Profile from './pages/account/profile';
 import { Dashboard, Deals, Promotions, Sales } from './pages/account/role-pages';
+import Search from './pages/search/search';
+import Category from './pages/category/category';
+import DealDetail from './pages/deal-detail/deal-detail';
+import Cart from './pages/cart/cart';
+import Wishlist from './pages/wishlist/wishlist';
+import Checkout from './pages/checkout/checkout';
 
-/**
- * Central route table. Public pages use PublicLayout, auth screens use
- * AuthLayout, and the signed-in console uses AdminLayout (role-filtered).
- * Role-specific pages are wrapped in <RequireRole>.
- */
 export function AppRoutes() {
   return (
     <Routes>
       <Route element={<PublicLayout />}>
+        {/* ── Consumer storefront ── */}
         <Route path="/" element={<Home />} />
+        <Route path="/explore" element={<Search />} />
+        <Route path="/category/:slug" element={<Category />} />
+        <Route path="/deal/:id" element={<DealDetail />} />
+        <Route path="/cart" element={<Cart />} />
+
+        {/* ── Auth-gated consumer pages ── */}
+        <Route
+          path="/wishlist"
+          element={
+            <RequireAuth>
+              <Wishlist />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/checkout"
+          element={
+            <RequireAuth>
+              <Checkout />
+            </RequireAuth>
+          }
+        />
+
+        {/* ── Content pages ── */}
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogDetail />} />
         <Route path="/showcase" element={<Showcase />} />
-        {/* Catch-all 404, inside the shell so it keeps header/footer. */}
+
+        {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}
         <Route path="*" element={<NotFound />} />
       </Route>
 
