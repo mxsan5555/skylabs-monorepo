@@ -5,28 +5,20 @@ import {
   SkyProductCardReact, OutlinedIconButton,
   FilledIconButton, FilledTonalButton, ListItem, List, AssistChip, SkyCardReact
 } from '@skylabs-monorepo/shared-ui/react';
-
 import { spas } from '../../data/spas';
 import './spa-details.css';
 
 export function SpaDetails() {
   const { id } = useParams();
-
   const [selectedImage, setSelectedImage] = useState(0);
-
   const spa = spas.find(
     (item) => item.id === Number(id)
   );
-
   if (!spa) {
     return (
       <main className="spa-details spa-details--missing">
         <h1>Spa not found</h1>
-
-        <p>
-          The spa you're looking for doesn't exist.
-        </p>
-
+        <p>  The spa you're looking for doesn't exist. </p>
         <Link to="/search">
           ← Back to Search
         </Link>
@@ -35,7 +27,6 @@ export function SpaDetails() {
   }
   const handleShare = async () => {
     const url = window.location.href;
-
     if (navigator.share) {
       await navigator.share({
         title: spa.heading,
@@ -44,6 +35,15 @@ export function SpaDetails() {
     } else {
       await navigator.clipboard.writeText(url);
       alert("Link copied!");
+    }
+  };
+  const scrollToSection = (id: string) => {
+    const section = document.getElementById(id);
+    if (section) {
+      section.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
     }
   };
   const similarSpas = spas
@@ -133,12 +133,29 @@ export function SpaDetails() {
             </div>
 
           </div>
-          <section className="spa-block">
+          <nav className="spa-sticky-nav">
+            <button onClick={() => scrollToSection('about')}>
+              About
+            </button>
+
+            <button onClick={() => scrollToSection('highlights')}>
+              Highlights
+            </button>
+
+            <button onClick={() => scrollToSection('location')}>
+              Location
+            </button>
+
+            <button onClick={() => scrollToSection('reviews')}>
+              Reviews
+            </button>
+          </nav>
+          <section id="about" className="spa-block">
             <h2>About this experience</h2>
             <p>{spa.description}</p>
           </section>
           <Divider />
-          <section className="spa-block">
+          <section id='highlights' className="spa-block">
             <h2>Highlights</h2>
             <div className="highlights-grid">
               {spa.highlights.map((item) => (
@@ -161,7 +178,7 @@ export function SpaDetails() {
             </div>
           </section>
           <Divider />
-          <section className="spa-block">
+          <section id='location' className="spa-block">
             <h2>Location</h2>
             <p className="location-text">
               <Icon>location_on</Icon>
@@ -251,7 +268,7 @@ export function SpaDetails() {
 
       </div>
 
-      <section className="spa-block reviews-section">
+      <section id='reviews' className="spa-block reviews-section">
         <h2>Customer Reviews</h2>
 
         <div className="reviews-grid">

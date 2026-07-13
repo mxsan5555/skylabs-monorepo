@@ -66,69 +66,69 @@ export function Header() {
           <Icon>menu</Icon>
         </IconButton>
 
-        <Menu
-          anchor="header-menu-anchor"
-          open={menuOpen}
-          positioning="popover"
-          onClosed={() => setMenuOpen(false)}
-        >
-          <MenuItem
-            onClick={() => {
-              navigate('/');
-              setMenuOpen(false);
-            }}
-          >
-            <div slot="headline">Home</div>
-          </MenuItem>
-
-          <MenuItem
-            onClick={() => {
-              navigate('/showcase');
-              setMenuOpen(false);
-            }}
-          >
-            <div slot="headline">Showcase</div>
-          </MenuItem>
-
-          <MenuItem
-            onClick={() => {
-              navigate('/summer-deals');
-              setMenuOpen(false);
-            }}
-          >
-            <div slot="headline">Summer Deals</div>
-          </MenuItem>
-
-          <MenuItem
-            onClick={() => {
-              navigate('/beauty&spa');
-              setMenuOpen(false);
-            }}
-          >
-            <div slot="headline">Beauty & Spa</div>
-          </MenuItem>
-
-          <MenuItem
-            onClick={() => {
-              navigate('/account');
-              setMenuOpen(false);
-            }}
-          >
-            <div slot="headline">My Account</div>
-          </MenuItem>
-
-          <MenuItem
-            onClick={() => {
-              signOut();
-              setMenuOpen(false);
-            }}
-          >
-            <div slot="headline">Logout</div>
-          </MenuItem>
-        </Menu>
-
       </div>
+      {menuOpen && (
+        <div
+          className="mobile-menu-overlay"
+          onClick={() => setMenuOpen(false)}
+        >
+          <aside
+            className="mobile-menu"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mobile-menu-header">
+              <div className="mobile-menu-brand">
+                <Icon>spa</Icon>
+                <h2>MSD</h2>
+              </div>
 
+              <IconButton onClick={() => setMenuOpen(false)}>
+                <Icon>close</Icon>
+              </IconButton>
+            </div>
+
+            <nav className="mobile-menu-nav">
+
+              <NavLink to="/" onClick={() => setMenuOpen(false)}>
+                <Icon>home</Icon>
+                Home
+              </NavLink>
+
+              <NavLink to="/showcase" onClick={() => setMenuOpen(false)}>
+                <Icon>grid_view</Icon>
+                Showcase
+              </NavLink>
+
+              <NavLink to="/summer-deals" onClick={() => setMenuOpen(false)}>
+                <Icon>local_offer</Icon>
+                Summer Deals
+              </NavLink>
+
+              <NavLink to="/beauty&spa" onClick={() => setMenuOpen(false)}>
+                <Icon>spa</Icon>
+                Beauty & Spa
+              </NavLink>
+
+              <NavLink to="/account" onClick={() => setMenuOpen(false)}>
+                <Icon>person</Icon>
+                My Account
+              </NavLink>
+
+              <button
+                className="logout-btn"
+                onClick={() => {
+                  signOut();
+                  setMenuOpen(false);
+                }}
+              >
+                <Icon>logout</Icon>
+                Logout
+              </button>
+
+            </nav>
+          </aside>
+        </div>
+      )}
     </header>
   );
 }

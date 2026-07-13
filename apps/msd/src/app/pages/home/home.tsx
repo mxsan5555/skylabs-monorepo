@@ -5,6 +5,7 @@ import {
   SkyCardReact,
   SkyBadgeReact,
   SkyProductCardReact,
+  Icon,
   SkyInfoCardReact,
 } from '@skylabs-monorepo/shared-ui/react';
 import './home.css';
@@ -34,10 +35,11 @@ export function Home() {
         <img
           src={img}
           alt={`Banner ${index + 1}`}
-          className="hero-carousel__image"
+          className="hero-carousel__slide"
         />
       </swiper-slide>
     ));
+
   return (
     <div className="home">
 
@@ -51,43 +53,130 @@ export function Home() {
         </swiper-container>
       </section>
 
+      <section className="showcase__card">
+        <div className="spa-section__header">
+          <Icon>local_fire_department</Icon>
+          <h2> Trending Spas
+          </h2>
+        </div>
 
+        <swiper-container
+          className="spa-carousel"
+          navigation="true"
+          // pagination="false"
+          slides-per-view="4"
+          space-between="20"
+        >
+          {spas.map((spa) => (
+            <swiper-slide key={spa.id}>
+              <Link
+                to={`/spa/${spa.id}`}
+                style={{ textDecoration: 'none', color: 'inherit' }}
+              >
+                <SkyProductCardReact
+                  image={spa.image[0]}
+                  imageAlt={spa.imageAlt}
+                  badge={spa.badge}
+                  favorite
+                  eyebrow={spa.eyebrow}
+                  heading={spa.heading}
+                  location={spa.location}
+                  distance={spa.distance}
+                  rating={spa.rating}
+                  reviews={spa.reviews}
+                  originalPrice={spa.originalPrice}
+                  price={spa.price}
+                  discount={spa.discount}
+                  priceNote={spa.priceNote}
+                />
+              </Link>
+            </swiper-slide>
+          ))}
+        </swiper-container>
+      </section>
 
       <section className="showcase__card">
-        <h2>Cards</h2>
-
-        <div className="cards-grid">
-          {spas.map((spa) => (
-            <Link
-              key={spa.id}
-              to={`/spa/${spa.id}`}
-              style={{ textDecoration: 'none', color: 'inherit' }}
-            >
-              <SkyProductCardReact
-                image={spa.image[0]}
-                imageAlt={spa.imageAlt}
-                badge={spa.badge}
-                favorite
-                eyebrow={spa.eyebrow}
-                heading={spa.heading}
-                location={spa.location}
-                distance={spa.distance}
-                rating={spa.rating}
-                reviews={spa.reviews}
-                originalPrice={spa.originalPrice}
-                price={spa.price}
-                discount={spa.discount}
-                priceNote={spa.priceNote}
-              />
-            </Link>
-          ))}
-          <SkyInfoCardReact
-            align="center"
-            icon="support_agent"
-            heading="Trusted 24/7 customer service you can rely on"
-            subheading="We're always here to help"
-          />
+        <div className="spa-section__header">
+          <Icon>diamond</Icon>
+          <h2> Luxury Spa Collection
+          </h2>
         </div>
+
+        <swiper-container
+          className="spa-carousel"
+          scrollbar="true"
+          // pagination="false"
+          slides-per-view="4"
+          space-between="20"
+        >
+          {spas.map((spa) => (
+            <swiper-slide key={spa.id}>
+              <Link
+                to={`/spa/${spa.id}`}
+                style={{ textDecoration: 'none', color: 'inherit' }}
+              >
+                <SkyProductCardReact
+                  image={spa.image[0]}
+                  imageAlt={spa.imageAlt}
+                  badge={spa.badge}
+                  favorite
+                  eyebrow={spa.eyebrow}
+                  heading={spa.heading}
+                  location={spa.location}
+                  distance={spa.distance}
+                  rating={spa.rating}
+                  reviews={spa.reviews}
+                  originalPrice={spa.originalPrice}
+                  price={spa.price}
+                  discount={spa.discount}
+                  priceNote={spa.priceNote}
+                />
+              </Link>
+            </swiper-slide>
+          ))}
+        </swiper-container>
+      </section>
+
+      <section className="showcase__card">
+        <div className="spa-section__header">
+          <Icon>workspace_premium</Icon>
+          <h2> Premium Experiences
+          </h2>
+        </div>
+
+        <swiper-container
+          className="spa-carousel"
+          loop="true"
+          navigation="true"
+          slides-per-view="4"
+          space-between="16"
+        >
+          {spas.map((spa) => (
+            <swiper-slide key={spa.id}>
+              <Link
+                to={`/spa/${spa.id}`}
+                style={{ textDecoration: 'none', color: 'inherit' }}
+              >
+                <SkyProductCardReact
+                  image={spa.image[0]}
+                  imageAlt={spa.imageAlt}
+                  badge={spa.badge}
+                  favorite
+                  eyebrow={spa.eyebrow}
+                  heading={spa.heading}
+                  location={spa.location}
+                  distance={spa.distance}
+                  rating={spa.rating}
+                  reviews={spa.reviews}
+                  originalPrice={spa.originalPrice}
+                  price={spa.price}
+                  discount={spa.discount}
+                  priceNote={spa.priceNote}
+                />
+              </Link>
+            </swiper-slide>
+          ))}
+        </swiper-container>
       </section>
 
       {/* React 19 hoists these to <head>. */}

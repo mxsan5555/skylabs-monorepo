@@ -1,5 +1,5 @@
 .home {
-  max-width: 880px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 24px 16px 64px;
   display: flex;
@@ -49,4 +49,30 @@
   color: var(--md-sys-color-on-surface-variant, #424940);
 }
 
+.spa-section {
+  margin: 40px 0;
+}
 
+.spa-section__header {
+  margin-bottom: 5px;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.spa-carousel {
+  display: block;
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.hero-carousel__slide {
+  width: 100%;
+  height: 450px;
+  object-fit: cover;
+}
+
+@media (max-width:768px) {
+  .hero-carousel__slide {
+    height: 220px;
+  }
+}
