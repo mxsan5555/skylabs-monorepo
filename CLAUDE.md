@@ -36,6 +36,16 @@ npx nx run-many -t lint test build --projects=shared-ui,msd,mera-driver
 # Single project targets
 npx nx run <project>:lint
 npx nx run <project>:test             # vitest (msd, shared-ui) / @angular/build:unit-test (mera-driver)
+
+# Single test file / single test name
+npx nx test msd -- run apps/msd/src/app/app.spec.tsx
+npx nx test msd -- run -t "test name"
+npx nx test mera-driver -- --include=apps/mera-driver/src/app/app.spec.ts
+
+# E2e (Playwright, project per app)
+npx nx e2e msd-e2e
+npx nx e2e mera-driver-e2e
+
 npx nx affected -t build --base=main
 npx nx graph
 ```

@@ -12,8 +12,9 @@ export const ALL_ROLES: UserRole[] = ['user', 'admin', 'marketing', 'sales'];
 
 export interface User {
   id: string;
-  name: string;
-  email: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
   roles: UserRole[];
 }
 

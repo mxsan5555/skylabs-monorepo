@@ -8,6 +8,7 @@ import {
   PrimaryTab,
   Icon,
 } from '@skylabs-monorepo/shared-ui/react';
+import { apiClient, ApiError, BASE_URL } from '../../../api/api-client';
 
 type Method = 'email' | 'phone';
 
@@ -20,6 +21,8 @@ export function SignIn() {
   const navigate = useNavigate();
   const [method, setMethod] = useState<Method>('phone');
   const [value, setValue] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   const isPhone = method === 'phone';
 
@@ -27,12 +30,38 @@ export function SignIn() {
     const index = (event.target as HTMLElement & { activeTabIndex: number })
       .activeTabIndex;
     setMethod(index === 1 ? 'phone' : 'email');
+    setError(null);
   };
 
-  const sendOtp = () => {
-    navigate('/otp', {
-      state: { destination: value || (isPhone ? '4564' : 'you@email.com'), method },
-    });
+  const sendOtp = async () => {
+    if (pending) return;
+    setError(null);
+
+    if (!value.trim()) {
+      setError(isPhone ? 'Enter your phone number.' : 'Enter your email address.');
+      return;
+    }
+
+    setPending(true);
+    try {
+      const { retryAfterSeconds } = await apiClient.post<{
+        ok: true;
+        retryAfterSeconds: number;
+      }>('/auth/otp/request', { method, destination: value });
+      navigate('/otp', { state: { destination: value, method, retryAfterSeconds } });
+    } catch (err) {
+      if (err instanceof ApiError && err.retryAfterSeconds) {
+        setError(`Please wait ${err.retryAfterSeconds}s before requesting another code.`);
+      } else {
+        setError('Something went wrong. Please try again.');
+      }
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const continueWithGoogle = () => {
+    window.location.href = `${BASE_URL}/auth/google`;
   };
 
   return (
@@ -84,8 +113,14 @@ export function SignIn() {
           </Icon>
         </OutlinedTextField>
 
-        <FilledButton className="auth-submit" onClick={sendOtp}>
-          Send OTP
+        {error && (
+          <p className="auth-error" role="alert">
+            {error}
+          </p>
+        )}
+
+        <FilledButton className="auth-submit" onClick={sendOtp} disabled={pending}>
+          {pending ? 'Sending…' : 'Send OTP'}
         </FilledButton>
       </div>
 
@@ -93,7 +128,7 @@ export function SignIn() {
         <span>or continue with</span>
       </div>
 
-      <OutlinedButton className="auth-google">
+      <OutlinedButton className="auth-google" onClick={continueWithGoogle}>
         <Icon slot="icon" aria-hidden="true">
           language
         </Icon>

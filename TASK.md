@@ -9,7 +9,30 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 
 ## In progress
 
-- _(none — next up: Content pages → contact, then the blog set)_
+- _(none — next up: register both Google OAuth redirect URIs on the shared Cloud Console
+  client, then Content pages → contact, then the blog set)_
+
+## External setup needed (outside this repo)
+
+Nothing here is a code task — these are accounts/config only you can create.
+
+- [x] Postgres databases `msdapi` and `meradriverapi` on `localhost:5432` — done;
+  credentials live in each app's `.env.local` (not committed)
+- [ ] **Google Cloud Console** — one OAuth 2.0 Client ID is currently shared by both apps.
+  Register **both** redirect URIs as "Authorized redirect URIs" on that one client (add the
+  production callback URLs too once deployed):
+  - `http://localhost:4300/api/auth/google/callback` (msd)
+  - `http://localhost:4500/api/auth/google/callback` (mera-driver)
+  - Until both are registered, Google will reject the callback for whichever app's URI is
+    missing. Splitting into two separate clients later is a straightforward config-only
+    change (no code) — see `apps/<app>-api/.env.local`.
+- [x] **Email provider** — Gmail SMTP configured with an App Password in both apps'
+  `.env.local`; live-tested successfully (real email delivered) — 2026-07
+- [x] **SMS provider** — `connectexpress.in` (`SMS_API_KEY`/`SMS_SENDER`) wired in both
+  apps' `.env.local`. The API has no public docs; the contract was reverse-engineered via
+  a couple of safe probe requests (see `lib/sms.ts`) — **not yet live-tested with a real
+  phone number**, since that would send an actual SMS and consume paid credit. Test it
+  yourself once by signing in with a real phone number on either app.
 
 ## Backlog
 
@@ -20,38 +43,46 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 ### Account & admin — both apps (remaining)
 - [ ] Logout from inside the console (currently in the public header)
 - [ ] Admin/marketing/sales feature pages (real content, not stubs)
-- [ ] Real role assignment + enforcement once backends exist (JWT claim + per-request API check); remove the "View as" demo switcher
-- [ ] Replace localStorage account store with profile API
+- [ ] Remove the "View as (demo)" role switcher now that real roles come from the JWT
+- [ ] Replace localStorage account store (`account-context.tsx` / `account.service.ts`) with
+  the real profile API (`/me` + a future profile-update endpoint)
 
-### Backends — one per app (deferred until pages need real data)
-- [ ] Scaffold `apps/msd-api` (Express + TS, `@nx/express`)
-- [ ] Scaffold `apps/mera-driver-api` (Express + TS)
-- [ ] PostgreSQL + Prisma schema per domain (massage deals / driver booking)
-- [ ] Zod + `zod-to-openapi` validation & spec, `swagger-ui-express` at `/docs`
-- [ ] Auth endpoints: phone/email OTP, Google OAuth, JWT issue/verify
-- [ ] Domain endpoints (blog, profile, admin, deals/bookings)
-
-### Auth integration (after backends)
-- [ ] Wire sign-in / OTP / Google to real endpoints (replace mock token)
-- [ ] Point each frontend `api` client at its API base via env (`VITE_API_URL`, etc.)
-- [ ] Add `authInterceptor` to msd (matching the one already in mera-driver) once msd-api exists
-- [ ] Remove "View as (demo)" role switcher from both sidebars; roles come from JWT
+### Auth integration (remaining)
+- [ ] Register both apps' Google OAuth redirect URIs on the shared Cloud Console client —
+  see "External setup needed" above
+- [ ] Live-test phone OTP with a real number (SMS send is implemented but unverified — see
+  "External setup needed" above)
+- [ ] Refresh-token rotation / revocation (v1 ships a stateless 7d access token only, by
+  design — see `apps/*-api/prisma/schema.prisma`)
+- [ ] True E.164 phone normalization (`libphonenumber-js`) — current normalization just
+  strips non-digits and assumes the user includes their country code
 
 **Key auth files (reference):**
 
 | Concern | msd | mera-driver |
 |---------|-----|-------------|
-| Auth state + roles | `apps/msd/src/auth/auth-context.tsx` | `apps/mera-driver/src/app/core/auth/auth.service.ts` |
+| Auth state + roles + user | `apps/msd/src/auth/auth-context.tsx` | `apps/mera-driver/src/app/core/auth/auth.service.ts` |
 | Auth guard | `apps/msd/src/auth/require-auth.tsx` | `apps/mera-driver/src/app/core/auth/auth.guard.ts` |
 | Role guard | `apps/msd/src/auth/require-role.tsx` | `apps/mera-driver/src/app/core/auth/role.guard.ts` |
-| HTTP interceptor | _(not yet)_ | `apps/mera-driver/src/app/core/auth/auth.interceptor.ts` |
+| HTTP token injection | `apps/msd/src/api/api-client.ts` | `apps/mera-driver/src/app/core/auth/auth.interceptor.ts` |
+| API base config | `apps/msd/.env.local` (`VITE_API_URL`) | `apps/mera-driver/src/environments/environment.ts` |
 | Menu / roles config | `apps/msd/src/app/admin/menu.ts` | `apps/mera-driver/src/app/admin/menu.ts` |
+| Backend auth routes | `apps/msd-api/src/routes/auth/` | `apps/mera-driver-api/src/routes/auth/` |
+| Backend OTP engine | `apps/msd-api/src/lib/otp.ts` | `apps/mera-driver-api/src/lib/otp.ts` |
+| Backend Prisma schema | `apps/msd-api/prisma/schema.prisma` | `apps/mera-driver-api/prisma/schema.prisma` |
+
+### Bugs
+- [ ] `apps/mera-driver/src/app/pages/blog/blog.ts:44` calls `this.blog.listPosts(...)`, but
+  `BlogService` only exposes `queryPosts` — blocks `nx build`/`nx test` for `mera-driver`
+  (pre-existing, unrelated to auth; found while verifying the auth work)
 
 ### Quality & ops
 - [ ] e2e tests (Playwright) for the auth flow
 - [ ] Error tracking (Sentry free tier)
 - [ ] CI gates (GitHub Actions: lint + test + build)
-- [ ] `.env.example` per app; deployment (frontends + APIs)
+- [ ] Deployment (frontends + APIs) — `.env.example` already exists per app
+  (msd, msd-api, mera-driver-api); mera-driver uses `environments/environment.prod.ts`
+  (via `fileReplacements`) instead of an `.env.example`
 - [ ] Fix `nx.json` `defaultBase` (`master` → `main`) if using `nx affected`
 
 ---
@@ -101,3 +132,30 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 
 ### Docs
 - [x] `ARCHITECTURE.md`, `PLANNING.md`, `TASK.md`, updated `CLAUDE.md`
+
+### Backends & auth integration
+- [x] Scaffolded `apps/msd-api` and `apps/mera-driver-api` (Express + TS, `@nx/express`),
+  each with its own Postgres DB (`msdapi`, `meradriverapi`) and port (4300, 4500) — 2026-07
+- [x] Prisma schema per app (`User`, `OtpCode`, `ExchangeCode`), migrated live against both
+  databases — 2026-07
+- [x] Zod + `zod-to-openapi` validation & spec, `swagger-ui-express` at `/docs` for both
+  APIs — 2026-07
+- [x] Universal OTP engine: hashed codes, expiry, server-driven resend cooldown, max-attempt
+  lockout, anti-enumeration, per-destination rate limiting — 2026-07
+- [x] Email OTP delivery via Gmail SMTP (`lib/email.ts`) — live-tested, real email
+  delivered — 2026-07
+- [x] Phone OTP delivery via the `connectexpress.in` SMS gateway (`lib/sms.ts`) — request
+  contract confirmed live (no public docs existed); not yet tested with a real phone
+  number — 2026-07
+- [x] Google OAuth (`passport-google-oauth20`) with a one-time exchange-code redirect flow
+  (JWT never sits in a URL); returns a clean 503 instead of crashing when Google credentials
+  aren't configured; real Cloud Console credentials now in both apps' `.env.local` — 2026-07
+- [x] `GET /me` + frontend rehydration on boot; `AuthContext`/`AuthService` gained a real
+  `user` field — 2026-07
+- [x] Wired both frontends' sign-in/OTP pages to the real endpoints (replacing the mock
+  token); post-login now lands on `/` — 2026-07
+- [x] mera-driver gained `environments/environment.ts` (+ `.prod.ts` via `fileReplacements`)
+  so its API base is configurable, matching msd's `VITE_API_URL` — 2026-07
+- [x] Live-verified end-to-end against real Postgres: OTP request/verify round trip,
+  wrong-code rejection, JWT issuance with the correct default role per app, `/me`
+  rehydration — 2026-07

@@ -158,6 +158,12 @@
   width: 100%;
 }
 
+.auth-error {
+  margin: -8px 0 0;
+  color: var(--md-sys-color-error);
+  font-size: 0.875rem;
+}
+
 .auth-divider {
   display: flex;
   align-items: center;
