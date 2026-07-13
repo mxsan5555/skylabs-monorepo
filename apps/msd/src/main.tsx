@@ -12,6 +12,8 @@ import '@skylabs-monorepo/shared-ui/layout.css';
 import './assets/theme/index.css';
 
 import App from './app/app';
+import { CartProvider } from './cart/cart-context';
+import { WishlistProvider } from './wishlist/wishlist-context';
 
 applyTheme('light');
 
@@ -25,8 +27,16 @@ console.log(
 root.render(
   <StrictMode>
     <BrowserRouter>
+<<<<<<< HEAD
       <App />
 
+=======
+      <CartProvider>
+        <WishlistProvider>
+          <App />
+        </WishlistProvider>
+      </CartProvider>
+>>>>>>> b8ad1f645856014b185848c108bb9207db76e646
     </BrowserRouter>
   </StrictMode>,
 );
