@@ -81,8 +81,14 @@ export async function startGoogleExchange(user: User): Promise<string> {
 export async function exchangeCodeForToken(code: string) {
   const userId = await consumeExchangeCode(prisma, code);
   if (!userId) throw new OtpError('invalid_or_expired_code', 400);
-
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const token = signAccessToken({ sub: user.id, roles: user.roles });
   return toAuthResponse(token, user);
 }
+
+
+
+
+
+
+
