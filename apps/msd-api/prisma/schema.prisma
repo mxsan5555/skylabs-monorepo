@@ -67,3 +67,5 @@ model ExchangeCode {
 
   @@index([userId])
 }
+
+

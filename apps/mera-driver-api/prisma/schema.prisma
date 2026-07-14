@@ -22,6 +22,7 @@ enum OtpChannel {
   PHONE
 }
 
+
 enum OtpPurpose {
   LOGIN
 }
@@ -59,6 +60,8 @@ model OtpCode {
 
 // Short-lived, single-use code exchanged for a real JWT after a Google OAuth
 // callback, so the JWT itself never sits in a redirect URL (history/Referer risk).
+
+
 model ExchangeCode {
   id        String   @id @default(cuid())
   userId    String
