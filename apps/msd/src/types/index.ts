@@ -83,3 +83,82 @@ export interface BlogQuery {
   page?: number;
   pageSize?: number;
 }
+
+// ─── Consumer storefront types ────────────────────────────────────────────────
+
+export type PriceLevel = '$' | '$$' | '$$$';
+export type SearchView = 'list' | 'grid' | 'map';
+export type CheckoutStep = 'details' | 'datetime' | 'payment';
+export type DealSort = 'popular' | 'rating' | 'price-asc' | 'price-desc' | 'distance';
+
+export interface Subcategory {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+export interface Category {
+  id: string;
+  slug: string;
+  name: string;
+  icon: string;
+  serviceCount: number;
+  description: string;
+  image: string;
+  imageAlt: string;
+  subcategories: Subcategory[];
+}
+
+export interface Deal {
+  id: string;
+  slug: string;
+  title: string;
+  providerName: string;
+  categorySlug: string;
+  subcategorySlug: string;
+  description: string;
+  image: string;
+  imageAlt: string;
+  gallery: string[];
+  price: number;
+  originalPrice?: number;
+  discount?: number;
+  priceLevel: PriceLevel;
+  priceUnit: string;
+  duration: number;
+  durationUnit: string;
+  rating: number;
+  reviews: number;
+  distance: number;
+  location: string;
+  isOpen: boolean;
+  isFeatured: boolean;
+  isHot: boolean;
+  badge?: string;
+  features: string[];
+  included: string[];
+  howToUse: string[];
+}
+
+export interface CartItem {
+  dealId: string;
+  quantity: number;
+  selectedDate?: string;
+  selectedTime?: string;
+}
+
+export interface WishlistItem {
+  dealId: string;
+}
+
+export interface SearchFilter {
+  query: string;
+  priceMin?: number;
+  priceMax?: number;
+  priceLevel?: PriceLevel[];
+  categorySlug?: string;
+  features?: string[];
+  distanceMax?: number;
+  suggested: boolean;
+  sort: DealSort;
+}
