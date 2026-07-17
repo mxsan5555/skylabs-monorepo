@@ -3,48 +3,140 @@
     "name": "MSD",
     "fullName": "MySpaDeal",
     "tagline": "India's wellness marketplace",
-    "description": "Discover and book the best spas, massage studios, and wellness centres near you — with exclusive deals starting at ₹499."
+    "description": "Discover trusted spa, beauty, and wellness experiences with exclusive offers and effortless booking."
   },
   "nav": {
     "drawerCategoryHeader": "Browse Categories",
     "primary": [
-      { "label": "Explore", "to": "/explore" },
-      { "label": "Blog", "to": "/blog" },
-      { "label": "Contact", "to": "/contact" }
+      {
+        "label": "Massage",
+        "to": "/category/massage",
+        "count": 12
+      },
+      {
+        "label": "Spas & Retreats",
+        "to": "/category/spas-retreats",
+        "count": 11
+      },
+      {
+        "label": "Skin & Beauty",
+        "to": "/category/skin-beauty",
+        "count": 14
+      },
+      {
+        "label": "Hair & Nails",
+        "to": "/category/hair-nails",
+        "count": 7
+      },
+      {
+        "label": "Health & Wellness",
+        "to": "/category/health-wellness",
+        "count": 13
+      }
     ],
     "categories": [
-      { "label": "Massage", "to": "/category/massage", "count": 12 },
-      { "label": "Spas & Retreats", "to": "/category/spas-retreats", "count": 11 },
-      { "label": "Skin & Beauty", "to": "/category/skin-beauty", "count": 14 },
-      { "label": "Hair & Nails", "to": "/category/hair-nails", "count": 7 },
-      { "label": "Health & Wellness", "to": "/category/health-wellness", "count": 13 }
+      {
+        "label": "Massage",
+        "to": "/category/massage",
+        "count": 12
+      },
+      {
+        "label": "Spas & Retreats",
+        "to": "/category/spas-retreats",
+        "count": 11
+      },
+      {
+        "label": "Skin & Beauty",
+        "to": "/category/skin-beauty",
+        "count": 14
+      },
+      {
+        "label": "Hair & Nails",
+        "to": "/category/hair-nails",
+        "count": 7
+      },
+      {
+        "label": "Health & Wellness",
+        "to": "/category/health-wellness",
+        "count": 13
+      }
     ],
     "footer": {
       "quickLinks": [
-        { "label": "Home", "to": "/" },
-        { "label": "Explore Deals", "to": "/explore" },
-        { "label": "Blog", "to": "/blog" },
-        { "label": "About Us", "to": "/about" },
-        { "label": "Contact", "to": "/contact" },
-        { "label": "Careers", "to": "/careers" }
+        {
+          "label": "Home",
+          "to": "/"
+        },
+        {
+          "label": "Hot Deals",
+          "to": "/explore"
+        },
+        {
+          "label": "Blog",
+          "to": "/blog"
+        },
+        {
+          "label": "About Us",
+          "to": "/about"
+        },
+        {
+          "label": "Contact",
+          "to": "/contact"
+        },
+        {
+          "label": "Careers",
+          "to": "/careers"
+        }
       ],
       "categories": [
-        { "label": "Massage", "to": "/category/massage" },
-        { "label": "Spas & Retreats", "to": "/category/spas-retreats" },
-        { "label": "Skin & Beauty", "to": "/category/skin-beauty" },
-        { "label": "Hair & Nails", "to": "/category/hair-nails" },
-        { "label": "Health & Wellness", "to": "/category/health-wellness" }
+        {
+          "label": "Massage",
+          "to": "/category/massage"
+        },
+        {
+          "label": "Spas & Retreats",
+          "to": "/category/spas-retreats"
+        },
+        {
+          "label": "Skin & Beauty",
+          "to": "/category/skin-beauty"
+        },
+        {
+          "label": "Hair & Nails",
+          "to": "/category/hair-nails"
+        },
+        {
+          "label": "Health & Wellness",
+          "to": "/category/health-wellness"
+        }
       ],
       "support": [
-        { "label": "Help Center", "to": "/help" },
-        { "label": "Partner With Us", "to": "/partner" },
-        { "label": "Gift Cards", "to": "/gift-cards" },
-        { "label": "Wishlist", "to": "/wishlist" }
+        {
+          "label": "Help Center",
+          "to": "/help"
+        },
+        {
+          "label": "Partner With Us",
+          "to": "/partner"
+        },
+        {
+          "label": "Wishlist",
+          "to": "/wishlist"
+        }
       ],
       "legal": [
-        { "label": "Privacy Policy", "to": "/privacy" },
-        { "label": "Terms of Service", "to": "/terms" },
-        { "label": "Accessibility Statement", "to": "/accessibility" }
+        {
+          "label": "Privacy Policy",
+          "to": "/privacy"
+        },
+        {
+          "label": "Terms of Service",
+          "to": "/terms"
+        },
+        {
+          "label": "Accessibility Statement",
+          "to": "/accessibility"
+        }
       ],
       "headings": {
         "quickLinks": "Quick Links",
@@ -58,16 +150,28 @@
         "submitLabel": "Subscribe",
         "successMessage": "You're subscribed! Check your inbox."
       },
-      "trust": [
-        { "icon": "verified", "text": "200+ Partner Spas" },
-        { "icon": "lock", "text": "Secure Checkout" },
-        { "icon": "accessibility_new", "text": "WCAG 2.2 AA" }
-      ],
+      
       "social": [
-        { "label": "Instagram", "icon": "photo_camera", "url": "https://instagram.com" },
-        { "label": "Facebook", "icon": "thumb_up", "url": "https://facebook.com" },
-        { "label": "X (Twitter)", "icon": "chat", "url": "https://twitter.com" },
-        { "label": "LinkedIn", "icon": "work", "url": "https://linkedin.com" }
+        {
+          "label": "Instagram",
+          "icon": "photo_camera",
+          "url": "https://instagram.com"
+        },
+        {
+          "label": "Facebook",
+          "icon": "thumb_up",
+          "url": "https://facebook.com"
+        },
+        {
+          "label": "X (Twitter)",
+          "icon": "chat",
+          "url": "https://twitter.com"
+        },
+        {
+          "label": "LinkedIn",
+          "icon": "work",
+          "url": "https://linkedin.com"
+        }
       ],
       "copyright": "MySpaDeal Pvt. Ltd. All rights reserved."
     }
@@ -79,28 +183,91 @@
       "searchPlaceholder": "Search spas, treatments, locations…",
       "ctaLabel": "Explore All Deals"
     },
+    "heroImages": [
+      "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=1920&q=80",
+      "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&w=1920&q=80",
+      "https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&w=1920&q=80",
+      "https://images.unsplash.com/photo-1507652313519-d4e9174996dd?auto=format&fit=crop&w=1920&q=80"
+    ],
     "sections": {
-      "featuredDeals": { "heading": "Featured Deals", "seeAll": "See all", "seeAllTo": "/explore?sort=featured" },
-      "browseByCategory": { "heading": "Browse by Category", "seeAll": "See all", "seeAllTo": "/explore" },
-      "hotRightNow": { "heading": "Hot Right Now", "seeAll": "See all", "seeAllTo": "/explore?sort=hot" },
-      "massageTherapy": { "heading": "Massage Therapy", "seeAll": "See all", "seeAllTo": "/category/massage" },
-      "facialSkin": { "heading": "Facial & Skin", "seeAll": "See all", "seeAllTo": "/category/skin-beauty" },
-      "nailCare": { "heading": "Nail Care", "seeAll": "See all", "seeAllTo": "/category/hair-nails" },
-      "spasRetreats": { "heading": "Spas & Retreats", "seeAll": "See all", "seeAllTo": "/category/spas-retreats" },
-      "healthWellness": { "heading": "Health & Wellness", "seeAll": "See all", "seeAllTo": "/category/health-wellness" }
+      "featuredDeals": {
+        "heading": "Featured Deals",
+        "seeAll": "See all",
+        "seeAllTo": "/explore?sort=featured"
+      },
+      "browseByCategory": {
+        "heading": "Browse by Category",
+        "seeAll": "See all",
+        "seeAllTo": "/explore"
+      },
+      "hotRightNow": {
+        "heading": "Hot Right Now",
+        "seeAll": "See all",
+        "seeAllTo": "/explore?sort=hot"
+      },
+      "massageTherapy": {
+        "heading": "Massage Therapy",
+        "seeAll": "See all",
+        "seeAllTo": "/category/massage"
+      },
+      "facialSkin": {
+        "heading": "Facial & Skin",
+        "seeAll": "See all",
+        "seeAllTo": "/category/skin-beauty"
+      },
+      "nailCare": {
+        "heading": "Nail Care",
+        "seeAll": "See all",
+        "seeAllTo": "/category/hair-nails"
+      },
+      "spasRetreats": {
+        "heading": "Spas & Retreats",
+        "seeAll": "See all",
+        "seeAllTo": "/category/spas-retreats"
+      },
+      "healthWellness": {
+        "heading": "Health & Wellness",
+        "seeAll": "See all",
+        "seeAllTo": "/category/health-wellness"
+      }
     },
-    "giftCard": {
-      "chip": "Gift Cards",
-      "heading": "Give the Gift of Wellness",
-      "body": "Treat someone special to a spa experience. Gift cards from ₹500, valid at 200+ partner spas — never expire.",
-      "cta": "Send a Gift Card"
+   "giftCard": {
+  "chip": "Gift Cards",
+  "heading": "Give the Gift of Wellness",
+  "body": "Treat someone special with a relaxing spa experience. Gift Cards are accepted at 200+ premium partner spas across India.",
+  "cta": "Buy Gift Card",
+
+  "image": "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&w=900&q=80",
+
+  "features": [
+    {
+      "icon": "verified",
+      "title": "Never Expires"
     },
-    "welcomeOffer": {
-      "chip": "Welcome Offer",
-      "heading": "First Visit? Save 20%",
-      "body": "New to MSD? Enjoy 20% off your first booking at any partner spa — discount applied automatically at checkout.",
-      "cta": "Book Your First Visit"
+    {
+      "icon": "redeem",
+      "title": "Instant Delivery"
+    },
+    {
+      "icon": "spa",
+      "title": "200+ Partner Spas"
     }
+  ]
+},
+
+"welcomeOffer": {
+  "badge": "✨ New Member Offer",
+  "title": "Flat 40% OFF",
+  "subtitle": "On Your First Spa Booking",
+  "description": "Experience premium wellness with exclusive introductory pricing. Relax, Refresh & Rejuvenate at India's finest spas.",
+  "cta": "Book Now",
+  "image": "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=1200&q=80",
+
+  "offerCard": {
+    "discount": "40% OFF",
+    "label": "First Booking Only"
+  }
+}
   },
   "search": {
     "placeholder": "Search spas, treatments, locations…",
@@ -112,16 +279,39 @@
         "min": 499,
         "max": 15000,
         "priceLevels": [
-          { "value": "$", "label": "Budget (₹499–₹1,499)" },
-          { "value": "$$", "label": "Mid-range (₹1,500–₹4,999)" },
-          { "value": "$$$", "label": "Premium (₹5,000+)" }
+          {
+            "value": "$",
+            "label": "Budget (₹499–₹1,499)"
+          },
+          {
+            "value": "$$",
+            "label": "Mid-range (₹1,500–₹4,999)"
+          },
+          {
+            "value": "$$$",
+            "label": "Premium (₹5,000+)"
+          }
         ]
       },
-      "suggested": { "label": "Suggested" },
-      "category": { "label": "Category" },
+      "suggested": {
+        "label": "Suggested"
+      },
+      "category": {
+        "label": "Category"
+      },
       "features": {
         "label": "Features",
-        "options": ["Couples", "Group", "Mobile Therapist", "Organic Products", "Private Room", "Pool Access", "Outdoor", "Steam Room", "Sauna"]
+        "options": [
+          "Couples",
+          "Group",
+          "Mobile Therapist",
+          "Organic Products",
+          "Private Room",
+          "Pool Access",
+          "Outdoor",
+          "Steam Room",
+          "Sauna"
+        ]
       },
       "distance": {
         "label": "Distance",
@@ -132,11 +322,26 @@
   },
   "category": {
     "sortOptions": [
-      { "value": "popular", "label": "Popular" },
-      { "value": "rating", "label": "Top Rated" },
-      { "value": "price-asc", "label": "Price: Low to High" },
-      { "value": "price-desc", "label": "Price: High to Low" },
-      { "value": "distance", "label": "Nearest First" }
+      {
+        "value": "popular",
+        "label": "Popular"
+      },
+      {
+        "value": "rating",
+        "label": "Top Rated"
+      },
+      {
+        "value": "price-asc",
+        "label": "Price: Low to High"
+      },
+      {
+        "value": "price-desc",
+        "label": "Price: High to Low"
+      },
+      {
+        "value": "distance",
+        "label": "Nearest First"
+      }
     ]
   },
   "dealDetail": {
@@ -170,9 +375,20 @@
   },
   "checkout": {
     "title": "Checkout",
-    "steps": ["Your Details", "Date & Time", "Payment"],
-    "stepHeadings": ["Your Details", "Choose Date & Time", "Payment Details"],
-    "datetimeLabels": { "selectDate": "Select a date", "selectTime": "Select a time" },
+    "steps": [
+      "Your Details",
+      "Date & Time",
+      "Payment"
+    ],
+    "stepHeadings": [
+      "Your Details",
+      "Choose Date & Time",
+      "Payment Details"
+    ],
+    "datetimeLabels": {
+      "selectDate": "Select a date",
+      "selectTime": "Select a time"
+    },
     "backLabel": "Back",
     "nextLabel": "Continue",
     "placeOrderLabel": "Place Order",

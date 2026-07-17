@@ -13,7 +13,7 @@ import {
 } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '../../auth/auth-context';
 import { useCart } from '../../cart/cart-context';
-import content from '../../content.json';
+import content from '../../content.json'
 import './header.css';
 
 export function Header() {
@@ -89,17 +89,25 @@ export function Header() {
 
           {/* Desktop primary nav */}
           <nav className="site-header__nav" aria-label="Primary">
-            <NavLink
+            {/* <NavLink
               to="/explore"
               className={({ isActive }) =>
                 `site-header__nav-link${isActive ? ' site-header__nav-link--active' : ''}`
               }
             >
               Explore
+            </NavLink> */}
+            <NavLink
+              to="/category/massage"
+              className={({ isActive }) =>
+                `site-header__nav-link${isActive ? ' site-header__nav-link--active' : ''}`
+              }
+            >
+             Massage
             </NavLink>
 
             {/* Categories mega-link */}
-            <div className="site-header__nav-group" role="none">
+            {/* <div className="site-header__nav-group" role="none">
               <button className="site-header__nav-link site-header__nav-link--drop" type="button" aria-haspopup="true">
                 Categories
                 <Icon aria-hidden="true" className="site-header__drop-icon">expand_more</Icon>
@@ -119,29 +127,45 @@ export function Header() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </div> */}
 
             <NavLink
-              to="/blog"
+              to="/category/spas-retreats"
               className={({ isActive }) =>
                 `site-header__nav-link${isActive ? ' site-header__nav-link--active' : ''}`
               }
             >
-              Blog
+              Spas & Retreats
             </NavLink>
 
             <NavLink
-              to="/contact"
+              to="/category/skin-beauty"
               className={({ isActive }) =>
                 `site-header__nav-link${isActive ? ' site-header__nav-link--active' : ''}`
               }
             >
-              Contact
+              Skin & Beauty
+            </NavLink>
+            <NavLink
+              to="/category/hair-nails"
+              className={({ isActive }) =>
+                `site-header__nav-link${isActive ? ' site-header__nav-link--active' : ''}`
+              }
+            >
+              Hair & Nails
+            </NavLink>
+            <NavLink
+              to="/category/health-wellness"
+              className={({ isActive }) =>
+                `site-header__nav-link${isActive ? ' site-header__nav-link--active' : ''}`
+              }
+            >
+              Health & Wellness
             </NavLink>
           </nav>
 
           {/* Desktop search */}
-          <form
+          {/* <form
             className={`site-header__search-form${searchOpen ? ' site-header__search-form--open' : ''}`}
             role="search"
             aria-label="Site search"
@@ -157,16 +181,16 @@ export function Header() {
             >
               <Icon slot="leading-icon" aria-hidden="true">search</Icon>
             </OutlinedTextField>
-          </form>
+          </form> */}
 
           {/* Mobile search toggle */}
-          <IconButton
+          {/* <IconButton
             className="site-header__search-toggle"
             aria-label={searchOpen ? 'Close search' : 'Open search'}
             onClick={() => setSearchOpen((v) => !v)}
           >
             <Icon aria-hidden="true">{searchOpen ? 'close' : 'search'}</Icon>
-          </IconButton>
+          </IconButton> */}
 
           {/* Cart */}
           <IconButton
@@ -175,6 +199,18 @@ export function Header() {
             onClick={() => navigate('/cart')}
           >
             <Icon aria-hidden="true">shopping_bag</Icon>
+            {totalItems > 0 && (
+              <span className="site-header__cart-badge" aria-hidden="true">
+                {totalItems}
+              </span>
+            )}
+          </IconButton>
+          <IconButton
+            className="site-header__cart"
+            aria-label={`Cart, ${totalItems} item${totalItems !== 1 ? 's' : ''}`}
+            onClick={() => navigate('/wishlist')}
+          >
+            <Icon aria-hidden="true">favorite_border</Icon>
             {totalItems > 0 && (
               <span className="site-header__cart-badge" aria-hidden="true">
                 {totalItems}
@@ -245,7 +281,7 @@ export function Header() {
 
         <div className="nav-drawer__body">
           <SkyAccordionReact>
-            <SkyAccordionItemReact header={content.nav.drawerCategoryHeader} open>
+            {/* <SkyAccordionItemReact header={content.nav.drawerCategoryHeader} open>
               <ul className="nav-drawer__cat-list">
                 {content.nav.categories.map((cat) => (
                   <li key={cat.to}>
@@ -260,7 +296,7 @@ export function Header() {
                   </li>
                 ))}
               </ul>
-            </SkyAccordionItemReact>
+            </SkyAccordionItemReact> */}
           </SkyAccordionReact>
 
           <Divider />

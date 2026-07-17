@@ -151,6 +151,7 @@ export class SkyProductCard extends LitElement {
       flex-direction: column;
       gap: 6px;
       padding: 12px 14px 14px;
+        background: var(--md-sys-color-surface-container, #eef2ea);
     }
     .tag {
       display: inline-flex;

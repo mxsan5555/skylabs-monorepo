@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
 import {
   FilledButton,
   OutlinedButton,
@@ -6,6 +8,7 @@ import {
   Icon,
   OutlinedTextField,
   SkyCategoryCardReact,
+  SkyProductCardReact,
   SkyCardReact,
   AssistChip,
 } from '@skylabs-monorepo/shared-ui/react';
@@ -23,7 +26,7 @@ import content from '../../../content.json';
 import './home.css';
 
 const { home } = content;
-
+const heroImages = home.heroImages as string[];
 function SectionHeader({
   heading,
   seeAll,
@@ -68,10 +71,25 @@ export function Home() {
         >
           {deals.map((deal) => (
             <swiper-slide key={deal.id} style={{ width: '260px', height: 'auto' }}>
-              <DealCard
-                deal={deal}
+              <SkyProductCardReact
+                image={deal.image}
+                imageAlt={deal.imageAlt}
+                badge={deal.badge}
+
+                favorite={true}
                 favoriteActive={has(deal.id)}
                 onFavorite={() => toggle(deal.id)}
+
+                eyebrow={deal.providerName}
+                heading={deal.title}
+                location={deal.location}
+                distance={`${deal.distance} km`}
+                rating={deal.rating}
+                reviews={deal.reviews}
+                originalPrice={deal.originalPrice ? `₹${deal.originalPrice}` : undefined}
+                price={`₹${deal.price}`}
+                discount={deal.discount ? `${deal.discount}% OFF` : undefined}
+                priceNote={deal.priceNote}
               />
             </swiper-slide>
           ))}
@@ -87,6 +105,21 @@ export function Home() {
 
       {/* ── Hero / Search ──────────────────────────────────────────────── */}
       <section className="home__hero" aria-labelledby="hero-heading">
+        <div className="home__hero-slider">
+          {heroImages.map((image, index) => (
+            <div
+              key={index}
+              className="home__hero-slide"
+              style={{
+                backgroundImage: `url(${image})`,
+                animationDelay: `${index * 6}s`,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Dark overlay */}
+        <div className="home__hero-overlay"></div>
         <div className="home__hero-content">
           <h1 id="hero-heading" className="home__hero-heading">
             {home.hero.heading}
@@ -113,7 +146,43 @@ export function Home() {
             <FilledButton type="submit">{home.hero.ctaLabel}</FilledButton>
           </form>
         </div>
-        <div className="home__hero-bg" aria-hidden="true" />
+        {/* <div className="home__hero-bg" aria-hidden="true" /> */}
+      </section>
+
+      {/* ── Browse by Category ─────────────────────────────────────────── */}
+      <section className="home-section home-section--alt" aria-labelledby="category-heading">
+        <div className="home-section__container">
+          <SectionHeader
+            id="category-heading"
+            heading={home.sections.browseByCategory.heading}
+            seeAll={home.sections.browseByCategory.seeAll}
+            seeAllTo={home.sections.browseByCategory.seeAllTo}
+          />
+          <div className="home__category-grid">
+            {CATEGORIES.map((cat) => (
+              <NavLink
+                key={cat.id}
+                to={`/category/${cat.slug}`}
+                className="category-card"
+              >
+                <div className="category-card__icon-wrap">
+                  <Icon className="category-card__icon">
+                    {cat.icon}
+                  </Icon>
+                </div>
+
+                <div className="category-card__content">
+                  <h3>{cat.name}</h3>
+                  <p>{cat.serviceCount} Services</p>
+                </div>
+
+                <div className="category-card__arrow">
+                  <Icon>arrow_forward</Icon>
+                </div>
+              </NavLink>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* ── Featured Deals ─────────────────────────────────────────────── */}
@@ -129,32 +198,8 @@ export function Home() {
         </div>
       </section>
 
-      {/* ── Browse by Category ─────────────────────────────────────────── */}
-      <section className="home-section home-section--alt" aria-labelledby="category-heading">
-        <div className="home-section__container">
-          <SectionHeader
-            id="category-heading"
-            heading={home.sections.browseByCategory.heading}
-            seeAll={home.sections.browseByCategory.seeAll}
-            seeAllTo={home.sections.browseByCategory.seeAllTo}
-          />
-          <div className="home__category-grid">
-            {CATEGORIES.map((cat) => (
-              <SkyCategoryCardReact
-                key={cat.id}
-                image={cat.image}
-                imageAlt={cat.imageAlt}
-                heading={cat.name}
-                subheading={`${cat.serviceCount} services`}
-                href={`/category/${cat.slug}`}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── Hot Right Now ──────────────────────────────────────────────── */}
-      <section className="home-section" aria-labelledby="hot-heading">
+      <section className="home__heroo" aria-labelledby="hot-heading">
         <div className="home-section__container">
           <SectionHeader
             id="hot-heading"
@@ -167,24 +212,69 @@ export function Home() {
       </section>
 
       {/* ── Gift Cards CTA ─────────────────────────────────────────────── */}
-      <section className="home-section home-section--alt" aria-label="Gift cards promotion">
-        <div className="home-section__container">
-          <SkyCardReact variant="filled" className="home__promo-card">
-            <div className="home__promo-inner">
-              <div className="home__promo-text">
-                <AssistChip label={home.giftCard.chip}>
-                  <Icon slot="icon" aria-hidden="true">card_giftcard</Icon>
-                </AssistChip>
-                <h2 className="home__promo-heading">{home.giftCard.heading}</h2>
-                <p className="home__promo-body">{home.giftCard.body}</p>
+     <section
+  className="home-section home-section--alt"
+  aria-label="Gift cards promotion"
+>
+  <div className="home-section__container">
+
+    <SkyCardReact
+      variant="filled"
+      className="home__gift-card"
+      style={{
+        backgroundImage: `url(${home.giftCard.image})`,
+      }}
+    >
+
+      <div className="home__gift-content">
+
+        <div className="home__gift-left">
+
+          <AssistChip
+            className="home__promo-chip"
+            label={home.giftCard.chip}
+          >
+            <Icon slot="icon">card_giftcard</Icon>
+          </AssistChip>
+
+          <h2 className="home__gift-heading">
+            {home.giftCard.heading}
+          </h2>
+
+          <p className="home__gift-body">
+            {home.giftCard.body}
+          </p>
+
+          <div className="home__gift-features">
+            {home.giftCard.features.map((item) => (
+              <div
+                key={item.title}
+                className="home__gift-feature"
+              >
+                <Icon>{item.icon}</Icon>
+                <span>{item.title}</span>
               </div>
-              <OutlinedButton onClick={() => navigate('/gift-cards')}>
-                {home.giftCard.cta}
-              </OutlinedButton>
-            </div>
-          </SkyCardReact>
+            ))}
+          </div>
+
+          <FilledButton
+            onClick={() => navigate('/gift-cards')}
+          >
+            {home.giftCard.cta}
+          </FilledButton>
+
         </div>
-      </section>
+
+        <div className="home__gift-right">
+          {/* Empty only for spacing */}
+        </div>
+
+      </div>
+
+    </SkyCardReact>
+
+  </div>
+</section>
 
       {/* ── Per-category horizontal sections ──────────────────────────── */}
       {massageDeals.length > 0 && (
@@ -258,20 +348,58 @@ export function Home() {
       )}
 
       {/* ── Welcome Offer CTA ──────────────────────────────────────────── */}
-      <section className="home-section home-section--alt" aria-label="Welcome offer promotion">
+      <section
+        className="home-section home-section--alt"
+        aria-label="Welcome offer promotion"
+      >
         <div className="home-section__container">
-          <SkyCardReact variant="outlined" className="home__promo-card home__promo-card--welcome">
-            <div className="home__promo-inner">
-              <div className="home__promo-text">
-                <AssistChip label={home.welcomeOffer.chip}>
-                  <Icon slot="icon" aria-hidden="true">local_offer</Icon>
-                </AssistChip>
-                <h2 className="home__promo-heading">{home.welcomeOffer.heading}</h2>
-                <p className="home__promo-body">{home.welcomeOffer.body}</p>
+          <SkyCardReact
+            variant="filled"
+            className="home__offer-banner"
+            style={{
+              backgroundImage: `
+         
+          url(${home.welcomeOffer.image})
+        `,
+            }}
+          >
+            <div className="home__offer-content">
+              <div className="home__offer-left">
+
+                <span className="home__offer-badge">
+                  {home.welcomeOffer.badge}
+                </span>
+
+                <h2 className="home__offer-title">
+                  {home.welcomeOffer.title}
+                </h2>
+
+                <p className="home__offer-subtitle">
+                  {home.welcomeOffer.subtitle}
+                </p>
+
+                <p className="home__offer-description">
+                  {home.welcomeOffer.description}
+                </p>
+
+                <FilledButton onClick={() => navigate('/explore')}>
+                  {home.welcomeOffer.cta}
+                </FilledButton>
+
               </div>
-              <FilledButton onClick={() => navigate('/explore')}>
-                {home.welcomeOffer.cta}
-              </FilledButton>
+
+              <div className="home__offer-right">
+                <div className="offer-floating-card">
+                  <span className="offer-discount">
+                    {home.welcomeOffer.offerCard.discount}
+                  </span>
+
+                  <span className="offer-valid">
+                    {home.welcomeOffer.offerCard.label}
+                  </span>
+                </div>
+              </div>
+
             </div>
           </SkyCardReact>
         </div>

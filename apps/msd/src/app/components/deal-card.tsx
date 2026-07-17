@@ -8,23 +8,38 @@ interface DealCardProps {
   onFavorite: () => void;
 }
 
-export function DealCard({ deal, favoriteActive, onFavorite }: DealCardProps) {
+export function DealCard({
+  deal,
+  favoriteActive,
+  onFavorite,
+}: DealCardProps) {
   return (
     <SkyProductCardReact
       image={deal.image}
       imageAlt={deal.imageAlt}
       badge={deal.badge}
-      heading={deal.title}
+      favorite
+      favoriteActive={favoriteActive}
+      onFavorite={onFavorite}
       eyebrow={deal.providerName}
-      location={`${deal.duration} ${deal.durationUnit}`}
-      price={formatINR(deal.price)}
-      originalPrice={deal.originalPrice ? formatINR(deal.originalPrice) : undefined}
+      heading={deal.title}
+      location={deal.location}
+      distance={`${deal.distance} km`}
       rating={deal.rating}
       reviews={deal.reviews}
-      favorite={true}
-      favoriteActive={favoriteActive}
-      href={`/deal/${deal.id}`}
-      onFavorite={onFavorite}
+      originalPrice={
+        deal.originalPrice
+          ? formatINR(deal.originalPrice)
+          : undefined
+      }
+      price={formatINR(deal.price)}
+      discount={
+        deal.discount
+          ? `-${deal.discount}%`
+          : undefined
+      }
+      priceNote={deal.priceNote}
+      href={`/deal/${deal.slug}`}
     />
   );
 }

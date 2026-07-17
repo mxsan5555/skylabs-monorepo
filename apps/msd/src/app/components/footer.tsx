@@ -7,7 +7,7 @@ import {
   Divider,
 } from '@skylabs-monorepo/shared-ui/react';
 import { inputValue } from '../../utils/format';
-import content from '../../content.json';
+import content  from '../../content.json';
 import './footer.css';
 
 export function Footer() {
@@ -127,14 +127,14 @@ export function Footer() {
           )}
 
           {/* Trust signals */}
-          <div className="site-footer__trust" aria-label="Trust indicators">
+          {/* <div className="site-footer__trust" aria-label="Trust indicators">
             {footer.trust.map((badge) => (
               <span key={badge.text} className="site-footer__trust-badge">
                 <Icon aria-hidden="true">{badge.icon}</Icon>
                 {badge.text}
               </span>
             ))}
-          </div>
+          </div> */}
         </div>
       </div>
 

@@ -123,6 +123,7 @@ export interface Deal {
   price: number;
   originalPrice?: number;
   discount?: number;
+  priceNote?: string;
   priceLevel: PriceLevel;
   priceUnit: string;
   duration: number;
