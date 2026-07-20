@@ -26,6 +26,8 @@ import content from '../../../content.json';
 import './home.css';
 
 const { home } = content;
+const { hero, sections, giftCard, welcomeOffer } = home;
+const { dealOfTheDay } = content;
 const heroImages = home.heroImages as string[];
 function SectionHeader({
   heading,
@@ -149,6 +151,87 @@ export function Home() {
         {/* <div className="home__hero-bg" aria-hidden="true" /> */}
       </section>
 
+      {/* Deal of the Day */}
+      {/* <section className="home-deal">
+        <div className="home-deal__container">
+          <div className="home-deal__image">
+            <img
+              src={dealOfTheDay.image}
+              alt={dealOfTheDay.title}
+            />
+          < /div>
+
+          <SkyCardReact
+            variant="filled"
+            className="home-deal__card"
+          >
+            <div className="home-deal__badge">
+              <Icon>local_fire_department</Icon>
+              <span>{dealOfTheDay.badge}</span>
+            </div>
+            <h2 className="home-deal__title">
+              {dealOfTheDay.title}
+            </h2>
+            <p className="home-deal__subtitle">
+              {dealOfTheDay.subtitle}
+            </p>
+            <div className="home-deal__meta">
+              <div className="home-deal__rating">
+                <Icon>star</Icon>
+                <span>{dealOfTheDay.rating.value}</span>
+              </div>
+              <span className="dot">•</span>
+              <span>
+                {dealOfTheDay.rating.reviews} Reviews
+              </span>
+              <span className="dot">•</span>
+              <span>{dealOfTheDay.duration}</span>
+              <span className="dot">•</span>
+              <span>{dealOfTheDay.location}</span>
+            </div>
+            <div className="home-deal__pricing">
+              <span className="home-deal__discount">
+                {dealOfTheDay.discount}
+              </span>
+              <div className="home-deal__prices">
+                <span className="home-deal__price">
+                  {dealOfTheDay.price}
+                </span>
+                <span className="home-deal__original-price">
+                  {dealOfTheDay.originalPrice}
+                </span>
+              </div>
+            </div>
+         
+            <div className="home-deal__features">
+              {dealOfTheDay.features.map((feature) => (
+                <div
+                  key={feature.label}
+                  className="home-deal__feature"
+                >
+                  <Icon>{feature.icon}</Icon>
+                  <span>{feature.label}</span>
+                </div>
+              ))}
+            </div>
+            <div className="home-deal__coupon">
+              <div className="home-deal__coupon-code">
+                <Icon>sell</Icon>
+                <strong>
+                  {dealOfTheDay.coupon.code}
+                </strong>
+              </div>
+              <p className="home-deal__coupon-description">
+                {dealOfTheDay.coupon.description}
+              </p>
+            </div>
+            <FilledButton className="home-deal__button">
+              {dealOfTheDay.buttonText}
+            </FilledButton>
+          </SkyCardReact>
+        </div>
+      </section> */}
+
       {/* ── Browse by Category ─────────────────────────────────────────── */}
       <section className="home-section home-section--alt" aria-labelledby="category-heading">
         <div className="home-section__container">
@@ -212,69 +295,68 @@ export function Home() {
       </section>
 
       {/* ── Gift Cards CTA ─────────────────────────────────────────────── */}
-     <section
-  className="home-section home-section--alt"
-  aria-label="Gift cards promotion"
->
-  <div className="home-section__container">
+      <section
+        className="home-section home-section--alt"
+        aria-label="Gift cards promotion"
+      >
+        <div className="home-section__container">
 
-    <SkyCardReact
-      variant="filled"
-      className="home__gift-card"
-      style={{
-        backgroundImage: `url(${home.giftCard.image})`,
-      }}
-    >
-
-      <div className="home__gift-content">
-
-        <div className="home__gift-left">
-
-          <AssistChip
-            className="home__promo-chip"
-            label={home.giftCard.chip}
+          <SkyCardReact
+            variant="filled"
+            className="home__gift-card"
+            style={{
+              backgroundImage: `url(${home.giftCard.image})`,
+            }}
           >
-            <Icon slot="icon">card_giftcard</Icon>
-          </AssistChip>
 
-          <h2 className="home__gift-heading">
-            {home.giftCard.heading}
-          </h2>
+            <div className="home__gift-content">
 
-          <p className="home__gift-body">
-            {home.giftCard.body}
-          </p>
+              <div className="home__gift-left">
 
-          <div className="home__gift-features">
-            {home.giftCard.features.map((item) => (
-              <div
-                key={item.title}
-                className="home__gift-feature"
-              >
-                <Icon>{item.icon}</Icon>
-                <span>{item.title}</span>
+                <AssistChip
+                  className="home__promo-chip"
+                  label={home.giftCard.chip}
+                >
+                  <Icon slot="icon">card_giftcard</Icon>
+                </AssistChip>
+
+                <h2 className="home__gift-heading">
+                  {home.giftCard.heading}
+                </h2>
+
+                <p className="home__gift-body">
+                  {home.giftCard.body}
+                </p>
+
+                <div className="home__gift-features">
+                  {home.giftCard.features.map((item) => (
+                    <div className="home__gift-feature">
+                      <Icon className="home__gift-feature-icon">
+                        {item.icon}
+                      </Icon>
+                      <span>{item.title}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <FilledButton
+                  onClick={() => navigate('/gift-cards')}
+                >
+                  {home.giftCard.cta}
+                </FilledButton>
+
               </div>
-            ))}
-          </div>
 
-          <FilledButton
-            onClick={() => navigate('/gift-cards')}
-          >
-            {home.giftCard.cta}
-          </FilledButton>
+              <div className="home__gift-right">
+                {/* Empty only for spacing */}
+              </div>
+
+            </div>
+
+          </SkyCardReact>
 
         </div>
-
-        <div className="home__gift-right">
-          {/* Empty only for spacing */}
-        </div>
-
-      </div>
-
-    </SkyCardReact>
-
-  </div>
-</section>
+      </section>
 
       {/* ── Per-category horizontal sections ──────────────────────────── */}
       {massageDeals.length > 0 && (

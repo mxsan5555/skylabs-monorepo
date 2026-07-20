@@ -25,6 +25,7 @@ import type { SearchView, PriceLevel } from '../../../types';
 import { formatINR } from '../../../utils/format';
 import content from '../../../content.json';
 import './search.css';
+import { Map } from '../../components/map';
 
 const { search: searchContent } = content;
 const DISTANCE_MAX = searchContent.filters.distance.max;
@@ -376,7 +377,7 @@ export function Search() {
         {view === 'map' && (
           <section aria-label="Search results map" className="search-map">
             <div className="search-map__canvas" role="img" aria-label="Map showing deal locations">
-              {filtered.map((deal, i) => (
+              {/* {filtered.map((deal, i) => (
                 <button
                   key={deal.id}
                   className="search-map__pin"
@@ -390,7 +391,8 @@ export function Search() {
                     {formatINR(Math.round(deal.price / 100) * 100)}
                   </span>
                 </button>
-              ))}
+              ))} */}
+              <Map deals={filtered} />
             </div>
             <div className="search-map__sidebar">
               <p className="search-map__sidebar-count">{filtered.length} results in view</p>

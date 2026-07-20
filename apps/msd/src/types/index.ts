@@ -132,6 +132,8 @@ export interface Deal {
   reviews: number;
   distance: number;
   location: string;
+  lat: number;
+  lng: number;
   isOpen: boolean;
   isFeatured: boolean;
   isHot: boolean;

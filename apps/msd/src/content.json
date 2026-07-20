@@ -150,7 +150,6 @@
         "submitLabel": "Subscribe",
         "successMessage": "You're subscribed! Check your inbox."
       },
-      
       "social": [
         {
           "label": "Instagram",
@@ -231,43 +230,39 @@
         "seeAllTo": "/category/health-wellness"
       }
     },
-   "giftCard": {
-  "chip": "Gift Cards",
-  "heading": "Give the Gift of Wellness",
-  "body": "Treat someone special with a relaxing spa experience. Gift Cards are accepted at 200+ premium partner spas across India.",
-  "cta": "Buy Gift Card",
-
-  "image": "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&w=900&q=80",
-
-  "features": [
-    {
-      "icon": "verified",
-      "title": "Never Expires"
+    "giftCard": {
+      "chip": "Gift Cards",
+      "heading": "Give the Gift of Wellness",
+      "body": "Treat someone special with a relaxing spa experience. Gift Cards are accepted at 200+ premium partner spas across India.",
+      "cta": "Buy Gift Card",
+      "image": "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&w=900&q=80",
+      "features": [
+        {
+          "icon": "verified",
+          "title": "Never Expires"
+        },
+        {
+          "icon": "redeem",
+          "title": "Instant Delivery"
+        },
+        {
+          "icon": "spa",
+          "title": "200+ Partner Spas"
+        }
+      ]
     },
-    {
-      "icon": "redeem",
-      "title": "Instant Delivery"
-    },
-    {
-      "icon": "spa",
-      "title": "200+ Partner Spas"
+    "welcomeOffer": {
+      "badge": "✨ New Member Offer",
+      "title": "Flat 40% OFF",
+      "subtitle": "On Your First Spa Booking",
+      "description": "Experience premium wellness with exclusive introductory pricing. Relax, Refresh & Rejuvenate at India's finest spas.",
+      "cta": "Book Now",
+      "image": "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=1200&q=80",
+      "offerCard": {
+        "discount": "40% OFF",
+        "label": "First Booking Only"
+      }
     }
-  ]
-},
-
-"welcomeOffer": {
-  "badge": "✨ New Member Offer",
-  "title": "Flat 40% OFF",
-  "subtitle": "On Your First Spa Booking",
-  "description": "Experience premium wellness with exclusive introductory pricing. Relax, Refresh & Rejuvenate at India's finest spas.",
-  "cta": "Book Now",
-  "image": "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=1200&q=80",
-
-  "offerCard": {
-    "discount": "40% OFF",
-    "label": "First Booking Only"
-  }
-}
   },
   "search": {
     "placeholder": "Search spas, treatments, locations…",
@@ -428,5 +423,44 @@
       "title": "Checkout | MSD – MySpaDeal",
       "description": "Complete your booking at MySpaDeal."
     }
+  },
+  "dealOfTheDay": {
+    "badge": "🔥 Deal of the Day",
+    "title": "Luxury Aroma Therapy",
+    "subtitle": "Relax. Rejuvenate. Refresh.",
+    "discount": "75% OFF",
+    "price": "₹999",
+    "originalPrice": "₹3999",
+    "duration": "90 mins",
+    "location": "Noida Sector 18",
+    "rating": {
+      "value": "4.9",
+      "reviews": 1248
+    },
+    "coupon": {
+      "label": "Use Coupon",
+      "code": "SPA75",
+      "description": "Extra 10% OFF"
+    },
+    "features": [
+      {
+        "icon": "spa",
+        "label": "Complimentary Steam"
+      },
+      {
+        "icon": "emoji_food_beverage",
+        "label": "Herbal Tea"
+      },
+      {
+        "icon": "verified",
+        "label": "Verified Partner"
+      },
+      {
+        "icon": "event_available",
+        "label": "Free Cancellation"
+      }
+    ],
+    "buttonText": "Book Now",
+    "image": "https://images.unsplash.com/photo-1507652313519-d4e9174996dd?auto=format&fit=crop&w=1920&q=80"
   }
 }
