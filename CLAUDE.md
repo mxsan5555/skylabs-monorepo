@@ -166,11 +166,61 @@ both places.
 - Auth (in-house): JWT + phone/email OTP + Google OAuth (`passport-google-oauth20`).
 - CI/CD: GitHub Actions.
 
+## AI Dev Team
+
+This project ships with a set of project-scoped agents, skills, and commands under `.claude/`. They are loaded automatically when Claude Code is opened in this repo.
+
+### Agent routing
+
+| Agent | Call for |
+|-------|---------|
+| `skylabs-abhi` | Any schema design, Prisma migration, Express route, Zod validation, auth flow (OTP/OAuth/JWT) in either API |
+| `skylabs-ravi` | Any React 19 or Angular 21 UI task — pages, components, routing, guards |
+| `skylabs-neha` | Design spec before building any new screen or component (60/30/10, M3 tokens, accessibility) |
+| `skylabs-dev` | Test cases (before coding), Vitest unit tests, Angular unit tests, Playwright e2e |
+| `skylabs-vivek` | SEO meta + JSON-LD + GA4 events before any public page ships; social media copy |
+| `skylabs-reena` | Any copywriting, `content.json` updates, blog articles, marketing text |
+
+### Commands (invoke as slash commands)
+
+| Command | What it does |
+|---------|-------------|
+| `/msd-feature` | Full 6-agent pipeline for a new msd feature (design → API → frontend → tests → SEO → copy) |
+| `/mera-driver-feature` | Same pipeline for mera-driver |
+| `/new-endpoint` | Build a new API endpoint in msd-api or mera-driver-api (abhi → dev) |
+| `/new-shared-component` | Add a new `sky-*` component to shared-ui (neha → ravi → dev) |
+| `/skylabs-audit` | Full project audit across all 5 dimensions (code/tests/SEO/content/design) |
+
+### Skills (auto-loaded by each agent)
+
+Skills are reference documents in `.claude/skills/`. Each agent loads only what it needs.
+
+| Skill file | Covers |
+|------------|--------|
+| `msd-stack.md` | React 19 + Vite file layout, routing, auth context, Vitest config |
+| `mera-driver-stack.md` | Angular 21 standalone patterns, routing, auth service, signals |
+| `skylabs-auth.md` | JWT, OTP, Google OAuth patterns for both APIs |
+| `skylabs-api.md` | Express + Prisma + Zod + OpenAPI conventions |
+| `shared-ui-usage.md` | All `sky-*` and `md-*` component usage for both apps |
+| `skylabs-testing.md` | Vitest + Playwright config, test templates per framework |
+| `skylabs-seo.md` | Per-app SEO, JSON-LD, GA4 event schema, noindex rules |
+| `skylabs-content.md` | Voice rules, content.json structure, blog schema |
+
+### Agent handoff format
+
+```
+HANDOFF: skylabs-<from> → skylabs-<to>
+Task: [one line]
+Delivers: [bullet list of what is handed over]
+Needs from you: [what the next agent must do]
+Constraints: [hard limits]
+```
+
 ## Adding things
 
 - **New page**: create `apps/<app>/src/app/pages/<name>/`, add it to the route table (`routes.tsx` / `app.routes.ts`) under the right layout; protect with `RequireAuth` (React) / `canActivate: [authGuard]` (Angular).
 - **New console (account/admin) page**: put it under `pages/account/`, render it inside `AdminPage` (centered title + subtitle), route it under the `AdminLayout` area, and add a `MenuItem` to `ADMIN_MENU` with its `roles`. Gate it with `RequireRole`/`roleGuard` (see Auth & roles above).
-- **New shared component**: add to `packages/shared-ui/src/components/` + barrel; add a React wrapper in `src/react.ts`.
+- **New shared component**: add to `packages/shared-ui/src/components/` + barrel; add a React wrapper in `src/react.ts`. Use `/new-shared-component` command to run the full pipeline.
 - **New app/lib**: `npx nx g @nx/react:app`, `@nx/angular:app`, `@nx/express:app`, or `@nx/js:lib`. Apps under `apps/`, shared code under `packages/`.
 
 ## Environment Variables

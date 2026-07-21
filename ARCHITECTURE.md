@@ -158,6 +158,39 @@ in intent; the implementation is framework-native.
 > Guards are **UX only**. Once backends exist, every API endpoint must re-check the
 > role from the JWT server-side — the frontend guard is not the security boundary.
 
+## `.claude/` — Project AI Dev Team
+
+Project-scoped agents, skills, and commands live here. Claude Code loads them automatically when opened in this repo. Do not delete or move this directory.
+
+```
+.claude/
+├── settings.local.json          ← project permissions (git restore/rm)
+├── agents/                      ← 6 project-specific AI agents
+│   ├── skylabs-abhi.md          ← DB + API (Express, Prisma, JWT auth)
+│   ├── skylabs-ravi.md          ← Frontend (React 19 + Angular 21)
+│   ├── skylabs-neha.md          ← UI/UX design (60/30/10 + M3)
+│   ├── skylabs-dev.md           ← QA (Vitest + Playwright + Angular tests)
+│   ├── skylabs-vivek.md         ← SEO + GA4 + social media
+│   └── skylabs-reena.md         ← Content management
+├── skills/                      ← Reference docs agents load on demand
+│   ├── msd-stack.md             ← React 19 + Vite patterns, auth, routing
+│   ├── mera-driver-stack.md     ← Angular 21 patterns, auth service, signals
+│   ├── skylabs-auth.md          ← JWT, OTP, Google OAuth implementation
+│   ├── skylabs-api.md           ← Express + Prisma + Zod + OpenAPI patterns
+│   ├── shared-ui-usage.md       ← All sky-* and md-* component usage
+│   ├── skylabs-testing.md       ← Vitest + Playwright config and templates
+│   ├── skylabs-seo.md           ← Per-app SEO, JSON-LD, GA4 events
+│   └── skylabs-content.md       ← Voice rules, content.json, blog schema
+└── commands/                    ← Slash commands that orchestrate agents
+    ├── msd-feature.md           ← /msd-feature — full pipeline for msd
+    ├── mera-driver-feature.md   ← /mera-driver-feature — full pipeline for mera-driver
+    ├── new-endpoint.md          ← /new-endpoint — API endpoint pipeline
+    ├── new-shared-component.md  ← /new-shared-component — shared-ui component pipeline
+    └── skylabs-audit.md         ← /skylabs-audit — full project audit
+```
+
+See `CLAUDE.md → AI Dev Team` for the agent routing table and command descriptions.
+
 ## Where the upcoming pages go
 
 `sign-in`, `otp`, `home`, `contact`, `blog`, `blog-detail`, `blog-category`,

@@ -65,11 +65,16 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 | Menu / roles config | `apps/msd/src/app/admin/menu.ts` | `apps/mera-driver/src/app/admin/menu.ts` |
 
 ### Quality & ops
-- [ ] e2e tests (Playwright) for the auth flow
+- [ ] e2e tests (Playwright) for the auth flow — add `playwright.config.ts` at repo root (config template in `.claude/skills/skylabs-testing.md`)
 - [ ] Error tracking (Sentry free tier)
 - [ ] CI gates (GitHub Actions: lint + test + build)
-- [ ] `.env.example` per app; deployment (frontends + APIs)
+- [ ] `.env.example` per app and per API (msd-api, mera-driver-api) — see env var list in `.claude/skills/skylabs-auth.md` and `skylabs-api.md`
 - [ ] Fix `nx.json` `defaultBase` (`master` → `main`) if using `nx affected`
+
+### AI dev team (`.claude/`)
+- [ ] Add `playwright.config.ts` at repo root so `skylabs-dev` can run e2e tests against both apps
+- [ ] Add `.env.example` to each API app once scaffolded (msd-api, mera-driver-api)
+- [ ] Run `/skylabs-audit` after each major milestone to catch regressions early
 
 ---
 
@@ -118,3 +123,9 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 
 ### Docs
 - [x] `ARCHITECTURE.md`, `PLANNING.md`, `TASK.md`, updated `CLAUDE.md`
+
+### AI Dev Team
+- [x] Project-scoped agent team: 6 agents (`skylabs-abhi`, `skylabs-ravi`, `skylabs-neha`, `skylabs-dev`, `skylabs-vivek`, `skylabs-reena`) in `.claude/agents/` — 2026-07-18
+- [x] 8 skill reference docs in `.claude/skills/` (msd-stack, mera-driver-stack, skylabs-auth, skylabs-api, shared-ui-usage, skylabs-testing, skylabs-seo, skylabs-content) — 2026-07-18
+- [x] 5 command pipelines in `.claude/commands/` (`/msd-feature`, `/mera-driver-feature`, `/new-endpoint`, `/new-shared-component`, `/skylabs-audit`) — 2026-07-18
+- [x] Updated `CLAUDE.md`, `PLANNING.md`, `ARCHITECTURE.md`, `TASK.md` with AI dev team docs — 2026-07-18
