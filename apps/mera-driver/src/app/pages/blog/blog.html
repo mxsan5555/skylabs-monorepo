@@ -1,0 +1,75 @@
+<main class="blog">
+  <header class="blog__header">
+    <h1>From the blog</h1>
+    <p>Travel tips, safety guides, and stories from the road.</p>
+  </header>
+
+  <ul class="blog__grid">
+    @for (p of items(); track p.id) {
+      <li>
+        <sky-card variant="outlined">
+          <article class="post-card">
+            <img
+              class="post-card__img"
+              [src]="p.coverImage"
+              [alt]="p.imageAlt"
+              width="800"
+              height="480"
+              loading="lazy"
+            />
+            <div class="post-card__body">
+              <sky-badge variant="secondary">{{
+                blog.categoryName(p.categorySlug)
+              }}</sky-badge>
+              <h2 class="post-card__title">
+                <a [routerLink]="['/blog', p.slug]">{{ p.title }}</a>
+              </h2>
+              <p class="post-card__excerpt">{{ p.excerpt }}</p>
+              <p class="post-card__meta">
+                <time [attr.datetime]="p.publishedAt">{{
+                  p.publishedAt | date: 'mediumDate'
+                }}</time>
+                <span aria-hidden="true">·</span>
+                <span class="post-card__read">
+                  <md-icon aria-hidden="true">schedule</md-icon>{{ p.readMinutes }}
+                  min read
+                </span>
+              </p>
+            </div>
+          </article>
+        </sky-card>
+      </li>
+    }
+  </ul>
+
+  @if (totalPages() > 1) {
+    <nav class="pagination" aria-label="Blog pages">
+      <md-outlined-button [disabled]="page() <= 1" (click)="goTo(page() - 1)">
+        <md-icon slot="icon" aria-hidden="true">chevron_left</md-icon>
+        Previous
+      </md-outlined-button>
+      <ul class="pagination__pages">
+        @for (n of pageNumbers(); track n) {
+          <li>
+            @if (n === page()) {
+              <md-filled-button aria-current="page" [attr.aria-label]="'Page ' + n">{{
+                n
+              }}</md-filled-button>
+            } @else {
+              <md-text-button [attr.aria-label]="'Page ' + n" (click)="goTo(n)">{{
+                n
+              }}</md-text-button>
+            }
+          </li>
+        }
+      </ul>
+      <md-outlined-button
+        [disabled]="page() >= totalPages()"
+        (click)="goTo(page() + 1)"
+      >
+        Next
+        <md-icon slot="icon" aria-hidden="true">chevron_right</md-icon>
+      </md-outlined-button>
+    </nav>
+  }
+</main>

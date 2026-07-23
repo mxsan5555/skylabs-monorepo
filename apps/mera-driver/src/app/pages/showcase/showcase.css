@@ -1,0 +1,152 @@
+/* Showcase layout. Colors come from the active M3 theme tokens so the page
+   re-themes with the components. */
+:host {
+  display: block;
+}
+
+.showcase {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.showcase__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.showcase__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.showcase__title h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  color: var(--md-sys-color-primary);
+}
+
+.showcase__toggle,
+.showcase__inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.showcase__card {
+  background-color: var(--md-sys-color-surface-container, #eef1f6);
+  color: var(--md-sys-color-on-surface, #191c1f);
+  border: 1px solid var(--md-sys-color-outline-variant, #c2c7ce);
+  border-radius: 16px;
+  padding: 16px 20px;
+}
+
+.showcase__card h2 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  color: var(--md-sys-color-on-surface-variant, #42474e);
+}
+
+.showcase__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.showcase__row:last-child {
+  margin-bottom: 0;
+}
+
+/* --- Component demo helpers --- */
+.demo-label {
+  margin: 16px 0 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface-variant, #42474e);
+}
+.demo-label:first-child {
+  margin-top: 0;
+}
+
+.fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.progress-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.menu-anchor-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.ripple-surface {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 28px;
+  border-radius: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c2c7ce);
+  background-color: var(--md-sys-color-surface-container-high, #e7e9ee);
+  color: var(--md-sys-color-on-surface, #191c1f);
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  --md-ripple-hover-color: var(--md-sys-color-primary);
+  --md-ripple-pressed-color: var(--md-sys-color-primary);
+}
+
+/* --- Card component demos --- */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* --- Carousel (Swiper Element) demos --- */
+.demo-carousel__label {
+  margin: 20px 0 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface-variant, #42474e);
+}
+
+.demo-carousel {
+  display: block;
+  width: 100%;
+  /* Room below the slides for pagination bullets / the scrollbar. */
+  padding-bottom: 28px;
+}
+
+.demo-slide {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+  border-radius: 12px;
+  background-color: var(--md-sys-color-primary-container, #cde5ff);
+  color: var(--md-sys-color-on-primary-container, #001d35);
+  font-size: 1.1rem;
+  font-weight: 600;
+  user-select: none;
+}
+
+/* Fixed width so `slides-per-view="auto"` and centered/free-mode demos work. */
+.demo-slide--auto {
+  width: 200px;
+}

@@ -1,1 +1,41 @@
-/* You can add global styles to this file, and also import other style files */
+/* Global app styles. The app-shell and auth-screen layout classes come from
+   @skylabs-monorepo/shared-ui/layout.css (imported in main.tsx). M3 theme
+   tokens come from the loaded theme (also main.tsx). Add msd-only global
+   overrides here. */
+
+/* ── Breadcrumb (shared component) ─────────────────────────────────────────── */
+.breadcrumb {
+  max-width: 1280px;
+  margin: 0 auto;
+  list-style: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.breadcrumb li {
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.breadcrumb a {
+  color: var(--md-sys-color-primary);
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb [aria-current="page"] {
+  color: var(--md-sys-color-on-surface);
+  font-weight: 500;
+}
+
+.breadcrumb__sep {
+  font-size: 16px;
+}
