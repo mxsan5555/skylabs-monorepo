@@ -18,12 +18,14 @@ export interface MenuGroup {
 }
 
 const EVERYONE: UserRole[] = ['user', 'admin', 'marketing', 'sales'];
+const STAFF: UserRole[] = ['admin', 'marketing'];
 
 export const ADMIN_MENU: MenuGroup[] = [
   {
     label: 'Overview',
     items: [
       { label: 'Dashboard', icon: 'dashboard', to: '/account/dashboard', roles: EVERYONE },
+      { label: 'My Bookings', icon: 'confirmation_number', to: '/account/bookings', roles: EVERYONE },
       { label: 'My Account', icon: 'person', to: '/account/profile', roles: EVERYONE },
     ],
   },
@@ -32,7 +34,16 @@ export const ADMIN_MENU: MenuGroup[] = [
     items: [
       { label: 'Deals', icon: 'sell', to: '/account/deals', roles: ['admin'] },
       { label: 'Promotions', icon: 'campaign', to: '/account/promotions', roles: ['marketing'] },
-      { label: 'Sales', icon: 'insights', to: '/account/sales', roles: ['sales'] },
+      { label: 'Sales', icon: 'insights', to: '/account/sales', roles: ['admin', 'sales'] },
+    ],
+  },
+  {
+    label: 'Master',
+    items: [
+      { label: 'Categories', icon: 'category', to: '/account/master/categories', roles: STAFF },
+      { label: 'Features', icon: 'tune', to: '/account/master/features', roles: STAFF },
+      { label: 'Cancellation Policies', icon: 'policy', to: '/account/master/cancellation-policies', roles: ['admin'] },
+      { label: 'Companies', icon: 'storefront', to: '/account/master/companies', roles: ['admin'] },
     ],
   },
 ];

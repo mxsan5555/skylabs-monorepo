@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FilledButton,
@@ -13,6 +13,9 @@ import {
 } from '@skylabs-monorepo/shared-ui/react';
 import { useCart } from '../../../cart/cart-context';
 import { useCartDeals } from '../../../hooks/use-cart-deals';
+import { useAuth } from '../../../auth/auth-context';
+import { checkoutApi, type AvailabilitySlot } from '../../../api/checkout-api';
+import { ApiError } from '../../../api/api-client';
 import { formatINR, inputValue } from '../../../utils/format';
 import type { CheckoutStep } from '../../../types';
 import content from '../../../content.json';
@@ -26,58 +29,63 @@ function stepIndex(s: CheckoutStep) {
   return STEPS.indexOf(s);
 }
 
-function buildDates(): string[] {
-  const dates: string[] = [];
+function buildDates(): { iso: string; label: string }[] {
+  const dates: { iso: string; label: string }[] = [];
   const today = new Date();
   for (let i = 0; i < 7; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
-    dates.push(
-      d.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' }),
-    );
+    dates.push({
+      iso: d.toISOString().slice(0, 10),
+      label: d.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' }),
+    });
   }
   return dates;
 }
 
 const DATE_OPTIONS = buildDates();
-const TIME_OPTIONS = [
-  '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
-  '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM',
-];
+
+type PaymentState = 'idle' | 'opening' | 'cancelled' | 'failed' | 'unavailable';
 
 export function Checkout() {
-  const { items, clearCart } = useCart();
+  const { serverCart, clearCart } = useCart();
   const { cartDeals, subtotal } = useCartDeals();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState<CheckoutStep>('details');
   const [placed, setPlaced] = useState(false);
 
   // Step 1 — details
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
+  const [name, setName] = useState(user?.name ?? '');
+  const [phone, setPhone] = useState(user?.phone ?? '');
+  const [email, setEmail] = useState(user?.email ?? '');
 
-  // Step 2 — date/time
+  // Step 2 — date/time (a single slot applied to every cart item, matching the
+  // existing single-slot checkout UX — per-item scheduling is a later addition).
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+  const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
 
   // Step 3 — payment
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const [cvv, setCvv] = useState('');
-  const [cardName, setCardName] = useState('');
+  const [paymentState, setPaymentState] = useState<PaymentState>('idle');
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  const firstDealSlug = cartDeals[0]?.deal.slug;
+
+  useEffect(() => {
+    if (!selectedDate || !firstDealSlug) return;
+    setSlotsLoading(true);
+    setSelectedTime('');
+    checkoutApi
+      .availability(firstDealSlug, selectedDate)
+      .then((res) => setSlots(res.slots))
+      .catch(() => setSlots([]))
+      .finally(() => setSlotsLoading(false));
+  }, [selectedDate, firstDealSlug]);
 
   const currentStepIdx = stepIndex(step);
   const progress = (currentStepIdx + 1) / STEPS.length;
-
-  function goNext() {
-    if (step === 'details') setStep('datetime');
-    else if (step === 'datetime') setStep('payment');
-    else {
-      setPlaced(true);
-      clearCart();
-    }
-  }
 
   function goBack() {
     if (step === 'datetime') setStep('details');
@@ -87,11 +95,73 @@ export function Checkout() {
   function canProceed() {
     if (step === 'details') return name.trim() && phone.trim() && email.trim();
     if (step === 'datetime') return !!selectedDate && !!selectedTime;
-    if (step === 'payment') return cardNumber.trim() && expiry.trim() && cvv.trim() && cardName.trim();
-    return false;
+    return true;
   }
 
-  if (items.length === 0 && !placed) {
+  async function startPayment() {
+    if (!serverCart || serverCart.items.length === 0) return;
+    setPaymentState('opening');
+    setPaymentError(null);
+    try {
+      const items = serverCart.items.map((i) => ({
+        cartItemId: i.id,
+        bookingDate: selectedDate,
+        bookingTime: selectedTime,
+      }));
+      const res = await checkoutApi.checkout({ name, phone, email }, items);
+
+      const razorpay = new window.Razorpay({
+        key: res.payment.keyId,
+        order_id: res.payment.providerOrderId,
+        amount: res.payment.amount.amount,
+        currency: res.payment.amount.currency,
+        name: 'MSD — MySpaDeal',
+        description: `Order ${res.orderNumber}`,
+        prefill: { name, email, contact: phone },
+        theme: { color: '#007C2B' },
+        handler: async (response) => {
+          try {
+            await checkoutApi.confirmPayment(res.orderId, response);
+            setPlaced(true);
+            clearCart();
+          } catch {
+            setPaymentState('failed');
+            setPaymentError('We could not confirm your payment. Please contact support with your order number.');
+          }
+        },
+        modal: {
+          ondismiss: () => setPaymentState('cancelled'),
+        },
+      });
+      razorpay.on('payment.failed', (response) => {
+        setPaymentState('failed');
+        setPaymentError(response.error.description);
+      });
+      razorpay.open();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 503) {
+        setPaymentState('unavailable');
+      } else if (err instanceof ApiError && err.code === 'SLOT_UNAVAILABLE') {
+        setPaymentState('failed');
+        setPaymentError('That time slot was just taken — please pick another.');
+        setStep('datetime');
+      } else if (err instanceof ApiError && err.code === 'CART_CHANGED') {
+        setPaymentState('failed');
+        setPaymentError('Your cart changed — please review it and try again.');
+      } else {
+        setPaymentState('failed');
+        setPaymentError('Something went wrong starting the payment. Please try again.');
+      }
+    }
+  }
+
+  function goNext() {
+    if (step === 'details') setStep('datetime');
+    else if (step === 'datetime') setStep('payment');
+    else startPayment();
+  }
+
+  if ((!serverCart || serverCart.items.length === 0) && !placed) {
     return (
       <div className="checkout-page checkout-page--empty">
         <title>Checkout | MSD</title>
@@ -113,7 +183,10 @@ export function Checkout() {
           </span>
           <h1 className="checkout-success__heading">{checkoutContent.successHeading}</h1>
           <p className="checkout-success__body">{checkoutContent.successBody}</p>
-          <FilledButton onClick={() => navigate('/')}>Back to Home</FilledButton>
+          <div className="checkout-form__nav">
+            <OutlinedButton onClick={() => navigate('/account/bookings')}>View My Bookings</OutlinedButton>
+            <FilledButton onClick={() => navigate('/')}>Back to Home</FilledButton>
+          </div>
         </div>
       </div>
     );
@@ -203,26 +276,35 @@ export function Checkout() {
                   <ChipSet className="checkout-dt__chips">
                     {DATE_OPTIONS.map((d) => (
                       <FilterChip
-                        key={d}
-                        label={d}
-                        selected={selectedDate === d}
-                        onClick={() => setSelectedDate(d)}
+                        key={d.iso}
+                        label={d.label}
+                        selected={selectedDate === d.iso}
+                        onClick={() => setSelectedDate(d.iso)}
                       />
                     ))}
                   </ChipSet>
                 </div>
                 <div className="checkout-form__group">
                   <p className="checkout-form__group-label">{checkoutContent.datetimeLabels.selectTime}</p>
-                  <ChipSet className="checkout-dt__chips">
-                    {TIME_OPTIONS.map((t) => (
-                      <FilterChip
-                        key={t}
-                        label={t}
-                        selected={selectedTime === t}
-                        onClick={() => setSelectedTime(t)}
-                      />
-                    ))}
-                  </ChipSet>
+                  {!selectedDate ? (
+                    <p className="checkout-form__secure">Pick a date first.</p>
+                  ) : slotsLoading ? (
+                    <LinearProgress indeterminate aria-label="Loading available times" />
+                  ) : slots.length === 0 ? (
+                    <p className="checkout-form__secure">No slots available that day — try another date.</p>
+                  ) : (
+                    <ChipSet className="checkout-dt__chips">
+                      {slots.map((s) => (
+                        <FilterChip
+                          key={s.time}
+                          label={s.available ? s.time : `${s.time} (full)`}
+                          disabled={!s.available}
+                          selected={selectedTime === s.time}
+                          onClick={() => setSelectedTime(s.time)}
+                        />
+                      ))}
+                    </ChipSet>
+                  )}
                 </div>
               </section>
             )}
@@ -232,52 +314,27 @@ export function Checkout() {
                 <h2 id="step-pay-heading" className="checkout-form__heading">
                   {checkoutContent.stepHeadings[2]}
                 </h2>
-                <div className="checkout-form__fields">
-                  <OutlinedTextField
-                    label={checkoutContent.fields.cardName}
-                    type="text"
-                    autocomplete="cc-name"
-                    required
-                    value={cardName}
-                    onInput={(e) => setCardName(inputValue(e as unknown as Event))}
-                  >
-                    <Icon slot="leading-icon" aria-hidden="true">person</Icon>
-                  </OutlinedTextField>
-                  <OutlinedTextField
-                    label={checkoutContent.fields.cardNumber}
-                    type="text"
-                    inputmode="numeric"
-                    autocomplete="cc-number"
-                    required
-                    maxlength={19}
-                    value={cardNumber}
-                    onInput={(e) => setCardNumber(inputValue(e as unknown as Event))}
-                  >
-                    <Icon slot="leading-icon" aria-hidden="true">credit_card</Icon>
-                  </OutlinedTextField>
-                  <div className="checkout-form__fields checkout-form__fields--row">
-                    <OutlinedTextField
-                      label={checkoutContent.fields.expiry}
-                      type="text"
-                      inputmode="numeric"
-                      autocomplete="cc-exp"
-                      required
-                      maxlength={5}
-                      value={expiry}
-                      onInput={(e) => setExpiry(inputValue(e as unknown as Event))}
-                    />
-                    <OutlinedTextField
-                      label={checkoutContent.fields.cvv}
-                      type="password"
-                      inputmode="numeric"
-                      autocomplete="cc-csc"
-                      required
-                      maxlength={4}
-                      value={cvv}
-                      onInput={(e) => setCvv(inputValue(e as unknown as Event))}
-                    />
-                  </div>
-                </div>
+
+                {paymentState === 'unavailable' && (
+                  <SkyCardReact variant="outlined">
+                    <p style={{ padding: 16 }}>
+                      Online payments aren't configured yet on this environment. Once Razorpay
+                      test keys are added to the API's <code>.env.local</code>, this button will
+                      open the payment widget.
+                    </p>
+                  </SkyCardReact>
+                )}
+                {paymentState === 'cancelled' && (
+                  <p className="checkout-form__secure" role="status">
+                    Payment window closed — your cart is safe. Tap "Pay now" to try again.
+                  </p>
+                )}
+                {paymentState === 'failed' && paymentError && (
+                  <p className="checkout-form__secure" role="alert">
+                    {paymentError}
+                  </p>
+                )}
+
                 <p className="checkout-form__secure">
                   <Icon aria-hidden="true">lock</Icon>
                   {checkoutContent.securePaymentNote}
@@ -296,11 +353,11 @@ export function Checkout() {
               <FilledButton
                 className="checkout-form__next-btn"
                 onClick={goNext}
-                disabled={!canProceed()}
+                disabled={!canProceed() || paymentState === 'opening'}
               >
-                {step === 'payment' ? checkoutContent.placeOrderLabel : checkoutContent.nextLabel}
+                {step === 'payment' ? 'Pay now' : checkoutContent.nextLabel}
                 <Icon slot="trailing-icon" aria-hidden="true">
-                  {step === 'payment' ? 'check' : 'arrow_forward'}
+                  {step === 'payment' ? 'lock' : 'arrow_forward'}
                 </Icon>
               </FilledButton>
             </div>

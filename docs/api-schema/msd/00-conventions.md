@@ -112,7 +112,7 @@ Two styles; each endpoint documents which it uses:
 
 | Param | Type | Notes |
 |-------|------|-------|
-| `sort` | string enum | Per-endpoint, e.g. `popular \| rating \| price-asc \| price-desc \| distance` (mirrors frontend `DealSort`) |
+| `sort` | string enum | Per-endpoint, e.g. `popular \| rating \| price-asc \| price-desc \|    distance` (mirrors frontend `DealSort`) |
 | `page`, `pageSize` | int | Offset style, `pageSize` max 100 |
 | `limit`, `cursor` | int, string | Cursor style, `limit` max 50 |
 | `include` | csv | Opt-in relations, e.g. `?include=pricingPlans,media` |

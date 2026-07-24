@@ -1,14 +1,22 @@
 import { AuthProvider } from '../auth/auth-context';
+import { CartProvider } from '../cart/cart-context';
+import { WishlistProvider } from '../wishlist/wishlist-context';
 import { AppRoutes } from './routes';
 
 /**
- * Root component: app-wide providers wrap the route tree. Add more providers
- * (query client, theme switcher, error boundary) here as the app grows.
+ * Root component: every app-wide provider wraps the route tree here (not in
+ * main.tsx) so App is self-contained for tests that render <App/> directly.
+ * CartProvider must be inside AuthProvider — it reads useAuth() to re-fetch
+ * the cart on sign-in/out (guest cart vs. account cart).
  */
 export function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <CartProvider>
+        <WishlistProvider>
+          <AppRoutes />
+        </WishlistProvider>
+      </CartProvider>
     </AuthProvider>
   );
 }

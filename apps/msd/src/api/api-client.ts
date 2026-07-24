@@ -7,6 +7,7 @@
  */
 
 import { AUTH_TOKEN_KEY } from '../auth/auth-storage';
+import { GUEST_TOKEN_KEY } from '../cart/guest-token';
 
 export const BASE_URL = import.meta.env.VITE_API_URL ?? '/api';
 
@@ -22,11 +23,13 @@ export class ApiError extends Error {
 }
 
 function authHeaders(): Record<string, string> {
-  const token =
-    typeof localStorage !== 'undefined'
-      ? localStorage.getItem(AUTH_TOKEN_KEY)
-      : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  if (typeof localStorage === 'undefined') return {};
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  if (token) return { Authorization: `Bearer ${token}` };
+  // No bearer token yet — send the guest cart token if we have one; the API
+  // ignores it once a real session exists (see optional-auth.ts server-side).
+  const guestToken = localStorage.getItem(GUEST_TOKEN_KEY);
+  return guestToken ? { 'X-Guest-Token': guestToken } : {};
 }
 
 async function request<T>(
@@ -43,6 +46,7 @@ async function request<T>(
     const data = await res.json().catch(() => ({}));
     throw new ApiError(res.status, data.error ?? 'unknown_error', data.retryAfterSeconds);
   }
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
@@ -50,5 +54,6 @@ export const apiClient = {
   get: <T>(path: string) => request<T>('GET', path),
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
-  delete: <T>(path: string) => request<T>('DELETE', path),
+  patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
+  delete: <T>(path: string, body?: unknown) => request<T>('DELETE', path, body),
 };

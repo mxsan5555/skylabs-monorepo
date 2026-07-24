@@ -30,5 +30,10 @@ export const env = {
   smsApiUrl: process.env.SMS_API_URL ?? 'https://connectexpress.in/api/v3/',
   smsApiKey: process.env.SMS_API_KEY ?? '',
   smsSender: process.env.SMS_SENDER ?? '',
+  // Optional: routes needing these return 503 payment_gateway_not_configured until set,
+  // rather than crashing the whole app on boot (see lib/razorpay.ts).
+  razorpayKeyId: process.env.RAZORPAY_KEY_ID ?? '',
+  razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET ?? '',
+  razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? '',
   isProduction: process.env.NODE_ENV === 'production',
 };

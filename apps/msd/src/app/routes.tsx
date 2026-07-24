@@ -13,13 +13,22 @@ import SignIn from './pages/sign-in/sign-in';
 import Otp from './pages/otp/otp';
 import AuthCallback from './pages/auth-callback/auth-callback';
 import Profile from './pages/account/profile';
-import { Dashboard, Deals, Promotions, Sales } from './pages/account/role-pages';
+import { Dashboard } from './pages/account/role-pages';
 import Search from './pages/search/search';
 import Category from './pages/category/category';
 import DealDetail from './pages/deal-detail/deal-detail';
 import Cart from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
 import Checkout from './pages/checkout/checkout';
+import DealsListPage from './pages/account/deals/deals-list';
+import DealFormPage from './pages/account/deals/deal-form';
+import PromotionsPage from './pages/account/promotions/promotions';
+import SalesPage from './pages/account/sales/sales';
+import BookingsPage from './pages/account/bookings/bookings';
+import CategoriesPage from './pages/account/master/categories/categories';
+import FeaturesPage from './pages/account/master/features/features';
+import CancellationPoliciesPage from './pages/account/master/cancellation-policies/cancellation-policies';
+import CompaniesPage from './pages/account/master/companies/companies';
 
 export function AppRoutes() {
   return (
@@ -77,11 +86,20 @@ export function AppRoutes() {
         <Route path="/account" element={<Navigate to="/account/profile" replace />} />
         <Route path="/account/dashboard" element={<Dashboard />} />
         <Route path="/account/profile" element={<Profile />} />
+        <Route path="/account/bookings" element={<BookingsPage />} />
         <Route
           path="/account/deals"
           element={
             <RequireRole roles={['admin']}>
-              <Deals />
+              <DealsListPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/account/deals/:id"
+          element={
+            <RequireRole roles={['admin']}>
+              <DealFormPage />
             </RequireRole>
           }
         />
@@ -89,15 +107,47 @@ export function AppRoutes() {
           path="/account/promotions"
           element={
             <RequireRole roles={['marketing']}>
-              <Promotions />
+              <PromotionsPage />
             </RequireRole>
           }
         />
         <Route
           path="/account/sales"
           element={
-            <RequireRole roles={['sales']}>
-              <Sales />
+            <RequireRole roles={['admin', 'sales']}>
+              <SalesPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/account/master/categories"
+          element={
+            <RequireRole roles={['admin', 'marketing']}>
+              <CategoriesPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/account/master/features"
+          element={
+            <RequireRole roles={['admin', 'marketing']}>
+              <FeaturesPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/account/master/cancellation-policies"
+          element={
+            <RequireRole roles={['admin']}>
+              <CancellationPoliciesPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/account/master/companies"
+          element={
+            <RequireRole roles={['admin']}>
+              <CompaniesPage />
             </RequireRole>
           }
         />

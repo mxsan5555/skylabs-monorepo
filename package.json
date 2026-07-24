@@ -2,6 +2,12 @@
   "name": "skylabs-monorepo",
   "version": "0.0.0",
   "private": true,
+  "prisma": {
+    "seed": "tsx apps/msd-api/prisma/seed.ts"
+  },
+  "scripts": {
+    "promote-admin": "tsx apps/msd-api/prisma/promote-admin.ts"
+  },
   "devDependencies": {
     "@angular-devkit/core": "~21.2.0",
     "@angular-devkit/schematics": "~21.2.0",
@@ -70,6 +76,7 @@
     "react-refresh": "^0.10.0",
     "tailwindcss": "^3.0.2",
     "tslib": "^2.3.0",
+    "tsx": "^4.23.1",
     "typescript": "~5.9.2",
     "vite": "^8.0.0",
     "vite-plugin-dts": "^4.5.4",
@@ -99,6 +106,7 @@
     "nodemailer": "^9.0.3",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
+    "razorpay": "^2.9.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "6.30.3",

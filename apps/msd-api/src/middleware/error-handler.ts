@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { OtpError } from '../lib/otp';
+import { ApiError } from '../lib/api-error';
 import { env } from '../env';
 
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
@@ -11,6 +12,11 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
 
   if (err instanceof OtpError) {
     res.status(err.status).json({ error: err.code, retryAfterSeconds: err.retryAfterSeconds });
+    return;
+  }
+
+  if (err instanceof ApiError) {
+    res.status(err.status).json({ error: err.code });
     return;
   }
 
