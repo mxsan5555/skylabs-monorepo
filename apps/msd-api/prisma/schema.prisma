@@ -11,6 +11,7 @@ generator client {
 
 enum UserRole {
   USER
+  PARTNER
   ADMIN
   MARKETING
   SALES
@@ -23,6 +24,11 @@ enum OtpChannel {
 
 enum OtpPurpose {
   LOGIN
+  SIGNUP
+  CHANGE_PHONE
+  CHANGE_EMAIL
+  PARTNER_SIGNUP
+
 }
 
 model User {
@@ -34,6 +40,8 @@ model User {
   name          String?
   googleId      String?    @unique
   roles         UserRole[] @default([USER])
+  refreshSessions RefreshSession[]
+
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -41,19 +49,34 @@ model User {
   @@index([phone])
 }
 
-model OtpCode {
-  id           String     @id @default(cuid())
-  destination  String
-  channel      OtpChannel
-  purpose      OtpPurpose @default(LOGIN)
-  codeHash     String
-  expiresAt    DateTime
-  consumedAt   DateTime?
-  attemptCount Int        @default(0)
-  maxAttempts  Int        @default(5)
-  createdAt    DateTime   @default(now())
+model OtpChallenge {
+     id       String    @id@default(uuid())
+  identifier  String
+  channel     OtpChannel
+   codeHash    String
+  purpose     OtpPurpose
+  attempts    Int        @default(0)
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime    @default(now())
+  
+  @@index([identifier, purpose, consumedAt])
+}
 
-  @@index([destination, purpose, consumedAt])
+
+model RefreshSession {
+   id         String      @id@default(uuid())
+  userId      String
+  tokenHash   String
+  deviceLabel String?
+  ip          String?
+  lastUsedAt  DateTime
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
 }
 
 // Short-lived, single-use code exchanged for a real JWT after a Google OAuth

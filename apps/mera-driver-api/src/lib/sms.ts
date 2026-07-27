@@ -12,7 +12,7 @@ interface SmsGatewayResponse {
  * Error:   { status: "ERROR", message: "Missing required field: ..." }
  */
 export async function sendOtpSms(to: string, code: string): Promise<void> {
- const message = `Your overseas education lane registration OTP is ${code}`;
+  const message = `Your overseas education lane registration OTP is ${code}`;
 
   if (!env.smsApiKey) {
     if (env.isProduction) throw new Error('SMS gateway is not configured');
@@ -29,8 +29,17 @@ export async function sendOtpSms(to: string, code: string): Promise<void> {
     message,
   });
 
+  console.log({
+    smsApiUrl: env.smsApiUrl,
+    smsApiKey: env.smsApiKey,
+    smsSender: env.smsSender,
+    isProduction: env.isProduction,
+  });
+
   const res = await fetch(`${env.smsApiUrl}?${params.toString()}`);
-  const data = (await res.json().catch(() => null)) as SmsGatewayResponse | null;
+  const data = (await res
+    .json()
+    .catch(() => null)) as SmsGatewayResponse | null;
 
   if (!res.ok || data?.status !== 'OK') {
     throw new Error(`SMS gateway error: ${data?.message ?? res.statusText}`);

@@ -16,7 +16,9 @@ export const env = {
   jwtSecret: required('JWT_SECRET'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
   otpTtlSeconds: Number(process.env.OTP_TTL_SECONDS ?? 300),
-  otpResendCooldownSeconds: Number(process.env.OTP_RESEND_COOLDOWN_SECONDS ?? 30),
+  otpResendCooldownSeconds: Number(
+    process.env.OTP_RESEND_COOLDOWN_SECONDS ?? 30,
+  ),
   otpMaxAttempts: Number(process.env.OTP_MAX_ATTEMPTS ?? 5),
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
@@ -27,8 +29,12 @@ export const env = {
   smtpUser: process.env.SMTP_USER ?? '',
   smtpPass: process.env.SMTP_PASS ?? '',
   emailFrom: process.env.EMAIL_FROM ?? 'no-reply@example.com',
-  smsApiUrl: process.env.SMS_API_URL ?? 'https://connectexpress.in/api/v3/',
+  smsApiUrl: process.env.SMS_API_URL ?? '',
   smsApiKey: process.env.SMS_API_KEY ?? '',
   smsSender: process.env.SMS_SENDER ?? '',
   isProduction: process.env.NODE_ENV === 'production',
 };
+
+
+
+https://connectexpress.in/api/v3/

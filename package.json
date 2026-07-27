@@ -92,6 +92,7 @@
     "dotenv": "^17.4.2",
     "express": "^4.21.2",
     "express-rate-limit": "^8.5.2",
+    "jest": "^30.4.2",
     "jsonwebtoken": "^9.0.3",
     "lit": "^3.2.1",
     "material-symbols": "^0.40.2",

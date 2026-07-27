@@ -16,6 +16,9 @@ export const authRouter = Router();
 authRouter.post('/otp/request', otpIpRateLimit, async (req, res, next) => {
   try {
     const input = otpRequestSchema.parse(req.body);
+
+    // console.log("the value of input is", input);
+
     const result = await requestLoginOtp(input);
     res.json(result);
   } catch (err) {
