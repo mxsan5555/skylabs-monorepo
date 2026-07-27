@@ -1,0 +1,82 @@
+@if (post(); as post) {
+  <main class="post">
+    <article>
+      <nav class="post__crumb" aria-label="Breadcrumb">
+        <a routerLink="/blog">
+          <md-icon aria-hidden="true">arrow_back</md-icon>
+          Blog
+        </a>
+      </nav>
+
+      <header class="post__header">
+        <sky-badge variant="secondary">{{
+          blog.categoryName(post.categorySlug)
+        }}</sky-badge>
+        <h1>{{ post.title }}</h1>
+        <p class="post__meta">
+          <span>By {{ post.author }}</span>
+          <span aria-hidden="true">·</span>
+          <time [attr.datetime]="post.publishedAt">{{
+            post.publishedAt | date: 'mediumDate'
+          }}</time>
+          <span aria-hidden="true">·</span>
+          <span class="post__read">
+            <md-icon aria-hidden="true">schedule</md-icon>{{ post.readMinutes }} min
+            read
+          </span>
+        </p>
+      </header>
+
+      <img
+        class="post__cover"
+        [src]="post.coverImage"
+        [alt]="post.imageAlt"
+        width="800"
+        height="480"
+      />
+
+      <div class="post__body">
+        @for (block of post.body; track $index) {
+          @switch (block.type) {
+            @case ('heading') {
+              <h2>{{ block.text }}</h2>
+            }
+            @case ('list') {
+              <ul>
+                @for (it of block.items; track it) {
+                  <li>{{ it }}</li>
+                }
+              </ul>
+            }
+            @case ('quote') {
+              <blockquote>{{ block.text }}</blockquote>
+            }
+            @default {
+              <p>{{ block.text }}</p>
+            }
+          }
+        }
+      </div>
+
+      <footer class="post__footer">
+        @if (post.tags.length) {
+          <ul class="post__tags" aria-label="Tags">
+            @for (t of post.tags; track t) {
+              <li><sky-badge variant="tertiary" size="small">#{{ t }}</sky-badge></li>
+            }
+          </ul>
+        }
+        <a class="post__back" routerLink="/blog">
+          <md-icon aria-hidden="true">arrow_back</md-icon>
+          Back to all articles
+        </a>
+      </footer>
+    </article>
+  </main>
+} @else {
+  <main class="post post--missing">
+    <h1>Article not found</h1>
+    <p>We couldn't find that article. It may have moved.</p>
+    <a routerLink="/blog">Back to the blog</a>
+  </main>
+}

@@ -59,6 +59,7 @@
     "tslib": "^2.3.0",
     "typescript": "~5.9.2",
     "vite": "^8.0.0",
+    "vite-plugin-dts": "^4.5.4",
     "vitest": "~4.1.0"
   },
   "dependencies": {
@@ -68,11 +69,17 @@
     "@angular/forms": "~21.2.0",
     "@angular/platform-browser": "~21.2.0",
     "@angular/router": "~21.2.0",
+    "@lit/react": "^1.0.7",
+    "@material/web": "^2.3.0",
+    "@react-google-maps/api": "^2.20.8",
     "express": "^4.21.2",
+    "lit": "^3.2.1",
+    "material-symbols": "^0.40.2",
     "next": "~16.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "6.30.3",
-    "rxjs": "~7.8.0"
+    "rxjs": "~7.8.0",
+    "swiper": "^12.2.0"
   }
 }

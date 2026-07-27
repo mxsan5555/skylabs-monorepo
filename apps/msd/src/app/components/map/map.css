@@ -1,0 +1,14 @@
+.price-marker {
+  background: #2e6d3f;
+  color: white;
+  border: 2px solid white;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,.25);
+}
+
+.price-marker:hover{
+  transform: scale(1.08);
+}

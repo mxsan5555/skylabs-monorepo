@@ -13,14 +13,12 @@ describe('App', () => {
     expect(baseElement).toBeTruthy();
   });
 
-  it('should have a greeting as the title', () => {
+  it('should render the msd showcase title', () => {
     const { getAllByText } = render(
       <BrowserRouter>
         <App />
       </BrowserRouter>,
     );
-    expect(
-      getAllByText(new RegExp('Welcome msd', 'gi')).length > 0,
-    ).toBeTruthy();
+    expect(getAllByText(/msd/i).length).toBeGreaterThan(0);
   });
 });
