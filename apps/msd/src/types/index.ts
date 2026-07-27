@@ -119,10 +119,11 @@ export interface Deal {
   description: string;
   image: string;
   imageAlt: string;
-  gallery: string[];
+  gallery?: string[];
   price: number;
   originalPrice?: number;
   discount?: number;
+  priceNote?: string;
   priceLevel: PriceLevel;
   priceUnit: string;
   duration: number;
@@ -131,6 +132,8 @@ export interface Deal {
   reviews: number;
   distance: number;
   location: string;
+  lat: number;
+  lng: number;
   isOpen: boolean;
   isFeatured: boolean;
   isHot: boolean;

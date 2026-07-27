@@ -1,5 +1,8 @@
 import type { Category } from '../types';
+import { DEALS } from './deals';
 
+const getServiceCount = (slug: string) =>
+  DEALS.filter(deal => deal.categorySlug === slug).length;
 const catImg = (seed: string) => `https://picsum.photos/seed/msd-cat-${seed}/400/400`;
 
 export const CATEGORIES: Category[] = [
@@ -8,7 +11,7 @@ export const CATEGORIES: Category[] = [
     slug: 'massage',
     name: 'Massage',
     icon: 'self_improvement',
-    serviceCount: 12,
+    serviceCount: getServiceCount('massage'),
     description: 'Swedish, deep tissue, Thai, hot stone and more from certified therapists.',
     image: catImg('massage'),
     imageAlt: 'Massage therapy session',
@@ -25,7 +28,7 @@ export const CATEGORIES: Category[] = [
     slug: 'spas-retreats',
     name: 'Spas & Retreats',
     icon: 'spa',
-    serviceCount: 11,
+    serviceCount: getServiceCount('spas-retreats'),
     description: 'Day spa packages, couples retreats, and full wellness escape experiences.',
     image: catImg('spa'),
     imageAlt: 'Luxury spa retreat',
@@ -41,7 +44,7 @@ export const CATEGORIES: Category[] = [
     slug: 'skin-beauty',
     name: 'Skin & Beauty',
     icon: 'face_retouching_natural',
-    serviceCount: 14,
+    serviceCount: getServiceCount('skin-beauty'),
     description: 'Facials, chemical peels, anti-ageing treatments, and more for glowing skin.',
     image: catImg('skin'),
     imageAlt: 'Facial skin treatment',
@@ -57,7 +60,7 @@ export const CATEGORIES: Category[] = [
     slug: 'hair-nails',
     name: 'Hair & Nails',
     icon: 'content_cut',
-    serviceCount: 7,
+    serviceCount:getServiceCount('hair-nails'),
     description: 'Manicures, pedicures, nail art, and hair treatments at top salons.',
     image: catImg('nails'),
     imageAlt: 'Nail care and manicure',
@@ -73,7 +76,7 @@ export const CATEGORIES: Category[] = [
     slug: 'health-wellness',
     name: 'Health & Wellness',
     icon: 'favorite',
-    serviceCount: 13,
+    serviceCount:getServiceCount('health-wellness'),
     description: 'Yoga, meditation, acupuncture, physiotherapy and holistic wellness sessions.',
     image: catImg('yoga'),
     imageAlt: 'Yoga and wellness session',
