@@ -23,16 +23,11 @@ main{
   position: fixed;
   top: 0;
   z-index: 9999;
-
   width: 100%;
-
   background: var(--md-sys-color-surface-container);
-
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
-
   box-shadow: 0 2px 12px rgba(0,0,0,.08);
 }
-
 .site-header__inner {
   max-width: 1280px;
   margin: 0 auto;

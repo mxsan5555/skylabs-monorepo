@@ -29,7 +29,7 @@
         "count": 7
       },
       {
-        "label": "Health & Wellness",
+        "label": "Health",
         "to": "/category/health-wellness",
         "count": 13
       }
@@ -462,5 +462,79 @@
     ],
     "buttonText": "Book Now",
     "image": "https://images.unsplash.com/photo-1507652313519-d4e9174996dd?auto=format&fit=crop&w=1920&q=80"
+  },
+  "auth": {
+    "signIn": {
+      "pageTitle": "Sign in · MSD",
+      "brand": {
+        "title": "MSD",
+        "subtitle": "Your wellness companion",
+        "logoIcon": "spa"
+      },
+      "heading": "Sign in",
+      "description": "Enter your details to receive a one-time code.",
+      "tabs": {
+        "email": {
+          "label": "Email",
+          "icon": "mail"
+        },
+        "phone": {
+          "label": "Phone",
+          "icon": "call"
+        }
+      },
+      "fields": {
+        "email": {
+          "label": "Email",
+          "defaultValue": "user@email.com"
+        },
+        "phone": {
+          "label": "Phone number",
+          "defaultValue": "9876543213"
+        }
+      },
+      "buttons": {
+        "sendOtp": "Send OTP",
+        "sendingOtp": "Sending OTP...",
+        "continueWithGoogle": "Continue with Google"
+      },
+      "divider": "or continue with",
+      "note": "New users are registered automatically.",
+      "googleIcon": "language",
+      "validation": {
+        "emptyPhone": "Please enter your mobile number.",
+        "emptyEmail": "Please enter your email address.",
+        "invalidPhone": "Please enter a valid 10-digit mobile number.",
+        "invalidEmail": "Please enter a valid email address.",
+        "phoneNotRegistered": "Mobile number is not registered.",
+        "emailNotRegistered": "Email address is not registered.",
+        "somethingWentWrong": "Something went wrong. Please try again."
+      }
+    },
+    "otp": {
+      "pageTitle": "Verify your phone · MSD",
+      "heading": "Verify your phone",
+      "subtitle": "We sent a 6-digit code to",
+      "enterCode": "Enter the code",
+      "description": "The code expires in a few minutes.",
+      "fieldLabel": "6-digit code",
+      "verifyButton": "Verify & Continue",
+      "verifyingButton": "Verifying...",
+      "backAriaLabel": "Go back",
+      "resend": {
+        "question": "Didn't receive the code?",
+        "countdown": "Resend in",
+        "button": "Resend code"
+      },
+      "icons": {
+        "logo": "sms",
+        "destination": "call",
+        "back": "arrow_back"
+      },
+      "validation": {
+        "emptyOtp": "Please enter the OTP.",
+        "invalidOtp": "Invalid OTP. Please try again."
+      }
+    }
   }
 }
