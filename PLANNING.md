@@ -83,6 +83,33 @@ Menu config: `apps/<app>/src/app/admin/menu.ts` — add `{ label, icon, to, role
 - **Boundary**: guards are UX only — each API must re-check the role from the JWT on
   every request once backends exist. See `CLAUDE.md` → "Auth & roles (RBAC)" for full detail.
 
+## AI Dev Team
+
+The project ships with 6 project-scoped AI agents, 8 skill reference docs, and 5 command pipelines — all under `.claude/`. They are loaded automatically in Claude Code sessions.
+
+### Agents
+
+| Agent | Specialty |
+|-------|-----------|
+| `skylabs-abhi` | Express APIs, Prisma schemas, JWT auth, OTP, Google OAuth |
+| `skylabs-ravi` | React 19 (msd) + Angular 21 (mera-driver) frontend |
+| `skylabs-neha` | UI/UX design — 60/30/10 rule, M3 tokens, accessibility specs |
+| `skylabs-dev` | QA — Vitest, Angular unit tests, Playwright e2e |
+| `skylabs-vivek` | SEO/GEO/AEO, GA4/GTM, social media copy |
+| `skylabs-reena` | Content — `content.json`, blog posts, marketing copy |
+
+### Commands
+
+| Command | Triggers |
+|---------|---------|
+| `/msd-feature` | Full pipeline: neha → abhi → ravi → dev → vivek → reena |
+| `/mera-driver-feature` | Same pipeline scoped to mera-driver |
+| `/new-endpoint` | abhi builds endpoint + dev writes integration tests |
+| `/new-shared-component` | neha spec → ravi LIT + React wrapper → dev unit test |
+| `/skylabs-audit` | Code + test + SEO + content + design audit across all agents |
+
+Full agent file map: `.claude/agents/` · Full skill file map: `.claude/skills/` · See `ARCHITECTURE.md → .claude/` for the directory layout.
+
 ## Conventions (summary)
 
 - Pages are framework-native and app-local; reuse at the component level only.
@@ -92,6 +119,9 @@ Menu config: `apps/<app>/src/app/admin/menu.ts` — add `{ label, icon, to, role
   forms); no abstraction before real duplication appears.
 - Keep it simple: no shared backend, no premium services where a free/in-house
   option works.
+- Use the AI agent team (above) for all new features — never build outside the
+  defined pipeline or bypass a step (e.g. shipping without skylabs-dev tests or
+  skylabs-vivek SEO on public pages).
 
 ## Roadmap
 
