@@ -22,8 +22,7 @@
 
 .home__heroo {
     position: relative;
-    height: 430px;
-    overflow: hidden;
+    padding: 16px 0;
 }
 
 .home__hero-slider {
@@ -1113,4 +1112,99 @@
 }
 .home-deal__button{
     width:100%;
+}
+.home-stays-swiper {
+  display: block;
+  width: 100%;
+  padding: 0 48px;
+}
+
+.home-stays-slide {
+  width: 240px;
+}
+.home-stays-swiper {
+  --swiper-navigation-size: 24px;
+  --swiper-navigation-color: white;
+}
+.home-stays-swiper::part(button-prev),
+.home-stays-swiper::part(button-next) {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  transition: all 0.2s ease;
+}
+
+.home-stays-swiper::part(button-prev) {
+  left: 8px;
+}
+
+.home-stays-swiper::part(button-next) {
+  right: 8px;
+}
+
+.home-stays-swiper::part(button-prev):hover,
+.home-stays-swiper::part(button-next):hover {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+.home-vacation-section {
+  padding: 0 24px;
+  margin-bottom: 48px;
+}
+.home__hot-deals{
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+}
+
+.home__hot-deals .home-carousel{
+    overflow:visible;
+    padding:8px 0 20px;
+}
+
+.home__hot-deals swiper-container{
+    --swiper-padding-start:20px;
+    --swiper-padding-end:20px;
+
+    overflow:visible;
+}
+
+.home__hot-deals swiper-slide{
+    width:260px;
+    height:auto;
+    overflow:visible;
+}
+
+.home__hot-deals tabs{
+    width:100%;
+    overflow-x:auto;
+    scrollbar-width:none;
+}
+
+.home__hot-deals tabs::-webkit-scrollbar{
+    display:none;
+}
+.home__hot-deals sky-product-card-react{
+    display:block;
+    height:auto;
+    overflow:visible;
+}
+.home__faq{
+    max-width:900px;
+    margin:0 auto;
+}
+
+.home__faq-subtitle{
+    margin:8px 0 32px;
+    color:var(--md-sys-color-on-surface-variant);
+    text-align:center;
+    line-height:1.6;
+}
+
+.home__faq .home-section__heading{
+    text-align:center;
+    margin-bottom:8px;
 }

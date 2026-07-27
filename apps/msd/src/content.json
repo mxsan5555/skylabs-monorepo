@@ -5,6 +5,17 @@
     "tagline": "India's wellness marketplace",
     "description": "Discover trusted spa, beauty, and wellness experiences with exclusive offers and effortless booking."
   },
+  "header": {
+    "skipToContent": "Skip to main content",
+    "openNavigation": "Open navigation menu",
+    "closeNavigation": "Close navigation",
+    "myAccount": "My Account",
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "cart": "Cart",
+    "wishlist": "Wishlist",
+    "homeAriaLabel": "MSD – MySpaDeal home"
+  },
   "nav": {
     "drawerCategoryHeader": "Browse Categories",
     "primary": [
@@ -29,7 +40,7 @@
         "count": 7
       },
       {
-        "label": "Health",
+        "label": "Health & Wellness",
         "to": "/category/health-wellness",
         "count": 13
       }
@@ -201,21 +212,47 @@
       },
       "hotRightNow": {
         "heading": "Hot Right Now",
-        "seeAll": "See all",
-        "seeAllTo": "/explore?sort=hot"
+        "seeAll": "See more deals",
+        "seeAllTo": "/explore?sort=hot",
+        "tabs": [
+          {
+            "label": "All Deals",
+            "value": "all"
+          },
+          {
+            "label": "Massage",
+            "value": "massage"
+          },
+          {
+            "label": "Spas & Retreats",
+            "value": "spas-retreats"
+          },
+          {
+            "label": "Skin & Beauty",
+            "value": "skin-beauty"
+          },
+          {
+            "label": "Hair & Nails",
+            "value": "hair-nails"
+          },
+          {
+            "label": "Health & Wellness",
+            "value": "health-wellness"
+          }
+        ]
       },
       "massageTherapy": {
-        "heading": "Massage Therapy",
+        "heading": "Massage",
         "seeAll": "See all",
         "seeAllTo": "/category/massage"
       },
       "facialSkin": {
-        "heading": "Facial & Skin",
+        "heading": "Skin & Beauty",
         "seeAll": "See all",
         "seeAllTo": "/category/skin-beauty"
       },
       "nailCare": {
-        "heading": "Nail Care",
+        "heading": "Hair & Nails",
         "seeAll": "See all",
         "seeAllTo": "/category/hair-nails"
       },
@@ -262,7 +299,70 @@
         "discount": "40% OFF",
         "label": "First Booking Only"
       }
+    },
+    "vacationStays": {
+      "title": "Vacation rentals for your kind of stay",
+      "items": [
+        {
+          "label": "Private vacation homes",
+          "image": "https://picsum.photos/seed/private/600/800",
+          "imageAlt": "Private vacation homes",
+          "href": "#private"
+        },
+        {
+          "label": "Apartments & Condos",
+          "image": "https://picsum.photos/seed/apartment/600/800",
+          "imageAlt": "Apartments & Condos",
+          "href": "#apartments"
+        },
+        {
+          "label": "Cabins",
+          "image": "https://picsum.photos/seed/cabins/600/800",
+          "imageAlt": "Cabins",
+          "href": "#cabins"
+        },
+        {
+          "label": "Cottages",
+          "image": "https://picsum.photos/seed/cottages/600/800",
+          "imageAlt": "Cottages",
+          "href": "#cottages"
+        },
+        {
+          "label": "Villas",
+          "image": "https://picsum.photos/seed/villas/600/800",
+          "imageAlt": "Villas",
+          "href": "#villas"
+        },
+        {
+          "label": "Huts",
+          "image": "https://picsum.photos/seed/huts/600/800",
+          "imageAlt": "huts",
+          "href": "#huts"
+        }
+      ]
+    },
+    "faq": {
+  "heading": "Frequently Asked Questions",
+  "subheading": "Find answers to the most common questions about bookings, payments, cancellations, and gift cards.",
+  "items": [
+    {
+      "question": "How do I book a spa deal?",
+      "answer": "Select your preferred deal, choose a date and time, then complete the payment to confirm your booking."
+    },
+    {
+      "question": "Can I cancel or reschedule my booking?",
+      "answer": "Yes. Most bookings can be cancelled or rescheduled before the cancellation deadline mentioned on the deal page."
+    },
+    {
+      "question": "Are gift cards valid for all spas?",
+      "answer": "Gift cards can be redeemed at participating spas listed on My Spa Deals."
+    },
+    {
+      "question": "How do I contact customer support?",
+      "answer": "You can contact our support team through the Contact Us page or email us anytime."
     }
+  ]
+}
   },
   "search": {
     "placeholder": "Search spas, treatments, locations…",

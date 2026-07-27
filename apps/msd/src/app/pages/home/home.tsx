@@ -1,32 +1,17 @@
 import { useNavigate } from 'react-router-dom';
 import { NavLink } from 'react-router-dom';
-import { useEffect, useRef } from 'react';
-import {
-  FilledButton,
-  OutlinedButton,
-  TextButton,
-  Icon,
-  OutlinedTextField,
-  SkyCategoryCardReact,
-  SkyProductCardReact,
-  SkyCardReact,
-  AssistChip,
-} from '@skylabs-monorepo/shared-ui/react';
+import { useState, useMemo } from 'react';
+import { FilledButton, SkyAccordionReact, SkyAccordionItemReact, TextButton, Icon, Tabs, SecondaryTab, SkyImageCardReact, OutlinedTextField, SkyProductCardReact, SkyCardReact, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import {
-  DEALS,
-  getFeaturedDeals,
-  getHotDeals,
-  getDealsByCategory,
-} from '../../../data/deals';
+import { DEALS, getFeaturedDeals, getHotDeals, getDealsByCategory, } from '../../../data/deals';
 import { CATEGORIES } from '../../../data/categories';
 import { DealCard } from '../../components/deal-card';
 import content from '../../../content.json';
 import './home.css';
 
 const { home } = content;
-const { hero, sections, giftCard, welcomeOffer } = home;
+const hotTabs = home.sections.hotRightNow.tabs;
 const { dealOfTheDay } = content;
 const heroImages = home.heroImages as string[];
 function SectionHeader({
@@ -53,7 +38,7 @@ function SectionHeader({
 export function Home() {
   const navigate = useNavigate();
   const { toggle, has } = useWishlist();
-
+  const [selectedTab, setSelectedTab] = useState('all');
   const featuredDeals = getFeaturedDeals();
   const hotDeals = getHotDeals();
   const massageDeals = getDealsByCategory('massage').slice(0, 6);
@@ -61,6 +46,15 @@ export function Home() {
   const nailDeals = getDealsByCategory('hair-nails').slice(0, 6);
   const spaDeals = getDealsByCategory('spas-retreats').slice(0, 6);
   const wellnessDeals = getDealsByCategory('health-wellness').slice(0, 6);
+
+  const filteredHotDeals = useMemo(() => {
+    if (selectedTab === 'all') {
+      return hotDeals;
+    }
+    return hotDeals.filter(
+      deal => deal.categorySlug === selectedTab
+    );
+  }, [selectedTab, hotDeals]);
 
   function renderDealCarousel(deals: typeof DEALS) {
     return (
@@ -75,6 +69,7 @@ export function Home() {
             <swiper-slide key={deal.id} style={{ width: '260px', height: 'auto' }}>
               <SkyProductCardReact
                 image={deal.image}
+                gallery={deal.gallery}
                 imageAlt={deal.imageAlt}
                 badge={deal.badge}
 
@@ -290,7 +285,23 @@ export function Home() {
             seeAll={home.sections.hotRightNow.seeAll}
             seeAllTo={home.sections.hotRightNow.seeAllTo}
           />
-          {renderDealCarousel(hotDeals)}
+          <div className="home__hot-deals">
+
+            <Tabs>
+              {hotTabs.map((tab) => (
+                <SecondaryTab
+                  key={tab.value}
+                  active={selectedTab === tab.value}
+                  onClick={() => setSelectedTab(tab.value)}
+                >
+                  {tab.label}
+                </SecondaryTab>
+              ))}
+            </Tabs>
+
+            {renderDealCarousel(filteredHotDeals)}
+
+          </div>
         </div>
       </section>
 
@@ -372,7 +383,29 @@ export function Home() {
           </div>
         </section>
       )}
+      <section className="home-section home-vacation-section">
+        <div className="home-section__header">
+          <h1>{home.vacationStays.title}</h1>
+        </div>
 
+        <swiper-container
+          navigation="true"
+          slides-per-view="auto"
+          space-between="20"
+          grab-cursor="true"
+        >
+          {home.vacationStays.items.map((item) => (
+            <swiper-slide key={item.label} className="home-stays-slide">
+              <SkyImageCardReact
+                image={item.image}
+                imageAlt={item.imageAlt}
+                label={item.label}
+                href={item.href}
+              />
+            </swiper-slide>
+          ))}
+        </swiper-container>
+      </section>
       {skinDeals.length > 0 && (
         <section className="home-section home-section--alt" aria-labelledby="facial-heading">
           <div className="home-section__container">
@@ -484,6 +517,30 @@ export function Home() {
 
             </div>
           </SkyCardReact>
+        </div>
+      </section>
+
+      {/* /*FAQS*/}
+      <section className="home-section home-section--alt" aria-labelledby="faq-heading">
+        <div className="home-section__container">
+          <div className="home__faq">
+            <h2 id="faq-heading" className="home-section__heading" >
+              {home.faq.heading}
+            </h2>
+            <p className="home__faq-subtitle">
+              {home.faq.subheading}
+            </p>
+            <SkyAccordionReact>
+              {home.faq.items.map((item) => (
+                <SkyAccordionItemReact
+                  key={item.question}
+                  header={item.question}
+                >
+                  {item.answer}
+                </SkyAccordionItemReact>
+              ))}
+            </SkyAccordionReact>
+          </div>
         </div>
       </section>
     </div>

@@ -119,7 +119,7 @@ export interface Deal {
   description: string;
   image: string;
   imageAlt: string;
-  gallery: string[];
+  gallery?: string[];
   price: number;
   originalPrice?: number;
   discount?: number;
