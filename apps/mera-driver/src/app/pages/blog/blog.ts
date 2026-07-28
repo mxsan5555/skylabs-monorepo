@@ -41,7 +41,9 @@ export class Blog {
   protected readonly page = computed(() =>
     Math.min(Math.max(1, this.queryPage()), this.totalPages()),
   );
-  protected readonly items = computed(() => this.blog.listPosts(this.page()).items);
+ readonly items = computed(() =>
+  this.blog.queryPosts({ page: this.page() }).items
+);
   protected readonly pageNumbers = computed(() =>
     Array.from({ length: this.totalPages() }, (_, i) => i + 1),
   );

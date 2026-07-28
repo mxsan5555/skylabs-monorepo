@@ -8,7 +8,18 @@
 
 import { AUTH_TOKEN_KEY } from '../auth/auth-storage';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? '/api';
+export const BASE_URL = import.meta.env.VITE_API_URL ?? '/api';
+
+/** Thrown on a non-2xx response; carries the backend's `{ error, retryAfterSeconds? }` body. */
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly code: string,
+    public readonly retryAfterSeconds?: number,
+  ) {
+    super(code);
+  }
+}
 
 function authHeaders(): Record<string, string> {
   const token =
@@ -29,7 +40,8 @@ async function request<T>(
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`API ${method} ${path} failed: ${res.status}`);
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.error ?? 'unknown_error', data.retryAfterSeconds);
   }
   return (await res.json()) as T;
 }

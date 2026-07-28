@@ -40,6 +40,18 @@ export const appRoutes: Routes = [
     ],
   },
   {
+    path: 'auth/callback',
+    component: AuthLayout,
+    children: [
+      {
+        path: '',
+        title: 'Signing in · mera-driver',
+        loadComponent: () =>
+          import('./pages/auth-callback/auth-callback').then((m) => m.AuthCallback),
+      },
+    ],
+  },
+  {
     // Authenticated console (after login / "My account").
     path: 'account',
     component: AdminLayout,

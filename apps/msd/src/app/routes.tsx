@@ -11,6 +11,7 @@ import Blog from './pages/blog/blog';
 import BlogDetail from './pages/blog-detail/blog-detail';
 import SignIn from './pages/sign-in/sign-in';
 import Otp from './pages/otp/otp';
+import AuthCallback from './pages/auth-callback/auth-callback';
 import Profile from './pages/account/profile';
 import { Dashboard, Deals, Promotions, Sales } from './pages/account/role-pages';
 import Search from './pages/search/search';
@@ -62,6 +63,7 @@ export function AppRoutes() {
       <Route element={<AuthLayout />}>
         <Route path="/sign-in" element={<SignIn />} />
         <Route path="/otp" element={<Otp />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
       </Route>
 
       {/* Authenticated console (after login / "My account"). */}
