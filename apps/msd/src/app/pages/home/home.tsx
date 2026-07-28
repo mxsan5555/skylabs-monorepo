@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { NavLink } from 'react-router-dom';
 import { useState, useMemo } from 'react';
-import { FilledButton, SkyAccordionReact, SkyAccordionItemReact, TextButton, Icon, Tabs, SecondaryTab, SkyImageCardReact, OutlinedTextField, SkyProductCardReact, SkyCardReact, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, SkyInfoCardReact, SkyAccordionReact, SkyAccordionItemReact, TextButton, Icon, Tabs, SecondaryTab, SkyImageCardReact, OutlinedTextField, SkyProductCardReact, SkyCardReact, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { DEALS, getFeaturedDeals, getHotDeals, getDealsByCategory, } from '../../../data/deals';
@@ -263,6 +263,38 @@ export function Home() {
         </div>
       </section>
 
+      <section
+        className="home-section home-section--alt"
+        aria-label="Member promotion"
+      >
+        <div className="home-section__container">
+          <SkyCardReact
+            variant="filled"
+            className="home__member-banner"
+          >
+            <div className="home__member-content">
+              <div className="home__member-left">
+                <FilledButton>
+                  <Icon>{home.memberBanner.icon}</Icon>
+                </FilledButton>
+                <div className="home__member-text">
+                  <h3>{home.memberBanner.heading}</h3>
+                </div>
+              </div>
+              <FilledButton
+                className="home__member-button"
+                onClick={() => navigate(home.memberBanner.buttonLink)}
+              >
+                {home.memberBanner.button}
+                <Icon slot="trailing-icon">
+                  arrow_forward
+                </Icon>
+              </FilledButton>
+            </div>
+          </SkyCardReact>
+        </div>
+      </section>
+
       {/* ── Hot Right Now ──────────────────────────────────────────────── */}
       <section className="home__heroo" aria-labelledby="hot-heading">
         <div className="home-section__container">
@@ -301,53 +333,47 @@ export function Home() {
 
           <SkyCardReact
             variant="filled"
-            className="home__gift-card"
-            style={{
-              backgroundImage: `url(${home.giftCard.image})`,
-            }}
+            className="home__gift-banner"
           >
 
-            <div className="home__gift-content">
+            <div className="home__gift-banner-content">
 
-              <div className="home__gift-left">
+              {/* Left Icon */}
 
-                <AssistChip
-                  className="home__promo-chip"
-                  label={home.giftCard.chip}
-                >
-                  <Icon slot="icon">card_giftcard</Icon>
-                </AssistChip>
+              <FilledButton>
+                <Icon>
+                  card_giftcard
+                </Icon>
+              </FilledButton>
 
-                <h2 className="home__gift-heading">
+
+              {/* Text */}
+              <div className="home__gift-banner-text">
+
+                <h2>
                   {home.giftCard.heading}
                 </h2>
 
-                <p className="home__gift-body">
+                <p>
                   {home.giftCard.body}
                 </p>
 
-                <div className="home__gift-features">
-                  {home.giftCard.features.map((item) => (
-                    <div className="home__gift-feature">
-                      <Icon className="home__gift-feature-icon">
-                        {item.icon}
-                      </Icon>
-                      <span>{item.title}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <FilledButton
-                  onClick={() => navigate('/gift-cards')}
-                >
-                  {home.giftCard.cta}
-                </FilledButton>
-
               </div>
 
-              <div className="home__gift-right">
-                {/* Empty only for spacing */}
-              </div>
+
+              {/* CTA */}
+              <FilledButton
+                className="home__gift-banner-button"
+                onClick={() => navigate('/gift-cards')}
+              >
+                {home.giftCard.cta}
+
+                <Icon slot="trailing-icon">
+                  arrow_forward
+                </Icon>
+
+              </FilledButton>
+
 
             </div>
 
@@ -489,9 +515,9 @@ export function Home() {
                   {home.welcomeOffer.subtitle}
                 </p>
 
-                <p className="home__offer-description">
+                {/* <p className="home__offer-description">
                   {home.welcomeOffer.description}
-                </p>
+                </p> */}
 
                 <FilledButton onClick={() => navigate('/explore')}>
                   {home.welcomeOffer.cta}
@@ -499,7 +525,7 @@ export function Home() {
 
               </div>
 
-              <div className="home__offer-right">
+              {/* <div className="home__offer-right">
                 <div className="offer-floating-card">
                   <span className="offer-discount">
                     {home.welcomeOffer.offerCard.discount}
@@ -509,10 +535,127 @@ export function Home() {
                     {home.welcomeOffer.offerCard.label}
                   </span>
                 </div>
-              </div>
+              </div> */}
 
             </div>
           </SkyCardReact>
+        </div>
+      </section>
+
+      <section
+        className="home-section"
+        aria-labelledby="search-destination-heading"
+      >
+        <div className="home-section__container">
+
+          <h2
+            id="search-destination-heading"
+            className="home-section__heading"
+          >
+            {home.searchByDestination.heading}
+          </h2>
+
+          <p className="home__search-description">
+            {home.searchByDestination.subheading}
+          </p>
+
+          <div className="home__search-grid">
+
+            {home.searchByDestination.columns.map((column, columnIndex) => (
+
+              <div
+                key={columnIndex}
+                className="home__search-column"
+              >
+
+                <SkyAccordionReact>
+
+                  {column.map((section) => (
+
+                    <SkyAccordionItemReact
+                      key={section.title}
+                      header={section.title}
+                    >
+                      <ul className="home__search-links">
+
+                        {section.items.map((item) => (
+                          <li key={item}>
+                            {item}
+                          </li>
+                        ))}
+
+                      </ul>
+                    </SkyAccordionItemReact>
+
+                  ))}
+
+                </SkyAccordionReact>
+
+              </div>
+
+            ))}
+
+          </div>
+
+        </div>
+      </section>
+
+      <section className="home-section">
+        <div className="home-section__container">
+          <div className="home__trust-grid">
+            {home.trustSection.cards.map((card, index) => (
+              <SkyCardReact
+                key={index}
+                variant="outlined"
+                className="home__trust-card"
+              >
+                <div className="home__trust-top">
+
+                  {card.type === 'logos' && (
+                    <div className="home__trust-icons">
+                      {card.logos.map((logo) => (
+                        <div key={logo} className="home__trust-circle">
+                          <img
+                            src={logo}
+                            alt=""
+                            className="home__trust-logo"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {card.type === "avatars" && (
+                    <div className="home__trust-avatars">
+                      {card.avatars.map((avatar) => (
+                        <div key={avatar} className="home__trust-circle">
+                          <img
+                            src={avatar}
+                            alt=""
+                            className="home__trust-avatar"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {card.type === 'stars' && (
+                    <div className="home__trust-stars">
+                      {Array.from({ length: card.stars }).map((_, i) => (
+                        <Icon key={i} filled>
+                          star
+                        </Icon>
+                      ))}
+                    </div>
+                  )}
+
+                </div>
+
+                <h3>{card.title}</h3>
+                <p>{card.subtitle}</p>
+              </SkyCardReact>
+            ))}
+          </div>
         </div>
       </section>
 

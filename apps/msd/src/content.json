@@ -341,28 +341,151 @@
         }
       ]
     },
+    "memberBanner": {
+      "icon": "payments",
+      "heading": "Want access to exclusive spa deals & member pricing?",
+      "button": "Sign In",
+      "buttonLink": "/sign-in"
+    },
+    "searchByDestination": {
+      "heading": "Search Spa Deals by Category",
+      "subheading": "Find massage, beauty, wellness and spa offers near you.",
+      "columns": [
+        [
+          {
+            "title": "Massage",
+            "items": [
+              "Swedish Massage",
+              "Deep Tissue Massage",
+              "Thai Massage",
+              "Hot Stone Massage"
+            ]
+          },
+          {
+            "title": "Facials",
+            "items": [
+              "Hydra Facial",
+              "Gold Facial",
+              "Anti Aging Facial"
+            ]
+          },
+          {
+            "title": "Hair Spa",
+            "items": [
+              "Hair Spa",
+              "Hair Smoothening",
+              "Keratin Treatment"
+            ]
+          }
+        ],
+        [
+          {
+            "title": "Spa Packages",
+            "items": [
+              "Couple Spa",
+              "Luxury Spa",
+              "Weekend Spa"
+            ]
+          },
+          {
+            "title": "Wellness",
+            "items": [
+              "Yoga",
+              "Meditation",
+              "Detox Therapy"
+            ]
+          },
+          {
+            "title": "Beauty",
+            "items": [
+              "Waxing",
+              "Threading",
+              "Makeup"
+            ]
+          }
+        ],
+        [
+          {
+            "title": "Nails",
+            "items": [
+              "Manicure",
+              "Pedicure",
+              "Nail Art"
+            ]
+          },
+          {
+            "title": "Body Care",
+            "items": [
+              "Body Polish",
+              "Body Scrub",
+              "Body Wrap"
+            ]
+          },
+          {
+            "title": "More Services",
+            "items": [
+              "Steam Bath",
+              "Sauna",
+              "Aromatherapy"
+            ]
+          }
+        ]
+      ]
+    },
     "faq": {
-  "heading": "Frequently Asked Questions",
-  "subheading": "Find answers to the most common questions about bookings, payments, cancellations, and gift cards.",
-  "items": [
-    {
-      "question": "How do I book a spa deal?",
-      "answer": "Select your preferred deal, choose a date and time, then complete the payment to confirm your booking."
+      "heading": "Frequently Asked Questions",
+      "subheading": "Find answers to the most common questions about bookings, payments, cancellations, and gift cards.",
+      "items": [
+        {
+          "question": "How do I book a spa deal?",
+          "answer": "Select your preferred deal, choose a date and time, then complete the payment to confirm your booking."
+        },
+        {
+          "question": "Can I cancel or reschedule my booking?",
+          "answer": "Yes. Most bookings can be cancelled or rescheduled before the cancellation deadline mentioned on the deal page."
+        },
+        {
+          "question": "Are gift cards valid for all spas?",
+          "answer": "Gift cards can be redeemed at participating spas listed on My Spa Deals."
+        },
+        {
+          "question": "How do I contact customer support?",
+          "answer": "You can contact our support team through the Contact Us page or email us anytime."
+        }
+      ]
     },
-    {
-      "question": "Can I cancel or reschedule my booking?",
-      "answer": "Yes. Most bookings can be cancelled or rescheduled before the cancellation deadline mentioned on the deal page."
-    },
-    {
-      "question": "Are gift cards valid for all spas?",
-      "answer": "Gift cards can be redeemed at participating spas listed on My Spa Deals."
-    },
-    {
-      "question": "How do I contact customer support?",
-      "answer": "You can contact our support team through the Contact Us page or email us anytime."
+    "trustSection": {
+      "cards": [
+        {
+          "type": "logos",
+          "logos": [
+            "https://picsum.photos/seed/logo1/60/60",
+            "https://picsum.photos/seed/logo2/60/60",
+            "https://picsum.photos/seed/logo3/60/60",
+            "https://picsum.photos/seed/logo4/60/60"
+          ],
+          "title": "Save when you compare",
+          "subtitle": "More deals, More sites, One search"
+        },
+        {
+          "type": "avatars",
+          "avatars": [
+            "https://picsum.photos/seed/user1/80/80",
+            "https://picsum.photos/seed/user2/80/80",
+            "https://picsum.photos/seed/user3/80/80",
+            "https://picsum.photos/seed/user4/80/80"
+          ],
+          "title": "10,000+",
+          "subtitle": "searches for massage this week"
+        },
+        {
+          "type": "stars",
+          "stars": 5,
+          "title": "You will definitly love it",
+          "subtitle": "1M+ ratings on our app"
+        }
+      ]
     }
-  ]
-}
   },
   "search": {
     "placeholder": "Search spas, treatments, locations…",

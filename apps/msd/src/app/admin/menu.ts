@@ -8,8 +8,9 @@ import type { UserRole } from '../../types';
 export interface MenuItem {
   label: string;
   icon: string;
-  to: string;
+  to?: string;
   roles: UserRole[];
+  children?: MenuItem[];
 }
 
 export interface MenuGroup {
@@ -27,6 +28,19 @@ export const ADMIN_MENU: MenuGroup[] = [
       { label: 'My Account', icon: 'person', to: '/account/profile', roles: EVERYONE },
     ],
   },
+  {
+    label: 'Masters',
+    items: [
+      {
+        label: 'Master', icon: 'folder', roles: ['admin'],
+        children: [
+          { label: 'Category', icon: 'category', to: '/account/master/category', roles: ['admin'], },
+          { label: 'Subcategory', icon: 'account_tree', to: '/account/master/subcategory', roles: ['admin'], },
+        ],
+      },
+    ],
+  },
+
   {
     label: 'Manage',
     items: [
