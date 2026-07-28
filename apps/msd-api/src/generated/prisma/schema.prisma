@@ -1,0 +1,987 @@
+// msd-api's own database — massage deals. Never shared with mera-driver-api.
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  MARKETING
+  SALES
+}
+
+enum OtpChannel {
+  EMAIL
+  PHONE
+}
+
+enum OtpPurpose {
+  LOGIN
+  CHANGE_PHONE
+  CHANGE_EMAIL
+}
+
+enum Gender {
+  FEMALE
+  MALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String?    @unique
+  phone         String?    @unique
+  emailVerified Boolean    @default(false)
+  phoneVerified Boolean    @default(false)
+  name          String?
+  googleId      String?    @unique
+  roles         UserRole[] @default([USER])
+  avatarUrl     String?
+  gender        Gender?
+  dateOfBirth   DateTime?
+  locale        String     @default("en-IN")
+  status        UserStatus @default(ACTIVE)
+  // UserPreferences, embedded: { theme, marketingEmails, marketingSms, bookingReminders, defaultCity }
+  preferences   Json       @default("{\"theme\":\"system\",\"marketingEmails\":true,\"marketingSms\":false,\"bookingReminders\":true,\"defaultCity\":null}")
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  addresses     Address[]
+  wishlistItems WishlistItem[]
+
+  @@index([email])
+  @@index([phone])
+}
+
+model Address {
+  id         String   @id @default(cuid())
+  userId     String
+  label      String
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  postalCode String
+  country    String   @default("IN")
+  lat        Decimal? @db.Decimal(9, 6)
+  lng        Decimal? @db.Decimal(9, 6)
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model WishlistItem {
+  userId    String
+  dealId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@id([userId, dealId])
+}
+
+model OtpCode {
+  id           String     @id @default(cuid())
+  destination  String
+  channel      OtpChannel
+  purpose      OtpPurpose @default(LOGIN)
+  codeHash     String
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  attemptCount Int        @default(0)
+  maxAttempts  Int        @default(5)
+  createdAt    DateTime   @default(now())
+
+  @@index([destination, purpose, consumedAt])
+}
+
+// Short-lived, single-use code exchanged for a real JWT after a Google OAuth
+// callback, so the JWT itself never sits in a redirect URL (history/Referer risk).
+model ExchangeCode {
+  id         String    @id @default(cuid())
+  userId     String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// ─── Categories ──────────────────────────────────────────────────────────────
+
+model Category {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  name            String
+  description     String
+  icon            String
+  imageUrl        String?
+  imageAlt        String?
+  heroImageUrl    String?
+  metaTitle       String?
+  metaDescription String?
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  subcategories Subcategory[]
+  dealLinks     DealCategory[]
+}
+
+model Subcategory {
+  id          String   @id @default(cuid())
+  categoryId  String
+  slug        String
+  name        String
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category  Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  dealLinks DealCategory[]
+
+  @@unique([categoryId, slug])
+}
+
+// Shared vocabulary used by Deal.features, Company/Location.amenities, and search filters.
+model Feature {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
+
+model CancellationPolicy {
+  id                    String   @id @default(cuid())
+  name                  String
+  description           String
+  freeCancelHoursBefore Int
+  partialRefundPct      Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  deals Deal[]
+}
+
+// ─── Companies (admin-managed for now — no partner self-service yet) ─────────
+
+enum CompanyStatus {
+  DRAFT
+  VERIFIED
+  SUSPENDED
+}
+
+enum BusinessType {
+  PROPRIETORSHIP
+  PARTNERSHIP
+  PVT_LTD
+  LLP
+  OTHER
+}
+
+model Company {
+  id            String        @id @default(cuid())
+  slug          String        @unique
+  displayName   String
+  legalName     String
+  businessType  BusinessType  @default(OTHER)
+  gstin         String?
+  pan           String
+  about         String
+  tagline       String?
+  website       String?
+  logoUrl       String?
+  coverUrl      String?
+  contactEmail  String
+  contactPhone  String
+  amenities     String[]      @default([])
+  status        CompanyStatus @default(DRAFT)
+  ratingAvg     Decimal       @default(0) @db.Decimal(2, 1)
+  ratingCount   Int           @default(0)
+  commissionPct Decimal?      @db.Decimal(5, 2) // internal — never in public responses
+  // PayoutDetails, embedded: { accountHolder, accountNumber, ifsc, upiId? } — masked in responses
+  payout        Json?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  locations Location[]
+  deals     Deal[]
+  members   CompanyMember[]
+}
+
+model CompanyMember {
+  companyId  String
+  userId     String
+  memberRole CompanyMemberRole @default(MANAGER)
+  createdAt  DateTime          @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@id([companyId, userId])
+}
+
+enum CompanyMemberRole {
+  OWNER
+  MANAGER
+}
+
+model Location {
+  id              String   @id @default(cuid())
+  companyId       String
+  name            String
+  line1           String
+  line2           String?
+  city            String
+  state           String
+  postalCode      String
+  country         String   @default("India")
+  landmark        String?
+  lat             Decimal  @db.Decimal(9, 6)
+  lng             Decimal  @db.Decimal(9, 6)
+  phone           String?
+  amenities       String[] @default([])
+  capacityPerSlot Int      @default(3)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  openingHours     OpeningHours[]
+  dealLinks        DealLocation[]
+  cartItems        CartItem[]
+  orderItems       OrderItem[]
+  staff            StaffMember[]
+  holidayOverrides HolidayOverride[]
+
+  @@index([companyId])
+}
+
+model OpeningHours {
+  id         String  @id @default(cuid())
+  locationId String
+  weekday    Int // 0 = Sunday .. 6 = Saturday
+  isClosed   Boolean @default(false)
+  opensAt    String? // "HH:mm"
+  closesAt   String? // "HH:mm"
+  breakStart String?
+  breakEnd   String?
+
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, weekday])
+}
+
+model HolidayOverride {
+  id         String  @id @default(cuid())
+  locationId String
+  date       String // "YYYY-MM-DD"
+  isClosed   Boolean @default(true)
+  opensAt    String?
+  closesAt   String?
+  note       String?
+
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, date])
+}
+
+model StaffMember {
+  id          String   @id @default(cuid())
+  locationId  String
+  name        String
+  title       String
+  specialties String[] @default([])
+  photoUrl    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([locationId])
+}
+
+// ─── Deals ─────────────────────────────────────────────────────────────────
+
+enum DealStatus {
+  DRAFT
+  LIVE
+  PAUSED
+  SOLD_OUT
+  EXPIRED
+  ARCHIVED
+}
+
+model Deal {
+  id                        String     @id @default(cuid())
+  slug                      String     @unique
+  companyId                 String
+  title                     String
+  shortDescription          String
+  description               String
+  heroImageUrl              String
+  heroImageAlt              String
+  gallery                   Json // [{ url, alt }]
+  badge                     String?
+  features                  String[]   @default([])
+  included                  String[]   @default([])
+  notIncluded               String[]   @default([])
+  howToUse                  String[]   @default([])
+  finePrint                 String
+  cancellationPolicyId      String
+  validFrom                 DateTime?
+  validUntil                DateTime?
+  redeemByDaysAfterPurchase Int?
+  maxPerCustomer            Int?
+  totalInventory            Int?
+  soldCount                 Int        @default(0)
+  isFeatured                Boolean    @default(false)
+  status                    DealStatus @default(DRAFT)
+  ratingAvg                 Decimal    @default(0) @db.Decimal(2, 1)
+  ratingCount               Int        @default(0)
+  metaTitle                 String?
+  metaDescription           String?
+  publishedAt               DateTime?
+  createdAt                 DateTime   @default(now())
+  updatedAt                 DateTime   @updatedAt
+
+  company            Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  cancellationPolicy CancellationPolicy @relation(fields: [cancellationPolicyId], references: [id])
+  pricingPlans       PricingPlan[]
+  menuItems          MenuItem[]
+  packages           Package[]
+  categoryLinks      DealCategory[]
+  locationLinks      DealLocation[]
+  cartItems          CartItem[]
+  orderItems         OrderItem[]
+  wishlistedBy       WishlistItem[]
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model PricingPlan {
+  id                  String   @id @default(cuid())
+  dealId              String
+  name                String
+  description         String?
+  durationMinutes     Int?
+  personCount         Int      @default(1)
+  priceAmount         Int // paise
+  originalPriceAmount Int?
+  inventory           Int?
+  sortOrder           Int      @default(0)
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  deal       Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  packages   Package[]
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@index([dealId])
+}
+
+model MenuItem {
+  id              String  @id @default(cuid())
+  dealId          String
+  group           String?
+  name            String
+  description     String?
+  durationMinutes Int?
+  sortOrder       Int     @default(0)
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+}
+
+model Package {
+  id            String  @id @default(cuid())
+  dealId        String
+  name          String
+  description   String?
+  pricingPlanId String
+  sortOrder     Int     @default(0)
+
+  deal        Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  pricingPlan PricingPlan   @relation(fields: [pricingPlanId], references: [id])
+  items       PackageItem[]
+
+  @@index([dealId])
+}
+
+model PackageItem {
+  id              String  @id @default(cuid())
+  packageId       String
+  name            String
+  durationMinutes Int?
+  note            String?
+
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+}
+
+model DealCategory {
+  id            String  @id @default(cuid())
+  dealId        String
+  categoryId    String
+  subcategoryId String?
+  isPrimary     Boolean @default(false)
+
+  deal        Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  category    Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  subcategory Subcategory? @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
+
+  @@unique([dealId, categoryId, subcategoryId])
+}
+
+model DealLocation {
+  dealId     String
+  locationId String
+
+  deal     Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@id([dealId, locationId])
+}
+
+// ─── Cart ──────────────────────────────────────────────────────────────────
+
+model Cart {
+  id           String   @id @default(cuid())
+  userId       String?  @unique
+  guestToken   String?  @unique
+  promoCode    String?
+  giftCardCode String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  items CartItem[]
+}
+
+enum GiftCardStatus {
+  ACTIVE
+  DEPLETED
+  EXPIRED
+  DISABLED
+}
+
+model GiftCard {
+  id                   String         @id @default(cuid())
+  code                 String         @unique
+  initialBalanceAmount Int
+  balanceAmount        Int
+  purchasedByUserId    String?
+  recipientEmail       String?
+  status               GiftCardStatus @default(ACTIVE)
+  expiresAt            DateTime?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+}
+
+model CartItem {
+  id                  String   @id @default(cuid())
+  cartId              String
+  dealId              String
+  pricingPlanId       String
+  locationId          String
+  quantity            Int      @default(1)
+  bookingDate         String? // "YYYY-MM-DD"
+  bookingTime         String? // "HH:mm"
+  priceSnapshotAmount Int
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  cart        Cart        @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  deal        Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  pricingPlan PricingPlan @relation(fields: [pricingPlanId], references: [id], onDelete: Cascade)
+  location    Location    @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([cartId])
+}
+
+enum PromoKind {
+  PERCENT
+  FIXED
+}
+
+enum PromoScope {
+  ALL
+  CATEGORY
+  COMPANY
+  DEAL
+}
+
+model PromoCode {
+  id                String     @id @default(cuid())
+  code              String     @unique
+  kind              PromoKind
+  value             Int // percent (1-100) or paise
+  maxDiscountAmount Int?
+  minSubtotalAmount Int?
+  scope             PromoScope @default(ALL)
+  scopeId           String?
+  firstOrderOnly    Boolean    @default(false)
+  usageLimitTotal   Int?
+  usageLimitPerUser Int?
+  usedCount         Int        @default(0)
+  validFrom         DateTime   @default(now())
+  validUntil        DateTime
+  isActive          Boolean    @default(true)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+}
+
+// ─── Orders & Payments ───────────────────────────────────────────────────────
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  COMPLETED
+  EXPIRED
+  CANCELLED
+  REFUNDED
+}
+
+enum OrderItemStatus {
+  PENDING
+  CONFIRMED
+  REDEEMED
+  CANCELLED
+  REFUNDED
+  EXPIRED
+}
+
+model Order {
+  id                    String      @id @default(cuid())
+  orderNumber           String      @unique
+  userId                String
+  contactName           String
+  contactPhone          String
+  contactEmail          String
+  subtotalAmount        Int
+  savingsAmount         Int         @default(0)
+  promoDiscountAmount   Int         @default(0)
+  giftCardAppliedAmount Int         @default(0)
+  giftCardCode          String?
+  payableAmount         Int
+  promoCode             String?
+  status                OrderStatus @default(PENDING_PAYMENT)
+  placedAt              DateTime    @default(now())
+  expiresAt             DateTime
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  items    OrderItem[]
+  payments Payment[]
+  refunds  Refund[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model OrderItem {
+  id                  String          @id @default(cuid())
+  orderId             String
+  dealId              String
+  dealTitle           String
+  companyName         String
+  heroImageUrl        String
+  pricingPlanId       String
+  planName            String
+  durationMinutes     Int?
+  unitPriceAmount     Int
+  originalPriceAmount Int?
+  locationId          String
+  locationName        String
+  addressLine         String
+  quantity            Int
+  bookingDate         String
+  bookingTime         String
+  voucherCode         String          @unique
+  redeemBy            DateTime?
+  itemStatus          OrderItemStatus @default(PENDING)
+  redeemedAt          DateTime?
+  createdAt           DateTime        @default(now())
+
+  order       Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  deal        Deal        @relation(fields: [dealId], references: [id])
+  pricingPlan PricingPlan @relation(fields: [pricingPlanId], references: [id])
+  location    Location    @relation(fields: [locationId], references: [id])
+
+  @@index([orderId])
+}
+
+enum PaymentStatus {
+  CREATED
+  AUTHORIZED
+  CAPTURED
+  FAILED
+}
+
+enum PaymentMethod {
+  UPI
+  CARD
+  NETBANKING
+  WALLET
+}
+
+model Payment {
+  id                String         @id @default(cuid())
+  orderId           String
+  provider          String         @default("razorpay")
+  providerOrderId   String
+  providerPaymentId String?
+  method            PaymentMethod?
+  amount            Int
+  status            PaymentStatus  @default(CREATED)
+  failureReason     String?
+  capturedAt        DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([providerOrderId])
+}
+
+// ─── Cancellation & Refunds ──────────────────────────────────────────────────
+
+enum CancellationReason {
+  CHANGE_OF_PLANS
+  BOOKED_BY_MISTAKE
+  FOUND_BETTER_PRICE
+  PROVIDER_ISSUE
+  OTHER
+}
+
+enum CancellationOutcome {
+  FULL_REFUND
+  PARTIAL_REFUND
+  NO_REFUND
+}
+
+enum CancellationStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+}
+
+model Cancellation {
+  id                String              @id @default(cuid())
+  orderItemId       String              @unique
+  requestedByUserId String
+  reason            CancellationReason
+  note              String?
+  // policySnapshot: { freeCancelHoursBefore, partialRefundPct } at request time
+  policySnapshot    Json
+  outcome           CancellationOutcome
+  status            CancellationStatus  @default(REQUESTED)
+  createdAt         DateTime            @default(now())
+
+  @@index([orderItemId])
+}
+
+enum RefundDestination {
+  ORIGINAL_METHOD
+  GIFT_CARD_CREDIT
+}
+
+enum RefundStatus {
+  REQUESTED
+  APPROVED
+  PROCESSING
+  PROCESSED
+  REJECTED
+  FAILED
+}
+
+model Refund {
+  id               String            @id @default(cuid())
+  orderId          String
+  orderItemId      String?
+  cancellationId   String?
+  amount           Int
+  destination      RefundDestination @default(ORIGINAL_METHOD)
+  providerRefundId String?
+  status           RefundStatus      @default(REQUESTED)
+  reason           String
+  processedAt      DateTime?
+  createdAt        DateTime          @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+// ─── Reviews ─────────────────────────────────────────────────────────────────
+
+enum ReviewStatus {
+  PUBLISHED
+  PENDING
+  HIDDEN
+  REMOVED
+}
+
+model Review {
+  id            String       @id @default(cuid())
+  userId        String
+  userName      String // denormalized display snapshot, mirrors OrderItem's pattern
+  userAvatarUrl String?
+  dealId        String
+  companyId     String
+  orderItemId   String       @unique // one review per redeemed order item
+  rating        Int
+  title         String?
+  body          String?
+  photos        Json         @default("[]") // MediaAsset[]
+  status        ReviewStatus @default(PUBLISHED)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  reply   PartnerReply?
+  reports ReviewReport[]
+
+  @@index([dealId])
+  @@index([companyId])
+}
+
+model PartnerReply {
+  reviewId     String   @id
+  authorUserId String
+  body         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+}
+
+enum ReviewReportReason {
+  SPAM
+  OFFENSIVE
+  FAKE
+  OFF_TOPIC
+  PERSONAL_INFO
+  OTHER
+}
+
+enum ReviewReportStatus {
+  OPEN
+  UPHELD
+  DISMISSED
+}
+
+model ReviewReport {
+  id               String             @id @default(cuid())
+  reviewId         String
+  reportedByUserId String
+  reason           ReviewReportReason
+  note             String?
+  status           ReviewReportStatus @default(OPEN)
+  createdAt        DateTime           @default(now())
+
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+}
+
+// ─── Support ─────────────────────────────────────────────────────────────────
+
+enum TicketCategory {
+  BOOKING
+  PAYMENT
+  REFUND
+  ACCOUNT
+  PARTNER
+  DEAL_CONTENT
+  TECHNICAL
+  OTHER
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_CUSTOMER
+  RESOLVED
+  CLOSED
+}
+
+model SupportTicket {
+  id               String         @id @default(cuid())
+  ticketNumber     String         @unique
+  userId           String
+  category         TicketCategory
+  subject          String
+  orderId          String?
+  orderItemId      String?
+  companyId        String?
+  priority         TicketPriority @default(NORMAL)
+  status           TicketStatus   @default(OPEN)
+  assignedToUserId String?
+  resolvedAt       DateTime?
+  closedAt         DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  messages TicketMessage[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum TicketAuthorKind {
+  CUSTOMER
+  STAFF
+  SYSTEM
+}
+
+model TicketMessage {
+  id             String           @id @default(cuid())
+  ticketId       String
+  authorUserId   String
+  authorKind     TicketAuthorKind
+  body           String
+  attachments    Json             @default("[]") // MediaAsset[]
+  isInternalNote Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model FaqEntry {
+  id          String  @id @default(cuid())
+  section     String
+  question    String
+  answer      String
+  sortOrder   Int     @default(0)
+  isPublished Boolean @default(true)
+}
+
+enum ContactTopic {
+  GENERAL
+  PARTNERSHIP
+  PRESS
+  FEEDBACK
+}
+
+enum ContactStatus {
+  NEW
+  HANDLED
+}
+
+model ContactSubmission {
+  id        String        @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  topic     ContactTopic
+  message   String
+  status    ContactStatus @default(NEW)
+  createdAt DateTime      @default(now())
+}
+
+// ─── Content & Navigation ──────────────────────────────────────────────────
+
+enum NavMenu {
+  HEADER_PRIMARY
+  FOOTER_QUICK_LINKS
+  FOOTER_SUPPORT
+  FOOTER_LEGAL
+  FOOTER_SOCIAL
+}
+
+model NavLink {
+  id         String  @id @default(cuid())
+  menu       NavMenu
+  label      String
+  url        String
+  icon       String?
+  isExternal Boolean @default(false)
+  sortOrder  Int     @default(0)
+  isActive   Boolean @default(true)
+}
+
+enum HomeSectionKind {
+  HERO
+  DEAL_RAIL
+  CATEGORY_GRID
+  PROMO_BANNER
+}
+
+model HomeSection {
+  id         String          @id @default(cuid())
+  kind       HomeSectionKind
+  heading    String?
+  subheading String?
+  seeAllUrl  String?
+  dealSource Json? // { filter: 'featured'|'hot'|'category', categorySlug? }
+  promo      Json? // { chip, heading, body, ctaLabel, ctaUrl, mediaUrl? }
+  sortOrder  Int             @default(0)
+  isActive   Boolean         @default(true)
+  startsAt   DateTime?
+  endsAt     DateTime?
+}
+
+/**
+ * Singleton config row — always id "default".
+ */
+model SiteSetting {
+  id                String   @id @default("default")
+  siteName          String   @default("MSD")
+  tagline           String   @default("")
+  siteDescription   String   @default("")
+  copyrightText     String   @default("")
+  trustBadges       Json     @default("[]") // [{ icon, text }]
+  newsletterHeading String   @default("")
+  newsletterBody    String   @default("")
+  supportEmail      String?
+  supportPhone      String?
+  priceLevels       Json     @default("[]") // [{ value, label, min, max }]
+  updatedAt         DateTime @updatedAt
+}
+
+enum NewsletterStatus {
+  SUBSCRIBED
+  UNSUBSCRIBED
+}
+
+model NewsletterSubscription {
+  id             String           @id @default(cuid())
+  email          String           @unique
+  userId         String?
+  status         NewsletterStatus @default(SUBSCRIBED)
+  source         String
+  createdAt      DateTime         @default(now())
+  unsubscribedAt DateTime?
+}
