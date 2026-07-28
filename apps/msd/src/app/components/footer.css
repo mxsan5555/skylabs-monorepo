@@ -234,8 +234,57 @@
   }
 }
 
-@media (max-width: 360px) {
+@media (max-width: 480px) {
+
   .site-footer__inner {
     grid-template-columns: 1fr;
+    padding: 32px 20px;
+    gap: 28px;
+    text-align: center;
+  }
+
+  .site-footer__logo {
+    justify-content: center;
+  }
+
+  .site-footer__desc {
+    max-width: 100%;
+    margin: 0 auto 20px;
+  }
+
+  .site-footer__social {
+    justify-content: center;
+  }
+
+  .site-footer__list {
+    align-items: center;
+  }
+
+  .site-footer__newsletter-form {
+    width: 100%;
+  }
+
+  .site-footer__newsletter-form md-outlined-text-field,
+  .site-footer__newsletter-form md-filled-button {
+    width: 100%;
+  }
+
+  .site-footer__trust {
+    align-items: center;
+  }
+
+  .site-footer__bottom-inner {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+  }
+
+  .site-footer__legal {
+    justify-content: center;
+  }
+
+  .site-footer__address {
+    text-align: center;
   }
 }

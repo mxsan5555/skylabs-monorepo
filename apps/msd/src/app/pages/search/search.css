@@ -16,19 +16,22 @@
 
 .search-page__bar {
   max-width: 1280px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 15px;
   display: flex;
   align-items: center;
   gap: 12px;
   padding-bottom: 10px;
+  overflow: hidden;
 }
-
 .search-page__form {
   flex: 1;
+  min-width: 0;
 }
 
 .search-page__field {
   width: 100%;
+  min-width: 0;
   --md-outlined-text-field-container-shape: 24px;
 }
 
@@ -45,7 +48,7 @@
 
 .search-page__chips {
   max-width: 1280px;
-  margin: 0 auto;
+  margin: 10px;
   padding-bottom: 12px;
   display: flex;
   align-items: center;
@@ -60,12 +63,12 @@
 /* ─── Content area ───────────────────────────────────────────────────────── */
 .search-page__content {
   max-width: 1280px;
+  width: 100%;
   margin: 0 auto;
   padding: 20px 20px 48px;
-  width: 100%;
+  box-sizing: border-box;
   flex: 1;
 }
-
 .search-page__count {
   font-size: 0.875rem;
   color: var(--md-sys-color-on-surface-variant);
@@ -421,4 +424,9 @@
   .search-result-card__body {
     padding: 12px;
   }
+}
+html,
+body,
+#root {
+  overflow-x: hidden;
 }
