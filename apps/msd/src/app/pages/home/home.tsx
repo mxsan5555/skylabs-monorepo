@@ -66,27 +66,14 @@ export function Home() {
           grab-cursor="true"
         >
           {deals.map((deal) => (
-            <swiper-slide key={deal.id} style={{ width: '260px', height: 'auto' }}>
-              <SkyProductCardReact
-                image={deal.image}
-                gallery={deal.gallery}
-                imageAlt={deal.imageAlt}
-                badge={deal.badge}
-
-                favorite={true}
+            <swiper-slide
+              key={deal.id}
+              style={{ width: '260px', height: 'auto' }}
+            >
+              <DealCard
+                deal={deal}
                 favoriteActive={has(deal.id)}
                 onFavorite={() => toggle(deal.id)}
-
-                eyebrow={deal.providerName}
-                heading={deal.title}
-                location={deal.location}
-                distance={`${deal.distance} km`}
-                rating={deal.rating}
-                reviews={deal.reviews}
-                originalPrice={deal.originalPrice ? `₹${deal.originalPrice}` : undefined}
-                price={`₹${deal.price}`}
-                discount={deal.discount ? `${deal.discount}% OFF` : undefined}
-                priceNote={deal.priceNote}
               />
             </swiper-slide>
           ))}
@@ -383,28 +370,37 @@ export function Home() {
           </div>
         </section>
       )}
-      <section className="home-section home-vacation-section">
-        <div className="home-section__header">
-          <h1>{home.vacationStays.title}</h1>
-        </div>
+      <section className="home-section ">
+        <div className="home-section__container">
 
-        <swiper-container
-          navigation="true"
-          slides-per-view="auto"
-          space-between="20"
-          grab-cursor="true"
-        >
-          {home.vacationStays.items.map((item) => (
-            <swiper-slide key={item.label} className="home-stays-slide">
-              <SkyImageCardReact
-                image={item.image}
-                imageAlt={item.imageAlt}
-                label={item.label}
-                href={item.href}
-              />
-            </swiper-slide>
-          ))}
-        </swiper-container>
+          <div className="home-section__header">
+            <h2 className="home-section__heading">
+              {home.vacationStays.title}
+            </h2>
+          </div>
+
+          <swiper-container
+            navigation="true"
+            slides-per-view="auto"
+            space-between="20"
+            grab-cursor="true"
+          >
+            {home.vacationStays.items.map((item) => (
+              <swiper-slide
+                key={item.label}
+                className="home-stays-slide"
+              >
+                <SkyImageCardReact
+                  image={item.image}
+                  imageAlt={item.imageAlt}
+                  label={item.label}
+                  href={item.href}
+                />
+              </swiper-slide>
+            ))}
+          </swiper-container>
+
+        </div>
       </section>
       {skinDeals.length > 0 && (
         <section className="home-section home-section--alt" aria-labelledby="facial-heading">
