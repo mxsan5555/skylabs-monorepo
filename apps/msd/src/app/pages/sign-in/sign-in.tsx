@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+<<<<<<< HEAD
 import {
   FilledButton,
   OutlinedButton,
@@ -10,6 +11,11 @@ import {
 } from '@skylabs-monorepo/shared-ui/react';
 import { apiClient, ApiError, BASE_URL } from '../../../api/api-client';
 
+=======
+import { FilledButton, OutlinedButton, OutlinedTextField, Tabs, PrimaryTab, Icon, } from '@skylabs-monorepo/shared-ui/react';
+import content from '../../../content.json';
+import { users } from '../../../data/users';
+>>>>>>> a0bb0a40a95c94497ee60230845f92e699535919
 type Method = 'email' | 'phone';
 
 /**
@@ -17,19 +23,30 @@ type Method = 'email' | 'phone';
  * one-time code — then continue to the OTP screen. Layout follows the design
  * reference; colors come from msd's M3 theme.
  */
+const validateEmail = (value: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const validatePhone = (value: string) =>
+  /^[6-9]\d{9}$/.test(value);
 export function SignIn() {
   const navigate = useNavigate();
   const [method, setMethod] = useState<Method>('phone');
   const [value, setValue] = useState('');
+<<<<<<< HEAD
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+=======
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const auth = content.auth.signIn;
+>>>>>>> a0bb0a40a95c94497ee60230845f92e699535919
   const isPhone = method === 'phone';
-
   const onTabChange = (event: Event) => {
     const index = (event.target as HTMLElement & { activeTabIndex: number })
       .activeTabIndex;
     setMethod(index === 1 ? 'phone' : 'email');
+<<<<<<< HEAD
     setError(null);
   };
 
@@ -62,22 +79,67 @@ export function SignIn() {
 
   const continueWithGoogle = () => {
     window.location.href = `${BASE_URL}/auth/google`;
+=======
+    setValue('');
+    setError('');
   };
+  const sendOtp = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const input = value.trim();
+      if (!input) {
+        setError(isPhone ? auth.validation.emptyPhone : auth.validation.emptyEmail);
+        return;
+      }
+      if (isPhone && !validatePhone(input)) {
+        setError(auth.validation.invalidPhone);
+        return;
+      }
+      if (!isPhone && !validateEmail(input)) {
+        setError(auth.validation.invalidEmail);
+        return;
+      }
+      // Check whether user exists
+      const user = users.find((u) =>
+        isPhone ? u.mobile === input : u.email === input
+      );
+      if (!user) {
+        setError(isPhone ? auth.validation.phoneNotRegistered : auth.validation.emailNotRegistered);
+        return;
+      }
+      // Mock API delay
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log('Mock OTP:', user.otp);
+      navigate('/otp', { state: { user, role: user.role, method, destination: input, }, });
+    } catch (error) {
+      console.error(error);
+      setError(auth.validation.somethingWentWrong);
+    } finally {
+      setLoading(false);
+    }
+>>>>>>> a0bb0a40a95c94497ee60230845f92e699535919
+  };
+  // const sendOtp = () => {
+  //   navigate('/otp', {
+  //     state: { destination: value || (isPhone ? auth.fields.phone.defaultValue : auth.fields.email.defaultValue), method },
+  //   });
+  // };
 
   return (
     <div className="auth-screen">
-      <title>Sign in · MSD</title>
+      <title>{auth.pageTitle}</title>
       <div className="auth-brand">
         <div className="auth-brand__logo">
-          <Icon aria-hidden="true">spa</Icon>
+          <Icon aria-hidden="true"> {auth.brand.logoIcon}</Icon>
         </div>
-        <h1 className="auth-brand__title">MSD</h1>
-        <p className="auth-brand__subtitle">Your wellness companion</p>
+        <h1 className="auth-brand__title"> {auth.brand.title}</h1>
+        <p className="auth-brand__subtitle"> {auth.brand.subtitle}</p>
       </div>
 
       <div className="auth-card">
-        <h2>Sign in</h2>
-        <p>Enter your details to receive a one-time code.</p>
+        <h2>{auth.heading}</h2>
+        <p>{auth.description}</p>
 
         <Tabs
           className="auth-tabs"
@@ -86,32 +148,44 @@ export function SignIn() {
         >
           <PrimaryTab>
             <Icon slot="icon" aria-hidden="true">
-              mail
+              {auth.tabs.email.icon}
             </Icon>
-            Email
+            {auth.tabs.email.label}
           </PrimaryTab>
           <PrimaryTab>
             <Icon slot="icon" aria-hidden="true">
-              call
+              {auth.tabs.phone.icon}
             </Icon>
-            Phone
+            {auth.tabs.phone.label}
           </PrimaryTab>
         </Tabs>
 
         <OutlinedTextField
           className="auth-field"
-          label={isPhone ? 'Phone number' : 'Email'}
+          label={isPhone ? auth.fields.phone.label : auth.fields.email.label}
           type={isPhone ? 'tel' : 'email'}
           autocomplete={isPhone ? 'tel' : 'email'}
+          inputMode={isPhone ? 'numeric' : 'email'}
+          maxLength={isPhone ? 10 : undefined}
           value={value}
-          onInput={(event: Event) =>
-            setValue((event.target as HTMLInputElement).value)
-          }
+          onInput={(event: Event) => {
+            const target = event.target as HTMLInputElement;
+            if (isPhone) {
+              // Allow only digits and limit to 10 characters
+              const phone = target.value.replace(/\D/g, '').slice(0, 10);
+              target.value = phone;
+              setValue(phone);
+            } else {
+              setValue(target.value.trim());
+            }
+            if (error) setError('');
+          }}
         >
           <Icon slot="leading-icon" aria-hidden="true">
-            {isPhone ? 'call' : 'mail'}
+            {isPhone ? auth.tabs.phone.icon : auth.tabs.email.icon}
           </Icon>
         </OutlinedTextField>
+<<<<<<< HEAD
 
         {error && (
           <p className="auth-error" role="alert">
@@ -121,21 +195,25 @@ export function SignIn() {
 
         <FilledButton className="auth-submit" onClick={sendOtp} disabled={pending}>
           {pending ? 'Sending…' : 'Send OTP'}
+=======
+        {error && <p className="auth-error">{error}</p>}
+        <FilledButton className="auth-submit" onClick={sendOtp} disabled={loading}>
+          {loading ? auth.buttons.sendingOtp : auth.buttons.sendOtp}
+>>>>>>> a0bb0a40a95c94497ee60230845f92e699535919
         </FilledButton>
       </div>
-
       <div className="auth-divider">
-        <span>or continue with</span>
+        <span>{auth.divider}</span>
       </div>
 
       <OutlinedButton className="auth-google" onClick={continueWithGoogle}>
         <Icon slot="icon" aria-hidden="true">
-          language
+          {auth.googleIcon}
         </Icon>
-        Continue with Google
+        {auth.buttons.continueWithGoogle}
       </OutlinedButton>
 
-      <p className="auth-note">New users are registered automatically.</p>
+      <p className="auth-note">{auth.note}</p>
     </div>
   );
 }

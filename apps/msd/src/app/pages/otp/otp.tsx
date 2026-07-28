@@ -7,6 +7,7 @@ import {
   IconButton,
   TextButton,
 } from '@skylabs-monorepo/shared-ui/react';
+import content from '../../../content.json';
 import { useAuth } from '../../../auth/auth-context';
 import { apiClient, ApiError } from '../../../api/api-client';
 import type { User, UserRole } from '../../../types';
@@ -35,7 +36,9 @@ export function Otp() {
   const method = state.method ?? 'email';
 
   const [code, setCode] = useState('');
-  const [seconds, setSeconds] = useState(state.retryAfterSeconds ?? DEFAULT_RETRY_SECONDS);
+  const [seconds, setSeconds] = useState(
+    state.retryAfterSeconds ?? DEFAULT_RETRY_SECONDS,
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [resending, setResending] = useState(false);
@@ -93,17 +96,19 @@ export function Otp() {
       <title>Verify your {method === 'phone' ? 'phone' : 'email'} · MSD</title>
       <IconButton
         className="otp-back"
-        aria-label="Go back"
+        aria-label={otpContent.backAriaLabel}
         onClick={() => navigate('/sign-in')}
       >
-        <Icon aria-hidden="true">arrow_back</Icon>
+        <Icon aria-hidden="true">{otpContent.icons.back}</Icon>
       </IconButton>
 
       <div className="auth-brand">
         <div className="auth-brand__logo">
-          <Icon aria-hidden="true">sms</Icon>
+          <Icon aria-hidden="true">{otpContent.icons.logo}</Icon>
         </div>
-        <h1 className="auth-brand__title">Verify your {method === 'phone' ? 'phone' : 'email'}</h1>
+        <h1 className="auth-brand__title">
+          Verify your {method === 'phone' ? 'phone' : 'email'}
+        </h1>
         <p className="auth-brand__subtitle">We sent a 6-digit code to</p>
         <span className="auth-destination">
           <Icon aria-hidden="true">{method === 'phone' ? 'call' : 'mail'}</Icon>
@@ -112,20 +117,24 @@ export function Otp() {
       </div>
 
       <div className="auth-card">
-        <h2>Enter the code</h2>
-        <p>The code expires in a few minutes.</p>
+        <h2>{otpContent.enterCode}</h2>
+        <p>{otpContent.description}</p>
 
         <OutlinedTextField
           className="otp-field"
-          label="6-digit code"
+          label={otpContent.fieldLabel}
           type="text"
           inputMode="numeric"
           autocomplete="one-time-code"
           maxLength={6}
           value={code}
-          onInput={(event: Event) =>
-            setCode((event.target as HTMLInputElement).value)
-          }
+          onInput={(event: Event) => {
+            const target = event.target as HTMLInputElement;
+            const otp = target.value.replace(/\D/g, '').slice(0, 6);
+            target.value = otp;
+            setCode(otp);
+            if (error) setError('');
+          }}
         />
 
         {error && (
@@ -134,15 +143,21 @@ export function Otp() {
           </p>
         )}
 
-        <FilledButton className="auth-submit" onClick={verify} disabled={pending}>
+        <FilledButton
+          className="auth-submit"
+          onClick={verify}
+          disabled={pending}
+        >
           {pending ? 'Verifying…' : 'Verify & Continue'}
         </FilledButton>
       </div>
 
       <p className="otp-resend">
-        Didn’t receive the code?{' '}
+        {otpContent.resend.question}{' '}
         {seconds > 0 ? (
-          <span className="otp-muted">Resend in {seconds}s</span>
+          <span className="otp-muted">
+            {otpContent.resend.countdown} {seconds}s
+          </span>
         ) : (
           <TextButton onClick={resend} disabled={resending}>
             Resend code

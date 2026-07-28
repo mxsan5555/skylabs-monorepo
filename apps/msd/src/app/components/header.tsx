@@ -13,7 +13,7 @@ import {
 } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '../../auth/auth-context';
 import { useCart } from '../../cart/cart-context';
-import content from '../../content.json';
+import content from '../../content.json'
 import './header.css';
 
 export function Header() {
@@ -60,7 +60,7 @@ export function Header() {
     <>
       {/* Skip to main content — accessibility */}
       <a className="skip-link" href="#main-content">
-        Skip to main content
+        {content.header.skipToContent}
       </a>
 
       <header className="site-header" role="banner">
@@ -68,7 +68,7 @@ export function Header() {
           {/* Mobile: hamburger */}
           <FilledTonalIconButton
             className="site-header__hamburger"
-            aria-label="Open navigation menu"
+            aria-label={content.header.openNavigation}
             aria-expanded={drawerOpen}
             aria-controls="nav-drawer"
             onClick={() => setDrawerOpen(true)}
@@ -77,71 +77,34 @@ export function Header() {
           </FilledTonalIconButton>
 
           {/* Brand */}
-          <NavLink to="/" className="site-header__brand" aria-label="MSD – MySpaDeal home">
+          <NavLink to="/" className="site-header__brand" aria-label={`${content.site.name} – ${content.site.fullName} home`}>
             <span className="site-header__brand-icon" aria-hidden="true">
               <Icon>spa</Icon>
             </span>
             <span className="site-header__brand-text">
-              <span className="site-header__brand-name">MSD</span>
-              <span className="site-header__brand-tagline">MySpaDeal</span>
+              <span className="site-header__brand-name">{content.site.name}</span>
+              <span className="site-header__brand-tagline">{content.site.fullName}</span>
             </span>
           </NavLink>
 
           {/* Desktop primary nav */}
           <nav className="site-header__nav" aria-label="Primary">
-            <NavLink
-              to="/explore"
-              className={({ isActive }) =>
-                `site-header__nav-link${isActive ? ' site-header__nav-link--active' : ''}`
-              }
-            >
-              Explore
-            </NavLink>
-
-            {/* Categories mega-link */}
-            <div className="site-header__nav-group" role="none">
-              <button className="site-header__nav-link site-header__nav-link--drop" type="button" aria-haspopup="true">
-                Categories
-                <Icon aria-hidden="true" className="site-header__drop-icon">expand_more</Icon>
-              </button>
-              <ul className="site-header__dropdown" role="menu">
-                {content.nav.categories.map((cat) => (
-                  <li key={cat.to} role="none">
-                    <NavLink
-                      to={cat.to}
-                      className="site-header__dropdown-item"
-                      role="menuitem"
-                      onClick={() => setDrawerOpen(false)}
-                    >
-                      {cat.label}
-                      <span className="site-header__dropdown-count">{cat.count} services</span>
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <NavLink
-              to="/blog"
-              className={({ isActive }) =>
-                `site-header__nav-link${isActive ? ' site-header__nav-link--active' : ''}`
-              }
-            >
-              Blog
-            </NavLink>
-
-            <NavLink
-              to="/contact"
-              className={({ isActive }) =>
-                `site-header__nav-link${isActive ? ' site-header__nav-link--active' : ''}`
-              }
-            >
-              Contact
-            </NavLink>
+            {content.nav.primary.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `site-header__nav-link${isActive ? ' site-header__nav-link--active' : ''
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
           </nav>
 
           {/* Desktop search */}
-          <form
+          {/* <form
             className={`site-header__search-form${searchOpen ? ' site-header__search-form--open' : ''}`}
             role="search"
             aria-label="Site search"
@@ -157,7 +120,7 @@ export function Header() {
             >
               <Icon slot="leading-icon" aria-hidden="true">search</Icon>
             </OutlinedTextField>
-          </form>
+          </form> */}
 
           {/* Mobile search toggle */}
           <IconButton
@@ -175,6 +138,18 @@ export function Header() {
             onClick={() => navigate('/cart')}
           >
             <Icon aria-hidden="true">shopping_bag</Icon>
+            {totalItems > 0 && (
+              <span className="site-header__cart-badge" aria-hidden="true">
+                {totalItems}
+              </span>
+            )}
+          </IconButton>
+          <IconButton
+            className="site-header__cart"
+            aria-label={`Cart, ${totalItems} item${totalItems !== 1 ? 's' : ''}`}
+            onClick={() => navigate('/wishlist')}
+          >
+            <Icon aria-hidden="true">favorite_border</Icon>
             {totalItems > 0 && (
               <span className="site-header__cart-badge" aria-hidden="true">
                 {totalItems}
@@ -236,7 +211,7 @@ export function Header() {
               <small>MySpaDeal</small>
             </span>
           </span>
-          <IconButton aria-label="Close navigation" onClick={() => setDrawerOpen(false)}>
+          <IconButton aria-label={content.header.closeNavigation} onClick={() => setDrawerOpen(false)}>
             <Icon aria-hidden="true">close</Icon>
           </IconButton>
         </div>
@@ -245,7 +220,7 @@ export function Header() {
 
         <div className="nav-drawer__body">
           <SkyAccordionReact>
-            <SkyAccordionItemReact header={content.nav.drawerCategoryHeader} open>
+            {/* <SkyAccordionItemReact header={content.nav.drawerCategoryHeader} open>
               <ul className="nav-drawer__cat-list">
                 {content.nav.categories.map((cat) => (
                   <li key={cat.to}>
@@ -260,7 +235,7 @@ export function Header() {
                   </li>
                 ))}
               </ul>
-            </SkyAccordionItemReact>
+            </SkyAccordionItemReact> */}
           </SkyAccordionReact>
 
           <Divider />
@@ -285,15 +260,15 @@ export function Header() {
             {isAuthenticated ? (
               <>
                 <FilledButton onClick={() => { navigate('/account'); setDrawerOpen(false); }}>
-                  My Account
+                  {content.header.myAccount}
                 </FilledButton>
                 <TextButton onClick={() => { signOut(); setDrawerOpen(false); }}>
-                  Sign Out
+                  {content.header.signOut}
                 </TextButton>
               </>
             ) : (
               <FilledButton onClick={() => { navigate('/sign-in'); setDrawerOpen(false); }}>
-                Sign In
+                {content.header.signIn}
               </FilledButton>
             )}
           </div>
