@@ -515,9 +515,9 @@ export function Home() {
                   {home.welcomeOffer.subtitle}
                 </p>
 
-                {/* <p className="home__offer-description">
+                <p className="home__offer-description">
                   {home.welcomeOffer.description}
-                </p> */}
+                </p>
 
                 <FilledButton onClick={() => navigate('/explore')}>
                   {home.welcomeOffer.cta}
@@ -525,7 +525,7 @@ export function Home() {
 
               </div>
 
-              {/* <div className="home__offer-right">
+              <div className="home__offer-right">
                 <div className="offer-floating-card">
                   <span className="offer-discount">
                     {home.welcomeOffer.offerCard.discount}
@@ -535,7 +535,7 @@ export function Home() {
                     {home.welcomeOffer.offerCard.label}
                   </span>
                 </div>
-              </div> */}
+              </div>
 
             </div>
           </SkyCardReact>

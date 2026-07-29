@@ -13,7 +13,7 @@ import {
 } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '../../auth/auth-context';
 import { useCart } from '../../cart/cart-context';
-import content from '../../content.json'
+import content from '../../content.json';
 import './header.css';
 
 export function Header() {

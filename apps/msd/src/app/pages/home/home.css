@@ -458,13 +458,12 @@
 /* ==========================================================
    PREMIUM OFFER
 ========================================================== */
-
 .home__offer-banner {
     position: relative;
     overflow: hidden;
 
-    height: 165px;
-    min-height: 165px;
+    height: 250px;
+    min-height: 180px;
 
     border-radius: 20px;
 
@@ -501,31 +500,42 @@
 
     z-index: 1;
 }
+.home__offer-banner::after {
+    content: "";
+    position: absolute;
+    inset: 0;
 
-.home__offer-content{
-    position:relative;
-    z-index:2;
+    background: linear-gradient(
+        90deg,
+        rgba(247,248,243,.97) 0%,
+        rgba(247,248,243,.90) 28%,
+        rgba(247,248,243,.55) 48%,
+        rgba(247,248,243,.08) 65%,
+        transparent 100%
+    );
 
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
+    z-index: 1;
+}
 
-    height:100%;
+.home__offer-content {
+    position: relative;
+    z-index: 2;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    height: 100%;
 }
 .home__offer-left {
     width: 46%;
     padding: 20px 32px;
-
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;   /* small spacing */
 }
 
-.home__offer-right{
-    width:54%;
-    height:100%;
-    position:relative;
+.home__offer-right {
+    width: 54%;
+    height: 100%;
+    position: relative;
 }
 
 /* Hide image because banner itself uses it */
@@ -534,57 +544,48 @@
 .home__offer-image {
     display: none;
 }
+.home__offer-badge {
+    display: inline-flex;
 
-/* Badge */
+    padding: 4px 10px;
 
-.home__offer-badge{
-    display:inline-flex;
+    border-radius: 999px;
 
-    padding:4px 10px;
+    font-size: .72rem;
+    font-weight: 600;
 
-    border-radius:999px;
-
-    font-size:.72rem;
-    font-weight:600;
-
-    margin-bottom:8px;
-      margin: 0;
+    margin-bottom: 8px;
 }
 
 /* Heading */
 
-.home__offer-title {
-    font-size:2rem;
-    line-height:1.05;
-    font-weight:700;
- color: #21442c;
-}
+.home__offer-badge {
+    display: inline-flex;
 
-.home__offer-subtitle {
-    margin:6px 0;
-    font-size:.95rem;
-    font-weight:600;
-     color: #57675d;
+    padding: 4px 10px;
+
+    border-radius: 999px;
+
+    font-size: .72rem;
+    font-weight: 600;
+
+    margin-bottom: 8px;
 }
 
 .home__offer-description {
-     margin:0 0 14px;
-    max-width:340px;
-    font-size:.82rem;
-    line-height:1.45;
+    margin: 0 0 14px;
+    max-width: 340px;
+    font-size: .82rem;
+    line-height: 1.45;
     color: #66736d;
 }
 
-.home__offer-left md-filled-button{
-    --md-filled-button-container-height:36px;
-    --md-filled-button-label-text-size:13px;
+.home__offer-left md-filled-button {
+    --md-filled-button-container-height: 36px;
+    --md-filled-button-label-text-size: 13px;
 }
-
-/* Floating Discount */
-
 .offer-floating-card {
     position: absolute;
-
     right: 26px;
     bottom: 22px;
 
@@ -596,29 +597,24 @@
 
     backdrop-filter: blur(18px);
 
-    background: rgba(255, 255, 255, .22);
+    background: rgba(255,255,255,.22);
 
-    border: 1px solid rgba(255, 255, 255, .35);
+    border: 1px solid rgba(255,255,255,.35);
 
-    box-shadow: 0 12px 30px rgba(0, 0, 0, .15);
+    box-shadow: 0 12px 30px rgba(0,0,0,.15);
 }
 
 .offer-discount {
     display: block;
-
     font-size: 1.2rem;
     font-weight: 700;
-
-    color: white;
+    color: #fff;
 }
 
 .offer-valid {
     display: block;
-
     margin-top: 2px;
-
-    color: white;
-
+    color: #fff;
     font-size: .82rem;
 }
 

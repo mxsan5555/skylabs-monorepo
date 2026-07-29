@@ -165,3 +165,23 @@ export interface SearchFilter {
   suggested: boolean;
   sort: DealSort;
 }
+
+export interface Product {
+  id: string;
+  name: string;
+  brand: string;
+  image: string;
+  gallery?: string[];
+  price: number;
+  originalPrice: number;
+  rating: number;
+  reviews: number;
+  category: string;
+  shortDescription: string;
+  description: string;
+  benefits: string[];
+  ingredients: string[];
+  howToUse: string[];
+  affiliateUrl: string;
+  slug: string;
+}

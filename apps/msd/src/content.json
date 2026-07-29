@@ -43,6 +43,10 @@
         "label": "Health & Wellness",
         "to": "/category/health-wellness",
         "count": 13
+      },
+      {
+        "label": "Product",
+        "to": "/products"
       }
     ],
     "categories": [
@@ -70,6 +74,10 @@
         "label": "Health & Wellness",
         "to": "/category/health-wellness",
         "count": 13
+      },
+      {
+        "label": "Product",
+        "to": "/products"
       }
     ],
     "footer": {
@@ -119,6 +127,10 @@
         {
           "label": "Health & Wellness",
           "to": "/category/health-wellness"
+        },
+        {
+          "label": "Product",
+          "to": "/products"
         }
       ],
       "support": [
@@ -562,6 +574,30 @@
       }
     ]
   },
+  "products": {
+    "title": "Wellness Products",
+    "subtitle": "Trusted wellness products from our affiliate partners.",
+    "emptyTitle": "No Products Found",
+    "emptySubtitle": "Please check back later.",
+    "sortOptions": [
+      {
+        "value": "popular",
+        "label": "Popular"
+      },
+      {
+        "value": "rating",
+        "label": "Top Rated"
+      },
+      {
+        "value": "price-asc",
+        "label": "Price: Low to High"
+      },
+      {
+        "value": "price-desc",
+        "label": "Price: High to Low"
+      }
+    ]
+  },
   "dealDetail": {
     "addToCart": "Add to Cart",
     "bookNow": "Book Now",
@@ -570,6 +606,16 @@
     "cancellationPolicy": "Cancellation Policy",
     "cancellationText": "Cancel up to 24 hours before your appointment for a full refund. Same-day cancellations are non-refundable.",
     "relatedDeals": "You May Also Like"
+  },
+  "productDetail": {
+    "buyNow": "Buy Now",
+    "relatedProducts": "Related Products",
+    "description": "Description",
+    "benefits": "Benefits",
+    "howToUse": "How to Use",
+    "ingredients": "Ingredients",
+    "shipping": "Shipping",
+    "shippingText": "Ships within 3-5 business days."
   },
   "cart": {
     "title": "My Cart",

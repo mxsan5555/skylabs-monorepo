@@ -19,7 +19,8 @@ import DealDetail from './pages/deal-detail/deal-detail';
 import Cart from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
 import Checkout from './pages/checkout/checkout';
-
+import Products from './pages/products/products';
+import ProductDetail from './pages/product-detail/product-detail';
 export function AppRoutes() {
   return (
     <Routes>
@@ -30,7 +31,7 @@ export function AppRoutes() {
         <Route path="/category/:slug" element={<Category />} />
         <Route path="/deal/:id" element={<DealDetail />} />
         <Route path="/cart" element={<Cart />} />
-
+<Route path="/products"  element={<Products />}/>
         {/* ── Auth-gated consumer pages ── */}
         <Route
           path="/wishlist"
@@ -52,6 +53,7 @@ export function AppRoutes() {
         {/* ── Content pages ── */}
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogDetail />} />
+        <Route  path="/products/:slug" element={<ProductDetail />}/>
         <Route path="/showcase" element={<Showcase />} />
 
         {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}
