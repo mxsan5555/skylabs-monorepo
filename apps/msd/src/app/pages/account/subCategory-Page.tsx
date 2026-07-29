@@ -22,7 +22,7 @@ export function SubCategoryPage() {
     const [subCategories, setSubCategories] = useState<SubCategory[]>([
         {
             id: 1,
-            subcategoryName: "Hair Care",
+            subcategoryName: "Hair dsdsdssdsddCare",
             subcategorySlug: "hair-care",
             iconImage: "",
             description: "Hair Products",
