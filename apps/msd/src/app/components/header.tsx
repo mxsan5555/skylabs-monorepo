@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   FilledButton,
@@ -8,8 +8,6 @@ import {
   Icon,
   OutlinedTextField,
   Divider,
-  SkyAccordionReact,
-  SkyAccordionItemReact,
 } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '../../auth/auth-context';
 import { useCart } from '../../cart/cart-context';
@@ -219,8 +217,8 @@ export function Header() {
         <Divider />
 
         <div className="nav-drawer__body">
-          <SkyAccordionReact>
-            {/* <SkyAccordionItemReact header={content.nav.drawerCategoryHeader} open>
+          <sky-accordion>
+            {/* <sky-accordion-item header={content.nav.drawerCategoryHeader} open>
               <ul className="nav-drawer__cat-list">
                 {content.nav.categories.map((cat) => (
                   <li key={cat.to}>
@@ -235,8 +233,8 @@ export function Header() {
                   </li>
                 ))}
               </ul>
-            </SkyAccordionItemReact> */}
-          </SkyAccordionReact>
+            </sky-accordion-item> */}
+          </sky-accordion>
 
           <Divider />
 

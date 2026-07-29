@@ -42,7 +42,7 @@ export class SkyInfoCard extends LitElement {
       gap: 10px;
       padding: 20px;
       border-radius: 16px;
-      background-color: var(--md-sys-color-surface-container, #eef1f6);
+      background-color: var(--md-sys-color-surface-container);
     }
     .media {
       display: inline-flex;
@@ -51,7 +51,7 @@ export class SkyInfoCard extends LitElement {
     }
     .media md-icon {
       --md-icon-size: 44px;
-      color: var(--md-sys-color-primary, #3a693c);
+      color: var(--md-sys-color-primary);
     }
     ::slotted([slot='media']) {
       max-height: 72px;
@@ -66,7 +66,7 @@ export class SkyInfoCard extends LitElement {
     .subheading {
       margin: 0;
       font-size: 0.875rem;
-      color: var(--md-sys-color-on-surface-variant, #424940);
+      color: var(--md-sys-color-on-surface-variant);
     }
     :host([align='center']) .card {
       align-items: center;

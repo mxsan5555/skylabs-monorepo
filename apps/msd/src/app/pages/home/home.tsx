@@ -1,12 +1,13 @@
-import { useNavigate } from 'react-router-dom';
+﻿import { useNavigate } from 'react-router-dom';
 import { NavLink } from 'react-router-dom';
 import { useState, useMemo } from 'react';
-import { FilledButton, SkyInfoCardReact, SkyAccordionReact, SkyAccordionItemReact, TextButton, Icon, Tabs, SecondaryTab, SkyImageCardReact, OutlinedTextField, SkyProductCardReact, SkyCardReact, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, TextButton, Icon, Tabs, SecondaryTab, OutlinedTextField, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { DEALS, getFeaturedDeals, getHotDeals, getDealsByCategory, } from '../../../data/deals';
 import { CATEGORIES } from '../../../data/categories';
 import { DealCard } from '../../components/deal-card';
+import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import content from '../../../content.json';
 import './home.css';
 
@@ -66,12 +67,14 @@ export function Home() {
           grab-cursor="true"
         >
           {deals.map((deal) => (
-            <swiper-slide
-              key={deal.id}
-              style={{ width: '260px', height: 'auto' }}
-            >
-              <DealCard
-                deal={deal}
+            <swiper-slide key={deal.id} style={{ width: '260px', height: 'auto' }}>
+              <SkyProductCardWC
+                image={deal.image}
+                gallery={deal.gallery}
+                imageAlt={deal.imageAlt}
+                badge={deal.badge}
+
+                favorite={true}
                 favoriteActive={has(deal.id)}
                 onFavorite={() => toggle(deal.id)}
               />
@@ -143,7 +146,7 @@ export function Home() {
             />
           < /div>
 
-          <SkyCardReact
+          <sky-card
             variant="filled"
             className="home-deal__card"
           >
@@ -210,7 +213,7 @@ export function Home() {
             <FilledButton className="home-deal__button">
               {dealOfTheDay.buttonText}
             </FilledButton>
-          </SkyCardReact>
+          </sky-card>
         </div>
       </section> */}
 
@@ -331,7 +334,7 @@ export function Home() {
       >
         <div className="home-section__container">
 
-          <SkyCardReact
+          <sky-card
             variant="filled"
             className="home__gift-banner"
           >
@@ -377,7 +380,7 @@ export function Home() {
 
             </div>
 
-          </SkyCardReact>
+          </sky-card>
 
         </div>
       </section>
@@ -490,7 +493,7 @@ export function Home() {
         aria-label="Welcome offer promotion"
       >
         <div className="home-section__container">
-          <SkyCardReact
+          <sky-card
             variant="filled"
             className="home__offer-banner"
             style={{
@@ -538,7 +541,7 @@ export function Home() {
               </div>
 
             </div>
-          </SkyCardReact>
+          </sky-card>
         </div>
       </section>
 
@@ -669,16 +672,16 @@ export function Home() {
             <p className="home__faq-subtitle">
               {home.faq.subheading}
             </p>
-            <SkyAccordionReact>
+            <sky-accordion>
               {home.faq.items.map((item) => (
-                <SkyAccordionItemReact
+                <sky-accordion-item
                   key={item.question}
                   header={item.question}
                 >
                   {item.answer}
-                </SkyAccordionItemReact>
+                </sky-accordion-item>
               ))}
-            </SkyAccordionReact>
+            </sky-accordion>
           </div>
         </div>
       </section>

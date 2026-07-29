@@ -1,9 +1,6 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  SkyCardReact,
-  SkyAccordionReact,
-  SkyAccordionItemReact,
   Icon,
   OutlinedButton,
   FilledButton,
@@ -128,8 +125,8 @@ export function Blog() {
             )}
           </div>
 
-          <SkyAccordionReact>
-            <SkyAccordionItemReact header="Sort by" open>
+          <sky-accordion>
+            <sky-accordion-item header="Sort by" open>
               <div className="facet" role="radiogroup" aria-label="Sort by">
                 {SORT_OPTIONS.map((o) => (
                   <label className="facet__opt" key={o.value}>
@@ -143,9 +140,9 @@ export function Blog() {
                   </label>
                 ))}
               </div>
-            </SkyAccordionItemReact>
+            </sky-accordion-item>
 
-            <SkyAccordionItemReact header="Category" open>
+            <sky-accordion-item header="Category" open>
               <div className="facet" role="group" aria-label="Category">
                 {categories.map((c) => (
                   <label className="facet__opt" key={c.slug}>
@@ -159,9 +156,9 @@ export function Blog() {
                   </label>
                 ))}
               </div>
-            </SkyAccordionItemReact>
+            </sky-accordion-item>
 
-            <SkyAccordionItemReact header="Reading time">
+            <sky-accordion-item header="Reading time">
               <div className="facet" role="radiogroup" aria-label="Reading time">
                 {READING_OPTIONS.map((o) => (
                   <label className="facet__opt" key={o.value}>
@@ -175,9 +172,9 @@ export function Blog() {
                   </label>
                 ))}
               </div>
-            </SkyAccordionItemReact>
+            </sky-accordion-item>
 
-            <SkyAccordionItemReact header="Author">
+            <sky-accordion-item header="Author">
               <div className="facet" role="group" aria-label="Author">
                 {authors.map((a) => (
                   <label className="facet__opt" key={a}>
@@ -191,9 +188,9 @@ export function Blog() {
                   </label>
                 ))}
               </div>
-            </SkyAccordionItemReact>
+            </sky-accordion-item>
 
-            <SkyAccordionItemReact header="Tag">
+            <sky-accordion-item header="Tag">
               <div className="facet" role="group" aria-label="Tag">
                 {tags.map((t) => (
                   <label className="facet__opt" key={t}>
@@ -205,8 +202,8 @@ export function Blog() {
                   </label>
                 ))}
               </div>
-            </SkyAccordionItemReact>
-          </SkyAccordionReact>
+            </sky-accordion-item>
+          </sky-accordion>
         </aside>
 
         <div className="blog__main">
@@ -247,7 +244,7 @@ export function Blog() {
               <ul className={`results results--${view}`}>
                 {items.map((p) => (
                   <li key={p.id}>
-                    <SkyCardReact variant="outlined">
+                    <sky-card variant="outlined">
                       <article className="post-card">
                         <img
                           className="post-card__img"
@@ -275,7 +272,7 @@ export function Blog() {
                           </p>
                         </div>
                       </article>
-                    </SkyCardReact>
+                    </sky-card>
                   </li>
                 ))}
               </ul>

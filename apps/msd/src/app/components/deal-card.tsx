@@ -1,4 +1,4 @@
-import { SkyProductCardReact } from '@skylabs-monorepo/shared-ui/react';
+import { SkyProductCardWC } from './sky-product-card-wc';
 import type { Deal } from '../../types';
 import { formatINR } from '../../utils/format';
 import { useRef } from 'react';

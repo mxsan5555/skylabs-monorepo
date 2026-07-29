@@ -1,8 +1,7 @@
-import { useNavigate } from 'react-router-dom';
+﻿import { useNavigate } from 'react-router-dom';
 import {
   FilledButton,
   Icon,
-  SkyInfoCardReact,
 } from '@skylabs-monorepo/shared-ui/react';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { useCart } from '../../../cart/cart-context';
@@ -41,7 +40,7 @@ export function Wishlist() {
 
         {savedDeals.length === 0 ? (
           <div className="wishlist-page__empty">
-            <SkyInfoCardReact
+            <sky-info-card
               icon="favorite_border"
               heading={wishlistContent.emptyHeading}
               subheading={wishlistContent.emptySubheading}
