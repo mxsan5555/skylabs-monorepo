@@ -25,6 +25,33 @@ export const ADMIN_MENU: MenuGroup[] = [
     items: [
       { label: 'Dashboard', icon: 'dashboard', to: '/account/dashboard', roles: EVERYONE },
       { label: 'My Account', icon: 'person', to: '/account/profile', roles: EVERYONE },
+     {
+  label: "Master",
+  icon: "database",
+  roles: EVERYONE,
+  children: [
+    {
+      label: "Category",
+      to: "/account/master/category",
+      roles: EVERYONE,
+    },
+    {
+      label: "Sub Category",
+      to: "/account/master/sub-category",
+      roles: EVERYONE,
+    },
+    {
+      label: "Brand",
+      to: "/account/master/brand",
+      roles: EVERYONE,
+    },
+    {
+      label: "Vehicle Type",
+      to: "/account/master/vehicle-type",
+      roles: EVERYONE,
+    },
+  ],
+},
     ],
   },
   {

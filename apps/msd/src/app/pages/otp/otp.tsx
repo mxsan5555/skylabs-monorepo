@@ -8,6 +8,7 @@ import {
   TextButton,
 } from '@skylabs-monorepo/shared-ui/react';
 import content from '../../../content.json';
+
 import { useAuth } from '../../../auth/auth-context';
 import { apiClient, ApiError } from '../../../api/api-client';
 import type { User, UserRole } from '../../../types';
@@ -30,7 +31,7 @@ export function Otp() {
   const navigate = useNavigate();
   const location = useLocation();
   const { signIn } = useAuth();
-
+  const otpContent = content.auth.otp;
   const state = (location.state as OtpLocationState | null) ?? {};
   const destination = state.destination ?? '';
   const method = state.method ?? 'email';

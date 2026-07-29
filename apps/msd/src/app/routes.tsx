@@ -20,6 +20,8 @@ import DealDetail from './pages/deal-detail/deal-detail';
 import Cart from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
 import Checkout from './pages/checkout/checkout';
+import { CategoryPage } from './pages/account/category-page';
+import { SubCategoryPage } from './pages/account/subCategory-Page';
 
 export function AppRoutes() {
   return (
@@ -77,6 +79,9 @@ export function AppRoutes() {
         <Route path="/account" element={<Navigate to="/account/profile" replace />} />
         <Route path="/account/dashboard" element={<Dashboard />} />
         <Route path="/account/profile" element={<Profile />} />
+        
+        <Route path="/account/master/category" element={<CategoryPage/>} />
+        <Route path="/account/master/sub-category" element={<SubCategoryPage/>} />
         <Route
           path="/account/deals"
           element={

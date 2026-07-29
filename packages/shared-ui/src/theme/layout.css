@@ -385,6 +385,109 @@
   font-size: 0.8rem;
 }
 
+----------------------
+
+.admin-nav-button {
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  color: inherit;
+  font: inherit;
+  padding: 12px 16px;
+}
+
+.admin-nav-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-submenu {
+  margin-left: 31px;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-submenu-item {
+  padding: 10px 12px;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 8px;
+}
+
+.admin-submenu-item:hover {
+  background: rgba(0, 128, 0, 0.1);
+}
+
+.admin-submenu-item.active {
+  background: rgba(0, 128, 0, 0.15);
+  color: green;
+}
+
+-------------category --------------------
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+}
+
+.page-header h1 {
+  margin: 0;
+}
+
+.add-btn {
+  margin-left: auto;
+}
+
+.category-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.category-table th,
+.category-table td {
+    border: 1px solid #ddd;
+    padding: 12px;
+    text-align: left;
+}
+
+.category-table th {
+    background: #f4f4f4;
+}
+
+.fields-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.category-form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+}
+
 /* Main column */
 .admin-main {
   display: flex;
@@ -554,3 +657,8 @@
   justify-content: flex-end;
   gap: 8px;
 }
+/* .page-header {
+  display: flex;
+  align-items: center;
+} */
+

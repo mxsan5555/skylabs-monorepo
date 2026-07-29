@@ -168,7 +168,7 @@ export async function requestOtp(
     const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     const recentCount = await prisma.otpChallenge.count({
       where: {
-        destination: params.destination,
+        identifier: params.destination,
         purpose,
         createdAt: { gte: hourAgo },
       },
@@ -183,7 +183,7 @@ export async function requestOtp(
 
     await prisma.$transaction([
       prisma.otpChallenge.updateMany({
-        where: { destination: params.destination, purpose, consumedAt: null },
+        where: { identifier : params.destination, purpose, consumedAt: null },
         data: { consumedAt: now },
       }),
       prisma.otpChallenge.create({
@@ -243,7 +243,7 @@ export async function verifyOtp(
       await prisma.otpChallenge.update({
         where: { id: record.id },
         data: {
-          attemptCount,
+           attempts: attemptCount,
           ...(attemptCount >=env.otpMaxAttempts? { consumedAt: now } : {}),
         },
       });

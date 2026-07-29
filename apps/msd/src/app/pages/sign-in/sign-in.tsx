@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-<<<<<<< HEAD
 import {
   FilledButton,
   OutlinedButton,
@@ -10,12 +9,7 @@ import {
   Icon,
 } from '@skylabs-monorepo/shared-ui/react';
 import { apiClient, ApiError, BASE_URL } from '../../../api/api-client';
-
-=======
-import { FilledButton, OutlinedButton, OutlinedTextField, Tabs, PrimaryTab, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import content from '../../../content.json';
-import { users } from '../../../data/users';
->>>>>>> a0bb0a40a95c94497ee60230845f92e699535919
 type Method = 'email' | 'phone';
 
 /**
@@ -32,21 +26,14 @@ export function SignIn() {
   const navigate = useNavigate();
   const [method, setMethod] = useState<Method>('phone');
   const [value, setValue] = useState('');
-<<<<<<< HEAD
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-
-=======
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const auth = content.auth.signIn;
->>>>>>> a0bb0a40a95c94497ee60230845f92e699535919
+  const auth = content.auth.signIn
   const isPhone = method === 'phone';
   const onTabChange = (event: Event) => {
     const index = (event.target as HTMLElement & { activeTabIndex: number })
       .activeTabIndex;
     setMethod(index === 1 ? 'phone' : 'email');
-<<<<<<< HEAD
     setError(null);
   };
 
@@ -79,46 +66,6 @@ export function SignIn() {
 
   const continueWithGoogle = () => {
     window.location.href = `${BASE_URL}/auth/google`;
-=======
-    setValue('');
-    setError('');
-  };
-  const sendOtp = async () => {
-    setError('');
-    setLoading(true);
-    try {
-      const input = value.trim();
-      if (!input) {
-        setError(isPhone ? auth.validation.emptyPhone : auth.validation.emptyEmail);
-        return;
-      }
-      if (isPhone && !validatePhone(input)) {
-        setError(auth.validation.invalidPhone);
-        return;
-      }
-      if (!isPhone && !validateEmail(input)) {
-        setError(auth.validation.invalidEmail);
-        return;
-      }
-      // Check whether user exists
-      const user = users.find((u) =>
-        isPhone ? u.mobile === input : u.email === input
-      );
-      if (!user) {
-        setError(isPhone ? auth.validation.phoneNotRegistered : auth.validation.emailNotRegistered);
-        return;
-      }
-      // Mock API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      console.log('Mock OTP:', user.otp);
-      navigate('/otp', { state: { user, role: user.role, method, destination: input, }, });
-    } catch (error) {
-      console.error(error);
-      setError(auth.validation.somethingWentWrong);
-    } finally {
-      setLoading(false);
-    }
->>>>>>> a0bb0a40a95c94497ee60230845f92e699535919
   };
   // const sendOtp = () => {
   //   navigate('/otp', {
@@ -185,7 +132,6 @@ export function SignIn() {
             {isPhone ? auth.tabs.phone.icon : auth.tabs.email.icon}
           </Icon>
         </OutlinedTextField>
-<<<<<<< HEAD
 
         {error && (
           <p className="auth-error" role="alert">
@@ -195,11 +141,6 @@ export function SignIn() {
 
         <FilledButton className="auth-submit" onClick={sendOtp} disabled={pending}>
           {pending ? 'Sending…' : 'Send OTP'}
-=======
-        {error && <p className="auth-error">{error}</p>}
-        <FilledButton className="auth-submit" onClick={sendOtp} disabled={loading}>
-          {loading ? auth.buttons.sendingOtp : auth.buttons.sendOtp}
->>>>>>> a0bb0a40a95c94497ee60230845f92e699535919
         </FilledButton>
       </div>
       <div className="auth-divider">
