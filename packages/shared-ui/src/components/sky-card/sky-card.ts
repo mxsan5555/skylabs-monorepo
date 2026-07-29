@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit';
+import { hostBase } from '../shared-styles.js';
 
 /**
  * <sky-card> — themed Material 3 surface container, built with LIT.
@@ -27,23 +28,21 @@ export class SkyCard extends LitElement {
   }
 
   static override styles = css`
+    ${hostBase}
     :host {
-      display: block;
-      box-sizing: border-box;
       padding: 16px 20px;
-      border-radius: 16px;
-      background-color: var(--md-sys-color-surface-container, #eef1f6);
-      color: var(--md-sys-color-on-surface, #191c1f);
+      border-radius: var(--md-sys-shape-corner-large, 16px);
+      background-color: var(--md-sys-color-surface-container);
     }
     :host([variant='outlined']) {
-      background-color: var(--md-sys-color-surface, #fafdfb);
-      border: 1px solid var(--md-sys-color-outline-variant, #c2c7ce);
+      background-color: var(--md-sys-color-surface);
+      border: 1px solid var(--md-sys-color-outline-variant);
     }
     :host([variant='elevated']) {
-      background-color: var(--md-sys-color-surface-container-low, #f3f4f9);
+      background-color: var(--md-sys-color-surface-container-low);
       box-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.3),
-        0 1px 3px 1px rgba(0, 0, 0, 0.15);
+        0 1px 2px color-mix(in srgb, var(--md-sys-color-shadow) 30%, transparent),
+        0 1px 3px 1px color-mix(in srgb, var(--md-sys-color-shadow) 15%, transparent);
     }
   `;
 

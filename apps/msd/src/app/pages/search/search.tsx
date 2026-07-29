@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+﻿import { useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
   OutlinedTextField,
@@ -14,9 +14,8 @@ import {
   Checkbox,
   Radio,
   Divider,
-  SkyProductCardReact,
-  SkyBadgeReact,
 } from '@skylabs-monorepo/shared-ui/react';
+import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { useCart } from '../../../cart/cart-context';
 import { DEALS } from '../../../data/deals';
@@ -301,12 +300,12 @@ export function Search() {
                         </div>
                         <p className="search-result-card__desc">{deal.description}</p>
                         <div className="search-result-card__meta">
-                          <SkyBadgeReact
+                          <sky-badge
                             variant={deal.isOpen ? 'primary' : 'secondary'}
                             size="small"
                           >
                             {deal.isOpen ? 'Open' : 'Closed'}
-                          </SkyBadgeReact>
+                          </sky-badge>
                           <span className="search-result-card__rating" aria-label={`Rating ${deal.rating}`}>
                             <Icon aria-hidden="true" className="search-result-card__star">star</Icon>
                             {deal.rating}
@@ -350,7 +349,7 @@ export function Search() {
               <ul className="search-results-grid">
                 {filtered.map((deal) => (
                   <li key={deal.id}>
-                    <SkyProductCardReact
+                    <SkyProductCardWC
                       image={deal.image}
                       imageAlt={deal.imageAlt}
                       badge={deal.badge}
