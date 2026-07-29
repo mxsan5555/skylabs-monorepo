@@ -34,10 +34,13 @@ share UI but **not** backends, databases, or business logic.
   TypeScript · Material 3 (`@material/web` + `lit`, themed per app).
 - **Component consumption**: typed `@lit/react` wrappers in React; raw `<md-*>` +
   `CUSTOM_ELEMENTS_SCHEMA` in Angular. Same components underneath.
-- **Backend (planned, one per app)**: Express + TypeScript · PostgreSQL (in-house) ·
+- **Backend (one per app)** ✅: Express + TypeScript · PostgreSQL (in-house) ·
   Prisma ORM · Zod + `zod-to-openapi` (validation → OpenAPI spec) · `swagger-ui-express`.
-  Chosen because the team knows Express and is learning OpenAPI; no Supabase (cost).
-- **Auth (in-house)**: JWT · phone/email OTP (SMS/email provider) · Google OAuth.
+  `apps/msd-api` (DB `msdapi`, port 4300) and `apps/mera-driver-api` (DB `meradriverapi`,
+  port 4500) — chosen because the team knows Express and is learning OpenAPI; no Supabase (cost).
+- **Auth (in-house)** ✅: JWT (stateless, 7d access token) · email OTP (phone OTP designed
+  channel-agnostically but not wired — no SMS provider yet) · Google OAuth via
+  `passport-google-oauth20` + a one-time exchange-code redirect (JWT never sits in a URL).
 - **Tooling**: Nx 22.7.5 (npm) · ESLint · Vitest / Angular unit-test · GitHub Actions.
 
 ## Access control (RBAC)
@@ -72,7 +75,7 @@ Menu config: `apps/<app>/src/app/admin/menu.ts` — add `{ label, icon, to, role
 | Auth state + roles | `auth/auth-context.tsx` (React Context) | `core/auth/auth.service.ts` (signals) |
 | Auth route guard | `auth/require-auth.tsx` | `core/auth/auth.guard.ts` |
 | Role route guard | `auth/require-role.tsx` | `core/auth/role.guard.ts` |
-| HTTP token injection | _(planned with API)_ | `core/auth/auth.interceptor.ts` |
+| HTTP token injection | `api/api-client.ts` (attaches header) | `core/auth/auth.interceptor.ts` |
 
 ### How access is controlled
 
@@ -80,8 +83,9 @@ Menu config: `apps/<app>/src/app/admin/menu.ts` — add `{ label, icon, to, role
   the roles allowed to see them, and the sidebar filters by the user's roles.
 - **Access**: routes are guarded to the same roles (`RequireRole` / `roleGuard`);
   lacking the role redirects to the profile.
-- **Boundary**: guards are UX only — each API must re-check the role from the JWT on
-  every request once backends exist. See `CLAUDE.md` → "Auth & roles (RBAC)" for full detail.
+- **Boundary**: guards are UX only — each `-api` app re-checks the role from the JWT on
+  every request (`middleware/require-auth.ts` + `require-role.ts`). See `CLAUDE.md` →
+  "Auth & roles (RBAC)" for full detail.
 
 ## AI Dev Team
 
@@ -130,8 +134,12 @@ Full agent file map: `.claude/agents/` · Full skill file map: `.claude/skills/`
 3. **Account/admin console** — role-based admin layout + My Account (profile + address CRUD) + role gating ✅
 4. **Content pages** — home ✅, then contact, blog, blog-detail, blog-category 🔜
 5. **Account extras** — logout from console, admin/marketing/sales feature pages 🔜
-6. **Backends** — `apps/msd-api`, `apps/mera-driver-api` (Express + Postgres + Prisma + OpenAPI) ⏳ deferred until pages need real data
-7. **Auth integration** — wire OTP/Google + real roles to the backend (replace mock token + demo role switcher) ⏳
+6. **Backends** — `apps/msd-api` (DB `msdapi`), `apps/mera-driver-api` (DB `meradriverapi`) —
+   Express + Postgres + Prisma + OpenAPI ✅ — 2026-07
+7. **Auth integration** — email OTP + Google OAuth wired to the backend, real JWT roles
+   replace the mock token, live-verified end-to-end ✅ — 2026-07; phone OTP (needs an SMS
+   provider), real Google Cloud Console credentials, and removing the "View as" demo switcher
+   remain — see `TASK.md`
 8. **Hardening** — tests, error tracking, CI gates, deployment ⏳
 
-Current focus: **frontend pages first** (step 4), backends deferred.
+Current focus: **content pages** (step 4) and the auth-integration follow-ups in `TASK.md`.

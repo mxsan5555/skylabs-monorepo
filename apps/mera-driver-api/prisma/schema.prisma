@@ -1,0 +1,73 @@
+// mera-driver-api's own database — driver booking. Never shared with msd-api.
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+enum UserRole {
+  CUSTOMER
+  DRIVER
+  ADMIN
+  MARKETING
+  SALES
+}
+
+enum OtpChannel {
+  EMAIL
+  PHONE
+}
+
+
+enum OtpPurpose {
+  LOGIN
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String?    @unique
+  phone         String?    @unique
+  emailVerified Boolean    @default(false)
+  phoneVerified Boolean    @default(false)
+  name          String?
+  googleId      String?    @unique
+  roles         UserRole[] @default([CUSTOMER])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([email])
+  @@index([phone])
+}
+
+model OtpCode {
+  id           String     @id @default(cuid())
+  destination  String
+  channel      OtpChannel
+  purpose      OtpPurpose @default(LOGIN)
+  codeHash     String
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  attemptCount Int        @default(0)
+  maxAttempts  Int        @default(5)
+  createdAt    DateTime   @default(now())
+
+  @@index([destination, purpose, consumedAt])
+}
+
+// Short-lived, single-use code exchanged for a real JWT after a Google OAuth
+// callback, so the JWT itself never sits in a redirect URL (history/Referer risk).
+
+
+model ExchangeCode {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}

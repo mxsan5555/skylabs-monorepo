@@ -50,14 +50,18 @@
       </md-outlined-text-field>
     }
 
-    <md-filled-button class="auth-submit" (click)="sendOtp()">
-      Send OTP
+    @if (error()) {
+      <p class="auth-error" role="alert">{{ error() }}</p>
+    }
+
+    <md-filled-button class="auth-submit" (click)="sendOtp()" [disabled]="pending()">
+      {{ pending() ? 'Sending…' : 'Send OTP' }}
     </md-filled-button>
   </div>
 
   <div class="auth-divider"><span>or continue with</span></div>
 
-  <md-outlined-button class="auth-google">
+  <md-outlined-button class="auth-google" (click)="continueWithGoogle()">
     <md-icon slot="icon" aria-hidden="true">language</md-icon>
     Continue with Google
   </md-outlined-button>

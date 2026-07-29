@@ -1,0 +1,14 @@
+<div class="auth-screen">
+  <div class="auth-brand">
+    <h1 class="auth-brand__title">mera-driver</h1>
+  </div>
+  <div class="auth-card">
+    @if (error()) {
+      <h2>Sign-in failed</h2>
+      <p>That link is invalid or has expired.</p>
+      <md-text-button (click)="backToSignIn()">Back to sign in</md-text-button>
+    } @else {
+      <p>Signing you in…</p>
+    }
+  </div>
+</div>

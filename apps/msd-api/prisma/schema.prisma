@@ -1,0 +1,94 @@
+// msd-api's own database — massage deals. Never shared with mera-driver-api.
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+enum UserRole {
+  USER
+  PARTNER
+  ADMIN
+  MARKETING
+  SALES
+}
+
+enum OtpChannel {
+  EMAIL
+  PHONE
+}
+
+enum OtpPurpose {
+  LOGIN
+  SIGNUP
+  CHANGE_PHONE
+  CHANGE_EMAIL
+  PARTNER_SIGNUP
+
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String?    @unique
+  phone         String?    @unique
+  emailVerified Boolean    @default(false)
+  phoneVerified Boolean    @default(false)
+  name          String?
+  googleId      String?    @unique
+  roles         UserRole[] @default([USER])
+  refreshSessions RefreshSession[]
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([email])
+  @@index([phone])
+}
+
+model OtpChallenge {
+     id       String    @id@default(uuid())
+  identifier  String
+  channel     OtpChannel
+   codeHash    String
+  purpose     OtpPurpose
+  attempts    Int        @default(0)
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime    @default(now())
+  
+  @@index([identifier, purpose, consumedAt])
+}
+
+
+model RefreshSession {
+   id         String      @id@default(uuid())
+  userId      String
+  tokenHash   String
+  deviceLabel String?
+  ip          String?
+  lastUsedAt  DateTime
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+// Short-lived, single-use code exchanged for a real JWT after a Google OAuth
+// callback, so the JWT itself never sits in a redirect URL (history/Referer risk).
+model ExchangeCode {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+
