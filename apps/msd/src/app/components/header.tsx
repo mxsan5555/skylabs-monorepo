@@ -1,33 +1,42 @@
-﻿import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import {
-  FilledButton,
-  TextButton,
-  IconButton,
-  FilledTonalIconButton,
-  Icon,
-  OutlinedTextField,
-  Divider,
-} from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, FilledTonalIconButton, TextButton, IconButton, Icon, OutlinedTextField, Divider } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '../../auth/auth-context';
 import { useCart } from '../../cart/cart-context';
 import content from '../../content.json';
 import './header.css';
+import { useCurrentLocation } from "../../hooks/useCurrentLocation";
+import { DEALS } from "../../data/deals";
+import type { Deal } from "../../types";
 
 export function Header() {
   const { isAuthenticated, signOut } = useAuth();
   const { totalItems } = useCart();
   const navigate = useNavigate();
+  const { location } = useCurrentLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
+  // const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const searchRef = useRef<HTMLInputElement>(null);
-
+  const [suggestions, setSuggestions] = useState<Deal[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   useEffect(() => {
-    if (searchOpen) {
-      setTimeout(() => searchRef.current?.focus(), 50);
+    const query = searchQuery.trim().toLowerCase();
+
+    if (!query) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
     }
-  }, [searchOpen]);
+
+    const results = DEALS.filter((deal) =>
+      deal.title.toLowerCase().includes(query) ||
+      deal.providerName.toLowerCase().includes(query) ||
+      deal.location.toLowerCase().includes(query)
+    );
+
+    setSuggestions(results.slice(0, 6));
+    setShowSuggestions(true);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -50,7 +59,7 @@ export function Header() {
     if (searchQuery.trim()) {
       navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`);
       setSearchQuery('');
-      setSearchOpen(false);
+      // setSearchOpen(false);
     }
   }
 
@@ -60,20 +69,9 @@ export function Header() {
       <a className="skip-link" href="#main-content">
         {content.header.skipToContent}
       </a>
-
+<>
       <header className="site-header" role="banner">
-        <div className="site-header__inner">
-          {/* Mobile: hamburger */}
-          <FilledTonalIconButton
-            className="site-header__hamburger"
-            aria-label={content.header.openNavigation}
-            aria-expanded={drawerOpen}
-            aria-controls="nav-drawer"
-            onClick={() => setDrawerOpen(true)}
-          >
-            <Icon aria-hidden="true">menu</Icon>
-          </FilledTonalIconButton>
-
+        <div className="site-header__top">
           {/* Brand */}
           <NavLink to="/" className="site-header__brand" aria-label={`${content.site.name} – ${content.site.fullName} home`}>
             <span className="site-header__brand-icon" aria-hidden="true">
@@ -84,109 +82,147 @@ export function Header() {
               <span className="site-header__brand-tagline">{content.site.fullName}</span>
             </span>
           </NavLink>
-
-          {/* Desktop primary nav */}
-          <nav className="site-header__nav" aria-label="Primary">
-            {content.nav.primary.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  `site-header__nav-link${isActive ? ' site-header__nav-link--active' : ''
-                  }`
-                }
+          <div className="site-header__search-wrapper">
+            <div className="site-header__search-top">
+              <form
+                className="home__hero-search"
+                role="search"
+                aria-label="Search deals"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const q = (e.currentTarget.elements.namedItem('q') as HTMLInputElement)?.value;
+                  if (q?.trim()) navigate(`/explore?q=${encodeURIComponent(q.trim())}`);
+                  else navigate('/explore');
+                }}
               >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
+                <OutlinedTextField
+                  name="q"
+                  label={content.search.placeholder}
+                  className="home__hero-search-field"
+                  value={searchQuery}
+                  onInput={(e) => {
+                    const target = e.currentTarget as HTMLInputElement;
+                    setSearchQuery(target.value);
+                  }}
+                >
+                  <Icon slot="leading-icon" aria-hidden="true">search</Icon>
+                  {searchQuery && (
+                    <Icon
+                      slot="trailing-icon"
+                      onClick={() => setSearchQuery('')}
+                      style={{ cursor: "pointer" }}
+                    >
+                      close
+                    </Icon>
+                  )}
+                </OutlinedTextField>
+              </form>
+              <button
+                type="button"
+                className="site-header__location"
+              >
+                <Icon>location_on</Icon>
 
-          {/* Desktop search */}
-          {/* <form
-            className={`site-header__search-form${searchOpen ? ' site-header__search-form--open' : ''}`}
-            role="search"
-            aria-label="Site search"
-            onSubmit={handleSearch}
-          >
-            <OutlinedTextField
-              className="site-header__search-field"
-              label={content.search.placeholder}
-              value={searchQuery}
-              onInput={(e) =>
-                setSearchQuery((e.target as unknown as { value: string }).value)
-              }
+                <span>
+                  {location ?? "Detecting location..."}
+                </span>
+              </button>
+            </div>
+            {showSuggestions && (
+              <div className="search-suggestions">
+                {suggestions.length > 0 ? (
+                  suggestions.map((deal) => (
+                    <button
+                      key={deal.id}
+                      type="button"
+                      className="search-suggestion"
+                      onClick={() => {
+                        navigate(`/deal/${deal.id}`);
+                        setSearchQuery("");
+                        setShowSuggestions(false);
+                      }}
+                    >
+                      <Icon>search</Icon>
+
+                      <div>
+                        <strong>{deal.title}</strong>
+                        <small>
+                          {deal.providerName} • {deal.location}
+                        </small>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="search-no-results">
+                    No spas found
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="site-header__actions">
+            {/*wishlist*/}
+            <FilledTonalIconButton
+              className="site-header__cart"
+              aria-label={`Cart, ${totalItems} item${totalItems !== 1 ? 's' : ''}`}
+              onClick={() => navigate('/wishlist')}
             >
-              <Icon slot="leading-icon" aria-hidden="true">search</Icon>
-            </OutlinedTextField>
-          </form> */}
+              <Icon aria-hidden="true">favorite_border</Icon>
+              {totalItems > 0 && (
+                <span className="site-header__cart-badge" aria-hidden="true">
+                  {totalItems}
+                </span>
+              )}
+            </FilledTonalIconButton>
 
-          {/* Mobile search toggle */}
-          <IconButton
-            className="site-header__search-toggle"
-            aria-label={searchOpen ? 'Close search' : 'Open search'}
-            onClick={() => setSearchOpen((v) => !v)}
-          >
-            <Icon aria-hidden="true">{searchOpen ? 'close' : 'search'}</Icon>
-          </IconButton>
-
-          {/* Cart */}
-          <IconButton
-            className="site-header__cart"
-            aria-label={`Cart, ${totalItems} item${totalItems !== 1 ? 's' : ''}`}
-            onClick={() => navigate('/cart')}
-          >
-            <Icon aria-hidden="true">shopping_bag</Icon>
-            {totalItems > 0 && (
-              <span className="site-header__cart-badge" aria-hidden="true">
-                {totalItems}
-              </span>
-            )}
-          </IconButton>
-          <IconButton
-            className="site-header__cart"
-            aria-label={`Cart, ${totalItems} item${totalItems !== 1 ? 's' : ''}`}
-            onClick={() => navigate('/wishlist')}
-          >
-            <Icon aria-hidden="true">favorite_border</Icon>
-            {totalItems > 0 && (
-              <span className="site-header__cart-badge" aria-hidden="true">
-                {totalItems}
-              </span>
-            )}
-          </IconButton>
-
-          {/* Auth */}
-          <div className="site-header__auth">
-            {isAuthenticated ? (
-              <>
-                <TextButton onClick={() => navigate('/account')}>My Account</TextButton>
-                <TextButton onClick={signOut}>Sign Out</TextButton>
-              </>
-            ) : (
-              <FilledButton onClick={() => navigate('/sign-in')}>Sign In</FilledButton>
-            )}
+            {/* Cart */}
+            <FilledTonalIconButton
+              className="site-header__cart"
+              aria-label={`Cart, ${totalItems} item${totalItems !== 1 ? 's' : ''}`}
+              onClick={() => navigate('/cart')}
+            >
+              <Icon aria-hidden="true">shopping_bag</Icon>
+              {totalItems > 0 && (
+                <span className="site-header__cart-badge" aria-hidden="true">
+                  {totalItems}
+                </span>
+              )}
+            </FilledTonalIconButton>
+            {/* Account */}
+            <div className="site-header__auth">
+              {isAuthenticated ? (
+                <>
+                  <FilledButton onClick={() => navigate('/account')}>My Account</FilledButton>
+                  <FilledButton onClick={signOut}>Sign Out</FilledButton>
+                </>
+              ) : (
+                <FilledButton onClick={() => navigate('/sign-in')}>Sign In</FilledButton>
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Mobile search bar (expanded) */}
-        {searchOpen && (
-          <div className="site-header__mobile-search">
-            <form role="search" aria-label="Site search" onSubmit={handleSearch}>
-              <OutlinedTextField
-                className="site-header__search-field site-header__search-field--mobile"
-                label={content.search.placeholder}
-                value={searchQuery}
-                onInput={(e) =>
-                  setSearchQuery((e.target as unknown as { value: string }).value)
-                }
-              >
-                <Icon slot="leading-icon" aria-hidden="true">search</Icon>
-              </OutlinedTextField>
-            </form>
-          </div>
-        )}
+        
+        {/* Second Row */}
+        <nav className="site-header__nav" aria-label="Primary">
+          {content.nav.primary.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `site-header__nav-link${isActive ? ' site-header__nav-link--active' : ''
+                }`
+              }
+            >
+              <>
+                <Icon className="site-header__nav-icon" aria-hidden="true"  >{item.icon} </Icon>
+                <span>{item.label}</span>
+              </>
+            </NavLink>
+          ))}
+        </nav>
       </header>
-
+</>
       {/* Mobile nav drawer */}
       {drawerOpen && (
         <div

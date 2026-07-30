@@ -18,37 +18,43 @@
   },
   "nav": {
     "drawerCategoryHeader": "Browse Categories",
-    "primary": [
-      {
-        "label": "Massage",
-        "to": "/category/massage",
-        "count": 12
-      },
-      {
-        "label": "Spas & Retreats",
-        "to": "/category/spas-retreats",
-        "count": 11
-      },
-      {
-        "label": "Skin & Beauty",
-        "to": "/category/skin-beauty",
-        "count": 14
-      },
-      {
-        "label": "Hair & Nails",
-        "to": "/category/hair-nails",
-        "count": 7
-      },
-      {
-        "label": "Health & Wellness",
-        "to": "/category/health-wellness",
-        "count": 13
-      },
-      {
-        "label": "Product",
-        "to": "/products"
-      }
-    ],
+   "primary": [
+  {
+    "label": "Massage",
+    "icon": "self_improvement",
+    "to": "/category/massage",
+    "count": 12
+  },
+  {
+    "label": "Spas & Retreats",
+    "icon": "spa",
+    "to": "/category/spas-retreats",
+    "count": 11
+  },
+  {
+    "label": "Skin & Beauty",
+    "icon": "face",
+    "to": "/category/skin-beauty",
+    "count": 14
+  },
+  {
+    "label": "Hair & Nails",
+    "icon": "content_cut",
+    "to": "/category/hair-nails",
+    "count": 7
+  },
+  {
+    "label": "Health & Wellness",
+    "icon": "heart_smile",
+    "to": "/category/health-wellness",
+    "count": 13
+  },
+  {
+    "label": "Product",
+    "icon": "shopping_bag",
+    "to": "/products"
+  }
+],
     "categories": [
       {
         "label": "Massage",
