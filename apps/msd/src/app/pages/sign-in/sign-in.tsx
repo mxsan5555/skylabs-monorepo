@@ -1,21 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-<<<<<<< HEAD
 import { FilledButton, OutlinedButton, OutlinedTextField, Tabs, PrimaryTab, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import content from '../../../content.json';
 import { users } from '../../../data/users';
-=======
-import {
-  FilledButton,
-  OutlinedButton,
-  OutlinedTextField,
-  Tabs,
-  PrimaryTab,
-  Icon,
-} from '@skylabs-monorepo/shared-ui/react';
-import { apiClient, ApiError, BASE_URL } from '../../../api/api-client';
-
->>>>>>> 97796a65f4d189f3bf9888273564c91f473f37a2
 type Method = 'email' | 'phone';
 
 /**
@@ -32,21 +19,14 @@ export function SignIn() {
   const navigate = useNavigate();
   const [method, setMethod] = useState<Method>('phone');
   const [value, setValue] = useState('');
-<<<<<<< HEAD
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const auth = content.auth.signIn;
-=======
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-
->>>>>>> 97796a65f4d189f3bf9888273564c91f473f37a2
   const isPhone = method === 'phone';
   const onTabChange = (event: Event) => {
     const index = (event.target as HTMLElement & { activeTabIndex: number })
       .activeTabIndex;
     setMethod(index === 1 ? 'phone' : 'email');
-<<<<<<< HEAD
     setValue('');
     setError('');
   };
@@ -85,40 +65,6 @@ export function SignIn() {
     } finally {
       setLoading(false);
     }
-=======
-    setError(null);
-  };
-
-  const sendOtp = async () => {
-    if (pending) return;
-    setError(null);
-
-    if (!value.trim()) {
-      setError(isPhone ? 'Enter your phone number.' : 'Enter your email address.');
-      return;
-    }
-
-    setPending(true);
-    try {
-      const { retryAfterSeconds } = await apiClient.post<{
-        ok: true;
-        retryAfterSeconds: number;
-      }>('/auth/otp/request', { method, destination: value });
-      navigate('/otp', { state: { destination: value, method, retryAfterSeconds } });
-    } catch (err) {
-      if (err instanceof ApiError && err.retryAfterSeconds) {
-        setError(`Please wait ${err.retryAfterSeconds}s before requesting another code.`);
-      } else {
-        setError('Something went wrong. Please try again.');
-      }
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const continueWithGoogle = () => {
-    window.location.href = `${BASE_URL}/auth/google`;
->>>>>>> 97796a65f4d189f3bf9888273564c91f473f37a2
   };
   // const sendOtp = () => {
   //   navigate('/otp', {
@@ -185,33 +131,16 @@ export function SignIn() {
             {isPhone ? auth.tabs.phone.icon : auth.tabs.email.icon}
           </Icon>
         </OutlinedTextField>
-<<<<<<< HEAD
         {error && <p className="auth-error">{error}</p>}
         <FilledButton className="auth-submit" onClick={sendOtp} disabled={loading}>
           {loading ? auth.buttons.sendingOtp : auth.buttons.sendOtp}
-=======
-
-        {error && (
-          <p className="auth-error" role="alert">
-            {error}
-          </p>
-        )}
-
-        <FilledButton className="auth-submit" onClick={sendOtp} disabled={pending}>
-          {pending ? 'Sending…' : 'Send OTP'}
->>>>>>> 97796a65f4d189f3bf9888273564c91f473f37a2
         </FilledButton>
       </div>
       <div className="auth-divider">
         <span>{auth.divider}</span>
       </div>
 
-      <OutlinedButton className="auth-google" onClick={continueWithGoogle}>
-        <Icon slot="icon" aria-hidden="true">
-          {auth.googleIcon}
-        </Icon>
-        {auth.buttons.continueWithGoogle}
-      </OutlinedButton>
+     
 
       <p className="auth-note">{auth.note}</p>
     </div>
