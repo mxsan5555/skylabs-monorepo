@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './showcase.css';
 // Opt-in: registers <swiper-container> / <swiper-slide> for the carousel demos.
 import '@skylabs-monorepo/shared-ui/carousel';
@@ -44,14 +44,249 @@ import {
   FilledSelect,
   OutlinedSelect,
   SelectOption,
-  SkyBadgeReact,
-  SkyProductCardReact,
-  SkyImageCardReact,
-  SkyCategoryCardReact,
-  SkyInfoCardReact,
-  SkyAccordionReact,
-  SkyAccordionItemReact,
 } from '@skylabs-monorepo/shared-ui/react';
+// sky-* components are raw LIT web component tags — no React adapter needed.
+// They are registered globally via main.tsx → import '@skylabs-monorepo/shared-ui'.
+
+// ── Data table demo ──────────────────────────────────────────────────────────
+
+const SERVICES = ['Thai Bliss', 'Deep Tissue', 'Swedish Relax', 'Hot Stone', 'Aromatherapy'];
+const LOCATIONS = ['Philadelphia', 'New York', 'Boston', 'Chicago', 'Miami'];
+const STATUSES = ['Active', 'Pending', 'Expired'] as const;
+const DURATIONS = ['60 min', '90 min', '120 min'];
+
+const ALL_DEALS = Array.from({ length: 100 }, (_, i) => ({
+  id:       `DEAL-${String(i + 1).padStart(4, '0')}`,
+  name:     `${SERVICES[i % 5]} #${i + 1}`,
+  location: LOCATIONS[i % 5],
+  duration: DURATIONS[i % 3],
+  price:    `$${50 + ((i * 7) % 150)}`,
+  status:   STATUSES[i % 3],
+}));
+
+const DT_COLUMNS = JSON.stringify([
+  { key: 'id',       label: 'Deal ID',      sortable: true, width: '130px' },
+  { key: 'name',     label: 'Service Name', sortable: true },
+  { key: 'location', label: 'Location',     sortable: true },
+  { key: 'duration', label: 'Duration' },
+  { key: 'price',    label: 'Price',        sortable: true },
+  { key: 'status',   label: 'Status',       type: 'status',
+    statusMap: { Active: 'success', Pending: 'warning', Expired: 'error' } },
+]);
+
+const DT_ACTIONS = JSON.stringify([
+  { icon: 'visibility', label: 'View details', event: '__view_detail__' },
+  { icon: 'edit',       label: 'Edit',         event: 'edit' },
+  { icon: 'delete',     label: 'Delete',       event: 'delete', variant: 'danger' },
+]);
+
+const DT_FILTERS = JSON.stringify([
+  { label: 'Active',  value: 'Active' },
+  { label: 'Pending', value: 'Pending' },
+  { label: 'Expired', value: 'Expired' },
+]);
+
+// ── Booking table constants (filter showcase — no PDF) ────────────────────────
+
+const THERAPISTS = ['Aria Chen', 'Marcus Bell', 'Sofia Park', 'James Rivera', 'Priya Nair'];
+const BOOKING_STATUSES = ['Active', 'Completed', 'Cancelled'] as const;
+
+const ALL_BOOKINGS = Array.from({ length: 60 }, (_, i) => ({
+  id:        `BK-${String(i + 1).padStart(3, '0')}`,
+  therapist: THERAPISTS[i % 5],
+  service:   SERVICES[i % 5],
+  date:      `2026-${String((i % 12) + 1).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')}`,
+  duration:  DURATIONS[i % 3],
+  status:    BOOKING_STATUSES[i % 3],
+}));
+
+const BK_COLUMNS = JSON.stringify([
+  { key: 'id',        label: 'Booking ID', sortable: true, width: '110px' },
+  { key: 'therapist', label: 'Therapist',  sortable: true },
+  { key: 'service',   label: 'Service',    sortable: true },
+  { key: 'date',      label: 'Date',       sortable: true },
+  { key: 'duration',  label: 'Duration' },
+  { key: 'status',    label: 'Status',     type: 'status',
+    statusMap: { Active: 'success', Completed: 'primary', Cancelled: 'error' } },
+]);
+
+const BK_ACTIONS = JSON.stringify([
+  { icon: 'visibility', label: 'View details', event: '__view_detail__' },
+]);
+
+const BK_FILTERS = JSON.stringify([
+  { label: 'Active',    value: 'Active' },
+  { label: 'Completed', value: 'Completed' },
+  { label: 'Cancelled', value: 'Cancelled' },
+]);
+
+// ── Revenue table constants (PDF export showcase — no filter) ─────────────────
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const ALL_REVENUE = Array.from({ length: 36 }, (_, i) => {
+  const gv = ((i * 7 + 3) % 30) - 10;
+  return {
+    month:    `${MONTHS[i % 12]} ${2024 + Math.floor(i / 12)}`,
+    service:  SERVICES[i % 5],
+    sessions: String(40 + (i * 13) % 61),
+    revenue:  `$${(1200 + (i * 89) % 3800).toLocaleString()}`,
+    growth:   `${gv >= 0 ? '+' : ''}${gv.toFixed(1)}%`,
+  };
+});
+
+const RV_COLUMNS = JSON.stringify([
+  { key: 'month',    label: 'Month',    sortable: true, width: '120px' },
+  { key: 'service',  label: 'Service',  sortable: true },
+  { key: 'sessions', label: 'Sessions', sortable: true },
+  { key: 'revenue',  label: 'Revenue',  sortable: true },
+  { key: 'growth',   label: 'Growth %' },
+]);
+
+// ── Top services constants (minimal — sort only, no toolbar) ──────────────────
+
+const TOP_SERVICES = [
+  { rank: '1', service: 'Swedish Relax', bookings: '2,847', avgRating: '4.9', avgPrice: '$89'  },
+  { rank: '2', service: 'Deep Tissue',   bookings: '2,431', avgRating: '4.8', avgPrice: '$99'  },
+  { rank: '3', service: 'Hot Stone',     bookings: '1,986', avgRating: '4.7', avgPrice: '$115' },
+  { rank: '4', service: 'Aromatherapy',  bookings: '1,654', avgRating: '4.6', avgPrice: '$79'  },
+  { rank: '5', service: 'Thai Bliss',    bookings: '1,322', avgRating: '4.5', avgPrice: '$94'  },
+];
+
+const TS_COLUMNS = JSON.stringify([
+  { key: 'rank',      label: '#',          width: '48px' },
+  { key: 'service',   label: 'Service',    sortable: true },
+  { key: 'bookings',  label: 'Bookings',   sortable: true },
+  { key: 'avgRating', label: 'Avg Rating', sortable: true },
+  { key: 'avgPrice',  label: 'Avg Price',  sortable: true },
+]);
+
+interface DtParams {
+  page: number;
+  pageSize: number;
+  sortKey: string;
+  sortDir: 'asc' | 'desc' | '';
+  search: string;
+  filter: string;
+}
+
+function useDealTable() {
+  const [params, setParams] = useState<DtParams>({
+    page: 1, pageSize: 10, sortKey: '', sortDir: '', search: '', filter: '',
+  });
+  const [loading, setLoading] = useState(false);
+
+  const filtered = useMemo(() => {
+    let data = [...ALL_DEALS];
+    if (params.search) {
+      const q = params.search.toLowerCase();
+      data = data.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q)));
+    }
+    if (params.filter) data = data.filter(r => r.status === params.filter);
+    if (params.sortKey) {
+      const key = params.sortKey as keyof (typeof ALL_DEALS)[0];
+      data.sort((a, b) => {
+        const cmp = String(a[key]).localeCompare(String(b[key]));
+        return params.sortDir === 'desc' ? -cmp : cmp;
+      });
+    }
+    return data;
+  }, [params.search, params.filter, params.sortKey, params.sortDir]);
+
+  const pageRows = useMemo(
+    () => filtered.slice((params.page - 1) * params.pageSize, params.page * params.pageSize),
+    [filtered, params.page, params.pageSize],
+  );
+
+  const onParamsChange = useCallback((e: Event) => {
+    const detail = (e as CustomEvent<DtParams>).detail;
+    setLoading(true);
+    // Simulate 300 ms network round-trip so the preloader is visible.
+    setTimeout(() => { setParams(detail); setLoading(false); }, 300);
+  }, []);
+
+  return {
+    rows:    JSON.stringify(pageRows),
+    total:   filtered.length,
+    loading,
+    onParamsChange,
+  };
+}
+
+function useBookingTable() {
+  const [params, setParams] = useState<DtParams>({
+    page: 1, pageSize: 10, sortKey: '', sortDir: '', search: '', filter: '',
+  });
+  const [loading, setLoading] = useState(false);
+
+  const filtered = useMemo(() => {
+    let data = [...ALL_BOOKINGS];
+    if (params.search) {
+      const q = params.search.toLowerCase();
+      data = data.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q)));
+    }
+    if (params.filter) data = data.filter(r => r.status === params.filter);
+    if (params.sortKey) {
+      const key = params.sortKey as keyof (typeof ALL_BOOKINGS)[0];
+      data.sort((a, b) => {
+        const cmp = String(a[key]).localeCompare(String(b[key]));
+        return params.sortDir === 'desc' ? -cmp : cmp;
+      });
+    }
+    return data;
+  }, [params.search, params.filter, params.sortKey, params.sortDir]);
+
+  const pageRows = useMemo(
+    () => filtered.slice((params.page - 1) * params.pageSize, params.page * params.pageSize),
+    [filtered, params.page, params.pageSize],
+  );
+
+  const onParamsChange = useCallback((e: Event) => {
+    const detail = (e as CustomEvent<DtParams>).detail;
+    setLoading(true);
+    setTimeout(() => { setParams(detail); setLoading(false); }, 300);
+  }, []);
+
+  return { rows: JSON.stringify(pageRows), total: filtered.length, loading, onParamsChange };
+}
+
+function useRevenueTable() {
+  const [params, setParams] = useState<DtParams>({
+    page: 1, pageSize: 10, sortKey: '', sortDir: '', search: '', filter: '',
+  });
+  const [loading, setLoading] = useState(false);
+
+  const filtered = useMemo(() => {
+    let data = [...ALL_REVENUE];
+    if (params.search) {
+      const q = params.search.toLowerCase();
+      data = data.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q)));
+    }
+    if (params.sortKey) {
+      const key = params.sortKey as keyof (typeof ALL_REVENUE)[0];
+      data.sort((a, b) => {
+        const cmp = String(a[key]).localeCompare(String(b[key]));
+        return params.sortDir === 'desc' ? -cmp : cmp;
+      });
+    }
+    return data;
+  }, [params.search, params.sortKey, params.sortDir]);
+
+  const pageRows = useMemo(
+    () => filtered.slice((params.page - 1) * params.pageSize, params.page * params.pageSize),
+    [filtered, params.page, params.pageSize],
+  );
+
+  const onParamsChange = useCallback((e: Event) => {
+    const detail = (e as CustomEvent<DtParams>).detail;
+    setLoading(true);
+    setTimeout(() => { setParams(detail); setLoading(false); }, 300);
+  }, []);
+
+  return { rows: JSON.stringify(pageRows), total: filtered.length, loading, onParamsChange };
+}
+
+// ── End data table demo ───────────────────────────────────────────────────────
 
 const LOREM =
   'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse ' +
@@ -116,6 +351,58 @@ export function Showcase() {
   const dynamicRef = useSwiperParams(PAGINATION_DYNAMIC);
   const fractionRef = useSwiperParams(PAGINATION_FRACTION);
 
+  const dt = useDealTable();
+  const dtRef = useRef<HTMLElement>(null);
+
+  const bk = useBookingTable();
+  const bkRef = useRef<HTMLElement>(null);
+
+  const rv = useRevenueTable();
+  const rvRef = useRef<HTMLElement>(null);
+
+  const tsRef = useRef<HTMLElement>(null);
+  const [tsSort, setTsSort] = useState({ key: '', dir: '' as 'asc' | 'desc' | '' });
+  const tsRows = useMemo(() => {
+    if (!tsSort.key) return TOP_SERVICES;
+    const key = tsSort.key as keyof (typeof TOP_SERVICES)[0];
+    return [...TOP_SERVICES].sort((a, b) => {
+      const cmp = String(a[key]).localeCompare(String(b[key]));
+      return tsSort.dir === 'desc' ? -cmp : cmp;
+    });
+  }, [tsSort.key, tsSort.dir]);
+  const onTsParamsChange = useCallback((e: Event) => {
+    const { sortKey, sortDir } = (e as CustomEvent<DtParams>).detail;
+    setTsSort({ key: sortKey, dir: sortDir });
+  }, []);
+
+  useEffect(() => {
+    const el = dtRef.current;
+    if (!el) return;
+    el.addEventListener('sky-dt-params-change', dt.onParamsChange);
+    return () => el.removeEventListener('sky-dt-params-change', dt.onParamsChange);
+  }, [dt.onParamsChange]);
+
+  useEffect(() => {
+    const el = bkRef.current;
+    if (!el) return;
+    el.addEventListener('sky-dt-params-change', bk.onParamsChange);
+    return () => el.removeEventListener('sky-dt-params-change', bk.onParamsChange);
+  }, [bk.onParamsChange]);
+
+  useEffect(() => {
+    const el = rvRef.current;
+    if (!el) return;
+    el.addEventListener('sky-dt-params-change', rv.onParamsChange);
+    return () => el.removeEventListener('sky-dt-params-change', rv.onParamsChange);
+  }, [rv.onParamsChange]);
+
+  useEffect(() => {
+    const el = tsRef.current;
+    if (!el) return;
+    el.addEventListener('sky-dt-params-change', onTsParamsChange);
+    return () => el.removeEventListener('sky-dt-params-change', onTsParamsChange);
+  }, [onTsParamsChange]);
+
   // Demo slides. `auto` adds a fixed width so `slides-per-view="auto"` works.
   const slideNums = [1, 2, 3, 4, 5, 6, 7, 8];
   const slides = (auto = false) =>
@@ -134,7 +421,7 @@ export function Showcase() {
       <header className="showcase__bar">
         <div className="showcase__title">
           <h1>msd</h1>
-          <SkyBadgeReact>M3</SkyBadgeReact>
+          <sky-badge>M3</sky-badge>
         </div>
         <label className="showcase__toggle">
           <span>{mode === 'dark' ? 'Dark' : 'Light'}</span>
@@ -463,7 +750,7 @@ export function Showcase() {
       <section className="showcase__card">
         <h2>Cards</h2>
         <div className="cards-grid">
-          <SkyProductCardReact
+          <sky-product-card
             image="https://picsum.photos/seed/spa/600/400"
             imageAlt="Massage therapy"
             badge="Popular Gift"
@@ -479,7 +766,7 @@ export function Showcase() {
             discount="-28%"
             priceNote="$119.25 with code SUMMER"
           />
-          <SkyProductCardReact
+          <sky-product-card
             variant="outlined"
             image="https://picsum.photos/seed/grandhotel/600/400"
             imageAlt="The Grand Hotel at night"
@@ -495,20 +782,20 @@ export function Showcase() {
             originalPrice="$215"
             price="$172"
           />
-          <SkyImageCardReact
+          <sky-image-card
             image="https://picsum.photos/seed/cottages/600/800"
             imageAlt="Children playing in a cottage garden"
             label="Cottages"
             href="#cottages"
           />
-          <SkyCategoryCardReact
+          <sky-category-card
             image="https://picsum.photos/seed/losangeles/600/600"
             imageAlt="Los Angeles hills"
             heading="Los Angeles"
             subheading="4,781 properties"
             href="#los-angeles"
           />
-          <SkyInfoCardReact
+          <sky-info-card
             align="center"
             icon="support_agent"
             heading="Trusted 24/7 customer service you can rely on"
@@ -519,17 +806,17 @@ export function Showcase() {
 
       <section className="showcase__card">
         <h2>Accordion</h2>
-        <SkyAccordionReact>
-          <SkyAccordionItemReact header="Accordion 1" open>
+        <sky-accordion>
+          <sky-accordion-item header="Accordion 1" open>
             {LOREM}
-          </SkyAccordionItemReact>
-          <SkyAccordionItemReact header="Accordion 2" open>
+          </sky-accordion-item>
+          <sky-accordion-item header="Accordion 2" open>
             {LOREM}
-          </SkyAccordionItemReact>
-          <SkyAccordionItemReact header="Accordion Actions">
+          </sky-accordion-item>
+          <sky-accordion-item header="Accordion Actions">
             {LOREM}
-          </SkyAccordionItemReact>
-        </SkyAccordionReact>
+          </sky-accordion-item>
+        </sky-accordion>
       </section>
 
       <section className="showcase__card">
@@ -622,6 +909,87 @@ export function Showcase() {
         >
           {slides(true)}
         </swiper-container>
+      </section>
+
+      <section className="showcase__card">
+        <h2>Data Table</h2>
+        <p className="demo-label">
+          100 records · lazy loading · search · filter · sort · PDF export ·
+          row selection · view / edit / delete actions · detail drawer
+        </p>
+        {/* sky-data-table is a raw LIT web component — events are wired via
+            dtRef + addEventListener in useEffect above. */}
+        <sky-data-table
+          ref={dtRef as React.RefObject<HTMLElement>}
+          caption="Massage Deals"
+          columns={DT_COLUMNS}
+          rows={dt.rows}
+          total={dt.total}
+          loading={dt.loading}
+          page-size={10}
+          searchable
+          search-placeholder="Search deals…"
+          filter-label="Filter by Status"
+          filter-options={DT_FILTERS}
+          selectable
+          exportable
+          actions={DT_ACTIONS}
+        />
+      </section>
+
+      <section className="showcase__card">
+        <h2>Data Table — Filter by Status (no PDF export)</h2>
+        <p className="demo-label">
+          60 bookings · search · filter by status (Active / Completed / Cancelled) · sort · view details — no PDF export button
+        </p>
+        <sky-data-table
+          ref={bkRef as React.RefObject<HTMLElement>}
+          caption="Therapist Bookings"
+          columns={BK_COLUMNS}
+          rows={bk.rows}
+          total={bk.total}
+          loading={bk.loading}
+          page-size={10}
+          searchable
+          search-placeholder="Search bookings…"
+          filter-label="Filter by Status"
+          filter-options={BK_FILTERS}
+          actions={BK_ACTIONS}
+        />
+      </section>
+
+      <section className="showcase__card">
+        <h2>Data Table — PDF Export (no filter dropdown)</h2>
+        <p className="demo-label">
+          36 records · search · sort · exportable PDF — filter dropdown omitted entirely
+        </p>
+        <sky-data-table
+          ref={rvRef as React.RefObject<HTMLElement>}
+          caption="Monthly Revenue"
+          columns={RV_COLUMNS}
+          rows={rv.rows}
+          total={rv.total}
+          loading={rv.loading}
+          page-size={10}
+          searchable
+          search-placeholder="Search revenue…"
+          exportable
+        />
+      </section>
+
+      <section className="showcase__card">
+        <h2>Data Table — Minimal (sort only)</h2>
+        <p className="demo-label">
+          5 records · sort only — no search, no filter, no export, no row selection, no actions
+        </p>
+        <sky-data-table
+          ref={tsRef as React.RefObject<HTMLElement>}
+          caption="Top Services"
+          columns={TS_COLUMNS}
+          rows={JSON.stringify(tsRows)}
+          total={TOP_SERVICES.length}
+          page-size={10}
+        />
       </section>
     </main>
   );

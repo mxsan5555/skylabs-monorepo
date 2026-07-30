@@ -1,12 +1,10 @@
-import { useNavigate } from 'react-router-dom';
+﻿import { useNavigate } from 'react-router-dom';
 import {
   FilledButton,
   OutlinedButton,
   IconButton,
   Icon,
   Divider,
-  SkyInfoCardReact,
-  SkyCardReact,
   OutlinedTextField,
 } from '@skylabs-monorepo/shared-ui/react';
 import { useCart } from '../../../cart/cart-context';
@@ -56,7 +54,7 @@ export function Cart() {
 
         {cartDeals.length === 0 ? (
           <div className="cart-page__empty">
-            <SkyInfoCardReact
+            <sky-info-card
               icon="shopping_bag"
               heading={cartContent.emptyHeading}
               subheading={cartContent.emptySubheading}
@@ -132,7 +130,7 @@ export function Cart() {
 
             {/* Summary column */}
             <aside className="cart-page__summary" aria-label="Order summary">
-              <SkyCardReact variant="outlined" className="cart-summary-card">
+              <sky-card variant="outlined" className="cart-summary-card">
                 <div className="cart-summary">
                   <h2 className="cart-summary__heading">{cartContent.orderSummaryHeading}</h2>
 
@@ -177,7 +175,7 @@ export function Cart() {
                     {cartContent.continueBrowsing}
                   </OutlinedButton>
                 </div>
-              </SkyCardReact>
+              </sky-card>
             </aside>
           </div>
         )}

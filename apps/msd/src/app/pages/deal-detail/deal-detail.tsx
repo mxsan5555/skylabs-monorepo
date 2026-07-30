@@ -1,13 +1,9 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   FilledButton,
   OutlinedIconButton,
   Icon,
-  SkyInfoCardReact,
-  SkyBadgeReact,
-  SkyAccordionReact,
-  SkyAccordionItemReact,
   Divider,
 } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
@@ -36,7 +32,7 @@ export function DealDetail() {
     return (
       <div className="deal-detail deal-detail--empty">
         <title>Deal Not Found | MSD</title>
-        <SkyInfoCardReact
+        <sky-info-card
           icon="search_off"
           heading="Deal not found"
           subheading="This deal may no longer be available."
@@ -137,16 +133,16 @@ export function DealDetail() {
           <div className="deal-detail__meta-row">
             <span className="deal-detail__provider">{deal.providerName}</span>
             {category && (
-              <SkyBadgeReact variant="secondary" size="small">
+              <sky-badge variant="secondary" size="small">
                 {category.name}
-              </SkyBadgeReact>
+              </sky-badge>
             )}
-            <SkyBadgeReact
+            <sky-badge
               variant={deal.isOpen ? 'primary' : 'error'}
               size="small"
             >
               {deal.isOpen ? 'Open' : 'Closed'}
-            </SkyBadgeReact>
+            </sky-badge>
           </div>
 
           <h1 className="deal-detail__title">{deal.title}</h1>
@@ -177,9 +173,9 @@ export function DealDetail() {
                 <s className="deal-detail__original-price" aria-label={`Original price ${formatINR(deal.originalPrice)}`}>
                   {formatINR(deal.originalPrice)}
                 </s>
-                <SkyBadgeReact variant="error" size="small">
+                <sky-badge variant="error" size="small">
                   {discountPct}% OFF
-                </SkyBadgeReact>
+                </sky-badge>
               </div>
             )}
           </div>
@@ -234,8 +230,8 @@ export function DealDetail() {
           <p className="deal-detail__desc">{deal.description}</p>
 
           {/* Accordion */}
-          <SkyAccordionReact>
-            <SkyAccordionItemReact header={dealDetail.whatIncluded} open>
+          <sky-accordion>
+            <sky-accordion-item header={dealDetail.whatIncluded} open>
               <ul className="deal-detail__list">
                 {deal.included.map((item) => (
                   <li key={item} className="deal-detail__list-item">
@@ -244,9 +240,9 @@ export function DealDetail() {
                   </li>
                 ))}
               </ul>
-            </SkyAccordionItemReact>
+            </sky-accordion-item>
 
-            <SkyAccordionItemReact header={dealDetail.howToUse}>
+            <sky-accordion-item header={dealDetail.howToUse}>
               <ol className="deal-detail__list deal-detail__list--ordered">
                 {deal.howToUse.map((step, i) => (
                   <li key={i} className="deal-detail__list-item">
@@ -255,12 +251,12 @@ export function DealDetail() {
                   </li>
                 ))}
               </ol>
-            </SkyAccordionItemReact>
+            </sky-accordion-item>
 
-            <SkyAccordionItemReact header={dealDetail.cancellationPolicy}>
+            <sky-accordion-item header={dealDetail.cancellationPolicy}>
               <p className="deal-detail__policy">{dealDetail.cancellationText}</p>
-            </SkyAccordionItemReact>
-          </SkyAccordionReact>
+            </sky-accordion-item>
+          </sky-accordion>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import { LitElement, html, css, nothing } from 'lit';
-import { hostBase } from '../shared-styles.js';
+import { hostBase, stretchLink } from '../shared-styles.js';
 
 /**
  * <sky-category-card> — rounded image, then heading + subheading below.
@@ -51,7 +51,7 @@ export class SkyCategoryCard extends LitElement {
       aspect-ratio: 1 / 1;
       overflow: hidden;
       border-radius: 16px;
-      background-color: var(--md-sys-color-surface-variant, #dde4d8);
+      background-color: var(--md-sys-color-surface-variant);
     }
     .media img {
       width: 100%;
@@ -76,7 +76,7 @@ export class SkyCategoryCard extends LitElement {
     .subheading {
       margin: 0;
       font-size: 0.875rem;
-      color: var(--md-sys-color-on-surface-variant, #424940);
+      color: var(--md-sys-color-on-surface-variant);
     }
     :host([align='center']) figcaption {
       text-align: center;
@@ -84,16 +84,7 @@ export class SkyCategoryCard extends LitElement {
     :host([align='right']) figcaption {
       text-align: right;
     }
-    .stretch {
-      position: absolute;
-      inset: 0;
-      z-index: 1;
-    }
-    .stretch:focus-visible {
-      outline: 2px solid var(--md-sys-color-primary, #3a693c);
-      outline-offset: 2px;
-      border-radius: 18px;
-    }
+    ${stretchLink}
   `;
 
   protected override render() {

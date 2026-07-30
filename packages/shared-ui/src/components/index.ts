@@ -7,3 +7,4 @@ export * from './sky-category-card/sky-category-card.js';
 export * from './sky-info-card/sky-info-card.js';
 export * from './sky-accordion/sky-accordion.js';
 export * from './sky-accordion/sky-accordion-item.js';
+export * from './sky-data-table/sky-data-table.js';

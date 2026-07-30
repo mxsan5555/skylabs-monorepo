@@ -1,4 +1,4 @@
-import { SkyProductCardReact } from '@skylabs-monorepo/shared-ui/react';
+import { SkyProductCardWC } from './sky-product-card-wc';
 import type { Deal } from '../../types';
 import { formatINR } from '../../utils/format';
 
@@ -14,7 +14,7 @@ export function DealCard({
   onFavorite,
 }: DealCardProps) {
   return (
-    <SkyProductCardReact
+    <SkyProductCardWC
       image={deal.image}
       imageAlt={deal.imageAlt}
       badge={deal.badge}

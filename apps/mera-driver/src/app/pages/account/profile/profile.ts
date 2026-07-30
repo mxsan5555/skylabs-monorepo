@@ -56,8 +56,7 @@ export class Profile {
   }
 
   protected startEdit(a: Address): void {
-    const { id, ...rest } = a;
-    void id;
+    const { id: _, ...rest } = a;
     this.draft.set({ line2: '', ...rest });
     this.editingId.set(a.id);
   }

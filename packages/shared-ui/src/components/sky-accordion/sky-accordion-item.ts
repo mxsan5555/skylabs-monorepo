@@ -59,20 +59,20 @@ export class SkyAccordionItem extends LitElement {
     .item {
       border-radius: 12px;
       overflow: hidden;
-      background-color: var(--md-sys-color-surface, #fafdfb);
+      background-color: var(--md-sys-color-surface);
     }
     :host([variant='outlined']) .item {
-      border: 1px solid var(--md-sys-color-outline-variant, #c2c7ce);
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+      border: 1px solid var(--md-sys-color-outline-variant);
+      box-shadow: 0 1px 2px color-mix(in srgb, var(--md-sys-color-shadow) 8%, transparent);
     }
     :host([variant='filled']) .item {
-      background-color: var(--md-sys-color-surface-container, #eef1f6);
+      background-color: var(--md-sys-color-surface-container);
     }
     :host([variant='elevated']) .item {
-      background-color: var(--md-sys-color-surface-container-low, #f3f4f9);
+      background-color: var(--md-sys-color-surface-container-low);
       box-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.3),
-        0 1px 3px 1px rgba(0, 0, 0, 0.15);
+        0 1px 2px color-mix(in srgb, var(--md-sys-color-shadow) 30%, transparent),
+        0 1px 3px 1px color-mix(in srgb, var(--md-sys-color-shadow) 15%, transparent);
     }
     .heading {
       margin: 0;
@@ -103,8 +103,8 @@ export class SkyAccordionItem extends LitElement {
       );
     }
     .trigger:focus-visible {
-      outline: 2px solid var(--md-sys-color-primary, #3a693c);
-      outline-offset: -2px;
+      outline: 3px solid var(--md-sys-color-primary);
+      outline-offset: -3px;
     }
     .trigger:disabled {
       cursor: default;
@@ -120,18 +120,18 @@ export class SkyAccordionItem extends LitElement {
     }
     .chevron {
       flex: none;
-      color: var(--md-sys-color-on-surface-variant, #424940);
+      color: var(--md-sys-color-on-surface-variant);
       transition: transform 200ms ease;
     }
     .trigger[aria-expanded='true'] .chevron {
       transform: rotate(180deg);
     }
     .panel {
-      border-top: 1px solid var(--md-sys-color-outline-variant, #c2c7ce);
+      border-top: 1px solid var(--md-sys-color-outline-variant);
     }
     .content {
       padding: 16px 20px;
-      color: var(--md-sys-color-on-surface-variant, #424940);
+      color: var(--md-sys-color-on-surface-variant);
     }
     [hidden] {
       display: none;

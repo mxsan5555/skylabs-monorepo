@@ -1,5 +1,5 @@
-import { Link, useParams } from 'react-router-dom';
-import { SkyBadgeReact, Icon } from '@skylabs-monorepo/shared-ui/react';
+﻿import { Link, useParams } from 'react-router-dom';
+import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import type { BlogBlock } from '../../../types';
 import { getPost, categoryName, formatDate } from '../../../blog/blog';
 import './blog-detail.css';
@@ -55,9 +55,9 @@ export function BlogDetail() {
         </nav>
 
         <header className="post__header">
-          <SkyBadgeReact variant="secondary">
+          <sky-badge variant="secondary">
             {categoryName(post.categorySlug)}
-          </SkyBadgeReact>
+          </sky-badge>
           <h1>{post.title}</h1>
           <p className="post__meta">
             <span>By {post.author}</span>
@@ -86,9 +86,9 @@ export function BlogDetail() {
             <ul className="post__tags" aria-label="Tags">
               {post.tags.map((t) => (
                 <li key={t}>
-                  <SkyBadgeReact variant="tertiary" size="small">
+                  <sky-badge variant="tertiary" size="small">
                     #{t}
-                  </SkyBadgeReact>
+                  </sky-badge>
                 </li>
               ))}
             </ul>
