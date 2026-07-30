@@ -36,6 +36,10 @@ export class SkyInfoCard extends LitElement {
 
   static override styles = css`
     ${hostBase}
+    :host {
+      display: block;
+      height: 100%;
+    }
     .card {
       display: flex;
       flex-direction: column;
@@ -43,6 +47,8 @@ export class SkyInfoCard extends LitElement {
       padding: 20px;
       border-radius: 16px;
       background-color: var(--md-sys-color-surface-container, #eef1f6);
+      height: 100%;
+      box-sizing: border-box;
     }
     .media {
       display: inline-flex;

@@ -57,7 +57,7 @@ export class SkyAccordionItem extends LitElement {
   static override styles = css`
     ${hostBase}
     .item {
-      border-radius: 12px;
+      border-radius: var(--sky-accordion-border-radius, 12px);
       overflow: hidden;
       background-color: var(--md-sys-color-surface, #fafdfb);
     }

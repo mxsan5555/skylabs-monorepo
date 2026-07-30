@@ -21,7 +21,6 @@ import type { BlogSort } from '../../models';
   selector: 'md-blog',
   imports: [RouterLink, DatePipe],
   templateUrl: './blog.html',
-  styleUrl: './blog.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class Blog {
@@ -62,22 +61,55 @@ export class Blog {
     },
   );
 
+  private readonly queryReading = toSignal(
+    this.route.queryParamMap.pipe(map((p) => p.get('reading') || 'any')),
+    {
+      initialValue:
+        this.route.snapshot.queryParamMap.get('reading') || 'any',
+    },
+  );
+
+  private readonly queryAuthor = toSignal(
+    this.route.queryParamMap.pipe(map((p) => p.get('author') || '')),
+    {
+      initialValue:
+        this.route.snapshot.queryParamMap.get('author') || '',
+    },
+  );
+
   protected readonly selectedCategory = computed(() => this.queryCategory());
   protected readonly selectedSort = computed(() => this.querySort());
   protected readonly searchQuery = computed(() => this.querySearch());
+  protected readonly selectedReading = computed(() => this.queryReading());
+  protected readonly selectedAuthor = computed(() => this.queryAuthor());
+
+  protected readonly hasActiveFilters = computed(() => {
+    return (
+      this.selectedCategory() !== '' ||
+      this.selectedReading() !== 'any' ||
+      this.selectedAuthor() !== '' ||
+      this.searchQuery() !== '' ||
+      this.selectedSort() !== 'newest'
+    );
+  });
 
   protected readonly categories = this.blog.categoryList();
+  protected readonly authors = this.blog.authorList();
 
   protected readonly queryResult = computed(() => {
     const rawPage = Math.max(1, this.queryPage());
     const cat = this.selectedCategory();
     const s = this.selectedSort() as BlogSort;
     const q = this.searchQuery();
+    const r = this.selectedReading();
+    const auth = this.selectedAuthor();
     const res = this.blog.queryPosts({
       page: rawPage,
       categories: cat ? [cat] : [],
       sort: s,
       search: q,
+      reading: r as any,
+      authors: auth ? [auth] : [],
     });
 
     const total = res.total;
@@ -140,6 +172,38 @@ export class Blog {
       relativeTo: this.route,
       queryParams: { search: target.value || null, page: null },
       queryParamsHandling: 'merge',
+    });
+  }
+
+  protected onReadingChange(event: Event): void {
+    const target = event.target as any;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { reading: target.value === 'any' ? null : target.value, page: null },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  protected onAuthorChange(event: Event): void {
+    const target = event.target as any;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { author: target.value || null, page: null },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  protected onClearFilters(): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        category: null,
+        reading: null,
+        author: null,
+        search: null,
+        sort: null,
+        page: null,
+      },
     });
   }
 }

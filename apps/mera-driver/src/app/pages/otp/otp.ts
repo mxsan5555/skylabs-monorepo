@@ -7,8 +7,11 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/auth/auth.service';
 import { ApiClient } from '../../core/api/api-client.service';
+import { AccountService } from '../../core/account/account.service';
+import { type UserRole } from '../../models';
 
 const RESEND_SECONDS = 24;
 
@@ -26,18 +29,68 @@ export class Otp implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
   private readonly api = inject(ApiClient);
+  private readonly http = inject(HttpClient);
+  private readonly account = inject(AccountService);
 
   protected readonly destination =
     (history.state as { destination?: string } | null)?.destination ?? '4564';
   protected readonly method =
     (history.state as { method?: 'email' | 'phone' } | null)?.method ?? 'phone';
+  protected readonly role =
+    (history.state as { role?: UserRole } | null)?.role ?? 'customer';
 
   protected code = '';
   protected readonly seconds = signal(RESEND_SECONDS);
 
+  private mockUsers: any[] = [];
   private timer?: ReturnType<typeof setInterval>;
 
+  protected readonly content = signal({
+    titlePhone: 'Verify your phone',
+    titleEmail: 'Verify your email',
+    subtitle: 'We sent a 6-digit code to',
+    cardTitle: 'Enter the code',
+    cardSubtitle: 'The code expires in a few minutes.',
+    inputLabel: '6-digit code',
+    btnVerify: 'Verify & Continue',
+    resendText: 'Didn’t receive the code?',
+    resendCooldown: 'Resend in',
+    btnResend: 'Resend code',
+    errorOtpEmpty: 'Please enter the 6-digit verification code.',
+    errorOtpInvalid: 'Please enter a valid 6-digit numeric code.',
+    errorVerificationFailed: 'Verification failed: ',
+    msgOtpSent: 'OTP sent successfully',
+    msgOtpResentMock: 'OTP resent successfully (Mock)',
+    errorResendFailed: 'Failed to resend OTP: ',
+    msgSuccessNoToken: 'Verification successful, but no authentication token was returned by the server.'
+  });
+
   ngOnInit(): void {
+    // Load copy strings dynamically
+    this.http.get<any>('data/auth.json').subscribe({
+      next: (data) => {
+        if (data && data.otp) {
+          this.content.set({
+            ...this.content(),
+            ...data.otp
+          });
+        }
+      },
+      error: (err) => {
+        console.error('Failed to load OTP copy from auth.json, using defaults', err);
+      }
+    });
+
+    // Load mock users dynamically
+    this.http.get<any[]>('data/mock-users.json').subscribe({
+      next: (users) => {
+        if (users) this.mockUsers = users;
+      },
+      error: (err) => {
+        console.warn('Failed to load mock-users.json, fallback values will be used', err);
+      }
+    });
+
     this.timer = setInterval(() => {
       const s = this.seconds();
       if (s > 0) this.seconds.set(s - 1);
@@ -51,7 +104,7 @@ export class Otp implements OnInit, OnDestroy {
   protected verify(): void {
     const otpCode = this.code.trim();
     if (!otpCode) {
-      alert('Please enter the OTP code');
+      alert(this.content().errorOtpEmpty);
       return;
     }
 
@@ -65,21 +118,73 @@ export class Otp implements OnInit, OnDestroy {
       next: (res) => {
         if (res && res.token) {
           this.auth.signIn(res.token);
+          this.auth.setRoles([this.role]);
+          this.updateMockProfile();
           this.router.navigate(['/account']);
         } else {
-          alert('Verification successful, but no authentication token was returned by the server.');
+          alert(this.content().msgSuccessNoToken);
         }
       },
       error: (err) => {
         console.error(err);
-        if (this.api.getBaseUrl() === '/api' && window.location.hostname === 'localhost') {
-          console.warn('Backend offline, logging in with mock token.');
-          this.auth.signIn('mock-demo-jwt-token');
-          this.router.navigate(['/account']);
+        if (this.api.getBaseUrl() === '/api' && isLocalHostOrIP()) {
+          console.warn('Backend offline, running local mock-users verification.');
+          
+          // Look up user by email or mobile destination
+          const matchedUser = this.mockUsers.find(
+            u => u.mail === this.destination || u.mobile === this.destination
+          );
+          
+          if (matchedUser) {
+            // Validate the specific OTP for this mock user
+            if (otpCode === matchedUser.otp) {
+              this.auth.signIn('mock-demo-jwt-token');
+              this.auth.setRoles([matchedUser.role]);
+              
+              // Update mock profile info
+              this.account.updateProfile({
+                name: matchedUser.name,
+                email: matchedUser.mail,
+                phone: matchedUser.mobile
+              });
+              
+              this.router.navigate(['/account']);
+            } else {
+              alert(`Verification failed: Invalid OTP code for ${matchedUser.role}. Please use ${matchedUser.otp}.`);
+            }
+          } else {
+            // Fallback for random phone/email: standard Customer login with OTP 123456
+            if (otpCode === '123456') {
+              this.auth.signIn('mock-demo-jwt-token');
+              this.auth.setRoles(['customer']);
+              
+              // Use default profile info
+              this.updateMockProfile();
+              
+              this.router.navigate(['/account']);
+            } else {
+              alert('Verification failed: Invalid OTP code. For demo, use 123456 or a valid mock user OTP.');
+            }
+          }
         } else {
-          alert('OTP Verification failed: ' + (err.error?.message || err.message));
+          alert(this.content().errorVerificationFailed + (err.error?.message || err.message));
         }
       },
+    });
+  }
+
+  private updateMockProfile(): void {
+    let roleName = 'Customer User';
+    if (this.role === 'admin') roleName = 'Admin User';
+    else if (this.role === 'marketing') roleName = 'Marketing Manager';
+    else if (this.role === 'sales') roleName = 'Sales Executive';
+    else if (this.role === 'driver') roleName = 'Driver Partner';
+
+    const isEmail = this.method === 'email';
+    this.account.updateProfile({
+      name: roleName,
+      email: isEmail ? this.destination : `${this.role}@mera-driver.com`,
+      phone: isEmail ? '+91 99999 88888' : this.destination
     });
   }
 
@@ -91,15 +196,15 @@ export class Otp implements OnInit, OnDestroy {
     this.api.post(endpoint, payload).subscribe({
       next: () => {
         this.seconds.set(RESEND_SECONDS);
-        alert('OTP sent successfully');
+        alert(this.content().msgOtpSent);
       },
       error: (err) => {
         console.error(err);
-        if (this.api.getBaseUrl() === '/api' && window.location.hostname === 'localhost') {
+        if (this.api.getBaseUrl() === '/api' && isLocalHostOrIP()) {
           this.seconds.set(RESEND_SECONDS);
-          alert('OTP resent successfully (Mock)');
+          alert(this.content().msgOtpResentMock);
         } else {
-          alert('Failed to resend OTP: ' + (err.error?.message || err.message));
+          alert(this.content().errorResendFailed + (err.error?.message || err.message));
         }
       },
     });
@@ -108,4 +213,14 @@ export class Otp implements OnInit, OnDestroy {
   protected back(): void {
     this.router.navigate(['/sign-in']);
   }
+}
+
+function isLocalHostOrIP(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname;
+  return hostname === 'localhost' || 
+         hostname === '127.0.0.1' || 
+         hostname.startsWith('192.168.') || 
+         hostname.startsWith('10.') || 
+         hostname.startsWith('172.');
 }

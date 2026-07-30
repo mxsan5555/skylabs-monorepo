@@ -90,6 +90,10 @@ export class SkyProductCard extends LitElement {
 
   static override styles = css`
     ${hostBase}
+    :host {
+      display: block;
+      height: 100%;
+    }
     .card {
       position: relative;
       display: flex;
@@ -98,6 +102,8 @@ export class SkyProductCard extends LitElement {
       border-radius: 16px;
       background-color: var(--md-sys-color-surface, #fafdfb);
       transition: box-shadow 150ms ease;
+      height: 100%;
+      box-sizing: border-box;
     }
     :host([variant='outlined']) .card {
       border: 1px solid var(--md-sys-color-outline-variant, #c2c7ce);
@@ -181,6 +187,7 @@ export class SkyProductCard extends LitElement {
       gap: 6px;
       padding: 12px 14px 14px;
         background: var(--md-sys-color-surface-container, #eef2ea);
+      flex: 1;
     }
     .tag {
       display: inline-flex;
@@ -286,7 +293,7 @@ export class SkyProductCard extends LitElement {
       align-items: baseline;
       flex-wrap: wrap;
       gap: 6px;
-      margin-top: 2px;
+      margin-top: auto;
     }
     .price__prefix {
       font-size: 0.8125rem;

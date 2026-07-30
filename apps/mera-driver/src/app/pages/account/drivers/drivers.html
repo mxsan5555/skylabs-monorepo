@@ -1,81 +1,73 @@
 <md-admin-page
-  title="Driver Registry"
-  subtitle="Manage and view registered drivers (Loaded dynamically from static JSON data)."
+  [title]="content().title"
+  [subtitle]="content().subtitle"
 >
-  <div class="drivers-layout">
+  <div class="flex gap-8 items-start max-md:flex-col w-full">
     <!-- Form Panel -->
-    <sky-card variant="outlined" class="drivers-layout__form-card">
-      <div class="drivers-form">
-        <h2 class="drivers-form__title">Register New Driver</h2>
+    <sky-card variant="outlined" class="w-80 shrink-0 p-6 bg-[var(--md-sys-color-surface-container-low,#f7f9fc)] max-md:w-full">
+      <div class="flex flex-col gap-5">
+        <h2 class="m-0 mb-1 text-xl font-semibold text-[var(--md-sys-color-on-surface)]">{{ content().cardTitle }}</h2>
         
         <md-outlined-text-field
-          label="Full Name"
+          class="w-full"
+          [label]="content().labelName"
           [value]="inputName()"
           (input)="onNameInput($event)"
-          placeholder="e.g. Rahul Verma"
+          [placeholder]="content().placeholderName"
         >
           <md-icon slot="leading-icon">person</md-icon>
         </md-outlined-text-field>
 
-        <md-outlined-text-field
-          label="Phone Number"
-          [value]="inputPhone()"
-          (input)="onPhoneInput($event)"
-          placeholder="e.g. 9876543210"
+        <md-outlined-text-field class="w-full" [label]="content().labelPhone" [value]="inputPhone()" (input)="onPhoneInput($event)" [placeholder]="content().placeholderPhone"
         >
           <md-icon slot="leading-icon">phone</md-icon>
         </md-outlined-text-field>
 
-        <md-outlined-text-field
-          label="Vehicle Details"
-          [value]="inputVehicle()"
-          (input)="onVehicleInput($event)"
-          placeholder="e.g. Hyundai Accent (Sedan)"
-        >
+        <md-outlined-text-field class="w-full" [label]="content().labelVehicle" [value]="inputVehicle()" (input)="onVehicleInput($event)" [placeholder]="content().placeholderVehicle">
           <md-icon slot="leading-icon">local_taxi</md-icon>
         </md-outlined-text-field>
 
-        <md-filled-button (click)="addDriver()">
+        <md-filled-button (click)="addDriver()" class="w-full mt-2">
           <md-icon slot="icon">person_add</md-icon>
-          Register Driver
+          {{ content().btnRegister }}
         </md-filled-button>
       </div>
     </sky-card>
 
     <!-- List Panel -->
-    <div class="drivers-layout__list-area">
-      <h2 class="drivers-list-title">Registered Drivers ({{ drivers().length }})</h2>
+    <div class="flex-1 min-w-0 flex flex-col gap-4 w-full">
+      <h2 class="m-0 text-xl font-semibold text-[var(--md-sys-color-on-surface)]">{{ content().listTitle }} ({{ drivers().length }})</h2>
       
       @if (drivers().length > 0) {
-        <div class="drivers-grid">
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
           @for (d of drivers(); track d.phone) {
-            <sky-card variant="outlined" class="driver-card">
-              <div class="driver-card__body">
-                <div class="driver-card__header">
-                  <div class="driver-card__avatar">
-                    <md-icon>local_taxi</md-icon>
+            <sky-card variant="outlined" class="p-4 bg-[var(--md-sys-color-surface,#ffffff)]">
+              <div class="flex flex-col gap-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-full bg-[var(--md-sys-color-primary-container,#e0f2fe)] text-[var(--md-sys-color-on-primary-container,#0369a1)] flex items-center justify-center">
+                    <md-icon class="[--md-icon-size:20px]">local_taxi</md-icon>
                   </div>
                   <div>
-                    <h3 class="driver-card__name">{{ d.name }}</h3>
-                    <p class="driver-card__vehicle">{{ d.vehicle }}</p>
+                    <h3 class="m-0 text-base font-semibold text-[var(--md-sys-color-on-surface)]">{{ d.name }}</h3>
+                    <p class="m-0 mt-0.5 text-[13px] text-[var(--md-sys-color-on-surface-variant,#64748b)]">{{ d.vehicle }}</p>
                   </div>
                 </div>
                 
-                <md-divider class="driver-card__divider"></md-divider>
+                <md-divider class="w-full [--md-divider-thickness:1px] [--md-divider-color:var(--md-sys-color-outline-variant,#e2e8f0)]"></md-divider>
                 
-                <div class="driver-card__info">
-                  <md-icon class="driver-card__info-icon">phone</md-icon>
-                  <span class="driver-card__info-text">{{ d.phone }}</span>
+                <div class="flex items-center gap-2 text-[var(--md-sys-color-on-surface-variant,#64748b)]">
+                  <md-icon class="[--md-icon-size:16px] text-slate-500">phone</md-icon>
+                  <span class="text-sm font-medium">{{ d.phone }}</span>
                 </div>
               </div>
             </sky-card>
           }
         </div>
       } @else {
-        <div class="drivers-empty">
-          <md-icon class="drivers-empty__icon">no_accounts</md-icon>
-          <p class="drivers-empty__title">No drivers registered</p>
-          <p class="drivers-empty__text">Add driver details on the left to register a new driver.</p>
+        <div class="text-center p-12 px-6 bg-[var(--md-sys-color-surface-container-lowest,#ffffff)] border border-dashed border-[var(--md-sys-color-outline-variant,#cbd5e1)] rounded-xl text-[var(--md-sys-color-on-surface-variant)]">
+          <md-icon class="[--md-icon-size:48px] mb-3 text-[var(--md-sys-color-outline,#94a3b8)]">no_accounts</md-icon>
+          <p class="m-0 text-lg font-semibold">{{ content().emptyTitle }}</p>
+          <p class="m-0 mt-1 text-sm">{{ content().emptyText }}</p>
         </div>
       }
     </div>

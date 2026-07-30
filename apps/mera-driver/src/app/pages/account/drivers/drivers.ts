@@ -28,7 +28,39 @@ export class Drivers implements OnInit {
   readonly inputPhone = signal<string>('');
   readonly inputVehicle = signal<string>('');
 
+  protected readonly content = signal({
+    title: 'Driver Registry',
+    subtitle: 'Manage and view registered drivers (Loaded dynamically from static JSON data).',
+    cardTitle: 'Register New Driver',
+    labelName: 'Full Name',
+    placeholderName: 'e.g. Rahul Verma',
+    labelPhone: 'Phone Number',
+    placeholderPhone: 'e.g. 9876543210',
+    labelVehicle: 'Vehicle Details',
+    placeholderVehicle: 'e.g. Hyundai Accent (Sedan)',
+    btnRegister: 'Register Driver',
+    listTitle: 'Registered Drivers',
+    emptyTitle: 'No drivers registered',
+    emptyText: 'Add driver details on the left to register a new driver.',
+    errorEmptyFields: 'Please fill out all driver input fields.'
+  });
+
   ngOnInit(): void {
+    // Load copy strings dynamically
+    this.http.get<any>('data/drivers-registry.json').subscribe({
+      next: (data) => {
+        if (data) {
+          this.content.set({
+            ...this.content(),
+            ...data
+          });
+        }
+      },
+      error: (err) => {
+        console.error('Failed to load drivers registry copy from drivers-registry.json, using defaults', err);
+      }
+    });
+
     // Load static data from the JSON file inside public/data directory
     this.http.get<Driver[]>('data/drivers.json').subscribe({
       next: (data) => {
@@ -47,7 +79,7 @@ export class Drivers implements OnInit {
     const vehicle = this.inputVehicle().trim();
 
     if (!name || !phone || !vehicle) {
-      alert('Please fill out all driver input fields.');
+      alert(this.content().errorEmptyFields);
       return;
     }
 

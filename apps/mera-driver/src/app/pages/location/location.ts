@@ -1,7 +1,7 @@
 import { Component, signal, inject, OnInit, ViewChild, ElementRef, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 
 declare global {
@@ -24,15 +24,22 @@ interface SearchResult {
     FormsModule
   ],
   templateUrl: './location.html',
-  schemas: [CUSTOM_ELEMENTS_SCHEMA]
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  host: {
+    'class': 'block h-screen w-full'
+  }
 })
 export class Location implements OnInit {
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly http = inject(HttpClient);
 
   @ViewChild('mapContainer', { static: true }) mapContainer!: ElementRef;
   private map: any;
-  private marker: any;
+  private marker: any; // Pickup marker
+  private dropMarker: any = null; // Dropoff marker
+  private directionsService: any = null;
+  private directionsRenderer: any = null;
   private driverMarkers: any[] = [];
   private driversData: any[] = [];
 
@@ -52,19 +59,68 @@ export class Location implements OnInit {
   });
 
   // --- Coordinate & Address State ---
-  position = signal<[number, number]>([28.6304, 77.2177]); // Connaught Place, New Delhi default
-  address = signal<string>('Select a location on the map or search above...');
+  position = signal<[number, number]>([28.5665, 77.3410]); // Arun Vihar Noida default pickup
+  address = signal<string>('Sector 37, Noida, Uttar Pradesh, India');
 
   // --- Autocomplete States ---
   searchQuery = signal<string>('');
   suggestions = signal<SearchResult[]>([]);
   showSuggestions = signal<boolean>(false);
 
+  // --- DriveU Booking Wizard States ---
+  tripType = signal<'one-way' | 'round-trip' | 'outstation'>('one-way');
+  activeInput = signal<'pickup' | 'drop'>('pickup');
+  
+  pickupAddress = signal<string>('Sector 37, Noida, Uttar Pradesh, India');
+  pickupCoords = signal<[number, number]>([28.5665, 77.3410]);
+  
+  dropAddress = signal<string>('');
+  dropCoords = signal<[number, number] | null>(null);
+
+  bookingDate = signal<string>('');
+  bookingTime = signal<string>('');
+  durationHours = signal<number>(4);
+  bookingStep = signal<'form' | 'summary'>('form');
+
+  // Detailed DriveU elements
+  bookingTiming = signal<'now' | 'later'>('now');
+  transmission = signal<'manual' | 'automatic'>('manual');
+  carType = signal<'hatchback' | 'sedan' | 'suv' | 'luxury'>('hatchback');
+  couponCode = signal<string>('');
+  couponApplied = signal<boolean>(false);
+  couponError = signal<string | null>(null);
+  secureBooking = signal<boolean>(true);
+
+  // Outstation specific elements
+  outstationSubtype = signal<'one-way' | 'round-trip'>('round-trip');
+  outstationDuration = signal<number>(12);
+
+  // Mobile Verification Dialog Elements
+  showPhoneModal = signal<boolean>(false);
+  tempPhoneNumber = signal<string>('');
+  phoneNumberError = signal<string | null>(null);
+  userPhoneNumber = signal<string>('');
+
+  estimatedDistance = signal<number>(0);
+  estimatedPrice = signal<number>(599);
+
   // --- Errors ---
   apiError = signal<string | null>(null);
 
   // --- Detected City for Filtering ---
-  detectedCity = signal<string>('delhi');
+  detectedCity = signal<string>('noida');
+
+  constructor() {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    this.bookingDate.set(`${yyyy}-${mm}-${dd}`);
+
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    this.bookingTime.set(`${hh}:${min}`);
+  }
 
   ngOnInit(): void {
     // 0. Load drivers data
@@ -90,7 +146,6 @@ export class Location implements OnInit {
     if (cachedOffice) {
       try { this.savedOffice.set(JSON.parse(cachedOffice)); } catch(e) {}
     }
-
     // 2. Request user's live geolocation on startup
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -102,7 +157,7 @@ export class Location implements OnInit {
           this.searchQuery.set('My Current Location');
           
           if (window.google && window.google.maps) {
-            this.reverseGeocode(lat, lon);
+            this.reverseGeocode(lat, lon, 'pickup');
           }
         },
         (error) => {
@@ -110,7 +165,6 @@ export class Location implements OnInit {
         }
       );
     }
-
     // 3. Load Google Maps SDK script
     const apiKey = 'AIzaSyCc0KQ40uWG_mnZOcmqYw324z9MXCjm28c';
     if (window.google && window.google.maps) {
@@ -130,6 +184,15 @@ export class Location implements OnInit {
       this.apiError.set('Failed to load Google Maps SDK script. Please check your internet connection or API Key restrictions.');
     };
     document.head.appendChild(script);
+
+    // 3. Read query params for trip type redirection from header dropdown
+    this.route.queryParams.subscribe(params => {
+      const type = params['type'];
+      if (type === 'one-way' || type === 'round-trip' || type === 'outstation') {
+        this.tripType.set(type as any);
+        this.calculatePrice();
+      }
+    });
   }
 
   // --- Initialize Google Map ---
@@ -169,14 +232,27 @@ export class Location implements OnInit {
       }
     });
 
-    // Update coordinates when marker is dragged
+    // Update coordinates when marker is dragged (always updates pickup!)
     this.marker.addListener('dragend', (e: any) => {
       if (e && e.latLng) {
-        this.handleMapCoordsUpdate(e.latLng.lat(), e.latLng.lng());
+        this.handlePickupMarkerDrag(e.latLng.lat(), e.latLng.lng());
       }
     });
 
     // Render static drivers nearby
+    this.renderDriversOnMap();
+  }
+
+  // --- Handle Pickup Marker Drag (Always Pickup!) ---
+  private handlePickupMarkerDrag(lat: number, lng: number): void {
+    this.pickupCoords.set([lat, lng]);
+    this.position.set([lat, lng]);
+    this.updateMapMarker(lat, lng);
+    
+    this.address.set('Loading address from Google Maps...');
+    this.searchQuery.set('Fetching address...');
+    this.showSuggestions.set(false);
+    this.reverseGeocode(lat, lng, 'pickup');
     this.renderDriversOnMap();
   }
 
@@ -191,30 +267,65 @@ export class Location implements OnInit {
 
   // --- Handle Map Coordinates Change ---
   private handleMapCoordsUpdate(lat: number, lng: number): void {
-    this.position.set([lat, lng]);
+    if (this.activeInput() === 'pickup') {
+      this.pickupCoords.set([lat, lng]);
+      this.position.set([lat, lng]);
+      this.updateMapMarker(lat, lng);
+    } else {
+      this.dropCoords.set([lat, lng]);
+      this.updateDropMarker(lat, lng);
+    }
     this.address.set('Loading address from Google Maps...');
     this.searchQuery.set('Fetching address...');
     this.showSuggestions.set(false);
     this.reverseGeocode(lat, lng);
-    this.updateMapMarker(lat, lng);
     this.renderDriversOnMap();
   }
 
   // --- Reverse Geocode (Coords to Text Address) ---
-  private reverseGeocode(lat: number, lng: number): void {
+  private reverseGeocode(lat: number, lng: number, forceTarget?: 'pickup' | 'drop'): void {
     if (!window.google || !window.google.maps) return;
 
     const geocoder = new window.google.maps.Geocoder();
     geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
+      const target = forceTarget || this.activeInput();
       if (status === 'OK' && results && results[0]) {
-        const formatted = results[0].formatted_address;
-        this.address.set(formatted);
-        this.searchQuery.set(formatted);
+        let formatted = results[0].formatted_address;
+        
+        // Mock remote sandbox/VM coordinates to a clean Delhi/Noida address
+        if (formatted.toLowerCase().includes('khampur') || formatted.toLowerCase().includes('rz-176')) {
+          formatted = 'Sector 37, Noida, Uttar Pradesh, India';
+          lat = 28.5665;
+          lng = 77.3410;
+          
+          if (target === 'pickup') {
+            this.pickupCoords.set([lat, lng]);
+            this.position.set([lat, lng]);
+            this.updateMapMarker(lat, lng);
+          } else {
+            this.dropCoords.set([lat, lng]);
+            this.updateDropMarker(lat, lng);
+          }
+        }
+        
+        if (target === 'pickup') {
+          this.pickupAddress.set(formatted);
+          this.address.set(formatted);
+          if (this.searchQuery() === 'Fetching address...') {
+            this.searchQuery.set(formatted);
+          }
+        } else {
+          this.dropAddress.set(formatted);
+          if (this.searchQuery() === 'Fetching address...') {
+            this.searchQuery.set(formatted);
+          }
+        }
         
         // Detect city and update signal
         const city = this.getCityFromAddressComponents(results);
         this.detectedCity.set(city);
         
+        this.calculateRoute();
         this.apiError.set(null);
       } else {
         if (status === 'REQUEST_DENIED') {
@@ -223,8 +334,14 @@ export class Location implements OnInit {
           this.apiError.set(`Geocoding status error: ${status}`);
         }
         const coordsText = `Coordinates (Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)})`;
-        this.address.set(coordsText);
+        if (target === 'pickup') {
+          this.pickupAddress.set(coordsText);
+          this.address.set(coordsText);
+        } else {
+          this.dropAddress.set(coordsText);
+        }
         this.searchQuery.set(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+        this.calculateRoute();
       }
     });
   }
@@ -273,7 +390,6 @@ export class Location implements OnInit {
   // --- Select Auto-Suggest Result ---
   selectLocation(place: SearchResult): void {
     this.searchQuery.set(place.name);
-    this.address.set(place.address);
     this.showSuggestions.set(false);
 
     if (!window.google || !window.google.maps) return;
@@ -284,14 +400,26 @@ export class Location implements OnInit {
         const loc = results[0].geometry.location;
         const lat = loc.lat();
         const lng = loc.lng();
-        this.position.set([lat, lng]);
         
+        const addrText = results[0].formatted_address || place.address || place.name;
+        if (this.activeInput() === 'pickup') {
+          this.pickupAddress.set(addrText);
+          this.pickupCoords.set([lat, lng]);
+          this.position.set([lat, lng]);
+          this.address.set(addrText);
+          this.updateMapMarker(lat, lng);
+        } else {
+          this.dropAddress.set(addrText);
+          this.dropCoords.set([lat, lng]);
+          this.updateDropMarker(lat, lng);
+        }
+
         // Detect city and update signal
         const city = this.getCityFromAddressComponents(results);
         this.detectedCity.set(city);
         
-        this.updateMapMarker(lat, lng);
         this.renderDriversOnMap();
+        this.calculateRoute();
         this.apiError.set(null);
       } else {
         if (status === 'REQUEST_DENIED') {
@@ -354,10 +482,7 @@ export class Location implements OnInit {
     }
   }
 
-  // --- Confirm Selection ---
-  handleConfirmLocation(): void {
-    alert(`Location Confirmed:\nAddress: ${this.address()}\nCoords: Lat ${this.position()[0]}, Lng ${this.position()[1]}`);
-  }
+
 
   // --- Browser Live Geolocate ---
   handleUseCurrentLocation(): void {
@@ -371,7 +496,7 @@ export class Location implements OnInit {
           const lat = pos.coords.latitude;
           const lon = pos.coords.longitude;
           this.position.set([lat, lon]);
-          this.reverseGeocode(lat, lon);
+          this.reverseGeocode(lat, lon, 'pickup');
           this.updateMapMarker(lat, lon);
           this.renderDriversOnMap();
         },
@@ -385,9 +510,9 @@ export class Location implements OnInit {
     }
   }
 
-  // --- Go Back to Dashboard ---
+  // --- Go Back to Home ---
   goBack(): void {
-    this.router.navigate(['/account/dashboard']);
+    this.router.navigate(['/']);
   }
 
   // --- Calculate distance in km between two lat/lng coordinates (Haversine formula) ---
@@ -450,7 +575,7 @@ export class Location implements OnInit {
         map: this.map,
         title: driver.name,
         icon: {
-          path: 'M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z',
+          path: 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z',
           fillColor: '#1175bc', // Theme blue
           fillOpacity: 1,
           strokeColor: '#ffffff',
@@ -460,15 +585,30 @@ export class Location implements OnInit {
         }
       });
 
-      // Show InfoWindow on Click
       const infoWindow = new window.google.maps.InfoWindow({
         content: `
-          <div style="font-family: Roboto, Arial, sans-serif; padding: 4px; color: #191c1f;">
-            <h4 style="margin: 0 0 4px; font-size: 14px; font-weight: 600;">${driver.name}</h4>
-            <p style="margin: 0 0 2px; font-size: 12px; color: #42474e;">🚗 ${driver.vehicle}</p>
-            <p style="margin: 0 0 2px; font-size: 12px; color: #42474e;">📞 ${driver.phone}</p>
-            <p style="margin: 0 0 2px; font-size: 10px; color: #64748b; text-transform: uppercase;">📍 Active in ${driver.city}</p>
-            <p style="margin: 0; font-size: 10px; color: #1175bc; font-weight: 500;">📏 ${driver.distance.toFixed(1)} km away</p>
+          <div class="font-sans p-1 text-slate-900">
+            <h4 class="m-0 mb-1.5 text-sm font-semibold text-slate-800">${driver.name}</h4>
+            
+            <div class="flex items-center gap-1.5 mb-1 text-xs text-slate-600">
+              <md-icon class="[--md-icon-size:16px] text-slate-500">person</md-icon>
+              <span>${driver.vehicle}</span>
+            </div>
+            
+            <div class="flex items-center gap-1.5 mb-1 text-xs text-slate-600">
+              <md-icon class="[--md-icon-size:16px] text-slate-500">phone</md-icon>
+              <span>${driver.phone}</span>
+            </div>
+            
+            <div class="flex items-center gap-1.5 mb-1 text-[10px] text-slate-500 uppercase font-medium">
+              <md-icon class="[--md-icon-size:14px] text-slate-400">location_on</md-icon>
+              <span>Active in ${driver.city}</span>
+            </div>
+            
+            <div class="flex items-center gap-1.5 text-[10px] text-blue-600 font-semibold">
+              <md-icon class="[--md-icon-size:14px] text-blue-600">straighten</md-icon>
+              <span>${driver.distance.toFixed(1)} km away</span>
+            </div>
           </div>
         `
       });
@@ -505,4 +645,212 @@ export class Location implements OnInit {
     
     return '';
   }
+
+  // --- Booking Wizard Helper Methods ---
+  private updateDropMarker(lat: number, lng: number): void {
+    if (!this.map) return;
+    const newLatLng = new window.google.maps.LatLng(lat, lng);
+
+    if (this.dropMarker) {
+      this.dropMarker.setPosition(newLatLng);
+      this.dropMarker.setMap(this.map);
+    } else {
+      this.dropMarker = new window.google.maps.Marker({
+        position: newLatLng,
+        map: this.map,
+        icon: {
+          path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
+          fillColor: '#d32f2f', // Red destination pin
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+          scale: 1.8,
+          anchor: new window.google.maps.Point(12, 22)
+        }
+      });
+    }
+  }
+
+  calculateRoute(): void {
+    if (this.tripType() === 'round-trip') {
+      if (this.directionsRenderer) {
+        this.directionsRenderer.setMap(null);
+        this.directionsRenderer = null;
+      }
+      if (this.dropMarker) {
+        this.dropMarker.setMap(null);
+        this.dropMarker = null;
+      }
+      this.estimatedDistance.set(0);
+      this.calculatePrice();
+      return;
+    }
+
+    if (!this.pickupCoords() || !this.dropCoords() || !window.google || !window.google.maps) {
+      this.calculatePrice();
+      return;
+    }
+
+    if (!this.directionsService) {
+      this.directionsService = new window.google.maps.DirectionsService();
+    }
+    if (!this.directionsRenderer) {
+      this.directionsRenderer = new window.google.maps.DirectionsRenderer({
+        map: this.map,
+        suppressMarkers: true
+      });
+    }
+
+    const origin = { lat: this.pickupCoords()[0], lng: this.pickupCoords()[1] };
+    const dest = { lat: this.dropCoords()![0], lng: this.dropCoords()![1] };
+
+    this.directionsService.route({
+      origin: origin,
+      destination: dest,
+      travelMode: window.google.maps.TravelMode.DRIVING
+    }, (response: any, status: any) => {
+      if (status === 'OK' && response) {
+        this.directionsRenderer.setMap(this.map);
+        this.directionsRenderer.setDirections(response);
+        const route = response.routes[0];
+        const leg = route.legs[0];
+        const distanceKm = (leg.distance.value || 0) / 1000;
+        this.estimatedDistance.set(Math.round(distanceKm * 10) / 10);
+      } else {
+        console.error('Directions request failed due to: ' + status);
+        const dist = this.getDistanceFromLatLng(origin.lat, origin.lng, dest.lat, dest.lng);
+        this.estimatedDistance.set(Math.round(dist * 10) / 10);
+      }
+      this.calculatePrice();
+    });
+  }
+
+  calculatePrice(): void {
+    let basePrice = 0;
+    if (this.tripType() === 'round-trip') {
+      const hours = Number(this.durationHours());
+      if (hours === 4) basePrice = 599;
+      else if (hours === 8) basePrice = 999;
+      else if (hours === 12) basePrice = 1399;
+      else basePrice = hours * 150;
+    } else {
+      const dist = this.estimatedDistance();
+      if (this.tripType() === 'one-way') {
+        basePrice = Math.round(399 + (dist * 12));
+      } else {
+        // tripType is outstation
+        if (this.outstationSubtype() === 'one-way') {
+          basePrice = Math.round(999 + (dist * 6));
+        } else {
+          const hours = Number(this.outstationDuration());
+          let durBase = 1199;
+          if (hours === 24) durBase = 1599;
+          else if (hours === 36) durBase = 2199;
+          else if (hours === 48) durBase = 2799;
+          basePrice = Math.round(durBase + (dist * 4));
+        }
+      }
+    }
+
+    // Add Transmission premium
+    if (this.transmission() === 'automatic') {
+      basePrice += 50;
+    }
+
+
+
+    // Add Security fee cover
+    if (this.secureBooking()) {
+      basePrice += 15;
+    }
+
+    // Subtract Promo discount
+    if (this.couponApplied()) {
+      basePrice = Math.max(0, basePrice - 99);
+    }
+
+    this.estimatedPrice.set(basePrice);
+  }
+
+  applyCoupon(): void {
+    const code = this.couponCode().trim().toUpperCase();
+    if (code === 'DRIVE99') {
+      this.couponApplied.set(true);
+      this.couponError.set(null);
+    } else {
+      this.couponApplied.set(false);
+      this.couponError.set('Invalid Promo Code!');
+    }
+    this.calculatePrice();
+  }
+
+  removeCoupon(): void {
+    this.couponApplied.set(false);
+    this.couponCode.set('');
+    this.couponError.set(null);
+    this.calculatePrice();
+  }
+
+  private getDistanceFromLatLng(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371; // Radius of the earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  onActiveInputFocus(type: 'pickup' | 'drop'): void {
+    this.activeInput.set(type);
+    const currentVal = type === 'pickup' ? this.pickupAddress() : this.dropAddress();
+    this.searchQuery.set(currentVal);
+    this.showSuggestions.set(true);
+  }
+
+  onTripTypeToggle(type: 'one-way' | 'round-trip' | 'outstation'): void {
+    this.tripType.set(type);
+    this.bookingStep.set('form');
+    this.calculateRoute();
+  }
+
+  onDurationSelect(hours: number): void {
+    this.durationHours.set(hours);
+    this.calculatePrice();
+  }
+
+  handleConfirmLocation(): void {
+    if (this.tripType() !== 'round-trip' && !this.dropAddress()) {
+      alert('Please select a destination drop location first.');
+      return;
+    }
+    this.tempPhoneNumber.set('');
+    this.phoneNumberError.set(null);
+    this.showPhoneModal.set(true);
+  }
+
+  submitPhoneNumber(): void {
+    const phone = this.tempPhoneNumber().trim();
+    if (/^\d{10}$/.test(phone)) {
+      this.userPhoneNumber.set(phone);
+      this.showPhoneModal.set(false);
+      this.bookingStep.set('summary');
+    } else {
+      this.phoneNumberError.set('Please enter a valid 10-digit mobile number.');
+    }
+  }
+
+  closePhoneModal(): void {
+    this.showPhoneModal.set(false);
+    this.tempPhoneNumber.set('');
+    this.phoneNumberError.set(null);
+  }
+
+  handleCreateBooking(): void {
+    alert(`Success! Your driver has been booked for ${this.bookingDate()} at ${this.bookingTime()}.\nTrip Mode: ${this.tripType().toUpperCase()} (${this.tripType() === 'round-trip' ? this.durationHours() + ' Hours' : 'Outstation'})\nEstimated Charge: ₹${this.estimatedPrice()}\nMobile: +91 ${this.userPhoneNumber()}`);
+    this.router.navigate(['/']);
+  }
 }
+

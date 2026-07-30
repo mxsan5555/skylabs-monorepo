@@ -1,48 +1,275 @@
-<div class="home">
-  <!-- Hero Slider -->
-  <section class="home__slider">
-    <swiper-container
-      class="home__carousel"
-      loop="true"
-      navigation="true"
-      pagination="true"
-      pagination-dynamic-bullets="true"
-      autoplay-delay="4000"
-      autoplay-disable-on-interaction="false"
-    >
-      @for (slide of slides; track slide.image) {
-        <swiper-slide>
-          <img [src]="slide.image" [alt]="slide.imageAlt" class="home__slide-img" />
-        </swiper-slide>
-      }
-    </swiper-container>
-  </section>
-
-  <section class="home__hero">
-    <sky-badge variant="primary">mera-driver</sky-badge>
-    <h1>Welcome to mera-driver</h1>
-    <p>
-      An Angular app built on the shared Material 3 design system. Pages live
-      here; reusable UI lives in <code>shared-ui</code>.
+<!-- Hero Section -->
+<section class="relative w-full h-[280px] sm:h-[380px] lg:h-[440px] bg-cover bg-center flex items-center justify-center" style="background-image: url('/slides/slide-1.png');">
+  <!-- Dark overlay mask -->
+  <div class="absolute inset-0 bg-black/60"></div>
+  
+  <div class="relative z-10 w-full max-w-[800px] mx-auto px-4 text-center text-white flex flex-col items-center gap-3">
+    <sky-badge variant="primary" class="bg-[var(--md-sys-color-primary)] text-white border-none">{{ content().hero.badge }}</sky-badge>
+    <h1 class="m-0 text-3xl sm:text-5xl font-extrabold tracking-tight drop-shadow-md text-white">
+      {{ content().hero.title }}
+    </h1>
+    <p class="m-0 text-xs sm:text-sm md:text-base max-w-[600px] text-gray-200 drop-shadow-sm">
+      {{ content().hero.subtitle }}
     </p>
-    <div class="home__actions">
-      <md-filled-button (click)="go('/showcase')">
-        View component showcase
+    
+    <!-- Search Bar -->
+    <div class="search-bar-wrapper relative w-full max-w-[500px] mt-3 sm:mt-5">
+      <div class="w-full bg-white rounded-full p-1 sm:p-1.5 flex items-center shadow-2xl">
+        <md-icon class="text-[var(--md-sys-color-outline)] ml-3 mr-2" style="color: #555;">search</md-icon>
+        <input 
+          type="text" 
+          [value]="searchQuery()"
+          (input)="onSearchInputChange($event)"
+          (keyup.enter)="onSearchSubmit()"
+          [placeholder]="content().hero.searchPlaceholder || 'Search for services...'" 
+          class="flex-grow bg-transparent border-none outline-none text-black text-xs sm:text-sm px-1 placeholder-gray-500" 
+        />
+        <md-filled-button (click)="onSearchSubmit()" class="rounded-full font-semibold shrink-0">
+          {{ content().hero.searchBtnLabel || 'Explore Services' }}
+        </md-filled-button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="w-full max-w-[1280px] mx-auto py-8 px-3 sm:px-6 flex flex-col gap-10">
+
+  <!-- Featured Driver Services -->
+  @if (filteredFeaturedServices().length > 0) {
+    <section class="flex flex-col gap-3 w-full">
+      <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().featuredServices.title }}</h2>
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-6 w-full"> 
+        @for (card of filteredFeaturedServices(); track card.heading) {
+          <sky-product-card
+            variant="outlined"
+            [href]="card.href || '/location'"
+            [image]="card.image"
+            [image-alt]="card.imageAlt"
+            [badge]="card.badge || ''"
+            favorite
+            [eyebrow]="card.eyebrow"
+            [heading]="card.heading"
+            [location]="card.location"
+            [distance]="card.distance || ''"
+            [rating]="card.rating || ''"
+            [score]="card.score || ''"
+            [score-label]="card.scoreLabel || ''"
+            [reviews]="card.reviews"
+            [price-prefix]="card.pricePrefix || ''"
+            [original-price]="card.originalPrice || ''"
+            [price]="card.price"
+            [discount]="card.discount || ''"
+          ></sky-product-card>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- Popular Ride Types -->
+  @if (popularRideTypes().length > 0) {
+    <section class="flex flex-col gap-3 w-full">
+      <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().popularRideTypes.title }}</h2>
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-6 w-full">
+        @for (card of popularRideTypes(); track card.heading) {
+          <sky-product-card
+            variant="outlined"
+            [href]="card.href || '/location'"
+            [image]="card.image"
+            [image-alt]="card.imageAlt"
+            [badge]="card.badge || ''"
+            favorite
+            [eyebrow]="card.eyebrow"
+            [heading]="card.heading"
+            [location]="card.location"
+            [distance]="card.distance || ''"
+            [rating]="card.rating || ''"
+            [score]="card.score || ''"
+            [score-label]="card.scoreLabel || ''"
+            [reviews]="card.reviews"
+            [price-prefix]="card.pricePrefix || ''"
+            [original-price]="card.originalPrice || ''"
+            [price]="card.price"
+            [discount]="card.discount || ''"
+          ></sky-product-card>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- How It Works -->
+  @if (content().howItWorks) {
+    <section class="flex flex-col gap-6 w-full mt-2 mb-2">
+      <div class="flex flex-col gap-2 items-center text-center">
+        <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().howItWorks.title }}</h2>
+        @if (content().howItWorks.subtitle) {
+          <p class="m-0 text-sm text-[var(--md-sys-color-on-surface-variant,#42474e)]">{{ content().howItWorks.subtitle }}</p>
+        }
+      </div>
+      
+      <div class="w-full h-px bg-[var(--md-sys-color-outline-variant,#c2c7ce)]"></div>
+      
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-2 justify-items-center">
+        @for (card of content().howItWorks.cards; track card.heading) {
+          <sky-card variant="elevated" class="w-full h-full text-center hover:shadow-md transition-all duration-200">
+            <div class="h-full flex flex-col items-center">
+              <div class="shadow-sm !mx-0 mb-3" style="background-color: var(--md-sys-color-primary-container); border-radius:12px; width:56px; height:56px; display:flex; align-items:center; justify-content:center;">
+                <md-icon style="--md-icon-size:28px; color: var(--md-sys-color-primary);">{{ card.icon }}</md-icon>
+              </div>
+              <h3 class="m-0 text-base font-bold text-[var(--md-sys-color-on-surface)]">{{ card.heading }}</h3>
+              <p class="m-0 mt-1.5 text-sm text-[var(--md-sys-color-on-surface-variant,#42474e)] leading-relaxed">{{ card.subheading }}</p>
+            </div>
+          </sky-card>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- Top Packages -->
+  @if (filteredPackages().length > 0) {
+    <section class="flex flex-col gap-3 w-full mt-2">
+      <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().packages.title }}</h2>
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-6 w-full">
+        @for (card of filteredPackages(); track card.heading) {
+          <sky-product-card
+            variant="outlined"
+            [href]="card.href || '/location'"
+            [image]="card.image"
+            [image-alt]="card.imageAlt"
+            favorite
+            [eyebrow]="card.eyebrow"
+            [heading]="card.heading"
+            [location]="card.location"
+            [score]="card.score || ''"
+            [score-label]="card.scoreLabel || ''"
+            [reviews]="card.reviews"
+            [price-prefix]="card.pricePrefix || ''"
+            [original-price]="card.originalPrice || ''"
+            [price]="card.price"
+            [discount]="card.discount || ''"
+          ></sky-product-card>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- No Results Found Banner -->
+  @if (filteredFeaturedServices().length === 0 && filteredPackages().length === 0) {
+    <div class="w-full py-16 px-4 flex flex-col items-center justify-center text-center gap-4 bg-[var(--md-sys-color-surface-container-low,#f0f4f9)] rounded-2xl border border-[var(--md-sys-color-outline-variant,#c2c7ce)]">
+      <md-icon class="text-[var(--md-sys-color-primary,#3a693c)] text-5xl" style="--md-icon-size: 48px;">search_off</md-icon>
+      <div class="flex flex-col gap-1">
+        <h3 class="m-0 text-lg font-bold text-[var(--md-sys-color-on-background)]">{{ content().noResults.title }}</h3>
+        <p class="m-0 text-sm text-[var(--md-sys-color-on-surface-variant,#42474e)] max-w-[350px]">
+          {{ content().noResults.message.replace('{query}', searchQuery()) }}
+        </p>
+      </div>
+
+      <md-filled-button (click)="activeFilter.set('all'); searchQuery.set(''); activeSearchQuery.set('');" class="mt-2 rounded-full font-semibold">
+        {{ content().noResults.btnReset }}
       </md-filled-button>
-      <md-outlined-button (click)="go('/blog')">
-        Read the blog
-      </md-outlined-button>
+    </div>
+  }
+
+  <!-- Safety & Guarantees -->
+  <section class="flex flex-col gap-3 w-full mt-2">
+    <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().whyChooseUs.title }}</h2>
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-6 w-full"> 
+      @for (card of content().whyChooseUs.cards; track card.heading) {
+        <sky-info-card
+          [align]="card.align || 'center'"
+          [icon]="card.icon"
+          [heading]="card.heading"
+          [subheading]="card.subheading"
+        ></sky-info-card>
+      }
     </div>
   </section>
 
-  <section class="home__cards">
-    <sky-card variant="elevated">
-      <h2>Reusable UI</h2>
-      <p>Material Web + custom LIT components, themed per app.</p>
-    </sky-card>
-    <sky-card variant="outlined">
-      <h2>App-owned pages</h2>
-      <p>Routing, auth, and data stay native to each framework.</p>
-    </sky-card>
-  </section>
+  <!-- Customer Testimonials (Success Stories Carousel) -->
+  @if (isDataLoaded() && content().testimonials) {
+    <section class="flex flex-col gap-6 w-full mt-4 items-center justify-center">
+      
+      <!-- Section Heading from JSON -->
+      <div class="flex flex-col gap-2 items-center text-center">
+        <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().testimonials.title }}</h2>
+        @if (content().testimonials.subtitle) {
+          <p class="m-0 text-sm text-[var(--md-sys-color-on-surface-variant,#42474e)]">{{ content().testimonials.subtitle }}</p>
+        }
+      </div>
+      
+      <!-- Centered 8-Column Layout Grid (Leaves 2 columns blank on left and right) -->
+      <div class="grid grid-cols-12 w-full mt-4 items-center">
+        
+        <!-- Left Custom Navigation Button -->
+        <div class="col-span-2 md:col-start-2 md:col-span-1 flex justify-end">
+          <md-icon-button (click)="swiper.swiper.slidePrev()" class="[--md-icon-button-icon-color:var(--md-sys-color-primary)]">
+            <md-icon>chevron_left</md-icon>
+          </md-icon-button>
+        </div>
+
+        <!-- Carousel Content (8 Columns) -->
+        <div class="col-span-8 md:col-span-8 px-2">
+          <swiper-container 
+            #swiper
+            init="false"
+            observer="true"
+            observe-parents="true"
+            resize-observer="true"
+            autoplay="true"
+            autoplay-delay="3500"
+            autoplay-disable-on-interaction="false"
+            loop="true"
+            pagination="true"
+            style="display: block; width: 100%; min-height: 280px;"
+            class="w-full py-4"
+          >
+            @for (card of content().testimonials.cards; track card.name) {
+              <swiper-slide class="w-full flex flex-col items-center text-center px-4 sm:px-8 py-6">
+                <img 
+                  [src]="card.avatar" 
+                  [alt]="card.name" 
+                  class="w-20 h-20 rounded-full border-2 border-[var(--md-sys-color-primary)] shadow-md object-cover mb-3"
+                />
+                
+                <h4 class="m-0 text-base font-bold text-[var(--md-sys-color-on-surface)] flex items-center justify-center gap-1">
+                  {{ card.name }}
+                  <md-icon style="--md-icon-size: 16px; color: #10b981;">verified</md-icon>
+                </h4>
+                <p class="m-0 text-xs text-[var(--md-sys-color-on-surface-variant,#42474e)] tracking-wide flex items-center justify-center gap-1 mt-1">
+                  <md-icon style="--md-icon-size:12px; color: var(--md-sys-color-on-surface-variant);">location_on</md-icon>
+                  {{ card.location }}
+                </p>
+                
+                <div class="flex justify-center gap-1 mt-2.5 mb-4">
+                  @for (star of [1,2,3,4,5]; track star) {
+                    @if (star <= card.rating) {
+                      <md-icon style="--md-icon-size:16px; color: #f59e0b;">star</md-icon>
+                    } @else {
+                      <md-icon style="--md-icon-size:16px; color: var(--md-sys-color-outline-variant);">star</md-icon>
+                    }
+                  }
+                </div>
+                
+                <!-- Quote Icon (Stylized brand color watermark) -->
+                <md-icon class="text-[var(--md-sys-color-primary)] opacity-10 mb-2" style="--md-icon-size: 56px;">format_quote</md-icon>
+                
+                <p class="m-0 text-base sm:text-lg md:text-xl text-[var(--md-sys-color-on-background)] font-medium italic leading-relaxed w-full max-w-[650px] mx-auto">
+                  "{{ card.review }}"
+                </p>
+              </swiper-slide>
+            }
+          </swiper-container>
+        </div>
+
+        <!-- Right Custom Navigation Button -->
+        <div class="col-span-2 md:col-span-1 flex justify-start">
+          <md-icon-button (click)="swiper.swiper.slideNext()" class="[--md-icon-button-icon-color:var(--md-sys-color-primary)]">
+            <md-icon>chevron_right</md-icon>
+          </md-icon-button>
+        </div>
+        
+      </div>
+    </section>
+  }
+
+
 </div>

@@ -1,0 +1,331 @@
+{
+  "hero": {
+    "badge": "verified drivers",
+    "title": "Your driver, your way",
+    "subtitle": "Book top-rated, background-verified personal drivers for hourly commutes, outstation travel, and luxury chauffeured rides. Instant booking, absolute safety.",
+    "btnShowcase": "View component showcase",
+    "btnBlog": "Read the blog",
+    "searchPlaceholder": "Search for services (e.g. One Way, Outstation)...",
+    "searchBtnLabel": "Explore Services"
+  },
+  "featuredServices": {
+    "title": "Featured Driver Services",
+    "cards": [
+      {
+        "image": "/slides/slide-1.png",
+        "imageAlt": "One Way",
+        "badge": "Top Rated",
+        "eyebrow": "One Way",
+        "heading": "Book a premium Mercedes-Benz luxury sedan for your corporate trip",
+        "location": "Connaught Place, Delhi",
+        "distance": "2.5 km away",
+        "rating": "4.9",
+        "reviews": "1248",
+        "originalPrice": "₹1,200",
+        "price": "₹899",
+        "discount": "-25%",
+        "service": "one-way"
+      },
+      {
+        "image": "/slides/slide-2.png",
+        "imageAlt": "Round Trip",
+        "badge": "Popular",
+        "eyebrow": "Round Trip",
+        "heading": "Indira Gandhi International Airport (T3) Dropoff service",
+        "location": "New Delhi, India",
+        "distance": "Airport Drop",
+        "rating": "4.9",
+        "reviews": "4798",
+        "pricePrefix": "Starting from",
+        "originalPrice": "₹999",
+        "price": "₹699",
+        "discount": "-30%",
+        "service": "round-trip"
+      },
+      {
+        "image": "/slides/slide-3.png",
+        "imageAlt": "Outstation",
+        "badge": "Best Seller",
+        "eyebrow": "Outstation",
+        "heading": "Hire a verified professional driver for roundtrip weekend outstation travel",
+        "location": "Delhi to Agra / Jaipur",
+        "distance": "Verified Driver",
+        "rating": "4.8",
+        "reviews": "312",
+        "originalPrice": "₹1,500",
+        "price": "₹1,199",
+        "discount": "-20%",
+        "service": "outstation"
+      },
+      {
+        "image": "/slides/slide-4.png",
+        "imageAlt": "Hourly Commute",
+        "badge": "New Launch",
+        "eyebrow": "Hourly Driver",
+        "heading": "Verified drivers for nighttime family events, weddings, & dinners",
+        "location": "Delhi NCR, India",
+        "distance": "Event Special",
+        "rating": "4.9",
+        "reviews": "184",
+        "originalPrice": "₹799",
+        "price": "₹599",
+        "discount": "-25%",
+        "service": "one-way"
+      }
+    ]
+  },
+
+  "packages": {
+    "title": "Hourly & Travel Packages",
+    "cards": [
+      {
+        "href": "/location",
+        "image": "/slides/slide-2.png",
+        "imageAlt": "4 Hour Rental",
+        "eyebrow": "Hourly Rental",
+        "heading": "4 Hours / 40 km local package — perfect for quick shopping trips",
+        "location": "New Delhi, India",
+        "score": "4.8",
+        "scoreLabel": "Excellent",
+        "reviews": "389",
+        "pricePrefix": "Deal price",
+        "originalPrice": "₹499",
+        "price": "₹399",
+        "discount": "-20%",
+        "service": "one-way"
+      },
+      {
+        "href": "/location",
+        "image": "/slides/slide-3.png",
+        "imageAlt": "8 Hour Rental",
+        "eyebrow": "Hourly Rental",
+        "heading": "8 Hours / 80 km full day package — ideal for city running & meetings",
+        "location": "New Delhi, India",
+        "score": "4.9",
+        "scoreLabel": "Excellent",
+        "reviews": "1028",
+        "pricePrefix": "Deal price",
+        "originalPrice": "₹999",
+        "price": "₹799",
+        "discount": "-20%",
+        "service": "one-way"
+      },
+      {
+        "href": "/location",
+        "image": "/slides/slide-4.png",
+        "imageAlt": "12 Hour Rental",
+        "eyebrow": "Hourly Rental",
+        "heading": "12 Hours / 120 km extended package — designed for outstation drops & events",
+        "location": "New Delhi, India",
+        "score": "4.8",
+        "scoreLabel": "Excellent",
+        "reviews": "217",
+        "pricePrefix": "Deal price",
+        "originalPrice": "₹1,499",
+        "price": "₹1,199",
+        "discount": "-20%",
+        "service": "round-trip"
+      },
+      {
+        "href": "/location",
+        "image": "/slides/slide-1.png",
+        "imageAlt": "24 Hour Rental",
+        "eyebrow": "Hourly Rental",
+        "heading": "24 Hours / 240 km weekend package — perfect for overnight outstation trips",
+        "location": "New Delhi, India",
+        "score": "4.9",
+        "scoreLabel": "Excellent",
+        "reviews": "412",
+        "pricePrefix": "Deal price",
+        "originalPrice": "₹2,499",
+        "price": "₹1,999",
+        "discount": "-20%",
+        "service": "outstation"
+      }
+    ]
+  },
+  "noResults": {
+    "title": "No matching services found",
+    "message": "We couldn't find any services matching \"{query}\". Try checking your spelling or select a service below.",
+    "btnReset": "Reset Search & Filters"
+  },
+  "popularRideTypes": {
+    "title": "Popular Ride Types",
+    "cards": [
+      {
+        "image": "/slides/popular-1.png",
+        "imageAlt": "Airport Transfer",
+        "badge": "Most Booked",
+        "eyebrow": "Airport Transfer",
+        "heading": "Airport pickup & drop with professional chauffeur",
+        "location": "IGI Airport T1, T2, T3",
+        "distance": "24/7 Available",
+        "rating": "4.9",
+        "reviews": "5120",
+        "originalPrice": "₹799",
+        "price": "₹549",
+        "discount": "-31%",
+        "service": "one-way"
+      },
+      {
+        "image": "/slides/popular-2.png",
+        "imageAlt": "Wedding & Events",
+        "badge": "Premium",
+        "eyebrow": "Wedding & Events",
+        "heading": "Chauffeur for weddings, receptions & celebrations",
+        "location": "Delhi NCR & Nearby",
+        "distance": "Event Special",
+        "rating": "4.9",
+        "reviews": "1876",
+        "originalPrice": "₹1,999",
+        "price": "₹1,499",
+        "discount": "-25%",
+        "service": "round-trip"
+      },
+      {
+        "image": "/slides/popular-3.png",
+        "imageAlt": "Corporate Chauffeur",
+        "badge": "Business",
+        "eyebrow": "Corporate",
+        "heading": "Corporate chauffeur for office commute & meetings",
+        "location": "Gurugram / Noida / Delhi",
+        "distance": "Monthly Plans",
+        "rating": "4.8",
+        "reviews": "2340",
+        "pricePrefix": "Starting from",
+        "originalPrice": "₹12,999",
+        "price": "₹9,999",
+        "discount": "-23%",
+        "service": "one-way"
+      },
+      {
+        "image": "/slides/popular-4.png",
+        "imageAlt": "Temporary Driver",
+        "badge": "Flexible",
+        "eyebrow": "Temporary Driver",
+        "heading": "Verified temporary driver — 1 day to 3 months",
+        "location": "Pan Delhi NCR",
+        "distance": "Instant Booking",
+        "rating": "4.7",
+        "reviews": "963",
+        "originalPrice": "₹699",
+        "price": "₹499",
+        "discount": "-29%",
+        "service": "one-way"
+      }
+    ]
+  },
+  "howItWorks": {
+    "title": "How it Works",
+    "subtitle": "Follow four simple steps to book a verified professional driver instantly.",
+    "cards": [
+      {
+        "align": "left",
+        "icon": "search",
+        "heading": "1. Choose Service",
+        "subheading": "Choose from One Way, Round Trip, or Outstation driver packages."
+      },
+      {
+        "align": "left",
+        "icon": "calendar_month",
+        "heading": "2. Book Schedule",
+        "subheading": "Enter pickup details, dates, and secure your booking."
+      },
+      {
+        "align": "left",
+        "icon": "assignment_ind",
+        "heading": "3. Driver Assigned",
+        "subheading": "Get matched with a verified professional driver."
+      },
+      {
+        "align": "left",
+        "icon": "sentiment_very_satisfied",
+        "heading": "4. Relax & Ride",
+        "subheading": "Track driver status, sit back, and enjoy your comfortable ride."
+      }
+    ]
+  },
+  "whyChooseUs": {
+    "title": "Why Choose mera-driver?",
+    "cards": [
+      {
+        "align": "center",
+        "icon": "support_agent",
+        "heading": "24/7 Live Support",
+        "subheading": "Help is always just a call away"
+      },
+      {
+        "align": "center",
+        "icon": "verified",
+        "heading": "100% Background Verified",
+        "subheading": "All drivers pass criminal & record checks"
+      },
+      {
+        "align": "center",
+        "icon": "security",
+        "heading": "Secure Live Tracking",
+        "subheading": "Share trip details with family in real time"
+      },
+      {
+        "align": "center",
+        "icon": "payments",
+        "heading": "Transparent Pricing",
+        "subheading": "No surge pricing or surprise hidden fees"
+      }
+    ]
+  },
+  "testimonials": {
+    "title": "Success Stories",
+    "subtitle": "Real customers, real transformations",
+    "cards": [
+      {
+        "name": "Rajesh Sharma",
+        "location": "New Delhi",
+        "rating": 5,
+        "review": "Booked a driver for my Jaipur trip. Very professional, punctual, and polite. Will definitely use again!",
+        "initials": "RS",
+        "avatar": "/slides/avatar-1.png"
+      },
+      {
+        "name": "Priya Verma",
+        "location": "Gurugram",
+        "rating": 5,
+        "review": "I use mera-driver daily for office commute. The drivers are well-trained and always on time.",
+        "initials": "PV",
+        "avatar": "/slides/avatar-2.png"
+      },
+      {
+        "name": "Amit Gupta",
+        "location": "Noida",
+        "rating": 4,
+        "review": "Used the airport transfer service for my family. Smooth experience, clean car, and safe driving.",
+        "initials": "AG",
+        "avatar": "/slides/avatar-3.png"
+      },
+      {
+        "name": "Sunita Mehra",
+        "location": "Delhi NCR",
+        "rating": 5,
+        "review": "Hired a driver for my daughter's wedding. Excellent service, very courteous. Highly recommend!",
+        "initials": "SM",
+        "avatar": "/slides/avatar-4.png"
+      },
+      {
+        "name": "Vikram Malhotra",
+        "location": "Mumbai",
+        "rating": 5,
+        "review": "Excellent service for weekend outstations. The driver knew all routes perfectly and was very safe.",
+        "initials": "VM",
+        "avatar": "/slides/avatar-5.png"
+      },
+      {
+        "name": "Neha Kapoor",
+        "location": "Bengaluru",
+        "rating": 5,
+        "review": "Super convenient for late-night office drops. Punctual, verified drivers give absolute peace of mind.",
+        "initials": "NK",
+        "avatar": "/slides/avatar-6.png"
+      }
+    ]
+  }
+}
