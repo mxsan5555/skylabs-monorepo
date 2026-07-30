@@ -3,8 +3,8 @@ import {
   ChipSet,
   FilterChip,
   Icon,
-  SkyInfoCardReact,
 } from '@skylabs-monorepo/shared-ui/react';
+import '@skylabs-monorepo/shared-ui';
 import ProductCard from '../../components/product-card';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { products } from '../../../data/products';

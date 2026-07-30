@@ -1,16 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import {
-    FilledButton,
-    OutlinedIconButton,
-    Icon,
-    SkyInfoCardReact,
-    SkyBadgeReact,
-    SkyAccordionReact,
-    SkyAccordionItemReact,
-    Divider,
-} from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedIconButton, Icon, Divider, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
+import '@skylabs-monorepo/shared-ui';
 import { useCart } from '../../../cart/cart-context';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { products, getProductBySlug, } from '../../../data/products';
@@ -32,27 +24,22 @@ export function ProductDetail() {
     if (!product) {
         return (
             <div className="product-detail product-detail--empty">
-                <SkyInfoCardReact
+                <sky-info-card
                     icon="search_off"
                     heading="Product not found"
                     subheading="The requested product does not exist."
                 />
-                <FilledButton onClick={() => navigate('/products')}>   Back to Products </FilledButton>
+                <FilledButton onClick={() => navigate('/products')}>Back to Products</FilledButton>
             </div>
         );
     }
     const relatedProducts = products
-        .filter(
-            (p) =>
-                p.category === product.category &&
-                p.id !== product.id
+        .filter((p) =>
+            p.category === product.category &&
+            p.id !== product.id
         )
         .slice(0, 6);
-    const discountPct = Math.round(
-        ((product.originalPrice - product.price) /
-            product.originalPrice) *
-        100
-    );
+    const discountPct = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
 
     function handleBuyNow() {
         addItem(product.id);
@@ -106,13 +93,13 @@ export function ProductDetail() {
                             width={800}
                             height={800}
                         />
-                        <SkyBadgeReact
+                        <sky-badge
                             className="product-detail__badge"
                             variant="secondary"
                             size="small"
                         >
                             {product.category}
-                        </SkyBadgeReact>
+                        </sky-badge>
                     </div>
                     {product.gallery && product.gallery.length > 1 && (
                         <div className="product-detail__thumbs">
@@ -140,7 +127,7 @@ export function ProductDetail() {
                 <div className="product-detail__info">
                     <div className="product-detail__meta-row">
                         <span className="product-detail__brand"> {product.brand} </span>
-                        <SkyBadgeReact variant="secondary" size="small" > {product.category} </SkyBadgeReact>
+                        <sky-badge variant="secondary" size="small" > {product.category} </sky-badge>
                     </div>
                     <h1 className="product-detail__title"> {product.name}  </h1>
                     <div className="product-detail__rating-row">
@@ -157,37 +144,37 @@ export function ProductDetail() {
                         </div>
                         <div className="product-detail__original">
                             <s>  {formatINR(product.originalPrice)} </s>
-                            <SkyBadgeReact variant="error" size="small" >
+                            <sky-badge variant="error" size="small" >
                                 {discountPct}% OFF
-                            </SkyBadgeReact>
+                            </sky-badge>
                         </div>
                     </div>
                     <p className="product-detail__short-desc">  {product.shortDescription}  </p>
-                   <div className="product-detail__cta">
-  <FilledButton
-    className="product-detail__cart-btn"
-    onClick={handleBuyNow}
-  >
-    <Icon slot="icon">
-      {addedToCart ? "check" : "shopping_bag"}
-    </Icon>
+                    <div className="product-detail__cta">
+                        <FilledButton
+                            className="product-detail__cart-btn"
+                            onClick={handleBuyNow}
+                        >
+                            <Icon slot="icon">
+                                {addedToCart ? "check" : "shopping_bag"}
+                            </Icon>
 
-    {addedToCart ? "Added to Cart!" : "Add to Cart"}
-  </FilledButton>
+                            {addedToCart ? "Added to Cart!" : "Add to Cart"}
+                        </FilledButton>
 
-  <OutlinedIconButton
-    toggle
-    selected={has(product.id)}
-    onClick={() => toggle(product.id)}
-  >
-    <Icon slot="selected">favorite</Icon>
-    <Icon>favorite_border</Icon>
-  </OutlinedIconButton>
-</div>
+                        <OutlinedIconButton
+                            toggle
+                            selected={has(product.id)}
+                            onClick={() => toggle(product.id)}
+                        >
+                            <Icon slot="selected">favorite</Icon>
+                            <Icon>favorite_border</Icon>
+                        </OutlinedIconButton>
+                    </div>
                     <Divider />
                     <p className="product-detail__description"> {product.description} </p>
-                    <SkyAccordionReact>
-                        <SkyAccordionItemReact header={productDetail.benefits} open >
+                    <sky-accordion>
+                        <sky-accordion-item header={productDetail.benefits} open >
                             <ul className="product-detail__list">
                                 {product.benefits.map((item) => (
                                     <li key={item} className="product-detail__list-item" >
@@ -196,8 +183,8 @@ export function ProductDetail() {
                                     </li>
                                 ))}
                             </ul>
-                        </SkyAccordionItemReact>
-                        <SkyAccordionItemReact
+                        </sky-accordion-item>
+                        <sky-accordion-item
                             header={productDetail.ingredients}
                         >
                             <ul className="product-detail__list">
@@ -211,8 +198,8 @@ export function ProductDetail() {
                                     </li>
                                 ))}
                             </ul>
-                        </SkyAccordionItemReact>
-                        <SkyAccordionItemReact
+                        </sky-accordion-item>
+                        <sky-accordion-item
                             header={productDetail.howToUse}
                         >
                             <ol className="product-detail__list">
@@ -226,13 +213,13 @@ export function ProductDetail() {
                                     </li>
                                 ))}
                             </ol>
-                        </SkyAccordionItemReact>
-                        <SkyAccordionItemReact
+                        </sky-accordion-item>
+                        <sky-accordion-item
                             header={productDetail.shipping}
                         >
                             <p className="product-detail__shipping"> {productDetail.shippingText} </p>
-                        </SkyAccordionItemReact>
-                    </SkyAccordionReact>
+                        </sky-accordion-item>
+                    </sky-accordion>
                 </div>
             </div>
             {relatedProducts.length > 0 && (

@@ -4,7 +4,7 @@ import { SkyProductCardReact, FilledTonalIconButton, Icon, FilledButton, } from 
 import type { Product } from '../../types';
 import { formatINR } from '../../utils/format';
 import './product-card.css';
-
+import '@skylabs-monorepo/shared-ui';
 interface ProductCardProps {
     product: Product;
 }
@@ -21,7 +21,7 @@ export function ProductCard({ product }: ProductCardProps) {
             : 0;
 
     return (
-        <SkyProductCardReact
+        <sky-product-card
             imageAlt={product.name}
             eyebrow={product.brand}
             heading={product.name}
@@ -86,7 +86,7 @@ export function ProductCard({ product }: ProductCardProps) {
             >
                 Buy Now
             </FilledButton>
-        </SkyProductCardReact>
+        </sky-product-card>
 
     );
 }

@@ -10,7 +10,8 @@ import { DealCard } from '../../components/deal-card';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import content from '../../../content.json';
 import './home.css';
-
+import '@skylabs-monorepo/shared-ui';
+import { formatINR } from '../../../utils/format';
 const { home } = content;
 const hotTabs = home.sections.hotRightNow.tabs;
 const { dealOfTheDay } = content;
@@ -58,6 +59,7 @@ export function Home() {
   }, [selectedTab, hotDeals]);
 
   function renderDealCarousel(deals: typeof DEALS) {
+
     return (
       <div className="home-carousel">
         <swiper-container
@@ -66,20 +68,47 @@ export function Home() {
           free-mode="true"
           grab-cursor="true"
         >
-          {deals.map((deal) => (
-            <swiper-slide key={deal.id} style={{ width: '260px', height: 'auto' }}>
-              <SkyProductCardWC
-                image={deal.image}
-                gallery={deal.gallery}
-                imageAlt={deal.imageAlt}
-                badge={deal.badge}
+          {deals.map((deal) => {
+            const discount =
+              deal.originalPrice > deal.price
+                ? Math.round(
+                  ((deal.originalPrice - deal.price) / deal.originalPrice) * 100
+                )
+                : 0;
 
-                favorite={true}
-                favoriteActive={has(deal.id)}
-                onFavorite={() => toggle(deal.id)}
-              />
-            </swiper-slide>
-          ))}
+            return (
+              <swiper-slide
+                key={deal.id}
+                style={{ width: '260px', height: 'auto' }}
+              >
+                <SkyProductCardWC
+                  image={deal.image}
+                  gallery={deal.gallery}
+                  imageAlt={deal.imageAlt}
+                  badge={deal.badge}
+
+                  eyebrow={deal.providerName}
+                  heading={deal.title}
+                  location={deal.location}
+                  distance={deal.distance}
+
+                  rating={deal.rating}
+                  reviews={deal.reviews}
+
+                  originalPrice={formatINR(deal.originalPrice)}
+                  price={formatINR(deal.price)}
+                  discount={discount ? `-${discount}%` : undefined}
+                  priceNote={deal.priceNote}
+
+                  href={`/deal/${deal.slug}`}
+
+                  favorite
+                  favoriteActive={has(deal.id)}
+                  onFavorite={() => toggle(deal.id)}
+                />
+              </swiper-slide>
+            );
+          })}
         </swiper-container>
       </div>
     );
@@ -271,7 +300,7 @@ export function Home() {
         aria-label="Member promotion"
       >
         <div className="home-section__container">
-          <SkyCardReact
+          <sky-card
             variant="filled"
             className="home__member-banner"
           >
@@ -294,7 +323,7 @@ export function Home() {
                 </Icon>
               </FilledButton>
             </div>
-          </SkyCardReact>
+          </sky-card>
         </div>
       </section>
 
@@ -419,7 +448,7 @@ export function Home() {
                 key={item.label}
                 className="home-stays-slide"
               >
-                <SkyImageCardReact
+                <sky-image-card
                   image={item.image}
                   imageAlt={item.imageAlt}
                   label={item.label}
@@ -571,11 +600,11 @@ export function Home() {
                 className="home__search-column"
               >
 
-                <SkyAccordionReact>
+                <sky-accordion>
 
                   {column.map((section) => (
 
-                    <SkyAccordionItemReact
+                    <sky-accordion-item
                       key={section.title}
                       header={section.title}
                     >
@@ -588,11 +617,11 @@ export function Home() {
                         ))}
 
                       </ul>
-                    </SkyAccordionItemReact>
+                    </sky-accordion-item>
 
                   ))}
 
-                </SkyAccordionReact>
+                </sky-accordion>
 
               </div>
 
@@ -607,7 +636,7 @@ export function Home() {
         <div className="home-section__container">
           <div className="home__trust-grid">
             {home.trustSection.cards.map((card, index) => (
-              <SkyCardReact
+              <sky-card
                 key={index}
                 variant="outlined"
                 className="home__trust-card"
@@ -656,7 +685,7 @@ export function Home() {
 
                 <h3>{card.title}</h3>
                 <p>{card.subtitle}</p>
-              </SkyCardReact>
+              </sky-card>
             ))}
           </div>
         </div>

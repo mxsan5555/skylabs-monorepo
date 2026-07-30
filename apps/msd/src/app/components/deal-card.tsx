@@ -3,8 +3,9 @@ import type { Deal } from '../../types';
 import { formatINR } from '../../utils/format';
 import { useRef } from 'react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import { Icon, FilledTonalIconButton, } from '@skylabs-monorepo/shared-ui/react';
+import { Icon, FilledTonalIconButton } from '@skylabs-monorepo/shared-ui/react';
 import './deal-card.css';
+import '@skylabs-monorepo/shared-ui';
 interface DealCardProps {
   deal: Deal;
   favoriteActive: boolean;
@@ -18,7 +19,7 @@ export function DealCard({
 }: DealCardProps) {
   const swiperRef = useRef<any>(null);
   return (
-    <SkyProductCardReact
+    <sky-product-card
       imageAlt={deal.imageAlt}
       badge={deal.badge}
       favorite
@@ -86,6 +87,6 @@ export function DealCard({
         </FilledTonalIconButton>
       </div>
 
-    </SkyProductCardReact>
+    </sky-product-card>
   );
 }
