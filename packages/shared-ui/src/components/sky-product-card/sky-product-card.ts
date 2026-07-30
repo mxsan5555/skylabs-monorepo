@@ -80,6 +80,9 @@ export class SkyProductCard extends LitElement {
   /** Content alignment: 'left' (default) | 'center' | 'right'. */
   declare align: 'left' | 'center' | 'right';
 
+  /** Per-instance ID used to wire aria-labelledby from article → heading. */
+  private readonly _uid = Math.random().toString(36).slice(2, 8);
+
   constructor() {
     super();
     this.variant = 'plain';
@@ -90,33 +93,28 @@ export class SkyProductCard extends LitElement {
 
   static override styles = css`
     ${hostBase}
-    :host {
-      display: block;
-      height: 100%;
-    }
     .card {
       position: relative;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      border-radius: 16px;
-      background-color: var(--md-sys-color-surface, #fafdfb);
+      border-radius: var(--md-sys-shape-corner-large, 16px);
+      background-color: var(--md-sys-color-surface);
       transition: box-shadow 150ms ease;
-      height: 100%;
-      box-sizing: border-box;
     }
     :host([variant='outlined']) .card {
-      border: 1px solid var(--md-sys-color-outline-variant, #c2c7ce);
+      border: 1px solid var(--md-sys-color-outline-variant);
     }
     .card:hover {
       box-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.3),
-        0 2px 6px 2px rgba(0, 0, 0, 0.15);
+        0 1px 2px color-mix(in srgb, var(--md-sys-color-shadow) 30%, transparent),
+        0 2px 6px 2px color-mix(in srgb, var(--md-sys-color-shadow) 15%, transparent);
     }
     .media {
       position: relative;
+      margin: 0; /* reset <figure> UA default margin */
       aspect-ratio: 3 / 2;
-      background-color: var(--md-sys-color-surface-variant, #dde4d8);
+      background-color: var(--md-sys-color-surface-variant);
     }
     .media img {
       width: 100%;
@@ -124,12 +122,12 @@ export class SkyProductCard extends LitElement {
       object-fit: cover;
       display: block;
     }
-      .media swiper-container {
-        width: 100%;
-       height: 100%;
-       --swiper-theme-color: var(--md-sys-color-primary);
-       --swiper-navigation-color: var(--md-sys-color-primary);
-      }
+    .media swiper-container {
+      width: 100%;
+      height: 100%;
+      --swiper-theme-color: var(--md-sys-color-primary);
+      --swiper-navigation-color: var(--md-sys-color-primary);
+    }
 
     .media swiper-slide {
       display: flex;
@@ -143,7 +141,7 @@ export class SkyProductCard extends LitElement {
 
     .media::part(button-prev),
     .media::part(button-next) {
-      color: white;
+      color: var(--md-sys-color-on-primary-container);
       width: 32px;
       height: 32px;
     }
@@ -161,8 +159,8 @@ export class SkyProductCard extends LitElement {
       gap: 4px;
       padding: 4px 10px;
       border-radius: 999px;
-      background-color: var(--md-sys-color-primary, #3a693c);
-      color: var(--md-sys-color-on-primary, #fff);
+      background-color: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
       font-size: 0.75rem;
       font-weight: 600;
     }
@@ -171,12 +169,12 @@ export class SkyProductCard extends LitElement {
       top: 6px;
       right: 6px;
       z-index: 2;
-      --md-icon-button-icon-color: var(--md-sys-color-on-surface, #1a1c19);
-      background-color: var(--md-sys-color-surface, #fff);
+      --md-icon-button-icon-color: var(--md-sys-color-on-surface);
+      background-color: var(--md-sys-color-surface);
       border-radius: 999px;
     }
     :host([favorite-active]) .favorite {
-      --md-icon-button-icon-color: var(--md-sys-color-error, #ba1a1a);
+      --md-icon-button-icon-color: var(--md-sys-color-error);
     }
     :host([favorite-active]) .favorite md-icon {
       font-variation-settings: 'FILL' 1;
@@ -186,8 +184,7 @@ export class SkyProductCard extends LitElement {
       flex-direction: column;
       gap: 6px;
       padding: 12px 14px 14px;
-        background: var(--md-sys-color-surface-container, #eef2ea);
-      flex: 1;
+      background: var(--md-sys-color-surface-container);
     }
     .tag {
       display: inline-flex;
@@ -195,15 +192,15 @@ export class SkyProductCard extends LitElement {
       gap: 4px;
       font-size: 0.75rem;
       font-weight: 600;
-      color: var(--md-sys-color-on-surface-variant, #424940);
+      color: var(--md-sys-color-on-surface-variant);
     }
     .tag md-icon {
       --md-icon-size: 16px;
-      color: var(--md-sys-color-primary, #3a693c);
+      color: var(--md-sys-color-primary);
     }
     .eyebrow {
       font-size: 0.8125rem;
-      color: var(--md-sys-color-primary, #3a693c);
+      color: var(--md-sys-color-primary);
     }
     .heading {
       margin: 0;
@@ -224,7 +221,7 @@ export class SkyProductCard extends LitElement {
       z-index: 1;
     }
     .card:focus-within {
-      outline: 2px solid var(--md-sys-color-primary, #3a693c);
+      outline: 2px solid var(--md-sys-color-primary);
       outline-offset: 2px;
     }
     .meta {
@@ -233,7 +230,7 @@ export class SkyProductCard extends LitElement {
       justify-content: space-between;
       gap: 8px;
       font-size: 0.8125rem;
-      color: var(--md-sys-color-on-surface-variant, #424940);
+      color: var(--md-sys-color-on-surface-variant);
     }
     .meta .distance {
       display: inline-flex;
@@ -249,11 +246,11 @@ export class SkyProductCard extends LitElement {
       align-items: center;
       gap: 6px;
       font-size: 0.8125rem;
-      color: var(--md-sys-color-on-surface-variant, #424940);
+      color: var(--md-sys-color-on-surface-variant);
     }
     .stars {
       display: inline-flex;
-      color: var(--md-sys-color-primary, #3a693c);
+      color: var(--md-sys-color-primary);
     }
     .stars md-icon {
       --md-icon-size: 18px;
@@ -261,17 +258,17 @@ export class SkyProductCard extends LitElement {
     }
     .stars md-icon.empty {
       font-variation-settings: 'FILL' 0;
-      color: var(--md-sys-color-outline, #72796f);
+      color: var(--md-sys-color-outline);
     }
     .rating strong {
-      color: var(--md-sys-color-on-surface, #1a1c19);
+      color: var(--md-sys-color-on-surface);
     }
     .score {
       display: inline-flex;
       align-items: center;
       gap: 8px;
       font-size: 0.8125rem;
-      color: var(--md-sys-color-on-surface-variant, #424940);
+      color: var(--md-sys-color-on-surface-variant);
     }
     .score__badge {
       display: inline-flex;
@@ -280,12 +277,12 @@ export class SkyProductCard extends LitElement {
       min-width: 2rem;
       padding: 3px 6px;
       border-radius: 8px 8px 8px 0;
-      background-color: var(--md-sys-color-primary, #3a693c);
-      color: var(--md-sys-color-on-primary, #fff);
+      background-color: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
       font-weight: 700;
     }
     .score__label {
-      color: var(--md-sys-color-on-surface, #1a1c19);
+      color: var(--md-sys-color-on-surface);
       font-weight: 600;
     }
     .price {
@@ -293,30 +290,30 @@ export class SkyProductCard extends LitElement {
       align-items: baseline;
       flex-wrap: wrap;
       gap: 6px;
-      margin-top: auto;
+      margin-top: 2px;
     }
     .price__prefix {
       font-size: 0.8125rem;
-      color: var(--md-sys-color-on-surface-variant, #424940);
+      color: var(--md-sys-color-on-surface-variant);
     }
     .price__original {
       font-size: 0.875rem;
       text-decoration: line-through;
-      color: var(--md-sys-color-on-surface-variant, #424940);
+      color: var(--md-sys-color-on-surface-variant);
     }
     .price__current {
       font-size: 1.15rem;
       font-weight: 700;
-      color: var(--md-sys-color-primary, #3a693c);
+      color: var(--md-sys-color-primary);
     }
     .price__discount {
       font-size: 0.8125rem;
       font-weight: 600;
-      color: var(--md-sys-color-primary, #3a693c);
+      color: var(--md-sys-color-primary);
     }
     .price__note {
       font-size: 0.8125rem;
-      color: var(--md-sys-color-primary, #3a693c);
+      color: var(--md-sys-color-primary);
     }
 
     /* Content alignment (default left). */
@@ -415,7 +412,7 @@ export class SkyProductCard extends LitElement {
             ${this.originalPrice
             ? html`<span class="price__original">${this.originalPrice}</span>`
             : nothing}
-            <span class="price__current">${this.price}</span>
+            <data class="price__current" value=${this.price ?? ''}>${this.price}</data>
             ${this.discount
             ? html`<span class="price__discount">${this.discount}</span>`
             : nothing}
@@ -429,8 +426,8 @@ export class SkyProductCard extends LitElement {
 
   protected override render() {
     return html`
-      <article class="card">
-        <div class="media">
+      <article class="card" aria-labelledby=${this.heading ? `${this._uid}-heading` : nothing}>
+        <figure class="media">
           <slot name="media">
            ${this.gallery && this.gallery.length > 1
         ? html`
@@ -475,7 +472,7 @@ export class SkyProductCard extends LitElement {
                 <md-icon>favorite</md-icon>
               </md-icon-button>`
         : nothing}
-        </div>
+        </figure>
         <div class="body">
           ${this.tag
         ? html`<span class="tag"
@@ -488,7 +485,7 @@ export class SkyProductCard extends LitElement {
         ? html`<span class="eyebrow">${this.eyebrow}</span>`
         : nothing}
           ${this.heading
-        ? html`<h3 class="heading">
+        ? html`<h3 id=${`${this._uid}-heading`} class="heading">
                 ${this.href
             ? html`<a href=${this.href}>${this.heading}</a>`
             : this.heading}
