@@ -14,47 +14,57 @@
     "signOut": "Sign Out",
     "cart": "Cart",
     "wishlist": "Wishlist",
-    "homeAriaLabel": "MSD – MySpaDeal home"
+    "homeAriaLabel": "MSD – MySpaDeal home",
+    "detectingLocation": "Detecting location...",
+    "openMenu": "Open menu",
+    "profile": "Profile",
+    "profileMenu": {
+      "profile": "My Profile",
+      "bookings": "My Bookings",
+      "wishlist": "Wishlist",
+      "signOut": "Sign Out"
+    },
+    "drawerLabel": "Navigation drawer"
   },
   "nav": {
     "drawerCategoryHeader": "Browse Categories",
-   "primary": [
-  {
-    "label": "Massage",
-    "icon": "self_improvement",
-    "to": "/category/massage",
-    "count": 12
-  },
-  {
-    "label": "Spas & Retreats",
-    "icon": "spa",
-    "to": "/category/spas-retreats",
-    "count": 11
-  },
-  {
-    "label": "Skin & Beauty",
-    "icon": "face",
-    "to": "/category/skin-beauty",
-    "count": 14
-  },
-  {
-    "label": "Hair & Nails",
-    "icon": "content_cut",
-    "to": "/category/hair-nails",
-    "count": 7
-  },
-  {
-    "label": "Health & Wellness",
-    "icon": "heart_smile",
-    "to": "/category/health-wellness",
-    "count": 13
-  },
-  {
-    "label": "Product",
-    "icon": "shopping_bag",
-    "to": "/products"
-  }
-],
+    "primary": [
+      {
+        "label": "Massage",
+        "icon": "self_improvement",
+        "to": "/category/massage",
+        "count": 12
+      },
+      {
+        "label": "Spas & Retreats",
+        "icon": "spa",
+        "to": "/category/spas-retreats",
+        "count": 11
+      },
+      {
+        "label": "Skin & Beauty",
+        "icon": "face",
+        "to": "/category/skin-beauty",
+        "count": 14
+      },
+      {
+        "label": "Hair & Nails",
+        "icon": "content_cut",
+        "to": "/category/hair-nails",
+        "count": 7
+      },
+      {
+        "label": "Health & Wellness",
+        "icon": "heart_smile",
+        "to": "/category/health-wellness",
+        "count": 13
+      },
+      {
+        "label": "Product",
+        "icon": "shopping_bag",
+        "to": "/products"
+      }
+    ],
     "categories": [
       {
         "label": "Massage",
@@ -507,8 +517,10 @@
   },
   "search": {
     "placeholder": "Search spas, treatments, locations…",
+    "ariaLabel": "Search deals",
     "resultLabel": "results",
     "noResults": "No results found. Try adjusting your filters.",
+    "emptySuggestion": "No spas found",
     "filters": {
       "price": {
         "label": "Price",

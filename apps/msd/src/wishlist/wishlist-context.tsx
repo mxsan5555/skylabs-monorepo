@@ -11,6 +11,7 @@ const STORAGE_KEY = 'msd_wishlist';
 
 interface WishlistContextValue {
   ids: Set<string>;
+  wishlistCount: number;
   toggle: (dealId: string) => void;
   has: (dealId: string) => boolean;
   remove: (dealId: string) => void;
@@ -62,9 +63,11 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clear = useCallback(() => setIds(new Set()), []);
+  const wishlistCount = ids.size;
 
   return (
-    <WishlistContext.Provider value={{ ids, toggle, has, remove, clear }}>
+    <WishlistContext.Provider
+      value={{ ids, wishlistCount, toggle, has, remove, clear, }}>
       {children}
     </WishlistContext.Provider>
   );

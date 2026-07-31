@@ -1,7 +1,3 @@
-/* ==========================================================================
-   Skip Link
-========================================================================== */
-
 .skip-link {
   position: absolute;
   top: -100%;
@@ -24,10 +20,6 @@ main {
   padding-top: 0;
 }
 
-/* ==========================================================================
-   Header
-========================================================================== */
-
 .site-header {
   position: static;
   inset: 0 0 auto;
@@ -37,9 +29,9 @@ main {
   box-shadow: 0 2px 12px rgb(0 0 0 / 8%);
 }
 
-/* ==========================================================================
-   Top Row
-========================================================================== */
+.site-header__menu-btn {
+  display: none;
+}
 
 .site-header__top {
   display: flex;
@@ -48,10 +40,6 @@ main {
   gap: 32px;
   padding: 12px 40px;
 }
-
-/* ==========================================================================
-   Brand
-========================================================================== */
 
 .site-header__brand {
   display: flex;
@@ -65,11 +53,9 @@ main {
   width: 54px;
   height: 54px;
   border-radius: 14px;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   background: var(--md-sys-color-primary-container);
   color: var(--md-sys-color-on-primary-container);
 }
@@ -96,35 +82,26 @@ main {
   margin-top: 2px;
 }
 
-/* ==========================================================================
-   Search
-========================================================================== */
-
 .home__hero-search {
   flex: 1;
   max-width: 700px;
 }
 
 .home__hero-search-field {
+  
   width: 100%;
-
   --md-outlined-text-field-container-height: 54px;
   --md-outlined-text-field-container-shape: 999px;
   --md-outlined-field-container-shape: 999px;
-
   --md-outlined-text-field-outline-width: 2px;
   --md-outlined-text-field-outline-color: #2e7d32;
   --md-outlined-text-field-focus-outline-color: #2e7d32;
 }
 
-/* ==========================================================================
-   Right Actions
-========================================================================== */
-
 .site-header__actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 15px;
   flex-shrink: 0;
 }
 
@@ -136,19 +113,14 @@ main {
   position: absolute;
   top: 4px;
   right: 4px;
-
   min-width: 18px;
   height: 18px;
-
   border-radius: 50%;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   background: var(--md-sys-color-error);
   color: var(--md-sys-color-on-error);
-
   font-size: .65rem;
   font-weight: 700;
 }
@@ -159,18 +131,12 @@ main {
   gap: 6px;
 }
 
-/* ==========================================================================
-   Second Row Navigation
-========================================================================== */
-
 .site-header__nav {
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 28px;
-
   height: 58px;
-
   border-top: 1px solid var(--md-sys-color-outline-variant);
 }
 
@@ -178,15 +144,10 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-
   padding: 8px 14px;
-
   text-decoration: none;
-
   color: var(--md-sys-color-on-surface-variant);
-
   border-radius: 24px;
-
   transition: .2s;
 }
 
@@ -203,35 +164,26 @@ main {
   font-size: 20px;
 }
 
-/* ==========================================================================
-   Drawer
-========================================================================== */
-
 .nav-drawer-backdrop {
   position: fixed;
   inset: 0;
   background: rgb(0 0 0 / .4);
+  z-index: 10000;
 }
 
 .nav-drawer {
   position: fixed;
   top: 0;
   left: 0;
-
-  width: min(320px,85vw);
+  width: min(320px, 85vw);
   height: 100vh;
-
   background: var(--md-sys-color-surface);
-
   transform: translateX(-100%);
   transition: transform .3s ease;
-
   display: flex;
   flex-direction: column;
-
   overflow-y: auto;
-
-  z-index: 999;
+  z-index: 10001;
 }
 
 .nav-drawer--open {
@@ -242,7 +194,6 @@ main {
   display: flex;
   justify-content: space-between;
   align-items: center;
-
   padding: 16px;
 }
 
@@ -255,13 +206,10 @@ main {
 .nav-drawer__brand-icon {
   width: 42px;
   height: 42px;
-
   border-radius: 12px;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   background: var(--md-sys-color-primary-container);
 }
 
@@ -279,9 +227,7 @@ main {
 .nav-drawer__link {
   display: block;
   padding: 14px 20px;
-
   text-decoration: none;
-
   color: var(--md-sys-color-on-surface);
 }
 
@@ -296,217 +242,278 @@ main {
   padding: 16px;
 }
 
-/* ==========================================================================
-   Responsive
-========================================================================== */
-
-@media (max-width:1200px){
-
-  .site-header__top{
-      padding:12px 24px;
-      gap:20px;
+@media (max-width:1200px) {
+  .site-header__top {
+    padding: 12px 24px;
+    gap: 20px;
   }
 
-  .home__hero-search{
-      max-width:500px;
+  .home__hero-search {
+    max-width: 500px;
   }
-
 }
 
-@media (max-width:992px){
-
-  .site-header__top{
-      gap:16px;
+@media (max-width:992px) {
+  .site-header__top {
+    gap: 16px;
   }
 
-  .site-header__brand-name{
-      font-size:1.4rem;
+  .site-header__brand-name {
+    font-size: 1.4rem;
   }
 
-  .site-header__brand-tagline{
-      font-size:.8rem;
+  .site-header__brand-tagline {
+    font-size: .8rem;
   }
 
-  .site-header__nav{
-      gap:16px;
-      overflow-x:auto;
-      justify-content:flex-start;
-      padding-inline:20px;
+  .site-header__nav {
+    gap: 16px;
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding-inline: 20px;
   }
-
 }
 
-@media (max-width:768px){
-
-  .site-header__top{
-      flex-wrap:wrap;
+@media (max-width:768px) {
+  .site-header__top {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "menu brand actions"
+      "search search search"
+      "location location location";
+    gap: 12px;
+    padding: 12px 16px;
+    align-items: center;
   }
 
-  .home__hero-search{
-      order:3;
-      width:100%;
-      max-width:100%;
-  }
-
-  .site-header__auth{
-      display:none;
-  }
-
-  .site-header__brand-tagline{
-      display:none;
-  }
-
-}
-
-@media (max-width:480px){
-
-  .site-header__top{
-      padding:10px 16px;
-  }
-
-  .site-header__brand-name{
-      font-size:1.2rem;
-  }
-
-  .site-header__brand-icon{
-      width:44px;
-      height:44px;
-  }
-
-  .site-header__nav{
-      gap:10px;
-      height:52px;
-  }
-
-  .site-header__nav-link{
-      padding:6px 10px;
-      font-size:.85rem;
-  }
-
-}
-
-
-
-.site-header__location{
-    display:flex;
-    align-items:center;
-    gap:6px;
-
-    padding:10px 14px;
-
-    border:1px solid var(--md-sys-color-outline-variant);
-
-    border-radius:999px;
-
-    background:var(--md-sys-color-surface);
-
-    white-space:nowrap;
-
-    cursor:pointer;
-
-    font-size:14px;
-
-    max-width:220px;
-}
-
-.site-header__location md-icon{
-    font-size:28px;
-    color:var(--md-sys-color-primary);
-}
-
-.site-header__search-section{
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    flex:1;
-}
-
-.site-header__location{
-    display:flex;
-    align-items:center;
-    gap:6px;
-    padding-left:8px;
-    font-size:14px;
-    color:var(--md-sys-color-on-surface-variant);
-}
-.site-header__search-wrapper{
-    position: relative;
+  .site-header__menu-btn {
     display: flex;
-    flex-direction: column;
-    width: 650px;
+    grid-area: menu;
+  }
+
+  .site-header__brand {
+    grid-area: brand;
+    min-width: 0;
+  }
+
+  .site-header__actions {
+    grid-area: actions;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .site-header__search-wrapper {
+    grid-area: search;
+    width: 100%;
+    max-width: none;
+  }
+
+  .site-header__search-top {
+    display: block;
+  }
+
+  .home__hero-search {
+    width: 100%;
+    max-width: none;
+  }
+
+  .site-header__location {
+    grid-area: location;
+    width: 100%;
+    max-width: none;
+  }
+
+  .site-header__profile {
+    display: flex;
+    align-items: center;
+  }
+
+  .site-header__profile md-filled-button {
+    display: none;
+  }
+
+  .site-header__nav {
+    display: none;
+  }
+
+  .site-header__brand-tagline {
+    display: none;
+  }
 }
-.site-header__search-top{
-    display:flex;
-    align-items:center;
-    gap:12px;
-}
-.search-suggestions{
-    position:absolute;
-    top:100%;
-    left:0;
-    width:100%;
 
-    margin-top:8px;
+@media (max-width:480px) {
+  .site-header__search-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
 
-    background:white;
-    border-radius:16px;
+  .home__hero-search {
+    flex: 1;
+  }
 
-    overflow:hidden;
+  .site-header__location {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 12px;
+  }
 
-    box-shadow:0 10px 30px rgba(0,0,0,.12);
+  .site-header__location span {
+    display: none;
+  }
 
-    z-index:999;
-}
-
-.search-suggestion{
-    width:100%;
-    display:flex;
-    align-items:center;
-    gap:12px;
-
-    padding:14px 18px;
-
-    border:none;
-    background:var(--md-sys-color-surface);
-
-    cursor:pointer;
-    text-align:left;
+  .site-header__location md-icon {
+    font-size: 20px;
+  }
 }
 
-.search-suggestion:hover{
-    background:var(--md-sys-color-surface-container);
+.site-header__location md-icon {
+  font-size: 28px;
+  color: var(--md-sys-color-primary);
 }
 
-.search-suggestion strong{
-    display:block;
+.site-header__search-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
 }
 
-.search-suggestion small{
-    color:#666;
+.site-header__location {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 999px;
+  background: var(--md-sys-color-surface);
+  white-space: nowrap;
+  cursor: pointer;
+  font-size: 14px;
+  max-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 8px;
+  font-size: 14px;
+  color: var(--md-sys-color-on-surface-variant);
 }
 
-.search-no-results{
-    padding:18px;
+.site-header__search-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  max-width: 750px;
 }
-.site-header__location span{
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
+
+.site-header__search-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-.search-suggestions{
-    position:absolute;
-    top:100%;
-    left:0;
 
-    width:calc(100% - 235px);
+.search-suggestion:hover {
+  background: var(--md-sys-color-surface-container);
+}
 
-    margin-top:8px;
+.search-suggestion strong {
+  display: block;
+}
 
-    background:var(--md-sys-color-surface);
+.search-suggestion small {
+  color: #666;
+}
 
-    border-radius:12px;
+.search-no-results {
+  padding: 18px;
+}
 
-    box-shadow:0 12px 24px rgba(0,0,0,.15);
+.site-header__location span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-    z-index:1000;
+.search-suggestions {
+  position: absolute;
+  top: 100%;
+  width: 100%;
+  left: 0;
+  margin-top: 8px;
+  background: var(--md-sys-color-surface);
+  border-radius: 12px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, .15);
+  z-index: 1000;
+}
+
+.profile-menu {
+  position: relative;
+}
+.profile-button {
+   width: 43px;
+  height: 43px;
+  border-radius: 12px; 
+  
+  --md-filled-tonal-icon-button-container-width: 80px;
+  --md-filled-tonal-icon-button-container-height: 48px;
+}
+
+
+.profile-arrow md-icon {
+  font-size: 16px;
+}
+.profile-name {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+
+.profile-arrow {
+  font-size: 18px;
+}
+
+
+.profile-arrow md-icon {
+  font-size: 18px;
+}
+.profile-menu {
+  position: relative;
+}
+
+
+.profile-menu md-menu {
+  margin-top: 8px;
+}
+md-menu-item {
+  min-width: 180px;
+}
+
+
+md-menu-item span {
+  white-space: nowrap;
+}
+.site-header__profile {
+  display: flex;
+  align-items: center;
+}
+
+.profile-button md-icon {
+  font-size: 24px;
+}
+
+.profile-arrow {
+  display: flex;
+  align-items: center;
+  margin-left: -6px;
+}
+
+.profile-arrow md-icon {
+  font-size: 18px;
 }

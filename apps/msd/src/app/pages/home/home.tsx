@@ -1,17 +1,16 @@
-﻿import { useNavigate } from 'react-router-dom';
-import { NavLink } from 'react-router-dom';
-import { useState, useMemo } from 'react';
-import { FilledButton, TextButton, Icon, Tabs, SecondaryTab, OutlinedTextField, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
+﻿import { useNavigate, NavLink } from 'react-router-dom';
+import { useState, useMemo, useRef } from 'react';
+import {FilledTonalIconButton, FilledButton, TextButton, Icon, Tabs, SecondaryTab, OutlinedTextField, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { DEALS, getFeaturedDeals, getHotDeals, getDealsByCategory, } from '../../../data/deals';
 import { CATEGORIES } from '../../../data/categories';
 import { DealCard } from '../../components/deal-card';
-import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import content from '../../../content.json';
 import './home.css';
 import '@skylabs-monorepo/shared-ui';
 import { formatINR } from '../../../utils/format';
+
 const { home } = content;
 const hotTabs = home.sections.hotRightNow.tabs;
 const { dealOfTheDay } = content;
@@ -38,6 +37,7 @@ function SectionHeader({
 }
 
 export function Home() {
+  const vacationSwiperRef = useRef<any>(null);
   const navigate = useNavigate();
   const { toggle, has } = useWishlist();
   const [selectedTab, setSelectedTab] = useState('all');
@@ -69,40 +69,13 @@ export function Home() {
           grab-cursor="true"
         >
           {deals.map((deal) => {
-            const discount =
-              deal.originalPrice > deal.price
-                ? Math.round(
-                  ((deal.originalPrice - deal.price) / deal.originalPrice) * 100
-                )
-                : 0;
-
             return (
               <swiper-slide
                 key={deal.id}
                 style={{ width: '260px', height: 'auto' }}
               >
-                <SkyProductCardWC
-                  image={deal.image}
-                  gallery={deal.gallery}
-                  imageAlt={deal.imageAlt}
-                  badge={deal.badge}
-
-                  eyebrow={deal.providerName}
-                  heading={deal.title}
-                  location={deal.location}
-                  distance={deal.distance}
-
-                  rating={deal.rating}
-                  reviews={deal.reviews}
-
-                  originalPrice={formatINR(deal.originalPrice)}
-                  price={formatINR(deal.price)}
-                  discount={discount ? `-${discount}%` : undefined}
-                  priceNote={deal.priceNote}
-
-                  href={`/deal/${deal.slug}`}
-
-                  favorite
+                <DealCard
+                  deal={deal}
                   favoriteActive={has(deal.id)}
                   onFavorite={() => toggle(deal.id)}
                 />
@@ -437,26 +410,46 @@ export function Home() {
             </h2>
           </div>
 
-          <swiper-container
-            navigation="true"
-            slides-per-view="auto"
-            space-between="20"
-            grab-cursor="true"
-          >
-            {home.vacationStays.items.map((item) => (
-              <swiper-slide
-                key={item.label}
-                className="home-stays-slide"
-              >
-                <sky-image-card
-                  image={item.image}
-                  imageAlt={item.imageAlt}
-                  label={item.label}
-                  href={item.href}
-                />
-              </swiper-slide>
-            ))}
-          </swiper-container>
+         <div className="vacation-slider">
+
+  <swiper-container
+    ref={vacationSwiperRef}
+    navigation={false}
+    pagination={false}
+    slides-per-view="auto"
+    space-between="20"
+    grab-cursor="true"
+  >
+    {home.vacationStays.items.map((item) => (
+      <swiper-slide
+        key={item.label}
+        className="home-stays-slide"
+      >
+        <sky-image-card
+          image={item.image}
+          imageAlt={item.imageAlt}
+          label={item.label}
+          href={item.href}
+        />
+      </swiper-slide>
+    ))}
+  </swiper-container>
+
+  <FilledTonalIconButton
+    className="slider-btn slider-btn--prev"
+    onClick={() => vacationSwiperRef.current?.swiper.slidePrev()}
+  >
+    <Icon>navigate_before</Icon>
+  </FilledTonalIconButton>
+
+  <FilledTonalIconButton
+    className="slider-btn slider-btn--next"
+    onClick={() => vacationSwiperRef.current?.swiper.slideNext()}
+  >
+    <Icon>navigate_next</Icon>
+  </FilledTonalIconButton>
+
+</div>
 
         </div>
       </section>
