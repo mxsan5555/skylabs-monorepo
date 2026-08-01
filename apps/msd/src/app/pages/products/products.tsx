@@ -1,40 +1,98 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import {
+  FilledButton,
+  Icon,
   ChipSet,
   FilterChip,
-  Icon,
+  OutlinedSelect,
+  SelectOption,
+  Divider,
 } from '@skylabs-monorepo/shared-ui/react';
-import '@skylabs-monorepo/shared-ui';
-import ProductCard from '../../components/product-card';
+import { useCart } from '../../../cart/cart-context';
+import { useWishlist } from '../../../wishlist/wishlist-context';
+import { PRODUCTS, getProductsByCategory, CATEGORY_LABELS } from '../../../data/products';
+import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
-import { products } from '../../../data/products';
-import type { DealSort } from '../../../types';
+import { formatINR } from '../../../utils/format';
+import type { ProductSort } from '../../../types';
 import content from '../../../content.json';
-import '../category/category.css';
+import './products.css';
 
-const SORT_OPTIONS = content.products.sortOptions as {
-  value: DealSort;
-  label: string;
-}[];
+const { products } = content;
 
-export function Products() {
-  const [sort, setSort] = useState<DealSort>('popular');
+const FILTERS = [
+  { value: 'all',        label: products.listing.filters.all },
+  { value: 'day',        label: products.listing.filters.day },
+  { value: 'night',      label: products.listing.filters.night },
+  { value: 'skin-care',  label: products.listing.filters.skinCare },
+];
 
-  // Temporary until we implement sorting
-  const sortedProducts = [...products];
+const SITE_URL: string = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
+
+export function ProductListing() {
+  const { addItem } = useCart();
+  const { toggle, has } = useWishlist();
+  const [activeFilter, setActiveFilter] = useState<string>('all');
+  const [sort, setSort] = useState<ProductSort>('popular');
+
+  const filteredProducts = useMemo(() => {
+    const list = activeFilter === 'all' ? PRODUCTS : getProductsByCategory(activeFilter);
+    switch (sort) {
+      case 'price-asc':  return [...list].sort((a, b) => a.price - b.price);
+      case 'price-desc': return [...list].sort((a, b) => b.price - a.price);
+      case 'newest':     return [...list].sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+      default:           return [...list];
+    }
+  }, [activeFilter, sort]);
 
   return (
-    <div className="category-page">
-      <title>Products | MSD</title>
-
-      <meta
-        name="description"
-        content="Browse wellness and skincare products from our affiliate partners."
+    <div id="main-content" className="products-page">
+      <title>{products.meta.listingTitle}</title>
+      <meta name="description" content={products.meta.listingDescription} />
+      <link rel="canonical" href={`${SITE_URL}/products`} />
+      <meta property="og:type" content="website" />
+      <meta property="og:title" content={products.meta.listingTitle} />
+      <meta property="og:description" content={products.meta.listingDescription} />
+      <meta property="og:url" content={`${SITE_URL}/products`} />
+      <meta name="twitter:card" content="summary" />
+      <meta name="twitter:title" content={products.meta.listingTitle} />
+      <meta name="twitter:description" content={products.meta.listingDescription} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/` },
+              { '@type': 'ListItem', position: 2, name: 'Products', item: `${SITE_URL}/products` },
+            ],
+          }),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'ItemList',
+            name: products.meta.listingTitle,
+            url: `${SITE_URL}/products`,
+            numberOfItems: PRODUCTS.length,
+            itemListElement: PRODUCTS.map((p, i) => ({
+              '@type': 'ListItem',
+              position: i + 1,
+              name: p.name,
+              url: `${SITE_URL}/products/${p.id}`,
+            })),
+          }),
+        }}
       />
 
       {/* Breadcrumb */}
       <Breadcrumb
-        className="category-page__breadcrumb"
+        className="products-page__breadcrumb"
         items={[
           { label: 'Home', to: '/' },
           { label: 'Products' },
@@ -42,76 +100,103 @@ export function Products() {
       />
 
       {/* Hero */}
-      <header className="category-page__hero">
-        <div className="category-page__hero-inner">
-          <div className="category-page__hero-icon" aria-hidden="true">
-            <Icon>inventory_2</Icon>
+      <section className="products-page__hero" aria-label="Products overview">
+        <div className="products-page__hero-inner">
+          <div className="products-page__hero-icon" aria-hidden="true">
+            <Icon>local_florist</Icon>
           </div>
-
           <div>
-            <h1 className="category-page__title">
-              {content.products.title}
-            </h1>
-
-            <p className="category-page__subtitle">
-              {products.length} products · {content.products.subtitle}
-            </p>
+            <h1 className="products-page__title">{products.listing.title}</h1>
+            <p className="products-page__subtitle">{products.listing.subtitle}</p>
           </div>
         </div>
-      </header>
+      </section>
 
-      {/* Sort */}
-      <div className="category-page__sort">
-        <div className="category-page__sort-inner">
-          <ChipSet>
-            {SORT_OPTIONS.map((opt) => (
+      {/* Single sticky row: filter chips + sort */}
+      <div className="products-page__filter-bar" role="toolbar" aria-label="Filter and sort products">
+        <div className="products-page__filter-bar-inner">
+          <ChipSet aria-label="Filter by category">
+            {FILTERS.map((f) => (
               <FilterChip
-                key={opt.value}
-                label={opt.label}
-                selected={sort === opt.value}
-                onClick={() => setSort(opt.value)}
+                key={f.value}
+                label={f.label}
+                selected={activeFilter === f.value}
+                onClick={() => setActiveFilter(f.value)}
               />
             ))}
           </ChipSet>
-
-          <p
-            className="category-page__count"
-            aria-live="polite"
-            aria-atomic="true"
+          <span className="products-page__count" aria-live="polite" aria-atomic="true">
+            {filteredProducts.length} {products.listing.resultLabel}
+          </span>
+          <OutlinedSelect
+            className="products-page__sort-select"
+            label={products.listing.sortLabel}
+            value={sort}
+            onInput={(e) => setSort((e.target as HTMLSelectElement).value as ProductSort)}
           >
-            {sortedProducts.length}{' '}
-            {sortedProducts.length === 1 ? 'product' : 'products'}
-          </p>
+            {products.listing.sortOptions.map((o) => (
+              <SelectOption key={o.value} value={o.value}>
+                {o.label}
+              </SelectOption>
+            ))}
+          </OutlinedSelect>
         </div>
       </div>
 
-      {/* Product Grid */}
-      <section
-        className="category-page__grid-wrap"
-        aria-label="Products"
-      >
-        <div className="category-page__grid-inner">
-          {sortedProducts.length === 0 ? (
-            <div className="category-page__empty">
-              <SkyInfoCardReact
-                icon="inventory_2"
-                heading={content.products.emptyTitle}
-                subheading={content.products.emptySubtitle}
-              />
-            </div>
-          ) : (
-            <ul className="category-page__grid">
-              {sortedProducts.map((product) => (
-                <li key={product.id}>
-                  <ProductCard product={product} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      <Divider />
+
+      {/* Grid */}
+      <section className="products-page__grid-section" aria-label="Product results">
+        {filteredProducts.length === 0 ? (
+          <div className="products-page__empty" role="status">
+            <sky-info-card
+              icon="search_off"
+              heading={products.listing.emptyHeading}
+              subheading={products.listing.emptySubheading}
+            />
+          </div>
+        ) : (
+          <div className="products-page__grid">
+            {filteredProducts.map((product) => (
+              <Link
+                key={product.id}
+                className="products-page__card-wrap"
+                to={`/products/${product.id}`}
+              >
+                <SkyProductCardWC
+                  variant="outlined"
+                  heading={product.name}
+                  eyebrow={product.brand}
+                  image={product.image}
+                  imageAlt={product.imageAlt}
+                  badge={CATEGORY_LABELS[product.categorySlug]}
+                  price={formatINR(product.price)}
+                  originalPrice={product.originalPrice ? formatINR(product.originalPrice) : undefined}
+                  discount={product.discount ? `${product.discount}% OFF` : undefined}
+                  favorite
+                  favoriteActive={has(product.id)}
+                  onFavorite={() => toggle(product.id)}
+                >
+                  <div
+                    className="products-page__card-cta"
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                  >
+                    <FilledButton
+                      className="products-page__card-btn"
+                      onClick={() => addItem(product.id)}
+                    >
+                      <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                      Add to Cart
+                    </FilledButton>
+                  </div>
+                </SkyProductCardWC>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );
 }
 
-export default Products;
+export default ProductListing;

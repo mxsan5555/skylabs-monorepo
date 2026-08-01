@@ -91,10 +91,15 @@ export class SkyProductCard extends LitElement {
 
   static override styles = css`
     ${hostBase}
+    :host {
+      display: flex;
+      flex-direction: column;
+    }
     .card {
       position: relative;
       display: flex;
       flex-direction: column;
+      flex: 1;
       overflow: hidden;
       border-radius: var(--md-sys-shape-corner-large, 16px);
       background-color: var(--md-sys-color-surface);
@@ -180,9 +185,14 @@ export class SkyProductCard extends LitElement {
     .body {
       display: flex;
       flex-direction: column;
+      flex: 1;
       gap: 6px;
       padding: 12px 14px 14px;
       background: var(--md-sys-color-surface-container);
+    }
+    slot {
+      display: block;
+      margin-top: auto;
     }
     .tag {
       display: inline-flex;

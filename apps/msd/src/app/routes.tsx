@@ -19,8 +19,10 @@ import DealDetail from './pages/deal-detail/deal-detail';
 import Cart from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
 import Checkout from './pages/checkout/checkout';
-import Products from './pages/products/products';
+import ProductListing from './pages/products/products';
 import ProductDetail from './pages/product-detail/product-detail';
+import VendorPage from './pages/vendor/vendor';
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -30,8 +32,11 @@ export function AppRoutes() {
         <Route path="/explore" element={<Search />} />
         <Route path="/category/:slug" element={<Category />} />
         <Route path="/deal/:id" element={<DealDetail />} />
+        <Route path="/products" element={<ProductListing />} />
+        <Route path="/products/:id" element={<ProductDetail />} />
+        <Route path="/vendor/:slug" element={<VendorPage />} />
         <Route path="/cart" element={<Cart />} />
-<Route path="/products"  element={<Products />}/>
+        <Route path="/products" element={<ProductListing />} />
         {/* ── Auth-gated consumer pages ── */}
         <Route
           path="/wishlist"
@@ -53,7 +58,7 @@ export function AppRoutes() {
         {/* ── Content pages ── */}
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogDetail />} />
-        <Route  path="/products/:slug" element={<ProductDetail />}/>
+        <Route path="/products/:slug" element={<ProductDetail />} />
         <Route path="/showcase" element={<Showcase />} />
 
         {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}

@@ -38,11 +38,13 @@ interface SkyProductCardProps {
   href?: string;
   align?: 'left' | 'center' | 'right';
   onFavorite?: () => void;
+  children?: ReactNode;
 }
 
 export function SkyProductCardWC({
   children,
   onFavorite,
+  children,
   ...props
 }: SkyProductCardProps) {
   const ref = useRef<HTMLElement>(null);
@@ -56,9 +58,5 @@ export function SkyProductCardWC({
 
   // React 19 passes unknown camelCase props as DOM properties — LIT reads them.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (
-    <sky-product-card ref={ref as any} {...(props as any)}>
-      {children}
-    </sky-product-card>
-  );
+  return <sky-product-card ref={ref as any} {...(props as any)}>{children}</sky-product-card>;
 }
