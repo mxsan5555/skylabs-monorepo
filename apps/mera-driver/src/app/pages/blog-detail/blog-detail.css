@@ -13,7 +13,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--md-sys-color-primary, #1175bc);
+  color: var(--md-sys-color-primary);
   text-decoration: none;
   font-size: 0.875rem;
 }
@@ -40,7 +40,7 @@
   margin: 0;
   font-size: clamp(1.6rem, 4vw, 2.25rem);
   line-height: 1.2;
-  color: var(--md-sys-color-on-surface, #191c1f);
+  color: var(--md-sys-color-on-surface);
 }
 
 .post__meta {
@@ -50,7 +50,7 @@
   align-items: center;
   gap: 6px;
   font-size: 0.875rem;
-  color: var(--md-sys-color-on-surface-variant, #42474e);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 .post__read {
@@ -71,14 +71,14 @@
   border-radius: 14px;
   display: block;
   margin: 8px 0 24px;
-  background-color: var(--md-sys-color-surface-variant, #dde2e8);
+  background-color: var(--md-sys-color-surface-variant);
 }
 
 .post__body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  color: var(--md-sys-color-on-surface, #191c1f);
+  color: var(--md-sys-color-on-surface);
   font-size: 1.05rem;
   line-height: 1.7;
 }
@@ -86,7 +86,7 @@
 .post__body h2 {
   margin: 12px 0 0;
   font-size: 1.35rem;
-  color: var(--md-sys-color-on-surface, #191c1f);
+  color: var(--md-sys-color-on-surface);
 }
 
 .post__body ul {
@@ -100,15 +100,15 @@
 .post__body blockquote {
   margin: 8px 0;
   padding: 8px 16px;
-  border-left: 4px solid var(--md-sys-color-primary, #1175bc);
-  color: var(--md-sys-color-on-surface-variant, #42474e);
+  border-left: 4px solid var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-surface-variant);
   font-style: italic;
 }
 
 .post__footer {
   margin-top: 32px;
   padding-top: 20px;
-  border-top: 1px solid var(--md-sys-color-outline-variant, #c2c7ce);
+  border-top: 1px solid var(--md-sys-color-outline-variant);
   display: flex;
   flex-direction: column;
   gap: 16px;

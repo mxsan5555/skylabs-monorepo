@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FilledButton,
@@ -9,7 +9,6 @@ import {
   Icon,
   LinearProgress,
   Divider,
-  SkyCardReact,
 } from '@skylabs-monorepo/shared-ui/react';
 import { useCart } from '../../../cart/cart-context';
 import { useCartDeals } from '../../../hooks/use-cart-deals';
@@ -308,7 +307,7 @@ export function Checkout() {
 
           {/* ── Order summary sidebar ────────────────────────────────────── */}
           <aside className="checkout-page__summary" aria-label="Order summary">
-            <SkyCardReact variant="outlined">
+            <sky-card variant="outlined">
               <div className="checkout-summary">
                 <h2 className="checkout-summary__heading">{checkoutContent.orderSummaryHeading}</h2>
                 <ul className="checkout-summary__items">
@@ -337,7 +336,7 @@ export function Checkout() {
                   <strong>{formatINR(subtotal)}</strong>
                 </div>
               </div>
-            </SkyCardReact>
+            </sky-card>
           </aside>
         </div>
       </div>

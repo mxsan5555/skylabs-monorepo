@@ -1,4 +1,4 @@
-import { SkyCardReact } from '@skylabs-monorepo/shared-ui/react';
+﻿
 import { AdminPage } from '../../admin/admin-page';
 
 /**
@@ -10,7 +10,7 @@ import { AdminPage } from '../../admin/admin-page';
 export function Dashboard() {
   return (
     <AdminPage title="Dashboard" subtitle="An overview of your account activity.">
-      <SkyCardReact>Welcome back. Pick a section from the sidebar.</SkyCardReact>
+      <sky-card>Welcome back. Pick a section from the sidebar.</sky-card>
     </AdminPage>
   );
 }
@@ -18,7 +18,7 @@ export function Dashboard() {
 export function Deals() {
   return (
     <AdminPage title="Deals" subtitle="Admin only — upload and manage massage deals.">
-      <SkyCardReact>Deal upload tools go here.</SkyCardReact>
+      <sky-card>Deal upload tools go here.</sky-card>
     </AdminPage>
   );
 }
@@ -29,7 +29,7 @@ export function Promotions() {
       title="Promotions"
       subtitle="Marketing only — create and schedule promotions."
     >
-      <SkyCardReact>Promotion builder goes here.</SkyCardReact>
+      <sky-card>Promotion builder goes here.</sky-card>
     </AdminPage>
   );
 }
@@ -37,7 +37,7 @@ export function Promotions() {
 export function Sales() {
   return (
     <AdminPage title="Sales" subtitle="Sales only — track revenue and conversions.">
-      <SkyCardReact>Sales dashboards go here.</SkyCardReact>
+      <sky-card>Sales dashboards go here.</sky-card>
     </AdminPage>
   );
 }

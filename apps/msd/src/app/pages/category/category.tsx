@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChipSet,
@@ -6,7 +6,6 @@ import {
   Icon,
   Tabs,
   PrimaryTab,
-  SkyInfoCardReact,
   FilledButton,
 } from '@skylabs-monorepo/shared-ui/react';
 import { useWishlist } from '../../../wishlist/wishlist-context';
@@ -33,7 +32,7 @@ export function Category() {
     return (
       <div className="category-page category-page--empty">
         <title>Category Not Found | MSD</title>
-        <SkyInfoCardReact
+        <sky-info-card
           icon="search_off"
           heading="Category not found"
           subheading="Try browsing all our deals."
@@ -139,7 +138,7 @@ export function Category() {
         <div className="category-page__grid-inner">
           {sorted.length === 0 ? (
             <div className="category-page__empty">
-              <SkyInfoCardReact
+              <sky-info-card
                 icon="sentiment_dissatisfied"
                 heading="No deals found"
                 subheading="Try a different subcategory or browse all deals."
