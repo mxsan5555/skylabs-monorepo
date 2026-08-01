@@ -9,9 +9,10 @@
  * Import this (not the raw tag) in any React component that needs onFavorite.
  * All other sky-product-card usages can use the raw <sky-product-card> tag.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 interface SkyProductCardProps {
+  children?: ReactNode;
   image?: string;
   imageAlt?: string;
   gallery?: string[];
@@ -40,6 +41,7 @@ interface SkyProductCardProps {
 }
 
 export function SkyProductCardWC({
+  children,
   onFavorite,
   ...props
 }: SkyProductCardProps) {
@@ -54,5 +56,9 @@ export function SkyProductCardWC({
 
   // React 19 passes unknown camelCase props as DOM properties — LIT reads them.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return <sky-product-card ref={ref as any} {...(props as any)} />;
+  return (
+    <sky-product-card ref={ref as any} {...(props as any)}>
+      {children}
+    </sky-product-card>
+  );
 }

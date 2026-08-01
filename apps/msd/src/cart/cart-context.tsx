@@ -13,10 +13,10 @@ const STORAGE_KEY = 'msd_cart';
 interface CartContextValue {
   items: CartItem[];
   totalItems: number;
-  addItem: (dealId: string) => void;
-  removeItem: (dealId: string) => void;
-  updateQuantity: (dealId: string, quantity: number) => void;
-  updateDateTime: (dealId: string, date: string, time: string) => void;
+  addItem: ( id: string,type: 'deal'  | 'product') => void;
+  removeItem: (id: string, type: 'deal' | 'product') => void;
+  updateQuantity: (id: string, type: 'deal' | 'product', quantity: number) => void;
+  updateDateTime: (id: string, type: 'deal' | 'product', date: string, time: string) => void;
   clearCart: () => void;
 }
 
@@ -42,39 +42,89 @@ export function CartProvider({ children }: { children: ReactNode }) {
     save(items);
   }, [items]);
 
-  const addItem = useCallback((dealId: string) => {
+const addItem = useCallback(
+  (id: string, type: 'deal' | 'product') => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.dealId === dealId);
+      const existing = prev.find((i) =>
+        type === 'deal'? i.dealId === id : i.productId === id );
       if (existing) {
         return prev.map((i) =>
-          i.dealId === dealId ? { ...i, quantity: i.quantity + 1 } : i,
-        );
-      }
-      return [...prev, { dealId, quantity: 1 }];
+          (type === 'deal' ? i.dealId === id: i.productId === id) ? { ...i,  quantity: i.quantity + 1, }: i, );}
+      return [  ...prev,
+        type === 'deal'
+          ? {
+              dealId: id,
+              quantity: 1,
+            }
+          : {
+              productId: id,
+              quantity: 1,
+            },
+      ];
     });
-  }, []);
-
-  const removeItem = useCallback((dealId: string) => {
-    setItems((prev) => prev.filter((i) => i.dealId !== dealId));
-  }, []);
-
-  const updateQuantity = useCallback((dealId: string, quantity: number) => {
-    if (quantity < 1) return;
+  }, [],
+);
+const removeItem = useCallback(
+  (id: string, type: 'deal' | 'product') => {
     setItems((prev) =>
-      prev.map((i) => (i.dealId === dealId ? { ...i, quantity } : i)),
+      prev.filter((i) =>
+        type === 'deal'
+          ? i.dealId !== id
+          : i.productId !== id
+      ),
     );
-  }, []);
+  },
+  [],
+);
 
-  const updateDateTime = useCallback(
-    (dealId: string, date: string, time: string) => {
-      setItems((prev) =>
-        prev.map((i) =>
-          i.dealId === dealId ? { ...i, selectedDate: date, selectedTime: time } : i,
-        ),
-      );
-    },
-    [],
-  );
+const updateQuantity = useCallback(
+  (
+    id: string,
+    type: 'deal' | 'product',
+    quantity: number,
+  ) => {
+    if (quantity < 1) return;
+
+    setItems((prev) =>
+      prev.map((i) =>
+        (
+          type === 'deal'
+            ? i.dealId === id
+            : i.productId === id
+        )
+          ? { ...i, quantity }
+          : i,
+      ),
+    );
+  },
+  [],
+);
+
+const updateDateTime = useCallback(
+  (
+    id: string,
+    type: 'deal' | 'product',
+    date: string,
+    time: string,
+  ) => {
+    setItems((prev) =>
+      prev.map((i) =>
+        (
+          type === 'deal'
+            ? i.dealId === id
+            : i.productId === id
+        )
+          ? {
+              ...i,
+              selectedDate: date,
+              selectedTime: time,
+            }
+          : i,
+      ),
+    );
+  },
+  [],
+);
 
   const clearCart = useCallback(() => setItems([]), []);
 

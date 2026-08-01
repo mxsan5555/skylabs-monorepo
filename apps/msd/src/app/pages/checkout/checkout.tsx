@@ -11,7 +11,7 @@ import {
   Divider,
 } from '@skylabs-monorepo/shared-ui/react';
 import { useCart } from '../../../cart/cart-context';
-import { useCartDeals } from '../../../hooks/use-cart-deals';
+import { useCartItems } from "../../../hooks/use-cart-items";
 import { formatINR, inputValue } from '../../../utils/format';
 import type { CheckoutStep } from '../../../types';
 import content from '../../../content.json';
@@ -46,7 +46,7 @@ const TIME_OPTIONS = [
 
 export function Checkout() {
   const { items, clearCart } = useCart();
-  const { cartDeals, subtotal } = useCartDeals();
+  const { cartItems, subtotal } = useCartItems();
   const navigate = useNavigate();
   const [step, setStep] = useState<CheckoutStep>('details');
   const [placed, setPlaced] = useState(false);
@@ -245,10 +245,10 @@ export function Checkout() {
                   <OutlinedTextField
                     label={checkoutContent.fields.cardNumber}
                     type="text"
-                    inputmode="numeric"
+                    inputMode="numeric"
                     autocomplete="cc-number"
                     required
-                    maxlength={19}
+                    maxLength={19}
                     value={cardNumber}
                     onInput={(e) => setCardNumber(inputValue(e as unknown as Event))}
                   >
@@ -258,20 +258,20 @@ export function Checkout() {
                     <OutlinedTextField
                       label={checkoutContent.fields.expiry}
                       type="text"
-                      inputmode="numeric"
+                      inputMode="numeric"
                       autocomplete="cc-exp"
                       required
-                      maxlength={5}
+                      maxLength={5}
                       value={expiry}
                       onInput={(e) => setExpiry(inputValue(e as unknown as Event))}
                     />
                     <OutlinedTextField
                       label={checkoutContent.fields.cvv}
                       type="password"
-                      inputmode="numeric"
+                      inputMode="numeric"
                       autocomplete="cc-csc"
                       required
-                      maxlength={4}
+                      maxLength={4}
                       value={cvv}
                       onInput={(e) => setCvv(inputValue(e as unknown as Event))}
                     />
@@ -311,24 +311,30 @@ export function Checkout() {
               <div className="checkout-summary">
                 <h2 className="checkout-summary__heading">{checkoutContent.orderSummaryHeading}</h2>
                 <ul className="checkout-summary__items">
-                  {cartDeals.map(({ item, deal }) => (
-                    <li key={deal.id} className="checkout-summary__item">
-                      <img
-                        src={deal.image}
-                        alt={deal.imageAlt}
-                        width={52}
-                        height={52}
-                        loading="lazy"
-                      />
-                      <div>
-                        <p className="checkout-summary__item-title">{deal.title}</p>
-                        <p className="checkout-summary__item-qty">× {item.quantity}</p>
-                      </div>
-                      <p className="checkout-summary__item-price">
-                        {formatINR(deal.price * item.quantity)}
-                      </p>
-                    </li>
-                  ))}
+                  {cartItems.map((entry) => {
+                    const data = entry.type === 'deal' ? entry.deal! : entry.product!;
+                    return (
+                      <li
+                        key={entry.type === 'deal' ? entry.deal!.id : entry.product!.id}
+                        className="checkout-summary__item"
+                      >
+                        <img
+                          src={data.image}
+                          alt={entry.type === 'deal' ? entry.deal!.imageAlt : entry.product!.name}
+                          width={52}
+                          height={52}
+                          loading="lazy"
+                        />
+                        <div>
+                          <p className="checkout-summary__item-title">{entry.type === 'deal' ? entry.deal!.title : entry.product!.name}</p>
+                          <p className="checkout-summary__item-qty">× {entry.item.quantity}</p>
+                        </div>
+                        <p className="checkout-summary__item-price">
+                          {formatINR((entry.type === 'deal' ? entry.deal!.price : entry.product!.price) * entry.item.quantity)}
+                        </p>
+                      </li>
+                    );
+                  })}
                 </ul>
                 <Divider />
                 <div className="checkout-summary__total">
@@ -343,5 +349,4 @@ export function Checkout() {
     </div>
   );
 }
-
 export default Checkout;

@@ -1,6 +1,6 @@
 ﻿import { useNavigate, NavLink } from 'react-router-dom';
 import { useState, useMemo, useRef } from 'react';
-import {FilledTonalIconButton, FilledButton, TextButton, Icon, Tabs, SecondaryTab, OutlinedTextField, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
+import { FilledTonalIconButton, FilledButton, TextButton, Icon, Tabs, SecondaryTab, OutlinedTextField, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { DEALS, getFeaturedDeals, getHotDeals, getDealsByCategory, } from '../../../data/deals';
@@ -9,17 +9,17 @@ import { DealCard } from '../../components/deal-card';
 import content from '../../../content.json';
 import './home.css';
 import '@skylabs-monorepo/shared-ui';
-import { formatINR } from '../../../utils/format';
 
 const { home } = content;
 const hotTabs = home.sections.hotRightNow.tabs;
-const { dealOfTheDay } = content;
 const heroImages = home.heroImages as string[];
 function SectionHeader({
+  id,
   heading,
   seeAll,
   seeAllTo,
 }: {
+  id: string;
   heading: string;
   seeAll: string;
   seeAllTo: string;
@@ -27,7 +27,7 @@ function SectionHeader({
   const navigate = useNavigate();
   return (
     <div className="home-section__header">
-      <h2 className="home-section__heading">{heading}</h2>
+      <h2 id={id} className="home-section__heading">{heading}</h2>
       <TextButton onClick={() => navigate(seeAllTo)}>
         {seeAll}
         <Icon slot="trailing-icon" aria-hidden="true">chevron_right</Icon>
@@ -59,7 +59,6 @@ export function Home() {
   }, [selectedTab, hotDeals]);
 
   function renderDealCarousel(deals: typeof DEALS) {
-
     return (
       <div className="home-carousel">
         <swiper-container
@@ -70,10 +69,7 @@ export function Home() {
         >
           {deals.map((deal) => {
             return (
-              <swiper-slide
-                key={deal.id}
-                style={{ width: '260px', height: 'auto' }}
-              >
+              <swiper-slide key={deal.id} style={{ width: '260px', height: 'auto' }} >
                 <DealCard
                   deal={deal}
                   favoriteActive={has(deal.id)}
@@ -135,89 +131,7 @@ export function Home() {
             <FilledButton type="submit">{home.hero.ctaLabel}</FilledButton>
           </form>
         </div>
-        {/* <div className="home__hero-bg" aria-hidden="true" /> */}
       </section>
-
-      {/* Deal of the Day */}
-      {/* <section className="home-deal">
-        <div className="home-deal__container">
-          <div className="home-deal__image">
-            <img
-              src={dealOfTheDay.image}
-              alt={dealOfTheDay.title}
-            />
-          < /div>
-
-          <sky-card
-            variant="filled"
-            className="home-deal__card"
-          >
-            <div className="home-deal__badge">
-              <Icon>local_fire_department</Icon>
-              <span>{dealOfTheDay.badge}</span>
-            </div>
-            <h2 className="home-deal__title">
-              {dealOfTheDay.title}
-            </h2>
-            <p className="home-deal__subtitle">
-              {dealOfTheDay.subtitle}
-            </p>
-            <div className="home-deal__meta">
-              <div className="home-deal__rating">
-                <Icon>star</Icon>
-                <span>{dealOfTheDay.rating.value}</span>
-              </div>
-              <span className="dot">•</span>
-              <span>
-                {dealOfTheDay.rating.reviews} Reviews
-              </span>
-              <span className="dot">•</span>
-              <span>{dealOfTheDay.duration}</span>
-              <span className="dot">•</span>
-              <span>{dealOfTheDay.location}</span>
-            </div>
-            <div className="home-deal__pricing">
-              <span className="home-deal__discount">
-                {dealOfTheDay.discount}
-              </span>
-              <div className="home-deal__prices">
-                <span className="home-deal__price">
-                  {dealOfTheDay.price}
-                </span>
-                <span className="home-deal__original-price">
-                  {dealOfTheDay.originalPrice}
-                </span>
-              </div>
-            </div>
-         
-            <div className="home-deal__features">
-              {dealOfTheDay.features.map((feature) => (
-                <div
-                  key={feature.label}
-                  className="home-deal__feature"
-                >
-                  <Icon>{feature.icon}</Icon>
-                  <span>{feature.label}</span>
-                </div>
-              ))}
-            </div>
-            <div className="home-deal__coupon">
-              <div className="home-deal__coupon-code">
-                <Icon>sell</Icon>
-                <strong>
-                  {dealOfTheDay.coupon.code}
-                </strong>
-              </div>
-              <p className="home-deal__coupon-description">
-                {dealOfTheDay.coupon.description}
-              </p>
-            </div>
-            <FilledButton className="home-deal__button">
-              {dealOfTheDay.buttonText}
-            </FilledButton>
-          </sky-card>
-        </div>
-      </section> */}
 
       {/* ── Browse by Category ─────────────────────────────────────────── */}
       <section className="home-section home-section--alt" aria-labelledby="category-heading">
@@ -410,46 +324,46 @@ export function Home() {
             </h2>
           </div>
 
-         <div className="vacation-slider">
+          <div className="vacation-slider">
 
-  <swiper-container
-    ref={vacationSwiperRef}
-    navigation={false}
-    pagination={false}
-    slides-per-view="auto"
-    space-between="20"
-    grab-cursor="true"
-  >
-    {home.vacationStays.items.map((item) => (
-      <swiper-slide
-        key={item.label}
-        className="home-stays-slide"
-      >
-        <sky-image-card
-          image={item.image}
-          imageAlt={item.imageAlt}
-          label={item.label}
-          href={item.href}
-        />
-      </swiper-slide>
-    ))}
-  </swiper-container>
+            <swiper-container
+              ref={vacationSwiperRef}
+              navigation={false}
+              pagination={false}
+              slides-per-view="auto"
+              space-between="20"
+              grab-cursor="true"
+            >
+              {home.vacationStays.items.map((item) => (
+                <swiper-slide
+                  key={item.label}
+                  className="home-stays-slide"
+                >
+                  <sky-image-card
+                    image={item.image}
+                    imageAlt={item.imageAlt}
+                    label={item.label}
+                    href={item.href}
+                  />
+                </swiper-slide>
+              ))}
+            </swiper-container>
 
-  <FilledTonalIconButton
-    className="slider-btn slider-btn--prev"
-    onClick={() => vacationSwiperRef.current?.swiper.slidePrev()}
-  >
-    <Icon>navigate_before</Icon>
-  </FilledTonalIconButton>
+            <FilledTonalIconButton
+              className="slider-btn slider-btn--prev"
+              onClick={() => vacationSwiperRef.current?.swiper.slidePrev()}
+            >
+              <Icon>navigate_before</Icon>
+            </FilledTonalIconButton>
 
-  <FilledTonalIconButton
-    className="slider-btn slider-btn--next"
-    onClick={() => vacationSwiperRef.current?.swiper.slideNext()}
-  >
-    <Icon>navigate_next</Icon>
-  </FilledTonalIconButton>
+            <FilledTonalIconButton
+              className="slider-btn slider-btn--next"
+              onClick={() => vacationSwiperRef.current?.swiper.slideNext()}
+            >
+              <Icon>navigate_next</Icon>
+            </FilledTonalIconButton>
 
-</div>
+          </div>
 
         </div>
       </section>

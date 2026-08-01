@@ -144,7 +144,8 @@ export interface Deal {
 }
 
 export interface CartItem {
-  dealId: string;
+  dealId?: string;
+  productId?: string;
   quantity: number;
   selectedDate?: string;
   selectedTime?: string;

@@ -41,14 +41,14 @@ export function DealDetail() {
       </div>
     );
   }
-
+  const currentDeal = deal;
   const category = getCategoryBySlug(deal.categorySlug);
   const related = DEALS.filter(
     (d) => d.categorySlug === deal.categorySlug && d.id !== deal.id,
   ).slice(0, 6);
 
   function handleAddToCart() {
-    addItem(deal.id);
+    addItem(currentDeal.id, 'deal');
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 2000);
   }
@@ -99,7 +99,7 @@ export function DealDetail() {
           <div className="deal-detail__main-img-wrap">
             <img
               className="deal-detail__main-img"
-              src={deal.gallery[activeImg] ?? deal.image}
+              src={deal.gallery?.[activeImg] ?? deal.image}
               alt={deal.imageAlt}
               width={800}
               height={450}
@@ -110,9 +110,9 @@ export function DealDetail() {
               </span>
             )}
           </div>
-          {deal.gallery.length > 1 && (
+          {(deal.gallery?.length ?? 0) > 1 && (
             <div className="deal-detail__thumbs" aria-label="Gallery thumbnails">
-              {deal.gallery.map((img, i) => (
+              {deal.gallery?.map((img, i) => (
                 <button
                   key={i}
                   className={`deal-detail__thumb${i === activeImg ? ' deal-detail__thumb--active' : ''}`}

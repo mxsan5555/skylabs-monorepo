@@ -40,9 +40,9 @@ export function ProductDetail() {
         )
         .slice(0, 6);
     const discountPct = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
-
+    const currentProduct = product;
     function handleBuyNow() {
-        addItem(product.id);
+        addItem(currentProduct.id, 'product');
         setAddedToCart(true);
         setTimeout(() => { setAddedToCart(false); }, 2000);
     }

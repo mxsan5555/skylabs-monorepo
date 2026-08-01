@@ -8,7 +8,7 @@ import {
   OutlinedTextField,
 } from '@skylabs-monorepo/shared-ui/react';
 import { useCart } from '../../../cart/cart-context';
-import { useCartDeals } from '../../../hooks/use-cart-deals';
+import { useCartItems } from '../../../hooks/use-cart-items';
 import { useAuth } from '../../../auth/auth-context';
 import { formatINR, pluralize } from '../../../utils/format';
 import content from '../../../content.json';
@@ -18,14 +18,17 @@ const { cart: cartContent } = content;
 
 export function Cart() {
   const { removeItem, updateQuantity, totalItems } = useCart();
-  const { cartDeals, subtotal } = useCartDeals();
+  const { cartItems, subtotal } = useCartItems();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  const totalOriginal = cartDeals.reduce(
-    (sum, { item, deal }) => sum + (deal.originalPrice ?? deal.price) * item.quantity,
-    0,
-  );
+  const totalOriginal = cartItems.reduce((sum, entry) => {
+    const originalPrice = entry.type === 'deal'
+      ? entry.deal!.originalPrice ?? entry.deal!.price
+      : entry.product!.originalPrice ?? entry.product!.price;
+
+    return sum + originalPrice * entry.item.quantity;
+  }, 0);
   const savings = totalOriginal - subtotal;
 
   function handleCheckout() {
@@ -52,7 +55,7 @@ export function Cart() {
           )}
         </h1>
 
-        {cartDeals.length === 0 ? (
+        {cartItems.length === 0 ? (
           <div className="cart-page__empty">
             <sky-info-card
               icon="shopping_bag"
@@ -68,12 +71,20 @@ export function Cart() {
             {/* Items column */}
             <section className="cart-page__items" aria-label="Cart items">
               <ul className="cart-list">
-                {cartDeals.map(({ item, deal }) => (
-                  <li key={deal.id} className="cart-item">
+                {cartItems.map((entry) => (
+                  <li key={entry.type === 'deal' ? entry.deal!.id : entry.product!.id} className="cart-item">
                     <img
                       className="cart-item__img"
-                      src={deal.image}
-                      alt={deal.imageAlt}
+                      src={
+                        entry.type === 'deal'
+                          ? entry.deal!.image
+                          : entry.product!.image
+                      }
+                      alt={
+                        entry.type === 'deal'
+                          ? entry.deal!.imageAlt
+                          : entry.product!.name
+                      }
                       width={100}
                       height={100}
                       loading="lazy"
@@ -81,43 +92,62 @@ export function Cart() {
                     <div className="cart-item__body">
                       <div className="cart-item__top">
                         <div>
-                          <h3 className="cart-item__title">{deal.title}</h3>
-                          <p className="cart-item__provider">{deal.providerName}</p>
-                          {item.selectedDate && (
+                          <h3 className="cart-item__title">{entry.type === 'deal' ? entry.deal!.title : entry.product!.name}</h3>
+                          <p className="cart-item__provider">{entry.type === 'deal' ? entry.deal!.providerName : entry.product!.brand}</p>
+                          {entry.item.selectedDate && (
                             <p className="cart-item__datetime">
                               <Icon aria-hidden="true">event</Icon>
-                              {item.selectedDate}
-                              {item.selectedTime && ` at ${item.selectedTime}`}
+                              {entry.item.selectedDate}
+                              {entry.item.selectedTime && ` at ${entry.item.selectedTime}`}
                             </p>
                           )}
                         </div>
                         <p className="cart-item__price">
-                          {formatINR(deal.price * item.quantity)}
+                          {formatINR(entry.type === 'deal'
+                            ? entry.deal!.price
+                            : entry.product!.price * entry.item.quantity)}
                         </p>
                       </div>
 
                       <div className="cart-item__actions">
-                        <div className="cart-item__qty" role="group" aria-label={`Quantity for ${deal.title}`}>
+                        <div className="cart-item__qty" role="group" aria-label={`Quantity for ${entry.type === 'deal' ? entry.deal!.title : entry.product!.name}`}>
                           <IconButton
                             aria-label="Decrease quantity"
-                            disabled={item.quantity <= 1}
-                            onClick={() => updateQuantity(deal.id, item.quantity - 1)}
+                            disabled={entry.item.quantity <= 1}
+                            onClick={() => updateQuantity(
+                              entry.type === 'deal'
+                                ? entry.deal!.id
+                                : entry.product!.id,
+                              entry.type,
+                              entry.item.quantity - 1
+                            )}
                           >
                             <Icon aria-hidden="true">remove</Icon>
                           </IconButton>
-                          <span className="cart-item__qty-val" aria-label={`${item.quantity} in cart`}>
-                            {item.quantity}
+                          <span className="cart-item__qty-val" aria-label={`${entry.item.quantity} in cart`}>
+                            {entry.item.quantity}
                           </span>
                           <IconButton
                             aria-label="Increase quantity"
-                            onClick={() => updateQuantity(deal.id, item.quantity + 1)}
+                            onClick={() => updateQuantity(
+                              entry.type === 'deal'
+                                ? entry.deal!.id
+                                : entry.product!.id,
+                              entry.type,
+                              entry.item.quantity + 1
+                            )}
                           >
                             <Icon aria-hidden="true">add</Icon>
                           </IconButton>
                         </div>
                         <IconButton
-                          aria-label={`Remove ${deal.title} from cart`}
-                          onClick={() => removeItem(deal.id)}
+                          aria-label={`Remove ${entry.type === 'deal' ? entry.deal!.title : entry.product!.name} from cart`}
+                          onClick={() => removeItem(
+                            entry.type === 'deal'
+                              ? entry.deal!.id
+                              : entry.product!.id,
+                            entry.type
+                          )}
                         >
                           <Icon aria-hidden="true">delete_outline</Icon>
                         </IconButton>
