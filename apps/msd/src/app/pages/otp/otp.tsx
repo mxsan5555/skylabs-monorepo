@@ -81,6 +81,7 @@ export function Otp() {
   return (
     <div className="auth-screen otp-screen">
       <title>{otpContent.pageTitle}</title>
+      <meta name="robots" content="noindex, nofollow" />
       <IconButton
         className="otp-back"
         aria-label={otpContent.backAriaLabel}

@@ -19,6 +19,9 @@ import DealDetail from './pages/deal-detail/deal-detail';
 import Cart from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
 import Checkout from './pages/checkout/checkout';
+import ProductListing from './pages/products/products';
+import ProductDetail from './pages/product-detail/product-detail';
+import VendorPage from './pages/vendor/vendor';
 
 export function AppRoutes() {
   return (
@@ -29,6 +32,9 @@ export function AppRoutes() {
         <Route path="/explore" element={<Search />} />
         <Route path="/category/:slug" element={<Category />} />
         <Route path="/deal/:id" element={<DealDetail />} />
+        <Route path="/products" element={<ProductListing />} />
+        <Route path="/products/:id" element={<ProductDetail />} />
+        <Route path="/vendor/:slug" element={<VendorPage />} />
         <Route path="/cart" element={<Cart />} />
 
         {/* ── Auth-gated consumer pages ── */}

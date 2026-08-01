@@ -43,6 +43,11 @@
         "label": "Health & Wellness",
         "to": "/category/health-wellness",
         "count": 13
+      },
+      {
+        "label": "Products",
+        "to": "/products",
+        "count": 0
       }
     ],
     "categories": [
@@ -81,6 +86,10 @@
         {
           "label": "Hot Deals",
           "to": "/explore"
+        },
+        {
+          "label": "Products",
+          "to": "/products"
         },
         {
           "label": "Blog",
@@ -635,6 +644,44 @@
         "emptyOtp": "Please enter the OTP.",
         "invalidOtp": "Invalid OTP. Please try again."
       }
+    }
+  },
+  "products": {
+    "listing": {
+      "title": "Wellness Products",
+      "subtitle": "Oils, creams, masks and kits — shop top-rated skincare and wellness products.",
+      "filters": {
+        "all": "All",
+        "day": "Day",
+        "night": "Night",
+        "skinCare": "Skin Care"
+      },
+      "sortOptions": [
+        { "value": "popular",    "label": "Popularity" },
+        { "value": "price-asc",  "label": "Price: Low to High" },
+        { "value": "price-desc", "label": "Price: High to Low" },
+        { "value": "newest",     "label": "Newest" }
+      ],
+      "sortLabel": "Sort by",
+      "resultLabel": "products",
+      "emptyHeading": "No products found",
+      "emptySubheading": "Try selecting a different category or check back later."
+    },
+    "detail": {
+      "addToCart": "Add to Cart",
+      "shareLabel": "Share this product",
+      "inStock": "In stock and ready to ship",
+      "quantityLabel": "Quantity",
+      "relatedProducts": "You May Also Like",
+      "accordionSummary": "Summary",
+      "accordionBenefits": "Benefits",
+      "accordionHowToUse": "How To Use",
+      "accordionIngredients": "Ingredients",
+      "accordionReturn": "Return / Refund Policy"
+    },
+    "meta": {
+      "listingTitle": "Wellness Products | MSD – MySpaDeal",
+      "listingDescription": "Shop massage oils, face masks, body scrubs, aromatherapy sets and wellness kits from top Indian wellness brands."
     }
   }
 }

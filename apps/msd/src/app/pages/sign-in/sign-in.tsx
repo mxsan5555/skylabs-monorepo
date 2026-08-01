@@ -75,6 +75,7 @@ export function SignIn() {
   return (
     <div className="auth-screen">
       <title>{auth.pageTitle}</title>
+      <meta name="robots" content="noindex, nofollow" />
       <div className="auth-brand">
         <div className="auth-brand__logo">
           <Icon aria-hidden="true"> {auth.brand.logoIcon}</Icon>
