@@ -1,25 +1,30 @@
 import { useRef } from 'react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import { SkyProductCardReact, FilledTonalIconButton, Icon, FilledButton, } from '@skylabs-monorepo/shared-ui/react';
+import { OutlinedIconButton, FilledTonalIconButton, Icon, FilledButton, } from '@skylabs-monorepo/shared-ui/react';
 import type { Product } from '../../types';
 import { formatINR } from '../../utils/format';
 import './product-card.css';
 import '@skylabs-monorepo/shared-ui';
 interface ProductCardProps {
     product: Product;
+    favoriteActive?: boolean;
+    onFavorite?: () => void;
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({
+    product,
+    favoriteActive = false,
+    onFavorite,
+}: ProductCardProps) {
     const swiperRef = useRef<any>(null);
     const discount =
-        product.originalPrice > product.price
+        product.originalPrice && product.originalPrice > product.price
             ? Math.round(
                 ((product.originalPrice - product.price) /
                     product.originalPrice) *
                 100
             )
             : 0;
-
     return (
         <sky-product-card
             imageAlt={product.name}
@@ -27,10 +32,10 @@ export function ProductCard({ product }: ProductCardProps) {
             heading={product.name}
             rating={product.rating}
             reviews={product.reviews}
-            originalPrice={formatINR(product.originalPrice)}
+            originalPrice={product.originalPrice !== undefined ? formatINR(product.originalPrice) : undefined}
             price={formatINR(product.price)}
             discount={discount ? `-${discount}%` : undefined}
-            href={`/products/${product.slug}`}
+            href={`/products/${product.id}`}
         >
             <div slot="media" className="product-card-slider">
                 <swiper-container
@@ -75,8 +80,24 @@ export function ProductCard({ product }: ProductCardProps) {
                 >
                     <Icon>navigate_next</Icon>
                 </FilledTonalIconButton>
+
+                {onFavorite && (
+                    <OutlinedIconButton
+                        className="product-card__wishlist"
+                        toggle
+                        selected={favoriteActive}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onFavorite();
+                        }}
+                    >
+                        <Icon slot="selected">favorite</Icon>
+                        <Icon>favorite_border</Icon>
+                    </OutlinedIconButton>
+                )}
             </div>
-            <FilledButton
+            {/* <FilledButton
                 onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -85,7 +106,7 @@ export function ProductCard({ product }: ProductCardProps) {
                 }}
             >
                 Buy Now
-            </FilledButton>
+            </FilledButton> */}
         </sky-product-card>
 
     );

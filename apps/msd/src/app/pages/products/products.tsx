@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, } from 'react';
 import { Link } from 'react-router-dom';
 import {
   FilledButton,
@@ -9,10 +9,11 @@ import {
   SelectOption,
   Divider,
 } from '@skylabs-monorepo/shared-ui/react';
+import '@skylabs-monorepo/shared-ui/carousel';
 import { useCart } from '../../../cart/cart-context';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { PRODUCTS, getProductsByCategory, CATEGORY_LABELS } from '../../../data/products';
-import { SkyProductCardWC } from '../../components/sky-product-card-wc';
+import { PRODUCTS, getProductsByCategory, } from '../../../data/products';
+import { ProductCard } from '../../components/product-card';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { formatINR } from '../../../utils/format';
 import type { ProductSort } from '../../../types';
@@ -22,10 +23,10 @@ import './products.css';
 const { products } = content;
 
 const FILTERS = [
-  { value: 'all',        label: products.listing.filters.all },
-  { value: 'day',        label: products.listing.filters.day },
-  { value: 'night',      label: products.listing.filters.night },
-  { value: 'skin-care',  label: products.listing.filters.skinCare },
+  { value: 'all', label: products.listing.filters.all },
+  { value: 'day', label: products.listing.filters.day },
+  { value: 'night', label: products.listing.filters.night },
+  { value: 'skin-care', label: products.listing.filters.skinCare },
 ];
 
 const SITE_URL: string = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
@@ -35,14 +36,14 @@ export function ProductListing() {
   const { toggle, has } = useWishlist();
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [sort, setSort] = useState<ProductSort>('popular');
-
+  // const swiperRef = useRef<any>(null);
   const filteredProducts = useMemo(() => {
     const list = activeFilter === 'all' ? PRODUCTS : getProductsByCategory(activeFilter);
     switch (sort) {
-      case 'price-asc':  return [...list].sort((a, b) => a.price - b.price);
+      case 'price-asc': return [...list].sort((a, b) => a.price - b.price);
       case 'price-desc': return [...list].sort((a, b) => b.price - a.price);
-      case 'newest':     return [...list].sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
-      default:           return [...list];
+      case 'newest': return [...list].sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+      default: return [...list];
     }
   }, [activeFilter, sort]);
 
@@ -163,39 +164,37 @@ export function ProductListing() {
                 className="products-page__card-wrap"
                 to={`/products/${product.id}`}
               >
-                <SkyProductCardWC
-                  variant="outlined"
-                  heading={product.name}
-                  eyebrow={product.brand}
-                  image={product.image}
-                  imageAlt={product.imageAlt}
-                  badge={CATEGORY_LABELS[product.categorySlug]}
-                  price={formatINR(product.price)}
-                  originalPrice={product.originalPrice ? formatINR(product.originalPrice) : undefined}
-                  discount={product.discount ? `${product.discount}% OFF` : undefined}
-                  favorite
-                  favoriteActive={has(product.id)}
-                  onFavorite={() => toggle(product.id)}
-                >
+                <>
+                  <ProductCard
+                    product={product}
+                    favoriteActive={has(product.id)}
+                    onFavorite={() => toggle(product.id)}
+                  />
+
                   <div
                     className="products-page__card-cta"
-                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
                   >
                     <FilledButton
                       className="products-page__card-btn"
-                      onClick={() => addItem(product.id)}
+                      onClick={() => addItem(product.id, 'product')}
                     >
-                      <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                      <Icon slot="icon">shopping_bag</Icon>
                       Add to Cart
                     </FilledButton>
                   </div>
-                </SkyProductCardWC>
+                </>
+
               </Link>
             ))}
           </div>
-        )}
-      </section>
-    </div>
+        )
+        }
+      </section >
+    </div >
   );
 }
 

@@ -177,6 +177,9 @@ export interface Product {
   badge?: string;
   price: number;
   originalPrice?: number;
+  rating: number;
+  reviews: number;
+  affiliateUrl: string;
   discount?: number;
   isNew: boolean;
   isFeatured: boolean;

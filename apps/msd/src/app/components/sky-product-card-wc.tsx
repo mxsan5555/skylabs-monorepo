@@ -38,13 +38,11 @@ interface SkyProductCardProps {
   href?: string;
   align?: 'left' | 'center' | 'right';
   onFavorite?: () => void;
-  children?: ReactNode;
 }
 
 export function SkyProductCardWC({
   children,
   onFavorite,
-  children,
   ...props
 }: SkyProductCardProps) {
   const ref = useRef<HTMLElement>(null);

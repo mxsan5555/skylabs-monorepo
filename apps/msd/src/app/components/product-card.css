@@ -50,3 +50,9 @@
 .slider-btn::part(outline) {
   display: none;
 }
+.product-card__wishlist {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+}

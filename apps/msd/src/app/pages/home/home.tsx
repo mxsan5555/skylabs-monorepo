@@ -550,7 +550,7 @@ export function Home() {
               >
                 <div className="home__trust-top">
 
-                  {card.type === 'logos' && (
+                  {card.type === 'logos' && card.logos && (
                     <div className="home__trust-icons">
                       {card.logos.map((logo) => (
                         <div key={logo} className="home__trust-circle">
@@ -564,7 +564,7 @@ export function Home() {
                     </div>
                   )}
 
-                  {card.type === "avatars" && (
+                  {card.type === "avatars" && card.avatars && (
                     <div className="home__trust-avatars">
                       {card.avatars.map((avatar) => (
                         <div key={avatar} className="home__trust-circle">
@@ -578,10 +578,10 @@ export function Home() {
                     </div>
                   )}
 
-                  {card.type === 'stars' && (
+                  {card.type === 'stars' && card.stars && (
                     <div className="home__trust-stars">
                       {Array.from({ length: card.stars }).map((_, i) => (
-                        <Icon key={i} filled>
+                        <Icon key={i}>
                           star
                         </Icon>
                       ))}

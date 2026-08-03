@@ -113,6 +113,7 @@
   text-decoration: none;
   color: inherit;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+  
 }
 
 .products-page__card-wrap:hover {
@@ -182,4 +183,8 @@
   .products-page__grid {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   }
+}
+.sky-product-card__image {
+  height: 180px;   /* pehle agar 260px hai to ise kam karo */
+  object-fit: cover;
 }

@@ -40,17 +40,23 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     save(ids);
   }, [ids]);
 
-  const toggle = useCallback((dealId: string) => {
-    setIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(dealId)) {
-        next.delete(dealId);
-      } else {
-        next.add(dealId);
-      }
-      return next;
-    });
-  }, []);
+ const toggle = (id: string) => {
+  console.log("Toggle:", id);
+
+  setIds((prev) => {
+    const next = new Set(prev);
+
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+
+    console.log("Wishlist IDs:", [...next]);
+
+    return next;
+  });
+};
 
   const has = useCallback((dealId: string) => ids.has(dealId), [ids]);
 

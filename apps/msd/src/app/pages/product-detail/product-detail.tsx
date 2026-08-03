@@ -45,7 +45,7 @@ export function ProductDetail() {
       </div>
     );
   }
-
+  const currentProduct = product;
   const relatedProducts = PRODUCTS.filter(
     (p) => p.categorySlug === product.categorySlug && p.id !== product.id,
   ).slice(0, 6);
@@ -53,14 +53,15 @@ export function ProductDetail() {
   const categoryLabel = CATEGORY_LABELS[product.categorySlug] ?? product.categorySlug;
 
   function handleAddToCart() {
-    addItem(product.id);
+    addItem(currentProduct.id, 'product');
+
     if (qty > 1) {
-      updateQuantity(product.id, qty);
+      updateQuantity(currentProduct.id, 'product', qty);
     }
+
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 2000);
   }
-
   async function copyLink() {
     await navigator.clipboard.writeText(window.location.href);
     setCopied(true);
@@ -236,7 +237,11 @@ export function ProductDetail() {
               toggle
               selected={has(product.id)}
               aria-label={has(product.id) ? 'Remove from wishlist' : 'Save to wishlist'}
-              onClick={() => toggle(product.id)}
+              onClick={() => {
+    console.log('Product ID:', product.id);
+    toggle(product.id);
+  }}
+              
             >
               <Icon aria-hidden="true" slot="selected">favorite</Icon>
               <Icon aria-hidden="true">favorite_border</Icon>
