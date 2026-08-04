@@ -225,6 +225,46 @@
       "searchPlaceholder": "Search spas, treatments, locations…",
       "ctaLabel": "Explore All Deals"
     },
+    "premiumHero": {
+      "heading": "Relax. Refresh. Rejuvenate.",
+      "subheading": "Discover premium spas, salons and wellness experiences near you.",
+     "image": "https://images.unsplash.com/photo-1540555700478-4be289fbecef",
+"imageAlt": "Luxury spa experience",
+      "tabs": [
+         {
+          "label": "Massage",
+          "icon": "self_improvement"
+        },
+        {
+          "label": "Spa & Retreats",
+          "icon": "spa"
+        },
+        {
+          "label": "Skin & Beauty",
+          "icon": "face"
+        },
+        {
+          "label": "Hair & Nails",
+          "icon": "content_cut"
+        },
+        {
+          "label": "Health & Wellness",
+          "icon": "favorite"
+        }
+      ],
+      "search": {
+        "locationPlaceholder": "Current Location",
+        "servicePlaceholder": "Search services",
+        "button": "Search"
+      },
+      "popular": [
+        "Couple Spa",
+        "Hair Spa",
+        "Deep Tissue",
+        "Facial",
+        "Ayurvedic Spa"
+      ]
+    },
     "heroImages": [
       "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=1920&q=80",
       "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&w=1920&q=80",
@@ -839,10 +879,22 @@
         "skinCare": "Skin Care"
       },
       "sortOptions": [
-        { "value": "popular",    "label": "Popularity" },
-        { "value": "price-asc",  "label": "Price: Low to High" },
-        { "value": "price-desc", "label": "Price: High to Low" },
-        { "value": "newest",     "label": "Newest" }
+        {
+          "value": "popular",
+          "label": "Popularity"
+        },
+        {
+          "value": "price-asc",
+          "label": "Price: Low to High"
+        },
+        {
+          "value": "price-desc",
+          "label": "Price: High to Low"
+        },
+        {
+          "value": "newest",
+          "label": "Newest"
+        }
       ],
       "sortLabel": "Sort by",
       "resultLabel": "products",
