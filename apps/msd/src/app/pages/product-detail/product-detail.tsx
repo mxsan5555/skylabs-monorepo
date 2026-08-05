@@ -1,11 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  FilledButton,
-  OutlinedIconButton,
-  Icon,
-  Divider,
-} from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedIconButton, Icon, Divider, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useCart } from '../../../cart/cart-context';
 import { useWishlist } from '../../../wishlist/wishlist-context';
@@ -24,12 +19,10 @@ export function ProductDetail() {
   const navigate = useNavigate();
   const { addItem, updateQuantity } = useCart();
   const { toggle, has } = useWishlist();
-
   const [activeImg, setActiveImg] = useState(0);
   const [qty, setQty] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
   const [copied, setCopied] = useState(false);
-
   const product = getProductById(id);
 
   if (!product) {
@@ -49,16 +42,10 @@ export function ProductDetail() {
   const relatedProducts = PRODUCTS.filter(
     (p) => p.categorySlug === product.categorySlug && p.id !== product.id,
   ).slice(0, 6);
-
   const categoryLabel = CATEGORY_LABELS[product.categorySlug] ?? product.categorySlug;
-
   function handleAddToCart() {
     addItem(currentProduct.id, 'product');
-
-    if (qty > 1) {
-      updateQuantity(currentProduct.id, 'product', qty);
-    }
-
+    if (qty > 1) { updateQuantity(currentProduct.id, 'product', qty); }
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 2000);
   }
@@ -67,7 +54,6 @@ export function ProductDetail() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
-
   const seoName = product.name.length > 50 ? `${product.name.slice(0, 47)}…` : product.name;
   const seoDesc = `${product.description.slice(0, 120)} Shop now at MSD.`;
   const canonicalUrl = `${SITE_URL}/products/${product.id}`;
@@ -86,7 +72,6 @@ export function ProductDetail() {
       <meta name="twitter:title" content={product.name} />
       <meta name="twitter:description" content={product.description.slice(0, 155)} />
       <meta name="twitter:image" content={product.image} />
-
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -123,7 +108,6 @@ export function ProductDetail() {
           }),
         }}
       />
-
       {/* ── Breadcrumb ─────────────────────────────────────────────────────── */}
       <Breadcrumb
         className="product-detail__breadcrumb"
@@ -133,7 +117,6 @@ export function ProductDetail() {
           { label: product.name },
         ]}
       />
-
       <div className="product-detail__layout">
         {/* ── Gallery ────────────────────────────────────────────────────── */}
         <div className="product-detail__gallery">
@@ -143,9 +126,9 @@ export function ProductDetail() {
               src={product.gallery[activeImg] ?? product.image}
               alt={product.imageAlt}
               width={600}
-              height={600}
+              height={200}
             />
-            {product.badge && (
+            {/* {product.badge && (
               <sky-badge
                 className="product-detail__badge"
                 variant="primary"
@@ -153,7 +136,7 @@ export function ProductDetail() {
               >
                 {product.badge}
               </sky-badge>
-            )}
+            )} */}
           </div>
           {product.gallery.length > 1 && (
             <div className="product-detail__thumbs" aria-label="Gallery thumbnails">
@@ -179,11 +162,8 @@ export function ProductDetail() {
             <sky-badge variant="secondary" size="small">{product.brand}</sky-badge>
             <sky-badge variant="primary" size="small">{categoryLabel}</sky-badge>
           </div>
-
           <h1 className="product-detail__title">{product.name}</h1>
-
           <Divider />
-
           {/* Price — current, original, discount */}
           <div className="product-detail__price-row">
             <span className="product-detail__price">{formatINR(product.price)}</span>
@@ -199,9 +179,7 @@ export function ProductDetail() {
               <sky-badge variant="error" size="small">{product.discount}% OFF</sky-badge>
             )}
           </div>
-
           <Divider />
-
           {/* Quantity stepper */}
           <div className="product-detail__qty" role="group" aria-label={products.detail.quantityLabel}>
             <OutlinedIconButton
@@ -211,9 +189,7 @@ export function ProductDetail() {
             >
               <Icon aria-hidden="true">remove</Icon>
             </OutlinedIconButton>
-            <span className="product-detail__qty-value" aria-live="polite" aria-atomic="true">
-              {qty}
-            </span>
+            <span className="product-detail__qty-value" aria-live="polite" aria-atomic="true">{qty}</span>
             <OutlinedIconButton
               aria-label="Increase quantity"
               onClick={() => setQty((q) => Math.min(10, q + 1))}
@@ -222,45 +198,42 @@ export function ProductDetail() {
               <Icon aria-hidden="true">add</Icon>
             </OutlinedIconButton>
           </div>
+          {/* Action Buttons */}
+          <div className="product-detail__actions">
+            <FilledButton
+              className="product-detail__add-btn"
+              onClick={handleAddToCart}
+            >
+              <Icon slot="icon">
+                {addedToCart ? 'check' : 'shopping_bag'}
+              </Icon>
+              {addedToCart ? 'Added to Cart!' : products.detail.addToCart}
+            </FilledButton>
 
-          {/* Add to cart */}
-          <FilledButton className="product-detail__add-btn" onClick={handleAddToCart}>
-            <Icon slot="icon" aria-hidden="true">
-              {addedToCart ? 'check' : 'shopping_bag'}
-            </Icon>
-            {addedToCart ? 'Added to Cart!' : products.detail.addToCart}
-          </FilledButton>
-
-          {/* Wishlist + stock + share */}
-          <div className="product-detail__secondary-actions">
             <OutlinedIconButton
               toggle
               selected={has(product.id)}
               aria-label={has(product.id) ? 'Remove from wishlist' : 'Save to wishlist'}
-              onClick={() => {
-    console.log('Product ID:', product.id);
-    toggle(product.id);
-  }}
-              
+              onClick={() => toggle(product.id)}
             >
-              <Icon aria-hidden="true" slot="selected">favorite</Icon>
-              <Icon aria-hidden="true">favorite_border</Icon>
+              <Icon slot="selected">favorite</Icon>
+              <Icon>favorite_border</Icon>
             </OutlinedIconButton>
 
-            <span className="product-detail__stock">
-              <Icon aria-hidden="true" className="product-detail__stock-icon">check_circle</Icon>
-              {products.detail.inStock}
-            </span>
+            <OutlinedIconButton
+              aria-label={copied ? 'Link copied!' : 'Copy product link'}
+              onClick={copyLink}
+            >
+              <Icon>{copied ? 'check' : 'share'}</Icon>
+            </OutlinedIconButton>
+          </div>
 
-            <div className="product-detail__share" aria-label="Share">
-              <span className="product-detail__share-label">Share</span>
-              <OutlinedIconButton
-                aria-label={copied ? 'Link copied!' : 'Copy product link'}
-                onClick={copyLink}
-              >
-                <Icon aria-hidden="true">{copied ? 'check' : 'link'}</Icon>
-              </OutlinedIconButton>
-            </div>
+          {/* Stock */}
+          <div className="product-detail__stock">
+            <Icon className="product-detail__stock-icon">
+              check_circle
+            </Icon>
+            {products.detail.inStock}
           </div>
 
           <Divider />
@@ -314,7 +287,7 @@ export function ProductDetail() {
                     src={product.gallery[i] ?? product.image}
                     alt=""
                     width={600}
-                    height={400}
+                    height={350}
                     loading="lazy"
                     aria-hidden="true"
                   />

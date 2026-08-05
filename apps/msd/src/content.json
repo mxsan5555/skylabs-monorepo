@@ -892,6 +892,7 @@
           "label": "Price: High to Low"
         },
         {
+          
           "value": "newest",
           "label": "Newest"
         }
