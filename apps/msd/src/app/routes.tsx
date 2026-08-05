@@ -12,7 +12,7 @@ import BlogDetail from './pages/blog-detail/blog-detail';
 import SignIn from './pages/sign-in/sign-in';
 import Otp from './pages/otp/otp';
 import Profile from './pages/account/profile';
-import { Dashboard, Deals, Promotions, Sales } from './pages/account/role-pages';
+import { Dashboard, Promotions, Sales } from './pages/account/role-pages';
 import Search from './pages/search/search';
 import Category from './pages/category/category';
 import DealDetail from './pages/deal-detail/deal-detail';
@@ -21,6 +21,12 @@ import Wishlist from './pages/wishlist/wishlist';
 import Checkout from './pages/checkout/checkout';
 import Products from './pages/products/products';
 import ProductDetail from './pages/product-detail/product-detail';
+import { CategoryPage } from './pages/account/category/category';
+import { SubCategoryPage } from './pages/account/subcategory/subCategory';
+import { ServicePage } from './pages/account/service/service';
+import {Vendor} from './pages/account/vendor/vendor';
+import {Deals} from './pages/account/deals/deals'
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -77,6 +83,10 @@ export function AppRoutes() {
         <Route path="/account" element={<Navigate to="/account/profile" replace />} />
         <Route path="/account/dashboard" element={<Dashboard />} />
         <Route path="/account/profile" element={<Profile />} />
+        <Route path="/account/master/category" element={<CategoryPage />}/>
+        <Route path="/account/master/subcategory" element={<SubCategoryPage />}/>
+        <Route path="/account/company/service" element={<ServicePage />}/>
+        <Route path="/account/company/vendor"  element={<Vendor/>}/>
         <Route
           path="/account/deals"
           element={

@@ -41,6 +41,8 @@
   border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: 16px;
   padding: 16px 20px;
+  width:1000px;
+  margin-left: 90px
 }
 
 .showcase__card h2 {

@@ -57,10 +57,10 @@ const DURATIONS = ['60 min', '90 min', '120 min'];
 
 const ALL_DEALS = Array.from({ length: 100 }, (_, i) => ({
   id:       `DEAL-${String(i + 1).padStart(4, '0')}`,
-  name:     `${SERVICES[i % 5]} #${i + 1}`,
+  name:     `${SERVICES[i % 5]} #{i + 1}`,
   location: LOCATIONS[i % 5],
   duration: DURATIONS[i % 3],
-  price:    `$${50 + ((i * 7) % 150)}`,
+  price:    `$${50 + ((i * 7) % 150)}`,                                                               
   status:   STATUSES[i % 3],
 }));
 
@@ -915,7 +915,7 @@ export function Showcase() {
         <h2>Data Table</h2>
         <p className="demo-label">
           100 records · lazy loading · search · filter · sort · PDF export ·
-          row selection · view / edit / delete actions · detail drawer
+          row selection · view /  / delete actions · detail drawer
         </p>
         {/* sky-data-table is a raw LIT web component — events are wired via
             dtRef + addEventListener in useEffect above. */}
