@@ -636,30 +636,6 @@
       }
     ]
   },
-  "products": {
-    "title": "Wellness Products",
-    "subtitle": "Trusted wellness products from our affiliate partners.",
-    "emptyTitle": "No Products Found",
-    "emptySubtitle": "Please check back later.",
-    "sortOptions": [
-      {
-        "value": "popular",
-        "label": "Popular"
-      },
-      {
-        "value": "rating",
-        "label": "Top Rated"
-      },
-      {
-        "value": "price-asc",
-        "label": "Price: Low to High"
-      },
-      {
-        "value": "price-desc",
-        "label": "Price: High to Low"
-      }
-    ]
-  },
   "dealDetail": {
     "addToCart": "Add to Cart",
     "bookNow": "Book Now",
@@ -892,7 +868,7 @@
           "label": "Price: High to Low"
         },
         {
-          
+
           "value": "newest",
           "label": "Newest"
         }
