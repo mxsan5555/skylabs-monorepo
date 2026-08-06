@@ -225,13 +225,62 @@
       "searchPlaceholder": "Search spas, treatments, locations…",
       "ctaLabel": "Explore All Deals"
     },
+    "spaFinderHero": {
+      "title": " Nearby Wellness",
+      "heading": "Find your perfect spa",
+      "subheading": "Discover spas near you",
+      "defaultTab": "Massage",
+"mapDealsLimit": 8,
+"suggestionLimit": 6,
+  "limits": {
+    "massage": 6,
+    "skinBeauty": 6,
+    "hairNails": 6,
+    "spaRetreats": 6,
+    "healthWellness": 6
+  },
+      "tabs": [
+        {
+          "label": "Massage",
+          "icon": "self_improvement"
+        },
+        {
+          "label": "Spa",
+          "icon": "spa"
+        },
+        {
+          "label": "Beauty",
+          "icon": "face"
+        },
+        {
+          "label": "Hair",
+          "icon": "content_cut"
+        },
+        {
+          "label": "Wellness",
+          "icon": "favorite"
+        }
+      ],
+      "search": {
+        "locationPlaceholder": "Current Location",
+        "servicePlaceholder": "Search services",
+        "button": "Search"
+      },
+      "popularHeading": "Popular",
+      "popular": [
+        "Couple Spa",
+        "Hair Spa",
+        "Deep Tissue",
+        "Facial"
+      ]
+    },
     "premiumHero": {
       "heading": "Relax. Refresh. Rejuvenate.",
       "subheading": "Discover premium spas, salons and wellness experiences near you.",
-     "image": "https://images.unsplash.com/photo-1540555700478-4be289fbecef",
-"imageAlt": "Luxury spa experience",
+      "image": "https://images.unsplash.com/photo-1540555700478-4be289fbecef",
+      "imageAlt": "Luxury spa experience",
       "tabs": [
-         {
+        {
           "label": "Massage",
           "icon": "self_improvement"
         },
@@ -868,7 +917,6 @@
           "label": "Price: High to Low"
         },
         {
-
           "value": "newest",
           "label": "Newest"
         }
