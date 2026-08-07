@@ -4,12 +4,13 @@
   margin-top: auto;
 }
 
+/* ─── Main grid: brand+newsletter | company | discover | help ───────────────── */
 .site-footer__inner {
   max-width: 1280px;
   margin: 0 auto;
   padding: 56px 20px 40px;
   display: grid;
-  grid-template-columns: 1.6fr 1fr 1fr 1fr 1.4fr;
+  grid-template-columns: 1.8fr 1fr 1fr 1fr;
   gap: 48px;
   align-items: start;
 }
@@ -34,6 +35,7 @@
   background: var(--md-sys-color-primary-container);
   color: var(--md-sys-color-on-primary-container);
   font-size: 22px;
+  flex-shrink: 0;
 }
 
 .site-footer__logo-name {
@@ -55,41 +57,16 @@
   font-size: 0.875rem;
   color: var(--md-sys-color-on-surface-variant);
   line-height: 1.6;
-  max-width: 28ch;
-}
-
-.site-footer__social {
-  display: flex;
-  gap: 8px;
-}
-
-.site-footer__social-link {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--md-sys-color-surface-container);
-  color: var(--md-sys-color-on-surface-variant);
-  text-decoration: none;
-  transition: background 0.15s, color 0.15s;
-}
-
-.site-footer__social-link:hover,
-.site-footer__social-link:focus-visible {
-  background: var(--md-sys-color-primary-container);
-  color: var(--md-sys-color-on-primary-container);
-  outline: none;
+  max-width: 32ch;
 }
 
 /* ─── Link columns ─────────────────────────────────────────────────────────── */
 .site-footer__col-heading {
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 0.8125rem;
+  font-weight: 700;
   color: var(--md-sys-color-on-surface);
   margin: 0 0 14px;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -109,11 +86,16 @@
   transition: color 0.15s;
 }
 
-.site-footer__link:hover,
-.site-footer__link:focus-visible {
+.site-footer__link:hover {
   color: var(--md-sys-color-primary);
   text-decoration: underline;
-  outline: none;
+}
+
+.site-footer__link:focus-visible {
+  color: var(--md-sys-color-primary);
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* ─── Newsletter ─────────────────────────────────────────────────────────── */
@@ -128,7 +110,6 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 20px;
 }
 
 .site-footer__newsletter-form md-outlined-text-field {
@@ -140,26 +121,6 @@
   align-items: center;
   gap: 8px;
   font-size: 0.875rem;
-  color: var(--md-sys-color-primary);
-  margin-bottom: 20px;
-}
-
-.site-footer__trust {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.site-footer__trust-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.75rem;
-  color: var(--md-sys-color-on-surface-variant);
-}
-
-.site-footer__trust-badge md-icon {
-  font-size: 16px;
   color: var(--md-sys-color-primary);
 }
 
@@ -196,6 +157,39 @@
   font-size: 0.8rem;
 }
 
+/* ─── Social icons (bottom bar) ─────────────────────────────────────────── */
+.site-footer__social {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.site-footer__social-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  color: var(--md-sys-color-on-surface-variant);
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.site-footer__social-link:hover {
+  border-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-primary);
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+}
+
+.site-footer__social-link:focus-visible {
+  border-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-primary);
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 1024px) {
   .site-footer__inner {
@@ -210,10 +204,6 @@
   .site-footer__desc {
     max-width: none;
   }
-
-  .site-footer__newsletter {
-    grid-column: 1 / -1;
-  }
 }
 
 @media (max-width: 600px) {
@@ -221,10 +211,6 @@
     grid-template-columns: 1fr 1fr;
     padding: 36px 16px 28px;
     gap: 28px;
-  }
-
-  .site-footer__newsletter-form {
-    flex-direction: column;
   }
 
   .site-footer__bottom-inner {
@@ -235,13 +221,10 @@
 }
 
 @media (max-width: 480px) {
-
   .site-footer__inner {
     grid-template-columns: 1fr;
-    padding: 24px 16px;
-    /* was 32px 20px */
-    gap: 20px;
-    /* was 28px */
+    padding: 32px 20px;
+    gap: 28px;
     text-align: center;
   }
 
@@ -249,57 +232,13 @@
     justify-content: center;
   }
 
-  .site-footer__logo-icon {
-    width: 44px;
-    height: 44px;
-  }
-
-  .site-footer__logo-name {
-    font-size: 1rem;
-  }
-
-  .site-footer__logo-sub {
-    font-size: 0.7rem;
-  }
-
   .site-footer__desc {
     max-width: 100%;
-    margin: 0 auto 16px;
-    font-size: 0.82rem;
-    line-height: 1.5;
-  }
-
-  .site-footer__col-heading {
-    font-size: 0.8rem;
-    margin-bottom: 10px;
+    margin: 0 auto 20px;
   }
 
   .site-footer__list {
     align-items: center;
-    gap: 8px;
-  }
-
-  .site-footer__link {
-    font-size: 0.82rem;
-  }
-
-  .site-footer__social {
-    justify-content: center;
-    gap: 12px;
-  }
-
-  .site-footer__social-link {
-    width: 44px;
-    height: 44px;
-  }
-
-  .site-footer__newsletter-sub {
-    font-size: 0.82rem;
-  }
-
-  .site-footer__newsletter-form {
-    width: 100%;
-    gap: 10px;
   }
 
   .site-footer__newsletter-form md-outlined-text-field,
@@ -310,21 +249,26 @@
   .site-footer__bottom-inner {
     flex-direction: column;
     align-items: center;
-    gap: 8px;
     text-align: center;
+    gap: 10px;
   }
 
   .site-footer__legal {
     justify-content: center;
-    gap: 6px;
   }
 
   .site-footer__address {
     text-align: center;
-    font-size: 0.75rem;
   }
 
-  .site-footer__link--legal {
-    font-size: 0.75rem;
+  .site-footer__social {
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-footer__link,
+  .site-footer__social-link {
+    transition: none;
   }
 }

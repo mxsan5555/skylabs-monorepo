@@ -1,12 +1,5 @@
 ﻿import { useNavigate } from 'react-router-dom';
-import {
-  FilledButton,
-  OutlinedButton,
-  IconButton,
-  Icon,
-  Divider,
-  OutlinedTextField,
-} from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedButton, IconButton, Icon, Divider, OutlinedTextField, } from '@skylabs-monorepo/shared-ui/react';
 import { useCart } from '../../../cart/cart-context';
 import { useCartItems } from '../../../hooks/use-cart-items';
 import { useAuth } from '../../../auth/auth-context';
@@ -15,22 +8,18 @@ import content from '../../../content.json';
 import './cart.css';
 
 const { cart: cartContent } = content;
-
 export function Cart() {
   const { removeItem, updateQuantity, totalItems } = useCart();
   const { cartItems, subtotal } = useCartItems();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-
   const totalOriginal = cartItems.reduce((sum, entry) => {
     const originalPrice = entry.type === 'deal'
       ? entry.deal!.originalPrice ?? entry.deal!.price
       : entry.product!.originalPrice ?? entry.product!.price;
-
     return sum + originalPrice * entry.item.quantity;
   }, 0);
   const savings = totalOriginal - subtotal;
-
   function handleCheckout() {
     if (!isAuthenticated) {
       navigate('/sign-in?next=/checkout');
@@ -38,7 +27,6 @@ export function Cart() {
       navigate('/checkout');
     }
   }
-
   return (
     <div className="cart-page">
       <title>{content.meta.cart.title}</title>
@@ -49,12 +37,9 @@ export function Cart() {
         <h1 className="cart-page__title">
           {cartContent.title}
           {totalItems > 0 && (
-            <span className="cart-page__count">
-              ({totalItems} {pluralize(totalItems, 'item')})
-            </span>
+            <span className="cart-page__count"> ({totalItems} {pluralize(totalItems, 'item')})</span>
           )}
         </h1>
-
         {cartItems.length === 0 ? (
           <div className="cart-page__empty">
             <sky-info-card
@@ -62,8 +47,7 @@ export function Cart() {
               heading={cartContent.emptyHeading}
               subheading={cartContent.emptySubheading}
             />
-            <FilledButton onClick={() => navigate('/explore')}>
-              {cartContent.emptyCtaLabel}
+            <FilledButton onClick={() => navigate('/explore')}> {cartContent.emptyCtaLabel}
             </FilledButton>
           </div>
         ) : (
@@ -75,16 +59,8 @@ export function Cart() {
                   <li key={entry.type === 'deal' ? entry.deal!.id : entry.product!.id} className="cart-item">
                     <img
                       className="cart-item__img"
-                      src={
-                        entry.type === 'deal'
-                          ? entry.deal!.image
-                          : entry.product!.image
-                      }
-                      alt={
-                        entry.type === 'deal'
-                          ? entry.deal!.imageAlt
-                          : entry.product!.name
-                      }
+                      src={entry.type === 'deal' ? entry.deal!.image : entry.product!.image}
+                      alt={entry.type === 'deal' ? entry.deal!.imageAlt : entry.product!.name}
                       width={100}
                       height={100}
                       loading="lazy"
@@ -103,36 +79,27 @@ export function Cart() {
                           )}
                         </div>
                         <p className="cart-item__price">
-                          {formatINR(entry.type === 'deal'
-                            ? entry.deal!.price
-                            : entry.product!.price * entry.item.quantity)}
+                          {formatINR(entry.type === 'deal' ? entry.deal!.price : entry.product!.price * entry.item.quantity)}
                         </p>
                       </div>
-
                       <div className="cart-item__actions">
                         <div className="cart-item__qty" role="group" aria-label={`Quantity for ${entry.type === 'deal' ? entry.deal!.title : entry.product!.name}`}>
                           <IconButton
                             aria-label="Decrease quantity"
                             disabled={entry.item.quantity <= 1}
                             onClick={() => updateQuantity(
-                              entry.type === 'deal'
-                                ? entry.deal!.id
-                                : entry.product!.id,
+                              entry.type === 'deal' ? entry.deal!.id : entry.product!.id,
                               entry.type,
                               entry.item.quantity - 1
                             )}
                           >
                             <Icon aria-hidden="true">remove</Icon>
                           </IconButton>
-                          <span className="cart-item__qty-val" aria-label={`${entry.item.quantity} in cart`}>
-                            {entry.item.quantity}
-                          </span>
+                          <span className="cart-item__qty-val" aria-label={`${entry.item.quantity} in cart`}>{entry.item.quantity}</span>
                           <IconButton
                             aria-label="Increase quantity"
                             onClick={() => updateQuantity(
-                              entry.type === 'deal'
-                                ? entry.deal!.id
-                                : entry.product!.id,
+                              entry.type === 'deal' ? entry.deal!.id : entry.product!.id,
                               entry.type,
                               entry.item.quantity + 1
                             )}
@@ -143,10 +110,7 @@ export function Cart() {
                         <IconButton
                           aria-label={`Remove ${entry.type === 'deal' ? entry.deal!.title : entry.product!.name} from cart`}
                           onClick={() => removeItem(
-                            entry.type === 'deal'
-                              ? entry.deal!.id
-                              : entry.product!.id,
-                            entry.type
+                            entry.type === 'deal' ? entry.deal!.id : entry.product!.id, entry.type
                           )}
                         >
                           <Icon aria-hidden="true">delete_outline</Icon>
@@ -157,39 +121,32 @@ export function Cart() {
                 ))}
               </ul>
             </section>
-
             {/* Summary column */}
             <aside className="cart-page__summary" aria-label="Order summary">
               <sky-card variant="outlined" className="cart-summary-card">
                 <div className="cart-summary">
                   <h2 className="cart-summary__heading">{cartContent.orderSummaryHeading}</h2>
-
                   <div className="cart-summary__row">
                     <span>{cartContent.subtotal} ({totalItems} {pluralize(totalItems, 'item')})</span>
                     <span>{formatINR(subtotal)}</span>
                   </div>
-
                   {savings > 0 && (
                     <div className="cart-summary__row cart-summary__row--saving">
                       <span>{cartContent.discount}</span>
                       <span>−{formatINR(savings)}</span>
                     </div>
                   )}
-
                   <Divider />
-
                   <div className="cart-summary__row cart-summary__row--total">
                     <strong>{cartContent.total}</strong>
                     <strong>{formatINR(subtotal)}</strong>
                   </div>
-
                   <OutlinedTextField
                     label={cartContent.giftCardPlaceholder}
                     className="cart-summary__gift"
                   >
                     <Icon slot="leading-icon" aria-hidden="true">card_giftcard</Icon>
                   </OutlinedTextField>
-
                   <FilledButton
                     className="cart-summary__checkout-btn"
                     onClick={handleCheckout}
@@ -197,7 +154,6 @@ export function Cart() {
                     {cartContent.checkoutCta}
                     <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
                   </FilledButton>
-
                   <OutlinedButton
                     className="cart-summary__continue-btn"
                     onClick={() => navigate('/explore')}
@@ -213,5 +169,4 @@ export function Cart() {
     </div>
   );
 }
-
 export default Cart;

@@ -7,16 +7,13 @@
 
 /** Access roles. The backend supplies these in the JWT; the UI only gates on them. */
 export type UserRole = 'user' | 'admin' | 'marketing' | 'sales';
-
 export const ALL_ROLES: UserRole[] = ['user', 'admin', 'marketing', 'sales'];
-
 export interface User {
   id: string;
   name: string;
   email: string;
   roles: UserRole[];
 }
-
 export interface Address {
   id: string;
   label: string;
@@ -27,26 +24,22 @@ export interface Address {
   postalCode: string;
   country: string;
 }
-
 export interface AccountProfile {
   name: string;
   email: string;
   phone: string;
 }
-
 export interface BlogCategory {
   id: string;
   slug: string;
   name: string;
 }
-
 /** A block of article body content. Maps cleanly to a CMS/API block model. */
 export type BlogBlock =
   | { type: 'paragraph'; text: string }
   | { type: 'heading'; text: string }
   | { type: 'list'; items: string[] }
   | { type: 'quote'; text: string };
-
 export interface BlogPost {
   id: string;
   slug: string;
@@ -61,17 +54,14 @@ export interface BlogPost {
   tags: string[];
   body: BlogBlock[];
 }
-
 export interface Paginated<T> {
   items: T[];
   total: number;
   page: number;
   pageSize: number;
 }
-
 export type BlogSort = 'newest' | 'oldest' | 'title';
 export type ReadingBucket = 'any' | 'short' | 'long';
-
 /** Blog list query — mirrors the future `GET /posts?...` request. */
 export interface BlogQuery {
   search?: string;
@@ -83,9 +73,8 @@ export interface BlogQuery {
   page?: number;
   pageSize?: number;
 }
-
 // ─── Consumer storefront types ────────────────────────────────────────────────
-
+export type BookingStatus = 'confirmed' | 'cancelled';
 export type PriceLevel = '$' | '$$' | '$$$';
 export type SearchView = 'list' | 'grid' | 'map';
 export type CheckoutStep = 'details' | 'datetime' | 'payment';
@@ -108,7 +97,6 @@ export interface Category {
   imageAlt: string;
   subcategories: Subcategory[];
 }
-
 export interface Deal {
   id: string;
   slug: string;
@@ -142,7 +130,6 @@ export interface Deal {
   included: string[];
   howToUse: string[];
 }
-
 export interface CartItem {
   dealId?: string;
   productId?: string;
@@ -150,15 +137,34 @@ export interface CartItem {
   selectedDate?: string;
   selectedTime?: string;
 }
-
+export interface BookingItem {
+  type: 'deal' | 'product';
+  id: string;
+  title: string;
+  image: string;
+  imageAlt: string;
+  price: number;
+  quantity: number;
+}
+export interface Booking {
+  id: string;
+  customer: {
+    name: string;
+    phone: string;
+    email: string;
+  };
+  date: string;
+  time: string;
+  items: BookingItem[];
+  total: number;
+  status: BookingStatus;
+  createdAt: string;
+}
 export interface WishlistItem {
   dealId: string;
 }
-
 // ─── Product types ────────────────────────────────────────────────────────────
-
 export type ProductSort = 'popular' | 'price-asc' | 'price-desc' | 'newest';
-
 export interface Product {
   id: string;
   slug: string;
@@ -184,7 +190,6 @@ export interface Product {
   isNew: boolean;
   isFeatured: boolean;
 }
-
 export interface SearchFilter {
   query: string;
   priceMin?: number;
@@ -196,9 +201,7 @@ export interface SearchFilter {
   suggested: boolean;
   sort: DealSort;
 }
-
 // ─── Vendor / Company Landing Page types ─────────────────────────────────────
-
 export interface DealVariant {
   id: string;
   label: string;
@@ -208,7 +211,6 @@ export interface DealVariant {
   duration: number;
   durationUnit: 'min' | 'hr';
 }
-
 export interface VendorService {
   id: string;
   title: string;
@@ -228,20 +230,17 @@ export interface VendorService {
   howToUse?: string[];
   cancellationPolicy?: string;
 }
-
 export interface VendorCategory {
   id: string;
   slug: string;
   name: string;
   icon?: string;
 }
-
 export interface VendorOpeningHours {
   day: string;
   open: string | null;
   close: string | null;
 }
-
 export interface Vendor {
   id: string;
   slug: string;

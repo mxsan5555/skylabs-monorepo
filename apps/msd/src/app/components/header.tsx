@@ -218,7 +218,7 @@ export function Header() {
                       </MenuItem>
                       <MenuItem
                         onClick={() => {
-                          navigate("/bookings");
+                          navigate("/account/bookings");
                           setProfileMenuOpen(false);
                         }}
                       >

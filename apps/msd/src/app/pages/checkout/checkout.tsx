@@ -16,7 +16,7 @@ import { formatINR, inputValue } from '../../../utils/format';
 import type { CheckoutStep } from '../../../types';
 import content from '../../../content.json';
 import './checkout.css';
-
+import { saveBooking } from '../../../utils/booking-storage';
 const { checkout: checkoutContent } = content;
 
 const STEPS: CheckoutStep[] = ['details', 'datetime', 'payment'];
@@ -43,7 +43,37 @@ const TIME_OPTIONS = [
   '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
   '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM',
 ];
+const validateName = (value: string) =>
+  /^[A-Za-z]+(?:[ '-][A-Za-z]+)*$/.test(value.trim());
 
+const validatePhone = (value: string) =>
+  /^[6-9]\d{9}$/.test(value);
+
+const validateEmail = (value: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
+const validateCardNumber = (value: string) =>
+  /^\d{16}$/.test(value.replace(/\s/g, ''));
+
+const validateExpiry = (value: string) => {
+  if (!/^\d{2}\/\d{2}$/.test(value)) return false;
+
+  const [month, year] = value.split('/').map(Number);
+
+  if (month < 1 || month > 12) return false;
+
+  const now = new Date();
+  const currentYear = now.getFullYear() % 100;
+  const currentMonth = now.getMonth() + 1;
+
+  if (year < currentYear) return false;
+  if (year === currentYear && month < currentMonth) return false;
+
+  return true;
+};
+
+const validateCvv = (value: string) =>
+  /^\d{3,4}$/.test(value);
 export function Checkout() {
   const { items, clearCart } = useCart();
   const { cartItems, subtotal } = useCartItems();
@@ -68,25 +98,173 @@ export function Checkout() {
 
   const currentStepIdx = stepIndex(step);
   const progress = (currentStepIdx + 1) / STEPS.length;
+  const [errors, setErrors] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    cardName: '',
+    cardNumber: '',
+    expiry: '',
+    cvv: '',
+  });
+  function clearError(field: keyof typeof errors) {
+    setErrors((prev) => ({
+      ...prev,
+      [field]: '',
+    }));
+  }
+  function validateDetails() {
+    const newErrors = {
+      name: '',
+      phone: '',
+      email: '',
+      cardName: '',
+      cardNumber: '',
+      expiry: '',
+      cvv: '',
+    };
 
+    if (!name.trim()) {
+      newErrors.name = 'Please enter your full name.';
+    } else if (!validateName(name)) {
+      newErrors.name = 'Please enter a valid name.';
+    }
+
+    if (!phone.trim()) {
+      newErrors.phone = 'Please enter your mobile number.';
+    } else if (!validatePhone(phone)) {
+      newErrors.phone = 'Please enter a valid 10-digit mobile number.';
+    }
+
+    if (!email.trim()) {
+      newErrors.email = 'Please enter your email address.';
+    } else if (!validateEmail(email)) {
+      newErrors.email = 'Please enter a valid email address.';
+    }
+
+    setErrors(newErrors);
+
+    return !newErrors.name && !newErrors.phone && !newErrors.email;
+  }
+  function validatePayment() {
+    const newErrors = {
+      name: '',
+      phone: '',
+      email: '',
+      cardName: '',
+      cardNumber: '',
+      expiry: '',
+      cvv: '',
+    };
+
+    if (!cardName.trim()) {
+      newErrors.cardName = 'Please enter the name on your card.';
+    } else if (!validateName(cardName)) {
+      newErrors.cardName = 'Please enter a valid cardholder name.';
+    }
+
+    if (!cardNumber.trim()) {
+      newErrors.cardNumber = 'Please enter your card number.';
+    } else if (!validateCardNumber(cardNumber)) {
+      newErrors.cardNumber = 'Please enter a valid 16-digit card number.';
+    }
+
+    if (!expiry.trim()) {
+      newErrors.expiry = 'Please enter your card expiry date.';
+    } else if (!validateExpiry(expiry)) {
+      newErrors.expiry = 'Please enter a valid, non-expired MM/YY.';
+    }
+
+    if (!cvv.trim()) {
+      newErrors.cvv = 'Please enter your CVV.';
+    } else if (!validateCvv(cvv)) {
+      newErrors.cvv = 'CVV must contain 3 or 4 digits.';
+    }
+
+    setErrors(newErrors);
+
+    return (
+      !newErrors.cardName &&
+      !newErrors.cardNumber &&
+      !newErrors.expiry &&
+      !newErrors.cvv
+    );
+  }
   function goNext() {
-    if (step === 'details') setStep('datetime');
-    else if (step === 'datetime') setStep('payment');
-    else {
+    if (step === 'details') {
+      if (!validateDetails()) return;
+      setStep('datetime');
+    } else if (step === 'datetime') {
+      if (!selectedDate || !selectedTime) return;
+      setStep('payment');
+    } else {
+      if (!validatePayment()) return;
+
+      const booking = {
+        id: `BK-${Date.now()}`,
+        customer: {
+          name,
+          phone,
+          email,
+        },
+        date: selectedDate,
+        time: selectedTime,
+        items: cartItems.map((entry) => ({
+          type: entry.type,
+          id: entry.type === 'deal'
+            ? entry.deal.id
+            : entry.product.id,
+          title: entry.type === 'deal'
+            ? entry.deal.title
+            : entry.product.name,
+          image: entry.type === 'deal'
+            ? entry.deal.image
+            : entry.product.image,
+          imageAlt: entry.type === 'deal'
+            ? entry.deal.imageAlt
+            : entry.product.imageAlt,
+          price: entry.type === 'deal'
+            ? entry.deal.price
+            : entry.product.price,
+          quantity: entry.item.quantity,
+        })),
+        total: subtotal,
+        status: 'confirmed' as const,
+        createdAt: new Date().toISOString(),
+      };
+
+      saveBooking(booking);
       setPlaced(true);
       clearCart();
     }
   }
-
   function goBack() {
     if (step === 'datetime') setStep('details');
     else if (step === 'payment') setStep('datetime');
   }
 
   function canProceed() {
-    if (step === 'details') return name.trim() && phone.trim() && email.trim();
-    if (step === 'datetime') return !!selectedDate && !!selectedTime;
-    if (step === 'payment') return cardNumber.trim() && expiry.trim() && cvv.trim() && cardName.trim();
+    if (step === 'details') {
+      return (
+        validateName(name) &&
+        validatePhone(phone) &&
+        validateEmail(email)
+      );
+    }
+
+    if (step === 'datetime') {
+      return !!selectedDate && !!selectedTime;
+    }
+
+    if (step === 'payment') {
+      return (
+        validateName(cardName) &&
+        validateCardNumber(cardNumber) &&
+        validateExpiry(expiry) &&
+        validateCvv(cvv)
+      );
+    }
+
     return false;
   }
 
@@ -113,6 +291,9 @@ export function Checkout() {
           <h1 className="checkout-success__heading">{checkoutContent.successHeading}</h1>
           <p className="checkout-success__body">{checkoutContent.successBody}</p>
           <FilledButton onClick={() => navigate('/')}>Back to Home</FilledButton>
+          <FilledButton onClick={() => navigate('/account/bookings')}>
+            View My Bookings
+          </FilledButton>
         </div>
       </div>
     );
@@ -164,30 +345,80 @@ export function Checkout() {
                     autocomplete="name"
                     required
                     value={name}
-                    onInput={(e) => setName(inputValue(e as unknown as Event))}
+                    onInput={(e) => {
+                      const target = e.currentTarget as HTMLInputElement;
+
+                      const value = target.value
+                        .replace(/[^A-Za-z\s'-]/g, '')
+                        .slice(0, 50);
+
+                      target.value = value;
+                      setName(value);
+                      clearError('name');
+                    }}
                   >
-                    <Icon slot="leading-icon" aria-hidden="true">person</Icon>
+                    <Icon slot="leading-icon" aria-hidden="true">
+                      person
+                    </Icon>
                   </OutlinedTextField>
+
+                  {errors.name && (
+                    <p className="checkout-form__error">
+                      {errors.name}
+                    </p>
+                  )}
                   <OutlinedTextField
                     label={checkoutContent.fields.phone}
                     type="tel"
+                    inputMode="numeric"
                     autocomplete="tel"
                     required
+                    maxLength={10}
                     value={phone}
-                    onInput={(e) => setPhone(inputValue(e as unknown as Event))}
+                    onInput={(e) => {
+                      const target = e.currentTarget as HTMLInputElement;
+
+                      const value = target.value
+                        .replace(/\D/g, '')
+                        .slice(0, 10);
+
+                      target.value = value;
+                      setPhone(value);
+                      clearError('phone');
+                    }}
                   >
-                    <Icon slot="leading-icon" aria-hidden="true">phone</Icon>
+                    <Icon slot="leading-icon" aria-hidden="true">
+                      phone
+                    </Icon>
                   </OutlinedTextField>
+
+                  {errors.phone && (
+                    <p className="checkout-form__error">
+                      {errors.phone}
+                    </p>
+                  )}
                   <OutlinedTextField
                     label={checkoutContent.fields.email}
                     type="email"
                     autocomplete="email"
                     required
                     value={email}
-                    onInput={(e) => setEmail(inputValue(e as unknown as Event))}
+                    onInput={(e) => {
+                      const target = e.currentTarget as HTMLInputElement;
+                      setEmail(target.value);
+                      clearError('email');
+                    }}
                   >
-                    <Icon slot="leading-icon" aria-hidden="true">mail</Icon>
+                    <Icon slot="leading-icon" aria-hidden="true">
+                      mail
+                    </Icon>
                   </OutlinedTextField>
+
+                  {errors.email && (
+                    <p className="checkout-form__error">
+                      {errors.email}
+                    </p>
+                  )}
                 </div>
               </section>
             )}
@@ -238,43 +469,121 @@ export function Checkout() {
                     autocomplete="cc-name"
                     required
                     value={cardName}
-                    onInput={(e) => setCardName(inputValue(e as unknown as Event))}
+                    onInput={(e) => {
+                      const target = e.currentTarget as HTMLInputElement;
+
+                      const value = target.value
+                        .replace(/[^A-Za-z\s'-]/g, '')
+                        .slice(0, 50);
+
+                      target.value = value;
+                      setCardName(value);
+                      clearError('cardName');
+                    }}
                   >
-                    <Icon slot="leading-icon" aria-hidden="true">person</Icon>
+                    <Icon slot="leading-icon" aria-hidden="true">
+                      person
+                    </Icon>
                   </OutlinedTextField>
+
+                  {errors.cardName && (
+                    <p className="checkout-form__error">
+                      {errors.cardName}
+                    </p>
+                  )}
                   <OutlinedTextField
                     label={checkoutContent.fields.cardNumber}
                     type="text"
                     inputMode="numeric"
                     autocomplete="cc-number"
                     required
-                    maxLength={19}
+                    maxLength={16}
                     value={cardNumber}
-                    onInput={(e) => setCardNumber(inputValue(e as unknown as Event))}
+                    onInput={(e) => {
+                      const target = e.currentTarget as HTMLInputElement;
+
+                      const value = target.value
+                        .replace(/\D/g, '')
+                        .slice(0, 16);
+
+                      target.value = value;
+                      setCardNumber(value);
+                      clearError('cardNumber');
+                    }}
                   >
-                    <Icon slot="leading-icon" aria-hidden="true">credit_card</Icon>
+                    <Icon slot="leading-icon" aria-hidden="true">
+                      credit_card
+                    </Icon>
                   </OutlinedTextField>
+
+                  {errors.cardNumber && (
+                    <p className="checkout-form__error">
+                      {errors.cardNumber}
+                    </p>
+                  )}
                   <div className="checkout-form__fields checkout-form__fields--row">
-                    <OutlinedTextField
-                      label={checkoutContent.fields.expiry}
-                      type="text"
-                      inputMode="numeric"
-                      autocomplete="cc-exp"
-                      required
-                      maxLength={5}
-                      value={expiry}
-                      onInput={(e) => setExpiry(inputValue(e as unknown as Event))}
-                    />
-                    <OutlinedTextField
-                      label={checkoutContent.fields.cvv}
-                      type="password"
-                      inputMode="numeric"
-                      autocomplete="cc-csc"
-                      required
-                      maxLength={4}
-                      value={cvv}
-                      onInput={(e) => setCvv(inputValue(e as unknown as Event))}
-                    />
+                    <div className="checkout-form__field-wrapper">
+                      <OutlinedTextField
+                        label={checkoutContent.fields.expiry}
+                        type="text"
+                        inputMode="numeric"
+                        autocomplete="cc-exp"
+                        required
+                        maxLength={5}
+                        value={expiry}
+                        onInput={(e) => {
+                          const target = e.currentTarget as HTMLInputElement;
+
+                          const digits = target.value
+                            .replace(/\D/g, '')
+                            .slice(0, 4);
+
+                          const value =
+                            digits.length > 2
+                              ? `${digits.slice(0, 2)}/${digits.slice(2)}`
+                              : digits;
+
+                          target.value = value;
+                          setExpiry(value);
+                          clearError('expiry');
+                        }}
+                      />
+
+                      {errors.expiry && (
+                        <p className="checkout-form__error">
+                          {errors.expiry}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="checkout-form__field-wrapper">
+                      <OutlinedTextField
+                        label={checkoutContent.fields.cvv}
+                        type="password"
+                        inputMode="numeric"
+                        autocomplete="cc-csc"
+                        required
+                        maxLength={4}
+                        value={cvv}
+                        onInput={(e) => {
+                          const target = e.currentTarget as HTMLInputElement;
+
+                          const value = target.value
+                            .replace(/\D/g, '')
+                            .slice(0, 4);
+
+                          target.value = value;
+                          setCvv(value);
+                          clearError('cvv');
+                        }}
+                      />
+
+                      {errors.cvv && (
+                        <p className="checkout-form__error">
+                          {errors.cvv}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <p className="checkout-form__secure">
@@ -295,7 +604,6 @@ export function Checkout() {
               <FilledButton
                 className="checkout-form__next-btn"
                 onClick={goNext}
-                disabled={!canProceed()}
               >
                 {step === 'payment' ? checkoutContent.placeOrderLabel : checkoutContent.nextLabel}
                 <Icon slot="trailing-icon" aria-hidden="true">
