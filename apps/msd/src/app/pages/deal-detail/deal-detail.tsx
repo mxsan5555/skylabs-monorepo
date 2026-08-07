@@ -16,10 +16,12 @@ import { Breadcrumb } from '../../components/breadcrumb';
 import { formatINR } from '../../../utils/format';
 import content from '../../../content.json';
 import './deal-detail.css';
+import { useAuth } from '../../../auth/auth-context';
 
 export function DealDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const { addItem } = useCart();
   const { toggle, has } = useWishlist();
   const [activeImg, setActiveImg] = useState(0);
@@ -46,11 +48,22 @@ export function DealDetail() {
   const related = DEALS.filter(
     (d) => d.categorySlug === deal.categorySlug && d.id !== deal.id,
   ).slice(0, 6);
+  function handleFavorite(id: string) {
+    if (!isAuthenticated) {
+      navigate('/sign-in');
+      return;
+    }
 
+    toggle(id);
+  }
   function handleAddToCart() {
+    if (!isAuthenticated) {
+      navigate('/sign-in');
+      return;
+    }
     addItem(currentDeal.id, 'deal');
     setAddedToCart(true);
-    setTimeout(() => setAddedToCart(false), 2000);
+    setTimeout(() => { setAddedToCart(false); }, 2000);
   }
 
   const discountPct = deal.originalPrice
@@ -203,9 +216,9 @@ export function DealDetail() {
             </FilledButton>
             <OutlinedIconButton
               toggle
-              selected={has(deal.id)}
-              aria-label={has(deal.id) ? 'Remove from wishlist' : 'Save to wishlist'}
-              onClick={() => toggle(deal.id)}
+              selected={isAuthenticated && has(deal.id)}
+             aria-label={ isAuthenticated && has(deal.id)? 'Remove from wishlist': 'Save to wishlist'}
+         onClick={() => handleFavorite(deal.id)}
             >
               <Icon aria-hidden="true" slot="selected">favorite</Icon>
               <Icon aria-hidden="true">favorite_border</Icon>
@@ -278,8 +291,8 @@ export function DealDetail() {
                   <swiper-slide key={d.id} style={{ width: '260px', height: 'auto' }}>
                     <DealCard
                       deal={d}
-                      favoriteActive={has(d.id)}
-                      onFavorite={() => toggle(d.id)}
+                      favoriteActive={isAuthenticated && has(d.id)}
+                      onFavorite={() => handleFavorite(d.id)}
                     />
                   </swiper-slide>
                 ))}

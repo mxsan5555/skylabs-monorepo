@@ -35,8 +35,6 @@ export function AppRoutes() {
         <Route path="/products" element={<ProductListing />} />
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/vendor/:slug" element={<VendorPage />} />
-        <Route path="/cart" element={<Cart />} />
-        <Route path="/products" element={<ProductListing />} />
         {/* ── Auth-gated consumer pages ── */}
         <Route
           path="/wishlist"
@@ -46,6 +44,14 @@ export function AppRoutes() {
             </RequireAuth>
           }
         />
+        <Route
+  path="/cart"
+  element={
+    <RequireAuth>
+      <Cart />
+    </RequireAuth>
+  }
+/>
         <Route
           path="/checkout"
           element={

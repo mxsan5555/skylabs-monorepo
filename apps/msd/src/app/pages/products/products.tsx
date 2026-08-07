@@ -1,4 +1,5 @@
 import { useState, useMemo, } from 'react';
+import { useNavigate} from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import {
   FilledButton,
@@ -19,7 +20,7 @@ import { formatINR } from '../../../utils/format';
 import type { ProductSort } from '../../../types';
 import content from '../../../content.json';
 import './products.css';
-
+import { useAuth } from '../../../auth/auth-context';
 const { products } = content;
 
 const FILTERS = [
@@ -36,6 +37,8 @@ export function ProductListing() {
   const { toggle, has } = useWishlist();
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [sort, setSort] = useState<ProductSort>('popular');
+    const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   // const swiperRef = useRef<any>(null);
   const filteredProducts = useMemo(() => {
     const list = activeFilter === 'all' ? PRODUCTS : getProductsByCategory(activeFilter);
@@ -46,7 +49,21 @@ export function ProductListing() {
       default: return [...list];
     }
   }, [activeFilter, sort]);
+  function handleFavorite(id: string) {
+    if (!isAuthenticated) {
+      navigate('/sign-in');
+      return;
+    }
+    toggle(id);
+  }
+  function handleAddToCart(id: string) {
+  if (!isAuthenticated) {
+    navigate('/sign-in');
+    return;
+  }
 
+  addItem(id, 'product');
+}
   return (
     <div id="main-content" className="products-page">
       <title>{products.meta.listingTitle}</title>
@@ -167,10 +184,9 @@ export function ProductListing() {
                 <>
                   <ProductCard
                     product={product}
-                    favoriteActive={has(product.id)}
-                    onFavorite={() => toggle(product.id)}
+                   favoriteActive={isAuthenticated && has(product.id)}
+                    onFavorite={() => handleFavorite(product.id)}
                   />
-
                   <div
                     className="products-page__card-cta"
                     onClick={(e) => {
@@ -180,7 +196,7 @@ export function ProductListing() {
                   >
                     <FilledButton
                       className="products-page__card-btn"
-                      onClick={() => addItem(product.id, 'product')}
+                     onClick={() => handleAddToCart(product.id)}
                     >
                       <Icon slot="icon">shopping_bag</Icon>
                       Add to Cart

@@ -10,6 +10,7 @@ import { Breadcrumb } from '../../components/breadcrumb';
 import { formatINR } from '../../../utils/format';
 import content from '../../../content.json';
 import './product-detail.css';
+import { useAuth } from '../../../auth/auth-context';
 
 const { products } = content;
 const SITE_URL: string = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
@@ -17,6 +18,7 @@ const SITE_URL: string = (import.meta.env['VITE_SITE_URL'] as string | undefined
 export function ProductDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const { addItem, updateQuantity } = useCart();
   const { toggle, has } = useWishlist();
   const [activeImg, setActiveImg] = useState(0);
@@ -44,6 +46,10 @@ export function ProductDetail() {
   ).slice(0, 6);
   const categoryLabel = CATEGORY_LABELS[product.categorySlug] ?? product.categorySlug;
   function handleAddToCart() {
+    if (!isAuthenticated) {
+      navigate('/sign-in');
+      return;
+    }
     addItem(currentProduct.id, 'product');
     if (qty > 1) { updateQuantity(currentProduct.id, 'product', qty); }
     setAddedToCart(true);
@@ -214,7 +220,13 @@ export function ProductDetail() {
               toggle
               selected={has(product.id)}
               aria-label={has(product.id) ? 'Remove from wishlist' : 'Save to wishlist'}
-              onClick={() => toggle(product.id)}
+              onClick={() => {
+                if (!isAuthenticated) {
+                  navigate('/sign-in');
+                  return;
+                }
+                toggle(product.id);
+              }}
             >
               <Icon slot="selected">favorite</Icon>
               <Icon>favorite_border</Icon>

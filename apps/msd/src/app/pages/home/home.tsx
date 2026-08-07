@@ -12,6 +12,7 @@ import '@skylabs-monorepo/shared-ui';
 import { useCurrentLocation } from "../../../hooks/useCurrentLocation";
 import Map from "../../components/map/map";
 import type { Deal } from "../../../types";
+import { useAuth } from '../../../auth/auth-context';
 const { home } = content;
 const premiumHero = home.premiumHero;
 const hotTabs = home.sections.hotRightNow.tabs;
@@ -35,13 +36,14 @@ function SectionHeader({ id, heading, seeAll, seeAllTo, }: {
 export function Home() {
   const vacationSwiperRef = useRef<any>(null);
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const { toggle, has } = useWishlist();
   const spaFinder = content.home.spaFinderHero;
   const [selectedTab, setSelectedTab] = useState('all');
   const featuredDeals = getFeaturedDeals();
- const spaFinderDeals = DEALS.slice( 0, spaFinder.mapDealsLimit);
+  const spaFinderDeals = DEALS.slice(0, spaFinder.mapDealsLimit);
   const hotDeals = getHotDeals();
- const massageDeals = getDealsByCategory("massage").slice(0, spaFinder.limits.massage);
+  const massageDeals = getDealsByCategory("massage").slice(0, spaFinder.limits.massage);
   const skinDeals = getDealsByCategory('skin-beauty').slice(0, 6);
   const nailDeals = getDealsByCategory('hair-nails').slice(0, 6);
   const spaDeals = getDealsByCategory('spas-retreats').slice(0, 6);
@@ -64,7 +66,7 @@ export function Home() {
         deal.providerName.toLowerCase().includes(query) ||
         deal.location.toLowerCase().includes(query)
     );
-   setSuggestions( results.slice(0, spaFinder.suggestionLimit));
+    setSuggestions(results.slice(0, spaFinder.suggestionLimit));
     setShowSuggestions(true);
   }, [searchQuery]);
 
@@ -90,8 +92,14 @@ export function Home() {
               <swiper-slide key={deal.id} style={{ width: '260px', height: 'auto' }} >
                 <DealCard
                   deal={deal}
-                  favoriteActive={has(deal.id)}
-                  onFavorite={() => toggle(deal.id)}
+                  favoriteActive={isAuthenticated && has(deal.id)}
+                  onFavorite={() => {
+                    if (!isAuthenticated) {
+                      navigate("/sign-in");
+                      return;
+                    }
+                    toggle(deal.id);
+                  }}
                 />
               </swiper-slide>
             );
@@ -100,202 +108,209 @@ export function Home() {
       </div>
     );
   }
+  function handleFavorite(id: string) {
+    if (!isAuthenticated) {
+      navigate('/sign-in');
+      return;
+    }
+    toggle(id);
+  }
   return (
     <div className="home">
       <title>{content.meta.home.title}</title>
       <meta name="description" content={content.meta.home.description} />
       {   /*spafinder like*/}
       {false && (
-      <section className="home__spa-finder">
-        <div className="home__spa-finder-left">
-          <span className="home__spa-badge">  {spaFinder.title}</span>
-          <h2 className="home__spa-title"> {spaFinder.heading} </h2>
-          <p className="home__spa-subtitle"> {spaFinder.subheading} </p>
-          <Tabs className="home__spa-tabs">
-            {spaFinder.tabs.map((tab: any) => (
-              <SecondaryTab key={tab.label} active={tab.label === spaFinder.defaultTab}>
-                <Icon slot="icon">{tab.icon}</Icon>
-                {tab.label}
-              </SecondaryTab>
-            ))}
-          </Tabs>
-          <sky-card variant="filled" className="home__spa-search-card">
-            <form
-              className="home__spa-search"
-              role="search"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (searchQuery.trim()) { navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`); }
-                else { navigate("/explore"); }
-                setShowSuggestions(false);
-              }}
-            >
-              <TextButton type="button" className="home__spa-location" >
-                <Icon>location_on</Icon>
-                <span>{shortLocation ?? spaFinder.search.locationPlaceholder}</span>
-              </TextButton>
-              <div className="home__spa-search-input">
-                <OutlinedTextField
-                  className="premium-field"
-                  value={searchQuery}
-                  label={spaFinder.search.servicePlaceholder}
-                  onInput={(e) => {
-                    const target = e.currentTarget as HTMLInputElement;
-                    setSearchQuery(target.value);
-                    setShowSuggestions(true);
-                  }}
-                >
-                  <Icon slot="leading-icon">  search </Icon>
-                  {searchQuery && (
-                    <Icon
-                      slot="trailing-icon"
-                      style={{ cursor: "pointer" }}
-                      onClick={() => setSearchQuery("")}
-                    >
-                      close
-                    </Icon>
-                  )}
-                </OutlinedTextField>
-                {showSuggestions && (
-                  <List className="search-suggestions">
-                    {suggestions.length > 0 ? (
-                      suggestions.map((deal) => (
-                        <ListItem
-                          key={deal.id}
-                          type="button"
-                          onClick={() => {
-                            navigate(`/deal/${deal.id}`);
-                            setSearchQuery("");
-                            setShowSuggestions(false);
-                          }}
-                        >
-                          <Icon slot="start">  search </Icon>
-                          <div>
-                            <strong>{deal.title}</strong>
-                            <small> {deal.providerName} • {deal.location} </small>
-                          </div>
-                        </ListItem>
-                      ))
-                    ) : (
-                      <ListItem disabled> No results found </ListItem>
-                    )}
-                  </List>
-                )}
-              </div>
-              <FilledButton type="submit"> Search
-                <Icon slot="trailing-icon">  arrow_forward </Icon>
-              </FilledButton>
-            </form>
-
-          </sky-card>
-          <div className="home__spa-popular">
-            {spaFinder.popular.map((item: string) => (
-              <AssistChip key={item}> {item} </AssistChip>
-            ))}
-          </div>
-        </div>
-        <div className="home__spa-finder-right">
-          <Map deals={spaFinderDeals} />
-        </div>
-      </section>
-)}
-      {/*premm-hero*/}
-      {/* {false && ( */}
-        <section className="home__premium-hero">
-          <div className="home__premium-content">
-            <div className="home__premium-left">
-              <h1 className="home__premium-title"> {premiumHero.heading} </h1>
-              <p className="home__premium-subtitle"> {premiumHero.subheading}</p>
-              <div className="home__premium-tabs">
-                {premiumHero.tabs.map((tab) => (
-                  <AssistChip key={tab.label}>
-                    <Icon slot="icon"> {tab.icon} </Icon>
-                    {tab.label}
-                  </AssistChip>
-                ))}
-              </div>
-              <sky-card variant="filled" className="home__premium-search-card">
-                <form
-                  className="home__premium-search"
-                  role="search"
-                  aria-label={content.search.ariaLabel}
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (searchQuery.trim()) { navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`); }
-                    else { navigate("/explore"); }
-                    setShowSuggestions(false);
-                  }}
-                >
-                  <TextButton type="button" className="home__premium-location">
-                    <Icon> location_on </Icon>
-                    <span>{shortLocation ?? premiumHero.search.locationPlaceholder}</span>
-                  </TextButton>
+        <section className="home__spa-finder">
+          <div className="home__spa-finder-left">
+            <span className="home__spa-badge">  {spaFinder.title}</span>
+            <h2 className="home__spa-title"> {spaFinder.heading} </h2>
+            <p className="home__spa-subtitle"> {spaFinder.subheading} </p>
+            <Tabs className="home__spa-tabs">
+              {spaFinder.tabs.map((tab: any) => (
+                <SecondaryTab key={tab.label} active={tab.label === spaFinder.defaultTab}>
+                  <Icon slot="icon">{tab.icon}</Icon>
+                  {tab.label}
+                </SecondaryTab>
+              ))}
+            </Tabs>
+            <sky-card variant="filled" className="home__spa-search-card">
+              <form
+                className="home__spa-search"
+                role="search"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (searchQuery.trim()) { navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`); }
+                  else { navigate("/explore"); }
+                  setShowSuggestions(false);
+                }}
+              >
+                <TextButton type="button" className="home__spa-location" >
+                  <Icon>location_on</Icon>
+                  <span>{shortLocation ?? spaFinder.search.locationPlaceholder}</span>
+                </TextButton>
+                <div className="home__spa-search-input">
                   <OutlinedTextField
-                    name="q"
-                    label={premiumHero.search.servicePlaceholder}
-                    className="premium-field premium-field--grow "
+                    className="premium-field"
                     value={searchQuery}
+                    label={spaFinder.search.servicePlaceholder}
                     onInput={(e) => {
                       const target = e.currentTarget as HTMLInputElement;
                       setSearchQuery(target.value);
                       setShowSuggestions(true);
                     }}
                   >
-                    <Icon slot="leading-icon">search</Icon>
+                    <Icon slot="leading-icon">  search </Icon>
                     {searchQuery && (
                       <Icon
                         slot="trailing-icon"
-                        onClick={() => setSearchQuery("")}
                         style={{ cursor: "pointer" }}
-                      > close </Icon>
+                        onClick={() => setSearchQuery("")}
+                      >
+                        close
+                      </Icon>
                     )}
                   </OutlinedTextField>
-                  <FilledButton type="submit">
-                    {premiumHero.search.button}
-                    <Icon slot="trailing-icon">arrow_forward</Icon>
-                  </FilledButton>
-                </form>
-                {showSuggestions && (
-                  <List className="search-suggestions">
-                    {suggestions.length > 0 ? (
-                      suggestions.map((deal) => (
-                        <ListItem
-                          key={deal.id}
-                          type="button"
-                          className="search-suggestion"
-                          onClick={() => {
-                            navigate(`/deal/${deal.id}`);
-                            setSearchQuery("");
-                            setShowSuggestions(false);
-                          }}
-                        >
-                          <Icon slot="start">  search </Icon>
-                          <div>
-                            <strong>{deal.title}</strong>
-                            <small>{deal.providerName} • {deal.location} </small>
-                          </div>
-                        </ListItem>
-                      ))
-                    ) : (
-                      <ListItem disabled> {content.search.emptySuggestion} </ListItem>
-                    )}
-                  </List>
-                )}
-              </sky-card>
-              <div className="home__premium-popular">
-                <span className="popular-label"> Popular: </span>
-                {premiumHero.popular.map((item) => (
-                  <AssistChip key={item}> {item} </AssistChip>
-                ))}
-              </div>
-            </div>
-            <div className="home__premium-right">
-              <div className="home__premium-image-card">
-                <img src={premiumHero.image} alt={premiumHero.imageAlt} />
-              </div>
+                  {showSuggestions && (
+                    <List className="search-suggestions">
+                      {suggestions.length > 0 ? (
+                        suggestions.map((deal) => (
+                          <ListItem
+                            key={deal.id}
+                            type="button"
+                            onClick={() => {
+                              navigate(`/deal/${deal.id}`);
+                              setSearchQuery("");
+                              setShowSuggestions(false);
+                            }}
+                          >
+                            <Icon slot="start">  search </Icon>
+                            <div>
+                              <strong>{deal.title}</strong>
+                              <small> {deal.providerName} • {deal.location} </small>
+                            </div>
+                          </ListItem>
+                        ))
+                      ) : (
+                        <ListItem disabled> No results found </ListItem>
+                      )}
+                    </List>
+                  )}
+                </div>
+                <FilledButton type="submit"> Search
+                  <Icon slot="trailing-icon">  arrow_forward </Icon>
+                </FilledButton>
+              </form>
+
+            </sky-card>
+            <div className="home__spa-popular">
+              {spaFinder.popular.map((item: string) => (
+                <AssistChip key={item}> {item} </AssistChip>
+              ))}
             </div>
           </div>
+          <div className="home__spa-finder-right">
+            <Map deals={spaFinderDeals} />
+          </div>
         </section>
+      )}
+      {/*premm-hero*/}
+      {/* {false && ( */}
+      <section className="home__premium-hero">
+        <div className="home__premium-content">
+          <div className="home__premium-left">
+            <h1 className="home__premium-title"> {premiumHero.heading} </h1>
+            <p className="home__premium-subtitle"> {premiumHero.subheading}</p>
+            <div className="home__premium-tabs">
+              {premiumHero.tabs.map((tab) => (
+                <AssistChip key={tab.label}>
+                  <Icon slot="icon"> {tab.icon} </Icon>
+                  {tab.label}
+                </AssistChip>
+              ))}
+            </div>
+            <sky-card variant="filled" className="home__premium-search-card">
+              <form
+                className="home__premium-search"
+                role="search"
+                aria-label={content.search.ariaLabel}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (searchQuery.trim()) { navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`); }
+                  else { navigate("/explore"); }
+                  setShowSuggestions(false);
+                }}
+              >
+                <TextButton type="button" className="home__premium-location">
+                  <Icon> location_on </Icon>
+                  <span>{shortLocation ?? premiumHero.search.locationPlaceholder}</span>
+                </TextButton>
+                <OutlinedTextField
+                  name="q"
+                  label={premiumHero.search.servicePlaceholder}
+                  className="premium-field premium-field--grow "
+                  value={searchQuery}
+                  onInput={(e) => {
+                    const target = e.currentTarget as HTMLInputElement;
+                    setSearchQuery(target.value);
+                    setShowSuggestions(true);
+                  }}
+                >
+                  <Icon slot="leading-icon">search</Icon>
+                  {searchQuery && (
+                    <Icon
+                      slot="trailing-icon"
+                      onClick={() => setSearchQuery("")}
+                      style={{ cursor: "pointer" }}
+                    > close </Icon>
+                  )}
+                </OutlinedTextField>
+                <FilledButton type="submit">
+                  {premiumHero.search.button}
+                  <Icon slot="trailing-icon">arrow_forward</Icon>
+                </FilledButton>
+              </form>
+              {showSuggestions && (
+                <List className="search-suggestions">
+                  {suggestions.length > 0 ? (
+                    suggestions.map((deal) => (
+                      <ListItem
+                        key={deal.id}
+                        type="button"
+                        className="search-suggestion"
+                        onClick={() => {
+                          navigate(`/deal/${deal.id}`);
+                          setSearchQuery("");
+                          setShowSuggestions(false);
+                        }}
+                      >
+                        <Icon slot="start">  search </Icon>
+                        <div>
+                          <strong>{deal.title}</strong>
+                          <small>{deal.providerName} • {deal.location} </small>
+                        </div>
+                      </ListItem>
+                    ))
+                  ) : (
+                    <ListItem disabled> {content.search.emptySuggestion} </ListItem>
+                  )}
+                </List>
+              )}
+            </sky-card>
+            <div className="home__premium-popular">
+              <span className="popular-label"> Popular: </span>
+              {premiumHero.popular.map((item) => (
+                <AssistChip key={item}> {item} </AssistChip>
+              ))}
+            </div>
+          </div>
+          <div className="home__premium-right">
+            <div className="home__premium-image-card">
+              <img src={premiumHero.image} alt={premiumHero.imageAlt} />
+            </div>
+          </div>
+        </div>
+      </section>
       {/* )} */}
       {/* ── Hero / Search ──────────────────────────────────────────────── */}
       {false && (

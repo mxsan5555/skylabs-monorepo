@@ -1,388 +1,353 @@
-﻿import { useState, useEffect, useRef } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { List, Menu, MenuItem, ListItem, FilledButton, FilledTonalIconButton, TextButton, IconButton, Icon, OutlinedTextField, Divider } from '@skylabs-monorepo/shared-ui/react';
-import { useAuth } from '../../auth/auth-context';
-import { useCart } from '../../cart/cart-context';
-import { useWishlist } from '../../wishlist/wishlist-context';
-import content from '../../content.json';
-import './header.css';
-import { useCurrentLocation } from "../../hooks/useCurrentLocation";
+﻿import { useEffect, useRef, useState } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { Divider, FilledButton, FilledTonalIconButton, Icon, IconButton, List, ListItem, Menu, MenuItem, OutlinedTextField, TextButton, } from "@skylabs-monorepo/shared-ui/react";
+import { useAuth } from "../../auth/auth-context";
+import { useCart } from "../../cart/cart-context";
+import { useWishlist } from "../../wishlist/wishlist-context";
+import content from "../../content.json";
 import { DEALS } from "../../data/deals";
-import type { Deal } from "../../types";
+import logo from "../../assets/logo.jpg";
+import logo2 from "../../assets/logo2.jpg";
+import "./header.css";
 
 export function Header() {
-  const { isAuthenticated, signOut } = useAuth();
-  const { totalItems: cartCount } = useCart();
-  const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
-  const { location } = useCurrentLocation();
+  const { isAuthenticated, signOut } = useAuth();
+  const { totalItems: cartCount, clearCart, } = useCart();
+  const { wishlistCount, clear, } = useWishlist();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<Deal[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [suggestions, setSuggestions] = useState(DEALS.slice(0, 6));
   const [showSuggestions, setShowSuggestions] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
-  const profileButtonRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    const handleClickOutside = (event: MouseEvent) => {
       if (
         profileRef.current &&
         !profileRef.current.contains(event.target as Node)
       ) {
         setProfileMenuOpen(false);
       }
-    }
-
+    };
     document.addEventListener("mousedown", handleClickOutside);
-
     return () =>
       document.removeEventListener("mousedown", handleClickOutside);
   }, []);
   useEffect(() => {
-    const query = searchQuery.trim().toLowerCase();
-
-    if (!query) {
+    const value = searchQuery.trim().toLowerCase();
+    if (!value) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
-
-    const results = DEALS.filter((deal) =>
-      deal.title.toLowerCase().includes(query) ||
-      deal.providerName.toLowerCase().includes(query) ||
-      deal.location.toLowerCase().includes(query)
+    const filtered = DEALS.filter(
+      (deal) =>
+        deal.title.toLowerCase().includes(value) ||
+        deal.providerName.toLowerCase().includes(value) ||
+        deal.location.toLowerCase().includes(value)
     );
-
-    setSuggestions(results.slice(0, 6));
+    setSuggestions(filtered.slice(0, 6));
     setShowSuggestions(true);
   }, [searchQuery]);
-
   useEffect(() => {
     if (!drawerOpen) return;
-    const close = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setDrawerOpen(false);
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDrawerOpen(false);
     };
-    document.addEventListener('keydown', close);
-    return () => document.removeEventListener('keydown', close);
+    document.addEventListener("keydown", handleEsc);
+    return () =>
+      document.removeEventListener("keydown", handleEsc);
   }, [drawerOpen]);
-
   useEffect(() => {
-    document.body.style.overflow = drawerOpen ? 'hidden' : '';
-    return () => {
-      document.body.style.overflow = '';
-    };
+    document.body.style.overflow = drawerOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
   }, [drawerOpen]);
-
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery('');
-      // setSearchOpen(false);
-    }
-  }
-
+  const search = (value: string) => {
+    const q = value.trim();
+    navigate(q ? `/explore?q=${encodeURIComponent(q)}` : "/explore");
+    setShowSuggestions(false);
+  };
+  const openDeal = (id: string | number) => {
+    navigate(`/deal/${id}`);
+    setSearchQuery("");
+    setShowSuggestions(false);
+  };
+  const closeDrawer = () => setDrawerOpen(false);
+  const toggleProfileMenu = () => setProfileMenuOpen((prev) => !prev);
   return (
     <>
-      {/* Skip to main content — accessibility */}
-      <a className="skip-link" href="#main-content">
-        {content.header.skipToContent}
-      </a>
-      <>
-        <header className="site-header" role="banner">
-          <div className="site-header__top">
-            <IconButton
-              className="site-header__menu-btn"
-              aria-label={content.header.openMenu}
-              onClick={() => setDrawerOpen(true)}
+      <a className="skip-link" href="#main-content"> {content.header.skipToContent}</a>
+      <header className="site-header" role="banner">
+        <div className="site-header__top">
+          <IconButton
+            className="site-header__menu-btn"
+            aria-label={content.header.openMenu}
+            onClick={() => setDrawerOpen(true)}
+          >
+            <Icon>menu</Icon>
+          </IconButton>
+          <NavLink
+            to="/"
+            className="site-header__brand"
+            aria-label={content.header.homeAriaLabel}
+          >
+            <img
+              src={logo}
+              alt={content.site.name}
+              className="site-header__logo site-header__logo--desktop"
+            />
+            <img
+              src={logo2}
+              alt={content.site.name}
+              className="site-header__logo site-header__logo--mobile"
+            />
+          </NavLink>
+          <div className="site-header__search-wrapper">
+            <form
+              className="home__hero-search"
+              role="search"
+              aria-label={content.search.ariaLabel}
+              onSubmit={(e) => {
+                e.preventDefault();
+                search(searchQuery);
+              }}
             >
-              <Icon>menu</Icon>
-            </IconButton>
-            {/* Brand */}
-            <NavLink to="/" className="site-header__brand" aria-label={content.header.homeAriaLabel}>
-              <span className="site-header__brand-icon" aria-hidden="true">
-                <Icon>spa</Icon>
-              </span>
-              <span className="site-header__brand-text">
-                <span className="site-header__brand-name">{content.site.name}</span>
-                <span className="site-header__brand-tagline">{content.site.fullName}</span>
-              </span>
-            </NavLink>
-            <div className="site-header__search-wrapper">
-              <div className="site-header__search-top">
-                <form
-                  className="home__hero-search"
-                  role="search"
-                  aria-label={content.search.ariaLabel}
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const q = (e.currentTarget.elements.namedItem('q') as HTMLInputElement)?.value;
-                    if (q?.trim()) navigate(`/explore?q=${encodeURIComponent(q.trim())}`);
-                    else navigate('/explore');
-                  }}
-                >
-                  <OutlinedTextField
-                    name="q"
-                    label={content.search.placeholder}
-                    className="home__hero-search-field"
-                    value={searchQuery}
-                    onInput={(e) => {
-                      const target = e.currentTarget as HTMLInputElement;
-                      setSearchQuery(target.value);
+              <OutlinedTextField
+                name="q"
+                value={searchQuery}
+                label={content.search.placeholder}
+                className="home__hero-search-field"
+                onInput={(e) =>
+                  setSearchQuery(
+                    (e.currentTarget as HTMLInputElement).value
+                  )}
+              >
+                <Icon slot="leading-icon">search</Icon>
+                {!!searchQuery && (
+                  <Icon
+                    slot="trailing-icon"
+                    style={{ cursor: "pointer" }}
+                    onClick={() => {
+                      setSearchQuery("");
+                      setShowSuggestions(false);
                     }}
+                  > close </Icon>
+                )}
+              </OutlinedTextField>
+            </form>
+            {showSuggestions && (
+              <List className="search-suggestions">
+                {suggestions.length ? (
+                  suggestions.map((deal) => (
+                    <ListItem
+                      key={deal.id}
+                      type="button"
+                      className="search-suggestion"
+                      onClick={() => openDeal(deal.id)}
+                    >
+                      <Icon slot="start">search</Icon>
+                      <div>
+                        <strong>{deal.title}</strong>
+                        <small> {deal.providerName} • {deal.location} </small>
+                      </div>
+                    </ListItem>
+                  ))
+                ) : (
+                  <ListItem disabled>
+                    {content.search.emptySuggestion}
+                  </ListItem>
+                )}
+              </List>
+            )}
+          </div>
+          <div className="site-header__actions">
+            <FilledTonalIconButton
+              className="site-header__cart"
+              aria-label={`Wishlist, ${isAuthenticated ? wishlistCount : 0
+                } item${(isAuthenticated ? wishlistCount : 0) !== 1 ? "s" : ""}`}
+              onClick={() => navigate("/wishlist")}
+            >
+              <Icon>favorite_border</Icon>
+              {isAuthenticated && wishlistCount > 0 && (
+                <span className="site-header__cart-badge">
+                  {wishlistCount}
+                </span>
+              )}
+            </FilledTonalIconButton>
+            <FilledTonalIconButton
+              className="site-header__cart"
+              aria-label={`Cart, ${isAuthenticated ? cartCount : 0
+                } item${(isAuthenticated ? cartCount : 0) !== 1 ? "s" : ""}`}
+              onClick={() => navigate("/cart")}
+            >
+              <Icon>shopping_bag</Icon>
+              {isAuthenticated && cartCount > 0 && (
+                <span className="site-header__cart-badge">
+                  {cartCount}
+                </span>
+              )}
+            </FilledTonalIconButton>
+            <div className="site-header__profile">
+              {isAuthenticated ? (
+                <div className="profile-menu" ref={profileRef} >
+                  <FilledTonalIconButton
+                    id="profile-button"
+                    className="profile-button"
+                    onClick={toggleProfileMenu}
                   >
-                    <Icon slot="leading-icon" aria-hidden="true">search</Icon>
-                    {searchQuery && (
-                      <Icon
-                        slot="trailing-icon"
-                        onClick={() => setSearchQuery('')}
-                        style={{ cursor: "pointer" }}
-                      >
-                        close
-                      </Icon>
-                    )}
-                  </OutlinedTextField>
-                </form>
-                <TextButton type="button" className="site-header__location" >
-                  <Icon>location_on</Icon>
-                  <span> {location ?? content.header.detectingLocation} </span>
-                </TextButton>
-              </div>
-              {showSuggestions && (
-                <List className="search-suggestions">
-                  {suggestions.length > 0 ? (
-                    suggestions.map((deal) => (
-                      <ListItem
-                        key={deal.id}
-                        type="button"
-                        className="search-suggestion"
+                    <Icon>account_circle</Icon>
+                    <span className="profile-arrow">
+                      <Icon>{profileMenuOpen ? "keyboard_arrow_up" : "keyboard_arrow_down"}</Icon>
+                    </span>
+                  </FilledTonalIconButton>
+                  {profileMenuOpen && (
+                    <Menu
+                      open
+                      anchor="profile-button"
+                      onClosed={() => setProfileMenuOpen(false)}
+                    >
+                      <MenuItem
                         onClick={() => {
-                          navigate(`/deal/${deal.id}`);
-                          setSearchQuery("");
-                          setShowSuggestions(false);
+                          navigate("/account");
+                          setProfileMenuOpen(false);
                         }}
                       >
-                        <Icon slot="start">search</Icon>
-
-                        <div>
-                          <strong>{deal.title}</strong>
-                          <small>
-                            {deal.providerName} • {deal.location}
-                          </small>
-                        </div>
-                      </ListItem>
-                    ))
-                  ) : (
-                    <ListItem disabled>{content.search.emptySuggestion}</ListItem>
+                        <Icon>person</Icon>
+                        {content.header.profileMenu.profile}
+                      </MenuItem>
+                      <MenuItem
+                        onClick={() => {
+                          navigate("/bookings");
+                          setProfileMenuOpen(false);
+                        }}
+                      >
+                        <Icon>calendar_month</Icon>
+                        {content.header.profileMenu.bookings}
+                      </MenuItem>
+                      <MenuItem
+                        onClick={() => {
+                          navigate("/wishlist");
+                          setProfileMenuOpen(false);
+                        }}
+                      >
+                        <Icon>favorite</Icon>
+                        {content.header.profileMenu.wishlist}
+                      </MenuItem>
+                      <MenuItem
+                        onClick={() => {
+                          clearCart();
+                          clear();
+                          signOut();
+                          setProfileMenuOpen(false);
+                        }}
+                      >
+                        <Icon>logout</Icon>
+                        {content.header.profileMenu.signOut}
+                      </MenuItem>
+                    </Menu>
                   )}
-                </List>
+                </div>
+              ) : (
+                <FilledButton
+                  onClick={() => navigate("/sign-in")}
+                >
+                  Sign In
+                </FilledButton>
               )}
             </div>
-
-            <div className="site-header__actions">
-              {/* Wishlist */}
-              <FilledTonalIconButton
-                className="site-header__cart"
-                aria-label={`Wishlist, ${wishlistCount} item${wishlistCount !== 1 ? 's' : ''}`}
-                onClick={() => navigate('/wishlist')}
-              >
-                <Icon aria-hidden="true">favorite_border</Icon>
-
-                {wishlistCount > 0 && (
-                  <span className="site-header__cart-badge" aria-hidden="true">
-                    {wishlistCount}
-                  </span>
-                )}
-              </FilledTonalIconButton>
-              {/* Cart */}
-              <FilledTonalIconButton
-                className="site-header__cart"
-                aria-label={`Cart, ${cartCount} item${cartCount !== 1 ? 's' : ''}`}
-                onClick={() => navigate('/cart')}
-              >
-                <Icon aria-hidden="true">shopping_bag</Icon>
-
-                {cartCount > 0 && (
-                  <span className="site-header__cart-badge" aria-hidden="true">
-                    {cartCount}
-                  </span>
-                )}
-              </FilledTonalIconButton>
-              {/* Account */}
-              <div className="site-header__profile">
-                {isAuthenticated ? (
-                  <div className="profile-menu" ref={profileRef}>
-                    <FilledTonalIconButton
-                      id="profile-button"
-                      className="profile-button"
-                      onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                    >
-                      <Icon>account_circle</Icon>
-
-                      <span className="profile-arrow">
-                        <Icon>
-                          {profileMenuOpen
-                            ? 'keyboard_arrow_up'
-                            : 'keyboard_arrow_down'}
-                        </Icon>
-                      </span>
-                    </FilledTonalIconButton>
-                    {profileMenuOpen && (
-                      <Menu
-                        open={profileMenuOpen}
-                        anchor="profile-button"
-                        onClosed={() => setProfileMenuOpen(false)}
-                      >
-                        <MenuItem
-                          onClick={() => {
-                            navigate("/account");
-                            setProfileMenuOpen(false);
-                          }}
-                        >
-                          <Icon>person</Icon>
-                          {content.header.profileMenu.profile}
-                        </MenuItem>
-
-                        <MenuItem
-                          onClick={() => {
-                            navigate("/bookings");
-                            setProfileMenuOpen(false);
-                          }}
-                        >
-                          <Icon>calendar_month</Icon>
-                          {content.header.profileMenu.bookings}
-                        </MenuItem>
-
-                        <MenuItem
-                          onClick={() => {
-                            navigate("/wishlist");
-                            setProfileMenuOpen(false);
-                          }}
-                        >
-                          <Icon>favorite</Icon>
-                          {content.header.profileMenu.wishlist}
-                        </MenuItem>
-
-                        <MenuItem
-                          onClick={() => {
-                            signOut();
-                            setProfileMenuOpen(false);
-                          }}
-                        >
-                          <Icon>logout</Icon>
-                          {content.header.profileMenu.signOut}
-                        </MenuItem>
-                      </Menu>
-                    )}
-                  </div>
-                ) : (
-                  <FilledButton onClick={() => navigate("/sign-in")}>
-                    Sign In
-                  </FilledButton>
-                )}
-              </div>
-            </div>
           </div>
-
-          {/* Second Row */}
-          <nav className="site-header__nav" aria-label="Primary">
-            {content.nav.primary.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  `site-header__nav-link${isActive ? ' site-header__nav-link--active' : ''
-                  }`
-                }
-              >
-                <>
-                  <Icon className="site-header__nav-icon" aria-hidden="true"  >{item.icon} </Icon>
-                  <span>{item.label}</span>
-                </>
-              </NavLink>
-            ))}
-          </nav>
-        </header>
-      </>
-      {/* Mobile nav drawer */}
+        </div>
+        <nav
+          className="site-header__nav"
+          aria-label="Primary"
+        >
+          {content.nav.primary.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `site-header__nav-link${isActive ? " site-header__nav-link--active" : ""}`}
+            >
+              <Icon className="site-header__nav-icon">{item.icon}</Icon>
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+      </header>
       {drawerOpen && (
         <div
           className="nav-drawer-backdrop"
           aria-hidden="true"
-          onClick={() => setDrawerOpen(false)}
+          onClick={closeDrawer}
         />
       )}
       <nav
         id="nav-drawer"
-        className={`nav-drawer${drawerOpen ? ' nav-drawer--open' : ''}`}
+        className={`nav-drawer${drawerOpen ? " nav-drawer--open" : ""}`}
         aria-label={content.header.drawerLabel}
         aria-hidden={!drawerOpen}
       >
         <div className="nav-drawer__header">
-          <span className="nav-drawer__brand">
-            <Icon aria-hidden="true" className="nav-drawer__brand-icon">spa</Icon>
-            <span>
-              <strong>{content.site.name}</strong>
-              <small>{content.site.fullName}</small>
-            </span>
-          </span>
-          <IconButton aria-label={content.header.closeNavigation} onClick={() => setDrawerOpen(false)}>
-            <Icon aria-hidden="true">close</Icon>
+          <img
+            src={logo}
+            alt={content.site.name}
+            className="site-header__logo"
+          />
+          <IconButton
+            aria-label={content.header.closeNavigation}
+            onClick={closeDrawer}
+          >
+            <Icon>close</Icon>
           </IconButton>
         </div>
-
         <Divider />
-
         <div className="nav-drawer__body">
-          <sky-accordion>
-            {/* <sky-accordion-item header={content.nav.drawerCategoryHeader} open>
-              <ul className="nav-drawer__cat-list">
-                {content.nav.categories.map((cat) => (
-                  <li key={cat.to}>
-                    <NavLink
-                      to={cat.to}
-                      className="nav-drawer__cat-link"
-                      onClick={() => setDrawerOpen(false)}
-                    >
-                      {cat.label}
-                      <span className="nav-drawer__cat-count">{cat.count} services</span>
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            </sky-accordion-item> */}
-          </sky-accordion>
-
+          <sky-accordion />
           <Divider />
-
           <ul className="nav-drawer__links">
             {content.nav.primary.map((item) => (
               <li key={item.to}>
                 <NavLink
                   to={item.to}
                   className="nav-drawer__link"
-                  onClick={() => setDrawerOpen(false)}
+                  onClick={closeDrawer}
                 >
                   {item.label}
                 </NavLink>
               </li>
             ))}
           </ul>
-
           <Divider />
-
           <div className="nav-drawer__auth">
             {isAuthenticated ? (
               <>
-                <FilledButton onClick={() => { navigate('/account'); setDrawerOpen(false); }}>
+                <FilledButton
+                  onClick={() => {
+                    navigate("/account");
+                    closeDrawer();
+                  }}
+                >
                   {content.header.myAccount}
                 </FilledButton>
-                <TextButton onClick={() => { signOut(); setDrawerOpen(false); }}>
+                <TextButton
+                  onClick={() => {
+                    clearCart();
+                    clear();
+                    signOut();
+                    closeDrawer();
+                  }}
+                >
                   {content.header.signOut}
                 </TextButton>
               </>
             ) : (
-              <FilledButton onClick={() => { navigate('/sign-in'); setDrawerOpen(false); }}>
+              <FilledButton
+                onClick={() => {
+                  navigate("/sign-in");
+                  closeDrawer();
+                }}
+              >
                 {content.header.signIn}
               </FilledButton>
             )}
