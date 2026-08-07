@@ -157,6 +157,18 @@ export const ADMIN_MENU: MenuGroup[] = [
         to: '/account/orders/booking',
         roles: ['admin'],
       },
+      {
+        label: 'Wishlist',
+        icon: 'favorite',
+        to: '/account/orders/wishlist',
+        roles: ['admin'],
+      },
+      {
+        label: 'Payment',
+        icon: 'paid',
+        to: '/account/orders/payment',
+        roles: ['admin'],
+      },
     ],
   },
 ];
