@@ -12,6 +12,9 @@ out/
 .next/
 .nuxt/
 
+# Generated Prisma clients (per-app custom output, regenerated via `prisma generate`)
+apps/*/src/generated/
+
 # Environment variables
 .env
 .env.local

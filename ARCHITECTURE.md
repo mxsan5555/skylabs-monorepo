@@ -7,11 +7,20 @@ reuse without fighting React or Angular.
 ## The rule of thumb
 
 - **Reusable, presentational UI → `packages/shared-ui`** (framework-agnostic web components).
-- **Pages, routing, auth, data → each app** (`apps/msd` React, `apps/mera-driver` Angular).
-- **Backend → one API per app** (`apps/msd-api`, `apps/mera-driver-api`), built later. msd
+- **Reusable RBAC *code* (not data) → `packages/shared-types`, `shared-permissions`,
+  `shared-menu`, `shared-auth`, `shared-utils`** — see the Dynamic RBAC section below.
+- **Pages, routing, auth, data, business modules → each app** (`apps/msd` React,
+  `apps/mera-driver` Angular). Each app's admin console lives inside that same app
+  (`apps/msd/src/app/admin` + `pages/account/`, `apps/mera-driver/src/app/admin` +
+  `pages/account/`) — **no separate `-admin` frontend app**. That was tried and reverted:
+  the ERP/RBAC screens are just more pages in the existing app, gated by permission like
+  everything else.
+- **Backend → one API per app** (`apps/msd-api`, `apps/mera-driver-api`), built. msd
   (massage deals) and mera-driver (driver booking) are different businesses with different
-  domains, data, and logic, so each gets its own API and database. Contracts are mirrored as
-  app-local models for now.
+  domains, data, and logic, so each gets its own API and database — **fully independent**:
+  own routes/controllers/services/Prisma schema/database/env/deployment. Business modules
+  (Customers/Vendors/Orders/… for msd-api; Drivers/Vehicles/Trips/… for mera-driver-api)
+  are currently permission-gated stub routers; RBAC itself is fully real.
 
 Pages are **not** shared web components. A page owns routing, guards, data
 fetching and SSR — all framework-specific. Sharing happens one level down, at
@@ -73,90 +82,136 @@ src/
     pages/          One folder per page (home, not-found, showcase, …); each owns its files
 ```
 
-### `apps/msd-api` and `apps/mera-driver-api` — Express + TypeScript (planned)
-One backend per app (separate domains, separate databases). Until they exist,
-each frontend's `api` client points at `/api` and models stay app-local (they
-will mirror each API's contract).
+### `packages/shared-types`, `shared-permissions`, `shared-menu`, `shared-auth`, `shared-utils` — RBAC code, never data
+Scaffolded like `shared-ui` (`type:lib,scope:shared` tags, `@nx/vite:build`, `@nx/vitest:test`).
+```
+shared-types/        Role, Permission, PermissionAction, MenuNode, WidgetConfig,
+                      BootstrapResponse, ApiEnvelope<T>, … — types only, no runtime code
+shared-permissions/  can(), filterMenuByPermissions(), permissionKeyFor() — pure functions
+shared-menu/         src/msd-menu.json, src/mera-driver-menu.json (static menu structure,
+                      the one thing that ISN'T DB-driven) + getMenuForApp()
+shared-auth/         src/index.ts (token storage, jwt decode, bootstrap fetch)
+                      src/react.ts    → AuthProvider, useAuth, RequireAuth,
+                                        RequirePermission, PermissionButton
+                      src/angular.ts  → provideSharedAuth, AuthService, authGuard,
+                                        permissionGuard, HasPermissionDirective
+shared-utils/        formatDateTime(), debounce() — small cross-cutting helpers
+```
+These packages carry **logic only** — no seeded roles, no permission rows, no menu
+*content* beyond the static structure above. Each API's own database is the only
+place actual Role/Permission/User rows live; `msd-api` and `mera-driver-api` each
+seed their own independently from the same shared-menu JSON.
 
-Recommended stack (team knows Express, is learning OpenAPI — optimised for easy + fast):
+### `apps/msd-api` and `apps/mera-driver-api` — Express + TypeScript (built)
+One backend per app, **fully independent**: own routes/controllers/services/Prisma
+schema/database/`.env.local`/deployment. Never share tables, never share a route.
 
-- **Express + TypeScript** — scaffold with `npx nx g @nx/express:app apps/<name>-api`.
-- **PostgreSQL** (in-house, free) — preferred over MySQL for richer types (JSONB),
-  constraints, and full-text search. Each API owns its own database
-  (`msd`, `mera_driver`); they never share tables.
-- **Prisma** as the ORM — typed client + migrations, very little hand-written SQL,
-  so the team moves fast with fewer bugs. Works with Postgres and MySQL.
-- **Zod** for request/response validation, and **`zod-to-openapi`** to generate the
-  OpenAPI 3 spec from those same Zod schemas — one source of truth, no spec drift,
-  and the team picks up OpenAPI naturally as a by-product of validation.
-- **`swagger-ui-express`** to serve interactive docs at `/docs` — the fastest way for
-  the team to learn OpenAPI by seeing the live spec.
-- **Auth** (no Supabase): issue JWTs; phone/email OTP via an SMS/email provider
-  (e.g. Twilio / Resend free tiers) with codes stored in the DB; Google sign-in via
-  `passport-google-oauth20`. The frontends' existing auth client/context already call
-  these endpoints once they exist.
+```
+apps/<name>-api/src/
+├── routes/          One file per resource: auth.routes.ts, rbac.routes.ts, plus a
+│                    stub router per business module (customers/vendors/orders/… for
+│                    msd-api; drivers/vehicles/trips/… for mera-driver-api)
+├── services/        Business logic layer; routes call services only
+├── middleware/       authenticate.ts, requirePermission.ts (the only permission
+│                    gate — no hardcoded role checks anywhere), validate.ts, errorHandler.ts
+├── schemas/         Zod schemas + zod-to-openapi registrations
+├── lib/
+│   ├── prisma.ts    Prisma client singleton
+│   └── jwt.ts, passport.ts, crypto.ts
+└── main.ts          App bootstrap, swagger at /docs, starts server
 
-Shared backend infrastructure (error handling, auth middleware, the Zod→OpenAPI
-setup) can move into a `packages/api-core` lib later **if** real duplication appears —
-not up front. Domain code never gets shared between the two APIs.
+apps/<name>-api/
+├── prisma/
+│   ├── schema.prisma   RBAC tables + soft-delete/audit conventions (see below)
+│   └── seed.ts         6 default roles + starter permission set from shared-menu
+└── .env.local          Never committed
+```
+
+- **PostgreSQL** — msd-api → db `msd`; mera-driver-api → db `mera_driver`. Never shared.
+- **Prisma**, pinned `6.19.3` (Prisma 7 dropped `datasource.url` from the schema file,
+  which the classic singleton-client pattern relies on). Each app generates its client
+  to its own `src/generated/prisma-client` rather than the shared `node_modules/@prisma/
+  client` default, so the two independent schemas can't clobber each other in this
+  single-`node_modules` monorepo.
+- **Zod** for request/response validation, **`zod-to-openapi`** to generate the OpenAPI
+  3 spec from those same Zod schemas, **`swagger-ui-express`** serving it at `/docs`.
+- **Auth** (no Supabase): JWT pairs (15-min access / 30-day rotated opaque refresh);
+  phone/email OTP (bcrypt-hashed, 5-attempt/10-min-expiry, no user enumeration); Google
+  sign-in via `passport-google-oauth20`.
+- **RBAC tables** (identical shape in both schemas): `User`, `Role` (`isSystem`/
+  `isSuperAdmin`/`isActive` flags), `Permission` (`menuKey`+`action`, unique
+  `${menuKey}:${action}` key), `RolePermission`/`UserRole` (join tables), `DashboardWidget`/
+  `RoleDashboardWidget`, `OtpChallenge`, `RefreshSession`, `AuditLog`, `LoginHistory`,
+  `ImpersonationSession`. Every model: uuid `id`, `createdAt`/`updatedAt`, soft-delete
+  `deletedAt` where semantically right (e.g. `User`). All FKs indexed. No business logic
+  in DB triggers.
+
+Business-module routes (Customers/Orders/Drivers/Trips/…) currently exist only as
+permission-gated stub routers (`GET /` behind `requirePermission(menuKey,'view')`,
+returns `[]`) — proving the gate wires up end to end. Building out real business logic
+per module is separate, future work; RBAC itself is complete.
 
 ## Auth & RBAC — file reference
 
-Both apps implement auth independently (no shared auth package). The patterns are identical
-in intent; the implementation is framework-native.
+Both apps consume the **same** `packages/shared-auth` package (via its `/react` and
+`/angular` entry points respectively) rather than hand-rolling auth logic — that's the
+one thing that *is* shared between the two businesses, since it's pure code, not data
+or a session. Each app still keeps its own token, its own bootstrap fetch, its own API
+base URL.
 
 ### Auth files
 
 | Concern | msd (`apps/msd/src/`) | mera-driver (`apps/mera-driver/src/app/`) |
 |---------|----------------------|------------------------------------------|
-| Auth state + roles | `auth/auth-context.tsx` | `core/auth/auth.service.ts` |
-| Token persistence | `auth/auth-storage.ts` | inside `auth.service.ts` |
-| Auth route guard | `auth/require-auth.tsx` | `core/auth/auth.guard.ts` |
-| Role route guard | `auth/require-role.tsx` | `core/auth/role.guard.ts` |
-| HTTP token injection | _(none yet — no API)_ | `core/auth/auth.interceptor.ts` |
-| Menu config (RBAC) | `app/admin/menu.ts` | `app/admin/menu.ts` |
-| Sidebar (role filter) | `app/admin/sidebar.tsx` | `app/admin/sidebar/sidebar.ts` |
-| Domain types / roles | `types/index.ts` | `models/index.ts` |
+| Auth state + bootstrap | `shared-auth/react`'s `AuthProvider`/`useAuth()`, wired in `app/app.tsx` (`appPrefix="msd"`) | `shared-auth/angular`'s `AuthService`, provided via `provideSharedAuth({appPrefix:'mera_driver',...})` in `app.config.ts` |
+| Token persistence | inside `shared-auth` (`msd_auth_token` / `msd_auth_real_token` during preview) | inside `shared-auth` (`mera_driver_auth_token` / `..._real_token`) |
+| Auth route guard | `shared-auth/react`'s `<RequireAuth>` | `shared-auth/angular`'s `authGuard` |
+| Permission route guard | `<RequirePermission menuKey="..." action?>` | `permissionGuard`, `data: { permission: { menuKey, action? } }` |
+| Permission button/directive | `<PermissionButton menuKey action?>` | `*appHasPermission="{menuKey,action}"` (`HasPermissionDirective`) |
+| HTTP token injection | fetch wrapper inside `shared-auth` core | `core/auth/auth.interceptor.ts` (reads token from `AuthService`) |
+| RBAC API client | `api/rbac/{client,auth,roles,users,audit-logs}.ts` | `core/rbac/rbac-api.service.ts`, `core/auth/auth-api.service.ts` |
+| Menu (dynamic) | `getMenuForApp('msd')` server-filtered into `bootstrap.menu`; `app/admin/menu-utils.ts` for breadcrumb lookup | `getMenuForApp('mera-driver')`, same server-filtered `bootstrap.menu` |
+| Sidebar | `app/admin/sidebar.tsx` — renders `bootstrap.menu` directly | `app/admin/sidebar/sidebar.ts` — same |
+| Dashboard widgets | `app/dashboard/widget-registry.tsx` (`WIDGET_REGISTRY` keyed by widget `key`) | local registry in `pages/account/dashboard/` |
+| Role Management | `app/pages/account/roles/{roles,role-list,permission-matrix,widget-assignments}.tsx` | `pages/account/administration/roles/` |
+| User Management | `app/pages/account/users/{users,user-list,role-assignment,login-history-panel,sessions-panel,create-user-dialog}.tsx` | `pages/account/administration/users/` |
+| Audit Logs | `app/pages/account/audit-logs/audit-logs.tsx` | `pages/account/administration/audit-logs/` |
+| Domain types | `@skylabs-monorepo/shared-types` (`Role`, `Permission`, `BootstrapResponse`, …) — no more app-local `UserRole` union | same |
 
-### Role definitions
+### Role model
 
-| App | Roles | Default on login |
-|-----|-------|-----------------|
-| msd | `user \| admin \| marketing \| sales` | `['user']` |
-| mera-driver | `customer \| driver \| admin \| marketing \| sales` | `['customer']` |
+No fixed per-app role union anymore. Both APIs seed the same 6 default role **keys**
+(`super_admin`, `admin`, `customer`, `vendor`, `marketing`, `sales` — each app's own DB
+row, own permission grants) and SuperAdmin can add unlimited custom roles at runtime in
+either app independently via the Role Management screen. What used to be a hardcoded
+`UserRole` union + inline `roles: [...]` arrays is now `bootstrap.permissions: string[]`
+resolved from the DB per request.
 
-### localStorage keys
+### Route protection map (shape, not a fixed table — every leaf below is one
+`RequirePermission`/`permissionGuard` call keyed to that node's `menuKey` from
+`packages/shared-menu`)
 
-| Key | App | Holds |
-|-----|-----|-------|
-| `msd_auth_token` | msd | Bearer token (string) |
-| `msd_auth_roles` | msd | `UserRole[]` (JSON) |
-| `mera_auth_token` | mera-driver | Bearer token (string) |
-| `mera_auth_roles` | mera-driver | `UserRole[]` (JSON) |
+| Route family | msd | mera-driver |
+|---------------|-----|-------------|
+| `/account/*` (all) | `<RequireAuth>` wraps `<AdminLayout>` | `canActivate: [authGuard]` on `/account` |
+| `/account/dashboard`, `/account/profile` | open (inside auth area, no extra permission) | open (inside auth area, no extra permission) |
+| `/account/{customers,vendors,orders,products,inventory,reports}` | `RequirePermission menuKey="<key>"` | n/a (mera-driver's business set is `drivers,vehicles,trips,attendance,payments,reports`) |
+| `/account/masters/*` | `RequirePermission menuKey="masters.*"` | `RequirePermission menuKey="masters.*"` |
+| `/account/administration/{roles,users,audit-logs}` | `RequirePermission menuKey="rbac.roles\|rbac.users\|rbac.audit-logs"` | same |
+| `/account/settings` | `RequirePermission menuKey="settings"` | same |
 
-### Route protection map
+### Login As / preview
 
-| Route | msd | mera-driver | Allowed roles |
-|-------|-----|-------------|---------------|
-| `/account/*` | `<RequireAuth>` wraps `<AdminLayout>` | `canActivate: [authGuard]` on `/account` | any authenticated |
-| `/account/dashboard` | open (inside auth area) | open (inside auth area) | all |
-| `/account/profile` | open (inside auth area) | open (inside auth area) | all |
-| `/account/deals` | `<RequireRole roles={['admin']}>` | — | `admin` |
-| `/account/bookings` | — | `roleGuard`, `data.roles: ['admin']` | `admin` |
-| `/account/promotions` | `<RequireRole roles={['marketing']}>` | `roleGuard`, `data.roles: ['marketing']` | `marketing` |
-| `/account/sales` | `<RequireRole roles={['sales']}>` | `roleGuard`, `data.roles: ['sales']` | `sales` |
+`useAuth().loginAsUser(targetUserId)` / `AuthService.loginAsUser(...)` calls `POST
+/rbac/impersonate`, stashes the real token, swaps in the returned preview token, and
+`isPreviewing`/`isPreviewing()` drives a banner in the admin layout with a "Return to
+SuperAdmin" action (`returnToSuperAdmin()`) that restores it. Both admin layouts hide
+the Administration nav group while previewing, on top of the backend's own
+`ImpersonationSession`/`AuditLog` trail.
 
-### Key implementation differences
-
-| Aspect | msd (React) | mera-driver (Angular) |
-|--------|-------------|----------------------|
-| State mechanism | React Context + `useState` | `signal()` + `computed()` |
-| Auth guard style | JSX wrapper `<RequireAuth>` | `canActivate: [authGuard]` |
-| Role guard style | JSX wrapper `<RequireRole roles={[...]}>` | `canActivate: [roleGuard], data: { roles: [...] }` |
-| HTTP token attachment | _(add interceptor when API is built)_ | `authInterceptor` on `HttpClient` ✅ |
-
-> Guards are **UX only**. Once backends exist, every API endpoint must re-check the
-> role from the JWT server-side — the frontend guard is not the security boundary.
+> Every guard/directive above is **UX only**. Every API endpoint re-checks the
+> permission from the JWT's roles server-side via `requirePermission` — the frontend
+> never is the security boundary.
 
 ## `.claude/` — Project AI Dev Team
 
@@ -202,8 +257,8 @@ See `CLAUDE.md → AI Dev Team` for the agent routing table and command descript
 | Page UI + route | each app `pages/` + route table | framework-native |
 | Layout/shell | each app `layouts/` | public / auth / admin shells |
 | Buttons, fields, cards, OTP input, blog card | `shared-ui` | reused by both apps |
-| Auth state + guards | each app `auth/` / `core/auth/` | `RequireAuth` / `authGuard` |
-| API calls + models | each app `api/` + `types/` / `core/` + `models/` | hit its own `*-api` later |
+| Auth state + guards | `packages/shared-auth` (`/react`, `/angular`) | `RequireAuth`/`RequirePermission` / `authGuard`/`permissionGuard` |
+| API calls + models | each app `api/` + `@skylabs-monorepo/shared-types` | hits its own `*-api` (msd → `msd-api`, mera-driver → `mera-driver-api`) |
 | Theme (brand colors) | each app `assets/theme` + `shared-ui` theme | msd green, mera-driver blue |
 
 Pattern to add a protected page (e.g. profile):

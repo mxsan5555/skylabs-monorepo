@@ -1,0 +1,139 @@
+[
+  {
+    "id": "dashboard",
+    "title": "Dashboard",
+    "icon": "dashboard",
+    "route": "/account/dashboard",
+    "permissionKey": "dashboard",
+    "parent": null,
+    "order": 1
+  },
+  {
+    "id": "customers",
+    "title": "Customerss",
+    "icon": "group",
+    "route": "/account/customers",
+    "permissionKey": "customers",
+    "parent": null,
+    "order": 2
+  },
+  {
+    "id": "vendors",
+    "title": "Vendors",
+    "icon": "storefront",
+    "route": "/account/vendors",
+    "permissionKey": "vendors",
+    "parent": null,
+    "order": 3
+  },
+  {
+    "id": "orders",
+    "title": "Orders",
+    "icon": "shopping_cart",
+    "route": "/account/orders",
+    "permissionKey": "orders",
+    "parent": null,
+    "order": 4
+  },
+  {
+    "id": "products",
+    "title": "Products",
+    "icon": "inventory_2",
+    "route": "/account/products",
+    "permissionKey": "products",
+    "parent": null,
+    "order": 5
+  },
+  {
+    "id": "inventory",
+    "title": "Inventory",
+    "icon": "warehouse",
+    "route": "/account/inventory",
+    "permissionKey": "inventory",
+    "parent": null,
+    "order": 6
+  },
+  {
+    "id": "reports",
+    "title": "Reports",
+    "icon": "insights",
+    "route": "/account/reports",
+    "permissionKey": "reports",
+    "parent": null,
+    "order": 7
+  },
+  {
+    "id": "masters",
+    "title": "Masters",
+    "icon": "category",
+    "permissionKey": "masters",
+    "parent": null,
+    "order": 8,
+    "children": [
+      {
+        "id": "masters-categories",
+        "title": "Categories",
+        "icon": "category",
+        "route": "/account/masters/categories",
+        "permissionKey": "masters.categories",
+        "parent": "masters",
+        "order": 1
+      },
+      {
+        "id": "masters-tags",
+        "title": "Marketing Tags",
+        "icon": "sell",
+        "route": "/account/masters/tags",
+        "permissionKey": "masters.tags",
+        "parent": "masters",
+        "order": 2
+      }
+    ]
+  },
+  {
+    "id": "administration",
+    "title": "Administration",
+    "icon": "admin_panel_settings",
+    "permissionKey": "administration",
+    "parent": null,
+    "order": 9,
+    "children": [
+      {
+        "id": "admin-roles",
+        "title": "Role Management",
+        "icon": "shield_person",
+        "route": "/account/administration/roles", 
+        "permissionKey": "rbac.roles",
+        "parent": "administration",
+        "order": 1
+      },
+      {
+        "id": "admin-users",
+        "title": "User Management",
+        "icon": "manage_accounts",
+        "route": "/account/administration/users",
+        "permissionKey": "rbac.users",
+        "parent": "administration",
+        "order": 2
+      },
+      {
+        "id": "admin-audit-logs",
+        "title": "Audit Logs",
+        "icon": "history",
+        "route": "/account/administration/audit-logs",
+        "permissionKey": "rbac.audit-logs",
+        "parent": "administration",
+        "order": 3
+      }
+    ]
+  },
+  {
+    "id": "settings",
+    "title": "Settings",
+    "icon": "settings",
+    "route": "/account/settings",
+    "permissionKey": "settings",
+    "parent": null,
+    "order": 10
+  }
+]

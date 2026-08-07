@@ -1,0 +1,261 @@
+// msd-api Prisma schema — Postgres database "msd".
+// Independent from mera-driver-api: no shared tables, no shared migrations.
+//
+// NOTE ON CLIENT OUTPUT: this is an Nx monorepo with a single root node_modules.
+// mera-driver-api will define its own, separately-modeled schema.prisma in parallel.
+// If both generators wrote to the default `node_modules/@prisma/client`, the second
+// `prisma generate` to run would silently overwrite the first app's client with a
+// different shape. Generating into this app's own `src/generated/prisma-client`
+// keeps msd-api's client isolated regardless of what mera-driver-api does.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+
+enum UserStatus {
+  active
+  inactive
+  blocked
+}
+
+/// Mirrors `PermissionAction` in packages/shared-types/src/index.ts — keep in sync.
+enum PermissionAction {
+  view
+  create
+  edit
+  delete
+  export
+  import
+  approve
+  reject
+  upload
+  download
+  print
+  assign
+  restore
+  permanent_delete
+  status_change
+  custom
+}
+
+enum OtpPurpose {
+  login
+  signup
+  change_phone
+  change_email
+}
+
+enum LoginMethod {
+  otp_email
+  otp_phone
+  google
+}
+
+// ─── Core identity & RBAC ───────────────────────────────────────────────────
+
+model User {
+  id          String    @id @default(uuid())
+  email       String?   @unique
+  phone       String?   @unique
+  name        String
+  googleId    String?   @unique
+  status      UserStatus @default(active)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? // soft delete — never hard-delete user data
+
+  roles                     UserRole[]
+  refreshSessions           RefreshSession[]
+  loginHistory              LoginHistory[]
+  auditLogsAsActor          AuditLog[]              @relation("AuditLogActor")
+  impersonationsAsAdmin     ImpersonationSession[]   @relation("ImpersonationSuperAdmin")
+  impersonationsAsTarget    ImpersonationSession[]   @relation("ImpersonationTarget")
+
+  @@index([status])
+}
+
+model Role {
+  id           String   @id @default(uuid())
+  key          String   @unique
+  name         String
+  description  String?
+  isSystem     Boolean  @default(false)
+  /// The ONLY place super-admin logic is allowed to live: seed.ts auto-grants every
+  /// Permission to any role with this flag. Application code must never do a string
+  /// comparison like `role.key === 'super_admin'` — always go through requirePermission().
+  isSuperAdmin Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  permissions       RolePermission[]
+  users             UserRole[]
+  dashboardWidgets  RoleDashboardWidget[]
+
+  @@index([isActive])
+}
+
+model Permission {
+  id        String            @id @default(uuid())
+  menuKey   String
+  action    PermissionAction
+  /// Canonical `${menuKey}:${action}` — must match `permissionKeyFor()` in shared-permissions.
+  key       String            @unique
+  label     String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  roles RolePermission[]
+
+  @@index([menuKey])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+model UserRole {
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+model DashboardWidget {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  title       String
+  module      String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  roles RoleDashboardWidget[]
+
+  @@index([module])
+}
+
+model RoleDashboardWidget {
+  roleId    String
+  widgetId  String
+  order     Int
+  createdAt DateTime @default(now())
+
+  role   Role            @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  widget DashboardWidget @relation(fields: [widgetId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, widgetId])
+  @@index([roleId])
+  @@index([widgetId])
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+model OtpChallenge {
+  id         String     @id @default(uuid())
+  identifier String
+  purpose    OtpPurpose
+  hashedOtp  String
+  attempts   Int        @default(0)
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([identifier, purpose])
+  @@index([expiresAt])
+}
+
+model RefreshSession {
+  id          String    @id @default(uuid())
+  userId      String
+  hashedToken String    @unique
+  deviceInfo  String?
+  ip          String?
+  userAgent   String?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ─── Audit / observability ──────────────────────────────────────────────────
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorUserId  String
+  action       String
+  targetType   String
+  targetId     String
+  before       Json?
+  after        Json?
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  actor User @relation("AuditLogActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@index([actorUserId])
+  @@index([targetType, targetId])
+}
+
+model LoginHistory {
+  id        String      @id @default(uuid())
+  userId    String
+  method    LoginMethod
+  success   Boolean
+  ip        String?
+  userAgent String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ImpersonationSession {
+  id               String    @id @default(uuid())
+  superAdminUserId String
+  targetUserId     String
+  startedAt        DateTime  @default(now())
+  endedAt          DateTime?
+  previewTokenJti  String    @unique
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  superAdmin User @relation("ImpersonationSuperAdmin", fields: [superAdminUserId], references: [id], onDelete: Cascade)
+  target     User @relation("ImpersonationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([superAdminUserId])
+  @@index([targetUserId])
+}

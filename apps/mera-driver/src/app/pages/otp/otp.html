@@ -7,10 +7,10 @@
     <div class="auth-brand__logo">
       <md-icon aria-hidden="true">sms</md-icon>
     </div>
-    <h1 class="auth-brand__title">Verify your phone</h1>
+    <h1 class="auth-brand__title">Verify your {{ method === 'phone' ? 'phone' : 'email' }}</h1>
     <p class="auth-brand__subtitle">We sent a 6-digit code to</p>
     <span class="auth-destination">
-      <md-icon aria-hidden="true">call</md-icon>
+      <md-icon aria-hidden="true">{{ method === 'phone' ? 'call' : 'mail' }}</md-icon>
       {{ destination }}
     </span>
   </div>
@@ -30,8 +30,12 @@
       (input)="code = $any($event.target).value"
     ></md-outlined-text-field>
 
-    <md-filled-button class="auth-submit" (click)="verify()">
-      Verify &amp; Continue
+    @if (error()) {
+      <p class="auth-error" role="alert">{{ error() }}</p>
+    }
+
+    <md-filled-button class="auth-submit" [disabled]="verifying()" (click)="verify()">
+      {{ verifying() ? 'Verifying…' : 'Verify & Continue' }}
     </md-filled-button>
   </div>
 

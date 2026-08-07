@@ -1,9 +1,9 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { RequireAuth, RequirePermission } from '@skylabs-monorepo/shared-auth/react';
 import { PublicLayout } from './layouts/public-layout';
 import { AuthLayout } from './layouts/auth-layout';
 import { AdminLayout } from './layouts/admin-layout';
-import { RequireAuth } from '../auth/require-auth';
-import { RequireRole } from '../auth/require-role';
+import { AdminPage } from './admin/admin-page';
 import Home from './pages/home/home';
 import NotFound from './pages/not-found/not-found';
 import Showcase from './pages/showcase/showcase';
@@ -12,7 +12,10 @@ import BlogDetail from './pages/blog-detail/blog-detail';
 import SignIn from './pages/sign-in/sign-in';
 import Otp from './pages/otp/otp';
 import Profile from './pages/account/profile';
-import { Dashboard, Deals, Promotions, Sales } from './pages/account/role-pages';
+import Dashboard from './pages/account/dashboard';
+import { RoleManagement } from './pages/account/roles/roles';
+import { UserManagement } from './pages/account/users/users';
+import { AuditLogs } from './pages/account/audit-logs/audit-logs';
 import Search from './pages/search/search';
 import Category from './pages/category/category';
 import DealDetail from './pages/deal-detail/deal-detail';
@@ -70,7 +73,12 @@ export function AppRoutes() {
         <Route path="/otp" element={<Otp />} />
       </Route>
 
-      {/* Authenticated console (after login / "My account"). */}
+      {/* Authenticated console (after login / "My account"). Every leaf below
+          `/account/dashboard` and `/account/profile` is additionally gated by
+          the exact `${menuKey}:view` permission the server already filtered
+          `bootstrap.menu` by — belt-and-suspenders, since msd-api re-checks on
+          every request. A user lacking a permission is bounced to
+          `/account/profile` (RequirePermission's default fallback). */}
       <Route
         element={
           <RequireAuth>
@@ -79,30 +87,110 @@ export function AppRoutes() {
         }
       >
         <Route path="/account" element={<Navigate to="/account/profile" replace />} />
-        <Route path="/account/dashboard" element={<Dashboard />} />
+        <Route
+          path="/account/dashboard"
+          element={
+            <RequirePermission menuKey="dashboard">
+              <Dashboard />
+            </RequirePermission>
+          }
+        />
         <Route path="/account/profile" element={<Profile />} />
+
         <Route
-          path="/account/deals"
+          path="/account/customers"
           element={
-            <RequireRole roles={['admin']}>
-              <Deals />
-            </RequireRole>
+            <RequirePermission menuKey="customers">
+              <AdminPage title="Customers" subtitle="Module coming soon." />
+            </RequirePermission>
           }
         />
         <Route
-          path="/account/promotions"
+          path="/account/vendors"
           element={
-            <RequireRole roles={['marketing']}>
-              <Promotions />
-            </RequireRole>
+            <RequirePermission menuKey="vendors">
+              <AdminPage title="Vendors" subtitle="Module coming soon." />
+            </RequirePermission>
           }
         />
         <Route
-          path="/account/sales"
+          path="/account/orders"
           element={
-            <RequireRole roles={['sales']}>
-              <Sales />
-            </RequireRole>
+            <RequirePermission menuKey="orders">
+              <AdminPage title="Orders" subtitle="Module coming soon." />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/products"
+          element={
+            <RequirePermission menuKey="products">
+              <AdminPage title="Products" subtitle="Module coming soon." />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/inventory"
+          element={
+            <RequirePermission menuKey="inventory">
+              <AdminPage title="Inventory" subtitle="Module coming soon." />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/reports"
+          element={
+            <RequirePermission menuKey="reports">
+              <AdminPage title="Reports" subtitle="Module coming soon." />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/masters/categories"
+          element={
+            <RequirePermission menuKey="masters.categories">
+              <AdminPage title="Categories" subtitle="Module coming soon." />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/masters/tags"
+          element={
+            <RequirePermission menuKey="masters.tags">
+              <AdminPage title="Marketing Tags" subtitle="Module coming soon." />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/administration/roles"
+          element={
+            <RequirePermission menuKey="rbac.roles">
+              <RoleManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/administration/users"
+          element={
+            <RequirePermission menuKey="rbac.users">
+              <UserManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/administration/audit-logs"
+          element={
+            <RequirePermission menuKey="rbac.audit-logs">
+              <AuditLogs />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/settings"
+          element={
+            <RequirePermission menuKey="settings">
+              <AdminPage title="Settings" subtitle="Module coming soon." />
+            </RequirePermission>
           }
         />
       </Route>

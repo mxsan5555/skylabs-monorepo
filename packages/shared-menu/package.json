@@ -1,0 +1,17 @@
+{
+  "name": "@skylabs-monorepo/shared-menu",
+  "version": "0.0.1",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./msd-menu.json": "./src/msd-menu.json",
+    "./mera-driver-menu.json": "./src/mera-driver-menu.json"
+  },
+  "peerDependencies": {
+    "@skylabs-monorepo/shared-types": "*"
+  }
+}

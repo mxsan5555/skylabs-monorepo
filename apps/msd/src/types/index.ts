@@ -5,18 +5,6 @@
  * package). When a NestJS/Express backend lands, these mirror its contract.
  */
 
-/** Access roles. The backend supplies these in the JWT; the UI only gates on them. */
-export type UserRole = 'user' | 'admin' | 'marketing' | 'sales';
-
-export const ALL_ROLES: UserRole[] = ['user', 'admin', 'marketing', 'sales'];
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  roles: UserRole[];
-}
-
 export interface Address {
   id: string;
   label: string;

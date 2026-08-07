@@ -1,0 +1,40 @@
+<md-admin-page
+  title="Dashboard"
+  [subtitle]="userName() ? 'Welcome back, ' + userName() + '.' : 'An overview of your account activity.'"
+>
+  @if (loading()) {
+    <div class="flex items-center gap-3 py-6" role="status" aria-live="polite">
+      <md-circular-progress indeterminate></md-circular-progress>
+      <span>Loading your dashboard…</span>
+    </div>
+  } @else if (widgets().length === 0) {
+    <sky-info-card
+      icon="widgets"
+      heading="No widgets assigned"
+      subheading="Your role doesn't have any dashboard widgets configured yet."
+    ></sky-info-card>
+  } @else {
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      @for (widget of widgets(); track widget.key) {
+        <sky-card>
+          <article class="flex items-start gap-3 p-1">
+            <span
+              class="grid h-11 w-11 flex-none place-items-center rounded-xl bg-[var(--md-sys-color-primary-container,#cee5ff)] text-[var(--md-sys-color-on-primary-container,#001d33)]"
+            >
+              <md-icon aria-hidden="true">{{ widget.icon }}</md-icon>
+            </span>
+            <div class="min-w-0">
+              <h3 class="m-0 text-sm font-semibold text-[var(--md-sys-color-on-surface-variant)]">
+                {{ widget.title }}
+              </h3>
+              <p class="m-0 text-2xl font-bold text-[var(--md-sys-color-on-surface)]">
+                {{ widget.value }}
+              </p>
+              <p class="m-0 text-xs text-[var(--md-sys-color-on-surface-variant)]">{{ widget.hint }}</p>
+            </div>
+          </article>
+        </sky-card>
+      }
+    </div>
+  }
+</md-admin-page>

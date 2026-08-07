@@ -28,7 +28,20 @@
       ],
       "@skylabs-monorepo/shared-ui/layout.css": [
         "packages/shared-ui/src/theme/layout.css"
-      ]
+      ],
+      "@skylabs-monorepo/shared-types": ["packages/shared-types/src/index.ts"],
+      "@skylabs-monorepo/shared-permissions": [
+        "packages/shared-permissions/src/index.ts"
+      ],
+      "@skylabs-monorepo/shared-menu": ["packages/shared-menu/src/index.ts"],
+      "@skylabs-monorepo/shared-auth": ["packages/shared-auth/src/index.ts"],
+      "@skylabs-monorepo/shared-auth/react": [
+        "packages/shared-auth/src/react.ts"
+      ],
+      "@skylabs-monorepo/shared-auth/angular": [
+        "packages/shared-auth/src/angular.ts"
+      ],
+      "@skylabs-monorepo/shared-utils": ["packages/shared-utils/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

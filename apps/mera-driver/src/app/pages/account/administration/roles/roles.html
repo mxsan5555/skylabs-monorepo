@@ -1,0 +1,201 @@
+<md-admin-page title="Role Management" subtitle="Define roles and the permissions + dashboard widgets each one grants.">
+  <section class="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]" aria-label="Roles">
+    <!-- Role list -->
+    <article class="flex flex-col gap-3">
+      <sky-card>
+        <h2 class="m-0 mb-2 text-base font-semibold">Roles</h2>
+
+        @if (rolesLoading()) {
+          <p role="status">Loading roles…</p>
+        } @else if (rolesError()) {
+          <p role="alert" class="auth-error">{{ rolesError() }}</p>
+        } @else if (roles().length === 0) {
+          <sky-info-card icon="shield_person" heading="No roles yet" subheading="Create your first role below."></sky-info-card>
+        } @else {
+          <ul class="m-0 flex list-none flex-col gap-1 p-0">
+            @for (role of roles(); track role.id) {
+              <li>
+                <button
+                  type="button"
+                  class="admin-nav-item w-full justify-between"
+                  [class.active]="selectedRoleId() === role.id"
+                  (click)="selectRole(role)"
+                >
+                  <span class="flex min-w-0 flex-col text-left">
+                    <span class="truncate font-medium">{{ role.name }}</span>
+                    <span class="truncate text-xs text-[var(--md-sys-color-on-surface-variant)]">{{ role.key }}</span>
+                  </span>
+                  @if (!role.isActive) {
+                    <sky-badge label="Inactive" color="neutral"></sky-badge>
+                  }
+                  @if (role.isSystem) {
+                    <sky-badge label="System" color="primary"></sky-badge>
+                  }
+                </button>
+
+                <div class="ml-2 mt-1 flex flex-wrap gap-2 text-xs">
+                  <button *appHasPermission="{ menuKey: 'rbac.roles', action: 'create' }" type="button" class="underline" (click)="startClone(role)">Clone</button>
+                  <button *appHasPermission="{ menuKey: 'rbac.roles', action: 'status_change' }" type="button" class="underline" [disabled]="role.isSystem" (click)="toggleStatus(role)">
+                    {{ role.isActive ? 'Deactivate' : 'Activate' }}
+                  </button>
+                  <button *appHasPermission="{ menuKey: 'rbac.roles', action: 'delete' }" type="button" class="underline text-[var(--md-sys-color-error,#b3261e)]" [disabled]="role.isSystem" (click)="deleteRole(role)">
+                    Delete
+                  </button>
+                </div>
+              </li>
+            }
+          </ul>
+        }
+
+        @if (roleActionError()) {
+          <p role="alert" class="auth-error mt-2">{{ roleActionError() }}</p>
+        }
+      </sky-card>
+
+      @if (cloningRoleId()) {
+        <sky-card>
+          <h3 class="m-0 mb-2 text-sm font-semibold">Clone role</h3>
+          <div class="flex flex-col gap-2">
+            <md-outlined-text-field label="New key (snake_case)" [value]="cloneKey" (input)="cloneKey = $any($event.target).value"></md-outlined-text-field>
+            <md-outlined-text-field label="New name" [value]="cloneName" (input)="cloneName = $any($event.target).value"></md-outlined-text-field>
+            @if (cloneError()) {
+              <p role="alert" class="auth-error">{{ cloneError() }}</p>
+            }
+            <div class="flex gap-2">
+              <md-filled-button [disabled]="cloneBusy()" (click)="confirmClone()">{{ cloneBusy() ? 'Cloning…' : 'Clone' }}</md-filled-button>
+              <md-text-button (click)="cancelClone()">Cancel</md-text-button>
+            </div>
+          </div>
+        </sky-card>
+      }
+
+      <sky-card *appHasPermission="{ menuKey: 'rbac.roles', action: 'create' }">
+        <h3 class="m-0 mb-2 text-sm font-semibold">Create role</h3>
+        <div class="flex flex-col gap-2">
+          <md-outlined-text-field label="Key (snake_case)" [value]="newRoleKey" (input)="newRoleKey = $any($event.target).value"></md-outlined-text-field>
+          <md-outlined-text-field label="Name" [value]="newRoleName" (input)="newRoleName = $any($event.target).value"></md-outlined-text-field>
+          <md-outlined-text-field label="Description (optional)" [value]="newRoleDescription" (input)="newRoleDescription = $any($event.target).value"></md-outlined-text-field>
+          @if (createRoleError()) {
+            <p role="alert" class="auth-error">{{ createRoleError() }}</p>
+          }
+          <md-filled-button [disabled]="creatingRole()" (click)="createRole()">
+            {{ creatingRole() ? 'Creating…' : 'Create role' }}
+          </md-filled-button>
+        </div>
+      </sky-card>
+    </article>
+
+    <!-- Permission matrix + widgets -->
+    <article class="flex flex-col gap-4">
+      @if (!selectedRole()) {
+        <sky-info-card icon="checklist" heading="Select a role" subheading="Choose a role on the left to manage its permissions and widgets."></sky-info-card>
+      } @else {
+        <sky-card>
+          <h2 class="m-0 mb-1 text-base font-semibold">Permissions — {{ selectedRole()?.name }}</h2>
+          <p class="m-0 mb-3 text-xs text-[var(--md-sys-color-on-surface-variant)]">
+            Grants replace the role's full permission set on save.
+          </p>
+
+          @if (catalogLoading()) {
+            <p role="status">Loading permission catalog…</p>
+          } @else if (catalogError()) {
+            <p role="alert" class="auth-error">{{ catalogError() }}</p>
+          } @else {
+            @if (permissionsLoading()) {
+              <p role="status" class="mb-2">Loading this role's current permissions…</p>
+            }
+            <div class="flex flex-col gap-3">
+              @for (group of catalogGroups(); track group.menuKey) {
+                <fieldset class="rounded-lg border border-[var(--md-sys-color-outline-variant,#c4c7c5)] p-3">
+                  <legend class="px-1 text-sm font-medium">{{ group.title }}</legend>
+                  <div class="flex flex-wrap gap-x-4 gap-y-2">
+                    @for (entry of group.entries; track entry.key) {
+                      <label class="flex min-h-11 items-center gap-2 text-sm">
+                        <md-checkbox
+                          [checked]="isPermissionChecked(entry.key)"
+                          [disabled]="permissionsLoading()"
+                          (change)="togglePermission(entry.key, $any($event.target).checked)"
+                        ></md-checkbox>
+                        {{ entry.action }}
+                      </label>
+                    }
+                  </div>
+                </fieldset>
+              }
+            </div>
+
+            @if (savePermissionsError()) {
+              <p role="alert" class="auth-error mt-3">{{ savePermissionsError() }}</p>
+            }
+            @if (savePermissionsSuccess()) {
+              <p role="status" class="mt-3 text-[var(--md-sys-color-primary)]">Permissions saved.</p>
+            }
+
+            <md-filled-button
+              class="mt-3"
+              *appHasPermission="{ menuKey: 'rbac.roles', action: 'edit' }"
+              [disabled]="savingPermissions() || permissionsLoading()"
+              (click)="savePermissions()"
+            >
+              {{ savingPermissions() ? 'Saving…' : 'Save permissions' }}
+            </md-filled-button>
+          }
+        </sky-card>
+
+        <sky-card>
+          <h2 class="m-0 mb-3 text-base font-semibold">Dashboard widgets — {{ selectedRole()?.name }}</h2>
+
+          @if (widgetsLoading()) {
+            <p role="status">Loading dashboard widgets…</p>
+          } @else if (widgetsError()) {
+            <p role="alert" class="auth-error">{{ widgetsError() }}</p>
+          } @else if (widgets().length === 0) {
+            <sky-info-card icon="widgets" heading="No widgets defined" subheading="Add dashboard widgets from the API first."></sky-info-card>
+          } @else {
+            <ul class="m-0 flex list-none flex-col gap-2 p-0">
+              @for (widget of widgets(); track widget.id) {
+                <li class="flex min-h-11 items-center gap-3">
+                  <label class="flex flex-1 items-center gap-2 text-sm">
+                    <md-checkbox
+                      [checked]="isWidgetChecked(widget.id)"
+                      (change)="toggleWidget(widget.id, $any($event.target).checked)"
+                    ></md-checkbox>
+                    {{ widget.title }}
+                  </label>
+                  @if (isWidgetChecked(widget.id)) {
+                    <label class="flex items-center gap-1 text-xs">
+                      Order
+                      <input
+                        type="number"
+                        min="0"
+                        class="w-14 rounded border border-[var(--md-sys-color-outline-variant,#c4c7c5)] px-1 py-0.5"
+                        [value]="selectedWidgetOrders().get(widget.id)"
+                        (input)="setWidgetOrder(widget.id, +$any($event.target).value)"
+                      />
+                    </label>
+                  }
+                </li>
+              }
+            </ul>
+
+            @if (saveWidgetsError()) {
+              <p role="alert" class="auth-error mt-3">{{ saveWidgetsError() }}</p>
+            }
+            @if (saveWidgetsSuccess()) {
+              <p role="status" class="mt-3 text-[var(--md-sys-color-primary)]">Widget assignment saved.</p>
+            }
+
+            <md-filled-button
+              class="mt-3"
+              *appHasPermission="{ menuKey: 'rbac.roles', action: 'edit' }"
+              [disabled]="savingWidgets()"
+              (click)="saveWidgets()"
+            >
+              {{ savingWidgets() ? 'Saving…' : 'Save widgets' }}
+            </md-filled-button>
+          }
+        </sky-card>
+      }
+    </article>
+  </section>
+</md-admin-page>
