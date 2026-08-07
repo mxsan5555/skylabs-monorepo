@@ -10,7 +10,7 @@
   },
   {
     "id": "customers",
-    "title": "Customerss",
+    "title": "Customers",
     "icon": "group",
     "route": "/account/customers",
     "permissionKey": "customers",
@@ -79,6 +79,16 @@
         "parent": "masters",
         "order": 1
       },
+      {
+        "id": "masters-sub-categories",
+        "title": "Sub Categories",
+        "icon": "category",
+        "route": "/account/masters/sub-categories",
+        "permissionKey": "masters.sub-categories",
+        "parent": "masters",
+        "order": 2
+      },
+      
       {
         "id": "masters-tags",
         "title": "Marketing Tags",

@@ -153,6 +153,15 @@ export function AppRoutes() {
             </RequirePermission>
           }
         />
+
+        <Route
+          path="/account/masters/sub-categories"
+          element={
+            <RequirePermission menuKey="masters.sub-categories">
+              <AdminPage title="Sub Categories" subtitle="Module coming soon." />
+            </RequirePermission>
+          }
+        />
         <Route
           path="/account/masters/tags"
           element={
