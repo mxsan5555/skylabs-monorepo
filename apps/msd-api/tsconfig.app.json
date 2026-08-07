@@ -12,5 +12,5 @@
     "src/test-utils/**/*.ts",
     "vite.config.ts"
   ],
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "prisma.config.ts"]
 }
