@@ -93,7 +93,11 @@
         <sky-card>
           <h2 class="m-0 mb-1 text-base font-semibold">Permissions — {{ selectedRole()?.name }}</h2>
           <p class="m-0 mb-3 text-xs text-[var(--md-sys-color-on-surface-variant)]">
-            Grants replace the role's full permission set on save.
+            @if (selectedRole()?.isSuperAdmin) {
+              SuperAdmin always has every current and future permission — this matrix is read-only and cannot restrict it.
+            } @else {
+              Grants replace the role's full permission set on save.
+            }
           </p>
 
           @if (catalogLoading()) {
@@ -113,7 +117,7 @@
                       <label class="flex min-h-11 items-center gap-2 text-sm">
                         <md-checkbox
                           [checked]="isPermissionChecked(entry.key)"
-                          [disabled]="permissionsLoading()"
+                          [disabled]="permissionsLoading() || selectedRole()?.isSuperAdmin"
                           (change)="togglePermission(entry.key, $any($event.target).checked)"
                         ></md-checkbox>
                         {{ entry.action }}
@@ -131,14 +135,16 @@
               <p role="status" class="mt-3 text-[var(--md-sys-color-primary)]">Permissions saved.</p>
             }
 
-            <md-filled-button
-              class="mt-3"
-              *appHasPermission="{ menuKey: 'rbac.roles', action: 'edit' }"
-              [disabled]="savingPermissions() || permissionsLoading()"
-              (click)="savePermissions()"
-            >
-              {{ savingPermissions() ? 'Saving…' : 'Save permissions' }}
-            </md-filled-button>
+            @if (!selectedRole()?.isSuperAdmin) {
+              <md-filled-button
+                class="mt-3"
+                *appHasPermission="{ menuKey: 'rbac.roles', action: 'edit' }"
+                [disabled]="savingPermissions() || permissionsLoading()"
+                (click)="savePermissions()"
+              >
+                {{ savingPermissions() ? 'Saving…' : 'Save permissions' }}
+              </md-filled-button>
+            }
           }
         </sky-card>
 

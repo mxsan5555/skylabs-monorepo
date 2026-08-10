@@ -79,6 +79,10 @@ export function getPermissionCatalog(token: string | null) {
   return apiGet<PermissionCatalogRow[]>('/rbac/permissions/catalog', token);
 }
 
+export function getRolePermissionIds(token: string | null, id: string) {
+  return apiGet<{ permissionIds: string[] }>(`/rbac/roles/${id}/permissions`, token);
+}
+
 export function setRolePermissions(token: string | null, id: string, permissionIds: string[]) {
   return apiPut<RolePermissionRow[]>(`/rbac/roles/${id}/permissions`, token, { permissionIds });
 }

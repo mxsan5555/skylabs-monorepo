@@ -1,4 +1,4 @@
-import type { MenuNode, PermissionAction } from '@skylabs-monorepo/shared-types';
+import { PERMISSION_ACTIONS, type MenuNode, type PermissionAction } from '@skylabs-monorepo/shared-types';
 
 /** Canonical permission key format shared by both APIs' `Permission.key` column and the frontends. */
 export function permissionKeyFor(menuKey: string, action: PermissionAction): string {
@@ -34,4 +34,26 @@ export function filterMenuByPermissions(
     }
   }
   return result.sort((a, b) => a.order - b.order);
+}
+
+function flattenMenuNodes(menu: readonly MenuNode[]): MenuNode[] {
+  const out: MenuNode[] = [];
+  for (const node of menu) {
+    out.push(node);
+    if (node.children) out.push(...flattenMenuNodes(node.children));
+  }
+  return out;
+}
+
+/**
+ * Every `${menuKey}:${action}` key derivable from a menu tree, across all fixed `PermissionAction`
+ * kinds. This is the full "grant everything, including whatever gets added later" permission set —
+ * for a role that must never lose access regardless of what's actually stored in `RolePermission`
+ * (e.g. SuperAdmin). Since it walks the live menu tree instead of a hardcoded list, a newly added
+ * sidebar/menu node is included automatically with no code change.
+ */
+export function allPermissionKeysForMenu(menu: readonly MenuNode[]): string[] {
+  return flattenMenuNodes(menu).flatMap((node) =>
+    PERMISSION_ACTIONS.map((action) => permissionKeyFor(node.permissionKey, action)),
+  );
 }

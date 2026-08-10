@@ -15,6 +15,7 @@ import {
   createRole,
   deleteRole,
   getPermissionCatalog,
+  getRolePermissionIds,
   listDashboardWidgetsCatalog,
   listRoles,
   setRolePermissions,
@@ -34,11 +35,12 @@ import { WidgetAssignments } from './widget-assignments';
  * Role Management — list + select a role, edit its name/description/status,
  * and assign its permission matrix + dashboard widgets.
  *
- * Known API gap: msd-api exposes `PUT /rbac/roles/:id/permissions` and
- * `PUT /rbac/roles/:id/widgets` (write + return new state) but no matching
- * GET to read a role's *current* grants before editing. Until that's added,
- * the matrix starts empty on every role selection — see the notice below —
- * rather than silently guessing (and possibly overwriting) existing grants.
+ * Permissions are preloaded via `GET /rbac/roles/:id/permissions` on role
+ * selection, so the matrix reflects saved grants. Known API gap: msd-api has
+ * no equivalent GET for a role's current widget grants, only
+ * `PUT /rbac/roles/:id/widgets` (write + return new state) — so the widget
+ * assignments still start empty on every role selection rather than silently
+ * guessing (and possibly overwriting) existing grants.
  */
 export function RoleManagement() {
   const { token, can } = useAuth();
@@ -59,6 +61,7 @@ export function RoleManagement() {
   const [selectedWidgets, setSelectedWidgets] = useState<Map<string, number>>(new Map());
 
   const [detailForm, setDetailForm] = useState({ name: '', description: '' });
+  const [permissionsLoading, setPermissionsLoading] = useState(false);
   const [savingDetails, setSavingDetails] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [savingWidgets, setSavingWidgets] = useState(false);
@@ -113,17 +116,33 @@ export function RoleManagement() {
     };
   }, [token]);
 
-  // Selecting a different role resets the editable matrix/widget state — see
-  // the API-gap note above for why this can't be preloaded with real data.
+  // Selecting a different role resets the widget state (msd-api has no GET for a
+  // role's current widget grants yet) and reloads the permission matrix from the
+  // role's actual saved grants via getRolePermissionIds.
   useEffect(() => {
+    let cancelled = false;
     setSelectedPermissionIds(new Set());
     setSelectedWidgets(new Map());
     setActionMessage('');
     setActionError('');
     if (selectedRole) {
       setDetailForm({ name: selectedRole.name, description: selectedRole.description ?? '' });
+      setPermissionsLoading(true);
+      getRolePermissionIds(token, selectedRole.id)
+        .then(({ data }) => {
+          if (!cancelled) setSelectedPermissionIds(new Set(data.permissionIds));
+        })
+        .catch((err) => {
+          if (!cancelled) setActionError(err instanceof ApiRequestError ? err.message : "Could not load this role's saved permissions.");
+        })
+        .finally(() => {
+          if (!cancelled) setPermissionsLoading(false);
+        });
     }
-  }, [selectedRoleId, selectedRole]);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRoleId, selectedRole, token]);
 
   const togglePermission = (permissionId: string) => {
     setSelectedPermissionIds((prev) => {
@@ -306,11 +325,11 @@ export function RoleManagement() {
 
               <h2 className="section-title">Permissions</h2>
               <p className="field-hint">
-                msd-api has no endpoint yet to read a role's current grants, only to write new ones — this matrix
-                starts empty each time you select a role. Check exactly what this role should have, then Save
-                (Save replaces the role's entire permission set).
+                {selectedRole.isSuperAdmin
+                  ? 'SuperAdmin always has every current and future permission — this matrix is read-only and cannot restrict it.'
+                  : "Checkboxes reflect this role's currently saved grants. Check or uncheck as needed, then Save (Save replaces the role's entire permission set)."}
               </p>
-              {catalogLoading ? (
+              {catalogLoading || permissionsLoading ? (
                 <p className="loading-state">Loading permission catalog…</p>
               ) : catalogError ? (
                 <p className="error-state">{catalogError}</p>
@@ -320,9 +339,9 @@ export function RoleManagement() {
                     catalog={catalog}
                     selectedPermissionIds={selectedPermissionIds}
                     onToggle={togglePermission}
-                    disabled={!canEdit}
+                    disabled={!canEdit || selectedRole.isSuperAdmin}
                   />
-                  {canEdit && (
+                  {canEdit && !selectedRole.isSuperAdmin && (
                     <div className="form-actions">
                       <FilledButton onClick={savePermissions} disabled={savingPermissions}>
                         {savingPermissions ? 'Saving…' : 'Save permissions'}
