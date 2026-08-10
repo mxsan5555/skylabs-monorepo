@@ -96,7 +96,25 @@
         "route": "/account/masters/tags",
         "permissionKey": "masters.tags",
         "parent": "masters",
-        "order": 2
+        "order": 3
+      },
+      {
+        "id": "masters-service",
+        "title": "Service",
+        "icon": "sell",
+        "route": "/account/masters/service",
+        "permissionKey": "masters.service",
+        "parent": "masters",
+        "order": 4
+      },
+      {
+        "id": "masters-deals",
+        "title": "Deals",
+        "icon": "sell",
+        "route": "/account/masters/deals",
+        "permissionKey": "masters.deals",
+        "parent": "masters",
+        "order": 5
       }
     ]
   },

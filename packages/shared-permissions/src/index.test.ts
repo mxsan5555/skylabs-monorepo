@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { MenuNode } from '@skylabs-monorepo/shared-types';
+import type { MenuNode } from '../../shared-types/src';
 import { permissionKeyFor, can, filterMenuByPermissions } from './index';
 
 describe('permissionKeyFor', () => {

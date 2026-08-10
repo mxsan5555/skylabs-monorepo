@@ -25,6 +25,7 @@ import Checkout from './pages/checkout/checkout';
 import ProductListing from './pages/products/products';
 import ProductDetail from './pages/product-detail/product-detail';
 import VendorPage from './pages/vendor/vendor';
+import { CategoryPage } from './admin/category/category';
 
 export function AppRoutes() {
   return (
@@ -101,7 +102,7 @@ export function AppRoutes() {
           path="/account/customers"
           element={
             <RequirePermission menuKey="customers">
-              <AdminPage title="Customers" subtitle="Module coming soon." />
+              <AdminPage title="Customer" subtitle="Module coming soon." />
             </RequirePermission>
           }
         />
@@ -149,7 +150,7 @@ export function AppRoutes() {
           path="/account/masters/categories"
           element={
             <RequirePermission menuKey="masters.categories">
-              <AdminPage title="Categories" subtitle="Module coming soon." />
+              <CategoryPage/>
             </RequirePermission>
           }
         />
