@@ -1,3 +1,5 @@
+import { getMenuForApp } from '@skylabs-monorepo/shared-menu';
+import { allPermissionKeysForMenu } from '@skylabs-monorepo/shared-permissions';
 import { prisma } from '../lib/prisma';
 
 interface CacheEntry {
@@ -10,6 +12,12 @@ interface CacheEntry {
  * role keys, joining UserRole → RolePermission → Permission. Short-TTL in-memory cache
  * keyed by the sorted role-key set — no invalidation machinery for v1 (per spec); a role's
  * permission changes simply take up to CACHE_TTL_MS to be reflected for already-issued tokens.
+ *
+ * A role flagged `isSuperAdmin` is a hard exception to the above: it always resolves to every
+ * permission key derivable from the live `shared-menu` tree, regardless of what's actually in
+ * `RolePermission` for it. This keeps SuperAdmin's access independent of the permission matrix
+ * UI — unchecking/saving boxes for that role (or a brand-new menu node never having been
+ * seeded/granted) can never reduce or lag behind its access. See CLAUDE.md's SuperAdmin rules.
  */
 const CACHE_TTL_MS = 30_000;
 const cache = new Map<string, CacheEntry>();
@@ -28,14 +36,25 @@ export async function resolveGrantedPermissionKeys(roleKeys: readonly string[]):
     return cached.permissionKeys;
   }
 
-  const rolePermissions = await prisma.rolePermission.findMany({
-    where: {
-      role: { key: { in: [...roleKeys] }, isActive: true },
-    },
-    select: { permission: { select: { key: true } } },
+  const roles = await prisma.role.findMany({
+    where: { key: { in: [...roleKeys] }, isActive: true },
+    select: { isSuperAdmin: true },
   });
+  const isSuperAdmin = (roles ?? []).some((r) => r.isSuperAdmin);
 
-  const permissionKeys = [...new Set(rolePermissions.map((rp) => rp.permission.key))];
+  let permissionKeys: string[];
+  if (isSuperAdmin) {
+    permissionKeys = allPermissionKeysForMenu(getMenuForApp('msd'));
+  } else {
+    const rolePermissions = await prisma.rolePermission.findMany({
+      where: {
+        role: { key: { in: [...roleKeys] }, isActive: true },
+      },
+      select: { permission: { select: { key: true } } },
+    });
+    permissionKeys = [...new Set(rolePermissions.map((rp) => rp.permission.key))];
+  }
+
   cache.set(key, { expiresAt: now + CACHE_TTL_MS, permissionKeys });
   return permissionKeys;
 }

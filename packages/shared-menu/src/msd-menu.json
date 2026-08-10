@@ -44,15 +44,7 @@
     "parent": null,
     "order": 5
   },
-  {
-    "id": "inventory",
-    "title": "Inventory",
-    "icon": "warehouse",
-    "route": "/account/inventory",
-    "permissionKey": "inventory",
-    "parent": null,
-    "order": 6
-  },
+  
   {
     "id": "reports",
     "title": "Reports",
@@ -85,6 +77,16 @@
         "icon": "category",
         "route": "/account/masters/sub-categories",
         "permissionKey": "masters.sub-categories",
+        "parent": "masters",
+        "order": 2
+      },
+
+       {
+        "id": "masters-deals",
+        "title": "Deals",
+        "icon": "category",
+        "route": "/account/masters/deals",
+        "permissionKey": "masters.deals",
         "parent": "masters",
         "order": 2
       },

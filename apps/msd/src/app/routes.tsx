@@ -130,14 +130,14 @@ export function AppRoutes() {
             </RequirePermission>
           }
         />
-        <Route
+        {/* <Route
           path="/account/inventory"
           element={
             <RequirePermission menuKey="inventory">
               <AdminPage title="Inventory" subtitle="Module coming soon." />
             </RequirePermission>
           }
-        />
+        /> */}
         <Route
           path="/account/reports"
           element={
@@ -160,6 +160,14 @@ export function AppRoutes() {
           element={
             <RequirePermission menuKey="masters.sub-categories">
               <AdminPage title="Sub Categories" subtitle="Module coming soon." />
+            </RequirePermission>
+          }
+        />
+         <Route
+          path="/account/masters/deals"
+          element={
+            <RequirePermission menuKey="masters.deals">
+              <AdminPage title="Deals" subtitle="Module coming soon." />
             </RequirePermission>
           }
         />
