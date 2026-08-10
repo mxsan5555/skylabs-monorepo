@@ -83,7 +83,7 @@ export const DEALS: Deal[] = [
     priceNote: "₹899 with code MASSAGE10",
     isOpen: true,
     isFeatured: true,
-    isHot: false,
+    isHot: true,
     features: ['Mobile Therapist'],
     included: ['Full body Swedish massage', 'Complimentary neck & shoulder focus', 'Post-session relaxation tea'],
     howToUse: ['Book your slot online.', 'Receive a therapist assignment notification.', 'Enjoy your session at the studio or at home.'],

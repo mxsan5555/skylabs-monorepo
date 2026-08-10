@@ -529,7 +529,7 @@ export function Home() {
           </section>
         )
       }
-      <section className="home-section ">
+      <section className="home-section">
         <div className="home-section__container">
 
           <div className="home-section__header">
@@ -542,8 +542,8 @@ export function Home() {
 
             <swiper-container
               ref={vacationSwiperRef}
-              navigation={false}
-              pagination={false}
+              navigation="true"
+              pagination="false"
               slides-per-view="auto"
               space-between="20"
               grab-cursor="true"
@@ -562,20 +562,6 @@ export function Home() {
                 </swiper-slide>
               ))}
             </swiper-container>
-
-            <FilledTonalIconButton
-              className="slider-btn slider-btn--prev"
-              onClick={() => vacationSwiperRef.current?.swiper.slidePrev()}
-            >
-              <Icon>navigate_before</Icon>
-            </FilledTonalIconButton>
-
-            <FilledTonalIconButton
-              className="slider-btn slider-btn--next"
-              onClick={() => vacationSwiperRef.current?.swiper.slideNext()}
-            >
-              <Icon>navigate_next</Icon>
-            </FilledTonalIconButton>
 
           </div>
 
