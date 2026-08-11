@@ -42,12 +42,20 @@ const ROLES: RoleSeed[] = [
 /** Per-menuKey action subset. Every node gets 'view' at minimum (added below); this map adds the rest. */
 const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   customers: ['create', 'edit', 'delete', 'export'],
-  vendors: ['create', 'edit', 'delete', 'export'],
+  // 'custom' gates the vendor's own `/vendors/me*` self-service surface — granted only to the
+  // `vendor` role (never `view`, which would leak the admin "list every vendor" endpoint).
+  vendors: ['create', 'edit', 'delete', 'export', 'approve', 'reject', 'status_change', 'custom'],
   orders: ['create', 'edit', 'delete', 'export', 'status_change'],
   products: ['create', 'edit', 'delete', 'export'],
+  services: ['create', 'edit', 'delete', 'export'],
   inventory: ['create', 'edit', 'delete', 'export'],
   reports: ['export'],
+  // Categories and Sub Categories are the same underlying Category table (parentId null vs
+  // set) — the backend gates all of it on 'masters.categories' (see categories.routes.ts);
+  // 'masters.sub-categories' only needs its own Permission rows so the *second* sidebar item
+  // (a distinct menu node) has something to grant :view on for visibility.
   'masters.categories': ['create', 'edit', 'delete'],
+  'masters.sub-categories': ['create', 'edit', 'delete'],
   'masters.tags': ['create', 'edit', 'delete'],
   'rbac.roles': ['create', 'edit', 'delete', 'status_change'],
   'rbac.users': ['create', 'edit', 'delete', 'assign', 'status_change', 'custom'],
@@ -140,11 +148,14 @@ async function grantStarterPermissions(
     'dashboard:view',
     'customers:view', 'customers:create', 'customers:edit', 'customers:delete',
     'vendors:view', 'vendors:create', 'vendors:edit', 'vendors:delete',
+    'vendors:approve', 'vendors:reject', 'vendors:status_change',
     'orders:view', 'orders:edit', 'orders:status_change',
     'products:view', 'products:create', 'products:edit', 'products:delete',
+    'services:view', 'services:create', 'services:edit', 'services:delete',
     'inventory:view', 'inventory:create', 'inventory:edit', 'inventory:delete',
     'reports:view',
     'masters:view', 'masters.categories:view', 'masters.categories:create', 'masters.categories:edit', 'masters.categories:delete',
+    'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit', 'masters.sub-categories:delete',
     'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
     'settings:view', 'settings:edit',
   ]);
@@ -152,6 +163,7 @@ async function grantStarterPermissions(
   await grant('marketing', [
     'dashboard:view',
     'masters:view', 'masters.categories:view', 'masters.categories:create', 'masters.categories:edit',
+    'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit',
     'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
     'reports:view',
   ]);
@@ -164,7 +176,12 @@ async function grantStarterPermissions(
   ]);
 
   await grant('customer', ['dashboard:view']);
-  await grant('vendor', ['dashboard:view', 'orders:view', 'products:view']);
+  // Deliberately NOT 'vendors:view' — that would also unlock the admin "list every vendor"
+  // endpoint (requirePermission only checks the boolean grant, not who's asking). 'custom'
+  // gates only the ownership-scoped `/vendors/me*` self-service surface. 'vendor-portal:view'
+  // is a separate, narrower menu key that only surfaces the "My Business" sidebar item —
+  // never granted to admin/customer/etc., so it can't leak the admin Vendors/Branches/Deals nav.
+  await grant('vendor', ['dashboard:view', 'orders:view', 'products:view', 'services:view', 'vendors:custom', 'vendor-portal:view']);
 }
 
 async function seedDashboardWidgets(roles: Map<string, { id: string; isSuperAdmin: boolean }>) {
@@ -172,6 +189,7 @@ async function seedDashboardWidgets(roles: Map<string, { id: string; isSuperAdmi
     { key: 'customers-count', title: 'Total Customers', module: 'customers', description: 'Count of active customers.' },
     { key: 'orders-recent', title: 'Recent Orders', module: 'orders', description: 'Latest orders across all vendors.' },
     { key: 'revenue-summary', title: 'Revenue Summary', module: 'reports', description: 'Revenue rollup for the current period.' },
+    { key: 'vendor-profile', title: 'My Business', module: 'vendors', description: "Entry point to the vendor's own business profile, branches, and deals." },
   ];
 
   const widgetIdByKey = new Map<string, string>();
@@ -205,6 +223,9 @@ async function seedDashboardWidgets(roles: Map<string, { id: string; isSuperAdmi
   await assign('admin', ['customers-count', 'orders-recent', 'revenue-summary']);
   await assign('sales', ['revenue-summary', 'orders-recent']);
   await assign('marketing', ['customers-count']);
+  // Vendor's own entry point to /account/vendors — the sidebar item itself is admin-only
+  // (see the `vendors:custom` note above), so this widget is how a vendor user reaches it.
+  await assign('vendor', ['vendor-profile']);
 }
 
 /**
@@ -239,6 +260,36 @@ async function seedSuperAdminUser(roles: Map<string, { id: string; isSuperAdmin:
   console.log(`Seeded SuperAdmin user (${phone ?? email}).`);
 }
 
+/**
+ * A starter handful of categories/subcategories — real admin CRUD (`masters.categories`/
+ * `masters.sub-categories`) manages the rest from here; this just seeds enough rows so the
+ * Deal form and the Category/Sub-category admin lists aren't empty on first run.
+ */
+async function seedCategories() {
+  const parents = [
+    { name: 'Spa & Wellness', slug: 'spa-wellness' },
+    { name: 'Salon & Grooming', slug: 'salon-grooming' },
+  ];
+  const parentIdBySlug = new Map<string, string>();
+  for (const parent of parents) {
+    const row = await prisma.category.upsert({ where: { slug: parent.slug }, update: parent, create: parent });
+    parentIdBySlug.set(parent.slug, row.id);
+  }
+
+  const children = [
+    { name: 'Massage Therapy', slug: 'massage-therapy', parentSlug: 'spa-wellness' },
+    { name: 'Facial & Skincare', slug: 'facial-skincare', parentSlug: 'salon-grooming' },
+  ];
+  for (const child of children) {
+    const parentId = parentIdBySlug.get(child.parentSlug)!;
+    await prisma.category.upsert({
+      where: { slug: child.slug },
+      update: { name: child.name, parentId },
+      create: { name: child.name, slug: child.slug, parentId },
+    });
+  }
+}
+
 async function main() {
   const roles = await seedRoles();
   const permissionIdByKey = await seedPermissions();
@@ -246,6 +297,7 @@ async function main() {
   await grantStarterPermissions(roles, permissionIdByKey);
   await seedDashboardWidgets(roles);
   await seedSuperAdminUser(roles);
+  await seedCategories();
   console.log(`Seeded ${roles.size} roles and ${permissionIdByKey.size} permissions.`);
 }
 

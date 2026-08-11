@@ -73,4 +73,10 @@ export const env = {
   smtpUser: process.env.SMTP_USER ?? '',
   smtpPass: process.env.SMTP_PASS ?? '',
   emailFrom: process.env.EMAIL_FROM ?? '',
+
+  // Razorpay (test mode). Same "optional here, validated at send time" rationale as SMS/SMTP —
+  // payment.service.ts's Razorpay client construction is what actually requires these.
+  razorpayKeyId: process.env.RAZORPAY_KEY_ID ?? '',
+  razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET ?? '',
+  razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? '',
 };

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect } from 'vitest';
 import { WIDGET_REGISTRY } from './widget-registry';
 
@@ -17,7 +18,12 @@ function renderFromRegistry(key: string) {
 
 describe('WIDGET_REGISTRY', () => {
   it('maps every documented widget key to a component', () => {
-    expect(Object.keys(WIDGET_REGISTRY).sort()).toEqual(['customers-count', 'orders-recent', 'revenue-summary']);
+    expect(Object.keys(WIDGET_REGISTRY).sort()).toEqual([
+      'customers-count',
+      'orders-recent',
+      'revenue-summary',
+      'vendor-profile',
+    ]);
   });
 
   it('renders the component for a known widget key ("customers-count")', () => {
@@ -34,6 +40,11 @@ describe('WIDGET_REGISTRY', () => {
   it('renders the component for a known widget key ("revenue-summary")', () => {
     render(<>{renderFromRegistry('revenue-summary')}</>);
     expect(screen.getByText('₹4.2L')).toBeTruthy();
+  });
+
+  it('renders the component for a known widget key ("vendor-profile"), linking to /account/vendors', () => {
+    render(<MemoryRouter>{renderFromRegistry('vendor-profile')}</MemoryRouter>);
+    expect(screen.getByRole('link', { name: /My Business/ })).toHaveProperty('pathname', '/account/vendors');
   });
 
   // Edge cases

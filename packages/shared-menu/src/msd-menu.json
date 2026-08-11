@@ -27,6 +27,33 @@
     "order": 3
   },
   {
+    "id": "branches",
+    "title": "Branches",
+    "icon": "store",
+    "route": "/account/branches",
+    "permissionKey": "vendors",
+    "parent": null,
+    "order": 3.1
+  },
+  {
+    "id": "deals",
+    "title": "Deals",
+    "icon": "local_offer",
+    "route": "/account/deals",
+    "permissionKey": "vendors",
+    "parent": null,
+    "order": 3.2
+  },
+  {
+    "id": "vendor-portal",
+    "title": "My Business",
+    "icon": "business_center",
+    "route": "/account/vendors",
+    "permissionKey": "vendor-portal",
+    "parent": null,
+    "order": 3.3
+  },
+  {
     "id": "orders",
     "title": "Orders",
     "icon": "shopping_cart",
@@ -34,6 +61,15 @@
     "permissionKey": "orders",
     "parent": null,
     "order": 4
+  },
+  {
+    "id": "services",
+    "title": "Services",
+    "icon": "design_services",
+    "route": "/account/services",
+    "permissionKey": "services",
+    "parent": null,
+    "order": 4.5
   },
   {
     "id": "products",
@@ -44,7 +80,7 @@
     "parent": null,
     "order": 5
   },
-  
+
   {
     "id": "reports",
     "title": "Reports",
@@ -81,15 +117,7 @@
         "order": 2
       },
 
-       {
-        "id": "masters-deals",
-        "title": "Deals",
-        "icon": "category",
-        "route": "/account/masters/deals",
-        "permissionKey": "masters.deals",
-        "parent": "masters",
-        "order": 2
-      },
+     
       
       {
         "id": "masters-tags",

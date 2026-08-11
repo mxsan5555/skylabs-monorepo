@@ -10,8 +10,14 @@ import authRoutes from './routes/auth.routes';
 import rbacRoutes from './routes/rbac.routes';
 import customersRoutes from './routes/customers.routes';
 import vendorsRoutes from './routes/vendors.routes';
+import categoriesRoutes from './routes/categories.routes';
+import catalogRoutes from './routes/catalog.routes';
+import cartRoutes from './routes/cart.routes';
+import bookingRoutes from './routes/booking.routes';
 import ordersRoutes from './routes/orders.routes';
+import paymentRoutes from './routes/payment.routes';
 import productsRoutes from './routes/products.routes';
+import servicesRoutes from './routes/services.routes';
 import inventoryRoutes from './routes/inventory.routes';
 import reportsRoutes from './routes/reports.routes';
 
@@ -25,7 +31,16 @@ export function createApp(): express.Express {
   const app = express();
 
   app.use(cors({ origin: env.corsOrigin, credentials: true }));
-  app.use(express.json());
+  // `verify` captures the exact raw bytes onto req.rawBody — payment.routes.ts's webhook needs
+  // these (not a re-serialized JSON.stringify of the parsed body) to match Razorpay's HMAC
+  // signature, which is computed over the literal request body it sent.
+  app.use(
+    express.json({
+      verify: (req, _res, buf) => {
+        (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
 
   configurePassport();
   app.use(passport.initialize());
@@ -37,8 +52,14 @@ export function createApp(): express.Express {
   api.use('/rbac', rbacRoutes);
   api.use('/customers', customersRoutes);
   api.use('/vendors', vendorsRoutes);
+  api.use('/categories', categoriesRoutes);
+  api.use('/catalog', catalogRoutes);
+  api.use('/cart', cartRoutes);
+  api.use('/bookings', bookingRoutes);
   api.use('/orders', ordersRoutes);
+  api.use('/payments', paymentRoutes);
   api.use('/products', productsRoutes);
+  api.use('/services', servicesRoutes);
   api.use('/inventory', inventoryRoutes);
   api.use('/reports', reportsRoutes);
 

@@ -1,6 +1,6 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import type { MenuNode } from '@skylabs-monorepo/shared-types';
-import { Icon } from '@skylabs-monorepo/shared-ui/react';
+import { Icon, TextButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 
 /**
@@ -15,10 +15,16 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
  * of permission resolution would otherwise show it).
  */
 export function Sidebar() {
-  const { bootstrap, isPreviewing } = useAuth();
+  const { bootstrap, isPreviewing, signOut } = useAuth();
+  const navigate = useNavigate();
   const menu = bootstrap?.menu ?? [];
   const visibleMenu = isPreviewing ? menu.filter((node) => node.id !== 'administration') : menu;
   const initial = (bootstrap?.user.name ?? '?').charAt(0).toUpperCase();
+
+  const doSignOut = () => {
+    signOut();
+    navigate('/sign-in');
+  };
 
   return (
     <aside className="admin-sidebar">
@@ -42,6 +48,10 @@ export function Sidebar() {
           <div className="admin-sidebar__user-name">{bootstrap?.user.name ?? 'Loading…'}</div>
           <div className="admin-sidebar__user-mail">{bootstrap?.user.email ?? bootstrap?.user.phone ?? ''}</div>
         </span>
+        <TextButton onClick={doSignOut}>
+          <Icon slot="icon" aria-hidden="true">logout</Icon>
+          Logout
+        </TextButton>
       </div>
     </aside>
   );

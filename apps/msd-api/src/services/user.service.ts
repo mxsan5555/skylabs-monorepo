@@ -3,16 +3,28 @@ import { ApiError } from '../lib/http';
 import { revokeAllRefreshTokens } from './token.service';
 import type { UserStatus } from '../generated/prisma-client';
 
-export async function listUsers(page: number, pageSize: number) {
+export async function listUsers(page: number, pageSize: number, search?: string) {
+  const where = {
+    deletedAt: null,
+    ...(search
+      ? {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' as const } },
+            { email: { contains: search, mode: 'insensitive' as const } },
+            { phone: { contains: search, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+  };
   const [items, total] = await Promise.all([
     prisma.user.findMany({
-      where: { deletedAt: null },
+      where,
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: { roles: { include: { role: true } } },
     }),
-    prisma.user.count({ where: { deletedAt: null } }),
+    prisma.user.count({ where }),
   ]);
 
   return {
@@ -21,7 +33,7 @@ export async function listUsers(page: number, pageSize: number) {
   };
 }
 
-function serializeUser(user: {
+export function serializeUser(user: {
   id: string;
   name: string;
   email: string | null;
