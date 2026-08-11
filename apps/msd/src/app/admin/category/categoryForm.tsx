@@ -52,7 +52,7 @@ export function CategoryForm({ onClose, onSave }: Props) {
     <div className="showcase__card">
       <h2>Add Category</h2>
 
-      <div className="category-form-grid">
+      <div className="form-grid">
 
         {/* Category Name */}
           <OutlinedTextField

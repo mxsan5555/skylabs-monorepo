@@ -44,6 +44,33 @@
     "parent": null,
     "order": 5
   },
+  {
+    "id": "wishlist",
+    "title": "Wishlist",
+    "icon": "inventory_2",
+    "route": "/account/wishlist",
+    "permissionKey": "wishlist",
+    "parent": null,
+    "order": 6
+  },
+  {
+    "id": "address",
+    "title": "Address",
+    "icon": "inventory_2",
+    "route": "/account/address",
+    "permissionKey": "address",
+    "parent": null,
+    "order": 7
+  },
+  {
+    "id": "refund",
+    "title": "Refund",
+    "icon": "inventory_2",
+    "route": "/account/refund",
+    "permissionKey": "refund",
+    "parent": null,
+    "order": 7
+  },
   
   {
     "id": "reports",
@@ -52,7 +79,7 @@
     "route": "/account/reports",
     "permissionKey": "reports",
     "parent": null,
-    "order": 7
+    "order": 8
   },
   {
     "id": "masters",
@@ -60,7 +87,7 @@
     "icon": "category",
     "permissionKey": "masters",
     "parent": null,
-    "order": 8,
+    "order": 9,
     "children": [
       {
         "id": "masters-categories",
@@ -81,15 +108,6 @@
         "order": 2
       },
 
-       {
-        "id": "masters-deals",
-        "title": "Deals",
-        "icon": "category",
-        "route": "/account/masters/deals",
-        "permissionKey": "masters.deals",
-        "parent": "masters",
-        "order": 2
-      },
       
       {
         "id": "masters-tags",
@@ -126,7 +144,7 @@
     "icon": "admin_panel_settings",
     "permissionKey": "administration",
     "parent": null,
-    "order": 9,
+    "order": 10,
     "children": [
       {
         "id": "admin-roles",
@@ -164,6 +182,6 @@
     "route": "/account/settings",
     "permissionKey": "settings",
     "parent": null,
-    "order": 10
+    "order": 11
   }
 ]

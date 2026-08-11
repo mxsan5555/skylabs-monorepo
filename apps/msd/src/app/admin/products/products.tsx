@@ -6,8 +6,8 @@ import {
   useCallback,
 } from "react";
 import { FilledButton } from "@skylabs-monorepo/shared-ui/react";
-import { CategoryForm } from "./categoryForm";
-import { BrandedFab, Icon } from "@skylabs-monorepo/shared-ui/react";
+import { ProductsForm } from "./productsForm";
+
 interface DtParams {
   page: number;
   pageSize: number;
@@ -21,15 +21,20 @@ interface DtParams {
 /*                                DUMMY DATA                                  */
 /* -------------------------------------------------------------------------- */
 
-const ALL_CATEGORIES = Array.from({ length: 100 }, (_, i) => ({
-  category_name: `Category ${i + 1}`,
-  category_slug: `category-${i + 1}`,
-  icon_image: `https://picsum.photos/40?random=${i + 1}`,
-  banner_image: `https://picsum.photos/200/80?random=${i + 1}`,
-  description: `Description for Category ${i + 1}`,
+const ALL_PRODUCTS = Array.from({ length: 100 }, (_, i) => ({
+  vendor_id: `vendor-${(i % 10) + 1}`,
+  category_id: `category-${(i % 8) + 1}`,
+  name: `Product ${i + 1}`,
+  description: `Description for Product ${i + 1}`,
+  price: `${500 + (i % 10) * 100}`,
+  discount_price:
+    i % 2 === 0
+      ? `${400 + (i % 10) * 80}`
+      : "",
+  stock: `${10 + (i % 50)}`,
+  sku: `SKU-${String(i + 1).padStart(5, "0")}`,
+  images: `https://picsum.photos/80/80?random=${i + 1}`,
   status: i % 2 === 0 ? "Active" : "Inactive",
-  meta_title: `Meta Title ${i + 1}`,
-  meta_description: `Meta Description ${i + 1}`,
 }));
 
 /* -------------------------------------------------------------------------- */
@@ -38,41 +43,49 @@ const ALL_CATEGORIES = Array.from({ length: 100 }, (_, i) => ({
 
 const DT_COLUMNS = JSON.stringify([
   {
-    key: "category_name",
-    label: "Category Name",
+    key: "vendor_id",
+    label: "Vendor ID",
     sortable: true,
   },
   {
-    key: "category_slug",
-    label: "Slug",
+    key: "category_id",
+    label: "Category ID",
     sortable: true,
   },
   {
-    key: "icon_image",
-    label: "Icon",
-    type: "image",
+    key: "name",
+    label: "Product Name",
+    sortable: true,
   },
-
-  {
-    key: "banner_image",
-    label: "Banner",
-    type: "image",
-  },
-
   {
     key: "description",
     label: "Description",
     sortable: false,
   },
   {
-    key: "meta_title",
-    label: "Meta Title",
-    sortable: false,
+    key: "price",
+    label: "Price",
+    sortable: true,
   },
   {
-    key: "meta_description",
-    label: "Meta Description",
-    sortable: false,
+    key: "discount_price",
+    label: "Discount Price",
+    sortable: true,
+  },
+  {
+    key: "stock",
+    label: "Stock",
+    sortable: true,
+  },
+  {
+    key: "sku",
+    label: "SKU",
+    sortable: true,
+  },
+  {
+    key: "images",
+    label: "Image",
+    type: "image",
   },
   {
     key: "status",
@@ -85,11 +98,15 @@ const DT_COLUMNS = JSON.stringify([
   },
 ]);
 
+/* -------------------------------------------------------------------------- */
+/*                              TABLE ACTIONS                                 */
+/* -------------------------------------------------------------------------- */
+
 const DT_ACTIONS = JSON.stringify([
   {
     icon: "visibility",
     label: "View Details",
-    event: "__view_detail__",
+    event: "view_detail",
   },
   {
     icon: "edit",
@@ -104,6 +121,10 @@ const DT_ACTIONS = JSON.stringify([
   },
 ]);
 
+/* -------------------------------------------------------------------------- */
+/*                               TABLE FILTERS                                */
+/* -------------------------------------------------------------------------- */
+
 const DT_FILTERS = JSON.stringify([
   {
     label: "Active",
@@ -116,10 +137,10 @@ const DT_FILTERS = JSON.stringify([
 ]);
 
 /* -------------------------------------------------------------------------- */
-/*                            TABLE HOOK                                      */
+/*                              TABLE HOOK                                    */
 /* -------------------------------------------------------------------------- */
 
-function useCategoryTable() {
+function useProductsTable() {
   const [params, setParams] = useState<DtParams>({
     page: 1,
     pageSize: 10,
@@ -132,8 +153,9 @@ function useCategoryTable() {
   const [loading, setLoading] = useState(false);
 
   const filtered = useMemo(() => {
-    let data = [...ALL_CATEGORIES];
+    let data = [...ALL_PRODUCTS];
 
+    /* Search */
     if (params.search) {
       const q = params.search.toLowerCase();
 
@@ -144,15 +166,23 @@ function useCategoryTable() {
       );
     }
 
+    /* Status Filter */
     if (params.filter) {
-      data = data.filter((row) => row.status === params.filter);
+      data = data.filter(
+        (row) => row.status === params.filter
+      );
     }
 
+    /* Sorting */
     if (params.sortKey) {
-      const key = params.sortKey as keyof (typeof ALL_CATEGORIES)[0];
+      const key =
+        params.sortKey as keyof (typeof ALL_PRODUCTS)[0];
 
       data.sort((a, b) => {
-        const cmp = String(a[key]).localeCompare(String(b[key]));
+        const cmp = String(a[key]).localeCompare(
+          String(b[key])
+        );
+
         return params.sortDir === "desc" ? -cmp : cmp;
       });
     }
@@ -165,6 +195,7 @@ function useCategoryTable() {
     params.sortDir,
   ]);
 
+  /* Pagination */
   const pageRows = useMemo(
     () =>
       filtered.slice(
@@ -174,10 +205,9 @@ function useCategoryTable() {
     [filtered, params.page, params.pageSize]
   );
 
-  // CategoryPage.tsx (PART 2)
-
+  /* Data table parameter change */
   const onParamsChange = useCallback((e: Event) => {
-    const detail = (e as CustomEvent<DtParams>).detail;
+    const detail = (e as CustomEvent).detail;
 
     setLoading(true);
 
@@ -196,20 +226,25 @@ function useCategoryTable() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                              CATEGORY PAGE                                 */
+/*                             PRODUCTS PAGE                                  */
 /* -------------------------------------------------------------------------- */
 
-export function CategoryPage() {
+export function ProductsPage() {
   const [open, setOpen] = useState(false);
 
-  const dt = useCategoryTable();
+  const dt = useProductsTable();
 
-  const dtRef = useRef<HTMLElement>(null);
+  const dtRef = useRef<HTMLElement | null>(null);
 
   const handleSave = (data: any) => {
-    console.log("Category Saved :", data);
+    console.log("Product Saved :", data);
+
     setOpen(false);
   };
+
+  /* ---------------------------------------------------------------------- */
+  /*                         DATA TABLE EVENT                                */
+  /* ---------------------------------------------------------------------- */
 
   useEffect(() => {
     const el = dtRef.current;
@@ -229,61 +264,62 @@ export function CategoryPage() {
   }, [dt.onParamsChange]);
 
   return (
-    <div className="category-page">
+    <div className="products-page">
 
-      {/* Header */}
+      {/* ---------------------------------------------------------------- */}
+      {/* Header                                                           */}
+      {/* ---------------------------------------------------------------- */}
+
       <div className="page-header">
-        <h1>Category</h1>
+        <h1>Products</h1>
 
-        {/* {!open && (
+        {!open && (
           <div className="add-btn">
             <FilledButton
               onClick={() => {
-                console.log("Add Category");
+                console.log("Add Product");
                 setOpen(true);
               }}
             >
-            <span className="plus-icon">+</span>
+              <span className="plus-icon">+</span>
             </FilledButton>
           </div>
-        )} */}
+        )}
       </div>
 
-      {/* FORM */}
+      {/* ---------------------------------------------------------------- */}
+      {/* FORM                                                             */}
+      {/* ---------------------------------------------------------------- */}
 
       {open ? (
-        <CategoryForm
+        <ProductsForm
           onSave={handleSave}
           onClose={() => setOpen(false)}
         />
       ) : (
         <>
-          {/* TABLE */}
+          {/* ------------------------------------------------------------ */}
+          {/* TABLE                                                        */}
+          {/* ------------------------------------------------------------ */}
 
           <section className="showcase__card">
-            <h2>Category List</h2>
+            <h2>Products List</h2>
 
             <p className="demo-label">
-              Category Management • Search • Filter • Sort • Export •
-              Selection • View • Edit • Delete
+              Product Management • Search • Filter • Sort •
+              Export • Selection • View • Edit • Delete
             </p>
 
-            <BrandedFab label="Create" aria-label="Create">
-                <Icon slot="icon" onClick={() => {
-                setOpen(true);
-              }} >add</Icon>
-           </BrandedFab>
-    
             <sky-data-table
-              ref={dtRef as React.RefObject<HTMLElement>}
-              caption="Category Master"
+              ref={dtRef}
+              caption="Products Master"
               columns={DT_COLUMNS}
               rows={dt.rows}
               total={dt.total}
               loading={dt.loading}
               page-size={10}
               searchable
-              search-placeholder="Search Category..."
+              search-placeholder="Search Product..."
               filter-label="Filter by Status"
               filter-options={DT_FILTERS}
               selectable
@@ -297,4 +333,4 @@ export function CategoryPage() {
   );
 }
 
-export default CategoryPage;
+export default ProductsPage;

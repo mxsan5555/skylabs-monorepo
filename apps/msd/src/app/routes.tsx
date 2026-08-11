@@ -26,6 +26,16 @@ import ProductListing from './pages/products/products';
 import ProductDetail from './pages/product-detail/product-detail';
 import VendorPage from './pages/vendor/vendor';
 import { CategoryPage } from './admin/category/category';
+import { SubCategoryPage } from './admin/subcategory/subCategory';
+import { ServicePage } from './admin/service/service';
+import DealPage from './admin/deal/deal';
+import CustomerPage from './admin/customer/customer';
+import Vendor from './admin/vendor/vendor';
+import OrdersPage from './admin/orders/order';
+import ProductsPage from './admin/products/products';
+import WishlistPage from './admin/wishlist/wishlist';
+import AddressPage from './admin/address/address';
+import RefundPage from './admin/refund/refund';
 
 export function AppRoutes() {
   return (
@@ -102,7 +112,7 @@ export function AppRoutes() {
           path="/account/customers"
           element={
             <RequirePermission menuKey="customers">
-              <AdminPage title="Customer" subtitle="Module coming soon." />
+              <CustomerPage/>
             </RequirePermission>
           }
         />
@@ -110,7 +120,7 @@ export function AppRoutes() {
           path="/account/vendors"
           element={
             <RequirePermission menuKey="vendors">
-              <AdminPage title="Vendors" subtitle="Module coming soon." />
+              <Vendor/>
             </RequirePermission>
           }
         />
@@ -118,7 +128,7 @@ export function AppRoutes() {
           path="/account/orders"
           element={
             <RequirePermission menuKey="orders">
-              <AdminPage title="Orders" subtitle="Module coming soon." />
+             <OrdersPage/>
             </RequirePermission>
           }
         />
@@ -126,7 +136,31 @@ export function AppRoutes() {
           path="/account/products"
           element={
             <RequirePermission menuKey="products">
-              <AdminPage title="Products" subtitle="Module coming soon." />
+             <ProductsPage/>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/wishlist"
+          element={
+            <RequirePermission menuKey="wishlist">
+             <WishlistPage/>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/address"
+          element={
+            <RequirePermission menuKey="address">
+              <AddressPage/>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/refund"
+          element={
+            <RequirePermission menuKey="refund">
+             <RefundPage/>
             </RequirePermission>
           }
         />
@@ -159,19 +193,12 @@ export function AppRoutes() {
           path="/account/masters/sub-categories"
           element={
             <RequirePermission menuKey="masters.sub-categories">
-              <AdminPage title="Sub Categories" subtitle="Module coming soon." />
+              <SubCategoryPage/>
             </RequirePermission>
           }
         />
+
          <Route
-          path="/account/masters/deals"
-          element={
-            <RequirePermission menuKey="masters.deals">
-              <AdminPage title="Deals" subtitle="Module coming soon." />
-            </RequirePermission>
-          }
-        />
-        <Route
           path="/account/masters/tags"
           element={
             <RequirePermission menuKey="masters.tags">
@@ -179,6 +206,25 @@ export function AppRoutes() {
             </RequirePermission>
           }
         />
+
+           <Route
+          path="/account/masters/service"
+          element={
+            <RequirePermission menuKey="masters.service">
+              <ServicePage/>
+            </RequirePermission>
+          }
+        />
+
+         <Route
+          path="/account/masters/deals"
+          element={
+            <RequirePermission menuKey="masters.deals">
+              <DealPage/>
+            </RequirePermission>
+          }
+        />
+       
         <Route
           path="/account/administration/roles"
           element={

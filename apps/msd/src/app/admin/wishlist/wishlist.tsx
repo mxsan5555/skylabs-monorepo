@@ -6,8 +6,8 @@ import {
   useCallback,
 } from "react";
 import { FilledButton } from "@skylabs-monorepo/shared-ui/react";
-import { CategoryForm } from "./categoryForm";
-import { BrandedFab, Icon } from "@skylabs-monorepo/shared-ui/react";
+import { WishlistForm } from "./wishlistForm";
+
 interface DtParams {
   page: number;
   pageSize: number;
@@ -21,15 +21,16 @@ interface DtParams {
 /*                                DUMMY DATA                                  */
 /* -------------------------------------------------------------------------- */
 
-const ALL_CATEGORIES = Array.from({ length: 100 }, (_, i) => ({
-  category_name: `Category ${i + 1}`,
-  category_slug: `category-${i + 1}`,
-  icon_image: `https://picsum.photos/40?random=${i + 1}`,
-  banner_image: `https://picsum.photos/200/80?random=${i + 1}`,
-  description: `Description for Category ${i + 1}`,
-  status: i % 2 === 0 ? "Active" : "Inactive",
-  meta_title: `Meta Title ${i + 1}`,
-  meta_description: `Meta Description ${i + 1}`,
+const ALL_WISHLISTS = Array.from({ length: 100 }, (_, i) => ({
+  customer_id: `customer-${(i % 20) + 1}`,
+  service_id:
+    i % 2 === 0
+      ? `service-${(i % 15) + 1}`
+      : "",
+  product_id:
+    i % 2 !== 0
+      ? `product-${(i % 20) + 1}`
+      : "",
 }));
 
 /* -------------------------------------------------------------------------- */
@@ -38,58 +39,31 @@ const ALL_CATEGORIES = Array.from({ length: 100 }, (_, i) => ({
 
 const DT_COLUMNS = JSON.stringify([
   {
-    key: "category_name",
-    label: "Category Name",
+    key: "customer_id",
+    label: "Customer ID",
     sortable: true,
   },
   {
-    key: "category_slug",
-    label: "Slug",
+    key: "service_id",
+    label: "Service ID",
     sortable: true,
   },
   {
-    key: "icon_image",
-    label: "Icon",
-    type: "image",
-  },
-
-  {
-    key: "banner_image",
-    label: "Banner",
-    type: "image",
-  },
-
-  {
-    key: "description",
-    label: "Description",
-    sortable: false,
-  },
-  {
-    key: "meta_title",
-    label: "Meta Title",
-    sortable: false,
-  },
-  {
-    key: "meta_description",
-    label: "Meta Description",
-    sortable: false,
-  },
-  {
-    key: "status",
-    label: "Status",
-    type: "status",
-    statusMap: {
-      Active: "success",
-      Inactive: "error",
-    },
+    key: "product_id",
+    label: "Product ID",
+    sortable: true,
   },
 ]);
+
+/* -------------------------------------------------------------------------- */
+/*                              TABLE ACTIONS                                 */
+/* -------------------------------------------------------------------------- */
 
 const DT_ACTIONS = JSON.stringify([
   {
     icon: "visibility",
     label: "View Details",
-    event: "__view_detail__",
+    event: "view_detail",
   },
   {
     icon: "edit",
@@ -104,22 +78,11 @@ const DT_ACTIONS = JSON.stringify([
   },
 ]);
 
-const DT_FILTERS = JSON.stringify([
-  {
-    label: "Active",
-    value: "Active",
-  },
-  {
-    label: "Inactive",
-    value: "Inactive",
-  },
-]);
-
 /* -------------------------------------------------------------------------- */
-/*                            TABLE HOOK                                      */
+/*                              TABLE HOOK                                    */
 /* -------------------------------------------------------------------------- */
 
-function useCategoryTable() {
+function useWishlistTable() {
   const [params, setParams] = useState<DtParams>({
     page: 1,
     pageSize: 10,
@@ -132,60 +95,72 @@ function useCategoryTable() {
   const [loading, setLoading] = useState(false);
 
   const filtered = useMemo(() => {
-    let data = [...ALL_CATEGORIES];
+    let data = [...ALL_WISHLISTS];
 
+    /* Search */
     if (params.search) {
       const q = params.search.toLowerCase();
 
       data = data.filter((row) =>
         Object.values(row).some((value) =>
-          String(value).toLowerCase().includes(q)
+          String(value)
+            .toLowerCase()
+            .includes(q)
         )
       );
     }
 
-    if (params.filter) {
-      data = data.filter((row) => row.status === params.filter);
-    }
-
+    /* Sorting */
     if (params.sortKey) {
-      const key = params.sortKey as keyof (typeof ALL_CATEGORIES)[0];
+      const key =
+        params.sortKey as keyof (typeof ALL_WISHLISTS)[0];
 
       data.sort((a, b) => {
-        const cmp = String(a[key]).localeCompare(String(b[key]));
-        return params.sortDir === "desc" ? -cmp : cmp;
+        const cmp = String(a[key]).localeCompare(
+          String(b[key])
+        );
+
+        return params.sortDir === "desc"
+          ? -cmp
+          : cmp;
       });
     }
 
     return data;
   }, [
     params.search,
-    params.filter,
     params.sortKey,
     params.sortDir,
   ]);
 
+  /* Pagination */
   const pageRows = useMemo(
     () =>
       filtered.slice(
         (params.page - 1) * params.pageSize,
         params.page * params.pageSize
       ),
-    [filtered, params.page, params.pageSize]
+    [
+      filtered,
+      params.page,
+      params.pageSize,
+    ]
   );
 
-  // CategoryPage.tsx (PART 2)
+  /* Data table parameter change */
+  const onParamsChange = useCallback(
+    (e: Event) => {
+      const detail = (e as CustomEvent).detail;
 
-  const onParamsChange = useCallback((e: Event) => {
-    const detail = (e as CustomEvent<DtParams>).detail;
+      setLoading(true);
 
-    setLoading(true);
-
-    setTimeout(() => {
-      setParams(detail);
-      setLoading(false);
-    }, 300);
-  }, []);
+      setTimeout(() => {
+        setParams(detail);
+        setLoading(false);
+      }, 300);
+    },
+    []
+  );
 
   return {
     rows: JSON.stringify(pageRows),
@@ -196,20 +171,26 @@ function useCategoryTable() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                              CATEGORY PAGE                                 */
+/*                            WISHLIST PAGE                                   */
 /* -------------------------------------------------------------------------- */
 
-export function CategoryPage() {
+export function WishlistPage() {
   const [open, setOpen] = useState(false);
 
-  const dt = useCategoryTable();
+  const dt = useWishlistTable();
 
-  const dtRef = useRef<HTMLElement>(null);
+  const dtRef =
+    useRef<HTMLElement | null>(null);
 
   const handleSave = (data: any) => {
-    console.log("Category Saved :", data);
+    console.log("Wishlist Saved :", data);
+
     setOpen(false);
   };
+
+  /* ---------------------------------------------------------------------- */
+  /*                         DATA TABLE EVENT                                */
+  /* ---------------------------------------------------------------------- */
 
   useEffect(() => {
     const el = dtRef.current;
@@ -229,67 +210,70 @@ export function CategoryPage() {
   }, [dt.onParamsChange]);
 
   return (
-    <div className="category-page">
+    <div className="wishlist-page">
 
-      {/* Header */}
+      {/* ---------------------------------------------------------------- */}
+      {/* Header                                                           */}
+      {/* ---------------------------------------------------------------- */}
+
       <div className="page-header">
-        <h1>Category</h1>
+        <h1>Wishlist</h1>
 
-        {/* {!open && (
+        {!open && (
           <div className="add-btn">
             <FilledButton
               onClick={() => {
-                console.log("Add Category");
+                console.log("Add Wishlist");
                 setOpen(true);
               }}
             >
-            <span className="plus-icon">+</span>
+              <span className="plus-icon">
+                +
+              </span>
             </FilledButton>
           </div>
-        )} */}
+        )}
       </div>
 
-      {/* FORM */}
+      {/* ---------------------------------------------------------------- */}
+      {/* FORM                                                             */}
+      {/* ---------------------------------------------------------------- */}
 
       {open ? (
-        <CategoryForm
+        <WishlistForm
           onSave={handleSave}
           onClose={() => setOpen(false)}
         />
       ) : (
         <>
-          {/* TABLE */}
+          {/* ------------------------------------------------------------ */}
+          {/* TABLE                                                        */}
+          {/* ------------------------------------------------------------ */}
 
           <section className="showcase__card">
-            <h2>Category List</h2>
+
+            <h2>Wishlist List</h2>
 
             <p className="demo-label">
-              Category Management • Search • Filter • Sort • Export •
-              Selection • View • Edit • Delete
+              Wishlist Management • Search • Sort •
+              Export • Selection • View • Edit • Delete
             </p>
 
-            <BrandedFab label="Create" aria-label="Create">
-                <Icon slot="icon" onClick={() => {
-                setOpen(true);
-              }} >add</Icon>
-           </BrandedFab>
-    
             <sky-data-table
-              ref={dtRef as React.RefObject<HTMLElement>}
-              caption="Category Master"
+              ref={dtRef}
+              caption="Wishlist Master"
               columns={DT_COLUMNS}
               rows={dt.rows}
               total={dt.total}
               loading={dt.loading}
               page-size={10}
               searchable
-              search-placeholder="Search Category..."
-              filter-label="Filter by Status"
-              filter-options={DT_FILTERS}
+              search-placeholder="Search Wishlist..."
               selectable
               exportable
               actions={DT_ACTIONS}
             />
+
           </section>
         </>
       )}
@@ -297,4 +281,4 @@ export function CategoryPage() {
   );
 }
 
-export default CategoryPage;
+export default WishlistPage;

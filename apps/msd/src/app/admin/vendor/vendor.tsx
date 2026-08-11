@@ -6,8 +6,8 @@ import {
   useCallback,
 } from "react";
 import { FilledButton } from "@skylabs-monorepo/shared-ui/react";
-import { CategoryForm } from "./categoryForm";
-import { BrandedFab, Icon } from "@skylabs-monorepo/shared-ui/react";
+import { VendorForm } from "./vendorForm";
+
 interface DtParams {
   page: number;
   pageSize: number;
@@ -21,16 +21,40 @@ interface DtParams {
 /*                                DUMMY DATA                                  */
 /* -------------------------------------------------------------------------- */
 
-const ALL_CATEGORIES = Array.from({ length: 100 }, (_, i) => ({
-  category_name: `Category ${i + 1}`,
-  category_slug: `category-${i + 1}`,
-  icon_image: `https://picsum.photos/40?random=${i + 1}`,
-  banner_image: `https://picsum.photos/200/80?random=${i + 1}`,
-  description: `Description for Category ${i + 1}`,
+const ALL_VENDORS = Array.from({ length: 100 }, (_, i) => ({
+  slug: `vendor-${i + 1}`,
+  name: `Vendor ${i + 1}`,
+  description: `Description for Vendor ${i + 1}`,
+  address: `${100 + i}, MG Road`,
+  city: ["Bangalore", "Delhi", "Mumbai", "Hyderabad"][i % 4],
+  location: [
+    "Koramangala, Bangalore",
+    "Connaught Place, Delhi",
+    "Andheri, Mumbai",
+    "Banjara Hills, Hyderabad",
+  ][i % 4],
+  coordinates: {
+    lat: 12.9716 + i * 0.001,
+    lng: 77.5946 + i * 0.001,
+  },
+  phone: `9876543${String(i).padStart(3, "0")}`,
+  email: `vendor${i + 1}@gmail.com`,
+  website: `https://vendor${i + 1}.com`,
+  image: `https://picsum.photos/200?random=${i + 1}`,
+  imageAlt: `Vendor ${i + 1}`,
+  gallery: [
+    `https://picsum.photos/400/300?random=${i + 1}`,
+    `https://picsum.photos/400/300?random=${i + 101}`,
+    `https://picsum.photos/400/300?random=${i + 201}`,
+  ],
+  rating: Number((4 + (i % 10) / 10).toFixed(1)),
+  reviews: 100 + i,
+  isOpen: i % 2 === 0 ? "Active" : "Inactive",
+  openingHours: "9:00 AM - 9:00 PM",
+  features: ["Private Room", "Couples", "Parking"],
   status: i % 2 === 0 ? "Active" : "Inactive",
-  meta_title: `Meta Title ${i + 1}`,
-  meta_description: `Meta Description ${i + 1}`,
 }));
+
 
 /* -------------------------------------------------------------------------- */
 /*                             TABLE COLUMNS                                  */
@@ -38,41 +62,37 @@ const ALL_CATEGORIES = Array.from({ length: 100 }, (_, i) => ({
 
 const DT_COLUMNS = JSON.stringify([
   {
-    key: "category_name",
-    label: "Category Name",
+    key: "name",
+    label: "Vendor Name",
     sortable: true,
   },
   {
-    key: "category_slug",
-    label: "Slug",
+    key: "city",
+    label: "City",
     sortable: true,
   },
   {
-    key: "icon_image",
-    label: "Icon",
-    type: "image",
-  },
-
-  {
-    key: "banner_image",
-    label: "Banner",
-    type: "image",
-  },
-
-  {
-    key: "description",
-    label: "Description",
-    sortable: false,
+    key: "location",
+    label: "Location",
+    sortable: true,
   },
   {
-    key: "meta_title",
-    label: "Meta Title",
-    sortable: false,
+    key: "phone",
+    label: "Phone",
   },
   {
-    key: "meta_description",
-    label: "Meta Description",
-    sortable: false,
+    key: "rating",
+    label: "Rating",
+    sortable: true,
+  },
+  {
+    key: "reviews",
+    label: "Reviews",
+    sortable: true,
+  },
+  {
+    key: "openingHours",
+    label: "Opening Hours",
   },
   {
     key: "status",
@@ -132,7 +152,7 @@ function useCategoryTable() {
   const [loading, setLoading] = useState(false);
 
   const filtered = useMemo(() => {
-    let data = [...ALL_CATEGORIES];
+    let data = [...ALL_VENDORS];
 
     if (params.search) {
       const q = params.search.toLowerCase();
@@ -149,7 +169,7 @@ function useCategoryTable() {
     }
 
     if (params.sortKey) {
-      const key = params.sortKey as keyof (typeof ALL_CATEGORIES)[0];
+      const key = params.sortKey as keyof (typeof ALL_VENDORS)[0];
 
       data.sort((a, b) => {
         const cmp = String(a[key]).localeCompare(String(b[key]));
@@ -199,7 +219,7 @@ function useCategoryTable() {
 /*                              CATEGORY PAGE                                 */
 /* -------------------------------------------------------------------------- */
 
-export function CategoryPage() {
+export function Vendor() {
   const [open, setOpen] = useState(false);
 
   const dt = useCategoryTable();
@@ -233,9 +253,9 @@ export function CategoryPage() {
 
       {/* Header */}
       <div className="page-header">
-        <h1>Category</h1>
+        <h1>Vendor</h1>
 
-        {/* {!open && (
+        {!open && (
           <div className="add-btn">
             <FilledButton
               onClick={() => {
@@ -243,16 +263,16 @@ export function CategoryPage() {
                 setOpen(true);
               }}
             >
-            <span className="plus-icon">+</span>
+             <span className="plus-icon">+</span>
             </FilledButton>
           </div>
-        )} */}
+        )}
       </div>
 
       {/* FORM */}
 
       {open ? (
-        <CategoryForm
+        <VendorForm
           onSave={handleSave}
           onClose={() => setOpen(false)}
         />
@@ -261,22 +281,16 @@ export function CategoryPage() {
           {/* TABLE */}
 
           <section className="showcase__card">
-            <h2>Category List</h2>
+            <h2>Vendor List</h2>
 
             <p className="demo-label">
-              Category Management • Search • Filter • Sort • Export •
+              Vendor Management • Search • Filter • Sort • Export •
               Selection • View • Edit • Delete
             </p>
 
-            <BrandedFab label="Create" aria-label="Create">
-                <Icon slot="icon" onClick={() => {
-                setOpen(true);
-              }} >add</Icon>
-           </BrandedFab>
-    
             <sky-data-table
               ref={dtRef as React.RefObject<HTMLElement>}
-              caption="Category Master"
+              caption=" Vendor Master"
               columns={DT_COLUMNS}
               rows={dt.rows}
               total={dt.total}
@@ -297,4 +311,4 @@ export function CategoryPage() {
   );
 }
 
-export default CategoryPage;
+export default Vendor;

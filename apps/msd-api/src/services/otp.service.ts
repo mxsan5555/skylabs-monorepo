@@ -14,7 +14,7 @@ function isPhoneIdentifier(identifier: string): boolean {
   return !identifier.includes('@');
 }
 
-export async function requestOtp(identifier: string, purpose: OtpPurpose): Promise<void> {
+export async function requestOtp(identifier: string, purpose: OtpPurpose): Promise<string> {
   const otp = crypto.randomInt(100000, 999999).toString();
   
   const hashedOtp = await bcrypt.hash(otp, OTP_HASH_ROUNDS);
@@ -30,13 +30,15 @@ export async function requestOtp(identifier: string, purpose: OtpPurpose): Promi
     if (!delivered) {
       throw new ApiError('SERVER_ERROR', 'Failed to send OTP via SMS provider');
     }
-    return;
+    return otp;
   }
 
   const delivered = await sendOtpEmail(identifier, otp);
   if (!delivered) {
     throw new ApiError('SERVER_ERROR', 'Failed to send OTP via email provider');
   }
+
+  return otp;
 }
 
 /**
