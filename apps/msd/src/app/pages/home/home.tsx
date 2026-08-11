@@ -221,12 +221,28 @@ export function Home() {
           <div className="home__premium-left">
             <h1 className="home__premium-title"> {premiumHero.heading} </h1>
             <p className="home__premium-subtitle"> {premiumHero.subheading}</p>
-            <div className="home__premium-tabs">
+            <div
+              className="home__premium-tabs"
+              role="navigation"
+              aria-label="Browse wellness categories"
+            >
               {premiumHero.tabs.map((tab) => (
-                <AssistChip key={tab.label}>
-                  <Icon slot="icon"> {tab.icon} </Icon>
-                  {tab.label}
-                </AssistChip>
+                <NavLink
+                  key={tab.label}
+                  to={tab.to}
+                  className="premium-category-link"
+                  aria-label={`Explore ${tab.label}`}
+                >
+                  <AssistChip className="premium-category-chip">
+                    <Icon slot="icon">{tab.icon}</Icon>
+
+                    <span>{tab.label}</span>
+
+                    <Icon slot="trailing-icon">
+                      arrow_forward
+                    </Icon>
+                  </AssistChip>
+                </NavLink>
               ))}
             </div>
             <sky-card variant="filled" className="home__premium-search-card">
@@ -298,9 +314,18 @@ export function Home() {
               )}
             </sky-card>
             <div className="home__premium-popular">
-              <span className="popular-label"> Popular: </span>
+              <span className="popular-label">Popular:</span>
+
               {premiumHero.popular.map((item) => (
-                <AssistChip key={item}> {item} </AssistChip>
+                <AssistChip
+                  key={item}
+                  className="premium-popular-chip"
+                  onClick={() => {
+                    navigate(`/explore?q=${encodeURIComponent(item)}`);
+                  }}
+                >
+                  {item}
+                </AssistChip>
               ))}
             </div>
           </div>

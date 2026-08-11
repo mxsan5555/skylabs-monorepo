@@ -286,23 +286,33 @@
       "tabs": [
         {
           "label": "Massage",
-          "icon": "self_improvement"
+          "icon": "self_improvement",
+          "to": "/category/massage"
         },
         {
           "label": "Spa & Retreats",
-          "icon": "spa"
+          "icon": "spa",
+          "to": "/category/spas-retreats"
         },
         {
           "label": "Skin & Beauty",
-          "icon": "face"
+          "icon": "face",
+          "to": "/category/skin-beauty"
         },
         {
           "label": "Hair & Nails",
-          "icon": "content_cut"
+          "icon": "content_cut",
+          "to": "/category/hair-nails"
         },
         {
           "label": "Health & Wellness",
-          "icon": "favorite"
+          "icon": "favorite",
+          "to": "/category/health-wellness"
+        },
+        {
+          "label": "Products",
+          "icon": "digital_wellbeing",
+          "to": "/products"
         }
       ],
       "search": {

@@ -82,6 +82,7 @@ export function Header() {
         <div className="site-header__top">
           <IconButton
             className="site-header__menu-btn"
+            
             aria-label={content.header.openMenu}
             onClick={() => setDrawerOpen(true)}
           >
@@ -104,7 +105,7 @@ export function Header() {
             />
           </NavLink>
           <div className="site-header__search-wrapper">
-            <form
+            {/* <form
               className="home__hero-search"
               role="search"
               aria-label={content.search.ariaLabel}
@@ -135,7 +136,7 @@ export function Header() {
                   > close </Icon>
                 )}
               </OutlinedTextField>
-            </form>
+            </form> */}
             {showSuggestions && (
               <List className="search-suggestions">
                 {suggestions.length ? (
@@ -258,7 +259,7 @@ export function Header() {
             </div>
           </div>
         </div>
-        <nav
+        {/* <nav
           className="site-header__nav"
           aria-label="Primary"
         >
@@ -273,7 +274,7 @@ export function Header() {
               <span>{item.label}</span>
             </NavLink>
           ))}
-        </nav>
+        </nav> */}
       </header>
       {drawerOpen && (
         <div
