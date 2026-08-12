@@ -185,13 +185,45 @@ export class Location implements OnInit {
     };
     document.head.appendChild(script);
 
-    // 3. Read query params for trip type redirection from header dropdown
+    // 3. Read query params for trip type and location pre-filling from homepage
     this.route.queryParams.subscribe(params => {
       const type = params['type'];
       if (type === 'one-way' || type === 'round-trip' || type === 'outstation') {
         this.tripType.set(type as any);
-        this.calculatePrice();
       }
+
+      const pickup = params['pickup'];
+      const pickupLat = Number(params['pickupLat']);
+      const pickupLng = Number(params['pickupLng']);
+      if (pickup && !isNaN(pickupLat) && !isNaN(pickupLng)) {
+        this.pickupAddress.set(pickup);
+        this.pickupCoords.set([pickupLat, pickupLng]);
+        this.position.set([pickupLat, pickupLng]);
+        if (this.map && this.marker) {
+          const latLng = new window.google.maps.LatLng(pickupLat, pickupLng);
+          this.map.setCenter(latLng);
+          this.marker.setPosition(latLng);
+        }
+      }
+
+      const drop = params['drop'];
+      const dropLat = Number(params['dropLat']);
+      const dropLng = Number(params['dropLng']);
+      if (drop && !isNaN(dropLat) && !isNaN(dropLng)) {
+        this.dropAddress.set(drop);
+        this.dropCoords.set([dropLat, dropLng]);
+        if (this.map) {
+          this.updateDropMarker(dropLat, dropLng);
+        }
+      }
+
+      const timing = params['timing'];
+      if (timing === 'now' || timing === 'later') {
+        this.bookingTiming.set(timing as any);
+      }
+
+      this.calculatePrice();
+      this.calculateRoute();
     });
   }
 
@@ -241,6 +273,16 @@ export class Location implements OnInit {
 
     // Render static drivers nearby
     this.renderDriversOnMap();
+
+    // Draw the drop marker if prefilled on load
+    if (this.dropCoords()) {
+      this.updateDropMarker(this.dropCoords()![0], this.dropCoords()![1]);
+    }
+
+    // Trigger route calculation on load if both are prefilled
+    if (this.pickupCoords() && this.dropCoords()) {
+      this.calculateRoute();
+    }
   }
 
   // --- Handle Pickup Marker Drag (Always Pickup!) ---

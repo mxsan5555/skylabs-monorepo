@@ -1,34 +1,154 @@
-<!-- Hero Section -->
-<section class="relative w-full h-[280px] sm:h-[380px] lg:h-[440px] bg-cover bg-center flex items-center justify-center" style="background-image: url('/slides/slide-1.png');">
-  <!-- Dark overlay mask -->
-  <div class="absolute inset-0 bg-black/60"></div>
-  
-  <div class="relative z-10 w-full max-w-[800px] mx-auto px-4 text-center text-white flex flex-col items-center gap-3">
-    <sky-badge variant="primary" class="bg-[var(--md-sys-color-primary)] text-white border-none">{{ content().hero.badge }}</sky-badge>
-    <h1 class="m-0 text-3xl sm:text-5xl font-extrabold tracking-tight drop-shadow-md text-white">
-      {{ content().hero.title }}
-    </h1>
-    <p class="m-0 text-xs sm:text-sm md:text-base max-w-[600px] text-gray-200 drop-shadow-sm">
-      {{ content().hero.subtitle }}
-    </p>
+<!-- Redesigned Hero Section (Uber-Style Stacking) -->
+<section class="relative w-full bg-[var(--md-sys-color-surface-container-lowest,#ffffff)] border-b border-[var(--md-sys-color-outline-variant,#e2e8f0)] pt-4 sm:pt-6 md:pt-8 pb-10 sm:pb-14">
+  <div class="max-w-[1280px] mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
     
-    <!-- Search Bar -->
-    <div class="search-bar-wrapper relative w-full max-w-[500px] mt-3 sm:mt-5">
-      <div class="w-full bg-white rounded-full p-1 sm:p-1.5 flex items-center shadow-2xl">
-        <md-icon class="text-[var(--md-sys-color-outline)] ml-3 mr-2" style="color: #555;">search</md-icon>
-        <input 
-          type="text" 
-          [value]="searchQuery()"
-          (input)="onSearchInputChange($event)"
-          (keyup.enter)="onSearchSubmit()"
-          [placeholder]="content().hero.searchPlaceholder || 'Search for services...'" 
-          class="flex-grow bg-transparent border-none outline-none text-black text-xs sm:text-sm px-1 placeholder-gray-500" 
-        />
-        <md-filled-button (click)="onSearchSubmit()" class="rounded-full font-semibold shrink-0">
-          {{ content().hero.searchBtnLabel || 'Explore Services' }}
-        </md-filled-button>
+    <!-- Left Column (Grid cols 1 to 5): Heading, Subtitle, and Booking Card Stacked -->
+    <div class="lg:col-span-5 w-full flex flex-col gap-6 z-10">
+      
+      <!-- Headings Stack (Clean Title Only) -->
+      <h1 class="m-0 text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight leading-tight text-[var(--md-sys-color-on-background)]">
+        {{ content().hero.title }}
+      </h1>
+
+      <!-- Booking Card Widget -->
+      <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200/80 flex flex-col">
+        <!-- Trip Type Tabs -->
+        <div class="flex border-b border-slate-200 bg-slate-50">
+          <button type="button"
+            class="flex-1 py-3.5 text-center text-xs font-bold transition-all duration-200 border-b-2 outline-none cursor-pointer flex items-center justify-center gap-1.5"
+            [class.bg-white]="tripType() === 'one-way'"
+            [class.text-[#1175bc]]="tripType() === 'one-way'"
+            [class.border-[#1175bc]]="tripType() === 'one-way'"
+            [class.text-slate-500]="tripType() !== 'one-way'"
+            [class.border-transparent]="tripType() !== 'one-way'"
+            (click)="tripType.set('one-way')">
+            <md-icon style="--md-icon-size: 15px;">east</md-icon>
+            One Way
+          </button>
+          <button type="button"
+            class="flex-1 py-3.5 text-center text-xs font-bold transition-all duration-200 border-b-2 outline-none cursor-pointer flex items-center justify-center gap-1.5"
+            [class.bg-white]="tripType() === 'round-trip'"
+            [class.text-[#1175bc]]="tripType() === 'round-trip'"
+            [class.border-[#1175bc]]="tripType() === 'round-trip'"
+            [class.text-slate-500]="tripType() !== 'round-trip'"
+            [class.border-transparent]="tripType() !== 'round-trip'"
+            (click)="tripType.set('round-trip')">
+            <md-icon style="--md-icon-size: 15px;">sync</md-icon>
+            Round Trip
+          </button>
+          <button type="button"
+            class="flex-1 py-3.5 text-center text-xs font-bold transition-all duration-200 border-b-2 outline-none cursor-pointer flex items-center justify-center gap-1.5"
+            [class.bg-white]="tripType() === 'outstation'"
+            [class.text-[#1175bc]]="tripType() === 'outstation'"
+            [class.border-[#1175bc]]="tripType() === 'outstation'"
+            [class.text-slate-500]="tripType() !== 'outstation'"
+            [class.border-transparent]="tripType() !== 'outstation'"
+            (click)="tripType.set('outstation')">
+            <md-icon style="--md-icon-size: 15px;">explore</md-icon>
+            Outstation
+          </button>
+        </div>
+
+        <!-- Booking Fields Panel -->
+        <div class="flex flex-col gap-4 p-5">
+          
+          <!-- Spacious Location Input Fields -->
+          <div class="flex flex-col gap-4 relative">
+            
+            <!-- Pickup Location Field -->
+            <div class="relative flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pickup Point</label>
+              <div class="flex items-center bg-[#f3f3f3] border border-transparent rounded-xl p-3.5 transition-all duration-150 focus-within:bg-white focus-within:border-[#1175bc] focus-within:shadow-sm"
+                   [class.border-[#1175bc]]="activeInput() === 'pickup' && showSuggestions()"
+                   [class.bg-white]="activeInput() === 'pickup' && showSuggestions()"
+                   [class.shadow-sm]="activeInput() === 'pickup' && showSuggestions()">
+                <md-icon class="text-[#1175bc] mr-2 [--md-icon-size:18px]">my_location</md-icon>
+                <input 
+                  type="text" 
+                  class="flex-1 border-none outline-none bg-transparent text-xs text-slate-800 font-semibold placeholder-slate-400"
+                  placeholder="Enter pickup location (e.g. Sector 37 Noida)" 
+                  [value]="activeInput() === 'pickup' && showSuggestions() ? autocompleteQuery() : pickupAddress()"
+                  (focus)="onActiveInputFocus('pickup')"
+                  (input)="onAutocompleteInputChange($event)"
+                />
+              </div>
+              
+              <!-- Suggestions Dropdown for Pickup -->
+              @if (activeInput() === 'pickup' && showSuggestions() && suggestions().length > 0) {
+                <md-list class="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-[999] max-h-[180px] overflow-y-auto">
+                  @for (place of suggestions(); track place.placeId) {
+                    <md-list-item (click)="selectLocation(place)" type="button">
+                      <md-icon slot="start">location_on</md-icon>
+                      <div slot="headline" class="text-xs font-semibold">{{ place.name }}</div>
+                      <div slot="supporting-text" class="text-[10px]">{{ place.address }}</div>
+                    </md-list-item>
+                  }
+                </md-list>
+              }
+            </div>
+
+            <!-- Drop Location Field (with smooth slide/fade transition) -->
+            <div class="transition-all duration-300 ease-in-out overflow-hidden"
+                 [class.max-h-0]="tripType() === 'round-trip'"
+                 [class.opacity-0]="tripType() === 'round-trip'"
+                 [class.max-h-[100px]]="tripType() !== 'round-trip'"
+                 [class.opacity-100]="tripType() !== 'round-trip'"
+                 [class.mt-0]="tripType() === 'round-trip'"
+                 [class.mt-1]="tripType() !== 'round-trip'">
+              <div class="relative flex flex-col gap-1.5">
+                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Destination</label>
+                <div class="flex items-center bg-[#f3f3f3] border border-transparent rounded-xl p-3.5 transition-all duration-150 focus-within:bg-white focus-within:border-[#1175bc] focus-within:shadow-sm"
+                     [class.border-[#1175bc]]="activeInput() === 'drop' && showSuggestions()"
+                     [class.bg-white]="activeInput() === 'drop' && showSuggestions()"
+                     [class.shadow-sm]="activeInput() === 'drop' && showSuggestions()">
+                  <md-icon class="text-red-500 mr-2 [--md-icon-size:18px]">location_on</md-icon>
+                  <input 
+                    type="text" 
+                    class="flex-1 border-none outline-none bg-transparent text-xs text-slate-800 font-semibold placeholder-slate-400"
+                    placeholder="Enter destination location" 
+                    [value]="activeInput() === 'drop' && showSuggestions() ? autocompleteQuery() : dropAddress()"
+                    (focus)="onActiveInputFocus('drop')"
+                    (input)="onAutocompleteInputChange($event)"
+                  />
+                </div>
+                
+                <!-- Suggestions Dropdown for Drop -->
+                @if (activeInput() === 'drop' && showSuggestions() && suggestions().length > 0) {
+                  <md-list class="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-[999] max-h-[180px] overflow-y-auto">
+                    @for (place of suggestions(); track place.placeId) {
+                      <md-list-item (click)="selectLocation(place)" type="button">
+                        <md-icon slot="start">location_on</md-icon>
+                        <div slot="headline" class="text-xs font-semibold">{{ place.name }}</div>
+                        <div slot="supporting-text" class="text-[10px]">{{ place.address }}</div>
+                      </md-list-item>
+                    }
+                  </md-list>
+                }
+              </div>
+            </div>
+          </div>
+
+          <md-filled-button (click)="onSubmitBooking()" [disabled]="isSearching()" class="w-full mt-2 font-semibold">
+            @if (isSearching()) {
+              Searching Drivers...
+            } @else {
+              Search Drivers
+            }
+          </md-filled-button>
+          
+        </div>
       </div>
     </div>
+
+    <!-- Right Column (Grid cols 6 to 12): Premium Chauffeur Graphic Showcase -->
+    <div class="lg:col-span-7 w-full flex flex-col justify-center">
+      <img 
+        src="/slides/premium_hero.png" 
+        alt="Professional verified chauffeur waiting at premium car door" 
+        class="w-full aspect-[4/3] lg:aspect-[16/10] object-cover object-[center_35%] rounded-2xl block"
+      />
+    </div>
+    
   </div>
 </section>
 
