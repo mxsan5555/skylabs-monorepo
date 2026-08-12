@@ -1,13 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-<<<<<<< HEAD
-import {
-  RequireAuth,
-  RequirePermission,
-} from '@skylabs-monorepo/shared-auth/react';
-=======
 import type { ReactNode } from 'react';
 import { RequireAuth, RequirePermission, useAuth } from '@skylabs-monorepo/shared-auth/react';
->>>>>>> 275db0b380a074e08b87dd1a64afa93a1a6d617c
 import { PublicLayout } from './layouts/public-layout';
 import { AuthLayout } from './layouts/auth-layout';
 import { AdminLayout } from './layouts/admin-layout';
@@ -212,9 +205,6 @@ export function AppRoutes() {
           path="/account/branches"
           element={
             <RequirePermission menuKey="vendors">
-<<<<<<< HEAD
-              <Vendor />
-=======
               <BranchList />
             </RequirePermission>
           }
@@ -224,7 +214,6 @@ export function AppRoutes() {
           element={
             <RequirePermission menuKey="vendors">
               <DealList />
->>>>>>> 275db0b380a074e08b87dd1a64afa93a1a6d617c
             </RequirePermission>
           }
         />
@@ -232,9 +221,6 @@ export function AppRoutes() {
           path="/account/orders"
           element={
             <RequirePermission menuKey="orders">
-<<<<<<< HEAD
-              <OrdersPage />
-=======
               <OrderManagement />
             </RequirePermission>
           }
@@ -244,7 +230,6 @@ export function AppRoutes() {
           element={
             <RequirePermission menuKey="services">
               <ServiceManagement />
->>>>>>> 275db0b380a074e08b87dd1a64afa93a1a6d617c
             </RequirePermission>
           }
         />
@@ -252,35 +237,7 @@ export function AppRoutes() {
           path="/account/products"
           element={
             <RequirePermission menuKey="products">
-<<<<<<< HEAD
-              <ProductsPage />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/wishlist"
-          element={
-            <RequirePermission menuKey="wishlist">
-              <WishlistPage />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/address"
-          element={
-            <RequirePermission menuKey="address">
-              <AddressPage />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/refund"
-          element={
-            <RequirePermission menuKey="refund">
-              <RefundPage />
-=======
               <ProductManagement />
->>>>>>> 275db0b380a074e08b87dd1a64afa93a1a6d617c
             </RequirePermission>
           }
         />
@@ -304,11 +261,7 @@ export function AppRoutes() {
           path="/account/masters/categories"
           element={
             <RequirePermission menuKey="masters.categories">
-<<<<<<< HEAD
-              <CategoryPage />
-=======
               <CategoryManagement scope="top" />
->>>>>>> 275db0b380a074e08b87dd1a64afa93a1a6d617c
             </RequirePermission>
           }
         />
@@ -317,9 +270,6 @@ export function AppRoutes() {
           path="/account/masters/sub-categories"
           element={
             <RequirePermission menuKey="masters.sub-categories">
-<<<<<<< HEAD
-              <SubCategoryPage />
-=======
               <CategoryManagement scope="sub" />
             </RequirePermission>
           }
@@ -329,7 +279,6 @@ export function AppRoutes() {
           element={
             <RequirePermission menuKey="masters.deals">
               <AdminPage title="Deals" subtitle="Module coming soon." />
->>>>>>> 275db0b380a074e08b87dd1a64afa93a1a6d617c
             </RequirePermission>
           }
         />
