@@ -17,6 +17,7 @@ import { Breadcrumb } from '../../components/breadcrumb';
 import { formatINR } from '../../../utils/format';
 import content from '../../../content.json';
 import './product-detail.css';
+import { useAuth } from '../../../auth/auth-context';
 
 const { products } = content;
 const SITE_URL: string = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
@@ -114,7 +115,6 @@ export function ProductDetail() {
       setAddError(err instanceof ApiRequestError ? err.message : 'Could not add to cart.');
     }
   }
-
   async function copyLink() {
     await navigator.clipboard.writeText(window.location.href);
     setCopied(true);
@@ -181,7 +181,6 @@ export function ProductDetail() {
           }),
         }}
       />
-
       {/* ── Breadcrumb ─────────────────────────────────────────────────────── */}
       <Breadcrumb
         className="product-detail__breadcrumb"
@@ -191,7 +190,6 @@ export function ProductDetail() {
           { label: name },
         ]}
       />
-
       <div className="product-detail__layout">
         {/* ── Gallery ────────────────────────────────────────────────────── */}
         <div className="product-detail__gallery">
@@ -207,13 +205,13 @@ export function ProductDetail() {
             )}
             {deal.discountPercent && (
               <sky-badge
-                class="product-detail__badge"
+                className="product-detail__badge"
                 variant="primary"
                 aria-label={`${deal.discountPercent}% off`}
               >
                 {deal.discountPercent}% OFF
               </sky-badge>
-            )}
+            )} */}
           </div>
           {gallery.length > 1 && (
             <div className="product-detail__thumbs" aria-label="Gallery thumbnails">
@@ -251,7 +249,6 @@ export function ProductDetail() {
           <h1 className="product-detail__title">{name}</h1>
 
           <Divider />
-
           {/* Price — current, original, discount */}
           <div className="product-detail__price-row">
             <span className="product-detail__price">{formatINR(salePrice)}</span>
@@ -267,9 +264,7 @@ export function ProductDetail() {
               <sky-badge variant="error" size="small">{deal.discountPercent}% OFF</sky-badge>
             )}
           </div>
-
           <Divider />
-
           {/* Quantity stepper */}
           <div className="product-detail__qty" role="group" aria-label={products.detail.quantityLabel}>
             <OutlinedIconButton
@@ -279,9 +274,7 @@ export function ProductDetail() {
             >
               <Icon aria-hidden="true">remove</Icon>
             </OutlinedIconButton>
-            <span className="product-detail__qty-value" aria-live="polite" aria-atomic="true">
-              {qty}
-            </span>
+            <span className="product-detail__qty-value" aria-live="polite" aria-atomic="true">{qty}</span>
             <OutlinedIconButton
               aria-label="Increase quantity"
               onClick={() => setQty((q) => Math.min(10, q + 1))}
@@ -290,6 +283,17 @@ export function ProductDetail() {
               <Icon aria-hidden="true">add</Icon>
             </OutlinedIconButton>
           </div>
+          {/* Action Buttons */}
+          <div className="product-detail__actions">
+            <FilledButton
+              className="product-detail__add-btn"
+              onClick={handleAddToCart}
+            >
+              <Icon slot="icon">
+                {addedToCart ? 'check' : 'shopping_bag'}
+              </Icon>
+              {addedToCart ? 'Added to Cart!' : products.detail.addToCart}
+            </FilledButton>
 
           {/* Add to cart */}
           <FilledButton className="product-detail__add-btn" onClick={handleAddToCart}>

@@ -28,7 +28,6 @@ import { hostBase } from '../shared-styles.js';
 export class SkyProductCard extends LitElement {
   static override properties = {
     image: { type: String },
-    gallery: { type: Array },
     imageAlt: { type: String, attribute: 'image-alt' },
     variant: { type: String, reflect: true },
     badge: { type: String },
@@ -55,7 +54,6 @@ export class SkyProductCard extends LitElement {
   };
 
   declare image?: string;
-  declare gallery?: string[];
   declare imageAlt?: string;
   /** Surface style: 'plain' (default) | 'outlined' (bordered). */
   declare variant: 'plain' | 'outlined';
@@ -385,10 +383,10 @@ export class SkyProductCard extends LitElement {
     const filled = Math.round(this.rating ?? 0);
     return html`<span class="stars" aria-hidden="true"
       >${[0, 1, 2, 3, 4].map((i) =>
-      i < filled
-        ? html`<md-icon>star</md-icon>`
-        : html`<md-icon class="empty">star</md-icon>`,
-    )}</span
+        i < filled
+          ? html`<md-icon>star</md-icon>`
+          : html`<md-icon class="empty">star</md-icon>`,
+      )}</span
     >`;
   }
 
@@ -418,7 +416,8 @@ export class SkyProductCard extends LitElement {
     if (this.rating != null) {
       return html`<div
         class="rating"
-        aria-label=${`Rated ${this.rating} out of 5${this.reviews != null ? `, ${this.reviews} reviews` : ''
+        aria-label=${`Rated ${this.rating} out of 5${
+          this.reviews != null ? `, ${this.reviews} reviews` : ''
         }`}
       >
         ${this._renderStars()}
@@ -434,15 +433,15 @@ export class SkyProductCard extends LitElement {
       ${this.price
         ? html`<div class="price">
             ${this.pricePrefix
-            ? html`<span class="price__prefix">${this.pricePrefix}</span>`
-            : nothing}
+              ? html`<span class="price__prefix">${this.pricePrefix}</span>`
+              : nothing}
             ${this.originalPrice
             ? html`<span class="price__original">${this.originalPrice}</span>`
             : nothing}
             <data class="price__current" value=${this.price ?? ''}>${this.price}</data>
             ${this.discount
-            ? html`<span class="price__discount">${this.discount}</span>`
-            : nothing}
+              ? html`<span class="price__discount">${this.discount}</span>`
+              : nothing}
           </div>`
         : nothing}
       ${this.priceNote
@@ -456,43 +455,19 @@ export class SkyProductCard extends LitElement {
       <article class="card" aria-labelledby=${this.heading ? `${this._uid}-heading` : nothing}>
         <figure class="media">
           <slot name="media">
-           ${this.gallery && this.gallery.length > 1
-        ? html`
-            <swiper-container
-              navigation="true"
-              pagination="false"
-              loop="true"
-              grab-cursor="true"
-            >
-              ${this.gallery.map(
-          (image) => html`
-                  <swiper-slide>
-                    <img
-                      src=${image}
-                      alt=${this.imageAlt ?? ''}
-                    />
-                  </swiper-slide>
-                `
-        )}
-            </swiper-container>
-          `
-        : html`
-            <img
-              src=${this.gallery?.[0] ?? this.image ?? ''}
-              alt=${this.imageAlt ?? ''}
-            />
-          `
-      }
+            ${this.image
+              ? html`<img src=${this.image} alt=${this.imageAlt ?? ''} />`
+              : nothing}
           </slot>
           ${this.badge
-        ? html`<span class="badge">${this.badge}</span>`
-        : nothing}
+            ? html`<span class="badge">${this.badge}</span>`
+            : nothing}
           ${this.favorite
-        ? html`<md-icon-button
+            ? html`<md-icon-button
                 class="favorite"
                 aria-label=${this.favoriteActive
-            ? 'Remove from favorites'
-            : 'Add to favorites'}
+                  ? 'Remove from favorites'
+                  : 'Add to favorites'}
                 aria-pressed=${this.favoriteActive ? 'true' : 'false'}
                 @click=${this._toggleFavorite}
               >
@@ -502,12 +477,12 @@ export class SkyProductCard extends LitElement {
         </figure>
         <div class="body">
           ${this.tag
-        ? html`<span class="tag"
+            ? html`<span class="tag"
                 >${this.tagIcon
-            ? html`<md-icon aria-hidden="true">${this.tagIcon}</md-icon>`
-            : nothing}${this.tag}</span
+                  ? html`<md-icon aria-hidden="true">${this.tagIcon}</md-icon>`
+                  : nothing}${this.tag}</span
               >`
-        : nothing}
+            : nothing}
           ${this.eyebrow
         ? this.eyebrowHref
           ? html`<a
@@ -521,21 +496,21 @@ export class SkyProductCard extends LitElement {
           ${this.heading
         ? html`<h3 id=${`${this._uid}-heading`} class="heading">
                 ${this.href
-            ? html`<a href=${this.href}>${this.heading}</a>`
-            : this.heading}
+                  ? html`<a href=${this.href}>${this.heading}</a>`
+                  : this.heading}
               </h3>`
-        : nothing}
+            : nothing}
           ${this.location || this.distance
-        ? html`<div class="meta">
+            ? html`<div class="meta">
                 <span>${this.location}</span>
                 ${this.distance
-            ? html`<span class="distance"
+                  ? html`<span class="distance"
                       ><md-icon aria-hidden="true">near_me</md-icon
                       >${this.distance}</span
                     >`
-            : nothing}
+                  : nothing}
               </div>`
-        : nothing}
+            : nothing}
           ${this._renderRating()} ${this._renderPrice()}
           <slot></slot>
         </div>

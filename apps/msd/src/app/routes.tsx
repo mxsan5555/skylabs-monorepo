@@ -151,12 +151,11 @@ export function AppRoutes() {
         {/* ── Content pages ── */}
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogDetail />} />
+        <Route path="/products/:slug" element={<ProductDetail />} />
         <Route path="/showcase" element={<Showcase />} />
-
         {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}
         <Route path="*" element={<NotFound />} />
       </Route>
-
       {/* Auth screens use a minimal centered shell (no header/footer). */}
       <Route element={<AuthLayout />}>
         <Route path="/sign-in" element={<SignIn />} />

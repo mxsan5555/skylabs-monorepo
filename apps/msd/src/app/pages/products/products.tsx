@@ -19,7 +19,7 @@ import { formatINR } from '../../../utils/format';
 import type { ProductSort } from '../../../types';
 import content from '../../../content.json';
 import './products.css';
-
+import { useAuth } from '../../../auth/auth-context';
 const { products } = content;
 const SITE_URL: string = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
 
@@ -85,6 +85,8 @@ export function ProductListing() {
     void toggleWishlist(deal.id);
   };
 
+  addItem(id, 'product');
+}
   return (
     <div id="main-content" className="products-page">
       <title>{products.meta.listingTitle}</title>
@@ -226,13 +228,16 @@ export function ProductListing() {
                 >
                   <div
                     className="products-page__card-cta"
-                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
                   >
                     <FilledButton
                       className="products-page__card-btn"
                       onClick={() => addToCart(deal)}
                     >
-                      <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                      <Icon slot="icon">shopping_bag</Icon>
                       Add to Cart
                     </FilledButton>
                   </div>
@@ -240,9 +245,10 @@ export function ProductListing() {
               </div>
             ))}
           </div>
-        )}
-      </section>
-    </div>
+        )
+        }
+      </section >
+    </div >
   );
 }
 

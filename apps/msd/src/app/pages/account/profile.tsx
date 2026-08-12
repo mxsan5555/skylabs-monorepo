@@ -16,5 +16,4 @@ export function Profile() {
     </AdminPage>
   );
 }
-
 export default Profile;

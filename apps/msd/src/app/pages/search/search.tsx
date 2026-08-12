@@ -70,15 +70,29 @@ export function Search() {
 
   const filtered = useMemo(() => {
     let list = [...DEALS];
-    const q = query.toLowerCase().trim();
-    if (q) {
-      list = list.filter(
-        (d) =>
-          d.title.toLowerCase().includes(q) ||
-          d.providerName.toLowerCase().includes(q) ||
-          d.description.toLowerCase().includes(q),
-      );
-    }
+ const q = query.toLowerCase().trim();
+
+if (q) {
+  const terms = q.split(/\s+/);
+
+  list = list.filter((d) => {
+    const searchableText = [
+      d.title,
+      d.providerName,
+      d.description,
+      d.categorySlug,
+      d.subcategorySlug,
+      d.location,
+      ...(d.features ?? []),
+      ...(d.included ?? []),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    return terms.every((term) => searchableText.includes(term));
+  });
+}
     if (selectedCategory) {
       list = list.filter((d) => d.categorySlug === selectedCategory);
     }

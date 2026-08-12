@@ -14,7 +14,6 @@ import type { CatalogDeal } from '../../../api/catalog';
 import { formatINR, pluralize } from '../../../utils/format';
 import content from '../../../content.json';
 import './wishlist.css';
-
 const { wishlist: wishlistContent } = content;
 
 /**
@@ -59,7 +58,6 @@ export function Wishlist() {
       <title>{content.meta.wishlist.title}</title>
       <meta name="description" content={content.meta.wishlist.description} />
       <meta name="robots" content="noindex" />
-
       <div className="wishlist-page__inner">
         <h1 className="wishlist-page__title">
           {wishlistContent.title}
@@ -138,5 +136,4 @@ export function Wishlist() {
     </div>
   );
 }
-
 export default Wishlist;

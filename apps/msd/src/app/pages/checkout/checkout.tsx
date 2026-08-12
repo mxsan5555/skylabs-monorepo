@@ -8,7 +8,7 @@ import { loadRazorpayScript } from '../../../utils/razorpay';
 import { formatINR } from '../../../utils/format';
 import content from '../../../content.json';
 import './checkout.css';
-
+import { saveBooking } from '../../../utils/booking-storage';
 const { checkout: checkoutContent } = content;
 
 interface CheckoutLocationState {
@@ -201,5 +201,4 @@ export function Checkout() {
     </div>
   );
 }
-
 export default Checkout;
