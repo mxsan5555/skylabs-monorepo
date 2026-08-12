@@ -22,6 +22,7 @@ interface SkyProductCardProps {
   tag?: string;
   tagIcon?: string;
   eyebrow?: string;
+  eyebrowHref?: string;
   heading?: string;
   location?: string;
   distance?: string;

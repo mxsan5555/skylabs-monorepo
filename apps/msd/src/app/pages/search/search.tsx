@@ -493,6 +493,7 @@ export function Search() {
               </label>
             ))}
           </div>
+          <Link to="/categories" className="field-hint">Browse all categories →</Link>
         </div>
         <div slot="actions">
           <TextButton onClick={() => setSelectedCategory('')}>Clear</TextButton>

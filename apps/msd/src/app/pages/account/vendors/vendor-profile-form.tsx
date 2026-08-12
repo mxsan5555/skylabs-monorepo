@@ -53,6 +53,70 @@ function cleanForSubmit(form: VendorFields): VendorFields {
 export type VendorFormSection = 'business' | 'owner' | 'address' | 'kyc' | 'bank';
 const ALL_SECTIONS: VendorFormSection[] = ['business', 'owner', 'address', 'kyc', 'bank'];
 
+/** Which `VendorFields` keys render in each section — used to scope Save-time validation to
+ *  only the fields the user can currently see, matching `sections`. */
+const SECTION_FIELDS: Record<VendorFormSection, (keyof VendorFields)[]> = {
+  business: ['businessName', 'legalName', 'businessType', 'businessDescription', 'businessEmail', 'businessPhone', 'alternatePhone', 'website', 'logoUrl'],
+  owner: ['ownerName', 'contactPerson', 'ownerEmail', 'ownerMobile', 'alternateOwnerMobile'],
+  address: ['address', 'city', 'state', 'country', 'pincode'],
+  kyc: ['gstNumber', 'panNumber', 'businessRegistrationNumber'],
+  bank: ['bankAccountHolder', 'bankName', 'bankAccountNumber', 'bankIfsc', 'upiId'],
+};
+
+// ─── Field-level validation (UX only) ─────────────────────────────────────────
+// Mirrors `VendorFieldsSchema` in msd-api's `vendor.schema.ts` exactly — same regexes, same
+// messages — so the user sees the problem before submitting instead of only after a 422. The
+// backend re-validates and remains the authority; this is not a security layer.
+
+const GSTIN_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}\d{1}[Z]{1}[A-Z\d]{1}$/;
+const PAN_REGEX = /^[A-Z]{5}\d{4}[A-Z]{1}$/;
+const PINCODE_REGEX = /^\d{6}$/;
+const INDIA_MOBILE_REGEX = /^\+91\d{10}$/;
+
+/** Local copy of just the phone-shaping half of msd-api's `normalizeIdentifier()` (see
+ *  `apps/msd-api/src/lib/normalizeIdentifier.ts`) — same two cases only: a bare 10-digit
+ *  number gets `+91` prepended, an already-`+91`-prefixed 10-digit number passes through
+ *  unchanged, anything else is left as-is for the regex below to reject. This file is
+ *  frontend-only display validation, so it doesn't import the API's server module. */
+function normalizeMobile(value: string): string {
+  const stripped = value.trim().replace(/[^\d+]/g, '');
+  if (/^\d{10}$/.test(stripped)) return `+91${stripped}`;
+  if (/^\+91\d{10}$/.test(stripped)) return stripped;
+  return value.trim();
+}
+
+function validateGstNumber(value: string): string | null {
+  if (!value) return null;
+  return GSTIN_REGEX.test(value.toUpperCase()) ? null : 'Enter a valid 15-character GST number';
+}
+
+function validatePanNumber(value: string): string | null {
+  if (!value) return null;
+  return PAN_REGEX.test(value.toUpperCase()) ? null : 'Enter a valid 10-character PAN number';
+}
+
+function validatePincode(value: string): string | null {
+  if (!value) return null;
+  return PINCODE_REGEX.test(value) ? null : 'Enter a valid 6-digit pincode';
+}
+
+function validateMobileNumber(value: string): string | null {
+  if (!value) return null;
+  return INDIA_MOBILE_REGEX.test(normalizeMobile(value)) ? null : 'Enter a valid 10-digit mobile number';
+}
+
+const FIELD_VALIDATORS: Partial<Record<keyof VendorFields, (value: string) => string | null>> = {
+  gstNumber: validateGstNumber,
+  panNumber: validatePanNumber,
+  pincode: validatePincode,
+  businessPhone: validateMobileNumber,
+  alternatePhone: validateMobileNumber,
+  ownerMobile: validateMobileNumber,
+  alternateOwnerMobile: validateMobileNumber,
+};
+
+type VendorFieldErrors = Partial<Record<keyof VendorFields, string>>;
+
 interface VendorProfileFormProps {
   vendor: Vendor | null;
   canEdit: boolean;
@@ -86,14 +150,46 @@ export function VendorProfileForm({
 }: VendorProfileFormProps) {
   const [form, setForm] = useState<VendorFields>(() => toFormFields(vendor));
   const [kycRejectReason, setKycRejectReason] = useState('');
+  const [errors, setErrors] = useState<VendorFieldErrors>({});
   const show = (section: VendorFormSection) => sections.includes(section);
 
   useEffect(() => {
     setForm(toFormFields(vendor));
+    setErrors({});
   }, [vendor]);
 
-  const set = <K extends keyof VendorFields>(key: K, value: VendorFields[K]) => setForm((f) => ({ ...f, [key]: value }));
+  const set = <K extends keyof VendorFields>(key: K, value: VendorFields[K]) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    // Clear a field's inline error as soon as the user edits it — the next Save click
+    // re-validates and re-populates it if the new value is still bad.
+    setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
+  };
   const text = (key: keyof VendorFields) => (e: Event) => set(key, (e.target as HTMLInputElement).value as never);
+
+  const businessNameError =
+    show('business') && !(form.businessName ?? '').trim() ? 'This field is required' : null;
+
+  /** Validates every field in the currently rendered `sections` only — fields the user can't
+   *  see right now are never checked, matching how each admin-pipeline/self-service step
+   *  saves one section at a time. Returns whether the visible fields are all valid. */
+  const validateVisibleFields = (): boolean => {
+    const nextErrors: VendorFieldErrors = {};
+    for (const section of sections) {
+      for (const key of SECTION_FIELDS[section]) {
+        const validator = FIELD_VALIDATORS[key];
+        if (!validator) continue;
+        const message = validator((form[key] as string | undefined) ?? '');
+        if (message) nextErrors[key] = message;
+      }
+    }
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleSave = () => {
+    if (!validateVisibleFields()) return;
+    onSave(cleanForSubmit(form));
+  };
 
   const documents: KycDocument[] = form.kycDocuments ?? [];
   const setDocuments = (docs: KycDocument[]) => set('kycDocuments', docs);
@@ -126,13 +222,36 @@ export function VendorProfileForm({
       {show('business') && (
         <>
           <h3 className="section-title">Business Details</h3>
-          <OutlinedTextField label="Business name" value={form.businessName ?? ''} disabled={!canEdit} onInput={text('businessName')} />
+          <OutlinedTextField
+            label="Business name"
+            value={form.businessName ?? ''}
+            disabled={!canEdit}
+            onInput={text('businessName')}
+            error={Boolean(businessNameError)}
+          />
+          {businessNameError && <p className="error-state" role="alert">{businessNameError}</p>}
           <OutlinedTextField label="Legal name" value={form.legalName ?? ''} disabled={!canEdit} onInput={text('legalName')} />
           <OutlinedTextField label="Business type" value={form.businessType ?? ''} disabled={!canEdit} onInput={text('businessType')} />
           <OutlinedTextField label="Description" value={form.businessDescription ?? ''} disabled={!canEdit} onInput={text('businessDescription')} />
           <OutlinedTextField label="Business email" type="email" value={form.businessEmail ?? ''} disabled={!canEdit} onInput={text('businessEmail')} />
-          <OutlinedTextField label="Business phone" type="tel" value={form.businessPhone ?? ''} disabled={!canEdit} onInput={text('businessPhone')} />
-          <OutlinedTextField label="Alternate phone" type="tel" value={form.alternatePhone ?? ''} disabled={!canEdit} onInput={text('alternatePhone')} />
+          <OutlinedTextField
+            label="Business phone"
+            type="tel"
+            value={form.businessPhone ?? ''}
+            disabled={!canEdit}
+            onInput={text('businessPhone')}
+            error={Boolean(errors.businessPhone)}
+          />
+          {errors.businessPhone && <p className="error-state" role="alert">{errors.businessPhone}</p>}
+          <OutlinedTextField
+            label="Alternate phone"
+            type="tel"
+            value={form.alternatePhone ?? ''}
+            disabled={!canEdit}
+            onInput={text('alternatePhone')}
+            error={Boolean(errors.alternatePhone)}
+          />
+          {errors.alternatePhone && <p className="error-state" role="alert">{errors.alternatePhone}</p>}
           <OutlinedTextField label="Website" value={form.website ?? ''} disabled={!canEdit} onInput={text('website')} />
           <OutlinedTextField label="Logo URL" value={form.logoUrl ?? ''} disabled={!canEdit} onInput={text('logoUrl')} />
         </>
@@ -144,8 +263,24 @@ export function VendorProfileForm({
           <OutlinedTextField label="Owner name" value={form.ownerName ?? ''} disabled={!canEdit} onInput={text('ownerName')} />
           <OutlinedTextField label="Contact person" value={form.contactPerson ?? ''} disabled={!canEdit} onInput={text('contactPerson')} />
           <OutlinedTextField label="Owner email" type="email" value={form.ownerEmail ?? ''} disabled={!canEdit} onInput={text('ownerEmail')} />
-          <OutlinedTextField label="Owner mobile" type="tel" value={form.ownerMobile ?? ''} disabled={!canEdit} onInput={text('ownerMobile')} />
-          <OutlinedTextField label="Alternate mobile" type="tel" value={form.alternateOwnerMobile ?? ''} disabled={!canEdit} onInput={text('alternateOwnerMobile')} />
+          <OutlinedTextField
+            label="Owner mobile"
+            type="tel"
+            value={form.ownerMobile ?? ''}
+            disabled={!canEdit}
+            onInput={text('ownerMobile')}
+            error={Boolean(errors.ownerMobile)}
+          />
+          {errors.ownerMobile && <p className="error-state" role="alert">{errors.ownerMobile}</p>}
+          <OutlinedTextField
+            label="Alternate mobile"
+            type="tel"
+            value={form.alternateOwnerMobile ?? ''}
+            disabled={!canEdit}
+            onInput={text('alternateOwnerMobile')}
+            error={Boolean(errors.alternateOwnerMobile)}
+          />
+          {errors.alternateOwnerMobile && <p className="error-state" role="alert">{errors.alternateOwnerMobile}</p>}
         </>
       )}
 
@@ -156,15 +291,36 @@ export function VendorProfileForm({
           <OutlinedTextField label="City" value={form.city ?? ''} disabled={!canEdit} onInput={text('city')} />
           <OutlinedTextField label="State" value={form.state ?? ''} disabled={!canEdit} onInput={text('state')} />
           <OutlinedTextField label="Country" value={form.country ?? ''} disabled={!canEdit} onInput={text('country')} />
-          <OutlinedTextField label="Pincode" value={form.pincode ?? ''} disabled={!canEdit} onInput={text('pincode')} />
+          <OutlinedTextField
+            label="Pincode"
+            value={form.pincode ?? ''}
+            disabled={!canEdit}
+            onInput={text('pincode')}
+            error={Boolean(errors.pincode)}
+          />
+          {errors.pincode && <p className="error-state" role="alert">{errors.pincode}</p>}
         </>
       )}
 
       {show('kyc') && (
         <>
           <h3 className="section-title">Business / KYC</h3>
-          <OutlinedTextField label="GST number" value={form.gstNumber ?? ''} disabled={!canEdit} onInput={text('gstNumber')} />
-          <OutlinedTextField label="PAN number" value={form.panNumber ?? ''} disabled={!canEdit} onInput={text('panNumber')} />
+          <OutlinedTextField
+            label="GST number"
+            value={form.gstNumber ?? ''}
+            disabled={!canEdit}
+            onInput={text('gstNumber')}
+            error={Boolean(errors.gstNumber)}
+          />
+          {errors.gstNumber && <p className="error-state" role="alert">{errors.gstNumber}</p>}
+          <OutlinedTextField
+            label="PAN number"
+            value={form.panNumber ?? ''}
+            disabled={!canEdit}
+            onInput={text('panNumber')}
+            error={Boolean(errors.panNumber)}
+          />
+          {errors.panNumber && <p className="error-state" role="alert">{errors.panNumber}</p>}
           <OutlinedTextField label="Business registration no." value={form.businessRegistrationNumber ?? ''} disabled={!canEdit} onInput={text('businessRegistrationNumber')} />
 
           <fieldset>
@@ -230,7 +386,7 @@ export function VendorProfileForm({
       {canEdit && (
         <div className="form-actions">
           <FilledButton
-            onClick={() => onSave(cleanForSubmit(form))}
+            onClick={handleSave}
             disabled={saving || (show('business') && !(form.businessName ?? '').trim())}
           >
             {saving ? 'Saving…' : (saveLabel ?? (vendor ? 'Save profile' : 'Create vendor'))}

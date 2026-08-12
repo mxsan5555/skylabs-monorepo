@@ -147,6 +147,13 @@ export function createPrismaMock() {
       delete: vi.fn(),
       deleteMany: vi.fn(),
     },
+    wishlistItem: {
+      findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      deleteMany: vi.fn(),
+    },
     booking: {
       findUnique: vi.fn(),
       findMany: vi.fn(),

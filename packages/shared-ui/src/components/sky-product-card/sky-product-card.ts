@@ -37,6 +37,7 @@ export class SkyProductCard extends LitElement {
     tag: { type: String },
     tagIcon: { type: String, attribute: 'tag-icon' },
     eyebrow: { type: String },
+    eyebrowHref: { type: String, attribute: 'eyebrow-href' },
     heading: { type: String },
     location: { type: String },
     distance: { type: String },
@@ -64,6 +65,9 @@ export class SkyProductCard extends LitElement {
   declare tag?: string;
   declare tagIcon?: string;
   declare eyebrow?: string;
+  /** Optional link target for the eyebrow (e.g. vendor storefront). Renders the
+   * eyebrow as its own anchor, independent of the card's stretched-link href. */
+  declare eyebrowHref?: string;
   declare heading?: string;
   declare location?: string;
   declare distance?: string;
@@ -211,6 +215,19 @@ export class SkyProductCard extends LitElement {
     .eyebrow {
       font-size: 0.8125rem;
       color: var(--md-sys-color-primary);
+    }
+    /* Own stacking context above the heading's stretched link (z-index: 1),
+       same technique as .favorite: an independently-clickable sibling that
+       resolves its own href instead of falling through to the card link. */
+    a.eyebrow {
+      position: relative;
+      z-index: 2;
+      display: inline-block;
+      text-decoration: none;
+    }
+    a.eyebrow:hover,
+    a.eyebrow:focus-visible {
+      text-decoration: underline;
     }
     .heading {
       margin: 0;
@@ -492,7 +509,14 @@ export class SkyProductCard extends LitElement {
               >`
         : nothing}
           ${this.eyebrow
-        ? html`<span class="eyebrow">${this.eyebrow}</span>`
+        ? this.eyebrowHref
+          ? html`<a
+                class="eyebrow"
+                href=${this.eyebrowHref}
+                @click=${(e: Event) => e.stopPropagation()}
+                >${this.eyebrow}</a
+              >`
+          : html`<span class="eyebrow">${this.eyebrow}</span>`
         : nothing}
           ${this.heading
         ? html`<h3 id=${`${this._uid}-heading`} class="heading">

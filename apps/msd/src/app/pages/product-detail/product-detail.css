@@ -88,6 +88,11 @@
   margin-bottom: 10px;
 }
 
+.product-detail__vendor-link {
+  display: inline-flex;
+  text-decoration: none;
+}
+
 .product-detail__title {
   margin: 0 0 12px;
   font-size: clamp(1.4rem, 3vw, 2rem);

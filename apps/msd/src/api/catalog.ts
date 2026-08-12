@@ -46,8 +46,45 @@ export interface CatalogDeal {
   subcategory: CatalogCategory | null;
   service: CatalogDealSummary | null;
   product: CatalogProductSummary | null;
-  vendor: { id: string; businessName: string | null; city: string | null; logoUrl: string | null } | null;
+  vendor: { id: string; slug: string | null; businessName: string | null; city: string | null; logoUrl: string | null } | null;
   branch: { id: string; name: string; city: string | null; address: string | null } | null;
+}
+
+/** `Branch.openingHours` shape — keys are lowercase 3-letter day codes (`mon`…`sun`), values are
+ *  either `"HH:MM-HH:MM"` or `"closed"`. Absent (`null`) for branches that haven't set hours yet. */
+export type CatalogOpeningHours = Record<string, string>;
+
+export interface CatalogVendorTherapist {
+  id: string;
+  name: string;
+  specialization: string | null;
+  bio: string | null;
+  experienceYears: number | null;
+  photoUrl: string | null;
+}
+
+export interface CatalogVendorBranch {
+  id: string;
+  name: string;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
+  phone: string | null;
+  openingHours: CatalogOpeningHours | null;
+  therapists: CatalogVendorTherapist[];
+}
+
+export interface CatalogVendorDetail {
+  id: string;
+  slug: string;
+  businessName: string;
+  businessDescription: string | null;
+  logoUrl: string | null;
+  city: string | null;
+  state: string | null;
+  address: string | null;
+  branches: CatalogVendorBranch[];
 }
 
 function toQuery(params: Record<string, string | number | undefined>): string {
@@ -72,6 +109,8 @@ export function listCatalogDeals(opts: {
   pageSize?: number;
   categoryId?: string;
   subcategoryId?: string;
+  vendorId?: string;
+  branchId?: string;
   type?: 'service' | 'product';
   search?: string;
 } = {}) {
@@ -80,4 +119,8 @@ export function listCatalogDeals(opts: {
 
 export function getCatalogDeal(id: string) {
   return apiGet<CatalogDeal>(`/catalog/deals/${id}`, null);
+}
+
+export function getCatalogVendor(slug: string) {
+  return apiGet<CatalogVendorDetail>(`/catalog/vendors/${encodeURIComponent(slug)}`, null);
 }

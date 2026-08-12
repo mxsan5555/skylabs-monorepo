@@ -10,14 +10,25 @@ import {
   Divider,
 } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { useCart } from '../../cart/cart-context';
+import { getCart, subscribeCartUpdated } from '../../api/cart';
+import { useWishlist } from '../../wishlist/wishlist-context';
+import { isCustomerUser, isStaffUser } from '../../auth/role-routing';
 import content from '../../content.json'
 import './header.css';
 
 export function Header() {
-  const { isAuthenticated, signOut } = useAuth();
-  const { totalItems } = useCart();
+  const { isAuthenticated, signOut, token, bootstrap } = useAuth();
   const navigate = useNavigate();
+  // Real, backend-driven wishlist count — `WishlistProvider` already loads the signed-in
+  // customer's full wishlist on mount/sign-in/sign-out, so the badge just reads its live `ids`.
+  const { ids: wishlistIds } = useWishlist();
+  // Customers (including dual-role customer+vendor users, who land here in their customer
+  // experience) get the storefront's own account area; staff/vendor-only users keep the
+  // existing admin-console destination — never mix the two navigations.
+  const myAccountPath = bootstrap && isCustomerUser(bootstrap) && !isStaffUser(bootstrap)
+    ? '/my-account'
+    : '/account';
+  const [totalItems, setTotalItems] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,6 +55,32 @@ export function Header() {
       document.body.style.overflow = '';
     };
   }, [drawerOpen]);
+
+  // Real, backend-driven cart count — refetched on sign-in/out and whenever any page mutates
+  // the cart (see `subscribeCartUpdated` in `api/cart.ts`), so the badge stays live without a
+  // global store.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setTotalItems(0);
+      return;
+    }
+    let cancelled = false;
+    const loadCount = () => {
+      getCart(token)
+        .then(({ data }) => {
+          if (!cancelled) setTotalItems(data.items.reduce((sum, item) => sum + item.quantity, 0));
+        })
+        .catch(() => {
+          if (!cancelled) setTotalItems(0);
+        });
+    };
+    loadCount();
+    const unsubscribe = subscribeCartUpdated(loadCount);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [isAuthenticated, token]);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -144,13 +181,13 @@ export function Header() {
           </IconButton>
           <IconButton
             className="site-header__cart"
-            aria-label={`Cart, ${totalItems} item${totalItems !== 1 ? 's' : ''}`}
+            aria-label={`Wishlist, ${wishlistIds.size} item${wishlistIds.size !== 1 ? 's' : ''}`}
             onClick={() => navigate('/wishlist')}
           >
             <Icon aria-hidden="true">favorite_border</Icon>
-            {totalItems > 0 && (
+            {wishlistIds.size > 0 && (
               <span className="site-header__cart-badge" aria-hidden="true">
-                {totalItems}
+                {wishlistIds.size}
               </span>
             )}
           </IconButton>
@@ -159,7 +196,7 @@ export function Header() {
           <div className="site-header__auth">
             {isAuthenticated ? (
               <>
-                <TextButton onClick={() => navigate('/account')}>My Account</TextButton>
+                <TextButton onClick={() => navigate(myAccountPath)}>My Account</TextButton>
                 <TextButton onClick={signOut}>Sign Out</TextButton>
               </>
             ) : (
@@ -257,7 +294,7 @@ export function Header() {
           <div className="nav-drawer__auth">
             {isAuthenticated ? (
               <>
-                <FilledButton onClick={() => { navigate('/account'); setDrawerOpen(false); }}>
+                <FilledButton onClick={() => { navigate(myAccountPath); setDrawerOpen(false); }}>
                   {content.header.myAccount}
                 </FilledButton>
                 <TextButton onClick={() => { signOut(); setDrawerOpen(false); }}>

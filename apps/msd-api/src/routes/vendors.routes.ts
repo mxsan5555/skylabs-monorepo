@@ -7,7 +7,7 @@ import { requirePermission } from '../middleware/requirePermission';
 import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
 import { sendError } from '../lib/http';
 import { validateBody, validateParams } from '../middleware/validate';
-import { UuidParamSchema } from '../schemas/common.schema';
+import { UuidParamSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
   VendorCreateSchema,
   VendorUpdateSchema,
@@ -26,6 +26,10 @@ import {
   DealUpdateSchema,
   DealStatusUpdateSchema,
   DealRejectSchema,
+  TherapistCreateSchema,
+  TherapistUpdateSchema,
+  TherapistStatusUpdateSchema,
+  VendorIdParamSchema,
 } from '../schemas/vendor.schema';
 import * as vendorService from '../services/vendor.service';
 import { writeAuditLog } from '../services/audit.service';
@@ -206,6 +210,22 @@ router.get('/me/branches', requirePermission('vendors', 'custom'), async (req, r
   }
 });
 
+/**
+ * Distinct customers who have ordered/booked from the caller's own vendor — for the vendor-facing
+ * "Customers" screen. Derived entirely from existing Order/Booking rows (no new table); paginates
+ * the merged distinct-customer list, not the raw Order/Booking rows.
+ */
+router.get('/me/customers', requirePermission('vendors', 'custom'), async (req, res, next) => {
+  try {
+    const { page, pageSize } = PaginationQuerySchema.parse(req.query);
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    const { items, total } = await vendorService.listMyCustomers(vendor.id, { page, pageSize });
+    sendData(res, items, { meta: { total, page, pageSize } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post(
   '/me/branches',
   requirePermission('vendors', 'custom'),
@@ -347,6 +367,86 @@ router.patch(
         ...requestMeta(req),
       });
       sendData(res, deal);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── Therapist (self-service — mirrors Branch's exact pattern) ──────────────
+
+router.get('/me/branches/:branchId/therapists', requirePermission('vendors', 'custom'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    sendData(res, await vendorService.listTherapists(vendor.id, req.params.branchId));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/me/branches/:branchId/therapists',
+  requirePermission('vendors', 'custom'),
+  validateBody(TherapistCreateSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const therapist = await vendorService.createTherapist(vendor.id, req.params.branchId, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist.create',
+        targetType: 'Therapist',
+        targetId: therapist.id,
+        after: therapist,
+        ...requestMeta(req),
+      });
+      sendData(res, therapist, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/therapists/:therapistId',
+  requirePermission('vendors', 'custom'),
+  validateBody(TherapistUpdateSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const therapist = await vendorService.updateTherapist(vendor.id, req.params.therapistId, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist.update',
+        targetType: 'Therapist',
+        targetId: therapist.id,
+        after: therapist,
+        ...requestMeta(req),
+      });
+      sendData(res, therapist);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/therapists/:therapistId/status',
+  requirePermission('vendors', 'custom'),
+  validateBody(TherapistStatusUpdateSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const therapist = await vendorService.setTherapistStatus(vendor.id, req.params.therapistId, req.body.isActive);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist.status_change',
+        targetType: 'Therapist',
+        targetId: therapist.id,
+        after: { isActive: therapist.isActive },
+        ...requestMeta(req),
+      });
+      sendData(res, therapist);
     } catch (err) {
       next(err);
     }
@@ -511,6 +611,50 @@ router.get('/:vendorId/branches', requirePermission('vendors', 'view'), async (r
     next(err);
   }
 });
+
+/**
+ * All of a vendor's therapists (active AND inactive, across every branch) for the admin's
+ * vendor detail page. Deliberately read-only — create/update/status-change stay self-service-only
+ * (`/me/branches/:branchId/therapists`, `/me/therapists/:therapistId[/status]`), which resolve the
+ * vendor from the caller's own `ownerUserId` and so are unreachable by a non-owner admin. Gated on
+ * the same `vendors:view` every other purely-admin vendor read in this file already uses — no new
+ * permission key needed.
+ */
+router.get(
+  '/:vendorId/therapists',
+  requirePermission('vendors', 'view'),
+  validateParams(VendorIdParamSchema),
+  async (req, res, next) => {
+    try {
+      sendData(res, await vendorService.listVendorTherapistsForAdmin(req.params.vendorId));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * Distinct customers who have ordered/booked from a vendor, for the admin's vendor detail page.
+ * Reuses the exact same `listMyCustomers` the self-service `/me/customers` route calls — that
+ * function takes `vendorId` as a plain parameter and does no ownership resolution internally
+ * (ownership is only relevant to the self-service route's `getMyVendorOrThrow` lookup), so no new
+ * service logic is needed here. Deliberately read-only, same as `/:vendorId/therapists`, and
+ * gated on the same `vendors:view` every other purely-admin vendor read in this file already uses.
+ */
+router.get(
+  '/:vendorId/customers',
+  requirePermission('vendors', 'view'),
+  validateParams(VendorIdParamSchema),
+  async (req, res, next) => {
+    try {
+      const { page, pageSize } = PaginationQuerySchema.parse(req.query);
+      const { items, total } = await vendorService.listMyCustomers(req.params.vendorId, { page, pageSize });
+      sendData(res, items, { meta: { total, page, pageSize } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.post(
   '/:vendorId/branches',

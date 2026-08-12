@@ -1,8 +1,18 @@
 import type { ComponentType } from 'react';
 import { Link } from 'react-router-dom';
+import type { DashboardStats } from '../../api/rbac/dashboard';
+import { formatINR } from '../../utils/format';
 
 interface WidgetProps {
   title: string;
+  /** Marketplace-wide counts from `GET /dashboard/stats`, fetched once by the Dashboard page
+   *  and handed down to every widget — `undefined` while the very first fetch hasn't resolved,
+   *  `null` if it failed (see `statsError`). Widgets that don't need it (e.g.
+   *  `VendorProfileWidget`) simply ignore these props — kept optional so the registry's
+   *  `ComponentType<WidgetProps>` typing stays a single shape for every entry. */
+  stats?: DashboardStats | null;
+  statsLoading?: boolean;
+  statsError?: string;
 }
 
 /**
@@ -12,40 +22,51 @@ interface WidgetProps {
  * keys are skipped by the dashboard page rather than crashing.
  */
 
-function CustomersCountWidget({ title }: WidgetProps) {
-  return (
-    <article className="stat-card">
-      <h2 className="stat-card__title">{title}</h2>
-      <p className="stat-card__value">1,284</p>
-    </article>
-  );
+/** Shared stat-card body: loading/error/empty states, reusing the same classes every other
+ *  data-fetching page in this app uses — no bespoke card style for widgets. */
+function StatCardBody({ loading, error, value }: { loading?: boolean; error?: string; value: string | undefined }) {
+  if (loading) return <p className="loading-state">Loading…</p>;
+  if (error) return <p className="error-state" role="alert">{error}</p>;
+  if (value === undefined) return <p className="empty-state">No data yet.</p>;
+  return <p className="stat-card__value">{value}</p>;
 }
 
-function OrdersRecentWidget({ title }: WidgetProps) {
-  const recent = [
-    { id: 'ORD-2291', label: 'Deep tissue massage · 2 sessions' },
-    { id: 'ORD-2290', label: 'Couples spa package' },
-    { id: 'ORD-2289', label: 'Foot reflexology · 1 session' },
-  ];
-  return (
-    <article className="stat-card">
-      <h2 className="stat-card__title">{title}</h2>
-      <ul className="stat-card__list">
-        {recent.map((order) => (
-          <li key={order.id}>
-            {order.id} — {order.label}
-          </li>
-        ))}
-      </ul>
-    </article>
-  );
+type CountKey = Exclude<keyof DashboardStats, 'revenue'>;
+
+/** Factory for the plain "one number" widgets — every stat except revenue renders identically,
+ *  just reading a different `DashboardStats` field, so there's no value in hand-writing eight
+ *  near-identical components. */
+function makeCountWidget(key: CountKey, displayName: string): ComponentType<WidgetProps> {
+  function CountWidget({ title, stats, statsLoading, statsError }: WidgetProps) {
+    const value = stats ? stats[key].toLocaleString('en-IN') : undefined;
+    return (
+      <article className="stat-card">
+        <h2 className="stat-card__title">{title}</h2>
+        <StatCardBody loading={statsLoading} error={statsError} value={value} />
+      </article>
+    );
+  }
+  CountWidget.displayName = displayName;
+  return CountWidget;
 }
 
-function RevenueSummaryWidget({ title }: WidgetProps) {
+const CustomersCountWidget = makeCountWidget('customers', 'CustomersCountWidget');
+const VendorsCountWidget = makeCountWidget('vendors', 'VendorsCountWidget');
+const BranchesCountWidget = makeCountWidget('branches', 'BranchesCountWidget');
+const CategoriesCountWidget = makeCountWidget('categories', 'CategoriesCountWidget');
+const SubCategoriesCountWidget = makeCountWidget('subCategories', 'SubCategoriesCountWidget');
+const ServicesCountWidget = makeCountWidget('services', 'ServicesCountWidget');
+const ProductsCountWidget = makeCountWidget('products', 'ProductsCountWidget');
+const DealsCountWidget = makeCountWidget('deals', 'DealsCountWidget');
+const OrdersCountWidget = makeCountWidget('orders', 'OrdersCountWidget');
+const BookingsCountWidget = makeCountWidget('bookings', 'BookingsCountWidget');
+
+function RevenueSummaryWidget({ title, stats, statsLoading, statsError }: WidgetProps) {
+  const value = stats ? formatINR(Number(stats.revenue)) : undefined;
   return (
     <article className="stat-card">
       <h2 className="stat-card__title">{title}</h2>
-      <p className="stat-card__value">₹4.2L</p>
+      <StatCardBody loading={statsLoading} error={statsError} value={value} />
     </article>
   );
 }
@@ -65,7 +86,15 @@ function VendorProfileWidget({ title }: WidgetProps) {
 
 export const WIDGET_REGISTRY: Record<string, ComponentType<WidgetProps>> = {
   'customers-count': CustomersCountWidget,
-  'orders-recent': OrdersRecentWidget,
+  'orders-recent': OrdersCountWidget,
   'revenue-summary': RevenueSummaryWidget,
   'vendor-profile': VendorProfileWidget,
+  'vendors-count': VendorsCountWidget,
+  'branches-count': BranchesCountWidget,
+  'categories-count': CategoriesCountWidget,
+  'subcategories-count': SubCategoriesCountWidget,
+  'services-count': ServicesCountWidget,
+  'products-count': ProductsCountWidget,
+  'deals-count': DealsCountWidget,
+  'bookings-count': BookingsCountWidget,
 };

@@ -6,6 +6,7 @@ import { otpRequestRateLimiter } from '../middleware/rateLimiter';
 import { OtpRequestSchema, OtpVerifySchema, RefreshRequestSchema } from '../schemas/auth.schema';
 import { requestOtp, verifyOtp } from '../services/otp.service';
 import { loginWithIdentifier } from '../services/auth.service';
+import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import { rotateRefreshToken, revokeRefreshToken, revokeAllRefreshTokens } from '../services/token.service';
 import { signAccessToken } from '../lib/jwt';
 import { sendData } from '../lib/http';
@@ -18,7 +19,8 @@ function requestMeta(req: import('express').Request) {
 
 router.post('/otp/request', otpRequestRateLimiter, validateBody(OtpRequestSchema), async (req, res, next) => {
   try {
-    const { identifier, purpose } = req.body as { identifier: string; purpose: 'login' | 'signup' | 'change_phone' | 'change_email' };
+    const { purpose } = req.body as { identifier: string; purpose: 'login' | 'signup' | 'change_phone' | 'change_email' };
+    const identifier = normalizeIdentifier(req.body.identifier as string);
     await requestOtp(identifier, purpose);
     // Same response whether or not the identifier has an account — no user enumeration.
     sendData(res, { message: 'OTP sent if the identifier is valid' });
@@ -29,7 +31,8 @@ router.post('/otp/request', otpRequestRateLimiter, validateBody(OtpRequestSchema
 
 router.post('/otp/verify', validateBody(OtpVerifySchema), async (req, res, next) => {
   try {
-    const { identifier, otp } = req.body as { identifier: string; otp: string };
+    const { otp } = req.body as { identifier: string; otp: string };
+    const identifier = normalizeIdentifier(req.body.identifier as string);
     await verifyOtp(identifier, otp);
     const result = await loginWithIdentifier(identifier, requestMeta(req));
     sendData(res, result);

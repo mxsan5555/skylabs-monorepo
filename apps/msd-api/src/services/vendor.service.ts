@@ -15,6 +15,8 @@ import type {
   BranchUpdateSchema,
   DealCreateSchema,
   DealUpdateSchema,
+  TherapistCreateSchema,
+  TherapistUpdateSchema,
 } from '../schemas/vendor.schema';
 
 type VendorCreateInput = z.infer<typeof VendorCreateSchema>;
@@ -25,6 +27,8 @@ type BranchCreateInput = z.infer<typeof BranchCreateSchema>;
 type BranchUpdateInput = z.infer<typeof BranchUpdateSchema>;
 type DealCreateInput = z.infer<typeof DealCreateSchema>;
 type DealUpdateInput = z.infer<typeof DealUpdateSchema>;
+type TherapistCreateInput = z.infer<typeof TherapistCreateSchema>;
+type TherapistUpdateInput = z.infer<typeof TherapistUpdateSchema>;
 
 /** Fields that, once edited after a KYC rejection, mean the vendor is resubmitting. */
 const KYC_RELEVANT_FIELDS = ['gstNumber', 'panNumber', 'businessRegistrationNumber', 'kycDocuments'] as const;
@@ -388,6 +392,120 @@ export async function updateBranch(vendorId: string, branchId: string, input: Br
 export async function setBranchStatus(vendorId: string, branchId: string, isActive: boolean) {
   await getBranchScopedOrThrow(vendorId, branchId);
   return prisma.branch.update({ where: { id: branchId }, data: { isActive } });
+}
+
+// ─── Therapist (shared by self-derived vendorId, mirrors Branch's scoping pattern) ───────────
+
+export async function listTherapists(vendorId: string, branchId: string) {
+  await getBranchScopedOrThrow(vendorId, branchId);
+  return prisma.therapist.findMany({ where: { branchId }, orderBy: { createdAt: 'desc' } });
+}
+
+/**
+ * All therapists for a vendor (active AND inactive — unlike the self-service/public reads,
+ * admin should see the full picture), across every branch, for the admin vendor detail page.
+ * No ownership-resolution needed: the `vendors:view` permission check on the route is the gate.
+ */
+export async function listVendorTherapistsForAdmin(vendorId: string) {
+  return prisma.therapist.findMany({
+    where: { vendorId },
+    include: { branch: { select: { id: true, name: true } } },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+/** 404 if the therapist doesn't exist at all; FORBIDDEN if it exists but belongs to a different
+ *  vendor — same discipline as getBranchScopedOrThrow/getDealScopedOrThrow. */
+export async function getTherapistScopedOrThrow(vendorId: string, therapistId: string) {
+  const therapist = await prisma.therapist.findUnique({ where: { id: therapistId } });
+  if (!therapist) throw new ApiError('NOT_FOUND', 'Therapist not found');
+  if (therapist.vendorId !== vendorId) throw new ApiError('FORBIDDEN', 'This therapist does not belong to your vendor');
+  return therapist;
+}
+
+export async function createTherapist(vendorId: string, branchId: string, input: TherapistCreateInput) {
+  await getBranchScopedOrThrow(vendorId, branchId);
+  return prisma.therapist.create({ data: { ...input, vendorId, branchId } as Prisma.TherapistUncheckedCreateInput });
+}
+
+export async function updateTherapist(vendorId: string, therapistId: string, input: TherapistUpdateInput) {
+  await getTherapistScopedOrThrow(vendorId, therapistId);
+  return prisma.therapist.update({ where: { id: therapistId }, data: input as Prisma.TherapistUncheckedUpdateInput });
+}
+
+/** No delete — like Branch, a Therapist is only ever soft-disabled via isActive, never
+ *  hard-deleted, to avoid orphaning historical Bookings that reference one. */
+export async function setTherapistStatus(vendorId: string, therapistId: string, isActive: boolean) {
+  await getTherapistScopedOrThrow(vendorId, therapistId);
+  return prisma.therapist.update({ where: { id: therapistId }, data: { isActive } });
+}
+
+// ─── Customers (derived from Order/Booking — no dedicated table) ─────────────
+
+/**
+ * Distinct customers who have at least one Order OR Booking with this vendor, for the
+ * vendor-facing "Customers" screen. Deliberately NOT a new Prisma model/migration — grouped off
+ * the existing Order/Booking rows and merged in application code, then the *distinct-customer*
+ * list (not the raw Order/Booking rows) is paginated and hydrated with each User's display
+ * fields. Same minimal, non-sensitive customer summary as ORDER_INCLUDE in order.service.ts
+ * (id/name/phone/email only).
+ */
+export async function listMyCustomers(vendorId: string, opts: { page: number; pageSize: number }) {
+  const [orderGroups, bookingGroups] = await Promise.all([
+    prisma.order.groupBy({
+      by: ['customerId'],
+      where: { vendorId },
+      _count: { _all: true },
+      _max: { createdAt: true },
+    }),
+    prisma.booking.groupBy({
+      by: ['customerId'],
+      where: { vendorId },
+      _count: { _all: true },
+      _max: { createdAt: true },
+    }),
+  ]);
+
+  const merged = new Map<string, { orderCount: number; bookingCount: number; lastActivityAt: Date }>();
+  for (const g of orderGroups) {
+    merged.set(g.customerId, { orderCount: g._count._all, bookingCount: 0, lastActivityAt: g._max.createdAt! });
+  }
+  for (const g of bookingGroups) {
+    const existing = merged.get(g.customerId);
+    if (existing) {
+      existing.bookingCount = g._count._all;
+      if (g._max.createdAt! > existing.lastActivityAt) existing.lastActivityAt = g._max.createdAt!;
+    } else {
+      merged.set(g.customerId, { orderCount: 0, bookingCount: g._count._all, lastActivityAt: g._max.createdAt! });
+    }
+  }
+
+  const total = merged.size;
+  const ranked = Array.from(merged.entries())
+    .map(([customerId, stats]) => ({ customerId, ...stats }))
+    .sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime());
+  const page = ranked.slice((opts.page - 1) * opts.pageSize, (opts.page - 1) * opts.pageSize + opts.pageSize);
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: page.map((p) => p.customerId) } },
+    select: { id: true, name: true, phone: true, email: true },
+  });
+  const userById = new Map(users.map((u) => [u.id, u]));
+
+  const items = page.map((p) => {
+    const user = userById.get(p.customerId);
+    return {
+      id: p.customerId,
+      name: user?.name ?? null,
+      phone: user?.phone ?? null,
+      email: user?.email ?? null,
+      orderCount: p.orderCount,
+      bookingCount: p.bookingCount,
+      lastActivityAt: p.lastActivityAt,
+    };
+  });
+
+  return { items, total };
 }
 
 // ─── Deal offering validation (Service/Product linkage) ──────────────────────

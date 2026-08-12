@@ -367,6 +367,85 @@ export function setMyDealStatus(token: string | null, branchId: string, dealId: 
   return apiPatch<Deal>(`/vendors/me/branches/${branchId}/deals/${dealId}/status`, token, { status });
 }
 
+/** One row of the vendor's own customer list — everyone who has ordered from or booked
+ *  with this vendor. Flat, no nested objects, matching `GET /vendors/me/customers`. */
+export interface CustomerRow {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  orderCount: number;
+  bookingCount: number;
+  lastActivityAt: string;
+}
+
+/** The logged-in vendor's own customers, resolved server-side from the caller's JWT (never a
+ *  client-supplied vendorId) — same pattern as every other `/vendors/me/*` self-service route. */
+export function listMyCustomers(token: string | null, opts: { page?: number; pageSize?: number } = {}) {
+  return apiGet<CustomerRow[]>(`/vendors/me/customers${toQuery(opts)}`, token);
+}
+
+/** A vendor's customers as seen by the admin Vendor Detail view — same shape as the vendor's own
+ *  `listMyCustomers` above, scoped by an explicit `vendorId` instead of the caller's JWT. See
+ *  `GET /vendors/:vendorId/customers`, gated `vendors:view` — the same permission that already
+ *  guards this whole admin screen (mirrors `listVendorTherapistsForAdmin` below). */
+export function listVendorCustomersForAdmin(token: string | null, vendorId: string, opts: { page?: number; pageSize?: number } = {}) {
+  return apiGet<CustomerRow[]>(`/vendors/${vendorId}/customers${toQuery(opts)}`, token);
+}
+
+/** A therapist staffed at one of the vendor's own branches. Branch-scoped (not vendor-wide)
+ *  because bookings reference `vendorId`+`branchId` consistency — see `GET
+ *  /vendors/me/branches/:branchId/therapists`. */
+export interface Therapist {
+  id: string;
+  vendorId: string;
+  branchId: string;
+  name: string;
+  specialization: string | null;
+  bio: string | null;
+  experienceYears: number | null;
+  photoUrl: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TherapistInput {
+  name: string;
+  specialization?: string;
+  bio?: string;
+  experienceYears?: number;
+  photoUrl?: string;
+}
+
+export function listMyTherapists(token: string | null, branchId: string) {
+  return apiGet<Therapist[]>(`/vendors/me/branches/${branchId}/therapists`, token);
+}
+
+export function createTherapist(token: string | null, branchId: string, input: TherapistInput) {
+  return apiPost<Therapist>(`/vendors/me/branches/${branchId}/therapists`, token, input);
+}
+
+export function updateTherapist(token: string | null, therapistId: string, input: Partial<TherapistInput>) {
+  return apiPatch<Therapist>(`/vendors/me/therapists/${therapistId}`, token, input);
+}
+
+export function setTherapistStatus(token: string | null, therapistId: string, isActive: boolean) {
+  return apiPatch<Therapist>(`/vendors/me/therapists/${therapistId}/status`, token, { isActive });
+}
+
+/** A therapist as seen by the admin Vendor Detail view — every therapist across every branch
+ *  of a given vendor (active AND inactive; admin sees the full picture), with the branch it
+ *  belongs to nested in. See `GET /vendors/:vendorId/therapists`, gated `vendors:view` — the
+ *  same permission that already guards this whole admin screen. */
+export interface AdminTherapist extends Therapist {
+  branch: { id: string; name: string };
+}
+
+export function listVendorTherapistsForAdmin(token: string | null, vendorId: string) {
+  return apiGet<AdminTherapist[]>(`/vendors/${vendorId}/therapists`, token);
+}
+
 // ─── Reference lookups ────────────────────────────────────────────────────────
 
 export function listCategories(token: string | null) {

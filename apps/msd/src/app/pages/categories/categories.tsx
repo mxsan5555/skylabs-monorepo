@@ -6,14 +6,14 @@ import { Breadcrumb } from '../../components/breadcrumb';
 import '../category/category.css';
 
 /**
- * Customer catalogue entry point — `Category → Sub Category → Service/Product → Deal`
- * discovery flow (marketplace architecture plan, Phase 6). Reuses `category.css` (same
- * hero/breadcrumb/grid classes as the existing static `/category/:slug` page) and
- * `sky-info-card` (already used for empty states elsewhere in the storefront) so this reads as
- * part of the same storefront, not a second design. Deliberately public — no auth, no admin
- * fields; backed by `GET /catalog/categories`.
+ * Customer catalogue entry point — "browse all categories" (formerly the marketplace categories
+ * index, absorbed here now that the marketplace route namespace is retired). Reuses
+ * `category.css` (same hero/breadcrumb/grid classes as `/category/:slug`) and `sky-info-card`
+ * (already used for empty states elsewhere in the storefront) so this reads as part of the same
+ * storefront, not a second design. Deliberately public — no auth, no admin fields; backed by
+ * `GET /catalog/categories`.
  */
-export function MarketplaceCategories() {
+export function CategoriesIndex() {
   const [categories, setCategories] = useState<CatalogCategoryWithChildren[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -29,10 +29,10 @@ export function MarketplaceCategories() {
 
   return (
     <div className="category-page">
-      <title>Browse the Marketplace | MSD</title>
+      <title>Browse Categories | MSD</title>
       <meta name="description" content="Browse services and products by category — compare vendors, branches, and prices." />
 
-      <Breadcrumb className="category-page__breadcrumb" items={[{ label: 'Home', to: '/' }, { label: 'Marketplace' }]} />
+      <Breadcrumb className="category-page__breadcrumb" items={[{ label: 'Home', to: '/' }, { label: 'Categories' }]} />
 
       <header className="category-page__hero">
         <div className="category-page__hero-inner">
@@ -40,7 +40,7 @@ export function MarketplaceCategories() {
             <Icon>storefront</Icon>
           </div>
           <div>
-            <h1 className="category-page__title">Marketplace</h1>
+            <h1 className="category-page__title">Categories</h1>
             <p className="category-page__subtitle">Browse services and products by category from vendors near you.</p>
           </div>
         </div>
@@ -63,7 +63,7 @@ export function MarketplaceCategories() {
                   <sky-category-card
                     heading={category.name}
                     subheading={category.description ?? `${category.children.length} sub-categor${category.children.length === 1 ? 'y' : 'ies'}`}
-                    href={`/marketplace/${category.slug}`}
+                    href={`/category/${category.slug}`}
                   />
                 </li>
               ))}
@@ -75,4 +75,4 @@ export function MarketplaceCategories() {
   );
 }
 
-export default MarketplaceCategories;
+export default CategoriesIndex;

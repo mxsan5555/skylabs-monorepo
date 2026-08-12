@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { PaginationQuerySchema } from './common.schema';
+import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 
 extendZodWithOpenApi(z);
 
@@ -19,6 +20,12 @@ export const CrossVendorListQuerySchema = PaginationQuerySchema.extend({
   search: z.string().max(200).optional(),
 });
 
+/** Route param for the admin-scoped `/:vendorId/...` sub-resources — same shape as
+ *  `UuidParamSchema` in `common.schema.ts`, just keyed `vendorId` to match the param name. */
+export const VendorIdParamSchema = z.object({
+  vendorId: z.string().uuid(),
+});
+
 const decimalString = z
   .string()
   .regex(/^\d+(\.\d{1,2})?$/, 'must be a plain decimal amount with up to 2 places, e.g. "199.00"');
@@ -35,6 +42,50 @@ const kycDocumentSchema = z.object({
   uploadedAt: z.string().datetime().optional(),
 });
 
+// ─── Vendor field-format validation ───────────────────────────────────────────
+// GST/PAN/pincode/phone were previously `z.string().max(N).optional()` with no format check at
+// all. An empty string ("") is treated as "field cleared" and bypasses the regex — these fields
+// stay optional (never newly required); only a *non-empty* value must match the expected shape.
+
+const GSTIN_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}\d{1}[Z]{1}[A-Z\d]{1}$/;
+const PAN_REGEX = /^[A-Z]{5}\d{4}[A-Z]{1}$/;
+const PINCODE_REGEX = /^\d{6}$/;
+const INDIA_MOBILE_REGEX = /^\+91\d{10}$/;
+
+const gstNumberSchema = z
+  .string()
+  .max(30)
+  .transform((v) => v.toUpperCase())
+  .refine((v) => v === '' || GSTIN_REGEX.test(v), { message: 'Enter a valid 15-character GST number' })
+  .optional();
+
+const panNumberSchema = z
+  .string()
+  .max(20)
+  .transform((v) => v.toUpperCase())
+  .refine((v) => v === '' || PAN_REGEX.test(v), { message: 'Enter a valid 10-character PAN number' })
+  .optional();
+
+const vendorPincodeSchema = z
+  .string()
+  .max(20)
+  .refine((v) => v === '' || PINCODE_REGEX.test(v), { message: 'Enter a valid 6-digit pincode' })
+  .optional();
+
+/**
+ * Vendor contact-phone fields (businessPhone/alternatePhone/ownerMobile/alternateOwnerMobile) —
+ * NOT login identifiers/User.phone, so there's no duplicate-*user* risk here. Still reuses
+ * `normalizeIdentifier()` (see lib/normalizeIdentifier.ts, applied at the OTP auth boundary) so
+ * a bare 10-digit number and an already-`+91`-prefixed number are both accepted and always
+ * stored the same way, matching that same normalize-then-validate discipline.
+ */
+const vendorPhoneSchema = z
+  .string()
+  .max(30)
+  .transform((v) => (v === '' ? v : normalizeIdentifier(v)))
+  .refine((v) => v === '' || INDIA_MOBILE_REGEX.test(v), { message: 'Enter a valid 10-digit mobile number' })
+  .optional();
+
 // ─── Vendor ──────────────────────────────────────────────────────────────────
 
 /**
@@ -49,27 +100,27 @@ const VendorFieldsSchema = z.object({
   businessType: z.string().max(100).optional(),
   businessDescription: z.string().max(2000).optional(),
   businessEmail: z.string().email().optional(),
-  businessPhone: z.string().max(30).optional(),
-  alternatePhone: z.string().max(30).optional(),
+  businessPhone: vendorPhoneSchema,
+  alternatePhone: vendorPhoneSchema,
   website: z.string().url().optional(),
   logoUrl: z.string().url().optional(),
 
   ownerName: z.string().max(150).optional(),
   contactPerson: z.string().max(150).optional(),
   ownerEmail: z.string().email().optional(),
-  ownerMobile: z.string().max(30).optional(),
-  alternateOwnerMobile: z.string().max(30).optional(),
+  ownerMobile: vendorPhoneSchema,
+  alternateOwnerMobile: vendorPhoneSchema,
 
   address: z.string().max(500).optional(),
   city: z.string().max(100).optional(),
   state: z.string().max(100).optional(),
   country: z.string().max(100).optional(),
-  pincode: z.string().max(20).optional(),
+  pincode: vendorPincodeSchema,
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
 
-  gstNumber: z.string().max(30).optional(),
-  panNumber: z.string().max(20).optional(),
+  gstNumber: gstNumberSchema,
+  panNumber: panNumberSchema,
   businessRegistrationNumber: z.string().max(100).optional(),
   kycDocuments: z.array(kycDocumentSchema).optional(),
 
@@ -139,6 +190,22 @@ const BranchFieldsSchema = z.object({
 export const BranchCreateSchema = BranchFieldsSchema.openapi('BranchCreate');
 export const BranchUpdateSchema = BranchFieldsSchema.partial().openapi('BranchUpdate');
 export const BranchStatusUpdateSchema = z.object({ isActive: z.boolean() }).openapi('BranchStatusUpdate');
+
+// ─── Therapist ───────────────────────────────────────────────────────────────
+
+const TherapistFieldsSchema = z.object({
+  name: z.string().min(1).max(200),
+  specialization: z.string().max(200).optional(),
+  bio: z.string().max(2000).optional(),
+  experienceYears: z.number().int().min(0).max(60).optional(),
+  /** URL only — matches Vendor.logoUrl/Deal.images' existing validation in this file; no
+   *  upload pipeline exists yet. */
+  photoUrl: z.string().url().optional(),
+});
+
+export const TherapistCreateSchema = TherapistFieldsSchema.openapi('TherapistCreate');
+export const TherapistUpdateSchema = TherapistFieldsSchema.partial().openapi('TherapistUpdate');
+export const TherapistStatusUpdateSchema = z.object({ isActive: z.boolean() }).openapi('TherapistStatusUpdate');
 
 // ─── Deal ────────────────────────────────────────────────────────────────────
 

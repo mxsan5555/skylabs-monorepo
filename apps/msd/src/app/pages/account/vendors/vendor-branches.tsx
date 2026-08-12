@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
 import { Dialog, FilledButton, OutlinedButton, OutlinedTextField, OutlinedSelect, SelectOption, TextButton, Icon } from '@skylabs-monorepo/shared-ui/react';
 import {
@@ -52,8 +52,10 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
   const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    listServices(token, { status: 'active', pageSize: 200 }).then(({ data }) => setServices(data)).catch(() => setServices([]));
-    listProducts(token, { status: 'active', pageSize: 200 }).then(({ data }) => setProducts(data)).catch(() => setProducts([]));
+    // pageSize is capped at 100 server-side (PaginationQuerySchema) — 200 here 500s, which
+    // silently left `services`/`products` empty and hid the "Add deal" button entirely.
+    listServices(token, { status: 'active', pageSize: 100 }).then(({ data }) => setServices(data)).catch(() => setServices([]));
+    listProducts(token, { status: 'active', pageSize: 100 }).then(({ data }) => setProducts(data)).catch(() => setProducts([]));
   }, [token]);
 
   const loadBranches = async () => {
@@ -309,22 +311,43 @@ type OfferingType = 'service' | 'product';
  * selected, not picked separately, so the vendor/admin can never submit a category that
  * mismatches the linked Service/Product (the backend still re-validates this — see
  * assertOfferingMatchesCatalogItem — this is just the UX guardrail).
+ *
+ * Exported so the flat, cross-branch "Deals / Packages" page (`vendor-deals.tsx`) can reuse
+ * this exact form instead of duplicating it. That page isn't already scoped to a single
+ * branch the way this two-pane page is (branch is picked on the left before any deal shows),
+ * so two optional additions support it without touching this page's own behavior:
+ *  - `branches`: when supplied, an add-mode "Branch" selector is prepended to the form (and
+ *    an edit-mode deal's branch is shown read-only, resolved from this list) — omitted here
+ *    on this page's own two call sites, so no branch field renders and nothing changes.
+ *  - `dialogRef`/`hideTrigger`: let a caller drive the dialog open/closed itself (e.g. from a
+ *    `sky-data-table` row action) instead of using this component's own built-in trigger
+ *    button — again opt-in, this page's own two call sites don't pass them.
  */
-function DealDialog({
+export function DealDialog({
   deal,
   categories,
   services,
   products,
+  branches,
+  dialogRef: externalDialogRef,
+  hideTrigger,
   onSave,
+  onClose,
 }: {
   deal?: Deal;
   categories: Category[];
   services: Service[];
   products: Product[];
-  onSave: (input: DealInput) => Promise<void>;
+  branches?: Branch[];
+  dialogRef?: RefObject<MdDialog | null>;
+  hideTrigger?: boolean;
+  onSave: (input: DealInput, branchId?: string) => Promise<void>;
+  onClose?: () => void;
 }) {
-  const dialogRef = useRef<MdDialog>(null);
+  const internalDialogRef = useRef<MdDialog>(null);
+  const dialogRef = externalDialogRef ?? internalDialogRef;
   const [offeringType, setOfferingType] = useState<OfferingType>(deal?.productId ? 'product' : 'service');
+  const [branchId, setBranchId] = useState<string>(deal?.branchId ?? branches?.[0]?.id ?? '');
   const [form, setForm] = useState<DealInput>({
     categoryId: deal?.categoryId ?? '',
     subcategoryId: deal?.subcategoryId ?? undefined,
@@ -353,6 +376,10 @@ function DealDialog({
   };
 
   const submit = async () => {
+    if (branches && !deal && !branchId) {
+      setError('Select a branch.');
+      return;
+    }
     if (!form.title.trim() || !form.slug.trim() || !form.originalPrice || !form.salePrice || !form.categoryId) {
       setError('Title, slug, original price, and sale price are required.');
       return;
@@ -372,7 +399,7 @@ function DealDialog({
     setSubmitting(true);
     setError('');
     try {
-      await onSave(form);
+      await onSave(form, branches ? branchId : undefined);
       dialogRef.current?.close();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not save deal.');
@@ -383,13 +410,28 @@ function DealDialog({
 
   return (
     <>
-      <OutlinedButton onClick={() => dialogRef.current?.show()}>
-        <Icon slot="icon" aria-hidden="true">{deal ? 'edit' : 'add'}</Icon>
-        {deal ? 'Edit' : 'Add deal'}
-      </OutlinedButton>
-      <Dialog ref={dialogRef}>
+      {!hideTrigger && (
+        <OutlinedButton onClick={() => dialogRef.current?.show()}>
+          <Icon slot="icon" aria-hidden="true">{deal ? 'edit' : 'add'}</Icon>
+          {deal ? 'Edit' : 'Add deal'}
+        </OutlinedButton>
+      )}
+      <Dialog ref={dialogRef} onClose={onClose}>
         <div slot="headline">{deal ? 'Edit deal' : 'Add deal'}</div>
         <div slot="content" className="form-grid">
+          {branches && (
+            deal ? (
+              <p className="field-hint">Branch: {branches.find((b) => b.id === deal.branchId)?.name ?? deal.branch?.name ?? '—'} (cannot be changed)</p>
+            ) : (
+              <OutlinedSelect label="Branch" value={branchId} onChange={(e: Event) => setBranchId((e.target as HTMLSelectElement).value)}>
+                {branches.map((b) => (
+                  <SelectOption key={b.id} value={b.id}>
+                    <div slot="headline">{b.name}</div>
+                  </SelectOption>
+                ))}
+              </OutlinedSelect>
+            )
+          )}
           <OutlinedSelect
             label="Offering type"
             value={offeringType}

@@ -154,7 +154,7 @@ describe('GET /api/v1/catalog/deals', () => {
     prismaMock.deal.count.mockResolvedValue(0);
     await request(app).get('/api/v1/catalog/deals');
     const call = prismaMock.deal.findMany.mock.calls[0][0];
-    expect(call.select.vendor.select).toEqual({ id: true, businessName: true, city: true, logoUrl: true });
+    expect(call.select.vendor.select).toEqual({ id: true, slug: true, businessName: true, city: true, logoUrl: true });
     expect(call.select.branch.select).toEqual({ id: true, name: true, city: true, address: true });
     const vendorFields = Object.keys(call.select.vendor.select);
     const branchFields = Object.keys(call.select.branch.select);
