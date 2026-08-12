@@ -1,23 +1,35 @@
-﻿import { useEffect, useRef, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import { Divider, FilledButton, FilledTonalIconButton, Icon, IconButton, List, ListItem, Menu, MenuItem, OutlinedTextField, TextButton, } from "@skylabs-monorepo/shared-ui/react";
-import { useAuth } from "../../auth/auth-context";
-import { useCart } from "../../cart/cart-context";
-import { useWishlist } from "../../wishlist/wishlist-context";
-import content from "../../content.json";
-import { DEALS } from "../../data/deals";
-import logo from "../../assets/logo.jpg";
-import logo2 from "../../assets/logo2.jpg";
-import "./header.css";
+﻿import { useEffect, useRef, useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import {
+  Divider,
+  FilledButton,
+  FilledTonalIconButton,
+  Icon,
+  IconButton,
+  List,
+  ListItem,
+  Menu,
+  MenuItem,
+  OutlinedTextField,
+  TextButton,
+} from '@skylabs-monorepo/shared-ui/react';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { useCart } from '../../cart/cart-context';
+import { useWishlist } from '../../wishlist/wishlist-context';
+import content from '../../content.json';
+import { DEALS } from '../../data/deals';
+import logo from '../../assets/logo.jpg';
+import logo2 from '../../assets/logo2.jpg';
+import './header.css';
 
 export function Header() {
   const navigate = useNavigate();
   const { isAuthenticated, signOut } = useAuth();
-  const { totalItems: cartCount, clearCart, } = useCart();
-  const { wishlistCount, clear, } = useWishlist();
+  const { totalItems: cartCount, clearCart } = useCart();
+  const { wishlistCount, clear } = useWishlist();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState(DEALS.slice(0, 6));
   const [showSuggestions, setShowSuggestions] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -30,9 +42,8 @@ export function Header() {
         setProfileMenuOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   useEffect(() => {
     const value = searchQuery.trim().toLowerCase();
@@ -45,7 +56,7 @@ export function Header() {
       (deal) =>
         deal.title.toLowerCase().includes(value) ||
         deal.providerName.toLowerCase().includes(value) ||
-        deal.location.toLowerCase().includes(value)
+        deal.location.toLowerCase().includes(value),
     );
     setSuggestions(filtered.slice(0, 6));
     setShowSuggestions(true);
@@ -53,36 +64,39 @@ export function Header() {
   useEffect(() => {
     if (!drawerOpen) return;
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setDrawerOpen(false);
+      if (e.key === 'Escape') setDrawerOpen(false);
     };
-    document.addEventListener("keydown", handleEsc);
-    return () =>
-      document.removeEventListener("keydown", handleEsc);
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
   }, [drawerOpen]);
   useEffect(() => {
-    document.body.style.overflow = drawerOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    document.body.style.overflow = drawerOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [drawerOpen]);
   const search = (value: string) => {
     const q = value.trim();
-    navigate(q ? `/explore?q=${encodeURIComponent(q)}` : "/explore");
+    navigate(q ? `/explore?q=${encodeURIComponent(q)}` : '/explore');
     setShowSuggestions(false);
   };
   const openDeal = (id: string | number) => {
     navigate(`/deal/${id}`);
-    setSearchQuery("");
+    setSearchQuery('');
     setShowSuggestions(false);
   };
   const closeDrawer = () => setDrawerOpen(false);
   const toggleProfileMenu = () => setProfileMenuOpen((prev) => !prev);
   return (
     <>
-      <a className="skip-link" href="#main-content"> {content.header.skipToContent}</a>
+      <a className="skip-link" href="#main-content">
+        {' '}
+        {content.header.skipToContent}
+      </a>
       <header className="site-header" role="banner">
         <div className="site-header__top">
           <IconButton
             className="site-header__menu-btn"
-            
             aria-label={content.header.openMenu}
             onClick={() => setDrawerOpen(true)}
           >
@@ -150,14 +164,15 @@ export function Header() {
                       <Icon slot="start">search</Icon>
                       <div>
                         <strong>{deal.title}</strong>
-                        <small> {deal.providerName} • {deal.location} </small>
+                        <small>
+                          {' '}
+                          {deal.providerName} • {deal.location}{' '}
+                        </small>
                       </div>
                     </ListItem>
                   ))
                 ) : (
-                  <ListItem disabled>
-                    {content.search.emptySuggestion}
-                  </ListItem>
+                  <ListItem disabled>{content.search.emptySuggestion}</ListItem>
                 )}
               </List>
             )}
@@ -165,33 +180,31 @@ export function Header() {
           <div className="site-header__actions">
             <FilledTonalIconButton
               className="site-header__cart"
-              aria-label={`Wishlist, ${isAuthenticated ? wishlistCount : 0
-                } item${(isAuthenticated ? wishlistCount : 0) !== 1 ? "s" : ""}`}
-              onClick={() => navigate("/wishlist")}
+              aria-label={`Wishlist, ${
+                isAuthenticated ? wishlistCount : 0
+              } item${(isAuthenticated ? wishlistCount : 0) !== 1 ? 's' : ''}`}
+              onClick={() => navigate('/wishlist')}
             >
               <Icon>favorite_border</Icon>
               {isAuthenticated && wishlistCount > 0 && (
-                <span className="site-header__cart-badge">
-                  {wishlistCount}
-                </span>
+                <span className="site-header__cart-badge">{wishlistCount}</span>
               )}
             </FilledTonalIconButton>
             <FilledTonalIconButton
               className="site-header__cart"
-              aria-label={`Cart, ${isAuthenticated ? cartCount : 0
-                } item${(isAuthenticated ? cartCount : 0) !== 1 ? "s" : ""}`}
-              onClick={() => navigate("/cart")}
+              aria-label={`Cart, ${
+                isAuthenticated ? cartCount : 0
+              } item${(isAuthenticated ? cartCount : 0) !== 1 ? 's' : ''}`}
+              onClick={() => navigate('/cart')}
             >
               <Icon>shopping_bag</Icon>
               {isAuthenticated && cartCount > 0 && (
-                <span className="site-header__cart-badge">
-                  {cartCount}
-                </span>
+                <span className="site-header__cart-badge">{cartCount}</span>
               )}
             </FilledTonalIconButton>
             <div className="site-header__profile">
               {isAuthenticated ? (
-                <div className="profile-menu" ref={profileRef} >
+                <div className="profile-menu" ref={profileRef}>
                   <FilledTonalIconButton
                     id="profile-button"
                     className="profile-button"
@@ -199,7 +212,11 @@ export function Header() {
                   >
                     <Icon>account_circle</Icon>
                     <span className="profile-arrow">
-                      <Icon>{profileMenuOpen ? "keyboard_arrow_up" : "keyboard_arrow_down"}</Icon>
+                      <Icon>
+                        {profileMenuOpen
+                          ? 'keyboard_arrow_up'
+                          : 'keyboard_arrow_down'}
+                      </Icon>
                     </span>
                   </FilledTonalIconButton>
                   {profileMenuOpen && (
@@ -210,7 +227,7 @@ export function Header() {
                     >
                       <MenuItem
                         onClick={() => {
-                          navigate("/account");
+                          navigate('/account');
                           setProfileMenuOpen(false);
                         }}
                       >
@@ -219,7 +236,7 @@ export function Header() {
                       </MenuItem>
                       <MenuItem
                         onClick={() => {
-                          navigate("/account/bookings");
+                          navigate('/account/bookings');
                           setProfileMenuOpen(false);
                         }}
                       >
@@ -228,7 +245,7 @@ export function Header() {
                       </MenuItem>
                       <MenuItem
                         onClick={() => {
-                          navigate("/wishlist");
+                          navigate('/wishlist');
                           setProfileMenuOpen(false);
                         }}
                       >
@@ -250,9 +267,7 @@ export function Header() {
                   )}
                 </div>
               ) : (
-                <FilledButton
-                  onClick={() => navigate("/sign-in")}
-                >
+                <FilledButton onClick={() => navigate('/sign-in')}>
                   Sign In
                 </FilledButton>
               )}
@@ -285,7 +300,7 @@ export function Header() {
       )}
       <nav
         id="nav-drawer"
-        className={`nav-drawer${drawerOpen ? " nav-drawer--open" : ""}`}
+        className={`nav-drawer${drawerOpen ? ' nav-drawer--open' : ''}`}
         aria-label={content.header.drawerLabel}
         aria-hidden={!drawerOpen}
       >
@@ -325,7 +340,7 @@ export function Header() {
               <>
                 <FilledButton
                   onClick={() => {
-                    navigate("/account");
+                    navigate('/account');
                     closeDrawer();
                   }}
                 >
@@ -345,7 +360,7 @@ export function Header() {
             ) : (
               <FilledButton
                 onClick={() => {
-                  navigate("/sign-in");
+                  navigate('/sign-in');
                   closeDrawer();
                 }}
               >

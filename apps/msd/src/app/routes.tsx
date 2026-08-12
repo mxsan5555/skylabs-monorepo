@@ -1,5 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { RequireAuth, RequirePermission } from '@skylabs-monorepo/shared-auth/react';
+import {
+  RequireAuth,
+  RequirePermission,
+} from '@skylabs-monorepo/shared-auth/react';
 import { PublicLayout } from './layouts/public-layout';
 import { AuthLayout } from './layouts/auth-layout';
 import { AdminLayout } from './layouts/admin-layout';
@@ -50,9 +53,31 @@ export function AppRoutes() {
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/vendor/:slug" element={<VendorPage />} />
         {/* ── Auth-gated consumer pages ── */}
-        <Route path="/wishlist" element={<RequireAuth><Wishlist /> </RequireAuth>} />
-        <Route path="/cart" element={<RequireAuth><Cart /></RequireAuth>} />
-        <Route path="/checkout" element={<RequireAuth> <Checkout /> </RequireAuth>} />
+        <Route
+          path="/wishlist"
+          element={
+            <RequireAuth>
+              <Wishlist />{' '}
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/cart"
+          element={
+            <RequireAuth>
+              <Cart />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/checkout"
+          element={
+            <RequireAuth>
+              {' '}
+              <Checkout />{' '}
+            </RequireAuth>
+          }
+        />
         {/* ── Content pages ── */}
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogDetail />} />
@@ -73,6 +98,7 @@ export function AppRoutes() {
           `bootstrap.menu` by — belt-and-suspenders, since msd-api re-checks on
           every request. A user lacking a permission is bounced to
           `/account/profile` (RequirePermission's default fallback). */}
+      {/* Authenticated console (after login / "My account"). */}
       <Route
         element={
           <RequireAuth>
@@ -80,9 +106,10 @@ export function AppRoutes() {
           </RequireAuth>
         }
       >
-      {/* Authenticated console (after login / "My account"). */}
-      <Route element={<RequireAuth><AdminLayout /></RequireAuth>}>
-        <Route path="/account" element={<Navigate to="/account/profile" replace />} />
+        <Route
+          path="/account"
+          element={<Navigate to="/account/profile" replace />}
+        />
         <Route
           path="/account/dashboard"
           element={
@@ -97,7 +124,7 @@ export function AppRoutes() {
           path="/account/customers"
           element={
             <RequirePermission menuKey="customers">
-              <CustomerPage/>
+              <CustomerPage />
             </RequirePermission>
           }
         />
@@ -105,7 +132,7 @@ export function AppRoutes() {
           path="/account/vendors"
           element={
             <RequirePermission menuKey="vendors">
-              <Vendor/>
+              <Vendor />
             </RequirePermission>
           }
         />
@@ -113,7 +140,7 @@ export function AppRoutes() {
           path="/account/orders"
           element={
             <RequirePermission menuKey="orders">
-             <OrdersPage/>
+              <OrdersPage />
             </RequirePermission>
           }
         />
@@ -121,7 +148,7 @@ export function AppRoutes() {
           path="/account/products"
           element={
             <RequirePermission menuKey="products">
-             <ProductsPage/>
+              <ProductsPage />
             </RequirePermission>
           }
         />
@@ -129,7 +156,7 @@ export function AppRoutes() {
           path="/account/wishlist"
           element={
             <RequirePermission menuKey="wishlist">
-             <WishlistPage/>
+              <WishlistPage />
             </RequirePermission>
           }
         />
@@ -137,7 +164,7 @@ export function AppRoutes() {
           path="/account/address"
           element={
             <RequirePermission menuKey="address">
-              <AddressPage/>
+              <AddressPage />
             </RequirePermission>
           }
         />
@@ -145,7 +172,7 @@ export function AppRoutes() {
           path="/account/refund"
           element={
             <RequirePermission menuKey="refund">
-             <RefundPage/>
+              <RefundPage />
             </RequirePermission>
           }
         />
@@ -169,7 +196,7 @@ export function AppRoutes() {
           path="/account/masters/categories"
           element={
             <RequirePermission menuKey="masters.categories">
-              <CategoryPage/>
+              <CategoryPage />
             </RequirePermission>
           }
         />
@@ -178,38 +205,41 @@ export function AppRoutes() {
           path="/account/masters/sub-categories"
           element={
             <RequirePermission menuKey="masters.sub-categories">
-              <SubCategoryPage/>
+              <SubCategoryPage />
             </RequirePermission>
           }
         />
 
-         <Route
+        <Route
           path="/account/masters/tags"
           element={
             <RequirePermission menuKey="masters.tags">
-              <AdminPage title="Marketing Tags" subtitle="Module coming soon." />
+              <AdminPage
+                title="Marketing Tags"
+                subtitle="Module coming soon."
+              />
             </RequirePermission>
           }
         />
 
-           <Route
+        <Route
           path="/account/masters/service"
           element={
             <RequirePermission menuKey="masters.service">
-              <ServicePage/>
+              <ServicePage />
             </RequirePermission>
           }
         />
 
-         <Route
+        <Route
           path="/account/masters/deals"
           element={
             <RequirePermission menuKey="masters.deals">
-              <DealPage/>
+              <DealPage />
             </RequirePermission>
           }
         />
-       
+
         <Route
           path="/account/administration/roles"
           element={

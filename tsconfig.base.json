@@ -3,7 +3,6 @@
   "compilerOptions": {
     "rootDir": ".",
     "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
     "sourceMap": true,
     "declaration": false,
     "moduleResolution": "node",

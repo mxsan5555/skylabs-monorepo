@@ -1,23 +1,44 @@
 ﻿import { useNavigate, NavLink } from 'react-router-dom';
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ListItem, List, FilledTonalIconButton, FilledButton, TextButton, Icon, Tabs, SecondaryTab, OutlinedTextField, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
+import {
+  ListItem,
+  List,
+  FilledTonalIconButton,
+  FilledButton,
+  TextButton,
+  Icon,
+  Tabs,
+  SecondaryTab,
+  OutlinedTextField,
+  AssistChip,
+} from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { DEALS, getFeaturedDeals, getHotDeals, getDealsByCategory, } from '../../../data/deals';
+import {
+  DEALS,
+  getFeaturedDeals,
+  getHotDeals,
+  getDealsByCategory,
+} from '../../../data/deals';
 import { CATEGORIES } from '../../../data/categories';
 import { DealCard } from '../../components/deal-card';
 import content from '../../../content.json';
 import './home.css';
 import '@skylabs-monorepo/shared-ui';
-import { useCurrentLocation } from "../../../hooks/useCurrentLocation";
-import Map from "../../components/map/map";
-import type { Deal } from "../../../types";
-import { useAuth } from '../../../auth/auth-context';
+import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
+import Map from '../../components/map/map';
+import type { Deal } from '../../../types';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 const { home } = content;
 const premiumHero = home.premiumHero;
 const hotTabs = home.sections.hotRightNow.tabs;
 const heroImages = home.heroImages as string[];
-function SectionHeader({ id, heading, seeAll, seeAllTo, }: {
+function SectionHeader({
+  id,
+  heading,
+  seeAll,
+  seeAllTo,
+}: {
   id: string;
   heading: string;
   seeAll: string;
@@ -26,9 +47,15 @@ function SectionHeader({ id, heading, seeAll, seeAllTo, }: {
   const navigate = useNavigate();
   return (
     <div className="home-section__header">
-      <h2 id={id} className="home-section__heading">{heading}</h2>
-      <TextButton onClick={() => navigate(seeAllTo)}> {seeAll}
-        <Icon slot="trailing-icon" aria-hidden="true">chevron_right</Icon>
+      <h2 id={id} className="home-section__heading">
+        {heading}
+      </h2>
+      <TextButton onClick={() => navigate(seeAllTo)}>
+        {' '}
+        {seeAll}
+        <Icon slot="trailing-icon" aria-hidden="true">
+          chevron_right
+        </Icon>
       </TextButton>
     </div>
   );
@@ -43,7 +70,10 @@ export function Home() {
   const featuredDeals = getFeaturedDeals();
   const spaFinderDeals = DEALS.slice(0, spaFinder.mapDealsLimit);
   const hotDeals = getHotDeals();
-  const massageDeals = getDealsByCategory("massage").slice(0, spaFinder.limits.massage);
+  const massageDeals = getDealsByCategory('massage').slice(
+    0,
+    spaFinder.limits.massage,
+  );
   const skinDeals = getDealsByCategory('skin-beauty').slice(0, 6);
   const nailDeals = getDealsByCategory('hair-nails').slice(0, 6);
   const spaDeals = getDealsByCategory('spas-retreats').slice(0, 6);
@@ -52,7 +82,7 @@ export function Home() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<Deal[]>([]);
   const { location } = useCurrentLocation();
-  const shortLocation = location?.split(",")[2]?.trim() ?? location;
+  const shortLocation = location?.split(',')[2]?.trim() ?? location;
   useEffect(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) {
@@ -64,7 +94,7 @@ export function Home() {
       (deal) =>
         deal.title.toLowerCase().includes(query) ||
         deal.providerName.toLowerCase().includes(query) ||
-        deal.location.toLowerCase().includes(query)
+        deal.location.toLowerCase().includes(query),
     );
     setSuggestions(results.slice(0, spaFinder.suggestionLimit));
     setShowSuggestions(true);
@@ -74,9 +104,7 @@ export function Home() {
     if (selectedTab === 'all') {
       return hotDeals;
     }
-    return hotDeals.filter(
-      deal => deal.categorySlug === selectedTab
-    );
+    return hotDeals.filter((deal) => deal.categorySlug === selectedTab);
   }, [selectedTab, hotDeals]);
   function renderDealCarousel(deals: typeof DEALS) {
     return (
@@ -89,13 +117,16 @@ export function Home() {
         >
           {deals.map((deal) => {
             return (
-              <swiper-slide key={deal.id} style={{ width: '260px', height: 'auto' }} >
+              <swiper-slide
+                key={deal.id}
+                style={{ width: '260px', height: 'auto' }}
+              >
                 <DealCard
                   deal={deal}
                   favoriteActive={isAuthenticated && has(deal.id)}
                   onFavorite={() => {
                     if (!isAuthenticated) {
-                      navigate("/sign-in");
+                      navigate('/sign-in');
                       return;
                     }
                     toggle(deal.id);
@@ -119,16 +150,19 @@ export function Home() {
     <div className="home">
       <title>{content.meta.home.title}</title>
       <meta name="description" content={content.meta.home.description} />
-      {   /*spafinder like*/}
+      {/*spafinder like*/}
       {false && (
         <section className="home__spa-finder">
           <div className="home__spa-finder-left">
-            <span className="home__spa-badge">  {spaFinder.title}</span>
+            <span className="home__spa-badge"> {spaFinder.title}</span>
             <h2 className="home__spa-title"> {spaFinder.heading} </h2>
             <p className="home__spa-subtitle"> {spaFinder.subheading} </p>
             <Tabs className="home__spa-tabs">
               {spaFinder.tabs.map((tab: any) => (
-                <SecondaryTab key={tab.label} active={tab.label === spaFinder.defaultTab}>
+                <SecondaryTab
+                  key={tab.label}
+                  active={tab.label === spaFinder.defaultTab}
+                >
                   <Icon slot="icon">{tab.icon}</Icon>
                   {tab.label}
                 </SecondaryTab>
@@ -140,14 +174,21 @@ export function Home() {
                 role="search"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (searchQuery.trim()) { navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`); }
-                  else { navigate("/explore"); }
+                  if (searchQuery.trim()) {
+                    navigate(
+                      `/explore?q=${encodeURIComponent(searchQuery.trim())}`,
+                    );
+                  } else {
+                    navigate('/explore');
+                  }
                   setShowSuggestions(false);
                 }}
               >
-                <TextButton type="button" className="home__spa-location" >
+                <TextButton type="button" className="home__spa-location">
                   <Icon>location_on</Icon>
-                  <span>{shortLocation ?? spaFinder.search.locationPlaceholder}</span>
+                  <span>
+                    {shortLocation ?? spaFinder.search.locationPlaceholder}
+                  </span>
                 </TextButton>
                 <div className="home__spa-search-input">
                   <OutlinedTextField
@@ -160,12 +201,12 @@ export function Home() {
                       setShowSuggestions(true);
                     }}
                   >
-                    <Icon slot="leading-icon">  search </Icon>
+                    <Icon slot="leading-icon"> search </Icon>
                     {searchQuery && (
                       <Icon
                         slot="trailing-icon"
-                        style={{ cursor: "pointer" }}
-                        onClick={() => setSearchQuery("")}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => setSearchQuery('')}
                       >
                         close
                       </Icon>
@@ -180,14 +221,17 @@ export function Home() {
                             type="button"
                             onClick={() => {
                               navigate(`/deal/${deal.id}`);
-                              setSearchQuery("");
+                              setSearchQuery('');
                               setShowSuggestions(false);
                             }}
                           >
-                            <Icon slot="start">  search </Icon>
+                            <Icon slot="start"> search </Icon>
                             <div>
                               <strong>{deal.title}</strong>
-                              <small> {deal.providerName} • {deal.location} </small>
+                              <small>
+                                {' '}
+                                {deal.providerName} • {deal.location}{' '}
+                              </small>
                             </div>
                           </ListItem>
                         ))
@@ -197,11 +241,12 @@ export function Home() {
                     </List>
                   )}
                 </div>
-                <FilledButton type="submit"> Search
-                  <Icon slot="trailing-icon">  arrow_forward </Icon>
+                <FilledButton type="submit">
+                  {' '}
+                  Search
+                  <Icon slot="trailing-icon"> arrow_forward </Icon>
                 </FilledButton>
               </form>
-
             </sky-card>
             <div className="home__spa-popular">
               {spaFinder.popular.map((item: string) => (
@@ -238,9 +283,7 @@ export function Home() {
 
                     <span>{tab.label}</span>
 
-                    <Icon slot="trailing-icon">
-                      arrow_forward
-                    </Icon>
+                    <Icon slot="trailing-icon">arrow_forward</Icon>
                   </AssistChip>
                 </NavLink>
               ))}
@@ -252,14 +295,21 @@ export function Home() {
                 aria-label={content.search.ariaLabel}
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (searchQuery.trim()) { navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`); }
-                  else { navigate("/explore"); }
+                  if (searchQuery.trim()) {
+                    navigate(
+                      `/explore?q=${encodeURIComponent(searchQuery.trim())}`,
+                    );
+                  } else {
+                    navigate('/explore');
+                  }
                   setShowSuggestions(false);
                 }}
               >
                 <TextButton type="button" className="home__premium-location">
                   <Icon> location_on </Icon>
-                  <span>{shortLocation ?? premiumHero.search.locationPlaceholder}</span>
+                  <span>
+                    {shortLocation ?? premiumHero.search.locationPlaceholder}
+                  </span>
                 </TextButton>
                 <OutlinedTextField
                   name="q"
@@ -276,9 +326,12 @@ export function Home() {
                   {searchQuery && (
                     <Icon
                       slot="trailing-icon"
-                      onClick={() => setSearchQuery("")}
-                      style={{ cursor: "pointer" }}
-                    > close </Icon>
+                      onClick={() => setSearchQuery('')}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {' '}
+                      close{' '}
+                    </Icon>
                   )}
                 </OutlinedTextField>
                 <FilledButton type="submit">
@@ -296,19 +349,24 @@ export function Home() {
                         className="search-suggestion"
                         onClick={() => {
                           navigate(`/deal/${deal.id}`);
-                          setSearchQuery("");
+                          setSearchQuery('');
                           setShowSuggestions(false);
                         }}
                       >
-                        <Icon slot="start">  search </Icon>
+                        <Icon slot="start"> search </Icon>
                         <div>
                           <strong>{deal.title}</strong>
-                          <small>{deal.providerName} • {deal.location} </small>
+                          <small>
+                            {deal.providerName} • {deal.location}{' '}
+                          </small>
                         </div>
                       </ListItem>
                     ))
                   ) : (
-                    <ListItem disabled> {content.search.emptySuggestion} </ListItem>
+                    <ListItem disabled>
+                      {' '}
+                      {content.search.emptySuggestion}{' '}
+                    </ListItem>
                   )}
                 </List>
               )}
@@ -342,14 +400,22 @@ export function Home() {
         <section className="home__hero" aria-labelledby="hero-heading">
           <div className="home__hero-slider">
             {heroImages.map((image, index) => (
-              <div key={index} className="home__hero-slide"
-                style={{ backgroundImage: `url(${image})`, animationDelay: `${index * 6}s`, }}
+              <div
+                key={index}
+                className="home__hero-slide"
+                style={{
+                  backgroundImage: `url(${image})`,
+                  animationDelay: `${index * 6}s`,
+                }}
               />
             ))}
           </div>
           <div className="home__hero-overlay"></div>
           <div className="home__hero-content">
-            <h1 id="hero-heading" className="home__hero-heading"> {home.hero.heading}</h1>
+            <h1 id="hero-heading" className="home__hero-heading">
+              {' '}
+              {home.hero.heading}
+            </h1>
             <p className="home__hero-sub">{home.hero.subheading}</p>
             <form
               className="home__hero-search"
@@ -357,13 +423,22 @@ export function Home() {
               aria-label="Search deals"
               onSubmit={(e) => {
                 e.preventDefault();
-                const q = (e.currentTarget.elements.namedItem('q') as HTMLInputElement)?.value;
-                if (q?.trim()) navigate(`/explore?q=${encodeURIComponent(q.trim())}`);
+                const q = (
+                  e.currentTarget.elements.namedItem('q') as HTMLInputElement
+                )?.value;
+                if (q?.trim())
+                  navigate(`/explore?q=${encodeURIComponent(q.trim())}`);
                 else navigate('/explore');
               }}
             >
-              <OutlinedTextField name="q" label={home.hero.searchPlaceholder} className="home__hero-search-field">
-                <Icon slot="leading-icon" aria-hidden="true">search</Icon>
+              <OutlinedTextField
+                name="q"
+                label={home.hero.searchPlaceholder}
+                className="home__hero-search-field"
+              >
+                <Icon slot="leading-icon" aria-hidden="true">
+                  search
+                </Icon>
               </OutlinedTextField>
               <FilledButton type="submit">{home.hero.ctaLabel}</FilledButton>
             </form>
@@ -371,7 +446,10 @@ export function Home() {
         </section>
       )}
       {/* ── Browse by Category ─────────────────────────────────────────── */}
-      <section className="home-section home-section--alt" aria-labelledby="category-heading">
+      <section
+        className="home-section home-section--alt"
+        aria-labelledby="category-heading"
+      >
         <div className="home-section__container">
           <SectionHeader
             id="category-heading"
@@ -387,9 +465,7 @@ export function Home() {
                 className="category-card"
               >
                 <div className="category-card__icon-wrap">
-                  <Icon className="category-card__icon">
-                    {cat.icon}
-                  </Icon>
+                  <Icon className="category-card__icon">{cat.icon}</Icon>
                 </div>
 
                 <div className="category-card__content">
@@ -424,10 +500,7 @@ export function Home() {
         aria-label="Member promotion"
       >
         <div className="home-section__container">
-          <sky-card
-            variant="filled"
-            className="home__member-banner"
-          >
+          <sky-card variant="filled" className="home__member-banner">
             <div className="home__member-content">
               <div className="home__member-left">
                 <FilledButton>
@@ -442,9 +515,7 @@ export function Home() {
                 onClick={() => navigate(home.memberBanner.buttonLink)}
               >
                 {home.memberBanner.button}
-                <Icon slot="trailing-icon">
-                  arrow_forward
-                </Icon>
+                <Icon slot="trailing-icon">arrow_forward</Icon>
               </FilledButton>
             </div>
           </sky-card>
@@ -461,7 +532,6 @@ export function Home() {
             seeAllTo={home.sections.hotRightNow.seeAllTo}
           />
           <div className="home__hot-deals">
-
             <Tabs>
               {hotTabs.map((tab) => (
                 <SecondaryTab
@@ -475,7 +545,6 @@ export function Home() {
             </Tabs>
 
             {renderDealCarousel(filteredHotDeals)}
-
           </div>
         </div>
       </section>
@@ -486,36 +555,20 @@ export function Home() {
         aria-label="Gift cards promotion"
       >
         <div className="home-section__container">
-
-          <sky-card
-            variant="filled"
-            className="home__gift-banner"
-          >
-
+          <sky-card variant="filled" className="home__gift-banner">
             <div className="home__gift-banner-content">
-
               {/* Left Icon */}
 
               <FilledButton>
-                <Icon>
-                  card_giftcard
-                </Icon>
+                <Icon>card_giftcard</Icon>
               </FilledButton>
-
 
               {/* Text */}
               <div className="home__gift-banner-text">
+                <h2>{home.giftCard.heading}</h2>
 
-                <h2>
-                  {home.giftCard.heading}
-                </h2>
-
-                <p>
-                  {home.giftCard.body}
-                </p>
-
+                <p>{home.giftCard.body}</p>
               </div>
-
 
               {/* CTA */}
               <FilledButton
@@ -524,39 +577,29 @@ export function Home() {
               >
                 {home.giftCard.cta}
 
-                <Icon slot="trailing-icon">
-                  arrow_forward
-                </Icon>
-
+                <Icon slot="trailing-icon">arrow_forward</Icon>
               </FilledButton>
-
-
             </div>
-
           </sky-card>
-
         </div>
       </section>
 
       {/* ── Per-category horizontal sections ──────────────────────────── */}
-      {
-        massageDeals.length > 0 && (
-          <section className="home-section" aria-labelledby="massage-heading">
-            <div className="home-section__container">
-              <SectionHeader
-                id="massage-heading"
-                heading={home.sections.massageTherapy.heading}
-                seeAll={home.sections.massageTherapy.seeAll}
-                seeAllTo={home.sections.massageTherapy.seeAllTo}
-              />
-              {renderDealCarousel(massageDeals)}
-            </div>
-          </section>
-        )
-      }
+      {massageDeals.length > 0 && (
+        <section className="home-section" aria-labelledby="massage-heading">
+          <div className="home-section__container">
+            <SectionHeader
+              id="massage-heading"
+              heading={home.sections.massageTherapy.heading}
+              seeAll={home.sections.massageTherapy.seeAll}
+              seeAllTo={home.sections.massageTherapy.seeAllTo}
+            />
+            {renderDealCarousel(massageDeals)}
+          </div>
+        </section>
+      )}
       <section className="home-section">
         <div className="home-section__container">
-
           <div className="home-section__header">
             <h2 className="home-section__heading">
               {home.vacationStays.title}
@@ -564,7 +607,6 @@ export function Home() {
           </div>
 
           <div className="vacation-slider">
-
             <swiper-container
               ref={vacationSwiperRef}
               navigation="true"
@@ -574,10 +616,7 @@ export function Home() {
               grab-cursor="true"
             >
               {home.vacationStays.items.map((item) => (
-                <swiper-slide
-                  key={item.label}
-                  className="home-stays-slide"
-                >
+                <swiper-slide key={item.label} className="home-stays-slide">
                   <sky-image-card
                     image={item.image}
                     imageAlt={item.imageAlt}
@@ -587,74 +626,70 @@ export function Home() {
                 </swiper-slide>
               ))}
             </swiper-container>
-
           </div>
-
         </div>
       </section>
-      {
-        skinDeals.length > 0 && (
-          <section className="home-section home-section--alt" aria-labelledby="facial-heading">
-            <div className="home-section__container">
-              <SectionHeader
-                id="facial-heading"
-                heading={home.sections.facialSkin.heading}
-                seeAll={home.sections.facialSkin.seeAll}
-                seeAllTo={home.sections.facialSkin.seeAllTo}
-              />
-              {renderDealCarousel(skinDeals)}
-            </div>
-          </section>
-        )
-      }
+      {skinDeals.length > 0 && (
+        <section
+          className="home-section home-section--alt"
+          aria-labelledby="facial-heading"
+        >
+          <div className="home-section__container">
+            <SectionHeader
+              id="facial-heading"
+              heading={home.sections.facialSkin.heading}
+              seeAll={home.sections.facialSkin.seeAll}
+              seeAllTo={home.sections.facialSkin.seeAllTo}
+            />
+            {renderDealCarousel(skinDeals)}
+          </div>
+        </section>
+      )}
 
-      {
-        nailDeals.length > 0 && (
-          <section className="home-section" aria-labelledby="nail-heading">
-            <div className="home-section__container">
-              <SectionHeader
-                id="nail-heading"
-                heading={home.sections.nailCare.heading}
-                seeAll={home.sections.nailCare.seeAll}
-                seeAllTo={home.sections.nailCare.seeAllTo}
-              />
-              {renderDealCarousel(nailDeals)}
-            </div>
-          </section>
-        )
-      }
+      {nailDeals.length > 0 && (
+        <section className="home-section" aria-labelledby="nail-heading">
+          <div className="home-section__container">
+            <SectionHeader
+              id="nail-heading"
+              heading={home.sections.nailCare.heading}
+              seeAll={home.sections.nailCare.seeAll}
+              seeAllTo={home.sections.nailCare.seeAllTo}
+            />
+            {renderDealCarousel(nailDeals)}
+          </div>
+        </section>
+      )}
 
-      {
-        spaDeals.length > 0 && (
-          <section className="home-section home-section--alt" aria-labelledby="spa-heading">
-            <div className="home-section__container">
-              <SectionHeader
-                id="spa-heading"
-                heading={home.sections.spasRetreats.heading}
-                seeAll={home.sections.spasRetreats.seeAll}
-                seeAllTo={home.sections.spasRetreats.seeAllTo}
-              />
-              {renderDealCarousel(spaDeals)}
-            </div>
-          </section>
-        )
-      }
+      {spaDeals.length > 0 && (
+        <section
+          className="home-section home-section--alt"
+          aria-labelledby="spa-heading"
+        >
+          <div className="home-section__container">
+            <SectionHeader
+              id="spa-heading"
+              heading={home.sections.spasRetreats.heading}
+              seeAll={home.sections.spasRetreats.seeAll}
+              seeAllTo={home.sections.spasRetreats.seeAllTo}
+            />
+            {renderDealCarousel(spaDeals)}
+          </div>
+        </section>
+      )}
 
-      {
-        wellnessDeals.length > 0 && (
-          <section className="home-section" aria-labelledby="wellness-heading">
-            <div className="home-section__container">
-              <SectionHeader
-                id="wellness-heading"
-                heading={home.sections.healthWellness.heading}
-                seeAll={home.sections.healthWellness.seeAll}
-                seeAllTo={home.sections.healthWellness.seeAllTo}
-              />
-              {renderDealCarousel(wellnessDeals)}
-            </div>
-          </section>
-        )
-      }
+      {wellnessDeals.length > 0 && (
+        <section className="home-section" aria-labelledby="wellness-heading">
+          <div className="home-section__container">
+            <SectionHeader
+              id="wellness-heading"
+              heading={home.sections.healthWellness.heading}
+              seeAll={home.sections.healthWellness.seeAll}
+              seeAllTo={home.sections.healthWellness.seeAllTo}
+            />
+            {renderDealCarousel(wellnessDeals)}
+          </div>
+        </section>
+      )}
 
       {/* ── Welcome Offer CTA ──────────────────────────────────────────── */}
       <section
@@ -674,14 +709,11 @@ export function Home() {
           >
             <div className="home__offer-content">
               <div className="home__offer-left">
-
                 <span className="home__offer-badge">
                   {home.welcomeOffer.badge}
                 </span>
 
-                <h2 className="home__offer-title">
-                  {home.welcomeOffer.title}
-                </h2>
+                <h2 className="home__offer-title">{home.welcomeOffer.title}</h2>
 
                 <p className="home__offer-subtitle">
                   {home.welcomeOffer.subtitle}
@@ -694,7 +726,6 @@ export function Home() {
                 <FilledButton onClick={() => navigate('/explore')}>
                   {home.welcomeOffer.cta}
                 </FilledButton>
-
               </div>
 
               <div className="home__offer-right">
@@ -708,7 +739,6 @@ export function Home() {
                   </span>
                 </div>
               </div>
-
             </div>
           </sky-card>
         </div>
@@ -719,11 +749,7 @@ export function Home() {
         aria-labelledby="search-destination-heading"
       >
         <div className="home-section__container">
-
-          <h2
-            id="search-destination-heading"
-            className="home-section__heading"
-          >
+          <h2 id="search-destination-heading" className="home-section__heading">
             {home.searchByDestination.heading}
           </h2>
 
@@ -732,43 +758,25 @@ export function Home() {
           </p>
 
           <div className="home__search-grid">
-
             {home.searchByDestination.columns.map((column, columnIndex) => (
-
-              <div
-                key={columnIndex}
-                className="home__search-column"
-              >
-
+              <div key={columnIndex} className="home__search-column">
                 <sky-accordion>
-
                   {column.map((section) => (
-
                     <sky-accordion-item
                       key={section.title}
                       header={section.title}
                     >
                       <ul className="home__search-links">
-
                         {section.items.map((item) => (
-                          <li key={item}>
-                            {item}
-                          </li>
+                          <li key={item}>{item}</li>
                         ))}
-
                       </ul>
                     </sky-accordion-item>
-
                   ))}
-
                 </sky-accordion>
-
               </div>
-
             ))}
-
           </div>
-
         </div>
       </section>
 
@@ -782,22 +790,17 @@ export function Home() {
                 className="home__trust-card"
               >
                 <div className="home__trust-top">
-
                   {card.type === 'logos' && card.logos && (
                     <div className="home__trust-icons">
                       {card.logos.map((logo) => (
                         <div key={logo} className="home__trust-circle">
-                          <img
-                            src={logo}
-                            alt=""
-                            className="home__trust-logo"
-                          />
+                          <img src={logo} alt="" className="home__trust-logo" />
                         </div>
                       ))}
                     </div>
                   )}
 
-                  {card.type === "avatars" && card.avatars && (
+                  {card.type === 'avatars' && card.avatars && (
                     <div className="home__trust-avatars">
                       {card.avatars.map((avatar) => (
                         <div key={avatar} className="home__trust-circle">
@@ -814,13 +817,10 @@ export function Home() {
                   {card.type === 'stars' && card.stars && (
                     <div className="home__trust-stars">
                       {Array.from({ length: card.stars }).map((_, i) => (
-                        <Icon key={i}>
-                          star
-                        </Icon>
+                        <Icon key={i}>star</Icon>
                       ))}
                     </div>
                   )}
-
                 </div>
 
                 <h3>{card.title}</h3>
@@ -832,21 +832,19 @@ export function Home() {
       </section>
 
       {/* /*FAQS*/}
-      <section className="home-section home-section--alt" aria-labelledby="faq-heading">
+      <section
+        className="home-section home-section--alt"
+        aria-labelledby="faq-heading"
+      >
         <div className="home-section__container">
           <div className="home__faq">
-            <h2 id="faq-heading" className="home-section__heading" >
+            <h2 id="faq-heading" className="home-section__heading">
               {home.faq.heading}
             </h2>
-            <p className="home__faq-subtitle">
-              {home.faq.subheading}
-            </p>
+            <p className="home__faq-subtitle">{home.faq.subheading}</p>
             <sky-accordion>
               {home.faq.items.map((item) => (
-                <sky-accordion-item
-                  key={item.question}
-                  header={item.question}
-                >
+                <sky-accordion-item key={item.question} header={item.question}>
                   {item.answer}
                 </sky-accordion-item>
               ))}
@@ -854,7 +852,7 @@ export function Home() {
           </div>
         </div>
       </section>
-    </div >
+    </div>
   );
 }
 

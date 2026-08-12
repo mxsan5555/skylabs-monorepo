@@ -16,7 +16,7 @@ import { Breadcrumb } from '../../components/breadcrumb';
 import { formatINR } from '../../../utils/format';
 import content from '../../../content.json';
 import './deal-detail.css';
-import { useAuth } from '../../../auth/auth-context';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 
 export function DealDetail() {
   const { id = '' } = useParams<{ id: string }>();
@@ -39,7 +39,9 @@ export function DealDetail() {
           heading="Deal not found"
           subheading="This deal may no longer be available."
         />
-        <FilledButton onClick={() => navigate('/explore')}>Explore Deals</FilledButton>
+        <FilledButton onClick={() => navigate('/explore')}>
+          Explore Deals
+        </FilledButton>
       </div>
     );
   }
@@ -63,7 +65,9 @@ export function DealDetail() {
     }
     addItem(currentDeal.id, 'deal');
     setAddedToCart(true);
-    setTimeout(() => { setAddedToCart(false); }, 2000);
+    setTimeout(() => {
+      setAddedToCart(false);
+    }, 2000);
   }
 
   const discountPct = deal.originalPrice
@@ -101,7 +105,9 @@ export function DealDetail() {
         className="deal-detail__breadcrumb"
         items={[
           { label: 'Home', to: '/' },
-          ...(category ? [{ label: category.name, to: `/category/${category.slug}` }] : []),
+          ...(category
+            ? [{ label: category.name, to: `/category/${category.slug}` }]
+            : []),
           { label: deal.title },
         ]}
       />
@@ -118,13 +124,19 @@ export function DealDetail() {
               height={450}
             />
             {deal.badge && (
-              <span className="deal-detail__badge" aria-label={`Deal badge: ${deal.badge}`}>
+              <span
+                className="deal-detail__badge"
+                aria-label={`Deal badge: ${deal.badge}`}
+              >
                 {deal.badge}
               </span>
             )}
           </div>
           {(deal.gallery?.length ?? 0) > 1 && (
-            <div className="deal-detail__thumbs" aria-label="Gallery thumbnails">
+            <div
+              className="deal-detail__thumbs"
+              aria-label="Gallery thumbnails"
+            >
               {deal.gallery?.map((img, i) => (
                 <button
                   key={i}
@@ -150,10 +162,7 @@ export function DealDetail() {
                 {category.name}
               </sky-badge>
             )}
-            <sky-badge
-              variant={deal.isOpen ? 'primary' : 'error'}
-              size="small"
-            >
+            <sky-badge variant={deal.isOpen ? 'primary' : 'error'} size="small">
               {deal.isOpen ? 'Open' : 'Closed'}
             </sky-badge>
           </div>
@@ -162,12 +171,22 @@ export function DealDetail() {
 
           {/* Rating + distance */}
           <div className="deal-detail__rating-row">
-            <span className="deal-detail__rating" aria-label={`Rating: ${deal.rating} out of 5`}>
-              <Icon aria-hidden="true" className="deal-detail__star">star</Icon>
+            <span
+              className="deal-detail__rating"
+              aria-label={`Rating: ${deal.rating} out of 5`}
+            >
+              <Icon aria-hidden="true" className="deal-detail__star">
+                star
+              </Icon>
               <strong>{deal.rating}</strong>
-              <span className="deal-detail__reviews">({deal.reviews.toLocaleString()} reviews)</span>
+              <span className="deal-detail__reviews">
+                ({deal.reviews.toLocaleString()} reviews)
+              </span>
             </span>
-            <span className="deal-detail__dist" aria-label={`${deal.distance} km away`}>
+            <span
+              className="deal-detail__dist"
+              aria-label={`${deal.distance} km away`}
+            >
               <Icon aria-hidden="true">near_me</Icon>
               {deal.distance} km · {deal.location}
             </span>
@@ -178,12 +197,20 @@ export function DealDetail() {
           {/* Price */}
           <div className="deal-detail__price-row">
             <div>
-              <span className="deal-detail__price">{formatINR(deal.price)}</span>
-              <span className="deal-detail__price-unit"> / {deal.priceUnit}</span>
+              <span className="deal-detail__price">
+                {formatINR(deal.price)}
+              </span>
+              <span className="deal-detail__price-unit">
+                {' '}
+                / {deal.priceUnit}
+              </span>
             </div>
             {deal.originalPrice && (
               <div className="deal-detail__original">
-                <s className="deal-detail__original-price" aria-label={`Original price ${formatINR(deal.originalPrice)}`}>
+                <s
+                  className="deal-detail__original-price"
+                  aria-label={`Original price ${formatINR(deal.originalPrice)}`}
+                >
                   {formatINR(deal.originalPrice)}
                 </s>
                 <sky-badge variant="error" size="small">
@@ -197,7 +224,10 @@ export function DealDetail() {
           <p className="deal-detail__duration">
             <Icon aria-hidden="true">schedule</Icon>
             {deal.duration} {deal.durationUnit}
-            <span className="deal-detail__price-level" aria-label={`Price level: ${deal.priceLevel}`}>
+            <span
+              className="deal-detail__price-level"
+              aria-label={`Price level: ${deal.priceLevel}`}
+            >
               {deal.priceLevel}
             </span>
           </p>
@@ -217,17 +247,26 @@ export function DealDetail() {
             <OutlinedIconButton
               toggle
               selected={isAuthenticated && has(deal.id)}
-             aria-label={ isAuthenticated && has(deal.id)? 'Remove from wishlist': 'Save to wishlist'}
-         onClick={() => handleFavorite(deal.id)}
+              aria-label={
+                isAuthenticated && has(deal.id)
+                  ? 'Remove from wishlist'
+                  : 'Save to wishlist'
+              }
+              onClick={() => handleFavorite(deal.id)}
             >
-              <Icon aria-hidden="true" slot="selected">favorite</Icon>
+              <Icon aria-hidden="true" slot="selected">
+                favorite
+              </Icon>
               <Icon aria-hidden="true">favorite_border</Icon>
             </OutlinedIconButton>
           </div>
 
           {/* Features */}
           {deal.features.length > 0 && (
-            <div className="deal-detail__features" aria-label="Available features">
+            <div
+              className="deal-detail__features"
+              aria-label="Available features"
+            >
               {deal.features.map((f) => (
                 <span key={f} className="deal-detail__feature-tag">
                   <Icon aria-hidden="true">check_circle</Icon>
@@ -259,7 +298,9 @@ export function DealDetail() {
               <ol className="deal-detail__list deal-detail__list--ordered">
                 {deal.howToUse.map((step, i) => (
                   <li key={i} className="deal-detail__list-item">
-                    <span className="deal-detail__step-num" aria-hidden="true">{i + 1}</span>
+                    <span className="deal-detail__step-num" aria-hidden="true">
+                      {i + 1}
+                    </span>
                     {step}
                   </li>
                 ))}
@@ -267,7 +308,9 @@ export function DealDetail() {
             </sky-accordion-item>
 
             <sky-accordion-item header={dealDetail.cancellationPolicy}>
-              <p className="deal-detail__policy">{dealDetail.cancellationText}</p>
+              <p className="deal-detail__policy">
+                {dealDetail.cancellationText}
+              </p>
             </sky-accordion-item>
           </sky-accordion>
         </div>
@@ -275,7 +318,10 @@ export function DealDetail() {
 
       {/* ── Related Deals ──────────────────────────────────────────────── */}
       {related.length > 0 && (
-        <section className="deal-detail__related" aria-labelledby="related-heading">
+        <section
+          className="deal-detail__related"
+          aria-labelledby="related-heading"
+        >
           <div className="deal-detail__related-inner">
             <h2 id="related-heading" className="deal-detail__related-heading">
               {dealDetail.relatedDeals}
@@ -288,7 +334,10 @@ export function DealDetail() {
                 grab-cursor="true"
               >
                 {related.map((d) => (
-                  <swiper-slide key={d.id} style={{ width: '260px', height: 'auto' }}>
+                  <swiper-slide
+                    key={d.id}
+                    style={{ width: '260px', height: 'auto' }}
+                  >
                     <DealCard
                       deal={d}
                       favoriteActive={isAuthenticated && has(d.id)}

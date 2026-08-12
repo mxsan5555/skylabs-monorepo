@@ -1,5 +1,5 @@
-import { useState, useMemo, } from 'react';
-import { useNavigate} from 'react-router-dom';
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import {
   FilledButton,
@@ -13,14 +13,14 @@ import {
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useCart } from '../../../cart/cart-context';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { PRODUCTS, getProductsByCategory, } from '../../../data/products';
+import { PRODUCTS, getProductsByCategory } from '../../../data/products';
 import { ProductCard } from '../../components/product-card';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { formatINR } from '../../../utils/format';
 import type { ProductSort } from '../../../types';
 import content from '../../../content.json';
 import './products.css';
-import { useAuth } from '../../../auth/auth-context';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 const { products } = content;
 
 const FILTERS = [
@@ -30,23 +30,29 @@ const FILTERS = [
   { value: 'skin-care', label: products.listing.filters.skinCare },
 ];
 
-const SITE_URL: string = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
+const SITE_URL: string =
+  (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
 
 export function ProductListing() {
   const { addItem } = useCart();
   const { toggle, has } = useWishlist();
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [sort, setSort] = useState<ProductSort>('popular');
-    const navigate = useNavigate();
+  const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   // const swiperRef = useRef<any>(null);
   const filteredProducts = useMemo(() => {
-    const list = activeFilter === 'all' ? PRODUCTS : getProductsByCategory(activeFilter);
+    const list =
+      activeFilter === 'all' ? PRODUCTS : getProductsByCategory(activeFilter);
     switch (sort) {
-      case 'price-asc': return [...list].sort((a, b) => a.price - b.price);
-      case 'price-desc': return [...list].sort((a, b) => b.price - a.price);
-      case 'newest': return [...list].sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
-      default: return [...list];
+      case 'price-asc':
+        return [...list].sort((a, b) => a.price - b.price);
+      case 'price-desc':
+        return [...list].sort((a, b) => b.price - a.price);
+      case 'newest':
+        return [...list].sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+      default:
+        return [...list];
     }
   }, [activeFilter, sort]);
   function handleFavorite(id: string) {
@@ -57,13 +63,13 @@ export function ProductListing() {
     toggle(id);
   }
   function handleAddToCart(id: string) {
-  if (!isAuthenticated) {
-    navigate('/sign-in');
-    return;
-  }
+    if (!isAuthenticated) {
+      navigate('/sign-in');
+      return;
+    }
 
-  addItem(id, 'product');
-}
+    addItem(id, 'product');
+  }
   return (
     <div id="main-content" className="products-page">
       <title>{products.meta.listingTitle}</title>
@@ -71,11 +77,17 @@ export function ProductListing() {
       <link rel="canonical" href={`${SITE_URL}/products`} />
       <meta property="og:type" content="website" />
       <meta property="og:title" content={products.meta.listingTitle} />
-      <meta property="og:description" content={products.meta.listingDescription} />
+      <meta
+        property="og:description"
+        content={products.meta.listingDescription}
+      />
       <meta property="og:url" content={`${SITE_URL}/products`} />
       <meta name="twitter:card" content="summary" />
       <meta name="twitter:title" content={products.meta.listingTitle} />
-      <meta name="twitter:description" content={products.meta.listingDescription} />
+      <meta
+        name="twitter:description"
+        content={products.meta.listingDescription}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -83,8 +95,18 @@ export function ProductListing() {
             '@context': 'https://schema.org',
             '@type': 'BreadcrumbList',
             itemListElement: [
-              { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/` },
-              { '@type': 'ListItem', position: 2, name: 'Products', item: `${SITE_URL}/products` },
+              {
+                '@type': 'ListItem',
+                position: 1,
+                name: 'Home',
+                item: `${SITE_URL}/`,
+              },
+              {
+                '@type': 'ListItem',
+                position: 2,
+                name: 'Products',
+                item: `${SITE_URL}/products`,
+              },
             ],
           }),
         }}
@@ -111,10 +133,7 @@ export function ProductListing() {
       {/* Breadcrumb */}
       <Breadcrumb
         className="products-page__breadcrumb"
-        items={[
-          { label: 'Home', to: '/' },
-          { label: 'Products' },
-        ]}
+        items={[{ label: 'Home', to: '/' }, { label: 'Products' }]}
       />
 
       {/* Hero */}
@@ -125,13 +144,19 @@ export function ProductListing() {
           </div>
           <div>
             <h1 className="products-page__title">{products.listing.title}</h1>
-            <p className="products-page__subtitle">{products.listing.subtitle}</p>
+            <p className="products-page__subtitle">
+              {products.listing.subtitle}
+            </p>
           </div>
         </div>
       </section>
 
       {/* Single sticky row: filter chips + sort */}
-      <div className="products-page__filter-bar" role="toolbar" aria-label="Filter and sort products">
+      <div
+        className="products-page__filter-bar"
+        role="toolbar"
+        aria-label="Filter and sort products"
+      >
         <div className="products-page__filter-bar-inner">
           <ChipSet aria-label="Filter by category">
             {FILTERS.map((f) => (
@@ -143,14 +168,20 @@ export function ProductListing() {
               />
             ))}
           </ChipSet>
-          <span className="products-page__count" aria-live="polite" aria-atomic="true">
+          <span
+            className="products-page__count"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             {filteredProducts.length} {products.listing.resultLabel}
           </span>
           <OutlinedSelect
             className="products-page__sort-select"
             label={products.listing.sortLabel}
             value={sort}
-            onInput={(e) => setSort((e.target as HTMLSelectElement).value as ProductSort)}
+            onInput={(e) =>
+              setSort((e.target as HTMLSelectElement).value as ProductSort)
+            }
           >
             {products.listing.sortOptions.map((o) => (
               <SelectOption key={o.value} value={o.value}>
@@ -164,7 +195,10 @@ export function ProductListing() {
       <Divider />
 
       {/* Grid */}
-      <section className="products-page__grid-section" aria-label="Product results">
+      <section
+        className="products-page__grid-section"
+        aria-label="Product results"
+      >
         {filteredProducts.length === 0 ? (
           <div className="products-page__empty" role="status">
             <sky-info-card
@@ -184,7 +218,7 @@ export function ProductListing() {
                 <>
                   <ProductCard
                     product={product}
-                   favoriteActive={isAuthenticated && has(product.id)}
+                    favoriteActive={isAuthenticated && has(product.id)}
                     onFavorite={() => handleFavorite(product.id)}
                   />
                   <div
@@ -196,21 +230,19 @@ export function ProductListing() {
                   >
                     <FilledButton
                       className="products-page__card-btn"
-                     onClick={() => handleAddToCart(product.id)}
+                      onClick={() => handleAddToCart(product.id)}
                     >
                       <Icon slot="icon">shopping_bag</Icon>
                       Add to Cart
                     </FilledButton>
                   </div>
                 </>
-
               </Link>
             ))}
           </div>
-        )
-        }
-      </section >
-    </div >
+        )}
+      </section>
+    </div>
   );
 }
 

@@ -1,4 +1,4 @@
-import type  UserRole from '../../types';
+import type { UserRole } from '../../types';
 
 /**
  * Role-aware navigation for the account/admin console (dummy labels for now).
@@ -36,9 +36,24 @@ export const ADMIN_MENU: MenuGroup[] = [
         to: '/account/profile',
         roles: EVERYONE,
       },
-      { label: 'Dashboard', icon: 'dashboard', to: '/account/dashboard', roles: EVERYONE },
-      { label: 'My Account', icon: 'person', to: '/account/profile', roles: EVERYONE },
-      { label: 'My Bookings', icon: 'calendar_month', to: '/account/bookings', roles: EVERYONE, },
+      {
+        label: 'Dashboard',
+        icon: 'dashboard',
+        to: '/account/dashboard',
+        roles: EVERYONE,
+      },
+      {
+        label: 'My Account',
+        icon: 'person',
+        to: '/account/profile',
+        roles: EVERYONE,
+      },
+      {
+        label: 'My Bookings',
+        icon: 'calendar_month',
+        to: '/account/bookings',
+        roles: EVERYONE,
+      },
     ],
   },
   {
@@ -51,7 +66,7 @@ export const ADMIN_MENU: MenuGroup[] = [
         children: [
           {
             label: 'Category',
-            icon: 'folder',
+            icon: 'category',
             to: '/account/master/category',
             roles: ['admin'],
           },
@@ -61,36 +76,12 @@ export const ADMIN_MENU: MenuGroup[] = [
             to: '/account/master/subcategory',
             roles: ['admin'],
           },
-          // {
-          //   label: 'Vendor',
-          //   icon: 'account_tree',
-          //   to: '/account/master/vendor',
-          //   roles: ['admin'],
-          // },
-          // {
-          //   label: 'Services',
-          //   icon: 'account_tree',
-          //   to: '/account/master/service',
-          //   roles: ['admin'],
-          // },
           {
             label: 'Customer',
             icon: 'account_tree',
             to: '/account/master/customer',
             roles: ['admin'],
           },
-          // {
-          //   label: 'Cart',
-          //   icon: 'account_tree',
-          //   to: '/account/master/cart',
-          //   roles: ['admin'],
-          // },
-          // {
-          //   label: 'Booking',
-          //   icon: 'account_tree',
-          //   to: '/account/master/booking',
-          //   roles: ['admin'],
-          // },
           {
             label: 'Notification',
             icon: 'account_tree',
@@ -103,10 +94,6 @@ export const ADMIN_MENU: MenuGroup[] = [
             to: '/account/master/membership',
             roles: ['admin'],
           },
-        label: 'Master', icon: 'folder', roles: ['admin'],
-        children: [
-          { label: 'Category', icon: 'category', to: '/account/master/category', roles: ['admin'], },
-          { label: 'Subcategory', icon: 'account_tree', to: '/account/master/subcategory', roles: ['admin'], },
         ],
       },
     ],
@@ -116,7 +103,12 @@ export const ADMIN_MENU: MenuGroup[] = [
     label: 'Manage',
     items: [
       { label: 'Deals', icon: 'sell', to: '/account/deals', roles: ['admin'] },
-      { label: 'Product', icon: 'package_2', to: '/account/product', roles: ['admin'] },
+      {
+        label: 'Product',
+        icon: 'package_2',
+        to: '/account/product',
+        roles: ['admin'],
+      },
       {
         label: 'Promotions',
         icon: 'campaign',

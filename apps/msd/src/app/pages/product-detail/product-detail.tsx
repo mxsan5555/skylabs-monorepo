@@ -1,19 +1,29 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FilledButton, OutlinedIconButton, Icon, Divider, } from '@skylabs-monorepo/shared-ui/react';
+import {
+  FilledButton,
+  OutlinedIconButton,
+  Icon,
+  Divider,
+} from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useCart } from '../../../cart/cart-context';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { getProductById, PRODUCTS, CATEGORY_LABELS } from '../../../data/products';
+import {
+  getProductById,
+  PRODUCTS,
+  CATEGORY_LABELS,
+} from '../../../data/products';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { formatINR } from '../../../utils/format';
 import content from '../../../content.json';
 import './product-detail.css';
-import { useAuth } from '../../../auth/auth-context';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 
 const { products } = content;
-const SITE_URL: string = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
+const SITE_URL: string =
+  (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
 
 export function ProductDetail() {
   const { id = '' } = useParams<{ id: string }>();
@@ -36,7 +46,9 @@ export function ProductDetail() {
           heading="Product not found"
           subheading="This product may no longer be available."
         />
-        <FilledButton onClick={() => navigate('/products')}>Browse Products</FilledButton>
+        <FilledButton onClick={() => navigate('/products')}>
+          Browse Products
+        </FilledButton>
       </div>
     );
   }
@@ -44,14 +56,17 @@ export function ProductDetail() {
   const relatedProducts = PRODUCTS.filter(
     (p) => p.categorySlug === product.categorySlug && p.id !== product.id,
   ).slice(0, 6);
-  const categoryLabel = CATEGORY_LABELS[product.categorySlug] ?? product.categorySlug;
+  const categoryLabel =
+    CATEGORY_LABELS[product.categorySlug] ?? product.categorySlug;
   function handleAddToCart() {
     if (!isAuthenticated) {
       navigate('/sign-in');
       return;
     }
     addItem(currentProduct.id, 'product');
-    if (qty > 1) { updateQuantity(currentProduct.id, 'product', qty); }
+    if (qty > 1) {
+      updateQuantity(currentProduct.id, 'product', qty);
+    }
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 2000);
   }
@@ -60,7 +75,8 @@ export function ProductDetail() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
-  const seoName = product.name.length > 50 ? `${product.name.slice(0, 47)}…` : product.name;
+  const seoName =
+    product.name.length > 50 ? `${product.name.slice(0, 47)}…` : product.name;
   const seoDesc = `${product.description.slice(0, 120)} Shop now at MSD.`;
   const canonicalUrl = `${SITE_URL}/products/${product.id}`;
 
@@ -71,12 +87,18 @@ export function ProductDetail() {
       <link rel="canonical" href={canonicalUrl} />
       <meta property="og:type" content="product" />
       <meta property="og:title" content={product.name} />
-      <meta property="og:description" content={product.description.slice(0, 155)} />
+      <meta
+        property="og:description"
+        content={product.description.slice(0, 155)}
+      />
       <meta property="og:image" content={product.image} />
       <meta property="og:url" content={canonicalUrl} />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={product.name} />
-      <meta name="twitter:description" content={product.description.slice(0, 155)} />
+      <meta
+        name="twitter:description"
+        content={product.description.slice(0, 155)}
+      />
       <meta name="twitter:image" content={product.image} />
       <script
         type="application/ld+json"
@@ -86,7 +108,8 @@ export function ProductDetail() {
             '@type': 'Product',
             name: product.name,
             description: product.description,
-            image: product.gallery.length > 0 ? product.gallery : [product.image],
+            image:
+              product.gallery.length > 0 ? product.gallery : [product.image],
             brand: { '@type': 'Brand', name: product.brand },
             sku: product.id,
             offers: {
@@ -107,9 +130,24 @@ export function ProductDetail() {
             '@context': 'https://schema.org',
             '@type': 'BreadcrumbList',
             itemListElement: [
-              { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/` },
-              { '@type': 'ListItem', position: 2, name: 'Products', item: `${SITE_URL}/products` },
-              { '@type': 'ListItem', position: 3, name: product.name, item: canonicalUrl },
+              {
+                '@type': 'ListItem',
+                position: 1,
+                name: 'Home',
+                item: `${SITE_URL}/`,
+              },
+              {
+                '@type': 'ListItem',
+                position: 2,
+                name: 'Products',
+                item: `${SITE_URL}/products`,
+              },
+              {
+                '@type': 'ListItem',
+                position: 3,
+                name: product.name,
+                item: canonicalUrl,
+              },
             ],
           }),
         }}
@@ -145,7 +183,10 @@ export function ProductDetail() {
             )} */}
           </div>
           {product.gallery.length > 1 && (
-            <div className="product-detail__thumbs" aria-label="Gallery thumbnails">
+            <div
+              className="product-detail__thumbs"
+              aria-label="Gallery thumbnails"
+            >
               {product.gallery.map((img, i) => (
                 <button
                   key={i}
@@ -165,14 +206,20 @@ export function ProductDetail() {
         <div className="product-detail__info">
           {/* Badges */}
           <div className="product-detail__meta-row">
-            <sky-badge variant="secondary" size="small">{product.brand}</sky-badge>
-            <sky-badge variant="primary" size="small">{categoryLabel}</sky-badge>
+            <sky-badge variant="secondary" size="small">
+              {product.brand}
+            </sky-badge>
+            <sky-badge variant="primary" size="small">
+              {categoryLabel}
+            </sky-badge>
           </div>
           <h1 className="product-detail__title">{product.name}</h1>
           <Divider />
           {/* Price — current, original, discount */}
           <div className="product-detail__price-row">
-            <span className="product-detail__price">{formatINR(product.price)}</span>
+            <span className="product-detail__price">
+              {formatINR(product.price)}
+            </span>
             {product.originalPrice && (
               <s
                 className="product-detail__original-price"
@@ -182,12 +229,18 @@ export function ProductDetail() {
               </s>
             )}
             {product.discount && (
-              <sky-badge variant="error" size="small">{product.discount}% OFF</sky-badge>
+              <sky-badge variant="error" size="small">
+                {product.discount}% OFF
+              </sky-badge>
             )}
           </div>
           <Divider />
           {/* Quantity stepper */}
-          <div className="product-detail__qty" role="group" aria-label={products.detail.quantityLabel}>
+          <div
+            className="product-detail__qty"
+            role="group"
+            aria-label={products.detail.quantityLabel}
+          >
             <OutlinedIconButton
               aria-label="Decrease quantity"
               onClick={() => setQty((q) => Math.max(1, q - 1))}
@@ -195,7 +248,13 @@ export function ProductDetail() {
             >
               <Icon aria-hidden="true">remove</Icon>
             </OutlinedIconButton>
-            <span className="product-detail__qty-value" aria-live="polite" aria-atomic="true">{qty}</span>
+            <span
+              className="product-detail__qty-value"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {qty}
+            </span>
             <OutlinedIconButton
               aria-label="Increase quantity"
               onClick={() => setQty((q) => Math.min(10, q + 1))}
@@ -210,16 +269,16 @@ export function ProductDetail() {
               className="product-detail__add-btn"
               onClick={handleAddToCart}
             >
-              <Icon slot="icon">
-                {addedToCart ? 'check' : 'shopping_bag'}
-              </Icon>
+              <Icon slot="icon">{addedToCart ? 'check' : 'shopping_bag'}</Icon>
               {addedToCart ? 'Added to Cart!' : products.detail.addToCart}
             </FilledButton>
 
             <OutlinedIconButton
               toggle
               selected={has(product.id)}
-              aria-label={has(product.id) ? 'Remove from wishlist' : 'Save to wishlist'}
+              aria-label={
+                has(product.id) ? 'Remove from wishlist' : 'Save to wishlist'
+              }
               onClick={() => {
                 if (!isAuthenticated) {
                   navigate('/sign-in');
@@ -242,9 +301,7 @@ export function ProductDetail() {
 
           {/* Stock */}
           <div className="product-detail__stock">
-            <Icon className="product-detail__stock-icon">
-              check_circle
-            </Icon>
+            <Icon className="product-detail__stock-icon">check_circle</Icon>
             {products.detail.inStock}
           </div>
 
@@ -269,14 +326,21 @@ export function ProductDetail() {
               <ol className="product-detail__list product-detail__list--ordered">
                 {product.howToUse.map((step, i) => (
                   <li key={i} className="product-detail__list-item">
-                    <span className="product-detail__step-num" aria-hidden="true">{i + 1}</span>
+                    <span
+                      className="product-detail__step-num"
+                      aria-hidden="true"
+                    >
+                      {i + 1}
+                    </span>
                     {step}
                   </li>
                 ))}
               </ol>
             </sky-accordion-item>
             <sky-accordion-item header={products.detail.accordionIngredients}>
-              <p className="product-detail__ingredients">{product.ingredients}</p>
+              <p className="product-detail__ingredients">
+                {product.ingredients}
+              </p>
             </sky-accordion-item>
             <sky-accordion-item header={products.detail.accordionReturn}>
               <p className="product-detail__policy">{product.returnPolicy}</p>
@@ -287,7 +351,10 @@ export function ProductDetail() {
 
       {/* ── Editorial benefits section ──────────────────────────────────── */}
       {product.benefits.length > 0 && (
-        <section className="product-detail__editorial" aria-label="Product highlights">
+        <section
+          className="product-detail__editorial"
+          aria-label="Product highlights"
+        >
           <div className="product-detail__editorial-inner">
             {product.benefits.slice(0, 3).map((benefit, i) => (
               <div
@@ -305,7 +372,9 @@ export function ProductDetail() {
                   />
                 </div>
                 <div className="product-detail__editorial-text">
-                  <h2 className="product-detail__editorial-heading">{benefit}</h2>
+                  <h2 className="product-detail__editorial-heading">
+                    {benefit}
+                  </h2>
                 </div>
               </div>
             ))}
@@ -315,9 +384,15 @@ export function ProductDetail() {
 
       {/* ── Related Products ────────────────────────────────────────────── */}
       {relatedProducts.length > 0 && (
-        <section className="product-detail__related" aria-labelledby="related-products-heading">
+        <section
+          className="product-detail__related"
+          aria-labelledby="related-products-heading"
+        >
           <div className="product-detail__related-inner">
-            <h2 id="related-products-heading" className="product-detail__related-heading">
+            <h2
+              id="related-products-heading"
+              className="product-detail__related-heading"
+            >
               {products.detail.relatedProducts}
             </h2>
             <div className="product-detail__related-carousel">
@@ -328,7 +403,10 @@ export function ProductDetail() {
                 grab-cursor="true"
               >
                 {relatedProducts.map((p) => (
-                  <swiper-slide key={p.id} style={{ width: '260px', height: 'auto' }}>
+                  <swiper-slide
+                    key={p.id}
+                    style={{ width: '260px', height: 'auto' }}
+                  >
                     <SkyProductCardWC
                       variant="outlined"
                       heading={p.name}
@@ -337,7 +415,9 @@ export function ProductDetail() {
                       imageAlt={p.imageAlt}
                       badge={p.badge}
                       price={formatINR(p.price)}
-                      originalPrice={p.originalPrice ? formatINR(p.originalPrice) : undefined}
+                      originalPrice={
+                        p.originalPrice ? formatINR(p.originalPrice) : undefined
+                      }
                       discount={p.discount ? `${p.discount}% OFF` : undefined}
                       href={`/products/${p.id}`}
                     />
