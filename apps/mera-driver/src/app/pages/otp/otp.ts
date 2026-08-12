@@ -8,17 +8,17 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { AuthService } from '../../core/auth/auth.service';
-import { ApiClient } from '../../core/api/api-client.service';
-import { AccountService } from '../../core/account/account.service';
-import { type UserRole } from '../../models';
+import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
+import { AuthApiService } from '../../core/auth/auth-api.service';
 
 const RESEND_SECONDS = 24;
 
 /**
  * OTP screen. Shows where the code was sent, takes the 6-digit code, and on
- * verify signs the user in and returns home. Includes a resend countdown.
- * Wired to the real AuthService (mock token until the auth API exists).
+ * verify calls `POST /auth/otp/verify`, then hands the access token to the
+ * shared `AuthService.signIn()` (which fetches `/rbac/bootstrap` before
+ * resolving) and lands on the dashboard. Includes a resend countdown that
+ * re-requests a fresh OTP.
  */
 @Component({
   selector: 'md-otp',
@@ -28,21 +28,19 @@ const RESEND_SECONDS = 24;
 export class Otp implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
-  private readonly api = inject(ApiClient);
+  private readonly authApi = inject(AuthApiService);
   private readonly http = inject(HttpClient);
-  private readonly account = inject(AccountService);
 
   protected readonly destination =
-    (history.state as { destination?: string } | null)?.destination ?? '4564';
+    (history.state as { destination?: string; method?: string } | null)?.destination ?? '';
   protected readonly method =
-    (history.state as { method?: 'email' | 'phone' } | null)?.method ?? 'phone';
-  protected readonly role =
-    (history.state as { role?: UserRole } | null)?.role ?? 'customer';
+    (history.state as { destination?: string; method?: 'email' | 'phone' } | null)?.method ?? 'phone';
 
   protected code = '';
   protected readonly seconds = signal(RESEND_SECONDS);
+  protected readonly verifying = signal(false);
+  protected readonly error = signal<string | null>(null);
 
-  private mockUsers: any[] = [];
   private timer?: ReturnType<typeof setInterval>;
 
   protected readonly content = signal({
@@ -66,6 +64,11 @@ export class Otp implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    if (!this.destination) {
+      this.router.navigate(['/sign-in']);
+      return;
+    }
+
     // Load copy strings dynamically
     this.http.get<any>('data/auth.json').subscribe({
       next: (data) => {
@@ -81,16 +84,6 @@ export class Otp implements OnInit, OnDestroy {
       }
     });
 
-    // Load mock users dynamically
-    this.http.get<any[]>('data/mock-users.json').subscribe({
-      next: (users) => {
-        if (users) this.mockUsers = users;
-      },
-      error: (err) => {
-        console.warn('Failed to load mock-users.json, fallback values will be used', err);
-      }
-    });
-
     this.timer = setInterval(() => {
       const s = this.seconds();
       if (s > 0) this.seconds.set(s - 1);
@@ -102,125 +95,32 @@ export class Otp implements OnInit, OnDestroy {
   }
 
   protected verify(): void {
-    const otpCode = this.code.trim();
-    if (!otpCode) {
-      alert(this.content().errorOtpEmpty);
+    if (this.code.length !== 6) {
+      this.error.set('Enter the 6-digit code.');
       return;
     }
 
-    const isEmail = this.method === 'email';
-    const endpoint = isEmail ? '/auth/verify-mail-otp' : '/mobile-otp/verify';
-    const payload = isEmail 
-      ? { email: this.destination, otp: otpCode } 
-      : { mobile: this.destination, otp: otpCode };
-
-    this.api.post<any>(endpoint, payload).subscribe({
-      next: (res) => {
-        if (res && res.token) {
-          this.auth.signIn(res.token);
-          this.auth.setRoles([this.role]);
-          this.updateMockProfile();
-          this.router.navigate(['/account']);
-        } else {
-          alert(this.content().msgSuccessNoToken);
-        }
+    this.error.set(null);
+    this.verifying.set(true);
+    this.authApi.verifyOtp(this.destination, this.code, 'login').subscribe({
+      next: async (result) => {
+        await this.auth.signIn(result.accessToken);
+        this.verifying.set(false);
+        this.router.navigate(['/account/dashboard']);
       },
-      error: (err) => {
-        console.error(err);
-        if (this.api.getBaseUrl() === '/api' && isLocalHostOrIP()) {
-          console.warn('Backend offline, running local mock-users verification.');
-          
-          // Look up user by email or mobile destination
-          const matchedUser = this.mockUsers.find(
-            u => u.mail === this.destination || u.mobile === this.destination
-          );
-          
-          if (matchedUser) {
-            // Validate the specific OTP for this mock user
-            if (otpCode === matchedUser.otp) {
-              this.auth.signIn('mock-demo-jwt-token');
-              this.auth.setRoles([matchedUser.role]);
-              
-              // Update mock profile info
-              this.account.updateProfile({
-                name: matchedUser.name,
-                email: matchedUser.mail,
-                phone: matchedUser.mobile
-              });
-              
-              this.router.navigate(['/account']);
-            } else {
-              alert(`Verification failed: Invalid OTP code for ${matchedUser.role}. Please use ${matchedUser.otp}.`);
-            }
-          } else {
-            // Fallback for random phone/email: standard Customer login with OTP 123456
-            if (otpCode === '123456') {
-              this.auth.signIn('mock-demo-jwt-token');
-              this.auth.setRoles(['customer']);
-              
-              // Use default profile info
-              this.updateMockProfile();
-              
-              this.router.navigate(['/account']);
-            } else {
-              alert('Verification failed: Invalid OTP code. For demo, use 123456 or a valid mock user OTP.');
-            }
-          }
-        } else {
-          alert(this.content().errorVerificationFailed + (err.error?.message || err.message));
-        }
+      error: () => {
+        this.verifying.set(false);
+        this.error.set('That code didn’t work. Check it and try again.');
       },
-    });
-  }
-
-  private updateMockProfile(): void {
-    let roleName = 'Customer User';
-    if (this.role === 'admin') roleName = 'Admin User';
-    else if (this.role === 'marketing') roleName = 'Marketing Manager';
-    else if (this.role === 'sales') roleName = 'Sales Executive';
-    else if (this.role === 'driver') roleName = 'Driver Partner';
-
-    const isEmail = this.method === 'email';
-    this.account.updateProfile({
-      name: roleName,
-      email: isEmail ? this.destination : `${this.role}@mera-driver.com`,
-      phone: isEmail ? '+91 99999 88888' : this.destination
     });
   }
 
   protected resend(): void {
-    const isEmail = this.method === 'email';
-    const endpoint = isEmail ? '/auth/send-mail-otp' : '/mobile-otp/send';
-    const payload = isEmail ? { email: this.destination } : { mobile: this.destination };
-
-    this.api.post(endpoint, payload).subscribe({
-      next: () => {
-        this.seconds.set(RESEND_SECONDS);
-        alert(this.content().msgOtpSent);
-      },
-      error: (err) => {
-        console.error(err);
-        if (this.api.getBaseUrl() === '/api' && isLocalHostOrIP()) {
-          this.seconds.set(RESEND_SECONDS);
-          alert(this.content().msgOtpResentMock);
-        } else {
-          alert(this.content().errorResendFailed + (err.error?.message || err.message));
-        }
-      },
-    });
+    this.authApi.requestOtp(this.destination, 'login').subscribe();
+    this.seconds.set(RESEND_SECONDS);
   }
 
   protected back(): void {
     this.router.navigate(['/sign-in']);
   }
-}
-
-function isLocalHostOrIP(): boolean {
-  if (typeof window === 'undefined') return false;
-  const hostname = window.location.hostname;
-  return hostname === 'localhost' || 
-         hostname === '127.0.0.1' || 
-         hostname.startsWith('192.168.') || 
-         hostname.startsWith('10.') || 
-         hostname.startsWith('172.');
 }

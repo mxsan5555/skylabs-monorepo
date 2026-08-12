@@ -43,6 +43,11 @@
         "label": "Health & Wellness",
         "to": "/category/health-wellness",
         "count": 13
+      },
+      {
+        "label": "Products",
+        "to": "/products",
+        "count": 0
       }
     ],
     "categories": [
@@ -73,86 +78,38 @@
       }
     ],
     "footer": {
-      "quickLinks": [
-        {
-          "label": "Home",
-          "to": "/"
-        },
-        {
-          "label": "Hot Deals",
-          "to": "/explore"
-        },
-        {
-          "label": "Blog",
-          "to": "/blog"
-        },
-        {
-          "label": "About Us",
-          "to": "/about"
-        },
-        {
-          "label": "Contact",
-          "to": "/contact"
-        },
-        {
-          "label": "Careers",
-          "to": "/careers"
-        }
+      "company": [
+        { "label": "About Us",     "to": "/about" },
+        { "label": "Blog",         "to": "/blog" },
+        { "label": "Careers",      "to": "/careers" },
+        { "label": "How It Works", "to": "/how-it-works" },
+        { "label": "Contact",      "to": "/contact" }
       ],
-      "categories": [
-        {
-          "label": "Massage",
-          "to": "/category/massage"
-        },
-        {
-          "label": "Spas & Retreats",
-          "to": "/category/spas-retreats"
-        },
-        {
-          "label": "Skin & Beauty",
-          "to": "/category/skin-beauty"
-        },
-        {
-          "label": "Hair & Nails",
-          "to": "/category/hair-nails"
-        },
-        {
-          "label": "Health & Wellness",
-          "to": "/category/health-wellness"
-        }
+      "discover": [
+        { "label": "Massage",          "to": "/category/massage" },
+        { "label": "Spas & Retreats",  "to": "/category/spas-retreats" },
+        { "label": "Skin & Beauty",    "to": "/category/skin-beauty" },
+        { "label": "Hair & Nails",     "to": "/category/hair-nails" },
+        { "label": "Health & Wellness","to": "/category/health-wellness" },
+        { "label": "Products",         "to": "/products" },
+        { "label": "Hot Deals",        "to": "/explore" }
       ],
-      "support": [
-        {
-          "label": "Help Center",
-          "to": "/help"
-        },
-        {
-          "label": "Partner With Us",
-          "to": "/partner"
-        },
-        {
-          "label": "Wishlist",
-          "to": "/wishlist"
-        }
+      "help": [
+        { "label": "Help Center",     "to": "/help" },
+        { "label": "Partner With Us", "to": "/partner" },
+        { "label": "Wishlist",        "to": "/wishlist" },
+        { "label": "Gifting",         "to": "/gifting" }
       ],
       "legal": [
-        {
-          "label": "Privacy Policy",
-          "to": "/privacy"
-        },
-        {
-          "label": "Terms of Service",
-          "to": "/terms"
-        },
-        {
-          "label": "Accessibility Statement",
-          "to": "/accessibility"
-        }
+        { "label": "Privacy Policy",  "to": "/privacy" },
+        { "label": "Terms of Service","to": "/terms" },
+        { "label": "Accessibility",   "to": "/accessibility" },
+        { "label": "Cookie Policy",   "to": "/cookies" }
       ],
       "headings": {
-        "quickLinks": "Quick Links",
-        "categories": "Categories",
-        "support": "Support",
+        "company":    "Company",
+        "discover":   "Discover",
+        "help":       "Help & Info",
         "newsletter": "Get Exclusive Deals"
       },
       "newsletter": {
@@ -162,26 +119,10 @@
         "successMessage": "You're subscribed! Check your inbox."
       },
       "social": [
-        {
-          "label": "Instagram",
-          "icon": "photo_camera",
-          "url": "https://instagram.com"
-        },
-        {
-          "label": "Facebook",
-          "icon": "thumb_up",
-          "url": "https://facebook.com"
-        },
-        {
-          "label": "X (Twitter)",
-          "icon": "chat",
-          "url": "https://twitter.com"
-        },
-        {
-          "label": "LinkedIn",
-          "icon": "work",
-          "url": "https://linkedin.com"
-        }
+        { "label": "Follow us on Facebook",  "key": "facebook",  "url": "https://facebook.com" },
+        { "label": "Follow us on X",         "key": "x",         "url": "https://x.com" },
+        { "label": "Watch us on YouTube",    "key": "youtube",   "url": "https://youtube.com" },
+        { "label": "Follow us on Instagram", "key": "instagram", "url": "https://instagram.com" }
       ],
       "copyright": "MySpaDeal Pvt. Ltd. All rights reserved."
     }
@@ -635,6 +576,44 @@
         "emptyOtp": "Please enter the OTP.",
         "invalidOtp": "Invalid OTP. Please try again."
       }
+    }
+  },
+  "products": {
+    "listing": {
+      "title": "Wellness Products",
+      "subtitle": "Oils, creams, masks and kits — shop top-rated skincare and wellness products.",
+      "filters": {
+        "all": "All",
+        "day": "Day",
+        "night": "Night",
+        "skinCare": "Skin Care"
+      },
+      "sortOptions": [
+        { "value": "popular",    "label": "Popularity" },
+        { "value": "price-asc",  "label": "Price: Low to High" },
+        { "value": "price-desc", "label": "Price: High to Low" },
+        { "value": "newest",     "label": "Newest" }
+      ],
+      "sortLabel": "Sort by",
+      "resultLabel": "products",
+      "emptyHeading": "No products found",
+      "emptySubheading": "Try selecting a different category or check back later."
+    },
+    "detail": {
+      "addToCart": "Add to Cart",
+      "shareLabel": "Share this product",
+      "inStock": "In stock and ready to ship",
+      "quantityLabel": "Quantity",
+      "relatedProducts": "You May Also Like",
+      "accordionSummary": "Summary",
+      "accordionBenefits": "Benefits",
+      "accordionHowToUse": "How To Use",
+      "accordionIngredients": "Ingredients",
+      "accordionReturn": "Return / Refund Policy"
+    },
+    "meta": {
+      "listingTitle": "Wellness Products | MSD – MySpaDeal",
+      "listingDescription": "Shop massage oils, face masks, body scrubs, aromatherapy sets and wellness kits from top Indian wellness brands."
     }
   }
 }

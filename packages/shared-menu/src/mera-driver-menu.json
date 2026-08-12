@@ -1,0 +1,139 @@
+[
+  {
+    "id": "dashboard",
+    "title": "Dashboard",
+    "icon": "dashboard",
+    "route": "/dashboard",
+    "permissionKey": "dashboard",
+    "parent": null,
+    "order": 1
+  },
+  {
+    "id": "drivers",
+    "title": "Drivers",
+    "icon": "sports_motorsports",
+    "route": "/drivers",
+    "permissionKey": "drivers",
+    "parent": null,
+    "order": 2
+  },
+  {
+    "id": "vehicles",
+    "title": "Vehicles",
+    "icon": "directions_car",
+    "route": "/vehicles",
+    "permissionKey": "vehicles",
+    "parent": null,
+    "order": 3
+  },
+  {
+    "id": "trips",
+    "title": "Trips",
+    "icon": "route",
+    "route": "/trips",
+    "permissionKey": "trips",
+    "parent": null,
+    "order": 4
+  },
+  {
+    "id": "attendance",
+    "title": "Attendance",
+    "icon": "event_available",
+    "route": "/attendance",
+    "permissionKey": "attendance",
+    "parent": null,
+    "order": 5
+  },
+  {
+    "id": "payments",
+    "title": "Payments",
+    "icon": "payments",
+    "route": "/payments",
+    "permissionKey": "payments",
+    "parent": null,
+    "order": 6
+  },
+  {
+    "id": "reports",
+    "title": "Reports",
+    "icon": "insights",
+    "route": "/reports",
+    "permissionKey": "reports",
+    "parent": null,
+    "order": 7
+  },
+  {
+    "id": "masters",
+    "title": "Driver Masters",
+    "icon": "category",
+    "permissionKey": "masters",
+    "parent": null,
+    "order": 8,
+    "children": [
+      {
+        "id": "masters-vehicle-types",
+        "title": "Vehicle Types",
+        "icon": "directions_car",
+        "route": "/masters/vehicle-types",
+        "permissionKey": "masters.vehicle-types",
+        "parent": "masters",
+        "order": 1
+      },
+      {
+        "id": "masters-zones",
+        "title": "Service Zones",
+        "icon": "location_on",
+        "route": "/masters/zones",
+        "permissionKey": "masters.zones",
+        "parent": "masters",
+        "order": 2
+      }
+    ]
+  },
+  {
+    "id": "administration",
+    "title": "Administration",
+    "icon": "admin_panel_settings",
+    "permissionKey": "administration",
+    "parent": null,
+    "order": 9,
+    "children": [
+      {
+        "id": "admin-roles",
+        "title": "Role Management",
+        "icon": "shield_person",
+        "route": "/administration/roles",
+        "permissionKey": "rbac.roles",
+        "parent": "administration",
+        "order": 1
+      },
+      {
+        "id": "admin-users",
+        "title": "User Management",
+        "icon": "manage_accounts",
+        "route": "/administration/users",
+        "permissionKey": "rbac.users",
+        "parent": "administration",
+        "order": 2
+      },
+      {
+        "id": "admin-audit-logs",
+        "title": "Audit Logs",
+        "icon": "history",
+        "route": "/administration/audit-logs",
+        "permissionKey": "rbac.audit-logs",
+        "parent": "administration",
+        "order": 3
+      }
+    ]
+  },
+  {
+    "id": "settings",
+    "title": "Settings",
+    "icon": "settings",
+    "route": "/settings",
+    "permissionKey": "settings",
+    "parent": null,
+    "order": 10
+  }
+]

@@ -1,19 +1,20 @@
-import {
-  Component,
-  CUSTOM_ELEMENTS_SCHEMA,
-  computed,
-  inject,
-} from '@angular/core';
-import { Router, RouterLink, RouterLinkActive } from '@angular/router';
-import { AuthService } from '../../core/auth/auth.service';
-import { AccountService } from '../../core/account/account.service';
-import { ALL_ROLES, type UserRole } from '../../models';
-import { ADMIN_MENU } from '../menu';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, computed, inject } from '@angular/core';
+import { RouterLink, RouterLinkActive } from '@angular/router';
+import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
+import type { MenuNode } from '@skylabs-monorepo/shared-types';
+import { accountPath } from '../menu';
 
 /**
- * Console sidebar: brand, (dummy) search, role-filtered navigation, and the
- * signed-in user. The "View as" switcher previews each persona until the
- * backend supplies real roles.
+ * Console sidebar: brand, search, and navigation rendered straight from
+ * `authService.bootstrap()?.menu` — the server already filtered this tree down to
+ * what the signed-in user's permissions allow (see `filterMenuByPermissions` in
+ * `@skylabs-monorepo/shared-permissions`), so there is no client-side role check
+ * here at all, and no "View as (demo)" switcher.
+ *
+ * The "Administration" group is additionally hidden while previewing another user
+ * ("Login As"), even though the server may still include it for the target user —
+ * a SuperAdmin previewing a lower-privileged account shouldn't see RBAC management
+ * for someone else's session.
  */
 @Component({
   selector: 'md-sidebar',
@@ -26,36 +27,14 @@ import { ADMIN_MENU } from '../menu';
 })
 export class Sidebar {
   private readonly auth = inject(AuthService);
-  protected readonly account = inject(AccountService);
-  protected readonly router = inject(Router);
+  protected readonly accountPath = accountPath;
 
-  protected readonly roles = this.auth.roles;
-  protected readonly allRoles = ALL_ROLES;
-  protected masterOpen = false;
+  protected readonly menu = computed<MenuNode[]>(() => {
+    const nodes = this.auth.bootstrap()?.menu ?? [];
+    return this.auth.isPreviewing() ? nodes.filter((n) => n.id !== 'administration') : nodes;
+  });
 
-  constructor() {
-    this.masterOpen = this.router.url.includes('/master/');
-  }
+  protected readonly user = computed(() => this.auth.bootstrap()?.user);
 
-  protected isDropdownActive(item: any): boolean {
-    if (!item.children) return false;
-    return item.children.some((child: any) => this.router.url === child.to);
-  }
-
-  protected readonly groups = computed(() =>
-    ADMIN_MENU.map((g) => ({
-      label: g.label,
-      items: g.items.filter((i) =>
-        i.roles.some((r) => this.roles().includes(r)),
-      ),
-    })).filter((g) => g.items.length > 0),
-  );
-
-  protected readonly initial = computed(() =>
-    this.account.profile().name.charAt(0).toUpperCase(),
-  );
-
-  protected setRole(value: string): void {
-    this.auth.setRoles([value as UserRole]);
-  }
+  protected readonly initial = computed(() => (this.user()?.name ?? '?').charAt(0).toUpperCase());
 }

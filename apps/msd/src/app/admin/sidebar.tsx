@@ -1,19 +1,30 @@
-import { NavLink } from 'react-router-dom';
-import { Icon } from '@skylabs-monorepo/shared-ui/react';
-import { useAuth } from '../../auth/auth-context';
-import { useAccount } from '../../account/account-context';
-import { ALL_ROLES, type UserRole } from '../../types';
-import { ADMIN_MENU } from './menu';
+import { NavLink, useNavigate } from 'react-router-dom';
+import type { MenuNode } from '@skylabs-monorepo/shared-types';
+import { Icon, TextButton } from '@skylabs-monorepo/shared-ui/react';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 
 /**
- * Console sidebar: brand, (dummy) search, role-filtered navigation, and the
- * signed-in user. The "View as" role switcher is a temporary affordance to
- * preview each persona until the backend supplies real roles.
+ * Console navigation, built directly from `bootstrap.menu` — the server has
+ * already pruned it down to what the caller's permissions allow, so this
+ * component only has to decide layout, not visibility (no more hardcoded
+ * per-role `ADMIN_MENU` or a "View as (demo)" switcher).
+ *
+ * While a SuperAdmin is previewing ("Login As"), the `administration` group
+ * is hidden outright (belt-and-suspenders on top of the server-side gate —
+ * previewed sessions shouldn't surface role/user management even if a quirk
+ * of permission resolution would otherwise show it).
  */
 export function Sidebar() {
-  const { roles, setRoles } = useAuth();
-  const { profile } = useAccount();
-  const initial = profile.name.charAt(0).toUpperCase();
+  const { bootstrap, isPreviewing, signOut } = useAuth();
+  const navigate = useNavigate();
+  const menu = bootstrap?.menu ?? [];
+  const visibleMenu = isPreviewing ? menu.filter((node) => node.id !== 'administration') : menu;
+  const initial = (bootstrap?.user.name ?? '?').charAt(0).toUpperCase();
+
+  const doSignOut = () => {
+    signOut();
+    navigate('/sign-in');
+  };
 
   return (
     <aside className="admin-sidebar">
@@ -27,55 +38,44 @@ export function Sidebar() {
         </span>
       </div>
 
-      <input
-        className="admin-sidebar__search"
-        type="search"
-        placeholder="Search…"
-        aria-label="Search"
-      />
-
       <nav className="admin-sidebar__nav" aria-label="Console">
-        {ADMIN_MENU.map((group) => {
-          const items = group.items.filter((i) =>
-            i.roles.some((r) => roles.includes(r)),
-          );
-          if (items.length === 0) return null;
-          return (
-            <div className="admin-nav-group" key={group.label}>
-              <p className="admin-nav-group__label">{group.label}</p>
-              {items.map((item) => (
-                <NavLink key={item.to} to={item.to} className="admin-nav-item">
-                  <Icon aria-hidden="true">{item.icon}</Icon>
-                  {item.label}
-                </NavLink>
-              ))}
-            </div>
-          );
-        })}
+        {visibleMenu.map((node) => <MenuNodeItem key={node.id} node={node} />)}
       </nav>
 
-      <div className="admin-roleswitch">
-        <label htmlFor="role-switch">View as (demo)</label>
-        <select
-          id="role-switch"
-          value={roles[0] ?? 'user'}
-          onChange={(e) => setRoles([e.target.value as UserRole])}
-        >
-          {ALL_ROLES.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
-      </div>
-
       <div className="admin-sidebar__user">
-        <span className="admin-sidebar__avatar">{initial}</span>
+        <span className="admin-sidebar__avatar" aria-hidden="true">{initial}</span>
         <span className="admin-sidebar__user-info">
-          <div className="admin-sidebar__user-name">{profile.name}</div>
-          <div className="admin-sidebar__user-mail">{profile.email}</div>
+          <div className="admin-sidebar__user-name">{bootstrap?.user.name ?? 'Loading…'}</div>
+          <div className="admin-sidebar__user-mail">{bootstrap?.user.email ?? bootstrap?.user.phone ?? ''}</div>
         </span>
+        <TextButton onClick={doSignOut}>
+          <Icon slot="icon" aria-hidden="true">logout</Icon>
+          Logout
+        </TextButton>
       </div>
     </aside>
+  );
+}
+
+function MenuNodeItem({ node }: { node: MenuNode }) {
+  if (node.children && node.children.length > 0) {
+    return (
+      <div className="admin-nav-group">
+        <p className="admin-nav-group__label">{node.title}</p>
+        {node.children.map((child) => <MenuNodeItem key={child.id} node={child} />)}
+      </div>
+    );
+  }
+
+  if (!node.route) return null;
+
+  return (
+    <NavLink
+      to={node.route}
+      className={({ isActive }) => `admin-nav-item${isActive ? ' active' : ''}`}
+    >
+      <Icon aria-hidden="true">{node.icon}</Icon>
+      {node.title}
+    </NavLink>
   );
 }

@@ -9,7 +9,7 @@ import {
   OutlinedTextField,
   Divider,
 } from '@skylabs-monorepo/shared-ui/react';
-import { useAuth } from '../../auth/auth-context';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { useCart } from '../../cart/cart-context';
 import content from '../../content.json'
 import './header.css';

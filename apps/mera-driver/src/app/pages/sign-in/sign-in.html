@@ -38,14 +38,18 @@
       </md-outlined-text-field>
     }
 
-    <md-filled-button class="auth-submit" (click)="sendOtp()">
-      {{ content().btnSendOtp }}
+    @if (error()) {
+      <p class="auth-error" role="alert">{{ error() }}</p>
+    }
+
+    <md-filled-button class="auth-submit" [disabled]="loading()" (click)="sendOtp()">
+      {{ loading() ? 'Sending…' : content().btnSendOtp }}
     </md-filled-button>
   </div>
 
   <div class="auth-divider"><span>{{ content().dividerText }}</span></div>
 
-  <md-outlined-button class="auth-google" (click)="continueWithGoogle()">
+  <md-outlined-button class="auth-google" href="{{ googleUrl }}">
     <md-icon slot="icon" aria-hidden="true">language</md-icon>
     {{ content().btnGoogle }}
   </md-outlined-button>

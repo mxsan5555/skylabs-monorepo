@@ -2,8 +2,7 @@ import { Routes } from '@angular/router';
 import { PublicLayout } from './layouts/public-layout/public-layout';
 import { AuthLayout } from './layouts/auth-layout/auth-layout';
 import { AdminLayout } from './layouts/admin-layout/admin-layout';
-import { authGuard } from './core/auth/auth.guard';
-import { roleGuard } from './core/auth/role.guard';
+import { authGuard, permissionGuard } from '@skylabs-monorepo/shared-auth/angular';
 
 /**
  * Route table.
@@ -12,8 +11,16 @@ import { roleGuard } from './core/auth/role.guard';
  * non-empty parent paths so they only match those URLs. An empty-path parent
  * matches every URL, so PublicLayout (which holds '/', showcase, and the 404
  * catch-all) must be the only empty-path parent — otherwise it would swallow
- * routes meant for the other layout. Protected pages added next use
- * `canActivate: [authGuard]`. Lazy-loaded via loadComponent.
+ * routes meant for the other layout.
+ *
+ * Every `/account/*` page requires `canActivate: [authGuard]` (any
+ * authenticated user). Permission-gated pages additionally carry
+ * `canActivate: [permissionGuard]` with `data: { permission: { menuKey, action } }`
+ * — this replaces the old `roleGuard` + `data: { roles: [...] }` pattern. The
+ * `menuKey`s below match `@skylabs-monorepo/shared-menu`'s
+ * `mera-driver-menu.json` node-for-node, so a route only "exists" for a user
+ * once the server's `/rbac/bootstrap` grants it — the sidebar (which renders
+ * `bootstrap.menu` directly) and this route table can never drift apart.
  */
 export const appRoutes: Routes = [
   {
@@ -46,17 +53,21 @@ export const appRoutes: Routes = [
     ],
   },
   {
-    // Authenticated console (after login / "My account").
+    // Authenticated console (after login / "My account"). noindex is applied in
+    // index.html-level defaults + per-page <title>; see skylabs-seo.md for the
+    // account-page robots rule.
     path: 'account',
     component: AdminLayout,
     canActivate: [authGuard],
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'profile' },
+      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {
         path: 'dashboard',
         title: 'Dashboard · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'dashboard', action: 'view' } },
         loadComponent: () =>
-          import('./pages/account/role-pages').then((m) => m.Dashboard),
+          import('./pages/account/dashboard/dashboard').then((m) => m.Dashboard),
       },
       {
         path: 'profile',
@@ -64,13 +75,17 @@ export const appRoutes: Routes = [
         loadComponent: () =>
           import('./pages/account/profile/profile').then((m) => m.Profile),
       },
+
+      // Business modules (placeholders — permission-gated, matching the menu
+      // 1:1; real screens land module-by-module).
       {
         path: 'drivers',
         title: 'Drivers · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'drivers', action: 'view' }, title: 'Drivers', subtitle: 'Manage your driver roster.' },
         loadComponent: () =>
           import('./pages/account/drivers/drivers').then((m) => m.Drivers),
       },
-
       {
         path: 'master',
         pathMatch: 'full',
@@ -89,28 +104,94 @@ export const appRoutes: Routes = [
           import('./pages/account/subcategory/subcategory').then((m) => m.Subcategory),
       },
       {
-        path: 'bookings',
-        title: 'Bookings · mera-driver',
-        canActivate: [roleGuard],
-        data: { roles: ['admin'] },
+        path: 'vehicles',
+        title: 'Vehicles · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'vehicles', action: 'view' }, title: 'Vehicles', subtitle: 'Manage the fleet.' },
         loadComponent: () =>
-          import('./pages/account/role-pages').then((m) => m.Bookings),
+          import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
       },
       {
-        path: 'promotions',
-        title: 'Promotions · mera-driver',
-        canActivate: [roleGuard],
-        data: { roles: ['marketing'] },
+        path: 'trips',
+        title: 'Trips · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'trips', action: 'view' }, title: 'Trips', subtitle: 'Track ongoing and completed trips.' },
         loadComponent: () =>
-          import('./pages/account/role-pages').then((m) => m.Promotions),
+          import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
       },
       {
-        path: 'sales',
-        title: 'Sales · mera-driver',
-        canActivate: [roleGuard],
-        data: { roles: ['sales'] },
+        path: 'attendance',
+        title: 'Attendance · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'attendance', action: 'view' }, title: 'Attendance', subtitle: 'Driver check-in/out records.' },
         loadComponent: () =>
-          import('./pages/account/role-pages').then((m) => m.Sales),
+          import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
+      },
+      {
+        path: 'payments',
+        title: 'Payments · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'payments', action: 'view' }, title: 'Payments', subtitle: 'Fares, payouts, and reconciliation.' },
+        loadComponent: () =>
+          import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
+      },
+      {
+        path: 'reports',
+        title: 'Reports · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'reports', action: 'view' }, title: 'Reports', subtitle: 'Operational and financial reporting.' },
+        loadComponent: () =>
+          import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
+      },
+      {
+        path: 'masters/vehicle-types',
+        title: 'Vehicle Types · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'masters.vehicle-types', action: 'view' }, title: 'Vehicle Types', subtitle: 'Driver master data.' },
+        loadComponent: () =>
+          import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
+      },
+      {
+        path: 'masters/zones',
+        title: 'Service Zones · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'masters.zones', action: 'view' }, title: 'Service Zones', subtitle: 'Driver master data.' },
+        loadComponent: () =>
+          import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
+      },
+      {
+        path: 'settings',
+        title: 'Settings · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'settings', action: 'view' }, title: 'Settings', subtitle: 'App-wide configuration.' },
+        loadComponent: () =>
+          import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
+      },
+
+      // Administration (real screens).
+      {
+        path: 'administration/roles',
+        title: 'Role Management · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'rbac.roles', action: 'view' } },
+        loadComponent: () =>
+          import('./pages/account/administration/roles/roles').then((m) => m.AdministrationRoles),
+      },
+      {
+        path: 'administration/users',
+        title: 'User Management · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'rbac.users', action: 'view' } },
+        loadComponent: () =>
+          import('./pages/account/administration/users/users').then((m) => m.AdministrationUsers),
+      },
+      {
+        path: 'administration/audit-logs',
+        title: 'Audit Logs · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'rbac.audit-logs', action: 'view' } },
+        loadComponent: () =>
+          import('./pages/account/administration/audit-logs/audit-logs').then((m) => m.AdministrationAuditLogs),
       },
     ],
   },

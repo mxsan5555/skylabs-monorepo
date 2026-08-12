@@ -1,14 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedTextField, Icon, IconButton, TextButton, } from '@skylabs-monorepo/shared-ui/react';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import content from '../../../content.json';
-import { useAuth } from '../../../auth/auth-context';
+import { requestOtp, verifyOtp } from '../../../api/rbac/auth';
+import { ApiRequestError } from '../../../api/rbac/client';
 const RESEND_SECONDS = 24;
 
 /**
  * OTP screen. Shows where the code was sent, takes the 6-digit code, and on
- * verify signs the user in and returns home. Includes a resend countdown.
- * Wired to the real auth context (mock token until the auth API exists).
+ * verify signs the user in and returns to `/account/dashboard`. Includes a
+ * resend countdown. Wired to the real msd-api `/auth/otp/verify` endpoint —
+ * `signIn()` (from `@skylabs-monorepo/shared-auth/react`) stores the token
+ * and fetches `/rbac/bootstrap`, so the destination is always the same
+ * regardless of the signed-in user's roles; what they can do once there is
+ * driven entirely by `bootstrap.menu`/`bootstrap.permissions`.
  */
 export function Otp() {
   const navigate = useNavigate();
@@ -17,15 +23,8 @@ export function Otp() {
   const [error, setError] = useState('');
   const otpContent = content.auth.otp;
   const [loading, setLoading] = useState(false);
-  const { user, destination } = (location.state as {
-    user: {
-      id: number;
-      email: string;
-      mobile: string;
-      role: string;
-      otp: string;
-    };
-    destination: string;
+  const { identifier, method } = (location.state as {
+    identifier: string;
     method: 'email' | 'phone';
   }) || {};
   const [code, setCode] = useState('');
@@ -35,52 +34,49 @@ export function Otp() {
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {
-    if (!user) { navigate('/sign-in', { replace: true }); }
-  }, [user, navigate]);
+    if (!identifier) { navigate('/sign-in', { replace: true }); }
+  }, [identifier, navigate]);
   const verify = async () => {
-    setLoading(true);
     setError('');
+    if (!code.trim()) {
+      setError(otpContent.validation.emptyOtp);
+      return;
+    }
+    if (code.length !== 6) {
+      setError(otpContent.validation.invalidOtp);
+      return;
+    }
+    if (!identifier) {
+      navigate('/sign-in');
+      return;
+    }
+    setLoading(true);
     try {
-      if (!code.trim()) {
-        setError(otpContent.validation.emptyOtp);
-        return;
-      }
-      if (code.length !== 6) {
-        setError(otpContent.validation.invalidOtp);
-        return;
-      }
-      if (!user) {
-        navigate('/sign-in');
-        return;
-      }
-      if (code !== user.otp) {
-        setError(otpContent.validation.invalidOtp);
-        return;
-      }
-      // Optional: simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      signIn('mock-token');
-      switch (user.role) {
-        case 'admin':
-          navigate('/admin');
-          break;
-        case 'marketing':
-          navigate('/marketing');
-          break;
-        case 'sales':
-          navigate('/sales');
-          break;
-        default:
-          navigate('/account');
-      }
+      const { data } = await verifyOtp(identifier, code);
+      await signIn(data.accessToken);
+      navigate('/account/dashboard', { replace: true });
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : otpContent.validation.invalidOtp);
     } finally {
       setLoading(false);
     }
   };
 
+  const resend = async () => {
+    setSeconds(RESEND_SECONDS);
+    try {
+      await requestOtp(identifier, 'login');
+    } catch {
+      // Resend failures are non-fatal — the countdown still resets so the user can retry.
+    }
+  };
+
+  if (!identifier) return null;
+
   return (
     <div className="auth-screen otp-screen">
       <title>{otpContent.pageTitle}</title>
+      <meta name="robots" content="noindex, nofollow" />
       <IconButton
         className="otp-back"
         aria-label={otpContent.backAriaLabel}
@@ -96,8 +92,8 @@ export function Otp() {
         <h1 className="auth-brand__title">{otpContent.heading}</h1>
         <p className="auth-brand__subtitle">{otpContent.subtitle}</p>
         <span className="auth-destination">
-          <Icon aria-hidden="true">{otpContent.icons.destination}</Icon>
-          {destination}
+          <Icon aria-hidden="true">{method === 'phone' ? otpContent.icons.destination : 'mail'}</Icon>
+          {identifier}
         </span>
       </div>
 
@@ -132,7 +128,7 @@ export function Otp() {
         {seconds > 0 ? (
           <span className="otp-muted">{otpContent.resend.countdown} {seconds}s</span>
         ) : (
-          <TextButton onClick={() => setSeconds(RESEND_SECONDS)}>
+          <TextButton onClick={resend}>
             {otpContent.resend.button}
           </TextButton>
         )}

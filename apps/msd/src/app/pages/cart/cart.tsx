@@ -9,7 +9,7 @@ import {
 } from '@skylabs-monorepo/shared-ui/react';
 import { useCart } from '../../../cart/cart-context';
 import { useCartDeals } from '../../../hooks/use-cart-deals';
-import { useAuth } from '../../../auth/auth-context';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { formatINR, pluralize } from '../../../utils/format';
 import content from '../../../content.json';
 import './cart.css';

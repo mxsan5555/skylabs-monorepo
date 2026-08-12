@@ -17,63 +17,39 @@
   />
 
   <nav class="admin-sidebar__nav" aria-label="Console">
-    @for (group of groups(); track group.label) {
-      <div class="admin-nav-group">
-        <p class="admin-nav-group__label">{{ group.label }}</p>
-        @for (item of group.items; track item.to) {
-          @if (item.children) {
-            <details [open]="masterOpen">
-              <summary class="admin-nav-item" (click)="masterOpen = !masterOpen; $event.preventDefault()">
-                <md-icon aria-hidden="true">{{ item.icon }}</md-icon>
-                <span class="flex-grow">{{ item.label }}</span>
-                <md-icon aria-hidden="true">{{ masterOpen ? 'expand_less' : 'expand_more' }}</md-icon>
-              </summary>
-              <div>
-                @for (child of item.children; track child.to) {
-                  <a
-                    class="admin-nav-item"
-                    [routerLink]="child.to"
-                    routerLinkActive="active"
-                  >
-                    <md-icon aria-hidden="true">{{ child.icon }}</md-icon>
-                    {{ child.label }}
-                  </a>
-                }
-              </div>
-            </details>
-          } @else {
+    @for (node of menu(); track node.id) {
+      @if (node.children && node.children.length > 0) {
+        <div class="admin-nav-group">
+          <p class="admin-nav-group__label">{{ node.title }}</p>
+          @for (child of node.children; track child.id) {
             <a
-              class="admin-nav-item"
-              [routerLink]="item.to"
+              class="admin-nav-item pl-6"
+              [routerLink]="accountPath(child)"
               routerLinkActive="active"
             >
-              <md-icon aria-hidden="true">{{ item.icon }}</md-icon>
-              {{ item.label }}
+              <md-icon aria-hidden="true">{{ child.icon }}</md-icon>
+              {{ child.title }}
             </a>
           }
-        }
-      </div>
+        </div>
+      } @else {
+        <a
+          class="admin-nav-item"
+          [routerLink]="accountPath(node)"
+          routerLinkActive="active"
+        >
+          <md-icon aria-hidden="true">{{ node.icon }}</md-icon>
+          {{ node.title }}
+        </a>
+      }
     }
   </nav>
-
-  <div class="admin-roleswitch">
-    <label for="role-switch">View as (demo)</label>
-    <select
-      id="role-switch"
-      [value]="roles()[0]"
-      (change)="setRole($any($event.target).value)"
-    >
-      @for (r of allRoles; track r) {
-        <option [value]="r">{{ r }}</option>
-      }
-    </select>
-  </div>
 
   <div class="admin-sidebar__user">
     <span class="admin-sidebar__avatar">{{ initial() }}</span>
     <span class="admin-sidebar__user-info">
-      <div class="admin-sidebar__user-name">{{ account.profile().name }}</div>
-      <div class="admin-sidebar__user-mail">{{ account.profile().email }}</div>
+      <div class="admin-sidebar__user-name">{{ user()?.name ?? 'Loading…' }}</div>
+      <div class="admin-sidebar__user-mail">{{ user()?.email ?? user()?.phone ?? '' }}</div>
     </span>
   </div>
 </aside>

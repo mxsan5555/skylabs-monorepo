@@ -1,7 +1,7 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal, OnInit } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
-import { AuthService } from '../../core/auth/auth.service';
 import { HttpClient } from '@angular/common/http';
+import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
 import layoutDefaults from '../../../../public/data/layout.json';
 
 /**

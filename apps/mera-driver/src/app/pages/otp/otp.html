@@ -30,8 +30,12 @@
       (input)="code = $any($event.target).value"
     ></md-outlined-text-field>
 
-    <md-filled-button class="auth-submit" (click)="verify()">
-      {{ content().btnVerify }}
+    @if (error()) {
+      <p class="auth-error" role="alert">{{ error() }}</p>
+    }
+
+    <md-filled-button class="auth-submit" [disabled]="verifying()" (click)="verify()">
+      {{ verifying() ? 'Verifying…' : content().btnVerify }}
     </md-filled-button>
   </div>
 
