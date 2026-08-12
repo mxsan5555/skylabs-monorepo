@@ -144,7 +144,11 @@ export function DealDetail() {
         <div className="deal-detail__info">
           {/* Provider + status */}
           <div className="deal-detail__meta-row">
-            <span className="deal-detail__provider">{deal.providerName}</span>
+            <button type="button" className="deal-detail__provider"
+              onClick={() => navigate(`/vendor/${deal.providerSlug}`)}
+            >
+              {deal.providerName}
+            </button>
             {category && (
               <sky-badge variant="secondary" size="small">
                 {category.name}
@@ -217,8 +221,8 @@ export function DealDetail() {
             <OutlinedIconButton
               toggle
               selected={isAuthenticated && has(deal.id)}
-             aria-label={ isAuthenticated && has(deal.id)? 'Remove from wishlist': 'Save to wishlist'}
-         onClick={() => handleFavorite(deal.id)}
+              aria-label={isAuthenticated && has(deal.id) ? 'Remove from wishlist' : 'Save to wishlist'}
+              onClick={() => handleFavorite(deal.id)}
             >
               <Icon aria-hidden="true" slot="selected">favorite</Icon>
               <Icon aria-hidden="true">favorite_border</Icon>

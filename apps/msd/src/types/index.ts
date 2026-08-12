@@ -102,6 +102,7 @@ export interface Deal {
   slug: string;
   title: string;
   providerName: string;
+  providerSlug: string;
   categorySlug: string;
   subcategorySlug: string;
   description: string;

@@ -1,29 +1,14 @@
 import { useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  FilledButton,
-  OutlinedIconButton,
-  Icon,
-  Divider,
-  Radio,
-  ChipSet,
-  FilterChip,
-  SuggestionChip,
-  AssistChip,
-  Dialog,
-  TextButton,
-  OutlinedTextField,
-} from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedIconButton, Icon, Divider, Radio, ChipSet, FilterChip, SuggestionChip, AssistChip, Dialog, TextButton, OutlinedTextField,} from '@skylabs-monorepo/shared-ui/react';
 import { getVendorBySlug } from '../../../data/vendors';
 import { Breadcrumb } from '../../components/breadcrumb';
 
 const SITE_URL: string = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
-
 const DAY_MAP: Record<string, string> = {
   Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday',
   Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday',
 };
-
 function to24h(time: string | null): string {
   if (!time) return '00:00';
   const [hm, period] = time.split(' ');

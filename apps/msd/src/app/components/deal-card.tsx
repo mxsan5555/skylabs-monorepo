@@ -3,7 +3,7 @@ import type { Deal } from '../../types';
 import { formatINR } from '../../utils/format';
 import { useRef } from 'react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import { Icon, FilledButton, FilledTonalIconButton } from '@skylabs-monorepo/shared-ui/react';
+import { Icon, FilledTonalIconButton } from '@skylabs-monorepo/shared-ui/react';
 import './deal-card.css';
 import '@skylabs-monorepo/shared-ui';
 interface DealCardProps {

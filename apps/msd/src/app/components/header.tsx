@@ -17,6 +17,7 @@ export function Header() {
   const { wishlistCount, clear, } = useWishlist();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState(DEALS.slice(0, 6));
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -82,7 +83,7 @@ export function Header() {
         <div className="site-header__top">
           <IconButton
             className="site-header__menu-btn"
-            
+
             aria-label={content.header.openMenu}
             onClick={() => setDrawerOpen(true)}
           >
@@ -104,8 +105,23 @@ export function Header() {
               className="site-header__logo site-header__logo--mobile"
             />
           </NavLink>
-          <div className="site-header__search-wrapper">
-            {/* <form
+          <div className="header-categories">
+            {content.nav.primary.map((category) => (
+              <NavLink
+                key={category.to}
+                to={category.to}
+                className={({ isActive }) =>
+                  `header-category-link${isActive ? " header-category-link--active" : ""
+                  }`
+                }
+              >
+                {/* <Icon>{category.icon || "spa"}</Icon> */}
+                <span>{category.label}</span>
+              </NavLink>
+            ))}
+          </div>
+          {/* <div className="site-header__search-wrapper">
+            <form
               className="home__hero-search"
               role="search"
               aria-label={content.search.ariaLabel}
@@ -136,7 +152,7 @@ export function Header() {
                   > close </Icon>
                 )}
               </OutlinedTextField>
-            </form> */}
+            </form>
             {showSuggestions && (
               <List className="search-suggestions">
                 {suggestions.length ? (
@@ -161,7 +177,7 @@ export function Header() {
                 )}
               </List>
             )}
-          </div>
+          </div> */}
           <div className="site-header__actions">
             <FilledTonalIconButton
               className="site-header__cart"
@@ -193,19 +209,18 @@ export function Header() {
               {isAuthenticated ? (
                 <div className="profile-menu" ref={profileRef} >
                   <FilledTonalIconButton
-                    id="profile-button"
-                    className="profile-button"
-                    onClick={toggleProfileMenu}
-                  >
-                    <Icon>account_circle</Icon>
-                    <span className="profile-arrow">
-                      <Icon>{profileMenuOpen ? "keyboard_arrow_up" : "keyboard_arrow_down"}</Icon>
-                    </span>
-                  </FilledTonalIconButton>
+  id="profile-button"
+  className="profile-button"
+  onClick={toggleProfileMenu}
+  aria-label="My Account"
+>
+  <Icon>person</Icon>
+</FilledTonalIconButton>
                   {profileMenuOpen && (
                     <Menu
                       open
                       anchor="profile-button"
+                        yOffset={15}
                       onClosed={() => setProfileMenuOpen(false)}
                     >
                       <MenuItem
@@ -214,7 +229,7 @@ export function Header() {
                           setProfileMenuOpen(false);
                         }}
                       >
-                        <Icon>person</Icon>
+                        <Icon slot="start">person</Icon>
                         {content.header.profileMenu.profile}
                       </MenuItem>
                       <MenuItem
@@ -223,7 +238,7 @@ export function Header() {
                           setProfileMenuOpen(false);
                         }}
                       >
-                        <Icon>calendar_month</Icon>
+                        <Icon slot="start">calendar_month</Icon>
                         {content.header.profileMenu.bookings}
                       </MenuItem>
                       <MenuItem
@@ -232,7 +247,7 @@ export function Header() {
                           setProfileMenuOpen(false);
                         }}
                       >
-                        <Icon>favorite</Icon>
+                        <Icon slot="start">favorite</Icon>
                         {content.header.profileMenu.wishlist}
                       </MenuItem>
                       <MenuItem
@@ -243,7 +258,7 @@ export function Header() {
                           setProfileMenuOpen(false);
                         }}
                       >
-                        <Icon>logout</Icon>
+                        <Icon slot="start">logout</Icon>
                         {content.header.profileMenu.signOut}
                       </MenuItem>
                     </Menu>
@@ -259,22 +274,6 @@ export function Header() {
             </div>
           </div>
         </div>
-        {/* <nav
-          className="site-header__nav"
-          aria-label="Primary"
-        >
-          {content.nav.primary.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `site-header__nav-link${isActive ? " site-header__nav-link--active" : ""}`}
-            >
-              <Icon className="site-header__nav-icon">{item.icon}</Icon>
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
-        </nav> */}
       </header>
       {drawerOpen && (
         <div

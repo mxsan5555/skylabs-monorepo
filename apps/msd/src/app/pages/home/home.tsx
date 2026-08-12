@@ -257,9 +257,11 @@ export function Home() {
                   setShowSuggestions(false);
                 }}
               >
-                <TextButton type="button" className="home__premium-location">
-                  <Icon> location_on </Icon>
-                  <span>{shortLocation ?? premiumHero.search.locationPlaceholder}</span>
+                <TextButton type="button" className="home__premium-location" >
+                  <span className="home__premium-location-content">
+                    <Icon>location_on</Icon>
+                    <span>{shortLocation ?? premiumHero.search.locationPlaceholder}</span>
+                  </span>
                 </TextButton>
                 <OutlinedTextField
                   name="q"
