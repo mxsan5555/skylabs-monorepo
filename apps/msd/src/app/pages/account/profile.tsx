@@ -1,18 +1,10 @@
 import { useState } from 'react';
-import {
-  FilledButton,
-  OutlinedButton,
-  TextButton,
-  IconButton,
-  OutlinedTextField,
-  Icon,
-} from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedButton, TextButton, IconButton, OutlinedTextField, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import { AdminPage } from '../../admin/admin-page';
 import { useAccount } from '../../../account/account-context';
 import type { Address } from '../../../types';
 
 type Draft = Omit<Address, 'id'>;
-
 const EMPTY: Draft = {
   label: '',
   line1: '',
@@ -22,7 +14,6 @@ const EMPTY: Draft = {
   postalCode: '',
   country: '',
 };
-
 /** One source of truth for the address form — add a field by extending this. */
 const ADDRESS_FIELDS: { key: keyof Draft; label: string; span2?: boolean }[] = [
   { key: 'label', label: 'Label (e.g. Home, Work)', span2: true },
@@ -33,9 +24,7 @@ const ADDRESS_FIELDS: { key: keyof Draft; label: string; span2?: boolean }[] = [
   { key: 'postalCode', label: 'Postal code' },
   { key: 'country', label: 'Country' },
 ];
-
 const value = (e: Event) => (e.target as HTMLInputElement).value;
-
 /** My Account: edit email/phone and manage saved addresses (full CRUD). */
 export function Profile() {
   const {
@@ -46,20 +35,16 @@ export function Profile() {
     updateAddress,
     removeAddress,
   } = useAccount();
-
   const [email, setEmail] = useState(profile.email);
   const [phone, setPhone] = useState(profile.phone);
   const [saved, setSaved] = useState(false);
-
   const [editingId, setEditingId] = useState<string | 'new' | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY);
-
   const saveProfile = () => {
     updateProfile({ email, phone });
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2000);
   };
-
   const startAdd = () => {
     setDraft(EMPTY);
     setEditingId('new');
@@ -87,9 +72,7 @@ export function Profile() {
         <div className="account-card__head">
           <h2>Contact details</h2>
           {saved && (
-            <span className="otp-muted" role="status">
-              Saved
-            </span>
+            <span className="otp-muted" role="status"> Saved </span>
           )}
         </div>
         <div className="account-fields">
@@ -118,14 +101,11 @@ export function Profile() {
           <h2>Addresses</h2>
           {editingId === null && (
             <OutlinedButton onClick={startAdd}>
-              <Icon slot="icon" aria-hidden="true">
-                add
-              </Icon>
+              <Icon slot="icon" aria-hidden="true">add</Icon>
               Add address
             </OutlinedButton>
           )}
         </div>
-
         {editingId !== null && (
           <div className="address-form">
             {ADDRESS_FIELDS.map((f) => (
@@ -145,7 +125,6 @@ export function Profile() {
             </div>
           </div>
         )}
-
         {addresses.length === 0 && editingId === null ? (
           <p className="address-empty">No addresses yet.</p>
         ) : (
@@ -185,5 +164,4 @@ export function Profile() {
     </AdminPage>
   );
 }
-
 export default Profile;

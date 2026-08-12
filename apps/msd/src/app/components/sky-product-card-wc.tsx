@@ -12,6 +12,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 
 interface SkyProductCardProps {
+  children?: ReactNode;
   image?: string;
   imageAlt?: string;
   gallery?: string[];
@@ -37,12 +38,11 @@ interface SkyProductCardProps {
   href?: string;
   align?: 'left' | 'center' | 'right';
   onFavorite?: () => void;
-  children?: ReactNode;
 }
 
 export function SkyProductCardWC({
-  onFavorite,
   children,
+  onFavorite,
   ...props
 }: SkyProductCardProps) {
   const ref = useRef<HTMLElement>(null);

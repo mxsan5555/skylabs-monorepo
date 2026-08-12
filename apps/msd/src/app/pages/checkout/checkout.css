@@ -262,7 +262,17 @@
   color: var(--md-sys-color-on-surface-variant);
   line-height: 1.6;
 }
+.checkout-form__field-wrapper {
+  flex: 1;
+  min-width: 0;
+}
 
+.checkout-form__error {
+   margin: 4px 0 0;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: var(--md-sys-color-error);
+}
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .checkout-page__layout {

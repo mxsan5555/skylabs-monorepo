@@ -42,8 +42,11 @@ export function Map({ deals }: MapProps) {
     if (!isLoaded) {
         return <p>Loading map...</p>;
     }
-    return (
-        <GoogleMap
+return (
+
+<div className="map">
+
+    <GoogleMap
             onLoad={onLoad}
             zoom={11}
             center={center}
@@ -75,8 +78,11 @@ export function Map({ deals }: MapProps) {
     </button>
   </OverlayView>
 ))}
-        </GoogleMap>
-    );
+           </GoogleMap>
+
+</div>
+
+);
 }
 
 export default Map;

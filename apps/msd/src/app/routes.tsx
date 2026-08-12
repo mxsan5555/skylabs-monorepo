@@ -49,35 +49,18 @@ export function AppRoutes() {
         <Route path="/products" element={<ProductListing />} />
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/vendor/:slug" element={<VendorPage />} />
-        <Route path="/cart" element={<Cart />} />
-
         {/* ── Auth-gated consumer pages ── */}
-        <Route
-          path="/wishlist"
-          element={
-            <RequireAuth>
-              <Wishlist />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/checkout"
-          element={
-            <RequireAuth>
-              <Checkout />
-            </RequireAuth>
-          }
-        />
-
+        <Route path="/wishlist" element={<RequireAuth><Wishlist /> </RequireAuth>} />
+        <Route path="/cart" element={<RequireAuth><Cart /></RequireAuth>} />
+        <Route path="/checkout" element={<RequireAuth> <Checkout /> </RequireAuth>} />
         {/* ── Content pages ── */}
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogDetail />} />
+        <Route path="/products/:slug" element={<ProductDetail />} />
         <Route path="/showcase" element={<Showcase />} />
-
         {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}
         <Route path="*" element={<NotFound />} />
       </Route>
-
       {/* Auth screens use a minimal centered shell (no header/footer). */}
       <Route element={<AuthLayout />}>
         <Route path="/sign-in" element={<SignIn />} />
@@ -97,6 +80,8 @@ export function AppRoutes() {
           </RequireAuth>
         }
       >
+      {/* Authenticated console (after login / "My account"). */}
+      <Route element={<RequireAuth><AdminLayout /></RequireAuth>}>
         <Route path="/account" element={<Navigate to="/account/profile" replace />} />
         <Route
           path="/account/dashboard"

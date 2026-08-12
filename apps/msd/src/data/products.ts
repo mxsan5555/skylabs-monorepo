@@ -51,6 +51,9 @@ export const PRODUCTS: Product[] = [
     discount: 30,
     isNew: true,
     isFeatured: true,
+    rating: 4.8,
+    reviews: 156,
+    affiliateUrl: "https://www.celiginglobal.com/product/re-furesh-gelling-mask-25gm-x-10ea-with-coscor-5000ppm",
   },
   {
     id: 'p-02',
@@ -92,6 +95,9 @@ export const PRODUCTS: Product[] = [
     discount: 30,
     isNew: true,
     isFeatured: true,
+    rating: 4.8,
+    reviews: 156,
+    affiliateUrl: "https://www.celiginglobal.com/product/re-furesh-gelling-mask-25gm-x-10ea-with-coscor-5000ppm",
   },
   {
     id: 'p-03',
@@ -132,6 +138,9 @@ export const PRODUCTS: Product[] = [
     discount: 30,
     isNew: true,
     isFeatured: false,
+    rating: 4.8,
+    reviews: 156,
+    affiliateUrl: "https://www.celiginglobal.com/product/re-furesh-gelling-mask-25gm-x-10ea-with-coscor-5000ppm",
   },
   {
     id: 'p-04',
@@ -172,6 +181,9 @@ export const PRODUCTS: Product[] = [
     discount: 30,
     isNew: true,
     isFeatured: true,
+    rating: 4.8,
+    reviews: 156,
+    affiliateUrl: "https://www.celiginglobal.com/product/re-furesh-gelling-mask-25gm-x-10ea-with-coscor-5000ppm",
   },
   {
     id: 'p-05',
@@ -213,6 +225,9 @@ export const PRODUCTS: Product[] = [
     discount: 30,
     isNew: true,
     isFeatured: true,
+    rating: 4.8,
+    reviews: 156,
+    affiliateUrl: "https://www.celiginglobal.com/product/re-furesh-gelling-mask-25gm-x-10ea-with-coscor-5000ppm",
   },
   {
     id: 'p-06',
@@ -254,6 +269,9 @@ export const PRODUCTS: Product[] = [
     discount: 30,
     isNew: true,
     isFeatured: false,
+    rating: 4.8,
+    reviews: 156,
+    affiliateUrl: "https://www.celiginglobal.com/product/re-furesh-gelling-mask-25gm-x-10ea-with-coscor-5000ppm",
   },
   {
     id: 'p-07',
@@ -294,6 +312,9 @@ export const PRODUCTS: Product[] = [
     discount: 30,
     isNew: true,
     isFeatured: true,
+    rating: 4.8,
+    reviews: 156,
+    affiliateUrl: "https://www.celiginglobal.com/product/re-furesh-gelling-mask-25gm-x-10ea-with-coscor-5000ppm",
   },
 ];
 

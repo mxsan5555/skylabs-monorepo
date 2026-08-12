@@ -14,33 +14,48 @@
     "signOut": "Sign Out",
     "cart": "Cart",
     "wishlist": "Wishlist",
-    "homeAriaLabel": "MSD – MySpaDeal home"
+    "homeAriaLabel": "MSD – MySpaDeal home",
+    "detectingLocation": "Detecting location...",
+    "openMenu": "Open menu",
+    "profile": "Profile",
+    "profileMenu": {
+      "profile": "My Profile",
+      "bookings": "My Bookings",
+      "wishlist": "Wishlist",
+      "signOut": "Sign Out"
+    },
+    "drawerLabel": "Navigation drawer"
   },
   "nav": {
     "drawerCategoryHeader": "Browse Categories",
     "primary": [
       {
         "label": "Massage",
+        "icon": "self_improvement",
         "to": "/category/massage",
         "count": 12
       },
       {
         "label": "Spas & Retreats",
+        "icon": "spa",
         "to": "/category/spas-retreats",
         "count": 11
       },
       {
         "label": "Skin & Beauty",
+        "icon": "face",
         "to": "/category/skin-beauty",
         "count": 14
       },
       {
         "label": "Hair & Nails",
+        "icon": "content_cut",
         "to": "/category/hair-nails",
         "count": 7
       },
       {
         "label": "Health & Wellness",
+        "icon": "heart_smile",
         "to": "/category/health-wellness",
         "count": 13
       },
@@ -75,41 +90,105 @@
         "label": "Health & Wellness",
         "to": "/category/health-wellness",
         "count": 13
+      },
+      {
+        "label": "Product",
+        "to": "/products"
       }
     ],
     "footer": {
       "company": [
-        { "label": "About Us",     "to": "/about" },
-        { "label": "Blog",         "to": "/blog" },
-        { "label": "Careers",      "to": "/careers" },
-        { "label": "How It Works", "to": "/how-it-works" },
-        { "label": "Contact",      "to": "/contact" }
+        {
+          "label": "About Us",
+          "to": "/about"
+        },
+        {
+          "label": "Blog",
+          "to": "/blog"
+        },
+        {
+          "label": "Careers",
+          "to": "/careers"
+        },
+        {
+          "label": "How It Works",
+          "to": "/how-it-works"
+        },
+        {
+          "label": "Contact",
+          "to": "/contact"
+        }
       ],
       "discover": [
-        { "label": "Massage",          "to": "/category/massage" },
-        { "label": "Spas & Retreats",  "to": "/category/spas-retreats" },
-        { "label": "Skin & Beauty",    "to": "/category/skin-beauty" },
-        { "label": "Hair & Nails",     "to": "/category/hair-nails" },
-        { "label": "Health & Wellness","to": "/category/health-wellness" },
-        { "label": "Products",         "to": "/products" },
-        { "label": "Hot Deals",        "to": "/explore" }
+        {
+          "label": "Massage",
+          "to": "/category/massage"
+        },
+        {
+          "label": "Spas & Retreats",
+          "to": "/category/spas-retreats"
+        },
+        {
+          "label": "Skin & Beauty",
+          "to": "/category/skin-beauty"
+        },
+        {
+          "label": "Hair & Nails",
+          "to": "/category/hair-nails"
+        },
+        {
+          "label": "Health & Wellness",
+          "to": "/category/health-wellness"
+        },
+        {
+          "label": "Products",
+          "to": "/products"
+        },
+        {
+          "label": "Hot Deals",
+          "to": "/explore"
+        }
       ],
       "help": [
-        { "label": "Help Center",     "to": "/help" },
-        { "label": "Partner With Us", "to": "/partner" },
-        { "label": "Wishlist",        "to": "/wishlist" },
-        { "label": "Gifting",         "to": "/gifting" }
+        {
+          "label": "Help Center",
+          "to": "/help"
+        },
+        {
+          "label": "Partner With Us",
+          "to": "/partner"
+        },
+        {
+          "label": "Wishlist",
+          "to": "/wishlist"
+        },
+        {
+          "label": "Gifting",
+          "to": "/gifting"
+        }
       ],
       "legal": [
-        { "label": "Privacy Policy",  "to": "/privacy" },
-        { "label": "Terms of Service","to": "/terms" },
-        { "label": "Accessibility",   "to": "/accessibility" },
-        { "label": "Cookie Policy",   "to": "/cookies" }
+        {
+          "label": "Privacy Policy",
+          "to": "/privacy"
+        },
+        {
+          "label": "Terms of Service",
+          "to": "/terms"
+        },
+        {
+          "label": "Accessibility",
+          "to": "/accessibility"
+        },
+        {
+          "label": "Cookie Policy",
+          "to": "/cookies"
+        }
       ],
       "headings": {
-        "company":    "Company",
-        "discover":   "Discover",
-        "help":       "Help & Info",
+        "company": "Company",
+        "discover": "Discover",
+        "help": "Help & Info",
         "newsletter": "Get Exclusive Deals"
       },
       "newsletter": {
@@ -119,10 +198,26 @@
         "successMessage": "You're subscribed! Check your inbox."
       },
       "social": [
-        { "label": "Follow us on Facebook",  "key": "facebook",  "url": "https://facebook.com" },
-        { "label": "Follow us on X",         "key": "x",         "url": "https://x.com" },
-        { "label": "Watch us on YouTube",    "key": "youtube",   "url": "https://youtube.com" },
-        { "label": "Follow us on Instagram", "key": "instagram", "url": "https://instagram.com" }
+        {
+          "label": "Follow us on Facebook",
+          "key": "facebook",
+          "url": "https://facebook.com"
+        },
+        {
+          "label": "Follow us on X",
+          "key": "x",
+          "url": "https://x.com"
+        },
+        {
+          "label": "Watch us on YouTube",
+          "key": "youtube",
+          "url": "https://youtube.com"
+        },
+        {
+          "label": "Follow us on Instagram",
+          "key": "instagram",
+          "url": "https://instagram.com"
+        }
       ],
       "copyright": "MySpaDeal Pvt. Ltd. All rights reserved."
     }
@@ -133,6 +228,105 @@
       "subheading": "Book top-rated spas, massage studios, and beauty centres near you — exclusive deals, instant confirmation.",
       "searchPlaceholder": "Search spas, treatments, locations…",
       "ctaLabel": "Explore All Deals"
+    },
+    "spaFinderHero": {
+      "title": " Nearby Wellness",
+      "heading": "Find your perfect spa",
+      "subheading": "Discover spas near you",
+      "defaultTab": "Massage",
+      "mapDealsLimit": 8,
+      "suggestionLimit": 6,
+      "limits": {
+        "massage": 6,
+        "skinBeauty": 6,
+        "hairNails": 6,
+        "spaRetreats": 6,
+        "healthWellness": 6
+      },
+      "tabs": [
+        {
+          "label": "Massage",
+          "icon": "self_improvement"
+        },
+        {
+          "label": "Spa",
+          "icon": "spa"
+        },
+        {
+          "label": "Beauty",
+          "icon": "face"
+        },
+        {
+          "label": "Hair",
+          "icon": "content_cut"
+        },
+        {
+          "label": "Wellness",
+          "icon": "favorite"
+        }
+      ],
+      "search": {
+        "locationPlaceholder": "Current Location",
+        "servicePlaceholder": "Search services",
+        "button": "Search"
+      },
+      "popularHeading": "Popular",
+      "popular": [
+        "Couple Spa",
+        "Hair Spa",
+        "Deep Tissue",
+        "Facial"
+      ]
+    },
+    "premiumHero": {
+      "heading": "Relax. Refresh. Rejuvenate.",
+      "subheading": "Discover premium spas, salons and wellness experiences near you.",
+      "image": "https://images.unsplash.com/photo-1540555700478-4be289fbecef",
+      "imageAlt": "Luxury spa experience",
+      "tabs": [
+        {
+          "label": "Massage",
+          "icon": "self_improvement",
+          "to": "/category/massage"
+        },
+        {
+          "label": "Spa & Retreats",
+          "icon": "spa",
+          "to": "/category/spas-retreats"
+        },
+        {
+          "label": "Skin & Beauty",
+          "icon": "face",
+          "to": "/category/skin-beauty"
+        },
+        {
+          "label": "Hair & Nails",
+          "icon": "content_cut",
+          "to": "/category/hair-nails"
+        },
+        {
+          "label": "Health & Wellness",
+          "icon": "favorite",
+          "to": "/category/health-wellness"
+        },
+        {
+          "label": "Products",
+          "icon": "digital_wellbeing",
+          "to": "/products"
+        }
+      ],
+      "search": {
+        "locationPlaceholder": "Current Location",
+        "servicePlaceholder": "Search services",
+        "button": "Search"
+      },
+      "popular": [
+        "Couple Spa",
+        "Hair Spa",
+        "Deep Tissue",
+        "Facial",
+        "Ayurvedic Spa"
+      ]
     },
     "heroImages": [
       "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=1920&q=80",
@@ -282,33 +476,158 @@
         }
       ]
     },
+    "memberBanner": {
+      "icon": "payments",
+      "heading": "Want access to exclusive spa deals & member pricing?",
+      "button": "Sign In",
+      "buttonLink": "/sign-in"
+    },
+    "searchByDestination": {
+      "heading": "Search Spa Deals by Category",
+      "subheading": "Find massage, beauty, wellness and spa offers near you.",
+      "columns": [
+        [
+          {
+            "title": "Massage",
+            "items": [
+              "Swedish Massage",
+              "Deep Tissue Massage",
+              "Thai Massage",
+              "Hot Stone Massage"
+            ]
+          },
+          {
+            "title": "Facials",
+            "items": [
+              "Hydra Facial",
+              "Gold Facial",
+              "Anti Aging Facial"
+            ]
+          },
+          {
+            "title": "Hair Spa",
+            "items": [
+              "Hair Spa",
+              "Hair Smoothening",
+              "Keratin Treatment"
+            ]
+          }
+        ],
+        [
+          {
+            "title": "Spa Packages",
+            "items": [
+              "Couple Spa",
+              "Luxury Spa",
+              "Weekend Spa"
+            ]
+          },
+          {
+            "title": "Wellness",
+            "items": [
+              "Yoga",
+              "Meditation",
+              "Detox Therapy"
+            ]
+          },
+          {
+            "title": "Beauty",
+            "items": [
+              "Waxing",
+              "Threading",
+              "Makeup"
+            ]
+          }
+        ],
+        [
+          {
+            "title": "Nails",
+            "items": [
+              "Manicure",
+              "Pedicure",
+              "Nail Art"
+            ]
+          },
+          {
+            "title": "Body Care",
+            "items": [
+              "Body Polish",
+              "Body Scrub",
+              "Body Wrap"
+            ]
+          },
+          {
+            "title": "More Services",
+            "items": [
+              "Steam Bath",
+              "Sauna",
+              "Aromatherapy"
+            ]
+          }
+        ]
+      ]
+    },
     "faq": {
-  "heading": "Frequently Asked Questions",
-  "subheading": "Find answers to the most common questions about bookings, payments, cancellations, and gift cards.",
-  "items": [
-    {
-      "question": "How do I book a spa deal?",
-      "answer": "Select your preferred deal, choose a date and time, then complete the payment to confirm your booking."
+      "heading": "Frequently Asked Questions",
+      "subheading": "Find answers to the most common questions about bookings, payments, cancellations, and gift cards.",
+      "items": [
+        {
+          "question": "How do I book a spa deal?",
+          "answer": "Select your preferred deal, choose a date and time, then complete the payment to confirm your booking."
+        },
+        {
+          "question": "Can I cancel or reschedule my booking?",
+          "answer": "Yes. Most bookings can be cancelled or rescheduled before the cancellation deadline mentioned on the deal page."
+        },
+        {
+          "question": "Are gift cards valid for all spas?",
+          "answer": "Gift cards can be redeemed at participating spas listed on My Spa Deals."
+        },
+        {
+          "question": "How do I contact customer support?",
+          "answer": "You can contact our support team through the Contact Us page or email us anytime."
+        }
+      ]
     },
-    {
-      "question": "Can I cancel or reschedule my booking?",
-      "answer": "Yes. Most bookings can be cancelled or rescheduled before the cancellation deadline mentioned on the deal page."
-    },
-    {
-      "question": "Are gift cards valid for all spas?",
-      "answer": "Gift cards can be redeemed at participating spas listed on My Spa Deals."
-    },
-    {
-      "question": "How do I contact customer support?",
-      "answer": "You can contact our support team through the Contact Us page or email us anytime."
+    "trustSection": {
+      "cards": [
+        {
+          "type": "logos",
+          "logos": [
+            "https://picsum.photos/seed/logo1/60/60",
+            "https://picsum.photos/seed/logo2/60/60",
+            "https://picsum.photos/seed/logo3/60/60",
+            "https://picsum.photos/seed/logo4/60/60"
+          ],
+          "title": "Save when you compare",
+          "subtitle": "More deals, More sites, One search"
+        },
+        {
+          "type": "avatars",
+          "avatars": [
+            "https://picsum.photos/seed/user1/80/80",
+            "https://picsum.photos/seed/user2/80/80",
+            "https://picsum.photos/seed/user3/80/80",
+            "https://picsum.photos/seed/user4/80/80"
+          ],
+          "title": "10,000+",
+          "subtitle": "searches for massage this week"
+        },
+        {
+          "type": "stars",
+          "stars": 5,
+          "title": "You will definitly love it",
+          "subtitle": "1M+ ratings on our app"
+        }
+      ]
     }
-  ]
-}
   },
   "search": {
     "placeholder": "Search spas, treatments, locations…",
+    "ariaLabel": "Search deals",
     "resultLabel": "results",
     "noResults": "No results found. Try adjusting your filters.",
+    "emptySuggestion": "No spas found",
     "filters": {
       "price": {
         "label": "Price",
@@ -389,6 +708,16 @@
     "cancellationText": "Cancel up to 24 hours before your appointment for a full refund. Same-day cancellations are non-refundable.",
     "relatedDeals": "You May Also Like"
   },
+  "productDetail": {
+    "buyNow": "Buy Now",
+    "relatedProducts": "Related Products",
+    "description": "Description",
+    "benefits": "Benefits",
+    "howToUse": "How to Use",
+    "ingredients": "Ingredients",
+    "shipping": "Shipping",
+    "shippingText": "Ships within 3-5 business days."
+  },
   "cart": {
     "title": "My Cart",
     "emptyHeading": "Your cart is empty",
@@ -400,7 +729,7 @@
     "subtotal": "Subtotal",
     "discount": "Discount",
     "total": "Total",
-    "giftCardPlaceholder": "Enter gift card code"
+    "giftCardPlaceholder": "Enter coupon code"
   },
   "wishlist": {
     "title": "Saved Deals",
@@ -440,8 +769,44 @@
       "cvv": "CVV",
       "cardName": "Name on Card"
     },
+    "validation": {
+      "emptyName": "Please enter your full name.",
+      "invalidName": "Please enter a valid name.",
+      "emptyPhone": "Please enter your mobile number.",
+      "invalidPhone": "Please enter a valid 10-digit mobile number.",
+      "emptyEmail": "Please enter your email address.",
+      "invalidEmail": "Please enter a valid email address.",
+      "emptyCardName": "Please enter the name on your card.",
+      "invalidCardName": "Please enter a valid cardholder name.",
+      "emptyCardNumber": "Please enter your card number.",
+      "invalidCardNumber": "Please enter a valid 16-digit card number.",
+      "emptyExpiry": "Please enter your card expiry date.",
+      "invalidExpiry": "Please enter a valid, non-expired MM/YY.",
+      "emptyCvv": "Please enter your CVV.",
+      "invalidCvv": "CVV must contain 3 or 4 digits."
+    },
     "successHeading": "Booking Confirmed!",
     "successBody": "We have sent your booking details to your email. You'll hear from the spa within 2 hours."
+  },
+  "bookings": {
+    "metaTitle": "My Bookings | MSD",
+    "title": "My Bookings",
+    "subtitle": "View and manage your spa bookings.",
+    "bookAnotherLabel": "Book Another",
+    "empty": {
+      "title": "No bookings yet",
+      "description": "You haven't made any spa bookings yet. Explore our deals and find your next relaxing experience.",
+      "ctaLabel": "Explore Deals"
+    },
+    "card": {
+      "bookingIdLabel": "Booking ID",
+      "dateLabel": "Date",
+      "timeLabel": "Time",
+      "servicesTitle": "Booked Services",
+      "quantityLabel": "Quantity",
+      "totalLabel": "Total Amount",
+      "statusIconLabel": "Booking confirmed"
+    }
   },
   "meta": {
     "home": {
@@ -589,10 +954,22 @@
         "skinCare": "Skin Care"
       },
       "sortOptions": [
-        { "value": "popular",    "label": "Popularity" },
-        { "value": "price-asc",  "label": "Price: Low to High" },
-        { "value": "price-desc", "label": "Price: High to Low" },
-        { "value": "newest",     "label": "Newest" }
+        {
+          "value": "popular",
+          "label": "Popularity"
+        },
+        {
+          "value": "price-asc",
+          "label": "Price: Low to High"
+        },
+        {
+          "value": "price-desc",
+          "label": "Price: High to Low"
+        },
+        {
+          "value": "newest",
+          "label": "Newest"
+        }
       ],
       "sortLabel": "Sort by",
       "resultLabel": "products",

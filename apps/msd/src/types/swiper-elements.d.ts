@@ -39,7 +39,8 @@ declare module 'react' {
   namespace JSX {
     interface IntrinsicElements {
       'swiper-container': SwiperElement;
-      'swiper-slide': SwiperElement<Record<string, never>>;
+      // 'swiper-slide': SwiperElement<Record<string, never>>;
+       'swiper-slide': SwiperElement;
     }
   }
 }
