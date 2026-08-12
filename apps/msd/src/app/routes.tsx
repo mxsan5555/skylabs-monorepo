@@ -1,8 +1,13 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
+<<<<<<< HEAD
 import {
   RequireAuth,
   RequirePermission,
 } from '@skylabs-monorepo/shared-auth/react';
+=======
+import type { ReactNode } from 'react';
+import { RequireAuth, RequirePermission, useAuth } from '@skylabs-monorepo/shared-auth/react';
+>>>>>>> 275db0b380a074e08b87dd1a64afa93a1a6d617c
 import { PublicLayout } from './layouts/public-layout';
 import { AuthLayout } from './layouts/auth-layout';
 import { AdminLayout } from './layouts/admin-layout';
@@ -19,8 +24,21 @@ import Dashboard from './pages/account/dashboard';
 import { RoleManagement } from './pages/account/roles/roles';
 import { UserManagement } from './pages/account/users/users';
 import { AuditLogs } from './pages/account/audit-logs/audit-logs';
+import { VendorManagement } from './pages/account/vendors/vendors';
+import { BranchList } from './pages/account/vendors/branch-list';
+import { DealList } from './pages/account/vendors/deal-list';
+import { CategoryManagement } from './pages/account/masters/categories';
+import { ProductManagement } from './pages/account/products/products';
+import { ServiceManagement } from './pages/account/services/services';
+import { OrderManagement } from './pages/account/orders/orders';
 import Search from './pages/search/search';
 import Category from './pages/category/category';
+import { MarketplaceCategories } from './pages/marketplace/marketplace-categories';
+import { MarketplaceCategory } from './pages/marketplace/marketplace-category';
+import { MarketplaceCart } from './pages/marketplace/marketplace-cart';
+import { MarketplaceBookings } from './pages/marketplace/marketplace-bookings';
+import { MarketplaceOrders } from './pages/marketplace/marketplace-orders';
+import { MarketplaceOrderDetail } from './pages/marketplace/marketplace-order-detail';
 import DealDetail from './pages/deal-detail/deal-detail';
 import Cart from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
@@ -40,6 +58,23 @@ import WishlistPage from './admin/wishlist/wishlist';
 import AddressPage from './admin/address/address';
 import RefundPage from './admin/refund/refund';
 
+/**
+ * `/account/vendors` serves three audiences under different permission keys: admins hold
+ * `vendors:view`, vendor-role users hold `vendors:custom` (never `view` — that would also
+ * unlock the admin "list every vendor" endpoint, see vendors.tsx's doc comment) plus the
+ * narrower `vendor-portal:view` that only surfaces the "My Business" sidebar item.
+ * `RequirePermission` only checks a single action, so this route needs its own small
+ * OR-of-three-actions guard instead — kept local here rather than changing the shared
+ * `RequirePermission` component used by every other route in the app.
+ */
+function VendorsRouteGuard({ children }: { children: ReactNode }) {
+  const { can } = useAuth();
+  if (!can('vendors', 'view') && !can('vendors', 'custom') && !can('vendor-portal', 'view')) {
+    return <Navigate to="/account/profile" replace />;
+  }
+  return <>{children}</>;
+}
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -48,6 +83,43 @@ export function AppRoutes() {
         <Route path="/" element={<Home />} />
         <Route path="/explore" element={<Search />} />
         <Route path="/category/:slug" element={<Category />} />
+        {/* Real, backend-driven customer catalogue (Category → Sub-category → Service/Product →
+            Deal) — kept as its own route namespace, separate from the static-data /category and
+            /products pages above, so existing mock-data links/pages keep working unchanged. */}
+        <Route path="/marketplace" element={<MarketplaceCategories />} />
+        <Route
+          path="/marketplace/cart"
+          element={
+            <RequireAuth>
+              <MarketplaceCart />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/marketplace/bookings"
+          element={
+            <RequireAuth>
+              <MarketplaceBookings />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/marketplace/orders"
+          element={
+            <RequireAuth>
+              <MarketplaceOrders />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/marketplace/orders/:id"
+          element={
+            <RequireAuth>
+              <MarketplaceOrderDetail />
+            </RequireAuth>
+          }
+        />
+        <Route path="/marketplace/:slug" element={<MarketplaceCategory />} />
         <Route path="/deal/:id" element={<DealDetail />} />
         <Route path="/products" element={<ProductListing />} />
         <Route path="/products/:id" element={<ProductDetail />} />
@@ -131,8 +203,28 @@ export function AppRoutes() {
         <Route
           path="/account/vendors"
           element={
+            <VendorsRouteGuard>
+              <VendorManagement />
+            </VendorsRouteGuard>
+          }
+        />
+        <Route
+          path="/account/branches"
+          element={
             <RequirePermission menuKey="vendors">
+<<<<<<< HEAD
               <Vendor />
+=======
+              <BranchList />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/deals"
+          element={
+            <RequirePermission menuKey="vendors">
+              <DealList />
+>>>>>>> 275db0b380a074e08b87dd1a64afa93a1a6d617c
             </RequirePermission>
           }
         />
@@ -140,7 +232,19 @@ export function AppRoutes() {
           path="/account/orders"
           element={
             <RequirePermission menuKey="orders">
+<<<<<<< HEAD
               <OrdersPage />
+=======
+              <OrderManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/services"
+          element={
+            <RequirePermission menuKey="services">
+              <ServiceManagement />
+>>>>>>> 275db0b380a074e08b87dd1a64afa93a1a6d617c
             </RequirePermission>
           }
         />
@@ -148,6 +252,7 @@ export function AppRoutes() {
           path="/account/products"
           element={
             <RequirePermission menuKey="products">
+<<<<<<< HEAD
               <ProductsPage />
             </RequirePermission>
           }
@@ -173,6 +278,9 @@ export function AppRoutes() {
           element={
             <RequirePermission menuKey="refund">
               <RefundPage />
+=======
+              <ProductManagement />
+>>>>>>> 275db0b380a074e08b87dd1a64afa93a1a6d617c
             </RequirePermission>
           }
         />
@@ -196,7 +304,11 @@ export function AppRoutes() {
           path="/account/masters/categories"
           element={
             <RequirePermission menuKey="masters.categories">
+<<<<<<< HEAD
               <CategoryPage />
+=======
+              <CategoryManagement scope="top" />
+>>>>>>> 275db0b380a074e08b87dd1a64afa93a1a6d617c
             </RequirePermission>
           }
         />
@@ -205,7 +317,19 @@ export function AppRoutes() {
           path="/account/masters/sub-categories"
           element={
             <RequirePermission menuKey="masters.sub-categories">
+<<<<<<< HEAD
               <SubCategoryPage />
+=======
+              <CategoryManagement scope="sub" />
+            </RequirePermission>
+          }
+        />
+         <Route
+          path="/account/masters/deals"
+          element={
+            <RequirePermission menuKey="masters.deals">
+              <AdminPage title="Deals" subtitle="Module coming soon." />
+>>>>>>> 275db0b380a074e08b87dd1a64afa93a1a6d617c
             </RequirePermission>
           }
         />

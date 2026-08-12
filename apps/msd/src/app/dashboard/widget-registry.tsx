@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import { Link } from 'react-router-dom';
 
 interface WidgetProps {
   title: string;
@@ -49,8 +50,22 @@ function RevenueSummaryWidget({ title }: WidgetProps) {
   );
 }
 
+/** The vendor role's entry point to `/account/vendors` — that sidebar item itself is
+ *  admin-only (gated on `vendors:view`), so this widget is how a vendor user reaches
+ *  their own business profile/branches/deals instead. */
+function VendorProfileWidget({ title }: WidgetProps) {
+  return (
+    <article className="stat-card">
+      <h2 className="stat-card__title">{title}</h2>
+      <p>Manage your business profile, branches, and deals.</p>
+      <Link to="/account/vendors">Go to My Business →</Link>
+    </article>
+  );
+}
+
 export const WIDGET_REGISTRY: Record<string, ComponentType<WidgetProps>> = {
   'customers-count': CustomersCountWidget,
   'orders-recent': OrdersRecentWidget,
   'revenue-summary': RevenueSummaryWidget,
+  'vendor-profile': VendorProfileWidget,
 };

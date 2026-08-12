@@ -7,7 +7,7 @@
     "msd-api:prisma:migrate": "dotenv -e apps/msd-api/.env.local -- prisma migrate dev --schema=apps/msd-api/prisma/schema.prisma",
     "msd-api:prisma:validate": "dotenv -e apps/msd-api/.env.local -- prisma validate --schema=apps/msd-api/prisma/schema.prisma",
     "msd-api:prisma:studio": "dotenv -e apps/msd-api/.env.local -- prisma studio --schema=apps/msd-api/prisma/schema.prisma",
-    "msd-api:prisma:seed": "dotenv -e apps/msd-api/.env.local -- tsx apps/msd-api/prisma/seed.ts"
+    "msd-api:prisma:seed": "dotenv -e apps/msd-api/.env.local -- tsx --tsconfig tsconfig.base.json apps/msd-api/prisma/seed.ts"
   },
   "devDependencies": {
     "@angular-devkit/core": "~21.2.0",
@@ -113,6 +113,7 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "prisma": "6.19.3",
+    "razorpay": "^2.9.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "6.30.3",
