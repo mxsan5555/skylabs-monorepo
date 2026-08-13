@@ -24,19 +24,46 @@ export const ADMIN_MENU: MenuGroup[] = [
   {
     label: 'Overview',
     items: [
-      { label: 'Dashboard', icon: 'dashboard', to: '/account/dashboard', roles: EVERYONE },
-      { label: 'My Account', icon: 'person', to: '/account/profile', roles: EVERYONE },
-      { label: 'My Bookings', icon: 'calendar_month', to: '/account/bookings', roles: EVERYONE, },
+      {
+        label: 'Dashboard',
+        icon: 'dashboard',
+        to: '/account/dashboard',
+        roles: EVERYONE,
+      },
+      {
+        label: 'My Account',
+        icon: 'person',
+        to: '/account/profile',
+        roles: EVERYONE,
+      },
+      {
+        label: 'My Bookings',
+        icon: 'calendar_month',
+        to: '/account/bookings',
+        roles: EVERYONE,
+      },
     ],
   },
   {
     label: 'Masters',
     items: [
       {
-        label: 'Master', icon: 'folder', roles: ['admin'],
+        label: 'Master',
+        icon: 'folder',
+        roles: ['admin'],
         children: [
-          { label: 'Category', icon: 'category', to: '/account/master/category', roles: ['admin'], },
-          { label: 'Subcategory', icon: 'account_tree', to: '/account/master/subcategory', roles: ['admin'], },
+          {
+            label: 'Category',
+            icon: 'category',
+            to: '/account/master/category',
+            roles: ['admin'],
+          },
+          {
+            label: 'Subcategory',
+            icon: 'account_tree',
+            to: '/account/master/subcategory',
+            roles: ['admin'],
+          },
         ],
       },
     ],

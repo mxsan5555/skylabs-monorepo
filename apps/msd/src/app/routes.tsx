@@ -1,6 +1,10 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import type { ReactNode } from 'react';
-import { RequireAuth, RequirePermission, useAuth } from '@skylabs-monorepo/shared-auth/react';
+import {
+  RequireAuth,
+  RequirePermission,
+  useAuth,
+} from '@skylabs-monorepo/shared-auth/react';
 import { PublicLayout } from './layouts/public-layout';
 import { AuthLayout } from './layouts/auth-layout';
 import { AdminLayout } from './layouts/admin-layout';
@@ -38,7 +42,7 @@ import { Orders } from './pages/orders/orders';
 import { OrderDetail } from './pages/orders/order-detail';
 import { Bookings } from './pages/bookings/bookings';
 import DealDetail from './pages/deal-detail/deal-detail';
-import Cart from './pages/cart/cart';
+import { Cart } from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
 import Checkout from './pages/checkout/checkout';
 import ProductListing from './pages/products/products';
@@ -47,6 +51,8 @@ import VendorPage from './pages/vendor/vendor';
 import { MyAccountLayout } from './pages/my-account/my-account-layout';
 import { MyAccountProfile } from './pages/my-account/profile';
 import { MyAccountPayments } from './pages/my-account/payments';
+import { CustomerPage } from './admin/customer/customer';
+import { DealPage } from './admin/deal/deal';
 
 /**
  * `/account/vendors` serves three audiences under different permission keys: admins hold
@@ -59,7 +65,11 @@ import { MyAccountPayments } from './pages/my-account/payments';
  */
 function VendorsRouteGuard({ children }: { children: ReactNode }) {
   const { can } = useAuth();
-  if (!can('vendors', 'view') && !can('vendors', 'custom') && !can('vendor-portal', 'view')) {
+  if (
+    !can('vendors', 'view') &&
+    !can('vendors', 'custom') &&
+    !can('vendor-portal', 'view')
+  ) {
     return <Navigate to="/account/profile" replace />;
   }
   return <>{children}</>;
@@ -144,8 +154,18 @@ export function AppRoutes() {
         >
           <Route index element={<MyAccountProfile />} />
           <Route path="payments" element={<MyAccountPayments />} />
-          <Route path="invoices" element={<AdminPage title="Invoices" subtitle="Module coming soon." />} />
-          <Route path="settings" element={<AdminPage title="Settings" subtitle="Module coming soon." />} />
+          <Route
+            path="invoices"
+            element={
+              <AdminPage title="Invoices" subtitle="Module coming soon." />
+            }
+          />
+          <Route
+            path="settings"
+            element={
+              <AdminPage title="Settings" subtitle="Module coming soon." />
+            }
+          />
         </Route>
 
         {/* ── Content pages ── */}
@@ -184,7 +204,10 @@ export function AppRoutes() {
           </RequireAuth>
         }
       >
-        <Route path="/account" element={<Navigate to="/account/profile" replace />} />
+        <Route
+          path="/account"
+          element={<Navigate to="/account/profile" replace />}
+        />
         <Route
           path="/account/dashboard"
           element={
@@ -344,7 +367,7 @@ export function AppRoutes() {
             </RequirePermission>
           }
         />
-         <Route
+        <Route
           path="/account/masters/deals"
           element={
             <RequirePermission menuKey="masters.deals">
@@ -369,7 +392,7 @@ export function AppRoutes() {
           path="/account/masters/service"
           element={
             <RequirePermission menuKey="masters.service">
-              <ServicePage />
+              <ServiceManagement />
             </RequirePermission>
           }
         />

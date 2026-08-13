@@ -69,7 +69,12 @@ export type BookingStatus = 'confirmed' | 'cancelled';
 export type PriceLevel = '$' | '$$' | '$$$';
 export type SearchView = 'list' | 'grid' | 'map';
 export type CheckoutStep = 'details' | 'datetime' | 'payment';
-export type DealSort = 'popular' | 'rating' | 'price-asc' | 'price-desc' | 'distance';
+export type DealSort =
+  | 'popular'
+  | 'rating'
+  | 'price-asc'
+  | 'price-desc'
+  | 'distance';
 
 export interface Subcategory {
   id: string;
@@ -193,3 +198,6 @@ export interface SearchFilter {
   suggested: boolean;
   sort: DealSort;
 }
+
+// ─── Auth & RBAC types ───────────────────────────────────────────────────────
+export type UserRole = 'user' | 'admin' | 'marketing' | 'sales';
