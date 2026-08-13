@@ -1,20 +1,6 @@
 ﻿import { useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import {
-  OutlinedTextField,
-  ChipSet,
-  FilterChip,
-  Icon,
-  IconButton,
-  FilledTonalButton,
-  Dialog,
-  FilledButton,
-  TextButton,
-  Slider,
-  Checkbox,
-  Radio,
-  Divider,
-} from '@skylabs-monorepo/shared-ui/react';
+import { OutlinedTextField, ChipSet, FilterChip, Icon, IconButton, FilledTonalButton, Dialog, FilledButton, TextButton, Slider, Checkbox, Radio, Divider,} from '@skylabs-monorepo/shared-ui/react';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { useCart } from '../../../cart/cart-context';
@@ -28,9 +14,7 @@ import { Map } from '../../components/map';
 
 const { search: searchContent } = content;
 const DISTANCE_MAX = searchContent.filters.distance.max;
-
 type ActiveDialog = 'price' | 'category' | 'features' | 'distance' | null;
-
 const PRICE_LEVELS: { value: PriceLevel; label: string }[] =
   searchContent.filters.price.priceLevels as { value: PriceLevel; label: string }[];
 
@@ -38,8 +22,6 @@ export function Search() {
   const [params, setParams] = useSearchParams();
   const [view, setView] = useState<SearchView>('list');
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
-
-  // Filter state
   const [query, setQuery] = useState(params.get('q') ?? '');
   const [priceRange, setPriceRange] = useState<[number, number]>([
     searchContent.filters.price.min,
@@ -50,7 +32,6 @@ export function Search() {
   const [selectedCategory, setSelectedCategory] = useState(params.get('category') ?? '');
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
   const [distanceMax, setDistanceMax] = useState(DISTANCE_MAX);
-
   const priceDialogRef = useRef<{ show: () => void; close: () => void } | null>(null);
   const categoryDialogRef = useRef<{ show: () => void; close: () => void } | null>(null);
   const featuresDialogRef = useRef<{ show: () => void; close: () => void } | null>(null);
@@ -71,10 +52,8 @@ export function Search() {
   const filtered = useMemo(() => {
     let list = [...DEALS];
  const q = query.toLowerCase().trim();
-
 if (q) {
   const terms = q.split(/\s+/);
-
   list = list.filter((d) => {
     const searchableText = [
       d.title,
@@ -89,7 +68,6 @@ if (q) {
       .filter(Boolean)
       .join(' ')
       .toLowerCase();
-
     return terms.every((term) => searchableText.includes(term));
   });
 }
@@ -111,13 +89,11 @@ if (q) {
     }
     return list;
   }, [query, selectedCategory, selectedPriceLevels, priceRange, selectedFeatures, distanceMax, suggested]);
-
   function toggleFeature(f: string) {
     setSelectedFeatures((prev) =>
       prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f],
     );
   }
-
   function clearAllFilters() {
     setQuery('');
     setSelectedPriceLevels([]);
@@ -128,23 +104,19 @@ if (q) {
     setDistanceMax(DISTANCE_MAX);
     setParams({});
   }
-
   const hasActiveFilters =
     selectedPriceLevels.length > 0 ||
     suggested ||
     selectedCategory !== '' ||
     selectedFeatures.length > 0 ||
     distanceMax < DISTANCE_MAX;
-
   const { toggle: wishlistToggle, has: wishlistHas } = useWishlist();
   const { addItem } = useCart();
-
   return (
     <div className="search-page">
       <title>{content.meta.explore.title}</title>
       <meta name="description" content={content.meta.explore.description} />
       <meta name="robots" content="noindex" />
-
       {/* ── Search bar ─────────────────────────────────────────────────── */}
       <div className="search-page__bar-wrap">
         <div className="search-page__bar">
@@ -168,7 +140,6 @@ if (q) {
               <Icon slot="leading-icon" aria-hidden="true">search</Icon>
             </OutlinedTextField>
           </form>
-
           {/* View toggle */}
           <div className="search-page__view-toggle" role="group" aria-label="Results view">
             <IconButton
@@ -197,7 +168,6 @@ if (q) {
             </IconButton>
           </div>
         </div>
-
         {/* ── Filter chips ──────────────────────────────────────────────── */}
         <div className="search-page__chips">
           <ChipSet>
@@ -220,7 +190,6 @@ if (q) {
             >
               <Icon slot="icon" aria-hidden="true">auto_awesome</Icon>
             </FilterChip>
-
             {/* Category */}
             <FilterChip
               label={selectedCategory
@@ -231,7 +200,6 @@ if (q) {
             >
               <Icon slot="icon" aria-hidden="true">category</Icon>
             </FilterChip>
-
             {/* Features */}
             <FilterChip
               label={selectedFeatures.length > 0
@@ -254,7 +222,6 @@ if (q) {
               <Icon slot="icon" aria-hidden="true">near_me</Icon>
             </FilterChip>
           </ChipSet>
-
           {hasActiveFilters && (
             <TextButton onClick={clearAllFilters} className="search-page__clear">
               <Icon slot="icon" aria-hidden="true">close</Icon>
@@ -263,7 +230,6 @@ if (q) {
           )}
         </div>
       </div>
-
       {/* ── Results header ─────────────────────────────────────────────── */}
       <div className="search-page__content">
         <p
@@ -274,7 +240,6 @@ if (q) {
         >
           {filtered.length} {searchContent.resultLabel}
         </p>
-
         {/* ── List view ─────────────────────────────────────────────────── */}
         {view === 'list' && (
           <section aria-label="Search results list">
@@ -353,7 +318,6 @@ if (q) {
             )}
           </section>
         )}
-
         {/* ── Grid view ─────────────────────────────────────────────────── */}
         {view === 'grid' && (
           <section aria-label="Search results grid">
@@ -427,7 +391,6 @@ if (q) {
           </section>
         )}
       </div>
-
       {/* ── Price Dialog ───────────────────────────────────────────────── */}
       <Dialog
         ref={priceDialogRef as unknown as React.Ref<HTMLElement>}
