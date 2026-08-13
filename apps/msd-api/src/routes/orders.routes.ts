@@ -140,8 +140,18 @@ router.post(
 
 router.get('/', requirePermission('orders', 'view'), async (req, res, next) => {
   try {
-    const { page, pageSize, status, vendorId } = OrderListQuerySchema.parse(req.query);
-    const { items, total } = await orderService.listOrders(req.user!.sub, { page, pageSize, status, vendorId });
+    const { page, pageSize, status, vendorId, branchId, paymentStatus, createdFrom, createdTo, search } = OrderListQuerySchema.parse(req.query);
+    const { items, total } = await orderService.listOrders(req.user!.sub, {
+      page,
+      pageSize,
+      status,
+      vendorId,
+      branchId,
+      paymentStatus,
+      createdFrom,
+      createdTo,
+      search,
+    });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);
@@ -163,7 +173,7 @@ router.patch(
   validateBody(OrderStatusUpdateSchema),
   async (req, res, next) => {
     try {
-      const order = await orderService.setOrderStatus(req.params.id, req.body.status, req.body.cancellationReason);
+      const order = await orderService.setOrderStatus(req.user!.sub, req.params.id, req.body.status, req.body.cancellationReason);
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'order.status_change',

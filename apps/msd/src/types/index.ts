@@ -5,18 +5,6 @@
  * package). When a NestJS/Express backend lands, these mirror its contract.
  */
 
-/** Access roles. The backend supplies these in the JWT; the UI only gates on them. */
-export type UserRole = 'user' | 'admin' | 'marketing' | 'sales';
-
-export const ALL_ROLES: UserRole[] = ['user', 'admin', 'marketing', 'sales'];
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  roles: UserRole[];
-}
-
 export interface Address {
   id: string;
   label: string;
@@ -105,6 +93,7 @@ export interface Deal {
   slug: string;
   title: string;
   providerName: string;
+  providerSlug: string;
   categorySlug: string;
   subcategorySlug: string;
   description: string;
@@ -203,62 +192,4 @@ export interface SearchFilter {
   distanceMax?: number;
   suggested: boolean;
   sort: DealSort;
-}
-// ─── Vendor / Company Landing Page types ─────────────────────────────────────
-export interface DealVariant {
-  id: string;
-  label: string;
-  price: number;
-  originalPrice?: number;
-  discount?: number;
-  duration: number;
-  durationUnit: 'min' | 'hr';
-}
-export interface VendorService {
-  id: string;
-  title: string;
-  description: string;
-  image: string;
-  imageAlt: string;
-  badge?: string;
-  vendorCategorySlug: string;
-  masterCategorySlug: string;
-  rating?: number;
-  reviews?: number;
-  isPopular?: boolean;
-  variants: DealVariant[];
-  features?: string[];
-  tagline?: string;
-  included?: string[];
-  howToUse?: string[];
-  cancellationPolicy?: string;
-}
-export interface VendorCategory {
-  id: string;
-  slug: string;
-  name: string;
-  icon?: string;
-}
-export interface VendorOpeningHours {
-  day: string;
-  open: string | null;
-  close: string | null;
-}
-export interface Vendor {
-  id: string;
-  slug: string;
-  name: string;
-  tagline?: string;
-  coverImage: string;
-  coverImageAlt: string;
-  rating: number;
-  reviews: number;
-  location: string;
-  isOpen: boolean;
-  features: string[];
-  categories: VendorCategory[];
-  services: VendorService[];
-  masterCategorySlug: string;
-  description: string;
-  openingHours?: VendorOpeningHours[];
 }

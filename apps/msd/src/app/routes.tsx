@@ -12,6 +12,7 @@ import Blog from './pages/blog/blog';
 import BlogDetail from './pages/blog-detail/blog-detail';
 import SignIn from './pages/sign-in/sign-in';
 import Otp from './pages/otp/otp';
+import { ChooseExperience } from './pages/choose-experience/choose-experience';
 import Profile from './pages/account/profile';
 import Dashboard from './pages/account/dashboard';
 import { RoleManagement } from './pages/account/roles/roles';
@@ -20,18 +21,22 @@ import { AuditLogs } from './pages/account/audit-logs/audit-logs';
 import { VendorManagement } from './pages/account/vendors/vendors';
 import { BranchList } from './pages/account/vendors/branch-list';
 import { DealList } from './pages/account/vendors/deal-list';
+import { VendorBusinessProfile } from './pages/account/vendors/vendor-business-profile';
+import { VendorBranchesDeals } from './pages/account/vendors/vendor-branches-deals';
+import { VendorCustomers } from './pages/account/vendors/vendor-customers';
+import { VendorTherapists } from './pages/account/vendors/vendor-therapists';
+import { VendorDeals } from './pages/account/vendors/vendor-deals';
 import { CategoryManagement } from './pages/account/masters/categories';
 import { ProductManagement } from './pages/account/products/products';
 import { ServiceManagement } from './pages/account/services/services';
 import { OrderManagement } from './pages/account/orders/orders';
+import { BookingManagement } from './pages/account/bookings/bookings';
 import Search from './pages/search/search';
 import Category from './pages/category/category';
-import { MarketplaceCategories } from './pages/marketplace/marketplace-categories';
-import { MarketplaceCategory } from './pages/marketplace/marketplace-category';
-import { MarketplaceCart } from './pages/marketplace/marketplace-cart';
-import { MarketplaceBookings } from './pages/marketplace/marketplace-bookings';
-import { MarketplaceOrders } from './pages/marketplace/marketplace-orders';
-import { MarketplaceOrderDetail } from './pages/marketplace/marketplace-order-detail';
+import { CategoriesIndex } from './pages/categories/categories';
+import { Orders } from './pages/orders/orders';
+import { OrderDetail } from './pages/orders/order-detail';
+import { Bookings } from './pages/bookings/bookings';
 import DealDetail from './pages/deal-detail/deal-detail';
 import Cart from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
@@ -39,17 +44,9 @@ import Checkout from './pages/checkout/checkout';
 import ProductListing from './pages/products/products';
 import ProductDetail from './pages/product-detail/product-detail';
 import VendorPage from './pages/vendor/vendor';
-import { CategoryPage } from './admin/category/category';
-import { SubCategoryPage } from './admin/subcategory/subCategory';
-import { ServicePage } from './admin/service/service';
-import DealPage from './admin/deal/deal';
-import CustomerPage from './admin/customer/customer';
-import Vendor from './admin/vendor/vendor';
-import OrdersPage from './admin/orders/order';
-import ProductsPage from './admin/products/products';
-import WishlistPage from './admin/wishlist/wishlist';
-import AddressPage from './admin/address/address';
-import RefundPage from './admin/refund/refund';
+import { MyAccountLayout } from './pages/my-account/my-account-layout';
+import { MyAccountProfile } from './pages/my-account/profile';
+import { MyAccountPayments } from './pages/my-account/payments';
 
 /**
  * `/account/vendors` serves three audiences under different permission keys: admins hold
@@ -75,57 +72,16 @@ export function AppRoutes() {
         {/* ── Consumer storefront ── */}
         <Route path="/" element={<Home />} />
         <Route path="/explore" element={<Search />} />
+        {/* Customer catalogue — Category → Sub-category → Service/Product → Deal — backed by
+            `GET /catalog/*`. `/categories` is the "browse all categories" entry point (formerly
+            the marketplace route namespace, retired once this page absorbed its real-API data
+            source). */}
+        <Route path="/categories" element={<CategoriesIndex />} />
         <Route path="/category/:slug" element={<Category />} />
-        {/* Real, backend-driven customer catalogue (Category → Sub-category → Service/Product →
-            Deal) — kept as its own route namespace, separate from the static-data /category and
-            /products pages above, so existing mock-data links/pages keep working unchanged. */}
-        <Route path="/marketplace" element={<MarketplaceCategories />} />
-        <Route
-          path="/marketplace/cart"
-          element={
-            <RequireAuth>
-              <MarketplaceCart />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/marketplace/bookings"
-          element={
-            <RequireAuth>
-              <MarketplaceBookings />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/marketplace/orders"
-          element={
-            <RequireAuth>
-              <MarketplaceOrders />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/marketplace/orders/:id"
-          element={
-            <RequireAuth>
-              <MarketplaceOrderDetail />
-            </RequireAuth>
-          }
-        />
-        <Route path="/marketplace/:slug" element={<MarketplaceCategory />} />
         <Route path="/deal/:id" element={<DealDetail />} />
         <Route path="/products" element={<ProductListing />} />
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/vendor/:slug" element={<VendorPage />} />
-        {/* ── Auth-gated consumer pages ── */}
-        <Route
-          path="/wishlist"
-          element={
-            <RequireAuth>
-              <Wishlist />{' '}
-            </RequireAuth>
-          }
-        />
         <Route
           path="/cart"
           element={
@@ -135,14 +91,63 @@ export function AppRoutes() {
           }
         />
         <Route
-          path="/checkout"
+          path="/bookings"
           element={
             <RequireAuth>
-              {' '}
-              <Checkout />{' '}
+              <Bookings />
             </RequireAuth>
           }
         />
+        <Route
+          path="/orders"
+          element={
+            <RequireAuth>
+              <Orders />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/orders/:id"
+          element={
+            <RequireAuth>
+              <OrderDetail />
+            </RequireAuth>
+          }
+        />
+
+        {/* ── Auth-gated consumer pages ── */}
+        <Route
+          path="/wishlist"
+          element={
+            <RequireAuth>
+              <Wishlist />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/checkout"
+          element={
+            <RequireAuth>
+              <Checkout />
+            </RequireAuth>
+          }
+        />
+
+        {/* ── Customer "My Account" (storefront chrome, never AdminLayout) ── */}
+        <Route
+          path="/my-account"
+          element={
+            <RequireAuth>
+              <MyAccountLayout />
+            </RequireAuth>
+          }
+        >
+          <Route index element={<MyAccountProfile />} />
+          <Route path="payments" element={<MyAccountPayments />} />
+          <Route path="invoices" element={<AdminPage title="Invoices" subtitle="Module coming soon." />} />
+          <Route path="settings" element={<AdminPage title="Settings" subtitle="Module coming soon." />} />
+        </Route>
+
         {/* ── Content pages ── */}
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogDetail />} />
@@ -155,6 +160,14 @@ export function AppRoutes() {
       <Route element={<AuthLayout />}>
         <Route path="/sign-in" element={<SignIn />} />
         <Route path="/otp" element={<Otp />} />
+        <Route
+          path="/choose-experience"
+          element={
+            <RequireAuth>
+              <ChooseExperience />
+            </RequireAuth>
+          }
+        />
       </Route>
 
       {/* Authenticated console (after login / "My account"). Every leaf below
@@ -171,10 +184,7 @@ export function AppRoutes() {
           </RequireAuth>
         }
       >
-        <Route
-          path="/account"
-          element={<Navigate to="/account/profile" replace />}
-        />
+        <Route path="/account" element={<Navigate to="/account/profile" replace />} />
         <Route
           path="/account/dashboard"
           element={
@@ -201,6 +211,58 @@ export function AppRoutes() {
             </VendorsRouteGuard>
           }
         />
+        {/* Self-service split of the old combined "My Business" page — "Business Profile" and
+            "Branches & Deals" as two distinct nav items, both gated by `vendor-portal:view`
+            (the same narrow permission that used to gate the single combined page, granted
+            only to the `vendor` role — see vendors.tsx's `VendorsRouteGuard` doc comment). */}
+        <Route
+          path="/account/vendor-profile"
+          element={
+            <RequirePermission menuKey="vendor-portal">
+              <VendorBusinessProfile />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/vendor-branches-deals"
+          element={
+            <RequirePermission menuKey="vendor-portal">
+              <VendorBranchesDeals />
+            </RequirePermission>
+          }
+        />
+        {/* Vendor-facing flat "Deals / Packages" — same `vendor-portal:view` permission, same
+            underlying deals data as "Branches" above, just merged across all of the vendor's
+            branches into one table instead of one-branch-at-a-time. */}
+        <Route
+          path="/account/vendor-deals"
+          element={
+            <RequirePermission menuKey="vendor-portal">
+              <VendorDeals />
+            </RequirePermission>
+          }
+        />
+        {/* Vendor-facing Customers list — reuses `vendor-portal:view` too, so it's visible with
+            zero seed.ts/permission changes (same one-permissionKey-many-nodes pattern as
+            orders/bookings above). Data itself is scoped `vendors:custom` server-side. */}
+        <Route
+          path="/account/vendor-customers"
+          element={
+            <RequirePermission menuKey="vendor-portal">
+              <VendorCustomers />
+            </RequirePermission>
+          }
+        />
+        {/* Vendor-facing Therapists CRUD — reuses `vendor-portal:view` too (same one-permissionKey-
+            many-nodes pattern as Customers above). Data itself is scoped `vendors:custom` server-side. */}
+        <Route
+          path="/account/vendor-therapists"
+          element={
+            <RequirePermission menuKey="vendor-portal">
+              <VendorTherapists />
+            </RequirePermission>
+          }
+        />
         <Route
           path="/account/branches"
           element={
@@ -222,6 +284,14 @@ export function AppRoutes() {
           element={
             <RequirePermission menuKey="orders">
               <OrderManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/bookings"
+          element={
+            <RequirePermission menuKey="orders">
+              <BookingManagement />
             </RequirePermission>
           }
         />

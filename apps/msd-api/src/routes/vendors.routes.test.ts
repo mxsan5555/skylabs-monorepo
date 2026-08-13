@@ -207,7 +207,7 @@ describe('POST /api/v1/vendors (admin create)', () => {
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Admin-created Vendor', gstNumber: 'GST123', panNumber: 'PAN123' });
+      .send({ businessName: 'Admin-created Vendor', gstNumber: '27AAAAA0000A1Z5', panNumber: 'AAAAA0000A' });
     expect(res.status).toBe(201);
     expect(res.body.data.status).toBe('PENDING_VERIFICATION'); // gst+pan present -> skip PROFILE_INCOMPLETE
     expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();

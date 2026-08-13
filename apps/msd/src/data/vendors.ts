@@ -258,6 +258,109 @@ export const VENDORS: Vendor[] = [
       },
     ],
   },
+  {
+    id: 'v-02',
+    slug: 'urban-massage-studio',
+    name: 'Urban Massage Studio',
+    tagline: 'Relax, rejuvenate and feel your best',
+    coverImage: 'https://picsum.photos/seed/urban-massage-cover/1200/500',
+    coverImageAlt: 'Urban Massage Studio treatment room',
+
+    rating: 4.6,
+    reviews: 389,
+
+    location: 'Koramangala, Bangalore',
+    isOpen: true,
+
+    features: [
+      'Certified Therapists',
+      'Private Rooms',
+      'Mobile Therapist',
+      'AC Facility',
+    ],
+
+    description:
+      'Urban Massage Studio offers Swedish, deep tissue and Thai massage treatments delivered by certified therapists in a modern and comfortable environment.',
+
+    masterCategorySlug: 'massage',
+
+    openingHours: [
+      { day: 'Mon', open: '9:00 AM', close: '8:00 PM' },
+      { day: 'Tue', open: '9:00 AM', close: '8:00 PM' },
+      { day: 'Wed', open: '9:00 AM', close: '8:00 PM' },
+      { day: 'Thu', open: '9:00 AM', close: '8:00 PM' },
+      { day: 'Fri', open: '9:00 AM', close: '9:00 PM' },
+      { day: 'Sat', open: '10:00 AM', close: '9:00 PM' },
+      { day: 'Sun', open: '10:00 AM', close: '6:00 PM' },
+    ],
+
+    categories: [
+      {
+        id: 'vc-04',
+        slug: 'body-massages',
+        name: 'Body Massages',
+        icon: 'self_improvement',
+      },
+      {
+        id: 'vc-05',
+        slug: 'thai-massage',
+        name: 'Thai Massage',
+        icon: 'spa',
+      },
+    ],
+
+    services: [
+      {
+        id: 'vs-08',
+        title: 'Swedish Bliss',
+        description:
+          'Swedish deep tissue and Thai massage by certified therapists in a modern studio.',
+
+        image: 'https://picsum.photos/seed/urban-swedish-massage/600/400',
+        imageAlt: 'Swedish massage session at Urban Massage Studio',
+
+        vendorCategorySlug: 'body-massages',
+        masterCategorySlug: 'massage',
+
+        rating: 4.6,
+        reviews: 389,
+
+        isPopular: true,
+
+        features: ['Mobile Therapist', 'Certified Therapist'],
+
+        tagline:
+          'A relaxing Swedish massage designed to release tension and improve circulation.',
+
+        included: [
+          'Full body Swedish massage',
+          'Complimentary neck & shoulder focus',
+          'Post-session relaxation tea',
+        ],
+
+        howToUse: [
+          'Book your slot online.',
+          'Receive a therapist assignment notification.',
+          'Enjoy the session at the studio or at home.',
+        ],
+
+        cancellationPolicy:
+          'Cancel up to 4 hours before your appointment for a full refund.',
+
+        variants: [
+          {
+            id: 'vv-08a',
+            label: '60 min',
+            price: 999,
+            originalPrice: 1299,
+            discount: 23,
+            duration: 60,
+            durationUnit: 'min',
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 export function getVendorBySlug(slug: string): Vendor | undefined {

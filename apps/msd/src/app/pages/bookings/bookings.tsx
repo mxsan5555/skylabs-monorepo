@@ -6,10 +6,11 @@ import { listBookings, cancelBooking, type Booking } from '../../../api/bookings
 import { ApiRequestError } from '../../../api/rbac/client';
 import '../category/category.css';
 
-/** Customer's own service bookings (Phase 7) — reuses the admin-console's `entity-list`/
- *  `status-pill` classes (global, defined once in `styles.css`, not admin-scoped) for a
- *  consistent list look without inventing a new one. */
-export function MarketplaceBookings() {
+/** Customer's own service bookings — reuses the admin-console's `entity-list`/`status-pill`
+ *  classes (global, defined once in `styles.css`, not admin-scoped) for a consistent list look
+ *  without inventing a new one. Relocated here from the old marketplace bookings route now that
+ *  the marketplace route namespace is retired. */
+export function Bookings() {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -41,15 +42,14 @@ export function MarketplaceBookings() {
   };
 
   const orderNow = (booking: Booking) => {
-    // The real order-creation call now happens on /checkout itself (the one real checkout —
-    // see the Phase 9 architecture plan). If this booking already has an order, checkout.tsx's
-    // own error handling surfaces that 409 plainly.
+    // The real order-creation call happens on /checkout itself. If this booking already has an
+    // order, checkout.tsx's own error handling surfaces that 409 plainly.
     navigate('/checkout', { state: { bookingId: booking.id } });
   };
 
   return (
     <div className="category-page">
-      <title>My Bookings | Marketplace | MSD</title>
+      <title>My Bookings | MSD</title>
       <meta name="robots" content="noindex" />
 
       <header className="category-page__hero">
@@ -69,8 +69,8 @@ export function MarketplaceBookings() {
             <p className="error-state" role="alert">{error}</p>
           ) : bookings.length === 0 ? (
             <div className="category-page__empty">
-              <sky-info-card icon="event_busy" heading="No bookings yet" subheading="Book a service from the marketplace." />
-              <FilledButton onClick={() => navigate('/marketplace')}>Browse Marketplace</FilledButton>
+              <sky-info-card icon="event_busy" heading="No bookings yet" subheading="Book a service from a category page." />
+              <FilledButton onClick={() => navigate('/categories')}>Browse Categories</FilledButton>
             </div>
           ) : (
             <ul className="entity-list">
@@ -105,10 +105,10 @@ export function MarketplaceBookings() {
         </div>
       </section>
 
-      <Link to="/marketplace/cart" className="field-hint">View your cart →</Link>{' '}
-      <Link to="/marketplace/orders" className="field-hint">View your orders →</Link>
+      <Link to="/cart" className="field-hint">View your cart →</Link>{' '}
+      <Link to="/orders" className="field-hint">View your orders →</Link>
     </div>
   );
 }
 
-export default MarketplaceBookings;
+export default Bookings;

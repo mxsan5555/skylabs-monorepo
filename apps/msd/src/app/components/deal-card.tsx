@@ -1,21 +1,51 @@
 import { SkyProductCardWC } from './sky-product-card-wc';
-import type { Deal } from '../../types';
 import { formatINR } from '../../utils/format';
 import { useRef } from 'react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import { Icon, FilledButton, FilledTonalIconButton } from '@skylabs-monorepo/shared-ui/react';
+import { Icon, FilledTonalIconButton } from '@skylabs-monorepo/shared-ui/react';
 import './deal-card.css';
 import '@skylabs-monorepo/shared-ui';
+
+/**
+ * What `DealCard` actually needs to render — a relaxed superset of the mock `Deal` type (still
+ * satisfied by it structurally, so existing mock-data callers like `home-deal-card.tsx` keep
+ * compiling unchanged) that also accepts a real `CatalogDeal` adapted to this shape. Real deals
+ * have no rating/reviews/distance/location/badge fields (none exist on the real `Deal` model),
+ * so those stay optional here and are simply omitted rather than fabricated when absent.
+ */
+export interface DealCardDeal {
+  id: string;
+  title: string;
+  image: string;
+  imageAlt: string;
+  gallery?: string[];
+  badge?: string;
+  providerName?: string;
+  location?: string;
+  distance?: number;
+  rating?: number;
+  reviews?: number;
+  price: number;
+  originalPrice?: number;
+  discount?: number;
+  priceNote?: string;
+}
+
 interface DealCardProps {
-  deal: Deal;
+  deal: DealCardDeal;
   favoriteActive: boolean;
   onFavorite: () => void;
+  /** Vendor-name link target, e.g. `/vendor/:slug` — only ever set for real deals (a real
+   *  `CatalogDeal.vendor.slug` is always present for a visible deal); mock-data callers omit it
+   *  and the vendor name simply renders unlinked, same as before. */
+  eyebrowHref?: string;
 }
 
 export function DealCard({
   deal,
   favoriteActive,
   onFavorite,
+  eyebrowHref,
 }: DealCardProps) {
   const swiperRef = useRef<any>(null);
   return (
@@ -26,9 +56,10 @@ export function DealCard({
       favoriteActive={favoriteActive}
       onFavorite={onFavorite}
       eyebrow={deal.providerName}
+      eyebrowHref={eyebrowHref}
       heading={deal.title}
       location={deal.location}
-      distance={`${deal.distance} km`}
+      distance={deal.distance !== undefined ? `${deal.distance} km` : undefined}
       rating={deal.rating}
       reviews={deal.reviews}
       originalPrice={

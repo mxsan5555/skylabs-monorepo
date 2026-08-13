@@ -148,6 +148,7 @@ model User {
   cart                      Cart?
   bookings                  Booking[]
   orders                    Order[]
+  wishlistItems             WishlistItem[]
 
   @@index([status])
 }
@@ -337,6 +338,10 @@ model Vendor {
   /// The User who logs in and manages this business. Null until an admin-created
   /// vendor is claimed, or set immediately on self-registration (== req.user.sub).
   ownerUserId String? @unique
+  /// Public storefront URL slug (`/vendors/:slug`). Nullable — existing rows predate this
+  /// column; backfilled once in seed.ts, never required at the DB level to avoid a
+  /// backfill-before-migrate step. Unique so two vendors can never collide on one slug.
+  slug        String? @unique
 
   // Business information
   /// Nullable: the admin-create pipeline persists a Vendor after Step 1 (Vendor User)
@@ -393,12 +398,13 @@ model Vendor {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner    User?    @relation("VendorOwner", fields: [ownerUserId], references: [id])
-  branches Branch[]
-  deals    Deal[]
-  carts    Cart[]
-  bookings Booking[]
-  orders   Order[]
+  owner      User?       @relation("VendorOwner", fields: [ownerUserId], references: [id])
+  branches   Branch[]
+  deals      Deal[]
+  carts      Cart[]
+  bookings   Booking[]
+  orders     Order[]
+  therapists Therapist[]
 
   @@index([status])
   @@index([ownerUserId])
@@ -418,17 +424,47 @@ model Branch {
   phone     String?
   email     String?
   isActive  Boolean @default(true)
+  /// Loosely-structured weekly hours, e.g. {"mon":"09:00-20:00",...,"sun":"closed"} — same
+  /// no-upload-pipeline-style Json field as Vendor.kycDocuments/Deal.images. Nullable: existing
+  /// seeded branches predate this column.
+  openingHours Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  deals  Deal[]
-  carts    Cart[]
-  bookings Booking[]
-  orders   Order[]
+  vendor     Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  deals      Deal[]
+  carts      Cart[]
+  bookings   Booking[]
+  orders     Order[]
+  therapists Therapist[]
 
   @@index([vendorId])
+}
+
+/// A vendor+branch's staff member offering services — vendor+branch scoped like Deal, but never
+/// priced/bookable on its own (the Deal remains the sellable unit; Therapist is just an optional
+/// "who" a Booking can request). No delete endpoint — like Branch, only ever soft-disabled via
+/// isActive to avoid orphaning historical Bookings that reference one.
+model Therapist {
+  id              String   @id @default(uuid())
+  vendorId        String
+  branchId        String
+  name            String
+  specialization  String?
+  bio             String?
+  experienceYears Int?
+  photoUrl        String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  branch   Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([vendorId])
+  @@index([branchId])
 }
 
 /// Self-referential category tree (a row with a non-null parentId IS a subcategory) — the
@@ -506,9 +542,10 @@ model Deal {
   subcategory Category? @relation("DealSubcategory", fields: [subcategoryId], references: [id])
   service     Service?  @relation(fields: [serviceId], references: [id])
   product     Product?  @relation(fields: [productId], references: [id])
-  cartItems   CartItem[]
-  bookings    Booking[]
-  orderItems  OrderItem[]
+  cartItems     CartItem[]
+  bookings      Booking[]
+  orderItems    OrderItem[]
+  wishlistItems WishlistItem[]
 
   @@index([vendorId])
   @@index([branchId])
@@ -638,6 +675,26 @@ model CartItem {
   @@index([dealId])
 }
 
+/// A customer's "saved for later" list — any deal type (service or product), unlike Cart which
+/// is product-only. customerId is always req.user.sub, never client-supplied, same resolution
+/// as Cart/Booking. Visibility of an item's Deal is re-checked at read time against
+/// catalog.service.ts's VISIBLE_DEAL_WHERE (not enforced here in the DB — a Deal can legitimately
+/// go inactive/rejected after being wishlisted, and the item should just stop appearing rather
+/// than being deleted, so the customer's intent isn't silently lost if the deal comes back).
+model WishlistItem {
+  id         String   @id @default(uuid())
+  customerId String
+  dealId     String
+  createdAt  DateTime @default(now())
+
+  customer User @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deal     Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, dealId])
+  @@index([customerId])
+  @@index([dealId])
+}
+
 /// One row = one appointment request for exactly one SERVICE deal (deal.serviceId != null,
 /// enforced in booking.service.ts). Deliberately no BookingItem sub-table: unlike a product
 /// cart — which exists specifically to accumulate several different deals before one checkout —
@@ -653,6 +710,11 @@ model Booking {
   /// pattern — lets ownership queries (a vendor's own bookings, a later phase) skip a join.
   vendorId   String
   branchId   String
+  /// Optional — "Any therapist" must remain a valid choice, so this is nullable. When set, must
+  /// belong to the same vendor+branch as the Deal (enforced in booking.service.ts, never trusted
+  /// from the client) and be active at booking time. No onDelete cascade: Therapists are never
+  /// hard-deleted (only soft-disabled via isActive), so this reference can never be orphaned.
+  therapistId String?
 
   bookingDate DateTime
   /// Free text for now (e.g. "10:00 AM"), matching the existing storefront's TIME_OPTIONS — a
@@ -672,16 +734,18 @@ model Booking {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  customer User   @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  deal     Deal   @relation(fields: [dealId], references: [id])
-  vendor   Vendor @relation(fields: [vendorId], references: [id])
-  branch   Branch @relation(fields: [branchId], references: [id])
-  order    Order?
+  customer  User       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deal      Deal       @relation(fields: [dealId], references: [id])
+  vendor    Vendor     @relation(fields: [vendorId], references: [id])
+  branch    Branch     @relation(fields: [branchId], references: [id])
+  therapist Therapist? @relation(fields: [therapistId], references: [id])
+  order     Order?
 
   @@index([customerId])
   @@index([vendorId])
   @@index([branchId])
   @@index([dealId])
+  @@index([therapistId])
 }
 
 // ─── Order (Phase 8 — Booking/Cart convergence point) ────────────────────────

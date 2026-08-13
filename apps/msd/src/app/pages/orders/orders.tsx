@@ -6,9 +6,11 @@ import { listMyOrders, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
 import '../category/category.css';
 
-/** Customer's own orders — the Cart/Booking convergence point (Phase 8). Reuses `entity-list`/
- *  `status-pill` exactly like `marketplace-bookings.tsx`. */
-export function MarketplaceOrders() {
+/** Customer's own orders — the Cart/Booking convergence point. Reuses `entity-list`/
+ *  `status-pill` exactly like `bookings.tsx`. Relocated here from the old marketplace orders
+ *  route now that the marketplace route namespace is retired — this page never had a
+ *  mock/static equivalent, so it moved rather than merged. */
+export function Orders() {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -30,7 +32,7 @@ export function MarketplaceOrders() {
 
   return (
     <div className="category-page">
-      <title>My Orders | Marketplace | MSD</title>
+      <title>My Orders | MSD</title>
       <meta name="robots" content="noindex" />
 
       <header className="category-page__hero">
@@ -50,8 +52,8 @@ export function MarketplaceOrders() {
             <p className="error-state" role="alert">{error}</p>
           ) : orders.length === 0 ? (
             <div className="category-page__empty">
-              <sky-info-card icon="receipt_long" heading="No orders yet" subheading="Orders you place from the marketplace will show up here." />
-              <FilledButton onClick={() => navigate('/marketplace')}>Browse Marketplace</FilledButton>
+              <sky-info-card icon="receipt_long" heading="No orders yet" subheading="Orders you place will show up here." />
+              <FilledButton onClick={() => navigate('/categories')}>Browse Categories</FilledButton>
             </div>
           ) : (
             <ul className="entity-list">
@@ -71,7 +73,7 @@ export function MarketplaceOrders() {
                       {order.status}
                     </span>
                   </div>
-                  <Link to={`/marketplace/orders/${order.id}`} className="field-hint">View details →</Link>
+                  <Link to={`/orders/${order.id}`} className="field-hint">View details →</Link>
                 </li>
               ))}
             </ul>
@@ -82,4 +84,4 @@ export function MarketplaceOrders() {
   );
 }
 
-export default MarketplaceOrders;
+export default Orders;

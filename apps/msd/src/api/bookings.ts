@@ -37,6 +37,8 @@ export interface BookingInput {
   bookingDate: string;
   timeSlot: string;
   quantity?: number;
+  /** Omit entirely for "any therapist" — the API assigns automatically. */
+  therapistId?: string;
 }
 
 function toQuery(params: Record<string, string | number | undefined>): string {

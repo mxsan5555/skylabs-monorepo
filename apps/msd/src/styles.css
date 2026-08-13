@@ -151,6 +151,41 @@ input[type='checkbox'] {
   color: var(--md-sys-color-on-surface-variant);
 }
 
+/* Dashboard business-process-flow section */
+.process-flow {
+  margin-top: 8px;
+}
+
+.process-flow__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.process-flow__step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.process-flow__card {
+  min-width: 160px;
+  padding: 14px 16px;
+}
+
+.process-flow__value {
+  font-size: 1.1rem;
+}
+
+.process-flow__arrow {
+  color: var(--md-sys-color-on-surface-variant);
+  flex-shrink: 0;
+}
+
 /* Generic two-pane admin screen: list on the left, detail on the right. */
 .two-pane {
   display: grid;
@@ -175,6 +210,31 @@ input[type='checkbox'] {
   margin: 0 0 12px;
   font-size: 1rem;
   color: var(--md-sys-color-on-surface);
+}
+
+/* Vendor Management page (vendors.tsx): the Vendors list panel now sits full-width above the
+   selected vendor's detail panel (rather than beside it in `.two-pane`), so the detail panel
+   needs its own top spacing instead of `.two-pane`'s grid `gap`. */
+.vendor-detail {
+  margin-top: 20px;
+}
+
+/* Vendor Detail (and similar) full-width tabbed panels: a Tabs strip switching between several
+   already-existing sub-views (e.g. Overview/Branches & Deals/Therapists/Customers/Orders/Bookings)
+   rendered below the shared header actions, instead of stacking every section vertically. */
+.admin-tabs-wrap {
+  margin: 4px 0 16px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.admin-tabs-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+.admin-tab-panel {
+  padding-top: 4px;
 }
 
 .entity-list {

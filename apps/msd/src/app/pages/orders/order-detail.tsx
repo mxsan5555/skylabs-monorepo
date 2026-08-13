@@ -8,8 +8,9 @@ import { formatINR } from '../../../utils/format';
 import '../cart/cart.css';
 
 /** Order confirmation / detail — the landing page after checkout or "confirm booking",
- *  reusing `cart.css`'s summary-card classes for a consistent look. */
-export function MarketplaceOrderDetail() {
+ *  reusing `cart.css`'s summary-card classes for a consistent look. Relocated here from
+ *  the old marketplace order-detail route now that the marketplace route namespace is retired. */
+export function OrderDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const { token } = useAuth();
   const navigate = useNavigate();
@@ -48,7 +49,7 @@ export function MarketplaceOrderDetail() {
       <div className="cart-page cart-page--empty">
         <title>Order Not Found | MSD</title>
         <sky-info-card icon="search_off" heading="Order not found" subheading={error || 'It may belong to a different account.'} />
-        <FilledButton onClick={() => navigate('/marketplace/orders')}>My Orders</FilledButton>
+        <FilledButton onClick={() => navigate('/orders')}>My Orders</FilledButton>
       </div>
     );
   }
@@ -106,7 +107,7 @@ export function MarketplaceOrderDetail() {
             {(order.status === 'PENDING_PAYMENT' || order.status === 'CONFIRMED') && (
               <OutlinedButton onClick={cancel}>Cancel order</OutlinedButton>
             )}
-            <OutlinedButton onClick={() => navigate('/marketplace/orders')}>My Orders</OutlinedButton>
+            <OutlinedButton onClick={() => navigate('/orders')}>My Orders</OutlinedButton>
           </div>
         </sky-card>
       </div>
@@ -114,4 +115,4 @@ export function MarketplaceOrderDetail() {
   );
 }
 
-export default MarketplaceOrderDetail;
+export default OrderDetail;

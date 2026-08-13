@@ -13,7 +13,6 @@ import './assets/theme/index.css';
 
 import App from './app/app';
 import { CartProvider } from './cart/cart-context';
-import { WishlistProvider } from './wishlist/wishlist-context';
 
 applyTheme('light');
 
@@ -25,9 +24,7 @@ root.render(
   <StrictMode>
     <BrowserRouter>
       <CartProvider>
-        <WishlistProvider>
-          <App />
-        </WishlistProvider>
+        <App />
       </CartProvider>
     </BrowserRouter>
   </StrictMode>,

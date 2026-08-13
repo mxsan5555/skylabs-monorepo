@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FilledButton, Icon, Divider } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
@@ -107,7 +107,7 @@ export function Checkout() {
         modal: { ondismiss: () => setPaying(false) },
         handler: (response) => {
           verifyPayment(token, order.id, response)
-            .then(({ data }) => navigate(`/marketplace/orders/${data.id}`))
+            .then(({ data }) => navigate(`/orders/${data.id}`))
             .catch((err) => {
               setError(
                 err instanceof ApiRequestError
@@ -142,12 +142,8 @@ export function Checkout() {
     return (
       <div className="checkout-page checkout-page--empty">
         <title>{content.meta.checkout.title}</title>
-        <p className="error-state" role="alert">
-          {error}
-        </p>
-        <FilledButton onClick={() => navigate('/marketplace')}>
-          Back to Marketplace
-        </FilledButton>
+        <p className="error-state" role="alert">{error}</p>
+        <FilledButton onClick={() => navigate('/categories')}>Back to Categories</FilledButton>
       </div>
     );
   }
@@ -202,11 +198,7 @@ export function Checkout() {
                 </>
               )}
 
-              {error && (
-                <p className="error-state" role="alert">
-                  {error}
-                </p>
-              )}
+              {error && <p className="error-state" role="alert">{error}</p>}
             </section>
           </main>
 

@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import type { MenuNode } from '@skylabs-monorepo/shared-types';
 import { Icon, TextButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { isDualRoleUser, setExperienceMode } from '../../auth/role-routing';
 
 /**
  * Console navigation, built directly from `bootstrap.menu` — the server has
@@ -20,10 +21,15 @@ export function Sidebar() {
   const menu = bootstrap?.menu ?? [];
   const visibleMenu = isPreviewing ? menu.filter((node) => node.id !== 'administration') : menu;
   const initial = (bootstrap?.user.name ?? '?').charAt(0).toUpperCase();
+  const dualRole = bootstrap ? isDualRoleUser(bootstrap) : false;
 
   const doSignOut = () => {
     signOut();
     navigate('/sign-in');
+  };
+
+  const switchToCustomer = () => {
+    setExperienceMode('customer');
   };
 
   return (
@@ -40,6 +46,12 @@ export function Sidebar() {
 
       <nav className="admin-sidebar__nav" aria-label="Console">
         {visibleMenu.map((node) => <MenuNodeItem key={node.id} node={node} />)}
+        {dualRole && (
+          <NavLink to="/" onClick={switchToCustomer} className="admin-nav-item">
+            <Icon aria-hidden="true">storefront</Icon>
+            Switch to Customer view
+          </NavLink>
+        )}
       </nav>
 
       <div className="admin-sidebar__user">

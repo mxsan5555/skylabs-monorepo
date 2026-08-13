@@ -39,18 +39,47 @@ export function getCart(token: string | null) {
   return apiGet<Cart>('/cart', token);
 }
 
+/**
+ * Lightweight pub/sub so any component that mutates the cart (category/product pages, the cart
+ * page itself) can tell others — chiefly the header's cart-count badge — to refetch, without a
+ * new global store. Every mutator below notifies on success.
+ */
+type CartListener = () => void;
+const listeners = new Set<CartListener>();
+
+export function subscribeCartUpdated(listener: CartListener): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function notifyCartUpdated() {
+  listeners.forEach((listener) => listener());
+}
+
 export function addCartItem(token: string | null, dealId: string, quantity = 1) {
-  return apiPost<Cart>('/cart/items', token, { dealId, quantity });
+  return apiPost<Cart>('/cart/items', token, { dealId, quantity }).then((res) => {
+    notifyCartUpdated();
+    return res;
+  });
 }
 
 export function updateCartItemQuantity(token: string | null, itemId: string, quantity: number) {
-  return apiPatch<Cart>(`/cart/items/${itemId}`, token, { quantity });
+  return apiPatch<Cart>(`/cart/items/${itemId}`, token, { quantity }).then((res) => {
+    notifyCartUpdated();
+    return res;
+  });
 }
 
 export function removeCartItem(token: string | null, itemId: string) {
-  return apiDelete<Cart>(`/cart/items/${itemId}`, token);
+  return apiDelete<Cart>(`/cart/items/${itemId}`, token).then((res) => {
+    notifyCartUpdated();
+    return res;
+  });
 }
 
 export function clearCart(token: string | null) {
-  return apiDelete<Cart>('/cart', token);
+  return apiDelete<Cart>('/cart', token).then((res) => {
+    notifyCartUpdated();
+    return res;
+  });
 }
