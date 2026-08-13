@@ -159,24 +159,60 @@ export function Home() {
   // "Featured" = newest real deals — no `isFeatured` flag exists on the real `Deal` model. The
   // batched fetch above already comes back in the backend's default `sort=newest` order, so this
   // just caps the showcase to a sensible carousel length.
-  const featuredDeals = useMemo(() => dealsData.slice(0, 12), [dealsData]);
-  // "Hot" = highest `discountPercent` first — no `isHot` flag exists either. Sorted client-side
-  // from the same fetched array instead of firing a second `sort=discount` request.
-  const hotDeals = useMemo(
-    () => [...dealsData].sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0)),
-    [dealsData],
-  );
-  const massageDeals = useMemo(
-    () => dealsData.filter((d) => dealMatchesMockSlug(d, 'massage')).slice(0, spaFinder.limits.massage),
-    [dealsData, spaFinder.limits.massage],
-  );
-  const skinDeals = useMemo(() => dealsData.filter((d) => dealMatchesMockSlug(d, 'skin-beauty')).slice(0, 6), [dealsData]);
-  const nailDeals = useMemo(() => dealsData.filter((d) => dealMatchesMockSlug(d, 'hair-nails')).slice(0, 6), [dealsData]);
-  const spaDeals = useMemo(() => dealsData.filter((d) => dealMatchesMockSlug(d, 'spas-retreats')).slice(0, 6), [dealsData]);
-  const wellnessDeals = useMemo(() => dealsData.filter((d) => dealMatchesMockSlug(d, 'health-wellness')).slice(0, 6), [dealsData]);
+  const safeDealsData = dealsData ?? [];
 
-  // Hero search suggestions — a real, debounced `GET /catalog/deals?search=` call instead of a
-  // client-side substring match over mock `DEALS`. One request per keystroke-debounce (not per
+const featuredDeals = useMemo(
+  () => safeDealsData.slice(0, 12),
+  [safeDealsData],
+);
+
+const hotDeals = useMemo(
+  () =>
+    [...safeDealsData].sort(
+      (a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0),
+    ),
+  [safeDealsData],
+);
+
+const massageDeals = useMemo(
+  () =>
+    safeDealsData
+      .filter((d) => dealMatchesMockSlug(d, 'massage'))
+      .slice(0, spaFinder.limits.massage),
+  [safeDealsData, spaFinder.limits.massage],
+);
+
+const skinDeals = useMemo(
+  () =>
+    safeDealsData
+      .filter((d) => dealMatchesMockSlug(d, 'skin-beauty'))
+      .slice(0, 6),
+  [safeDealsData],
+);
+
+const nailDeals = useMemo(
+  () =>
+    safeDealsData
+      .filter((d) => dealMatchesMockSlug(d, 'hair-nails'))
+      .slice(0, 6),
+  [safeDealsData],
+);
+
+const spaDeals = useMemo(
+  () =>
+    safeDealsData
+      .filter((d) => dealMatchesMockSlug(d, 'spas-retreats'))
+      .slice(0, 6),
+  [safeDealsData],
+);
+
+const wellnessDeals = useMemo(
+  () =>
+    safeDealsData
+      .filter((d) => dealMatchesMockSlug(d, 'health-wellness'))
+      .slice(0, 6),
+  [safeDealsData],
+);// client-side substring match over mock `DEALS`. One request per keystroke-debounce (not per
   // item), so this is not an N+1 concern.
   useEffect(() => {
     const query = searchQuery.trim();
@@ -531,30 +567,30 @@ export function Home() {
             seeAll={home.sections.browseByCategory.seeAll}
             seeAllTo={home.sections.browseByCategory.seeAllTo}
           />
-          <div className="home__category-grid">
-            {categories.map((cat) => (
-              <NavLink
-                key={cat.id}
-                to={`/category/${cat.slug}`}
-                className="category-card"
-              >
-                <div className="category-card__icon-wrap">
-                  <Icon className="category-card__icon" aria-hidden="true">
-                    category
-                  </Icon>
-                </div>
+        <div className="home__category-grid">
+  {(categories ?? []).map((cat) => (
+    <NavLink
+      key={cat.id}
+      to={`/category/${cat.slug}`}
+      className="category-card"
+    >
+      <div className="category-card__icon-wrap">
+        <Icon className="category-card__icon" aria-hidden="true">
+          category
+        </Icon>
+      </div>
 
-                <div className="category-card__content">
-                  <h3>{cat.name}</h3>
-                  <p>{categoryDealCount(cat.id)} Services</p>
-                </div>
+      <div className="category-card__content">
+        <h3>{cat.name}</h3>
+        <p>{categoryDealCount(cat.id)} Services</p>
+      </div>
 
-                <div className="category-card__arrow">
-                  <Icon>arrow_forward</Icon>
-                </div>
-              </NavLink>
-            ))}
-          </div>
+      <div className="category-card__arrow">
+        <Icon>arrow_forward</Icon>
+      </div>
+    </NavLink>
+  ))}
+</div>
         </div>
       </section>
 

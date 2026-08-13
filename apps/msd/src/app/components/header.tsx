@@ -20,7 +20,8 @@ import { isCustomerUser, isStaffUser } from '../../auth/role-routing';
 import { DEALS } from '../../data/deals';
 import content from '../../content.json'
 import './header.css';
-
+import logo from "../../assets/logo.jpg";
+import logo2 from "../../assets/logo2.jpg";
 export function Header() {
   const { isAuthenticated, signOut, token, bootstrap } = useAuth();
   const navigate = useNavigate();
@@ -139,7 +140,16 @@ export function Header() {
             <Icon>menu</Icon>
           </IconButton>
           <NavLink to="/" className="site-header__brand" aria-label={content.header.homeAriaLabel}>
-            <strong className="site-header__brand-text">{content.site.name}</strong>
+            <img
+              src={logo}
+              alt={content.site.name}
+              className="site-header__logo site-header__logo--desktop"
+            />
+            <img
+              src={logo2}
+              alt={content.site.name}
+              className="site-header__logo site-header__logo--mobile"
+            />
           </NavLink>
           <div className="header-categories">
             {content.nav.primary.map((category) => (
