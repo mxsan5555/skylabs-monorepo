@@ -98,6 +98,12 @@
   font-size: 0.875rem;
   color: var(--md-sys-color-on-surface-variant);
   font-weight: 500;
+  text-decoration: none;
+}
+
+a.deal-detail__provider:hover,
+a.deal-detail__provider:focus-visible {
+  text-decoration: underline;
 }
 
 .deal-detail__title {

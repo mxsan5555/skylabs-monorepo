@@ -6,7 +6,10 @@
  * fetch directly, so auth and error handling stay in one place.
  */
 
-import { AUTH_TOKEN_KEY } from '../auth/auth-storage';
+// Same storage key `@skylabs-monorepo/shared-auth` derives for appPrefix "msd"
+// (`authStorageKeys('msd').token`) — inlined here to avoid this generic
+// storefront client depending on the RBAC auth package for one constant.
+const AUTH_TOKEN_KEY = 'msd_auth_token';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '/api';
 

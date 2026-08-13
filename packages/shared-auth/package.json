@@ -1,0 +1,28 @@
+{
+  "name": "@skylabs-monorepo/shared-auth",
+  "version": "0.0.1",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react.ts",
+    "./angular": "./src/angular.ts"
+  },
+  "peerDependencies": {
+    "@skylabs-monorepo/shared-permissions": "*",
+    "@skylabs-monorepo/shared-types": "*",
+    "react": ">=18.0.0",
+    "react-router-dom": ">=6.0.0",
+    "@angular/core": ">=21.0.0",
+    "@angular/router": ">=21.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "react-router-dom": { "optional": true },
+    "@angular/core": { "optional": true },
+    "@angular/router": { "optional": true }
+  }
+}

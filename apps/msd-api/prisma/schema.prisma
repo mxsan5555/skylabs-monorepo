@@ -1,0 +1,857 @@
+// msd-api Prisma schema — Postgres database "msd".
+// Independent from mera-driver-api: no shared tables, no shared migrations.
+//
+// NOTE ON CLIENT OUTPUT: this is an Nx monorepo with a single root node_modules.
+// mera-driver-api will define its own, separately-modeled schema.prisma in parallel.
+// If both generators wrote to the default `node_modules/@prisma/client`, the second
+// `prisma generate` to run would silently overwrite the first app's client with a
+// different shape. Generating into this app's own `src/generated/prisma-client`
+// keeps msd-api's client isolated regardless of what mera-driver-api does.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+
+enum UserStatus {
+  active
+  inactive
+  blocked
+}
+
+/// Mirrors `PermissionAction` in packages/shared-types/src/index.ts — keep in sync.
+enum PermissionAction {
+  view
+  create
+  edit
+  delete
+  export
+  import
+  approve
+  reject
+  upload
+  download
+  print
+  assign
+  restore
+  permanent_delete
+  status_change
+  custom
+}
+
+enum OtpPurpose {
+  login
+  signup
+  change_phone
+  change_email
+}
+
+enum LoginMethod {
+  otp_email
+  otp_phone
+  google
+}
+
+// ─── Vendor / Branch / Deal ─────────────────────────────────────────────────
+
+enum VendorStatus {
+  PROFILE_INCOMPLETE
+  PENDING_VERIFICATION
+  APPROVED
+  REJECTED
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum KycStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum DealStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  EXPIRED
+}
+
+enum DealApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderType {
+  SERVICE
+  PRODUCT
+}
+
+/// PENDING_PAYMENT (renamed from PENDING in Phase 9 — same transitions, now explicit that a
+/// freshly-created Order is always awaiting payment) -> CONFIRMED (payment verified) ->
+/// COMPLETED, or -> CANCELLED from either PENDING_PAYMENT or CONFIRMED.
+enum OrderStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentProvider {
+  RAZORPAY
+}
+
+/// The minimal set Razorpay's real flow actually needs — no invented PENDING/REFUNDED (refunds
+/// are out of scope this phase, see the Phase 9 architecture plan).
+enum PaymentStatus {
+  CREATED
+  PAID
+  FAILED
+  CANCELLED
+}
+
+// ─── Core identity & RBAC ───────────────────────────────────────────────────
+
+model User {
+  id          String    @id @default(uuid())
+  email       String?   @unique
+  phone       String?   @unique
+  name        String
+  googleId    String?   @unique
+  status      UserStatus @default(active)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? // soft delete — never hard-delete user data
+
+  roles                     UserRole[]
+  refreshSessions           RefreshSession[]
+  loginHistory              LoginHistory[]
+  auditLogsAsActor          AuditLog[]              @relation("AuditLogActor")
+  impersonationsAsAdmin     ImpersonationSession[]   @relation("ImpersonationSuperAdmin")
+  impersonationsAsTarget    ImpersonationSession[]   @relation("ImpersonationTarget")
+  vendorProfile             Vendor?                 @relation("VendorOwner")
+  cart                      Cart?
+  bookings                  Booking[]
+  orders                    Order[]
+  wishlistItems             WishlistItem[]
+
+  @@index([status])
+}
+
+model Role {
+  id           String   @id @default(uuid())
+  key          String   @unique
+  name         String
+  description  String?
+  isSystem     Boolean  @default(false)
+  /// The ONLY place super-admin logic is allowed to live: seed.ts auto-grants every
+  /// Permission to any role with this flag. Application code must never do a string
+  /// comparison like `role.key === 'super_admin'` — always go through requirePermission().
+  isSuperAdmin Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  permissions       RolePermission[]
+  users             UserRole[]
+  dashboardWidgets  RoleDashboardWidget[]
+
+  @@index([isActive])
+}
+
+model Permission {
+  id        String            @id @default(uuid())
+  menuKey   String
+  action    PermissionAction
+  /// Canonical `${menuKey}:${action}` — must match `permissionKeyFor()` in shared-permissions.
+  key       String            @unique
+  label     String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  roles RolePermission[]
+
+  @@index([menuKey])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+model UserRole {
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+model DashboardWidget {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  title       String
+  module      String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  roles RoleDashboardWidget[]
+
+  @@index([module])
+}
+
+model RoleDashboardWidget {
+  roleId    String
+  widgetId  String
+  order     Int
+  createdAt DateTime @default(now())
+
+  role   Role            @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  widget DashboardWidget @relation(fields: [widgetId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, widgetId])
+  @@index([roleId])
+  @@index([widgetId])
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+model OtpChallenge {
+  id         String     @id @default(uuid())
+  identifier String
+  purpose    OtpPurpose
+  hashedOtp  String
+  attempts   Int        @default(0)
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([identifier, purpose])
+  @@index([expiresAt])
+}
+
+model RefreshSession {
+  id          String    @id @default(uuid())
+  userId      String
+  hashedToken String    @unique
+  deviceInfo  String?
+  ip          String?
+  userAgent   String?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ─── Audit / observability ──────────────────────────────────────────────────
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorUserId  String
+  action       String
+  targetType   String
+  targetId     String
+  before       Json?
+  after        Json?
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  actor User @relation("AuditLogActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@index([actorUserId])
+  @@index([targetType, targetId])
+}
+
+model LoginHistory {
+  id        String      @id @default(uuid())
+  userId    String
+  method    LoginMethod
+  success   Boolean
+  ip        String?
+  userAgent String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ImpersonationSession {
+  id               String    @id @default(uuid())
+  superAdminUserId String
+  targetUserId     String
+  startedAt        DateTime  @default(now())
+  endedAt          DateTime?
+  previewTokenJti  String    @unique
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  superAdmin User @relation("ImpersonationSuperAdmin", fields: [superAdminUserId], references: [id], onDelete: Cascade)
+  target     User @relation("ImpersonationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([superAdminUserId])
+  @@index([targetUserId])
+}
+
+// ─── Vendor / Branch / Deal (business domain) ───────────────────────────────
+
+model Vendor {
+  id          String  @id @default(uuid())
+  /// The User who logs in and manages this business. Null until an admin-created
+  /// vendor is claimed, or set immediately on self-registration (== req.user.sub).
+  ownerUserId String? @unique
+  /// Public storefront URL slug (`/vendors/:slug`). Nullable — existing rows predate this
+  /// column; backfilled once in seed.ts, never required at the DB level to avoid a
+  /// backfill-before-migrate step. Unique so two vendors can never collide on one slug.
+  slug        String? @unique
+
+  // Business information
+  /// Nullable: the admin-create pipeline persists a Vendor after Step 1 (Vendor User)
+  /// with only ownerUserId set, before Business Details (Step 2) is filled in.
+  businessName         String?
+  legalName            String?
+  businessType         String?
+  businessDescription  String?
+  businessEmail        String?
+  businessPhone        String?
+  alternatePhone       String?
+  website              String?
+  logoUrl              String?
+
+  // Owner information
+  ownerName             String?
+  contactPerson         String?
+  ownerEmail            String?
+  ownerMobile           String?
+  alternateOwnerMobile  String?
+
+  // Address
+  address   String?
+  city      String?
+  state     String?
+  country   String?
+  pincode   String?
+  latitude  Decimal? @db.Decimal(10, 6)
+  longitude Decimal? @db.Decimal(10, 6)
+
+  // Business / KYC information
+  gstNumber                   String?
+  panNumber                   String?
+  businessRegistrationNumber  String?
+  /// Free-form record of uploaded document URLs: [{ type, url, uploadedAt }]. URL/string
+  /// only for this MVP — no upload pipeline exists yet (see CLAUDE.md/plan notes).
+  kycDocuments        Json?
+  kycStatus           KycStatus @default(PENDING)
+  kycRejectionReason  String?
+
+  // Bank information
+  bankAccountHolder  String?
+  bankName           String?
+  bankAccountNumber  String?
+  bankIfsc           String?
+  upiId              String?
+
+  status          VendorStatus @default(PROFILE_INCOMPLETE)
+  /// Reason recorded on reject/suspend — never on approve/activate.
+  statusReason    String?
+  /// Admin who created this vendor profile, if admin-created (self-registration leaves this null).
+  createdByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner      User?       @relation("VendorOwner", fields: [ownerUserId], references: [id])
+  branches   Branch[]
+  deals      Deal[]
+  carts      Cart[]
+  bookings   Booking[]
+  orders     Order[]
+  therapists Therapist[]
+
+  @@index([status])
+  @@index([ownerUserId])
+}
+
+model Branch {
+  id        String  @id @default(uuid())
+  vendorId  String
+  name      String
+  address   String?
+  city      String?
+  state     String?
+  country   String?
+  pincode   String?
+  latitude  Decimal? @db.Decimal(10, 6)
+  longitude Decimal? @db.Decimal(10, 6)
+  phone     String?
+  email     String?
+  isActive  Boolean @default(true)
+  /// Loosely-structured weekly hours, e.g. {"mon":"09:00-20:00",...,"sun":"closed"} — same
+  /// no-upload-pipeline-style Json field as Vendor.kycDocuments/Deal.images. Nullable: existing
+  /// seeded branches predate this column.
+  openingHours Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vendor     Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  deals      Deal[]
+  carts      Cart[]
+  bookings   Booking[]
+  orders     Order[]
+  therapists Therapist[]
+
+  @@index([vendorId])
+}
+
+/// A vendor+branch's staff member offering services — vendor+branch scoped like Deal, but never
+/// priced/bookable on its own (the Deal remains the sellable unit; Therapist is just an optional
+/// "who" a Booking can request). No delete endpoint — like Branch, only ever soft-disabled via
+/// isActive to avoid orphaning historical Bookings that reference one.
+model Therapist {
+  id              String   @id @default(uuid())
+  vendorId        String
+  branchId        String
+  name            String
+  specialization  String?
+  bio             String?
+  experienceYears Int?
+  photoUrl        String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  branch   Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([vendorId])
+  @@index([branchId])
+}
+
+/// Self-referential category tree (a row with a non-null parentId IS a subcategory) — the
+/// full CRUD backing for both `masters.categories` (parentId: null rows) and
+/// `masters.sub-categories` (parentId: set rows) admin pages, and the source of
+/// Deal.categoryId/subcategoryId.
+model Category {
+  id          String  @id @default(uuid())
+  name        String
+  slug        String  @unique
+  description String?
+  parentId    String?
+  sortOrder   Int     @default(0)
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent   Category?  @relation("CategoryParent", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryParent")
+  deals            Deal[]    @relation("DealCategory")
+  subcategoryDeals Deal[]    @relation("DealSubcategory")
+  products            Product[] @relation("ProductCategory")
+  subcategoryProducts Product[] @relation("ProductSubcategory")
+  services            Service[] @relation("ServiceCategory")
+  subcategoryServices Service[] @relation("ServiceSubcategory")
+
+  @@index([parentId])
+}
+
+/// A Deal is a vendor+branch's priced, bookable offering of exactly one catalog item — a
+/// Service (see the Haircut example in the marketplace architecture plan) or a Product, never
+/// both, never neither, for any Deal created going forward (`service.service.ts`/
+/// `product.service.ts` stay the unpriced, vendor-independent catalog masters — see their own
+/// doc comments). `serviceId`/`productId` are nullable at the column level only so pre-existing
+/// Deal rows (created before this migration, when neither column existed) remain valid without
+/// a backfill; `vendor.service.ts` enforces "exactly one" at the application layer for every
+/// create and for any update that touches either field.
+model Deal {
+  id            String  @id @default(uuid())
+  vendorId      String
+  branchId      String
+  categoryId    String
+  subcategoryId String?
+  serviceId     String?
+  productId     String?
+
+  title                    String
+  slug                     String   @unique
+  shortDescription         String?
+  description              String?
+  originalPrice            Decimal  @db.Decimal(10, 2)
+  salePrice                Decimal  @db.Decimal(10, 2)
+  discountPercent          Int?
+  /// Only meaningful when serviceId is set (a bookable time slot) — never required for a
+  /// Product deal.
+  durationMinutes          Int?
+  termsAndConditions       String?
+  /// URLs only for this MVP — string[] of hosted image URLs, no upload pipeline.
+  images                   Json?
+  maxBookings              Int?
+  availableBookings        Int?
+  startDate                DateTime?
+  endDate                  DateTime?
+  status                   DealStatus         @default(DRAFT)
+  approvalStatus           DealApprovalStatus @default(PENDING)
+  approvalRejectionReason  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vendor      Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  branch      Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  category    Category  @relation("DealCategory", fields: [categoryId], references: [id])
+  subcategory Category? @relation("DealSubcategory", fields: [subcategoryId], references: [id])
+  service     Service?  @relation(fields: [serviceId], references: [id])
+  product     Product?  @relation(fields: [productId], references: [id])
+  cartItems     CartItem[]
+  bookings      Booking[]
+  orderItems    OrderItem[]
+  wishlistItems WishlistItem[]
+
+  @@index([vendorId])
+  @@index([branchId])
+  @@index([serviceId])
+  @@index([productId])
+  @@index([status])
+}
+
+/// Standalone retail product catalog (e.g. skincare) — unlike Deal, NOT vendor/branch-scoped;
+/// nothing in the existing storefront data (apps/msd/src/data/products.ts) ties a product to a
+/// vendor. `brand` is a plain label, not a relation. subcategoryId mirrors Deal's optional
+/// pattern even though the source data doesn't use it yet.
+model Product {
+  id            String  @id @default(uuid())
+  name          String
+  slug          String  @unique
+  brand         String?
+  categoryId    String
+  subcategoryId String?
+
+  description  String?
+  summary      String?
+  /// string[]
+  benefits     Json?
+  /// string[]
+  howToUse     Json?
+  ingredients  String?
+  returnPolicy String?
+
+  /// URL only for this MVP — no upload pipeline, matches Vendor/Deal's existing approach.
+  image    String?
+  /// string[] of hosted image URLs.
+  gallery  Json?
+  imageAlt String?
+  badge    String?
+
+  price         Decimal  @db.Decimal(10, 2)
+  originalPrice Decimal? @db.Decimal(10, 2)
+  /// Percentage off, matches the existing storefront field name exactly.
+  discount      Int?
+
+  isNew      Boolean @default(false)
+  isFeatured Boolean @default(false)
+  isActive   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category    Category  @relation("ProductCategory", fields: [categoryId], references: [id])
+  subcategory Category? @relation("ProductSubcategory", fields: [subcategoryId], references: [id])
+  deals       Deal[]
+
+  @@index([categoryId])
+}
+
+/// Marketplace service catalog master (e.g. "Haircut") — Category/Sub-category scoped, like
+/// Product. Deliberately NEVER priced and NEVER vendor/branch-scoped: a vendor's actual
+/// bookable offering of a Service (price, duration, vendor, branch) is represented by a Deal
+/// row (Phase 4/5 of the marketplace architecture plan), not by fields on this model.
+model Service {
+  id            String  @id @default(uuid())
+  name          String
+  slug          String  @unique
+  categoryId    String
+  subcategoryId String?
+
+  description String?
+  image       String?
+  imageAlt    String?
+  /// Typical duration for this service type; a vendor's Deal may override it per offering.
+  defaultDurationMinutes Int?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category    Category  @relation("ServiceCategory", fields: [categoryId], references: [id])
+  subcategory Category? @relation("ServiceSubcategory", fields: [subcategoryId], references: [id])
+  deals       Deal[]
+
+  @@index([categoryId])
+}
+
+// ─── Cart / Booking (Phase 7 — customer catalogue → purchase intent) ────────
+
+/// One customer, one active cart, PRODUCT deals only (never a service deal — Booking is the
+/// service equivalent, see the Booking model doc comment). customerId is always req.user.sub,
+/// never client-supplied, exactly like Vendor.ownerUserId's resolution.
+model Cart {
+  id         String  @id @default(uuid())
+  customerId String  @unique
+  /// Set from the first item added; every further item must match (enforced in cart.service.ts,
+  /// not a DB constraint — same style as Deal's category/subcategory checks). Restricting a cart
+  /// to one vendor+branch keeps fulfillment simple and keeps Cart structurally consistent with
+  /// Booking, which is single-vendor/branch by construction (one Deal = one vendor = one branch).
+  vendorId   String?
+  branchId   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer User       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  vendor   Vendor?    @relation(fields: [vendorId], references: [id])
+  branch   Branch?    @relation(fields: [branchId], references: [id])
+  items    CartItem[]
+}
+
+model CartItem {
+  id        String  @id @default(uuid())
+  cartId    String
+  /// Must reference a Product deal (deal.productId != null) — enforced in cart.service.ts.
+  dealId    String
+  quantity  Int     @default(1)
+  /// Captured when added — provisional, not the historical/immutable snapshot Booking has below.
+  /// Cart hasn't committed to anything yet; a future checkout (Order, not this phase) re-checks
+  /// against the live Deal price before charging.
+  unitPrice Decimal @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  deal Deal @relation(fields: [dealId], references: [id])
+
+  @@unique([cartId, dealId])
+  @@index([dealId])
+}
+
+/// A customer's "saved for later" list — any deal type (service or product), unlike Cart which
+/// is product-only. customerId is always req.user.sub, never client-supplied, same resolution
+/// as Cart/Booking. Visibility of an item's Deal is re-checked at read time against
+/// catalog.service.ts's VISIBLE_DEAL_WHERE (not enforced here in the DB — a Deal can legitimately
+/// go inactive/rejected after being wishlisted, and the item should just stop appearing rather
+/// than being deleted, so the customer's intent isn't silently lost if the deal comes back).
+model WishlistItem {
+  id         String   @id @default(uuid())
+  customerId String
+  dealId     String
+  createdAt  DateTime @default(now())
+
+  customer User @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deal     Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, dealId])
+  @@index([customerId])
+  @@index([dealId])
+}
+
+/// One row = one appointment request for exactly one SERVICE deal (deal.serviceId != null,
+/// enforced in booking.service.ts). Deliberately no BookingItem sub-table: unlike a product
+/// cart — which exists specifically to accumulate several different deals before one checkout —
+/// a service booking is itself the commitment the moment it's created (an appointment request
+/// against a specific date+slot), so Booking is already the atomic unit, the same way Deal is
+/// already the atomic sellable unit.
+model Booking {
+  id         String @id @default(uuid())
+  /// Always req.user.sub, never client-supplied.
+  customerId String
+  dealId     String
+  /// Denormalized from deal.vendorId/branchId at booking time, mirroring Deal's own existing
+  /// pattern — lets ownership queries (a vendor's own bookings, a later phase) skip a join.
+  vendorId   String
+  branchId   String
+  /// Optional — "Any therapist" must remain a valid choice, so this is nullable. When set, must
+  /// belong to the same vendor+branch as the Deal (enforced in booking.service.ts, never trusted
+  /// from the client) and be active at booking time. No onDelete cascade: Therapists are never
+  /// hard-deleted (only soft-disabled via isActive), so this reference can never be orphaned.
+  therapistId String?
+
+  bookingDate DateTime
+  /// Free text for now (e.g. "10:00 AM"), matching the existing storefront's TIME_OPTIONS — a
+  /// real availability/slot-capacity model is a later phase.
+  timeSlot    String
+  quantity    Int      @default(1)
+
+  /// Immutable — copied from deal.salePrice at booking time, never re-read from Deal again, so a
+  /// later Deal price change can never alter an existing booking's historical amount.
+  priceSnapshot           Decimal @db.Decimal(10, 2)
+  /// Immutable — copied from deal.durationMinutes at booking time.
+  durationMinutesSnapshot Int?
+
+  status             BookingStatus @default(PENDING)
+  cancellationReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer  User       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deal      Deal       @relation(fields: [dealId], references: [id])
+  vendor    Vendor     @relation(fields: [vendorId], references: [id])
+  branch    Branch     @relation(fields: [branchId], references: [id])
+  therapist Therapist? @relation(fields: [therapistId], references: [id])
+  order     Order?
+
+  @@index([customerId])
+  @@index([vendorId])
+  @@index([branchId])
+  @@index([dealId])
+  @@index([therapistId])
+}
+
+// ─── Order (Phase 8 — Booking/Cart convergence point) ────────────────────────
+
+/// The single convergence point for both purchase flows (Booking -> Order for services, Cart ->
+/// Order for products) — never re-reads Deal/Vendor/Branch after creation; every display field
+/// is snapshotted once (see OrderItem + vendorNameSnapshot/branchNameSnapshot below), so a later
+/// Deal price edit, Vendor rename, or Branch address change can never alter an existing Order.
+model Order {
+  id         String      @id @default(uuid())
+  customerId String
+  vendorId   String
+  branchId   String
+  type       OrderType
+  status     OrderStatus @default(PENDING_PAYMENT)
+
+  /// One-to-one, unique — the DB-level guarantee that one Booking can never produce two Orders
+  /// (order.service.ts additionally pre-checks this for a clean 409 instead of a raw DB error).
+  bookingId String? @unique
+
+  /// Snapshotted once at creation — display must always prefer these over the live Vendor/Branch
+  /// relation (kept only for admin drill-down/traceability), exactly like OrderItem below.
+  vendorNameSnapshot String
+  branchNameSnapshot String
+
+  subtotal Decimal @db.Decimal(10, 2)
+  /// == subtotal for now (no coupons/tax/delivery yet) — stored separately because they'll
+  /// diverge once those later phases exist.
+  total    Decimal @db.Decimal(10, 2)
+
+  cancellationReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer User        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  vendor   Vendor      @relation(fields: [vendorId], references: [id])
+  branch   Branch      @relation(fields: [branchId], references: [id])
+  booking  Booking?    @relation(fields: [bookingId], references: [id])
+  items    OrderItem[]
+  payments Payment[]
+
+  @@index([customerId])
+  @@index([vendorId])
+  @@index([branchId])
+  @@index([status])
+}
+
+/// Every Order has at least one OrderItem — a SERVICE order always has exactly one (copied from
+/// its Booking's already-immutable snapshot), a PRODUCT order has one per CartItem checked out.
+/// Keeping this uniform means nothing downstream ever special-cases "service order has zero
+/// items, read order.booking instead."
+model OrderItem {
+  id      String @id @default(uuid())
+  orderId String
+  /// Kept for admin traceability only — display must use the snapshot fields below, never
+  /// re-read Deal.
+  dealId  String
+
+  itemName        String    // service.name or product.name at order time
+  itemType        OrderType
+  unitPrice       Decimal   @db.Decimal(10, 2)
+  quantity        Int
+  lineTotal       Decimal   @db.Decimal(10, 2)
+  /// Service only — never set for a product line item.
+  durationMinutes Int?
+
+  deal  Deal  @relation(fields: [dealId], references: [id])
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([dealId])
+}
+
+// ─── Payment (Phase 9 — Razorpay) ─────────────────────────────────────────────
+
+/// Order 1 -> Payment[], deliberately NOT one-to-one: a retry (after a FAILED/CANCELLED
+/// attempt) creates a new Payment row against the SAME Order rather than a new Order, so
+/// "customer clicks Pay twice" or "payment fails then customer retries" never multiplies
+/// Orders — only ever Payment attempts. See payment.service.ts for the reuse-vs-create rule.
+model Payment {
+  id       String          @id @default(uuid())
+  orderId  String
+  provider PaymentProvider @default(RAZORPAY)
+
+  /// Razorpay order_xxx — one per attempt/row.
+  providerOrderId String @unique
+  /// Razorpay pay_xxx — set only once a payment actually succeeds.
+  providerPaymentId String? @unique
+
+  /// == Order.total at the moment this Payment was created — server-computed from the
+  /// authoritative Order, never a client-supplied amount.
+  amount   Decimal @db.Decimal(10, 2)
+  currency String  @default("INR")
+
+  status        PaymentStatus @default(CREATED)
+  failureReason String?
+  /// True only once the server has independently recomputed and matched Razorpay's HMAC
+  /// signature (widget-callback or webhook path) — never set from a bare frontend claim.
+  signatureVerified Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+}

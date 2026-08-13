@@ -1,20 +1,39 @@
-﻿import { useEffect, useRef, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import { Divider, FilledButton, FilledTonalIconButton, Icon, IconButton, List, ListItem, Menu, MenuItem, OutlinedTextField, TextButton, } from "@skylabs-monorepo/shared-ui/react";
-import { useAuth } from "../../auth/auth-context";
-import { useCart } from "../../cart/cart-context";
-import { useWishlist } from "../../wishlist/wishlist-context";
-import content from "../../content.json";
-import { DEALS } from "../../data/deals";
-import logo from "../../assets/logo.jpg";
-import logo2 from "../../assets/logo2.jpg";
-import "./header.css";
+﻿import { useState, useRef, useEffect } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import {
+  FilledButton,
+  TextButton,
+  IconButton,
+  FilledTonalIconButton,
+  Icon,
+  Menu,
+  MenuItem,
+  List,
+  ListItem,
+  OutlinedTextField,
+  Divider,
+} from '@skylabs-monorepo/shared-ui/react';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { getCart, subscribeCartUpdated, clearCart } from '../../api/cart';
+import { useWishlist } from '../../wishlist/wishlist-context';
+import { isCustomerUser, isStaffUser } from '../../auth/role-routing';
+import { DEALS } from '../../data/deals';
+import content from '../../content.json'
+import './header.css';
 
 export function Header() {
+  const { isAuthenticated, signOut, token, bootstrap } = useAuth();
   const navigate = useNavigate();
-  const { isAuthenticated, signOut } = useAuth();
-  const { totalItems: cartCount, clearCart, } = useCart();
-  const { wishlistCount, clear, } = useWishlist();
+  // Real, backend-driven wishlist count — `WishlistProvider` already loads the signed-in
+  // customer's full wishlist on mount/sign-in/sign-out, so the badge just reads its live `ids`.
+  const { ids: wishlistIds } = useWishlist();
+  // Customers (including dual-role customer+vendor users, who land here in their customer
+  // experience) get the storefront's own account area; staff/vendor-only users keep the
+  // existing admin-console destination — never mix the two navigations.
+  const myAccountPath = bootstrap && isCustomerUser(bootstrap) && !isStaffUser(bootstrap)
+    ? '/my-account'
+    : '/account';
+  const [totalItems, setTotalItems] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
@@ -22,6 +41,12 @@ export function Header() {
   const [suggestions, setSuggestions] = useState(DEALS.slice(0, 6));
   const [showSuggestions, setShowSuggestions] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  const wishlistCount = wishlistIds ? wishlistIds.size : 0;
+  const cartCount = totalItems;
+
+  const toggleProfileMenu = () => setProfileMenuOpen((s) => !s);
+  const closeDrawer = () => setDrawerOpen(false);
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -64,18 +89,42 @@ export function Header() {
     document.body.style.overflow = drawerOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [drawerOpen]);
-  const search = (value: string) => {
-    const q = value.trim();
-    navigate(q ? `/explore?q=${encodeURIComponent(q)}` : "/explore");
-    setShowSuggestions(false);
-  };
-  const openDeal = (id: string | number) => {
-    navigate(`/deal/${id}`);
-    setSearchQuery("");
-    setShowSuggestions(false);
-  };
-  const closeDrawer = () => setDrawerOpen(false);
-  const toggleProfileMenu = () => setProfileMenuOpen((prev) => !prev);
+
+  // Real, backend-driven cart count — refetched on sign-in/out and whenever any page mutates
+  // the cart (see `subscribeCartUpdated` in `api/cart.ts`), so the badge stays live without a
+  // global store.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setTotalItems(0);
+      return;
+    }
+    let cancelled = false;
+    const loadCount = () => {
+      getCart(token)
+        .then(({ data }) => {
+          if (!cancelled) setTotalItems(data.items.reduce((sum, item) => sum + item.quantity, 0));
+        })
+        .catch(() => {
+          if (!cancelled) setTotalItems(0);
+        });
+    };
+    loadCount();
+    const unsubscribe = subscribeCartUpdated(loadCount);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [isAuthenticated, token]);
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery('');
+      // search UI is currently local to the hero; no global `setSearchOpen` here
+    }
+  }
+
   return (
     <>
       <a className="skip-link" href="#main-content"> {content.header.skipToContent}</a>
@@ -89,21 +138,8 @@ export function Header() {
           >
             <Icon>menu</Icon>
           </IconButton>
-          <NavLink
-            to="/"
-            className="site-header__brand"
-            aria-label={content.header.homeAriaLabel}
-          >
-            <img
-              src={logo}
-              alt={content.site.name}
-              className="site-header__logo site-header__logo--desktop"
-            />
-            <img
-              src={logo2}
-              alt={content.site.name}
-              className="site-header__logo site-header__logo--mobile"
-            />
+          <NavLink to="/" className="site-header__brand" aria-label={content.header.homeAriaLabel}>
+            <strong className="site-header__brand-text">{content.site.name}</strong>
           </NavLink>
           <div className="header-categories">
             {content.nav.primary.map((category) => (
@@ -208,14 +244,9 @@ export function Header() {
             <div className="site-header__profile">
               {isAuthenticated ? (
                 <div className="profile-menu" ref={profileRef} >
-                  <FilledTonalIconButton
-  id="profile-button"
-  className="profile-button"
-  onClick={toggleProfileMenu}
-  aria-label="My Account"
->
-  <Icon>person</Icon>
-</FilledTonalIconButton>
+                  <FilledTonalIconButton id="profile-button" className="profile-button" onClick={toggleProfileMenu} aria-label="My Account">
+                    <Icon>person</Icon>
+                  </FilledTonalIconButton>
                   {profileMenuOpen && (
                     <Menu
                       open
@@ -252,8 +283,7 @@ export function Header() {
                       </MenuItem>
                       <MenuItem
                         onClick={() => {
-                          clearCart();
-                          clear();
+                          clearCart(token);
                           signOut();
                           setProfileMenuOpen(false);
                         }}
@@ -289,11 +319,7 @@ export function Header() {
         aria-hidden={!drawerOpen}
       >
         <div className="nav-drawer__header">
-          <img
-            src={logo}
-            alt={content.site.name}
-            className="site-header__logo"
-          />
+          <strong className="site-header__brand-text">{content.site.name}</strong>
           <IconButton
             aria-label={content.header.closeNavigation}
             onClick={closeDrawer}
@@ -332,8 +358,7 @@ export function Header() {
                 </FilledButton>
                 <TextButton
                   onClick={() => {
-                    clearCart();
-                    clear();
+                    clearCart(token);
                     signOut();
                     closeDrawer();
                   }}

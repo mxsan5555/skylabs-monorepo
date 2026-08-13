@@ -2,13 +2,20 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedButton, OutlinedTextField, Tabs, PrimaryTab, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import content from '../../../content.json';
-import { users } from '../../../data/users';
+import { googleSignInUrl, requestOtp } from '../../../api/rbac/auth';
+import { ApiRequestError } from '../../../api/rbac/client';
+
 type Method = 'email' | 'phone';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 /**
- * Sign-in screen. Choose Email or Phone, enter the destination, and request a
- * one-time code — then continue to the OTP screen. Layout follows the design
- * reference; colors come from msd's M3 theme.
+ * Sign-in screen. Choose Email or Phone, request a one-time code from the
+ * real msd-api (`POST /auth/otp/request`), then continue to the OTP screen.
+ * Serves every signed-in area of the app — the consumer storefront (cart,
+ * wishlist, checkout) and the staff console under `/account/*` alike; which
+ * one a user lands on and can navigate to is entirely permission-driven via
+ * `bootstrap.menu`/`bootstrap.permissions`, not anything decided here.
  */
 const validateEmail = (value: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -32,45 +39,29 @@ export function SignIn() {
   };
   const sendOtp = async () => {
     setError('');
+    const input = value.trim();
+    if (!input) {
+      setError(isPhone ? auth.validation.emptyPhone : auth.validation.emptyEmail);
+      return;
+    }
+    if (isPhone && !validatePhone(input)) {
+      setError(auth.validation.invalidPhone);
+      return;
+    }
+    if (!isPhone && !validateEmail(input)) {
+      setError(auth.validation.invalidEmail);
+      return;
+    }
     setLoading(true);
     try {
-      const input = value.trim();
-      if (!input) {
-        setError(isPhone ? auth.validation.emptyPhone : auth.validation.emptyEmail);
-        return;
-      }
-      if (isPhone && !validatePhone(input)) {
-        setError(auth.validation.invalidPhone);
-        return;
-      }
-      if (!isPhone && !validateEmail(input)) {
-        setError(auth.validation.invalidEmail);
-        return;
-      }
-      // Check whether user exists
-      const user = users.find((u) =>
-        isPhone ? u.mobile === input : u.email === input
-      );
-      if (!user) {
-        setError(isPhone ? auth.validation.phoneNotRegistered : auth.validation.emailNotRegistered);
-        return;
-      }
-      // Mock API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      console.log('Mock OTP:', user.otp);
-      navigate('/otp', { state: { user, role: user.role, method, destination: input, }, });
-    } catch (error) {
-      console.error(error);
-      setError(auth.validation.somethingWentWrong);
+      await requestOtp(input, 'login');
+      navigate('/otp', { state: { identifier: input, method } });
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : auth.validation.somethingWentWrong);
     } finally {
       setLoading(false);
     }
   };
-  // const sendOtp = () => {
-  //   navigate('/otp', {
-  //     state: { destination: value || (isPhone ? auth.fields.phone.defaultValue : auth.fields.email.defaultValue), method },
-  //   });
-  // };
 
   return (
     <div className="auth-screen">
@@ -141,7 +132,7 @@ export function SignIn() {
         <span>{auth.divider}</span>
       </div>
 
-      <OutlinedButton className="auth-google">
+      <OutlinedButton className="auth-google" href={googleSignInUrl(API_BASE_URL)}>
         <Icon slot="icon" aria-hidden="true">
           {auth.googleIcon}
         </Icon>
