@@ -256,7 +256,7 @@ export function Header() {
                     >
                       <MenuItem
                         onClick={() => {
-                          navigate("/account");
+                          navigate("/my-account");
                           setProfileMenuOpen(false);
                         }}
                       >
@@ -265,22 +265,14 @@ export function Header() {
                       </MenuItem>
                       <MenuItem
                         onClick={() => {
-                          navigate("/account/bookings");
+                          navigate("/bookings");
                           setProfileMenuOpen(false);
                         }}
                       >
                         <Icon slot="start">calendar_month</Icon>
                         {content.header.profileMenu.bookings}
                       </MenuItem>
-                      <MenuItem
-                        onClick={() => {
-                          navigate("/wishlist");
-                          setProfileMenuOpen(false);
-                        }}
-                      >
-                        <Icon slot="start">favorite</Icon>
-                        {content.header.profileMenu.wishlist}
-                      </MenuItem>
+                     
                       <MenuItem
                         onClick={() => {
                           clearCart(token);

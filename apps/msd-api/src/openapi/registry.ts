@@ -47,7 +47,7 @@ import { CatalogDealQuerySchema } from '../schemas/catalog.schema';
 import { CartAddItemSchema, CartUpdateItemSchema } from '../schemas/cart.schema';
 import { WishlistAddItemSchema } from '../schemas/wishlist.schema';
 import { BookingCreateSchema, BookingCancelSchema, BookingVendorStatusUpdateSchema } from '../schemas/booking.schema';
-import { OrderFromBookingSchema, OrderCustomerCancelSchema, OrderStatusUpdateSchema } from '../schemas/order.schema';
+import { OrderCheckoutSchema, OrderFromBookingSchema, OrderCustomerCancelSchema, OrderStatusUpdateSchema } from '../schemas/order.schema';
 import { VerifyPaymentSchema } from '../schemas/payment.schema';
 import { DashboardStatsResponseSchema } from '../schemas/dashboard.schema';
 
@@ -1268,6 +1268,7 @@ export function buildOpenApiDocument() {
     summary: "Create a PRODUCT order from the caller's cart (server-recalculated pricing, transactional)",
     tags: ['Orders'],
     security: bearer,
+    request: { body: { content: { 'application/json': { schema: OrderCheckoutSchema } } } },
     responses: { 201: { description: 'Created' }, 422: errorResponse, 409: errorResponse },
   });
 
@@ -1355,6 +1356,16 @@ export function buildOpenApiDocument() {
     security: bearer,
     request: { params: z.object({ id: z.string().uuid() }) },
     responses: { 200: { description: 'Razorpay order details (providerOrderId, amount, currency, keyId)' }, 409: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/orders/me/{id}/pay-cod',
+    summary: 'Confirm a Cash on Delivery order — no gateway; creates a CREATED-status COD Payment and moves the Order to CONFIRMED',
+    tags: ['Payments'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Order confirmed' }, 409: errorResponse },
   });
 
   registry.registerPath({

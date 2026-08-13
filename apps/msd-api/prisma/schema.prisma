@@ -113,6 +113,10 @@ enum OrderStatus {
 
 enum PaymentProvider {
   RAZORPAY
+  /// Cash on Delivery — no gateway involved; see payment.service.ts's createCodPayment. A COD
+  /// Payment row is created with status CREATED (never PAID — cash hasn't been collected yet),
+  /// while the Order itself moves to CONFIRMED so the order is placed/fulfillable.
+  COD
 }
 
 /// The minimal set Razorpay's real flow actually needs — no invented PENDING/REFUNDED (refunds
@@ -770,6 +774,18 @@ model Order {
   /// relation (kept only for admin drill-down/traceability), exactly like OrderItem below.
   vendorNameSnapshot String
   branchNameSnapshot String
+
+  /// Checkout's "Customer Details" step — collected/confirmed once per order, before payment.
+  /// Nullable: every pre-existing Order predates this step, and it stays optional at the schema
+  /// level so it's never a breaking change for a caller that omits it; the frontend enforces
+  /// "required before payment" as UX, not a DB constraint.
+  contactName     String?
+  contactPhone    String?
+  contactEmail    String?
+  shippingAddress String?
+  shippingCity    String?
+  shippingState   String?
+  shippingPincode String?
 
   subtotal Decimal @db.Decimal(10, 2)
   /// == subtotal for now (no coupons/tax/delivery yet) — stored separately because they'll

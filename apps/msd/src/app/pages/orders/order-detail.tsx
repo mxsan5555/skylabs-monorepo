@@ -108,6 +108,7 @@ export function OrderDetail() {
               <OutlinedButton onClick={cancel}>Cancel order</OutlinedButton>
             )}
             <OutlinedButton onClick={() => navigate('/orders')}>My Orders</OutlinedButton>
+            <OutlinedButton onClick={() => navigate('/categories')}>Continue Shopping</OutlinedButton>
           </div>
         </sky-card>
       </div>

@@ -75,7 +75,7 @@ export function Otp() {
     setLoading(true);
     try {
       const { data } = await verifyOtp(identifier, code);
-      await signIn(data.accessToken);
+      await signIn(data.accessToken, data.refreshToken);
       setAwaitingBootstrap(true);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : otpContent.validation.invalidOtp);
