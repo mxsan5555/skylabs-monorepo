@@ -54,6 +54,38 @@ export async function createOrReusePayment(customerId: string, orderId: string) 
   return { providerOrderId: payment.providerOrderId, amount: payment.amount, currency: payment.currency, keyId: env.razorpayKeyId };
 }
 
+/**
+ * Cash on Delivery — no gateway, no widget. Creates a Payment row (status CREATED, provider
+ * COD — never PAID, since cash hasn't actually been collected yet) and moves the Order straight
+ * to CONFIRMED in the same transaction, mirroring `verifyPayment`'s Order transition without
+ * ever touching Razorpay. `providerOrderId` still needs a value (the column is @unique/required
+ * for every Payment row regardless of provider) — a synthetic `cod_<orderId>` is safe to reuse
+ * as the uniqueness key since a second attempt against the same order 409s below before ever
+ * reaching this insert.
+ */
+export async function createCodPayment(customerId: string, orderId: string) {
+  const order = await getMyOrderOrThrow(customerId, orderId);
+  if (order.status !== 'PENDING_PAYMENT') {
+    throw new ApiError('CONFLICT', `Cannot pay for an order with status ${order.status}`);
+  }
+
+  const [payment, updatedOrder] = await prisma.$transaction([
+    prisma.payment.create({
+      data: {
+        orderId: order.id,
+        provider: 'COD',
+        providerOrderId: `cod_${order.id}`,
+        amount: order.total,
+        currency: 'INR',
+        status: 'CREATED',
+      },
+    }),
+    prisma.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } }),
+  ]);
+
+  return { order: updatedOrder, payment };
+}
+
 interface VerifyPaymentInput {
   razorpay_order_id: string;
   razorpay_payment_id: string;

@@ -137,6 +137,48 @@ describe('POST /api/v1/orders/me/:id/pay', () => {
   });
 });
 
+describe('POST /api/v1/orders/me/:id/pay-cod', () => {
+  it('returns 401 with no token', async () => {
+    const res = await request(app).post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`);
+    expect(res.status).toBe(401);
+  });
+
+  it("404s for another customer's order (never confirms existence)", async () => {
+    prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, customerId: OTHER_CUSTOMER_ID });
+    const res = await request(app)
+      .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+    expect(res.status).toBe(404);
+  });
+
+  it('creates a CREATED-status COD payment and confirms the order — never marks it PAID', async () => {
+    prismaMock.order.findUnique.mockResolvedValue(orderFixture);
+    prismaMock.payment.create.mockResolvedValue({ ...paymentFixture, provider: 'COD', providerOrderId: `cod_${ORDER_ID}`, status: 'CREATED' });
+    prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
+    const res = await request(app)
+      .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('CONFIRMED');
+    expect(prismaMock.payment.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ provider: 'COD', status: 'CREATED' }) }),
+    );
+    // Never PAID for COD — cash hasn't actually been collected.
+    expect(prismaMock.payment.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'PAID' }) }),
+    );
+  });
+
+  it('rejects COD confirmation for an order that is not PENDING_PAYMENT', async () => {
+    prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
+    const res = await request(app)
+      .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+    expect(res.status).toBe(409);
+    expect(prismaMock.payment.create).not.toHaveBeenCalled();
+  });
+});
+
 describe('POST /api/v1/orders/me/:id/verify-payment', () => {
   it('4/11. verifies a correct signature, marks Payment PAID and Order CONFIRMED', async () => {
     prismaMock.order.findUnique.mockResolvedValue(orderFixture);

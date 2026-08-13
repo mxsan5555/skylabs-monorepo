@@ -138,6 +138,20 @@
   color: var(--md-sys-color-on-surface);
 }
 
+.checkout-payment-methods {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.checkout-payment-methods__opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
 .checkout-dt__chips {
   flex-wrap: wrap;
   gap: 8px;

@@ -25,14 +25,26 @@ export type PaymentStatus = 'CREATED' | 'PAID' | 'FAILED' | 'CANCELLED';
 export interface PaymentSummary {
   id: string;
   status: PaymentStatus;
-  provider: 'RAZORPAY';
+  provider: 'RAZORPAY' | 'COD';
   amount: string;
   currency: string;
   failureReason: string | null;
   createdAt: string;
 }
 
-export interface Order {
+/** Checkout's "Customer Details" step — every field optional to match the backend's Zod schema
+ *  (an order created before this step existed has none of these set). */
+export interface OrderContactDetails {
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  shippingAddress?: string;
+  shippingCity?: string;
+  shippingState?: string;
+  shippingPincode?: string;
+}
+
+export interface Order extends OrderContactDetails {
   id: string;
   type: OrderType;
   status: OrderStatus;
@@ -71,12 +83,12 @@ function toQuery(params: Record<string, string | number | undefined>): string {
   return qs ? `?${qs}` : '';
 }
 
-export function checkout(token: string | null) {
-  return apiPost<Order>('/orders/checkout', token);
+export function checkout(token: string | null, contactDetails: OrderContactDetails = {}) {
+  return apiPost<Order>('/orders/checkout', token, contactDetails);
 }
 
-export function createOrderFromBooking(token: string | null, bookingId: string) {
-  return apiPost<Order>('/orders/from-booking', token, { bookingId });
+export function createOrderFromBooking(token: string | null, bookingId: string, contactDetails: OrderContactDetails = {}) {
+  return apiPost<Order>('/orders/from-booking', token, { bookingId, ...contactDetails });
 }
 
 export function listMyOrders(token: string | null, opts: { page?: number; pageSize?: number; status?: OrderStatus } = {}) {
@@ -93,6 +105,12 @@ export function cancelMyOrder(token: string | null, id: string, cancellationReas
 
 export function pay(token: string | null, orderId: string) {
   return apiPost<PaymentIntent>(`/orders/me/${orderId}/pay`, token);
+}
+
+/** Confirms a Cash on Delivery order — no gateway, no widget. Moves the order straight to
+ *  CONFIRMED; the paired Payment stays CREATED (never PAID — cash hasn't been collected yet). */
+export function payCod(token: string | null, orderId: string) {
+  return apiPost<Order>(`/orders/me/${orderId}/pay-cod`, token);
 }
 
 export function verifyPayment(token: string | null, orderId: string, input: VerifyPaymentInput) {
