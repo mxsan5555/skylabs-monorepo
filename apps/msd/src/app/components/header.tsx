@@ -266,7 +266,7 @@ export function Header() {
                     >
                       <MenuItem
                         onClick={() => {
-                          navigate("/my-account");
+                          navigate(myAccountPath);
                           setProfileMenuOpen(false);
                         }}
                       >
@@ -352,7 +352,7 @@ export function Header() {
               <>
                 <FilledButton
                   onClick={() => {
-                    navigate("/account");
+                    navigate(myAccountPath);
                     closeDrawer();
                   }}
                 >

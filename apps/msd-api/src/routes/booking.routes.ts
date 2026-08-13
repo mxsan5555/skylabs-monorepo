@@ -50,8 +50,8 @@ router.post('/', validateBody(BookingCreateSchema), async (req, res, next) => {
 
 router.get('/vendor', requirePermission('orders', 'view'), async (req, res, next) => {
   try {
-    const { page, pageSize, status, vendorId } = BookingListQuerySchema.parse(req.query);
-    const { items, total } = await bookingService.listVendorBookings(req.user!.sub, { page, pageSize, status, vendorId });
+    const { page, pageSize, status, vendorId, customerId } = BookingListQuerySchema.parse(req.query);
+    const { items, total } = await bookingService.listVendorBookings(req.user!.sub, { page, pageSize, status, vendorId, customerId });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);

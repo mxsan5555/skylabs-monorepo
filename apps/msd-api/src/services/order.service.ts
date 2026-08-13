@@ -184,6 +184,7 @@ interface OrderListFilters {
   status?: OrderStatus;
   vendorId?: string;
   branchId?: string;
+  customerId?: string;
   paymentStatus?: 'CREATED' | 'PAID' | 'FAILED' | 'CANCELLED';
   createdFrom?: string;
   createdTo?: string;
@@ -202,6 +203,7 @@ export async function listOrders(callerUserId: string, opts: OrderListFilters) {
   const where = {
     ...(scopedVendorId ? { vendorId: scopedVendorId } : {}),
     ...(opts.branchId ? { branchId: opts.branchId } : {}),
+    ...(opts.customerId ? { customerId: opts.customerId } : {}),
     ...(opts.status ? { status: opts.status } : {}),
     // Order has no single "payment status" column of its own (Order 1 -> Payment[]) — this
     // matches "has at least one payment attempt in this state", not "the current/latest one".

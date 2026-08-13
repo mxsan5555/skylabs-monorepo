@@ -234,7 +234,10 @@ export function Category() {
                     favoriteActive={isWishlisted(deal.id)}
                     onFavorite={() => toggleFavorite(deal)}
                   >
-                    <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
+                    <div
+                      className="category-page__card-actions"
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                    >
                       {deal.service ? (
                         <BookingDialog deal={deal} onBook={(date, time) => bookDeal(deal, date, time)} />
                       ) : (

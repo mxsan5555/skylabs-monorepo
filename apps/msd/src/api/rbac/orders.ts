@@ -65,6 +65,8 @@ export interface ListOrdersOpts {
    *  force-scoped to their own vendor — see order.service.ts#listOrders. */
   vendorId?: string;
   branchId?: string;
+  /** Admin-only drill-in filter (Customer Detail's Orders tab) — same rule as `vendorId`. */
+  customerId?: string;
   /** Matches orders with at least one payment attempt in this state (Order has no single
    *  flat "payment status" column — see order.schema.ts#OrderListQuerySchema). */
   paymentStatus?: PaymentStatus;

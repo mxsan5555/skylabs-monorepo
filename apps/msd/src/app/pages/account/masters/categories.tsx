@@ -318,6 +318,20 @@ function CategoryFormDialog({
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // The Add dialog is a single long-lived instance (no `key`, unlike the Edit dialog below,
+  // which remounts per row) — its `form` useState initializer only ever runs once, against
+  // whatever `parentOptions` happened to be at that first mount (usually still `[]`, since it
+  // loads asynchronously). Without this, "Add subcategory" permanently shows no parent selected
+  // even after categories finish loading. Only applies in Add mode, and only until the user
+  // has picked something themselves.
+  useEffect(() => {
+    if (category || scope !== 'sub' || form.parentId) return;
+    if (parentOptions.length > 0) {
+      setForm((f) => ({ ...f, parentId: parentOptions[0].id }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parentOptions, scope, category]);
+
   const submit = async () => {
     if (!form.name.trim() || !form.slug.trim()) {
       setError('Name and slug are required.');

@@ -54,6 +54,8 @@ export interface ListVendorBookingsOpts {
   /** Admin-only drill-in filter — ignored server-side for a vendor caller, who is always
    *  force-scoped to their own vendor — see booking.service.ts#listVendorBookings. */
   vendorId?: string;
+  /** Admin-only drill-in filter (Customer Detail's Bookings tab) — same rule as `vendorId`. */
+  customerId?: string;
 }
 
 /** Admin sees every booking behind a SERVICE order (optionally ?vendorId=); a vendor caller

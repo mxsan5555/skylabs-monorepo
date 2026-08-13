@@ -6,6 +6,7 @@ import { useWishlist } from '../../../wishlist/wishlist-context';
 import { DEALS } from '../../../data/deals';
 import { listCatalogCategories, listCatalogDeals, type CatalogCategoryWithChildren, type CatalogDeal } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
+import { addCartItem } from '../../../api/cart';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
 import content from '../../../content.json';
 import './home.css';
@@ -87,6 +88,7 @@ function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
     originalPrice: originalPrice && originalPrice !== salePrice ? originalPrice : undefined,
     discount: deal.discountPercent ?? undefined,
     priceNote: deal.durationMinutes ? `${deal.durationMinutes} min` : undefined,
+    isProduct: !deal.service,
   };
 }
 
@@ -109,7 +111,7 @@ function SectionHeader({ id, heading, seeAll, seeAllTo, }: {
 export function Home() {
   const vacationSwiperRef = useRef<any>(null);
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, token } = useAuth();
   const { toggle, has } = useWishlist();
   const spaFinder = content.home.spaFinderHero;
   const [selectedTab, setSelectedTab] = useState('all');
@@ -121,23 +123,24 @@ export function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<CatalogDeal[]>([]);
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState('');
   const { location } = useCurrentLocation();
   const shortLocation = location?.split(",")[2]?.trim() ?? location;
 
   // Single batched fetch on mount — every section below (category grid, featured, hot, the 5
   // per-category carousels, and each category card's service count) derives from these two
   // already-fetched arrays via client-side grouping/filtering, never a per-section API call.
-  // Restricted to `type: 'service'` so every deal rendered here keeps working with `DealCard`'s
-  // existing fixed `/deal/:id` href (a real product deal instead routes to `/products/:id` — see
-  // `category.tsx` — mixing the two would need a routing change out of scope for this swap) and
-  // so the "N Services" copy on each category card stays literally true.
+  // Includes both services and products (real Cart Add-to-Cart action needs real product deals
+  // to attach to) — `DealCard`'s `href`/`isProduct` correctly routes each to `/deal/:id` or
+  // `/products/:id`; `categoryDealCount` below stays service-scoped so "N Services" is unchanged.
   useEffect(() => {
     let cancelled = false;
     setCatalogLoading(true);
     setCatalogError('');
     Promise.all([
       listCatalogCategories(),
-      listCatalogDeals({ pageSize: 100, type: 'service' }),
+      listCatalogDeals({ pageSize: 100 }),
     ])
       .then(([categoriesRes, dealsRes]) => {
         if (cancelled) return;
@@ -249,7 +252,25 @@ const wellnessDeals = useMemo(
   }, [selectedTab, hotDeals]);
 
   function categoryDealCount(categoryId: string) {
-    return dealsData.filter((d) => d.category?.id === categoryId).length;
+    return dealsData.filter((d) => d.category?.id === categoryId && d.service).length;
+  }
+
+  function requireAuthOrRedirect() {
+    if (isAuthenticated) return true;
+    navigate('/sign-in?next=%2F');
+    return false;
+  }
+
+  async function addToCart(deal: CatalogDeal) {
+    if (!requireAuthOrRedirect()) return;
+    setActionError('');
+    setActionMessage('');
+    try {
+      await addCartItem(token, deal.id, 1);
+      setActionMessage(`Added "${deal.product?.name ?? deal.title}" to your cart.`);
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : 'Could not add to cart.');
+    }
   }
 
   function renderDealCarousel(deals: CatalogDeal[]) {
@@ -275,6 +296,14 @@ const wellnessDeals = useMemo(
                     }
                     toggle(deal.id);
                   }}
+                  actions={
+                    deal.product ? (
+                      <FilledButton onClick={() => addToCart(deal)}>
+                        <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                        Add to Cart
+                      </FilledButton>
+                    ) : undefined
+                  }
                 />
               </swiper-slide>
             );
@@ -305,6 +334,8 @@ const wellnessDeals = useMemo(
     <div className="home">
       <title>{content.meta.home.title}</title>
       <meta name="description" content={content.meta.home.description} />
+      {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
+      {actionError && <p className="error-state" role="alert">{actionError}</p>}
       {   /*spafinder like*/}
       {false && (
         <section className="home__spa-finder">
