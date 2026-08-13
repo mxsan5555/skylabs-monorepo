@@ -85,6 +85,35 @@ describe('POST /api/v1/bookings', () => {
     );
   });
 
+  it('rejects a second booking for the same deal while the first is still PENDING/CONFIRMED (409)', async () => {
+    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
+    prismaMock.booking.findFirst.mockResolvedValue(bookingFixture);
+    const res = await request(app)
+      .post('/api/v1/bookings')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ dealId: SERVICE_DEAL_ID, bookingDate: '2026-09-01T00:00:00.000Z', timeSlot: '10:00 AM' });
+    expect(res.status).toBe(409);
+    expect(res.body.error.details).toEqual({ bookingId: BOOKING_ID });
+    expect(prismaMock.booking.create).not.toHaveBeenCalled();
+    // Scoped to this customer's own bookings only — never leaks another customer's booking.
+    expect(prismaMock.booking.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ customerId: CUSTOMER_ID, dealId: SERVICE_DEAL_ID }),
+      }),
+    );
+  });
+
+  it('allows a new booking once the previous one for the same deal is CANCELLED', async () => {
+    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
+    prismaMock.booking.findFirst.mockResolvedValue(null); // the CANCELLED one is filtered out server-side
+    prismaMock.booking.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: BOOKING_ID, ...data }));
+    const res = await request(app)
+      .post('/api/v1/bookings')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ dealId: SERVICE_DEAL_ID, bookingDate: '2026-09-01T00:00:00.000Z', timeSlot: '10:00 AM' });
+    expect(res.status).toBe(201);
+  });
+
   it('the price snapshot is copied once at booking time and is never re-derived on read', async () => {
     // Simulate the Deal's live price having since changed to 599.00 — the booking's own
     // (already-created) priceSnapshot of 499.00 must be what's returned, proving nothing in

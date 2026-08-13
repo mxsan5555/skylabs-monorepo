@@ -4,6 +4,7 @@ import { requirePermission } from '../middleware/requirePermission';
 import { validateBody, validateParams } from '../middleware/validate';
 import { UuidParamSchema } from '../schemas/common.schema';
 import {
+  OrderCheckoutSchema,
   OrderFromBookingSchema,
   OrderCustomerCancelSchema,
   OrderStatusUpdateSchema,
@@ -32,9 +33,9 @@ function requestMeta(req: import('express').Request) {
 
 // ─── Customer self-service ────────────────────────────────────────────────────
 
-router.post('/checkout', async (req, res, next) => {
+router.post('/checkout', validateBody(OrderCheckoutSchema), async (req, res, next) => {
   try {
-    const order = await orderService.createOrderFromCart(req.user!.sub);
+    const order = await orderService.createOrderFromCart(req.user!.sub, req.body);
     await writeAuditLog({
       actorUserId: req.user!.sub,
       action: 'order.create_from_cart',
@@ -51,7 +52,8 @@ router.post('/checkout', async (req, res, next) => {
 
 router.post('/from-booking', validateBody(OrderFromBookingSchema), async (req, res, next) => {
   try {
-    const order = await orderService.createOrderFromBooking(req.user!.sub, req.body.bookingId);
+    const { bookingId, ...contactDetails } = req.body;
+    const order = await orderService.createOrderFromBooking(req.user!.sub, bookingId, contactDetails);
     await writeAuditLog({
       actorUserId: req.user!.sub,
       action: 'order.create_from_booking',
@@ -109,6 +111,23 @@ router.patch(
 router.post('/me/:id/pay', validateParams(UuidParamSchema), async (req, res, next) => {
   try {
     sendData(res, await paymentService.createOrReusePayment(req.user!.sub, req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/me/:id/pay-cod', validateParams(UuidParamSchema), async (req, res, next) => {
+  try {
+    const { order } = await paymentService.createCodPayment(req.user!.sub, req.params.id);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'payment.cod_confirmed',
+      targetType: 'Order',
+      targetId: order.id,
+      after: { status: order.status },
+      ...requestMeta(req),
+    });
+    sendData(res, order);
   } catch (err) {
     next(err);
   }

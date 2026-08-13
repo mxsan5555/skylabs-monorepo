@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import type { BootstrapResponse, PermissionAction } from '@skylabs-monorepo/shared-types';
 import { can as canPermission } from '@skylabs-monorepo/shared-permissions';
 import {
+  AuthRequestError,
   authStorageKeys,
   fetchBootstrap,
   isJwtExpired,
@@ -39,10 +40,16 @@ export class AuthService {
     try {
       const data = await fetchBootstrap(this.config.apiBaseUrl, token);
       this._bootstrap.set(data);
-    } catch {
-      this._bootstrap.set(null);
-      this._token.set(null);
-      writeStorageValue(this.keys.token, null);
+    } catch (err) {
+      // Only a genuine auth failure (401/403) is a real "session ended" — sign out. A network
+      // blip, 5xx, or other transient failure must not clear an otherwise-valid token (same fix
+      // as the React AuthProvider's loadBootstrap).
+      const status = err instanceof AuthRequestError ? err.status : undefined;
+      if (status === 401 || status === 403) {
+        this._bootstrap.set(null);
+        this._token.set(null);
+        writeStorageValue(this.keys.token, null);
+      }
     } finally {
       this._loading.set(false);
     }

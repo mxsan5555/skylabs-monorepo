@@ -69,12 +69,28 @@ async function assertTherapistBookable(therapistId: string, vendorId: string, br
   }
 }
 
+/** Non-terminal statuses — a booking still "in play" per BookingStatus's lifecycle
+ *  (PENDING/CONFIRMED -> COMPLETED/CANCELLED). Shared by the duplicate-booking guard below. */
+const ACTIVE_BOOKING_STATUSES: BookingStatus[] = ['PENDING', 'CONFIRMED'];
+
 export async function createBooking(customerId: string, input: BookingCreateInput) {
   const deal = await prisma.deal.findUnique({ where: { id: input.dealId } });
   if (!deal) throw new ApiError('NOT_FOUND', 'Deal not found');
   if (!deal.serviceId) throw new ApiError('VALIDATION_ERROR', 'Only service deals can be booked');
   if (input.therapistId) {
     await assertTherapistBookable(input.therapistId, deal.vendorId, deal.branchId);
+  }
+
+  // Same customer + same deal + still-active booking already exists — block a second one until
+  // the first reaches a terminal status (COMPLETED/CANCELLED). Scoped to `customerId` so the
+  // 409's `details` can never reveal another customer's booking.
+  const existingActive = await prisma.booking.findFirst({
+    where: { customerId, dealId: deal.id, status: { in: ACTIVE_BOOKING_STATUSES } },
+  });
+  if (existingActive) {
+    throw new ApiError('CONFLICT', 'Already booked. Your existing booking is still active.', {
+      bookingId: existingActive.id,
+    });
   }
 
   return prisma.booking.create({

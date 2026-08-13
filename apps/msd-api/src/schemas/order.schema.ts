@@ -4,9 +4,30 @@ import { PaginationQuerySchema } from './common.schema';
 
 extendZodWithOpenApi(z);
 
-export const OrderFromBookingSchema = z
-  .object({ bookingId: z.string().uuid() })
-  .openapi('OrderFromBooking');
+/**
+ * Checkout's "Customer Details" step — collected once, before payment. Every field is optional
+ * at the schema level (pre-existing `/checkout`/`/from-booking` callers send none at all, and
+ * that must keep working) — the frontend enforces "required before payment" as UX. The backend's
+ * job is only to reject a malformed value if one IS sent, never to silently persist garbage.
+ */
+export const OrderContactDetailsSchema = z.object({
+  contactName: z.string().trim().min(1).max(200).optional(),
+  contactPhone: z
+    .string()
+    .regex(/^[6-9]\d{9}$/, 'Mobile number must be a valid 10-digit Indian number')
+    .optional(),
+  contactEmail: z.string().email('Enter a valid email address').optional(),
+  shippingAddress: z.string().trim().min(1).max(500).optional(),
+  shippingCity: z.string().trim().min(1).max(100).optional(),
+  shippingState: z.string().trim().min(1).max(100).optional(),
+  shippingPincode: z.string().regex(/^\d{6}$/, 'Pincode must be 6 digits').optional(),
+});
+
+export const OrderCheckoutSchema = OrderContactDetailsSchema.openapi('OrderCheckout');
+
+export const OrderFromBookingSchema = OrderContactDetailsSchema.extend({
+  bookingId: z.string().uuid(),
+}).openapi('OrderFromBooking');
 
 /** Customer self-service may only ever cancel — confirm/complete is admin-only (existing
  *  `orders:status_change`), matching Booking's equivalent split. */

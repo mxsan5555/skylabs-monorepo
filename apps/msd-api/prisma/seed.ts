@@ -516,11 +516,10 @@ async function seedCategories() {
   ];
   const parentIdBySlug = new Map<string, string>();
   for (const parent of parents) {
-    const row = await prisma.category.upsert({
-      where: { slug: parent.slug },
-      update: parent,
-      create: parent,
-    });
+    // Find-or-create, never blind-update: Category.name/description are admin-editable via
+    // masters.categories CRUD, and re-running seed must never revert an admin's rename.
+    const row = (await prisma.category.findUnique({ where: { slug: parent.slug } }))
+      ?? (await prisma.category.create({ data: parent }));
     parentIdBySlug.set(parent.slug, row.id);
   }
 
@@ -538,11 +537,10 @@ async function seedCategories() {
   ];
   for (const child of children) {
     const parentId = parentIdBySlug.get(child.parentSlug)!;
-    await prisma.category.upsert({
-      where: { slug: child.slug },
-      update: { name: child.name, parentId },
-      create: { name: child.name, slug: child.slug, parentId },
-    });
+    const existing = await prisma.category.findUnique({ where: { slug: child.slug } });
+    if (!existing) {
+      await prisma.category.create({ data: { name: child.name, slug: child.slug, parentId } });
+    }
   }
 }
 
@@ -658,11 +656,9 @@ async function seedCatalogTaxonomy(): Promise<Map<string, string>> {
     },
   ];
   for (const cat of topLevel) {
-    const row = await prisma.category.upsert({
-      where: { slug: cat.slug },
-      update: { name: cat.name, description: cat.description },
-      create: cat,
-    });
+    // Find-or-create — see seedCategories()'s comment; never overwrite an admin rename.
+    const row = (await prisma.category.findUnique({ where: { slug: cat.slug } }))
+      ?? (await prisma.category.create({ data: cat }));
     categoryIdBySlug.set(cat.slug, row.id);
   }
 
@@ -684,11 +680,8 @@ async function seedCatalogTaxonomy(): Promise<Map<string, string>> {
   ];
   for (const cat of subLevel) {
     const parentId = categoryIdBySlug.get(cat.parentSlug)!;
-    const row = await prisma.category.upsert({
-      where: { slug: cat.slug },
-      update: { name: cat.name, parentId },
-      create: { name: cat.name, slug: cat.slug, parentId },
-    });
+    const row = (await prisma.category.findUnique({ where: { slug: cat.slug } }))
+      ?? (await prisma.category.create({ data: { name: cat.name, slug: cat.slug, parentId } }));
     categoryIdBySlug.set(cat.slug, row.id);
   }
 
@@ -820,11 +813,9 @@ async function seedServices(
       imageAlt: svc.name,
       isActive: true,
     };
-    const row = await prisma.service.upsert({
-      where: { slug: svc.slug },
-      update: data,
-      create: { ...data, slug: svc.slug },
-    });
+    // Find-or-create: Service name/description/duration are admin-editable — never overwrite.
+    const row = (await prisma.service.findUnique({ where: { slug: svc.slug } }))
+      ?? (await prisma.service.create({ data: { ...data, slug: svc.slug } }));
     serviceIdBySlug.set(svc.slug, row.id);
   }
   return serviceIdBySlug;
@@ -951,11 +942,9 @@ async function seedProducts(
       discount,
       isActive: true,
     };
-    const row = await prisma.product.upsert({
-      where: { slug: prod.slug },
-      update: data,
-      create: { ...data, slug: prod.slug },
-    });
+    // Find-or-create: Product name/description/price/etc. are admin-editable — never overwrite.
+    const row = (await prisma.product.findUnique({ where: { slug: prod.slug } }))
+      ?? (await prisma.product.create({ data: { ...data, slug: prod.slug } }));
     productIdBySlug.set(prod.slug, row.id);
   }
   return productIdBySlug;
@@ -1138,11 +1127,10 @@ async function seedVendorsAndBranches(
       status: 'ACTIVE' as const,
     };
 
-    const vendor = await prisma.vendor.upsert({
-      where: { ownerUserId: ownerUser.id },
-      update: vendorData,
-      create: { ...vendorData, ownerUserId: ownerUser.id },
-    });
+    // Find-or-create: businessName/address/kycStatus/status/etc. are admin- and vendor-editable
+    // (KYC approval, profile edits) — never overwrite them on a re-run.
+    const vendor = (await prisma.vendor.findUnique({ where: { ownerUserId: ownerUser.id } }))
+      ?? (await prisma.vendor.create({ data: { ...vendorData, ownerUserId: ownerUser.id } }));
     vendorIdByKey.set(v.key, vendor.id);
 
     for (const b of v.branches) {
@@ -1400,14 +1388,9 @@ async function seedDeals(
       status: 'ACTIVE' as const,
       approvalStatus: 'APPROVED' as const,
     };
-    const row = await prisma.deal.upsert({
-      where: { slug: d.slug },
-      update: data as unknown as Prisma.DealUncheckedUpdateInput,
-      create: {
-        ...data,
-        slug: d.slug,
-      } as unknown as Prisma.DealUncheckedCreateInput,
-    });
+    // Find-or-create: title/price/description/status are admin/vendor-editable — never overwrite.
+    const row = (await prisma.deal.findUnique({ where: { slug: d.slug } }))
+      ?? (await prisma.deal.create({ data: { ...data, slug: d.slug } as unknown as Prisma.DealUncheckedCreateInput }));
     dealIdBySlug.set(d.slug, row.id);
   }
 
@@ -1437,14 +1420,8 @@ async function seedDeals(
       status: 'ACTIVE' as const,
       approvalStatus: 'APPROVED' as const,
     };
-    const row = await prisma.deal.upsert({
-      where: { slug: d.slug },
-      update: data as unknown as Prisma.DealUncheckedUpdateInput,
-      create: {
-        ...data,
-        slug: d.slug,
-      } as unknown as Prisma.DealUncheckedCreateInput,
-    });
+    const row = (await prisma.deal.findUnique({ where: { slug: d.slug } }))
+      ?? (await prisma.deal.create({ data: { ...data, slug: d.slug } as unknown as Prisma.DealUncheckedCreateInput }));
     dealIdBySlug.set(d.slug, row.id);
   }
 

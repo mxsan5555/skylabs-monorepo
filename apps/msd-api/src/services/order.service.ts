@@ -1,8 +1,12 @@
+import type { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import { Prisma, type OrderStatus } from '../generated/prisma-client';
 import { getVendorByOwnerUserId } from './vendor.service';
 import { VISIBLE_DEAL_WHERE } from './catalog.service';
+import type { OrderContactDetailsSchema } from '../schemas/order.schema';
+
+type OrderContactDetails = z.infer<typeof OrderContactDetailsSchema>;
 
 const ORDER_INCLUDE = {
   items: true,
@@ -23,7 +27,7 @@ const ORDER_INCLUDE = {
 
 // ─── Customer: Cart → Order (product) ────────────────────────────────────────
 
-export async function createOrderFromCart(customerId: string) {
+export async function createOrderFromCart(customerId: string, contactDetails: OrderContactDetails = {}) {
   return prisma.$transaction(async (tx) => {
     const cart = await tx.cart.findUnique({ where: { customerId }, include: { items: true } });
     if (!cart || cart.items.length === 0 || !cart.vendorId || !cart.branchId) {
@@ -73,6 +77,7 @@ export async function createOrderFromCart(customerId: string) {
         subtotal,
         total: subtotal,
         items: { create: itemsData },
+        ...contactDetails,
       },
       include: ORDER_INCLUDE,
     });
@@ -88,7 +93,7 @@ export async function createOrderFromCart(customerId: string) {
 
 // ─── Customer: Booking → Order (service) ─────────────────────────────────────
 
-export async function createOrderFromBooking(customerId: string, bookingId: string) {
+export async function createOrderFromBooking(customerId: string, bookingId: string, contactDetails: OrderContactDetails = {}) {
   return prisma.$transaction(async (tx) => {
     const booking = await tx.booking.findUnique({
       where: { id: bookingId },
@@ -117,6 +122,7 @@ export async function createOrderFromBooking(customerId: string, bookingId: stri
         branchNameSnapshot: booking.branch.name,
         subtotal: lineTotal,
         total: lineTotal,
+        ...contactDetails,
         items: {
           create: [
             {

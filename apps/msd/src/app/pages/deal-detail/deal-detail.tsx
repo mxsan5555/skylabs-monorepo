@@ -25,7 +25,7 @@ import {
 } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
-import { createBooking } from '../../../api/bookings';
+import { createBooking, type Booking } from '../../../api/bookings';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
@@ -82,6 +82,16 @@ export function DealDetail() {
   const [addedToCart, setAddedToCart] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
+
+  const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
+  const [duplicateBookingId, setDuplicateBookingId] = useState<string | null>(null);
+  const resultDialogRef = useRef<MdDialog>(null);
+
+  useEffect(() => {
+    if (confirmedBooking || duplicateBookingId) {
+      resultDialogRef.current?.show();
+    }
+  }, [confirmedBooking, duplicateBookingId]);
 
   useEffect(() => {
     if (!id) {
@@ -264,7 +274,7 @@ export function DealDetail() {
     setActionMessage('');
 
     try {
-      await createBooking(token, {
+      const { data } = await createBooking(token, {
         dealId,
         bookingDate: new Date(
           `${bookingDate}T00:00:00`,
@@ -272,10 +282,13 @@ export function DealDetail() {
         timeSlot,
       });
 
-      setActionMessage(
-        `Booked "${name}" for ${bookingDate} at ${timeSlot}.`,
-      );
+      setConfirmedBooking(data);
     } catch (err: unknown) {
+      if (err instanceof ApiRequestError && err.status === 409) {
+        const details = err.details as { bookingId?: string } | undefined;
+        setDuplicateBookingId(details?.bookingId ?? null);
+        return;
+      }
       throw err;
     }
   }
@@ -598,6 +611,60 @@ export function DealDetail() {
               {actionError}
             </p>
           )}
+
+          <Dialog
+            ref={resultDialogRef}
+            onClose={() => {
+              setConfirmedBooking(null);
+              setDuplicateBookingId(null);
+            }}
+          >
+            {confirmedBooking ? (
+              <>
+                <span slot="headline">Booking confirmed successfully.</span>
+                <div slot="content" className="form-grid">
+                  <p>
+                    <strong>
+                      {confirmedBooking.deal.service?.name ?? confirmedBooking.deal.title}
+                    </strong>
+                  </p>
+                  {confirmedBooking.vendor.businessName && (
+                    <p>{confirmedBooking.vendor.businessName}</p>
+                  )}
+                  <p>{confirmedBooking.branch.name}</p>
+                  <p>
+                    {new Date(confirmedBooking.bookingDate).toLocaleDateString()} at{' '}
+                    {confirmedBooking.timeSlot}
+                  </p>
+                  {confirmedBooking.therapist && (
+                    <p>Therapist: {confirmedBooking.therapist.name}</p>
+                  )}
+                  <p className="field-hint">Booking ID: {confirmedBooking.id}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <span slot="headline">Already booked</span>
+                <div slot="content" className="form-grid">
+                  <p>Already booked. Your existing booking is still active.</p>
+                </div>
+              </>
+            )}
+            <div slot="actions">
+              <TextButton
+                type="button"
+                onClick={() => navigate('/categories')}
+              >
+                Continue Shopping
+              </TextButton>
+              <FilledButton
+                type="button"
+                onClick={() => navigate('/bookings')}
+              >
+                View Booking
+              </FilledButton>
+            </div>
+          </Dialog>
 
           <Divider />
 

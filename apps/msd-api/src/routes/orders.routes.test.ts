@@ -166,6 +166,58 @@ describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
     expect(res.status).toBe(422);
     expect(prismaMock.order.create).not.toHaveBeenCalled();
   });
+
+  it('stores the checkout "Customer Details" step contact/shipping fields on the order', async () => {
+    prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
+    prismaMock.deal.findFirst.mockResolvedValue(productDealFixture);
+    prismaMock.order.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: ORDER_ID, ...data }));
+    const res = await request(app)
+      .post('/api/v1/orders/checkout')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({
+        contactName: 'Priya Sharma',
+        contactPhone: '9810099999',
+        contactEmail: 'priya@example.com',
+        shippingAddress: '12 MG Road',
+        shippingCity: 'Gorakhpur',
+        shippingState: 'Uttar Pradesh',
+        shippingPincode: '273001',
+      });
+    expect(res.status).toBe(201);
+    expect(prismaMock.order.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          contactName: 'Priya Sharma',
+          contactPhone: '9810099999',
+          contactEmail: 'priya@example.com',
+          shippingAddress: '12 MG Road',
+          shippingCity: 'Gorakhpur',
+          shippingState: 'Uttar Pradesh',
+          shippingPincode: '273001',
+        }),
+      }),
+    );
+  });
+
+  it('rejects a malformed pincode on checkout with a field-level validation error', async () => {
+    const res = await request(app)
+      .post('/api/v1/orders/checkout')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ shippingPincode: '123' }); // must be exactly 6 digits
+    expect(res.status).toBe(422);
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed contact phone on checkout with a field-level validation error', async () => {
+    const res = await request(app)
+      .post('/api/v1/orders/checkout')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ contactPhone: '12345' }); // not a valid 10-digit Indian mobile number
+    expect(res.status).toBe(422);
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/v1/orders/from-booking — Service Booking -> Order', () => {

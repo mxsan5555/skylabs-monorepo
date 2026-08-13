@@ -30,6 +30,7 @@ export interface Booking {
   };
   vendor: { id: string; businessName: string | null };
   branch: { id: string; name: string; address: string | null; city: string | null };
+  therapist: { id: string; name: string; specialization: string | null; photoUrl: string | null } | null;
 }
 
 export interface BookingInput {
