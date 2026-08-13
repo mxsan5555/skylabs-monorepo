@@ -589,12 +589,15 @@ interface VendorSeed {
   businessType: string;
   city: string;
   state: string;
-  branches: { key: string; name: string; address: string; pincode: string; phone: string; email: string }[];
+  branches: { key: string; name: string; address: string; pincode: string; phone: string; email: string; latitude: number; longitude: number }[];
 }
 
 /** At least 3 approved, active vendors so the public catalogue has real sellers to browse —
  *  `status: 'ACTIVE'` + `kycStatus: 'VERIFIED'` are required for a vendor's deals to ever be
- *  publicly visible (see `VISIBLE_DEAL_WHERE` in catalog.service.ts). */
+ *  publicly visible (see `VISIBLE_DEAL_WHERE` in catalog.service.ts). Each branch's
+ *  `latitude`/`longitude` are real-world approximate coordinates for its actual named locality
+ *  in Gorakhpur (Golghar, Taramandal, Civil Lines, etc.) — demo data, not random/fake points —
+ *  so the Explore map view has real coordinates to plot. */
 const VENDOR_SEEDS: VendorSeed[] = [
   {
     key: 'glow',
@@ -606,8 +609,8 @@ const VENDOR_SEEDS: VendorSeed[] = [
     city: 'Gorakhpur',
     state: 'Uttar Pradesh',
     branches: [
-      { key: 'glow-golghar', name: 'Golghar Branch', address: 'Golghar Main Road', pincode: '273001', phone: '+919810000011', email: 'golghar@glowbeauty.seed.msd.local' },
-      { key: 'glow-taramandal', name: 'Taramandal Branch', address: 'Taramandal Chowk', pincode: '273001', phone: '+919810000012', email: 'taramandal@glowbeauty.seed.msd.local' },
+      { key: 'glow-golghar', name: 'Golghar Branch', address: 'Golghar Main Road', pincode: '273001', phone: '+919810000011', email: 'golghar@glowbeauty.seed.msd.local', latitude: 26.7550, longitude: 83.3706 },
+      { key: 'glow-taramandal', name: 'Taramandal Branch', address: 'Taramandal Chowk', pincode: '273001', phone: '+919810000012', email: 'taramandal@glowbeauty.seed.msd.local', latitude: 26.7476, longitude: 83.3855 },
     ],
   },
   {
@@ -620,8 +623,8 @@ const VENDOR_SEEDS: VendorSeed[] = [
     city: 'Gorakhpur',
     state: 'Uttar Pradesh',
     branches: [
-      { key: 'urban-civillines', name: 'Civil Lines Branch', address: 'Civil Lines', pincode: '273001', phone: '+919810000021', email: 'civillines@urbanwellness.seed.msd.local' },
-      { key: 'urban-medicalroad', name: 'Medical College Road Branch', address: 'Medical College Road', pincode: '273013', phone: '+919810000022', email: 'medicalroad@urbanwellness.seed.msd.local' },
+      { key: 'urban-civillines', name: 'Civil Lines Branch', address: 'Civil Lines', pincode: '273001', phone: '+919810000021', email: 'civillines@urbanwellness.seed.msd.local', latitude: 26.7598, longitude: 83.3646 },
+      { key: 'urban-medicalroad', name: 'Medical College Road Branch', address: 'Medical College Road', pincode: '273013', phone: '+919810000022', email: 'medicalroad@urbanwellness.seed.msd.local', latitude: 26.7364, longitude: 83.3745 },
     ],
   },
   {
@@ -634,8 +637,8 @@ const VENDOR_SEEDS: VendorSeed[] = [
     city: 'Gorakhpur',
     state: 'Uttar Pradesh',
     branches: [
-      { key: 'elite-rustampur', name: 'Rustampur Branch', address: 'Rustampur', pincode: '273001', phone: '+919810000031', email: 'rustampur@elitehome.seed.msd.local' },
-      { key: 'elite-mohaddipur', name: 'Mohaddipur Branch', address: 'Mohaddipur', pincode: '273010', phone: '+919810000032', email: 'mohaddipur@elitehome.seed.msd.local' },
+      { key: 'elite-rustampur', name: 'Rustampur Branch', address: 'Rustampur', pincode: '273001', phone: '+919810000031', email: 'rustampur@elitehome.seed.msd.local', latitude: 26.7429, longitude: 83.3947 },
+      { key: 'elite-mohaddipur', name: 'Mohaddipur Branch', address: 'Mohaddipur', pincode: '273010', phone: '+919810000032', email: 'mohaddipur@elitehome.seed.msd.local', latitude: 26.7213, longitude: 83.3961 },
     ],
   },
 ];
@@ -707,8 +710,16 @@ async function seedVendorsAndBranches(
             pincode: b.pincode,
             phone: b.phone,
             email: b.email,
+            latitude: b.latitude,
+            longitude: b.longitude,
             isActive: true,
           },
+        });
+      } else if (branch.latitude === null || branch.longitude === null) {
+        // Backfill: branch predates the latitude/longitude columns being seeded.
+        branch = await prisma.branch.update({
+          where: { id: branch.id },
+          data: { latitude: b.latitude, longitude: b.longitude },
         });
       }
       branchIdByKey.set(b.key, branch.id);

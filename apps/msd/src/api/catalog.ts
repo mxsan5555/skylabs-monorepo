@@ -47,7 +47,10 @@ export interface CatalogDeal {
   service: CatalogDealSummary | null;
   product: CatalogProductSummary | null;
   vendor: { id: string; slug: string | null; businessName: string | null; city: string | null; logoUrl: string | null } | null;
-  branch: { id: string; name: string; city: string | null; address: string | null } | null;
+  /** `latitude`/`longitude` are Decimal → string over the wire (same convention as
+   *  originalPrice/salePrice below), and nullable — most branches don't have coordinates set
+   *  yet. Never fabricate a value when these are null; treat as "location not available". */
+  branch: { id: string; name: string; city: string | null; address: string | null; latitude: string | null; longitude: string | null } | null;
 }
 
 /** `Branch.openingHours` shape — keys are lowercase 3-letter day codes (`mon`…`sun`), values are
@@ -113,6 +116,9 @@ export function listCatalogDeals(opts: {
   branchId?: string;
   type?: 'service' | 'product';
   search?: string;
+  sort?: 'newest' | 'discount';
+  minPrice?: number;
+  maxPrice?: number;
 } = {}) {
   return apiGet<CatalogDeal[]>(`/catalog/deals${toQuery(opts)}`, null);
 }

@@ -32,8 +32,21 @@ router.get('/categories/:slug', validateParams(z.object({ slug: z.string().min(1
 
 router.get('/deals', async (req, res, next) => {
   try {
-    const { page, pageSize, categoryId, subcategoryId, vendorId, branchId, type, search } = CatalogDealQuerySchema.parse(req.query);
-    const { items, total } = await catalogService.listPublicDeals({ page, pageSize, categoryId, subcategoryId, vendorId, branchId, type, search });
+    const { page, pageSize, categoryId, subcategoryId, vendorId, branchId, type, search, sort, minPrice, maxPrice } =
+      CatalogDealQuerySchema.parse(req.query);
+    const { items, total } = await catalogService.listPublicDeals({
+      page,
+      pageSize,
+      categoryId,
+      subcategoryId,
+      vendorId,
+      branchId,
+      type,
+      search,
+      sort,
+      minPrice,
+      maxPrice,
+    });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);

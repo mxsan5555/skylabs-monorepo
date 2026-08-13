@@ -1062,7 +1062,9 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/catalog/deals',
-    summary: 'Public deal listing — active/approved deals with an active vendor+branch (+active linked service/product)',
+    summary:
+      'Public deal listing — active/approved deals with an active vendor+branch (+active linked service/product); ' +
+      'sort=newest|discount (default newest), minPrice/maxPrice filter on salePrice',
     tags: ['Catalogue (public)'],
     request: { query: CatalogDealQuerySchema },
     responses: { 200: { description: 'Deals' } },

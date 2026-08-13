@@ -14,7 +14,10 @@ import { listActiveCategories, getActiveCategoryBySlugOrThrow } from './category
 /** Only what a public storefront card/hero ever needs — never KYC, bank, owner, or audit fields.
  *  `slug` is included so a deal/product card's vendor-name link can point at `/vendor/:slug`. */
 const PUBLIC_VENDOR_SELECT = { id: true, slug: true, businessName: true, city: true, logoUrl: true } as const;
-const PUBLIC_BRANCH_SELECT = { id: true, name: true, city: true, address: true } as const;
+/** `latitude`/`longitude` are included so the Explore map view can plot a deal's real branch
+ *  location when it's been set — nullable, since most seeded/onboarded branches don't have
+ *  coordinates yet; the frontend must never fabricate a value when these come back null. */
+const PUBLIC_BRANCH_SELECT = { id: true, name: true, city: true, address: true, latitude: true, longitude: true } as const;
 const PUBLIC_CATEGORY_SELECT = { id: true, name: true, slug: true } as const;
 
 /** Only what the public vendor storefront's therapist list ever needs — Therapist has no
@@ -134,6 +137,12 @@ export async function listPublicDeals(opts: {
   branchId?: string;
   type?: 'service' | 'product';
   search?: string;
+  /** 'newest' (default) preserves the original unconditional `{createdAt: 'desc'}` ordering —
+   *  every pre-existing caller that omits this gets byte-identical results. 'discount' is the
+   *  only non-fabricated "best deals" proxy on Deal (no Review/Rating model exists). */
+  sort?: 'newest' | 'discount';
+  minPrice?: number;
+  maxPrice?: number;
 }) {
   const where = {
     ...VISIBLE_DEAL_WHERE,
@@ -143,6 +152,14 @@ export async function listPublicDeals(opts: {
     ...(opts.branchId ? { branchId: opts.branchId } : {}),
     ...(opts.type === 'service' ? { serviceId: { not: null } } : {}),
     ...(opts.type === 'product' ? { productId: { not: null } } : {}),
+    ...(opts.minPrice !== undefined || opts.maxPrice !== undefined
+      ? {
+          salePrice: {
+            ...(opts.minPrice !== undefined ? { gte: opts.minPrice } : {}),
+            ...(opts.maxPrice !== undefined ? { lte: opts.maxPrice } : {}),
+          },
+        }
+      : {}),
     ...(opts.search
       ? {
           OR: [
@@ -154,10 +171,17 @@ export async function listPublicDeals(opts: {
         }
       : {}),
   };
+  // 'discount' sorts deals with the biggest discountPercent first; deals with no discount
+  // (null) are pushed to the end via `nulls: 'last'` rather than sorting ahead of real
+  // discounts (Prisma's null-sort-order support is GA on PostgreSQL — no preview flag needed).
+  const orderBy =
+    opts.sort === 'discount'
+      ? [{ discountPercent: { sort: 'desc' as const, nulls: 'last' as const } }]
+      : { createdAt: 'desc' as const };
   const [items, total] = await Promise.all([
     prisma.deal.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy,
       skip: (opts.page - 1) * opts.pageSize,
       take: opts.pageSize,
       select: PUBLIC_DEAL_SELECT,

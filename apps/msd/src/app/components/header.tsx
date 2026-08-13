@@ -6,13 +6,18 @@ import {
   IconButton,
   FilledTonalIconButton,
   Icon,
+  Menu,
+  MenuItem,
+  List,
+  ListItem,
   OutlinedTextField,
   Divider,
 } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { getCart, subscribeCartUpdated } from '../../api/cart';
+import { getCart, subscribeCartUpdated, clearCart } from '../../api/cart';
 import { useWishlist } from '../../wishlist/wishlist-context';
 import { isCustomerUser, isStaffUser } from '../../auth/role-routing';
+import { DEALS } from '../../data/deals';
 import content from '../../content.json'
 import './header.css';
 
@@ -36,6 +41,12 @@ export function Header() {
   const [suggestions, setSuggestions] = useState(DEALS.slice(0, 6));
   const [showSuggestions, setShowSuggestions] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  const wishlistCount = wishlistIds ? wishlistIds.size : 0;
+  const cartCount = totalItems;
+
+  const toggleProfileMenu = () => setProfileMenuOpen((s) => !s);
+  const closeDrawer = () => setDrawerOpen(false);
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -110,7 +121,7 @@ export function Header() {
     if (searchQuery.trim()) {
       navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`);
       setSearchQuery('');
-      setSearchOpen(false);
+      // search UI is currently local to the hero; no global `setSearchOpen` here
     }
   }
 
@@ -127,21 +138,8 @@ export function Header() {
           >
             <Icon>menu</Icon>
           </IconButton>
-          <NavLink
-            to="/"
-            className="site-header__brand"
-            aria-label={content.header.homeAriaLabel}
-          >
-            <img
-              src={logo}
-              alt={content.site.name}
-              className="site-header__logo site-header__logo--desktop"
-            />
-            <img
-              src={logo2}
-              alt={content.site.name}
-              className="site-header__logo site-header__logo--mobile"
-            />
+          <NavLink to="/" className="site-header__brand" aria-label={content.header.homeAriaLabel}>
+            <strong className="site-header__brand-text">{content.site.name}</strong>
           </NavLink>
           <div className="header-categories">
             {content.nav.primary.map((category) => (
@@ -157,72 +155,6 @@ export function Header() {
                 <span>{category.label}</span>
               </NavLink>
             ))}
-          </nav>
-
-          {/* Desktop search */}
-          {/* <form
-            className={`site-header__search-form${searchOpen ? ' site-header__search-form--open' : ''}`}
-            role="search"
-            aria-label="Site search"
-            onSubmit={handleSearch}
-          >
-            <OutlinedTextField
-              className="site-header__search-field"
-              label={content.search.placeholder}
-              value={searchQuery}
-              onInput={(e) =>
-                setSearchQuery((e.target as unknown as { value: string }).value)
-              }
-            >
-              <Icon slot="leading-icon" aria-hidden="true">search</Icon>
-            </OutlinedTextField>
-          </form> */}
-
-          {/* Mobile search toggle */}
-          <IconButton
-            className="site-header__search-toggle"
-            aria-label={searchOpen ? 'Close search' : 'Open search'}
-            onClick={() => setSearchOpen((v) => !v)}
-          >
-            <Icon aria-hidden="true">{searchOpen ? 'close' : 'search'}</Icon>
-          </IconButton>
-
-          {/* Cart */}
-          <IconButton
-            className="site-header__cart"
-            aria-label={`Cart, ${totalItems} item${totalItems !== 1 ? 's' : ''}`}
-            onClick={() => navigate('/cart')}
-          >
-            <Icon aria-hidden="true">shopping_bag</Icon>
-            {totalItems > 0 && (
-              <span className="site-header__cart-badge" aria-hidden="true">
-                {totalItems}
-              </span>
-            )}
-          </IconButton>
-          <IconButton
-            className="site-header__cart"
-            aria-label={`Wishlist, ${wishlistIds.size} item${wishlistIds.size !== 1 ? 's' : ''}`}
-            onClick={() => navigate('/wishlist')}
-          >
-            <Icon aria-hidden="true">favorite_border</Icon>
-            {wishlistIds.size > 0 && (
-              <span className="site-header__cart-badge" aria-hidden="true">
-                {wishlistIds.size}
-              </span>
-            )}
-          </IconButton>
-
-          {/* Auth */}
-          <div className="site-header__auth">
-            {isAuthenticated ? (
-              <>
-                <TextButton onClick={() => navigate(myAccountPath)}>My Account</TextButton>
-                <TextButton onClick={signOut}>Sign Out</TextButton>
-              </>
-            ) : (
-              <FilledButton onClick={() => navigate('/sign-in')}>Sign In</FilledButton>
-            )}
           </div>
           {/* <div className="site-header__search-wrapper">
             <form
@@ -312,14 +244,9 @@ export function Header() {
             <div className="site-header__profile">
               {isAuthenticated ? (
                 <div className="profile-menu" ref={profileRef} >
-                  <FilledTonalIconButton
-  id="profile-button"
-  className="profile-button"
-  onClick={toggleProfileMenu}
-  aria-label="My Account"
->
-  <Icon>person</Icon>
-</FilledTonalIconButton>
+                  <FilledTonalIconButton id="profile-button" className="profile-button" onClick={toggleProfileMenu} aria-label="My Account">
+                    <Icon>person</Icon>
+                  </FilledTonalIconButton>
                   {profileMenuOpen && (
                     <Menu
                       open
@@ -356,8 +283,7 @@ export function Header() {
                       </MenuItem>
                       <MenuItem
                         onClick={() => {
-                          clearCart();
-                          clear();
+                          clearCart(token);
                           signOut();
                           setProfileMenuOpen(false);
                         }}
@@ -393,11 +319,7 @@ export function Header() {
         aria-hidden={!drawerOpen}
       >
         <div className="nav-drawer__header">
-          <img
-            src={logo}
-            alt={content.site.name}
-            className="site-header__logo"
-          />
+          <strong className="site-header__brand-text">{content.site.name}</strong>
           <IconButton
             aria-label={content.header.closeNavigation}
             onClick={closeDrawer}
@@ -426,13 +348,17 @@ export function Header() {
           <div className="nav-drawer__auth">
             {isAuthenticated ? (
               <>
-                <FilledButton onClick={() => { navigate(myAccountPath); setDrawerOpen(false); }}>
+                <FilledButton
+                  onClick={() => {
+                    navigate("/account");
+                    closeDrawer();
+                  }}
+                >
                   {content.header.myAccount}
                 </FilledButton>
                 <TextButton
                   onClick={() => {
-                    clearCart();
-                    clear();
+                    clearCart(token);
                     signOut();
                     closeDrawer();
                   }}
