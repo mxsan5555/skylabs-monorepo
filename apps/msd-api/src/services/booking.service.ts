@@ -132,6 +132,9 @@ interface BookingListFilters {
   pageSize: number;
   status?: BookingStatus;
   vendorId?: string;
+  /** Admin-only drill-in filter (Customer Detail's Bookings tab) — a vendor caller stays
+   *  force-scoped to its own vendorId regardless, same rule as `vendorId`. */
+  customerId?: string;
 }
 
 /** Same "one endpoint, ownership-aware" shape as order.service.ts's listOrders/getOrderOrThrow —
@@ -140,7 +143,11 @@ interface BookingListFilters {
 export async function listVendorBookings(callerUserId: string, opts: BookingListFilters) {
   const vendor = await getVendorByOwnerUserId(callerUserId);
   const scopedVendorId = vendor ? vendor.id : opts.vendorId;
-  const where = { ...(scopedVendorId ? { vendorId: scopedVendorId } : {}), ...(opts.status ? { status: opts.status } : {}) };
+  const where = {
+    ...(scopedVendorId ? { vendorId: scopedVendorId } : {}),
+    ...(opts.status ? { status: opts.status } : {}),
+    ...(opts.customerId ? { customerId: opts.customerId } : {}),
+  };
   const [items, total] = await Promise.all([
     prisma.booking.findMany({
       where,

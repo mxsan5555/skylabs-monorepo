@@ -1,6 +1,6 @@
 import { SkyProductCardWC } from './sky-product-card-wc';
 import { formatINR } from '../../utils/format';
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { Icon, FilledTonalIconButton } from '@skylabs-monorepo/shared-ui/react';
 import './deal-card.css';
@@ -29,6 +29,10 @@ export interface DealCardDeal {
   originalPrice?: number;
   discount?: number;
   priceNote?: string;
+  /** True for a real PRODUCT deal (`deal.product` set) — routes to `/products/:id` and, when
+   *  `onAddToCart` is supplied, shows a real "Add to Cart" action instead of the default
+   *  click-through-only card. A service deal (the default) still routes to `/deal/:id`. */
+  isProduct?: boolean;
 }
 
 interface DealCardProps {
@@ -39,6 +43,10 @@ interface DealCardProps {
    *  `CatalogDeal.vendor.slug` is always present for a visible deal); mock-data callers omit it
    *  and the vendor name simply renders unlinked, same as before. */
   eyebrowHref?: string;
+  /** Extra action content below the price (e.g. a real "Add to Cart" button for a product deal)
+   *  — wrapped in a stopPropagation/preventDefault div (same pattern as category.tsx's existing
+   *  card action row) so the click never falls through to the card's own stretched link. */
+  actions?: ReactNode;
 }
 
 export function DealCard({
@@ -46,6 +54,7 @@ export function DealCard({
   favoriteActive,
   onFavorite,
   eyebrowHref,
+  actions,
 }: DealCardProps) {
   const swiperRef = useRef<any>(null);
   return (
@@ -74,7 +83,7 @@ export function DealCard({
           : undefined
       }
       priceNote={deal.priceNote}
-      href={`/deal/${deal.id}`}
+      href={deal.isProduct ? `/products/${deal.id}` : `/deal/${deal.id}`}
     >
 
       <div slot="media" className="deal-card-slider">
@@ -117,6 +126,18 @@ export function DealCard({
           <Icon aria-hidden="true">navigate_next</Icon>
         </FilledTonalIconButton>
       </div>
+
+      {actions && (
+        <div
+          className="deal-card__actions"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          {actions}
+        </div>
+      )}
 
     </SkyProductCardWC>
 

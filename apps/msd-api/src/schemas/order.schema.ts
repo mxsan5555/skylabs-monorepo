@@ -52,6 +52,9 @@ export const OrderListQuerySchema = PaginationQuerySchema.extend({
   vendorId: z.string().uuid().optional(),
   /** A vendor may narrow to one of its own branches; admin may filter any branch. */
   branchId: z.string().uuid().optional(),
+  /** Admin-only drill-in filter (Customer Detail's Orders tab) — a vendor caller stays
+   *  force-scoped to its own vendorId regardless, same rule as `vendorId` above. */
+  customerId: z.string().uuid().optional(),
   /** Matches orders with at least one payment attempt in this state — Order has no single
    *  "payment status" column of its own (Order 1 -> Payment[], see the Phase 9 architecture
    *  plan), so this is necessarily "has a payment attempt with this status", not "the current

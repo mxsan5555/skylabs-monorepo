@@ -49,3 +49,17 @@
 .slider-btn::part(outline) {
     display: none;
 }
+
+/* Same technique sky-product-card's own .favorite button uses to escape the card's
+   stretched-link overlay (`.heading a::after`, z-index: 1, covering the whole card) — without
+   this, the button is visually correct but hit-tested behind the stretched link and every click
+   falls through to the card's own href navigation instead of the action. */
+.deal-card__actions {
+    position: relative;
+    z-index: 2;
+    padding: 0 4px 4px;
+}
+
+.deal-card__actions md-filled-button {
+    width: 100%;
+}

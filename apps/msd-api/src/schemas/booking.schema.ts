@@ -9,6 +9,8 @@ export const BookingListQuerySchema = PaginationQuerySchema.extend({
   /** Admin-only drill-in filter — ignored for a caller who owns a Vendor profile, whose results
    *  are always force-scoped to their own vendorId (matches OrderListQuerySchema's vendorId). */
   vendorId: z.string().uuid().optional(),
+  /** Admin-only drill-in filter (Customer Detail's Bookings tab) — same rule as `vendorId`. */
+  customerId: z.string().uuid().optional(),
 });
 
 export const BookingCreateSchema = z
