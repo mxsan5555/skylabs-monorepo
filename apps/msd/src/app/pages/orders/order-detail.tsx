@@ -107,6 +107,7 @@ export function OrderDetail() {
             {(order.status === 'PENDING_PAYMENT' || order.status === 'CONFIRMED') && (
               <OutlinedButton onClick={cancel}>Cancel order</OutlinedButton>
             )}
+            <OutlinedButton onClick={() => navigate(`/orders/${order.id}/invoice`)}>Download Invoice</OutlinedButton>
             <OutlinedButton onClick={() => navigate('/orders')}>My Orders</OutlinedButton>
             <OutlinedButton onClick={() => navigate('/categories')}>Continue Shopping</OutlinedButton>
           </div>

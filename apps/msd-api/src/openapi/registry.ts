@@ -1403,9 +1403,30 @@ export function buildOpenApiDocument() {
     },
   });
 
+  // ─── Customers (SuperAdmin/staff directory, `customers:view`) ────────────────
+
+  registry.registerPath({
+    method: 'get',
+    path: '/customers',
+    summary: 'List customers (any User holding the customer role) — search/paginate',
+    tags: ['Customers'],
+    security: bearer,
+    responses: { 200: { description: 'Customers' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/customers/{id}',
+    summary: 'A single customer, with order/booking counts',
+    tags: ['Customers'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Customer' }, 404: errorResponse },
+  });
+
   // ─── Business module stubs ───────────────────────────────────────────────────
 
-  for (const tag of ['customers', 'inventory', 'reports']) {
+  for (const tag of ['inventory', 'reports']) {
     registry.registerPath({
       method: 'get',
       path: `/${tag}`,

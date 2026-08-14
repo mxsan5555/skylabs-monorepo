@@ -159,13 +159,14 @@ router.post(
 
 router.get('/', requirePermission('orders', 'view'), async (req, res, next) => {
   try {
-    const { page, pageSize, status, vendorId, branchId, paymentStatus, createdFrom, createdTo, search } = OrderListQuerySchema.parse(req.query);
+    const { page, pageSize, status, vendorId, branchId, customerId, paymentStatus, createdFrom, createdTo, search } = OrderListQuerySchema.parse(req.query);
     const { items, total } = await orderService.listOrders(req.user!.sub, {
       page,
       pageSize,
       status,
       vendorId,
       branchId,
+      customerId,
       paymentStatus,
       createdFrom,
       createdTo,

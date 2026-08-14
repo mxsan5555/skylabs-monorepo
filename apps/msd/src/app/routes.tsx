@@ -23,6 +23,7 @@ import { RoleManagement } from './pages/account/roles/roles';
 import { UserManagement } from './pages/account/users/users';
 import { AuditLogs } from './pages/account/audit-logs/audit-logs';
 import { VendorManagement } from './pages/account/vendors/vendors';
+import { CustomerManagement } from './pages/account/customers/customers';
 import { BranchList } from './pages/account/vendors/branch-list';
 import { DealList } from './pages/account/vendors/deal-list';
 import { VendorBusinessProfile } from './pages/account/vendors/vendor-business-profile';
@@ -40,6 +41,7 @@ import Category from './pages/category/category';
 import { CategoriesIndex } from './pages/categories/categories';
 import { Orders } from './pages/orders/orders';
 import { OrderDetail } from './pages/orders/order-detail';
+import { Invoice } from './pages/invoice/invoice';
 import { Bookings } from './pages/bookings/bookings';
 import DealDetail from './pages/deal-detail/deal-detail';
 import { Cart } from './pages/cart/cart';
@@ -51,8 +53,7 @@ import VendorPage from './pages/vendor/vendor';
 import { MyAccountLayout } from './pages/my-account/my-account-layout';
 import { MyAccountProfile } from './pages/my-account/profile';
 import { MyAccountPayments } from './pages/my-account/payments';
-import { CustomerPage } from './admin/customer/customer';
-import { DealPage } from './admin/deal/deal';
+import { MyAccountInvoices } from './pages/my-account/invoices';
 
 /**
  * `/account/vendors` serves three audiences under different permission keys: admins hold
@@ -124,6 +125,14 @@ export function AppRoutes() {
             </RequireAuth>
           }
         />
+        <Route
+          path="/orders/:id/invoice"
+          element={
+            <RequireAuth>
+              <Invoice />
+            </RequireAuth>
+          }
+        />
 
         {/* ── Auth-gated consumer pages ── */}
         <Route
@@ -154,18 +163,8 @@ export function AppRoutes() {
         >
           <Route index element={<MyAccountProfile />} />
           <Route path="payments" element={<MyAccountPayments />} />
-          <Route
-            path="invoices"
-            element={
-              <AdminPage title="Invoices" subtitle="Module coming soon." />
-            }
-          />
-          <Route
-            path="settings"
-            element={
-              <AdminPage title="Settings" subtitle="Module coming soon." />
-            }
-          />
+          <Route path="invoices" element={<MyAccountInvoices />} />
+          <Route path="settings" element={<AdminPage title="Settings" subtitle="Module coming soon." />} />
         </Route>
 
         {/* ── Content pages ── */}
@@ -222,7 +221,7 @@ export function AppRoutes() {
           path="/account/customers"
           element={
             <RequirePermission menuKey="customers">
-              <CustomerPage />
+              <CustomerManagement />
             </RequirePermission>
           }
         />

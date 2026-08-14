@@ -122,6 +122,15 @@
   gap: 20px;
 }
 
+/* Same technique sky-product-card's own .favorite button uses to escape the card's
+   stretched-link overlay (`.heading a::after`, z-index: 1, covering the whole card) — without
+   this, the Book Now/Add to Cart button is visually correct but hit-tested behind the stretched
+   link and every click falls through to the card's own href navigation instead of the action. */
+.category-page__card-actions {
+  position: relative;
+  z-index: 2;
+}
+
 .category-page__empty {
   display: flex;
   justify-content: center;

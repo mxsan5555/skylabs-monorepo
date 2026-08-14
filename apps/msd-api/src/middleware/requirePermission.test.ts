@@ -15,20 +15,20 @@ import { resolveGrantedPermissionKeys } from '../services/permission-resolver.se
 
 const resolveMock = vi.mocked(resolveGrantedPermissionKeys);
 
-describe('requirePermission (via GET /api/v1/customers, a stub route gated on customers:view)', () => {
+describe('requirePermission (via GET /api/v1/inventory, a stub route gated on inventory:view)', () => {
   beforeEach(() => {
     resolveMock.mockReset();
   });
 
   it('returns 401 with no Authorization header at all', async () => {
-    const res = await request(app).get('/api/v1/customers');
+    const res = await request(app).get('/api/v1/inventory');
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe('UNAUTHORIZED');
     expect(resolveMock).not.toHaveBeenCalled();
   });
 
   it('returns 401 with a malformed/invalid token', async () => {
-    const res = await request(app).get('/api/v1/customers').set('Authorization', 'Bearer not-a-real-jwt');
+    const res = await request(app).get('/api/v1/inventory').set('Authorization', 'Bearer not-a-real-jwt');
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe('UNAUTHORIZED');
   });
@@ -36,17 +36,17 @@ describe('requirePermission (via GET /api/v1/customers, a stub route gated on cu
   it('returns 403 with a valid token whose roles resolve to no matching permission', async () => {
     resolveMock.mockResolvedValue(['dashboard:view']);
     const res = await request(app)
-      .get('/api/v1/customers')
+      .get('/api/v1/inventory')
       .set('Authorization', bearerFor({ roles: ['customer'] }));
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('FORBIDDEN');
-    expect(res.body.error.message).toContain('customers:view');
+    expect(res.body.error.message).toContain('inventory:view');
   });
 
   it('passes through (200) with a valid token whose roles resolve to the required permission', async () => {
-    resolveMock.mockResolvedValue(['customers:view']);
+    resolveMock.mockResolvedValue(['inventory:view']);
     const res = await request(app)
-      .get('/api/v1/customers')
+      .get('/api/v1/inventory')
       .set('Authorization', bearerFor({ roles: ['admin'] }));
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual([]);
@@ -56,7 +56,7 @@ describe('requirePermission (via GET /api/v1/customers, a stub route gated on cu
   it('propagates a resolver failure as a 500 rather than hanging or crashing', async () => {
     resolveMock.mockRejectedValue(new Error('db unreachable'));
     const res = await request(app)
-      .get('/api/v1/customers')
+      .get('/api/v1/inventory')
       .set('Authorization', bearerFor({ roles: ['admin'] }));
     expect(res.status).toBe(500);
     expect(res.body.error.code).toBe('SERVER_ERROR');
