@@ -164,7 +164,12 @@ export function AppRoutes() {
           <Route index element={<MyAccountProfile />} />
           <Route path="payments" element={<MyAccountPayments />} />
           <Route path="invoices" element={<MyAccountInvoices />} />
-          <Route path="settings" element={<AdminPage title="Settings" subtitle="Module coming soon." />} />
+          <Route
+            path="settings"
+            element={
+              <AdminPage title="Settings" subtitle="Module coming soon." />
+            }
+          />
         </Route>
 
         {/* ── Content pages ── */}
@@ -392,15 +397,6 @@ export function AppRoutes() {
           element={
             <RequirePermission menuKey="masters.service">
               <ServiceManagement />
-            </RequirePermission>
-          }
-        />
-
-        <Route
-          path="/account/masters/deals"
-          element={
-            <RequirePermission menuKey="masters.deals">
-              <DealPage />
             </RequirePermission>
           }
         />
