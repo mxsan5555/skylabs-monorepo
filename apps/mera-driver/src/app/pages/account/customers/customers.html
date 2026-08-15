@@ -1,0 +1,291 @@
+<md-admin-page title="Customers" subtitle="Manage customer profiles, contact info, and registration details.">
+  <div class="relative w-full">
+
+    <!-- VIEW 1: DATA TABLE LIST -->
+    @if (!showAddForm()) {
+      <div class="w-full mt-4">
+        <sky-card class="p-6 block">
+          <sky-data-table
+            [columns]="tableColumns"
+            [rows]="tableRowsString()"
+            [total]="options().length"
+            selectable
+            exportable
+            searchable
+            [actions]="tableActions"
+            (sky-dt-row-action)="onRowAction($event)"
+            caption="Customers Management Database"
+          >
+            <!-- Projected Add button -->
+            <md-icon-button
+              slot="toolbar-actions"
+              aria-label="Add Customer"
+              title="Add Customer"
+              (click)="startAdd()"
+            >
+              <md-icon>add</md-icon>
+            </md-icon-button>
+          </sky-data-table>
+        </sky-card>
+      </div>
+    }
+
+    <!-- VIEW 2: ADD / EDIT FORM VIEW -->
+    @else {
+      <div class="flex flex-col gap-6 w-full mt-2">
+        <!-- Breadcrumb / Back Button bar -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="text-xs text-slate-500 font-semibold tracking-wide">
+            Home / <span class="text-[#2e7d32]">{{ editingId() !== null && editingId() !== 'new' ? 'Edit Customer' : 'Add Customer' }}</span>
+          </div>
+          <md-outlined-button (click)="cancelEdit()">
+            <md-icon slot="icon">arrow_back</md-icon>
+            Back to List
+          </md-outlined-button>
+        </div>
+
+        <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm block">
+          <div class="flex flex-col gap-y-6 w-full">
+            
+            <!-- SECTION 1: Account & Contact Information -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>1. Account & Contact Information</h3>
+              </div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <!-- First Name -->
+                <md-outlined-text-field
+                  label="First Name"
+                  required
+                  [value]="inputFirstName()"
+                  (input)="inputFirstName.set($any($event.target).value)"
+                  placeholder="Enter first name"
+                ></md-outlined-text-field>
+
+                <!-- Last Name -->
+                <md-outlined-text-field
+                  label="Last Name"
+                  [value]="inputLastName() || ''"
+                  (input)="inputLastName.set($any($event.target).value || null)"
+                  placeholder="Enter last name"
+                ></md-outlined-text-field>
+
+                <!-- Mobile Number -->
+                <md-outlined-text-field
+                  label="Mobile Number"
+                  required
+                  [value]="inputMobileNumber()"
+                  (input)="inputMobileNumber.set($any($event.target).value)"
+                  placeholder="e.g. 9876543210"
+                ></md-outlined-text-field>
+
+                <!-- Email -->
+                <md-outlined-text-field
+                  label="Email Address"
+                  type="email"
+                  [value]="inputEmail() || ''"
+                  (input)="inputEmail.set($any($event.target).value || null)"
+                  placeholder="name@example.com"
+                ></md-outlined-text-field>
+
+                <!-- Alternate Phone -->
+                <md-outlined-text-field
+                  label="Alternate Phone"
+                  [value]="inputAlternatePhone() || ''"
+                  (input)="inputAlternatePhone.set($any($event.target).value || null)"
+                  placeholder="Landline or other mobile"
+                ></md-outlined-text-field>
+
+                <!-- Date of Birth -->
+                <md-outlined-text-field
+                  label="Date of Birth"
+                  type="date"
+                  [value]="inputDateOfBirth() || ''"
+                  (input)="inputDateOfBirth.set($any($event.target).value || null)"
+                ></md-outlined-text-field>
+
+                <!-- Gender -->
+                <md-outlined-select
+                  label="Gender"
+                  [value]="inputGender() || ''"
+                  (change)="inputGender.set($any($event.target).value || null)"
+                >
+                  <md-select-option value="">
+                    <div slot="headline">Select Gender</div>
+                  </md-select-option>
+                  <md-select-option value="Male">
+                    <div slot="headline">Male</div>
+                  </md-select-option>
+                  <md-select-option value="Female">
+                    <div slot="headline">Female</div>
+                  </md-select-option>
+                  <md-select-option value="Other">
+                    <div slot="headline">Other</div>
+                  </md-select-option>
+                </md-outlined-select>
+              </div>
+            </sky-card>
+
+            <!-- SECTION 2: Address & Location Details -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>2. Address & Location Details</h3>
+              </div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <!-- Address Line 1 -->
+                <md-outlined-text-field
+                  class="col-span-2 max-sm:col-span-1"
+                  label="Address Line 1"
+                  [value]="inputAddress1() || ''"
+                  (input)="inputAddress1.set($any($event.target).value || null)"
+                  placeholder="House/Plot no., Street name"
+                ></md-outlined-text-field>
+
+                <!-- Pincode -->
+                <md-outlined-text-field
+                  label="Pincode"
+                  [value]="inputPincode() || ''"
+                  (input)="inputPincode.set($any($event.target).value || null)"
+                  placeholder="e.g. 400053"
+                ></md-outlined-text-field>
+
+                <!-- Address Line 2 -->
+                <md-outlined-text-field
+                  class="col-span-2 max-sm:col-span-1"
+                  label="Address Line 2"
+                  [value]="inputAddress2() || ''"
+                  (input)="inputAddress2.set($any($event.target).value || null)"
+                  placeholder="Locality, landmark"
+                ></md-outlined-text-field>
+
+                <!-- State ID -->
+                <md-outlined-text-field
+                  label="State Reference ID"
+                  type="number"
+                  [value]="inputStateId() !== null ? inputStateId()!.toString() : ''"
+                  (input)="inputStateId.set($any($event.target).value ? +$any($event.target).value : null)"
+                  placeholder="State ID"
+                ></md-outlined-text-field>
+
+                <!-- City ID -->
+                <md-outlined-text-field
+                  label="City Reference ID"
+                  type="number"
+                  [value]="inputCityId() !== null ? inputCityId()!.toString() : ''"
+                  (input)="inputCityId.set($any($event.target).value ? +$any($event.target).value : null)"
+                  placeholder="City ID"
+                ></md-outlined-text-field>
+              </div>
+            </sky-card>
+
+            <!-- SECTION 3: System & Status Settings -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>3. System & Status Settings</h3>
+              </div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <!-- Customer Type -->
+                <md-outlined-select
+                  label="Customer Type"
+                  [value]="inputCustomerType() || ''"
+                  (change)="inputCustomerType.set($any($event.target).value || null)"
+                >
+                  <md-select-option value="Individual">
+                    <div slot="headline">Individual</div>
+                  </md-select-option>
+                  <md-select-option value="Corporate">
+                    <div slot="headline">Corporate</div>
+                  </md-select-option>
+                </md-outlined-select>
+
+                <!-- Registration Source -->
+                <md-outlined-select
+                  label="Registration Source"
+                  [value]="inputRegSource() || ''"
+                  (change)="inputRegSource.set($any($event.target).value || null)"
+                >
+                  <md-select-option value="App">
+                    <div slot="headline">Mobile App</div>
+                  </md-select-option>
+                  <md-select-option value="Website">
+                    <div slot="headline">Website</div>
+                  </md-select-option>
+                  <md-select-option value="Admin">
+                    <div slot="headline">Admin Portal</div>
+                  </md-select-option>
+                  <md-select-option value="Referral">
+                    <div slot="headline">Referral</div>
+                  </md-select-option>
+                </md-outlined-select>
+
+                <!-- Verification Status -->
+                <md-outlined-select
+                  label="Verification Status"
+                  [value]="inputVerStatus()"
+                  (change)="inputVerStatus.set($any($event.target).value)"
+                >
+                  <md-select-option value="Pending">
+                    <div slot="headline">Pending</div>
+                  </md-select-option>
+                  <md-select-option value="Verified">
+                    <div slot="headline">Verified</div>
+                  </md-select-option>
+                  <md-select-option value="Rejected">
+                    <div slot="headline">Rejected</div>
+                  </md-select-option>
+                </md-outlined-select>
+
+                <!-- Account Status -->
+                <md-outlined-select
+                  label="Account Status"
+                  [value]="inputAccStatus()"
+                  (change)="inputAccStatus.set($any($event.target).value)"
+                >
+                  <md-select-option value="Active">
+                    <div slot="headline">Active</div>
+                  </md-select-option>
+                  <md-select-option value="Inactive">
+                    <div slot="headline">Inactive</div>
+                  </md-select-option>
+                  <md-select-option value="Blocked">
+                    <div slot="headline">Blocked</div>
+                  </md-select-option>
+                </md-outlined-select>
+
+                <!-- Profile Image URL -->
+                <md-outlined-text-field
+                  class="col-span-2 max-sm:col-span-1"
+                  label="Profile Image URL"
+                  [value]="inputProfileImage() || ''"
+                  (input)="inputProfileImage.set($any($event.target).value || null)"
+                  placeholder="HTTPS image link"
+                ></md-outlined-text-field>
+
+                <!-- Notes / Admin Remarks -->
+                <md-outlined-text-field
+                  class="col-span-2 max-sm:col-span-1"
+                  label="Admin Notes"
+                  type="textarea"
+                  rows="2"
+                  [value]="inputNotes() || ''"
+                  (input)="inputNotes.set($any($event.target).value || null)"
+                  placeholder="Enter internal remarks about this customer..."
+                ></md-outlined-text-field>
+              </div>
+            </sky-card>
+
+          </div>
+
+          <!-- Form Actions -->
+          <div class="flex gap-2 mt-6 justify-end border-t border-slate-100 pt-4">
+            <md-outlined-button (click)="cancelEdit()">Cancel</md-outlined-button>
+            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;">
+              <md-icon slot="icon">save</md-icon> Save
+            </md-filled-button>
+          </div>
+        </sky-card>
+      </div>
+    }
+
+  </div>
+</md-admin-page>

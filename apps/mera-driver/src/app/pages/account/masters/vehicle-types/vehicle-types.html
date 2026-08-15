@@ -1,0 +1,147 @@
+<md-admin-page title="Vehicle Types" subtitle="Manage configuration values for driver vehicle types.">
+  <div class="relative w-full">
+
+    <!-- VIEW 1: DATA TABLE LIST -->
+    @if (!showAddForm()) {
+      <div class="w-full mt-4">
+        <sky-card class="p-6 block">
+          <sky-data-table
+            [columns]="tableColumns"
+            [rows]="tableRowsString()"
+            [total]="options().length"
+            selectable
+            exportable
+            searchable
+            [actions]="tableActions"
+            (sky-dt-row-action)="onRowAction($event)"
+            caption="Vehicle Types Configuration Database"
+          >
+            <!-- Projected Add button -->
+            <md-icon-button
+              slot="toolbar-actions"
+              aria-label="Add Option"
+              title="Add Option"
+              (click)="startAdd()"
+            >
+              <md-icon>add</md-icon>
+            </md-icon-button>
+          </sky-data-table>
+        </sky-card>
+      </div>
+    }
+
+    <!-- VIEW 2: ADD / EDIT FORM VIEW -->
+    @else {
+      <div class="flex flex-col gap-6 w-full mt-2">
+        <!-- Breadcrumb / Back Button bar -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="text-xs text-slate-500 font-semibold tracking-wide">
+            Home / <span class="text-[#2e7d32]">{{ editingId() !== null && editingId() !== 'new' ? 'Edit Option' : 'Add Option' }}</span>
+          </div>
+          <md-outlined-button (click)="cancelEdit()">
+            <md-icon slot="icon">arrow_back</md-icon>
+            Back to List
+          </md-outlined-button>
+        </div>
+
+        <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm block">
+          <div class="flex flex-col gap-y-6 w-full">
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>1. Option Details</h3>
+              </div>
+              
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <!-- Vehicle Type Name -->
+                <md-outlined-text-field
+                  label="Vehicle Type Name"
+                  required
+                  [value]="inputName()"
+                  (input)="inputName.set($any($event.target).value)"
+                  placeholder="e.g. Sedan, SUV"
+                ></md-outlined-text-field>
+
+                <!-- Short Code -->
+                <md-outlined-text-field
+                  label="Short Code"
+                  required
+                  [value]="inputCode()"
+                  (input)="inputCode.set($any($event.target).value)"
+                  placeholder="e.g. SEDAN, SUV"
+                ></md-outlined-text-field>
+
+                <!-- Status -->
+                <md-outlined-select
+                  label="Status"
+                  [value]="inputStatus()"
+                  (change)="inputStatus.set($any($event.target).value)"
+                >
+                  <md-select-option value="Active">
+                    <div slot="headline">Active</div>
+                  </md-select-option>
+                  <md-select-option value="Inactive">
+                    <div slot="headline">Inactive</div>
+                  </md-select-option>
+                </md-outlined-select>
+
+                <!-- Seating Capacity -->
+                <md-outlined-text-field
+                  label="Seating Capacity"
+                  type="number"
+                  [value]="inputSeating() !== null ? inputSeating()!.toString() : ''"
+                  (input)="inputSeating.set($any($event.target).value ? +$any($event.target).value : null)"
+                  placeholder="e.g. 4, 6"
+                ></md-outlined-text-field>
+
+                <!-- Luggage Capacity -->
+                <md-outlined-text-field
+                  label="Luggage Capacity (Bags)"
+                  type="number"
+                  [value]="inputLuggage() !== null ? inputLuggage()!.toString() : ''"
+                  (input)="inputLuggage.set($any($event.target).value ? +$any($event.target).value : null)"
+                  placeholder="e.g. 2, 4"
+                ></md-outlined-text-field>
+
+                <!-- Minimum Fare -->
+                <md-outlined-text-field
+                  label="Minimum Fare (₹)"
+                  type="number"
+                  step="0.01"
+                  [value]="inputMinFare() !== null ? inputMinFare()!.toString() : ''"
+                  (input)="inputMinFare.set($any($event.target).value ? +$any($event.target).value : null)"
+                  placeholder="e.g. 150.00"
+                ></md-outlined-text-field>
+
+                <!-- Sort Order -->
+                <md-outlined-text-field
+                  label="Sort Order"
+                  type="number"
+                  [value]="inputSortOrder() !== null ? inputSortOrder()!.toString() : ''"
+                  (input)="inputSortOrder.set($any($event.target).value ? +$any($event.target).value : null)"
+                  placeholder="e.g. 1, 2"
+                ></md-outlined-text-field>
+
+                <!-- Description (Spans 2 columns on grid) -->
+                <md-outlined-text-field
+                  class="col-span-2 max-sm:col-span-1"
+                  label="Description"
+                  [value]="inputDescription()"
+                  (input)="inputDescription.set($any($event.target).value)"
+                  placeholder="Describe this vehicle type..."
+                ></md-outlined-text-field>
+              </div>
+            </sky-card>
+          </div>
+
+          <div class="flex gap-2 mt-6 justify-end border-t border-slate-100 pt-4">
+            <md-outlined-button (click)="cancelEdit()">Cancel</md-outlined-button>
+            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;">
+              <md-icon slot="icon">save</md-icon> Save
+            </md-filled-button>
+          </div>
+        </sky-card>
+      </div>
+    }
+
+  </div>
+</md-admin-page>

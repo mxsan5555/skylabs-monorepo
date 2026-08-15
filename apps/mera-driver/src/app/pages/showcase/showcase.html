@@ -41,6 +41,23 @@
   </section>
 
   <section class="showcase__card">
+    <h2>Data Table (Custom Element: &lt;sky-data-table&gt;)</h2>
+    <div style="display: flex; flex-direction: column; gap: 16px; width: 100%; overflow-x: auto;">
+      <sky-data-table
+        [columns]="tableColumns"
+        [rows]="tableRows"
+        [total]="5"
+        [pageSize]="10"
+        [page]="1"
+        selectable
+        exportable
+        searchable
+        caption="Drivers Roster Demo"
+      ></sky-data-table>
+    </div>
+  </section>
+
+  <section class="showcase__card">
     <h2>Icon buttons</h2>
     <div class="showcase__row">
       <md-icon-button aria-label="Settings">

@@ -135,7 +135,7 @@ async function grantBaselinePermissions(roles: Map<string, { id: string }>) {
     });
   };
 
-  await grantViewOf('admin', ['dashboard', 'drivers', 'vehicles', 'trips', 'attendance', 'payments', 'reports', 'masters', 'masters.vehicle-types', 'masters.zones', 'administration', 'rbac.roles', 'rbac.users', 'rbac.audit-logs', 'settings']);
+  await grantViewOf('admin', ['dashboard', 'customers', 'drivers', 'vehicles', 'trips', 'attendance', 'payments', 'reports', 'masters', 'masters.vehicle-types', 'masters.zones', 'administration', 'rbac.roles', 'rbac.users', 'rbac.audit-logs', 'settings']);
   await grantViewOf('marketing', ['dashboard', 'reports', 'settings']);
   await grantViewOf('sales', ['dashboard', 'trips', 'payments', 'reports', 'settings']);
   await grantViewOf('vendor', ['dashboard', 'drivers', 'vehicles', 'trips']);

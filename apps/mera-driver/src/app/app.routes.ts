@@ -79,6 +79,14 @@ export const appRoutes: Routes = [
       // Business modules (placeholders — permission-gated, matching the menu
       // 1:1; real screens land module-by-module).
       {
+        path: 'customers',
+        title: 'Customers · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'customers', action: 'view' }, title: 'Customers', subtitle: 'Manage your customer roster.' },
+        loadComponent: () =>
+          import('./pages/account/customers/customers').then((m) => m.Customers),
+      },
+      {
         path: 'drivers',
         title: 'Drivers · mera-driver',
         canActivate: [permissionGuard],
@@ -109,7 +117,7 @@ export const appRoutes: Routes = [
         canActivate: [permissionGuard],
         data: { permission: { menuKey: 'vehicles', action: 'view' }, title: 'Vehicles', subtitle: 'Manage the fleet.' },
         loadComponent: () =>
-          import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
+          import('./pages/account/vehicles/vehicles').then((m) => m.Vehicles),
       },
       {
         path: 'trips',
@@ -149,7 +157,7 @@ export const appRoutes: Routes = [
         canActivate: [permissionGuard],
         data: { permission: { menuKey: 'masters.vehicle-types', action: 'view' }, title: 'Vehicle Types', subtitle: 'Driver master data.' },
         loadComponent: () =>
-          import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
+          import('./pages/account/masters/vehicle-types/vehicle-types').then((m) => m.VehicleTypesMaster),
       },
       {
         path: 'masters/zones',
@@ -157,7 +165,72 @@ export const appRoutes: Routes = [
         canActivate: [permissionGuard],
         data: { permission: { menuKey: 'masters.zones', action: 'view' }, title: 'Service Zones', subtitle: 'Driver master data.' },
         loadComponent: () =>
-          import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
+          import('./pages/account/masters/zones/zones').then((m) => m.ZonesMaster),
+      },
+
+      {
+        path: 'masters/source-types',
+        title: 'Source Type · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'masters.source-types', action: 'view' }, title: 'Source Type', subtitle: 'Driver source configuration.' },
+        loadComponent: () =>
+          import('./pages/account/masters/source-types/source-types').then((m) => m.SourceTypesMaster),
+      },
+      {
+        path: 'masters/statuses',
+        title: 'Category Status · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'masters.statuses', action: 'view' }, title: 'Category Status', subtitle: 'Driver verification status configuration.' },
+        loadComponent: () =>
+          import('./pages/account/masters/statuses/statuses').then((m) => m.StatusesMaster),
+      },
+      {
+        path: 'masters/driver-types',
+        title: 'Driver Types · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'masters.driver-types', action: 'view' }, title: 'Driver Types', subtitle: 'Driver job type configuration.' },
+        loadComponent: () =>
+          import('./pages/account/masters/driver-types/driver-types').then((m) => m.DriverTypesMaster),
+      },
+      {
+        path: 'masters/education',
+        title: 'Education Document · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'masters.education', action: 'view' }, title: 'Education Document', subtitle: 'Driver academic qualifications.' },
+        loadComponent: () =>
+          import('./pages/account/masters/education/education').then((m) => m.EducationMaster),
+      },
+      {
+        path: 'masters/eye-visions',
+        title: 'Eye Vision · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'masters.eye-visions', action: 'view' }, title: 'Eye Vision', subtitle: 'Driver medical eye specifications.' },
+        loadComponent: () =>
+          import('./pages/account/masters/eye-visions/eye-visions').then((m) => m.EyeVisionsMaster),
+      },
+      {
+        path: 'masters/personal-docs',
+        title: 'Document Type · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'masters.personal-docs', action: 'view' }, title: 'Document Type', subtitle: 'Driver personal documents configuration.' },
+        loadComponent: () =>
+          import('./pages/account/masters/personal-docs/personal-docs').then((m) => m.PersonalDocsMaster),
+      },
+      {
+        path: 'masters/health-docs',
+        title: 'Health Document · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'masters.health-docs', action: 'view' }, title: 'Health Document', subtitle: 'Driver health documents configuration.' },
+        loadComponent: () =>
+          import('./pages/account/masters/health-docs/health-docs').then((m) => m.HealthDocsMaster),
+      },
+      {
+        path: 'masters/police-docs',
+        title: 'Police Verification Documents · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'masters.police-docs', action: 'view' }, title: 'Police Verification Documents', subtitle: 'Driver police verification documents configuration.' },
+        loadComponent: () =>
+          import('./pages/account/masters/police-docs/police-docs').then((m) => m.PoliceDocsMaster),
       },
       {
         path: 'settings',

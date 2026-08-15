@@ -1,33 +1,28 @@
+/* Shared styles for all Driver Master pages */
+
 ::ng-deep .admin-page {
   max-width: 1000px !important;
 }
 
-/* Make all form section headings blue */
-::ng-deep sky-card h3 {
-  color: #1976d2 !important; /* Blue color */
-  font-weight: 700 !important;
-  font-size: 1rem !important;
-}
-
-/* Blue Box Styling for Section Headings */
+/* Blue Box Styling for Section Headings (matching drivers page) */
 ::ng-deep .section-heading-box {
-  background-color: #eff6ff !important; /* Light blue background */
-  border-left: 4px solid #2563eb !important; /* Blue left indicator */
+  background-color: #eff6ff !important;
+  border-left: 4px solid #2563eb !important;
   padding: 10px 16px !important;
   margin-bottom: 20px !important;
   border-radius: 0 6px 6px 0 !important;
 }
 
 ::ng-deep .section-heading-box h3 {
-  color: #1e293b !important; /* Black text */
+  color: #1e293b !important;
   margin: 0 !important;
   font-size: 0.95rem !important;
   font-weight: 700 !important;
 }
 
-/* ── Force Pure White Background for Inner Section Cards only ── */
+/* Force light background behind form card wrapper */
 ::ng-deep .flex.flex-col.gap-6.w-full.mt-2 {
-  background-color: #f8fafc !important; /* Light slate background behind cards */
+  background-color: #f8fafc !important;
 }
 
 /* Outer card wrapper */
@@ -46,13 +41,4 @@
   padding: 24px !important;
   display: block !important;
 }
-
-::ng-deep .file-upload-text {
-  font-size: 0.75rem;
-  color: #64748b;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 

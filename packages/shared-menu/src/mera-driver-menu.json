@@ -9,13 +9,22 @@
     "order": 1
   },
   {
+    "id": "customers",
+    "title": "Customers",
+    "icon": "people",
+    "route": "/customers",
+    "permissionKey": "customers",
+    "parent": null,
+    "order": 2
+  },
+  {
     "id": "drivers",
     "title": "Drivers",
     "icon": "sports_motorsports",
     "route": "/drivers",
     "permissionKey": "drivers",
     "parent": null,
-    "order": 2
+    "order": 3
   },
   {
     "id": "vehicles",
@@ -24,7 +33,7 @@
     "route": "/vehicles",
     "permissionKey": "vehicles",
     "parent": null,
-    "order": 3
+    "order": 4
   },
   {
     "id": "trips",
@@ -33,7 +42,7 @@
     "route": "/trips",
     "permissionKey": "trips",
     "parent": null,
-    "order": 4
+    "order": 5
   },
   {
     "id": "attendance",
@@ -42,7 +51,7 @@
     "route": "/attendance",
     "permissionKey": "attendance",
     "parent": null,
-    "order": 5
+    "order": 6
   },
   {
     "id": "payments",
@@ -51,7 +60,7 @@
     "route": "/payments",
     "permissionKey": "payments",
     "parent": null,
-    "order": 6
+    "order": 7
   },
   {
     "id": "reports",
@@ -60,7 +69,7 @@
     "route": "/reports",
     "permissionKey": "reports",
     "parent": null,
-    "order": 7
+    "order": 8
   },
   {
     "id": "masters",
@@ -68,7 +77,7 @@
     "icon": "category",
     "permissionKey": "masters",
     "parent": null,
-    "order": 8,
+    "order": 9,
     "children": [
       {
         "id": "masters-vehicle-types",
@@ -87,6 +96,78 @@
         "permissionKey": "masters.zones",
         "parent": "masters",
         "order": 2
+      },
+      {
+        "id": "masters-source-types",
+        "title": "Source Type",
+        "icon": "input",
+        "route": "/masters/source-types",
+        "permissionKey": "masters.source-types",
+        "parent": "masters",
+        "order": 3
+      },
+      {
+        "id": "masters-statuses",
+        "title": "Category Status",
+        "icon": "rule",
+        "route": "/masters/statuses",
+        "permissionKey": "masters.statuses",
+        "parent": "masters",
+        "order": 4
+      },
+      {
+        "id": "masters-driver-types",
+        "title": "Driver Types",
+        "icon": "supervised_user_circle",
+        "route": "/masters/driver-types",
+        "permissionKey": "masters.driver-types",
+        "parent": "masters",
+        "order": 5
+      },
+      {
+        "id": "masters-education",
+        "title": "Education Document",
+        "icon": "school",
+        "route": "/masters/education",
+        "permissionKey": "masters.education",
+        "parent": "masters",
+        "order": 6
+      },
+      {
+        "id": "masters-eye-visions",
+        "title": "Eye Vision",
+        "icon": "visibility",
+        "route": "/masters/eye-visions",
+        "permissionKey": "masters.eye-visions",
+        "parent": "masters",
+        "order": 7
+      },
+      {
+        "id": "masters-personal-docs",
+        "title": "Document Type",
+        "icon": "assignment_ind",
+        "route": "/masters/personal-docs",
+        "permissionKey": "masters.personal-docs",
+        "parent": "masters",
+        "order": 8
+      },
+      {
+        "id": "masters-health-docs",
+        "title": "Health Document",
+        "icon": "assignment_turned_in",
+        "route": "/masters/health-docs",
+        "permissionKey": "masters.health-docs",
+        "parent": "masters",
+        "order": 9
+      },
+      {
+        "id": "masters-police-docs",
+        "title": "Police Verification Documents",
+        "icon": "verified_user",
+        "route": "/masters/police-docs",
+        "permissionKey": "masters.police-docs",
+        "parent": "masters",
+        "order": 10
       }
     ]
   },
@@ -96,7 +177,7 @@
     "icon": "admin_panel_settings",
     "permissionKey": "administration",
     "parent": null,
-    "order": 9,
+    "order": 10,
     "children": [
       {
         "id": "admin-roles",
@@ -134,6 +215,6 @@
     "route": "/settings",
     "permissionKey": "settings",
     "parent": null,
-    "order": 10
+    "order": 11
   }
 ]

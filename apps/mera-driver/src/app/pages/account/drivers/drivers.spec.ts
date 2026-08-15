@@ -50,8 +50,8 @@ describe('Drivers Component', () => {
     ]);
 
     expect((component as any).content().title).toBe('Test Registry Title');
-    expect(component.drivers().length).toBe(1);
-    expect(component.drivers()[0].name).toBe('Driver A');
+    expect(component.allDrivers().length).toBe(1);
+    expect(component.allDrivers()[0].name).toBe('Driver A');
   });
 
   it('should fail to add driver if any fields are empty', () => {
@@ -63,13 +63,13 @@ describe('Drivers Component', () => {
 
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
-    component.inputName.set('Rahul');
+    component.inputFirstName.set('Rahul');
     component.inputPhone.set(''); // Missing phone
-    component.inputVehicle.set('Car');
+    component.inputEmail.set('rahul@test.com');
     component.addDriver();
 
     expect(alertSpy).toHaveBeenCalledWith((component as any).content().errorEmptyFields);
-    expect(component.drivers().length).toBe(0);
+    expect(component.allDrivers().length).toBe(0);
 
     alertSpy.mockRestore();
   });
@@ -81,19 +81,22 @@ describe('Drivers Component', () => {
     const reqDrivers = httpMock.expectOne('data/drivers.json');
     reqDrivers.flush([]);
 
-    component.inputName.set('Rahul Verma');
+    component.inputFirstName.set('Rahul');
+    component.inputLastName.set('Verma');
     component.inputPhone.set('9876543210');
+    component.inputEmail.set('rahul@test.com');
     component.inputVehicle.set('Hyundai Accent');
     component.addDriver();
 
-    expect(component.drivers().length).toBe(1);
-    expect(component.drivers()[0].name).toBe('Rahul Verma');
-    expect(component.drivers()[0].phone).toBe('9876543210');
-    expect(component.drivers()[0].vehicle).toBe('Hyundai Accent');
+    expect(component.allDrivers().length).toBe(1);
+    expect(component.allDrivers()[0].name).toBe('Rahul Verma');
+    expect(component.allDrivers()[0].phone).toBe('9876543210');
+    expect(component.allDrivers()[0].vehicle).toBe('Hyundai Accent');
 
     // Inputs should be reset
-    expect(component.inputName()).toBe('');
+    expect(component.inputFirstName()).toBe('');
+    expect(component.inputLastName()).toBe('');
     expect(component.inputPhone()).toBe('');
-    expect(component.inputVehicle()).toBe('');
+    expect(component.inputEmail()).toBe('');
   });
 });
