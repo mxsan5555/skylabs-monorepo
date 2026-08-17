@@ -131,7 +131,7 @@ export function Search() {
       pageSize: 100,
     })
       .then(({ data }) => setDeals(data))
-      .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : 'Could not load deals.'))
+      .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : searchContent.errors.loadDeals))
       .finally(() => setDealsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, selectedCategoryEntry?.id, suggested, priceMax, categoriesLoading]);
@@ -181,7 +181,7 @@ export function Search() {
         <div className="search-page__bar">
           <form
             role="search"
-            aria-label="Search deals"
+            aria-label={searchContent.ariaLabel}
             className="search-page__form"
             onSubmit={(e) => {
               e.preventDefault();
@@ -200,9 +200,9 @@ export function Search() {
             </OutlinedTextField>
           </form>
           {/* View toggle */}
-          <div className="search-page__view-toggle" role="group" aria-label="Results view">
+          <div className="search-page__view-toggle" role="group" aria-label={searchContent.view.groupLabel}>
             <IconButton
-              aria-label="List view"
+              aria-label={searchContent.view.list}
               aria-pressed={view === 'list'}
               onClick={() => setView('list')}
               className={view === 'list' ? 'search-page__view-btn--active' : ''}
@@ -210,7 +210,7 @@ export function Search() {
               <Icon aria-hidden="true">view_list</Icon>
             </IconButton>
             <IconButton
-              aria-label="Grid view"
+              aria-label={searchContent.view.grid}
               aria-pressed={view === 'grid'}
               onClick={() => setView('grid')}
               className={view === 'grid' ? 'search-page__view-btn--active' : ''}
@@ -218,7 +218,7 @@ export function Search() {
               <Icon aria-hidden="true">grid_view</Icon>
             </IconButton>
             <IconButton
-              aria-label="Map view"
+              aria-label={searchContent.view.map}
               aria-pressed={view === 'map'}
               onClick={() => setView('map')}
               className={view === 'map' ? 'search-page__view-btn--active' : ''}
@@ -261,7 +261,7 @@ export function Search() {
           {hasActiveFilters && (
             <TextButton onClick={clearAllFilters} className="search-page__clear">
               <Icon slot="icon" aria-hidden="true">close</Icon>
-              Clear filters
+              {searchContent.filters.clearAll}
             </TextButton>
           )}
         </div>
@@ -278,7 +278,7 @@ export function Search() {
         </p>
 
         {dealsLoading ? (
-          <p className="loading-state">Loading deals…</p>
+          <p className="loading-state"> {searchContent.loading.deals}</p>
         ) : dealsError ? (
           <p className="error-state" role="alert">{dealsError}</p>
         ) : deals.length === 0 ? (
@@ -340,10 +340,14 @@ export function Search() {
                             </div>
                             <div className="search-result-card__actions">
                               <FilledTonalButton onClick={() => addItem(deal.id)}>
-                                Book
+                                {searchContent.labels.book}
                               </FilledTonalButton>
                               <IconButton
-                                aria-label={wishlistHas(deal.id) ? 'Remove from wishlist' : 'Save to wishlist'}
+                                aria-label={
+                                  wishlistHas(deal.id)
+                                    ? searchContent.labels.removeWishlist
+                                    : searchContent.labels.saveWishlist
+                                }
                                 onClick={() => wishlistToggle(deal.id)}
                               >
                                 <Icon aria-hidden="true">
@@ -369,7 +373,10 @@ export function Search() {
                       <SkyProductCardWC
                         image={deal.service?.image ?? deal.product?.image ?? deal.images?.[0]}
                         imageAlt={deal.service?.imageAlt ?? deal.product?.imageAlt ?? undefined}
-                        badge={deal.service ? 'Service' : 'Product'}
+                        badge={deal.service
+                          ? searchContent.labels.service
+                          : searchContent.labels.product
+                        }
                         heading={deal.service?.name ?? deal.product?.name ?? deal.title}
                         eyebrow={[deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · ')}
                         eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
@@ -478,7 +485,9 @@ export function Search() {
               <span>All categories</span>
             </label>
             {categoriesLoading ? (
-              <p className="loading-state">Loading categories…</p>
+              <p className="loading-state">
+                {searchContent.loading.categories}
+              </p>
             ) : (
               categories.map((cat) => (
                 <label key={cat.id} className="filter-dialog__check-opt">

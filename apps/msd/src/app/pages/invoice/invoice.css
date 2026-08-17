@@ -140,13 +140,24 @@
 }
 
 @media (max-width: 640px) {
-  .invoice__header,
-  .invoice__parties,
-  .invoice__payment {
-    grid-template-columns: 1fr;
+  .invoice__header {
     flex-direction: column;
     text-align: left;
   }
+
+  .invoice__parties,
+  .invoice__payment {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice__meta {
+    text-align: left;
+  }
+
+  .invoice__totals {
+    width: 100%;
+  }
+
 
   .invoice__meta {
     text-align: left;
@@ -158,6 +169,7 @@
 }
 
 @media print {
+
   .invoice-page__actions,
   .site-header,
   .site-footer {

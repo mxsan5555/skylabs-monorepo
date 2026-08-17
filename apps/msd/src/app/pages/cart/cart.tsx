@@ -5,6 +5,7 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCart, updateCartItemQuantity, removeCartItem, clearCart, type Cart } from '../../../api/cart';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR, pluralize } from '../../../utils/format';
+import content from '../../../content.json';
 import './cart.css';
 
 /**
@@ -25,7 +26,7 @@ export function Cart() {
     setError('');
     getCart(token)
       .then(({ data }) => setCart(data))
-      .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not load your cart.'))
+      .catch((err) => setError(err instanceof ApiRequestError ? err.message : content.cart.error.load))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -44,7 +45,7 @@ export function Cart() {
       const { data } = await updateCartItemQuantity(token, itemId, quantity);
       setCart(data);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not update quantity.');
+      setError(err instanceof ApiRequestError ? err.message : content.cart.error.updateQuantity);
     }
   };
 
@@ -54,7 +55,7 @@ export function Cart() {
       const { data } = await removeCartItem(token, itemId);
       setCart(data);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not remove item.');
+      setError(err instanceof ApiRequestError ? err.message : content.cart.error.removeItem);
     }
   };
 
@@ -64,16 +65,16 @@ export function Cart() {
     navigate('/checkout');
   };
 
-  if (loading) return <p className="loading-state">Loading your cart…</p>;
+  if (loading) return <p className="loading-state"> {content.cart.loading}</p>;
 
   return (
     <div className="cart-page">
-      <title>Cart | MSD</title>
+      <title>{content.meta.cart.title}</title>
       <meta name="robots" content="noindex" />
 
       <div className="cart-page__inner">
         <h1 className="cart-page__title">
-          Cart
+          {content.cart.title}
           {totalItems > 0 && <span className="cart-page__count">({totalItems} {pluralize(totalItems, 'item')})</span>}
         </h1>
 
@@ -81,15 +82,16 @@ export function Cart() {
 
         {items.length === 0 ? (
           <div className="cart-page__empty">
-            <sky-info-card icon="shopping_bag" heading="Your cart is empty" subheading="Browse categories to add products." />
-            <FilledButton onClick={() => navigate('/categories')}>Browse Categories</FilledButton>
+            <sky-info-card icon="shopping_bag" heading={content.cart.emptyHeading} subheading={content.cart.emptySubheading} />
+            <FilledButton onClick={() => navigate('/categories')}> {content.cart.emptyCtaLabel}</FilledButton>
           </div>
         ) : (
           <div className="cart-page__layout">
-            <section className="cart-page__items" aria-label="Cart items">
+            <section className="cart-page__items" aria-label={content.cart.itemsAriaLabel}>
               {cart?.vendor && (
                 <p className="field-hint">
-                  All items from <strong>{cart.vendor.businessName}</strong>
+                  {content.cart.allItemsFrom}{' '}
+                  <strong>{cart.vendor.businessName}</strong>
                   {cart.branch && ` · ${cart.branch.name}`}
                 </p>
               )}
@@ -115,16 +117,16 @@ export function Cart() {
                         <p className="cart-item__price">{formatINR(Number(item.deal.salePrice) * item.quantity)}</p>
                       </div>
                       <div className="cart-item__actions">
-                        <div className="cart-item__qty" role="group" aria-label={`Quantity for ${item.deal.title}`}>
-                          <IconButton aria-label="Decrease quantity" disabled={item.quantity <= 1} onClick={() => changeQty(item.id, item.quantity - 1)}>
+                        <div className="cart-item__qty" role="group" aria-label={`${content.cart.quantityLabel} ${item.deal.title}`}>
+                          <IconButton aria-label={content.cart.decreaseQuantity} disabled={item.quantity <= 1} onClick={() => changeQty(item.id, item.quantity - 1)}>
                             <Icon aria-hidden="true">remove</Icon>
                           </IconButton>
-                          <span className="cart-item__qty-val" aria-label={`${item.quantity} in cart`}>{item.quantity}</span>
-                          <IconButton aria-label="Increase quantity" onClick={() => changeQty(item.id, item.quantity + 1)}>
+                          <span className="cart-item__qty-val" aria-label={`${item.quantity} ${content.cart.quantityInCart}`}>{item.quantity}</span>
+                          <IconButton aria-label={content.cart.increaseQuantity} onClick={() => changeQty(item.id, item.quantity + 1)}>
                             <Icon aria-hidden="true">add</Icon>
                           </IconButton>
                         </div>
-                        <IconButton aria-label={`Remove ${item.deal.title} from cart`} onClick={() => remove(item.id)}>
+                        <IconButton aria-label={`${content.cart.removeItem} ${item.deal.title} ${content.cart.fromCart}`} onClick={() => remove(item.id)}>
                           <Icon aria-hidden="true">delete_outline</Icon>
                         </IconButton>
                       </div>
@@ -134,30 +136,30 @@ export function Cart() {
               </ul>
               <OutlinedButton onClick={() => clearCart(token).then(({ data }) => setCart(data))}>
                 <Icon slot="icon" aria-hidden="true">delete_sweep</Icon>
-                Clear cart
+                {content.cart.clearCart}
               </OutlinedButton>
             </section>
 
-            <aside className="cart-page__summary" aria-label="Order summary">
+            <aside className="cart-page__summary" aria-label={content.cart.orderSummaryHeading}>
               <sky-card variant="outlined" className="cart-summary-card">
                 <div className="cart-summary">
-                  <h2 className="cart-summary__heading">Order Summary</h2>
+                  <h2 className="cart-summary__heading">{content.cart.orderSummaryHeading}</h2>
                   <div className="cart-summary__row">
-                    <span>Subtotal ({totalItems} {pluralize(totalItems, 'item')})</span>
+                    <span>  {content.cart.subtotal}  ({totalItems} {pluralize(totalItems, 'item')})</span>
                     <span>{formatINR(subtotal)}</span>
                   </div>
                   <Divider />
                   <div className="cart-summary__row cart-summary__row--total">
-                    <strong>Total</strong>
+                    <strong>{content.cart.total}</strong>
                     <strong>{formatINR(subtotal)}</strong>
                   </div>
-                  <p className="field-hint">Price is recalculated server-side at checkout, before payment.</p>
+                  <p className="field-hint"> {content.cart.serverPriceNote}</p>
                   <FilledButton className="cart-summary__checkout-btn" onClick={doCheckout}>
-                    Checkout
+                   {content.cart.checkoutCta}
                     <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
                   </FilledButton>
                   <OutlinedButton className="cart-summary__continue-btn" onClick={() => navigate('/categories')}>
-                    Continue browsing
+                    {content.cart.continueBrowsing}
                   </OutlinedButton>
                 </div>
               </sky-card>
@@ -165,8 +167,8 @@ export function Cart() {
           </div>
         )}
 
-        <Link to="/bookings" className="field-hint">View your bookings →</Link>{' '}
-        <Link to="/orders" className="field-hint">View your orders →</Link>
+        <Link to="/bookings" className="field-hint">{content.cart.links.bookings}</Link>{' '}
+        <Link to="/orders" className="field-hint">{content.cart.links.orders}</Link>
       </div>
     </div>
   );

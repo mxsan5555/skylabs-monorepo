@@ -5,6 +5,7 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getMyOrder, cancelMyOrder, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR } from '../../../utils/format';
+import content from '../../../content.json';
 import '../cart/cart.css';
 
 /** Order confirmation / detail — the landing page after checkout or "confirm booking",
@@ -17,13 +18,13 @@ export function OrderDetail() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
+  const { orderDetail } = content;
   const load = useCallback(() => {
     setLoading(true);
     setError('');
     getMyOrder(token, id)
       .then(({ data }) => setOrder(data))
-      .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not load this order.'))
+      .catch((err) => setError(err instanceof ApiRequestError ? err.message : orderDetail.errors.load))
       .finally(() => setLoading(false));
   }, [token, id]);
 
@@ -47,69 +48,68 @@ export function OrderDetail() {
   if (error || !order) {
     return (
       <div className="cart-page cart-page--empty">
-        <title>Order Not Found | MSD</title>
-        <sky-info-card icon="search_off" heading="Order not found" subheading={error || 'It may belong to a different account.'} />
-        <FilledButton onClick={() => navigate('/orders')}>My Orders</FilledButton>
+        <title>{orderDetail.notFound.metaTitle}</title>
+        <sky-info-card icon="search_off" heading={orderDetail.notFound.heading} subheading={error || orderDetail.notFound.subheading} />
+        <FilledButton onClick={() => navigate('/orders')}>{orderDetail.notFound.cta}</FilledButton>
       </div>
     );
   }
 
   return (
     <div className="cart-page">
-      <title>Order Confirmed | MSD</title>
+      <title>{orderDetail.metaTitle}</title>
       <meta name="robots" content="noindex" />
 
       <div className="cart-page__inner">
-        <h1 className="cart-page__title">Order {order.status === 'PENDING_PAYMENT' ? 'placed' : order.status.toLowerCase()}</h1>
+        <h1 className="cart-page__title"> {orderDetail.title.prefix}{' '} {order.status === 'PENDING_PAYMENT' ? orderDetail.title.placed : order.status.toLowerCase()}</h1>
 
         {error && <p className="error-state" role="alert">{error}</p>}
 
         <sky-card variant="outlined" className="cart-summary-card">
           <div className="cart-summary">
             <div className="cart-summary__row">
-              <span>Vendor</span>
+              <span>{orderDetail.labels.vendor}</span>
               <span>{order.vendorNameSnapshot}</span>
             </div>
             <div className="cart-summary__row">
-              <span>Branch</span>
+              <span>{orderDetail.labels.branch}</span>
               <span>{order.branchNameSnapshot}</span>
             </div>
             {order.booking && (
               <div className="cart-summary__row">
-                <span>Appointment</span>
-                <span>{new Date(order.booking.bookingDate).toLocaleDateString()} at {order.booking.timeSlot}</span>
-              </div>
+                <span>{orderDetail.labels.appointment}</span>
+                <span>{new Date(order.booking.bookingDate).toLocaleDateString()}{' '}{orderDetail.labels.timeConnector}{' '}{order.booking.timeSlot}</span></div>
             )}
             <Divider />
             {order.items.map((item) => (
               <div className="cart-summary__row" key={item.id}>
                 <span>
                   {item.itemName} × {item.quantity}
-                  {item.durationMinutes && ` (${item.durationMinutes} min)`}
+                  {item.durationMinutes && ` (${item.durationMinutes} ${orderDetail.labels.durationSuffix})`}
                 </span>
                 <span>{formatINR(Number(item.lineTotal))}</span>
               </div>
             ))}
             <Divider />
             <div className="cart-summary__row cart-summary__row--total">
-              <strong>Total</strong>
+              <strong>{orderDetail.labels.total}</strong>
               <strong>{formatINR(Number(order.total))}</strong>
             </div>
-            {order.cancellationReason && <p className="error-state">Cancelled: {order.cancellationReason}</p>}
+            {order.cancellationReason && <p className="error-state"> {orderDetail.labels.cancelled} {order.cancellationReason}</p>}
             {order.status === 'PENDING_PAYMENT' && order.payments[0]?.status === 'FAILED' && (
-              <p className="error-state">Payment failed: {order.payments[0].failureReason ?? 'Please try again.'}</p>
+              <p className="error-state"> {orderDetail.labels.paymentFailed}{' '} {order.payments[0].failureReason ?? orderDetail.labels.retryPayment}</p>
             )}
             {order.status === 'PENDING_PAYMENT' && (
               <FilledButton onClick={() => navigate('/checkout', { state: { orderId: order.id } })}>
-                Pay {formatINR(Number(order.total))}
+                 {orderDetail.actions.payPrefix} {formatINR(Number(order.total))}
               </FilledButton>
             )}
             {(order.status === 'PENDING_PAYMENT' || order.status === 'CONFIRMED') && (
-              <OutlinedButton onClick={cancel}>Cancel order</OutlinedButton>
+              <OutlinedButton onClick={cancel}>{orderDetail.actions.cancelOrder}</OutlinedButton>
             )}
-            <OutlinedButton onClick={() => navigate(`/orders/${order.id}/invoice`)}>Download Invoice</OutlinedButton>
-            <OutlinedButton onClick={() => navigate('/orders')}>My Orders</OutlinedButton>
-            <OutlinedButton onClick={() => navigate('/categories')}>Continue Shopping</OutlinedButton>
+            <OutlinedButton onClick={() => navigate(`/orders/${order.id}/invoice`)}> {orderDetail.actions.downloadInvoice}</OutlinedButton>
+            <OutlinedButton onClick={() => navigate('/orders')}> {orderDetail.actions.myOrders}</OutlinedButton>
+            <OutlinedButton onClick={() => navigate('/categories')}> {orderDetail.actions.continueShopping}</OutlinedButton>
           </div>
         </sky-card>
       </div>

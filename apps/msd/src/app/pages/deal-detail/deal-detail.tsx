@@ -1,54 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
-
-import {
-  ChipSet,
-  Dialog,
-  Divider,
-  FilledButton,
-  FilterChip,
-  Icon,
-  OutlinedIconButton,
-  OutlinedTextField,
-  TextButton,
-} from '@skylabs-monorepo/shared-ui/react';
-
+import { ChipSet, Dialog, Divider, FilledButton, FilterChip, Icon, OutlinedIconButton, OutlinedTextField, TextButton, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
-
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-
-import {
-  getCatalogDeal,
-  listCatalogDeals,
-  type CatalogDeal,
-} from '../../../api/catalog';
+import { getCatalogDeal, listCatalogDeals, type CatalogDeal, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
 import { createBooking, type Booking } from '../../../api/bookings';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
-
 import { formatINR } from '../../../utils/format';
 import content from '../../../content.json';
-
 import './deal-detail.css';
-
-const TIME_SLOTS = [
-  '9:00 AM',
-  '10:00 AM',
-  '11:00 AM',
-  '12:00 PM',
-  '1:00 PM',
-  '2:00 PM',
-  '3:00 PM',
-  '4:00 PM',
-  '5:00 PM',
-  '6:00 PM',
-];
-
+const TIME_SLOTS = content.category.timeSlots;
 /**
  * A single Deal — GET /catalog/deals/:id.
  *
@@ -61,50 +27,39 @@ const TIME_SLOTS = [
 export function DealDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
-
   const { token, isAuthenticated } = useAuth();
-
   const {
     has: isWishlisted,
     toggle: toggleWishlist,
     isPending: wishlistPending,
   } = useWishlist();
-
   const { dealDetail } = content;
-
   const [deal, setDeal] = useState<CatalogDeal | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   const [related, setRelated] = useState<CatalogDeal[]>([]);
-
   const [activeImg, setActiveImg] = useState(0);
   const [addedToCart, setAddedToCart] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
-
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
   const [duplicateBookingId, setDuplicateBookingId] = useState<string | null>(null);
   const resultDialogRef = useRef<MdDialog>(null);
-
   useEffect(() => {
     if (confirmedBooking || duplicateBookingId) {
       resultDialogRef.current?.show();
     }
   }, [confirmedBooking, duplicateBookingId]);
-
   useEffect(() => {
     if (!id) {
       setDeal(null);
-      setError('Invalid deal.');
+      setError(dealDetail.errors.invalidDeal);
       setLoading(false);
       return;
     }
-
     setLoading(true);
     setError('');
     setActiveImg(0);
-
     getCatalogDeal(id)
       .then(({ data }) => {
         setDeal(data);
@@ -117,24 +72,21 @@ export function DealDetail() {
           setDeal(null);
           return;
         }
-
         setError(
           err instanceof ApiRequestError
             ? err.message
-            : 'Could not load this deal.',
+            : dealDetail.errors.loadDeal
         );
       })
       .finally(() => {
         setLoading(false);
       });
   }, [id]);
-
   useEffect(() => {
     if (!deal?.category?.id) {
       setRelated([]);
       return;
     }
-
     listCatalogDeals({
       categoryId: deal.category.id,
       type: deal.service ? 'service' : 'product',
@@ -155,7 +107,7 @@ export function DealDetail() {
   if (loading) {
     return (
       <p className="loading-state">
-        Loading deal…
+        {dealDetail.loading}
       </p>
     );
   }
@@ -163,22 +115,19 @@ export function DealDetail() {
   if (error || !deal) {
     return (
       <div className="deal-detail deal-detail--empty">
-        <title>Deal Not Found | MSD</title>
+        <title>{dealDetail.notFound.metaTitle}</title>
 
         <sky-info-card
           icon="search_off"
-          heading="Deal not found"
-          subheading={
-            error ||
-            'This deal may no longer be available.'
-          }
+          heading={dealDetail.notFound.heading}
+          subheading={dealDetail.notFound.subheading}
         />
 
         <FilledButton
           type="button"
           onClick={() => navigate('/categories')}
         >
-          Browse Categories
+          {dealDetail.notFound.cta}
         </FilledButton>
       </div>
     );
@@ -205,12 +154,12 @@ export function DealDetail() {
     deal.images?.length
       ? deal.images
       : [
-          deal.service?.image ??
-            deal.product?.image,
-        ].filter(
-          (image): image is string =>
-            Boolean(image),
-        );
+        deal.service?.image ??
+        deal.product?.image,
+      ].filter(
+        (image): image is string =>
+          Boolean(image),
+      );
 
   const description =
     deal.description ??
@@ -227,12 +176,12 @@ export function DealDetail() {
   const discountPct =
     deal.discountPercent ??
     (originalPrice !== undefined &&
-    originalPrice > salePrice
+      originalPrice > salePrice
       ? Math.round(
-          ((originalPrice - salePrice) /
-            originalPrice) *
-            100,
-        )
+        ((originalPrice - salePrice) /
+          originalPrice) *
+        100,
+      )
       : 0);
 
   const dealId = deal.id;
@@ -257,7 +206,7 @@ export function DealDetail() {
       setActionError(
         err instanceof ApiRequestError
           ? err.message
-          : 'Could not add to cart.',
+          : dealDetail.errors.addToCart,
       );
     }
   }
@@ -304,21 +253,18 @@ export function DealDetail() {
   return (
     <div className="deal-detail">
       <title>
-        {`${name} – ${
-          deal.vendor?.businessName ?? 'MSD'
-        } | MSD`}
+        {`${name} – ${deal.vendor?.businessName ?? 'MSD'
+          } | MSD`}
       </title>
 
       <meta
         name="description"
-        content={`${
-          description ||
+        content={`${description ||
           `Book ${name} at MSD.`
-        } ${formatINR(salePrice)}${
-          deal.branch?.city
+          } ${formatINR(salePrice)}${deal.branch?.city
             ? ` in ${deal.branch.city}`
             : ''
-        }.`}
+          }.`}
       />
 
       <script
@@ -334,9 +280,9 @@ export function DealDetail() {
             provider:
               deal.vendor?.businessName
                 ? {
-                    '@type': 'Organization',
-                    name: deal.vendor.businessName,
-                  }
+                  '@type': 'Organization',
+                  name: deal.vendor.businessName,
+                }
                 : undefined,
             offers: {
               '@type': 'Offer',
@@ -354,16 +300,16 @@ export function DealDetail() {
         className="deal-detail__breadcrumb"
         items={[
           {
-            label: 'Home',
+            label: content.categories.breadcrumb.home,
             to: '/',
           },
           ...(deal.category
             ? [
-                {
-                  label: deal.category.name,
-                  to: `/category/${deal.category.slug}`,
-                },
-              ]
+              {
+                label: deal.category.name,
+                to: `/category/${deal.category.slug}`,
+              },
+            ]
             : []),
           {
             label: name,
@@ -392,9 +338,9 @@ export function DealDetail() {
             {discountPct > 0 && (
               <span
                 className="deal-detail__badge"
-                aria-label={`${discountPct}% off`}
+                aria-label={`${discountPct}% ${dealDetail.labels.off}`}
               >
-                {discountPct}% OFF
+                {discountPct}% {dealDetail.labels.off}
               </span>
             )}
           </div>
@@ -408,17 +354,14 @@ export function DealDetail() {
                 <button
                   key={`${image}-${index}`}
                   type="button"
-                  className={`deal-detail__thumb${
-                    index === activeImg
-                      ? ' deal-detail__thumb--active'
-                      : ''
-                  }`}
+                  className={`deal-detail__thumb${index === activeImg
+                    ? ' deal-detail__thumb--active'
+                    : ''
+                    }`}
                   onClick={() =>
                     setActiveImg(index)
                   }
-                  aria-label={`View image ${
-                    index + 1
-                  }`}
+                  aria-label={`${dealDetail.gallery.viewImage} ${index + 1}`}
                   aria-pressed={
                     index === activeImg
                   }
@@ -467,9 +410,7 @@ export function DealDetail() {
               variant="primary"
               size="small"
             >
-              {deal.service
-                ? 'Service'
-                : 'Product'}
+              {deal.service ? dealDetail.serviceType.service : dealDetail.serviceType.product}
             </sky-badge>
           </div>
 
@@ -479,23 +420,23 @@ export function DealDetail() {
 
           {(deal.branch?.city ||
             deal.branch?.address) && (
-            <p
-              className="deal-detail__dist"
-              aria-label="Location"
-            >
-              <Icon aria-hidden="true">
-                near_me
-              </Icon>
+              <p
+                className="deal-detail__dist"
+                aria-label={dealDetail.labels.location}
+              >
+                <Icon aria-hidden="true">
+                  near_me
+                </Icon>
 
-              {[
-                deal.branch?.name,
-                deal.branch?.address ??
+                {[
+                  deal.branch?.name,
+                  deal.branch?.address ??
                   deal.branch?.city,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </p>
-          )}
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            )}
 
           <Divider />
 
@@ -512,9 +453,7 @@ export function DealDetail() {
                 <div className="deal-detail__original">
                   <s
                     className="deal-detail__original-price"
-                    aria-label={`Original price ${formatINR(
-                      originalPrice,
-                    )}`}
+                    aria-label={`${dealDetail.labels.originalPrice} ${formatINR(originalPrice)}`}
                   >
                     {formatINR(originalPrice)}
                   </s>
@@ -524,7 +463,7 @@ export function DealDetail() {
                       variant="error"
                       size="small"
                     >
-                      {discountPct}% OFF
+                      {discountPct}% {dealDetail.labels.off}
                     </sky-badge>
                   )}
                 </div>
@@ -538,8 +477,7 @@ export function DealDetail() {
                 <Icon aria-hidden="true">
                   schedule
                 </Icon>
-
-                {deal.durationMinutes} min
+                {deal.durationMinutes} {dealDetail.labels.durationSuffix}
               </p>
             )}
 
@@ -567,7 +505,7 @@ export function DealDetail() {
                 </Icon>
 
                 {addedToCart
-                  ? 'Added to Cart!'
+                  ? dealDetail.addedToCart
                   : dealDetail.addToCart}
               </FilledButton>
             )}
@@ -575,8 +513,8 @@ export function DealDetail() {
             <OutlinedIconButton
               aria-label={
                 isWishlisted(dealId)
-                  ? 'Remove from wishlist'
-                  : 'Save to wishlist'
+                  ? dealDetail.wishlist.remove
+                  : dealDetail.wishlist.save
               }
               aria-pressed={isWishlisted(
                 dealId,
@@ -621,7 +559,7 @@ export function DealDetail() {
           >
             {confirmedBooking ? (
               <>
-                <span slot="headline">Booking confirmed successfully.</span>
+                <span slot="headline"> {dealDetail.booking.confirmationTitle}</span>
                 <div slot="content" className="form-grid">
                   <p>
                     <strong>
@@ -633,20 +571,21 @@ export function DealDetail() {
                   )}
                   <p>{confirmedBooking.branch.name}</p>
                   <p>
-                    {new Date(confirmedBooking.bookingDate).toLocaleDateString()} at{' '}
+                    {new Date(confirmedBooking.bookingDate).toLocaleDateString()}{' '}
+                    {dealDetail.booking.timeConnector}{' '}
                     {confirmedBooking.timeSlot}
                   </p>
                   {confirmedBooking.therapist && (
-                    <p>Therapist: {confirmedBooking.therapist.name}</p>
+                    <p> {dealDetail.booking.therapist}{' '}{confirmedBooking.therapist.name}</p>
                   )}
-                  <p className="field-hint">Booking ID: {confirmedBooking.id}</p>
+                  <p className="field-hint">{dealDetail.booking.bookingId}: {confirmedBooking.id}</p>
                 </div>
               </>
             ) : (
               <>
-                <span slot="headline">Already booked</span>
+                <span slot="headline"> {dealDetail.booking.alreadyBookedTitle}</span>
                 <div slot="content" className="form-grid">
-                  <p>Already booked. Your existing booking is still active.</p>
+                  <p> {dealDetail.booking.alreadyBookedMessage}</p>
                 </div>
               </>
             )}
@@ -655,13 +594,13 @@ export function DealDetail() {
                 type="button"
                 onClick={() => navigate('/categories')}
               >
-                Continue Shopping
+                {dealDetail.booking.continueShopping}
               </TextButton>
               <FilledButton
                 type="button"
                 onClick={() => navigate('/bookings')}
               >
-                View Booking
+                {dealDetail.booking.viewBooking}
               </FilledButton>
             </div>
           </Dialog>
@@ -672,7 +611,7 @@ export function DealDetail() {
           <sky-accordion>
             {description && (
               <sky-accordion-item
-                header="Description"
+                header={dealDetail.description}
                 open
               >
                 <p className="deal-detail__desc">
@@ -727,8 +666,7 @@ export function DealDetail() {
                       variant="outlined"
                       badge={
                         item.service
-                          ? 'Service'
-                          : 'Product'
+                          ? dealDetail.serviceType.service : dealDetail.serviceType.product
                       }
                       eyebrow={
                         item.vendor
@@ -763,17 +701,17 @@ export function DealDetail() {
                       originalPrice={
                         item.originalPrice !=
                           null &&
-                        Number(
-                          item.originalPrice,
-                        ) !==
+                          Number(
+                            item.originalPrice,
+                          ) !==
                           Number(
                             item.salePrice,
                           )
                           ? formatINR(
-                              Number(
-                                item.originalPrice,
-                              ),
-                            )
+                            Number(
+                              item.originalPrice,
+                            ),
+                          )
                           : undefined
                       }
                       discount={
@@ -829,7 +767,7 @@ function BookingDialog({
   ) => Promise<void>;
 }) {
   const dialogRef = useRef<MdDialog>(null);
-
+  const { dealDetail } = content;
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [error, setError] = useState('');
@@ -839,7 +777,7 @@ function BookingDialog({
   const submit = async () => {
     if (!date || !time) {
       setError(
-        'Select a date and time.',
+        dealDetail.booking.selectDateTime
       );
       return;
     }
@@ -855,7 +793,7 @@ function BookingDialog({
       setError(
         err instanceof ApiRequestError
           ? err.message
-          : 'Could not book this service.',
+          : dealDetail.errors.bookService,
       );
     } finally {
       setSubmitting(false);
@@ -878,12 +816,12 @@ function BookingDialog({
           event_available
         </Icon>
 
-        Book Now
+        {dealDetail.bookNow}
       </FilledButton>
 
       <Dialog ref={dialogRef}>
         <div slot="headline">
-          Book {deal.service?.name ?? deal.title}
+          {dealDetail.booking.headlinePrefix}{' '}{deal.service?.name ?? deal.title}
         </div>
 
         <div
@@ -891,7 +829,7 @@ function BookingDialog({
           className="form-grid"
         >
           <OutlinedTextField
-            label="Date"
+            label={dealDetail.booking.date}
             type="date"
             value={date}
             onInput={(event: Event) => {
@@ -903,10 +841,10 @@ function BookingDialog({
           />
 
           <p className="field-hint">
-            Time slot
+            {dealDetail.booking.timeSlot}
           </p>
 
-          <ChipSet aria-label="Select a time slot">
+          <ChipSet aria-label={dealDetail.booking.timeSlotAriaLabel}>
             {TIME_SLOTS.map((slot) => (
               <FilterChip
                 key={slot}
@@ -936,7 +874,7 @@ function BookingDialog({
               dialogRef.current?.close()
             }
           >
-            Cancel
+            {dealDetail.booking.cancel}
           </TextButton>
 
           <FilledButton
@@ -945,8 +883,8 @@ function BookingDialog({
             disabled={submitting}
           >
             {submitting
-              ? 'Booking…'
-              : 'Confirm booking'}
+              ? dealDetail.booking.submitting
+              : dealDetail.booking.confirm}
           </FilledButton>
         </div>
       </Dialog>

@@ -147,7 +147,7 @@ export function VendorPipeline({ token, initialVendor, onVendorChange, canReview
         <>
           <VendorUserPicker selectedUser={pendingOwner} onSelect={setPendingOwner} />
           <div className="form-actions">
-            <FilledButton onClick={saveUser} disabled={saving || !pendingOwner}>
+            <FilledButton onClick={saveUser} >
               {saving ? 'Saving…' : 'Save & Continue'}
             </FilledButton>
           </div>

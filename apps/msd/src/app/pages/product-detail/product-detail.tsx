@@ -1,19 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import {
-  Divider,
-  FilledButton,
-  Icon,
-  OutlinedIconButton,
-} from '@skylabs-monorepo/shared-ui/react';
+import { Divider, FilledButton, Icon, OutlinedIconButton, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-
-import {
-  getCatalogDeal,
-  listCatalogDeals,
-  type CatalogDeal,
-} from '../../../api/catalog';
+import { getCatalogDeal, listCatalogDeals, type CatalogDeal, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
@@ -21,13 +11,10 @@ import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { formatINR } from '../../../utils/format';
 import content from '../../../content.json';
-
 import './product-detail.css';
 
 const { products } = content;
-
-const SITE_URL =
-  (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
+const SITE_URL = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
 
 /**
  * A single product-deal — GET /catalog/deals/:id.
@@ -42,21 +29,16 @@ const SITE_URL =
 export function ProductDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
-
   const { token, isAuthenticated } = useAuth();
-
   const {
     has: isWishlisted,
     toggle: toggleWishlist,
     isPending: wishlistPending,
   } = useWishlist();
-
   const [deal, setDeal] = useState<CatalogDeal | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   const [related, setRelated] = useState<CatalogDeal[]>([]);
-
   const [activeImg, setActiveImg] = useState(0);
   const [qty, setQty] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
@@ -66,7 +48,7 @@ export function ProductDetail() {
   useEffect(() => {
     if (!id) {
       setDeal(null);
-      setError('Invalid product.');
+      setError(products.detail.errors.invalidProduct);
       setLoading(false);
       return;
     }
@@ -88,7 +70,7 @@ export function ProductDetail() {
         setError(
           err instanceof ApiRequestError
             ? err.message
-            : 'Could not load this product.',
+            : products.detail.errors.loadProduct,
         );
       })
       .finally(() => {
@@ -121,27 +103,25 @@ export function ProductDetail() {
 
   if (loading) {
     return (
-      <p className="loading-state">
-        Loading product…
-      </p>
+      <p className="loading-state"> {products.detail.loading}</p>
     );
   }
 
   if (error || !deal) {
     return (
       <div className="product-detail product-detail--empty">
-        <title>Product Not Found | MSD</title>
+        <title>{products.detail.notFound.metaTitle}</title>
 
         <sky-info-card
           icon="search_off"
-          heading="Product not found"
+          heading={products.detail.notFound.heading}
           subheading={
-            error || 'This product may no longer be available.'
+            error || products.detail.notFound.subheading
           }
         />
 
         <FilledButton onClick={() => navigate('/products')}>
-          Browse Products
+          {products.detail.notFound.cta}
         </FilledButton>
       </div>
     );
@@ -199,7 +179,7 @@ export function ProductDetail() {
       setAddError(
         err instanceof ApiRequestError
           ? err.message
-          : 'Could not add to cart.',
+          : products.detail.errors.addToCart,
       );
     }
   }
@@ -314,9 +294,9 @@ export function ProductDetail() {
             image: gallery,
             brand: deal.product?.brand
               ? {
-                  '@type': 'Brand',
-                  name: deal.product.brand,
-                }
+                '@type': 'Brand',
+                name: deal.product.brand,
+              }
               : undefined,
             sku: deal.id,
             offers: {
@@ -372,11 +352,11 @@ export function ProductDetail() {
         className="product-detail__breadcrumb"
         items={[
           {
-            label: 'Home',
+            label: products.detail.breadcrumb.home,
             to: '/',
           },
           {
-            label: 'Products',
+            label: products.detail.breadcrumb.products,
             to: '/products',
           },
           {
@@ -406,9 +386,9 @@ export function ProductDetail() {
               <sky-badge
                 className="product-detail__badge"
                 variant="primary"
-                aria-label={`${deal.discountPercent}% off`}
+                aria-label={`${deal.discountPercent}% ${products.detail.offSuffix}`}
               >
-                {deal.discountPercent}% OFF
+                {deal.discountPercent}% {products.detail.offSuffix}
               </sky-badge>
             )}
           </div>
@@ -416,23 +396,20 @@ export function ProductDetail() {
           {gallery.length > 1 && (
             <div
               className="product-detail__thumbs"
-              aria-label="Gallery thumbnails"
+              aria-label={products.detail.gallery.thumbnailsLabel}
             >
               {gallery.map((img, index) => (
                 <button
                   key={img + index}
                   type="button"
-                  className={`product-detail__thumb${
-                    index === activeImg
+                  className={`product-detail__thumb${index === activeImg
                       ? ' product-detail__thumb--active'
                       : ''
-                  }`}
+                    }`}
                   onClick={() =>
                     setActiveImg(index)
                   }
-                  aria-label={`View image ${
-                    index + 1
-                  }`}
+                  aria-label={`${products.detail.gallery.viewImage} ${index + 1}`}
                   aria-pressed={
                     index === activeImg
                   }
@@ -502,9 +479,7 @@ export function ProductDetail() {
               originalPrice !== salePrice && (
                 <s
                   className="product-detail__original-price"
-                  aria-label={`Original price ${formatINR(
-                    originalPrice,
-                  )}`}
+                  aria-label={`${products.detail.originalPrice} ${formatINR(originalPrice)}`}
                 >
                   {formatINR(originalPrice)}
                 </s>
@@ -531,7 +506,7 @@ export function ProductDetail() {
             }
           >
             <OutlinedIconButton
-              aria-label="Decrease quantity"
+              aria-label={products.detail.decreaseQuantity}
               onClick={() =>
                 setQty((currentQty) =>
                   Math.max(1, currentQty - 1),
@@ -553,7 +528,7 @@ export function ProductDetail() {
             </span>
 
             <OutlinedIconButton
-              aria-label="Increase quantity"
+              aaria-label={products.detail.increaseQuantity}
               onClick={() =>
                 setQty((currentQty) =>
                   Math.min(10, currentQty + 1),
@@ -583,7 +558,7 @@ export function ProductDetail() {
               </Icon>
 
               {addedToCart
-                ? 'Added to Cart!'
+                ? products.detail.addedToCart
                 : products.detail.addToCart}
             </FilledButton>
 
@@ -611,13 +586,13 @@ export function ProductDetail() {
 
               <div
                 className="product-detail__share"
-                aria-label="Share"
+                aria-label={products.detail.shareAriaLabel}
               >
                 <OutlinedIconButton
                   aria-label={
                     isWishlisted(dealId)
-                      ? 'Remove from wishlist'
-                      : 'Save to wishlist'
+                      ? products.detail.removeFromWishlist
+                      : products.detail.saveToWishlist
                   }
                   aria-pressed={isWishlisted(
                     dealId,
@@ -635,14 +610,14 @@ export function ProductDetail() {
                 </OutlinedIconButton>
 
                 <span className="product-detail__share-label">
-                  Share
+                  {products.detail.shareLabel}
                 </span>
 
                 <OutlinedIconButton
                   aria-label={
                     copied
-                      ? 'Link copied!'
-                      : 'Copy product link'
+                      ? products.detail.linkCopied
+                      : products.detail.copyProductLink
                   }
                   onClick={copyLink}
                 >
@@ -721,7 +696,7 @@ export function ProductDetail() {
                       }
                       eyebrowHref={
                         !item.product?.brand &&
-                        item.vendor?.slug
+                          item.vendor?.slug
                           ? `/vendor/${item.vendor.slug}`
                           : undefined
                       }
@@ -739,13 +714,13 @@ export function ProductDetail() {
                       )}
                       originalPrice={
                         item.originalPrice &&
-                        Number(item.originalPrice) !==
+                          Number(item.originalPrice) !==
                           Number(item.salePrice)
                           ? formatINR(
-                              Number(
-                                item.originalPrice,
-                              ),
-                            )
+                            Number(
+                              item.originalPrice,
+                            ),
+                          )
                           : undefined
                       }
                       discount={

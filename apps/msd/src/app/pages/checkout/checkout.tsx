@@ -2,17 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedButton, Icon, Divider, OutlinedTextField, Radio } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import {
-  checkout,
-  createOrderFromBooking,
-  getMyOrder,
-  pay,
-  payCod,
-  verifyPayment,
-  type Order,
-  type OrderContactDetails,
-  type PaymentIntent,
-} from '../../../api/orders';
+import { checkout, createOrderFromBooking, getMyOrder, pay, payCod, verifyPayment, type Order, type OrderContactDetails, type PaymentIntent, } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { loadRazorpayScript } from '../../../utils/razorpay';
 import { formatINR } from '../../../utils/format';
@@ -116,7 +106,7 @@ export function Checkout() {
         const intent = (await pay(token, order.id)).data;
         setPaymentIntent(intent);
       } catch (err) {
-        setError(err instanceof ApiRequestError ? err.message : 'Could not prepare payment.');
+        setError(err instanceof ApiRequestError ? err.message : checkoutContent.errors.preparePayment);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,17 +114,16 @@ export function Checkout() {
 
   function validateDetails(): boolean {
     const errors: FieldErrors = {};
-    if (!contactName.trim()) errors.contactName = 'Name is required.';
-    if (!/^[6-9]\d{9}$/.test(contactPhone.trim())) errors.contactPhone = 'Enter a valid 10-digit mobile number.';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) errors.contactEmail = 'Enter a valid email address.';
-    if (!shippingAddress.trim()) errors.shippingAddress = 'Address is required.';
-    if (!shippingCity.trim()) errors.shippingCity = 'City is required.';
-    if (!shippingState.trim()) errors.shippingState = 'State is required.';
-    if (!/^\d{6}$/.test(shippingPincode.trim())) errors.shippingPincode = 'Enter a valid 6-digit pincode.';
+    if (!contactName.trim()) { errors.contactName = checkoutContent.validation.emptyName; }
+    if (!/^[6-9]\d{9}$/.test(contactPhone.trim())) { errors.contactPhone = checkoutContent.validation.invalidPhone; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) { errors.contactEmail = checkoutContent.validation.invalidEmail; }
+    if (!shippingAddress.trim()) { errors.shippingAddress = checkoutContent.validation.emptyAddress; }
+    if (!shippingCity.trim()) { errors.shippingCity = checkoutContent.validation.emptyCity; }
+    if (!shippingState.trim()) { errors.shippingState = checkoutContent.validation.emptyState; }
+    if (!/^\d{6}$/.test(shippingPincode.trim())) { errors.shippingPincode = checkoutContent.validation.invalidPincode; }
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   }
-
   const submitDetails = async () => {
     if (!validateDetails()) return;
     setDetailsSubmitting(true);
@@ -155,7 +144,7 @@ export function Checkout() {
       setOrder(currentOrder);
       setStep('payment');
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not start checkout.');
+      setError(err instanceof ApiRequestError ? err.message : checkoutContent.errors.startCheckout);
     } finally {
       setDetailsSubmitting(false);
     }
@@ -167,7 +156,7 @@ export function Checkout() {
     setPaying(true);
     try {
       await loadRazorpayScript();
-      if (!window.Razorpay) throw new Error('Payment gateway unavailable.');
+      if (!window.Razorpay) throw new Error(checkoutContent.errors.gatewayUnavailable);
       const rzp = new window.Razorpay({
         key: paymentIntent.keyId,
         order_id: paymentIntent.providerOrderId,
@@ -184,7 +173,7 @@ export function Checkout() {
               setError(
                 err instanceof ApiRequestError
                   ? err.message
-                  : 'Payment verification failed — if an amount was deducted, contact support with your order id.',
+                  : checkoutContent.errors.verificationFailed,
               );
               setPaying(false);
             });
@@ -192,7 +181,7 @@ export function Checkout() {
       });
       rzp.open();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not open the payment gateway.');
+      setError(err instanceof Error ? err.message : checkoutContent.errors.openGateway);
       setPaying(false);
     }
   };
@@ -205,7 +194,7 @@ export function Checkout() {
       const { data } = await payCod(token, order.id);
       navigate(`/orders/${data.id}`);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not place your order. Please try again.');
+      setError(err instanceof ApiRequestError ? err.message : checkoutContent.errors.placeOrder);
       setPaying(false);
     }
   };
@@ -214,7 +203,7 @@ export function Checkout() {
     return (
       <div className="checkout-page checkout-page--empty">
         <title>{content.meta.checkout.title}</title>
-        <p className="loading-state">Preparing your order…</p>
+        <p className="loading-state"> {checkoutContent.loadingOrder}</p>
       </div>
     );
   }
@@ -224,7 +213,7 @@ export function Checkout() {
       <div className="checkout-page checkout-page--empty">
         <title>{content.meta.checkout.title}</title>
         <p className="error-state" role="alert">{error}</p>
-        <FilledButton onClick={() => navigate('/categories')}>Back to Categories</FilledButton>
+        <FilledButton onClick={() => navigate('/categories')}>{checkoutContent.backToCategories}</FilledButton>
       </div>
     );
   }
@@ -263,7 +252,7 @@ export function Checkout() {
                   <div className="checkout-form__fields checkout-form__fields--row">
                     <div className="checkout-form__field-wrapper">
                       <OutlinedTextField
-                        label="Full name"
+                        label={checkoutContent.fields.name}
                         value={contactName}
                         onInput={(e) => setContactName((e.target as unknown as { value: string }).value)}
                       />
@@ -271,7 +260,7 @@ export function Checkout() {
                     </div>
                     <div className="checkout-form__field-wrapper">
                       <OutlinedTextField
-                        label="Mobile number"
+                        label={checkoutContent.fields.phone}
                         type="tel"
                         inputMode="numeric"
                         maxLength={10}
@@ -284,7 +273,7 @@ export function Checkout() {
 
                   <div className="checkout-form__field-wrapper">
                     <OutlinedTextField
-                      label="Email"
+                      label={checkoutContent.fields.email}
                       type="email"
                       value={contactEmail}
                       onInput={(e) => setContactEmail((e.target as unknown as { value: string }).value)}
@@ -294,7 +283,7 @@ export function Checkout() {
 
                   <div className="checkout-form__field-wrapper">
                     <OutlinedTextField
-                      label="Address"
+                      label={checkoutContent.fields.address}
                       value={shippingAddress}
                       onInput={(e) => setShippingAddress((e.target as unknown as { value: string }).value)}
                     />
@@ -304,7 +293,7 @@ export function Checkout() {
                   <div className="checkout-form__fields checkout-form__fields--row">
                     <div className="checkout-form__field-wrapper">
                       <OutlinedTextField
-                        label="City"
+                        label={checkoutContent.fields.city}
                         value={shippingCity}
                         onInput={(e) => setShippingCity((e.target as unknown as { value: string }).value)}
                       />
@@ -312,7 +301,7 @@ export function Checkout() {
                     </div>
                     <div className="checkout-form__field-wrapper">
                       <OutlinedTextField
-                        label="State"
+                        label={checkoutContent.fields.state}
                         value={shippingState}
                         onInput={(e) => setShippingState((e.target as unknown as { value: string }).value)}
                       />
@@ -320,7 +309,7 @@ export function Checkout() {
                     </div>
                     <div className="checkout-form__field-wrapper">
                       <OutlinedTextField
-                        label="Pincode"
+                        label={checkoutContent.fields.pincode}
                         inputMode="numeric"
                         maxLength={6}
                         value={shippingPincode}
@@ -335,7 +324,7 @@ export function Checkout() {
 
                 <div className="checkout-form__nav">
                   <FilledButton className="checkout-form__next-btn" onClick={submitDetails} disabled={detailsSubmitting}>
-                    {detailsSubmitting ? 'Please wait…' : checkoutContent.nextLabel}
+                    {detailsSubmitting ? checkoutContent.pleaseWait : checkoutContent.nextLabel}
                     <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
                   </FilledButton>
                 </div>
@@ -349,19 +338,19 @@ export function Checkout() {
                 <h2 id="step-pay-heading" className="checkout-form__heading">{checkoutContent.stepHeadings[2]}</h2>
 
                 {order.status !== 'PENDING_PAYMENT' ? (
-                  <p className="field-hint">This order is already {order.status.toLowerCase()}.</p>
+                  <p className="field-hint"> {checkoutContent.orderStatusPrefix}{' '} {order.status.toLowerCase()}.</p>
                 ) : (
                   <>
                     <div className="checkout-form__group">
-                      <p className="checkout-form__group-label">Payment Method</p>
-                      <div role="radiogroup" aria-label="Payment method" className="checkout-payment-methods">
+                      <p className="checkout-form__group-label">  {checkoutContent.payment.methodHeading}</p>
+                      <div role="radiogroup" aria-label={checkoutContent.payment.methodAriaLabel} className="checkout-payment-methods">
                         <label className="checkout-payment-methods__opt">
                           <Radio
                             name="payment-method"
                             checked={paymentMethod === 'online'}
                             onChange={() => setPaymentMethod('online')}
                           />
-                          <span>Online Payment (Razorpay)</span>
+                          <span>{checkoutContent.payment.online}</span>
                         </label>
                         <label className="checkout-payment-methods__opt">
                           <Radio
@@ -369,29 +358,35 @@ export function Checkout() {
                             checked={paymentMethod === 'cod'}
                             onChange={() => setPaymentMethod('cod')}
                           />
-                          <span>Cash on Delivery</span>
+                          <span>{checkoutContent.payment.cod}</span>
                         </label>
                       </div>
                     </div>
 
                     <p className="field-hint">
-                      You're paying {formatINR(Number(order.total))} to {order.vendorNameSnapshot} ({order.branchNameSnapshot}).
+                      {checkoutContent.payment.payingTo
+                        .replace('{amount}', formatINR(Number(order.total)))
+                        .replace('{vendor}', order.vendorNameSnapshot)
+                        .replace('{branch}', order.branchNameSnapshot)}
                     </p>
 
                     {paymentMethod === 'online' ? (
                       <>
                         <FilledButton className="checkout-form__next-btn" onClick={openRazorpay} disabled={paying || !paymentIntent}>
-                          {paying ? 'Opening payment…' : `Pay ${formatINR(Number(order.total))}`}
+                          {paying ? checkoutContent.payment.openingPayment : `${checkoutContent.payment.payPrefix} ${formatINR(Number(order.total))}`}
                           <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
                         </FilledButton>
                         <p className="checkout-form__secure">
                           <Icon aria-hidden="true">lock</Icon>
-                          Payments are handled securely by Razorpay — card/UPI/netbanking details never touch MSD's servers.
+                          <p className="checkout-form__secure">
+                            <Icon aria-hidden="true">lock</Icon>
+                            {checkoutContent.securePaymentNote}
+                          </p>
                         </p>
                       </>
                     ) : (
                       <FilledButton className="checkout-form__next-btn" onClick={placeCodOrder} disabled={paying}>
-                        {paying ? 'Placing order…' : checkoutContent.placeOrderLabel}
+                        {paying ? checkoutContent.payment.placingOrder : checkoutContent.placeOrderLabel}
                         <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
                       </FilledButton>
                     )}
@@ -413,7 +408,7 @@ export function Checkout() {
                           <p className="checkout-summary__item-title">{item.itemName}</p>
                           <p className="checkout-summary__item-qty">
                             × {item.quantity}
-                            {item.durationMinutes && ` · ${item.durationMinutes} min`}
+                            {item.durationMinutes && ` · ${item.durationMinutes} ${checkoutContent.durationSuffix}`}
                           </p>
                         </div>
                         <p className="checkout-summary__item-price">{formatINR(Number(item.lineTotal))}</p>
@@ -429,7 +424,7 @@ export function Checkout() {
                     <>
                       <Divider />
                       <p className="field-hint">
-                        Delivering to {order.contactName} · {order.shippingAddress}, {order.shippingCity} {order.shippingPincode}
+                        {checkoutContent.deliveringTo}{order.contactName} · {order.shippingAddress}, {order.shippingCity} {order.shippingPincode}
                       </p>
                     </>
                   )}

@@ -144,42 +144,6 @@ main {
   --md-filled-tonal-icon-button-container-height: 44px;
   border-radius: 50%;
 }
-
-
-
-.profile-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-}
-
-.profile-button md-icon {
-  font-size: 22px;
-}
-
-.profile-arrow {
-  display: flex;
-  align-items: center;
-  margin-left: -6px;
-}
-
-.profile-arrow md-icon {
-  font-size: 18px;
-}
-
-.profile-menu md-menu {
-  margin-top: 8px;
-}
-
-md-menu-item {
-  min-width: 180px;
-}
-
-md-menu-item span {
-  white-space: nowrap;
-}
-
 .nav-drawer-backdrop {
   position: fixed;
   inset: 0;

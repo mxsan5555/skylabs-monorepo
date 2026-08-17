@@ -93,7 +93,7 @@ export function ProductListing() {
         setError(
           err instanceof ApiRequestError
             ? err.message
-            : 'Could not load products.',
+            : products.listing.errors.load,
         );
       })
       .finally(() => {
@@ -169,16 +169,16 @@ export function ProductListing() {
       );
 
       setActionMessage(
-        `Added "${
-          deal.product?.name ??
-          deal.title
-        }" to your cart.`,
+        products.listing.addToCartSuccess.replace(
+          '{item}',
+          deal.product?.name ?? deal.title,
+        ),
       );
     } catch (err: unknown) {
       setActionError(
         err instanceof ApiRequestError
           ? err.message
-          : 'Could not add to cart.',
+          : products.listing.addToCartError,
       );
     }
   };
@@ -322,11 +322,11 @@ export function ProductListing() {
         className="products-page__breadcrumb"
         items={[
           {
-            label: 'Home',
+            label: products.listing.breadcrumb.home,
             to: '/',
           },
           {
-            label: 'Products',
+            label: products.listing.breadcrumb.products,
           },
         ]}
       />
@@ -362,11 +362,11 @@ export function ProductListing() {
       <div
         className="products-page__filter-bar"
         role="toolbar"
-        aria-label="Search and sort products"
+        aria-label={products.listing.filterAriaLabel}
       >
         <div className="products-page__filter-bar-inner">
           <OutlinedTextField
-            label="Search"
+            label={products.listing.searchLabel}
             value={search}
             onInput={(event: Event) => {
               const target =
@@ -450,11 +450,11 @@ export function ProductListing() {
       {/* Product Grid */}
       <section
         className="products-page__grid-section"
-        aria-label="Product results"
+        aria-label={products.listing.resultsAriaLabel}
       >
         {loading ? (
           <p className="loading-state">
-            Loading products…
+            {products.listing.loading}
           </p>
         ) : error ? (
           <p
@@ -493,8 +493,8 @@ export function ProductListing() {
               const originalPrice =
                 deal.originalPrice != null
                   ? Number(
-                      deal.originalPrice,
-                    )
+                    deal.originalPrice,
+                  )
                   : undefined;
 
               const image =
@@ -528,16 +528,16 @@ export function ProductListing() {
                     originalPrice={
                       originalPrice !==
                         undefined &&
-                      originalPrice !==
+                        originalPrice !==
                         salePrice
                         ? formatINR(
-                            originalPrice,
-                          )
+                          originalPrice,
+                        )
                         : undefined
                     }
                     discount={
                       deal.discountPercent
-                        ? `${deal.discountPercent}% OFF`
+                        ? `${deal.discountPercent}% ${products.listing.offSuffix}`
                         : undefined
                     }
                     href={`/products/${deal.id}`}
@@ -571,8 +571,7 @@ export function ProductListing() {
                         >
                           shopping_bag
                         </Icon>
-
-                        Add to Cart
+                        {products.listing.addToCart}
                       </FilledButton>
                     </div>
                   </SkyProductCardWC>

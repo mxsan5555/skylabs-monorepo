@@ -267,9 +267,9 @@ const wellnessDeals = useMemo(
     setActionMessage('');
     try {
       await addCartItem(token, deal.id, 1);
-      setActionMessage(`Added "${deal.product?.name ?? deal.title}" to your cart.`);
+      setActionMessage( home.ui.messages.addToCartSuccess.replace('{item}', deal.product?.name ?? deal.title,));
     } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : 'Could not add to cart.');
+      setActionError(err instanceof ApiRequestError ? err.message :  home.ui.messages.addToCartError);
     }
   }
 
@@ -324,7 +324,7 @@ const wellnessDeals = useMemo(
   // sections interleaved below) waits on this one batched fetch, matching `category.tsx`'s
   // existing whole-page loading/error convention.
   if (catalogLoading) {
-    return <p className="loading-state">Loading…</p>;
+    return <p className="loading-state"> {home.ui.messages.loading}</p>;
   }
   if (catalogError) {
     return <p className="error-state" role="alert">{catalogError}</p>;
@@ -409,7 +409,7 @@ const wellnessDeals = useMemo(
                           </ListItem>
                         ))
                       ) : (
-                        <ListItem disabled> No results found </ListItem>
+                        <ListItem disabled>  {home.ui.messages.loading}</ListItem>
                       )}
                     </List>
                   )}
@@ -441,14 +441,14 @@ const wellnessDeals = useMemo(
             <div
               className="home__premium-tabs"
               role="navigation"
-              aria-label="Browse wellness categories"
+             aria-label={home.ui.accessibility.browseWellnessCategories}
             >
               {premiumHero.tabs.map((tab) => (
                 <NavLink
                   key={tab.label}
                   to={tab.to}
                   className="premium-category-link"
-                  aria-label={`Explore ${tab.label}`}
+                  aria-label={home.ui.accessibility.exploreCategory.replace('{category}',tab.label,)}
                 >
                   <AssistChip className="premium-category-chip">
                     <Icon slot="icon">{tab.icon}</Icon>
@@ -533,7 +533,7 @@ const wellnessDeals = useMemo(
               )}
             </sky-card>
             <div className="home__premium-popular">
-              <span className="popular-label">Popular:</span>
+              <span className="popular-label"> {home.ui.labels.popular}</span>
 
               {premiumHero.popular.map((item) => (
                 <AssistChip
@@ -613,9 +613,8 @@ const wellnessDeals = useMemo(
 
       <div className="category-card__content">
         <h3>{cat.name}</h3>
-        <p>{categoryDealCount(cat.id)} Services</p>
+       <p>{categoryDealCount(cat.id)} {home.ui.labels.services}</p>
       </div>
-
       <div className="category-card__arrow">
         <Icon>arrow_forward</Icon>
       </div>
@@ -640,7 +639,7 @@ const wellnessDeals = useMemo(
 
       <section
         className="home-section home-section--alt"
-        aria-label="Member promotion"
+        aria-label={home.ui.accessibility.memberPromotion}
       >
         <div className="home-section__container">
           <sky-card
@@ -702,7 +701,7 @@ const wellnessDeals = useMemo(
       {/* ── Gift Cards CTA ─────────────────────────────────────────────── */}
       <section
         className="home-section home-section--alt"
-        aria-label="Gift cards promotion"
+        aria-label={home.ui.accessibility.giftCardsPromotion}
       >
         <div className="home-section__container">
 
@@ -878,7 +877,7 @@ const wellnessDeals = useMemo(
       {/* ── Welcome Offer CTA ──────────────────────────────────────────── */}
       <section
         className="home-section home-section--alt"
-        aria-label="Welcome offer promotion"
+     aria-label={home.ui.accessibility.welcomeOfferPromotion}
       >
         <div className="home-section__container">
           <sky-card

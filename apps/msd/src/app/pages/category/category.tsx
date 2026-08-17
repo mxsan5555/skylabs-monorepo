@@ -1,18 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
-import {
-  Icon,
-  Tabs,
-  PrimaryTab,
-  ChipSet,
-  FilterChip,
-  OutlinedTextField,
-  FilledButton,
-  OutlinedButton,
-  TextButton,
-  Dialog,
-} from '@skylabs-monorepo/shared-ui/react';
+import { Icon, Tabs, PrimaryTab, ChipSet, FilterChip, OutlinedTextField, FilledButton, OutlinedButton, TextButton, Dialog, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCatalogCategory, listCatalogDeals, type CatalogCategoryWithChildren, type CatalogDeal } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
@@ -22,11 +11,11 @@ import { useWishlist } from '../../../wishlist/wishlist-context';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { formatINR } from '../../../utils/format';
+import content from '../../../content.json';
 import './category.css';
 
 type OfferingFilter = 'all' | 'service' | 'product';
-
-const TIME_SLOTS = ['9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM'];
+const TIME_SLOTS = content.category.timeSlots;
 
 /**
  * Category → Sub Category → Service/Product → Deal discovery page — the customer catalogue's
@@ -48,15 +37,12 @@ export function Category() {
   const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
-
   const [category, setCategory] = useState<CatalogCategoryWithChildren | null>(null);
   const [categoryLoading, setCategoryLoading] = useState(true);
   const [categoryError, setCategoryError] = useState('');
-
   const [subcategoryIdx, setSubcategoryIdx] = useState(0);
   const [offeringFilter, setOfferingFilter] = useState<OfferingFilter>('all');
   const [search, setSearch] = useState('');
-
   const [deals, setDeals] = useState<CatalogDeal[]>([]);
   const [dealsLoading, setDealsLoading] = useState(true);
   const [dealsError, setDealsError] = useState('');
@@ -72,7 +58,7 @@ export function Category() {
         if (err instanceof ApiRequestError && err.status === 404) {
           setCategory(null);
         } else {
-          setCategoryError(err instanceof ApiRequestError ? err.message : 'Could not load category.');
+          setCategoryError(err instanceof ApiRequestError ? err.message : content.category.errors.loadCategory);
         }
       })
       .finally(() => setCategoryLoading(false));
@@ -92,18 +78,17 @@ export function Category() {
     setActionMessage('');
     try {
       await addCartItem(token, deal.id, 1);
-      setActionMessage(`Added "${deal.product?.name ?? deal.title}" to your cart.`);
+      setActionMessage(content.category.messages.addToCartSuccess.replace('{item}', deal.product?.name ?? deal.title));
     } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : 'Could not add to cart.');
+      setActionError(err instanceof ApiRequestError ? err.message : content.category.errors.addToCart);
     }
   };
 
   const bookDeal = async (deal: CatalogDeal, bookingDate: string, timeSlot: string) => {
     if (!requireAuthOrRedirect()) return;
     await createBooking(token, { dealId: deal.id, bookingDate: new Date(bookingDate).toISOString(), timeSlot });
-    setActionMessage(`Booked "${deal.service?.name ?? deal.title}" for ${bookingDate} at ${timeSlot}.`);
+    setActionMessage(content.category.messages.bookingSuccess.replace('{item}', deal.service?.name ?? deal.title).replace('{date}', bookingDate).replace('{time}', timeSlot));
   };
-
   const toggleFavorite = (deal: CatalogDeal) => {
     if (!requireAuthOrRedirect()) return;
     void toggleWishlist(deal.id);
@@ -121,34 +106,37 @@ export function Category() {
       pageSize: 60,
     })
       .then(({ data }) => setDeals(data))
-      .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : 'Could not load deals.'))
+      .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : content.category.errors.loadDeals))
       .finally(() => setDealsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category, activeSubcategory?.id, offeringFilter, search]);
 
   if (categoryLoading) {
-    return <p className="loading-state">Loading category…</p>;
+    return <p className="loading-state"> {content.category.loading}</p>;
   }
 
   if (categoryError || !category) {
     return (
       <div className="category-page category-page--empty">
-        <title>Category Not Found | MSD</title>
-        <sky-info-card icon="search_off" heading="Category not found" subheading={categoryError || 'Try browsing all categories.'} />
-        <FilledButton onClick={() => navigate('/categories')}>Browse Categories</FilledButton>
+        <title>{content.category.notFound.metaTitle}</title>
+        <sky-info-card icon="search_off" heading={content.category.notFound.heading} subheading={categoryError || content.category.notFound.subheading} />
+        <FilledButton onClick={() => navigate('/categories')}>{content.category.notFound.cta}</FilledButton>
       </div>
     );
   }
 
   return (
     <div className="category-page">
-      <title>{`${category.name} Deals | MSD`}</title>
-      <meta name="description" content={category.description ?? `Browse ${category.name} services and products near you.`} />
+      <title>{`${category.name}${content.category.metaTitleSuffix}`}</title>
+      <meta name="description" content={category.description ?? content.category.metaDescriptionTemplate.replace('{category}', category.name)} />
 
       <Breadcrumb
         className="category-page__breadcrumb"
-        items={[{ label: 'Home', to: '/' }, { label: 'Categories', to: '/categories' }, { label: category.name }]}
-      />
+        items={[
+          { label: content.category.breadcrumb.home, to: '/' },
+          { label: content.category.breadcrumb.categories, to: '/categories' },
+          { label: category.name }
+        ]} />
 
       <header className="category-page__hero">
         <div className="category-page__hero-inner">
@@ -168,7 +156,7 @@ export function Category() {
             className="category-page__tabs"
             onChange={(e) => setSubcategoryIdx((e.target as unknown as { activeTabIndex: number }).activeTabIndex)}
           >
-            <PrimaryTab active={subcategoryIdx === 0}>All</PrimaryTab>
+            <PrimaryTab active={subcategoryIdx === 0}> {content.category.tabs.all}</PrimaryTab>
             {category.children.map((sub, i) => (
               <PrimaryTab key={sub.id} active={subcategoryIdx === i + 1}>
                 {sub.name}
@@ -180,18 +168,18 @@ export function Category() {
 
       <div className="category-page__sort">
         <div className="category-page__sort-inner">
-          <ChipSet aria-label="Filter by offering type">
-            <FilterChip label="All" selected={offeringFilter === 'all'} onClick={() => setOfferingFilter('all')} />
-            <FilterChip label="Services" selected={offeringFilter === 'service'} onClick={() => setOfferingFilter('service')} />
-            <FilterChip label="Products" selected={offeringFilter === 'product'} onClick={() => setOfferingFilter('product')} />
+          <ChipSet aria-label={content.category.filter.ariaLabel}>
+            <FilterChip label={content.category.filter.all} selected={offeringFilter === 'all'} onClick={() => setOfferingFilter('all')} />
+            <FilterChip label={content.category.filter.services} selected={offeringFilter === 'service'} onClick={() => setOfferingFilter('service')} />
+            <FilterChip label={content.category.filter.products} selected={offeringFilter === 'product'} onClick={() => setOfferingFilter('product')} />
           </ChipSet>
           <OutlinedTextField
-            label="Search"
+            label={content.category.searchLabel}
             value={search}
             onInput={(e: Event) => setSearch((e.target as HTMLInputElement).value)}
           />
           <p className="category-page__count" aria-live="polite" aria-atomic="true">
-            {dealsLoading ? '…' : `${deals.length} deal${deals.length === 1 ? '' : 's'}`}
+            {dealsLoading ? '…' : `${deals.length} ${deals.length === 1 ? content.category.dealCount.singular : content.category.dealCount.plural}`}
           </p>
         </div>
       </div>
@@ -199,15 +187,15 @@ export function Category() {
       {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
       {actionError && <p className="error-state" role="alert">{actionError}</p>}
 
-      <section className="category-page__grid-wrap" aria-label={`${category.name} deals`}>
+      <section className="category-page__grid-wrap"  aria-label={`${category.name} ${content.category.dealsAriaLabelSuffix}`}>
         <div className="category-page__grid-inner">
           {dealsLoading ? (
-            <p className="loading-state">Loading deals…</p>
+            <p className="loading-state">{content.category.loadingDeals}</p>
           ) : dealsError ? (
             <p className="error-state" role="alert">{dealsError}</p>
           ) : deals.length === 0 ? (
             <div className="category-page__empty">
-              <sky-info-card icon="sentiment_dissatisfied" heading="No deals found" subheading="Try a different sub-category or filter." />
+              <sky-info-card icon="sentiment_dissatisfied" heading={content.category.emptyDeals.heading} subheading={content.category.emptyDeals.subheading} />
             </div>
           ) : (
             <ul className="category-page__grid">
@@ -215,7 +203,7 @@ export function Category() {
                 <li key={deal.id}>
                   <SkyProductCardWC
                     variant="outlined"
-                    badge={deal.service ? 'Service' : 'Product'}
+                    badge={deal.service ? content.category.offeringLabels.service : content.category.offeringLabels.product}
                     eyebrow={[deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · ')}
                     eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
                     heading={deal.service?.name ?? deal.product?.name ?? deal.title}
@@ -228,7 +216,7 @@ export function Category() {
                         : undefined
                     }
                     discount={deal.discountPercent ? `-${deal.discountPercent}%` : undefined}
-                    priceNote={deal.durationMinutes ? `${deal.durationMinutes} min` : undefined}
+                    priceNote={deal.durationMinutes ? `${deal.durationMinutes} ${content.category.durationSuffix}` : undefined}
                     href={deal.service ? `/deal/${deal.id}` : `/products/${deal.id}`}
                     favorite
                     favoriteActive={isWishlisted(deal.id)}
@@ -243,7 +231,7 @@ export function Category() {
                       ) : (
                         <FilledButton onClick={() => addToCart(deal)}>
                           <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-                          Add to Cart
+                          {content.category.actions.addToCart}
                         </FilledButton>
                       )}
                     </div>
@@ -269,7 +257,7 @@ function BookingDialog({ deal, onBook }: { deal: CatalogDeal; onBook: (date: str
 
   const submit = async () => {
     if (!date || !time) {
-      setError('Select a date and time.');
+      setError(content.category.booking.selectDateTime);
       return;
     }
     setSubmitting(true);
@@ -278,7 +266,7 @@ function BookingDialog({ deal, onBook }: { deal: CatalogDeal; onBook: (date: str
       await onBook(date, time);
       dialogRef.current?.close();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not book this service.');
+      setError(err instanceof ApiRequestError ? err.message : content.category.booking.error);
     } finally {
       setSubmitting(false);
     }
@@ -288,19 +276,19 @@ function BookingDialog({ deal, onBook }: { deal: CatalogDeal; onBook: (date: str
     <>
       <OutlinedButton onClick={() => dialogRef.current?.show()}>
         <Icon slot="icon" aria-hidden="true">event_available</Icon>
-        Book
+        {content.category.booking.button}
       </OutlinedButton>
       <Dialog ref={dialogRef}>
-        <div slot="headline">Book {deal.service?.name ?? deal.title}</div>
+        <div slot="headline">{content.category.booking.headlinePrefix}{' '} {deal.service?.name ?? deal.title}</div>
         <div slot="content" className="form-grid">
           <OutlinedTextField
-            label="Date"
+            label={content.category.booking.dateLabel}
             type="date"
             value={date}
             onInput={(e: Event) => setDate((e.target as HTMLInputElement).value)}
           />
-          <p className="field-hint">Time slot</p>
-          <ChipSet aria-label="Select a time slot">
+          <p className="field-hint">{content.category.booking.timeSlotLabel}</p>
+          <ChipSet aria-label={content.category.booking.timeSlotAriaLabel}>
             {TIME_SLOTS.map((slot) => (
               <FilterChip key={slot} label={slot} selected={time === slot} onClick={() => setTime(slot)} />
             ))}
@@ -308,8 +296,8 @@ function BookingDialog({ deal, onBook }: { deal: CatalogDeal; onBook: (date: str
           {error && <p className="error-state" role="alert">{error}</p>}
         </div>
         <div slot="actions">
-          <TextButton onClick={() => dialogRef.current?.close()}>Cancel</TextButton>
-          <FilledButton onClick={submit} disabled={submitting}>{submitting ? 'Booking…' : 'Confirm booking'}</FilledButton>
+          <TextButton onClick={() => dialogRef.current?.close()}>{content.category.booking.cancel}</TextButton>
+          <FilledButton onClick={submit} disabled={submitting}>{submitting ? content.category.booking.submitting : content.category.booking.confirm}</FilledButton>
         </div>
       </Dialog>
     </>
