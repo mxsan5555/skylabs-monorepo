@@ -10,6 +10,7 @@ import '../category/category.css';
  *  `status-pill` exactly like `bookings.tsx`. Relocated here from the old marketplace orders
  *  route now that the marketplace route namespace is retired — this page never had a
  *  mock/static equivalent, so it moved rather than merged. */
+ 
 export function Orders() {
   const { token } = useAuth();
   const navigate = useNavigate();

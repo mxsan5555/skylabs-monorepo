@@ -51,7 +51,7 @@ function toOrderRow(order: Order): Record<string, string | number> {
     'Payment Provider': latestPayment?.provider ?? '—',
     'Payment Failure Reason': latestPayment?.failureReason ?? '—',
     'Cancellation Reason': order.cancellationReason ?? '—',
-    'Booking Date': order.booking ? new Date(order.booking.bookingDate).toLocaleDateString() : '—',
+    'Booking Date': order.booking?.bookingDate ? new Date(order.booking.bookingDate).toLocaleDateString() : '—',
     'Booking Time Slot': order.booking?.timeSlot ?? '—',
     'Booking Status': order.booking?.status ?? '—',
   };

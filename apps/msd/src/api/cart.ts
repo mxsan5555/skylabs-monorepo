@@ -13,6 +13,10 @@ export interface CartDealSummary {
   salePrice: string;
   originalPrice: string;
   images: string[] | null;
+  vendorId: string;
+  branchId: string;
+  vendor: { id: string; businessName: string | null } | null;
+  branch: { id: string; name: string } | null;
   product: { id: string; name: string; image: string | null; imageAlt: string | null } | null;
 }
 
@@ -25,13 +29,12 @@ export interface CartItem {
   deal: CartDealSummary;
 }
 
+/** Multi-vendor: a cart may hold items from any number of vendors/branches — each item's own
+ *  `deal.vendorId`/`deal.vendor`/`deal.branch` is authoritative; Cart itself carries no
+ *  vendor/branch field. Group `items` by `deal.vendorId` for a vendor-grouped display. */
 export interface Cart {
   id: string;
   customerId: string;
-  vendorId: string | null;
-  branchId: string | null;
-  vendor: { id: string; businessName: string | null } | null;
-  branch: { id: string; name: string } | null;
   items: CartItem[];
 }
 
@@ -52,7 +55,10 @@ export function subscribeCartUpdated(listener: CartListener): () => void {
   return () => listeners.delete(listener);
 }
 
-function notifyCartUpdated() {
+/** Exported (unlike a private helper) so `api/orders.ts#checkout` can notify too — checkout
+ *  clears the cart server-side, and without this the header badge would stay stale until some
+ *  unrelated cart mutation happened to refetch it. */
+export function notifyCartUpdated() {
   listeners.forEach((listener) => listener());
 }
 

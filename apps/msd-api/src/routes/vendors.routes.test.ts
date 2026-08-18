@@ -520,10 +520,18 @@ describe('Admin nested branch/deal approval', () => {
 describe('Deal offering integration (Service/Product linkage)', () => {
   const categoryFixture = { id: CATEGORY_ID, name: 'Salon & Grooming', parentId: null };
 
+  // A service deal now requires >=1 package (see DealCreateSchema's own refinement) — every
+  // service-deal test body below includes one. `deal.findUniqueOrThrow` is what createDeal/
+  // updateDeal actually return from (they read back inside the same $transaction after
+  // create/update + package sync) — mock it per test to mirror whatever `deal.create`/
+  // `deal.update` was mocked to return.
+  const baseServicePackages = [{ durationMinutes: 30, sellingPrice: 299 }];
+
   beforeEach(() => {
     prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
     prismaMock.deal.findUnique.mockResolvedValue(null); // slug free, by default
     prismaMock.category.findUnique.mockResolvedValue(categoryFixture); // assertCategoryChildOf's categoryId lookup
+    prismaMock.dealPackage.findFirst.mockResolvedValue(null); // syncDealPriceFromPackages: no-op unless a test overrides
   });
 
   it('1. creates a deal linked to a service', async () => {
@@ -532,10 +540,11 @@ describe('Deal offering integration (Service/Product linkage)', () => {
     prismaMock.deal.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: DEAL_A_ID, ...data }),
     );
+    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_A_ID, serviceId: SERVICE_ID, packages: [] });
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseDealBody, serviceId: SERVICE_ID, durationMinutes: 30 });
+      .send({ ...baseDealBody, serviceId: SERVICE_ID, durationMinutes: 30, packages: baseServicePackages });
     expect(res.status).toBe(201);
     expect(res.body.data.serviceId).toBe(SERVICE_ID);
   });
@@ -546,6 +555,7 @@ describe('Deal offering integration (Service/Product linkage)', () => {
     prismaMock.deal.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: DEAL_A_ID, ...data }),
     );
+    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_A_ID, productId: PRODUCT_ID, packages: [] });
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
@@ -591,6 +601,7 @@ describe('Deal offering integration (Service/Product linkage)', () => {
     prismaMock.deal.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: DEAL_A_ID, ...data }),
     );
+    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_A_ID, productId: PRODUCT_ID, packages: [] });
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
@@ -605,10 +616,11 @@ describe('Deal offering integration (Service/Product linkage)', () => {
     prismaMock.deal.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: DEAL_A_ID, ...data }),
     );
+    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_A_ID, vendorId: VENDOR_A_ID, status: 'DRAFT', packages: [] });
     const res = await request(app)
       .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals`)
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ ...baseDealBody, serviceId: SERVICE_ID, durationMinutes: 30 });
+      .send({ ...baseDealBody, serviceId: SERVICE_ID, durationMinutes: 30, packages: baseServicePackages });
     expect(res.status).toBe(201);
     expect(res.body.data.vendorId).toBe(VENDOR_A_ID); // always server-derived, never from the client
     expect(res.body.data.status).toBe('DRAFT'); // vendor self-service starts DRAFT/PENDING, not ACTIVE/APPROVED
@@ -621,7 +633,7 @@ describe('Deal offering integration (Service/Product linkage)', () => {
     const res = await request(app)
       .post(`/api/v1/vendors/me/branches/${BRANCH_B_ID}/deals`)
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ ...baseDealBody, serviceId: SERVICE_ID, durationMinutes: 30 });
+      .send({ ...baseDealBody, serviceId: SERVICE_ID, durationMinutes: 30, packages: baseServicePackages });
     expect(res.status).toBe(403);
     expect(prismaMock.deal.create).not.toHaveBeenCalled();
   });
@@ -672,6 +684,7 @@ describe('Deal offering integration (Service/Product linkage)', () => {
     resolveMock.mockResolvedValue(['vendors:edit']);
     prismaMock.deal.findUnique.mockResolvedValue(dealAFixture); // legacy deal: no serviceId/productId
     prismaMock.deal.update.mockResolvedValue({ ...dealAFixture, salePrice: '249.00' });
+    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ ...dealAFixture, salePrice: '249.00', packages: [] });
     const res = await request(app)
       .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))

@@ -7,7 +7,7 @@
 
 export type AppId = 'msd' | 'mera-driver';
 
-/** The fifteen configurable action kinds a Permission can grant on a menu key. */
+/** The sixteen configurable action kinds a Permission can grant on a menu key. */
 export type PermissionAction =
   | 'view'
   | 'create'

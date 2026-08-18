@@ -19,3 +19,9 @@ export const CatalogDealQuerySchema = PaginationQuerySchema.extend({
   minPrice: z.coerce.number().min(0).optional(),
   maxPrice: z.coerce.number().min(0).optional(),
 }).openapi('CatalogDealQuery');
+
+export const CatalogTherapistQuerySchema = PaginationQuerySchema.extend({
+  vendorId: z.string().uuid().optional(),
+  branchId: z.string().uuid().optional(),
+  search: z.string().max(200).optional(),
+}).openapi('CatalogTherapistQuery');

@@ -12,7 +12,6 @@ import '@skylabs-monorepo/shared-ui/layout.css';
 import './assets/theme/index.css';
 
 import App from './app/app';
-import { CartProvider } from './cart/cart-context';
 
 applyTheme('light');
 
@@ -23,9 +22,7 @@ const root = ReactDOM.createRoot(
 root.render(
   <StrictMode>
     <BrowserRouter>
-      <CartProvider>
-        <App />
-      </CartProvider>
+      <App />
     </BrowserRouter>
   </StrictMode>,
 );

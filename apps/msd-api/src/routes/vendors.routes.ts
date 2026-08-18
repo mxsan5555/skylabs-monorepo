@@ -29,6 +29,8 @@ import {
   TherapistCreateSchema,
   TherapistUpdateSchema,
   TherapistStatusUpdateSchema,
+  TherapistPackageCreateSchema,
+  TherapistPackageUpdateSchema,
   VendorIdParamSchema,
 } from '../schemas/vendor.schema';
 import * as vendorService from '../services/vendor.service';
@@ -447,6 +449,84 @@ router.patch(
         ...requestMeta(req),
       });
       sendData(res, therapist);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── TherapistPackage (per-therapist price for one specific service Deal) ────
+
+router.get('/me/therapists/:therapistId/packages', requirePermission('vendors', 'custom'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    sendData(res, await vendorService.listTherapistPackages(vendor.id, req.params.therapistId));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/me/therapists/:therapistId/packages',
+  requirePermission('vendors', 'custom'),
+  validateBody(TherapistPackageCreateSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const pkg = await vendorService.createTherapistPackage(vendor.id, req.params.therapistId, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_package.create',
+        targetType: 'TherapistPackage',
+        targetId: pkg.id,
+        after: pkg,
+        ...requestMeta(req),
+      });
+      sendData(res, pkg, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/therapists/:therapistId/packages/:packageId',
+  requirePermission('vendors', 'custom'),
+  validateBody(TherapistPackageUpdateSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const pkg = await vendorService.updateTherapistPackage(vendor.id, req.params.therapistId, req.params.packageId, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_package.update',
+        targetType: 'TherapistPackage',
+        targetId: pkg.id,
+        after: pkg,
+        ...requestMeta(req),
+      });
+      sendData(res, pkg);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/me/therapists/:therapistId/packages/:packageId',
+  requirePermission('vendors', 'custom'),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.deleteTherapistPackage(vendor.id, req.params.therapistId, req.params.packageId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_package.delete',
+        targetType: 'TherapistPackage',
+        targetId: req.params.packageId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
     } catch (err) {
       next(err);
     }

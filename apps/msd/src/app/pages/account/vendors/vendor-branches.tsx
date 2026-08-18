@@ -25,6 +25,7 @@ import {
   type Category,
   type Deal,
   type DealInput,
+  type DealPackageInput,
 } from '../../../../api/rbac/vendors';
 import { listServices, type Service } from '../../../../api/rbac/services';
 import { listProducts, type Product } from '../../../../api/rbac/products';
@@ -359,9 +360,32 @@ export function DealDialog({
     salePrice: deal?.salePrice ?? '',
     durationMinutes: deal?.durationMinutes ?? undefined,
     shortDescription: deal?.shortDescription ?? undefined,
+    images: deal?.images ?? [],
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const images = form.images ?? [];
+  const setImages = (urls: string[]) => setForm((f) => ({ ...f, images: urls }));
+
+  // A service deal's own duration/price menu — a real child table (DealPackage), never a
+  // top-level single duration+price (see DealPackage's schema doc comment in msd-api). `id`
+  // present on an entry = update that existing row on save; absent = create a new one — the
+  // whole array is diffed server-side by `id` (vendor.service.ts#updateDeal).
+  const [packages, setPackages] = useState<DealPackageInput[]>(
+    deal?.packages?.map((p) => ({
+      id: p.id,
+      durationMinutes: p.durationMinutes,
+      sellingPrice: Number(p.sellingPrice),
+      originalPrice: p.originalPrice != null ? Number(p.originalPrice) : undefined,
+      isActive: p.isActive,
+      sortOrder: p.sortOrder,
+    })) ?? [],
+  );
+  const setPackage = (index: number, patch: Partial<DealPackageInput>) =>
+    setPackages((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
+  const addPackage = () => setPackages((prev) => [...prev, { durationMinutes: 30, sellingPrice: 0 }]);
+  const removePackage = (index: number) => setPackages((prev) => prev.filter((_, i) => i !== index));
 
   const selectOffering = (type: OfferingType, id: string) => {
     const catalogItem = type === 'service' ? services.find((s) => s.id === id) : products.find((p) => p.id === id);
@@ -380,26 +404,68 @@ export function DealDialog({
       setError('Select a branch.');
       return;
     }
-    if (!form.title.trim() || !form.slug.trim() || !form.originalPrice || !form.salePrice || !form.categoryId) {
-      setError('Title, slug, original price, and sale price are required.');
+    if (!form.title.trim() || !form.slug.trim() || !form.categoryId) {
+      setError('Title, slug, and category are required.');
       return;
     }
     if (offeringType === 'service' && !form.serviceId) {
       setError('Select a service.');
       return;
     }
-    if (offeringType === 'service' && !form.durationMinutes) {
-      setError('Duration is required for a service deal.');
-      return;
-    }
     if (offeringType === 'product' && !form.productId) {
       setError('Select a product.');
       return;
     }
+    if (offeringType === 'product' && (!form.originalPrice || !form.salePrice)) {
+      setError('Original price and sale price are required.');
+      return;
+    }
+
+    let payload = { ...form };
+
+    if (offeringType === 'service') {
+      if (packages.length === 0) {
+        setError('At least one package (duration + price) is required for a service deal.');
+        return;
+      }
+      for (const p of packages) {
+        if (!p.durationMinutes || p.durationMinutes <= 0) {
+          setError('Every package needs a duration greater than 0.');
+          return;
+        }
+        if (p.sellingPrice == null || p.sellingPrice < 0) {
+          setError('Every package needs a selling price of 0 or more.');
+          return;
+        }
+        if (p.originalPrice !== undefined && p.originalPrice < p.sellingPrice) {
+          setError("Each package's original price must be greater than or equal to its selling price.");
+          return;
+        }
+      }
+      // The Deal's own originalPrice/salePrice/durationMinutes are a synced "from price"/
+      // default-duration display cache (see DealPackage's schema doc comment in msd-api) — the
+      // server re-syncs them to the cheapest active package right after save regardless, but the
+      // create/update schema still requires *some* value up front, so derive one here from the
+      // cheapest package the admin actually entered rather than asking them to fill a redundant,
+      // now-meaningless single duration+price pair.
+      const cheapest = packages.reduce((min, p) => (p.sellingPrice < min.sellingPrice ? p : min), packages[0]);
+      payload = {
+        ...payload,
+        durationMinutes: cheapest.durationMinutes,
+        salePrice: String(cheapest.sellingPrice),
+        originalPrice: String(cheapest.originalPrice ?? cheapest.sellingPrice),
+        packages,
+      };
+    } else {
+      delete payload.durationMinutes;
+      delete payload.packages;
+    }
+
     setSubmitting(true);
     setError('');
     try {
-      await onSave(form, branches ? branchId : undefined);
+      // Blank rows (an "Add image" click left empty) never reach the backend.
+      await onSave({ ...payload, images: images.filter((url) => url.trim()) }, branches ? branchId : undefined);
       dialogRef.current?.close();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not save deal.');
@@ -450,25 +516,17 @@ export function DealDialog({
           </OutlinedSelect>
 
           {offeringType === 'service' ? (
-            <>
-              <OutlinedSelect
-                label="Service"
-                value={form.serviceId ?? ''}
-                onChange={(e: Event) => selectOffering('service', (e.target as HTMLSelectElement).value)}
-              >
-                {services.map((s) => (
-                  <SelectOption key={s.id} value={s.id}>
-                    <div slot="headline">{s.name}</div>
-                  </SelectOption>
-                ))}
-              </OutlinedSelect>
-              <OutlinedTextField
-                label="Duration (minutes)"
-                type="number"
-                value={form.durationMinutes !== undefined ? String(form.durationMinutes) : ''}
-                onInput={(e: Event) => setForm((f) => ({ ...f, durationMinutes: Number((e.target as HTMLInputElement).value) || undefined }))}
-              />
-            </>
+            <OutlinedSelect
+              label="Service"
+              value={form.serviceId ?? ''}
+              onChange={(e: Event) => selectOffering('service', (e.target as HTMLSelectElement).value)}
+            >
+              {services.map((s) => (
+                <SelectOption key={s.id} value={s.id}>
+                  <div slot="headline">{s.name}</div>
+                </SelectOption>
+              ))}
+            </OutlinedSelect>
           ) : (
             <OutlinedSelect
               label="Product"
@@ -489,9 +547,74 @@ export function DealDialog({
 
           <OutlinedTextField label="Title" value={form.title} onInput={(e: Event) => setForm((f) => ({ ...f, title: (e.target as HTMLInputElement).value }))} />
           <OutlinedTextField label="Slug" value={form.slug} onInput={(e: Event) => setForm((f) => ({ ...f, slug: (e.target as HTMLInputElement).value }))} />
-          <OutlinedTextField label="Original price" value={form.originalPrice} onInput={(e: Event) => setForm((f) => ({ ...f, originalPrice: (e.target as HTMLInputElement).value }))} />
-          <OutlinedTextField label="Sale price" value={form.salePrice} onInput={(e: Event) => setForm((f) => ({ ...f, salePrice: (e.target as HTMLInputElement).value }))} />
+
+          {offeringType === 'product' && (
+            <>
+              <OutlinedTextField label="Original price" value={form.originalPrice} onInput={(e: Event) => setForm((f) => ({ ...f, originalPrice: (e.target as HTMLInputElement).value }))} />
+              <OutlinedTextField label="Sale price" value={form.salePrice} onInput={(e: Event) => setForm((f) => ({ ...f, salePrice: (e.target as HTMLInputElement).value }))} />
+            </>
+          )}
+
           <OutlinedTextField label="Short description" value={form.shortDescription ?? ''} onInput={(e: Event) => setForm((f) => ({ ...f, shortDescription: (e.target as HTMLInputElement).value }))} />
+
+          {offeringType === 'service' && (
+            <fieldset>
+              <legend>Packages</legend>
+              <p className="field-hint">Every duration/price option a customer can select — at least one is required.</p>
+              {packages.map((pkg, i) => (
+                <div className="form-grid" key={pkg.id ?? `new-${i}`}>
+                  <OutlinedTextField
+                    label="Duration (minutes)"
+                    type="number"
+                    value={pkg.durationMinutes ? String(pkg.durationMinutes) : ''}
+                    onInput={(e: Event) => setPackage(i, { durationMinutes: Number((e.target as HTMLInputElement).value) || 0 })}
+                  />
+                  <OutlinedTextField
+                    label="Selling price"
+                    type="number"
+                    value={pkg.sellingPrice ? String(pkg.sellingPrice) : ''}
+                    onInput={(e: Event) => setPackage(i, { sellingPrice: Number((e.target as HTMLInputElement).value) || 0 })}
+                  />
+                  <OutlinedTextField
+                    label="Original price (optional)"
+                    type="number"
+                    value={pkg.originalPrice !== undefined ? String(pkg.originalPrice) : ''}
+                    onInput={(e: Event) => setPackage(i, { originalPrice: Number((e.target as HTMLInputElement).value) || undefined })}
+                  />
+                  <OutlinedButton onClick={() => removePackage(i)}>
+                    <Icon slot="icon" aria-hidden="true">delete</Icon>
+                    Remove
+                  </OutlinedButton>
+                </div>
+              ))}
+              <OutlinedButton onClick={addPackage}>
+                <Icon slot="icon" aria-hidden="true">add</Icon>
+                Add package
+              </OutlinedButton>
+            </fieldset>
+          )}
+
+          <fieldset>
+            <legend>Images</legend>
+            {images.map((url, i) => (
+              <div className="form-grid" key={i}>
+                <OutlinedTextField
+                  label={`Image URL ${i + 1}${i === 0 ? ' (primary)' : ''}`}
+                  value={url}
+                  onInput={(e: Event) => setImages(images.map((u, idx) => (idx === i ? (e.target as HTMLInputElement).value : u)))}
+                />
+                <OutlinedButton onClick={() => setImages(images.filter((_, idx) => idx !== i))}>
+                  <Icon slot="icon" aria-hidden="true">delete</Icon>
+                  Remove
+                </OutlinedButton>
+              </div>
+            ))}
+            <OutlinedButton onClick={() => setImages([...images, ''])}>
+              <Icon slot="icon" aria-hidden="true">add</Icon>
+              Add image
+            </OutlinedButton>
+          </fieldset>
+
           {error && <p className="error-state" role="alert">{error}</p>}
         </div>
         <div slot="actions">

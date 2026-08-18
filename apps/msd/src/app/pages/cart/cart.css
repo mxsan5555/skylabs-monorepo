@@ -45,6 +45,26 @@
   align-items: start;
 }
 
+/* ─── Vendor group (multi-vendor cart) ──────────────────────────────────── */
+.cart-vendor-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cart-vendor-group + .cart-vendor-group {
+  margin-top: 24px;
+}
+
+.cart-vendor-group__heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
 /* ─── Cart list ──────────────────────────────────────────────────────────── */
 .cart-list {
   list-style: none;

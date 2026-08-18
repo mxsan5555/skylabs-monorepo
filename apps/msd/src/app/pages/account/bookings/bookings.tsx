@@ -5,6 +5,7 @@ import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listVendorBookings, setVendorBookingStatus, type Booking, type BookingStatus } from '../../../../api/rbac/bookings';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { formatBookingSchedule, bookingDisplayName } from '../../../../utils/format';
 
 const ALLOWED_NEXT: Record<BookingStatus, BookingStatus[]> = {
   PENDING: ['CONFIRMED', 'CANCELLED'],
@@ -45,14 +46,14 @@ function toBookingRow(booking: Booking): Record<string, string | number> {
     Customer: booking.customer.name,
     Vendor: booking.vendor.businessName ?? '—',
     Branch: booking.branch.name,
-    Service: booking.deal.service?.name ?? booking.deal.title,
-    'Booking Date/Time': `${new Date(booking.bookingDate).toLocaleDateString()} · ${booking.timeSlot}`,
+    Service: bookingDisplayName(booking),
+    'Booking Date/Time': formatBookingSchedule(booking.bookingDate, booking.timeSlot),
     Status: booking.status,
     'Created At': new Date(booking.createdAt).toLocaleString(),
     'Customer Phone': booking.customer.phone ?? '—',
     'Customer Email': booking.customer.email ?? '—',
     'Branch Address': [booking.branch.address, booking.branch.city].filter(Boolean).join(', ') || '—',
-    Deal: booking.deal.title,
+    Deal: booking.deal?.title ?? '—',
     Quantity: booking.quantity,
     Price: `₹${booking.priceSnapshot}`,
     'Duration Minutes': booking.durationMinutesSnapshot ?? '—',

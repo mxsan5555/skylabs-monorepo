@@ -109,6 +109,16 @@ export function createPrismaMock() {
       update: vi.fn(),
       count: vi.fn(),
     },
+    dealPackage: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      createMany: vi.fn(),
+      update: vi.fn(),
+      deleteMany: vi.fn(),
+      count: vi.fn(),
+    },
     category: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
@@ -162,11 +172,26 @@ export function createPrismaMock() {
       update: vi.fn(),
       count: vi.fn(),
     },
+    therapist: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    therapistPackage: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
     order: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       count: vi.fn(),
     },
     orderItem: {
@@ -178,7 +203,9 @@ export function createPrismaMock() {
       findFirst: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
+      createMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       count: vi.fn(),
     },
     // Default behavior mirrors real Prisma: array-form runs the (already-invoked, since JS

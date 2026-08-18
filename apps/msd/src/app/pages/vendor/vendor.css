@@ -434,100 +434,9 @@
   line-height: 1.3;
 }
 
-/* Package list */
-.vendor-page__packages-label {
-  margin: 0 0 8px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
+.vendor-page__selected-therapist {
+  font-weight: 400;
   color: var(--md-sys-color-on-surface-variant);
-}
-
-.vendor-page__package-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.vendor-page__package-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  border: 1.5px solid var(--md-sys-color-outline-variant);
-  background: var(--md-sys-color-surface);
-  font-size: 0.85rem;
-  color: var(--md-sys-color-on-surface);
-  transition: background 150ms ease, border-color 150ms ease;
-  text-align: left;
-  width: 100%;
-  gap: 8px;
-}
-
-.vendor-page__package-row:hover {
-  background: var(--md-sys-color-surface-container);
-  border-color: var(--md-sys-color-outline);
-}
-
-.vendor-page__package-row:focus-visible {
-  outline: 3px solid var(--md-sys-color-primary);
-  outline-offset: 2px;
-}
-
-.vendor-page__package-row--selected {
-  background: var(--md-sys-color-primary-container);
-  border-color: var(--md-sys-color-primary);
-  color: var(--md-sys-color-on-primary-container);
-}
-
-.vendor-page__package-row--selected:hover {
-  background: var(--md-sys-color-primary-container);
-}
-
-.vendor-page__package-label {
-  flex: 1;
-  font-weight: 500;
-  font-size: 0.85rem;
-}
-
-.vendor-page__package-discount {
-  display: inline-block;
-  margin-left: 4px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--md-sys-color-primary);
-}
-
-.vendor-page__package-row--selected .vendor-page__package-discount {
-  color: var(--md-sys-color-on-primary-container);
-}
-
-.vendor-page__package-price-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1px;
-  flex-shrink: 0;
-}
-
-.vendor-page__package-price {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--md-sys-color-primary);
-  white-space: nowrap;
-}
-
-.vendor-page__package-row--selected .vendor-page__package-price {
-  color: var(--md-sys-color-on-primary-container);
-}
-
-.vendor-page__package-orig {
-  font-size: 0.72rem;
-  color: var(--md-sys-color-on-surface-variant);
-  text-decoration: line-through;
 }
 
 /* Quantity stepper */
@@ -578,6 +487,15 @@
 
 .vendor-page__book-btn {
   width: 100%;
+}
+
+.vendor-page__cta-row {
+  display: flex;
+  gap: 10px;
+}
+
+.vendor-page__cta-row > * {
+  flex: 1;
 }
 
 /* Empty state */
@@ -660,8 +578,7 @@
 /* ─── Responsive ──────────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
-  .vendor-page__deal-card,
-  .vendor-page__package-row {
+  .vendor-page__deal-card {
     transition: none;
   }
 }

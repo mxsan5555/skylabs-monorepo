@@ -19,6 +19,9 @@ const SERVICE_DEAL_ID = 'd0d0d0d0-0000-4000-8000-000000000004';
 const PRODUCT_DEAL_ID = 'e0e0e0e0-0000-4000-8000-000000000005';
 const VENDOR_ID = 'f0f0f0f0-0000-4000-8000-000000000006';
 const BRANCH_ID = 'a1a1a1a1-0000-4000-8000-000000000007';
+const THERAPIST_ID = 'b2b2b2b2-0000-4000-8000-000000000008';
+const OTHER_THERAPIST_ID = 'c3c3c3c3-0000-4000-8000-000000000009';
+const PACKAGE_ID = 'd4d4d4d4-0000-4000-8000-000000000010';
 
 const serviceDealFixture = {
   id: SERVICE_DEAL_ID,
@@ -44,6 +47,11 @@ const bookingFixture = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // These fixtures predate DealPackage — 0 active packages means resolveDealPrice takes the
+  // safety-net fallback (deal.salePrice/durationMinutes directly), matching every existing
+  // fixture/assertion in this file. Tests exercising the DealPackage-required path set their
+  // own dealPackage mocks explicitly.
+  prismaMock.dealPackage.count.mockResolvedValue(0);
 });
 
 describe('POST /api/v1/bookings', () => {
@@ -64,6 +72,8 @@ describe('POST /api/v1/bookings', () => {
 
   it('books a service deal, snapshotting price/duration and deriving vendor/branch from the deal (never the client)', async () => {
     prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
+    // No therapist packages exist for this deal — therapist-optional, base Deal price applies.
+    prismaMock.therapistPackage.findMany.mockResolvedValue([]);
     prismaMock.booking.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: BOOKING_ID, ...data }));
     const res = await request(app)
       .post('/api/v1/bookings')
@@ -105,6 +115,7 @@ describe('POST /api/v1/bookings', () => {
 
   it('allows a new booking once the previous one for the same deal is CANCELLED', async () => {
     prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
+    prismaMock.therapistPackage.findMany.mockResolvedValue([]);
     prismaMock.booking.findFirst.mockResolvedValue(null); // the CANCELLED one is filtered out server-side
     prismaMock.booking.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: BOOKING_ID, ...data }));
     const res = await request(app)
@@ -112,6 +123,129 @@ describe('POST /api/v1/bookings', () => {
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
       .send({ dealId: SERVICE_DEAL_ID, bookingDate: '2026-09-01T00:00:00.000Z', timeSlot: '10:00 AM' });
     expect(res.status).toBe(201);
+  });
+
+  it('books successfully without a therapist, using the base Deal price, even when the deal has therapists with packages elsewhere', async () => {
+    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture); // salePrice 499.00, durationMinutes 30
+    prismaMock.booking.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: BOOKING_ID, ...data }));
+    const res = await request(app)
+      .post('/api/v1/bookings')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ dealId: SERVICE_DEAL_ID, bookingDate: '2026-09-01T00:00:00.000Z', timeSlot: '10:00 AM' });
+    expect(res.status).toBe(201);
+    // Therapist is always optional now (Deal and Therapist are independently managed — see
+    // TherapistPackage's schema doc comment) — no therapistPackage lookup should even run.
+    expect(prismaMock.therapistPackage.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.booking.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ priceSnapshot: '499.00', therapistPackageId: null }) }),
+    );
+  });
+
+  it('rejects a therapist who has no active package at the deal\'s exact duration', async () => {
+    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture); // durationMinutes 30
+    prismaMock.therapist.findUnique.mockResolvedValue({
+      id: OTHER_THERAPIST_ID, vendorId: VENDOR_ID, branchId: BRANCH_ID, isActive: true,
+    });
+    // This therapist has packages, just none matching this deal's 30-minute duration.
+    prismaMock.therapistPackage.findFirst.mockResolvedValue(null);
+    const res = await request(app)
+      .post('/api/v1/bookings')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ dealId: SERVICE_DEAL_ID, bookingDate: '2026-09-01T00:00:00.000Z', timeSlot: '10:00 AM', therapistId: OTHER_THERAPIST_ID });
+    expect(res.status).toBe(422);
+    expect(prismaMock.booking.create).not.toHaveBeenCalled();
+  });
+
+  it('resolves price from the selected therapist\'s package at the matching duration, never the base Deal price or a client-supplied price', async () => {
+    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture); // salePrice 499.00, durationMinutes 30
+    prismaMock.therapistPackage.findFirst.mockResolvedValue({
+      id: PACKAGE_ID, therapistId: THERAPIST_ID, durationMinutes: 30, sellingPrice: '899.00', isActive: true,
+    });
+    prismaMock.therapist.findUnique.mockResolvedValue({
+      id: THERAPIST_ID, vendorId: VENDOR_ID, branchId: BRANCH_ID, isActive: true,
+    });
+    prismaMock.booking.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: BOOKING_ID, ...data }));
+    const res = await request(app)
+      .post('/api/v1/bookings')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({
+        dealId: SERVICE_DEAL_ID,
+        bookingDate: '2026-09-01T00:00:00.000Z',
+        timeSlot: '10:00 AM',
+        therapistId: THERAPIST_ID,
+      });
+    expect(res.status).toBe(201);
+    expect(prismaMock.booking.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          priceSnapshot: '899.00',
+          therapistPackageId: PACKAGE_ID,
+          therapistId: THERAPIST_ID,
+        }),
+      }),
+    );
+  });
+
+  it('requires a dealPackageId when the deal has active packages', async () => {
+    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
+    prismaMock.dealPackage.count.mockResolvedValue(2); // this deal has active packages
+    const res = await request(app)
+      .post('/api/v1/bookings')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ dealId: SERVICE_DEAL_ID });
+    expect(res.status).toBe(422);
+    expect(prismaMock.booking.create).not.toHaveBeenCalled();
+  });
+
+  it('books the exact selected DealPackage, never the base Deal price', async () => {
+    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture); // salePrice 499.00 (cheapest package, kept in sync)
+    prismaMock.dealPackage.count.mockResolvedValue(2);
+    prismaMock.dealPackage.findUnique.mockResolvedValue({
+      id: PACKAGE_ID, dealId: SERVICE_DEAL_ID, durationMinutes: 60, sellingPrice: '799.00', isActive: true,
+    });
+    prismaMock.booking.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: BOOKING_ID, ...data }));
+    const res = await request(app)
+      .post('/api/v1/bookings')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ dealId: SERVICE_DEAL_ID, dealPackageId: PACKAGE_ID });
+    expect(res.status).toBe(201);
+    expect(prismaMock.booking.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          priceSnapshot: '799.00',
+          durationMinutesSnapshot: 60,
+          dealPackageId: PACKAGE_ID,
+        }),
+      }),
+    );
+  });
+
+  it("rejects a dealPackageId that belongs to a different deal", async () => {
+    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
+    prismaMock.dealPackage.count.mockResolvedValue(1);
+    prismaMock.dealPackage.findUnique.mockResolvedValue({
+      id: PACKAGE_ID, dealId: 'some-other-deal-id', durationMinutes: 60, sellingPrice: '799.00', isActive: true,
+    });
+    const res = await request(app)
+      .post('/api/v1/bookings')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ dealId: SERVICE_DEAL_ID, dealPackageId: PACKAGE_ID });
+    expect(res.status).toBe(404);
+    expect(prismaMock.booking.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects an inactive dealPackageId', async () => {
+    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
+    prismaMock.dealPackage.count.mockResolvedValue(1);
+    prismaMock.dealPackage.findUnique.mockResolvedValue({
+      id: PACKAGE_ID, dealId: SERVICE_DEAL_ID, durationMinutes: 60, sellingPrice: '799.00', isActive: false,
+    });
+    const res = await request(app)
+      .post('/api/v1/bookings')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ dealId: SERVICE_DEAL_ID, dealPackageId: PACKAGE_ID });
+    expect(res.status).toBe(422);
+    expect(prismaMock.booking.create).not.toHaveBeenCalled();
   });
 
   it('the price snapshot is copied once at booking time and is never re-derived on read', async () => {

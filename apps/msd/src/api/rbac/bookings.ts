@@ -20,11 +20,14 @@ export interface BookingDeal {
 export interface Booking {
   id: string;
   customerId: string;
-  dealId: string;
+  /** Nullable — absent for a Therapist booked directly (no Deal involved at all). */
+  dealId: string | null;
   vendorId: string;
   branchId: string;
-  bookingDate: string;
-  timeSlot: string;
+  /** Nullable — this is a service purchase, not an appointment-scheduling system; the customer
+   *  is never required to pick a date/time to complete a booking. */
+  bookingDate: string | null;
+  timeSlot: string | null;
   quantity: number;
   priceSnapshot: string;
   durationMinutesSnapshot: number | null;
@@ -32,7 +35,9 @@ export interface Booking {
   cancellationReason: string | null;
   createdAt: string;
   updatedAt: string;
-  deal: BookingDeal;
+  /** Null for a Therapist booked directly — see `dealId` above. */
+  deal: BookingDeal | null;
+  therapist: { id: string; therapistType: string; personName: string; specialization: string | null; photoUrl: string | null } | null;
   vendor: { id: string; businessName: string | null };
   branch: { id: string; name: string; address: string | null; city: string | null };
   customer: { id: string; name: string; phone: string | null; email: string | null };

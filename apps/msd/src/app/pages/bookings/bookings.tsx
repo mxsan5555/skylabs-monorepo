@@ -4,6 +4,7 @@ import { FilledButton, OutlinedButton } from '@skylabs-monorepo/shared-ui/react'
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listBookings, cancelBooking, type Booking } from '../../../api/bookings';
 import { ApiRequestError } from '../../../api/rbac/client';
+import { formatBookingSchedule, bookingDisplayName } from '../../../utils/format';
 import '../category/category.css';
 
 /** Customer's own service bookings — reuses the admin-console's `entity-list`/`status-pill`
@@ -31,7 +32,7 @@ export function Bookings() {
   }, [load]);
 
   const cancel = async (booking: Booking) => {
-    if (!window.confirm(`Cancel your booking for "${booking.deal.title}"?`)) return;
+    if (!window.confirm(`Cancel your booking for "${bookingDisplayName(booking)}"?`)) return;
     setError('');
     try {
       await cancelBooking(token, booking.id);
@@ -78,13 +79,13 @@ export function Bookings() {
                 <li key={booking.id}>
                   <div className="entity-list__item">
                     <span className="role-list__name">
-                      {booking.deal.service?.name ?? booking.deal.title}
+                      {bookingDisplayName(booking)}
                       <span className="field-hint">
                         {' '}
                         · {booking.vendor.businessName} · {booking.branch.name} · ₹{booking.priceSnapshot}
                         {booking.durationMinutesSnapshot && ` · ${booking.durationMinutesSnapshot} min`}
                         {' '}
-                        · {new Date(booking.bookingDate).toLocaleDateString()} at {booking.timeSlot}
+                        · {formatBookingSchedule(booking.bookingDate, booking.timeSlot)}
                       </span>
                     </span>
                     <span className={`status-pill ${booking.status === 'CANCELLED' ? 'status-pill--inactive' : 'status-pill--active'}`}>

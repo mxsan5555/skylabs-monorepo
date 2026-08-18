@@ -323,9 +323,6 @@ function ProductFormDialog({
     <Dialog ref={dialogRef} onClose={onClose}>
       <div slot="headline">{product ? 'Edit product' : 'Add product'}</div>
       <div slot="content" className="form-grid">
-        <OutlinedTextField label="Name" value={form.name} onInput={(e: Event) => set('name', (e.target as HTMLInputElement).value)} />
-        <OutlinedTextField label="Slug" value={form.slug} onInput={(e: Event) => set('slug', (e.target as HTMLInputElement).value)} />
-        <OutlinedTextField label="Brand" value={form.brand ?? ''} onInput={(e: Event) => set('brand', (e.target as HTMLInputElement).value)} />
 
         <OutlinedSelect
           label="Category"
@@ -355,6 +352,11 @@ function ProductFormDialog({
             ))}
           </OutlinedSelect>
         )}
+        <OutlinedTextField label="Name" value={form.name} onInput={(e: Event) => set('name', (e.target as HTMLInputElement).value)} />
+        <OutlinedTextField label="Slug" value={form.slug} onInput={(e: Event) => set('slug', (e.target as HTMLInputElement).value)} />
+        <OutlinedTextField label="Brand" value={form.brand ?? ''} onInput={(e: Event) => set('brand', (e.target as HTMLInputElement).value)} />
+
+        
 
         <OutlinedTextField label="Price" value={form.price} onInput={(e: Event) => set('price', (e.target as HTMLInputElement).value)} />
         <OutlinedTextField label="Original price" value={form.originalPrice ?? ''} onInput={(e: Event) => set('originalPrice', (e.target as HTMLInputElement).value)} />
