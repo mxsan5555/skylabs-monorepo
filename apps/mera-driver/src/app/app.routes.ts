@@ -2,18 +2,19 @@ import { Routes } from '@angular/router';
 import { PublicLayout } from './layouts/public-layout/public-layout';
 import { AuthLayout } from './layouts/auth-layout/auth-layout';
 import { AdminLayout } from './layouts/admin-layout/admin-layout';
+import { RiderLayout } from './layouts/rider-layout/rider-layout';
 import { authGuard } from './core/auth/auth.guard';
 import { roleGuard } from './core/auth/role.guard';
 
 /**
  * Route table.
  *
- * Auth screens (sign-in, otp) use the centered AuthLayout, given explicit
- * non-empty parent paths so they only match those URLs. An empty-path parent
- * matches every URL, so PublicLayout (which holds '/', showcase, and the 404
- * catch-all) must be the only empty-path parent — otherwise it would swallow
- * routes meant for the other layout. Protected pages added next use
- * `canActivate: [authGuard]`. Lazy-loaded via loadComponent.
+ * An empty-path parent matches every URL, so exactly one layout may use it —
+ * here PublicLayout (the marketing landing '/', blog, showcase, and the 404
+ * catch-all, all with the site header/footer). Every other layout gets an
+ * explicit non-empty parent path: AuthLayout (sign-in, otp), AdminLayout
+ * (account), and the full-bleed RiderLayout (the booking flow under '/ride/*').
+ * Protected pages use `canActivate: [authGuard]`. Lazy-loaded via loadComponent.
  */
 export const appRoutes: Routes = [
   {
@@ -85,12 +86,68 @@ export const appRoutes: Routes = [
     ],
   },
   {
+    // Full-bleed rider booking flow (no marketing header/footer). Reached from
+    // the landing hero "See prices" and the header "Find Drivers".
+    // TODO: guard 'verify' and 'payment' with authGuard once the mera-driver
+    // auth API lands (a rider must be signed in to pay).
+    path: 'ride',
+    component: RiderLayout,
+    children: [
+      {
+        path: '',
+        title: 'Find a driver · mera-driver',
+        loadComponent: () =>
+          import('./pages/ride/home/home').then((m) => m.RideHome),
+      },
+      {
+        path: 'location',
+        title: 'Enable location · mera-driver',
+        loadComponent: () =>
+          import('./pages/ride/location/location').then((m) => m.RideLocation),
+      },
+      {
+        path: 'options',
+        title: 'Choose a ride · mera-driver',
+        loadComponent: () =>
+          import('./pages/ride/options/options').then((m) => m.RideOptions),
+      },
+      {
+        path: 'drivers',
+        title: 'Choose a driver · mera-driver',
+        loadComponent: () =>
+          import('./pages/ride/drivers/drivers').then((m) => m.RideDrivers),
+      },
+      {
+        path: 'verify',
+        title: 'Start trip · mera-driver',
+        loadComponent: () =>
+          import('./pages/ride/verify/verify').then((m) => m.RideVerify),
+      },
+      {
+        path: 'payment',
+        title: 'Payment · mera-driver',
+        loadComponent: () =>
+          import('./pages/ride/payment/payment').then((m) => m.RidePayment),
+      },
+      {
+        path: 'confirmed',
+        title: 'Booking confirmed · mera-driver',
+        loadComponent: () =>
+          import('./pages/ride/confirmed/confirmed').then(
+            (m) => m.RideConfirmed,
+          ),
+      },
+    ],
+  },
+  {
+    // Marketing + content shell (site header/footer). The only empty-path
+    // parent, so it owns the landing page at '/'.
     path: '',
     component: PublicLayout,
     children: [
       {
         path: '',
-        title: 'mera-driver — Your ride, your way',
+        title: 'mera-driver — Book a trusted driver, your way',
         loadComponent: () => import('./pages/home/home').then((m) => m.Home),
       },
       {

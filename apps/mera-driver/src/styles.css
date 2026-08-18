@@ -5,3 +5,909 @@
 /* The app-shell and auth-screen layout classes come from
    @skylabs-monorepo/shared-ui/layout.css (see project.json build "styles").
    Add mera-driver-only global overrides here. */
+
+/* Locks page scroll while the mobile nav drawer is open. */
+body.no-scroll {
+  overflow: hidden;
+}
+
+/* Customer | Driver persona toggle on the sign-in card. */
+.auth-role {
+  display: flex;
+  gap: 8px;
+}
+
+.auth-role__btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  border: 1.5px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-radius: 12px;
+  background-color: var(--md-sys-color-surface, #fff);
+  font: inherit;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  --md-icon-size: 20px;
+}
+
+.auth-role__btn.active {
+  border-color: var(--md-sys-color-primary, #33618d);
+  border-width: 2px;
+  color: var(--md-sys-color-on-surface);
+  background-color: var(--md-sys-color-primary-container, #d0e4ff);
+}
+
+/* ------------------------------------------------------------------ *
+ * Rider booking flow — a full-bleed, mobile-first app shell for the
+ * Uber/Lyft-style screens (home, choose ride, choose driver, verify,
+ * payment, confirmed). Global (not component-scoped) so the bottom sheet,
+ * map screen, list rows and sticky footer are shared across all steps
+ * without duplication. Everything is driven by --md-sys-color-* tokens, so
+ * it renders in mera-driver's blue palette.
+ * ------------------------------------------------------------------ */
+
+.rider-shell {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--md-sys-color-surface, #fafdfb);
+}
+
+/* The content column is capped so the "mobile app" stays phone-width on
+   desktop, centered, with subtle side rails. */
+.rider-viewport {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--md-sys-color-surface, #fafdfb);
+}
+
+/* The routed screen components are the flex children of the viewport, so their
+   host elements must stretch (custom elements default to inline). `flex: 1 0
+   auto` fills the space on short pages yet still lets tall content grow and the
+   page scroll. */
+md-ride-home,
+md-ride-location,
+md-ride-options,
+md-ride-drivers,
+md-ride-verify,
+md-ride-payment,
+md-ride-confirmed {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+  min-height: 0;
+}
+
+/* A screen that is a full-bleed map with a bottom sheet floating over it. */
+.rider-map-screen {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 60vh;
+}
+
+.rider-map {
+  position: relative;
+  flex: 1;
+  min-height: 42vh;
+}
+
+/* Floating circular control (back / locate) over the map. */
+.rider-fab {
+  position: absolute;
+  z-index: 500;
+  --md-icon-button-container-color: var(--md-sys-color-surface, #fff);
+  background-color: var(--md-sys-color-surface, #fff);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
+}
+
+.rider-fab--back {
+  top: 16px;
+  left: 16px;
+}
+
+/* Bottom sheet: rounded card that holds each step's controls. */
+.rider-sheet {
+  position: relative;
+  z-index: 500;
+  margin-top: -20px;
+  padding: 8px 20px calc(20px + env(safe-area-inset-bottom));
+  border-radius: 24px 24px 0 0;
+  background-color: var(--md-sys-color-surface, #fff);
+  box-shadow: 0 -4px 24px rgb(0 0 0 / 0.12);
+}
+
+.rider-sheet__handle {
+  width: 40px;
+  height: 4px;
+  margin: 4px auto 12px;
+  border-radius: 999px;
+  background-color: var(--md-sys-color-outline-variant, #c4c7c5);
+}
+
+.rider-sheet__title {
+  margin: 0 0 16px;
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface, #1a1c1e);
+}
+
+/* A plain full-height screen (no map) — verify, location prompt. */
+.rider-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px calc(24px + env(safe-area-inset-bottom));
+}
+
+.rider-topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+}
+
+.rider-topbar__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+/* Pickup → drop entry, with the connector rail like the reference. */
+.rider-route {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 0 12px;
+  align-items: center;
+  padding: 6px 14px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-radius: 14px;
+  background-color: var(--md-sys-color-surface-container-low, #f3f4f9);
+}
+
+.rider-route__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  padding: 10px 0;
+}
+
+.rider-route__dot {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--md-sys-color-primary, #33618d);
+  border-radius: 50%;
+}
+
+.rider-route__dot--square {
+  border-radius: 2px;
+  border-color: var(--md-sys-color-on-surface, #1a1c1e);
+}
+
+.rider-route__line {
+  flex: 1;
+  width: 2px;
+  min-height: 18px;
+  background-color: var(--md-sys-color-outline, #74796d);
+}
+
+.rider-route__field {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 4px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--md-sys-color-on-surface);
+}
+
+.rider-route__field::placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.rider-route__field + .rider-route__field {
+  border-top: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+}
+
+/* Tappable list rows (saved places, payment methods). */
+.rider-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rider-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 4px;
+  border: none;
+  border-top: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+}
+
+.rider-row:first-child {
+  border-top: none;
+}
+
+.rider-row:hover {
+  background-color: var(--md-sys-color-surface-container-low, #f3f4f9);
+}
+
+.rider-row__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.rider-row__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rider-row__title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rider-row__sub {
+  font-size: 0.85rem;
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rider-row__meta {
+  flex: none;
+  text-align: right;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+/* Sticky footer CTA that sits above the bottom nav / safe area. */
+.rider-cta {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  margin-top: auto;
+  background-color: var(--md-sys-color-surface, #fff);
+}
+
+.rider-cta md-filled-button {
+  width: 100%;
+  --md-filled-button-container-height: 52px;
+}
+
+/* Bottom navigation for the rider shell. */
+.rider-nav {
+  position: sticky;
+  bottom: 0;
+  z-index: 600;
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface, #fafdfb);
+}
+
+.rider-nav__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 16px;
+  border: none;
+  background: transparent;
+  text-decoration: none;
+  font: inherit;
+  font-size: 0.7rem;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  --md-icon-size: 24px;
+}
+
+.rider-nav__item.active {
+  color: var(--md-sys-color-primary);
+  font-weight: 600;
+}
+
+/* Selectable option / driver card (choose ride, choose driver). */
+.rider-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px;
+  margin-bottom: 12px;
+  border: 1.5px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-radius: 16px;
+  background-color: var(--md-sys-color-surface, #fff);
+  font: inherit;
+  text-align: left;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+}
+
+.rider-option:hover {
+  background-color: var(--md-sys-color-surface-container-low, #f3f4f9);
+}
+
+.rider-option.selected {
+  border-color: var(--md-sys-color-primary, #33618d);
+  border-width: 2px;
+  background-color: var(--md-sys-color-primary-container, #d0e4ff);
+}
+
+.rider-option__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+  color: var(--md-sys-color-primary);
+  --md-icon-size: 28px;
+}
+
+.rider-option__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.rider-option__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.rider-option__sub {
+  margin-top: 2px;
+  font-size: 0.85rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.rider-option__seats {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface-variant);
+  --md-icon-size: 16px;
+}
+
+.rider-option__price {
+  flex: none;
+  text-align: right;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+/* Small muted section label inside a sheet. */
+.rider-eyebrow {
+  margin: 8px 0 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ================================================================== *
+ * Responsive — tablet & desktop.
+ *
+ * Mobile (base, above) is a single phone-width column. From 768px up the
+ * app uses the room:
+ *   - Map screens become a two-pane layout (a controls panel beside a large
+ *     map), the standard desktop ride-hailing pattern.
+ *   - Plain screens (location / verify / payment / confirmed / drivers)
+ *     centre in a comfortable column instead of stretching edge to edge.
+ *   - The bottom nav groups its items in the centre.
+ * All still token-driven, so the brand palette is unchanged.
+ * ================================================================== */
+@media (min-width: 768px) {
+  /* The phone-width cap is lifted; the viewport now fills the screen (and is
+     itself centred + capped on ultra-wide below). */
+  .rider-viewport {
+    max-width: none;
+  }
+
+  /* Map screens fill exactly one viewport; the sheet scrolls internally rather
+     than growing the page. */
+  md-ride-home,
+  md-ride-options {
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+
+  /* Map screen → two panes: controls sheet on the left, map fills the rest. */
+  .rider-map-screen {
+    flex-direction: row;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .rider-map {
+    order: 2;
+    min-height: 0;
+  }
+
+  /* The sheet is no longer an overlapping rounded card — it's a side panel. */
+  .rider-sheet {
+    order: 1;
+    flex: none;
+    width: clamp(340px, 34vw, 460px);
+    margin-top: 0;
+    padding: 24px 24px calc(24px + env(safe-area-inset-bottom));
+    border-radius: 0;
+    border-right: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+    box-shadow: none;
+    overflow-y: auto;
+  }
+
+  .rider-sheet__handle {
+    display: none;
+  }
+
+  .rider-sheet__title {
+    text-align: left;
+  }
+
+  /* Plain (non-map) screens centre their content. */
+  .rider-screen {
+    width: 100%;
+    max-width: 560px;
+    margin-inline: auto;
+    padding: 24px 24px calc(28px + env(safe-area-inset-bottom));
+  }
+
+  /* Group the bottom-nav items in the centre rather than spreading them. */
+  .rider-nav {
+    justify-content: center;
+    gap: 56px;
+  }
+
+  /* The floating "share location" pill can sit a touch larger. */
+  .rider-share {
+    top: 24px;
+  }
+}
+
+/* Ultra-wide: keep the whole app frame from becoming uncomfortably wide. */
+@media (min-width: 1600px) {
+  .rider-viewport {
+    max-width: 1600px;
+    margin-inline: auto;
+    border-inline: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  }
+}
+
+/* ================================================================== *
+ * Marketing landing page (pages/home). Kept global (like the rider
+ * styles above) so it stays out of the per-component style budget and
+ * the section primitives are reusable. Mobile-first → 2-col from md/lg.
+ * ================================================================== */
+.landing {
+  display: flex;
+  flex-direction: column;
+  gap: 64px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+/* ---- Hero ---- */
+.hero {
+  display: grid;
+  gap: 24px;
+}
+
+.hero__city {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  color: var(--md-sys-color-on-surface-variant);
+  --md-icon-size: 18px;
+}
+
+.hero__city a {
+  color: var(--md-sys-color-primary);
+  text-underline-offset: 2px;
+}
+
+.hero__title {
+  margin: 0 0 16px;
+  font-size: clamp(1.9rem, 6vw, 2.6rem);
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--md-sys-color-on-surface);
+}
+
+.hero__tabs {
+  margin-bottom: 12px;
+  --md-secondary-tab-container-color: transparent;
+}
+
+.hero__seg {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.hero__seg-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  border: 1.5px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-radius: 12px;
+  background-color: var(--md-sys-color-surface, #fff);
+  font: inherit;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  --md-icon-size: 18px;
+}
+
+.hero__seg-btn.active {
+  border-color: var(--md-sys-color-primary, #33618d);
+  border-width: 2px;
+  color: var(--md-sys-color-on-surface);
+  background-color: var(--md-sys-color-primary-container, #d0e4ff);
+}
+
+.hero__schedule {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.hero__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.hero__field input {
+  padding: 10px 12px;
+  border: 1px solid var(--md-sys-color-outline, #74796d);
+  border-radius: 10px;
+  background-color: var(--md-sys-color-surface, #fff);
+  font: inherit;
+  color: var(--md-sys-color-on-surface);
+}
+
+.hero__route {
+  margin-bottom: 16px;
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+
+.hero__actions md-filled-button {
+  --md-filled-button-container-height: 48px;
+}
+
+.hero__link {
+  font-size: 0.9rem;
+  color: var(--md-sys-color-on-surface-variant);
+  text-underline-offset: 2px;
+}
+
+.hero__map {
+  position: relative;
+  min-height: 280px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+}
+
+/* ---- Section shells ---- */
+.section__title {
+  margin: 0 0 20px;
+  font-size: clamp(1.4rem, 4vw, 1.8rem);
+  font-weight: 800;
+  color: var(--md-sys-color-on-surface);
+}
+
+/* ---- Services ---- */
+.service-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+}
+
+.service-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 140px;
+  padding: 20px;
+  border-radius: 16px;
+  background-color: var(--md-sys-color-surface-container, #eef1f6);
+}
+
+.service-card__title {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+.service-card__desc {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.service-card__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 999px;
+  background-color: var(--md-sys-color-surface, #fff);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+  --md-icon-size: 16px;
+}
+
+.service-card__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background-color: var(--md-sys-color-primary-container, #d0e4ff);
+  color: var(--md-sys-color-on-primary-container, #001d33);
+  --md-icon-size: 30px;
+}
+
+/* ---- Promo bands ---- */
+.promo {
+  display: grid;
+  gap: 24px;
+  align-items: center;
+}
+
+.promo__art {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  border-radius: 20px;
+  overflow: hidden;
+  background-color: var(--md-sys-color-surface-container, #eef1f6);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
+
+.promo__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.promo__title {
+  margin: 0 0 10px;
+  font-size: clamp(1.4rem, 4vw, 1.9rem);
+  font-weight: 800;
+  color: var(--md-sys-color-on-surface);
+}
+
+.promo__desc {
+  margin: 0 0 18px;
+  color: var(--md-sys-color-on-surface-variant);
+  line-height: 1.55;
+}
+
+.promo__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+}
+
+/* ---- Safety (centered fixed-width box, vertical list) ---- */
+.safety__box {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.safety__title {
+  margin: 0 0 12px;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 800;
+  color: var(--md-sys-color-on-surface);
+}
+
+.safety__intro {
+  margin: 0 auto 32px;
+  max-width: 46ch;
+  color: var(--md-sys-color-on-surface-variant);
+  line-height: 1.55;
+}
+
+.safety__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 24px;
+  text-align: left;
+}
+
+.safety__item {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  column-gap: 16px;
+  row-gap: 4px;
+}
+
+.safety__icon {
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background-color: var(--md-sys-color-tertiary, #6a5779);
+  color: var(--md-sys-color-on-tertiary, #fff);
+  --md-icon-size: 24px;
+}
+
+.safety__text {
+  min-width: 0;
+}
+
+.safety__item h3 {
+  margin: 0 0 2px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+.safety__item p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ---- App download ---- */
+.apps__grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+}
+
+.app-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 16px;
+  background-color: var(--md-sys-color-surface-container, #eef1f6);
+}
+
+.app-card__qr {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  border-radius: 8px;
+  background-color: #fff;
+}
+
+.app-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-card__title {
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+.app-card__sub {
+  font-size: 0.85rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.app-card__arrow {
+  flex: none;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+@media (min-width: 768px) {
+  .landing {
+    gap: 80px;
+  }
+  .service-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .apps__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 960px) {
+  .hero {
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 40px;
+  }
+  .hero__map {
+    min-height: 440px;
+    height: 100%;
+  }
+  /* Both bands put the illustration in the SAME-width column (5fr) so the two
+     squares render at identical dimensions; the reverse band swaps the columns
+     (7fr 5fr) and reorders the text so the art sits on the right. */
+  .promo {
+    grid-template-columns: 5fr 7fr;
+    gap: 48px;
+  }
+  .promo--reverse {
+    grid-template-columns: 7fr 5fr;
+  }
+  .promo--reverse .promo__body {
+    order: -1;
+  }
+  .service-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}

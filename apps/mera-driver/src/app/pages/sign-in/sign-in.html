@@ -8,7 +8,28 @@
   </div>
 
   <div class="auth-card">
-    <h2>Sign in</h2>
+    <div class="auth-role" role="group" aria-label="Sign in as">
+      <button
+        type="button"
+        class="auth-role__btn"
+        [class.active]="role() === 'customer'"
+        [attr.aria-pressed]="role() === 'customer'"
+        (click)="setRole('customer')"
+      >
+        <md-icon aria-hidden="true">person</md-icon> Customer
+      </button>
+      <button
+        type="button"
+        class="auth-role__btn"
+        [class.active]="role() === 'driver'"
+        [attr.aria-pressed]="role() === 'driver'"
+        (click)="setRole('driver')"
+      >
+        <md-icon aria-hidden="true">badge</md-icon> Driver
+      </button>
+    </div>
+
+    <h2>{{ role() === 'driver' ? 'Driver sign in' : 'Sign in' }}</h2>
     <p>Enter your details to receive a one-time code.</p>
 
     <md-tabs
