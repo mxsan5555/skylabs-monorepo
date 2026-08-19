@@ -22,6 +22,7 @@ export function CategoriesIndex() {
   useEffect(() => {
     setLoading(true);
     setError('');
+    
     listCatalogCategories()
       .then(({ data }) => setCategories(data))
       .catch((err) => setError(err instanceof ApiRequestError ? err.message : content.categories.error.load))

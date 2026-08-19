@@ -1,10 +1,6 @@
 ﻿import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  FilledButton,
-  OutlinedButton,
-  Icon,
-} from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedButton, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { addCartItem } from '../../../api/cart';
@@ -31,7 +27,6 @@ export function Wishlist() {
   const [cartMessage, setCartMessage] = useState('');
   const [cartError, setCartError] = useState('');
   const [addingId, setAddingId] = useState<string | null>(null);
-
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
     navigate(`/sign-in?next=${encodeURIComponent('/wishlist')}`);
@@ -47,7 +42,7 @@ export function Wishlist() {
       await addCartItem(token, deal.id, 1);
       setCartMessage(`Added "${deal.product?.name ?? deal.title}" to your cart.`);
     } catch (err) {
-      setCartError(err instanceof ApiRequestError ? err.message : 'Could not add to cart.');
+      setCartError(err instanceof ApiRequestError ? err.message : wishlistContent.addToCartError);
     } finally {
       setAddingId(null);
     }
@@ -63,16 +58,14 @@ export function Wishlist() {
           {wishlistContent.title}
           {items.length > 0 && (
             <span className="wishlist-page__count">
-              ({items.length} {pluralize(items.length, 'deal')})
+              ({items.length}{' '} {items.length === 1 ? wishlistContent.dealSingular : wishlistContent.dealPlural})
             </span>
           )}
         </h1>
-
         {cartMessage && <p className="field-hint" role="status">{cartMessage}</p>}
         {cartError && <p className="error-state" role="alert">{cartError}</p>}
-
         {loading ? (
-          <p className="loading-state">Loading your wishlist…</p>
+          <p className="loading-state">{wishlistContent.loading}</p>
         ) : items.length === 0 ? (
           <div className="wishlist-page__empty">
             <sky-info-card
@@ -91,7 +84,7 @@ export function Wishlist() {
               <li key={dealId} className="wishlist-grid__item">
                 <SkyProductCardWC
                   variant="outlined"
-                  badge={deal.service ? 'Service' : 'Product'}
+                  badge={deal.service ? wishlistContent.serviceLabel : wishlistContent.productLabel}
                   eyebrow={[deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · ') || undefined}
                   eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
                   heading={deal.service?.name ?? deal.product?.name ?? deal.title}
@@ -116,7 +109,7 @@ export function Wishlist() {
                     onClick={() => navigate(`/deal/${deal.id}`)}
                   >
                     <Icon slot="icon" aria-hidden="true">event_available</Icon>
-                    Book
+                    {wishlistContent.bookLabel}
                   </OutlinedButton>
                 ) : (
                   <FilledButton
@@ -125,7 +118,7 @@ export function Wishlist() {
                     disabled={addingId === deal.id}
                   >
                     <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-                    {addingId === deal.id ? 'Adding…' : wishlistContent.addToCartLabel}
+                    {addingId === deal.id ? wishlistContent.addingLabel : wishlistContent.addToCartLabel}
                   </FilledButton>
                 )}
               </li>

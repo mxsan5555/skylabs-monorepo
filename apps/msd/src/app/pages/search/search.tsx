@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
+import type { MdDialog } from '@material/web/dialog/dialog.js';
 import {
   OutlinedTextField,
   ChipSet,
@@ -65,19 +66,17 @@ export function Search() {
   // control ever changes it.
   const [priceMax, setPriceMax] = useState(searchContent.filters.price.max);
 
-  const priceDialogRef = useRef<{ show: () => void; close: () => void } | null>(null);
-  const categoryDialogRef = useRef<{ show: () => void; close: () => void } | null>(null);
-
+  const priceDialogRef = useRef<MdDialog>(null);
+  const categoryDialogRef = useRef<MdDialog>(null);
   useEffect(() => {
-    const map: Record<NonNullable<ActiveDialog>, React.MutableRefObject<{ show: () => void; close: () => void } | null>> = {
-      price: priceDialogRef,
-      category: categoryDialogRef,
-    };
-    if (activeDialog) {
-      map[activeDialog].current?.show();
+    if (activeDialog === 'price') {
+      priceDialogRef.current?.show();
+    }
+
+    if (activeDialog === 'category') {
+      categoryDialogRef.current?.show();
     }
   }, [activeDialog]);
-
   // Browser back/forward (or a fresh load) changes `params` out from under
   // us — resync local filter state from the URL whenever that happens. Our
   // own `updateParams()` calls also flow back through here, which is a
@@ -232,9 +231,14 @@ export function Search() {
           <ChipSet>
             {/* Price */}
             <FilterChip
-              label={priceMax < searchContent.filters.price.max
-                ? `Price (up to ${formatINR(priceMax)})`
-                : searchContent.filters.price.label}
+              label={
+                priceMax < searchContent.filters.price.max
+                  ? searchContent.filters.price.activeLabel.replace(
+                    '{price}',
+                    formatINR(priceMax)
+                  )
+                  : searchContent.filters.price.label
+              }
               selected={priceMax < searchContent.filters.price.max}
               onClick={() => setActiveDialog('price')}
             >
@@ -287,7 +291,7 @@ export function Search() {
           <>
             {/* ── List view ───────────────────────────────────────────── */}
             {view === 'list' && (
-              <section aria-label="Search results list">
+              <section aria-label={searchContent.results.listAriaLabel}>
                 <ul className="search-results-list">
                   {deals.map((deal) => {
                     const heading = deal.service?.name ?? deal.product?.name ?? deal.title;
@@ -339,8 +343,14 @@ export function Search() {
                               </span>
                             </div>
                             <div className="search-result-card__actions">
-                              <FilledTonalButton onClick={() => addItem(deal.id)}>
-                                {searchContent.labels.book}
+                              <FilledTonalButton
+                                onClick={() =>
+                                  addItem(deal.id, deal.service ? 'deal' : 'product')
+                                }
+                              >
+                                {deal.service
+                                  ? searchContent.labels.book
+                                  : searchContent.labels.addToCart}
                               </FilledTonalButton>
                               <IconButton
                                 aria-label={
@@ -366,7 +376,7 @@ export function Search() {
 
             {/* ── Grid view ───────────────────────────────────────────── */}
             {view === 'grid' && (
-              <section aria-label="Search results grid">
+              <section aria-label={searchContent.results.gridAriaLabel}>
                 <ul className="search-results-grid">
                   {deals.map((deal) => (
                     <li key={deal.id}>
@@ -380,7 +390,7 @@ export function Search() {
                         heading={deal.service?.name ?? deal.product?.name ?? deal.title}
                         eyebrow={[deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · ')}
                         eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
-                        priceNote={deal.durationMinutes ? `${deal.durationMinutes} min` : undefined}
+                        priceNote={deal.durationMinutes ? `${deal.durationMinutes}${searchContent.labels.durationSuffix}` : undefined}
                         price={formatINR(Number(deal.salePrice))}
                         originalPrice={
                           deal.originalPrice && Number(deal.originalPrice) !== Number(deal.salePrice)
@@ -400,16 +410,16 @@ export function Search() {
 
             {/* ── Map view ────────────────────────────────────────────── */}
             {view === 'map' && (
-              <section aria-label="Search results map" className="search-map">
+              <section aria-label={searchContent.results.mapAriaLabel} className="search-map">
                 {mappableDeals.length === 0 ? (
                   <p className="search-page__empty">{searchContent.noResults}</p>
                 ) : (
                   <>
-                    <div className="search-map__canvas" role="img" aria-label="Map showing deal locations">
+                    <div className="search-map__canvas" role="img" aria-label={searchContent.results.mapImageLabel}>
                       <Map deals={mappableDeals} />
                     </div>
                     <div className="search-map__sidebar">
-                      <p className="search-map__sidebar-count">{mappableDeals.length} results in view</p>
+                      <p className="search-map__sidebar-count">{mappableDeals.length}  {searchContent.results.mapResultsSuffix}</p>
                       <ul className="search-map__list">
                         {dealsWithCoords
                           .slice(0, 5)
@@ -443,13 +453,13 @@ export function Search() {
       </div>
       {/* ── Price Dialog ───────────────────────────────────────────────── */}
       <Dialog
-        ref={priceDialogRef as unknown as React.Ref<HTMLElement>}
+        ref={priceDialogRef}
         onClose={() => setActiveDialog(null)}
       >
-        <span slot="headline">Filter by Price</span>
+        <span slot="headline"> {searchContent.filters.price.dialogTitle}</span>
         <div slot="content" className="filter-dialog">
           <p className="filter-dialog__label">
-            Price up to: {formatINR(priceMax)}
+            {searchContent.filters.price.priceUpTo} {formatINR(priceMax)}
           </p>
           <Slider
             min={searchContent.filters.price.min}
@@ -461,20 +471,20 @@ export function Search() {
         </div>
         <div slot="actions">
           <TextButton onClick={() => setPriceMax(searchContent.filters.price.max)}>
-            Clear
+            {searchContent.filters.price.clear}
           </TextButton>
-          <FilledButton onClick={() => setActiveDialog(null)}>Apply</FilledButton>
+          <FilledButton onClick={() => setActiveDialog(null)}> {searchContent.filters.price.apply}</FilledButton>
         </div>
       </Dialog>
 
       {/* ── Category Dialog ────────────────────────────────────────────── */}
       <Dialog
-        ref={categoryDialogRef as unknown as React.Ref<HTMLElement>}
+        ref={categoryDialogRef}
         onClose={() => setActiveDialog(null)}
       >
-        <span slot="headline">Select Category</span>
+        <span slot="headline"> {searchContent.filters.category.dialogTitle}</span>
         <div slot="content" className="filter-dialog">
-          <div role="radiogroup" aria-label="Category" className="filter-dialog__checks">
+          <div role="radiogroup" aria-label={searchContent.filters.category.ariaLabel} className="filter-dialog__checks">
             <label className="filter-dialog__check-opt">
               <Radio
                 name="category"
@@ -482,7 +492,7 @@ export function Search() {
                 checked={selectedCategory === ''}
                 onChange={() => selectCategory('')}
               />
-              <span>All categories</span>
+              <span>{searchContent.filters.category.all}</span>
             </label>
             {categoriesLoading ? (
               <p className="loading-state">
@@ -503,11 +513,11 @@ export function Search() {
             )}
           </div>
           <Divider />
-          <Link to="/categories" className="field-hint">Browse all categories →</Link>
+          <Link to="/categories" className="field-hint">{searchContent.filters.category.browseAll}</Link>
         </div>
         <div slot="actions">
-          <TextButton onClick={() => selectCategory('')}>Clear</TextButton>
-          <FilledButton onClick={() => setActiveDialog(null)}>Apply</FilledButton>
+          <TextButton onClick={() => selectCategory('')}>{searchContent.filters.category.clear}</TextButton>
+          <FilledButton onClick={() => setActiveDialog(null)}>{searchContent.filters.category.apply}</FilledButton>
         </div>
       </Dialog>
     </div>

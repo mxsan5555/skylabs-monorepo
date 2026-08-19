@@ -665,6 +665,7 @@
         "label": "Price",
         "min": 499,
         "max": 15000,
+        "activeLabel": "Price (up to {price})",
         "priceLevels": [
           {
             "value": "$",
@@ -706,6 +707,7 @@
       "mapResultsSuffix": "results in view"
     },
     "labels": {
+      "addToCart": "Add to Cart",
       "service": "Service",
       "product": "Product",
       "durationSuffix": "min",
@@ -953,13 +955,24 @@
       "removeItem": "Could not remove item."
     }
   },
-  "wishlist": {
-    "title": "Saved Deals",
-    "emptyHeading": "No saved deals yet",
-    "emptySubheading": "Tap the heart on any deal to save it here for later.",
-    "emptyCtaLabel": "Browse Deals",
-    "addToCartLabel": "Add to Cart"
-  },
+"wishlist": {
+  "title": "Saved Deals",
+  "emptyHeading": "No saved deals yet",
+  "emptySubheading": "Tap the heart on any deal to save it here for later.",
+  "emptyCtaLabel": "Browse Deals",
+  "addToCartLabel": "Add to Cart",
+  "loading": "Loading your wishlist…",
+  "savedDealsLabel": "Saved deals",
+  "serviceLabel": "Service",
+  "productLabel": "Product",
+  "bookLabel": "Book",
+  "addingLabel": "Adding…",
+  "addToCartError": "Could not add to cart.",
+  "dealSingular": "deal",
+  "dealPlural": "deals",
+  "removeFromWishlist": "Remove from wishlist",
+  "saveToWishlist": "Save to wishlist"
+},
   "checkout": {
     "title": "Checkout",
     "steps": [
@@ -1429,6 +1442,107 @@
       "orderStatus": "Order status",
       "durationSuffix": "min",
       "cashOnDelivery": "Cash on Delivery"
+    }
+  },
+  "vendor": {
+    "meta": {
+      "titleSuffix": " | MSD",
+      "defaultDescription": "Book services at {vendor}{location}.",
+      "notFoundTitle": "Vendor Not Found | MSD",
+      "vendorTitleSuffix": " | MSD"
+    },
+    "breadcrumb": {
+      "home": "Home",
+      "explore": "Explore"
+    },
+    "labels": {
+      "workingHours": "Working Hours",
+      "selectService": "Select Service",
+      "services": "Services",
+      "products": "Products",
+      "therapists": "Meet Our Therapists",
+      "yourSelection": "Your selection",
+      "selectPackage": "Select your package",
+      "selectTherapist": "Select a therapist",
+      "anyTherapist": "Any therapist",
+      "date": "Date",
+      "timeSlot": "Time slot",
+      "quantity": "Quantity",
+      "total": "Total",
+      "details": "Details",
+      "from": "From",
+      "packages": "packages",
+      "minutes": "min",
+      "yearsExperience": "years experience",
+      "closed": "Closed"
+    },
+    "actions": {
+      "browseServices": "Browse Services",
+      "bookNow": "Book Now",
+      "cancel": "Cancel",
+      "addToCart": "Add to Cart",
+      "select": "Select"
+    },
+    "filters": {
+      "all": "All",
+      "filterByServiceCategory": "Filter by service category"
+    },
+    "empty": {
+      "noServices": "No services available at this branch.",
+      "noProducts": "No products available at this branch.",
+      "noTherapists": "No therapist profiles listed for this branch yet.",
+      "selectService": "Select a service to see packages and pricing."
+    },
+    "loading": {
+      "vendor": "Loading vendor…",
+      "services": "Loading services…",
+      "products": "Loading products…"
+    },
+    "errors": {
+      "loadVendor": "Could not load this vendor.",
+      "loadServicesProducts": "Could not load services and products.",
+      "addToCart": "Could not add to cart.",
+      "bookService": "Could not book this service.",
+      "selectDateTime": "Select a date and time slot."
+    },
+    "notFound": {
+      "metaTitle": "Vendor Not Found | MSD",
+      "heading": "Vendor not found",
+      "subheading": "This vendor may no longer be available.",
+      "cta": "Browse Services"
+    },
+    "booking": {
+      "bookedPrefix": "Booked",
+      "for": "for",
+      "at": "at",
+      "bookingNow": "Booking…",
+      "bookNow": "Book Now",
+      "ariaLabel": "Book {service} — {amount}"
+    },
+    "accessibility": {
+      "services": "Services",
+      "products": "Products",
+      "therapists": "Therapists",
+      "yourSelection": "Your selection",
+      "selectTimeSlot": "Select a time slot",
+      "selectTherapist": "Select a therapist",
+      "selectPackage": "Select a package",
+      "decreaseQuantity": "Decrease quantity",
+      "increaseQuantity": "Increase quantity",
+      "quantity": "Quantity"
+    },
+    "days": {
+      "mon": "Monday",
+      "tue": "Tuesday",
+      "wed": "Wednesday",
+      "thu": "Thursday",
+      "fri": "Friday",
+      "sat": "Saturday",
+      "sun": "Sunday"
+    },
+    "messages": {
+      "addToCartSuccess": "Added \"{item}\" to your cart.",
+      "bookingSuccess": "Booked \"{service}\" for {date} at {time}."
     }
   }
 }

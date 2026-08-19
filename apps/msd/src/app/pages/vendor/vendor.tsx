@@ -1,26 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  FilledButton,
-  OutlinedIconButton,
-  Icon,
-  Divider,
-  Radio,
-  ChipSet,
-  FilterChip,
-  SuggestionChip,
-  Tabs,
-  PrimaryTab,
-  OutlinedTextField,
-} from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedIconButton, Icon, Divider, Radio, ChipSet, FilterChip, SuggestionChip, Tabs, PrimaryTab, OutlinedTextField, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import {
-  getCatalogVendor,
-  listCatalogDeals,
-  type CatalogVendorDetail,
-  type CatalogVendorBranch,
-  type CatalogDeal,
-} from '../../../api/catalog';
+import { getCatalogVendor, listCatalogDeals, type CatalogVendorDetail, type CatalogVendorBranch, type CatalogDeal, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
 import { createBooking } from '../../../api/bookings';
@@ -29,15 +11,14 @@ import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { formatINR, pluralize } from '../../../utils/format';
 import './vendor.css';
+import content from '../../../content.json';
 
+const vendorContent = content.vendor;
 const SITE_URL: string = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
-
-const TIME_SLOTS = ['9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM'];
+const TIME_SLOTS = content.category.timeSlots;
 
 const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
-const DAY_LABELS: Record<(typeof DAY_ORDER)[number], string> = {
-  mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday',
-};
+const DAY_LABELS = vendorContent.days;
 
 /** Builds schema.org `OpeningHoursSpecification` entries from `Branch.openingHours`
  *  (`{ mon: "09:00-20:00", sun: "closed", ... }`) — skips closed/unset days. */
@@ -149,7 +130,7 @@ export function VendorPage() {
         if (err instanceof ApiRequestError && err.status === 404) {
           setVendor(null);
         } else {
-          setVendorError(err instanceof ApiRequestError ? err.message : 'Could not load this vendor.');
+          setVendorError(err instanceof ApiRequestError ? err.message : vendorContent.errors.loadVendor);
         }
       })
       .finally(() => setVendorLoading(false));
@@ -187,7 +168,7 @@ export function VendorPage() {
         setServiceDeals(services.data);
         setProductDeals(products.data);
       })
-      .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : 'Could not load services and products.'))
+      .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : vendorContent.errors.loadServicesProducts))
       .finally(() => setDealsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendor, selectedBranch?.id]);
@@ -248,7 +229,7 @@ export function VendorPage() {
     setActionMessage('');
     try {
       await addCartItem(token, deal.id, 1);
-      setActionMessage(`Added "${deal.product?.name ?? deal.title}" to your cart.`);
+      setActionMessage(vendorContent.messages.addToCartSuccess.replace('{item}', deal.product?.name ?? deal.title,),);
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : 'Could not add to cart.');
     }
@@ -258,7 +239,7 @@ export function VendorPage() {
     if (!activeGroup || !activeDeal) return;
     if (!requireAuthOrRedirect()) return;
     if (!bookingDate || !timeSlot) {
-      setActionError('Select a date and time slot.');
+      setActionError(vendorContent.errors.selectDateTime);
       setActionMessage('');
       return;
     }
@@ -273,7 +254,7 @@ export function VendorPage() {
         quantity: qty,
         ...(selectedTherapistId ? { therapistId: selectedTherapistId } : {}),
       });
-      setActionMessage(`Booked "${activeGroup.name}" for ${bookingDate} at ${timeSlot}.`);
+      setActionMessage(vendorContent.messages.bookingSuccess.replace('{service}', activeGroup.name).replace('{date}', bookingDate).replace('{time}', timeSlot),);
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : 'Could not book this service.');
     } finally {
@@ -282,19 +263,19 @@ export function VendorPage() {
   };
 
   if (vendorLoading) {
-    return <p className="loading-state">Loading vendor…</p>;
+    return <p className="loading-state"> {vendorContent.loading.vendor}</p>;
   }
 
   if (vendorError || !vendor) {
     return (
       <div className="vendor-page vendor-page--empty">
-        <title>Vendor Not Found | MSD</title>
+        <title>{vendorContent.notFound.metaTitle}</title>
         <sky-info-card
           icon="search_off"
-          heading="Vendor not found"
-          subheading={vendorError || 'This vendor may no longer be available.'}
+          heading={vendorContent.notFound.heading}
+          subheading={vendorError || vendorContent.notFound.subheading}
         />
-        <FilledButton onClick={() => navigate('/explore')}>Browse Services</FilledButton>
+        <FilledButton onClick={() => navigate('/explore')}> {vendorContent.notFound.cta}</FilledButton>
       </div>
     );
   }
@@ -359,8 +340,8 @@ export function VendorPage() {
       <Breadcrumb
         className="vendor-page__breadcrumb"
         items={[
-          { label: 'Home', to: '/' },
-          { label: 'Explore', to: '/explore' },
+          { label: vendorContent.breadcrumb.home, to: '/' },
+          { label: vendorContent.breadcrumb.explore, to: '/explore' },
           { label: vendor.businessName },
         ]}
       />
@@ -392,7 +373,7 @@ export function VendorPage() {
                       .join(', ')}
                   </span>
                 )}
-               
+
               </div>
             </div>
             {vendor.logoUrl && (
@@ -422,7 +403,7 @@ export function VendorPage() {
           {/* Opening hours */}
           {selectedBranch?.openingHours && (
             <div className="vendor-page__hours-section">
-              <h2 className="vendor-page__hours-title">Working Hours</h2>
+              <h2 className="vendor-page__hours-title">{vendorContent.labels.workingHours}</h2>
               <div className="vendor-page__hours-grid">
                 {DAY_ORDER.map((day) => {
                   const raw = selectedBranch.openingHours?.[day];
@@ -431,7 +412,7 @@ export function VendorPage() {
                     <div key={day} className="vendor-page__hours-row">
                       <span className="vendor-page__hours-day">{DAY_LABELS[day]}</span>
                       <span className="vendor-page__hours-time">
-                        {closed ? 'Closed' : raw.replace('-', ' – ')}
+                        {closed ? vendorContent.labels.closed : raw.replace('-', ' – ')}
                       </span>
                     </div>
                   );
@@ -443,13 +424,13 @@ export function VendorPage() {
           <Divider />
 
           {/* Select Service */}
-          <section className="vendor-page__section" aria-label="Services">
-            <h2 className="vendor-page__section-title">Select Service</h2>
+          <section className="vendor-page__section" aria-label={vendorContent.accessibility.services}>
+            <h2 className="vendor-page__section-title"> {vendorContent.labels.selectService}</h2>
 
             {categoryNames.length > 1 && (
-              <ChipSet aria-label="Filter by service category">
+              <ChipSet aria-label={vendorContent.filters.filterByServiceCategory}>
                 <FilterChip
-                  label="All"
+                  label={vendorContent.filters.all}
                   selected={activeCategoryName === 'all'}
                   onClick={() => handleCategoryFilter('all')}
                 />
@@ -465,11 +446,11 @@ export function VendorPage() {
             )}
 
             {dealsLoading ? (
-              <p className="loading-state">Loading services…</p>
+              <p className="loading-state">{vendorContent.loading.services}</p>
             ) : dealsError ? (
               <p className="error-state" role="alert">{dealsError}</p>
             ) : displayedCategoryGroups.length === 0 ? (
-              <p className="vendor-page__deal-empty">No services available at this branch.</p>
+              <p className="vendor-page__deal-empty"> {vendorContent.empty.noServices}</p>
             ) : (
               <div className="vendor-page__deal-groups">
                 {displayedCategoryGroups.map((cat) => {
@@ -528,13 +509,13 @@ export function VendorPage() {
                                     <div className="vendor-page__deal-card-meta">
                                       <ChipSet>
                                         {group.deals.length > 1 && (
-                                          <SuggestionChip label={`${group.deals.length} packages`} />
+                                          <SuggestionChip label={`${group.deals.length}  ${vendorContent.labels.packages}`} />
                                         )}
                                         {first.durationMinutes != null && (
-                                          <SuggestionChip label={`${first.durationMinutes} min`} />
+                                          <SuggestionChip label={`${first.durationMinutes} ${vendorContent.labels.minutes}`} />
                                         )}
                                       </ChipSet>
-                                      <span className="vendor-page__deal-price">From {formatINR(minPrice)}</span>
+                                      <span className="vendor-page__deal-price"> {vendorContent.labels.from}  {formatINR(minPrice)}</span>
                                     </div>
                                   </div>
                                   <span
@@ -565,19 +546,19 @@ export function VendorPage() {
           <Divider />
 
           {/* Products */}
-          <section className="vendor-page__section" aria-label="Products">
+          <section className="vendor-page__section" aria-label={vendorContent.accessibility.products}>
             <h2 className="vendor-page__section-title">Products</h2>
             {dealsLoading ? (
-              <p className="loading-state">Loading products…</p>
+              <p className="loading-state">{vendorContent.loading.products}</p>
             ) : productDeals.length === 0 ? (
-              <p className="vendor-page__deal-empty">No products available at this branch.</p>
+              <p className="vendor-page__deal-empty">{vendorContent.empty.noProducts}</p>
             ) : (
               <ul className="vendor-page__product-grid">
                 {productDeals.map((deal) => (
                   <li key={deal.id}>
                     <SkyProductCardWC
                       variant="outlined"
-                      badge="Product"
+                      badge={vendorContent.labels.products}
                       eyebrow={deal.product?.brand ?? undefined}
                       heading={deal.product?.name ?? deal.title}
                       image={deal.product?.image ?? deal.images?.[0] ?? undefined}
@@ -597,7 +578,7 @@ export function VendorPage() {
                       <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
                         <FilledButton onClick={() => addProductToCart(deal)}>
                           <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-                          Add to Cart
+                          {vendorContent.actions.addToCart}
                         </FilledButton>
                       </div>
                     </SkyProductCardWC>
@@ -610,7 +591,7 @@ export function VendorPage() {
           <Divider />
 
           {/* Therapists */}
-          <section className="vendor-page__section" aria-label="Therapists">
+          <section className="vendor-page__section" aria-label={vendorContent.accessibility.therapists}>
             <h2 className="vendor-page__section-title">Meet Our Therapists</h2>
             {selectedBranch && selectedBranch.therapists.length > 0 ? (
               <ul className="vendor-page__therapist-grid">
@@ -633,14 +614,14 @@ export function VendorPage() {
                 ))}
               </ul>
             ) : (
-              <p className="vendor-page__deal-empty">No therapist profiles listed for this branch yet.</p>
+              <p className="vendor-page__deal-empty">{vendorContent.empty.noTherapists}</p>
             )}
           </section>
         </div>
 
         {/* ── Right: Your selection card ───────────────────────────────────── */}
-        <aside className="vendor-page__selection-card" aria-label="Your selection">
-          <h2 className="vendor-page__selection-title">Your selection</h2>
+        <aside className="vendor-page__selection-card" aria-label={vendorContent.accessibility.yourSelection}>
+          <h2 className="vendor-page__selection-title"> {vendorContent.labels.yourSelection}</h2>
 
           {activeGroup && activeDeal ? (
             <>
@@ -666,8 +647,8 @@ export function VendorPage() {
               {/* Package selection */}
               {activeGroup.deals.length > 1 && (
                 <div>
-                  <p className="vendor-page__packages-label">Select your package</p>
-                  <div className="vendor-page__package-list" role="group" aria-label="Select a package">
+                  <p className="vendor-page__packages-label"> {vendorContent.labels.selectPackage}</p>
+                  <div className="vendor-page__package-list" role="group" aria-label={vendorContent.accessibility.selectPackage}>
                     {activeGroup.deals.map((deal) => {
                       const isSel = deal.id === activeDeal.id;
                       const label = deal.durationMinutes != null ? `${deal.durationMinutes} min` : deal.title;
@@ -706,10 +687,10 @@ export function VendorPage() {
                 <>
                   <Divider />
                   <div>
-                    <p className="vendor-page__packages-label">Select a therapist</p>
+                    <p className="vendor-page__packages-label">  {vendorContent.labels.selectTherapist}</p>
                     <ChipSet aria-label="Select a therapist">
                       <FilterChip
-                        label="Any therapist"
+                        label={vendorContent.labels.anyTherapist}
                         selected={selectedTherapistId === ''}
                         onClick={() => setSelectedTherapistId('')}
                       />
@@ -731,12 +712,12 @@ export function VendorPage() {
               {/* Date + time slot */}
               <div className="vendor-page__booking-fields">
                 <OutlinedTextField
-                  label="Date"
+                  label={vendorContent.labels.date}
                   type="date"
                   value={bookingDate}
                   onInput={(e: Event) => setBookingDate((e.target as HTMLInputElement).value)}
                 />
-                <p className="field-hint">Time slot</p>
+                <p className="field-hint">{vendorContent.labels.timeSlot}</p>
                 <ChipSet aria-label="Select a time slot">
                   {TIME_SLOTS.map((slot) => (
                     <FilterChip
@@ -752,12 +733,12 @@ export function VendorPage() {
               <Divider />
 
               {/* Quantity */}
-              <div className="vendor-page__stepper-row" role="group" aria-label="Quantity">
-                <span className="vendor-page__stepper-label">Quantity</span>
+              <div className="vendor-page__stepper-row" role="group" aria-label={vendorContent.accessibility.quantity}>
+                <span className="vendor-page__stepper-label">{vendorContent.labels.quantity}</span>
                 <div className="vendor-page__stepper-controls">
                   <OutlinedIconButton
                     onClick={() => setQty((q) => Math.max(1, q - 1))}
-                    aria-label="Decrease quantity"
+                    aria-label={vendorContent.accessibility.decreaseQuantity}
                     disabled={qty === 1}
                   >
                     <Icon aria-hidden="true">remove</Icon>
@@ -767,7 +748,7 @@ export function VendorPage() {
                   </span>
                   <OutlinedIconButton
                     onClick={() => setQty((q) => q + 1)}
-                    aria-label="Increase quantity"
+                    aria-label={vendorContent.accessibility.increaseQuantity}
                   >
                     <Icon aria-hidden="true">add</Icon>
                   </OutlinedIconButton>
@@ -776,7 +757,7 @@ export function VendorPage() {
 
               {/* Total */}
               <div className="vendor-page__total-row">
-                <span>Total</span>
+                <span>{vendorContent.labels.total}</span>
                 <strong className="vendor-page__total-amount">{formatINR(total)}</strong>
               </div>
 
@@ -788,10 +769,10 @@ export function VendorPage() {
                 className="vendor-page__book-btn"
                 onClick={submitBooking}
                 disabled={bookingSubmitting}
-                aria-label={`Book ${activeGroup.name} — ${formatINR(total)}`}
+                aria-label={vendorContent.booking.ariaLabel.replace('{service}', activeGroup.name).replace('{amount}', formatINR(total))}
               >
                 <Icon slot="icon" aria-hidden="true">calendar_month</Icon>
-                {bookingSubmitting ? 'Booking…' : 'Book Now'}
+                {bookingSubmitting ? vendorContent.booking.bookingNow : vendorContent.booking.bookNow}
               </FilledButton>
 
               {/* Details accordion — only what the API actually returns, nothing fabricated */}
@@ -803,7 +784,7 @@ export function VendorPage() {
                   )}
                   {activeDeal.description && (
                     <sky-accordion>
-                      <sky-accordion-item header="Details" open>
+                      <sky-accordion-item header={vendorContent.labels.details} open>
                         <p className="vendor-page__accordion-text">{activeDeal.description}</p>
                       </sky-accordion-item>
                     </sky-accordion>
@@ -814,7 +795,7 @@ export function VendorPage() {
           ) : (
             <div className="vendor-page__selection-empty">
               <Icon aria-hidden="true" className="vendor-page__empty-icon">spa</Icon>
-              <p>Select a service to see packages and pricing.</p>
+              <p> {vendorContent.empty.selectService}</p>
             </div>
           )}
         </aside>
