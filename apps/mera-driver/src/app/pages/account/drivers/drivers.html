@@ -232,34 +232,109 @@
             </div>
           }
 
-          <!-- TAB 3: Documents Details (Dynamic Multi-Document Lists) -->
+          <!-- TAB 3: Documents Details -->
           @if (activeFormTab() === 2) {
             <div class="flex flex-col gap-y-6 w-full">
               
-              <!-- 1. Personal Documents -->
+              <!-- 1. Driving License Details -->
               <sky-card class="p-6 block">
                 <div class="section-heading-box">
-                  <h3>1. Personal Documents</h3>
+                  <h3>1. Driving License Details</h3>
+                </div>
+                <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                  <md-outlined-select label="License Details" [value]="inputLicenseDetails()" (change)="onInputChange('licenseDetails', $event)">
+                    @for (opt of licenseDetailsOptions(); track opt) {
+                      <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                    }
+                  </md-outlined-select>
+
+                  <md-outlined-select label="Vehicle Type" [value]="inputVehicleType()" (change)="onInputChange('vehicleType', $event)">
+                    @for (opt of vehicleTypeOptions(); track opt) {
+                      <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                    }
+                  </md-outlined-select>
+
+                  <md-outlined-text-field label="Driving License No" [value]="inputDlNo()" (input)="onInputChange('dlNo', $event)" placeholder="e.g. DL-1420110012345"></md-outlined-text-field>
+
+                  <md-outlined-text-field label="DL Issue Date" type="date" [value]="inputDlIssueDate()" (input)="onInputChange('dlIssueDate', $event)"></md-outlined-text-field>
+
+                  <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="DL Expired Date" type="date" [value]="inputDlExpiryDate()" (input)="onInputChange('dlExpiryDate', $event)"></md-outlined-text-field>
+                </div>
+              </sky-card>
+
+              <!-- 2. Police Verification & Employment Details -->
+              <sky-card class="p-6 block">
+                <div class="section-heading-box">
+                  <h3>2. Police Verification & Employment Details</h3>
+                </div>
+                <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                  <md-outlined-select label="Police Verified Status" [value]="inputPoliceVerifiedStatus()" (change)="onInputChange('policeVerifiedStatus', $event)">
+                    @for (opt of policeVerifiedStatuses(); track opt) {
+                      <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                    }
+                  </md-outlined-select>
+
+                  <md-outlined-text-field label="Police Verified No" [value]="inputPoliceVerifiedNo()" (input)="onInputChange('policeVerifiedNo', $event)" placeholder="e.g. PV-883921"></md-outlined-text-field>
+
+                  <div class="flex flex-col gap-y-1 col-span-2 max-sm:col-span-1">
+                    <label class="text-xs font-semibold text-slate-500 dark:text-slate-400">Police Verified Upload</label>
+                    <div class="flex items-center gap-3">
+                      <input type="file" (change)="onDocFileChange('police', 0, $event)" class="hidden" #fileInputPoliceUpload>
+                      <md-outlined-button type="button" (click)="fileInputPoliceUpload.click()">
+                        Choose File
+                      </md-outlined-button>
+                      <span class="file-upload-text truncate max-w-[300px]" [title]="inputPoliceVerifiedUpload() || 'No file chosen'">
+                        {{ inputPoliceVerifiedUpload() || 'No file chosen' }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <md-outlined-select label="Job Type" [value]="inputJobType()" (change)="onInputChange('jobType', $event)">
+                    @for (opt of jobTypeOptions(); track opt) {
+                      <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                    }
+                  </md-outlined-select>
+
+                  <md-outlined-select label="Experience" [value]="inputExperience()" (change)="onInputChange('experience', $event)">
+                    @for (opt of experienceOptions(); track opt) {
+                      <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                    }
+                  </md-outlined-select>
+
+                  <md-outlined-text-field label="Current Salary (₹)" type="number" [value]="inputCurrentSalary()" (input)="onInputChange('currentSalary', $event)" placeholder="e.g. 12000"></md-outlined-text-field>
+
+                  <md-outlined-select label="Expected Salary" [value]="inputExpectedSalary()" (change)="onInputChange('expectedSalary', $event)">
+                    @for (opt of expectedSalaryOptions(); track opt) {
+                      <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                    }
+                  </md-outlined-select>
+                </div>
+              </sky-card>
+
+              <!-- 3. Personal & Category Documents -->
+              <sky-card class="p-6 block">
+                <div class="section-heading-box">
+                  <h3>3. Personal & Category Documents</h3>
                 </div>
                 <div class="flex flex-col gap-y-4">
                   @for (doc of personalDocs(); track $index) {
                     <div class="flex flex-row gap-4 items-center w-full max-md:flex-col max-md:items-stretch border-b border-slate-100 dark:border-slate-800 pb-4">
-                      <!-- Dropdown -->
-                      <md-outlined-select class="flex-1 min-w-[200px]" label="Document Name / Type" [value]="doc.type" (change)="onDocChange('personal', $index, 'type', $event)">
-                        @for (opt of personalDocTypes(); track opt) {
+                      <!-- Document Category Dropdown -->
+                      <md-outlined-select class="flex-1 min-w-[240px]" label="Document Category" [value]="doc.type" (change)="onDocChange('personal', $index, 'type', $event)">
+                        @for (opt of documentCategoryOptions(); track opt) {
                           <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                         }
                       </md-outlined-select>
 
-                      <!-- Reg No -->
-                      <md-outlined-text-field class="flex-1 min-w-[200px]" label="Document / Registration No." [value]="doc.regNo" (input)="onDocChange('personal', $index, 'regNo', $event)" placeholder="Enter ID number"></md-outlined-text-field>
+                      <!-- Reg / Ref No -->
+                      <md-outlined-text-field class="flex-1 min-w-[200px]" label="Document / Registration No." [value]="doc.regNo" (input)="onDocChange('personal', $index, 'regNo', $event)" placeholder="Enter Document ID / Ref No."></md-outlined-text-field>
 
-                      <!-- File Upload -->
+                      <!-- Document Upload -->
                       <div class="flex flex-col gap-y-1 flex-1 min-w-[200px]">
-                        <label class="text-xs font-semibold text-slate-500 dark:text-slate-400">Upload File</label>
+                        <label class="text-xs font-semibold text-slate-500 dark:text-slate-400">Document Upload</label>
                         <div class="flex items-center gap-3">
-                          <input type="file" (change)="onDocFileChange('personal', $index, $event)" class="hidden" #fileInputPersonal>
-                          <md-outlined-button type="button" (click)="fileInputPersonal.click()">
+                          <input type="file" (change)="onDocFileChange('personal', $index, $event)" class="hidden" #fileInputDocCat>
+                          <md-outlined-button type="button" (click)="fileInputDocCat.click()">
                             Choose File
                           </md-outlined-button>
                           <span class="file-upload-text truncate max-w-[150px]" [title]="doc.file || 'No file chosen'">
@@ -287,10 +362,10 @@
                 </div>
               </sky-card>
 
-              <!-- 2. Health Documents -->
+              <!-- 4. Health Documents -->
               <sky-card class="p-6 block">
                 <div class="section-heading-box">
-                  <h3>2. Health Documents</h3>
+                  <h3>4. Health Documents</h3>
                 </div>
                 <div class="flex flex-col gap-y-4">
                   @for (doc of healthDocs(); track $index) {
@@ -339,10 +414,10 @@
                 </div>
               </sky-card>
 
-              <!-- 3. Education Documents -->
+              <!-- 5. Education Documents -->
               <sky-card class="p-6 block">
                 <div class="section-heading-box">
-                  <h3>3. Education Documents</h3>
+                  <h3>5. Education Documents</h3>
                 </div>
                 <div class="flex flex-col gap-y-4">
                   @for (doc of educationDocs(); track $index) {
@@ -386,10 +461,10 @@
                 </div>
               </sky-card>
 
-              <!-- 4. Police Verification Documents -->
+              <!-- 6. Police Verification Documents -->
               <sky-card class="p-6 block">
                 <div class="section-heading-box">
-                  <h3>4. Police Verification Documents</h3>
+                  <h3>6. Police Verification Documents</h3>
                 </div>
                 <div class="flex flex-col gap-y-4">
                   @for (doc of policeDocs(); track $index) {

@@ -68,25 +68,16 @@
                 <h3>1. Primary Attendance Details</h3>
               </div>
               <div class="grid grid-cols-3 gap-4 max-md:grid-cols-2 max-sm:grid-cols-1 w-full">
-                <div class="form-group">
-                  <label class="form-label">Driver ID *</label>
-                  <input type="text" class="form-control" [value]="inputDriverId()" (input)="onInputChange('driver_id', $event)" placeholder="e.g. 501" />
-                </div>
+                <md-outlined-text-field label="Driver ID *" required [value]="inputDriverId()" (input)="onInputChange('driver_id', $event)" placeholder="e.g. 501"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Attendance Date *</label>
-                  <input type="date" class="form-control" [value]="inputAttendanceDate()" (input)="onInputChange('attendance_date', $event)" />
-                </div>
+                <md-outlined-text-field label="Attendance Date *" type="date" required [value]="inputAttendanceDate()" (input)="onInputChange('attendance_date', $event)"></md-outlined-text-field>
 
-                <div class="form-group max-md:col-span-2 max-sm:col-span-1">
-                  <label class="form-label">Status *</label>
-                  <select class="form-control" [value]="inputStatus()" (change)="onInputChange('status', $event)">
-                    <option value="Present">Present</option>
-                    <option value="Absent">Absent</option>
-                    <option value="Half Day">Half Day</option>
-                    <option value="Leave">Leave</option>
-                  </select>
-                </div>
+                <md-outlined-select class="max-md:col-span-2 max-sm:col-span-1" label="Status *" [value]="inputStatus()" (change)="onInputChange('status', $event)">
+                  <md-select-option value="Present"><div slot="headline">Present</div></md-select-option>
+                  <md-select-option value="Absent"><div slot="headline">Absent</div></md-select-option>
+                  <md-select-option value="Half Day"><div slot="headline">Half Day</div></md-select-option>
+                  <md-select-option value="Leave"><div slot="headline">Leave</div></md-select-option>
+                </md-outlined-select>
               </div>
             </sky-card>
 
@@ -96,45 +87,21 @@
                 <h3>2. Check-In & Shift Location</h3>
               </div>
               <div class="grid grid-cols-4 gap-4 max-md:grid-cols-2 max-sm:grid-cols-1 w-full">
-                <div class="form-group">
-                  <label class="form-label">Check-In Time</label>
-                  <input type="text" class="form-control" [value]="inputCheckInTime()" (input)="onInputChange('check_in_time', $event)" placeholder="YYYY-MM-DD HH:MM" />
-                </div>
+                <md-outlined-text-field label="Check-In Time" [value]="inputCheckInTime()" (input)="onInputChange('check_in_time', $event)" placeholder="YYYY-MM-DD HH:MM"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Check-Out Time</label>
-                  <input type="text" class="form-control" [value]="inputCheckOutTime()" (input)="onInputChange('check_out_time', $event)" placeholder="YYYY-MM-DD HH:MM" />
-                </div>
+                <md-outlined-text-field label="Check-Out Time" [value]="inputCheckOutTime()" (input)="onInputChange('check_out_time', $event)" placeholder="YYYY-MM-DD HH:MM"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Total Hours Worked</label>
-                  <input type="text" class="form-control" [value]="inputTotalHours()" (input)="onInputChange('total_hours', $event)" placeholder="e.g. 8.5" />
-                </div>
+                <md-outlined-text-field label="Total Hours Worked" type="number" step="0.5" [value]="inputTotalHours()" (input)="onInputChange('total_hours', $event)" placeholder="e.g. 8.5"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Assigned Trip ID</label>
-                  <input type="text" class="form-control" [value]="inputAssignedTripId()" (input)="onInputChange('assigned_trip_id', $event)" placeholder="e.g. 9001" />
-                </div>
+                <md-outlined-text-field label="Assigned Trip ID" [value]="inputAssignedTripId()" (input)="onInputChange('assigned_trip_id', $event)" placeholder="e.g. 9001"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Check-In Latitude</label>
-                  <input type="text" class="form-control" [value]="inputCheckInLatitude()" (input)="onInputChange('check_in_latitude', $event)" placeholder="e.g. 28.6304" />
-                </div>
+                <md-outlined-text-field label="Check-In Latitude" type="number" step="0.0001" [value]="inputCheckInLatitude()" (input)="onInputChange('check_in_latitude', $event)" placeholder="e.g. 28.6304"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Check-In Longitude</label>
-                  <input type="text" class="form-control" [value]="inputCheckInLongitude()" (input)="onInputChange('check_in_longitude', $event)" placeholder="e.g. 77.2177" />
-                </div>
+                <md-outlined-text-field label="Check-In Longitude" type="number" step="0.0001" [value]="inputCheckInLongitude()" (input)="onInputChange('check_in_longitude', $event)" placeholder="e.g. 77.2177"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Check-Out Latitude</label>
-                  <input type="text" class="form-control" [value]="inputCheckOutLatitude()" (input)="onInputChange('check_out_latitude', $event)" placeholder="e.g. 28.6305" />
-                </div>
+                <md-outlined-text-field label="Check-Out Latitude" type="number" step="0.0001" [value]="inputCheckOutLatitude()" (input)="onInputChange('check_out_latitude', $event)" placeholder="e.g. 28.6305"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Check-Out Longitude</label>
-                  <input type="text" class="form-control" [value]="inputCheckOutLongitude()" (input)="onInputChange('check_out_longitude', $event)" placeholder="e.g. 77.2178" />
-                </div>
+                <md-outlined-text-field label="Check-Out Longitude" type="number" step="0.0001" [value]="inputCheckOutLongitude()" (input)="onInputChange('check_out_longitude', $event)" placeholder="e.g. 77.2178"></md-outlined-text-field>
               </div>
             </sky-card>
 
@@ -144,20 +111,11 @@
                 <h3>3. Leave Management & Notes</h3>
               </div>
               <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
-                <div class="form-group">
-                  <label class="form-label">Leave Type (if on leave)</label>
-                  <input type="text" class="form-control" [value]="inputLeaveType()" (input)="onInputChange('leave_type', $event)" placeholder="e.g. Sick Leave, Casual Leave" />
-                </div>
+                <md-outlined-text-field label="Leave Type (if on leave)" [value]="inputLeaveType()" (input)="onInputChange('leave_type', $event)" placeholder="e.g. Sick Leave, Casual Leave"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Remarks / Notes</label>
-                  <input type="text" class="form-control" [value]="inputRemarks()" (input)="onInputChange('remarks', $event)" placeholder="Enter remarks" />
-                </div>
+                <md-outlined-text-field label="Remarks / Notes" [value]="inputRemarks()" (input)="onInputChange('remarks', $event)" placeholder="Enter remarks"></md-outlined-text-field>
 
-                <div class="form-group col-span-2 max-sm:col-span-1">
-                  <label class="form-label">Leave Reason</label>
-                  <input type="text" class="form-control" [value]="inputLeaveReason()" (input)="onInputChange('leave_reason', $event)" placeholder="Enter detailed reason for leave/absence" />
-                </div>
+                <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Leave Reason" [value]="inputLeaveReason()" (input)="onInputChange('leave_reason', $event)" placeholder="Enter detailed reason for leave/absence"></md-outlined-text-field>
               </div>
             </sky-card>
 

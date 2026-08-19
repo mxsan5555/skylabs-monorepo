@@ -17,11 +17,19 @@ interface MasterOption {
 })
 export class PersonalDocsMaster {
   readonly options = signal<MasterOption[]>([
-    { id: 1, name: 'Aadhar Card', status: 'Active' },
-    { id: 2, name: 'PAN Card', status: 'Active' },
-    { id: 3, name: 'Driving License', status: 'Active' },
-    { id: 4, name: 'Passport', status: 'Active' },
-    { id: 5, name: 'Voter ID', status: 'Active' }
+    { id: 1, name: 'Address Proof', status: 'Active' },
+    { id: 2, name: 'Affidavit of No Criminal Record', status: 'Active' },
+    { id: 3, name: 'Bank Passbook / Cancelled Cheque', status: 'Active' },
+    { id: 4, name: 'Commercial Driving License', status: 'Active' },
+    { id: 5, name: 'Driver Badge', status: 'Active' },
+    { id: 6, name: 'Driving License', status: 'Active' },
+    { id: 7, name: 'PAN Card', status: 'Active' },
+    { id: 8, name: 'Passport-size Photograph', status: 'Active' },
+    { id: 9, name: 'Police Station NOC', status: 'Active' },
+    { id: 10, name: 'Police Verification Certificate (PCC)', status: 'Active' },
+    { id: 11, name: 'UPI / Bank Details for Payments', status: 'Active' },
+    { id: 12, name: 'Vehicle Insurance Certificate', status: 'Active' },
+    { id: 13, name: 'Vehicle Registration Certificate (RC)', status: 'Active' }
   ]);
 
   readonly showAddForm = signal<boolean>(false);

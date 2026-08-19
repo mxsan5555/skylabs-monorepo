@@ -6,11 +6,7 @@ interface VehicleType {
   name: string;
   code: string;
   description: string;
-  seating_capacity: number | null;
-  luggage_capacity: number | null;
-  minimum_fare: number | null;
   status: 'Active' | 'Inactive';
-  sort_order: number | null;
 }
 
 @Component({
@@ -28,33 +24,35 @@ export class VehicleTypesMaster {
       name: 'Sedan',
       code: 'SEDAN',
       description: 'Standard 4-door sedan, comfortable and economical.',
-      seating_capacity: 4,
-      luggage_capacity: 2,
-      minimum_fare: 150.00,
-      status: 'Active',
-      sort_order: 1
+      status: 'Active'
     },
     {
       vehicle_type_uid: 'vt-2',
       name: 'SUV',
       code: 'SUV',
       description: 'Spacious Sports Utility Vehicle, perfect for family trips.',
-      seating_capacity: 6,
-      luggage_capacity: 4,
-      minimum_fare: 250.00,
-      status: 'Active',
-      sort_order: 2
+      status: 'Active'
     },
     {
       vehicle_type_uid: 'vt-3',
+      name: 'MUV',
+      code: 'MUV',
+      description: 'Multi Utility Vehicle for large groups and luggage.',
+      status: 'Active'
+    },
+    {
+      vehicle_type_uid: 'vt-4',
+      name: 'HUV',
+      code: 'HUV',
+      description: 'Heavy Utility Vehicle for special transportation needs.',
+      status: 'Active'
+    },
+    {
+      vehicle_type_uid: 'vt-5',
       name: 'Hatchback',
       code: 'HATCHBACK',
       description: 'Compact city hatchback, easy to park and navigate.',
-      seating_capacity: 4,
-      luggage_capacity: 1,
-      minimum_fare: 100.00,
-      status: 'Active',
-      sort_order: 3
+      status: 'Active'
     }
   ]);
 
@@ -65,19 +63,13 @@ export class VehicleTypesMaster {
   readonly inputName = signal<string>('');
   readonly inputCode = signal<string>('');
   readonly inputDescription = signal<string>('');
-  readonly inputSeating = signal<number | null>(null);
-  readonly inputLuggage = signal<number | null>(null);
-  readonly inputMinFare = signal<number | null>(null);
   readonly inputStatus = signal<'Active' | 'Inactive'>('Active');
-  readonly inputSortOrder = signal<number | null>(null);
 
   // --- Showcase Datatable Configuration ---
   readonly tableColumns = JSON.stringify([
-    { key: 'name', label: 'Name', sortable: true },
-    { key: 'code', label: 'Code', sortable: true },
-    { key: 'seating_capacity', label: 'Seats', sortable: true },
-    { key: 'luggage_capacity', label: 'Luggage (Bags)', sortable: true },
-    { key: 'minimum_fare', label: 'Min Fare (₹)', sortable: true },
+    { key: 'name', label: 'Vehicle Type Name', sortable: true },
+    { key: 'code', label: 'Short Code', sortable: true },
+    { key: 'description', label: 'Description', sortable: true },
     { key: 'status', label: 'Status', type: 'status', statusMap: { 'Active': 'success', 'Inactive': 'error' } }
   ]);
 
@@ -104,11 +96,7 @@ export class VehicleTypesMaster {
     this.inputName.set('');
     this.inputCode.set('');
     this.inputDescription.set('');
-    this.inputSeating.set(null);
-    this.inputLuggage.set(null);
-    this.inputMinFare.set(null);
     this.inputStatus.set('Active');
-    this.inputSortOrder.set(null);
     this.showAddForm.set(true);
   }
 
@@ -117,11 +105,7 @@ export class VehicleTypesMaster {
     this.inputName.set(option.name);
     this.inputCode.set(option.code);
     this.inputDescription.set(option.description || '');
-    this.inputSeating.set(option.seating_capacity);
-    this.inputLuggage.set(option.luggage_capacity);
-    this.inputMinFare.set(option.minimum_fare);
     this.inputStatus.set(option.status);
-    this.inputSortOrder.set(option.sort_order);
     this.showAddForm.set(true);
   }
 
@@ -145,11 +129,7 @@ export class VehicleTypesMaster {
         name,
         code,
         description: this.inputDescription(),
-        seating_capacity: this.inputSeating(),
-        luggage_capacity: this.inputLuggage(),
-        minimum_fare: this.inputMinFare(),
-        status: this.inputStatus(),
-        sort_order: this.inputSortOrder()
+        status: this.inputStatus()
       };
       this.options.update(list => [...list, newOption]);
     } else if (id) {
@@ -158,11 +138,7 @@ export class VehicleTypesMaster {
         name,
         code,
         description: this.inputDescription(),
-        seating_capacity: this.inputSeating(),
-        luggage_capacity: this.inputLuggage(),
-        minimum_fare: this.inputMinFare(),
-        status: this.inputStatus(),
-        sort_order: this.inputSortOrder()
+        status: this.inputStatus()
       } : opt));
     }
 
@@ -174,16 +150,12 @@ export class VehicleTypesMaster {
     this.inputName.set('');
     this.inputCode.set('');
     this.inputDescription.set('');
-    this.inputSeating.set(null);
-    this.inputLuggage.set(null);
-    this.inputMinFare.set(null);
     this.inputStatus.set('Active');
-    this.inputSortOrder.set(null);
     this.showAddForm.set(false);
   }
 
   deleteOption(option: VehicleType): void {
-    if (confirm(`Are you sure you want to delete vehicle type "${option.name}"?`)) {
+    if (confirm(`Are you sure you want to delete "${option.name}"?`)) {
       this.options.update(list => list.filter(opt => opt.vehicle_type_uid !== option.vehicle_type_uid));
     }
   }

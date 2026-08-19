@@ -42,7 +42,7 @@ interface Trip {
   standalone: true,
   imports: [AdminPage],
   templateUrl: './trips.html',
-  styleUrl: './trips.css',
+  styleUrl: '../masters/masters.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class Trips implements OnInit {

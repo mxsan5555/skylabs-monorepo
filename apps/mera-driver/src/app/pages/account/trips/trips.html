@@ -68,51 +68,30 @@
                 <h3>1. Primary Trip Information</h3>
               </div>
               <div class="grid grid-cols-3 gap-4 max-md:grid-cols-2 max-sm:grid-cols-1 w-full">
-                <div class="form-group">
-                  <label class="form-label">Trip UID *</label>
-                  <md-outlined-text-field label="Trip UID *" required [value]="inputTripUid()" (input)="onInputChange('trip_uid', $event)" placeholder="e.g. TRIP-201"></md-outlined-text-field>
-                </div>
+                <md-outlined-text-field label="Trip UID *" required [value]="inputTripUid()" (input)="onInputChange('trip_uid', $event)" placeholder="e.g. TRIP-201"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Booking ID *</label>
-                  <md-outlined-text-field label="Booking ID *" required [value]="inputBookingId()" (input)="onInputChange('booking_id', $event)" placeholder="e.g. 9001"></md-outlined-text-field>
-                </div>
+                <md-outlined-text-field label="Booking ID *" required [value]="inputBookingId()" (input)="onInputChange('booking_id', $event)" placeholder="e.g. 9001"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Customer ID *</label>
-                  <md-outlined-text-field label="Customer ID *" required [value]="inputCustomerId()" (input)="onInputChange('customer_id', $event)" placeholder="e.g. 1001"></md-outlined-text-field>
-                </div>
+                <md-outlined-text-field label="Customer ID *" required [value]="inputCustomerId()" (input)="onInputChange('customer_id', $event)" placeholder="e.g. 1001"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Assigned Driver ID *</label>
-                  <md-outlined-text-field label="Assigned Driver ID *" required [value]="inputDriverId()" (input)="onInputChange('driver_id', $event)" placeholder="e.g. 501"></md-outlined-text-field>
-                </div>
+                <md-outlined-text-field label="Assigned Driver ID *" required [value]="inputDriverId()" (input)="onInputChange('driver_id', $event)" placeholder="e.g. 501"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Vehicle ID *</label>
-                  <md-outlined-text-field label="Vehicle ID *" required [value]="inputVehicleId()" (input)="onInputChange('vehicle_id', $event)" placeholder="e.g. 1"></md-outlined-text-field>
-                </div>
+                <md-outlined-text-field label="Vehicle ID *" required [value]="inputVehicleId()" (input)="onInputChange('vehicle_id', $event)" placeholder="e.g. 1"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Trip Type *</label>
-                  <md-outlined-select label="Trip Type *" required [value]="inputTripType()" (change)="onInputChange('trip_type', $event)">
-                    <md-select-option value="Local">Local</md-select-option>
-                    <md-select-option value="One Way">One Way</md-select-option>
-                    <md-select-option value="Round Trip">Round Trip</md-select-option>
-                    <md-select-option value="Outstation">Outstation</md-select-option>
-                  </md-outlined-select>
-                </div>
+                <md-outlined-select label="Trip Type *" required [value]="inputTripType()" (change)="onInputChange('trip_type', $event)">
+                  <md-select-option value="Local"><div slot="headline">Local</div></md-select-option>
+                  <md-select-option value="One Way"><div slot="headline">One Way</div></md-select-option>
+                  <md-select-option value="Round Trip"><div slot="headline">Round Trip</div></md-select-option>
+                  <md-select-option value="Outstation"><div slot="headline">Outstation</div></md-select-option>
+                </md-outlined-select>
 
-                <div class="form-group col-span-3 max-md:col-span-2 max-sm:col-span-1">
-                  <label class="form-label">Status *</label>
-                  <md-outlined-select label="Status *" required [value]="inputStatus()" (change)="onInputChange('status', $event)">
-                    <md-select-option value="Scheduled">Scheduled</md-select-option>
-                    <md-select-option value="Assigned">Assigned</md-select-option>
-                    <md-select-option value="Ongoing">Ongoing</md-select-option>
-                    <md-select-option value="Completed">Completed</md-select-option>
-                    <md-select-option value="Cancelled">Cancelled</md-select-option>
-                  </md-outlined-select>
-                </div>
+                <md-outlined-select class="col-span-3 max-md:col-span-2 max-sm:col-span-1" label="Status *" required [value]="inputStatus()" (change)="onInputChange('status', $event)">
+                  <md-select-option value="Scheduled"><div slot="headline">Scheduled</div></md-select-option>
+                  <md-select-option value="Assigned"><div slot="headline">Assigned</div></md-select-option>
+                  <md-select-option value="Ongoing"><div slot="headline">Ongoing</div></md-select-option>
+                  <md-select-option value="Completed"><div slot="headline">Completed</div></md-select-option>
+                  <md-select-option value="Cancelled"><div slot="headline">Cancelled</div></md-select-option>
+                </md-outlined-select>
               </div>
             </sky-card>
 
@@ -122,45 +101,21 @@
                 <h3>2. Schedule & Time Tracking</h3>
               </div>
               <div class="grid grid-cols-4 gap-4 max-md:grid-cols-2 max-sm:grid-cols-1 w-full">
-                <div class="form-group">
-                  <label class="form-label">Scheduled Date *</label>
-                  <md-outlined-text-field type="date" label="Scheduled Date *" required [value]="inputScheduledDate()" (input)="onInputChange('scheduled_date', $event)" />
-                </div>
+                <md-outlined-text-field type="date" label="Scheduled Date *" required [value]="inputScheduledDate()" (input)="onInputChange('scheduled_date', $event)"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Scheduled Time *</label>
-                  <md-outlined-text-field type="time" label="Scheduled Time *" required [value]="inputScheduledTime()" (input)="onInputChange('scheduled_time', $event)" />
-                </div>
+                <md-outlined-text-field type="time" label="Scheduled Time *" required [value]="inputScheduledTime()" (input)="onInputChange('scheduled_time', $event)"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Actual Start Time</label>
-                  <md-outlined-text-field label="Actual Start Time" placeholder="YYYY-MM-DD HH:MM" [value]="inputActualStartTime()" (input)="onInputChange('actual_start_time', $event)" />
-                </div>
+                <md-outlined-text-field label="Actual Start Time" placeholder="YYYY-MM-DD HH:MM" [value]="inputActualStartTime()" (input)="onInputChange('actual_start_time', $event)"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Actual End Time</label>
-                  <md-outlined-text-field label="Actual End Time" placeholder="YYYY-MM-DD HH:MM" [value]="inputActualEndTime()" (input)="onInputChange('actual_end_time', $event)" />
-                </div>
+                <md-outlined-text-field label="Actual End Time" placeholder="YYYY-MM-DD HH:MM" [value]="inputActualEndTime()" (input)="onInputChange('actual_end_time', $event)"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Est. Distance (KM)</label>
-                  <md-outlined-text-field label="Est. Distance (KM)" [value]="inputEstimatedDistance()" (input)="onInputChange('estimated_distance_km', $event)" placeholder="e.g. 18.5"></md-outlined-text-field>
-                </div>
+                <md-outlined-text-field label="Est. Distance (KM)" type="number" step="0.1" [value]="inputEstimatedDistance()" (input)="onInputChange('estimated_distance_km', $event)" placeholder="e.g. 18.5"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Actual Distance (KM)</label>
-                  <md-outlined-text-field label="Actual Distance (KM)" [value]="inputActualDistance()" (input)="onInputChange('actual_distance_km', $event)" placeholder="e.g. 19.2"></md-outlined-text-field>
-                </div>
+                <md-outlined-text-field label="Actual Distance (KM)" type="number" step="0.1" [value]="inputActualDistance()" (input)="onInputChange('actual_distance_km', $event)" placeholder="e.g. 19.2"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Est. Duration (Mins)</label>
-                  <md-outlined-text-field label="Est. Duration (Mins)" [value]="inputEstimatedDuration()" (input)="onInputChange('estimated_duration_min', $event)" placeholder="e.g. 45"></md-outlined-text-field>
-                </div>
+                <md-outlined-text-field label="Est. Duration (Mins)" type="number" [value]="inputEstimatedDuration()" (input)="onInputChange('estimated_duration_min', $event)" placeholder="e.g. 45"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Actual Duration (Mins)</label>
-                  <md-outlined-text-field label="Actual Duration (Mins)" placeholder="e.g. 48" [value]="inputActualDuration()" (input)="onInputChange('actual_duration_min', $event)" />
-                </div>
+                <md-outlined-text-field label="Actual Duration (Mins)" type="number" placeholder="e.g. 48" [value]="inputActualDuration()" (input)="onInputChange('actual_duration_min', $event)"></md-outlined-text-field>
               </div>
             </sky-card>
 
@@ -170,37 +125,19 @@
                 <h3>3. Route & Geolocation</h3>
               </div>
               <div class="grid grid-cols-3 gap-4 max-md:grid-cols-2 max-sm:grid-cols-1 w-full">
-                <div class="form-group col-span-3 max-md:col-span-2 max-sm:col-span-1">
-                  <label class="form-label">Pickup Address *</label>
-                  <md-outlined-text-field label="Pickup Address *" [value]="inputPickupAddress()" (input)="onInputChange('pickup_address', $event)" placeholder="Enter pickup address details"></md-outlined-text-field>
-                </div>
+                <md-outlined-text-field class="col-span-3 max-md:col-span-2 max-sm:col-span-1" label="Pickup Address *" [value]="inputPickupAddress()" (input)="onInputChange('pickup_address', $event)" placeholder="Enter pickup address details"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Pickup Latitude</label>
-                  <md-outlined-text-field label="Pickup Latitude" [value]="inputPickupLatitude()" (input)="onInputChange('pickup_latitude', $event)" placeholder="e.g. 28.6304"></md-outlined-text-field>
-                </div>
+                <md-outlined-text-field label="Pickup Latitude" type="number" step="0.0001" [value]="inputPickupLatitude()" (input)="onInputChange('pickup_latitude', $event)" placeholder="e.g. 28.6304"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Pickup Longitude</label>
-                  <md-outlined-text-field label="Pickup Longitude" [value]="inputPickupLongitude()" (input)="onInputChange('pickup_longitude', $event)" placeholder="e.g. 77.2177"></md-outlined-text-field>
-                </div>
+                <md-outlined-text-field label="Pickup Longitude" type="number" step="0.0001" [value]="inputPickupLongitude()" (input)="onInputChange('pickup_longitude', $event)" placeholder="e.g. 77.2177"></md-outlined-text-field>
 
-                <div class="form-group max-md:col-span-2 max-sm:col-span-1"></div>
+                <div class="max-md:hidden max-sm:hidden"></div>
 
-                <div class="form-group col-span-3 max-md:col-span-2 max-sm:col-span-1">
-                  <label class="form-label">Destination Address</label>
-                  <md-outlined-text-field label="Destination Address" [value]="inputDropAddress()" (input)="onInputChange('drop_address', $event)" placeholder="Enter destination address details"></md-outlined-text-field>
-                </div>
+                <md-outlined-text-field class="col-span-3 max-md:col-span-2 max-sm:col-span-1" label="Destination Address" [value]="inputDropAddress()" (input)="onInputChange('drop_address', $event)" placeholder="Enter destination address details"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Drop Latitude</label>
-                  <md-outlined-text-field label="Drop Latitude" [value]="inputDropLatitude()" (input)="onInputChange('drop_latitude', $event)" placeholder="e.g. 28.5562"></md-outlined-text-field>
-                </div>
+                <md-outlined-text-field label="Drop Latitude" type="number" step="0.0001" [value]="inputDropLatitude()" (input)="onInputChange('drop_latitude', $event)" placeholder="e.g. 28.5562"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Drop Longitude</label>
-                  <md-outlined-text-field label="Drop Longitude" [value]="inputDropLongitude()" (input)="onInputChange('drop_longitude', $event)" placeholder="e.g. 77.1000"></md-outlined-text-field>
-                </div>
+                <md-outlined-text-field label="Drop Longitude" type="number" step="0.0001" [value]="inputDropLongitude()" (input)="onInputChange('drop_longitude', $event)" placeholder="e.g. 77.1000"></md-outlined-text-field>
               </div>
             </sky-card>
 
@@ -210,45 +147,21 @@
                 <h3>4. Fare Details & Feedback</h3>
               </div>
               <div class="grid grid-cols-4 gap-4 max-md:grid-cols-2 max-sm:grid-cols-1 w-full">
-                <div class="form-group">
-                  <label class="form-label">Base Fare (₹)</label>
-                  <input type="text" class="form-control" [value]="inputBaseFare()" (input)="onInputChange('base_fare', $event)" placeholder="e.g. 500.00" />
-                </div>
+                <md-outlined-text-field label="Base Fare (₹)" type="number" step="0.01" [value]="inputBaseFare()" (input)="onInputChange('base_fare', $event)" placeholder="e.g. 500.00"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Extra Charges (₹)</label>
-                  <input type="text" class="form-control" [value]="inputExtraCharges()" (input)="onInputChange('extra_charges', $event)" placeholder="e.g. 50.00" />
-                </div>
+                <md-outlined-text-field label="Extra Charges (₹)" type="number" step="0.01" [value]="inputExtraCharges()" (input)="onInputChange('extra_charges', $event)" placeholder="e.g. 50.00"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Discount Amount (₹)</label>
-                  <input type="text" class="form-control" [value]="inputDiscountAmount()" (input)="onInputChange('discount_amount', $event)" placeholder="e.g. 100.00" />
-                </div>
+                <md-outlined-text-field label="Discount Amount (₹)" type="number" step="0.01" [value]="inputDiscountAmount()" (input)="onInputChange('discount_amount', $event)" placeholder="e.g. 100.00"></md-outlined-text-field>
 
-                <div class="form-group">
-                  <label class="form-label">Final Fare Amount (₹)</label>
-                  <input type="text" class="form-control" [value]="inputFinalAmount()" (input)="onInputChange('final_amount', $event)" placeholder="e.g. 450.00" />
-                </div>
+                <md-outlined-text-field label="Final Fare Amount (₹)" type="number" step="0.01" [value]="inputFinalAmount()" (input)="onInputChange('final_amount', $event)" placeholder="e.g. 450.00"></md-outlined-text-field>
 
-                <div class="form-group col-span-2 max-md:col-span-1">
-                  <label class="form-label">Customer Rating (1-5)</label>
-                  <input type="text" class="form-control" [value]="inputCustomerRating()" (input)="onInputChange('customer_rating', $event)" placeholder="e.g. 4.5" />
-                </div>
+                <md-outlined-text-field class="col-span-2 max-md:col-span-1" label="Customer Rating (1-5)" type="number" step="0.1" [value]="inputCustomerRating()" (input)="onInputChange('customer_rating', $event)" placeholder="e.g. 4.5"></md-outlined-text-field>
 
-                <div class="form-group col-span-2 max-md:col-span-1">
-                  <label class="form-label">Customer Review</label>
-                  <input type="text" class="form-control" [value]="inputCustomerReview()" (input)="onInputChange('customer_review', $event)" placeholder="Feedback review text" />
-                </div>
+                <md-outlined-text-field class="col-span-2 max-md:col-span-1" label="Customer Review" [value]="inputCustomerReview()" (input)="onInputChange('customer_review', $event)" placeholder="Feedback review text"></md-outlined-text-field>
 
-                <div class="form-group col-span-2 max-md:col-span-1">
-                  <label class="form-label">Cancellation Reason</label>
-                  <input type="text" class="form-control" [value]="inputCancellationReason()" (input)="onInputChange('cancellation_reason', $event)" placeholder="cancellation note" />
-                </div>
+                <md-outlined-text-field class="col-span-2 max-md:col-span-1" label="Cancellation Reason" [value]="inputCancellationReason()" (input)="onInputChange('cancellation_reason', $event)" placeholder="cancellation note"></md-outlined-text-field>
 
-                <div class="form-group col-span-2 max-md:col-span-1">
-                  <label class="form-label">Admin Notes / Remarks</label>
-                  <input type="text" class="form-control" [value]="inputNotes()" (input)="onInputChange('notes', $event)" placeholder="Admin remarks" />
-                </div>
+                <md-outlined-text-field class="col-span-2 max-md:col-span-1" label="Admin Notes / Remarks" [value]="inputNotes()" (input)="onInputChange('notes', $event)" placeholder="Admin remarks"></md-outlined-text-field>
               </div>
             </sky-card>
 

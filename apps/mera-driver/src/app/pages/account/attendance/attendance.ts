@@ -26,7 +26,7 @@ interface AttendanceRecord {
   standalone: true,
   imports: [AdminPage],
   templateUrl: './attendance.html',
-  styleUrl: './attendance.css',
+  styleUrl: '../masters/masters.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class Attendance implements OnInit {

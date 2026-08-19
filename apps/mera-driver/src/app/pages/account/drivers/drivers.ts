@@ -189,6 +189,27 @@ export class Drivers implements OnInit {
   readonly healthInsurances = signal<string[]>(['Yes', 'No']);
 
   // --- Document Category Options ---
+  readonly licenseDetailsOptions = signal<string[]>(['HMV', 'HPMV', 'HTV', 'LMV', 'LMV-TR', 'MCWG', 'MCWOG', 'MGV', 'TRAILER']);
+  readonly vehicleTypeOptions = signal<string[]>(['HUV', 'MUV', 'SUV', 'SEDAN', 'HATCHBACK']);
+  readonly policeVerifiedStatuses = signal<string[]>(['Yes', 'No']);
+  readonly jobTypeOptions = signal<string[]>(['Full time', 'Part Time']);
+  readonly experienceOptions = signal<string[]>(['1 Year', '2 Year', '3 Year', '4 Year', '5+ Years']);
+  readonly expectedSalaryOptions = signal<string[]>(['10000-15000', '15000-20000', '20000-25000', '25000+']);
+  readonly documentCategoryOptions = signal<string[]>([
+    'Address Proof',
+    'Affidavit of No Criminal Record',
+    'Bank Passbook / Cancelled Cheque',
+    'Commercial Driving License',
+    'Driver Badge',
+    'Driving License',
+    'PAN Card',
+    'Passport-size Photograph',
+    'Police Station NOC',
+    'Police Verification Certificate (PCC)',
+    'UPI / Bank Details for Payments',
+    'Vehicle Insurance Certificate',
+    'Vehicle Registration Certificate (RC)'
+  ]);
   readonly personalDocTypes = signal<string[]>(['Aadhaar / National ID', 'Passport', 'PAN Card', 'Driving License', 'Voter ID']);
   readonly healthDocTypes = signal<string[]>(['Eye Vision Test', 'Medical Fitness Certificate', 'Health Insurance Policy', 'Vaccine Certificate']);
   readonly policeDocTypes = signal<string[]>(['Address Proof', 'Police Clearance Certificate (PCC)', 'Character Verification Form']);

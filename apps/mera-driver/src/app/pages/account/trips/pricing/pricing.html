@@ -25,7 +25,7 @@
       <div class="flex flex-col gap-6 w-full mt-2">
         <div class="flex items-center justify-between pb-3 border-b border-slate-100">
           <div class="text-xs text-slate-500 font-semibold tracking-wide">
-            Home / <span class="text-[#1175BC]">{{ editingId() !== null && editingId() !== 'new' ? 'Edit Fare Rule' : 'Add Fare Rule' }}</span>
+            Home / <span class="text-[#2e7d32]">{{ editingId() !== null && editingId() !== 'new' ? 'Edit Fare Rule' : 'Add Fare Rule' }}</span>
           </div>
           <md-outlined-button (click)="cancelEdit()">
             <md-icon slot="icon">arrow_back</md-icon>
@@ -76,30 +76,24 @@
 
                 <md-outlined-text-field label="Surge Multiplier" type="number" step="0.05" [value]="inputSurgeMultiplier()" (input)="inputSurgeMultiplier.set($any($event.target).value)"></md-outlined-text-field>
 
-                <div class="flex items-center justify-between border border-slate-200 dark:border-slate-800 rounded-lg p-3">
-                  <div class="flex flex-col">
-                    <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">Toll Included</span>
-                    <span class="text-xs text-slate-500">Enable if toll charges are covered in base rate</span>
-                  </div>
-                  <md-switch [selected]="inputTollIncluded()" (change)="inputTollIncluded.set($any($event.target).selected)"></md-switch>
-                </div>
+                <md-outlined-select label="Toll Included" [value]="inputTollIncluded() ? 'Yes' : 'No'" (change)="inputTollIncluded.set($any($event.target).value === 'Yes')">
+                  <md-select-option value="Yes"><div slot="headline">Yes</div></md-select-option>
+                  <md-select-option value="No"><div slot="headline">No</div></md-select-option>
+                </md-outlined-select>
 
-                <div class="flex items-center justify-between border border-slate-200 dark:border-slate-800 rounded-lg p-3 col-span-2 max-sm:col-span-1">
-                  <div class="flex flex-col">
-                    <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">Active Rule Status</span>
-                    <span class="text-xs text-slate-500">Inactive rules will not be applied to new trip calculations</span>
-                  </div>
-                  <md-switch [selected]="inputIsActive()" (change)="inputIsActive.set($any($event.target).selected)"></md-switch>
-                </div>
+                <md-outlined-select class="col-span-2 max-sm:col-span-1" label="Rule Status" [value]="inputIsActive() ? 'Active' : 'Inactive'" (change)="inputIsActive.set($any($event.target).value === 'Active')">
+                  <md-select-option value="Active"><div slot="headline">Active</div></md-select-option>
+                  <md-select-option value="Inactive"><div slot="headline">Inactive</div></md-select-option>
+                </md-outlined-select>
               </div>
             </sky-card>
           </div>
 
           <div class="flex justify-end gap-3 mt-8 border-t border-slate-100 pt-4">
             <md-outlined-button (click)="cancelEdit()">Cancel</md-outlined-button>
-            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #1175BC; --md-filled-button-label-text-color: white;">
+            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;">
               <md-icon slot="icon">save</md-icon>
-              {{ editingId() !== null && editingId() !== 'new' ? 'Save Changes' : 'Add Fare Rule' }}
+              {{ editingId() !== null && editingId() !== 'new' ? 'Save Changes' : 'Save Fare Rule' }}
             </md-filled-button>
           </div>
         </sky-card>
