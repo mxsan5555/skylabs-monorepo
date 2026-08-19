@@ -18,13 +18,21 @@ import {
   listMyTherapists,
   setTherapistStatus,
   updateTherapist,
+  listTherapistPackages,
+  createTherapistPackage,
+  updateTherapistPackage,
+  deleteTherapistPackage,
   type Branch,
   type Therapist,
   type TherapistInput,
+  type TherapistPackage,
+  type TherapistPackageInput,
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { formatINR } from '../../../../utils/format';
 
 const THERAPIST_COLUMNS = JSON.stringify([
+  { key: 'Type', label: 'Type' },
   { key: 'Name', label: 'Name' },
   { key: 'Branch', label: 'Branch' },
   { key: 'Specialization', label: 'Specialization' },
@@ -40,7 +48,8 @@ interface TherapistWithBranch extends Therapist {
 
 function toRow(t: TherapistWithBranch): Record<string, string | number> {
   return {
-    Name: t.name,
+    Type: t.therapistType,
+    Name: t.personName,
     Branch: t.branchName,
     Specialization: t.specialization || '—',
     Experience: t.experienceYears ? `${t.experienceYears} yrs` : '—',
@@ -50,6 +59,7 @@ function toRow(t: TherapistWithBranch): Record<string, string | number> {
 
 const THERAPIST_ACTIONS = JSON.stringify([
   { icon: 'edit', label: 'Edit', event: 'edit' },
+  { icon: 'sell', label: 'Manage Packages', event: 'manage-packages' },
   { icon: 'toggle_on', label: 'Activate / Deactivate', event: 'toggle-status' },
 ]);
 
@@ -77,8 +87,10 @@ export function VendorTherapists() {
   const [params, setParams] = useState<TableParams>(DEFAULT_PARAMS);
 
   const [editingTherapist, setEditingTherapist] = useState<TherapistWithBranch | null>(null);
+  const [managingTherapist, setManagingTherapist] = useState<TherapistWithBranch | null>(null);
   const addDialogRef = useRef<MdDialog>(null);
   const editDialogRef = useRef<MdDialog>(null);
+  const packagesDialogRef = useRef<MdDialog>(null);
   const tableRef = useRef<HTMLElement>(null);
 
   const load = useCallback(async () => {
@@ -146,6 +158,9 @@ export function VendorTherapists() {
       if (detail.action === 'edit') {
         setEditingTherapist(therapist);
         editDialogRef.current?.show();
+      } else if (detail.action === 'manage-packages') {
+        setManagingTherapist(therapist);
+        packagesDialogRef.current?.show();
       } else if (detail.action === 'toggle-status') {
         toggleStatus(therapist);
       }
@@ -211,11 +226,20 @@ export function VendorTherapists() {
           onClose={() => setEditingTherapist(null)}
         />
       )}
+
+      {managingTherapist && (
+        <TherapistPackagesDialog
+          key={managingTherapist.id}
+          dialogRef={packagesDialogRef}
+          therapist={managingTherapist}
+          onClose={() => setManagingTherapist(null)}
+        />
+      )}
     </div>
   );
 }
 
-const EMPTY_INPUT: TherapistInput = { name: '' };
+const EMPTY_INPUT: TherapistInput = { therapistType: '', personName: '' };
 
 function TherapistFormDialog({
   dialogRef,
@@ -233,7 +257,9 @@ function TherapistFormDialog({
   const [form, setForm] = useState<TherapistInput>(
     therapist
       ? {
-          name: therapist.name,
+          therapistType: therapist.therapistType,
+          personName: therapist.personName,
+          gender: therapist.gender ?? undefined,
           specialization: therapist.specialization ?? undefined,
           bio: therapist.bio ?? undefined,
           experienceYears: therapist.experienceYears ?? undefined,
@@ -248,8 +274,8 @@ function TherapistFormDialog({
   const set = <K extends keyof TherapistInput>(key: K, value: TherapistInput[K]) => setForm((f) => ({ ...f, [key]: value }));
 
   const submit = async () => {
-    if (!form.name.trim() || !branchId) {
-      setError('Name and branch are required.');
+    if (!form.therapistType.trim() || !form.personName.trim() || !branchId) {
+      setError('Type, name, and branch are required.');
       return;
     }
     setSubmitting(true);
@@ -268,7 +294,21 @@ function TherapistFormDialog({
     <Dialog ref={dialogRef} onClose={onClose}>
       <div slot="headline">{therapist ? 'Edit therapist' : 'Add therapist'}</div>
       <div slot="content" className="form-grid">
-        <OutlinedTextField label="Name" value={form.name} onInput={(e: Event) => set('name', (e.target as HTMLInputElement).value)} />
+        <OutlinedTextField
+          label="Therapist Type / Service Name"
+          value={form.therapistType}
+          onInput={(e: Event) => set('therapistType', (e.target as HTMLInputElement).value)}
+        />
+        <OutlinedTextField
+          label="Person Name"
+          value={form.personName}
+          onInput={(e: Event) => set('personName', (e.target as HTMLInputElement).value)}
+        />
+        <OutlinedTextField
+          label="Gender"
+          value={form.gender ?? ''}
+          onInput={(e: Event) => set('gender', (e.target as HTMLInputElement).value || undefined)}
+        />
 
         {therapist ? (
           <p className="field-hint">Branch: {therapist.branchName} (cannot be changed)</p>
@@ -306,6 +346,250 @@ function TherapistFormDialog({
           value={form.photoUrl ?? ''}
           onInput={(e: Event) => set('photoUrl', (e.target as HTMLInputElement).value || undefined)}
         />
+
+        {error && <p className="error-state" role="alert">{error}</p>}
+      </div>
+      <div slot="actions">
+        <TextButton onClick={() => dialogRef.current?.close()}>Cancel</TextButton>
+        <FilledButton onClick={submit} disabled={submitting}>{submitting ? 'Saving…' : 'Save'}</FilledButton>
+      </div>
+    </Dialog>
+  );
+}
+
+const PACKAGE_EMPTY_INPUT: TherapistPackageInput = { durationMinutes: 30, sellingPrice: 0 };
+
+/**
+ * A therapist's own duration/price menu — entirely independent of any Deal (no Deal picker
+ * anywhere in this flow; see TherapistPackage's schema doc comment in msd-api). Reuses the same
+ * Dialog/data-table/form-grid patterns as `TherapistFormDialog` above, just for a nested
+ * sub-resource instead of the therapist record itself.
+ */
+function TherapistPackagesDialog({
+  dialogRef,
+  therapist,
+  onClose,
+}: {
+  dialogRef: RefObject<MdDialog>;
+  therapist: TherapistWithBranch;
+  onClose: () => void;
+}) {
+  const { token } = useAuth();
+  const [packages, setPackages] = useState<TherapistPackage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const [editingPackage, setEditingPackage] = useState<TherapistPackage | null>(null);
+  const formDialogRef = useRef<MdDialog>(null);
+
+  // This dialog only mounts once `managingTherapist` is set, one render after the row action
+  // that triggers it — so the caller's synchronous `packagesDialogRef.current?.show()` fires on
+  // a still-null ref (same race the pre-existing edit/add dialogs happen to dodge only because
+  // theirs are already mounted, or the user's second click lands after mount). Showing on mount
+  // here sidesteps that timing entirely.
+  useEffect(() => {
+    dialogRef.current?.show();
+  }, [dialogRef]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data } = await listTherapistPackages(token, therapist.id);
+      setPackages(data);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'Could not load packages.');
+    } finally {
+      setLoading(false);
+    }
+  }, [token, therapist.id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const openAdd = () => {
+    setEditingPackage(null);
+    formDialogRef.current?.show();
+  };
+  const openEdit = (pkg: TherapistPackage) => {
+    setEditingPackage(pkg);
+    formDialogRef.current?.show();
+  };
+
+  const save = async (input: TherapistPackageInput) => {
+    if (editingPackage) {
+      const { data } = await updateTherapistPackage(token, therapist.id, editingPackage.id, input);
+      setPackages((prev) => prev.map((p) => (p.id === data.id ? data : p)));
+    } else {
+      const { data } = await createTherapistPackage(token, therapist.id, input);
+      setPackages((prev) => [...prev, data]);
+    }
+  };
+
+  const remove = async (pkg: TherapistPackage) => {
+    setError('');
+    try {
+      await deleteTherapistPackage(token, therapist.id, pkg.id);
+      setPackages((prev) => prev.filter((p) => p.id !== pkg.id));
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'Could not delete this package.');
+    }
+  };
+
+  return (
+    <>
+      <Dialog ref={dialogRef} onClose={onClose}>
+        <div slot="headline">Packages — {therapist.therapistType} ({therapist.personName})</div>
+        <div slot="content">
+          <p className="field-hint">
+            {therapist.personName}'s own duration/price menu — customers pick this therapist, then one
+            of these durations, and always pay this price.
+          </p>
+
+          {error && <p className="error-state" role="alert">{error}</p>}
+
+          {loading ? (
+            <p className="loading-state">Loading packages…</p>
+          ) : packages.length === 0 ? (
+            <p className="empty-state">No packages yet — add one to let customers select {therapist.personName}.</p>
+          ) : (
+            <div className="data-table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Duration</th>
+                    <th scope="col">Selling Price</th>
+                    <th scope="col">Original Price</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {packages.map((pkg) => (
+                    <tr key={pkg.id}>
+                      <td>{pkg.durationMinutes} min</td>
+                      <td>{formatINR(Number(pkg.sellingPrice))}</td>
+                      <td>{pkg.originalPrice != null ? formatINR(Number(pkg.originalPrice)) : '—'}</td>
+                      <td>
+                        <span className={`status-pill ${pkg.isActive ? 'status-pill--active' : 'status-pill--blocked'}`}>
+                          {pkg.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="data-table__actions">
+                        <TextButton onClick={() => openEdit(pkg)}>Edit</TextButton>
+                        <TextButton onClick={() => remove(pkg)}>Delete</TextButton>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        <div slot="actions">
+          <OutlinedButton onClick={openAdd}>
+            <Icon slot="icon" aria-hidden="true">add</Icon>
+            Add Package
+          </OutlinedButton>
+          <TextButton onClick={() => dialogRef.current?.close()}>Close</TextButton>
+        </div>
+      </Dialog>
+
+      {!loading && (
+        <PackageFormDialog
+          key={editingPackage?.id ?? 'new'}
+          dialogRef={formDialogRef}
+          pkg={editingPackage}
+          onSave={save}
+        />
+      )}
+    </>
+  );
+}
+
+function PackageFormDialog({
+  dialogRef,
+  pkg,
+  onSave,
+}: {
+  dialogRef: RefObject<MdDialog>;
+  pkg: TherapistPackage | null;
+  onSave: (input: TherapistPackageInput) => Promise<void>;
+}) {
+  const [form, setForm] = useState<TherapistPackageInput>(
+    pkg
+      ? {
+          durationMinutes: pkg.durationMinutes,
+          sellingPrice: Number(pkg.sellingPrice),
+          originalPrice: pkg.originalPrice != null ? Number(pkg.originalPrice) : undefined,
+          isActive: pkg.isActive,
+        }
+      : { ...PACKAGE_EMPTY_INPUT },
+  );
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const set = <K extends keyof TherapistPackageInput>(key: K, value: TherapistPackageInput[K]) => setForm((f) => ({ ...f, [key]: value }));
+
+  const submit = async () => {
+    if (!form.durationMinutes || form.durationMinutes <= 0) {
+      setError('Duration is required and must be positive.');
+      return;
+    }
+    if (!form.sellingPrice || form.sellingPrice <= 0) {
+      setError('Selling price is required and must be positive.');
+      return;
+    }
+    if (form.originalPrice !== undefined && form.originalPrice < form.sellingPrice) {
+      setError('Original price must be greater than or equal to selling price.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      await onSave(form);
+      dialogRef.current?.close();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'Could not save.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog ref={dialogRef}>
+      <div slot="headline">{pkg ? 'Edit package' : 'Add package'}</div>
+      <div slot="content" className="form-grid">
+        <OutlinedTextField
+          label="Duration (minutes)"
+          type="number"
+          value={form.durationMinutes ? String(form.durationMinutes) : ''}
+          onInput={(e: Event) => set('durationMinutes', Number((e.target as HTMLInputElement).value) || 0)}
+        />
+
+        <OutlinedTextField
+          label="Selling Price"
+          type="number"
+          value={form.sellingPrice ? String(form.sellingPrice) : ''}
+          onInput={(e: Event) => set('sellingPrice', Number((e.target as HTMLInputElement).value) || 0)}
+        />
+
+        <OutlinedTextField
+          label="Original Price (optional)"
+          type="number"
+          value={form.originalPrice !== undefined ? String(form.originalPrice) : ''}
+          onInput={(e: Event) => set('originalPrice', Number((e.target as HTMLInputElement).value) || undefined)}
+        />
+
+        <OutlinedSelect
+          label="Status"
+          value={form.isActive === false ? 'inactive' : 'active'}
+          onChange={(e: Event) => set('isActive', (e.target as HTMLSelectElement).value !== 'inactive')}
+        >
+          <SelectOption value="active"><div slot="headline">Active</div></SelectOption>
+          <SelectOption value="inactive"><div slot="headline">Inactive</div></SelectOption>
+        </OutlinedSelect>
 
         {error && <p className="error-state" role="alert">{error}</p>}
       </div>

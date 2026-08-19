@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { MdDialog } from '@material/web/dialog/dialog.js';
 import {
   Icon,
   Tabs,
@@ -10,23 +9,19 @@ import {
   OutlinedTextField,
   FilledButton,
   OutlinedButton,
-  TextButton,
-  Dialog,
 } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCatalogCategory, listCatalogDeals, type CatalogCategoryWithChildren, type CatalogDeal } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
-import { createBooking } from '../../../api/bookings';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
-import { formatINR } from '../../../utils/format';
+import { DealBookingDialog } from '../../components/deal-booking-dialog';
+import { formatINR, formatBookingSchedule } from '../../../utils/format';
 import './category.css';
 
 type OfferingFilter = 'all' | 'service' | 'product';
-
-const TIME_SLOTS = ['9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM'];
 
 /**
  * Category → Sub Category → Service/Product → Deal discovery page — the customer catalogue's
@@ -96,12 +91,6 @@ export function Category() {
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : 'Could not add to cart.');
     }
-  };
-
-  const bookDeal = async (deal: CatalogDeal, bookingDate: string, timeSlot: string) => {
-    if (!requireAuthOrRedirect()) return;
-    await createBooking(token, { dealId: deal.id, bookingDate: new Date(bookingDate).toISOString(), timeSlot });
-    setActionMessage(`Booked "${deal.service?.name ?? deal.title}" for ${bookingDate} at ${timeSlot}.`);
   };
 
   const toggleFavorite = (deal: CatalogDeal) => {
@@ -239,7 +228,26 @@ export function Category() {
                       onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
                     >
                       {deal.service ? (
-                        <BookingDialog deal={deal} onBook={(date, time) => bookDeal(deal, date, time)} />
+                        <DealBookingDialog
+                          deal={deal}
+                          onBooked={(booking, intent) =>
+                            setActionMessage(
+                              intent === 'cart'
+                                ? `Added "${deal.service?.name ?? deal.title}" to your cart.`
+                                : `Booked "${deal.service?.name ?? deal.title}" — ${formatBookingSchedule(booking.bookingDate, booking.timeSlot)}.`,
+                            )
+                          }
+                          renderTrigger={(open) => (
+                            <OutlinedButton
+                              onClick={() => {
+                                if (requireAuthOrRedirect()) open();
+                              }}
+                            >
+                              <Icon slot="icon" aria-hidden="true">event_available</Icon>
+                              Book
+                            </OutlinedButton>
+                          )}
+                        />
                       ) : (
                         <FilledButton onClick={() => addToCart(deal)}>
                           <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
@@ -255,64 +263,6 @@ export function Category() {
         </div>
       </section>
     </div>
-  );
-}
-
-/** Date + time-slot picker for a service deal — reuses `checkout.tsx`'s existing chip-based
- *  time-slot pattern instead of a new date/time widget. */
-function BookingDialog({ deal, onBook }: { deal: CatalogDeal; onBook: (date: string, time: string) => Promise<void> }) {
-  const dialogRef = useRef<MdDialog>(null);
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const submit = async () => {
-    if (!date || !time) {
-      setError('Select a date and time.');
-      return;
-    }
-    setSubmitting(true);
-    setError('');
-    try {
-      await onBook(date, time);
-      dialogRef.current?.close();
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not book this service.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <>
-      <OutlinedButton onClick={() => dialogRef.current?.show()}>
-        <Icon slot="icon" aria-hidden="true">event_available</Icon>
-        Book
-      </OutlinedButton>
-      <Dialog ref={dialogRef}>
-        <div slot="headline">Book {deal.service?.name ?? deal.title}</div>
-        <div slot="content" className="form-grid">
-          <OutlinedTextField
-            label="Date"
-            type="date"
-            value={date}
-            onInput={(e: Event) => setDate((e.target as HTMLInputElement).value)}
-          />
-          <p className="field-hint">Time slot</p>
-          <ChipSet aria-label="Select a time slot">
-            {TIME_SLOTS.map((slot) => (
-              <FilterChip key={slot} label={slot} selected={time === slot} onClick={() => setTime(slot)} />
-            ))}
-          </ChipSet>
-          {error && <p className="error-state" role="alert">{error}</p>}
-        </div>
-        <div slot="actions">
-          <TextButton onClick={() => dialogRef.current?.close()}>Cancel</TextButton>
-          <FilledButton onClick={submit} disabled={submitting}>{submitting ? 'Booking…' : 'Confirm booking'}</FilledButton>
-        </div>
-      </Dialog>
-    </>
   );
 }
 

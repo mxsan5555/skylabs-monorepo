@@ -1,5 +1,6 @@
 import { AuthProvider } from '@skylabs-monorepo/shared-auth/react';
 import { WishlistProvider } from '../wishlist/wishlist-context';
+import { ToastProvider } from '../toast/toast-context';
 import { AppRoutes } from './routes';
 
 /**
@@ -10,13 +11,17 @@ import { AppRoutes } from './routes';
  *
  * `WishlistProvider` must sit *inside* `AuthProvider` (unlike the mock `CartProvider`, which
  * stays in `main.tsx`) because it calls `useAuth()` to load the signed-in customer's real
- * wishlist from the API and to reload it on sign-in/sign-out.
+ * wishlist from the API and to reload it on sign-in/sign-out. `ToastProvider` doesn't need
+ * auth, but sits innermost anyway so its fixed-position stack always mounts closest to the
+ * route tree that calls `useToast()`.
  */
 export function App() {
   return (
     <AuthProvider appPrefix="msd" apiBaseUrl={import.meta.env.VITE_API_URL}>
       <WishlistProvider>
-        <AppRoutes />
+        <ToastProvider>
+          <AppRoutes />
+        </ToastProvider>
       </WishlistProvider>
     </AuthProvider>
   );

@@ -50,11 +50,20 @@ function toOrderRow(order: Order): Record<string, string | number> {
   const latestPayment = order.payments.length
     ? [...order.payments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
     : null;
+  // A vendor caller's `items` is already scoped server-side to only their own vendorId (see
+  // order.service.ts#scopeOrderItemsToVendor) — when every visible item shares one vendorId,
+  // show THAT vendor/branch rather than Order's own "primary vendor" snapshot, which may belong
+  // to a different vendor on a genuinely multi-vendor order an admin created. Admin callers see
+  // every item, so a real multi-vendor order falls through to the primary-vendor snapshot below.
+  const singleVendorItem =
+    order.items.length > 0 && order.items.every((i) => i.vendorId === order.items[0].vendorId)
+      ? order.items[0]
+      : null;
   return {
     'Order ID': order.id,
     Customer: order.customer.name,
-    Vendor: order.vendorNameSnapshot,
-    Branch: order.branchNameSnapshot,
+    Vendor: singleVendorItem?.vendorNameSnapshot ?? order.vendorNameSnapshot,
+    Branch: singleVendorItem?.branchNameSnapshot ?? order.branchNameSnapshot,
     Type: order.type,
     Item: order.items.map((i) => i.itemName).join(', ') || '—',
     Amount: `₹${order.total}`,
@@ -69,7 +78,7 @@ function toOrderRow(order: Order): Record<string, string | number> {
     'Payment Provider': latestPayment?.provider ?? '—',
     'Payment Failure Reason': latestPayment?.failureReason ?? '—',
     'Cancellation Reason': order.cancellationReason ?? '—',
-    'Booking Date': order.booking ? new Date(order.booking.bookingDate).toLocaleDateString() : '—',
+    'Booking Date': order.booking?.bookingDate ? new Date(order.booking.bookingDate).toLocaleDateString() : '—',
     'Booking Time Slot': order.booking?.timeSlot ?? '—',
     'Booking Status': order.booking?.status ?? '—',
   };

@@ -1,102 +1,156 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FilledButton, OutlinedButton, Icon, Divider, OutlinedTextField, Radio } from '@skylabs-monorepo/shared-ui/react';
+import {
+  FilledButton,
+  OutlinedButton,
+  Icon,
+  Divider,
+  OutlinedTextField,
+  Radio,
+} from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+
 import {
   checkout,
   createOrderFromBooking,
   getMyOrder,
-  pay,
-  payCod,
-  verifyPayment,
+  payBatch,
+  payBatchCod,
+  verifyBatchPayment,
   type Order,
   type OrderContactDetails,
   type PaymentIntent,
 } from '../../../api/orders';
+import { getCart } from '../../../api/cart';
+import { listBookings } from '../../../api/bookings';
+
 import { ApiRequestError } from '../../../api/rbac/client';
 import { loadRazorpayScript } from '../../../utils/razorpay';
 import { formatINR } from '../../../utils/format';
+import { groupOrderItemsByVendor } from '../../../utils/order-items';
 import content from '../../../content.json';
+
 import './checkout.css';
+
 const { checkout: checkoutContent } = content;
 
 interface CheckoutLocationState {
-  /** Retry payment for an Order that already exists (from the order-detail page's "Pay now"). */
+  /**
+   * Retry payment for an existing order.
+   * Used from Order Detail → Pay Now.
+   */
   orderId?: string;
-  /** Create a SERVICE order from an existing Booking ("Create order" on My Bookings). */
+
+  /**
+   * Create a SERVICE order from an existing booking.
+   */
   bookingId?: string;
-  /** Neither set = the default PRODUCT path: create an order from the caller's current Cart. */
 }
 
 type Step = 'details' | 'payment';
+
 type PaymentMethod = 'online' | 'cod';
 
 type FieldErrors = Partial<Record<keyof OrderContactDetails, string>>;
 
-/**
- * The one real checkout — Phase 8's Order creation (Cart or Booking) followed by Phase 9's
- * Razorpay payment. Restored the "Customer Details" step ahead of payment (this file's own
- * `.checkout-steps`/`.checkout-form__fields`/`.checkout-form__field-wrapper` CSS classes were
- * never deleted from the earlier multi-step design — only unused since the Phase 9 rewrite
- * dropped them — so this reuses them rather than inventing new ones). The order's live pricing
- * summary sidebar (already always shown next to Payment) serves as the "review" — no separate
- * review screen was added, since the existing layout already puts every line item + total in
- * front of the customer before they pay. A "Date & Time" step is still correctly omitted: a
- * SERVICE order's date/time was already captured at Booking-creation time; a PRODUCT order never
- * had one.
- */
 export function Checkout() {
   const { token, bootstrap } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
   const state = (location.state ?? {}) as CheckoutLocationState;
+
   const isRetryPayment = !!state.orderId;
 
-  const [step, setStep] = useState<Step>(isRetryPayment ? 'payment' : 'details');
-  const [order, setOrder] = useState<Order | null>(null);
-  const [paymentIntent, setPaymentIntent] = useState<PaymentIntent | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('online');
+  const [step, setStep] = useState<Step>(
+    isRetryPayment ? 'payment' : 'details',
+  );
+
+  // Deal + Therapist + Product together: ONE checkout action, ONE payment, ONE combined
+  // receipt — multiple Order rows under the hood (see msd-api's payment.service.ts doc
+  // comment). `orders` always holds every Order created/loaded for this checkout action —
+  // exactly one for a retry-payment or single-booking checkout, one-per-vendor-cart-plus-
+  // one-per-pending-booking for the default (Cart page) combined checkout.
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [placedOrders, setPlacedOrders] = useState<Order[] | null>(null);
+  const [paymentIntent, setPaymentIntent] =
+    useState<PaymentIntent | null>(null);
+
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentMethod>('online');
+
   const [loading, setLoading] = useState(isRetryPayment);
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
-  const initRef = useRef(false);
 
-  // ── Customer Details form state — pre-filled from the caller's own profile (bootstrap.user)
-  // once it loads; no separate Address API exists yet, so shipping fields start blank. ─────────
+  const initRef = useRef(false);
+  const prefilledRef = useRef(false);
+
+  // ---------------------------------------------------------------------------
+  // Customer Details
+  // ---------------------------------------------------------------------------
+
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
+
   const [shippingAddress, setShippingAddress] = useState('');
   const [shippingCity, setShippingCity] = useState('');
   const [shippingState, setShippingState] = useState('');
   const [shippingPincode, setShippingPincode] = useState('');
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [detailsSubmitting, setDetailsSubmitting] = useState(false);
-  const prefilledRef = useRef(false);
+
+  const [fieldErrors, setFieldErrors] =
+    useState<FieldErrors>({});
+
+  const [detailsSubmitting, setDetailsSubmitting] =
+    useState(false);
+
+  // ---------------------------------------------------------------------------
+  // Prefill customer information
+  // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    if (prefilledRef.current || !bootstrap?.user) return;
+    if (prefilledRef.current || !bootstrap?.user) {
+      return;
+    }
+
     prefilledRef.current = true;
+
     setContactName(bootstrap.user.name ?? '');
-    setContactPhone((bootstrap.user.phone ?? '').replace(/^\+91/, ''));
+
+    setContactPhone(
+      (bootstrap.user.phone ?? '').replace(/^\+91/, ''),
+    );
+
     setContactEmail(bootstrap.user.email ?? '');
   }, [bootstrap]);
 
-  // Retry-payment path only ("Pay now" from order-detail) — fetches the already-existing order
-  // directly and skips the Customer Details step entirely (details were already captured, or
-  // predate this step, when the order was first created).
+  // ---------------------------------------------------------------------------
+  // Retry Payment
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
-    if (initRef.current) return; // guards against a duplicate call under React StrictMode's double-invoke
+    if (initRef.current) {
+      return;
+    }
+
     initRef.current = true;
+
     const { orderId } = state;
-    if (!orderId) return;
+
+    if (!orderId) {
+      return;
+    }
 
     (async () => {
       setLoading(true);
       setError('');
+
       try {
-        const currentOrder = (await getMyOrder(token, orderId)).data;
-        setOrder(currentOrder);
+        const currentOrder =
+          (await getMyOrder(token, orderId)).data;
+
+        setOrders([currentOrder]);
       } catch (err) {
         setError(
           err instanceof ApiRequestError
@@ -107,42 +161,106 @@ export function Checkout() {
         setLoading(false);
       }
     })();
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Once an order exists and is still unpaid, lazily create a Razorpay intent — only while
-  // Online is the selected method, so choosing COD never wastes a Razorpay API call.
+  // ---------------------------------------------------------------------------
+  // Razorpay Payment Intent
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
-    if (!order || order.status !== 'PENDING_PAYMENT' || paymentMethod !== 'online' || paymentIntent) return;
+    if (
+      orders.length === 0 ||
+      !orders.every((o) => o.status === 'PENDING_PAYMENT') ||
+      paymentMethod !== 'online' ||
+      paymentIntent
+    ) {
+      return;
+    }
+
     (async () => {
       setError('');
+
       try {
-        const intent = (await pay(token, order.id)).data;
+        const intent =
+          (await payBatch(token, orders.map((o) => o.id))).data;
+
         setPaymentIntent(intent);
       } catch (err) {
-        setError(err instanceof ApiRequestError ? err.message : 'Could not prepare payment.');
+        setError(
+          err instanceof ApiRequestError
+            ? err.message
+            : 'Could not prepare payment.',
+        );
       }
     })();
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order, paymentMethod]);
+  }, [orders, paymentMethod]);
+
+  // ---------------------------------------------------------------------------
+  // Validation
+  // ---------------------------------------------------------------------------
 
   function validateDetails(): boolean {
     const errors: FieldErrors = {};
-    if (!contactName.trim()) errors.contactName = 'Name is required.';
-    if (!/^[6-9]\d{9}$/.test(contactPhone.trim())) errors.contactPhone = 'Enter a valid 10-digit mobile number.';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) errors.contactEmail = 'Enter a valid email address.';
-    if (!shippingAddress.trim()) errors.shippingAddress = 'Address is required.';
-    if (!shippingCity.trim()) errors.shippingCity = 'City is required.';
-    if (!shippingState.trim()) errors.shippingState = 'State is required.';
-    if (!/^\d{6}$/.test(shippingPincode.trim())) errors.shippingPincode = 'Enter a valid 6-digit pincode.';
+
+    if (!contactName.trim()) {
+      errors.contactName = 'Name is required.';
+    }
+
+    if (!/^[6-9]\d{9}$/.test(contactPhone.trim())) {
+      errors.contactPhone =
+        'Enter a valid 10-digit mobile number.';
+    }
+
+    if (
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+        contactEmail.trim(),
+      )
+    ) {
+      errors.contactEmail =
+        'Enter a valid email address.';
+    }
+
+    if (!shippingAddress.trim()) {
+      errors.shippingAddress =
+        'Address is required.';
+    }
+
+    if (!shippingCity.trim()) {
+      errors.shippingCity =
+        'City is required.';
+    }
+
+    if (!shippingState.trim()) {
+      errors.shippingState =
+        'State is required.';
+    }
+
+    if (!/^\d{6}$/.test(shippingPincode.trim())) {
+      errors.shippingPincode =
+        'Enter a valid 6-digit pincode.';
+    }
+
     setFieldErrors(errors);
+
     return Object.keys(errors).length === 0;
   }
 
+  // ---------------------------------------------------------------------------
+  // Create Order
+  // ---------------------------------------------------------------------------
+
   const submitDetails = async () => {
-    if (!validateDetails()) return;
+    if (!validateDetails()) {
+      return;
+    }
+
     setDetailsSubmitting(true);
     setError('');
+
     const contactDetails: OrderContactDetails = {
       contactName: contactName.trim(),
       contactPhone: contactPhone.trim(),
@@ -152,48 +270,129 @@ export function Checkout() {
       shippingState: shippingState.trim(),
       shippingPincode: shippingPincode.trim(),
     };
+
     try {
-      const currentOrder = state.bookingId
-        ? (await createOrderFromBooking(token, state.bookingId, contactDetails)).data
-        : (await checkout(token, contactDetails)).data;
-      setOrder(currentOrder);
+      let newOrders: Order[];
+
+      if (state.bookingId) {
+        // Single-booking checkout (e.g. Bookings page "Pay Now") — unchanged, one Order.
+        newOrders = [(await createOrderFromBooking(token, state.bookingId, contactDetails)).data];
+      } else {
+        // Default: the combined checkout from /cart — Deal + Therapist + Product together.
+        // ONE checkout action creates an Order from the Product cart (if non-empty) AND one
+        // Order per PENDING Booking (Deal or Therapist booked directly), all with the same
+        // contact/shipping details, feeding into ONE combined payment below.
+        const [{ data: cart }, { data: pendingBookings }] = await Promise.all([
+          getCart(token),
+          listBookings(token, { status: 'PENDING', pageSize: 50 }),
+        ]);
+
+        if (cart.items.length === 0 && pendingBookings.length === 0) {
+          setError('Your cart is empty — add a product, deal, or therapist booking first.');
+          setDetailsSubmitting(false);
+          return;
+        }
+
+        newOrders = [];
+        if (cart.items.length > 0) {
+          newOrders.push((await checkout(token, contactDetails)).data);
+        }
+        for (const booking of pendingBookings) {
+          newOrders.push((await createOrderFromBooking(token, booking.id, contactDetails)).data);
+        }
+      }
+
+      setOrders(newOrders);
       setStep('payment');
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not start checkout.');
+      setError(
+        err instanceof ApiRequestError
+          ? err.message
+          : 'Could not start checkout.',
+      );
     } finally {
       setDetailsSubmitting(false);
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Razorpay
+  // ---------------------------------------------------------------------------
+
   const openRazorpay = async () => {
-    if (!order || !paymentIntent) return;
+    if (orders.length === 0 || !paymentIntent) {
+      return;
+    }
+
     setError('');
     setPaying(true);
+
+    const orderIds = orders.map((o) => o.id);
+
     try {
       await loadRazorpayScript();
-      if (!window.Razorpay) throw new Error('Payment gateway unavailable.');
+
+      if (!window.Razorpay) {
+        throw new Error(
+          'Payment gateway unavailable.',
+        );
+      }
+
       const rzp = new window.Razorpay({
         key: paymentIntent.keyId,
-        order_id: paymentIntent.providerOrderId,
-        amount: Math.round(Number(paymentIntent.amount) * 100),
+
+        order_id:
+          paymentIntent.providerOrderId,
+
+        amount:
+          Math.round(
+            Number(paymentIntent.amount) * 100,
+          ),
+
         currency: paymentIntent.currency,
+
         name: 'MSD',
-        description: order.items.map((i) => i.itemName).join(', '),
-        theme: { color: '#007C2B' },
-        modal: { ondismiss: () => setPaying(false) },
+
+        description: orders
+          .flatMap((o) => o.items)
+          .map((item) => item.itemName)
+          .join(', '),
+
+        theme: {
+          color: '#007C2B',
+        },
+
+        modal: {
+          ondismiss: () => {
+            setPaying(false);
+          },
+        },
+
         handler: (response) => {
-          verifyPayment(token, order.id, response)
-            .then(({ data }) => navigate(`/orders/${data.id}`))
+          verifyBatchPayment(
+            token,
+            orderIds,
+            response,
+          )
+            .then(({ data }) => {
+              if (data.length === 1) {
+                navigate(`/orders/${data[0].id}`);
+              } else {
+                setPlacedOrders(data);
+              }
+            })
             .catch((err) => {
               setError(
                 err instanceof ApiRequestError
                   ? err.message
                   : 'Payment verification failed — if an amount was deducted, contact support with your order id.',
               );
+
               setPaying(false);
             });
         },
       });
+
       rzp.open();
     } catch (err) {
       setError(
@@ -205,252 +404,1119 @@ export function Checkout() {
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // COD
+  // ---------------------------------------------------------------------------
+
   const placeCodOrder = async () => {
-    if (!order) return;
+    if (orders.length === 0) {
+      return;
+    }
+
     setError('');
     setPaying(true);
+
     try {
-      const { data } = await payCod(token, order.id);
-      navigate(`/orders/${data.id}`);
+      const { data } =
+        await payBatchCod(token, orders.map((o) => o.id));
+
+      if (data.length === 1) {
+        navigate(`/orders/${data[0].id}`);
+      } else {
+        setPlacedOrders(data);
+      }
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not place your order. Please try again.');
+      setError(
+        err instanceof ApiRequestError
+          ? err.message
+          : 'Could not place your order. Please try again.',
+      );
+
       setPaying(false);
     }
   };
 
+  // The single order most of this page's display logic still reads from (contact/shipping
+  // details are identical across every Order in the batch, since they're created together
+  // from the same submitDetails call) — null only before any Order exists yet.
+  const order = orders[0] ?? null;
+
+  // Multi-vendor AND multi-order: purely a display grouping across every Order's already-flat
+  // items[] — see utils/order-items.ts. A combined checkout's Product Order and each Booking's
+  // own Order are flattened together into one list here.
+  const vendorGroups = groupOrderItemsByVendor(orders.flatMap((o) => o.items));
+  const combinedTotal = orders.reduce((sum, o) => sum + Number(o.total), 0);
+
+  // ---------------------------------------------------------------------------
+  // Loading
+  // ---------------------------------------------------------------------------
+
   if (loading) {
     return (
       <div className="checkout-page checkout-page--empty">
-        <title>{content.meta.checkout.title}</title>
-        <p className="loading-state">Preparing your order…</p>
+        <title>
+          {content.meta.checkout.title}
+        </title>
+
+        <div className="checkout-empty-state">
+          <div className="checkout-empty-state__icon">
+            <Icon>shopping_bag</Icon>
+          </div>
+
+          <h1>Preparing your checkout</h1>
+
+          <p className="loading-state">
+            Please wait while we prepare your order…
+          </p>
+        </div>
       </div>
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Error without order
+  // ---------------------------------------------------------------------------
 
   if (error && !order) {
     return (
       <div className="checkout-page checkout-page--empty">
-        <title>{content.meta.checkout.title}</title>
-        <p className="error-state" role="alert">{error}</p>
-        <FilledButton onClick={() => navigate('/categories')}>Back to Categories</FilledButton>
+        <title>
+          {content.meta.checkout.title}
+        </title>
+
+        <div className="checkout-empty-state">
+          <div className="checkout-empty-state__icon checkout-empty-state__icon--error">
+            <Icon>error_outline</Icon>
+          </div>
+
+          <h1>Checkout unavailable</h1>
+
+          <p
+            className="error-state"
+            role="alert"
+          >
+            {error}
+          </p>
+
+          <FilledButton
+            onClick={() =>
+              navigate('/categories')
+            }
+          >
+            Back to Categories
+          </FilledButton>
+        </div>
       </div>
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Combined confirmation — one checkout action, one payment, one combined receipt,
+  // multiple Order rows under the hood. Shown only when the batch produced more than one
+  // Order (a single-order checkout keeps the existing behavior of navigating straight to
+  // /orders/:id, unchanged from before this combined checkout existed).
+  // ---------------------------------------------------------------------------
+
+  if (placedOrders) {
+    const placedTotal = placedOrders.reduce((sum, o) => sum + Number(o.total), 0);
+    return (
+      <div className="checkout-page checkout-page--empty">
+        <title>Order Placed | MSD</title>
+        <meta name="robots" content="noindex" />
+
+        <div className="checkout-empty-state">
+          <div className="checkout-empty-state__icon">
+            <Icon>check_circle</Icon>
+          </div>
+
+          <h1>Orders placed successfully</h1>
+          <p>
+            Your Deal, Therapist, and Product purchases have been placed together in one payment —
+            {' '}{formatINR(placedTotal)} across {placedOrders.length} orders.
+          </p>
+
+          <ul className="entity-list">
+            {placedOrders.map((placed) => (
+              <li key={placed.id}>
+                <div className="entity-list__item">
+                  <span className="role-list__name">
+                    Order #{placed.id.slice(0, 8)}
+                    <span className="field-hint">
+                      {' '}· {placed.vendorNameSnapshot} · {formatINR(Number(placed.total))}
+                    </span>
+                  </span>
+                  <FilledButton onClick={() => navigate(`/orders/${placed.id}`)}>View</FilledButton>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <FilledButton onClick={() => navigate('/orders')}>View My Orders</FilledButton>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Header
+  // ---------------------------------------------------------------------------
+
   return (
     <div className="checkout-page">
-      <title>{content.meta.checkout.title}</title>
-      <meta name="description" content={content.meta.checkout.description} />
-      <meta name="robots" content="noindex" />
+      <title>
+        {content.meta.checkout.title}
+      </title>
+
+      <meta
+        name="description"
+        content={
+          content.meta.checkout.description
+        }
+      />
+
+      <meta
+        name="robots"
+        content="noindex"
+      />
 
       <div className="checkout-page__inner">
+
+        {/* ================================================================
+            HEADER
+        ================================================================= */}
+
         <header className="checkout-header">
-          <h1 className="checkout-header__title">{checkoutContent.title}</h1>
+
+          <div className="checkout-header__top">
+            <div>
+              <p className="checkout-header__eyebrow">
+                MSD CHECKOUT
+              </p>
+
+              <h1 className="checkout-header__title">
+                {checkoutContent.title}
+              </h1>
+            </div>
+
+            <div className="checkout-header__secure">
+              <Icon aria-hidden="true">
+                lock
+              </Icon>
+
+              <span>
+                Secure Checkout
+              </span>
+            </div>
+          </div>
 
           {!isRetryPayment && (
-            <ol className="checkout-steps">
-              <li className={`checkout-steps__step${step === 'payment' ? ' checkout-steps__step--done' : ''}`}>
-                <span className="checkout-steps__num">{step === 'payment' ? <Icon aria-hidden="true">check</Icon> : 1}</span>
-                <span className="checkout-steps__label">{checkoutContent.steps[0]}</span>
+            <ol
+              className="checkout-steps"
+              aria-label="Checkout steps"
+            >
+
+              <li
+                className={`checkout-steps__step${
+                  step === 'payment'
+                    ? ' checkout-steps__step--done'
+                    : ''
+                }`}
+              >
+                <span
+                  className="checkout-steps__num"
+                  aria-hidden="true"
+                >
+                  {step === 'payment' ? (
+                    <Icon>check</Icon>
+                  ) : (
+                    1
+                  )}
+                </span>
+
+                <span className="checkout-steps__label">
+                  {checkoutContent.steps[0]}
+                </span>
               </li>
-              <li className={`checkout-steps__step${step === 'payment' ? ' checkout-steps__step--done' : ''}`}>
-                <span className="checkout-steps__num">2</span>
-                <span className="checkout-steps__label">{checkoutContent.steps[2]}</span>
+
+              <li
+                className={`checkout-steps__step${
+                  step === 'payment'
+                    ? ' checkout-steps__step--active'
+                    : ''
+                }`}
+              >
+                <span
+                  className="checkout-steps__num"
+                  aria-hidden="true"
+                >
+                  2
+                </span>
+
+                <span className="checkout-steps__label">
+                  {checkoutContent.steps[2]}
+                </span>
               </li>
+
             </ol>
           )}
+
         </header>
 
+        {/* ================================================================
+            CUSTOMER DETAILS
+        ================================================================= */}
+
         {step === 'details' ? (
+
           <div className="checkout-page__layout">
+
             <main className="checkout-page__form">
-              <section aria-labelledby="step-details-heading">
-                <h2 id="step-details-heading" className="checkout-form__heading">{checkoutContent.stepHeadings[0]}</h2>
+
+              <section
+                aria-labelledby="step-details-heading"
+                className="checkout-form-section"
+              >
+
+                <div className="checkout-form-section__header">
+
+                  <div className="checkout-form-section__icon">
+                    <Icon>
+                      person
+                    </Icon>
+                  </div>
+
+                  <div>
+                    <h2
+                      id="step-details-heading"
+                      className="checkout-form__heading"
+                    >
+                      {checkoutContent.stepHeadings[0]}
+                    </h2>
+
+                    <p className="checkout-form__subheading">
+                      Enter your contact and delivery
+                      information to continue.
+                    </p>
+                  </div>
+
+                </div>
 
                 <div className="checkout-form__fields">
+
+                  {/* Name + Phone */}
+
                   <div className="checkout-form__fields checkout-form__fields--row">
+
                     <div className="checkout-form__field-wrapper">
+
                       <OutlinedTextField
                         label="Full name"
                         value={contactName}
-                        onInput={(e) => setContactName((e.target as unknown as { value: string }).value)}
+                        required
+                        autocomplete="name"
+                        onInput={(e) =>
+                          setContactName(
+                            (
+                              e.target as unknown as {
+                                value: string;
+                              }
+                            ).value,
+                          )
+                        }
                       />
-                      {fieldErrors.contactName && <p className="checkout-form__error" role="alert">{fieldErrors.contactName}</p>}
+
+                      {fieldErrors.contactName && (
+                        <p
+                          className="checkout-form__error"
+                          role="alert"
+                        >
+                          {fieldErrors.contactName}
+                        </p>
+                      )}
+
                     </div>
+
                     <div className="checkout-form__field-wrapper">
+
                       <OutlinedTextField
                         label="Mobile number"
                         type="tel"
                         inputMode="numeric"
+                        autocomplete="tel"
                         maxLength={10}
+                        required
                         value={contactPhone}
-                        onInput={(e) => setContactPhone((e.target as unknown as { value: string }).value.replace(/\D/g, '').slice(0, 10))}
+                        onInput={(e) =>
+                          setContactPhone(
+                            (
+                              e.target as unknown as {
+                                value: string;
+                              }
+                            ).value
+                              .replace(/\D/g, '')
+                              .slice(0, 10),
+                          )
+                        }
                       />
-                      {fieldErrors.contactPhone && <p className="checkout-form__error" role="alert">{fieldErrors.contactPhone}</p>}
+
+                      {fieldErrors.contactPhone && (
+                        <p
+                          className="checkout-form__error"
+                          role="alert"
+                        >
+                          {fieldErrors.contactPhone}
+                        </p>
+                      )}
+
                     </div>
+
                   </div>
 
+                  {/* Email */}
+
                   <div className="checkout-form__field-wrapper">
+
                     <OutlinedTextField
                       label="Email"
                       type="email"
+                      autocomplete="email"
+                      required
                       value={contactEmail}
-                      onInput={(e) => setContactEmail((e.target as unknown as { value: string }).value)}
+                      onInput={(e) =>
+                        setContactEmail(
+                          (
+                            e.target as unknown as {
+                              value: string;
+                            }
+                          ).value,
+                        )
+                      }
                     />
-                    {fieldErrors.contactEmail && <p className="checkout-form__error" role="alert">{fieldErrors.contactEmail}</p>}
+
+                    {fieldErrors.contactEmail && (
+                      <p
+                        className="checkout-form__error"
+                        role="alert"
+                      >
+                        {fieldErrors.contactEmail}
+                      </p>
+                    )}
+
                   </div>
+
+                  {/* Address */}
 
                   <div className="checkout-form__field-wrapper">
+
                     <OutlinedTextField
                       label="Address"
+                      autocomplete="street-address"
+                      required
                       value={shippingAddress}
-                      onInput={(e) => setShippingAddress((e.target as unknown as { value: string }).value)}
+                      onInput={(e) =>
+                        setShippingAddress(
+                          (
+                            e.target as unknown as {
+                              value: string;
+                            }
+                          ).value,
+                        )
+                      }
                     />
-                    {fieldErrors.shippingAddress && <p className="checkout-form__error" role="alert">{fieldErrors.shippingAddress}</p>}
+
+                    {fieldErrors.shippingAddress && (
+                      <p
+                        className="checkout-form__error"
+                        role="alert"
+                      >
+                        {fieldErrors.shippingAddress}
+                      </p>
+                    )}
+
                   </div>
 
+                  {/* City State Pincode */}
+
                   <div className="checkout-form__fields checkout-form__fields--row">
+
                     <div className="checkout-form__field-wrapper">
+
                       <OutlinedTextField
                         label="City"
+                        autocomplete="address-level2"
+                        required
                         value={shippingCity}
-                        onInput={(e) => setShippingCity((e.target as unknown as { value: string }).value)}
+                        onInput={(e) =>
+                          setShippingCity(
+                            (
+                              e.target as unknown as {
+                                value: string;
+                              }
+                            ).value,
+                          )
+                        }
                       />
-                      {fieldErrors.shippingCity && <p className="checkout-form__error" role="alert">{fieldErrors.shippingCity}</p>}
+
+                      {fieldErrors.shippingCity && (
+                        <p
+                          className="checkout-form__error"
+                          role="alert"
+                        >
+                          {fieldErrors.shippingCity}
+                        </p>
+                      )}
+
                     </div>
+
                     <div className="checkout-form__field-wrapper">
+
                       <OutlinedTextField
                         label="State"
+                        autocomplete="address-level1"
+                        required
                         value={shippingState}
-                        onInput={(e) => setShippingState((e.target as unknown as { value: string }).value)}
+                        onInput={(e) =>
+                          setShippingState(
+                            (
+                              e.target as unknown as {
+                                value: string;
+                              }
+                            ).value,
+                          )
+                        }
                       />
-                      {fieldErrors.shippingState && <p className="checkout-form__error" role="alert">{fieldErrors.shippingState}</p>}
+
+                      {fieldErrors.shippingState && (
+                        <p
+                          className="checkout-form__error"
+                          role="alert"
+                        >
+                          {fieldErrors.shippingState}
+                        </p>
+                      )}
+
                     </div>
+
                     <div className="checkout-form__field-wrapper">
+
                       <OutlinedTextField
                         label="Pincode"
                         inputMode="numeric"
+                        autocomplete="postal-code"
                         maxLength={6}
+                        required
                         value={shippingPincode}
-                        onInput={(e) => setShippingPincode((e.target as unknown as { value: string }).value.replace(/\D/g, '').slice(0, 6))}
+                        onInput={(e) =>
+                          setShippingPincode(
+                            (
+                              e.target as unknown as {
+                                value: string;
+                              }
+                            ).value
+                              .replace(/\D/g, '')
+                              .slice(0, 6),
+                          )
+                        }
                       />
-                      {fieldErrors.shippingPincode && <p className="checkout-form__error" role="alert">{fieldErrors.shippingPincode}</p>}
+
+                      {fieldErrors.shippingPincode && (
+                        <p
+                          className="checkout-form__error"
+                          role="alert"
+                        >
+                          {fieldErrors.shippingPincode}
+                        </p>
+                      )}
+
                     </div>
+
                   </div>
+
                 </div>
 
-                {error && <p className="error-state" role="alert">{error}</p>}
+                {error && (
+                  <p
+                    className="error-state"
+                    role="alert"
+                  >
+                    {error}
+                  </p>
+                )}
 
                 <div className="checkout-form__nav">
-                  <FilledButton className="checkout-form__next-btn" onClick={submitDetails} disabled={detailsSubmitting}>
-                    {detailsSubmitting ? 'Please wait…' : checkoutContent.nextLabel}
-                    <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
+
+                  <FilledButton
+                    className="checkout-form__next-btn"
+                    onClick={submitDetails}
+                    disabled={detailsSubmitting}
+                  >
+                    {detailsSubmitting
+                      ? 'Please wait…'
+                      : checkoutContent.nextLabel}
+
+                    <Icon
+                      slot="trailing-icon"
+                      aria-hidden="true"
+                    >
+                      arrow_forward
+                    </Icon>
                   </FilledButton>
+
                 </div>
+
               </section>
+
             </main>
+
+            {/* ============================================================
+                SUMMARY
+            ============================================================= */}
+
+            <aside
+              className="checkout-page__summary"
+              aria-label="Order summary"
+            >
+
+              <div className="checkout-summary-card">
+
+                <div className="checkout-summary">
+
+                  <div className="checkout-summary__header">
+
+                    <div>
+                      <p className="checkout-summary__eyebrow">
+                        YOUR ORDER
+                      </p>
+
+                      <h2 className="checkout-summary__heading">
+                        {checkoutContent.orderSummaryHeading}
+                      </h2>
+                    </div>
+
+                    <div className="checkout-summary__bag">
+                      <Icon>
+                        shopping_bag
+                      </Icon>
+                    </div>
+
+                  </div>
+
+                  <div className="checkout-summary__empty">
+
+                    <Icon>
+                      shopping_cart
+                    </Icon>
+
+                    <p>
+                      Your order summary will appear
+                      after checkout.
+                    </p>
+
+                  </div>
+
+                  <Divider />
+
+                  <div className="checkout-summary__secure">
+
+                    <Icon>
+                      verified_user
+                    </Icon>
+
+                    <div>
+                      <strong>
+                        Safe & Secure
+                      </strong>
+
+                      <span>
+                        Your information is protected.
+                      </span>
+                    </div>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+            </aside>
+
           </div>
+
         ) : !order ? null : (
+
+          /* ================================================================
+             PAYMENT
+          ================================================================= */
+
           <div className="checkout-page__layout">
+
             <main className="checkout-page__form">
-              <section aria-labelledby="step-pay-heading">
-                <h2 id="step-pay-heading" className="checkout-form__heading">{checkoutContent.stepHeadings[2]}</h2>
+
+              <section
+                aria-labelledby="step-pay-heading"
+                className="checkout-form-section"
+              >
+
+                <div className="checkout-form-section__header">
+
+                  <div className="checkout-form-section__icon">
+                    <Icon>
+                      credit_card
+                    </Icon>
+                  </div>
+
+                  <div>
+                    <h2
+                      id="step-pay-heading"
+                      className="checkout-form__heading"
+                    >
+                      {checkoutContent.stepHeadings[2]}
+                    </h2>
+
+                    <p className="checkout-form__subheading">
+                      Choose your preferred payment
+                      method to complete your order.
+                    </p>
+                  </div>
+
+                </div>
 
                 {order.status !== 'PENDING_PAYMENT' ? (
-                  <p className="field-hint">This order is already {order.status.toLowerCase()}.</p>
-                ) : (
-                  <>
-                    <div className="checkout-form__group">
-                      <p className="checkout-form__group-label">Payment Method</p>
-                      <div role="radiogroup" aria-label="Payment method" className="checkout-payment-methods">
-                        <label className="checkout-payment-methods__opt">
-                          <Radio
-                            name="payment-method"
-                            checked={paymentMethod === 'online'}
-                            onChange={() => setPaymentMethod('online')}
-                          />
-                          <span>Online Payment (Razorpay)</span>
-                        </label>
-                        <label className="checkout-payment-methods__opt">
-                          <Radio
-                            name="payment-method"
-                            checked={paymentMethod === 'cod'}
-                            onChange={() => setPaymentMethod('cod')}
-                          />
-                          <span>Cash on Delivery</span>
-                        </label>
-                      </div>
+
+                  <div className="checkout-payment-status">
+
+                    <div className="checkout-payment-status__icon">
+                      <Icon>
+                        check_circle
+                      </Icon>
                     </div>
 
                     <p className="field-hint">
-                      You're paying {formatINR(Number(order.total))} to {order.vendorNameSnapshot} ({order.branchNameSnapshot}).
+                      This order is already{' '}
+                      {order.status.toLowerCase()}.
                     </p>
 
-                    {paymentMethod === 'online' ? (
-                      <>
-                        <FilledButton className="checkout-form__next-btn" onClick={openRazorpay} disabled={paying || !paymentIntent}>
-                          {paying ? 'Opening payment…' : `Pay ${formatINR(Number(order.total))}`}
-                          <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
+                  </div>
+
+                ) : (
+
+                  <>
+
+                    {/* Payment Methods */}
+
+                    <div className="checkout-form__group">
+
+                      <p className="checkout-form__group-label">
+                        Payment Method
+                      </p>
+
+                      <div
+                        role="radiogroup"
+                        aria-label="Payment method"
+                        className="checkout-payment-methods"
+                      >
+
+                        <label
+                          className={`checkout-payment-methods__opt${
+                            paymentMethod === 'online'
+                              ? ' checkout-payment-methods__opt--selected'
+                              : ''
+                          }`}
+                        >
+
+                          <Radio
+                            name="payment-method"
+                            checked={
+                              paymentMethod ===
+                              'online'
+                            }
+                            onChange={() =>
+                              setPaymentMethod(
+                                'online',
+                              )
+                            }
+                          />
+
+                          <span className="checkout-payment-methods__content">
+
+                            <span className="checkout-payment-methods__icon">
+                              <Icon>
+                                account_balance_wallet
+                              </Icon>
+                            </span>
+
+                            <span>
+                              <strong>
+                                Online Payment
+                              </strong>
+
+                              <small>
+                                Razorpay · UPI · Card · Net Banking
+                              </small>
+                            </span>
+
+                          </span>
+
+                        </label>
+
+                        <label
+                          className={`checkout-payment-methods__opt${
+                            paymentMethod === 'cod'
+                              ? ' checkout-payment-methods__opt--selected'
+                              : ''
+                          }`}
+                        >
+
+                          <Radio
+                            name="payment-method"
+                            checked={
+                              paymentMethod ===
+                              'cod'
+                            }
+                            onChange={() =>
+                              setPaymentMethod(
+                                'cod',
+                              )
+                            }
+                          />
+
+                          <span className="checkout-payment-methods__content">
+
+                            <span className="checkout-payment-methods__icon">
+                              <Icon>
+                                payments
+                              </Icon>
+                            </span>
+
+                            <span>
+                              <strong>
+                                Cash on Delivery
+                              </strong>
+
+                              <small>
+                                Pay when your order arrives
+                              </small>
+                            </span>
+
+                          </span>
+
+                        </label>
+
+                      </div>
+
+                    </div>
+
+                    {/* Amount Information */}
+
+                    <div className="checkout-payment-total">
+
+                      <div>
+                        <span>
+                          Amount payable
+                        </span>
+
+                        <strong>
+                          {formatINR(
+                            combinedTotal,
+                          )}
+                        </strong>
+                      </div>
+
+                      <p>
+                        You're paying{' '}
+                        <strong>
+                          {formatINR(
+                            combinedTotal,
+                          )}
+                        </strong>{' '}
+                        {vendorGroups.length <= 1 ? (
+                          <>
+                            to{' '}
+                            <strong>
+                              {order.vendorNameSnapshot}
+                            </strong>{' '}
+                            ({order.branchNameSnapshot}).
+                          </>
+                        ) : (
+                          `across ${vendorGroups.length} vendors in one payment.`
+                        )}
+                      </p>
+
+                    </div>
+
+                    {/* Online */}
+
+                    {paymentMethod ===
+                    'online' ? (
+
+                      <div className="checkout-payment-action">
+
+                        <FilledButton
+                          className="checkout-form__next-btn"
+                          onClick={
+                            openRazorpay
+                          }
+                          disabled={
+                            paying ||
+                            !paymentIntent
+                          }
+                        >
+                          {paying
+                            ? 'Opening payment…'
+                            : `Pay ${formatINR(
+                                combinedTotal,
+                              )}`}
+
+                          <Icon
+                            slot="trailing-icon"
+                            aria-hidden="true"
+                          >
+                            arrow_forward
+                          </Icon>
                         </FilledButton>
+
                         <p className="checkout-form__secure">
-                          <Icon aria-hidden="true">lock</Icon>
-                          Payments are handled securely by Razorpay — card/UPI/netbanking details never touch MSD's servers.
+
+                          <Icon aria-hidden="true">
+                            lock
+                          </Icon>
+
+                          Payments are handled
+                          securely by Razorpay.
+                          Card/UPI/netbanking
+                          details never touch
+                          MSD's servers.
+
                         </p>
-                      </>
+
+                      </div>
+
                     ) : (
-                      <FilledButton className="checkout-form__next-btn" onClick={placeCodOrder} disabled={paying}>
-                        {paying ? 'Placing order…' : checkoutContent.placeOrderLabel}
-                        <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
-                      </FilledButton>
+
+                      /* COD */
+
+                      <div className="checkout-payment-action">
+
+                        <FilledButton
+                          className="checkout-form__next-btn"
+                          onClick={
+                            placeCodOrder
+                          }
+                          disabled={paying}
+                        >
+                          {paying
+                            ? 'Placing order…'
+                            : checkoutContent.placeOrderLabel}
+
+                          <Icon
+                            slot="trailing-icon"
+                            aria-hidden="true"
+                          >
+                            check
+                          </Icon>
+                        </FilledButton>
+
+                      </div>
+
                     )}
+
                   </>
+
                 )}
 
-                {error && <p className="error-state" role="alert">{error}</p>}
+                {error && (
+                  <p
+                    className="error-state"
+                    role="alert"
+                  >
+                    {error}
+                  </p>
+                )}
+
               </section>
+
             </main>
 
-            <aside className="checkout-page__summary" aria-label="Order summary">
-              <sky-card variant="outlined">
+            {/* ============================================================
+                ORDER SUMMARY
+            ============================================================= */}
+
+            <aside
+              className="checkout-page__summary"
+              aria-label="Order summary"
+            >
+
+              <div className="checkout-summary-card">
+
                 <div className="checkout-summary">
-                  <h2 className="checkout-summary__heading">{checkoutContent.orderSummaryHeading}</h2>
-                  <ul className="checkout-summary__items">
-                    {order.items.map((item) => (
-                      <li key={item.id} className="checkout-summary__item">
-                        <div>
-                          <p className="checkout-summary__item-title">{item.itemName}</p>
-                          <p className="checkout-summary__item-qty">
-                            × {item.quantity}
-                            {item.durationMinutes && ` · ${item.durationMinutes} min`}
-                          </p>
-                        </div>
-                        <p className="checkout-summary__item-price">{formatINR(Number(item.lineTotal))}</p>
-                      </li>
-                    ))}
-                  </ul>
-                  <Divider />
-                  <div className="checkout-summary__total">
-                    <strong>{content.cart.total}</strong>
-                    <strong>{formatINR(Number(order.total))}</strong>
+
+                  <div className="checkout-summary__header">
+
+                    <div>
+                      <p className="checkout-summary__eyebrow">
+                        ORDER REVIEW
+                      </p>
+
+                      <h2 className="checkout-summary__heading">
+                        {checkoutContent.orderSummaryHeading}
+                      </h2>
+                    </div>
+
+                    <div className="checkout-summary__bag">
+                      <Icon>
+                        shopping_bag
+                      </Icon>
+                    </div>
+
                   </div>
+
+                  {vendorGroups.map((group) => (
+                    <div key={group.vendorId} className="checkout-summary__vendor-group">
+                      {vendorGroups.length > 1 && (
+                        <p className="checkout-summary__vendor-heading">
+                          <Icon aria-hidden="true">storefront</Icon>
+                          {group.vendorName}
+                        </p>
+                      )}
+                      <ul className="checkout-summary__items">
+                        {group.items.map(
+                          (item) => (
+                            <li
+                              key={item.id}
+                              className="checkout-summary__item"
+                            >
+
+                              <div className="checkout-summary__item-main">
+
+                                <p className="checkout-summary__item-title">
+                                  {item.itemName}
+                                </p>
+
+                                <p className="checkout-summary__item-qty">
+
+                                  × {item.quantity}
+
+                                  {item.durationMinutes &&
+                                    ` · ${item.durationMinutes} min`}
+
+                                </p>
+
+                              </div>
+
+                              <p className="checkout-summary__item-price">
+                                {formatINR(
+                                  Number(
+                                    item.lineTotal,
+                                  ),
+                                )}
+                              </p>
+
+                            </li>
+                          ),
+                        )}
+                      </ul>
+                    </div>
+                  ))}
+
+                  <Divider />
+
+                  <div className="checkout-summary__total">
+
+                    <span>
+                      {content.cart.total}
+                    </span>
+
+                    <strong>
+                      {formatINR(
+                        combinedTotal,
+                      )}
+                    </strong>
+
+                  </div>
+
                   {order.shippingAddress && (
                     <>
                       <Divider />
-                      <p className="field-hint">
-                        Delivering to {order.contactName} · {order.shippingAddress}, {order.shippingCity} {order.shippingPincode}
-                      </p>
+
+                      <div className="checkout-summary__delivery">
+
+                        <div className="checkout-summary__delivery-icon">
+                          <Icon>
+                            location_on
+                          </Icon>
+                        </div>
+
+                        <div>
+                          <strong>
+                            Delivery Details
+                          </strong>
+
+                          <p>
+                            {order.contactName}
+                            {' · '}
+                            {order.shippingAddress}
+                            {', '}
+                            {order.shippingCity}
+                            {' '}
+                            {order.shippingPincode}
+                          </p>
+
+                        </div>
+
+                      </div>
                     </>
                   )}
+
+                  <div className="checkout-summary__secure">
+
+                    <Icon>
+                      verified_user
+                    </Icon>
+
+                    <div>
+                      <strong>
+                        Secure Checkout
+                      </strong>
+
+                      <span>
+                        Your payment and personal
+                        information are protected.
+                      </span>
+                    </div>
+
+                  </div>
+
                 </div>
-              </sky-card>
+
+              </div>
+
               {!isRetryPayment && (
-                <OutlinedButton onClick={() => setStep('details')}>{checkoutContent.backLabel}</OutlinedButton>
+                <OutlinedButton
+                  className="checkout-summary__back"
+                  onClick={() =>
+                    setStep('details')
+                  }
+                >
+                  <Icon
+                    slot="icon"
+                    aria-hidden="true"
+                  >
+                    arrow_back
+                  </Icon>
+
+                  {checkoutContent.backLabel}
+                </OutlinedButton>
               )}
+
             </aside>
+
           </div>
+
         )}
+
       </div>
     </div>
   );
 }
+
 export default Checkout;

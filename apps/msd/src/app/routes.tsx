@@ -50,10 +50,11 @@ import Checkout from './pages/checkout/checkout';
 import ProductListing from './pages/products/products';
 import ProductDetail from './pages/product-detail/product-detail';
 import VendorPage from './pages/vendor/vendor';
+import { Therapists } from './pages/therapists/therapists';
+import TherapistDetail from './pages/therapist-detail/therapist-detail';
 import { MyAccountLayout } from './pages/my-account/my-account-layout';
 import { MyAccountProfile } from './pages/my-account/profile';
 import { MyAccountPayments } from './pages/my-account/payments';
-import { MyAccountInvoices } from './pages/my-account/invoices';
 
 /**
  * `/account/vendors` serves three audiences under different permission keys: admins hold
@@ -93,6 +94,10 @@ export function AppRoutes() {
         <Route path="/products" element={<ProductListing />} />
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/vendor/:slug" element={<VendorPage />} />
+        {/* Therapist as an independent, directly browsable/purchasable entity — never reachable
+            only via a Deal's page (see msd-api's Therapist schema doc comment). */}
+        <Route path="/therapists" element={<Therapists />} />
+        <Route path="/therapist/:id" element={<TherapistDetail />} />
         <Route
           path="/cart"
           element={
@@ -163,13 +168,8 @@ export function AppRoutes() {
         >
           <Route index element={<MyAccountProfile />} />
           <Route path="payments" element={<MyAccountPayments />} />
-          <Route path="invoices" element={<MyAccountInvoices />} />
-          <Route
-            path="settings"
-            element={
-              <AdminPage title="Settings" subtitle="Module coming soon." />
-            }
-          />
+          <Route path="invoices" element={<AdminPage title="Invoices" subtitle="Module coming soon." />} />
+          <Route path="settings" element={<AdminPage title="Settings" subtitle="Module coming soon." />} />
         </Route>
 
         {/* ── Content pages ── */}

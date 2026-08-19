@@ -3,14 +3,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
 
 import {
-  ChipSet,
   Dialog,
   Divider,
   FilledButton,
-  FilterChip,
   Icon,
   OutlinedIconButton,
-  OutlinedTextField,
   TextButton,
 } from '@skylabs-monorepo/shared-ui/react';
 
@@ -25,29 +22,17 @@ import {
 } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
-import { createBooking, type Booking } from '../../../api/bookings';
+import type { Booking } from '../../../api/bookings';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
+import { DealBookingDialog } from '../../components/deal-booking-dialog';
 
-import { formatINR } from '../../../utils/format';
+import { formatINR, formatBookingSchedule, bookingDisplayName } from '../../../utils/format';
 import content from '../../../content.json';
 
 import './deal-detail.css';
-
-const TIME_SLOTS = [
-  '9:00 AM',
-  '10:00 AM',
-  '11:00 AM',
-  '12:00 PM',
-  '1:00 PM',
-  '2:00 PM',
-  '3:00 PM',
-  '4:00 PM',
-  '5:00 PM',
-  '6:00 PM',
-];
 
 /**
  * A single Deal — GET /catalog/deals/:id.
@@ -84,14 +69,13 @@ export function DealDetail() {
   const [actionError, setActionError] = useState('');
 
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
-  const [duplicateBookingId, setDuplicateBookingId] = useState<string | null>(null);
   const resultDialogRef = useRef<MdDialog>(null);
 
   useEffect(() => {
-    if (confirmedBooking || duplicateBookingId) {
+    if (confirmedBooking) {
       resultDialogRef.current?.show();
     }
-  }, [confirmedBooking, duplicateBookingId]);
+  }, [confirmedBooking]);
 
   useEffect(() => {
     if (!id) {
@@ -259,37 +243,6 @@ export function DealDetail() {
           ? err.message
           : 'Could not add to cart.',
       );
-    }
-  }
-
-  async function bookDeal(
-    bookingDate: string,
-    timeSlot: string,
-  ) {
-    if (!requireAuthOrRedirect()) {
-      return;
-    }
-
-    setActionError('');
-    setActionMessage('');
-
-    try {
-      const { data } = await createBooking(token, {
-        dealId,
-        bookingDate: new Date(
-          `${bookingDate}T00:00:00`,
-        ).toISOString(),
-        timeSlot,
-      });
-
-      setConfirmedBooking(data);
-    } catch (err: unknown) {
-      if (err instanceof ApiRequestError && err.status === 409) {
-        const details = err.details as { bookingId?: string } | undefined;
-        setDuplicateBookingId(details?.bookingId ?? null);
-        return;
-      }
-      throw err;
     }
   }
 
@@ -546,10 +499,27 @@ export function DealDetail() {
           {/* CTA */}
           <div className="deal-detail__cta">
             {deal.service ? (
-              <BookingDialog
+              <DealBookingDialog
                 deal={deal}
-                name={name}
-                onBook={bookDeal}
+                onBooked={(booking, intent) => {
+                  if (intent === 'cart') {
+                    setActionMessage(`Added "${name}" to your cart.`);
+                  } else {
+                    setConfirmedBooking(booking);
+                  }
+                }}
+                renderTrigger={(open) => (
+                  <FilledButton
+                    type="button"
+                    className="deal-detail__add-btn"
+                    onClick={() => {
+                      if (requireAuthOrRedirect()) open();
+                    }}
+                  >
+                    <Icon slot="icon" aria-hidden="true">event_available</Icon>
+                    Book Now
+                  </FilledButton>
+                )}
               />
             ) : (
               <FilledButton
@@ -614,39 +584,26 @@ export function DealDetail() {
 
           <Dialog
             ref={resultDialogRef}
-            onClose={() => {
-              setConfirmedBooking(null);
-              setDuplicateBookingId(null);
-            }}
+            onClose={() => setConfirmedBooking(null)}
           >
-            {confirmedBooking ? (
+            {confirmedBooking && (
               <>
                 <span slot="headline">Booking confirmed successfully.</span>
                 <div slot="content" className="form-grid">
                   <p>
                     <strong>
-                      {confirmedBooking.deal.service?.name ?? confirmedBooking.deal.title}
+                      {bookingDisplayName(confirmedBooking)}
                     </strong>
                   </p>
                   {confirmedBooking.vendor.businessName && (
                     <p>{confirmedBooking.vendor.businessName}</p>
                   )}
                   <p>{confirmedBooking.branch.name}</p>
-                  <p>
-                    {new Date(confirmedBooking.bookingDate).toLocaleDateString()} at{' '}
-                    {confirmedBooking.timeSlot}
-                  </p>
+                  <p>{formatBookingSchedule(confirmedBooking.bookingDate, confirmedBooking.timeSlot)}</p>
                   {confirmedBooking.therapist && (
-                    <p>Therapist: {confirmedBooking.therapist.name}</p>
+                    <p>Therapist: {confirmedBooking.therapist.therapistType} — {confirmedBooking.therapist.personName}</p>
                   )}
                   <p className="field-hint">Booking ID: {confirmedBooking.id}</p>
-                </div>
-              </>
-            ) : (
-              <>
-                <span slot="headline">Already booked</span>
-                <div slot="content" className="form-grid">
-                  <p>Already booked. Your existing booking is still active.</p>
                 </div>
               </>
             )}
@@ -810,147 +767,6 @@ export function DealDetail() {
         </section>
       )}
     </div>
-  );
-}
-
-/**
- * Date + time-slot picker for a service deal.
- */
-function BookingDialog({
-  deal,
-  name,
-  onBook,
-}: {
-  deal: CatalogDeal;
-  name: string;
-  onBook: (
-    date: string,
-    time: string,
-  ) => Promise<void>;
-}) {
-  const dialogRef = useRef<MdDialog>(null);
-
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] =
-    useState(false);
-
-  const submit = async () => {
-    if (!date || !time) {
-      setError(
-        'Select a date and time.',
-      );
-      return;
-    }
-
-    setSubmitting(true);
-    setError('');
-
-    try {
-      await onBook(date, time);
-
-      dialogRef.current?.close();
-    } catch (err: unknown) {
-      setError(
-        err instanceof ApiRequestError
-          ? err.message
-          : 'Could not book this service.',
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <>
-      <FilledButton
-        type="button"
-        className="deal-detail__add-btn"
-        onClick={() =>
-          dialogRef.current?.show()
-        }
-      >
-        <Icon
-          slot="icon"
-          aria-hidden="true"
-        >
-          event_available
-        </Icon>
-
-        Book Now
-      </FilledButton>
-
-      <Dialog ref={dialogRef}>
-        <div slot="headline">
-          Book {deal.service?.name ?? deal.title}
-        </div>
-
-        <div
-          slot="content"
-          className="form-grid"
-        >
-          <OutlinedTextField
-            label="Date"
-            type="date"
-            value={date}
-            onInput={(event: Event) => {
-              const target =
-                event.target as HTMLInputElement;
-
-              setDate(target.value);
-            }}
-          />
-
-          <p className="field-hint">
-            Time slot
-          </p>
-
-          <ChipSet aria-label="Select a time slot">
-            {TIME_SLOTS.map((slot) => (
-              <FilterChip
-                key={slot}
-                label={slot}
-                selected={time === slot}
-                onClick={() =>
-                  setTime(slot)
-                }
-              />
-            ))}
-          </ChipSet>
-
-          {error && (
-            <p
-              className="error-state"
-              role="alert"
-            >
-              {error}
-            </p>
-          )}
-        </div>
-
-        <div slot="actions">
-          <TextButton
-            type="button"
-            onClick={() =>
-              dialogRef.current?.close()
-            }
-          >
-            Cancel
-          </TextButton>
-
-          <FilledButton
-            type="button"
-            onClick={submit}
-            disabled={submitting}
-          >
-            {submitting
-              ? 'Booking…'
-              : 'Confirm booking'}
-          </FilledButton>
-        </div>
-      </Dialog>
-    </>
   );
 }
 

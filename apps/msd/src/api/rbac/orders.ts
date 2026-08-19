@@ -4,9 +4,15 @@ export type OrderType = 'SERVICE' | 'PRODUCT';
 export type OrderStatus = 'PENDING_PAYMENT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
 export type PaymentStatus = 'CREATED' | 'PAID' | 'FAILED' | 'CANCELLED';
 
+/** Multi-vendor: each item carries its own vendor/branch — see api/orders.ts's `OrderItem` doc
+ *  comment for the full explanation (same shape, admin-facing client). */
 export interface OrderItem {
   id: string;
   dealId: string;
+  vendorId: string;
+  branchId: string;
+  vendorNameSnapshot: string;
+  branchNameSnapshot: string;
   itemName: string;
   itemType: OrderType;
   unitPrice: string;
@@ -44,7 +50,7 @@ export interface Order {
   customer: { id: string; name: string; phone: string | null; email: string | null };
   vendor: { id: string; businessName: string | null };
   branch: { id: string; name: string; address: string | null; city: string | null };
-  booking: { id: string; bookingDate: string; timeSlot: string; status: string } | null;
+  booking: { id: string; bookingDate: string | null; timeSlot: string | null; status: string } | null;
   payments: OrderPayment[];
 }
 

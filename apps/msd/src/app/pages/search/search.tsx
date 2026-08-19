@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import {
   OutlinedTextField,
   ChipSet,
@@ -15,8 +15,10 @@ import {
   Divider,
 } from '@skylabs-monorepo/shared-ui/react';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
+import { DealBookingDialog } from '../../components/deal-booking-dialog';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { useCart } from '../../../cart/cart-context';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { addCartItem } from '../../../api/cart';
 import {
   listCatalogCategories,
   listCatalogDeals,
@@ -24,7 +26,7 @@ import {
   type CatalogDeal,
 } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { formatINR } from '../../../utils/format';
+import { formatINR, formatBookingSchedule } from '../../../utils/format';
 import content from '../../../content.json';
 import './search.css';
 import { Map } from '../../components/map';
@@ -52,9 +54,13 @@ type ActiveDialog = 'price' | 'category' | null;
  * of guessing a location.
  */
 export function Search() {
+  const navigate = useNavigate();
+  const { token, isAuthenticated } = useAuth();
   const [params, setParams] = useSearchParams();
   const [view, setView] = useState<View>('list');
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState('');
 
   // ── Filter state (mirrors the URL; kept in sync both ways) ─────────────
   const [query, setQuery] = useState(params.get('q') ?? '');
@@ -159,7 +165,24 @@ export function Search() {
     suggested || selectedCategory !== '' || priceMax < searchContent.filters.price.max;
 
   const { toggle: wishlistToggle, has: wishlistHas } = useWishlist();
-  const { addItem } = useCart();
+
+  const requireAuthOrRedirect = () => {
+    if (isAuthenticated) return true;
+    navigate(`/sign-in?next=${encodeURIComponent('/explore')}`);
+    return false;
+  };
+
+  const addToCart = async (deal: CatalogDeal) => {
+    if (!requireAuthOrRedirect()) return;
+    setActionError('');
+    setActionMessage('');
+    try {
+      await addCartItem(token, deal.id, 1);
+      setActionMessage(`Added "${deal.product?.name ?? deal.title}" to your cart.`);
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : 'Could not add to cart.');
+    }
+  };
 
   // ── Map view — only deals whose branch has real, non-fabricated coordinates ──
   const dealsWithCoords = deals.filter(
@@ -285,6 +308,9 @@ export function Search() {
           {dealsLoading ? '…' : `${deals.length} ${searchContent.resultLabel}`}
         </p>
 
+        {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
+        {actionError && <p className="error-state" role="alert">{actionError}</p>}
+
         {dealsLoading ? (
           <p className="loading-state">Loading deals…</p>
         ) : dealsError ? (
@@ -347,9 +373,31 @@ export function Search() {
                               </span>
                             </div>
                             <div className="search-result-card__actions">
-                              <FilledTonalButton onClick={() => addItem(deal.id)}>
-                                Book
-                              </FilledTonalButton>
+                              {deal.service ? (
+                                <DealBookingDialog
+                                  deal={deal}
+                                  onBooked={(booking, intent) =>
+                                    setActionMessage(
+                                      intent === 'cart'
+                                        ? `Added "${deal.service?.name ?? deal.title}" to your cart.`
+                                        : `Booked "${deal.service?.name ?? deal.title}" — ${formatBookingSchedule(booking.bookingDate, booking.timeSlot)}.`,
+                                    )
+                                  }
+                                  renderTrigger={(open) => (
+                                    <FilledTonalButton
+                                      onClick={() => {
+                                        if (requireAuthOrRedirect()) open();
+                                      }}
+                                    >
+                                      Book
+                                    </FilledTonalButton>
+                                  )}
+                                />
+                              ) : (
+                                <FilledTonalButton onClick={() => addToCart(deal)}>
+                                  Add to Cart
+                                </FilledTonalButton>
+                              )}
                               <IconButton
                                 aria-label={wishlistHas(deal.id) ? 'Remove from wishlist' : 'Save to wishlist'}
                                 onClick={() => wishlistToggle(deal.id)}
