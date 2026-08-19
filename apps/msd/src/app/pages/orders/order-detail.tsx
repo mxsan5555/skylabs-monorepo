@@ -6,11 +6,14 @@ import { getMyOrder, cancelMyOrder, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR } from '../../../utils/format';
 import content from '../../../content.json';
+import { groupOrderItemsByVendor } from '../../../utils/order-items';
 import '../cart/cart.css';
 
 /** Order confirmation / detail — the landing page after checkout or "confirm booking",
  *  reusing `cart.css`'s summary-card classes for a consistent look. Relocated here from
- *  the old marketplace order-detail route now that the marketplace route namespace is retired. */
+ *  the old marketplace order-detail route now that the marketplace route namespace is retired.
+ *  Multi-vendor: items are grouped by their own vendor (see utils/order-items.ts) — for a
+ *  single-vendor order (still the common case) this renders exactly one group, unchanged. */
 export function OrderDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const { token } = useAuth();
@@ -42,6 +45,8 @@ export function OrderDetail() {
       setError(err instanceof ApiRequestError ? err.message : 'Could not cancel this order.');
     }
   };
+
+  const vendorGroups = order ? groupOrderItemsByVendor(order.items) : [];
 
   if (loading) return <p className="loading-state">Loading order…</p>;
 
@@ -81,13 +86,20 @@ export function OrderDetail() {
                 <span>{new Date(order.booking.bookingDate).toLocaleDateString()}{' '}{orderDetail.labels.timeConnector}{' '}{order.booking.timeSlot}</span></div>
             )}
             <Divider />
-            {order.items.map((item) => (
-              <div className="cart-summary__row" key={item.id}>
-                <span>
-                  {item.itemName} × {item.quantity}
-                  {item.durationMinutes && ` (${item.durationMinutes} ${orderDetail.labels.durationSuffix})`}
-                </span>
-                <span>{formatINR(Number(item.lineTotal))}</span>
+            {vendorGroups.map((group) => (
+              <div key={group.vendorId}>
+                {vendorGroups.length > 1 && (
+                  <p className="field-hint">{group.vendorName} · {group.branchName}</p>
+                )}
+                {group.items.map((item) => (
+                  <div className="cart-summary__row" key={item.id}>
+                    <span>
+                      {item.itemName} × {item.quantity}
+                      {item.durationMinutes && ` (${item.durationMinutes} min)`}
+                    </span>
+                    <span>{formatINR(Number(item.lineTotal))}</span>
+                  </div>
+                ))}
               </div>
             ))}
             <Divider />

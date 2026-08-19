@@ -10,7 +10,7 @@ import {
   OrderStatusUpdateSchema,
   OrderListQuerySchema,
 } from '../schemas/order.schema';
-import { VerifyPaymentSchema } from '../schemas/payment.schema';
+import { VerifyPaymentSchema, OrderBatchSchema, VerifyBatchPaymentSchema } from '../schemas/payment.schema';
 import * as orderService from '../services/order.service';
 import * as paymentService from '../services/payment.service';
 import { writeAuditLog } from '../services/audit.service';
@@ -154,6 +154,60 @@ router.post(
     }
   },
 );
+
+// ─── Combined checkout (Deal + Therapist + Product together — one checkout action, one
+// payment, multiple Order rows under the hood; see payment.service.ts's `*Batch` functions) ──
+
+router.post('/pay-batch', validateBody(OrderBatchSchema), async (req, res, next) => {
+  try {
+    sendData(res, await paymentService.createOrReuseBatchPayment(req.user!.sub, req.body.orderIds));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/pay-batch/cod', validateBody(OrderBatchSchema), async (req, res, next) => {
+  try {
+    const { orders } = await paymentService.createCodBatchPayment(req.user!.sub, req.body.orderIds);
+    await Promise.all(
+      orders.map((order) =>
+        writeAuditLog({
+          actorUserId: req.user!.sub,
+          action: 'payment.cod_confirmed',
+          targetType: 'Order',
+          targetId: order.id,
+          after: { status: order.status },
+          ...requestMeta(req),
+        }),
+      ),
+    );
+    sendData(res, orders);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/pay-batch/verify', validateBody(VerifyBatchPaymentSchema), async (req, res, next) => {
+  try {
+    const { orderIds, ...verification } = req.body;
+    const { orders } = await paymentService.verifyBatchPayment(req.user!.sub, orderIds, verification);
+    await Promise.all(
+      orders.map((order) =>
+        writeAuditLog({
+          actorUserId: req.user!.sub,
+          action: 'payment.verified',
+          targetType: 'Order',
+          targetId: order.id,
+          after: { status: order.status },
+          ...requestMeta(req),
+        }),
+      ),
+    );
+    sendData(res, orders);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ─── Admin / vendor-scoped (existing `orders` permission) ────────────────────
 

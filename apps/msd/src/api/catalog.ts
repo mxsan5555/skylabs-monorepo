@@ -31,12 +31,26 @@ export interface CatalogProductSummary extends CatalogDealSummary {
   brand?: string | null;
 }
 
+/** A service Deal's own duration/price menu entry — a real child row (DealPackage), never a
+ *  sibling Deal row. Only active packages are ever included here. Empty for a product deal (no
+ *  duration/package concept applies) or a not-yet-migrated legacy service deal. */
+export interface CatalogDealPackage {
+  id: string;
+  durationMinutes: number;
+  sellingPrice: string;
+  originalPrice: string | null;
+}
+
 export interface CatalogDeal {
   id: string;
   title: string;
   slug: string;
   shortDescription: string | null;
   description: string | null;
+  /** A synced "from price"/default-duration display cache (kept in sync with the cheapest
+   *  active `packages[]` entry server-side — see DealPackage's own schema doc comment in
+   *  msd-api) — accurate for listing/sort/filter display, but NEVER the authoritative booking
+   *  price for a service deal that has packages; the customer's selected `packages[].id` is. */
   originalPrice: string;
   salePrice: string;
   discountPercent: number | null;
@@ -51,19 +65,46 @@ export interface CatalogDeal {
    *  originalPrice/salePrice below), and nullable — most branches don't have coordinates set
    *  yet. Never fabricate a value when these are null; treat as "location not available". */
   branch: { id: string; name: string; city: string | null; address: string | null; latitude: string | null; longitude: string | null } | null;
+  packages: CatalogDealPackage[];
 }
 
 /** `Branch.openingHours` shape — keys are lowercase 3-letter day codes (`mon`…`sun`), values are
  *  either `"HH:MM-HH:MM"` or `"closed"`. Absent (`null`) for branches that haven't set hours yet. */
 export type CatalogOpeningHours = Record<string, string>;
 
+/** A therapist's own duration/price menu entry — independent of any Deal (see msd-api's
+ *  TherapistPackage schema doc comment). Combined with a Deal only at purchase time, by matching
+ *  `durationMinutes` against the customer's selected Deal — never by any shared id. Only active
+ *  packages are ever included here. */
+export interface CatalogTherapistPackage {
+  id: string;
+  durationMinutes: number;
+  sellingPrice: string;
+  originalPrice: string | null;
+}
+
 export interface CatalogVendorTherapist {
   id: string;
-  name: string;
+  /** The service/role label a customer browses by (e.g. "Legs Therapist") — distinct from
+   *  `personName` below, never merged into one field; the customer must see both clearly. */
+  therapistType: string;
+  /** The actual staff member (e.g. "Ramesh Kumar"). */
+  personName: string;
+  gender: string | null;
   specialization: string | null;
   bio: string | null;
   experienceYears: number | null;
   photoUrl: string | null;
+  packages: CatalogTherapistPackage[];
+}
+
+/** The flat, independently-browsable Therapist listing entry (`GET /catalog/therapists`) —
+ *  unlike `CatalogVendorTherapist` above (nested under a vendor storefront), this also carries
+ *  `vendor`/`branch`, since a customer browsing Therapists directly never picks a Deal/vendor
+ *  first (see msd-api's PUBLIC_THERAPIST_LISTING_SELECT doc comment). */
+export interface CatalogTherapist extends CatalogVendorTherapist {
+  vendor: { id: string; slug: string | null; businessName: string | null; city: string | null; logoUrl: string | null } | null;
+  branch: { id: string; name: string; city: string | null; address: string | null; latitude: string | null; longitude: string | null } | null;
 }
 
 export interface CatalogVendorBranch {
@@ -129,4 +170,12 @@ export function getCatalogDeal(id: string) {
 
 export function getCatalogVendor(slug: string) {
   return apiGet<CatalogVendorDetail>(`/catalog/vendors/${encodeURIComponent(slug)}`, null);
+}
+
+export function listCatalogTherapists(opts: { page?: number; pageSize?: number; vendorId?: string; branchId?: string; search?: string } = {}) {
+  return apiGet<CatalogTherapist[]>(`/catalog/therapists${toQuery(opts)}`, null);
+}
+
+export function getCatalogTherapist(id: string) {
+  return apiGet<CatalogTherapist>(`/catalog/therapists/${id}`, null);
 }

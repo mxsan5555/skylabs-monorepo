@@ -151,6 +151,10 @@
           "to": "/products"
         },
         {
+          "label": "Therapists",
+          "to": "/therapists"
+        },
+        {
           "label": "Hot Deals",
           "to": "/explore"
         }

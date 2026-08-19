@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from './client';
+import { apiGet, apiPatch, apiPost, apiDelete } from './client';
 
 export type VendorStatus =
   | 'PROFILE_INCOMPLETE'
@@ -170,6 +170,33 @@ export interface Deal {
   /** Only present on the cross-vendor `GET /vendors/deals` sidebar listing. */
   vendor?: { id: string; businessName: string | null };
   branch?: { id: string; name: string };
+  /** The deal's own duration/price menu (a real child table — DealPackage — mirrors
+   *  TherapistPackage exactly). Always empty for a product deal. */
+  packages?: DealPackage[];
+}
+
+export interface DealPackage {
+  id: string;
+  dealId: string;
+  durationMinutes: number;
+  sellingPrice: string;
+  originalPrice: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** `id` present = update that existing package row; absent = create a new one — the whole array
+ *  is submitted together with the Deal create/update request and diffed server-side by `id`
+ *  (see vendor.service.ts#updateDeal). */
+export interface DealPackageInput {
+  id?: string;
+  durationMinutes: number;
+  sellingPrice: number;
+  originalPrice?: number;
+  isActive?: boolean;
+  sortOrder?: number;
 }
 
 export interface DealInput {
@@ -191,6 +218,9 @@ export interface DealInput {
   availableBookings?: number;
   startDate?: string;
   endDate?: string;
+  /** Required (>=1) for a service deal — omit entirely on update to leave existing packages
+   *  untouched. Never set for a product deal. */
+  packages?: DealPackageInput[];
 }
 
 function toQuery(params: Record<string, string | number | undefined>): string {
@@ -400,7 +430,12 @@ export interface Therapist {
   id: string;
   vendorId: string;
   branchId: string;
-  name: string;
+  /** The service/role label a customer browses by (e.g. "Legs Therapist") — distinct from
+   *  `personName` below, never merged into one field. */
+  therapistType: string;
+  /** The actual staff member (e.g. "Ramesh Kumar"). */
+  personName: string;
+  gender: string | null;
   specialization: string | null;
   bio: string | null;
   experienceYears: number | null;
@@ -411,7 +446,9 @@ export interface Therapist {
 }
 
 export interface TherapistInput {
-  name: string;
+  therapistType: string;
+  personName: string;
+  gender?: string;
   specialization?: string;
   bio?: string;
   experienceYears?: number;
@@ -444,6 +481,51 @@ export interface AdminTherapist extends Therapist {
 
 export function listVendorTherapistsForAdmin(token: string | null, vendorId: string) {
   return apiGet<AdminTherapist[]>(`/vendors/${vendorId}/therapists`, token);
+}
+
+/** A therapist's own duration/price menu entry — independent of any Deal (no Deal picker, no
+ *  `dealId`; see msd-api's TherapistPackage schema doc comment). Combined with a Deal only at
+ *  purchase time, by matching `durationMinutes` — never by any shared id. See `GET
+ *  /vendors/me/therapists/:therapistId/packages`. */
+export interface TherapistPackage {
+  id: string;
+  therapistId: string;
+  durationMinutes: number;
+  sellingPrice: string;
+  originalPrice: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TherapistPackageInput {
+  durationMinutes: number;
+  sellingPrice: number;
+  originalPrice?: number;
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
+export function listTherapistPackages(token: string | null, therapistId: string) {
+  return apiGet<TherapistPackage[]>(`/vendors/me/therapists/${therapistId}/packages`, token);
+}
+
+export function createTherapistPackage(token: string | null, therapistId: string, input: TherapistPackageInput) {
+  return apiPost<TherapistPackage>(`/vendors/me/therapists/${therapistId}/packages`, token, input);
+}
+
+export function updateTherapistPackage(
+  token: string | null,
+  therapistId: string,
+  packageId: string,
+  input: Partial<TherapistPackageInput>,
+) {
+  return apiPatch<TherapistPackage>(`/vendors/me/therapists/${therapistId}/packages/${packageId}`, token, input);
+}
+
+export function deleteTherapistPackage(token: string | null, therapistId: string, packageId: string) {
+  return apiDelete<{ deleted: boolean }>(`/vendors/me/therapists/${therapistId}/packages/${packageId}`, token);
 }
 
 // ─── Reference lookups ────────────────────────────────────────────────────────

@@ -84,6 +84,7 @@ interface VendorTableParams {
 const DEFAULT_VENDOR_PARAMS: VendorTableParams = { page: 1, pageSize: 10, search: '' };
 
 const THERAPIST_COLUMNS = JSON.stringify([
+  { key: 'Type', label: 'Type' },
   { key: 'Name', label: 'Name' },
   { key: 'Branch', label: 'Branch' },
   { key: 'Specialization', label: 'Specialization' },
@@ -93,7 +94,8 @@ const THERAPIST_COLUMNS = JSON.stringify([
 
 function toTherapistRow(t: AdminTherapist): Record<string, string | number> {
   return {
-    Name: t.name,
+    Type: t.therapistType,
+    Name: t.personName,
     Branch: t.branch.name,
     Specialization: t.specialization || '—',
     Experience: t.experienceYears ? `${t.experienceYears} yrs` : '—',
@@ -289,6 +291,7 @@ function AdminVendorManagement({
           {error && <p className="error-state" role="alert">{error}</p>}
           <h2>New vendor</h2>
           <VendorPipeline token={token} initialVendor={null} onVendorChange={handlePipelineChange} />
+       
         </section>
       )}
 

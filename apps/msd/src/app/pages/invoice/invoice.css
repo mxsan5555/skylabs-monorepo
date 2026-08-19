@@ -101,6 +101,14 @@
   font-weight: 600;
 }
 
+.invoice__items-vendor-row td {
+  padding-top: 16px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--md-sys-color-primary);
+  border-bottom: none;
+}
+
 .invoice__totals {
   align-self: flex-end;
   width: 260px;

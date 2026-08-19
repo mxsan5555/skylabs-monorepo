@@ -194,7 +194,12 @@ export const BranchStatusUpdateSchema = z.object({ isActive: z.boolean() }).open
 // ─── Therapist ───────────────────────────────────────────────────────────────
 
 const TherapistFieldsSchema = z.object({
-  name: z.string().min(1).max(200),
+  /** The service/role label a customer browses by (e.g. "Legs Therapist") — distinct from
+   *  `personName` below, never merged into one field. */
+  therapistType: z.string().min(1).max(200),
+  /** The actual staff member (e.g. "Ramesh Kumar"). */
+  personName: z.string().min(1).max(200),
+  gender: z.string().max(50).optional(),
   specialization: z.string().max(200).optional(),
   bio: z.string().max(2000).optional(),
   experienceYears: z.number().int().min(0).max(60).optional(),
@@ -206,6 +211,34 @@ const TherapistFieldsSchema = z.object({
 export const TherapistCreateSchema = TherapistFieldsSchema.openapi('TherapistCreate');
 export const TherapistUpdateSchema = TherapistFieldsSchema.partial().openapi('TherapistUpdate');
 export const TherapistStatusUpdateSchema = z.object({ isActive: z.boolean() }).openapi('TherapistStatusUpdate');
+
+// ─── TherapistPackage (a therapist's own duration/price menu — independent of any Deal) ───
+
+/** `durationMinutes` identifies the package (unique per therapist) — editable on update too
+ *  (mirrors sellingPrice/originalPrice/isActive/sortOrder), subject to the same uniqueness
+ *  constraint the database enforces (see vendor.service.ts#updateTherapistPackage). */
+const TherapistPackageFieldsSchema = z.object({
+  durationMinutes: z.number().int().positive(),
+  sellingPrice: z.number().min(0),
+  originalPrice: z.number().min(0).optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).optional(),
+});
+
+export const TherapistPackageCreateSchema = TherapistPackageFieldsSchema
+  .refine((data) => data.originalPrice === undefined || data.originalPrice >= data.sellingPrice, {
+    message: 'originalPrice must be greater than or equal to sellingPrice',
+    path: ['originalPrice'],
+  })
+  .openapi('TherapistPackageCreate');
+
+export const TherapistPackageUpdateSchema = TherapistPackageFieldsSchema
+  .partial()
+  .refine((data) => data.originalPrice === undefined || data.sellingPrice === undefined || data.originalPrice >= data.sellingPrice, {
+    message: 'originalPrice must be greater than or equal to sellingPrice',
+    path: ['originalPrice'],
+  })
+  .openapi('TherapistPackageUpdate');
 
 // ─── Deal ────────────────────────────────────────────────────────────────────
 
@@ -235,8 +268,56 @@ const DealFieldsSchema = z.object({
   endDate: z.string().datetime().optional(),
 });
 
-export const DealCreateSchema = DealFieldsSchema.openapi('DealCreate');
-export const DealUpdateSchema = DealFieldsSchema.partial().openapi('DealUpdate');
+/** A service Deal's own duration/price menu — mirrors TherapistPackageFieldsSchema exactly (see
+ *  DealPackage's own schema doc comment for the full rationale). `id` present = update that
+ *  existing package row; absent = create a new one. Never used for a product deal. */
+const DealPackageFieldsSchema = z.object({
+  id: z.string().uuid().optional(),
+  durationMinutes: z.number().int().positive(),
+  sellingPrice: z.number().min(0),
+  originalPrice: z.number().min(0).optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).optional(),
+});
+
+export const DealCreateSchema = DealFieldsSchema.extend({
+  /** Required (>=1) for a service deal — the customer always books a specific package, never
+   *  the Deal's own price directly (see booking.service.ts#createBookingFromDeal). Must be
+   *  absent/empty for a product deal — no duration/package concept applies there. */
+  packages: z.array(DealPackageFieldsSchema).optional(),
+})
+  .refine((data) => !data.serviceId || (data.packages && data.packages.length > 0), {
+    message: 'At least one package (duration + price) is required for a service deal.',
+    path: ['packages'],
+  })
+  .refine((data) => !data.productId || !data.packages || data.packages.length === 0, {
+    message: 'Packages only apply to service deals, never a product deal.',
+    path: ['packages'],
+  })
+  .refine((data) => (data.packages ?? []).every((p) => p.originalPrice === undefined || p.originalPrice >= p.sellingPrice), {
+    message: "Each package's originalPrice must be greater than or equal to its sellingPrice.",
+    path: ['packages'],
+  })
+  .openapi('DealCreate');
+
+export const DealUpdateSchema = DealFieldsSchema.partial()
+  .extend({
+    /** Omit entirely to leave existing packages untouched. When present, replaces the full set
+     *  (diff by `id` — entries with an id update that row, entries without one are created, any
+     *  existing row whose id is no longer present is deleted — see
+     *  vendor.service.ts#updateDeal) and must have >=1 entry (a service deal can never be left
+     *  with zero packages via update either). */
+    packages: z.array(DealPackageFieldsSchema).optional(),
+  })
+  .refine((data) => data.packages === undefined || data.packages.length > 0, {
+    message: 'A service deal must have at least one package — omit `packages` to leave them unchanged instead of clearing them.',
+    path: ['packages'],
+  })
+  .refine((data) => (data.packages ?? []).every((p) => p.originalPrice === undefined || p.originalPrice >= p.sellingPrice), {
+    message: "Each package's originalPrice must be greater than or equal to its sellingPrice.",
+    path: ['packages'],
+  })
+  .openapi('DealUpdate');
 
 export const DealStatusUpdateSchema = z
   .object({ status: z.enum(['DRAFT', 'ACTIVE', 'INACTIVE', 'EXPIRED']) })

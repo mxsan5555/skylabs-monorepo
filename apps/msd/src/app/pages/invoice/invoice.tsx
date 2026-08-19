@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FilledButton, OutlinedButton, Icon, Divider } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
@@ -6,6 +6,7 @@ import { getMyOrder, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR } from '../../../utils/format';
 import content from '../../../content.json';
+import { groupOrderItemsByVendor } from '../../../utils/order-items';
 import './invoice.css';
 
 /**
@@ -56,6 +57,8 @@ export function Invoice() {
   const latestPayment = order.payments.length
     ? [...order.payments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
     : null;
+  const vendorGroups = groupOrderItemsByVendor(order.items);
+  const isMultiVendor = vendorGroups.length > 1;
 
   return (
     <div className="invoice-page">
@@ -76,8 +79,10 @@ export function Invoice() {
       <article className="invoice">
         <header className="invoice__header">
           <div>
-            <h1 className="invoice__vendor">{order.vendorNameSnapshot}</h1>
-            <p className="invoice__branch">{order.branchNameSnapshot}</p>
+            <h1 className="invoice__vendor">
+              {isMultiVendor ? `${vendorGroups.length} Vendors` : order.vendorNameSnapshot}
+            </h1>
+            {!isMultiVendor && <p className="invoice__branch">{order.branchNameSnapshot}</p>}
           </div>
           <div className="invoice__meta">
             <h2 className="invoice__title">{invoice.title}</h2>
@@ -118,16 +123,25 @@ export function Invoice() {
             </tr>
           </thead>
           <tbody>
-            {order.items.map((item) => (
-              <tr key={item.id}>
-                <td>
-                  {item.itemName}
-                  {item.durationMinutes ? ` (${item.durationMinutes} ${invoice.labels.durationSuffix})` : ''}
-                </td>
-                <td>{item.quantity}</td>
-                <td>{formatINR(Number(item.unitPrice))}</td>
-                <td>{formatINR(Number(item.lineTotal))}</td>
-              </tr>
+            {vendorGroups.map((group) => (
+              <Fragment key={group.vendorId}>
+                {isMultiVendor && (
+                  <tr className="invoice__items-vendor-row">
+                    <td colSpan={4}>{group.vendorName} · {group.branchName}</td>
+                  </tr>
+                )}
+                {group.items.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      {item.itemName}
+                      {item.durationMinutes ? ` (${item.durationMinutes} min)` : ''}
+                    </td>
+                    <td>{item.quantity}</td>
+                    <td>{formatINR(Number(item.unitPrice))}</td>
+                    <td>{formatINR(Number(item.lineTotal))}</td>
+                  </tr>
+                ))}
+              </Fragment>
             ))}
           </tbody>
         </table>

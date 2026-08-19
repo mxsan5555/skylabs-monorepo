@@ -265,10 +265,11 @@ function ServiceFormDialog({
   const [form, setForm] = useState<ServiceInput>(
     service
       ? {
-          name: service.name,
-          slug: service.slug,
           categoryId: service.categoryId,
           subcategoryId: service.subcategoryId ?? undefined,
+          name: service.name,
+          slug: service.slug,
+        
           description: service.description ?? undefined,
           image: service.image ?? undefined,
           imageAlt: service.imageAlt ?? undefined,
@@ -305,10 +306,8 @@ function ServiceFormDialog({
     <Dialog ref={dialogRef} onClose={onClose}>
       <div slot="headline">{service ? 'Edit service' : 'Add service'}</div>
       <div slot="content" className="form-grid">
-        <OutlinedTextField label="Name" value={form.name} onInput={(e: Event) => set('name', (e.target as HTMLInputElement).value)} />
-        <OutlinedTextField label="Slug" value={form.slug} onInput={(e: Event) => set('slug', (e.target as HTMLInputElement).value)} />
 
-        <OutlinedSelect
+          <OutlinedSelect
           label="Category"
           value={form.categoryId}
           onChange={(e: Event) => { set('categoryId', (e.target as HTMLSelectElement).value); set('subcategoryId', undefined); }}
@@ -337,6 +336,10 @@ function ServiceFormDialog({
           </OutlinedSelect>
         )}
 
+        <OutlinedTextField label="Name" value={form.name} onInput={(e: Event) => set('name', (e.target as HTMLInputElement).value)} />
+        <OutlinedTextField label="Slug" value={form.slug} onInput={(e: Event) => set('slug', (e.target as HTMLInputElement).value)} />
+
+      
         <OutlinedTextField
           label="Typical duration (minutes)"
           type="number"

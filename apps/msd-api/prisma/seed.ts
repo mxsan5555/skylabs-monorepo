@@ -983,24 +983,25 @@ async function seedBookings(
 
 /** One Cart, two PRODUCT-deal CartItems, both from the same vendor+branch (Cart is
  *  single-vendor/branch by construction — see Cart's schema doc comment). */
+/** Multi-vendor cart, deliberately: two items from Glow Beauty Studio plus one from Urban
+ *  Wellness Spa, demonstrating (and exercising, on every seed run) the real multi-vendor
+ *  checkout — a cart has no vendor/branch of its own since the schema migration that removed
+ *  the single-vendor lock (see Cart's schema doc comment); each item's own deal.vendorId is
+ *  authoritative. */
 async function seedCart(
   customerId: string,
   dealIdBySlug: Map<string, string>,
-  vendorIdByKey: Map<string, string>,
-  branchIdByKey: Map<string, string>,
 ): Promise<void> {
-  const vendorId = vendorIdByKey.get('glow')!;
-  const branchId = branchIdByKey.get('glow-golghar')!;
-
   const cart = await prisma.cart.upsert({
     where: { customerId },
-    update: { vendorId, branchId },
-    create: { customerId, vendorId, branchId },
+    update: {},
+    create: { customerId },
   });
 
   const cartItemSeeds = [
     { dealSlug: 'hair-shampoo-glow-golghar', quantity: 2 },
     { dealSlug: 'face-wash-glow-golghar', quantity: 1 },
+    { dealSlug: 'massage-oil-urban-civillines', quantity: 1 },
   ];
   for (const item of cartItemSeeds) {
     const dealId = dealIdBySlug.get(item.dealSlug)!;
@@ -1058,6 +1059,10 @@ async function seedServiceOrderFromBooking(customerId: string, bookingId: string
         create: [
           {
             dealId: booking.dealId,
+            vendorId: booking.vendorId,
+            branchId: booking.branchId,
+            vendorNameSnapshot: booking.vendor.businessName ?? 'Vendor',
+            branchNameSnapshot: booking.branch.name,
             itemName: booking.deal.service?.name ?? booking.deal.title,
             itemType: 'SERVICE',
             unitPrice,
@@ -1103,6 +1108,10 @@ async function seedProductOrder(
     subtotal += lineTotal;
     return {
       dealId: it.dealId,
+      vendorId,
+      branchId,
+      vendorNameSnapshot,
+      branchNameSnapshot,
       itemName: it.itemName,
       itemType: 'PRODUCT' as const,
       unitPrice: it.unitPrice,
@@ -1167,7 +1176,7 @@ async function seedDemoCustomerActivity(
 ): Promise<string> {
   const customerId = await seedDemoCustomer(roles);
   const bookingIdByDealSlug = await seedBookings(customerId, dealIdBySlug, vendorIdByKey, branchIdByKey);
-  await seedCart(customerId, dealIdBySlug, vendorIdByKey, branchIdByKey);
+  await seedCart(customerId, dealIdBySlug);
   await seedWishlist(customerId, dealIdBySlug);
 
   // 1) SERVICE order — COMPLETED, from the COMPLETED Haircut booking.

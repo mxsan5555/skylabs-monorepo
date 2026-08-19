@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
+import type { Prisma } from '../generated/prisma-client';
 import { listActiveCategories, getActiveCategoryBySlugOrThrow } from './category.service';
 
 /**
@@ -20,16 +21,58 @@ const PUBLIC_VENDOR_SELECT = { id: true, slug: true, businessName: true, city: t
 const PUBLIC_BRANCH_SELECT = { id: true, name: true, city: true, address: true, latitude: true, longitude: true } as const;
 const PUBLIC_CATEGORY_SELECT = { id: true, name: true, slug: true } as const;
 
+/** Only active rows — an inactive package must never be selectable by a customer. A therapist's
+ *  own duration/price menu, independent of any Deal (see TherapistPackage's schema doc comment)
+ *  — matched against a selected Deal's own `durationMinutes` purely by that number at purchase
+ *  time (booking.service.ts#resolveBookingPrice), never by any shared id. An empty array means
+ *  this therapist has no priced packages yet; selecting them still works, just at the Deal's own
+ *  (unoverridden) price. */
+const PUBLIC_THERAPIST_PACKAGE_SELECT = {
+  id: true,
+  durationMinutes: true,
+  sellingPrice: true,
+  originalPrice: true,
+} as const;
+
+/** Declared outside PUBLIC_THERAPIST_SELECT's own `as const` (and explicitly typed, not
+ *  inferred) so its `orderBy` stays the mutable array Prisma's generated types expect — nesting
+ *  a plain array literal directly inside an `as const` object freezes it into a readonly tuple,
+ *  which `TherapistPackageOrderByWithRelationInput[]` rejects (caught by the webpack/ts-loader
+ *  production build, not by a plain `tsc --noEmit` run). */
+const PUBLIC_THERAPIST_PACKAGE_ORDER_BY: Prisma.TherapistPackageOrderByWithRelationInput[] = [
+  { sortOrder: 'asc' },
+  { durationMinutes: 'asc' },
+];
+
 /** Only what the public vendor storefront's therapist list ever needs — Therapist has no
  *  auth/user link at all, but the select stays explicit and tight anyway, matching every other
- *  allow-list in this file. */
+ *  allow-list in this file. `therapistType`/`personName` are two distinct name concepts, never
+ *  merged into one field — see Therapist's own schema doc comment. */
 const PUBLIC_THERAPIST_SELECT = {
   id: true,
-  name: true,
+  therapistType: true,
+  personName: true,
+  gender: true,
   specialization: true,
   bio: true,
   experienceYears: true,
   photoUrl: true,
+  packages: {
+    where: { isActive: true },
+    orderBy: PUBLIC_THERAPIST_PACKAGE_ORDER_BY,
+    select: PUBLIC_THERAPIST_PACKAGE_SELECT,
+  },
+} as const;
+
+/** The flat, independently-browsable Therapist listing (`GET /catalog/therapists`) — unlike the
+ *  nested-under-vendor-storefront `PUBLIC_THERAPIST_SELECT` above, this ALSO carries `vendor`/
+ *  `branch` (a customer browsing Therapists directly, never having picked a Deal/vendor first,
+ *  needs to know whose therapist this is) and `isActive`-filtered at the query's `where`, same
+ *  as every other public listing in this file. */
+const PUBLIC_THERAPIST_LISTING_SELECT = {
+  ...PUBLIC_THERAPIST_SELECT,
+  vendor: { select: PUBLIC_VENDOR_SELECT },
+  branch: { select: PUBLIC_BRANCH_SELECT },
 } as const;
 
 /** Vendor storefront page (`GET /catalog/vendors/:slug`) — general location only (city/state/
@@ -65,6 +108,31 @@ const PUBLIC_VENDOR_DETAIL_SELECT = {
 const PUBLIC_SERVICE_SELECT = { id: true, name: true, slug: true, description: true, image: true, imageAlt: true } as const;
 const PUBLIC_PRODUCT_SELECT = { id: true, name: true, slug: true, brand: true, description: true, image: true, imageAlt: true } as const;
 
+/** Only active rows — an inactive package must never be selectable by a customer. Same shape as
+ *  PUBLIC_THERAPIST_PACKAGE_SELECT above (see DealPackage's own schema doc comment for why this
+ *  mirrors TherapistPackage exactly). Never used for a product deal — no duration/package
+ *  concept applies there. */
+const PUBLIC_DEAL_PACKAGE_SELECT = {
+  id: true,
+  durationMinutes: true,
+  sellingPrice: true,
+  originalPrice: true,
+} as const;
+
+/** Same "declared outside the `as const` object" reasoning as PUBLIC_THERAPIST_PACKAGE_ORDER_BY
+ *  above — keeps `orderBy` a mutable array. */
+const PUBLIC_DEAL_PACKAGE_ORDER_BY: Prisma.DealPackageOrderByWithRelationInput[] = [
+  { sortOrder: 'asc' },
+  { durationMinutes: 'asc' },
+];
+
+/// Deal and Therapist packages are independently managed and independently exposed — a Deal is
+/// never nested under a Therapist here, nor a Therapist under a Deal; the frontend combines them
+/// at purchase time (a customer may pick a Therapist for a Deal booking) by matching durations.
+/// `salePrice`/`originalPrice`/`durationMinutes` on Deal itself are a synced "from price"/
+/// default-duration display cache (see DealPackage's own schema doc comment) — accurate for
+/// listing/sort/filter display, but NEVER the authoritative booking price for a service deal
+/// that has packages; the customer's selected `packages[].id` is (booking.service.ts).
 export const PUBLIC_DEAL_SELECT = {
   id: true,
   title: true,
@@ -82,6 +150,11 @@ export const PUBLIC_DEAL_SELECT = {
   product: { select: PUBLIC_PRODUCT_SELECT },
   vendor: { select: PUBLIC_VENDOR_SELECT },
   branch: { select: PUBLIC_BRANCH_SELECT },
+  packages: {
+    where: { isActive: true },
+    orderBy: PUBLIC_DEAL_PACKAGE_ORDER_BY,
+    select: PUBLIC_DEAL_PACKAGE_SELECT,
+  },
 } as const;
 
 /**
@@ -211,4 +284,59 @@ export async function getPublicVendorBySlugOrThrow(slug: string) {
   });
   if (!vendor) throw new ApiError('NOT_FOUND', 'Vendor not found');
   return vendor;
+}
+
+/**
+ * Independently-browsable Therapist catalogue (`GET /catalog/therapists`) — mirrors
+ * `listPublicDeals` exactly: a customer can browse/select a Therapist directly, never having
+ * picked a Deal or even a vendor first (see Therapist's own schema doc comment). Only active
+ * Therapists at an active Vendor/Branch, same "active gating" convention as VISIBLE_DEAL_WHERE.
+ */
+const VISIBLE_THERAPIST_WHERE = {
+  isActive: true,
+  vendor: { status: 'ACTIVE' as const },
+  branch: { isActive: true },
+};
+
+export async function listPublicTherapists(opts: {
+  page: number;
+  pageSize: number;
+  vendorId?: string;
+  branchId?: string;
+  search?: string;
+}) {
+  const where = {
+    ...VISIBLE_THERAPIST_WHERE,
+    ...(opts.vendorId ? { vendorId: opts.vendorId } : {}),
+    ...(opts.branchId ? { branchId: opts.branchId } : {}),
+    ...(opts.search
+      ? {
+          OR: [
+            { therapistType: { contains: opts.search, mode: 'insensitive' as const } },
+            { personName: { contains: opts.search, mode: 'insensitive' as const } },
+            { vendor: { is: { businessName: { contains: opts.search, mode: 'insensitive' as const } } } },
+          ],
+        }
+      : {}),
+  };
+  const [items, total] = await Promise.all([
+    prisma.therapist.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (opts.page - 1) * opts.pageSize,
+      take: opts.pageSize,
+      select: PUBLIC_THERAPIST_LISTING_SELECT,
+    }),
+    prisma.therapist.count({ where }),
+  ]);
+  return { items, total };
+}
+
+export async function getPublicTherapistOrThrow(id: string) {
+  const therapist = await prisma.therapist.findFirst({
+    where: { id, ...VISIBLE_THERAPIST_WHERE },
+    select: PUBLIC_THERAPIST_LISTING_SELECT,
+  });
+  if (!therapist) throw new ApiError('NOT_FOUND', 'Therapist not found');
+  return therapist;
 }
