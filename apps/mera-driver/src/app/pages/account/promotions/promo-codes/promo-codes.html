@@ -1,0 +1,96 @@
+<md-admin-page title="Promo Codes" subtitle="Configure and manage promotional discount codes.">
+  <div class="relative w-full">
+    @if (!showAddForm()) {
+      <div class="w-full mt-4">
+        <sky-card class="p-6 block">
+          <sky-data-table
+            [columns]="tableColumns"
+            [rows]="tableRowsString()"
+            [total]="promoList().length"
+            selectable
+            exportable
+            searchable
+            [actions]="tableActions"
+            (sky-dt-row-action)="onRowAction($event)"
+            caption="Promo Codes Management Database"
+          >
+            <md-icon-button slot="toolbar-actions" aria-label="Add Promo Code" title="Add Promo Code" (click)="startAdd()">
+              <md-icon>add</md-icon>
+            </md-icon-button>
+          </sky-data-table>
+        </sky-card>
+      </div>
+    } @else {
+      <div class="flex flex-col gap-6 w-full mt-2">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="text-xs text-slate-500 font-semibold tracking-wide">
+            Home / <span class="text-[#2e7d32]">{{ editingId() !== null && editingId() !== 'new' ? 'Edit Promo Code' : 'Add Promo Code' }}</span>
+          </div>
+          <md-outlined-button (click)="cancelEdit()">
+            <md-icon slot="icon">arrow_back</md-icon>
+            Back to List
+          </md-outlined-button>
+        </div>
+
+        <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm block">
+          <div class="flex flex-col gap-y-6 w-full">
+            <!-- 1. Code & Discount Rules -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>1. Code & Discount Rules</h3>
+              </div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="Promo Code" required [value]="inputCode()" (input)="inputCode.set($any($event.target).value)" placeholder="e.g. FIRST50"></md-outlined-text-field>
+
+                <md-outlined-select label="Discount Type" [value]="inputDiscountType()" (change)="inputDiscountType.set($any($event.target).value)">
+                  @for (opt of discountTypeOptions(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt | uppercase }}</div></md-select-option>
+                  }
+                </md-outlined-select>
+
+                <md-outlined-text-field label="Discount Value" type="number" step="0.01" required [value]="inputDiscountValue()" (input)="inputDiscountValue.set($any($event.target).value)" placeholder="e.g. 20"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Max Discount Amount (₹)" type="number" step="0.01" [value]="inputMaxDiscountAmount()" (input)="inputMaxDiscountAmount.set($any($event.target).value)" placeholder="e.g. 100"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Minimum Fare Required (₹)" type="number" step="0.01" [value]="inputMinFareRequired()" (input)="inputMinFareRequired.set($any($event.target).value)" placeholder="e.g. 200"></md-outlined-text-field>
+
+                <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Description" [value]="inputDescription()" (input)="inputDescription.set($any($event.target).value)" placeholder="Short promotional note..."></md-outlined-text-field>
+              </div>
+            </sky-card>
+
+            <!-- 2. Usage Limits, Validity & Active Status -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>2. Usage Limits & Validity Period</h3>
+              </div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="Usage Limit Per User" type="number" [value]="inputUsageLimitPerUser()" (input)="inputUsageLimitPerUser.set($any($event.target).value)" placeholder="e.g. 1"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Total Usage Limit" type="number" [value]="inputTotalUsageLimit()" (input)="inputTotalUsageLimit.set($any($event.target).value)" placeholder="e.g. 1000"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Valid From Date" type="date" [value]="inputValidFrom()" (input)="inputValidFrom.set($any($event.target).value)"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Valid Until Date" type="date" [value]="inputValidUntil()" (input)="inputValidUntil.set($any($event.target).value)"></md-outlined-text-field>
+
+                <div class="flex items-center justify-between border border-slate-200 dark:border-slate-800 rounded-lg p-3 col-span-2 max-sm:col-span-1">
+                  <div class="flex flex-col">
+                    <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">Active Status</span>
+                    <span class="text-xs text-slate-500">Only active promo codes can be redeemed by customers</span>
+                  </div>
+                  <md-switch [selected]="inputIsActive()" (change)="inputIsActive.set($any($event.target).selected)"></md-switch>
+                </div>
+              </div>
+            </sky-card>
+          </div>
+
+          <div class="flex gap-2 mt-6 justify-end border-t border-slate-100 pt-4">
+            <md-outlined-button (click)="cancelEdit()">Cancel</md-outlined-button>
+            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;">
+              <md-icon slot="icon">save</md-icon> Save
+            </md-filled-button>
+          </div>
+        </sky-card>
+      </div>
+    }
+  </div>
+</md-admin-page>

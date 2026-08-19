@@ -75,7 +75,7 @@ interface Driver {
   standalone: true,
   imports: [AdminPage],
   templateUrl: './drivers.html',
-  styleUrl: './drivers.css',
+  styleUrl: '../masters/masters.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class Drivers implements OnInit {

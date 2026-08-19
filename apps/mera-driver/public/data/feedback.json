@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "user_name": "Rohan Sharma",
+    "role": "Customer",
+    "rating": 5,
+    "comments": "Great service! Driver arrived on time and was very polite.",
+    "created_at": "2026-08-18 12:00"
+  },
+  {
+    "id": 2,
+    "user_name": "Rahul Verma",
+    "role": "Driver",
+    "rating": 4,
+    "comments": "Smooth payout process and responsive support team.",
+    "created_at": "2026-08-19 10:15"
+  }
+]

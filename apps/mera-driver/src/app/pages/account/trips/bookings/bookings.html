@@ -1,0 +1,127 @@
+<md-admin-page
+  [title]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit Booking' : 'Add Booking') : 'Bookings'"
+  [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit booking details' : 'Add a new booking') : 'View and manage customer ride bookings.'"
+>
+  <div class="relative w-full">
+    @if (!showAddForm()) {
+      <div class="w-full mt-4">
+        <sky-card class="p-6 block">
+          <sky-data-table
+            [columns]="tableColumns"
+            [rows]="tableRowsString()"
+            [total]="list().length"
+            selectable exportable searchable
+            [actions]="tableActions"
+            (sky-dt-row-action)="onRowAction($event)"
+            caption="Bookings Database"
+          >
+            <md-icon-button slot="toolbar-actions" aria-label="Add Booking" title="Add Booking" (click)="startAdd()">
+              <md-icon>add</md-icon>
+            </md-icon-button>
+          </sky-data-table>
+        </sky-card>
+      </div>
+    } @else {
+      <div class="flex flex-col gap-6 w-full mt-2">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="text-xs text-slate-500 font-semibold tracking-wide">
+            Home / <span class="text-[#1175BC]">{{ editingId() !== null && editingId() !== 'new' ? 'Edit Booking' : 'Add Booking' }}</span>
+          </div>
+          <md-outlined-button (click)="cancelEdit()">
+            <md-icon slot="icon">arrow_back</md-icon>
+            Back to List
+          </md-outlined-button>
+        </div>
+
+        <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
+          <div class="flex flex-col gap-y-6 w-full">
+            <!-- 1. Booking & Participant Information -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box"><h3>1. Booking & Participant Information</h3></div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="Booking Code *" required [value]="inputCode()" (input)="inputCode.set($any($event.target).value)"></md-outlined-text-field>
+                
+                <md-outlined-select label="Trip Type" [value]="inputTripType()" (change)="inputTripType.set($any($event.target).value)">
+                  @for (opt of tripTypeOptions(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                  }
+                </md-outlined-select>
+
+                <md-outlined-text-field label="Customer Name / ID" [value]="inputCustomer()" (input)="inputCustomer.set($any($event.target).value)" placeholder="Enter customer name"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Driver Name / ID" [value]="inputDriver()" (input)="inputDriver.set($any($event.target).value)" placeholder="Assign driver"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Vehicle Assigned" [value]="inputVehicle()" (input)="inputVehicle.set($any($event.target).value)" placeholder="Vehicle details"></md-outlined-text-field>
+
+                <md-outlined-select label="Vehicle Category" [value]="inputVehicleCategory()" (change)="inputVehicleCategory.set($any($event.target).value)">
+                  @for (opt of vehicleCategories(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                  }
+                </md-outlined-select>
+              </div>
+            </sky-card>
+
+            <!-- 2. Route, Coordinates & Schedule -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box"><h3>2. Route, Coordinates & Schedule</h3></div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Pickup Address *" required [value]="inputPickup()" (input)="inputPickup.set($any($event.target).value)" placeholder="Enter full pickup location"></md-outlined-text-field>
+                
+                <md-outlined-text-field label="Pickup Latitude" type="number" step="0.000001" [value]="inputPickupLat()" (input)="inputPickupLat.set($any($event.target).value)"></md-outlined-text-field>
+                <md-outlined-text-field label="Pickup Longitude" type="number" step="0.000001" [value]="inputPickupLng()" (input)="inputPickupLng.set($any($event.target).value)"></md-outlined-text-field>
+
+                <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Drop Address" [value]="inputDrop()" (input)="inputDrop.set($any($event.target).value)" placeholder="Enter drop location (optional for rental)"></md-outlined-text-field>
+                
+                <md-outlined-text-field label="Drop Latitude" type="number" step="0.000001" [value]="inputDropLat()" (input)="inputDropLat.set($any($event.target).value)"></md-outlined-text-field>
+                <md-outlined-text-field label="Drop Longitude" type="number" step="0.000001" [value]="inputDropLng()" (input)="inputDropLng.set($any($event.target).value)"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Scheduled At" type="datetime-local" [value]="inputScheduledAt()" (input)="inputScheduledAt.set($any($event.target).value)"></md-outlined-text-field>
+                <md-outlined-text-field label="Start OTP" [value]="inputOtp()" (input)="inputOtp.set($any($event.target).value)"></md-outlined-text-field>
+              </div>
+            </sky-card>
+
+            <!-- 3. Distance, Fares & Status -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box"><h3>3. Distance, Fares & Status</h3></div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="Est. Distance (km)" type="number" step="0.1" [value]="inputEstDistance()" (input)="inputEstDistance.set($any($event.target).value)"></md-outlined-text-field>
+                <md-outlined-text-field label="Est. Duration (mins)" type="number" [value]="inputEstDuration()" (input)="inputEstDuration.set($any($event.target).value)"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Estimated Fare (₹)" type="number" step="0.01" [value]="inputEstFare()" (input)="inputEstFare.set($any($event.target).value)"></md-outlined-text-field>
+                <md-outlined-text-field label="Final Fare (₹)" type="number" step="0.01" [value]="inputFinalFare()" (input)="inputFinalFare.set($any($event.target).value)"></md-outlined-text-field>
+
+                <md-outlined-select label="Booking Status" [value]="inputStatus()" (change)="inputStatus.set($any($event.target).value)">
+                  @for (opt of statusOptions(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                  }
+                </md-outlined-select>
+
+                <md-outlined-select label="Payment Status" [value]="inputPaymentStatus()" (change)="inputPaymentStatus.set($any($event.target).value)">
+                  @for (opt of paymentStatusOptions(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                  }
+                </md-outlined-select>
+
+                <md-outlined-select label="Payment Mode" [value]="inputPaymentMode()" (change)="inputPaymentMode.set($any($event.target).value)">
+                  @for (opt of paymentModeOptions(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                  }
+                </md-outlined-select>
+
+                <md-outlined-text-field label="Requested At" type="datetime-local" [value]="inputRequestedAt()" (input)="inputRequestedAt.set($any($event.target).value)"></md-outlined-text-field>
+              </div>
+            </sky-card>
+          </div>
+
+          <div class="flex justify-end gap-3 mt-8 border-t border-slate-100 pt-4">
+            <md-outlined-button (click)="cancelEdit()">Cancel</md-outlined-button>
+            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #1175BC; --md-filled-button-label-text-color: white;">
+              <md-icon slot="icon">save</md-icon>
+              {{ editingId() !== null && editingId() !== 'new' ? 'Save Changes' : 'Add Booking' }}
+            </md-filled-button>
+          </div>
+        </sky-card>
+      </div>
+    }
+  </div>
+</md-admin-page>

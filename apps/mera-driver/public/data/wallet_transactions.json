@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "txn_code": "WTXN-501",
+    "user_name": "Rohan Sharma",
+    "user_type": "Customer",
+    "type": "Credit",
+    "amount": 2000,
+    "balance_after": 3500,
+    "description": "Added funds via UPI",
+    "status": "Success",
+    "created_at": "2026-08-18 14:20"
+  },
+  {
+    "id": 2,
+    "txn_code": "WTXN-502",
+    "user_name": "Rahul Verma",
+    "user_type": "Driver",
+    "type": "Debit",
+    "amount": 150,
+    "balance_after": 1850,
+    "description": "Platform commission fee deduction",
+    "status": "Success",
+    "created_at": "2026-08-19 08:30"
+  }
+]

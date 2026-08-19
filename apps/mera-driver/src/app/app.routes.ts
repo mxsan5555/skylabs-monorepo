@@ -4,24 +4,6 @@ import { AuthLayout } from './layouts/auth-layout/auth-layout';
 import { AdminLayout } from './layouts/admin-layout/admin-layout';
 import { authGuard, permissionGuard } from '@skylabs-monorepo/shared-auth/angular';
 
-/**
- * Route table.
- *
- * Auth screens (sign-in, otp) use the centered AuthLayout, given explicit
- * non-empty parent paths so they only match those URLs. An empty-path parent
- * matches every URL, so PublicLayout (which holds '/', showcase, and the 404
- * catch-all) must be the only empty-path parent — otherwise it would swallow
- * routes meant for the other layout.
- *
- * Every `/account/*` page requires `canActivate: [authGuard]` (any
- * authenticated user). Permission-gated pages additionally carry
- * `canActivate: [permissionGuard]` with `data: { permission: { menuKey, action } }`
- * — this replaces the old `roleGuard` + `data: { roles: [...] }` pattern. The
- * `menuKey`s below match `@skylabs-monorepo/shared-menu`'s
- * `mera-driver-menu.json` node-for-node, so a route only "exists" for a user
- * once the server's `/rbac/bootstrap` grants it — the sidebar (which renders
- * `bootstrap.menu` directly) and this route table can never drift apart.
- */
 export const appRoutes: Routes = [
   {
     path: 'location',
@@ -53,9 +35,6 @@ export const appRoutes: Routes = [
     ],
   },
   {
-    // Authenticated console (after login / "My account"). noindex is applied in
-    // index.html-level defaults + per-page <title>; see skylabs-seo.md for the
-    // account-page robots rule.
     path: 'account',
     component: AdminLayout,
     canActivate: [authGuard],
@@ -75,9 +54,6 @@ export const appRoutes: Routes = [
         loadComponent: () =>
           import('./pages/account/profile/profile').then((m) => m.Profile),
       },
-
-      // Business modules (placeholders — permission-gated, matching the menu
-      // 1:1; real screens land module-by-module).
       {
         path: 'customers',
         title: 'Customers · mera-driver',
@@ -95,23 +71,6 @@ export const appRoutes: Routes = [
           import('./pages/account/drivers/drivers').then((m) => m.Drivers),
       },
       {
-        path: 'master',
-        pathMatch: 'full',
-        redirectTo: 'master/category',
-      },
-      {
-        path: 'master/category',
-        title: 'Category · mera-driver',
-        loadComponent: () =>
-          import('./pages/account/category/category').then((m) => m.Category),
-      },
-      {
-        path: 'master/subcategory',
-        title: 'Subcategory · mera-driver',
-        loadComponent: () =>
-          import('./pages/account/subcategory/subcategory').then((m) => m.Subcategory),
-      },
-      {
         path: 'vehicles',
         title: 'Vehicles · mera-driver',
         canActivate: [permissionGuard],
@@ -119,38 +78,146 @@ export const appRoutes: Routes = [
         loadComponent: () =>
           import('./pages/account/vehicles/vehicles').then((m) => m.Vehicles),
       },
+
+      // Trips & Bookings Section
       {
-        path: 'trips',
-        title: 'Trips · mera-driver',
+        path: 'pricing',
+        title: 'Pricing · mera-driver',
         canActivate: [permissionGuard],
-        data: { permission: { menuKey: 'trips', action: 'view' }, title: 'Trips', subtitle: 'Track ongoing and completed trips.' },
+        data: { permission: { menuKey: 'trips.pricing', action: 'view' }, title: 'Pricing', subtitle: 'Fare and rate configurations.' },
         loadComponent: () =>
-          import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
+          import('./pages/account/trips/pricing/pricing').then((m) => m.Pricing),
       },
+      {
+        path: 'trips/bookings',
+        title: 'Bookings · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'trips.bookings', action: 'view' }, title: 'Bookings', subtitle: 'Trip booking records.' },
+        loadComponent: () =>
+          import('./pages/account/trips/bookings/bookings').then((m) => m.Bookings),
+      },
+      {
+        path: 'trips/pricing',
+        title: 'Pricing · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'trips.pricing', action: 'view' }, title: 'Pricing', subtitle: 'Fare and rate configurations.' },
+        loadComponent: () =>
+          import('./pages/account/trips/pricing/pricing').then((m) => m.Pricing),
+      },
+      {
+        path: 'trips/cancellation-reasons',
+        title: 'Cancellation Reasons · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'trips.cancellation-reasons', action: 'view' }, title: 'Cancellation Reasons', subtitle: 'Configured cancellation reasons.' },
+        loadComponent: () =>
+          import('./pages/account/trips/cancellation-reasons/cancellation-reasons').then((m) => m.CancellationReasons),
+      },
+      {
+        path: 'trips/driver-locations',
+        title: 'Driver Locations · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'trips.driver-locations', action: 'view' }, title: 'Driver Locations', subtitle: 'Real-time and historic driver coordinates.' },
+        loadComponent: () =>
+          import('./pages/account/trips/driver-locations/driver-locations').then((m) => m.DriverLocations),
+      },
+      {
+        path: 'trips/trip-types',
+        title: 'Trip Types · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'trips.trip-types', action: 'view' }, title: 'Trip Types', subtitle: 'Trip categories and service types.' },
+        loadComponent: () =>
+          import('./pages/account/trips/trip-types/trip-types').then((m) => m.TripTypes),
+      },
+
       {
         path: 'attendance',
         title: 'Attendance · mera-driver',
         canActivate: [permissionGuard],
         data: { permission: { menuKey: 'attendance', action: 'view' }, title: 'Attendance', subtitle: 'Driver check-in/out records.' },
         loadComponent: () =>
-          import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
+          import('./pages/account/attendance/attendance').then((m) => m.Attendance),
       },
+
+      // Payments Section
       {
         path: 'payments',
         title: 'Payments · mera-driver',
         canActivate: [permissionGuard],
-        data: { permission: { menuKey: 'payments', action: 'view' }, title: 'Payments', subtitle: 'Fares, payouts, and reconciliation.' },
+        data: { permission: { menuKey: 'payments.overview', action: 'view' }, title: 'Payments', subtitle: 'Fares, payouts, and reconciliation.' },
         loadComponent: () =>
-          import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
+          import('./pages/account/payments/payments').then((m) => m.Payments),
       },
+      {
+        path: 'payments/transactions',
+        title: 'Transactions · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'payments.transactions', action: 'view' }, title: 'Transactions', subtitle: 'Payment transaction logs.' },
+        loadComponent: () =>
+          import('./pages/account/payments/transactions/transactions').then((m) => m.PaymentTransactions),
+      },
+      {
+        path: 'payments/wallet-transactions',
+        title: 'Wallet Transactions · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'payments.wallet-transactions', action: 'view' }, title: 'Wallet Transactions', subtitle: 'Driver and user wallet log.' },
+        loadComponent: () =>
+          import('./pages/account/payments/wallet-transactions/wallet-transactions').then((m) => m.WalletTransactions),
+      },
+      {
+        path: 'payments/driver-payouts',
+        title: 'Driver Payouts · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'payments.driver-payouts', action: 'view' }, title: 'Driver Payouts', subtitle: 'Driver earnings and payout transfers.' },
+        loadComponent: () =>
+          import('./pages/account/payments/driver-payouts/driver-payouts').then((m) => m.DriverPayouts),
+      },
+
+      // Promotions Section
+      {
+        path: 'promotions/promo-codes',
+        title: 'Promo Codes · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'promotions.promo-codes', action: 'view' }, title: 'Promo Codes', subtitle: 'Promotional discount codes.' },
+        loadComponent: () =>
+          import('./pages/account/promotions/promo-codes/promo-codes').then((m) => m.PromoCodes),
+      },
+      {
+        path: 'promotions/promo-usage',
+        title: 'Promo Usage · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'promotions.promo-usage', action: 'view' }, title: 'Promo Usage', subtitle: 'Promotional code usage logs.' },
+        loadComponent: () =>
+          import('./pages/account/promotions/promo-usage/promo-usage').then((m) => m.PromoUsage),
+      },
+
+      // FAQs & Feedback
+      {
+        path: 'faqs',
+        title: 'FAQs · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'faqs', action: 'view' }, title: 'FAQs', subtitle: 'In-app frequently asked questions.' },
+        loadComponent: () =>
+          import('./pages/account/faqs/faqs').then((m) => m.Faqs),
+      },
+      {
+        path: 'feedback',
+        title: 'Feedback · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'feedback', action: 'view' }, title: 'Feedback', subtitle: 'User reviews and feedback.' },
+        loadComponent: () =>
+          import('./pages/account/feedback/feedback').then((m) => m.Feedback),
+      },
+
       {
         path: 'reports',
         title: 'Reports · mera-driver',
         canActivate: [permissionGuard],
         data: { permission: { menuKey: 'reports', action: 'view' }, title: 'Reports', subtitle: 'Operational and financial reporting.' },
         loadComponent: () =>
-          import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
+          import('./pages/account/reports/reports').then((m) => m.Reports),
       },
+
+      // Masters Section
       {
         path: 'masters/vehicle-types',
         title: 'Vehicle Types · mera-driver',
@@ -167,7 +234,6 @@ export const appRoutes: Routes = [
         loadComponent: () =>
           import('./pages/account/masters/zones/zones').then((m) => m.ZonesMaster),
       },
-
       {
         path: 'masters/source-types',
         title: 'Source Type · mera-driver',
@@ -232,6 +298,7 @@ export const appRoutes: Routes = [
         loadComponent: () =>
           import('./pages/account/masters/police-docs/police-docs').then((m) => m.PoliceDocsMaster),
       },
+
       {
         path: 'settings',
         title: 'Settings · mera-driver',
@@ -241,7 +308,7 @@ export const appRoutes: Routes = [
           import('./pages/account/module-placeholder/module-placeholder').then((m) => m.ModulePlaceholder),
       },
 
-      // Administration (real screens).
+      // Administration
       {
         path: 'administration/roles',
         title: 'Role Management · mera-driver',
@@ -289,7 +356,6 @@ export const appRoutes: Routes = [
       },
       {
         path: 'blog/:slug',
-        // Title is set per-article by the component (it knows the slug).
         loadComponent: () =>
           import('./pages/blog-detail/blog-detail').then((m) => m.BlogDetail),
       },
@@ -300,7 +366,6 @@ export const appRoutes: Routes = [
           import('./pages/showcase/showcase').then((m) => m.Showcase),
       },
       {
-        // Catch-all 404, inside the shell so it keeps header/footer.
         path: '**',
         title: 'Page not found · mera-driver',
         loadComponent: () =>

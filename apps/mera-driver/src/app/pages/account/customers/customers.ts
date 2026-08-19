@@ -31,7 +31,7 @@ interface Customer {
   standalone: true,
   imports: [AdminPage],
   templateUrl: './customers.html',
-  styleUrl: './customers.css',
+  styleUrl: '../masters/masters.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class Customers implements OnInit {

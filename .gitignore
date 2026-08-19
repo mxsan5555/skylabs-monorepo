@@ -63,13 +63,3 @@ out
 vite.config.*.timestamp*
 vitest.config.*.timestamp*
 __screenshots__/
-
-# Temporary ignore for disabled pages
-apps/mera-driver/src/app/pages/account/trips/
-apps/mera-driver/src/app/pages/account/attendance/
-apps/mera-driver/src/app/pages/account/payments/
-apps/mera-driver/src/app/pages/account/reports/
-apps/mera-driver/public/data/trips.json
-apps/mera-driver/public/data/attendance.json
-apps/mera-driver/public/data/payments.json
-apps/mera-driver/public/data/reports.json

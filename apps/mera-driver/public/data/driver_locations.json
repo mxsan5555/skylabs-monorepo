@@ -1,0 +1,35 @@
+[
+  {
+    "id": 1,
+    "driver_name": "Rahul Verma",
+    "phone": "9876543210",
+    "vehicle": "Hyundai Accent (Sedan)",
+    "city": "New Delhi",
+    "lat": 28.6304,
+    "lng": 77.2177,
+    "status": "Online",
+    "last_updated": "Just now"
+  },
+  {
+    "id": 2,
+    "driver_name": "Sana Kapoor",
+    "phone": "8765432109",
+    "vehicle": "Maruti Dzire (Compact)",
+    "city": "Noida",
+    "lat": 28.5708,
+    "lng": 77.3258,
+    "status": "On Trip",
+    "last_updated": "2 mins ago"
+  },
+  {
+    "id": 3,
+    "driver_name": "Vikram Singh",
+    "phone": "9988776655",
+    "vehicle": "Toyota Innova (SUV)",
+    "city": "Gurugram",
+    "lat": 28.4595,
+    "lng": 77.0266,
+    "status": "Offline",
+    "last_updated": "1 hour ago"
+  }
+]

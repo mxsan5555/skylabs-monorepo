@@ -36,13 +36,59 @@
     "order": 4
   },
   {
-    "id": "trips",
-    "title": "Trips",
+    "id": "trips-group",
+    "title": "Trips & Bookings",
     "icon": "route",
-    "route": "/trips",
     "permissionKey": "trips",
     "parent": null,
-    "order": 5
+    "order": 5,
+    "children": [
+      {
+        "id": "trips-types",
+        "title": "Trip Types",
+        "icon": "merge_type",
+        "route": "/trips/trip-types",
+        "permissionKey": "trips.trip-types",
+        "parent": "trips-group",
+        "order": 1
+      },
+      {
+        "id": "trips-bookings",
+        "title": "Bookings",
+        "icon": "book_online",
+        "route": "/trips/bookings",
+        "permissionKey": "trips.bookings",
+        "parent": "trips-group",
+        "order": 2
+      },
+      {
+        "id": "trips-locations",
+        "title": "Driver Locations",
+        "icon": "my_location",
+        "route": "/trips/driver-locations",
+        "permissionKey": "trips.driver-locations",
+        "parent": "trips-group",
+        "order": 3
+      },
+      {
+        "id": "trips-cancellation",
+        "title": "Cancellation Reasons",
+        "icon": "cancel",
+        "route": "/trips/cancellation-reasons",
+        "permissionKey": "trips.cancellation-reasons",
+        "parent": "trips-group",
+        "order": 4
+      }
+    ]
+  },
+  {
+    "id": "pricing",
+    "title": "Pricing",
+    "icon": "sell",
+    "route": "/pricing",
+    "permissionKey": "trips.pricing",
+    "parent": null,
+    "order": 6
   },
   {
     "id": "attendance",
@@ -54,13 +100,96 @@
     "order": 6
   },
   {
-    "id": "payments",
-    "title": "Payments",
+    "id": "payments-group",
+    "title": "Payments & Wallets",
     "icon": "payments",
-    "route": "/payments",
     "permissionKey": "payments",
     "parent": null,
-    "order": 7
+    "order": 7,
+    "children": [
+      {
+        "id": "payments-overview",
+        "title": "Payments",
+        "icon": "receipt_long",
+        "route": "/payments",
+        "permissionKey": "payments.overview",
+        "parent": "payments-group",
+        "order": 1
+      },
+      {
+        "id": "payments-transactions",
+        "title": "Transactions",
+        "icon": "sync_alt",
+        "route": "/payments/transactions",
+        "permissionKey": "payments.transactions",
+        "parent": "payments-group",
+        "order": 2
+      },
+      {
+        "id": "payments-wallet-transactions",
+        "title": "Wallet Transactions",
+        "icon": "account_balance_wallet",
+        "route": "/payments/wallet-transactions",
+        "permissionKey": "payments.wallet-transactions",
+        "parent": "payments-group",
+        "order": 3
+      },
+      {
+        "id": "payments-driver-payouts",
+        "title": "Driver Payouts",
+        "icon": "monetization_on",
+        "route": "/payments/driver-payouts",
+        "permissionKey": "payments.driver-payouts",
+        "parent": "payments-group",
+        "order": 4
+      }
+    ]
+  },
+  {
+    "id": "promotions-group",
+    "title": "Promotions",
+    "icon": "local_offer",
+    "permissionKey": "promotions",
+    "parent": null,
+    "order": 8,
+    "children": [
+      {
+        "id": "promotions-promo-codes",
+        "title": "Promo Codes",
+        "icon": "style",
+        "route": "/promotions/promo-codes",
+        "permissionKey": "promotions.promo-codes",
+        "parent": "promotions-group",
+        "order": 1
+      },
+      {
+        "id": "promotions-promo-usage",
+        "title": "Promo Usage",
+        "icon": "analytics",
+        "route": "/promotions/promo-usage",
+        "permissionKey": "promotions.promo-usage",
+        "parent": "promotions-group",
+        "order": 2
+      }
+    ]
+  },
+  {
+    "id": "faqs",
+    "title": "FAQs",
+    "icon": "quiz",
+    "route": "/faqs",
+    "permissionKey": "faqs",
+    "parent": null,
+    "order": 9
+  },
+  {
+    "id": "feedback",
+    "title": "Feedback",
+    "icon": "rate_review",
+    "route": "/feedback",
+    "permissionKey": "feedback",
+    "parent": null,
+    "order": 10
   },
   {
     "id": "reports",
@@ -69,7 +198,7 @@
     "route": "/reports",
     "permissionKey": "reports",
     "parent": null,
-    "order": 8
+    "order": 11
   },
   {
     "id": "masters",
@@ -77,7 +206,7 @@
     "icon": "category",
     "permissionKey": "masters",
     "parent": null,
-    "order": 9,
+    "order": 12,
     "children": [
       {
         "id": "masters-vehicle-types",
@@ -177,7 +306,7 @@
     "icon": "admin_panel_settings",
     "permissionKey": "administration",
     "parent": null,
-    "order": 10,
+    "order": 13,
     "children": [
       {
         "id": "admin-roles",
@@ -215,6 +344,6 @@
     "route": "/settings",
     "permissionKey": "settings",
     "parent": null,
-    "order": 11
+    "order": 14
   }
 ]

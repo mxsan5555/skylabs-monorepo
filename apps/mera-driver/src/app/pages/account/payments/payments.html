@@ -1,0 +1,108 @@
+<md-admin-page
+  [title]="showAddForm() ? (editingPaymentId() !== null && editingPaymentId() !== 'new' ? 'Edit Payment' : 'Log Payment') : content().title"
+  [subtitle]="showAddForm() ? (editingPaymentId() !== null && editingPaymentId() !== 'new' ? 'Modify transaction audit log details' : 'Log a new payment transaction entry') : content().subtitle"
+>
+  <div class="relative w-full">
+
+    <!-- VIEW 1: PAYMENTS DATA TABLE -->
+    @if (!showAddForm()) {
+      <div class="w-full mt-4">
+        <sky-card class="p-6 block">
+          <sky-data-table
+            caption="Payments Registry Logs"
+            [columns]="tableColumns"
+            [rows]="tableRowsString()"
+            [total]="totalPayments()"
+            [page]="page()"
+            [page-size]="pageSize()"
+            searchable
+            search-placeholder="Search Booking Ref, Payer, Txn ID..."
+            filter-label="Filter by Status"
+            [filter-options]="tableFilterOptions"
+            [actions]="tableActions"
+            exportable
+            selectable
+            (sky-dt-params-change)="onParamsChange($event)"
+            (sky-dt-row-action)="onRowAction($event)"
+          >
+            <!-- Projected Add button next to download/export button in the toolbar -->
+            <md-icon-button
+              slot="toolbar-actions"
+              aria-label="Log Payment"
+              title="Log Payment"
+              (click)="openAddPaymentForm()"
+            >
+              <md-icon>add</md-icon>
+            </md-icon-button>
+          </sky-data-table>
+        </sky-card>
+      </div>
+    }
+
+    <!-- VIEW 2: ADD/EDIT PAYMENT FORM -->
+    @else {
+      <div class="flex flex-col gap-6 w-full mt-2">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+          <div class="flex items-center gap-x-2">
+            <md-icon-button (click)="closeAddPaymentForm()">
+              <md-icon>arrow_back</md-icon>
+            </md-icon-button>
+            <span class="form-header-title">
+              {{ editingPaymentId() !== null && editingPaymentId() !== 'new' ? 'Edit Transaction Details' : 'Log Payment Transaction' }}
+            </span>
+          </div>
+          <md-outlined-button (click)="closeAddPaymentForm()">
+            <md-icon slot="icon">arrow_back</md-icon>
+            Back to List
+          </md-outlined-button>
+        </div>
+
+        <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
+          <div class="flex flex-col gap-y-6 w-full">
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>1. Payment Transaction Details</h3>
+              </div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="Booking Ref / Code *" required [value]="inputBookingCode()" (input)="inputBookingCode.set($any($event.target).value)" placeholder="e.g. BK-1001"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Payer Customer Name / ID *" required [value]="inputPayerName()" (input)="inputPayerName.set($any($event.target).value)" placeholder="e.g. Rohan Sharma"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Amount (₹) *" type="number" step="0.01" required [value]="inputAmount()" (input)="inputAmount.set($any($event.target).value)"></md-outlined-text-field>
+
+                <md-outlined-select label="Payment Method *" [value]="inputPaymentMethod()" (change)="inputPaymentMethod.set($any($event.target).value)">
+                  @for (opt of paymentMethods(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt | uppercase }}</div></md-select-option>
+                  }
+                </md-outlined-select>
+
+                <md-outlined-select label="Payment Gateway" [value]="inputGateway()" (change)="inputGateway.set($any($event.target).value)">
+                  @for (opt of gateways(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt | uppercase }}</div></md-select-option>
+                  }
+                </md-outlined-select>
+
+                <md-outlined-text-field label="Gateway Txn ID" [value]="inputGatewayTxnId()" (input)="inputGatewayTxnId.set($any($event.target).value)" placeholder="e.g. pay_987123"></md-outlined-text-field>
+
+                <md-outlined-select label="Transaction Status *" [value]="inputStatus()" (change)="inputStatus.set($any($event.target).value)">
+                  @for (opt of statuses(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt | uppercase }}</div></md-select-option>
+                  }
+                </md-outlined-select>
+              </div>
+            </sky-card>
+          </div>
+
+          <div class="flex justify-end gap-3 mt-8 border-t border-slate-100 pt-4">
+            <md-outlined-button (click)="closeAddPaymentForm()">Cancel</md-outlined-button>
+            <md-filled-button (click)="savePayment()" style="--md-filled-button-container-color: #1175BC; --md-filled-button-label-text-color: white;">
+              <md-icon slot="icon">save</md-icon>
+              {{ editingPaymentId() !== null && editingPaymentId() !== 'new' ? 'Save Changes' : 'Save Transaction' }}
+            </md-filled-button>
+          </div>
+        </sky-card>
+      </div>
+    }
+
+  </div>
+</md-admin-page>

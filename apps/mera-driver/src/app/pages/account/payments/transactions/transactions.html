@@ -1,0 +1,69 @@
+<md-admin-page
+  [title]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit Payment' : 'Add Payment') : 'Payments'"
+  [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit trip payment details' : 'Add a new trip payment record') : 'Trip payment records derived from bookings.'"
+>
+  <div class="relative w-full">
+    @if (!showAddForm()) {
+      <div class="w-full mt-4">
+        <sky-card class="p-6 block">
+          <sky-data-table
+            [columns]="tableColumns"
+            [rows]="tableRowsString()"
+            [total]="list().length"
+            selectable exportable searchable
+            [actions]="tableActions"
+            (sky-dt-row-action)="onRowAction($event)"
+            caption="Payment Transactions Database"
+          >
+            <md-icon-button slot="toolbar-actions" aria-label="Add Payment" title="Add Payment" (click)="startAdd()">
+              <md-icon>add</md-icon>
+            </md-icon-button>
+          </sky-data-table>
+        </sky-card>
+      </div>
+    } @else {
+      <div class="flex flex-col gap-6 w-full mt-2">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="text-xs text-slate-500 font-semibold tracking-wide">
+            Home / <span class="text-[#2e7d32]">{{ editingId() !== null && editingId() !== 'new' ? 'Edit Payment' : 'Add Payment' }}</span>
+          </div>
+          <md-outlined-button (click)="cancelEdit()">
+            <md-icon slot="icon">arrow_back</md-icon>
+            Back to List
+          </md-outlined-button>
+        </div>
+
+        <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
+          <div class="flex flex-col gap-y-6 w-full">
+            <sky-card class="p-6 block">
+              <div class="section-heading-box"><h3>1. Payment Details</h3></div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="Booking Code *" required [value]="inputCode()" (input)="inputCode.set($any($event.target).value)"></md-outlined-text-field>
+                <md-outlined-text-field label="Customer" [value]="inputCustomer()" (input)="inputCustomer.set($any($event.target).value)"></md-outlined-text-field>
+                <md-outlined-text-field label="Amount (₹)" type="number" [value]="inputFare()" (input)="inputFare.set($any($event.target).value)"></md-outlined-text-field>
+                <md-outlined-select label="Payment Mode" [value]="inputMode()" (change)="inputMode.set($any($event.target).value)">
+                  <md-select-option value="upi"><div slot="headline">UPI</div></md-select-option>
+                  <md-select-option value="cash"><div slot="headline">Cash</div></md-select-option>
+                  <md-select-option value="card"><div slot="headline">Card</div></md-select-option>
+                  <md-select-option value="wallet"><div slot="headline">Wallet</div></md-select-option>
+                </md-outlined-select>
+                <md-outlined-select label="Status" [value]="inputStatus()" (change)="inputStatus.set($any($event.target).value)">
+                  <md-select-option value="pending"><div slot="headline">Pending</div></md-select-option>
+                  <md-select-option value="paid"><div slot="headline">Paid</div></md-select-option>
+                  <md-select-option value="failed"><div slot="headline">Failed</div></md-select-option>
+                </md-outlined-select>
+              </div>
+            </sky-card>
+          </div>
+
+          <div class="flex justify-end gap-3 mt-8 border-t border-slate-100 pt-4">
+            <md-outlined-button (click)="cancelEdit()">Cancel</md-outlined-button>
+            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;">
+              <md-icon slot="icon">save</md-icon> Save
+            </md-filled-button>
+          </div>
+        </sky-card>
+      </div>
+    }
+  </div>
+</md-admin-page>
