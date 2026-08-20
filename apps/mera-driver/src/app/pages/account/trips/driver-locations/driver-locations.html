@@ -1,6 +1,6 @@
 <md-admin-page
-  [title]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit Driver Location' : 'Add Driver Location') : 'Driver Locations'"
-  [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit driver location details' : 'Add a new driver location') : 'Live and historical GPS pings from drivers.'"
+  [title]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit Driver Location' : 'Log Driver Location') : 'Driver Locations'"
+  [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit driver location details' : 'Log a new driver GPS coordinate entry') : 'Real-time GPS tracking and live driver locations.'"
 >
   <div class="relative w-full">
     @if (!showAddForm()) {
@@ -13,9 +13,9 @@
             selectable exportable searchable
             [actions]="tableActions"
             (sky-dt-row-action)="onRowAction($event)"
-            caption="Driver Locations Database"
+            caption="Driver Locations Tracking Database"
           >
-            <md-icon-button slot="toolbar-actions" aria-label="Add Location" title="Add Location" (click)="startAdd()">
+            <md-icon-button slot="toolbar-actions" aria-label="Log Location" title="Log Location" (click)="startAdd()">
               <md-icon>add</md-icon>
             </md-icon-button>
           </sky-data-table>
@@ -25,7 +25,7 @@
       <div class="flex flex-col gap-6 w-full mt-2">
         <div class="flex items-center justify-between pb-3 border-b border-slate-100">
           <div class="text-xs text-slate-500 font-semibold tracking-wide">
-            Home / <span class="text-[#1175BC]">{{ editingId() !== null && editingId() !== 'new' ? 'Edit Driver Location' : 'Add Driver Location' }}</span>
+            Home / <span class="text-[#2e7d32]">{{ editingId() !== null && editingId() !== 'new' ? 'Edit Location' : 'Log Location' }}</span>
           </div>
           <md-outlined-button (click)="cancelEdit()">
             <md-icon slot="icon">arrow_back</md-icon>
@@ -36,23 +36,36 @@
         <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
           <div class="flex flex-col gap-y-6 w-full">
             <sky-card class="p-6 block">
-              <div class="section-heading-box"><h3>1. Location Details</h3></div>
+              <div class="section-heading-box"><h3>1. Driver GPS Location Details</h3></div>
               <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
-                <md-outlined-text-field label="Driver *" required [value]="inputDriver()" (input)="inputDriver.set($any($event.target).value)"></md-outlined-text-field>
-                <md-outlined-text-field label="Booking Code" [value]="inputBooking()" (input)="inputBooking.set($any($event.target).value)"></md-outlined-text-field>
-                <md-outlined-text-field label="Latitude" type="number" [value]="inputLat()" (input)="inputLat.set($any($event.target).value)"></md-outlined-text-field>
-                <md-outlined-text-field label="Longitude" type="number" [value]="inputLng()" (input)="inputLng.set($any($event.target).value)"></md-outlined-text-field>
-                <md-outlined-text-field label="Heading" type="number" [value]="inputHeading()" (input)="inputHeading.set($any($event.target).value)"></md-outlined-text-field>
-                <md-outlined-text-field label="Recorded At" [value]="inputRecordedAt()" (input)="inputRecordedAt.set($any($event.target).value)"></md-outlined-text-field>
+                <md-outlined-text-field label="Driver Name *" required [value]="inputDriver()" (input)="inputDriver.set($any($event.target).value)" placeholder="e.g. Rahul Verma"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Phone Number *" required [value]="inputPhone()" (input)="inputPhone.set($any($event.target).value)" placeholder="e.g. 9876543210"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Vehicle Assigned" [value]="inputVehicle()" (input)="inputVehicle.set($any($event.target).value)" placeholder="e.g. Personal Sedan (DL-01-AB-1234)"></md-outlined-text-field>
+
+                <md-outlined-text-field label="City / Region" [value]="inputCity()" (input)="inputCity.set($any($event.target).value)" placeholder="e.g. New Delhi"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Latitude *" type="number" step="0.0001" required [value]="inputLat()" (input)="inputLat.set($any($event.target).value)" placeholder="e.g. 28.6304"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Longitude *" type="number" step="0.0001" required [value]="inputLng()" (input)="inputLng.set($any($event.target).value)" placeholder="e.g. 77.2177"></md-outlined-text-field>
+
+                <md-outlined-select label="Status" [value]="inputStatus()" (change)="inputStatus.set($any($event.target).value)">
+                  <md-select-option value="Online"><div slot="headline">Online</div></md-select-option>
+                  <md-select-option value="On Trip"><div slot="headline">On Trip</div></md-select-option>
+                  <md-select-option value="Offline"><div slot="headline">Offline</div></md-select-option>
+                </md-outlined-select>
+
+                <md-outlined-text-field label="Recorded At / Timestamp" [value]="inputRecordedAt()" (input)="inputRecordedAt.set($any($event.target).value)" placeholder="e.g. 2026-08-20 11:30 AM"></md-outlined-text-field>
               </div>
             </sky-card>
           </div>
 
           <div class="flex justify-end gap-3 mt-8 border-t border-slate-100 pt-4">
             <md-outlined-button (click)="cancelEdit()">Cancel</md-outlined-button>
-            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #1175BC; --md-filled-button-label-text-color: white;">
+            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;">
               <md-icon slot="icon">save</md-icon>
-              {{ editingId() !== null && editingId() !== 'new' ? 'Save Changes' : 'Add Location' }}
+              {{ editingId() !== null && editingId() !== 'new' ? 'Save Changes' : 'Save Location' }}
             </md-filled-button>
           </div>
         </sky-card>

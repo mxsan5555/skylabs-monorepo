@@ -3,10 +3,12 @@ import { HttpClient } from '@angular/common/http';
 import { AdminPage } from '../../../../admin/admin-page/admin-page';
 
 interface CancellationReason {
-  id?: string;
+  id?: number | string;
+  code: string;
   reason_text: string;
-  applies_to: 'customer' | 'driver' | 'both';
-  is_active: boolean;
+  applies_to: 'Customer' | 'Driver' | 'Both';
+  penalty_applicable: 'Yes' | 'No';
+  status: 'Active' | 'Inactive';
 }
 
 @Component({
@@ -21,23 +23,29 @@ export class CancellationReasons implements OnInit {
   private readonly http = inject(HttpClient);
   readonly list = signal<CancellationReason[]>([]);
   readonly showAddForm = signal(false);
-  readonly editingId = signal<string | 'new' | null>(null);
+  readonly editingId = signal<number | string | 'new' | null>(null);
+
+  // --- Form Input Signals ---
+  readonly inputCode = signal('');
   readonly inputReason = signal('');
-  readonly inputAppliesTo = signal<'customer' | 'driver' | 'both'>('customer');
-  readonly inputIsActive = signal(true);
+  readonly inputAppliesTo = signal<'Customer' | 'Driver' | 'Both'>('Customer');
+  readonly inputPenalty = signal<'Yes' | 'No'>('No');
+  readonly inputStatus = signal<'Active' | 'Inactive'>('Active');
 
   readonly tableColumns = JSON.stringify([
-    { key: 'reason_text', label: 'Reason', sortable: true },
+    { key: 'code', label: 'Code', sortable: true },
+    { key: 'reason_text', label: 'Reason Description', sortable: true },
     { key: 'applies_to', label: 'Applies To', sortable: true },
-    { key: 'status_label', label: 'Status', type: 'status', statusMap: { Active: 'success', Inactive: 'error' } },
+    { key: 'penalty_applicable', label: 'Penalty Applicable', sortable: true },
+    { key: 'status', label: 'Status', type: 'status', statusMap: { Active: 'success', Inactive: 'error' } },
   ]);
+
   readonly tableActions = JSON.stringify([
     { icon: 'edit', label: 'Edit', event: 'edit_option' },
     { icon: 'delete', label: 'Delete', event: 'delete_option', variant: 'danger' },
   ]);
-  readonly tableRowsString = computed(() =>
-    JSON.stringify(this.list().map((r) => ({ ...r, status_label: r.is_active ? 'Active' : 'Inactive' })))
-  );
+
+  readonly tableRowsString = computed(() => JSON.stringify(this.list()));
 
   ngOnInit(): void {
     this.http.get<CancellationReason[]>('data/cancellation_reasons.json').subscribe({
@@ -54,34 +62,45 @@ export class CancellationReasons implements OnInit {
 
   startAdd(): void {
     this.editingId.set('new');
+    this.inputCode.set('CR-0' + (this.list().length + 1));
     this.inputReason.set('');
-    this.inputAppliesTo.set('customer');
-    this.inputIsActive.set(true);
+    this.inputAppliesTo.set('Customer');
+    this.inputPenalty.set('No');
+    this.inputStatus.set('Active');
     this.showAddForm.set(true);
   }
 
   startEdit(row: CancellationReason): void {
     this.editingId.set(row.id || null);
-    this.inputReason.set(row.reason_text);
-    this.inputAppliesTo.set(row.applies_to);
-    this.inputIsActive.set(row.is_active);
+    this.inputCode.set(row.code || '');
+    this.inputReason.set(row.reason_text || '');
+    this.inputAppliesTo.set(row.applies_to || 'Customer');
+    this.inputPenalty.set(row.penalty_applicable || 'No');
+    this.inputStatus.set(row.status || 'Active');
     this.showAddForm.set(true);
   }
 
   saveOption(): void {
-    if (!this.inputReason().trim()) {
-      alert('Reason is required.');
+    const reason = this.inputReason().trim();
+    if (!reason) {
+      alert('Reason description is required.');
       return;
     }
     const id = this.editingId();
     const record: CancellationReason = {
-      id: id === 'new' ? 'cr-' + Date.now() : id!,
-      reason_text: this.inputReason().trim(),
+      id: id === 'new' ? Date.now() : id!,
+      code: this.inputCode().trim() || 'CR-00',
+      reason_text: reason,
       applies_to: this.inputAppliesTo(),
-      is_active: this.inputIsActive(),
+      penalty_applicable: this.inputPenalty(),
+      status: this.inputStatus(),
     };
-    if (id === 'new') this.list.update((l) => [...l, record]);
-    else this.list.update((l) => l.map((x) => (x.id === id ? record : x)));
+
+    if (id === 'new') {
+      this.list.update((l) => [record, ...l]);
+    } else {
+      this.list.update((l) => l.map((x) => (x.id === id ? record : x)));
+    }
     this.cancelEdit();
   }
 
@@ -91,7 +110,7 @@ export class CancellationReasons implements OnInit {
   }
 
   deleteOption(row: CancellationReason): void {
-    if (confirm('Delete this cancellation reason?')) {
+    if (confirm(`Delete cancellation reason "${row.reason_text}"?`)) {
       this.list.update((l) => l.filter((x) => x.id !== row.id));
     }
   }

@@ -3,12 +3,14 @@ import { HttpClient } from '@angular/common/http';
 import { AdminPage } from '../../../../admin/admin-page/admin-page';
 
 interface DriverLocation {
-  id?: string;
+  id?: number | string;
   driver_name: string;
-  booking_code: string | null;
+  phone: string;
+  vehicle: string;
+  city: string;
   latitude: number;
   longitude: number;
-  heading: number;
+  status: string;
   recorded_at: string;
 }
 
@@ -24,28 +26,35 @@ export class DriverLocations implements OnInit {
   private readonly http = inject(HttpClient);
   readonly list = signal<DriverLocation[]>([]);
   readonly showAddForm = signal(false);
-  readonly editingId = signal<string | 'new' | null>(null);
+  readonly editingId = signal<number | string | 'new' | null>(null);
+
+  // --- Form Input Signals ---
   readonly inputDriver = signal('');
-  readonly inputBooking = signal('');
+  readonly inputPhone = signal('');
+  readonly inputVehicle = signal('');
+  readonly inputCity = signal('');
   readonly inputLat = signal('');
   readonly inputLng = signal('');
-  readonly inputHeading = signal('');
+  readonly inputStatus = signal('Online');
   readonly inputRecordedAt = signal('');
 
   readonly tableColumns = JSON.stringify([
-    { key: 'driver_name', label: 'Driver', sortable: true },
-    { key: 'booking_code', label: 'Booking', sortable: true },
+    { key: 'driver_name', label: 'Driver Name', sortable: true },
+    { key: 'phone', label: 'Phone Number', sortable: true },
+    { key: 'vehicle', label: 'Vehicle Assigned', sortable: true },
+    { key: 'city', label: 'City / Region', sortable: true },
     { key: 'latitude', label: 'Latitude', sortable: true },
     { key: 'longitude', label: 'Longitude', sortable: true },
     { key: 'recorded_at', label: 'Recorded At', sortable: true },
+    { key: 'status', label: 'Status', type: 'status', statusMap: { Online: 'success', 'On Trip': 'info', Offline: 'error' } },
   ]);
+
   readonly tableActions = JSON.stringify([
     { icon: 'edit', label: 'Edit', event: 'edit_option' },
     { icon: 'delete', label: 'Delete', event: 'delete_option', variant: 'danger' },
   ]);
-  readonly tableRowsString = computed(() =>
-    JSON.stringify(this.list().map((r) => ({ ...r, booking_code: r.booking_code || '—' })))
-  );
+
+  readonly tableRowsString = computed(() => JSON.stringify(this.list()));
 
   ngOnInit(): void {
     this.http.get<DriverLocation[]>('data/driver_locations.json').subscribe({
@@ -63,42 +72,53 @@ export class DriverLocations implements OnInit {
   startAdd(): void {
     this.editingId.set('new');
     this.inputDriver.set('');
-    this.inputBooking.set('');
-    this.inputLat.set('');
-    this.inputLng.set('');
-    this.inputHeading.set('');
-    this.inputRecordedAt.set(new Date().toISOString());
+    this.inputPhone.set('');
+    this.inputVehicle.set('Personal Sedan');
+    this.inputCity.set('New Delhi');
+    this.inputLat.set('28.6304');
+    this.inputLng.set('77.2177');
+    this.inputStatus.set('Online');
+    this.inputRecordedAt.set(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     this.showAddForm.set(true);
   }
 
   startEdit(row: DriverLocation): void {
     this.editingId.set(row.id || null);
-    this.inputDriver.set(row.driver_name);
-    this.inputBooking.set(row.booking_code || '');
-    this.inputLat.set(String(row.latitude));
-    this.inputLng.set(String(row.longitude));
-    this.inputHeading.set(String(row.heading));
-    this.inputRecordedAt.set(row.recorded_at);
+    this.inputDriver.set(row.driver_name || '');
+    this.inputPhone.set(row.phone || '');
+    this.inputVehicle.set(row.vehicle || '');
+    this.inputCity.set(row.city || '');
+    this.inputLat.set(row.latitude !== undefined ? String(row.latitude) : '');
+    this.inputLng.set(row.longitude !== undefined ? String(row.longitude) : '');
+    this.inputStatus.set(row.status || 'Online');
+    this.inputRecordedAt.set(row.recorded_at || '');
     this.showAddForm.set(true);
   }
 
   saveOption(): void {
-    if (!this.inputDriver().trim()) {
+    const driver = this.inputDriver().trim();
+    if (!driver) {
       alert('Driver name is required.');
       return;
     }
     const id = this.editingId();
     const record: DriverLocation = {
-      id: id === 'new' ? 'dl-' + Date.now() : id!,
-      driver_name: this.inputDriver().trim(),
-      booking_code: this.inputBooking().trim() || null,
+      id: id === 'new' ? Date.now() : id!,
+      driver_name: driver,
+      phone: this.inputPhone().trim() || '—',
+      vehicle: this.inputVehicle().trim() || '—',
+      city: this.inputCity().trim() || '—',
       latitude: +this.inputLat() || 0,
       longitude: +this.inputLng() || 0,
-      heading: +this.inputHeading() || 0,
-      recorded_at: this.inputRecordedAt(),
+      status: this.inputStatus(),
+      recorded_at: this.inputRecordedAt() || 'Just now',
     };
-    if (id === 'new') this.list.update((l) => [...l, record]);
-    else this.list.update((l) => l.map((x) => (x.id === id ? record : x)));
+
+    if (id === 'new') {
+      this.list.update((l) => [record, ...l]);
+    } else {
+      this.list.update((l) => l.map((x) => (x.id === id ? record : x)));
+    }
     this.cancelEdit();
   }
 
@@ -108,7 +128,7 @@ export class DriverLocations implements OnInit {
   }
 
   deleteOption(row: DriverLocation): void {
-    if (confirm('Delete this location record?')) {
+    if (confirm(`Delete location tracking for "${row.driver_name}"?`)) {
       this.list.update((l) => l.filter((x) => x.id !== row.id));
     }
   }

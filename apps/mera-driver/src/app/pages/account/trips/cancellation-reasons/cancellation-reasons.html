@@ -38,16 +38,25 @@
             <sky-card class="p-6 block">
               <div class="section-heading-box"><h3>1. Reason Details</h3></div>
               <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
-                <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Reason *" required [value]="inputReason()" (input)="inputReason.set($any($event.target).value)"></md-outlined-text-field>
+                <md-outlined-text-field label="Reason Code *" required [value]="inputCode()" (input)="inputCode.set($any($event.target).value)" placeholder="e.g. CR-01"></md-outlined-text-field>
+
                 <md-outlined-select label="Applies To" [value]="inputAppliesTo()" (change)="inputAppliesTo.set($any($event.target).value)">
-                  <md-select-option value="customer"><div slot="headline">Customer</div></md-select-option>
-                  <md-select-option value="driver"><div slot="headline">Driver</div></md-select-option>
-                  <md-select-option value="both"><div slot="headline">Both</div></md-select-option>
+                  <md-select-option value="Customer"><div slot="headline">Customer</div></md-select-option>
+                  <md-select-option value="Driver"><div slot="headline">Driver</div></md-select-option>
+                  <md-select-option value="Both"><div slot="headline">Both</div></md-select-option>
                 </md-outlined-select>
-                <md-outlined-select label="Status" [value]="inputIsActive() ? 'Active' : 'Inactive'" (change)="inputIsActive.set($any($event.target).value === 'Active')">
+
+                <md-outlined-select label="Penalty Applicable" [value]="inputPenalty()" (change)="inputPenalty.set($any($event.target).value)">
+                  <md-select-option value="Yes"><div slot="headline">Yes</div></md-select-option>
+                  <md-select-option value="No"><div slot="headline">No</div></md-select-option>
+                </md-outlined-select>
+
+                <md-outlined-select label="Status" [value]="inputStatus()" (change)="inputStatus.set($any($event.target).value)">
                   <md-select-option value="Active"><div slot="headline">Active</div></md-select-option>
                   <md-select-option value="Inactive"><div slot="headline">Inactive</div></md-select-option>
                 </md-outlined-select>
+
+                <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Reason Description *" required [value]="inputReason()" (input)="inputReason.set($any($event.target).value)" placeholder="Describe reason details..."></md-outlined-text-field>
               </div>
             </sky-card>
           </div>
