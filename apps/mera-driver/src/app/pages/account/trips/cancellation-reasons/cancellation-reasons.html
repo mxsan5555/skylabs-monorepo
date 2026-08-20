@@ -1,6 +1,6 @@
 <md-admin-page
   [title]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit Cancellation Reason' : 'Add Cancellation Reason') : 'Cancellation Reasons'"
-  [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit cancellation reason details' : 'Add a new cancellation reason') : 'Predefined reasons shown when a trip is cancelled.'"
+  [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit cancellation reason details' : 'Add a new cancellation reason') : 'Master list of predefined cancellation reasons shown in-app.'"
 >
   <div class="relative w-full">
     @if (!showAddForm()) {

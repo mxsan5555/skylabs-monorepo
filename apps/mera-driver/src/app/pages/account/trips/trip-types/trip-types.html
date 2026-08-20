@@ -1,6 +1,6 @@
 <md-admin-page
   [title]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit Trip Type' : 'Add Trip Type') : 'Trip Types'"
-  [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit trip type details' : 'Add a new trip type') : 'Configure one-way, round-trip, hourly, and outstation packages.'"
+  [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit trip type details' : 'Add a new trip type') : 'Types of trips offered (one-way, round trip, local, outstation, airport).'"
 >
   <div class="relative w-full">
     @if (!showAddForm()) {

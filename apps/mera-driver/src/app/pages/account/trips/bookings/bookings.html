@@ -1,6 +1,6 @@
 <md-admin-page
   [title]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit Booking' : 'Add Booking') : 'Bookings'"
-  [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit booking details' : 'Add a new booking') : 'View and manage customer ride bookings.'"
+  [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit booking details' : 'Add a new booking') : 'Core trip/booking record from customer request to completion.'"
 >
   <div class="relative w-full">
     @if (!showAddForm()) {

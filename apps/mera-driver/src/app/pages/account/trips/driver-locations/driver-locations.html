@@ -1,6 +1,6 @@
 <md-admin-page
   [title]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit Driver Location' : 'Log Driver Location') : 'Driver Locations'"
-  [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit driver location details' : 'Log a new driver GPS coordinate entry') : 'Real-time GPS tracking and live driver locations.'"
+  [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit driver location details' : 'Log a new driver GPS coordinate entry') : 'Master list of predefined cancellation reasons shown in-app.'"
 >
   <div class="relative w-full">
     @if (!showAddForm()) {

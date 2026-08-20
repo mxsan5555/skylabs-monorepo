@@ -1,6 +1,6 @@
 {
   "title": "Driver Registry",
-  "subtitle": "Manage and view registered drivers (Loaded dynamically from static JSON data).",
+  "subtitle": "Registered drivers on the platform.",
   "cardTitle": "Register New Driver",
   "labelName": "Full Name",
   "placeholderName": "e.g. Rahul Verma",
