@@ -117,22 +117,13 @@
         "order": 1
       },
       {
-        "id": "payments-transactions",
-        "title": "Transactions",
-        "icon": "sync_alt",
-        "route": "/payments/transactions",
-        "permissionKey": "payments.transactions",
-        "parent": "payments-group",
-        "order": 2
-      },
-      {
         "id": "payments-wallet-transactions",
         "title": "Wallet Transactions",
         "icon": "account_balance_wallet",
         "route": "/payments/wallet-transactions",
         "permissionKey": "payments.wallet-transactions",
         "parent": "payments-group",
-        "order": 3
+        "order": 2
       },
       {
         "id": "payments-driver-payouts",
@@ -141,7 +132,7 @@
         "route": "/payments/driver-payouts",
         "permissionKey": "payments.driver-payouts",
         "parent": "payments-group",
-        "order": 4
+        "order": 3
       }
     ]
   },

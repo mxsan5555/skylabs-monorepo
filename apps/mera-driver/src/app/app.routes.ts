@@ -148,14 +148,6 @@ export const appRoutes: Routes = [
           import('./pages/account/payments/payments').then((m) => m.Payments),
       },
       {
-        path: 'payments/transactions',
-        title: 'Transactions · mera-driver',
-        canActivate: [permissionGuard],
-        data: { permission: { menuKey: 'payments.transactions', action: 'view' }, title: 'Transactions', subtitle: 'Payment transaction logs.' },
-        loadComponent: () =>
-          import('./pages/account/payments/transactions/transactions').then((m) => m.PaymentTransactions),
-      },
-      {
         path: 'payments/wallet-transactions',
         title: 'Wallet Transactions · mera-driver',
         canActivate: [permissionGuard],
