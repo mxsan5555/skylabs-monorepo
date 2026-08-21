@@ -46,25 +46,26 @@ export class Sidebar {
   protected readonly initial = computed(() => (this.user()?.name ?? '?').charAt(0).toUpperCase());
 
   protected isGroupExpanded(node: MenuNode): boolean {
-    const toggled = this.userToggled();
-    if (toggled[node.id] !== undefined) {
-      return toggled[node.id];
-    }
-
-    // Auto-expand if any of the child routes are active
+    // 1. If any child route is currently active, ALWAYS keep group expanded so active item is visible
     if (node.children) {
+      const current = this.currentUrl();
       const hasActiveChild = node.children.some((child) => {
         const path = accountPath(child);
-        return path && this.currentUrl().startsWith(path);
+        return path ? (current === path || current.startsWith(path + '/') || current.startsWith(path + '?')) : false;
       });
       if (hasActiveChild) {
         return true;
       }
     }
 
-    // Default: 'masters' is collapsed by default to keep sidebar clean.
-    // Others can be expanded by default.
-    return node.id !== 'masters';
+    // 2. If user manually toggled this group, honor user preference
+    const toggled = this.userToggled();
+    if (toggled[node.id] !== undefined) {
+      return toggled[node.id];
+    }
+
+    // 3. Default: Non-active groups remain collapsed to keep sidebar clean & organized
+    return false;
   }
 
   protected toggleGroup(node: MenuNode): void {
