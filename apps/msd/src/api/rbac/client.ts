@@ -44,10 +44,14 @@ async function request<T>(
   token: string | null,
   init: RequestInit = {},
 ): Promise<ApiResult<T>> {
+  // FormData bodies (multipart file uploads) must never get a hardcoded JSON Content-Type — the
+  // browser sets its own `multipart/form-data; boundary=...` header, which fetch only does
+  // automatically when no Content-Type is set at all.
+  const isFormData = init.body instanceof FormData;
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init.headers ?? {}),
     },
@@ -81,6 +85,13 @@ export function apiPost<T>(path: string, token: string | null, body?: unknown): 
     method: 'POST',
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+}
+
+/** For multipart file uploads (the media-upload system) — `formData` is sent as-is, never
+ *  JSON.stringify'd, and the browser sets its own Content-Type boundary (see `request`'s
+ *  `isFormData` check above). */
+export function apiPostForm<T>(path: string, token: string | null, formData: FormData): Promise<ApiResult<T>> {
+  return request<T>(path, token, { method: 'POST', body: formData });
 }
 
 export function apiPatch<T>(path: string, token: string | null, body?: unknown): Promise<ApiResult<T>> {

@@ -18,6 +18,7 @@ dotenv.config({ path: path.join(__dirname, '../.env.local') });
 import { PrismaClient, Prisma } from '../src/generated/prisma-client';
 import type { PermissionAction, MenuNode } from '@skylabs-monorepo/shared-types';
 import { permissionKeyFor } from '@skylabs-monorepo/shared-permissions';
+import { ensureUniqueSlug } from '../src/lib/slug';
 import { getMenuForApp } from '@skylabs-monorepo/shared-menu';
 import { normalizeIdentifier } from '../src/lib/normalizeIdentifier';
 
@@ -352,35 +353,22 @@ async function seedCategories() {
 }
 
 /** lowercase, non-alphanumeric runs -> single '-', leading/trailing '-' trimmed. */
-function slugify(input: string): string {
-  return (
-    input
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-+|-+$)/g, '') || 'vendor'
-  );
-}
-
 /**
  * One-off backfill for `Vendor.slug` (added in the Therapist/storefront migration) — every
  * existing Vendor row (the 3 demo vendors, and any other pre-existing row) predates this column,
  * so this walks every Vendor with `slug: null` and assigns one derived from `businessName` (or
  * the row's own `id` if businessName is unset). Idempotent and safe to re-run: only ever touches
- * rows that still have `slug: null`, and a collision on the derived slug (extremely unlikely,
- * but checked anyway) falls back to a short id-derived suffix, then the raw id as a last resort.
+ * rows that still have `slug: null`. Shares `ensureUniqueSlug` with `vendor.service.ts`'s
+ * `createVendor`/`createSelfVendor`/`updateVendor` — this used to be a local copy of the same
+ * fallback logic; now there's one implementation.
  */
 async function backfillVendorSlugs(): Promise<number> {
   const vendorsMissingSlug = await prisma.vendor.findMany({ where: { slug: null } });
   for (const v of vendorsMissingSlug) {
-    const base = slugify(v.businessName ?? v.id);
-    let candidate = base;
-    if (await prisma.vendor.findUnique({ where: { slug: candidate } })) {
-      candidate = `${base}-${v.id.slice(0, 6)}`;
-      if (await prisma.vendor.findUnique({ where: { slug: candidate } })) {
-        candidate = v.id; // id is guaranteed unique — last-resort fallback
-      }
-    }
-    await prisma.vendor.update({ where: { id: v.id }, data: { slug: candidate } });
+    const slug = await ensureUniqueSlug(v.businessName ?? v.id, v.id, (candidate) =>
+      prisma.vendor.findUnique({ where: { slug: candidate } }).then(Boolean),
+    );
+    await prisma.vendor.update({ where: { id: v.id }, data: { slug } });
   }
   return vendorsMissingSlug.length;
 }

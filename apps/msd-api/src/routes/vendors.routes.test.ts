@@ -212,6 +212,34 @@ describe('POST /api/v1/vendors (admin create)', () => {
     expect(res.body.data.status).toBe('PENDING_VERIFICATION'); // gst+pan present -> skip PROFILE_INCOMPLETE
     expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
   });
+
+  it('generates a non-null, businessName-derived slug — never leaves it null', async () => {
+    resolveMock.mockResolvedValue(['vendors:create']);
+    prismaMock.vendor.findUnique.mockResolvedValue(null); // no existing vendor owns this slug
+    prismaMock.vendor.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: VENDOR_A_ID, ...data }),
+    );
+    const res = await request(app)
+      .post('/api/v1/vendors')
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ businessName: 'Urban Wellness Spa' });
+    expect(res.status).toBe(201);
+    expect(res.body.data.slug).toBe('urban-wellness-spa');
+  });
+
+  it('disambiguates the slug when the plain businessName-derived slug is already taken', async () => {
+    resolveMock.mockResolvedValue(['vendors:create']);
+    prismaMock.vendor.findUnique.mockResolvedValueOnce({ id: 'other-vendor', slug: 'urban-wellness-spa' });
+    prismaMock.vendor.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: VENDOR_A_ID, ...data }),
+    );
+    const res = await request(app)
+      .post('/api/v1/vendors')
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ businessName: 'Urban Wellness Spa' });
+    expect(res.status).toBe(201);
+    expect(res.body.data.slug).toMatch(/^urban-wellness-spa-[a-f0-9]{6}$/);
+  });
 });
 
 describe('Vendor <-> existing User linking', () => {
@@ -282,6 +310,83 @@ describe('Vendor <-> existing User linking', () => {
       .send({ ownerUserId: USER_A_ID });
 
     expect(res.status).toBe(200);
+  });
+});
+
+describe('Vendor mobile phone validation (canonical /^[6-9]\\d{9}$/ rule)', () => {
+  it.each([
+    ['98765abc10', 'letters mixed with digits'],
+    ['123456789', 'only 9 digits'],
+    ['12345678901', '11 digits'],
+    ['5876543210', 'first digit not 6-9'],
+  ])('rejects "%s" (%s)', async (badPhone) => {
+    resolveMock.mockResolvedValue(['vendors:edit']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ businessPhone: badPhone });
+
+    expect(res.status).toBe(422);
+    expect(prismaMock.vendor.update).not.toHaveBeenCalled();
+  });
+
+  it('accepts a bare 10-digit number starting 6-9 and stores it +91-normalized', async () => {
+    resolveMock.mockResolvedValue(['vendors:edit']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.vendor.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ ...vendorAFixture, ...data }),
+    );
+
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ businessPhone: '9876543210' });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.vendor.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ businessPhone: '+919876543210' }) }),
+    );
+  });
+});
+
+describe('POST /api/v1/vendors/:vendorId/branches — latitude/longitude/pincode validation', () => {
+  it('accepts valid latitude/longitude and persists them', async () => {
+    resolveMock.mockResolvedValue(['vendors:create']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.branch.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: BRANCH_A_ID, ...data }),
+    );
+
+    const res = await request(app)
+      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ name: 'Golghar Branch', latitude: 26.7606, longitude: 83.3732, pincode: '273001' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.latitude).toBe(26.7606);
+    expect(res.body.data.longitude).toBe(83.3732);
+  });
+
+  it.each([
+    [{ latitude: 200 }, 'latitude above 90'],
+    [{ latitude: -200 }, 'latitude below -90'],
+    [{ longitude: 300 }, 'longitude above 180'],
+    [{ longitude: -300 }, 'longitude below -180'],
+    [{ pincode: '12345' }, 'a 5-digit pincode'],
+    [{ pincode: 'abcdef' }, 'a non-numeric pincode'],
+  ])('rejects %s (%s)', async (badField) => {
+    resolveMock.mockResolvedValue(['vendors:create']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+
+    const res = await request(app)
+      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ name: 'Golghar Branch', ...badField });
+
+    expect(res.status).toBe(422);
+    expect(prismaMock.branch.create).not.toHaveBeenCalled();
   });
 });
 
@@ -691,5 +796,67 @@ describe('Deal offering integration (Service/Product linkage)', () => {
       .send({ salePrice: '249.00' });
     expect(res.status).toBe(200);
     expect(res.body.data.salePrice).toBe('249.00');
+  });
+});
+
+describe('POST /api/v1/vendors/me/branches/:branchId/therapists — duplicate-submit guard', () => {
+  const therapistBody = { therapistType: 'Legs Therapist', personName: 'Ramesh Kumar' };
+
+  it('creates a therapist normally when no recent identical row exists', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
+    prismaMock.therapist.findFirst.mockResolvedValue(null);
+    prismaMock.therapist.create.mockResolvedValue({ id: 'therapist-1', ...therapistBody, vendorId: VENDOR_A_ID, branchId: BRANCH_A_ID });
+
+    const res = await request(app)
+      .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/therapists`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+      .send(therapistBody);
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.therapist.create).toHaveBeenCalledOnce();
+  });
+
+  it('returns the existing row instead of creating a duplicate when an identical request landed in the last 10s (rapid double-click)', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
+    const recentRow = { id: 'therapist-1', ...therapistBody, vendorId: VENDOR_A_ID, branchId: BRANCH_A_ID, createdAt: new Date() };
+    prismaMock.therapist.findFirst.mockResolvedValue(recentRow);
+
+    const res = await request(app)
+      .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/therapists`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+      .send(therapistBody);
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.id).toBe('therapist-1');
+    expect(prismaMock.therapist.create).not.toHaveBeenCalled(); // reused the existing row, no second insert
+  });
+
+  it('the near-duplicate lookup is scoped by vendorId/branchId/therapistType/personName and a short createdAt window', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
+    prismaMock.therapist.findFirst.mockResolvedValue(null);
+    prismaMock.therapist.create.mockResolvedValue({ id: 'therapist-2', ...therapistBody, vendorId: VENDOR_A_ID, branchId: BRANCH_A_ID });
+
+    await request(app)
+      .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/therapists`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+      .send(therapistBody);
+
+    expect(prismaMock.therapist.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          vendorId: VENDOR_A_ID,
+          branchId: BRANCH_A_ID,
+          therapistType: therapistBody.therapistType,
+          personName: therapistBody.personName,
+          createdAt: expect.objectContaining({ gte: expect.any(Date) }),
+        }),
+      }),
+    );
   });
 });

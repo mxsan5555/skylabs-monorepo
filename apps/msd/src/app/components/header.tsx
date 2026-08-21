@@ -226,24 +226,18 @@ export function Header() {
 
   useEffect(() => {
     /**
-     * Cart API belongs only to customer storefront.
-     *
-     * IMPORTANT:
-     * The cart icon itself is visible to everyone.
-     *
-     * But we DO NOT call customer cart API for:
-     * - Guest
-     * - SuperAdmin
-     * - Admin
-     * - Vendor
-     * - Marketing
-     * - Sales
+     * The cart icon itself is visible to everyone (including guests). The COUNT is fetched for
+     * any signed-in user, regardless of role — `GET /cart` and `GET /bookings` are gated on
+     * `authenticate` alone server-side (no role/permission check; see cart.routes.ts/
+     * booking.routes.ts doc comments), so a staff/admin/vendor account can genuinely have real
+     * items in their own cart (every public "Add to Cart"/"Book Now" button is reachable by any
+     * signed-in user, not customer-role-gated) and must see an accurate badge too — gating this
+     * fetch more strictly than the backend itself gates the API would silently show a
+     * hardcoded 0 for those accounts even though Add to Cart genuinely succeeded. Only an
+     * unauthenticated guest (no token to fetch with) shows 0.
      */
 
-    if (
-      !isAuthenticated ||
-      !isCustomer
-    ) {
+    if (!isAuthenticated) {
       setTotalItems(0);
       return;
     }
@@ -291,7 +285,6 @@ export function Header() {
     };
   }, [
     isAuthenticated,
-    isCustomer,
     token,
   ]);
 
@@ -332,7 +325,9 @@ export function Header() {
   // ---------------------------------------------------------------------------
 
   const handleSignOut = () => {
-    clearCart(token);
+    // Signing out must never delete the customer's persisted cart — they should see the same
+    // items when they sign back in. Only local UI state resets here (the badge naturally drops
+    // to 0 via the effect above once `isAuthenticated` flips false).
     signOut();
 
     setProfileMenuOpen(false);

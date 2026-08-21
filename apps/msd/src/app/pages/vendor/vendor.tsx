@@ -14,6 +14,7 @@ import { TherapistPackageSelector } from '../../components/therapist-package-sel
 import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selection';
 import { useTherapistPurchaseSelection } from '../../../hooks/use-therapist-purchase-selection';
 import { formatINR, pluralize } from '../../../utils/format';
+import { resolveDealMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import { useToast } from '../../../toast/toast-context';
 import './vendor.css';
 import content from '../../../content.json';
@@ -455,7 +456,7 @@ export function VendorPage() {
                               const isSelected = group.id === selectedServiceId;
                               const deal = group.deal;
                               const fromPrice = dealFromPrice(deal);
-                              const thumb = deal.service?.image ?? deal.images?.[0] ?? undefined;
+                              const thumb = primaryImage(resolveDealMedia(deal));
                               return (
                                 <label
                                   key={group.id}
@@ -540,7 +541,7 @@ export function VendorPage() {
                       badge={vendorContent.labels.products}
                       eyebrow={deal.product?.brand ?? undefined}
                       heading={deal.product?.name ?? deal.title}
-                      image={deal.product?.image ?? deal.images?.[0] ?? undefined}
+                      image={primaryImage(resolveDealMedia(deal))}
                       imageAlt={deal.product?.imageAlt ?? undefined}
                       price={formatINR(Number(deal.salePrice))}
                       originalPrice={
@@ -591,10 +592,10 @@ export function VendorPage() {
                         onChange={() => handleTherapistSelect(t.id)}
                       />
 
-                      {t.photoUrl && (
+                      {primaryImage(resolveTherapistMedia(t)) && (
                         <img
                           className="vendor-page__deal-card-img"
-                          src={t.photoUrl}
+                          src={primaryImage(resolveTherapistMedia(t))}
                           alt=""
                           loading="lazy"
                           width={120}
@@ -726,10 +727,10 @@ function DealSelectionPanel({
     <>
       {/* Selected deal preview */}
       <div className="vendor-page__selected-deal">
-        {(group.deal.service?.image ?? group.deal.images?.[0]) && (
+        {primaryImage(resolveDealMedia(group.deal)) && (
           <img
             className="vendor-page__selected-thumb"
-            src={group.deal.service?.image ?? group.deal.images?.[0]}
+            src={primaryImage(resolveDealMedia(group.deal))}
             alt=""
             loading="lazy"
             width={52}
@@ -886,10 +887,10 @@ function TherapistSelectionPanel({
     <>
       {/* Selected therapist preview */}
       <div className="vendor-page__selected-deal">
-        {therapist.photoUrl && (
+        {primaryImage(resolveTherapistMedia(therapist)) && (
           <img
             className="vendor-page__selected-thumb"
-            src={therapist.photoUrl}
+            src={primaryImage(resolveTherapistMedia(therapist))}
             alt=""
             loading="lazy"
             width={52}

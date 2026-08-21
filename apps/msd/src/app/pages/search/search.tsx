@@ -27,6 +27,7 @@ import {
 } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR, formatBookingSchedule } from '../../../utils/format';
+import { resolveDealMedia, primaryImage } from '../../../utils/media';
 import content from '../../../content.json';
 import './search.css';
 import { Map } from '../../components/map';
@@ -320,7 +321,7 @@ export function Search() {
                 <ul className="search-results-list">
                   {deals.map((deal) => {
                     const heading = deal.service?.name ?? deal.product?.name ?? deal.title;
-                    const image = deal.service?.image ?? deal.product?.image ?? deal.images?.[0];
+                    const image = primaryImage(resolveDealMedia(deal));
                     const imageAlt = deal.service?.imageAlt ?? deal.product?.imageAlt ?? heading;
                     return (
                       <li key={deal.id} className="search-results-list__item">
@@ -422,7 +423,7 @@ export function Search() {
                   {deals.map((deal) => (
                     <li key={deal.id}>
                       <SkyProductCardWC
-                        image={deal.service?.image ?? deal.product?.image ?? deal.images?.[0]}
+                        image={primaryImage(resolveDealMedia(deal))}
                         imageAlt={deal.service?.imageAlt ?? deal.product?.imageAlt ?? undefined}
                         badge={deal.service
                           ? searchContent.labels.service
@@ -466,7 +467,7 @@ export function Search() {
                           .slice(0, 5)
                           .map((deal) => {
                             const heading = deal.service?.name ?? deal.product?.name ?? deal.title;
-                            const image = deal.service?.image ?? deal.product?.image ?? deal.images?.[0];
+                            const image = primaryImage(resolveDealMedia(deal));
                             const imageAlt = deal.service?.imageAlt ?? deal.product?.imageAlt ?? heading;
                             return (
                               <li key={deal.id} className="search-map__list-item">

@@ -10,6 +10,7 @@ import type { Booking } from '../../../api/bookings';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { TherapistBookingDialog } from '../../components/therapist-booking-dialog';
 import { formatBookingSchedule, bookingDisplayName, pluralize } from '../../../utils/format';
+import { resolveTherapistMedia } from '../../../utils/media';
 
 import '../deal-detail/deal-detail.css';
 
@@ -32,6 +33,7 @@ export function TherapistDetail() {
 
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
   const [actionMessage, setActionMessage] = useState('');
+  const [activeImg, setActiveImg] = useState(0);
   const resultDialogRef = useRef<MdDialog>(null);
 
   useEffect(() => {
@@ -80,6 +82,7 @@ export function TherapistDetail() {
   };
 
   const fromPrice = therapist.packages.length > 0 ? Math.min(...therapist.packages.map((p) => Number(p.sellingPrice))) : null;
+  const media = resolveTherapistMedia(therapist);
 
   return (
     <div className="deal-detail">
@@ -101,10 +104,29 @@ export function TherapistDetail() {
       <div className="deal-detail__layout">
         <div className="deal-detail__gallery">
           <div className="deal-detail__main-img-wrap">
-            {therapist.photoUrl && (
-              <img className="deal-detail__main-img" src={therapist.photoUrl} alt={therapist.personName} width={800} height={450} />
+            {media.images[activeImg] && (
+              <img className="deal-detail__main-img" src={media.images[activeImg]} alt={therapist.personName} width={800} height={450} />
             )}
           </div>
+
+          {media.images.length > 1 && (
+            <div className="deal-detail__thumbs" aria-label="Gallery thumbnails">
+              {media.images.map((image, index) => (
+                <button
+                  key={`${image}-${index}`}
+                  type="button"
+                  className={`deal-detail__thumb${index === activeImg ? ' deal-detail__thumb--active' : ''}`}
+                  onClick={() => setActiveImg(index)}
+                  aria-label={`View image ${index + 1}`}
+                  aria-pressed={index === activeImg}
+                >
+                  <img src={image} alt="" width={80} height={60} loading="lazy" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {media.video && <video className="deal-detail__video" controls src={media.video} />}
         </div>
 
         <div className="deal-detail__info">

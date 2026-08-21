@@ -306,6 +306,22 @@ input[type='checkbox'] {
   color: var(--md-sys-color-on-error-container, #410002);
 }
 
+/* Reports — simple CSS-width bar next to a revenue figure in a data-table cell (no chart
+   library installed for this; see reports.tsx's own doc comment). */
+.bar-viz {
+  margin-top: 4px;
+  height: 6px;
+  border-radius: 3px;
+  background-color: var(--md-sys-color-surface-container-highest, #e2e2e2);
+  overflow: hidden;
+}
+
+.bar-viz__fill {
+  height: 100%;
+  border-radius: 3px;
+  background-color: var(--md-sys-color-primary);
+}
+
 /* Data table */
 .data-table-wrap {
   overflow-x: auto;
@@ -410,12 +426,42 @@ input[type='checkbox'] {
 
 .form-grid {
   display: grid;
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px 20px;
+  /* Every admin form in the app (Deal/Product/Therapist/Branch/Vendor) uses this class —
+     collapses to one column below ~500px (minmax's floor), up to 2-3 columns on wider
+     viewports, without a dedicated breakpoint per form. */
+  max-width: 100%;
 }
 
 .form-grid md-outlined-text-field,
 .form-grid md-outlined-select {
   width: 100%;
+}
+
+/* Elements that must always span every column, never squeeze into a single field-width cell —
+   section headers, hints/errors, fieldsets (packages, KYC documents, etc.), and the save/cancel
+   action row. */
+.form-grid > .section-title,
+.form-grid > .field-hint,
+.form-grid > .error-state,
+.form-grid > fieldset,
+.form-grid > .form-actions,
+.form-grid > section {
+  grid-column: 1 / -1;
+}
+
+/* Long unbroken values (GSTIN, PAN, email, phone, slug, addresses, business descriptions) must
+   wrap inside their container instead of forcing horizontal overflow — the actual root cause of
+   the vendor detail page's reported layout breakage. Applies wherever this app displays a
+   read-only label/value pair (vendor detail sections, review-style summaries). */
+.form-grid dt,
+.form-grid dd,
+.form-grid p,
+.panel dt,
+.panel dd {
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .form-actions {

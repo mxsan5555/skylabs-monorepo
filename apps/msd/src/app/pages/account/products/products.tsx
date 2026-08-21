@@ -23,6 +23,7 @@ import {
 } from '../../../../api/rbac/products';
 import { listCategories, type Category } from '../../../../api/rbac/categories';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { MediaUploader } from '../../../components/media-uploader';
 
 const PRODUCT_COLUMNS = JSON.stringify([
   { key: 'Name', label: 'Name' },
@@ -107,12 +108,15 @@ export function ProductManagement() {
     if (existing) {
       const { data } = await updateProduct(token, existing.id, input);
       setProducts((prev) => prev.map((p) => (p.id === data.id ? data : p)));
+      setMessage('Saved.');
+      return data;
     } else {
       const { data } = await createProduct(token, input);
       setProducts((prev) => [data, ...prev]);
       setTotal((t) => t + 1);
+      setMessage('Saved.');
+      return data;
     }
-    setMessage('Saved.');
   };
 
   const toggleStatus = async (product: Product) => {
@@ -233,7 +237,7 @@ export function ProductManagement() {
       />
 
       {canCreate && categories.length > 0 && (
-        <ProductFormDialog dialogRef={addDialogRef} categories={categories} onSave={(input) => save(input)} />
+        <ProductFormDialog dialogRef={addDialogRef} categories={categories} token={token} onSave={(input) => save(input)} />
       )}
 
       {canEdit && (
@@ -242,6 +246,7 @@ export function ProductManagement() {
           dialogRef={editDialogRef}
           categories={categories}
           product={editingProduct ?? undefined}
+          token={token}
           onSave={(input) => save(input, editingProduct ?? undefined)}
           onClose={() => setEditingProduct(null)}
         />
@@ -256,13 +261,15 @@ function ProductFormDialog({
   dialogRef,
   categories,
   product,
+  token,
   onSave,
   onClose,
 }: {
   dialogRef: RefObject<MdDialog>;
   categories: Category[];
   product?: Product;
-  onSave: (input: ProductInput) => Promise<void>;
+  token: string | null;
+  onSave: (input: ProductInput) => Promise<Product | void>;
   onClose?: () => void;
 }) {
   const [form, setForm] = useState<ProductInput>(
@@ -277,9 +284,6 @@ function ProductFormDialog({
           description: product.description ?? undefined,
           ingredients: product.ingredients ?? undefined,
           returnPolicy: product.returnPolicy ?? undefined,
-          image: product.image ?? undefined,
-          gallery: product.gallery ?? [],
-          imageAlt: product.imageAlt ?? undefined,
           badge: product.badge ?? undefined,
           price: product.price,
           originalPrice: product.originalPrice ?? undefined,
@@ -293,14 +297,14 @@ function ProductFormDialog({
   );
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Tracks the entity MediaUploader should upload against — see DealDialog's identical
+  // `savedDeal` state for the full staged-upload-after-create rationale.
+  const [savedProduct, setSavedProduct] = useState<Product | undefined>(product);
 
   const parentCategories = categories.filter((c) => !c.parentId);
   const subcategoryOptions = categories.filter((c) => c.parentId === form.categoryId);
 
   const set = <K extends keyof ProductInput>(key: K, value: ProductInput[K]) => setForm((f) => ({ ...f, [key]: value }));
-
-  const gallery = form.gallery ?? [];
-  const setGallery = (urls: string[]) => set('gallery', urls);
 
   const submit = async () => {
     if (!form.name.trim() || !form.slug.trim() || !form.categoryId || !form.price.trim()) {
@@ -310,8 +314,12 @@ function ProductFormDialog({
     setSubmitting(true);
     setError('');
     try {
-      await onSave(form);
-      dialogRef.current?.close();
+      const result = await onSave(form);
+      if (!product && result) {
+        setSavedProduct(result);
+      } else {
+        dialogRef.current?.close();
+      }
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not save.');
     } finally {
@@ -373,29 +381,13 @@ function ProductFormDialog({
         <OutlinedTextField label="Ingredients" value={form.ingredients ?? ''} onInput={(e: Event) => set('ingredients', (e.target as HTMLInputElement).value)} />
         <OutlinedTextField label="Return policy" value={form.returnPolicy ?? ''} onInput={(e: Event) => set('returnPolicy', (e.target as HTMLInputElement).value)} />
 
-        <OutlinedTextField label="Primary image URL" value={form.image ?? ''} onInput={(e: Event) => set('image', (e.target as HTMLInputElement).value)} />
-        <OutlinedTextField label="Image alt text" value={form.imageAlt ?? ''} onInput={(e: Event) => set('imageAlt', (e.target as HTMLInputElement).value)} />
-
-        <fieldset>
-          <legend>Gallery images</legend>
-          {gallery.map((url, i) => (
-            <div className="form-grid" key={i}>
-              <OutlinedTextField
-                label={`Image URL ${i + 1}`}
-                value={url}
-                onInput={(e: Event) => setGallery(gallery.map((u, idx) => (idx === i ? (e.target as HTMLInputElement).value : u)))}
-              />
-              <OutlinedButton onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))}>
-                <Icon slot="icon" aria-hidden="true">delete</Icon>
-                Remove
-              </OutlinedButton>
-            </div>
-          ))}
-          <OutlinedButton onClick={() => setGallery([...gallery, ''])}>
-            <Icon slot="icon" aria-hidden="true">add</Icon>
-            Add gallery image
-          </OutlinedButton>
-        </fieldset>
+        <MediaUploader
+          entityType="product"
+          entityId={savedProduct?.id ?? null}
+          existingImages={savedProduct?.mediaImages ?? []}
+          existingVideo={savedProduct?.mediaVideo ?? null}
+          token={token}
+        />
 
         <label className="widget-assign-row__label">
           <input type="checkbox" checked={form.isNew ?? false} onChange={(e) => set('isNew', e.target.checked)} />

@@ -409,9 +409,47 @@ model Vendor {
   orders     Order[]
   orderItems OrderItem[]
   therapists Therapist[]
+  mediaImages VendorImage[]
+  mediaVideo  VendorVideo?
 
   @@index([status])
   @@index([ownerUserId])
+}
+
+/// One uploaded image for a Vendor's public profile — part of the shared Deal/Product/
+/// Therapist/Vendor media-upload system (see DealImage's doc comment for the full architecture
+/// rationale, identical here). `Vendor.logoUrl` stays populated as the legacy pasted-URL field
+/// and is never written to going forward; the frontend resolver prefers this table and falls
+/// back to `logoUrl` only for rows that predate it.
+model VendorImage {
+  id               String   @id @default(uuid())
+  vendorId         String
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  sortOrder        Int      @default(0)
+  isPrimary        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+}
+
+/// A Vendor's single optional profile video — one-to-one, enforced by the @unique on vendorId.
+model VendorVideo {
+  id               String   @id @default(uuid())
+  vendorId         String   @unique
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 }
 
 model Branch {
@@ -477,6 +515,8 @@ model Therapist {
   bookings   Booking[]
   packages   TherapistPackage[]
   orderItems OrderItem[]
+  mediaImages TherapistImage[]
+  mediaVideo  TherapistVideo?
 
   @@index([vendorId])
   @@index([branchId])
@@ -516,6 +556,42 @@ model TherapistPackage {
 
   @@unique([therapistId, durationMinutes])
   @@index([therapistId])
+}
+
+/// One uploaded photo for a Therapist — part of the shared Deal/Product/Therapist media-upload
+/// system (see DealImage's doc comment for the full architecture rationale, identical here).
+/// `Therapist.photoUrl` stays populated as the legacy single-URL field and is never written to
+/// going forward; the resolver on the frontend prefers `images` (ordered by sortOrder, primary
+/// first) and falls back to `photoUrl` only for rows that predate this table.
+model TherapistImage {
+  id               String   @id @default(uuid())
+  therapistId      String
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  sortOrder        Int      @default(0)
+  isPrimary        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  therapist Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@index([therapistId])
+}
+
+/// A Therapist's single optional video — one-to-one, enforced by the @unique on therapistId.
+model TherapistVideo {
+  id               String   @id @default(uuid())
+  therapistId      String   @unique
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  therapist Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
 }
 
 /// Self-referential category tree (a row with a non-null parentId IS a subcategory) — the
@@ -598,6 +674,8 @@ model Deal {
   orderItems    OrderItem[]
   wishlistItems WishlistItem[]
   packages      DealPackage[]
+  mediaImages   DealImage[]
+  mediaVideo    DealVideo?
 
   @@index([vendorId])
   @@index([branchId])
@@ -632,6 +710,46 @@ model DealPackage {
 
   @@unique([dealId, durationMinutes])
   @@index([dealId])
+}
+
+/// One uploaded image for a Deal — part of the shared Deal/Product/Therapist media-upload
+/// system. Deliberately a real per-entity table (not a polymorphic entityType/entityId `Media`
+/// table) so the FK + `onDelete: Cascade` gives real referential integrity, matching this
+/// schema's established convention for every other child table (DealPackage, TherapistPackage).
+/// `Deal.images` (Json) stays populated as the legacy URL-array field and is never written to
+/// going forward — a one-time backfill script seeds one DealImage per legacy URL for existing
+/// rows; the frontend resolver prefers this table and falls back to the legacy field only for
+/// rows that were never re-edited after this table shipped. At most one row per dealId may have
+/// `isPrimary = true` (enforced by a partial unique index in the migration, not just app logic).
+model DealImage {
+  id               String   @id @default(uuid())
+  dealId           String
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  sortOrder        Int      @default(0)
+  isPrimary        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+}
+
+/// A Deal's single optional video — one-to-one, enforced by the @unique on dealId.
+model DealVideo {
+  id               String   @id @default(uuid())
+  dealId           String   @unique
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
 }
 
 /// Standalone retail product catalog (e.g. skincare) — unlike Deal, NOT vendor/branch-scoped;
@@ -677,8 +795,46 @@ model Product {
   category    Category  @relation("ProductCategory", fields: [categoryId], references: [id])
   subcategory Category? @relation("ProductSubcategory", fields: [subcategoryId], references: [id])
   deals       Deal[]
+  mediaImages ProductImage[]
+  mediaVideo  ProductVideo?
 
   @@index([categoryId])
+}
+
+/// One uploaded image for a Product — part of the shared Deal/Product/Therapist media-upload
+/// system (see DealImage's doc comment for the full architecture rationale, identical here).
+/// `Product.image`/`gallery` stay populated as the legacy fields and are never written to going
+/// forward; the frontend resolver prefers this table and falls back to the legacy fields only
+/// for rows that predate it.
+model ProductImage {
+  id               String   @id @default(uuid())
+  productId        String
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  sortOrder        Int      @default(0)
+  isPrimary        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+/// A Product's single optional video — one-to-one, enforced by the @unique on productId.
+model ProductVideo {
+  id               String   @id @default(uuid())
+  productId        String   @unique
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 /// Marketplace service catalog master (e.g. "Haircut") — Category/Sub-category scoped, like
@@ -724,11 +880,21 @@ model Cart {
   id         String  @id @default(uuid())
   customerId String  @unique
 
+  /// Set when `createOrderFromCart` creates an Order from this cart's items — the cart's items
+  /// are deliberately NOT deleted at that moment (only once payment actually succeeds, via
+  /// `finalizeCartForOrder`, see order.service.ts/payment.service.ts). While set, a repeat
+  /// checkout call reuses this same Order instead of creating a duplicate (same idempotency
+  /// discipline as Payment's own createOrReusePayment). Cleared back to null either by
+  /// `finalizeCartForOrder` (success) or by `createOrderFromCart` itself, when it finds this
+  /// pointing at an Order that's since gone CANCELLED (so a fresh checkout attempt can proceed).
+  pendingOrderId String? @unique
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  customer User       @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  items    CartItem[]
+  customer    User       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items       CartItem[]
+  pendingOrder Order?    @relation(fields: [pendingOrderId], references: [id])
 }
 
 model CartItem {
@@ -917,6 +1083,10 @@ model Order {
   booking  Booking?    @relation(fields: [bookingId], references: [id])
   items    OrderItem[]
   payments Payment[]
+  /// Back-relation for Cart.pendingOrderId — see that field's doc comment. Nullable/optional:
+  /// most Orders (once finalized, or every Order predating this field) have no Cart pointing at
+  /// them anymore.
+  pendingForCart Cart?
 
   @@index([customerId])
   @@index([vendorId])

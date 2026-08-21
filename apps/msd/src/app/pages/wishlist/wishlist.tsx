@@ -8,6 +8,7 @@ import { ApiRequestError } from '../../../api/rbac/client';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import type { CatalogDeal } from '../../../api/catalog';
 import { formatINR, pluralize } from '../../../utils/format';
+import { resolveDealMedia, primaryImage } from '../../../utils/media';
 import content from '../../../content.json';
 import './wishlist.css';
 const { wishlist: wishlistContent } = content;
@@ -88,7 +89,7 @@ export function Wishlist() {
                   eyebrow={[deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · ') || undefined}
                   eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
                   heading={deal.service?.name ?? deal.product?.name ?? deal.title}
-                  image={deal.service?.image ?? deal.product?.image ?? deal.images?.[0] ?? undefined}
+                  image={primaryImage(resolveDealMedia(deal))}
                   imageAlt={deal.service?.imageAlt ?? deal.product?.imageAlt ?? undefined}
                   price={formatINR(Number(deal.salePrice))}
                   originalPrice={

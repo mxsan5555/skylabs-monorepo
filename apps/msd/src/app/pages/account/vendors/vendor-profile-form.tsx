@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FilledButton, OutlinedButton, OutlinedTextField, Icon } from '@skylabs-monorepo/shared-ui/react';
 import type { KycDocument, Vendor, VendorFields } from '../../../../api/rbac/vendors';
+import { ApiRequestError } from '../../../../api/rbac/client';
 
 const EMPTY_FORM: VendorFields = {
   businessName: '',
@@ -33,13 +34,30 @@ const EMPTY_FORM: VendorFields = {
   upiId: '',
 };
 
+/** Vendor phone fields — see this file's own phone-validation doc comment below. The backend
+ *  always stores these `+91`-prefixed (`vendorPhoneSchema`'s `normalizeIdentifier()` transform).
+ *  The form only ever works with plain 10-digit values, so a `+91` prefix from a previously
+ *  saved vendor must be stripped before it ever reaches form state — otherwise editing an
+ *  existing vendor starts from a 13-character `+91XXXXXXXXXX` string instead of a clean
+ *  10-digit one, which is what made a correct-looking edit intermittently fail validation. */
+const PHONE_FIELDS: (keyof VendorFields)[] = ['businessPhone', 'alternatePhone', 'ownerMobile', 'alternateOwnerMobile'];
+
+function stripIndiaPrefix(value: string): string {
+  const digitsOnly = value.replace(/\D/g, '');
+  return digitsOnly.length === 12 && digitsOnly.startsWith('91') ? digitsOnly.slice(2) : digitsOnly;
+}
+
 function toFormFields(vendor: Vendor | null): VendorFields {
   if (!vendor) return { ...EMPTY_FORM };
   const fields = { ...EMPTY_FORM };
   for (const key of Object.keys(EMPTY_FORM) as (keyof VendorFields)[]) {
     // Skip both undefined (field simply absent from the response) and null (e.g. businessName
     // before Step 2 is filled in) — either way the EMPTY_FORM default ('' / []) is correct.
-    if (vendor[key] !== undefined && vendor[key] !== null) (fields as Record<string, unknown>)[key] = vendor[key];
+    if (vendor[key] !== undefined && vendor[key] !== null) {
+      const raw = vendor[key];
+      (fields as Record<string, unknown>)[key] =
+        PHONE_FIELDS.includes(key) && typeof raw === 'string' ? stripIndiaPrefix(raw) : raw;
+    }
   }
   return fields;
 }
@@ -71,19 +89,16 @@ const SECTION_FIELDS: Record<VendorFormSection, (keyof VendorFields)[]> = {
 const GSTIN_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}\d{1}[Z]{1}[A-Z\d]{1}$/;
 const PAN_REGEX = /^[A-Z]{5}\d{4}[A-Z]{1}$/;
 const PINCODE_REGEX = /^\d{6}$/;
-const INDIA_MOBILE_REGEX = /^\+91\d{10}$/;
-
-/** Local copy of just the phone-shaping half of msd-api's `normalizeIdentifier()` (see
- *  `apps/msd-api/src/lib/normalizeIdentifier.ts`) — same two cases only: a bare 10-digit
- *  number gets `+91` prepended, an already-`+91`-prefixed 10-digit number passes through
- *  unchanged, anything else is left as-is for the regex below to reject. This file is
- *  frontend-only display validation, so it doesn't import the API's server module. */
-function normalizeMobile(value: string): string {
-  const stripped = value.trim().replace(/[^\d+]/g, '');
-  if (/^\d{10}$/.test(stripped)) return `+91${stripped}`;
-  if (/^\+91\d{10}$/.test(stripped)) return stripped;
-  return value.trim();
-}
+/** Canonical Indian mobile rule (the ONLY mobile regex in this file — matches msd-api's
+ *  `INDIA_MOBILE_LOCAL_REGEX` in `vendor.schema.ts` character-for-character, just applied to
+ *  the plain 10-digit value this form always holds instead of the `+91`-prefixed value the
+ *  backend stores). First digit 6-9, exactly 10 digits — no more, no less. */
+const INDIA_MOBILE_REGEX = /^[6-9]\d{9}$/;
+/** Deliberately simple (not RFC 5322) — mirrors the intent of msd-api's `z.string().email()`
+ *  closely enough to catch obviously-invalid input before submit; the backend remains the
+ *  authority (see this section's own doc comment above). */
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const URL_REGEX = /^https?:\/\/.+/i;
 
 function validateGstNumber(value: string): string | null {
   if (!value) return null;
@@ -102,7 +117,17 @@ function validatePincode(value: string): string | null {
 
 function validateMobileNumber(value: string): string | null {
   if (!value) return null;
-  return INDIA_MOBILE_REGEX.test(normalizeMobile(value)) ? null : 'Enter a valid 10-digit mobile number';
+  return INDIA_MOBILE_REGEX.test(value) ? null : 'Enter a valid 10-digit mobile number';
+}
+
+function validateEmail(value: string): string | null {
+  if (!value) return null;
+  return EMAIL_REGEX.test(value) ? null : 'Enter a valid email address';
+}
+
+function validateWebsite(value: string): string | null {
+  if (!value) return null;
+  return URL_REGEX.test(value) ? null : 'Enter a valid URL (starting with http:// or https://)';
 }
 
 const FIELD_VALIDATORS: Partial<Record<keyof VendorFields, (value: string) => string | null>> = {
@@ -113,9 +138,27 @@ const FIELD_VALIDATORS: Partial<Record<keyof VendorFields, (value: string) => st
   alternatePhone: validateMobileNumber,
   ownerMobile: validateMobileNumber,
   alternateOwnerMobile: validateMobileNumber,
+  businessEmail: validateEmail,
+  ownerEmail: validateEmail,
+  website: validateWebsite,
 };
 
-type VendorFieldErrors = Partial<Record<keyof VendorFields, string>>;
+/** Extracts a flat `{field: message}` map from a 422's Zod-flattened `details.fieldErrors`
+ *  (see msd-api's `middleware/validate.ts`) — first message per field only, matching how this
+ *  form already surfaces one message per field. Returns `null` for anything else (network
+ *  error, a non-validation ApiError, etc.) so the caller falls back to its own generic message. */
+export function extractVendorFieldErrors(err: unknown): VendorFieldErrors | null {
+  if (!(err instanceof ApiRequestError) || err.code !== 'VALIDATION_ERROR') return null;
+  const details = err.details as { fieldErrors?: Record<string, string[]> } | undefined;
+  if (!details?.fieldErrors) return null;
+  const flat: VendorFieldErrors = {};
+  for (const [key, messages] of Object.entries(details.fieldErrors)) {
+    if (messages?.[0]) flat[key as keyof VendorFields] = messages[0];
+  }
+  return Object.keys(flat).length > 0 ? flat : null;
+}
+
+export type VendorFieldErrors = Partial<Record<keyof VendorFields, string>>;
 
 interface VendorProfileFormProps {
   vendor: Vendor | null;
@@ -130,6 +173,11 @@ interface VendorProfileFormProps {
   sections?: VendorFormSection[];
   /** Overrides the built-in save button's label — the pipeline uses "Save & Continue". */
   saveLabel?: string;
+  /** Set by the parent after a failed save whose 422 response carried per-field messages (see
+   *  `extractVendorFieldErrors`) — merged into this form's own `errors` state so a field the
+   *  frontend's own `FIELD_VALIDATORS` missed still gets a correct inline error instead of only
+   *  a generic top-level toast. */
+  serverFieldErrors?: VendorFieldErrors | null;
 }
 
 /**
@@ -147,6 +195,7 @@ export function VendorProfileForm({
   onSubmitForVerification,
   sections = ALL_SECTIONS,
   saveLabel,
+  serverFieldErrors,
 }: VendorProfileFormProps) {
   const [form, setForm] = useState<VendorFields>(() => toFormFields(vendor));
   const [kycRejectReason, setKycRejectReason] = useState('');
@@ -158,6 +207,12 @@ export function VendorProfileForm({
     setErrors({});
   }, [vendor]);
 
+  useEffect(() => {
+    if (serverFieldErrors && Object.keys(serverFieldErrors).length > 0) {
+      setErrors((e) => ({ ...e, ...serverFieldErrors }));
+    }
+  }, [serverFieldErrors]);
+
   const set = <K extends keyof VendorFields>(key: K, value: VendorFields[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
     // Clear a field's inline error as soon as the user edits it — the next Save click
@@ -165,6 +220,15 @@ export function VendorProfileForm({
     setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
   };
   const text = (key: keyof VendorFields) => (e: Event) => set(key, (e.target as HTMLInputElement).value as never);
+  /** Phone fields only ever hold digits, max 10 — strips anything else (letters, spaces,
+   *  `+`/`-`, a pasted `+91` prefix) on every keystroke AND on paste, since a paste also fires
+   *  `input`. Re-reads the resulting `e.target.value`, so a pasted "+91 98765-43210" or
+   *  "98765abc10" both collapse to a clean "9876543210" — the browser's own input element is
+   *  then re-synced to the filtered value on the next render via the controlled `value` prop. */
+  const phoneInput = (key: keyof VendorFields) => (e: Event) => {
+    const digitsOnly = (e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 10);
+    set(key, digitsOnly as never);
+  };
 
   const businessNameError =
     show('business') && !(form.businessName ?? '').trim() ? 'This field is required' : null;
@@ -237,23 +301,26 @@ export function VendorProfileForm({
           <OutlinedTextField
             label="Business phone"
             type="tel"
+            inputMode="numeric"
+            maxLength={10}
             value={form.businessPhone ?? ''}
             disabled={!canEdit}
-            onInput={text('businessPhone')}
+            onInput={phoneInput('businessPhone')}
             error={Boolean(errors.businessPhone)}
           />
           {errors.businessPhone && <p className="error-state" role="alert">{errors.businessPhone}</p>}
           <OutlinedTextField
             label="Alternate phone"
             type="tel"
+            inputMode="numeric"
+            maxLength={10}
             value={form.alternatePhone ?? ''}
             disabled={!canEdit}
-            onInput={text('alternatePhone')}
+            onInput={phoneInput('alternatePhone')}
             error={Boolean(errors.alternatePhone)}
           />
           {errors.alternatePhone && <p className="error-state" role="alert">{errors.alternatePhone}</p>}
           <OutlinedTextField label="Website" value={form.website ?? ''} disabled={!canEdit} onInput={text('website')} />
-          <OutlinedTextField label="Logo URL" value={form.logoUrl ?? ''} disabled={!canEdit} onInput={text('logoUrl')} />
         </>
       )}
 
@@ -266,18 +333,22 @@ export function VendorProfileForm({
           <OutlinedTextField
             label="Owner mobile"
             type="tel"
+            inputMode="numeric"
+            maxLength={10}
             value={form.ownerMobile ?? ''}
             disabled={!canEdit}
-            onInput={text('ownerMobile')}
+            onInput={phoneInput('ownerMobile')}
             error={Boolean(errors.ownerMobile)}
           />
           {errors.ownerMobile && <p className="error-state" role="alert">{errors.ownerMobile}</p>}
           <OutlinedTextField
             label="Alternate mobile"
             type="tel"
+            inputMode="numeric"
+            maxLength={10}
             value={form.alternateOwnerMobile ?? ''}
             disabled={!canEdit}
-            onInput={text('alternateOwnerMobile')}
+            onInput={phoneInput('alternateOwnerMobile')}
             error={Boolean(errors.alternateOwnerMobile)}
           />
           {errors.alternateOwnerMobile && <p className="error-state" role="alert">{errors.alternateOwnerMobile}</p>}

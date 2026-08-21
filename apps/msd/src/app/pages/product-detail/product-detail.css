@@ -58,6 +58,13 @@
   flex-wrap: wrap;
 }
 
+.product-detail__video {
+  width: 100%;
+  border-radius: 12px;
+  margin-top: 12px;
+  background: black;
+}
+
 .product-detail__thumb {
   padding: 0;
   border: 2px solid transparent;

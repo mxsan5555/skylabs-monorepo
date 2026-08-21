@@ -4,7 +4,7 @@ import { razorpay } from '../lib/razorpay';
 import { env } from '../config/env';
 import { ApiError } from '../lib/http';
 import { Prisma } from '../generated/prisma-client';
-import { getMyOrderOrThrow, cascadeBookingStatus } from './order.service';
+import { getMyOrderOrThrow, cascadeBookingStatus, finalizeCartForOrder } from './order.service';
 
 /**
  * Razorpay integration for the existing Order (Phase 8) — see the Phase 9 architecture plan.
@@ -98,6 +98,9 @@ export async function createCodPayment(customerId: string, orderId: string) {
     // Consumes the linked Booking out of the customer's "pending cart" — see
     // cascadeBookingStatus's own doc comment in order.service.ts.
     await cascadeBookingStatus(tx, updatedOrder, 'CONFIRMED');
+    // And, symmetrically, finalizes the linked Cart's items — see finalizeCartForOrder's own
+    // doc comment. No-op for a SERVICE order/booking-linked order (nothing to finalize).
+    await finalizeCartForOrder(tx, updatedOrder.id);
     return { payment, updatedOrder };
   });
 
@@ -195,6 +198,8 @@ export async function createCodBatchPayment(customerId: string, orderIds: string
       // Consumes each linked Booking out of the customer's "pending cart" — see
       // cascadeBookingStatus's own doc comment in order.service.ts.
       await cascadeBookingStatus(tx, updatedOrder, 'CONFIRMED');
+      // And, symmetrically, finalizes each linked Cart's items — see finalizeCartForOrder.
+      await finalizeCartForOrder(tx, updatedOrder.id);
       results.push(updatedOrder);
     }
     return results;
@@ -221,6 +226,22 @@ export async function verifyBatchPayment(customerId: string, orderIds: string[],
     return { orders };
   }
 
+  // If any order in this batch was already settled by a different payment attempt (e.g. COD,
+  // placed while this Razorpay attempt was still open in another tab) — this whole batch payment
+  // intent is stale: every order in a batch shares one Razorpay checkout, so if part of it was
+  // already paid another way, the rest must not silently pile a second PAID Payment row on top.
+  // Mark the still-open rows FAILED instead of letting them flip to PAID (see verifyPayment's
+  // identical single-order guard for why — this is what caused a product to show twice in
+  // Payment History, once per payment method).
+  const stillOpen = payments.filter((p) => p.status !== 'PAID');
+  if (orders.some((o) => o.status !== 'PENDING_PAYMENT')) {
+    await prisma.payment.updateMany({
+      where: { id: { in: stillOpen.map((p) => p.id) } },
+      data: { status: 'FAILED', failureReason: 'One or more orders in this batch were already settled by a different payment' },
+    });
+    throw new ApiError('CONFLICT', 'One or more orders in this batch have already been settled');
+  }
+
   const expectedSignature = crypto
     .createHmac('sha256', env.razorpayKeySecret)
     .update(`${input.razorpay_order_id}|${input.razorpay_payment_id}`)
@@ -245,6 +266,8 @@ export async function verifyBatchPayment(customerId: string, orderIds: string[],
       // Consumes each linked Booking out of the customer's "pending cart" — see
       // cascadeBookingStatus's own doc comment in order.service.ts.
       await cascadeBookingStatus(tx, updatedOrder, 'CONFIRMED');
+      // And, symmetrically, finalizes each linked Cart's items — see finalizeCartForOrder.
+      await finalizeCartForOrder(tx, updatedOrder.id);
       results.push(updatedOrder);
     }
     return results;
@@ -282,6 +305,19 @@ export async function verifyPayment(customerId: string, orderId: string, input: 
   if (payment.status === 'PAID') {
     return { order, payment };
   }
+  // The order was already settled by a different payment attempt (e.g. COD placed while this
+  // Razorpay attempt was still open in another tab) — this stray verification must not flip a
+  // second Payment row to PAID on an already-CONFIRMED/COMPLETED order (that's exactly how the
+  // same product ended up showing twice in Payment History, once per payment method).
+  // `createOrReusePayment`/`createCodPayment` already guard the same way at attempt-*creation*
+  // time; this is the matching guard at attempt-*verification* time.
+  if (order.status !== 'PENDING_PAYMENT') {
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: 'FAILED', failureReason: `Order already settled with status ${order.status}` },
+    });
+    throw new ApiError('CONFLICT', `This order has already been settled (status: ${order.status})`);
+  }
 
   const expectedSignature = crypto
     .createHmac('sha256', env.razorpayKeySecret)
@@ -302,6 +338,8 @@ export async function verifyPayment(customerId: string, orderId: string, input: 
     // Consumes the linked Booking out of the customer's "pending cart" — see
     // cascadeBookingStatus's own doc comment in order.service.ts.
     await cascadeBookingStatus(tx, updatedOrder, 'CONFIRMED');
+    // And, symmetrically, finalizes the linked Cart's items — see finalizeCartForOrder.
+    await finalizeCartForOrder(tx, updatedOrder.id);
     return { updatedPayment, updatedOrder };
   });
 
@@ -351,11 +389,30 @@ export async function handleWebhookEvent(body: RazorpayWebhookBody): Promise<voi
 
   if (body.event === 'payment.captured') {
     await prisma.$transaction(async (tx) => {
+      // A pending Payment's Order may have already been settled by a different attempt (e.g.
+      // COD, placed while this Razorpay payment was still in flight) — those must be marked
+      // FAILED here, not PAID, or the order ends up with two "successful-looking" Payment rows
+      // (see verifyPayment's identical guard for the interactive-callback path).
+      const pendingOrderIds = [...new Set(pending.map((p) => p.orderId))];
+      const relatedOrders = await tx.order.findMany({ where: { id: { in: pendingOrderIds } } });
+      const statusByOrderId = new Map(relatedOrders.map((o) => [o.id, o.status]));
+
+      const stale = pending.filter((p) => statusByOrderId.get(p.orderId) !== 'PENDING_PAYMENT');
+      if (stale.length > 0) {
+        await tx.payment.updateMany({
+          where: { id: { in: stale.map((p) => p.id) } },
+          data: { status: 'FAILED', failureReason: 'Order already settled by a different payment attempt' },
+        });
+      }
+
+      const live = pending.filter((p) => statusByOrderId.get(p.orderId) === 'PENDING_PAYMENT');
+      if (live.length === 0) return;
+
       await tx.payment.updateMany({
-        where: { id: { in: pending.map((p) => p.id) } },
+        where: { id: { in: live.map((p) => p.id) } },
         data: { status: 'PAID', providerPaymentId: entity.id, signatureVerified: true },
       });
-      const orderIds = [...new Set(pending.map((p) => p.orderId))];
+      const orderIds = [...new Set(live.map((p) => p.orderId))];
       await tx.order.updateMany({ where: { id: { in: orderIds } }, data: { status: 'CONFIRMED' } });
       // Consumes each linked Booking out of the customer's "pending cart" — see
       // cascadeBookingStatus's own doc comment in order.service.ts. Re-reads the (now-updated)
@@ -363,6 +420,8 @@ export async function handleWebhookEvent(body: RazorpayWebhookBody): Promise<voi
       const updatedOrders = await tx.order.findMany({ where: { id: { in: orderIds } } });
       for (const order of updatedOrders) {
         await cascadeBookingStatus(tx, order, 'CONFIRMED');
+        // And, symmetrically, finalizes each linked Cart's items — see finalizeCartForOrder.
+        await finalizeCartForOrder(tx, order.id);
       }
     });
   } else if (body.event === 'payment.failed') {

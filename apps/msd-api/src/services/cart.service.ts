@@ -1,9 +1,19 @@
 import type { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
+import type { Prisma } from '../generated/prisma-client';
 import type { CartAddItemSchema } from '../schemas/cart.schema';
 
 type CartAddItemInput = z.infer<typeof CartAddItemSchema>;
+
+/** Declared outside CART_INCLUDE's own `as const` (and explicitly typed, not inferred) so this
+ *  stays the mutable array Prisma's generated types expect — nesting a plain array literal
+ *  directly inside an `as const` object freezes it into a readonly tuple, which
+ *  `DealImageOrderByWithRelationInput[]`/`ProductImageOrderByWithRelationInput[]` reject (caught
+ *  by the webpack/ts-loader production build, not by a plain `tsc --noEmit` run — same gotcha as
+ *  vendor.service.ts's DEAL_PACKAGE_ORDER_BY). */
+const DEAL_IMAGE_ORDER_BY: Prisma.DealImageOrderByWithRelationInput[] = [{ isPrimary: 'desc' }, { sortOrder: 'asc' }];
+const PRODUCT_IMAGE_ORDER_BY: Prisma.ProductImageOrderByWithRelationInput[] = [{ isPrimary: 'desc' }, { sortOrder: 'asc' }];
 
 const CART_INCLUDE = {
   items: {
@@ -20,7 +30,16 @@ const CART_INCLUDE = {
           branchId: true,
           vendor: { select: { id: true, businessName: true } },
           branch: { select: { id: true, name: true } },
-          product: { select: { id: true, name: true, image: true, imageAlt: true } },
+          product: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              imageAlt: true,
+              mediaImages: { orderBy: PRODUCT_IMAGE_ORDER_BY },
+            },
+          },
+          mediaImages: { orderBy: DEAL_IMAGE_ORDER_BY },
         },
       },
     },

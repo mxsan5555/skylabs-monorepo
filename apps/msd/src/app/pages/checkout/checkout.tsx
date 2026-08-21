@@ -85,6 +85,13 @@ export function Checkout() {
 
   const initRef = useRef(false);
   const prefilledRef = useRef(false);
+  // Re-entrancy guards for submitDetails/openRazorpay/placeCodOrder — a `disabled` state prop
+  // alone can't stop a second click/tap that fires before React commits the disabling re-render
+  // (same gap fixed for TherapistFormDialog/PackageFormDialog elsewhere in this app). Checked
+  // and set synchronously, before any `await`, so a fast double-click can't start two checkout
+  // requests in the same tick.
+  const submittingDetailsRef = useRef(false);
+  const payingRef = useRef(false);
 
   // ---------------------------------------------------------------------------
   // Customer Details
@@ -254,10 +261,12 @@ export function Checkout() {
   // ---------------------------------------------------------------------------
 
   const submitDetails = async () => {
+    if (submittingDetailsRef.current) return;
     if (!validateDetails()) {
       return;
     }
 
+    submittingDetailsRef.current = true;
     setDetailsSubmitting(true);
     setError('');
 
@@ -311,6 +320,7 @@ export function Checkout() {
           : 'Could not start checkout.',
       );
     } finally {
+      submittingDetailsRef.current = false;
       setDetailsSubmitting(false);
     }
   };
@@ -320,10 +330,12 @@ export function Checkout() {
   // ---------------------------------------------------------------------------
 
   const openRazorpay = async () => {
+    if (payingRef.current) return;
     if (orders.length === 0 || !paymentIntent) {
       return;
     }
 
+    payingRef.current = true;
     setError('');
     setPaying(true);
 
@@ -364,6 +376,7 @@ export function Checkout() {
 
         modal: {
           ondismiss: () => {
+            payingRef.current = false;
             setPaying(false);
           },
         },
@@ -388,6 +401,7 @@ export function Checkout() {
                   : checkoutContent.errors.verificationFailed,
               );
 
+              payingRef.current = false;
               setPaying(false);
             });
         },
@@ -401,6 +415,7 @@ export function Checkout() {
           : 'Could not open the payment gateway.',
       );
 
+      payingRef.current = false;
       setPaying(false);
     }
   };
@@ -410,10 +425,12 @@ export function Checkout() {
   // ---------------------------------------------------------------------------
 
   const placeCodOrder = async () => {
+    if (payingRef.current) return;
     if (orders.length === 0) {
       return;
     }
 
+    payingRef.current = true;
     setError('');
     setPaying(true);
 
@@ -433,6 +450,7 @@ export function Checkout() {
           : 'Could not place your order. Please try again.',
       );
 
+      payingRef.current = false;
       setPaying(false);
     }
   };

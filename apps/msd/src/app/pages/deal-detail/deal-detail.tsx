@@ -23,6 +23,7 @@ import { Breadcrumb } from '../../components/breadcrumb';
 import { DealBookingDialog } from '../../components/deal-booking-dialog';
 
 import { formatINR, formatBookingSchedule, bookingDisplayName } from '../../../utils/format';
+import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
 import './deal-detail.css';
 /**
@@ -160,16 +161,9 @@ export function DealDetail() {
     deal.product?.name ??
     deal.title;
 
-  const gallery =
-    deal.images?.length
-      ? deal.images
-      : [
-        deal.service?.image ??
-        deal.product?.image,
-      ].filter(
-        (image): image is string =>
-          Boolean(image),
-      );
+  const dealMedia = resolveDealMedia(deal);
+  const gallery = dealMedia.images;
+  const video = dealMedia.video;
 
   const description =
     deal.description ??
@@ -355,6 +349,10 @@ export function DealDetail() {
                 </button>
               ))}
             </div>
+          )}
+
+          {video && (
+            <video className="deal-detail__video" controls src={video} />
           )}
         </div>
 

@@ -3,6 +3,14 @@ import { ApiError } from '../lib/http';
 import type { Prisma } from '../generated/prisma-client';
 import { listActiveCategories, getActiveCategoryBySlugOrThrow } from './category.service';
 
+/** Shared by every entity's public select below — only what a card/gallery ever needs, ordered
+ *  primary-first then by sortOrder (see DealImage's schema doc comment for the full media
+ *  architecture). `mimeType`/`originalFilename` are omitted — the frontend never needs them for
+ *  display, just `storageKey`/`isPrimary`. */
+const PUBLIC_MEDIA_IMAGE_SELECT = { id: true, storageKey: true, isPrimary: true, sortOrder: true } as const;
+const PUBLIC_MEDIA_IMAGE_ORDER_BY = [{ isPrimary: 'desc' as const }, { sortOrder: 'asc' as const }];
+const PUBLIC_MEDIA_VIDEO_SELECT = { id: true, storageKey: true } as const;
+
 /**
  * Public, unauthenticated customer catalogue — the read-only "discovery" surface described in
  * the marketplace architecture plan's Phase 6. Everything here is deliberately separate from
@@ -14,7 +22,15 @@ import { listActiveCategories, getActiveCategoryBySlugOrThrow } from './category
 
 /** Only what a public storefront card/hero ever needs — never KYC, bank, owner, or audit fields.
  *  `slug` is included so a deal/product card's vendor-name link can point at `/vendor/:slug`. */
-const PUBLIC_VENDOR_SELECT = { id: true, slug: true, businessName: true, city: true, logoUrl: true } as const;
+const PUBLIC_VENDOR_SELECT = {
+  id: true,
+  slug: true,
+  businessName: true,
+  city: true,
+  logoUrl: true,
+  mediaImages: { orderBy: PUBLIC_MEDIA_IMAGE_ORDER_BY, select: PUBLIC_MEDIA_IMAGE_SELECT },
+  mediaVideo: { select: PUBLIC_MEDIA_VIDEO_SELECT },
+} as const;
 /** `latitude`/`longitude` are included so the Explore map view can plot a deal's real branch
  *  location when it's been set — nullable, since most seeded/onboarded branches don't have
  *  coordinates yet; the frontend must never fabricate a value when these come back null. */
@@ -62,6 +78,8 @@ const PUBLIC_THERAPIST_SELECT = {
     orderBy: PUBLIC_THERAPIST_PACKAGE_ORDER_BY,
     select: PUBLIC_THERAPIST_PACKAGE_SELECT,
   },
+  mediaImages: { orderBy: PUBLIC_MEDIA_IMAGE_ORDER_BY, select: PUBLIC_MEDIA_IMAGE_SELECT },
+  mediaVideo: { select: PUBLIC_MEDIA_VIDEO_SELECT },
 } as const;
 
 /** The flat, independently-browsable Therapist listing (`GET /catalog/therapists`) — unlike the
@@ -87,6 +105,8 @@ const PUBLIC_VENDOR_DETAIL_SELECT = {
   city: true,
   state: true,
   address: true,
+  mediaImages: { orderBy: PUBLIC_MEDIA_IMAGE_ORDER_BY, select: PUBLIC_MEDIA_IMAGE_SELECT },
+  mediaVideo: { select: PUBLIC_MEDIA_VIDEO_SELECT },
   branches: {
     where: { isActive: true },
     select: {
@@ -106,7 +126,17 @@ const PUBLIC_VENDOR_DETAIL_SELECT = {
   },
 } as const;
 const PUBLIC_SERVICE_SELECT = { id: true, name: true, slug: true, description: true, image: true, imageAlt: true } as const;
-const PUBLIC_PRODUCT_SELECT = { id: true, name: true, slug: true, brand: true, description: true, image: true, imageAlt: true } as const;
+const PUBLIC_PRODUCT_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  brand: true,
+  description: true,
+  image: true,
+  imageAlt: true,
+  mediaImages: { orderBy: PUBLIC_MEDIA_IMAGE_ORDER_BY, select: PUBLIC_MEDIA_IMAGE_SELECT },
+  mediaVideo: { select: PUBLIC_MEDIA_VIDEO_SELECT },
+} as const;
 
 /** Only active rows — an inactive package must never be selectable by a customer. Same shape as
  *  PUBLIC_THERAPIST_PACKAGE_SELECT above (see DealPackage's own schema doc comment for why this
@@ -155,6 +185,8 @@ export const PUBLIC_DEAL_SELECT = {
     orderBy: PUBLIC_DEAL_PACKAGE_ORDER_BY,
     select: PUBLIC_DEAL_PACKAGE_SELECT,
   },
+  mediaImages: { orderBy: PUBLIC_MEDIA_IMAGE_ORDER_BY, select: PUBLIC_MEDIA_IMAGE_SELECT },
+  mediaVideo: { select: PUBLIC_MEDIA_VIDEO_SELECT },
 } as const;
 
 /**
