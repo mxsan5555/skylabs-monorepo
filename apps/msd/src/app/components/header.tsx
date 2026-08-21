@@ -1,41 +1,13 @@
 ﻿import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-
-import {
-  FilledButton,
-  TextButton,
-  IconButton,
-  FilledTonalIconButton,
-  Icon,
-  Menu,
-  MenuItem,
-  Divider,
-} from '@skylabs-monorepo/shared-ui/react';
-
+import { FilledButton, TextButton, IconButton, FilledTonalIconButton, Icon, Menu, MenuItem, Divider,} from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-
-import {
-  getCart,
-  subscribeCartUpdated,
-  clearCart,
-} from '../../api/cart';
-
-import {
-  listBookings,
-  subscribeBookingsUpdated,
-} from '../../api/bookings';
-
+import { getCart, subscribeCartUpdated, clearCart,} from '../../api/cart';
+import { listBookings, subscribeBookingsUpdated,} from '../../api/bookings';
 import { useWishlist } from '../../wishlist/wishlist-context';
-
-import {
-  isCustomerUser,
-  isStaffUser,
-} from '../../auth/role-routing';
-
+import { isCustomerUser, isStaffUser,} from '../../auth/role-routing';
 import { DEALS } from '../../data/deals';
-
 import content from '../../content.json';
-
 import './header.css';
 import logo from "../../assets/logo.jpg";
 import logo2 from "../../assets/logo2.jpg";
@@ -289,8 +261,12 @@ export function Header() {
         listBookings(token, { status: 'PENDING', pageSize: 50 }),
       ])
         .then(([cartRes, bookingsRes]) => {
+           console.log('CART RESPONSE:', cartRes);
+  console.log('BOOKINGS RESPONSE:', bookingsRes);
           if (!cancelled) {
             const cartItemCount = cartRes.data.items.reduce((sum, item) => sum + item.quantity, 0);
+             console.log('CART ITEM COUNT:', cartItemCount);
+    console.log('BOOKING COUNT:', bookingsRes.data.length);
             setTotalItems(cartItemCount + bookingsRes.data.length);
           }
         })
@@ -429,18 +405,22 @@ export function Header() {
               Logo
           ---------------------------------------------------------------- */}
 
-          <NavLink
+     <NavLink
             to="/"
             className="site-header__brand"
-            aria-label={
-              content.header.homeAriaLabel
-            }
+            aria-label={content.header.homeAriaLabel}
           >
-            <strong className="site-header__brand-text">
-              {content.site.name}
-            </strong>
+            <img
+              src={logo}
+              alt={content.site.name}
+              className="site-header__logo site-header__logo--desktop"
+            />
+            <img
+              src={logo2}
+              alt={content.site.name}
+              className="site-header__logo site-header__logo--mobile"
+            />
           </NavLink>
-
           {/* ---------------------------------------------------------------
               Categories
           ---------------------------------------------------------------- */}

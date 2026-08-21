@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-empty-function, @typescript-eslint/no-explicit-any */
+
+import '@testing-library/jest-dom/vitest';
 /**
+ * 
  * Test setup for apps that render Material 3 web components under jsdom.
  *
  * Several M3 elements (dialog, menu, slider, tabs, form controls) call browser

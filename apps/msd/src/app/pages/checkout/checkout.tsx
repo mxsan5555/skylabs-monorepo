@@ -902,7 +902,9 @@ export function Checkout() {
 
                       <OutlinedTextField
                         label={checkoutContent.fields.pincode}
+                         type="text"
                         inputMode="numeric"
+                          pattern="[0-9]*"
                         autocomplete="postal-code"
                         maxLength={6}
                         required
