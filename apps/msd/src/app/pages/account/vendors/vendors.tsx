@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FilledButton, OutlinedButton, Icon, Tabs, PrimaryTab } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
@@ -21,7 +21,7 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { VendorList } from './vendor-list';
-import { VendorProfileForm } from './vendor-profile-form';
+import { VendorProfileForm, extractVendorFieldErrors, type VendorFieldErrors } from './vendor-profile-form';
 import { VendorBranches } from './vendor-branches';
 import { VendorPipeline } from './vendor-pipeline';
 import { VendorDetailCustomers } from './vendor-detail-customers';
@@ -126,6 +126,7 @@ function AdminVendorManagement({
   canStatusChange: boolean;
   categories: Category[];
 }) {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [total, setTotal] = useState(0);
@@ -134,7 +135,6 @@ function AdminVendorManagement({
   const [params, setParams] = useState<VendorTableParams>(DEFAULT_VENDOR_PARAMS);
   // Pre-selected from `?vendorId=` — the "View vendor" link on the Branches/Deals sidebar pages.
   const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get('vendorId'));
-  const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState(0);
@@ -200,7 +200,6 @@ function AdminVendorManagement({
   const handlePipelineChange = (vendor: Vendor) => {
     setVendors((prev) => (prev.some((v) => v.id === vendor.id) ? prev.map((v) => (v.id === vendor.id ? vendor : v)) : [vendor, ...prev]));
     setSelectedId(vendor.id);
-    setCreating(false);
     setMessage('Saved.');
   };
 
@@ -262,7 +261,7 @@ function AdminVendorManagement({
         </div>
         <div className="page-head__actions">
           {canCreate && (
-            <FilledButton onClick={() => { setCreating(true); setSelectedId(null); }}>
+            <FilledButton onClick={() => navigate('/account/vendors/new')}>
               <Icon slot="icon" aria-hidden="true">add</Icon>
               Add vendor
             </FilledButton>
@@ -276,7 +275,7 @@ function AdminVendorManagement({
         <VendorList
           vendors={vendors}
           selectedId={selectedId}
-          onSelect={(id) => { setSelectedId(id); setCreating(false); }}
+          onSelect={setSelectedId}
           total={total}
           page={params.page}
           pageSize={params.pageSize}
@@ -285,17 +284,7 @@ function AdminVendorManagement({
         />
       </section>
 
-      {creating && (
-        <section className="panel vendor-detail" aria-label="New vendor">
-          {message && <p className="field-hint" role="status">{message}</p>}
-          {error && <p className="error-state" role="alert">{error}</p>}
-          <h2>New vendor</h2>
-          <VendorPipeline token={token} initialVendor={null} onVendorChange={handlePipelineChange} />
-       
-        </section>
-      )}
-
-      {!creating && selectedVendor && (
+      {selectedVendor && (
         <section className="panel vendor-detail" aria-label="Vendor details">
           {message && <p className="field-hint" role="status">{message}</p>}
           {error && <p className="error-state" role="alert">{error}</p>}
@@ -390,7 +379,7 @@ function AdminVendorManagement({
         </section>
       )}
 
-      {!creating && !selectedVendor && <p className="empty-state">Select a vendor, or add a new one.</p>}
+      {!selectedVendor && <p className="empty-state">Select a vendor, or add a new one.</p>}
     </div>
   );
 }
@@ -402,6 +391,7 @@ export interface UseMyVendorResult {
   saving: boolean;
   message: string;
   error: string;
+  fieldErrors: VendorFieldErrors | null;
   save: (input: VendorFields) => Promise<void>;
   submit: () => Promise<void>;
 }
@@ -418,6 +408,7 @@ export function useMyVendor(token: string | null): UseMyVendorResult {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<VendorFieldErrors | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -443,6 +434,7 @@ export function useMyVendor(token: string | null): UseMyVendorResult {
   const save = async (input: VendorFields) => {
     setSaving(true);
     setError('');
+    setFieldErrors(null);
     try {
       if (notFound) {
         const { data } = await createMyVendor(token, input);
@@ -456,6 +448,7 @@ export function useMyVendor(token: string | null): UseMyVendorResult {
       }
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not save your profile.');
+      setFieldErrors(extractVendorFieldErrors(err));
     } finally {
       setSaving(false);
     }
@@ -472,11 +465,11 @@ export function useMyVendor(token: string | null): UseMyVendorResult {
     }
   };
 
-  return { vendor, notFound, loading, saving, message, error, save, submit };
+  return { vendor, notFound, loading, saving, message, error, fieldErrors, save, submit };
 }
 
 function SelfVendorManagement({ token, categories }: { token: string | null; categories: Category[] }) {
-  const { vendor, notFound, loading, saving, message, error, save, submit } = useMyVendor(token);
+  const { vendor, notFound, loading, saving, message, error, fieldErrors, save, submit } = useMyVendor(token);
 
   if (loading) {
     return (
@@ -499,7 +492,15 @@ function SelfVendorManagement({ token, categories }: { token: string | null; cat
       {message && <p className="field-hint" role="status">{message}</p>}
       {error && <p className="error-state" role="alert">{error}</p>}
 
-      <VendorProfileForm vendor={vendor} canEdit canReviewKyc={false} saving={saving} onSave={save} onSubmitForVerification={submit} />
+      <VendorProfileForm
+        vendor={vendor}
+        canEdit
+        canReviewKyc={false}
+        saving={saving}
+        onSave={save}
+        onSubmitForVerification={submit}
+        serverFieldErrors={fieldErrors}
+      />
 
       {vendor && vendor.status === 'ACTIVE' && (
         <>

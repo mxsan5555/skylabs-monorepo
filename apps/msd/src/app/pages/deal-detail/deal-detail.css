@@ -64,6 +64,14 @@
   flex-wrap: wrap;
 }
 
+.deal-detail__video {
+  width: 100%;
+  max-width: 800px;
+  border-radius: 12px;
+  margin-top: 12px;
+  background: black;
+}
+
 .deal-detail__thumb {
   padding: 0;
   border: 2px solid transparent;

@@ -1,4 +1,5 @@
 import { apiGet } from './rbac/client';
+import type { MediaImage, MediaVideo } from './media';
 
 /**
  * Public, unauthenticated customer catalogue client — mirrors msd-api's `/catalog/*` routes.
@@ -29,6 +30,8 @@ export interface CatalogDealSummary {
 
 export interface CatalogProductSummary extends CatalogDealSummary {
   brand?: string | null;
+  mediaImages?: MediaImage[];
+  mediaVideo?: MediaVideo | null;
 }
 
 /** A service Deal's own duration/price menu entry — a real child row (DealPackage), never a
@@ -66,6 +69,8 @@ export interface CatalogDeal {
    *  yet. Never fabricate a value when these are null; treat as "location not available". */
   branch: { id: string; name: string; city: string | null; address: string | null; latitude: string | null; longitude: string | null } | null;
   packages: CatalogDealPackage[];
+  mediaImages?: MediaImage[];
+  mediaVideo?: MediaVideo | null;
 }
 
 /** `Branch.openingHours` shape — keys are lowercase 3-letter day codes (`mon`…`sun`), values are
@@ -96,6 +101,8 @@ export interface CatalogVendorTherapist {
   experienceYears: number | null;
   photoUrl: string | null;
   packages: CatalogTherapistPackage[];
+  mediaImages?: MediaImage[];
+  mediaVideo?: MediaVideo | null;
 }
 
 /** The flat, independently-browsable Therapist listing entry (`GET /catalog/therapists`) —

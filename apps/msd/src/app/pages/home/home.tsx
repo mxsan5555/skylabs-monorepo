@@ -8,6 +8,7 @@ import { listCatalogCategories, listCatalogDeals, type CatalogCategoryWithChildr
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
+import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
 import './home.css';
 
@@ -77,12 +78,14 @@ function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
   const title = item?.name ?? deal.title;
   const salePrice = Number(deal.salePrice);
   const originalPrice = deal.originalPrice ? Number(deal.originalPrice) : undefined;
+  const media = resolveDealMedia(deal);
   return {
     id: deal.id,
     title,
-    image: item?.image ?? deal.images?.[0] ?? '',
+    image: media.images[0] ?? '',
     imageAlt: item?.imageAlt ?? title,
-    gallery: deal.images ?? undefined,
+    gallery: media.images.length > 0 ? media.images : undefined,
+    video: media.video,
     providerName: deal.vendor?.businessName ?? undefined,
     price: salePrice,
     originalPrice: originalPrice && originalPrice !== salePrice ? originalPrice : undefined,

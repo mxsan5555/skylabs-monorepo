@@ -1,4 +1,5 @@
 import { apiGet, apiPatch, apiPost, apiDelete } from './client';
+import type { MediaImage, MediaVideo } from '../media';
 
 export type VendorStatus =
   | 'PROFILE_INCOMPLETE'
@@ -69,6 +70,9 @@ export interface VendorFields {
 export interface Vendor extends Omit<VendorFields, 'businessName'> {
   id: string;
   businessName: string | null;
+  /** Public storefront URL slug (`/vendor/:slug`) — generated server-side from `businessName` at
+   *  creation time, never client-supplied or client-editable (see msd-api's `lib/slug.ts`). */
+  slug: string | null;
   ownerUserId: string | null;
   kycStatus: KycStatus;
   kycRejectionReason: string | null;
@@ -83,6 +87,11 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
   /** The existing User account this vendor is linked to — null if an admin created the
    *  profile without linking an owner yet. Never includes session/auth data. */
   owner: UserSummary | null;
+  /** Uploaded media (shared Deal/Product/Therapist/Vendor system) — the authoritative image/
+   *  video source going forward; `logoUrl` above is the legacy pasted-URL field, kept only for
+   *  rows that predate this table (see `resolveVendorMedia` in `utils/media.ts`). */
+  mediaImages?: MediaImage[];
+  mediaVideo?: MediaVideo | null;
 }
 
 export type VendorCreateInput = VendorFields & { ownerUserId?: string };
@@ -173,6 +182,11 @@ export interface Deal {
   /** The deal's own duration/price menu (a real child table — DealPackage — mirrors
    *  TherapistPackage exactly). Always empty for a product deal. */
   packages?: DealPackage[];
+  /** Uploaded media (shared Deal/Product/Therapist system) — the authoritative image/video
+   *  source going forward; `images` above is the legacy pasted-URL field, kept only for rows
+   *  that predate this table (see `resolveDealMedia` in `utils/media.ts`). */
+  mediaImages?: MediaImage[];
+  mediaVideo?: MediaVideo | null;
 }
 
 export interface DealPackage {
@@ -443,6 +457,11 @@ export interface Therapist {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Uploaded media (shared Deal/Product/Therapist system) — the authoritative image/video
+   *  source going forward; `photoUrl` above is the legacy pasted-URL field, kept only for rows
+   *  that predate this table (see `resolveTherapistMedia` in `utils/media.ts`). */
+  mediaImages?: MediaImage[];
+  mediaVideo?: MediaVideo | null;
 }
 
 export interface TherapistInput {

@@ -129,12 +129,15 @@ export function VendorDeals() {
       const { data } = await updateMyDeal(token, existing.branchId, existing.id, input);
       const branchName = branches.find((b) => b.id === data.branchId)?.name ?? existing.branchName;
       setDeals((prev) => prev.map((d) => (d.id === data.id ? { ...data, branchName } : d)));
+      setMessage('Saved.');
+      return data;
     } else {
       const { data } = await createMyDeal(token, branchId, input);
       const branchName = branches.find((b) => b.id === branchId)?.name ?? '—';
       setDeals((prev) => [{ ...data, branchName }, ...prev]);
+      setMessage('Saved.');
+      return data;
     }
-    setMessage('Saved.');
   };
 
   const toggleStatus = async (deal: DealWithBranch) => {
@@ -225,6 +228,7 @@ export function VendorDeals() {
           services={services}
           products={products}
           branches={branches}
+          token={token}
           dialogRef={addDialogRef}
           hideTrigger
           onSave={(input, branchId) => save(input, branchId ?? branches[0]?.id ?? '')}
@@ -239,6 +243,7 @@ export function VendorDeals() {
           services={services}
           products={products}
           branches={branches}
+          token={token}
           dialogRef={editDialogRef}
           hideTrigger
           onSave={(input) => save(input, editingDeal.branchId, editingDeal)}

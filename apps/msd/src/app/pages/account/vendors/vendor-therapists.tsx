@@ -30,6 +30,7 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { formatINR } from '../../../../utils/format';
+import { MediaUploader } from '../../../components/media-uploader';
 
 const THERAPIST_COLUMNS = JSON.stringify([
   { key: 'Type', label: 'Type' },
@@ -121,13 +122,18 @@ export function VendorTherapists() {
   const save = async (input: TherapistInput, branchId: string, existing?: TherapistWithBranch) => {
     if (existing) {
       const { data } = await updateTherapist(token, existing.id, input);
-      setTherapists((prev) => prev.map((t) => (t.id === data.id ? { ...data, branchName: existing.branchName } : t)));
+      const merged = { ...data, branchName: existing.branchName };
+      setTherapists((prev) => prev.map((t) => (t.id === data.id ? merged : t)));
+      setMessage('Saved.');
+      return merged;
     } else {
       const { data } = await createTherapist(token, branchId, input);
       const branchName = branches.find((b) => b.id === branchId)?.name ?? '—';
-      setTherapists((prev) => [{ ...data, branchName }, ...prev]);
+      const created = { ...data, branchName };
+      setTherapists((prev) => [created, ...prev]);
+      setMessage('Saved.');
+      return created;
     }
-    setMessage('Saved.');
   };
 
   const toggleStatus = async (therapist: TherapistWithBranch) => {
@@ -213,7 +219,7 @@ export function VendorTherapists() {
       )}
 
       {branches.length > 0 && (
-        <TherapistFormDialog dialogRef={addDialogRef} branches={branches} onSave={(input, branchId) => save(input, branchId)} />
+        <TherapistFormDialog dialogRef={addDialogRef} branches={branches} token={token} onSave={(input, branchId) => save(input, branchId)} />
       )}
 
       {editingTherapist && (
@@ -222,6 +228,7 @@ export function VendorTherapists() {
           dialogRef={editDialogRef}
           branches={branches}
           therapist={editingTherapist}
+          token={token}
           onSave={(input) => save(input, editingTherapist.branchId, editingTherapist)}
           onClose={() => setEditingTherapist(null)}
         />
@@ -245,13 +252,15 @@ function TherapistFormDialog({
   dialogRef,
   branches,
   therapist,
+  token,
   onSave,
   onClose,
 }: {
   dialogRef: RefObject<MdDialog>;
   branches: Branch[];
   therapist?: TherapistWithBranch;
-  onSave: (input: TherapistInput, branchId: string) => Promise<void>;
+  token: string | null;
+  onSave: (input: TherapistInput, branchId: string) => Promise<TherapistWithBranch | void>;
   onClose?: () => void;
 }) {
   const [form, setForm] = useState<TherapistInput>(
@@ -263,29 +272,42 @@ function TherapistFormDialog({
           specialization: therapist.specialization ?? undefined,
           bio: therapist.bio ?? undefined,
           experienceYears: therapist.experienceYears ?? undefined,
-          photoUrl: therapist.photoUrl ?? undefined,
         }
       : { ...EMPTY_INPUT },
   );
   const [branchId, setBranchId] = useState(therapist?.branchId ?? branches[0]?.id ?? '');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Tracks the entity MediaUploader should upload against — see DealDialog's identical
+  // `savedDeal` state for the full staged-upload-after-create rationale.
+  const [savedTherapist, setSavedTherapist] = useState<TherapistWithBranch | undefined>(therapist);
+  // A `submitting` state guard alone can't stop a second click that fires before React commits
+  // the re-render disabling the button — this ref is checked/set synchronously, before any
+  // `await`, so it blocks the second invocation even if both start in the same tick.
+  const submittingRef = useRef(false);
 
   const set = <K extends keyof TherapistInput>(key: K, value: TherapistInput[K]) => setForm((f) => ({ ...f, [key]: value }));
 
   const submit = async () => {
+    if (submittingRef.current) return;
     if (!form.therapistType.trim() || !form.personName.trim() || !branchId) {
       setError('Type, name, and branch are required.');
       return;
     }
+    submittingRef.current = true;
     setSubmitting(true);
     setError('');
     try {
-      await onSave(form, branchId);
-      dialogRef.current?.close();
+      const result = await onSave(form, branchId);
+      if (!therapist && result) {
+        setSavedTherapist(result);
+      } else {
+        dialogRef.current?.close();
+      }
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not save.');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -341,10 +363,12 @@ function TherapistFormDialog({
           onInput={(e: Event) => set('experienceYears', Number((e.target as HTMLInputElement).value) || undefined)}
         />
 
-        <OutlinedTextField
-          label="Photo URL"
-          value={form.photoUrl ?? ''}
-          onInput={(e: Event) => set('photoUrl', (e.target as HTMLInputElement).value || undefined)}
+        <MediaUploader
+          entityType="therapist"
+          entityId={savedTherapist?.id ?? null}
+          existingImages={savedTherapist?.mediaImages ?? []}
+          existingVideo={savedTherapist?.mediaVideo ?? null}
+          token={token}
         />
 
         {error && <p className="error-state" role="alert">{error}</p>}
@@ -529,10 +553,14 @@ function PackageFormDialog({
   );
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // See TherapistFormDialog's identical guard above for why a `submitting` state check alone
+  // isn't sufficient against a second click landing before the disabling re-render commits.
+  const submittingRef = useRef(false);
 
   const set = <K extends keyof TherapistPackageInput>(key: K, value: TherapistPackageInput[K]) => setForm((f) => ({ ...f, [key]: value }));
 
   const submit = async () => {
+    if (submittingRef.current) return;
     if (!form.durationMinutes || form.durationMinutes <= 0) {
       setError('Duration is required and must be positive.');
       return;
@@ -545,6 +573,7 @@ function PackageFormDialog({
       setError('Original price must be greater than or equal to selling price.');
       return;
     }
+    submittingRef.current = true;
     setSubmitting(true);
     setError('');
     try {
@@ -553,6 +582,7 @@ function PackageFormDialog({
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not save.');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };

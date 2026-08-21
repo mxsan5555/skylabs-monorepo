@@ -19,6 +19,7 @@ import { RoleManagement } from './pages/account/roles/roles';
 import { UserManagement } from './pages/account/users/users';
 import { AuditLogs } from './pages/account/audit-logs/audit-logs';
 import { VendorManagement } from './pages/account/vendors/vendors';
+import { VendorNewPage } from './pages/account/vendors/vendor-new-page';
 import { CustomerManagement } from './pages/account/customers/customers';
 import { BranchList } from './pages/account/vendors/branch-list';
 import { DealList } from './pages/account/vendors/deal-list';
@@ -32,6 +33,7 @@ import { ProductManagement } from './pages/account/products/products';
 import { ServiceManagement } from './pages/account/services/services';
 import { OrderManagement } from './pages/account/orders/orders';
 import { BookingManagement } from './pages/account/bookings/bookings';
+import { Reports } from './pages/account/reports/reports';
 import Search from './pages/search/search';
 import Category from './pages/category/category';
 import { CategoriesIndex } from './pages/categories/categories';
@@ -90,6 +92,11 @@ export function AppRoutes() {
             only via a Deal's page (see msd-api's Therapist schema doc comment). */}
         <Route path="/therapists" element={<Therapists />} />
         <Route path="/therapist/:id" element={<TherapistDetail />} />
+
+        {/* Cart / Wishlist / Checkout — plain PublicLayout children (Header+Footer, no sidebar),
+            exactly as they worked before the Customer Sidebar fix. These are NOT part of the
+            Customer Sidebar — they stay reachable from the existing Header cart/wishlist icons,
+            same route, same page, same layout as always. */}
         <Route
           path="/cart"
           element={
@@ -98,40 +105,6 @@ export function AppRoutes() {
             </RequireAuth>
           }
         />
-        <Route
-          path="/bookings"
-          element={
-            <RequireAuth>
-              <Bookings />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/orders"
-          element={
-            <RequireAuth>
-              <Orders />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/orders/:id"
-          element={
-            <RequireAuth>
-              <OrderDetail />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/orders/:id/invoice"
-          element={
-            <RequireAuth>
-              <Invoice />
-            </RequireAuth>
-          }
-        />
-
-        {/* ── Auth-gated consumer pages ── */}
         <Route
           path="/wishlist"
           element={
@@ -149,19 +122,29 @@ export function AppRoutes() {
           }
         />
 
-        {/* ── Customer "My Account" (storefront chrome, never AdminLayout) ── */}
+        {/* Customer account pages (Orders/Order Detail/Bookings) — nested INSIDE PublicLayout so
+            the site Header/Footer stay mounted around them, reusing the SAME existing
+            `MyAccountLayout` (full sidebar: Profile & Addresses/Orders/Bookings/Wishlist/Cart/
+            Payment History/Invoices/Settings — see my-account-layout.tsx's NAV_ITEMS) that
+            `/my-account/*` uses below, not a cut-down sidebar. `MyAccountLayout` itself never
+            renders a header/footer, so nesting it here (inside PublicLayout) is what keeps
+            Header, Footer, and the full sidebar all mounted together for these routes — the same
+            component instance is reused a second time, unwrapped, for `/my-account/*` further
+            down, exactly as it already was before any of this. Cart/Wishlist/Checkout
+            deliberately stay OUTSIDE this block (see above) even though the sidebar's own
+            NAV_ITEMS still links to them — clicking those links just navigates to the
+            sidebar-less Cart/Wishlist routes above, same as clicking the Header icons. */}
         <Route
-          path="/my-account"
           element={
             <RequireAuth>
               <MyAccountLayout />
             </RequireAuth>
           }
         >
-          <Route index element={<MyAccountProfile />} />
-          <Route path="payments" element={<MyAccountPayments />} />
-          <Route path="invoices" element={<AdminPage title="Invoices" subtitle="Module coming soon." />} />
-          <Route path="settings" element={<AdminPage title="Settings" subtitle="Module coming soon." />} />
+          <Route path="/orders" element={<Orders />} />
+          <Route path="/orders/:id" element={<OrderDetail />} />
+          <Route path="/orders/:id/invoice" element={<Invoice />} />
+          <Route path="/bookings" element={<Bookings />} />
         </Route>
 
         {/* ── Content pages ── */}
@@ -172,6 +155,25 @@ export function AppRoutes() {
         {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}
         <Route path="*" element={<NotFound />} />
       </Route>
+
+      {/* ── "My Account" (Profile/Payments/Invoices/Settings) — MyAccountLayout used bare, on its
+          own, exactly as before (no PublicLayout wrapper, no header/footer — see
+          MyAccountLayout's own doc comment for why). This is the ORIGINAL, unmodified placement;
+          the Orders/Bookings block above just nests the same layout a second time, inside
+          PublicLayout, for its own routes. ── */}
+      <Route
+        element={
+          <RequireAuth>
+            <MyAccountLayout />
+          </RequireAuth>
+        }
+      >
+        <Route path="/my-account" element={<MyAccountProfile />} />
+        <Route path="/my-account/payments" element={<MyAccountPayments />} />
+        <Route path="/my-account/invoices" element={<AdminPage title="Invoices" subtitle="Module coming soon." />} />
+        <Route path="/my-account/settings" element={<AdminPage title="Settings" subtitle="Module coming soon." />} />
+      </Route>
+
       {/* Auth screens use a minimal centered shell (no header/footer). */}
       <Route element={<AuthLayout />}>
         <Route path="/sign-in" element={<SignIn />} />
@@ -223,6 +225,20 @@ export function AppRoutes() {
           element={
             <VendorsRouteGuard>
               <VendorManagement />
+            </VendorsRouteGuard>
+          }
+        />
+        {/* Dedicated "Add New Vendor" page — see vendor-new-page.tsx's doc comment for why this
+            is a real route rather than the old inline-on-the-list-page wizard. Reuses the same
+            route guard as /account/vendors; VendorNewPage itself checks the finer-grained
+            `vendors:create` action and shows an empty state if the caller only holds
+            `vendors:view`/`vendors:custom` (the backend route is the real enforcement either
+            way). */}
+        <Route
+          path="/account/vendors/new"
+          element={
+            <VendorsRouteGuard>
+              <VendorNewPage />
             </VendorsRouteGuard>
           }
         />
@@ -338,7 +354,7 @@ export function AppRoutes() {
           path="/account/reports"
           element={
             <RequirePermission menuKey="reports">
-              <AdminPage title="Reports" subtitle="Module coming soon." />
+              <Reports />
             </RequirePermission>
           }
         />

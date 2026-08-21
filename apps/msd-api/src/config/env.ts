@@ -79,4 +79,8 @@ export const env = {
   razorpayKeyId: process.env.RAZORPAY_KEY_ID ?? '',
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET ?? '',
   razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? '',
+
+  // Media upload system (Deal/Product/Therapist images+video). Local disk, relative to this
+  // app's own directory by default — override for a persistent-volume mount in a real deploy.
+  mediaUploadDir: process.env.MEDIA_UPLOAD_DIR ?? '',
 };

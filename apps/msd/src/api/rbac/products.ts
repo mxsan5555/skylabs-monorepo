@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from './client';
+import type { MediaImage, MediaVideo } from '../media';
 
 export interface Product {
   id: string;
@@ -27,6 +28,11 @@ export interface Product {
   updatedAt: string;
   category?: { id: string; name: string };
   subcategory?: { id: string; name: string } | null;
+  /** Uploaded media (shared Deal/Product/Therapist system) — the authoritative image/video
+   *  source going forward; `image`/`gallery` above are the legacy pasted-URL fields, kept only
+   *  for rows that predate this table (see `resolveProductMedia` in `utils/media.ts`). */
+  mediaImages?: MediaImage[];
+  mediaVideo?: MediaVideo | null;
 }
 
 export interface ProductInput {

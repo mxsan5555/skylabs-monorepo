@@ -19,6 +19,7 @@ import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { DealBookingDialog } from '../../components/deal-booking-dialog';
 import { formatINR, formatBookingSchedule } from '../../../utils/format';
+import { resolveDealMedia, primaryImage } from '../../../utils/media';
 import './category.css';
 
 type OfferingFilter = 'all' | 'service' | 'product';
@@ -208,7 +209,7 @@ export function Category() {
                     eyebrow={[deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · ')}
                     eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
                     heading={deal.service?.name ?? deal.product?.name ?? deal.title}
-                    image={deal.service?.image ?? deal.product?.image ?? undefined}
+                    image={primaryImage(resolveDealMedia(deal))}
                     imageAlt={deal.service?.imageAlt ?? deal.product?.imageAlt ?? undefined}
                     price={formatINR(Number(deal.salePrice))}
                     originalPrice={

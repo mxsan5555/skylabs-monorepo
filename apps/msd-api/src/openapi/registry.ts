@@ -52,6 +52,7 @@ import { BookingCreateSchema, BookingCancelSchema, BookingVendorStatusUpdateSche
 import { OrderCheckoutSchema, OrderFromBookingSchema, OrderCustomerCancelSchema, OrderStatusUpdateSchema } from '../schemas/order.schema';
 import { VerifyPaymentSchema, OrderBatchSchema, VerifyBatchPaymentSchema } from '../schemas/payment.schema';
 import { DashboardStatsResponseSchema } from '../schemas/dashboard.schema';
+import { MediaReorderSchema } from '../schemas/media.schema';
 
 export function buildOpenApiDocument() {
   const registry = new OpenAPIRegistry();
@@ -654,6 +655,95 @@ export function buildOpenApiDocument() {
     request: { params: z.object({ therapistId: z.string().uuid(), packageId: z.string().uuid() }) },
     responses: { 200: { description: 'Deleted' }, 403: errorResponse, 404: errorResponse },
   });
+
+  // ─── Media routes (Deal/Product/Therapist images+video — one shared upload system, see
+  // media.service.ts's doc comment) — generated per entity rather than hand-duplicated 3x,
+  // since all 6 routes' shapes are identical modulo the base path and OpenAPI tag. Every path is
+  // still individually registered, exactly as every other route in this file is. ────────────
+  const mediaFileBody = {
+    content: {
+      'multipart/form-data': {
+        schema: z.object({ file: z.any().openapi({ type: 'string', format: 'binary' }) }),
+      },
+    },
+  };
+  const mediaEntities: Array<{ base: string; params: z.ZodRawShape; tag: string; label: string }> = [
+    {
+      base: '/vendors/me/branches/{branchId}/deals/{dealId}',
+      params: { branchId: z.string().uuid(), dealId: z.string().uuid() },
+      tag: 'Vendors - Self-service',
+      label: 'deal',
+    },
+    {
+      base: '/vendors/me/therapists/{therapistId}',
+      params: { therapistId: z.string().uuid() },
+      tag: 'Vendors - Self-service',
+      label: 'therapist',
+    },
+    {
+      base: '/products/{id}',
+      params: { id: z.string().uuid() },
+      tag: 'Products',
+      label: 'product',
+    },
+  ];
+  for (const entity of mediaEntities) {
+    const paramsSchema = z.object(entity.params);
+    registry.registerPath({
+      method: 'post',
+      path: `${entity.base}/images`,
+      summary: `Upload an image for a ${entity.label} (JPG/PNG/WEBP, 30KB–80KB)`,
+      tags: [entity.tag],
+      security: bearer,
+      request: { params: paramsSchema, body: mediaFileBody },
+      responses: { 201: { description: 'Created' }, 403: errorResponse, 404: errorResponse, 422: errorResponse },
+    });
+    registry.registerPath({
+      method: 'delete',
+      path: `${entity.base}/images/{imageId}`,
+      summary: `Delete a ${entity.label} image`,
+      tags: [entity.tag],
+      security: bearer,
+      request: { params: paramsSchema.extend({ imageId: z.string().uuid() }) },
+      responses: { 200: { description: 'Deleted' }, 403: errorResponse, 404: errorResponse },
+    });
+    registry.registerPath({
+      method: 'patch',
+      path: `${entity.base}/images/reorder`,
+      summary: `Reorder a ${entity.label}'s images`,
+      tags: [entity.tag],
+      security: bearer,
+      request: { params: paramsSchema, body: { content: { 'application/json': { schema: MediaReorderSchema } } } },
+      responses: { 200: { description: 'Reordered' }, 403: errorResponse, 404: errorResponse, 422: errorResponse },
+    });
+    registry.registerPath({
+      method: 'patch',
+      path: `${entity.base}/images/{imageId}/primary`,
+      summary: `Set a ${entity.label}'s primary image`,
+      tags: [entity.tag],
+      security: bearer,
+      request: { params: paramsSchema.extend({ imageId: z.string().uuid() }) },
+      responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse },
+    });
+    registry.registerPath({
+      method: 'post',
+      path: `${entity.base}/video`,
+      summary: `Upload/replace a ${entity.label}'s single video (MP4/WEBM/MOV, ≤1MB)`,
+      tags: [entity.tag],
+      security: bearer,
+      request: { params: paramsSchema, body: mediaFileBody },
+      responses: { 201: { description: 'Created' }, 403: errorResponse, 404: errorResponse, 422: errorResponse },
+    });
+    registry.registerPath({
+      method: 'delete',
+      path: `${entity.base}/video`,
+      summary: `Delete a ${entity.label}'s video`,
+      tags: [entity.tag],
+      security: bearer,
+      request: { params: paramsSchema },
+      responses: { 200: { description: 'Deleted' }, 403: errorResponse, 404: errorResponse },
+    });
+  }
 
   registry.registerPath({
     method: 'get',

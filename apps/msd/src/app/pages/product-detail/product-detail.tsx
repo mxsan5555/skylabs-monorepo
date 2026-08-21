@@ -20,6 +20,7 @@ import { useWishlist } from '../../../wishlist/wishlist-context';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { formatINR } from '../../../utils/format';
+import { resolveDealMedia, primaryImage } from '../../../utils/media';
 import content from '../../../content.json';
 
 import './product-detail.css';
@@ -161,11 +162,9 @@ export function ProductDetail() {
 
   const name = deal.product?.name ?? deal.title;
 
-  const gallery =
-    deal.images ??
-    (deal.product?.image
-      ? [deal.product.image]
-      : []);
+  const dealMedia = resolveDealMedia(deal);
+  const gallery = dealMedia.images;
+  const video = dealMedia.video;
 
   const description =
     deal.description ??
@@ -448,6 +447,10 @@ export function ProductDetail() {
               ))}
             </div>
           )}
+
+          {video && (
+            <video className="product-detail__video" controls src={video} />
+          )}
         </div>
 
         {/* Info panel */}
@@ -725,11 +728,7 @@ export function ProductDetail() {
                           ? `/vendor/${item.vendor.slug}`
                           : undefined
                       }
-                      image={
-                        item.product?.image ??
-                        item.images?.[0] ??
-                        undefined
-                      }
+                      image={primaryImage(resolveDealMedia(item))}
                       imageAlt={
                         item.product?.imageAlt ??
                         undefined

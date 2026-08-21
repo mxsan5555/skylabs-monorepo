@@ -6,12 +6,13 @@ import { listAllDeals, type Deal } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 
 const DEAL_COLUMNS = JSON.stringify([
-  { key: 'Deal/Offering', label: 'Deal/Offering' },
+  { key: 'Deal Name', label: 'Deal Name' },
+  { key: 'Service', label: 'Service/Product' },
   { key: 'Vendor', label: 'Vendor' },
   { key: 'Branch', label: 'Branch' },
-  { key: 'Type', label: 'Type' },
-  { key: 'Price', label: 'Price' },
-  { key: 'Duration', label: 'Duration' },
+  { key: 'Category', label: 'Category' },
+  { key: 'Packages', label: 'Packages' },
+  { key: 'Starting Price', label: 'Starting Price' },
   {
     key: 'Status',
     label: 'Status',
@@ -24,24 +25,50 @@ const DEAL_COLUMNS = JSON.stringify([
     type: 'status',
     statusMap: { APPROVED: 'success', PENDING: 'warning', REJECTED: 'error' },
   },
+  { key: 'Created', label: 'Created', type: 'date' },
 ]);
 
 /** Not '__view_detail__' — editing a deal happens on its vendor's own page (VendorBranches,
  *  reused there), so the row action here just deep-links to that vendor. */
 const DEAL_ACTIONS = JSON.stringify([{ icon: 'open_in_new', label: 'View vendor', event: 'view-vendor' }]);
 
+/** "From ₹X" for a service deal with 2+ active packages, the single package's price for exactly
+ *  one, or a plain dash for a product deal (packages are service-only — see DealPackage's schema
+ *  doc comment in msd-api) or a service deal with none yet. Mirrors what the customer-facing
+ *  storefront already shows for a multi-package deal — never a separate row per package, since
+ *  packages are children of one logical Deal, not separate deals (per this request's own "do not
+ *  create multiple confusing cards for the same logical Deal" instruction). */
+function packagesSummary(deal: Deal): string {
+  const active = (deal.packages ?? []).filter((p) => p.isActive);
+  if (active.length === 0) return deal.service ? '—' : 'N/A';
+  const cheapest = active.reduce((min, p) => (Number(p.sellingPrice) < Number(min.sellingPrice) ? p : min), active[0]);
+  const label = active.length > 1 ? `${active.length} packages` : `${cheapest.durationMinutes} min`;
+  return `${label} · From ₹${cheapest.sellingPrice}`;
+}
+
+function startingPrice(deal: Deal): string {
+  const active = (deal.packages ?? []).filter((p) => p.isActive);
+  if (active.length > 0) {
+    const cheapest = active.reduce((min, p) => (Number(p.sellingPrice) < Number(min.sellingPrice) ? p : min), active[0]);
+    return `₹${cheapest.sellingPrice}`;
+  }
+  return `₹${deal.salePrice}`;
+}
+
 /** Flat row for <sky-data-table> — 'Vendor ID' is an extra (non-column) key used only to drive
  *  the 'view-vendor' row action; it is not one of the visible columns. */
 function toDealRow(deal: Deal): Record<string, string | number> {
   return {
-    'Deal/Offering': deal.title,
+    'Deal Name': deal.title,
+    Service: (deal.service ?? deal.product)?.name ?? '—',
     Vendor: deal.vendor?.businessName ?? '—',
     Branch: deal.branch?.name ?? '—',
-    Type: deal.service ? 'Service' : 'Product',
-    Price: `₹${deal.salePrice}`,
-    Duration: deal.durationMinutes ? `${deal.durationMinutes} min` : '—',
+    Category: deal.category?.name ?? '—',
+    Packages: packagesSummary(deal),
+    'Starting Price': startingPrice(deal),
     Status: deal.status,
     'Approval Status': deal.approvalStatus,
+    Created: deal.createdAt,
     'Vendor ID': deal.vendor?.id ?? '',
   };
 }

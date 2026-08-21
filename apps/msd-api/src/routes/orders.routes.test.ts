@@ -150,12 +150,37 @@ describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
     expect(call.data.subtotal.toString()).toBe('398'); // 199 * qty(2), not 150 * 2 = 300
   });
 
-  it('12. clears cart items only after the order is successfully created', async () => {
+  it('12. links the cart to its new order (pendingOrderId) instead of deleting cart items at checkout time', async () => {
+    // CartItem rows are deliberately NOT deleted here anymore — only once payment actually
+    // succeeds (finalizeCartForOrder, called from payment.service.ts). Checkout submission just
+    // links the cart to its new Order via pendingOrderId, so a repeat checkout call can reuse it
+    // (see the next test) and a failed/abandoned payment leaves the cart intact for retry.
     prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);
     prismaMock.deal.findFirst.mockResolvedValue(productDealFixture);
     prismaMock.order.create.mockResolvedValue(orderFixture);
     await request(app).post('/api/v1/orders/checkout').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
-    expect(prismaMock.cartItem.deleteMany).toHaveBeenCalledWith({ where: { cartId: CART_ID } });
+    expect(prismaMock.cartItem.deleteMany).not.toHaveBeenCalled();
+    expect(prismaMock.cart.update).toHaveBeenCalledWith({ where: { id: CART_ID }, data: { pendingOrderId: ORDER_ID } });
+  });
+
+  it('12b. a repeat checkout call reuses the still-PENDING_PAYMENT order from a previous checkout instead of creating a duplicate', async () => {
+    prismaMock.cart.findUnique.mockResolvedValue({ ...cartWithOneItem, pendingOrderId: ORDER_ID });
+    prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, status: 'PENDING_PAYMENT' });
+    const res = await request(app).post('/api/v1/orders/checkout').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+    expect(res.status).toBe(201);
+    expect(res.body.data.id).toBe(ORDER_ID);
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+
+  it('12c. a stale pendingOrderId pointing at a CANCELLED order is cleared and a fresh order is created from the still-intact cart', async () => {
+    prismaMock.cart.findUnique.mockResolvedValue({ ...cartWithOneItem, pendingOrderId: ORDER_ID });
+    prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, status: 'CANCELLED' });
+    prismaMock.deal.findFirst.mockResolvedValue(productDealFixture);
+    prismaMock.order.create.mockResolvedValue(orderFixture);
+    const res = await request(app).post('/api/v1/orders/checkout').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+    expect(res.status).toBe(201);
+    expect(prismaMock.cart.update).toHaveBeenCalledWith({ where: { id: CART_ID }, data: { pendingOrderId: null } });
+    expect(prismaMock.order.create).toHaveBeenCalled();
   });
 
   it('13/20. leaves the cart intact and creates nothing when a deal fails revalidation (transaction rollback)', async () => {
@@ -255,14 +280,17 @@ describe('POST /api/v1/orders/from-booking — Service Booking -> Order', () => 
     expect(prismaMock.deal.findUnique).not.toHaveBeenCalled();
   });
 
-  it('14. rejects creating a second order from the same booking', async () => {
+  it('14. a repeat request for a booking that already has an order reuses it idempotently, instead of erroring or duplicating', async () => {
+    // A retried checkout request (double-click, refresh, browser back/forward) must not throw a
+    // conflict — it gets the SAME existing order back, exactly as if this were its first call.
     prismaMock.booking.findUnique.mockResolvedValue(bookingFixture);
     prismaMock.order.findUnique.mockResolvedValue({ id: 'existing-order', bookingId: BOOKING_ID });
     const res = await request(app)
       .post('/api/v1/orders/from-booking')
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
       .send({ bookingId: BOOKING_ID });
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(201);
+    expect(res.body.data.id).toBe('existing-order');
     expect(prismaMock.order.create).not.toHaveBeenCalled();
   });
 

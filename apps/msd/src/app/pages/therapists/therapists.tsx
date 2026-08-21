@@ -4,6 +4,7 @@ import { listCatalogTherapists, type CatalogTherapist } from '../../../api/catal
 import { ApiRequestError } from '../../../api/rbac/client';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { formatINR } from '../../../utils/format';
+import { resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import '../category/category.css';
 
 /** Lowest active package price, for the listing card's "From ₹X" line — null when this
@@ -74,7 +75,7 @@ export function Therapists() {
                 return (
                   <li key={t.id}>
                     <sky-category-card
-                      image={t.photoUrl ?? undefined}
+                      image={primaryImage(resolveTherapistMedia(t))}
                       heading={t.therapistType}
                       subheading={`${t.personName} · ${details}`}
                       href={`/therapist/${t.id}`}

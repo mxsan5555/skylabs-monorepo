@@ -38,8 +38,26 @@ const ORDER_INCLUDE = {
  */
 export async function createOrderFromCart(customerId: string, contactDetails: OrderContactDetails = {}) {
   return prisma.$transaction(async (tx) => {
-    const cart = await tx.cart.findUnique({ where: { customerId }, include: { items: true } });
-    if (!cart || cart.items.length === 0) {
+    let cart = await tx.cart.findUnique({ where: { customerId }, include: { items: true } });
+    if (!cart) {
+      throw new ApiError('VALIDATION_ERROR', 'Your cart is empty');
+    }
+
+    // Idempotent reuse — see Cart.pendingOrderId's schema doc comment. A repeat checkout call
+    // (double-click, page refresh, browser back/forward) for a cart whose Order is still in
+    // flight returns that same Order instead of creating a duplicate one.
+    if (cart.pendingOrderId) {
+      const pending = await tx.order.findUnique({ where: { id: cart.pendingOrderId }, include: ORDER_INCLUDE });
+      if (pending && pending.status === 'PENDING_PAYMENT') {
+        return pending;
+      }
+      // Stale reference (that Order was since cancelled, or is otherwise gone) — clear it and
+      // fall through to create a fresh Order from the cart's still-intact items.
+      await tx.cart.update({ where: { id: cart.id }, data: { pendingOrderId: null } });
+      cart = { ...cart, pendingOrderId: null };
+    }
+
+    if (cart.items.length === 0) {
       throw new ApiError('VALIDATION_ERROR', 'Your cart is empty');
     }
 
@@ -101,9 +119,14 @@ export async function createOrderFromCart(customerId: string, contactDetails: Or
       include: ORDER_INCLUDE,
     });
 
-    // Cart cleanup only happens here, inside the same transaction as the successful Order — a
-    // thrown error above rolls everything back and the cart is untouched.
-    await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+    // Cart items are deliberately NOT deleted here — only once payment for this Order actually
+    // succeeds (see `finalizeCartForOrder` in payment.service.ts, called from every payment-
+    // success path alongside the existing `cascadeBookingStatus`). Deleting them eagerly, at
+    // checkout submission and before any payment, was the root cause of "product disappears from
+    // cart while a paired service booking stays pending" — the two now finalize together, on the
+    // same trigger. Linking the cart to this Order (instead) is also what makes a repeat checkout
+    // call idempotent — see the `pendingOrderId` reuse check at the top of this function.
+    await tx.cart.update({ where: { id: cart.id }, data: { pendingOrderId: order.id } });
 
     return order;
   });
@@ -126,9 +149,13 @@ export async function createOrderFromBooking(customerId: string, bookingId: stri
     if (booking.status === 'CANCELLED' || booking.status === 'COMPLETED') {
       throw new ApiError('CONFLICT', `Cannot create an order from a booking with status ${booking.status}`);
     }
-    // App-layer pre-check for a clean 409 — Order.bookingId's DB-level @unique is the hard guarantee.
-    const existingOrder = await tx.order.findUnique({ where: { bookingId } });
-    if (existingOrder) throw new ApiError('CONFLICT', 'This booking already has an order');
+    // App-layer pre-check, reused idempotently rather than treated as a conflict — a retried
+    // checkout request (double-click, refresh, browser back/forward) for a booking that already
+    // has an order just gets that same order back. Order.bookingId's DB-level @unique is the
+    // hard guarantee this pre-check can't fully replace under a genuine race (see the P2002
+    // catch below for that case).
+    const existingOrder = await tx.order.findUnique({ where: { bookingId }, include: ORDER_INCLUDE });
+    if (existingOrder) return existingOrder;
 
     // Never re-reads Deal — copies the already-immutable Booking snapshot from Phase 7.
     const priceSnapshot = new Prisma.Decimal(booking.priceSnapshot);
@@ -146,43 +173,56 @@ export async function createOrderFromBooking(customerId: string, bookingId: stri
         : `${booking.therapist.therapistType} — ${booking.therapist.personName}`
       : serviceName!;
 
-    return tx.order.create({
-      data: {
-        customerId,
-        vendorId: booking.vendorId,
-        branchId: booking.branchId,
-        type: 'SERVICE',
-        bookingId: booking.id,
-        vendorNameSnapshot: booking.vendor.businessName ?? 'Vendor',
-        branchNameSnapshot: booking.branch.name,
-        subtotal: lineTotal,
-        total: lineTotal,
-        ...contactDetails,
-        items: {
-          create: [
-            {
-              ...(booking.dealId ? { deal: { connect: { id: booking.dealId } } } : {}),
-              ...(booking.dealPackageId ? { dealPackage: { connect: { id: booking.dealPackageId } } } : {}),
-              ...(booking.therapistId ? { therapist: { connect: { id: booking.therapistId } } } : {}),
-              ...(booking.therapistPackageId
-                ? { therapistPackage: { connect: { id: booking.therapistPackageId } } }
-                : {}),
-              vendor: { connect: { id: booking.vendorId } },
-              branch: { connect: { id: booking.branchId } },
-              itemName,
-              itemType: 'SERVICE',
-              vendorNameSnapshot: booking.vendor.businessName ?? 'Vendor',
-              branchNameSnapshot: booking.branch.name,
-              unitPrice: priceSnapshot,
-              quantity: booking.quantity,
-              lineTotal,
-              durationMinutes: booking.durationMinutesSnapshot,
-            },
-          ],
+    try {
+      return await tx.order.create({
+        data: {
+          customerId,
+          vendorId: booking.vendorId,
+          branchId: booking.branchId,
+          type: 'SERVICE',
+          bookingId: booking.id,
+          vendorNameSnapshot: booking.vendor.businessName ?? 'Vendor',
+          branchNameSnapshot: booking.branch.name,
+          subtotal: lineTotal,
+          total: lineTotal,
+          ...contactDetails,
+          items: {
+            create: [
+              {
+                ...(booking.dealId ? { deal: { connect: { id: booking.dealId } } } : {}),
+                ...(booking.dealPackageId ? { dealPackage: { connect: { id: booking.dealPackageId } } } : {}),
+                ...(booking.therapistId ? { therapist: { connect: { id: booking.therapistId } } } : {}),
+                ...(booking.therapistPackageId
+                  ? { therapistPackage: { connect: { id: booking.therapistPackageId } } }
+                  : {}),
+                vendor: { connect: { id: booking.vendorId } },
+                branch: { connect: { id: booking.branchId } },
+                itemName,
+                itemType: 'SERVICE',
+                vendorNameSnapshot: booking.vendor.businessName ?? 'Vendor',
+                branchNameSnapshot: booking.branch.name,
+                unitPrice: priceSnapshot,
+                quantity: booking.quantity,
+                lineTotal,
+                durationMinutes: booking.durationMinutesSnapshot,
+              },
+            ],
+          },
         },
-      },
-      include: ORDER_INCLUDE,
-    });
+        include: ORDER_INCLUDE,
+      });
+    } catch (err) {
+      // A genuine race: two concurrent requests both passed the pre-check above before either
+      // committed. Order.bookingId's DB-level @unique is the real guarantee here — on a P2002
+      // hit, the other request won, so return ITS order instead of surfacing an opaque 500 (the
+      // errorHandler only special-cases ApiError, so an unhandled P2002 would otherwise reach the
+      // client as a raw "Internal server error").
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const winner = await tx.order.findUnique({ where: { bookingId }, include: ORDER_INCLUDE });
+        if (winner) return winner;
+      }
+      throw err;
+    }
   });
 }
 
@@ -345,6 +385,23 @@ export async function cascadeBookingStatus(
   const booking = await tx.booking.findUnique({ where: { id: order.bookingId } });
   if (!booking || booking.status === 'COMPLETED' || booking.status === 'CANCELLED' || booking.status === status) return;
   await tx.booking.update({ where: { id: order.bookingId }, data: { status } });
+}
+
+/**
+ * Sibling to `cascadeBookingStatus` above — same call sites in `payment.service.ts`, same
+ * "only on actual payment success" trigger. Finalizes a cart-linked PRODUCT order's `CartItem`
+ * rows now that payment has actually succeeded (see `Cart.pendingOrderId`'s schema doc comment
+ * for why this doesn't happen eagerly at Order creation — that was the root cause of "product
+ * disappears from cart while a paired service booking stays pending"). No-op for a SERVICE order
+ * (never cart-linked) or once the cart has already moved on (its `pendingOrderId` no longer
+ * points at this order — nothing left to finalize, safe to call more than once). Exported for
+ * `payment.service.ts` to reuse — never duplicated there.
+ */
+export async function finalizeCartForOrder(tx: Prisma.TransactionClient, orderId: string) {
+  const cart = await tx.cart.findUnique({ where: { pendingOrderId: orderId } });
+  if (!cart) return;
+  await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+  await tx.cart.update({ where: { id: cart.id }, data: { pendingOrderId: null } });
 }
 
 /**

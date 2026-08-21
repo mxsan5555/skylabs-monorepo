@@ -1,4 +1,5 @@
 import { apiGet, apiPost, apiPatch, apiDelete } from './rbac/client';
+import type { MediaImage } from './media';
 
 /**
  * Customer product cart — authenticated, self-service only (backend gates on `authenticate`
@@ -17,7 +18,8 @@ export interface CartDealSummary {
   branchId: string;
   vendor: { id: string; businessName: string | null } | null;
   branch: { id: string; name: string } | null;
-  product: { id: string; name: string; image: string | null; imageAlt: string | null } | null;
+  product: { id: string; name: string; image: string | null; imageAlt: string | null; mediaImages?: MediaImage[] } | null;
+  mediaImages?: MediaImage[];
 }
 
 export interface CartItem {

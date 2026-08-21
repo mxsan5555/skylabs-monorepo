@@ -22,6 +22,7 @@ import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
 
 import { formatINR } from '../../../utils/format';
+import { resolveDealMedia, primaryImage } from '../../../utils/media';
 import type { ProductSort } from '../../../types';
 
 import content from '../../../content.json';
@@ -497,10 +498,7 @@ export function ProductListing() {
                     )
                   : undefined;
 
-              const image =
-                deal.product?.image ??
-                deal.images?.[0] ??
-                undefined;
+              const image = primaryImage(resolveDealMedia(deal));
 
               return (
                 <div

@@ -50,7 +50,11 @@ const kycDocumentSchema = z.object({
 const GSTIN_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}\d{1}[Z]{1}[A-Z\d]{1}$/;
 const PAN_REGEX = /^[A-Z]{5}\d{4}[A-Z]{1}$/;
 const PINCODE_REGEX = /^\d{6}$/;
-const INDIA_MOBILE_REGEX = /^\+91\d{10}$/;
+/** Canonical Indian mobile rule — first digit 6-9, exactly 10 digits after the `+91` this
+ *  schema's own `normalizeIdentifier()` transform always prepends. Matches the frontend's
+ *  `INDIA_MOBILE_REGEX` in `vendor-profile-form.tsx` (applied there to the plain 10-digit value
+ *  before this schema ever sees it) — same canonical rule, same digit class, on both sides. */
+const INDIA_MOBILE_REGEX = /^\+91[6-9]\d{9}$/;
 
 const gstNumberSchema = z
   .string()
@@ -174,13 +178,21 @@ export const VendorKycReviewSchema = z
 
 // ─── Branch ──────────────────────────────────────────────────────────────────
 
+/** Same 6-digit-only rule as Vendor's own PINCODE_REGEX above — Branch previously had no format
+ *  check at all here (`z.string().max(20)`), unlike Vendor. */
+const branchPincodeSchema = z
+  .string()
+  .max(20)
+  .refine((v) => v === '' || PINCODE_REGEX.test(v), { message: 'Enter a valid 6-digit pincode' })
+  .optional();
+
 const BranchFieldsSchema = z.object({
   name: z.string().min(1).max(150),
   address: z.string().max(500).optional(),
   city: z.string().max(100).optional(),
   state: z.string().max(100).optional(),
   country: z.string().max(100).optional(),
-  pincode: z.string().max(20).optional(),
+  pincode: branchPincodeSchema,
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
   phone: z.string().max(30).optional(),

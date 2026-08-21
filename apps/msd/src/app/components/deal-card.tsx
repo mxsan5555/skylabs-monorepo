@@ -19,6 +19,7 @@ export interface DealCardDeal {
   image: string;
   imageAlt: string;
   gallery?: string[];
+  video?: string | null;
   badge?: string;
   providerName?: string;
   location?: string;
@@ -102,6 +103,11 @@ export function DealCard({
               />
             </swiper-slide>
           ))}
+          {deal.video && (
+            <swiper-slide key={deal.video}>
+              <video src={deal.video} controls muted />
+            </swiper-slide>
+          )}
         </swiper-container>
 
         <FilledTonalIconButton

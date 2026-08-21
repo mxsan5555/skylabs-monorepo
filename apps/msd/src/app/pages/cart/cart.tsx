@@ -6,6 +6,7 @@ import { getCart, updateCartItemQuantity, removeCartItem, clearCart, type Cart }
 import { listBookings, cancelBooking, type Booking } from '../../../api/bookings';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR, pluralize, formatBookingSchedule, bookingDisplayName } from '../../../utils/format';
+import { resolveDealMedia, primaryImage } from '../../../utils/media';
 import './cart.css';
 
 /**
@@ -173,10 +174,10 @@ export function Cart() {
                   <ul className="cart-list">
                     {group.items.map((item) => (
                       <li key={item.id} className="cart-item">
-                        {(item.deal.product?.image ?? item.deal.images?.[0]) && (
+                        {primaryImage(resolveDealMedia(item.deal)) && (
                           <img
                             className="cart-item__img"
-                            src={item.deal.product?.image ?? item.deal.images?.[0] ?? undefined}
+                            src={primaryImage(resolveDealMedia(item.deal))}
                             alt={item.deal.product?.imageAlt ?? ''}
                             width={100}
                             height={100}

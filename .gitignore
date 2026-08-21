@@ -15,6 +15,9 @@ out/
 # Generated Prisma clients (per-app custom output, regenerated via `prisma generate`)
 apps/*/src/generated/
 
+# Local media-upload storage (Deal/Product/Therapist images+video) — never committed
+apps/msd-api/uploads/
+
 # Environment variables
 .env
 .env.local

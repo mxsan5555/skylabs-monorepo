@@ -1,10 +1,14 @@
+import { randomUUID } from 'crypto';
 import type { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
+import { ensureUniqueSlug } from '../lib/slug';
 import { assignRole, serializeUser } from './user.service';
 import { listActiveCategories, assertCategoryChildOf } from './category.service';
 import { getServiceOrThrow } from './service.service';
 import { getProductOrThrow } from './product.service';
+import * as mediaService from './media.service';
+import type { MediaFile } from './media.service';
 import { Prisma, type VendorStatus, type KycStatus, type DealStatus, type DealApprovalStatus } from '../generated/prisma-client';
 import type {
   VendorCreateSchema,
@@ -50,8 +54,22 @@ const OWNER_SUMMARY_SELECT = {
   },
 } as const;
 
+/** Declared outside the various Vendor `include` objects' own `as const` (and explicitly typed,
+ *  not inferred) so this stays the mutable array Prisma's generated types expect — same gotcha
+ *  as DEAL_PACKAGE_ORDER_BY/DEAL_IMAGE_ORDER_BY further down this file. */
+const VENDOR_IMAGE_ORDER_BY: Prisma.VendorImageOrderByWithRelationInput[] = [
+  { isPrimary: 'desc' },
+  { sortOrder: 'asc' },
+];
+/** Shared by every Vendor read/write include below — `getVendorByOwnerUserId`/`createSelfVendor`/
+ *  `updateSelfVendor` used to each have their own bespoke include (or none at all), which is
+ *  exactly the kind of per-endpoint drift that silently left a media include out of one read
+ *  path in an earlier round of this same work (see `listDeals`'s equivalent gap) — one shared
+ *  const here instead. */
+const VENDOR_MEDIA_INCLUDE = { mediaImages: { orderBy: VENDOR_IMAGE_ORDER_BY }, mediaVideo: true } as const;
+
 /** Standard `include` for any Vendor read/write that should carry its linked-owner summary + branch count. */
-const OWNER_INCLUDE = { _count: { select: { branches: true } }, owner: OWNER_SUMMARY_SELECT } as const;
+const OWNER_INCLUDE = { _count: { select: { branches: true } }, owner: OWNER_SUMMARY_SELECT, ...VENDOR_MEDIA_INCLUDE } as const;
 
 function heuristicInitialStatus(input: { gstNumber?: string; panNumber?: string }): VendorStatus {
   return input.gstNumber && input.panNumber ? 'PENDING_VERIFICATION' : 'PROFILE_INCOMPLETE';
@@ -181,9 +199,18 @@ export async function searchEligibleOwnerCandidates(query: string | undefined, p
 export async function createVendor(input: VendorCreateInput, createdByUserId: string) {
   await assertOwnerUserAvailable(input.ownerUserId);
   if (input.ownerUserId) await ensureVendorRoleAssigned(input.ownerUserId);
+  // Generated up front (rather than relying on the schema's `@default(uuid())`) so it's
+  // available as ensureUniqueSlug's id-based fallback/placeholder in the same insert — see
+  // that function's doc comment for why a plain businessName-derived slug isn't always enough.
+  const id = randomUUID();
+  const slug = await ensureUniqueSlug(input.businessName || id, id, (candidate) =>
+    prisma.vendor.findUnique({ where: { slug: candidate } }).then(Boolean),
+  );
   const vendor = await prisma.vendor.create({
     data: {
       ...input,
+      id,
+      slug,
       status: heuristicInitialStatus(input),
       createdByUserId,
     } as Prisma.VendorUncheckedCreateInput,
@@ -193,12 +220,23 @@ export async function createVendor(input: VendorCreateInput, createdByUserId: st
 }
 
 export async function updateVendor(id: string, input: VendorUpdateInput) {
-  await getVendorOrThrow(id);
+  const existing = await getVendorOrThrow(id);
   if ('ownerUserId' in input) await assertOwnerUserAvailable(input.ownerUserId, id);
   if (input.ownerUserId) await ensureVendorRoleAssigned(input.ownerUserId);
+  // The admin-create pipeline's Step 1 persists a Vendor before any businessName is known (see
+  // createVendor above), so its slug starts out id-derived rather than name-derived. The FIRST
+  // time a real businessName arrives via update, upgrade the slug to reflect it — but never
+  // again after that, so a vendor's public `/vendor/:slug` URL never unexpectedly changes once
+  // it's been derived from a real name.
+  const data: Prisma.VendorUncheckedUpdateInput = { ...input } as Prisma.VendorUncheckedUpdateInput;
+  if (!existing.businessName && input.businessName) {
+    data.slug = await ensureUniqueSlug(input.businessName, id, (candidate) =>
+      prisma.vendor.findUnique({ where: { slug: candidate } }).then((v) => Boolean(v) && v!.id !== id),
+    );
+  }
   const vendor = await prisma.vendor.update({
     where: { id },
-    data: input as Prisma.VendorUncheckedUpdateInput,
+    data,
     include: OWNER_INCLUDE,
   });
   return serializeVendor(vendor);
@@ -238,7 +276,10 @@ export async function reviewKyc(id: string, kycStatus: Extract<KycStatus, 'VERIF
 
 /** Never throws — callers decide whether "no vendor yet" means 404 or "show onboarding." */
 export async function getVendorByOwnerUserId(ownerUserId: string) {
-  return prisma.vendor.findUnique({ where: { ownerUserId }, include: { _count: { select: { branches: true } } } });
+  return prisma.vendor.findUnique({
+    where: { ownerUserId },
+    include: { _count: { select: { branches: true } }, ...VENDOR_MEDIA_INCLUDE },
+  });
 }
 
 export async function getMyVendorOrThrow(ownerUserId: string) {
@@ -250,12 +291,19 @@ export async function getMyVendorOrThrow(ownerUserId: string) {
 export async function createSelfVendor(ownerUserId: string, input: VendorSelfCreateInput) {
   const existing = await prisma.vendor.findUnique({ where: { ownerUserId } });
   if (existing) throw new ApiError('CONFLICT', 'You already have a vendor profile');
+  const id = randomUUID();
+  const slug = await ensureUniqueSlug(input.businessName, id, (candidate) =>
+    prisma.vendor.findUnique({ where: { slug: candidate } }).then(Boolean),
+  );
   return prisma.vendor.create({
     data: {
       ...input,
+      id,
+      slug,
       ownerUserId,
       status: heuristicInitialStatus(input),
     } as Prisma.VendorUncheckedCreateInput,
+    include: VENDOR_MEDIA_INCLUDE,
   });
 }
 
@@ -267,7 +315,11 @@ export async function updateSelfVendor(ownerUserId: string, input: VendorSelfUpd
     data.kycStatus = 'PENDING';
     data.kycRejectionReason = null;
   }
-  return prisma.vendor.update({ where: { id: vendor.id }, data: data as Prisma.VendorUncheckedUpdateInput });
+  return prisma.vendor.update({
+    where: { id: vendor.id },
+    data: data as Prisma.VendorUncheckedUpdateInput,
+    include: VENDOR_MEDIA_INCLUDE,
+  });
 }
 
 const REQUIRED_FOR_SUBMISSION: { key: keyof Awaited<ReturnType<typeof getMyVendorOrThrow>>; label: string }[] = [
@@ -355,9 +407,10 @@ export async function listAllDeals(opts: { page: number; pageSize: number; searc
       include: {
         vendor: { select: { id: true, businessName: true } },
         branch: { select: { id: true, name: true } },
-        category: { select: { id: true, name: true } },
-        service: { select: { id: true, name: true } },
-        product: { select: { id: true, name: true } },
+        // Reuses the same OFFERING_INCLUDE shape (packages + media) every single-vendor deal
+        // read already uses — the cross-vendor Deals list needed these too for a "From ₹X"
+        // package summary and a thumbnail image, previously omitted here.
+        ...OFFERING_INCLUDE,
       },
     }),
     prisma.deal.count({ where }),
@@ -400,9 +453,21 @@ export async function setBranchStatus(vendorId: string, branchId: string, isActi
 
 // ─── Therapist (shared by self-derived vendorId, mirrors Branch's scoping pattern) ───────────
 
+/** Same "declared outside the `as const` object" reasoning as DEAL_IMAGE_ORDER_BY — used only by
+ *  the actual list/detail reads below, not by getTherapistScopedOrThrow (a pure ownership check,
+ *  called from every therapist-nested mutation, where the extra join would be dead weight). */
+const THERAPIST_IMAGE_ORDER_BY: Prisma.TherapistImageOrderByWithRelationInput[] = [
+  { isPrimary: 'desc' },
+  { sortOrder: 'asc' },
+];
+const THERAPIST_MEDIA_INCLUDE = {
+  mediaImages: { orderBy: THERAPIST_IMAGE_ORDER_BY },
+  mediaVideo: true,
+} as const;
+
 export async function listTherapists(vendorId: string, branchId: string) {
   await getBranchScopedOrThrow(vendorId, branchId);
-  return prisma.therapist.findMany({ where: { branchId }, orderBy: { createdAt: 'desc' } });
+  return prisma.therapist.findMany({ where: { branchId }, orderBy: { createdAt: 'desc' }, include: THERAPIST_MEDIA_INCLUDE });
 }
 
 /**
@@ -413,7 +478,7 @@ export async function listTherapists(vendorId: string, branchId: string) {
 export async function listVendorTherapistsForAdmin(vendorId: string) {
   return prisma.therapist.findMany({
     where: { vendorId },
-    include: { branch: { select: { id: true, name: true } } },
+    include: { branch: { select: { id: true, name: true } }, ...THERAPIST_MEDIA_INCLUDE },
     orderBy: { createdAt: 'desc' },
   });
 }
@@ -427,14 +492,43 @@ export async function getTherapistScopedOrThrow(vendorId: string, therapistId: s
   return therapist;
 }
 
+/** A rapid double-click/double-submit sends two near-identical create requests before the
+ *  first one's response reaches the frontend's own submit-guard — deliberately NOT solved with
+ *  a DB `@@unique` on `(vendorId, branchId, therapistType, personName)`, since two different real
+ *  people can legitimately share a name at the same branch, and that would permanently reject a
+ *  legitimate second therapist, not just the accidental duplicate. Instead: if an identical
+ *  request created a row in the last 10 seconds, treat this as the same submission and return
+ *  that row rather than creating another — mirrors payment.service.ts's own
+ *  find-recent-then-reuse idempotency pattern rather than inventing a new mechanism. */
+const DUPLICATE_SUBMIT_WINDOW_MS = 10_000;
+
 export async function createTherapist(vendorId: string, branchId: string, input: TherapistCreateInput) {
   await getBranchScopedOrThrow(vendorId, branchId);
-  return prisma.therapist.create({ data: { ...input, vendorId, branchId } as Prisma.TherapistUncheckedCreateInput });
+  const recentDuplicate = await prisma.therapist.findFirst({
+    where: {
+      vendorId,
+      branchId,
+      therapistType: input.therapistType,
+      personName: input.personName,
+      createdAt: { gte: new Date(Date.now() - DUPLICATE_SUBMIT_WINDOW_MS) },
+    },
+    orderBy: { createdAt: 'desc' },
+    include: THERAPIST_MEDIA_INCLUDE,
+  });
+  if (recentDuplicate) return recentDuplicate;
+  return prisma.therapist.create({
+    data: { ...input, vendorId, branchId } as Prisma.TherapistUncheckedCreateInput,
+    include: THERAPIST_MEDIA_INCLUDE,
+  });
 }
 
 export async function updateTherapist(vendorId: string, therapistId: string, input: TherapistUpdateInput) {
   await getTherapistScopedOrThrow(vendorId, therapistId);
-  return prisma.therapist.update({ where: { id: therapistId }, data: input as Prisma.TherapistUncheckedUpdateInput });
+  return prisma.therapist.update({
+    where: { id: therapistId },
+    data: input as Prisma.TherapistUncheckedUpdateInput,
+    include: THERAPIST_MEDIA_INCLUDE,
+  });
 }
 
 /** No delete — like Branch, a Therapist is only ever soft-disabled via isActive, never
@@ -505,6 +599,39 @@ export async function updateTherapistPackage(
 export async function deleteTherapistPackage(vendorId: string, therapistId: string, packageId: string) {
   await getTherapistPackageScopedOrThrow(vendorId, therapistId, packageId);
   await prisma.therapistPackage.delete({ where: { id: packageId } });
+}
+
+// ─── Therapist media (shared upload system — see media.service.ts's doc comment; ownership
+// stays here, mechanics live there, same layering as Deal media above) ───────────────────
+
+export async function addTherapistImage(vendorId: string, therapistId: string, file: MediaFile) {
+  await getTherapistScopedOrThrow(vendorId, therapistId);
+  return mediaService.addImage('therapist', therapistId, file);
+}
+
+export async function deleteTherapistImage(vendorId: string, therapistId: string, imageId: string) {
+  await getTherapistScopedOrThrow(vendorId, therapistId);
+  return mediaService.deleteImage('therapist', therapistId, imageId);
+}
+
+export async function reorderTherapistImages(vendorId: string, therapistId: string, orderedImageIds: string[]) {
+  await getTherapistScopedOrThrow(vendorId, therapistId);
+  return mediaService.reorderImages('therapist', therapistId, orderedImageIds);
+}
+
+export async function setTherapistPrimaryImage(vendorId: string, therapistId: string, imageId: string) {
+  await getTherapistScopedOrThrow(vendorId, therapistId);
+  return mediaService.setPrimaryImage('therapist', therapistId, imageId);
+}
+
+export async function replaceTherapistVideo(vendorId: string, therapistId: string, file: MediaFile) {
+  await getTherapistScopedOrThrow(vendorId, therapistId);
+  return mediaService.replaceVideo('therapist', therapistId, file);
+}
+
+export async function deleteTherapistVideo(vendorId: string, therapistId: string) {
+  await getTherapistScopedOrThrow(vendorId, therapistId);
+  return mediaService.deleteVideo('therapist', therapistId);
 }
 
 // ─── Customers (derived from Order/Booking — no dedicated table) ─────────────
@@ -649,7 +776,14 @@ export async function listDeals(vendorId: string, branchId: string) {
   return prisma.deal.findMany({
     where: { branchId },
     orderBy: { createdAt: 'desc' },
-    include: { category: true, subcategory: true, service: true, product: true },
+    include: {
+      category: true,
+      subcategory: true,
+      service: true,
+      product: true,
+      mediaImages: { orderBy: DEAL_IMAGE_ORDER_BY },
+      mediaVideo: true,
+    },
   });
 }
 
@@ -674,12 +808,20 @@ const DEAL_PACKAGE_ORDER_BY: Prisma.DealPackageOrderByWithRelationInput[] = [
   { durationMinutes: 'asc' },
 ];
 
+/** Same "declared outside the `as const` object" reasoning as DEAL_PACKAGE_ORDER_BY. */
+const DEAL_IMAGE_ORDER_BY: Prisma.DealImageOrderByWithRelationInput[] = [
+  { isPrimary: 'desc' },
+  { sortOrder: 'asc' },
+];
+
 const OFFERING_INCLUDE = {
   category: { select: { id: true, name: true } },
   subcategory: { select: { id: true, name: true } },
   service: { select: { id: true, name: true } },
   product: { select: { id: true, name: true } },
   packages: { orderBy: DEAL_PACKAGE_ORDER_BY },
+  mediaImages: { orderBy: DEAL_IMAGE_ORDER_BY },
+  mediaVideo: true,
 } as const;
 
 type DealPackageInput = NonNullable<DealCreateInput['packages']>[number];
@@ -850,6 +992,74 @@ export async function rejectDeal(vendorId: string, branchId: string, dealId: str
     where: { id: dealId },
     data: { approvalStatus: 'REJECTED' as DealApprovalStatus, status: 'INACTIVE', approvalRejectionReason: reason },
   });
+}
+
+// ─── Deal media (shared upload system — see media.service.ts's doc comment for the full
+// architecture; ownership stays here, mechanics live there, same layering as every other
+// nested Deal resource in this file) ──────────────────────────────────────────
+
+export async function addDealImage(vendorId: string, branchId: string, dealId: string, file: MediaFile) {
+  await getDealScopedOrThrow(vendorId, branchId, dealId);
+  return mediaService.addImage('deal', dealId, file);
+}
+
+export async function deleteDealImage(vendorId: string, branchId: string, dealId: string, imageId: string) {
+  await getDealScopedOrThrow(vendorId, branchId, dealId);
+  return mediaService.deleteImage('deal', dealId, imageId);
+}
+
+export async function reorderDealImages(vendorId: string, branchId: string, dealId: string, orderedImageIds: string[]) {
+  await getDealScopedOrThrow(vendorId, branchId, dealId);
+  return mediaService.reorderImages('deal', dealId, orderedImageIds);
+}
+
+export async function setDealPrimaryImage(vendorId: string, branchId: string, dealId: string, imageId: string) {
+  await getDealScopedOrThrow(vendorId, branchId, dealId);
+  return mediaService.setPrimaryImage('deal', dealId, imageId);
+}
+
+export async function replaceDealVideo(vendorId: string, branchId: string, dealId: string, file: MediaFile) {
+  await getDealScopedOrThrow(vendorId, branchId, dealId);
+  return mediaService.replaceVideo('deal', dealId, file);
+}
+
+export async function deleteDealVideo(vendorId: string, branchId: string, dealId: string) {
+  await getDealScopedOrThrow(vendorId, branchId, dealId);
+  return mediaService.deleteVideo('deal', dealId);
+}
+
+// ─── Vendor media (shared upload system — see media.service.ts's doc comment; ownership here
+// is just "does this Vendor exist" — the self-service route already resolves its own vendorId
+// via getMyVendorOrThrow before calling these, and the admin route can manage any vendor) ────
+
+export async function addVendorImage(vendorId: string, file: MediaFile) {
+  await getVendorOrThrow(vendorId);
+  return mediaService.addImage('vendor', vendorId, file);
+}
+
+export async function deleteVendorImage(vendorId: string, imageId: string) {
+  await getVendorOrThrow(vendorId);
+  return mediaService.deleteImage('vendor', vendorId, imageId);
+}
+
+export async function reorderVendorImages(vendorId: string, orderedImageIds: string[]) {
+  await getVendorOrThrow(vendorId);
+  return mediaService.reorderImages('vendor', vendorId, orderedImageIds);
+}
+
+export async function setVendorPrimaryImage(vendorId: string, imageId: string) {
+  await getVendorOrThrow(vendorId);
+  return mediaService.setPrimaryImage('vendor', vendorId, imageId);
+}
+
+export async function replaceVendorVideo(vendorId: string, file: MediaFile) {
+  await getVendorOrThrow(vendorId);
+  return mediaService.replaceVideo('vendor', vendorId, file);
+}
+
+export async function deleteVendorVideo(vendorId: string) {
+  await getVendorOrThrow(vendorId);
+  return mediaService.deleteVideo('vendor', vendorId);
 }
 
 // ─── Categories (read-only lookup for the Deal form) ─────────────────────────

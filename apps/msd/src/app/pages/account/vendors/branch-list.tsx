@@ -8,7 +8,12 @@ import { ApiRequestError } from '../../../../api/rbac/client';
 const BRANCH_COLUMNS = JSON.stringify([
   { key: 'Branch Name', label: 'Branch Name' },
   { key: 'Vendor', label: 'Vendor' },
-  { key: 'City/State', label: 'City/State' },
+  { key: 'Address', label: 'Address' },
+  { key: 'City', label: 'City' },
+  { key: 'State', label: 'State' },
+  { key: 'PIN Code', label: 'PIN Code' },
+  { key: 'Latitude', label: 'Latitude' },
+  { key: 'Longitude', label: 'Longitude' },
   { key: 'Status', label: 'Status', type: 'status', statusMap: { Active: 'success', Inactive: 'error' } },
 ]);
 
@@ -22,7 +27,12 @@ function toBranchRow(branch: Branch): Record<string, string | number> {
   return {
     'Branch Name': branch.name,
     Vendor: branch.vendor?.businessName ?? '—',
-    'City/State': [branch.city, branch.state].filter(Boolean).join(', ') || '—',
+    Address: branch.address ?? '—',
+    City: branch.city ?? '—',
+    State: branch.state ?? '—',
+    'PIN Code': branch.pincode ?? '—',
+    Latitude: branch.latitude ?? '—',
+    Longitude: branch.longitude ?? '—',
     Status: branch.isActive ? 'Active' : 'Inactive',
     'Vendor ID': branch.vendor?.id ?? '',
   };

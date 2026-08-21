@@ -33,9 +33,11 @@ import {
   TherapistPackageUpdateSchema,
   VendorIdParamSchema,
 } from '../schemas/vendor.schema';
+import { MediaReorderSchema } from '../schemas/media.schema';
+import { imageUpload, videoUpload } from '../lib/media-upload.middleware';
 import * as vendorService from '../services/vendor.service';
 import { writeAuditLog } from '../services/audit.service';
-import { sendData } from '../lib/http';
+import { sendData, ApiError } from '../lib/http';
 
 const router = Router();
 router.use(authenticate);
@@ -185,6 +187,119 @@ router.patch(
     }
   },
 );
+
+// ─── Vendor media, self-service (shared upload system — see media.service.ts's doc comment) ──
+
+router.post(
+  '/me/images',
+  requirePermission('vendors', 'custom'),
+  imageUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const image = await vendorService.addVendorImage(vendor.id, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_image.create',
+        targetType: 'VendorImage',
+        targetId: image.id,
+        ...requestMeta(req),
+      });
+      sendData(res, image, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete('/me/images/:imageId', requirePermission('vendors', 'custom'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    await vendorService.deleteVendorImage(vendor.id, req.params.imageId);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'vendor_image.delete',
+      targetType: 'VendorImage',
+      targetId: req.params.imageId,
+      ...requestMeta(req),
+    });
+    sendData(res, { deleted: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch(
+  '/me/images/reorder',
+  requirePermission('vendors', 'custom'),
+  validateBody(MediaReorderSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.reorderVendorImages(vendor.id, req.body.imageIds);
+      sendData(res, { reordered: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch('/me/images/:imageId/primary', requirePermission('vendors', 'custom'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    await vendorService.setVendorPrimaryImage(vendor.id, req.params.imageId);
+    sendData(res, { primary: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/me/video',
+  requirePermission('vendors', 'custom'),
+  videoUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const video = await vendorService.replaceVendorVideo(vendor.id, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_video.upsert',
+        targetType: 'VendorVideo',
+        targetId: video.id,
+        ...requestMeta(req),
+      });
+      sendData(res, video, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete('/me/video', requirePermission('vendors', 'custom'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    await vendorService.deleteVendorVideo(vendor.id);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'vendor_video.delete',
+      targetType: 'VendorVideo',
+      targetId: vendor.id,
+      ...requestMeta(req),
+    });
+    sendData(res, { deleted: true });
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.post('/me/submit', requirePermission('vendors', 'custom'), async (req, res, next) => {
   try {
@@ -375,6 +490,131 @@ router.patch(
   },
 );
 
+// ─── Deal media (shared upload system — see media.service.ts's doc comment) ─────────────────
+
+router.post(
+  '/me/branches/:branchId/deals/:dealId/images',
+  requirePermission('vendors', 'custom'),
+  imageUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const image = await vendorService.addDealImage(vendor.id, req.params.branchId, req.params.dealId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'deal_image.create',
+        targetType: 'DealImage',
+        targetId: image.id,
+        ...requestMeta(req),
+      });
+      sendData(res, image, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/me/branches/:branchId/deals/:dealId/images/:imageId',
+  requirePermission('vendors', 'custom'),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.deleteDealImage(vendor.id, req.params.branchId, req.params.dealId, req.params.imageId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'deal_image.delete',
+        targetType: 'DealImage',
+        targetId: req.params.imageId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/branches/:branchId/deals/:dealId/images/reorder',
+  requirePermission('vendors', 'custom'),
+  validateBody(MediaReorderSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.reorderDealImages(vendor.id, req.params.branchId, req.params.dealId, req.body.imageIds);
+      sendData(res, { reordered: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/branches/:branchId/deals/:dealId/images/:imageId/primary',
+  requirePermission('vendors', 'custom'),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.setDealPrimaryImage(vendor.id, req.params.branchId, req.params.dealId, req.params.imageId);
+      sendData(res, { primary: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/me/branches/:branchId/deals/:dealId/video',
+  requirePermission('vendors', 'custom'),
+  videoUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const video = await vendorService.replaceDealVideo(vendor.id, req.params.branchId, req.params.dealId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'deal_video.upsert',
+        targetType: 'DealVideo',
+        targetId: video.id,
+        ...requestMeta(req),
+      });
+      sendData(res, video, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/me/branches/:branchId/deals/:dealId/video',
+  requirePermission('vendors', 'custom'),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.deleteDealVideo(vendor.id, req.params.branchId, req.params.dealId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'deal_video.delete',
+        targetType: 'DealVideo',
+        targetId: req.params.dealId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // ─── Therapist (self-service — mirrors Branch's exact pattern) ──────────────
 
 router.get('/me/branches/:branchId/therapists', requirePermission('vendors', 'custom'), async (req, res, next) => {
@@ -533,6 +773,131 @@ router.delete(
   },
 );
 
+// ─── Therapist media (shared upload system — see media.service.ts's doc comment) ────────────
+
+router.post(
+  '/me/therapists/:therapistId/images',
+  requirePermission('vendors', 'custom'),
+  imageUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const image = await vendorService.addTherapistImage(vendor.id, req.params.therapistId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_image.create',
+        targetType: 'TherapistImage',
+        targetId: image.id,
+        ...requestMeta(req),
+      });
+      sendData(res, image, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/me/therapists/:therapistId/images/:imageId',
+  requirePermission('vendors', 'custom'),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.deleteTherapistImage(vendor.id, req.params.therapistId, req.params.imageId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_image.delete',
+        targetType: 'TherapistImage',
+        targetId: req.params.imageId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/therapists/:therapistId/images/reorder',
+  requirePermission('vendors', 'custom'),
+  validateBody(MediaReorderSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.reorderTherapistImages(vendor.id, req.params.therapistId, req.body.imageIds);
+      sendData(res, { reordered: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/therapists/:therapistId/images/:imageId/primary',
+  requirePermission('vendors', 'custom'),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.setTherapistPrimaryImage(vendor.id, req.params.therapistId, req.params.imageId);
+      sendData(res, { primary: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/me/therapists/:therapistId/video',
+  requirePermission('vendors', 'custom'),
+  videoUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const video = await vendorService.replaceTherapistVideo(vendor.id, req.params.therapistId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_video.upsert',
+        targetType: 'TherapistVideo',
+        targetId: video.id,
+        ...requestMeta(req),
+      });
+      sendData(res, video, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/me/therapists/:therapistId/video',
+  requirePermission('vendors', 'custom'),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.deleteTherapistVideo(vendor.id, req.params.therapistId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_video.delete',
+        targetType: 'TherapistVideo',
+        targetId: req.params.therapistId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // ─── Admin/SuperAdmin surface ─────────────────────────────────────────────────
 
 router.get('/', requirePermission('vendors', 'view'), async (req, res, next) => {
@@ -587,6 +952,131 @@ router.patch(
         ...requestMeta(req),
       });
       sendData(res, withCompletion(vendor));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── Vendor media, admin (shared upload system — see media.service.ts's doc comment) ─────────
+
+router.post(
+  '/:id/images',
+  requirePermission('vendors', 'edit'),
+  validateParams(UuidParamSchema),
+  imageUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const image = await vendorService.addVendorImage(req.params.id, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_image.create',
+        targetType: 'VendorImage',
+        targetId: image.id,
+        ...requestMeta(req),
+      });
+      sendData(res, image, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/:id/images/:imageId',
+  requirePermission('vendors', 'edit'),
+  validateParams(UuidParamSchema),
+  async (req, res, next) => {
+    try {
+      await vendorService.deleteVendorImage(req.params.id, req.params.imageId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_image.delete',
+        targetType: 'VendorImage',
+        targetId: req.params.imageId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/:id/images/reorder',
+  requirePermission('vendors', 'edit'),
+  validateParams(UuidParamSchema),
+  validateBody(MediaReorderSchema),
+  async (req, res, next) => {
+    try {
+      await vendorService.reorderVendorImages(req.params.id, req.body.imageIds);
+      sendData(res, { reordered: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/:id/images/:imageId/primary',
+  requirePermission('vendors', 'edit'),
+  validateParams(UuidParamSchema),
+  async (req, res, next) => {
+    try {
+      await vendorService.setVendorPrimaryImage(req.params.id, req.params.imageId);
+      sendData(res, { primary: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/:id/video',
+  requirePermission('vendors', 'edit'),
+  validateParams(UuidParamSchema),
+  videoUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const video = await vendorService.replaceVendorVideo(req.params.id, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_video.upsert',
+        targetType: 'VendorVideo',
+        targetId: video.id,
+        ...requestMeta(req),
+      });
+      sendData(res, video, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/:id/video',
+  requirePermission('vendors', 'edit'),
+  validateParams(UuidParamSchema),
+  async (req, res, next) => {
+    try {
+      await vendorService.deleteVendorVideo(req.params.id);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_video.delete',
+        targetType: 'VendorVideo',
+        targetId: req.params.id,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
     } catch (err) {
       next(err);
     }
