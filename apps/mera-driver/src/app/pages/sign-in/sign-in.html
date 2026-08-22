@@ -8,8 +8,10 @@
   </div>
 
   <div class="auth-card">
-    <h2>Sign in</h2>
-    <p>Enter your details to receive a one-time code.</p>
+    <h2>{{ content().title }}</h2>
+    <p>{{ content().subtitle }}</p>
+
+
 
     <md-tabs
       class="auth-tabs"
@@ -18,34 +20,20 @@
     >
       <md-primary-tab>
         <md-icon slot="icon" aria-hidden="true">mail</md-icon>
-        Email
+        {{ content().tabEmail }}
       </md-primary-tab>
       <md-primary-tab>
         <md-icon slot="icon" aria-hidden="true">call</md-icon>
-        Phone
+        {{ content().tabPhone }}
       </md-primary-tab>
     </md-tabs>
 
     @if (method() === 'phone') {
-      <md-outlined-text-field
-        class="auth-field"
-        label="Phone number"
-        type="tel"
-        autocomplete="tel"
-        [value]="value"
-        (input)="value = $any($event.target).value"
-      >
+      <md-outlined-text-field class="auth-field" [label]="content().labelPhone" type="tel" autocomplete="tel" [value]="value" (input)="onInput($any($event.target).value)"  [error]="!!phoneError()"  [errorText]="phoneError()">
         <md-icon slot="leading-icon" aria-hidden="true">call</md-icon>
       </md-outlined-text-field>
     } @else {
-      <md-outlined-text-field
-        class="auth-field"
-        label="Email"
-        type="email"
-        autocomplete="email"
-        [value]="value"
-        (input)="value = $any($event.target).value"
-      >
+      <md-outlined-text-field class="auth-field" [label]="content().labelEmail" type="email" autocomplete="email" [value]="value" (input)="onInput($any($event.target).value)"  [error]="!!emailError()"  [errorText]="emailError()">
         <md-icon slot="leading-icon" aria-hidden="true">mail</md-icon>
       </md-outlined-text-field>
     }
@@ -55,16 +43,18 @@
     }
 
     <md-filled-button class="auth-submit" [disabled]="loading()" (click)="sendOtp()">
-      {{ loading() ? 'Sending…' : 'Send OTP' }}
+      {{ loading() ? 'Sending…' : content().btnSendOtp }}
     </md-filled-button>
   </div>
 
-  <div class="auth-divider"><span>or continue with</span></div>
+  <div class="auth-divider"><span>{{ content().dividerText }}</span></div>
 
   <md-outlined-button class="auth-google" href="{{ googleUrl }}">
     <md-icon slot="icon" aria-hidden="true">language</md-icon>
-    Continue with Google
+    {{ content().btnGoogle }}
   </md-outlined-button>
 
-  <p class="auth-note">New users are registered automatically.</p>
+  <p class="auth-note">{{ content().disclaimer }}</p>
+
+
 </div>

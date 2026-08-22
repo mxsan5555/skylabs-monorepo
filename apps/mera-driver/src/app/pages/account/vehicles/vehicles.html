@@ -1,0 +1,153 @@
+<md-admin-page
+  [title]="showAddForm() ? (editingVehicleId() !== null ? 'Edit Vehicle' : 'Add Vehicle') : content().title"
+  [subtitle]="showAddForm() ? (editingVehicleId() !== null ? 'Edit vehicle profile details' : 'Add a new vehicle to the registry') : content().subtitle"
+>
+  <div class="relative w-full">
+
+    <!-- VIEW 1: VEHICLES DATA TABLE -->
+    @if (!showAddForm()) {
+      <div class="w-full mt-4">
+        <sky-card class="p-6 block">
+          <sky-data-table
+            caption="Vehicles Database"
+            [columns]="tableColumns"
+            [rows]="tableRowsString()"
+            [total]="totalVehicles()"
+            [page]="page()"
+            [page-size]="pageSize()"
+            searchable
+            search-placeholder="Search UID, Number, Make, Model..."
+            filter-label="Filter by Status"
+            [filter-options]="tableFilterOptions"
+            [actions]="tableActions"
+            exportable
+            selectable
+            (sky-dt-params-change)="onParamsChange($event)"
+            (sky-dt-row-action)="onRowAction($event)"
+            (sky-dt-row-select)="onRowSelect($event)"
+          >
+            <!-- Projected Add button next to download/export button in the toolbar -->
+            <md-icon-button
+              slot="toolbar-actions"
+              aria-label="Add Vehicle"
+              title="Add Vehicle"
+              (click)="openAddVehicleForm()"
+            >
+              <md-icon>add</md-icon>
+            </md-icon-button>
+          </sky-data-table>
+        </sky-card>
+      </div>
+    }
+    @else {
+      <div class="flex flex-col gap-6 w-full mt-2">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+          <div class="flex items-center gap-x-2">
+            <md-icon-button (click)="closeAddVehicleForm()">
+              <md-icon>arrow_back</md-icon>
+            </md-icon-button>
+            <span class="form-header-title">
+              {{ editingVehicleId() !== null ? 'Edit Vehicle Profile' : 'Register New Vehicle' }}
+            </span>
+          </div>
+          <md-outlined-button (click)="closeAddVehicleForm()">
+            <md-icon slot="icon">arrow_back</md-icon>
+            Back to List
+          </md-outlined-button>
+        </div>
+
+        <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
+          
+          <div class="flex flex-col gap-y-6 w-full">
+            
+            <!-- 1. Primary Vehicle Information -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>1. Primary Vehicle Information</h3>
+              </div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="Vehicle UID *" [value]="inputVehicleUid()" (input)="onInputChange('vehicle_uid', $event)" placeholder="e.g. VEH-101"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Vehicle Number *" [value]="inputVehicleNumber()" (input)="onInputChange('vehicle_number', $event)" placeholder="e.g. DL-3C-AS-1234"></md-outlined-text-field>
+
+                <md-outlined-select label="Vehicle Type *" [value]="inputVehicleTypeId()" (change)="onInputChange('vehicle_type_id', $event)">
+                  <md-select-option value="1"><div slot="headline">Sedan</div></md-select-option>
+                  <md-select-option value="2"><div slot="headline">SUV</div></md-select-option>
+                  <md-select-option value="3"><div slot="headline">Hatchback</div></md-select-option>
+                  <md-select-option value="4"><div slot="headline">EV</div></md-select-option>
+                </md-outlined-select>
+
+                <md-outlined-text-field label="Customer / Owner ID *" [value]="inputCustomerId()" (input)="onInputChange('customer_id', $event)" placeholder="e.g. 1001"></md-outlined-text-field>
+
+                <md-outlined-select class="col-span-2 max-sm:col-span-1" label="Status *" [value]="inputStatus()" (change)="onInputChange('status', $event)">
+                  <md-select-option value="Active"><div slot="headline">Active</div></md-select-option>
+                  <md-select-option value="Inactive"><div slot="headline">Inactive</div></md-select-option>
+                  <md-select-option value="Maintenance"><div slot="headline">Maintenance</div></md-select-option>
+                </md-outlined-select>
+              </div>
+            </sky-card>
+
+            <!-- 2. Technical Specifications -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>2. Technical Specifications</h3>
+              </div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="Make" [value]="inputMake()" (input)="onInputChange('make', $event)" placeholder="e.g. Maruti Suzuki"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Model" [value]="inputModel()" (input)="onInputChange('model', $event)" placeholder="e.g. Ciaz"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Variant" [value]="inputVariant()" (input)="onInputChange('variant', $event)" placeholder="e.g. Alpha 1.5 AT"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Manufacturing Year" [value]="inputManufacturingYear()" (input)="onInputChange('manufacturing_year', $event)" placeholder="e.g. 2022"></md-outlined-text-field>
+
+                <md-outlined-select label="Fuel Type" [value]="inputFuelType()" (change)="onInputChange('fuel_type', $event)">
+                  <md-select-option value="Petrol"><div slot="headline">Petrol</div></md-select-option>
+                  <md-select-option value="Diesel"><div slot="headline">Diesel</div></md-select-option>
+                  <md-select-option value="CNG"><div slot="headline">CNG</div></md-select-option>
+                  <md-select-option value="EV"><div slot="headline">EV</div></md-select-option>
+                </md-outlined-select>
+
+                <md-outlined-select label="Transmission" [value]="inputTransmission()" (change)="onInputChange('transmission', $event)">
+                  <md-select-option value="Manual"><div slot="headline">Manual</div></md-select-option>
+                  <md-select-option value="Automatic"><div slot="headline">Automatic</div></md-select-option>
+                </md-outlined-select>
+
+                <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Color" [value]="inputColor()" (input)="onInputChange('color', $event)" placeholder="e.g. Phantom Black"></md-outlined-text-field>
+              </div>
+            </sky-card>
+
+            <!-- 3. Registration & Insurance Details -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>3. Registration & Insurance Details</h3>
+              </div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="RC Number" [value]="inputRcNumber()" (input)="onInputChange('rc_number', $event)" placeholder="Enter RC Number"></md-outlined-text-field>
+
+                <md-outlined-text-field type="date" label="RC Expiry Date" [value]="inputRcExpiryDate()" (input)="onInputChange('rc_expiry_date', $event)"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Insurance Number" [value]="inputInsuranceNumber()" (input)="onInputChange('insurance_number', $event)" placeholder="Enter Insurance Policy Number"></md-outlined-text-field>
+
+                <md-outlined-text-field type="date" label="Insurance Expiry Date" [value]="inputInsuranceExpiryDate()" (input)="onInputChange('insurance_expiry_date', $event)"></md-outlined-text-field>
+
+                <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Notes / Remarks" [value]="inputNotes()" (input)="onInputChange('notes', $event)" placeholder="Enter admin notes or vehicle remarks"></md-outlined-text-field>
+              </div>
+            </sky-card>
+
+          </div>
+
+          <!-- Form Actions Bar -->
+          <div class="flex justify-end gap-3 mt-8 border-t border-slate-100 pt-4">
+            <md-outlined-button (click)="closeAddVehicleForm()">Cancel</md-outlined-button>
+            <md-filled-button (click)="addVehicle()" style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;">
+              <md-icon slot="icon">save</md-icon>
+              {{ editingVehicleId() !== null ? 'Save Changes' : content().btnRegister }}
+            </md-filled-button>
+          </div>
+        </sky-card>
+      </div>
+    }
+
+  </div>
+</md-admin-page>

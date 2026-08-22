@@ -1,0 +1,208 @@
+@if (isLoading()) {
+  <div class="border-t border-slate-200 bg-slate-50 py-10">
+    <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 animate-pulse">
+      <!-- Column 1: Brand Logo Skeleton -->
+      <div class="flex flex-col gap-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-lg bg-slate-200"></div>
+          <div class="h-5 bg-slate-200 rounded w-24"></div>
+        </div>
+        <div class="h-3.5 bg-slate-200 rounded w-48 mt-2"></div>
+      </div>
+      
+      <!-- Column 2: Quick Links Skeleton -->
+      <div class="flex flex-col gap-3">
+        <div class="h-4 bg-slate-200 rounded w-24 mb-1"></div>
+        <div class="flex flex-col gap-2">
+          <div class="h-3.5 bg-slate-200 rounded w-16"></div>
+          <div class="h-3.5 bg-slate-200 rounded w-24"></div>
+          <div class="h-3.5 bg-slate-200 rounded w-20"></div>
+          <div class="h-3.5 bg-slate-200 rounded w-16"></div>
+          <div class="h-3.5 bg-slate-200 rounded w-24"></div>
+        </div>
+      </div>
+      
+      <!-- Column 3: Account Links Skeleton -->
+      <div class="flex flex-col gap-3">
+        <div class="h-4 bg-slate-200 rounded w-24 mb-1"></div>
+        <div class="flex flex-col gap-2">
+          <div class="h-3.5 bg-slate-200 rounded w-20"></div>
+          <div class="h-3.5 bg-slate-200 rounded w-24"></div>
+          <div class="h-3.5 bg-slate-200 rounded w-24"></div>
+        </div>
+      </div>
+
+      <!-- Column 4: Services Links Skeleton -->
+      <div class="flex flex-col gap-3">
+        <div class="h-4 bg-slate-200 rounded w-24 mb-1"></div>
+        <div class="flex flex-col gap-2">
+          <div class="h-3.5 bg-slate-200 rounded w-20"></div>
+          <div class="h-3.5 bg-slate-200 rounded w-24"></div>
+          <div class="h-3.5 bg-slate-200 rounded w-24"></div>
+        </div>
+      </div>
+      
+      <!-- Column 5: Contact Info Skeleton -->
+      <div class="flex flex-col gap-3">
+        <div class="h-4 bg-slate-200 rounded w-28 mb-1"></div>
+        <div class="flex flex-col gap-2.5">
+          <div class="h-3.5 bg-slate-200 rounded w-48"></div>
+          <div class="h-3.5 bg-slate-200 rounded w-32"></div>
+          <div class="h-3.5 bg-slate-200 rounded w-40"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+} @else {
+  <!-- Premium App Download Promo Section (CTA) -->
+  @if (isHomePage()) {
+    <div class="max-w-7xl mx-auto px-6 py-12 md:py-16">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 items-center">
+        
+        <!-- Left Column on desktop (Mockup): order-last on mobile, order-first on desktop -->
+        <div class="md:col-span-5 flex justify-center items-center order-last md:order-first">
+          <img 
+            src="app_mockup.png" 
+            alt="Mera Driver Mobile Application Mockup" 
+            class="w-auto h-[240px] md:h-[300px] object-contain select-none transform hover:scale-[1.03] transition-transform duration-300"
+          />
+        </div>
+
+        <!-- Right Column on desktop (Copy): order-first on mobile, order-last on desktop -->
+        <div class="md:col-span-7 flex flex-col gap-5 z-10 order-first md:order-last">
+          <span class="text-blue-700 text-xs font-bold uppercase tracking-wider bg-blue-50 px-3.5 py-1 rounded-full self-start border border-blue-100/60">
+            {{ appPromoTagline() }}
+          </span>
+          <h2 class="text-3xl md:text-4xl font-extrabold text-slate-900 leading-tight m-0">
+            {{ appPromoTitle() }}
+          </h2>
+          <p class="text-slate-600 text-sm md:text-base leading-relaxed m-0 max-w-lg">
+            {{ appPromoDescription() }}
+          </p>
+          
+          <!-- App Store Badges & Star Ratings -->
+          <div class="flex flex-col gap-3 mt-2">
+            <div class="flex flex-wrap gap-3">
+              <a [href]="playStoreUrl()" target="_blank" rel="noopener noreferrer" class="hover:scale-105 transition-transform duration-200 shrink-0">
+                <img src="google_play_badge.png" alt="Get it on Google Play" class="h-[44px] w-auto object-contain" />
+              </a>
+              <a [href]="appStoreUrl()" target="_blank" rel="noopener noreferrer" class="hover:scale-105 transition-transform duration-200 shrink-0">
+                <img src="app_store_badge.png" alt="Download on the App Store" class="h-[44px] w-auto object-contain" />
+              </a>
+            </div>
+            <!-- Star Ratings line -->
+            <div class="text-xs text-slate-500 font-semibold flex items-center gap-1.5 select-none">
+              {{ appPromoRatingText() }}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  }
+
+  <footer class="border-t border-slate-200 bg-slate-50 text-slate-600 text-sm">
+    <!-- Top section: Brand + Links + Contact -->
+    <div class="max-w-7xl mx-auto px-6 py-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8">
+      <!-- Brand column -->
+      <div class="flex flex-col gap-3">
+        <a routerLink="/" class="flex items-center gap-2.5 text-lg font-bold no-underline text-blue-600">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center bg-blue-600 text-white">
+            <md-icon aria-hidden="true" class="[--md-icon-size:22px]">directions_car</md-icon>
+          </span>
+          mera-driver
+        </a>
+        <p class="text-sm text-slate-500 m-0">{{ tagline() }}</p>
+      </div>
+
+      <!-- Quick Links -->
+      <div class="flex flex-col gap-3">
+        <h3 class="text-xs font-semibold text-slate-900 uppercase tracking-wider m-0">{{ quickLinksTitle() }}</h3>
+        <nav class="flex flex-col gap-2" aria-label="Footer navigation">
+          @for (link of navLinks(); track link.route) {
+            <a [routerLink]="link.route" class="flex items-center gap-2 text-slate-600 no-underline hover:text-blue-600 transition">
+              <md-icon aria-hidden="true" class="[--md-icon-size:18px]">{{ link.icon }}</md-icon>
+              {{ link.label }}
+            </a>
+          }
+        </nav>
+      </div>
+
+      <!-- Account Links -->
+      <div class="flex flex-col gap-3">
+        <h3 class="text-xs font-semibold text-slate-900 uppercase tracking-wider m-0">{{ accountLinksTitle() }}</h3>
+        <nav class="flex flex-col gap-2" aria-label="Account links">
+          @for (link of accountLinks(); track link.route) {
+            <a [routerLink]="link.route" class="flex items-center gap-2 text-slate-600 no-underline hover:text-blue-600 transition">
+              <md-icon aria-hidden="true" class="[--md-icon-size:18px]">{{ link.icon }}</md-icon>
+              {{ link.label }}
+            </a>
+          }
+        </nav>
+      </div>
+
+      <!-- Services Links -->
+      <div class="flex flex-col gap-3">
+        <h3 class="text-xs font-semibold text-slate-900 uppercase tracking-wider m-0">Services</h3>
+        <nav class="flex flex-col gap-2" aria-label="Services links">
+          @for (link of serviceLinks(); track link.route) {
+            @if (link.route === '#') {
+              <span class="flex items-center gap-2 text-slate-400 select-none">
+                <md-icon aria-hidden="true" class="[--md-icon-size:18px]">{{ link.icon }}</md-icon>
+                {{ link.label }}
+              </span>
+            } @else {
+              <a [routerLink]="link.route" class="flex items-center gap-2 text-slate-600 no-underline hover:text-blue-600 transition">
+                <md-icon aria-hidden="true" class="[--md-icon-size:18px]">{{ link.icon }}</md-icon>
+                {{ link.label }}
+              </a>
+            }
+          }
+        </nav>
+      </div>
+
+      <!-- Contact Info -->
+      <div class="flex flex-col gap-3">
+        <h3 class="text-xs font-semibold text-slate-900 uppercase tracking-wider m-0">{{ contactTitle() }}</h3>
+        @if (contactInfo()) {
+          <div class="flex flex-col gap-2.5">
+            <span class="flex items-center gap-2 text-slate-600">
+              <md-icon aria-hidden="true" class="[--md-icon-size:18px]">mail</md-icon>
+              {{ contactInfo().email }}
+            </span>
+            <span class="flex items-center gap-2 text-slate-600">
+              <md-icon aria-hidden="true" class="[--md-icon-size:18px]">phone</md-icon>
+              {{ contactInfo().phone }}
+            </span>
+            <span class="flex items-center gap-2 text-slate-600">
+              <md-icon aria-hidden="true" class="[--md-icon-size:18px]">location_on</md-icon>
+              {{ contactInfo().address }}
+            </span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <md-divider></md-divider>
+
+    <!-- Bottom bar: Copyright + Social icons -->
+    <div class="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <span class="text-slate-500 text-xs">© {{ year }} mera-driver. All rights reserved.</span>
+      <div class="flex gap-1">
+        <md-icon-button aria-label="Facebook">
+          <md-icon>group</md-icon>
+        </md-icon-button>
+        <md-icon-button aria-label="Twitter">
+          <md-icon>tag</md-icon>
+        </md-icon-button>
+        <md-icon-button aria-label="Instagram">
+          <md-icon>photo_camera</md-icon>
+        </md-icon-button>
+        <md-icon-button aria-label="YouTube">
+          <md-icon>play_circle</md-icon>
+        </md-icon-button>
+      </div>
+    </div>
+  </footer>
+}

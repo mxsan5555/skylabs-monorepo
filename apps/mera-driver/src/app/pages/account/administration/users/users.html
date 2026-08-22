@@ -77,17 +77,16 @@
               }
             </ul>
             <div *appHasPermission="{ menuKey: 'rbac.users', action: 'assign' }" class="flex items-center gap-2">
-              <select
-                class="rounded border border-[var(--md-sys-color-outline-variant,#c4c7c5)] px-2 py-2 text-sm"
-                aria-label="Add role"
+              <md-outlined-select
+                label="Add role"
                 [value]="addRoleId"
                 (change)="addRoleId = $any($event.target).value"
               >
-                <option value="">Choose a role…</option>
+                <md-select-option value=""><div slot="headline">Choose a role…</div></md-select-option>
                 @for (role of roles(); track role.id) {
-                  <option [value]="role.id">{{ role.name }}</option>
+                  <md-select-option [value]="role.id"><div slot="headline">{{ role.name }}</div></md-select-option>
                 }
-              </select>
+              </md-outlined-select>
               <md-text-button [disabled]="!addRoleId || detailBusy()" (click)="assignRole()">Add</md-text-button>
             </div>
           </section>

@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1,
+    "name": "Delhi NCR - Central",
+    "code": "Z-DEL-01",
+    "city": "New Delhi",
+    "status": "Active"
+  },
+  {
+    "id": 2,
+    "name": "Noida - Sector 18 & 62",
+    "code": "Z-NOI-02",
+    "city": "Noida",
+    "status": "Active"
+  },
+  {
+    "id": 3,
+    "name": "Gurugram - Cyber City",
+    "code": "Z-GUR-03",
+    "city": "Gurugram",
+    "status": "Active"
+  }
+]

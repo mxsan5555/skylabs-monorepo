@@ -29,6 +29,23 @@ export class Showcase {
     'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse ' +
     'malesuada lacus ex, sit amet blandit leo lobortis eget.';
 
+  /** Data Table Demo Columns & Rows */
+  readonly tableColumns = JSON.stringify([
+    { key: 'name', label: 'Driver Name', sortable: true },
+    { key: 'phone', label: 'Phone Number', sortable: false },
+    { key: 'rating', label: 'Rating', sortable: true },
+    { key: 'status', label: 'Status', status: true },
+    { key: 'joined', label: 'Joined Date', sortable: true }
+  ]);
+
+  readonly tableRows = JSON.stringify([
+    { name: 'Rahul Sharma', phone: '+91 98765 43210', rating: '4.8 ★', status: 'success', joined: '15 May 2025' },
+    { name: 'Amit Verma', phone: '+91 99988 77766', rating: '4.6 ★', status: 'success', joined: '10 June 2025' },
+    { name: 'Sanjay Kumar', phone: '+91 91234 56789', rating: '4.2 ★', status: 'warning', joined: '22 Jan 2026' },
+    { name: 'Vikram Singh', phone: '+91 88877 66655', rating: '3.9 ★', status: 'error', joined: '03 Feb 2026' },
+    { name: 'Rohan Gupta', phone: '+91 77766 55544', rating: '4.9 ★', status: 'info', joined: '18 Mar 2026' }
+  ]);
+
   toggleMode(): void {
     const next: ThemeMode = this.mode() === 'light' ? 'dark' : 'light';
     this.mode.set(next);

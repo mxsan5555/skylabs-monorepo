@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "booking_code": "BK-1001",
+    "customer_name": "Rohan Sharma",
+    "driver_name": "Rahul Verma",
+    "trip_type": "Outstation",
+    "pickup_address": "Connaught Place, New Delhi",
+    "drop_address": "Sector 18, Noida",
+    "fare": 1250,
+    "status": "Completed",
+    "created_at": "2026-08-18 10:30"
+  },
+  {
+    "id": 2,
+    "booking_code": "BK-1002",
+    "customer_name": "Ananya Roy",
+    "driver_name": "Sana Kapoor",
+    "trip_type": "Hourly Rental",
+    "pickup_address": "DLF Cyber City, Gurugram",
+    "drop_address": "IGI Airport Terminal 3, New Delhi",
+    "fare": 850,
+    "status": "Ongoing",
+    "created_at": "2026-08-19 09:15"
+  },
+  {
+    "id": 3,
+    "booking_code": "BK-1003",
+    "customer_name": "Karan Malhotra",
+    "driver_name": "Vikram Singh",
+    "trip_type": "One-Way City",
+    "pickup_address": "Hauz Khas Village, New Delhi",
+    "drop_address": "Vasant Kunj, New Delhi",
+    "fare": 450,
+    "status": "Pending",
+    "created_at": "2026-08-19 11:45"
+  }
+]

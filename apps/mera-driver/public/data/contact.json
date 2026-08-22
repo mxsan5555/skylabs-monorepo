@@ -1,0 +1,89 @@
+{
+  "form": {
+    "title": "Submit Partnership Inquiry",
+    "fields": {
+      "name": {
+        "label": "Full Name",
+        "placeholder": "e.g. Rahul Verma"
+      },
+      "company": {
+        "label": "Company / Organization",
+        "placeholder": "e.g. Skylabs Technologies"
+      },
+      "email": {
+        "label": "Official Email",
+        "placeholder": "e.g. business@skylabs.com"
+      },
+      "phone": {
+        "label": "Contact Number",
+        "placeholder": "e.g. 9876543210"
+      },
+      "purpose": {
+        "label": "Purpose of Inquiry",
+        "options": [
+          { "value": "corporate", "label": "Corporate Tie-ups / Accounts" },
+          { "value": "partnership", "label": "Driver Recruitment Partnerships" },
+          { "value": "integration", "label": "API Access & System Integration" },
+          { "value": "fleet", "label": "Fleet Management Services" },
+          { "value": "other", "label": "General Business Inquiry" }
+        ]
+      },
+      "message": {
+        "label": "Requirement Details",
+        "placeholder": "Describe your business requirements..."
+      }
+    },
+    "submitButton": "Submit Inquiry",
+    "submittingButton": "Submitting...",
+    "privacyText": "Your information is secure & private",
+    "success": {
+      "title": "Inquiry Submitted!",
+      "description": "Thank you. Your business inquiry has been recorded successfully. Our team will connect with you within 1 business day.",
+      "button": "Submit Another Inquiry"
+    }
+  },
+  "office": {
+    "title": "Corporate Office",
+    "description": "Contact our business development team for partnerships, integrations, or fleet accounts.",
+    "hqName": "Mera Driver HQ",
+    "address": "Connaught Place, New Delhi, India",
+    "hotlineLabel": "Business Hotline",
+    "phone": "+91 98765 43210",
+    "emailLabel": "Corporate Email",
+    "email": "business@meradriver.com",
+    "hoursLabel": "Inquiry Desk Hours",
+    "hours": "Monday - Friday (10:00 AM - 5:00 PM)"
+  },
+  "map": {
+    "title": "Location Map",
+    "description": "Click below to view our location on interactive maps.",
+    "embedUrl": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7008.2120651821115!2d77.34102709999999!3d28.56657855!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x390ce5b7d4af0dc1%3A0xc370dee296269b66!2sArun%20Vihar%2C%20Sector%2037%2C%20Noida%2C%20Uttar%20Pradesh%20201303!5e0!3m2!1sen!2sin!4v1782389958130!5m2!1sen!2sin"
+  },
+  "faqSection": {
+    "tagline": "Got Questions?",
+    "title": "Frequently Asked Questions",
+    "description": "Quick answers to common questions about our corporate plans, APIs, and services."
+  },
+  "faqs": [
+    {
+      "id": 1,
+      "question": "How do corporate cab services work?",
+      "answer": "Corporate clients get a dedicated dashboard to manage employee rides, set custom approval hierarchies, schedule recurring routes, and access monthly consolidated invoicing. You can start the setup process by filling out the form above."
+    },
+    {
+      "id": 2,
+      "question": "What is the average timeline for API key deployment?",
+      "answer": "Standard API credentials are generated within 24 hours. For advanced routing algorithms and custom fleet integrations, our developer relations team will collaborate with your engineering team to guide you from sandbox to production in 3-5 business days."
+    },
+    {
+      "id": 3,
+      "question": "Is there a dedicated helpline for corporate fleet support?",
+      "answer": "Yes. All corporate contracts include 24/7 dedicated telephone support and live fleet monitoring to resolve any on-road dispatch issues instantly."
+    },
+    {
+      "id": 4,
+      "question": "Can we customize the driver selection and vehicle types?",
+      "answer": "Absolutely. Our platform allows corporate accounts to set specific vehicle class rules (e.g. EV-only, premium sedans) and prioritize top-rated driver tiers based on employee roles or distance categories."
+    }
+  ]
+}

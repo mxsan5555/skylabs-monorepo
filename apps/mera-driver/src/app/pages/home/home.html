@@ -1,29 +1,395 @@
-<div class="home">
-  <section class="home__hero">
-    <sky-badge variant="primary">mera-driver</sky-badge>
-    <h1>Welcome to mera-driver</h1>
-    <p>
-      An Angular app built on the shared Material 3 design system. Pages live
-      here; reusable UI lives in <code>shared-ui</code>.
-    </p>
-    <div class="home__actions">
-      <md-filled-button (click)="go('/showcase')">
-        View component showcase
+<!-- Redesigned Hero Section (Uber-Style Stacking) -->
+<section class="relative w-full bg-[var(--md-sys-color-surface-container-lowest,#ffffff)] border-b border-[var(--md-sys-color-outline-variant,#e2e8f0)] pt-4 sm:pt-6 md:pt-8 pb-10 sm:pb-14">
+  <div class="max-w-[1280px] mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+    
+    <!-- Left Column (Grid cols 1 to 5): Heading, Subtitle, and Booking Card Stacked -->
+    <div class="lg:col-span-5 w-full flex flex-col gap-6 z-10">
+      
+      <!-- Headings Stack (Clean Title Only) -->
+      <h1 class="m-0 text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight leading-tight text-[var(--md-sys-color-on-background)]">
+        {{ content().hero.title }}
+      </h1>
+
+      <!-- Booking Card Widget -->
+      <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200/80 flex flex-col">
+        <!-- Trip Type Tabs -->
+        <div class="flex border-b border-slate-200 bg-slate-50">
+          <button type="button"
+            class="flex-1 py-3.5 text-center text-xs font-bold transition-all duration-200 border-b-2 outline-none cursor-pointer flex items-center justify-center gap-1.5"
+            [class.bg-white]="tripType() === 'one-way'"
+            [class.text-[#1175bc]]="tripType() === 'one-way'"
+            [class.border-[#1175bc]]="tripType() === 'one-way'"
+            [class.text-slate-500]="tripType() !== 'one-way'"
+            [class.border-transparent]="tripType() !== 'one-way'"
+            (click)="tripType.set('one-way')">
+            <md-icon style="--md-icon-size: 15px;">east</md-icon>
+            One Way
+          </button>
+          <button type="button"
+            class="flex-1 py-3.5 text-center text-xs font-bold transition-all duration-200 border-b-2 outline-none cursor-pointer flex items-center justify-center gap-1.5"
+            [class.bg-white]="tripType() === 'round-trip'"
+            [class.text-[#1175bc]]="tripType() === 'round-trip'"
+            [class.border-[#1175bc]]="tripType() === 'round-trip'"
+            [class.text-slate-500]="tripType() !== 'round-trip'"
+            [class.border-transparent]="tripType() !== 'round-trip'"
+            (click)="tripType.set('round-trip')">
+            <md-icon style="--md-icon-size: 15px;">sync</md-icon>
+            Round Trip
+          </button>
+          <button type="button"
+            class="flex-1 py-3.5 text-center text-xs font-bold transition-all duration-200 border-b-2 outline-none cursor-pointer flex items-center justify-center gap-1.5"
+            [class.bg-white]="tripType() === 'outstation'"
+            [class.text-[#1175bc]]="tripType() === 'outstation'"
+            [class.border-[#1175bc]]="tripType() === 'outstation'"
+            [class.text-slate-500]="tripType() !== 'outstation'"
+            [class.border-transparent]="tripType() !== 'outstation'"
+            (click)="tripType.set('outstation')">
+            <md-icon style="--md-icon-size: 15px;">explore</md-icon>
+            Outstation
+          </button>
+        </div>
+
+        <!-- Booking Fields Panel -->
+        <div class="flex flex-col gap-4 p-5">
+          
+          <!-- Spacious Location Input Fields -->
+          <div class="flex flex-col gap-4 relative">
+            
+            <!-- Pickup Location Field -->
+            <div class="relative flex flex-col gap-1.5">
+              <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pickup Point</label>
+              <div class="flex items-center bg-[#f3f3f3] border border-transparent rounded-xl p-3.5 transition-all duration-150 focus-within:bg-white focus-within:border-[#1175bc] focus-within:shadow-sm"
+                   [class.border-[#1175bc]]="activeInput() === 'pickup' && showSuggestions()"
+                   [class.bg-white]="activeInput() === 'pickup' && showSuggestions()"
+                   [class.shadow-sm]="activeInput() === 'pickup' && showSuggestions()">
+                <md-icon class="text-[#1175bc] mr-2 [--md-icon-size:18px]">my_location</md-icon>
+                <input 
+                  type="text" 
+                  class="flex-1 border-none outline-none bg-transparent text-xs text-slate-800 font-semibold placeholder-slate-400"
+                  placeholder="Enter pickup location (e.g. Sector 37 Noida)" 
+                  [value]="activeInput() === 'pickup' && showSuggestions() ? autocompleteQuery() : pickupAddress()"
+                  (focus)="onActiveInputFocus('pickup')"
+                  (input)="onAutocompleteInputChange($event)"
+                />
+              </div>
+              
+              <!-- Suggestions Dropdown for Pickup -->
+              @if (activeInput() === 'pickup' && showSuggestions() && suggestions().length > 0) {
+                <md-list class="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-[999] max-h-[180px] overflow-y-auto">
+                  @for (place of suggestions(); track place.placeId) {
+                    <md-list-item (click)="selectLocation(place)" type="button">
+                      <md-icon slot="start">location_on</md-icon>
+                      <div slot="headline" class="text-xs font-semibold">{{ place.name }}</div>
+                      <div slot="supporting-text" class="text-[10px]">{{ place.address }}</div>
+                    </md-list-item>
+                  }
+                </md-list>
+              }
+            </div>
+
+            <!-- Drop Location Field (with smooth slide/fade transition) -->
+            <div class="transition-all duration-300 ease-in-out overflow-hidden"
+                 [class.max-h-0]="tripType() === 'round-trip'"
+                 [class.opacity-0]="tripType() === 'round-trip'"
+                 [class.max-h-[100px]]="tripType() !== 'round-trip'"
+                 [class.opacity-100]="tripType() !== 'round-trip'"
+                 [class.mt-0]="tripType() === 'round-trip'"
+                 [class.mt-1]="tripType() !== 'round-trip'">
+              <div class="relative flex flex-col gap-1.5">
+                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Destination</label>
+                <div class="flex items-center bg-[#f3f3f3] border border-transparent rounded-xl p-3.5 transition-all duration-150 focus-within:bg-white focus-within:border-[#1175bc] focus-within:shadow-sm"
+                     [class.border-[#1175bc]]="activeInput() === 'drop' && showSuggestions()"
+                     [class.bg-white]="activeInput() === 'drop' && showSuggestions()"
+                     [class.shadow-sm]="activeInput() === 'drop' && showSuggestions()">
+                  <md-icon class="text-red-500 mr-2 [--md-icon-size:18px]">location_on</md-icon>
+                  <input 
+                    type="text" 
+                    class="flex-1 border-none outline-none bg-transparent text-xs text-slate-800 font-semibold placeholder-slate-400"
+                    placeholder="Enter destination location" 
+                    [value]="activeInput() === 'drop' && showSuggestions() ? autocompleteQuery() : dropAddress()"
+                    (focus)="onActiveInputFocus('drop')"
+                    (input)="onAutocompleteInputChange($event)"
+                  />
+                </div>
+                
+                <!-- Suggestions Dropdown for Drop -->
+                @if (activeInput() === 'drop' && showSuggestions() && suggestions().length > 0) {
+                  <md-list class="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-[999] max-h-[180px] overflow-y-auto">
+                    @for (place of suggestions(); track place.placeId) {
+                      <md-list-item (click)="selectLocation(place)" type="button">
+                        <md-icon slot="start">location_on</md-icon>
+                        <div slot="headline" class="text-xs font-semibold">{{ place.name }}</div>
+                        <div slot="supporting-text" class="text-[10px]">{{ place.address }}</div>
+                      </md-list-item>
+                    }
+                  </md-list>
+                }
+              </div>
+            </div>
+          </div>
+
+          <md-filled-button (click)="onSubmitBooking()" [disabled]="isSearching()" class="w-full mt-2 font-semibold">
+            @if (isSearching()) {
+              Searching Drivers...
+            } @else {
+              Search Drivers
+            }
+          </md-filled-button>
+          
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column (Grid cols 6 to 12): Premium Chauffeur Graphic Showcase -->
+    <div class="lg:col-span-7 w-full flex flex-col justify-center">
+      <img 
+        src="/slides/premium_hero.png" 
+        alt="Professional verified chauffeur waiting at premium car door" 
+        class="w-full aspect-[4/3] lg:aspect-[16/10] object-cover object-[center_35%] rounded-2xl block"
+      />
+    </div>
+    
+  </div>
+</section>
+
+<div class="w-full max-w-[1280px] mx-auto py-8 px-3 sm:px-6 flex flex-col gap-10">
+
+  <!-- Featured Driver Services -->
+  @if (filteredFeaturedServices().length > 0) {
+    <section class="flex flex-col gap-3 w-full">
+      <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().featuredServices.title }}</h2>
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-6 w-full"> 
+        @for (card of filteredFeaturedServices(); track card.heading) {
+          <sky-product-card
+            variant="outlined"
+            [href]="card.href || '/location'"
+            [image]="card.image"
+            [image-alt]="card.imageAlt"
+            [badge]="card.badge || ''"
+            favorite
+            [eyebrow]="card.eyebrow"
+            [heading]="card.heading"
+            [location]="card.location"
+            [distance]="card.distance || ''"
+            [rating]="card.rating || ''"
+            [score]="card.score || ''"
+            [score-label]="card.scoreLabel || ''"
+            [reviews]="card.reviews"
+            [price-prefix]="card.pricePrefix || ''"
+            [original-price]="card.originalPrice || ''"
+            [price]="card.price"
+            [discount]="card.discount || ''"
+          ></sky-product-card>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- Popular Ride Types -->
+  @if (popularRideTypes().length > 0) {
+    <section class="flex flex-col gap-3 w-full">
+      <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().popularRideTypes.title }}</h2>
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-6 w-full">
+        @for (card of popularRideTypes(); track card.heading) {
+          <sky-product-card
+            variant="outlined"
+            [href]="card.href || '/location'"
+            [image]="card.image"
+            [image-alt]="card.imageAlt"
+            [badge]="card.badge || ''"
+            favorite
+            [eyebrow]="card.eyebrow"
+            [heading]="card.heading"
+            [location]="card.location"
+            [distance]="card.distance || ''"
+            [rating]="card.rating || ''"
+            [score]="card.score || ''"
+            [score-label]="card.scoreLabel || ''"
+            [reviews]="card.reviews"
+            [price-prefix]="card.pricePrefix || ''"
+            [original-price]="card.originalPrice || ''"
+            [price]="card.price"
+            [discount]="card.discount || ''"
+          ></sky-product-card>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- How It Works -->
+  @if (content().howItWorks) {
+    <section class="flex flex-col gap-6 w-full mt-2 mb-2">
+      <div class="flex flex-col gap-2 items-center text-center">
+        <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().howItWorks.title }}</h2>
+        @if (content().howItWorks.subtitle) {
+          <p class="m-0 text-sm text-[var(--md-sys-color-on-surface-variant,#42474e)]">{{ content().howItWorks.subtitle }}</p>
+        }
+      </div>
+      
+      <div class="w-full h-px bg-[var(--md-sys-color-outline-variant,#c2c7ce)]"></div>
+      
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-2 justify-items-center">
+        @for (card of content().howItWorks.cards; track card.heading) {
+          <sky-card variant="elevated" class="w-full h-full text-center hover:shadow-md transition-all duration-200">
+            <div class="h-full flex flex-col items-center">
+              <div class="shadow-sm !mx-0 mb-3" style="background-color: var(--md-sys-color-primary-container); border-radius:12px; width:56px; height:56px; display:flex; align-items:center; justify-content:center;">
+                <md-icon style="--md-icon-size:28px; color: var(--md-sys-color-primary);">{{ card.icon }}</md-icon>
+              </div>
+              <h3 class="m-0 text-base font-bold text-[var(--md-sys-color-on-surface)]">{{ card.heading }}</h3>
+              <p class="m-0 mt-1.5 text-sm text-[var(--md-sys-color-on-surface-variant,#42474e)] leading-relaxed">{{ card.subheading }}</p>
+            </div>
+          </sky-card>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- Top Packages -->
+  @if (filteredPackages().length > 0) {
+    <section class="flex flex-col gap-3 w-full mt-2">
+      <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().packages.title }}</h2>
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-6 w-full">
+        @for (card of filteredPackages(); track card.heading) {
+          <sky-product-card
+            variant="outlined"
+            [href]="card.href || '/location'"
+            [image]="card.image"
+            [image-alt]="card.imageAlt"
+            favorite
+            [eyebrow]="card.eyebrow"
+            [heading]="card.heading"
+            [location]="card.location"
+            [score]="card.score || ''"
+            [score-label]="card.scoreLabel || ''"
+            [reviews]="card.reviews"
+            [price-prefix]="card.pricePrefix || ''"
+            [original-price]="card.originalPrice || ''"
+            [price]="card.price"
+            [discount]="card.discount || ''"
+          ></sky-product-card>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- No Results Found Banner -->
+  @if (filteredFeaturedServices().length === 0 && filteredPackages().length === 0) {
+    <div class="w-full py-16 px-4 flex flex-col items-center justify-center text-center gap-4 bg-[var(--md-sys-color-surface-container-low,#f0f4f9)] rounded-2xl border border-[var(--md-sys-color-outline-variant,#c2c7ce)]">
+      <md-icon class="text-[var(--md-sys-color-primary,#3a693c)] text-5xl" style="--md-icon-size: 48px;">search_off</md-icon>
+      <div class="flex flex-col gap-1">
+        <h3 class="m-0 text-lg font-bold text-[var(--md-sys-color-on-background)]">{{ content().noResults.title }}</h3>
+        <p class="m-0 text-sm text-[var(--md-sys-color-on-surface-variant,#42474e)] max-w-[350px]">
+          {{ content().noResults.message.replace('{query}', searchQuery()) }}
+        </p>
+      </div>
+
+      <md-filled-button (click)="activeFilter.set('all'); searchQuery.set(''); activeSearchQuery.set('');" class="mt-2 rounded-full font-semibold">
+        {{ content().noResults.btnReset }}
       </md-filled-button>
-      <md-outlined-button (click)="go('/blog')">
-        Read the blog
-      </md-outlined-button>
+    </div>
+  }
+
+  <!-- Safety & Guarantees -->
+  <section class="flex flex-col gap-3 w-full mt-2">
+    <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().whyChooseUs.title }}</h2>
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-6 w-full"> 
+      @for (card of content().whyChooseUs.cards; track card.heading) {
+        <sky-info-card
+          [align]="card.align || 'center'"
+          [icon]="card.icon"
+          [heading]="card.heading"
+          [subheading]="card.subheading"
+        ></sky-info-card>
+      }
     </div>
   </section>
 
-  <section class="home__cards">
-    <sky-card variant="elevated">
-      <h2>Reusable UI</h2>
-      <p>Material Web + custom LIT components, themed per app.</p>
-    </sky-card>
-    <sky-card variant="outlined">
-      <h2>App-owned pages</h2>
-      <p>Routing, auth, and data stay native to each framework.</p>
-    </sky-card>
-  </section>
+  <!-- Customer Testimonials (Success Stories Carousel) -->
+  @if (isDataLoaded() && content().testimonials) {
+    <section class="flex flex-col gap-6 w-full mt-4 items-center justify-center">
+      
+      <!-- Section Heading from JSON -->
+      <div class="flex flex-col gap-2 items-center text-center">
+        <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().testimonials.title }}</h2>
+        @if (content().testimonials.subtitle) {
+          <p class="m-0 text-sm text-[var(--md-sys-color-on-surface-variant,#42474e)]">{{ content().testimonials.subtitle }}</p>
+        }
+      </div>
+      
+      <!-- Centered 8-Column Layout Grid (Leaves 2 columns blank on left and right) -->
+      <div class="grid grid-cols-12 w-full mt-4 items-center">
+        
+        <!-- Left Custom Navigation Button -->
+        <div class="col-span-2 md:col-start-2 md:col-span-1 flex justify-end">
+          <md-icon-button (click)="swiper.swiper.slidePrev()" class="[--md-icon-button-icon-color:var(--md-sys-color-primary)]">
+            <md-icon>chevron_left</md-icon>
+          </md-icon-button>
+        </div>
+
+        <!-- Carousel Content (8 Columns) -->
+        <div class="col-span-8 md:col-span-8 px-2">
+          <swiper-container 
+            #swiper
+            init="false"
+            observer="true"
+            observe-parents="true"
+            resize-observer="true"
+            autoplay="true"
+            autoplay-delay="3500"
+            autoplay-disable-on-interaction="false"
+            loop="true"
+            pagination="true"
+            style="display: block; width: 100%; min-height: 280px;"
+            class="w-full py-4"
+          >
+            @for (card of content().testimonials.cards; track card.name) {
+              <swiper-slide class="w-full flex flex-col items-center text-center px-4 sm:px-8 py-6">
+                <img 
+                  [src]="card.avatar" 
+                  [alt]="card.name" 
+                  class="w-20 h-20 rounded-full border-2 border-[var(--md-sys-color-primary)] shadow-md object-cover mb-3"
+                />
+                
+                <h4 class="m-0 text-base font-bold text-[var(--md-sys-color-on-surface)] flex items-center justify-center gap-1">
+                  {{ card.name }}
+                  <md-icon style="--md-icon-size: 16px; color: #10b981;">verified</md-icon>
+                </h4>
+                <p class="m-0 text-xs text-[var(--md-sys-color-on-surface-variant,#42474e)] tracking-wide flex items-center justify-center gap-1 mt-1">
+                  <md-icon style="--md-icon-size:12px; color: var(--md-sys-color-on-surface-variant);">location_on</md-icon>
+                  {{ card.location }}
+                </p>
+                
+                <div class="flex justify-center gap-1 mt-2.5 mb-4">
+                  @for (star of [1,2,3,4,5]; track star) {
+                    @if (star <= card.rating) {
+                      <md-icon style="--md-icon-size:16px; color: #f59e0b;">star</md-icon>
+                    } @else {
+                      <md-icon style="--md-icon-size:16px; color: var(--md-sys-color-outline-variant);">star</md-icon>
+                    }
+                  }
+                </div>
+                
+                <!-- Quote Icon (Stylized brand color watermark) -->
+                <md-icon class="text-[var(--md-sys-color-primary)] opacity-10 mb-2" style="--md-icon-size: 56px;">format_quote</md-icon>
+                
+                <p class="m-0 text-base sm:text-lg md:text-xl text-[var(--md-sys-color-on-background)] font-medium italic leading-relaxed w-full max-w-[650px] mx-auto">
+                  "{{ card.review }}"
+                </p>
+              </swiper-slide>
+            }
+          </swiper-container>
+        </div>
+
+        <!-- Right Custom Navigation Button -->
+        <div class="col-span-2 md:col-span-1 flex justify-start">
+          <md-icon-button (click)="swiper.swiper.slideNext()" class="[--md-icon-button-icon-color:var(--md-sys-color-primary)]">
+            <md-icon>chevron_right</md-icon>
+          </md-icon-button>
+        </div>
+        
+      </div>
+    </section>
+  }
+
+
 </div>
