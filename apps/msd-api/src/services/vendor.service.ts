@@ -858,38 +858,49 @@ export async function createDeal(
   await assertCategoryChildOf(input.categoryId, input.subcategoryId);
   await assertOfferingMatchesCatalogItem(input.categoryId, input.subcategoryId, input.serviceId, input.productId);
   assertDurationRequiredForService(input.serviceId, input.durationMinutes);
+  // App-layer pre-check for a clean 409 in the common case — Deal.slug's DB-level @unique is
+  // the hard guarantee this can't fully replace under a genuine race (two near-simultaneous
+  // double-submits of the same form both reading "slug free" before either commits — see the
+  // P2002 catch below, same discipline as order.service.ts#createOrderFromBooking).
   const existingSlug = await prisma.deal.findUnique({ where: { slug: input.slug } });
   if (existingSlug) throw new ApiError('CONFLICT', `Deal slug "${input.slug}" already exists`);
 
   const { packages, ...dealFields } = input;
 
-  return prisma.$transaction(async (tx) => {
-    const deal = await tx.deal.create({
-      data: {
-        ...dealFields,
-        vendorId, // always derived server-side — never trusted from the client
-        branchId,
-        status: actorIsAdmin ? 'ACTIVE' : 'DRAFT',
-        approvalStatus: actorIsAdmin ? 'APPROVED' : 'PENDING',
-      } as unknown as Prisma.DealUncheckedCreateInput,
-    });
-
-    if (packages && packages.length > 0) {
-      await tx.dealPackage.createMany({
-        data: packages.map((p: DealPackageInput) => ({
-          dealId: deal.id,
-          durationMinutes: p.durationMinutes,
-          sellingPrice: p.sellingPrice,
-          originalPrice: p.originalPrice,
-          isActive: p.isActive ?? true,
-          sortOrder: p.sortOrder ?? 0,
-        })),
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const deal = await tx.deal.create({
+        data: {
+          ...dealFields,
+          vendorId, // always derived server-side — never trusted from the client
+          branchId,
+          status: actorIsAdmin ? 'ACTIVE' : 'DRAFT',
+          approvalStatus: actorIsAdmin ? 'APPROVED' : 'PENDING',
+        } as unknown as Prisma.DealUncheckedCreateInput,
       });
-      await syncDealPriceFromPackages(tx, deal.id);
-    }
 
-    return tx.deal.findUniqueOrThrow({ where: { id: deal.id }, include: OFFERING_INCLUDE });
-  });
+      if (packages && packages.length > 0) {
+        await tx.dealPackage.createMany({
+          data: packages.map((p: DealPackageInput) => ({
+            dealId: deal.id,
+            durationMinutes: p.durationMinutes,
+            sellingPrice: p.sellingPrice,
+            originalPrice: p.originalPrice,
+            isActive: p.isActive ?? true,
+            sortOrder: p.sortOrder ?? 0,
+          })),
+        });
+        await syncDealPriceFromPackages(tx, deal.id);
+      }
+
+      return tx.deal.findUniqueOrThrow({ where: { id: deal.id }, include: OFFERING_INCLUDE });
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      throw new ApiError('CONFLICT', `Deal slug "${input.slug}" already exists`);
+    }
+    throw err;
+  }
 }
 
 export async function updateDeal(vendorId: string, branchId: string, dealId: string, input: DealUpdateInput) {

@@ -763,6 +763,24 @@ describe('Deal offering integration (Service/Product linkage)', () => {
     expect(prismaMock.deal.create).not.toHaveBeenCalled();
   });
 
+  it('10b. a genuine double-submit race on the same slug returns a clean 409, not a raw 500', async () => {
+    // Both requests pass the app-level "slug free" pre-check before either commits (the actual
+    // race window) — the DB's own slug @unique constraint is what catches it, surfacing as a
+    // Prisma P2002 from the create call itself.
+    resolveMock.mockResolvedValue(['vendors:create']);
+    prismaMock.product.findUnique.mockResolvedValue(productFixture);
+    const { Prisma } = await import('../generated/prisma-client');
+    prismaMock.deal.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: '6.19.3' }),
+    );
+    const res = await request(app)
+      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ ...baseDealBody, productId: PRODUCT_ID });
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toMatch(/already exists/i);
+  });
+
   it('11a. rejects a deal whose categoryId does not match the linked service\'s category', async () => {
     resolveMock.mockResolvedValue(['vendors:create']);
     prismaMock.service.findUnique.mockResolvedValue({ ...serviceFixture, categoryId: OTHER_CATEGORY_ID });
