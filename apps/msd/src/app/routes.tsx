@@ -42,7 +42,7 @@ import { OrderDetail } from './pages/orders/order-detail';
 import { Invoice } from './pages/invoice/invoice';
 import { Bookings } from './pages/bookings/bookings';
 import DealDetail from './pages/deal-detail/deal-detail';
-import Cart from './pages/cart/cart';
+import {Cart} from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
 import Checkout from './pages/checkout/checkout';
 import ProductListing from './pages/products/products';
@@ -92,7 +92,6 @@ export function AppRoutes() {
             only via a Deal's page (see msd-api's Therapist schema doc comment). */}
         <Route path="/therapists" element={<Therapists />} />
         <Route path="/therapist/:id" element={<TherapistDetail />} />
-
         {/* Cart / Wishlist / Checkout — plain PublicLayout children (Header+Footer, no sidebar),
             exactly as they worked before the Customer Sidebar fix. These are NOT part of the
             Customer Sidebar — they stay reachable from the existing Header cart/wishlist icons,
@@ -134,18 +133,40 @@ export function AppRoutes() {
             deliberately stay OUTSIDE this block (see above) even though the sidebar's own
             NAV_ITEMS still links to them — clicking those links just navigates to the
             sidebar-less Cart/Wishlist routes above, same as clicking the Header icons. */}
-        <Route
-          element={
-            <RequireAuth>
-              <MyAccountLayout />
-            </RequireAuth>
-          }
-        >
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/orders/:id" element={<OrderDetail />} />
-          <Route path="/orders/:id/invoice" element={<Invoice />} />
-          <Route path="/bookings" element={<Bookings />} />
-        </Route>
+       <Route
+  element={
+    <RequireAuth>
+      <MyAccountLayout />
+    </RequireAuth>
+  }
+>
+  <Route path="/my-account" element={<MyAccountProfile />} />
+  <Route path="/my-account/profile" element={<MyAccountProfile />} />
+  <Route path="/my-account/payments" element={<MyAccountPayments />} />
+  <Route
+    path="/my-account/invoices"
+    element={
+      <AdminPage
+        title="Invoices"
+        subtitle="Module coming soon."
+      />
+    }
+  />
+  <Route
+    path="/my-account/settings"
+    element={
+      <AdminPage
+        title="Settings"
+        subtitle="Module coming soon."
+      />
+    }
+  />
+
+  <Route path="/orders" element={<Orders />} />
+  <Route path="/orders/:id" element={<OrderDetail />} />
+  <Route path="/orders/:id/invoice" element={<Invoice />} />
+  <Route path="/bookings" element={<Bookings />} />
+</Route>
 
         {/* ── Content pages ── */}
         <Route path="/blog" element={<Blog />} />
@@ -161,19 +182,7 @@ export function AppRoutes() {
           MyAccountLayout's own doc comment for why). This is the ORIGINAL, unmodified placement;
           the Orders/Bookings block above just nests the same layout a second time, inside
           PublicLayout, for its own routes. ── */}
-      <Route
-        element={
-          <RequireAuth>
-            <MyAccountLayout />
-          </RequireAuth>
-        }
-      >
-        <Route path="/my-account" element={<MyAccountProfile />} />
-        <Route path="/my-account/payments" element={<MyAccountPayments />} />
-        <Route path="/my-account/invoices" element={<AdminPage title="Invoices" subtitle="Module coming soon." />} />
-        <Route path="/my-account/settings" element={<AdminPage title="Settings" subtitle="Module coming soon." />} />
-      </Route>
-
+    
       {/* Auth screens use a minimal centered shell (no header/footer). */}
       <Route element={<AuthLayout />}>
         <Route path="/sign-in" element={<SignIn />} />

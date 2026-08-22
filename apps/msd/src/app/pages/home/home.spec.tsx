@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Home } from './home';
 import '@testing-library/jest-dom/vitest';
+import { listCatalogCategories, listCatalogDeals } from '../../../api/catalog';
+
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   useAuth: () => ({
     token: null,
@@ -27,12 +29,8 @@ vi.mock('../../../wishlist/wishlist-context', () => ({
 }));
 
 vi.mock('../../../api/catalog', () => ({
-  listCatalogCategories: vi.fn(
-    () => new Promise(() => {}),
-  ),
-  listCatalogDeals: vi.fn(
-    () => new Promise(() => {}),
-  ),
+  listCatalogCategories: vi.fn(),
+  listCatalogDeals: vi.fn(),
 }));
 
 describe('Home', () => {
@@ -44,5 +42,43 @@ describe('Home', () => {
     );
 
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
+  });
+  it('shows error message when catalog API fails', async () => {
+    vi.mocked(listCatalogCategories).mockRejectedValue(
+      new Error('Could not load home page content.'),
+    );
+
+    vi.mocked(listCatalogDeals).mockRejectedValue(
+      new Error('Could not load home page content.'),
+    );
+
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole('alert'),
+    ).toHaveTextContent(/could not load home page content/i);
+  });
+  it('shows error message when catalog API fails', async () => {
+    vi.mocked(listCatalogCategories).mockRejectedValue(
+      new Error('Could not load home page content.'),
+    );
+
+    vi.mocked(listCatalogDeals).mockRejectedValue(
+      new Error('Could not load home page content.'),
+    );
+
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole('alert'),
+    ).toHaveTextContent(/could not load home page content/i);
   });
 });
