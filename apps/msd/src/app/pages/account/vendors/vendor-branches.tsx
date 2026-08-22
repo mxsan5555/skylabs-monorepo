@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
+import type { MdFilledButton } from '@material/web/button/filled-button.js';
 import { Dialog, FilledButton, OutlinedButton, OutlinedTextField, OutlinedSelect, SelectOption, TextButton, Icon, Tabs, PrimaryTab } from '@skylabs-monorepo/shared-ui/react';
 import {
   approveDeal,
@@ -31,6 +32,7 @@ import { listServices, type Service } from '../../../../api/rbac/services';
 import { listProducts, type Product } from '../../../../api/rbac/products';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { MediaUploader } from '../../../components/media-uploader';
+import { useToast } from '../../../../toast/toast-context';
 
 interface VendorBranchesProps {
   token: string | null;
@@ -52,6 +54,18 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
   const [dealsLoading, setDealsLoading] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  // Guards against an in-flight branches/deals fetch for a PREVIOUS vendorId resolving after
+  // the caller has already switched to a different vendorId (e.g. an admin browsing from one
+  // vendor's detail page to another's without a full remount). Without this, a slower request
+  // for vendor A can resolve after a faster request for vendor B already landed, silently
+  // overwriting the correct vendor B branch list with vendor A's — the caller then unknowingly
+  // selects a branch that belongs to a DIFFERENT vendor than the one `vendorId` now points to,
+  // and the (correct) backend ownership check rejects it with a confusing "this branch does not
+  // belong to your vendor" for what looks, from the UI, like the vendor's own branch. Bumped on
+  // every vendorId/isSelf change; a resolving fetch only commits its result if its own captured
+  // token still matches the latest one.
+  const branchesRequestToken = useRef(0);
+  const dealsRequestToken = useRef(0);
 
   useEffect(() => {
     // pageSize is capped at 100 server-side (PaginationQuerySchema) — 200 here 500s, which
@@ -61,15 +75,18 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
   }, [token]);
 
   const loadBranches = async () => {
+    const requestId = ++branchesRequestToken.current;
     setBranchesLoading(true);
     setError('');
     try {
       const { data } = isSelf ? await listMyBranches(token) : await listBranches(token, vendorId);
+      if (requestId !== branchesRequestToken.current) return; // superseded by a newer vendorId switch
       setBranches(data);
     } catch (err) {
+      if (requestId !== branchesRequestToken.current) return;
       setError(err instanceof ApiRequestError ? err.message : 'Could not load branches.');
     } finally {
-      setBranchesLoading(false);
+      if (requestId === branchesRequestToken.current) setBranchesLoading(false);
     }
   };
 
@@ -82,16 +99,29 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
 
   useEffect(() => {
     if (!selectedBranchId) return;
+    const requestId = ++dealsRequestToken.current;
     setDealsLoading(true);
     (isSelf ? listMyDeals(token, selectedBranchId) : listDeals(token, vendorId, selectedBranchId))
-      .then(({ data }) => setDeals(data))
-      .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not load deals.'))
-      .finally(() => setDealsLoading(false));
+      .then(({ data }) => {
+        if (requestId !== dealsRequestToken.current) return; // superseded by a newer branch/vendor switch
+        setDeals(data);
+      })
+      .catch((err) => {
+        if (requestId !== dealsRequestToken.current) return;
+        setError(err instanceof ApiRequestError ? err.message : 'Could not load deals.');
+      })
+      .finally(() => {
+        if (requestId === dealsRequestToken.current) setDealsLoading(false);
+      });
   }, [token, vendorId, isSelf, selectedBranchId]);
 
   const reloadDeals = () => {
     if (!selectedBranchId) return;
-    (isSelf ? listMyDeals(token, selectedBranchId) : listDeals(token, vendorId, selectedBranchId)).then(({ data }) => setDeals(data));
+    const requestId = ++dealsRequestToken.current;
+    (isSelf ? listMyDeals(token, selectedBranchId) : listDeals(token, vendorId, selectedBranchId)).then(({ data }) => {
+      if (requestId !== dealsRequestToken.current) return;
+      setDeals(data);
+    });
   };
 
   const saveBranch = async (input: BranchInput, existing?: Branch) => {
@@ -448,6 +478,17 @@ export function DealDialog({
 }) {
   const internalDialogRef = useRef<MdDialog>(null);
   const dialogRef = externalDialogRef ?? internalDialogRef;
+  const { showToast } = useToast();
+  // Checked/set synchronously at the very top of submit(), before any await — a `submitting`
+  // state guard alone can't stop a second click/tap/Enter that fires before React commits the
+  // disabling re-render (same gap already fixed this session for TherapistFormDialog/
+  // PackageFormDialog/checkout.tsx; DealDialog had the identical gap).
+  const submittingRef = useRef(false);
+  // Belt-and-suspenders on top of submittingRef: disables the actual DOM element synchronously,
+  // in the same tick as the click, rather than waiting on React's `disabled={submitting}`
+  // re-render to commit — closes the residual window where two clicks issued close enough
+  // together can both reach submit() before either state update has visibly taken effect.
+  const saveButtonRef = useRef<MdFilledButton>(null);
   const [offeringType, setOfferingType] = useState<OfferingType>(deal?.productId ? 'product' : 'service');
   const [branchId, setBranchId] = useState<string>(deal?.branchId ?? fixedBranchId ?? branches?.[0]?.id ?? '');
   const [form, setForm] = useState<DealInput>({
@@ -512,6 +553,7 @@ export function DealDialog({
   };
 
   const submit = async () => {
+    if (submittingRef.current) return;
     if (branches && !deal && !branchId) {
       setError('Select a branch.');
       return;
@@ -573,10 +615,20 @@ export function DealDialog({
       delete payload.packages;
     }
 
+    submittingRef.current = true;
+    // Disables the real DOM element in the same synchronous tick, rather than waiting on
+    // React's `disabled={submitting}` re-render to commit — see saveButtonRef's own doc comment.
+    if (saveButtonRef.current) saveButtonRef.current.disabled = true;
     setSubmitting(true);
     setError('');
     try {
       const result = await onSave(payload, branches ? branchId : undefined);
+      // Fired only here, after the API call has actually resolved — never optimistically, and
+      // never for a failed request (see the catch block below, which shows an inline error
+      // instead). Wording distinguishes Service vs Product per the offering type actually
+      // submitted, and create vs update, matching what the caller just did.
+      const kind = offeringType === 'service' ? 'Service' : 'Product';
+      showToast(`${kind} ${deal ? 'updated' : 'added'} successfully`);
       if (!deal && result) {
         // A fresh create — keep the dialog open so MediaUploader can flush any staged photos/
         // video against the new id; an edit's dialog closes immediately as before, since
@@ -588,6 +640,7 @@ export function DealDialog({
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not save deal.');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -743,7 +796,7 @@ export function DealDialog({
         </div>
         <div slot="actions">
           <TextButton onClick={() => dialogRef.current?.close()}>Cancel</TextButton>
-          <FilledButton onClick={submit} disabled={submitting}>{submitting ? 'Saving…' : 'Save'}</FilledButton>
+          <FilledButton ref={saveButtonRef} onClick={submit} disabled={submitting}>{submitting ? 'Saving…' : 'Save'}</FilledButton>
         </div>
       </Dialog>
     </>
