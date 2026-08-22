@@ -147,8 +147,8 @@ export function Home() {
     ])
       .then(([categoriesRes, dealsRes]) => {
         if (cancelled) return;
-        setCategories(categoriesRes.data);
-        setDealsData(dealsRes.data);
+        setCategories(categoriesRes.data ?? []);
+        setDealsData(dealsRes.data ?? []);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -196,7 +196,7 @@ export function Home() {
       listCatalogDeals({ search: query, pageSize: spaFinder.suggestionLimit })
         .then(({ data }) => {
           if (cancelled) return;
-          setSuggestions(data);
+          setSuggestions(data ?? []);
           setShowSuggestions(true);
         })
         .catch(() => {
