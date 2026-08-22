@@ -1,8 +1,12 @@
+import type { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import { Prisma, type OrderStatus } from '../generated/prisma-client';
 import { getVendorByOwnerUserId } from './vendor.service';
 import { VISIBLE_DEAL_WHERE } from './catalog.service';
+import type { OrderContactDetailsSchema } from '../schemas/order.schema';
+
+type OrderContactDetails = z.infer<typeof OrderContactDetailsSchema>;
 
 const ORDER_INCLUDE = {
   items: true,
@@ -11,7 +15,7 @@ const ORDER_INCLUDE = {
   customer: { select: { id: true, name: true, phone: true, email: true } },
   vendor: { select: { id: true, businessName: true } },
   branch: { select: { id: true, name: true, address: true, city: true } },
-  booking: { select: { id: true, bookingDate: true, timeSlot: true } },
+  booking: { select: { id: true, bookingDate: true, timeSlot: true, status: true } },
   // Payment status only — never providerOrderId/providerPaymentId/signatureVerified, which
   // stay internal (see payment.service.ts). A customer/vendor/admin only ever needs to know
   // whether/why a payment attempt succeeded, not the gateway's own reference ids.
@@ -23,28 +27,55 @@ const ORDER_INCLUDE = {
 
 // ─── Customer: Cart → Order (product) ────────────────────────────────────────
 
-export async function createOrderFromCart(customerId: string) {
+/**
+ * Multi-vendor: a cart may hold product deals from any number of vendors/branches — this
+ * creates ONE Order (one checkout, one payment) with per-line vendor/branch on each OrderItem
+ * (see OrderItem's schema doc comment). `vendorId`/`branchId`/`vendorNameSnapshot`/
+ * `branchNameSnapshot` on the Order itself are the "primary vendor" — the first item's vendor,
+ * kept only so every existing single-vendor-order display (order-detail header, invoice header,
+ * admin list) keeps working unchanged; for a cart that happens to hold only one vendor (still
+ * the common case) this is byte-identical to every item's own vendor, so nothing changes there.
+ */
+export async function createOrderFromCart(customerId: string, contactDetails: OrderContactDetails = {}) {
   return prisma.$transaction(async (tx) => {
-    const cart = await tx.cart.findUnique({ where: { customerId }, include: { items: true } });
-    if (!cart || cart.items.length === 0 || !cart.vendorId || !cart.branchId) {
+    let cart = await tx.cart.findUnique({ where: { customerId }, include: { items: true } });
+    if (!cart) {
       throw new ApiError('VALIDATION_ERROR', 'Your cart is empty');
     }
 
-    const vendor = await tx.vendor.findUnique({ where: { id: cart.vendorId } });
-    const branch = await tx.branch.findUnique({ where: { id: cart.branchId } });
-    if (!vendor || !branch) throw new ApiError('NOT_FOUND', 'Vendor or branch no longer exists');
+    // Idempotent reuse — see Cart.pendingOrderId's schema doc comment. A repeat checkout call
+    // (double-click, page refresh, browser back/forward) for a cart whose Order is still in
+    // flight returns that same Order instead of creating a duplicate one.
+    if (cart.pendingOrderId) {
+      const pending = await tx.order.findUnique({ where: { id: cart.pendingOrderId }, include: ORDER_INCLUDE });
+      if (pending && pending.status === 'PENDING_PAYMENT') {
+        return pending;
+      }
+      // Stale reference (that Order was since cancelled, or is otherwise gone) — clear it and
+      // fall through to create a fresh Order from the cart's still-intact items.
+      await tx.cart.update({ where: { id: cart.id }, data: { pendingOrderId: null } });
+      cart = { ...cart, pendingOrderId: null };
+    }
+
+    if (cart.items.length === 0) {
+      throw new ApiError('VALIDATION_ERROR', 'Your cart is empty');
+    }
 
     let subtotal = new Prisma.Decimal(0);
     const itemsData: Prisma.OrderItemCreateWithoutOrderInput[] = [];
+    // First item's vendor/branch — see doc comment above.
+    let primaryVendor: { id: string; businessName: string | null } | null = null;
+    let primaryBranch: { id: string; name: string } | null = null;
 
     for (const item of cart.items) {
       // Re-validate against the SAME visibility rule the public catalogue uses — a deal that's
       // gone inactive/unapproved/vendor-suspended since it was added can't be checked out.
       // Server-side price, never CartItem.unitPrice (which is only provisional — see its doc
-      // comment in schema.prisma).
+      // comment in schema.prisma). Vendor/branch come from the deal's own relations, not the
+      // cart — VISIBLE_DEAL_WHERE already requires an ACTIVE vendor + active branch.
       const deal = await tx.deal.findFirst({
         where: { id: item.dealId, ...VISIBLE_DEAL_WHERE },
-        include: { product: { select: { name: true } } },
+        include: { product: { select: { name: true } }, vendor: true, branch: true },
       });
       if (!deal || !deal.productId || !deal.product) {
         throw new ApiError('CONFLICT', 'One or more items in your cart are no longer available — please review your cart');
@@ -52,10 +83,20 @@ export async function createOrderFromCart(customerId: string) {
       const unitPrice = new Prisma.Decimal(deal.salePrice);
       const lineTotal = unitPrice.mul(item.quantity);
       subtotal = subtotal.add(lineTotal);
+
+      if (!primaryVendor) {
+        primaryVendor = deal.vendor;
+        primaryBranch = deal.branch;
+      }
+
       itemsData.push({
         deal: { connect: { id: deal.id } },
+        vendor: { connect: { id: deal.vendorId } },
+        branch: { connect: { id: deal.branchId } },
         itemName: deal.product.name,
         itemType: 'PRODUCT',
+        vendorNameSnapshot: deal.vendor.businessName ?? 'Vendor',
+        branchNameSnapshot: deal.branch.name,
         unitPrice,
         quantity: item.quantity,
         lineTotal,
@@ -65,22 +106,27 @@ export async function createOrderFromCart(customerId: string) {
     const order = await tx.order.create({
       data: {
         customerId,
-        vendorId: vendor.id,
-        branchId: branch.id,
+        vendorId: primaryVendor!.id,
+        branchId: primaryBranch!.id,
         type: 'PRODUCT',
-        vendorNameSnapshot: vendor.businessName ?? 'Vendor',
-        branchNameSnapshot: branch.name,
+        vendorNameSnapshot: primaryVendor!.businessName ?? 'Vendor',
+        branchNameSnapshot: primaryBranch!.name,
         subtotal,
         total: subtotal,
         items: { create: itemsData },
+        ...contactDetails,
       },
       include: ORDER_INCLUDE,
     });
 
-    // Cart cleanup only happens here, inside the same transaction as the successful Order — a
-    // thrown error above rolls everything back and the cart is untouched.
-    await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-    await tx.cart.update({ where: { id: cart.id }, data: { vendorId: null, branchId: null } });
+    // Cart items are deliberately NOT deleted here — only once payment for this Order actually
+    // succeeds (see `finalizeCartForOrder` in payment.service.ts, called from every payment-
+    // success path alongside the existing `cascadeBookingStatus`). Deleting them eagerly, at
+    // checkout submission and before any payment, was the root cause of "product disappears from
+    // cart while a paired service booking stays pending" — the two now finalize together, on the
+    // same trigger. Linking the cart to this Order (instead) is also what makes a repeat checkout
+    // call idempotent — see the `pendingOrderId` reuse check at the top of this function.
+    await tx.cart.update({ where: { id: cart.id }, data: { pendingOrderId: order.id } });
 
     return order;
   });
@@ -88,51 +134,95 @@ export async function createOrderFromCart(customerId: string) {
 
 // ─── Customer: Booking → Order (service) ─────────────────────────────────────
 
-export async function createOrderFromBooking(customerId: string, bookingId: string) {
+export async function createOrderFromBooking(customerId: string, bookingId: string, contactDetails: OrderContactDetails = {}) {
   return prisma.$transaction(async (tx) => {
     const booking = await tx.booking.findUnique({
       where: { id: bookingId },
-      include: { deal: { include: { service: { select: { name: true } } } }, vendor: true, branch: true },
+      include: {
+        deal: { include: { service: { select: { name: true } } } },
+        vendor: true,
+        branch: true,
+        therapist: { select: { therapistType: true, personName: true } },
+      },
     });
     if (!booking || booking.customerId !== customerId) throw new ApiError('NOT_FOUND', 'Booking not found');
     if (booking.status === 'CANCELLED' || booking.status === 'COMPLETED') {
       throw new ApiError('CONFLICT', `Cannot create an order from a booking with status ${booking.status}`);
     }
-    // App-layer pre-check for a clean 409 — Order.bookingId's DB-level @unique is the hard guarantee.
-    const existingOrder = await tx.order.findUnique({ where: { bookingId } });
-    if (existingOrder) throw new ApiError('CONFLICT', 'This booking already has an order');
+    // App-layer pre-check, reused idempotently rather than treated as a conflict — a retried
+    // checkout request (double-click, refresh, browser back/forward) for a booking that already
+    // has an order just gets that same order back. Order.bookingId's DB-level @unique is the
+    // hard guarantee this pre-check can't fully replace under a genuine race (see the P2002
+    // catch below for that case).
+    const existingOrder = await tx.order.findUnique({ where: { bookingId }, include: ORDER_INCLUDE });
+    if (existingOrder) return existingOrder;
 
     // Never re-reads Deal — copies the already-immutable Booking snapshot from Phase 7.
     const priceSnapshot = new Prisma.Decimal(booking.priceSnapshot);
     const lineTotal = priceSnapshot.mul(booking.quantity);
+    // booking.deal is null for a Therapist booked directly (no Deal involved at all) — see
+    // Booking's own "exactly one of dealId/therapistId" doc comment.
+    const serviceName = booking.deal ? (booking.deal.service?.name ?? booking.deal.title) : undefined;
+    // Surfaces WHICH therapist this booking is for on the order/invoice, without adding a new
+    // column — OrderItem's itemName is already a free-text label, and the authoritative
+    // therapistId/therapistPackageId/priceSnapshot live on Booking itself (order.booking.* is
+    // already reachable from any Order this item belongs to).
+    const itemName = booking.therapist
+      ? serviceName
+        ? `${serviceName} — ${booking.therapist.personName}`
+        : `${booking.therapist.therapistType} — ${booking.therapist.personName}`
+      : serviceName!;
 
-    return tx.order.create({
-      data: {
-        customerId,
-        vendorId: booking.vendorId,
-        branchId: booking.branchId,
-        type: 'SERVICE',
-        bookingId: booking.id,
-        vendorNameSnapshot: booking.vendor.businessName ?? 'Vendor',
-        branchNameSnapshot: booking.branch.name,
-        subtotal: lineTotal,
-        total: lineTotal,
-        items: {
-          create: [
-            {
-              deal: { connect: { id: booking.dealId } },
-              itemName: booking.deal.service?.name ?? booking.deal.title,
-              itemType: 'SERVICE',
-              unitPrice: priceSnapshot,
-              quantity: booking.quantity,
-              lineTotal,
-              durationMinutes: booking.durationMinutesSnapshot,
-            },
-          ],
+    try {
+      return await tx.order.create({
+        data: {
+          customerId,
+          vendorId: booking.vendorId,
+          branchId: booking.branchId,
+          type: 'SERVICE',
+          bookingId: booking.id,
+          vendorNameSnapshot: booking.vendor.businessName ?? 'Vendor',
+          branchNameSnapshot: booking.branch.name,
+          subtotal: lineTotal,
+          total: lineTotal,
+          ...contactDetails,
+          items: {
+            create: [
+              {
+                ...(booking.dealId ? { deal: { connect: { id: booking.dealId } } } : {}),
+                ...(booking.dealPackageId ? { dealPackage: { connect: { id: booking.dealPackageId } } } : {}),
+                ...(booking.therapistId ? { therapist: { connect: { id: booking.therapistId } } } : {}),
+                ...(booking.therapistPackageId
+                  ? { therapistPackage: { connect: { id: booking.therapistPackageId } } }
+                  : {}),
+                vendor: { connect: { id: booking.vendorId } },
+                branch: { connect: { id: booking.branchId } },
+                itemName,
+                itemType: 'SERVICE',
+                vendorNameSnapshot: booking.vendor.businessName ?? 'Vendor',
+                branchNameSnapshot: booking.branch.name,
+                unitPrice: priceSnapshot,
+                quantity: booking.quantity,
+                lineTotal,
+                durationMinutes: booking.durationMinutesSnapshot,
+              },
+            ],
+          },
         },
-      },
-      include: ORDER_INCLUDE,
-    });
+        include: ORDER_INCLUDE,
+      });
+    } catch (err) {
+      // A genuine race: two concurrent requests both passed the pre-check above before either
+      // committed. Order.bookingId's DB-level @unique is the real guarantee here — on a P2002
+      // hit, the other request won, so return ITS order instead of surfacing an opaque 500 (the
+      // errorHandler only special-cases ApiError, so an unhandled P2002 would otherwise reach the
+      // client as a raw "Internal server error").
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const winner = await tx.order.findUnique({ where: { bookingId }, include: ORDER_INCLUDE });
+        if (winner) return winner;
+      }
+      throw err;
+    }
   });
 }
 
@@ -159,53 +249,198 @@ export async function cancelMyOrder(customerId: string, id: string, reason?: str
   if (order.status !== 'PENDING_PAYMENT' && order.status !== 'CONFIRMED') {
     throw new ApiError('CONFLICT', `Cannot cancel an order with status ${order.status}`);
   }
-  return prisma.order.update({ where: { id }, data: { status: 'CANCELLED', cancellationReason: reason ?? null }, include: ORDER_INCLUDE });
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.order.update({
+      where: { id },
+      data: { status: 'CANCELLED', cancellationReason: reason ?? null },
+      include: ORDER_INCLUDE,
+    });
+    await cascadeBookingStatus(tx, updated, 'CANCELLED');
+    return updated;
+  });
 }
 
 // ─── Admin / vendor-scoped ────────────────────────────────────────────────────
+
+interface OrderListFilters {
+  page: number;
+  pageSize: number;
+  status?: OrderStatus;
+  vendorId?: string;
+  branchId?: string;
+  customerId?: string;
+  paymentStatus?: 'CREATED' | 'PAID' | 'FAILED' | 'CANCELLED';
+  createdFrom?: string;
+  createdTo?: string;
+  search?: string;
+}
+
+/** For a vendor caller, an Order's `items[]` must never include another vendor's line items —
+ *  a multi-vendor order is only ever fully visible to the customer who placed it and to
+ *  admin/SuperAdmin. Applied to every order returned to a vendor caller in this file. */
+function scopeOrderItemsToVendor<T extends { items: { vendorId: string }[] }>(order: T, vendorId: string): T {
+  return { ...order, items: order.items.filter((item) => item.vendorId === vendorId) };
+}
 
 /**
  * One endpoint serves both admin (cross-tenant) and vendor (own-orders-only) callers. If the
  * caller owns a Vendor profile, results are ALWAYS force-scoped to that vendorId — never the
  * optional `vendorId` filter, which only an admin (no Vendor profile) can use to drill in.
  * Reuses vendor.service.ts's existing getVendorByOwnerUserId — not reimplemented.
+ *
+ * Multi-vendor: matching and filtering is done via `OrderItem.vendorId`/`branchId` (an order
+ * "belongs" to a vendor if any of its items do), never the Order-level vendorId/branchId, which
+ * is only the "primary vendor" for display (see Order's schema doc comment). A vendor caller's
+ * results additionally have every returned order's `items[]` filtered down to their own items
+ * only — never another vendor's line items/pricing, even for an order they're scoped to see.
  */
-export async function listOrders(callerUserId: string, opts: { page: number; pageSize: number; status?: OrderStatus; vendorId?: string }) {
+export async function listOrders(callerUserId: string, opts: OrderListFilters) {
   const vendor = await getVendorByOwnerUserId(callerUserId);
   const scopedVendorId = vendor ? vendor.id : opts.vendorId;
-  const where = { ...(scopedVendorId ? { vendorId: scopedVendorId } : {}), ...(opts.status ? { status: opts.status } : {}) };
-  const [items, total] = await Promise.all([
+  const where = {
+    ...(scopedVendorId ? { items: { some: { vendorId: scopedVendorId } } } : {}),
+    ...(opts.branchId ? { items: { some: { branchId: opts.branchId } } } : {}),
+    ...(opts.customerId ? { customerId: opts.customerId } : {}),
+    ...(opts.status ? { status: opts.status } : {}),
+    // Order has no single "payment status" column of its own (Order 1 -> Payment[]) — this
+    // matches "has at least one payment attempt in this state", not "the current/latest one".
+    ...(opts.paymentStatus ? { payments: { some: { status: opts.paymentStatus } } } : {}),
+    ...(opts.createdFrom || opts.createdTo
+      ? {
+          createdAt: {
+            ...(opts.createdFrom ? { gte: new Date(opts.createdFrom) } : {}),
+            ...(opts.createdTo ? { lte: new Date(opts.createdTo) } : {}),
+          },
+        }
+      : {}),
+    ...(opts.search
+      ? {
+          OR: [
+            { vendorNameSnapshot: { contains: opts.search, mode: 'insensitive' as const } },
+            { branchNameSnapshot: { contains: opts.search, mode: 'insensitive' as const } },
+            { customer: { is: { name: { contains: opts.search, mode: 'insensitive' as const } } } },
+            { items: { some: { itemName: { contains: opts.search, mode: 'insensitive' as const } } } },
+            { items: { some: { vendorNameSnapshot: { contains: opts.search, mode: 'insensitive' as const } } } },
+          ],
+        }
+      : {}),
+  };
+  const [rawItems, total] = await Promise.all([
     prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (opts.page - 1) * opts.pageSize, take: opts.pageSize, include: ORDER_INCLUDE }),
     prisma.order.count({ where }),
   ]);
+  const items = vendor ? rawItems.map((order) => scopeOrderItemsToVendor(order, vendor.id)) : rawItems;
   return { items, total };
 }
 
-/** Same vendor-scoping rule as listOrders — a vendor requesting another vendor's order id 404s. */
+/** Same vendor-scoping rule as listOrders — a vendor requesting an order none of its own deals
+ *  are part of 404s (never confirms existence), and the returned order's items[] are filtered
+ *  to the caller's own vendor only. */
 export async function getOrderOrThrow(callerUserId: string, id: string) {
   const vendor = await getVendorByOwnerUserId(callerUserId);
   const order = await prisma.order.findUnique({ where: { id }, include: ORDER_INCLUDE });
-  if (!order || (vendor && order.vendorId !== vendor.id)) throw new ApiError('NOT_FOUND', 'Order not found');
-  return order;
+  if (!order) throw new ApiError('NOT_FOUND', 'Order not found');
+  if (!vendor) return order;
+  const scoped = scopeOrderItemsToVendor(order, vendor.id);
+  if (scoped.items.length === 0) throw new ApiError('NOT_FOUND', 'Order not found');
+  return scoped;
 }
 
-const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+const ADMIN_ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   PENDING_PAYMENT: ['CONFIRMED', 'CANCELLED'],
   CONFIRMED: ['COMPLETED', 'CANCELLED'],
   COMPLETED: [],
   CANCELLED: [],
 };
 
-/** Admin-only (routed only from the admin-gated `orders:status_change` surface). */
-export async function setOrderStatus(id: string, status: OrderStatus, reason?: string) {
-  const order = await prisma.order.findUnique({ where: { id } });
+/** Narrower than admin's: a vendor can never touch an order that hasn't been paid yet — the
+ *  ONLY path from PENDING_PAYMENT to CONFIRMED is verified payment (payment.service.ts), never
+ *  a manual status change — so "payment failure must never accidentally confirm/complete an
+ *  order" holds structurally here, not just by convention. */
+const VENDOR_ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  PENDING_PAYMENT: [],
+  CONFIRMED: ['COMPLETED', 'CANCELLED'],
+  COMPLETED: [],
+  CANCELLED: [],
+};
+
+/**
+ * Keeps a SERVICE order's linked Booking in sync with the Order's own lifecycle. Booking stays
+ * its own row/lifecycle (never recreated or merged into Order) — this only mirrors the Order's
+ * transition so a paid/cancelled/completed order doesn't leave its Booking sitting at PENDING
+ * forever (which would otherwise keep counting toward the customer's "pending cart" — see
+ * `listMyBookings`'s `status=PENDING` filter, used by the header cart badge and cart page).
+ * `CONFIRMED` is called from `payment.service.ts` the moment an Order is actually paid/COD-
+ * confirmed — this is the fix for "purchased item still shows in cart after checkout". No-op if
+ * the Booking is already terminal (COMPLETED/CANCELLED — never overwritten) or already in the
+ * target state (idempotent, safe to call from a duplicate payment-verification callback).
+ * Exported for `payment.service.ts` to reuse — never duplicated there.
+ */
+export async function cascadeBookingStatus(
+  tx: Prisma.TransactionClient,
+  order: { type: string; bookingId: string | null },
+  status: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED',
+) {
+  if (order.type !== 'SERVICE' || !order.bookingId) return;
+  const booking = await tx.booking.findUnique({ where: { id: order.bookingId } });
+  if (!booking || booking.status === 'COMPLETED' || booking.status === 'CANCELLED' || booking.status === status) return;
+  await tx.booking.update({ where: { id: order.bookingId }, data: { status } });
+}
+
+/**
+ * Sibling to `cascadeBookingStatus` above — same call sites in `payment.service.ts`, same
+ * "only on actual payment success" trigger. Finalizes a cart-linked PRODUCT order's `CartItem`
+ * rows now that payment has actually succeeded (see `Cart.pendingOrderId`'s schema doc comment
+ * for why this doesn't happen eagerly at Order creation — that was the root cause of "product
+ * disappears from cart while a paired service booking stays pending"). No-op for a SERVICE order
+ * (never cart-linked) or once the cart has already moved on (its `pendingOrderId` no longer
+ * points at this order — nothing left to finalize, safe to call more than once). Exported for
+ * `payment.service.ts` to reuse — never duplicated there.
+ */
+export async function finalizeCartForOrder(tx: Prisma.TransactionClient, orderId: string) {
+  const cart = await tx.cart.findUnique({ where: { pendingOrderId: orderId } });
+  if (!cart) return;
+  await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+  await tx.cart.update({ where: { id: cart.id }, data: { pendingOrderId: null } });
+}
+
+/**
+ * Admin (no linked Vendor profile) may drive the full ADMIN_ALLOWED_TRANSITIONS matrix on any
+ * order. A vendor caller is force-scoped to orders it has at least one line item in (404 for an
+ * order it isn't part of at all — never confirms existence) and restricted to
+ * VENDOR_ALLOWED_TRANSITIONS. Order.status is order-wide, not per-item, so a vendor caller may
+ * only change status on an order that is entirely its own (single vendor) — a multi-vendor order
+ * can only have its status changed by admin, since one vendor completing/cancelling would
+ * otherwise silently affect every other vendor's items in the same order too. Cascades to the
+ * linked Booking on a terminal transition (see cascadeBookingStatus) — all inside one transaction.
+ */
+export async function setOrderStatus(callerUserId: string, id: string, status: OrderStatus, reason?: string) {
+  const vendor = await getVendorByOwnerUserId(callerUserId);
+  const order = await prisma.order.findUnique({ where: { id }, include: { items: { select: { vendorId: true } } } });
   if (!order) throw new ApiError('NOT_FOUND', 'Order not found');
-  if (!ALLOWED_TRANSITIONS[order.status].includes(status)) {
+
+  if (vendor) {
+    const distinctVendorIds = new Set(order.items.map((item) => item.vendorId));
+    if (!distinctVendorIds.has(vendor.id)) throw new ApiError('NOT_FOUND', 'Order not found');
+    if (distinctVendorIds.size > 1) {
+      throw new ApiError('FORBIDDEN', 'This order includes other vendors’ items — only an admin can change its status');
+    }
+  }
+
+  const allowed = vendor ? VENDOR_ALLOWED_TRANSITIONS : ADMIN_ALLOWED_TRANSITIONS;
+  if (!allowed[order.status].includes(status)) {
     throw new ApiError('CONFLICT', `Cannot change status from ${order.status} to ${status}`);
   }
-  return prisma.order.update({
-    where: { id },
-    data: { status, cancellationReason: status === 'CANCELLED' ? (reason ?? order.cancellationReason) : order.cancellationReason },
-    include: ORDER_INCLUDE,
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.order.update({
+      where: { id },
+      data: { status, cancellationReason: status === 'CANCELLED' ? (reason ?? order.cancellationReason) : order.cancellationReason },
+      include: ORDER_INCLUDE,
+    });
+    if (status === 'COMPLETED' || status === 'CANCELLED') {
+      await cascadeBookingStatus(tx, updated, status);
+    }
+    return updated;
   });
 }

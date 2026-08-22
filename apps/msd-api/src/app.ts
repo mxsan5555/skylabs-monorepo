@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { env } from './config/env';
+import { getUploadRoot } from './lib/media-storage';
 import { passport, configurePassport } from './lib/passport';
 import { buildOpenApiDocument } from './openapi/registry';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
@@ -13,6 +14,7 @@ import vendorsRoutes from './routes/vendors.routes';
 import categoriesRoutes from './routes/categories.routes';
 import catalogRoutes from './routes/catalog.routes';
 import cartRoutes from './routes/cart.routes';
+import wishlistRoutes from './routes/wishlist.routes';
 import bookingRoutes from './routes/booking.routes';
 import ordersRoutes from './routes/orders.routes';
 import paymentRoutes from './routes/payment.routes';
@@ -20,6 +22,7 @@ import productsRoutes from './routes/products.routes';
 import servicesRoutes from './routes/services.routes';
 import inventoryRoutes from './routes/inventory.routes';
 import reportsRoutes from './routes/reports.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 
 /**
  * The Express app, wired up but not listening. Split out of main.ts so Supertest can
@@ -46,6 +49,9 @@ export function createApp(): express.Express {
   app.use(passport.initialize());
 
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(buildOpenApiDocument()));
+  // Uploaded Deal/Product/Therapist media — served by relative storageKey, e.g.
+  // `/media/deals/<dealId>/<uuid>.jpg` (see media-storage.ts's doc comment).
+  app.use('/media', express.static(getUploadRoot()));
 
   const api = express.Router();
   api.use('/auth', authRoutes);
@@ -55,6 +61,7 @@ export function createApp(): express.Express {
   api.use('/categories', categoriesRoutes);
   api.use('/catalog', catalogRoutes);
   api.use('/cart', cartRoutes);
+  api.use('/wishlist', wishlistRoutes);
   api.use('/bookings', bookingRoutes);
   api.use('/orders', ordersRoutes);
   api.use('/payments', paymentRoutes);
@@ -62,6 +69,7 @@ export function createApp(): express.Express {
   api.use('/services', servicesRoutes);
   api.use('/inventory', inventoryRoutes);
   api.use('/reports', reportsRoutes);
+  api.use('/dashboard', dashboardRoutes);
 
   app.use('/api/v1', api);
 

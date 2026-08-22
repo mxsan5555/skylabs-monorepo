@@ -36,8 +36,6 @@ const branchAFixture = { id: BRANCH_A_ID, name: 'Gorakhpur Branch', isActive: tr
 const cartWithOneItem = {
   id: CART_ID,
   customerId: CUSTOMER_ID,
-  vendorId: VENDOR_A_ID,
-  branchId: BRANCH_A_ID,
   items: [{ id: CART_ITEM_ID, cartId: CART_ID, dealId: PRODUCT_DEAL_ID, quantity: 2, unitPrice: '150.00' }], // stale unitPrice — live deal price is 199.00
 };
 
@@ -49,6 +47,8 @@ const productDealFixture = {
   branchId: BRANCH_A_ID,
   salePrice: '199.00', // the live, current price — must be what's used, not the stale cart snapshot of 150.00
   product: { name: 'Face Cream' },
+  vendor: vendorAFixture,
+  branch: branchAFixture,
 };
 
 const serviceDealFixture = {
@@ -87,7 +87,20 @@ const orderFixture = {
   branchNameSnapshot: 'Gorakhpur Branch',
   subtotal: '398.00',
   total: '398.00',
-  items: [{ id: 'oi-1', dealId: PRODUCT_DEAL_ID, itemName: 'Face Cream', itemType: 'PRODUCT', unitPrice: '199.00', quantity: 2, lineTotal: '398.00', durationMinutes: null }],
+  items: [{
+    id: 'oi-1',
+    dealId: PRODUCT_DEAL_ID,
+    vendorId: VENDOR_A_ID,
+    branchId: BRANCH_A_ID,
+    vendorNameSnapshot: 'ABC Salon',
+    branchNameSnapshot: 'Gorakhpur Branch',
+    itemName: 'Face Cream',
+    itemType: 'PRODUCT',
+    unitPrice: '199.00',
+    quantity: 2,
+    lineTotal: '398.00',
+    durationMinutes: null,
+  }],
 };
 
 beforeEach(() => {
@@ -137,32 +150,103 @@ describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
     expect(call.data.subtotal.toString()).toBe('398'); // 199 * qty(2), not 150 * 2 = 300
   });
 
-  it('12. clears cart items only after the order is successfully created', async () => {
+  it('12. links the cart to its new order (pendingOrderId) instead of deleting cart items at checkout time', async () => {
+    // CartItem rows are deliberately NOT deleted here anymore — only once payment actually
+    // succeeds (finalizeCartForOrder, called from payment.service.ts). Checkout submission just
+    // links the cart to its new Order via pendingOrderId, so a repeat checkout call can reuse it
+    // (see the next test) and a failed/abandoned payment leaves the cart intact for retry.
     prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
     prismaMock.deal.findFirst.mockResolvedValue(productDealFixture);
     prismaMock.order.create.mockResolvedValue(orderFixture);
     await request(app).post('/api/v1/orders/checkout').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
-    expect(prismaMock.cartItem.deleteMany).toHaveBeenCalledWith({ where: { cartId: CART_ID } });
-    expect(prismaMock.cart.update).toHaveBeenCalledWith({ where: { id: CART_ID }, data: { vendorId: null, branchId: null } });
+    expect(prismaMock.cartItem.deleteMany).not.toHaveBeenCalled();
+    expect(prismaMock.cart.update).toHaveBeenCalledWith({ where: { id: CART_ID }, data: { pendingOrderId: ORDER_ID } });
+  });
+
+  it('12b. a repeat checkout call reuses the still-PENDING_PAYMENT order from a previous checkout instead of creating a duplicate', async () => {
+    prismaMock.cart.findUnique.mockResolvedValue({ ...cartWithOneItem, pendingOrderId: ORDER_ID });
+    prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, status: 'PENDING_PAYMENT' });
+    const res = await request(app).post('/api/v1/orders/checkout').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+    expect(res.status).toBe(201);
+    expect(res.body.data.id).toBe(ORDER_ID);
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+
+  it('12c. a stale pendingOrderId pointing at a CANCELLED order is cleared and a fresh order is created from the still-intact cart', async () => {
+    prismaMock.cart.findUnique.mockResolvedValue({ ...cartWithOneItem, pendingOrderId: ORDER_ID });
+    prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, status: 'CANCELLED' });
+    prismaMock.deal.findFirst.mockResolvedValue(productDealFixture);
+    prismaMock.order.create.mockResolvedValue(orderFixture);
+    const res = await request(app).post('/api/v1/orders/checkout').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+    expect(res.status).toBe(201);
+    expect(prismaMock.cart.update).toHaveBeenCalledWith({ where: { id: CART_ID }, data: { pendingOrderId: null } });
+    expect(prismaMock.order.create).toHaveBeenCalled();
   });
 
   it('13/20. leaves the cart intact and creates nothing when a deal fails revalidation (transaction rollback)', async () => {
     prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
     prismaMock.deal.findFirst.mockResolvedValue(null); // deal went inactive/unapproved since being added to cart
     const res = await request(app).post('/api/v1/orders/checkout').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
     expect(res.status).toBe(409);
     expect(prismaMock.order.create).not.toHaveBeenCalled();
     expect(prismaMock.cartItem.deleteMany).not.toHaveBeenCalled();
-    expect(prismaMock.cart.update).not.toHaveBeenCalled();
   });
 
   it('rejects checkout of an empty cart', async () => {
-    prismaMock.cart.findUnique.mockResolvedValue({ ...cartWithOneItem, items: [], vendorId: null, branchId: null });
+    prismaMock.cart.findUnique.mockResolvedValue({ ...cartWithOneItem, items: [] });
     const res = await request(app).post('/api/v1/orders/checkout').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+    expect(res.status).toBe(422);
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+
+  it('stores the checkout "Customer Details" step contact/shipping fields on the order', async () => {
+    prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
+    prismaMock.deal.findFirst.mockResolvedValue(productDealFixture);
+    prismaMock.order.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: ORDER_ID, ...data }));
+    const res = await request(app)
+      .post('/api/v1/orders/checkout')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({
+        contactName: 'Priya Sharma',
+        contactPhone: '9810099999',
+        contactEmail: 'priya@example.com',
+        shippingAddress: '12 MG Road',
+        shippingCity: 'Gorakhpur',
+        shippingState: 'Uttar Pradesh',
+        shippingPincode: '273001',
+      });
+    expect(res.status).toBe(201);
+    expect(prismaMock.order.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          contactName: 'Priya Sharma',
+          contactPhone: '9810099999',
+          contactEmail: 'priya@example.com',
+          shippingAddress: '12 MG Road',
+          shippingCity: 'Gorakhpur',
+          shippingState: 'Uttar Pradesh',
+          shippingPincode: '273001',
+        }),
+      }),
+    );
+  });
+
+  it('rejects a malformed pincode on checkout with a field-level validation error', async () => {
+    const res = await request(app)
+      .post('/api/v1/orders/checkout')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ shippingPincode: '123' }); // must be exactly 6 digits
+    expect(res.status).toBe(422);
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed contact phone on checkout with a field-level validation error', async () => {
+    const res = await request(app)
+      .post('/api/v1/orders/checkout')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ contactPhone: '12345' }); // not a valid 10-digit Indian mobile number
     expect(res.status).toBe(422);
     expect(prismaMock.order.create).not.toHaveBeenCalled();
   });
@@ -196,14 +280,17 @@ describe('POST /api/v1/orders/from-booking — Service Booking -> Order', () => 
     expect(prismaMock.deal.findUnique).not.toHaveBeenCalled();
   });
 
-  it('14. rejects creating a second order from the same booking', async () => {
+  it('14. a repeat request for a booking that already has an order reuses it idempotently, instead of erroring or duplicating', async () => {
+    // A retried checkout request (double-click, refresh, browser back/forward) must not throw a
+    // conflict — it gets the SAME existing order back, exactly as if this were its first call.
     prismaMock.booking.findUnique.mockResolvedValue(bookingFixture);
     prismaMock.order.findUnique.mockResolvedValue({ id: 'existing-order', bookingId: BOOKING_ID });
     const res = await request(app)
       .post('/api/v1/orders/from-booking')
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
       .send({ bookingId: BOOKING_ID });
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(201);
+    expect(res.body.data.id).toBe('existing-order');
     expect(prismaMock.order.create).not.toHaveBeenCalled();
   });
 
@@ -293,7 +380,9 @@ describe('GET /api/v1/orders — admin / vendor scoping', () => {
     await request(app)
       .get(`/api/v1/orders?vendorId=${VENDOR_B_ID}`)
       .set('Authorization', bearerFor({ sub: 'vendor-user-1', roles: ['vendor'] }));
-    expect(prismaMock.order.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ vendorId: VENDOR_A_ID }) }));
+    expect(prismaMock.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ items: { some: { vendorId: VENDOR_A_ID } } }) }),
+    );
   });
 
   it('admin (no vendor profile) can filter by an explicit vendorId', async () => {
@@ -304,7 +393,29 @@ describe('GET /api/v1/orders — admin / vendor scoping', () => {
     await request(app)
       .get(`/api/v1/orders?vendorId=${VENDOR_A_ID}`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-    expect(prismaMock.order.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ vendorId: VENDOR_A_ID }) }));
+    expect(prismaMock.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ items: { some: { vendorId: VENDOR_A_ID } } }) }),
+    );
+  });
+
+  it("filters a vendor caller's returned items to only their own vendor within a multi-vendor order", async () => {
+    resolveMock.mockResolvedValue(['orders:view']);
+    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
+    const multiVendorOrder = {
+      ...orderFixture,
+      items: [
+        orderFixture.items[0],
+        { ...orderFixture.items[0], id: 'oi-2', vendorId: VENDOR_B_ID, vendorNameSnapshot: 'XYZ Spa', itemName: 'Hair Serum' },
+      ],
+    };
+    prismaMock.order.findMany.mockResolvedValue([multiVendorOrder]);
+    prismaMock.order.count.mockResolvedValue(1);
+    const res = await request(app)
+      .get('/api/v1/orders')
+      .set('Authorization', bearerFor({ sub: 'vendor-user-1', roles: ['vendor'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].items).toHaveLength(1);
+    expect(res.body.data[0].items[0].vendorId).toBe(VENDOR_A_ID);
   });
 });
 
@@ -350,6 +461,22 @@ describe('PATCH /api/v1/orders/:id/status — admin', () => {
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
       .send({ status: 'CONFIRMED' });
     expect(res.status).toBe(409);
+    expect(prismaMock.order.update).not.toHaveBeenCalled();
+  });
+
+  it('a vendor caller cannot change status on a multi-vendor order — only admin may', async () => {
+    resolveMock.mockResolvedValue(['orders:status_change']);
+    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
+    prismaMock.order.findUnique.mockResolvedValue({
+      ...orderFixture,
+      status: 'CONFIRMED',
+      items: [orderFixture.items[0], { ...orderFixture.items[0], id: 'oi-2', vendorId: VENDOR_B_ID }],
+    });
+    const res = await request(app)
+      .patch(`/api/v1/orders/${ORDER_ID}/status`)
+      .set('Authorization', bearerFor({ sub: 'vendor-user-1', roles: ['vendor'] }))
+      .send({ status: 'COMPLETED' });
+    expect(res.status).toBe(403);
     expect(prismaMock.order.update).not.toHaveBeenCalled();
   });
 });

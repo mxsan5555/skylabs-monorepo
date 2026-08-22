@@ -151,6 +151,41 @@ input[type='checkbox'] {
   color: var(--md-sys-color-on-surface-variant);
 }
 
+/* Dashboard business-process-flow section */
+.process-flow {
+  margin-top: 8px;
+}
+
+.process-flow__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.process-flow__step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.process-flow__card {
+  min-width: 160px;
+  padding: 14px 16px;
+}
+
+.process-flow__value {
+  font-size: 1.1rem;
+}
+
+.process-flow__arrow {
+  color: var(--md-sys-color-on-surface-variant);
+  flex-shrink: 0;
+}
+
 /* Generic two-pane admin screen: list on the left, detail on the right. */
 .two-pane {
   display: grid;
@@ -175,6 +210,31 @@ input[type='checkbox'] {
   margin: 0 0 12px;
   font-size: 1rem;
   color: var(--md-sys-color-on-surface);
+}
+
+/* Vendor Management page (vendors.tsx): the Vendors list panel now sits full-width above the
+   selected vendor's detail panel (rather than beside it in `.two-pane`), so the detail panel
+   needs its own top spacing instead of `.two-pane`'s grid `gap`. */
+.vendor-detail {
+  margin-top: 20px;
+}
+
+/* Vendor Detail (and similar) full-width tabbed panels: a Tabs strip switching between several
+   already-existing sub-views (e.g. Overview/Branches & Deals/Therapists/Customers/Orders/Bookings)
+   rendered below the shared header actions, instead of stacking every section vertically. */
+.admin-tabs-wrap {
+  margin: 4px 0 16px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.admin-tabs-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+.admin-tab-panel {
+  padding-top: 4px;
 }
 
 .entity-list {
@@ -244,6 +304,22 @@ input[type='checkbox'] {
 .status-pill--blocked {
   background-color: var(--md-sys-color-error-container, #ffdad6);
   color: var(--md-sys-color-on-error-container, #410002);
+}
+
+/* Reports — simple CSS-width bar next to a revenue figure in a data-table cell (no chart
+   library installed for this; see reports.tsx's own doc comment). */
+.bar-viz {
+  margin-top: 4px;
+  height: 6px;
+  border-radius: 3px;
+  background-color: var(--md-sys-color-surface-container-highest, #e2e2e2);
+  overflow: hidden;
+}
+
+.bar-viz__fill {
+  height: 100%;
+  border-radius: 3px;
+  background-color: var(--md-sys-color-primary);
 }
 
 /* Data table */
@@ -350,12 +426,42 @@ input[type='checkbox'] {
 
 .form-grid {
   display: grid;
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px 20px;
+  /* Every admin form in the app (Deal/Product/Therapist/Branch/Vendor) uses this class —
+     collapses to one column below ~500px (minmax's floor), up to 2-3 columns on wider
+     viewports, without a dedicated breakpoint per form. */
+  max-width: 100%;
 }
 
 .form-grid md-outlined-text-field,
 .form-grid md-outlined-select {
   width: 100%;
+}
+
+/* Elements that must always span every column, never squeeze into a single field-width cell —
+   section headers, hints/errors, fieldsets (packages, KYC documents, etc.), and the save/cancel
+   action row. */
+.form-grid > .section-title,
+.form-grid > .field-hint,
+.form-grid > .error-state,
+.form-grid > fieldset,
+.form-grid > .form-actions,
+.form-grid > section {
+  grid-column: 1 / -1;
+}
+
+/* Long unbroken values (GSTIN, PAN, email, phone, slug, addresses, business descriptions) must
+   wrap inside their container instead of forcing horizontal overflow — the actual root cause of
+   the vendor detail page's reported layout breakage. Applies wherever this app displays a
+   read-only label/value pair (vendor detail sections, review-style summaries). */
+.form-grid dt,
+.form-grid dd,
+.form-grid p,
+.panel dt,
+.panel dd {
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .form-actions {

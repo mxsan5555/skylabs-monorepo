@@ -45,13 +45,49 @@
     "order": 3.2
   },
   {
-    "id": "vendor-portal",
-    "title": "My Business",
+    "id": "vendor-business-profile",
+    "title": "Business Profile",
     "icon": "business_center",
-    "route": "/account/vendors",
+    "route": "/account/vendor-profile",
     "permissionKey": "vendor-portal",
     "parent": null,
     "order": 3.3
+  },
+  {
+    "id": "vendor-branches-deals",
+    "title": "Branches",
+    "icon": "store",
+    "route": "/account/vendor-branches-deals",
+    "permissionKey": "vendor-portal",
+    "parent": null,
+    "order": 3.31
+  },
+  {
+    "id": "vendor-deals",
+    "title": "Deals / Packages",
+    "icon": "sell",
+    "route": "/account/vendor-deals",
+    "permissionKey": "vendor-portal",
+    "parent": null,
+    "order": 3.315
+  },
+  {
+    "id": "vendor-customers",
+    "title": "Customers",
+    "icon": "group",
+    "route": "/account/vendor-customers",
+    "permissionKey": "vendor-portal",
+    "parent": null,
+    "order": 3.32
+  },
+  {
+    "id": "vendor-therapists",
+    "title": "Therapists",
+    "icon": "badge",
+    "route": "/account/vendor-therapists",
+    "permissionKey": "vendor-portal",
+    "parent": null,
+    "order": 3.33
   },
   {
     "id": "orders",
@@ -61,6 +97,15 @@
     "permissionKey": "orders",
     "parent": null,
     "order": 4
+  },
+  {
+    "id": "bookings",
+    "title": "Bookings",
+    "icon": "event_available",
+    "route": "/account/bookings",
+    "permissionKey": "orders",
+    "parent": null,
+    "order": 4.1
   },
   {
     "id": "services",

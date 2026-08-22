@@ -104,6 +104,22 @@ describe('POST /api/v1/orders/me/:id/pay', () => {
     expect(razorpayMock.orders.create).toHaveBeenCalledWith(expect.objectContaining({ amount: 39800 }));
   });
 
+  it('surfaces a clean 500 with a real message (never an opaque crash) when the Razorpay SDK call itself fails', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    prismaMock.order.findUnique.mockResolvedValue(orderFixture);
+    prismaMock.payment.findFirst.mockResolvedValue(null);
+    razorpayMock.orders.create.mockRejectedValue(new Error('Razorpay: authentication failed'));
+    const res = await request(app)
+      .post(`/api/v1/orders/me/${ORDER_ID}/pay`)
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+    expect(res.status).toBe(500);
+    expect(res.body.error.message).toBe('Could not start the payment — please try again in a moment.');
+    expect(prismaMock.payment.create).not.toHaveBeenCalled();
+    // The real SDK error is still logged server-side for diagnosis — never silently discarded.
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.objectContaining({ context: 'razorpay.orders.create' }));
+    consoleErrorSpy.mockRestore();
+  });
+
   it('7/8. reuses an existing non-terminal Payment instead of creating a second one (retry / duplicate click)', async () => {
     prismaMock.order.findUnique.mockResolvedValue(orderFixture);
     prismaMock.payment.findFirst.mockResolvedValue(paymentFixture); // an attempt already in flight
@@ -137,10 +153,65 @@ describe('POST /api/v1/orders/me/:id/pay', () => {
   });
 });
 
+describe('POST /api/v1/orders/me/:id/pay-cod', () => {
+  it('returns 401 with no token', async () => {
+    const res = await request(app).post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`);
+    expect(res.status).toBe(401);
+  });
+
+  it("404s for another customer's order (never confirms existence)", async () => {
+    prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, customerId: OTHER_CUSTOMER_ID });
+    const res = await request(app)
+      .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+    expect(res.status).toBe(404);
+  });
+
+  it('creates a CREATED-status COD payment and confirms the order — never marks it PAID', async () => {
+    prismaMock.order.findUnique.mockResolvedValue(orderFixture);
+    prismaMock.payment.create.mockResolvedValue({ ...paymentFixture, provider: 'COD', providerOrderId: `cod_${ORDER_ID}`, status: 'CREATED' });
+    prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
+    const res = await request(app)
+      .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('CONFIRMED');
+    expect(prismaMock.payment.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ provider: 'COD', status: 'CREATED' }) }),
+    );
+    // Never PAID for COD — cash hasn't actually been collected.
+    expect(prismaMock.payment.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'PAID' }) }),
+    );
+  });
+
+  it('rejects COD confirmation for an order that is not PENDING_PAYMENT', async () => {
+    prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
+    const res = await request(app)
+      .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+    expect(res.status).toBe(409);
+    expect(prismaMock.payment.create).not.toHaveBeenCalled();
+  });
+
+  it('consumes the linked Booking (PENDING -> CONFIRMED) when a SERVICE order is COD-confirmed', async () => {
+    const serviceOrderFixture = { ...orderFixture, type: 'SERVICE', bookingId: 'booking-1' };
+    prismaMock.order.findUnique.mockResolvedValue(serviceOrderFixture);
+    prismaMock.payment.create.mockResolvedValue({ ...paymentFixture, provider: 'COD', status: 'CREATED' });
+    prismaMock.order.update.mockResolvedValue({ ...serviceOrderFixture, status: 'CONFIRMED' });
+    prismaMock.booking.findUnique.mockResolvedValue({ id: 'booking-1', status: 'PENDING' });
+    const res = await request(app)
+      .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+    expect(res.status).toBe(200);
+    expect(prismaMock.booking.update).toHaveBeenCalledWith({ where: { id: 'booking-1' }, data: { status: 'CONFIRMED' } });
+  });
+});
+
 describe('POST /api/v1/orders/me/:id/verify-payment', () => {
   it('4/11. verifies a correct signature, marks Payment PAID and Order CONFIRMED', async () => {
     prismaMock.order.findUnique.mockResolvedValue(orderFixture);
-    prismaMock.payment.findUnique.mockResolvedValue(paymentFixture);
+    prismaMock.payment.findFirst.mockResolvedValue(paymentFixture);
     prismaMock.payment.update.mockResolvedValue({ ...paymentFixture, status: 'PAID', providerPaymentId: 'pay_test123', signatureVerified: true });
     prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
     const signature = crypto.createHmac('sha256', env.razorpayKeySecret).update('order_test123|pay_test123').digest('hex');
@@ -155,9 +226,40 @@ describe('POST /api/v1/orders/me/:id/verify-payment', () => {
     );
   });
 
+  it('consumes the linked Booking (PENDING -> CONFIRMED) when a SERVICE order is paid — the purchased item must stop counting toward the customer\'s pending cart', async () => {
+    const serviceOrderFixture = { ...orderFixture, type: 'SERVICE', bookingId: 'booking-1' };
+    prismaMock.order.findUnique.mockResolvedValue(serviceOrderFixture);
+    prismaMock.payment.findFirst.mockResolvedValue(paymentFixture);
+    prismaMock.payment.update.mockResolvedValue({ ...paymentFixture, status: 'PAID' });
+    prismaMock.order.update.mockResolvedValue({ ...serviceOrderFixture, status: 'CONFIRMED' });
+    prismaMock.booking.findUnique.mockResolvedValue({ id: 'booking-1', status: 'PENDING' });
+    const signature = crypto.createHmac('sha256', env.razorpayKeySecret).update('order_test123|pay_test123').digest('hex');
+    const res = await request(app)
+      .post(`/api/v1/orders/me/${ORDER_ID}/verify-payment`)
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ razorpay_order_id: 'order_test123', razorpay_payment_id: 'pay_test123', razorpay_signature: signature });
+    expect(res.status).toBe(200);
+    expect(prismaMock.booking.update).toHaveBeenCalledWith({ where: { id: 'booking-1' }, data: { status: 'CONFIRMED' } });
+  });
+
+  it('never re-confirms an already-terminal (COMPLETED/CANCELLED) Booking on payment success', async () => {
+    const serviceOrderFixture = { ...orderFixture, type: 'SERVICE', bookingId: 'booking-1' };
+    prismaMock.order.findUnique.mockResolvedValue(serviceOrderFixture);
+    prismaMock.payment.findFirst.mockResolvedValue(paymentFixture);
+    prismaMock.payment.update.mockResolvedValue({ ...paymentFixture, status: 'PAID' });
+    prismaMock.order.update.mockResolvedValue({ ...serviceOrderFixture, status: 'CONFIRMED' });
+    prismaMock.booking.findUnique.mockResolvedValue({ id: 'booking-1', status: 'CANCELLED' });
+    const signature = crypto.createHmac('sha256', env.razorpayKeySecret).update('order_test123|pay_test123').digest('hex');
+    await request(app)
+      .post(`/api/v1/orders/me/${ORDER_ID}/verify-payment`)
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ razorpay_order_id: 'order_test123', razorpay_payment_id: 'pay_test123', razorpay_signature: signature });
+    expect(prismaMock.booking.update).not.toHaveBeenCalled();
+  });
+
   it('5/11. rejects an invalid signature — Payment marked FAILED, Order untouched', async () => {
     prismaMock.order.findUnique.mockResolvedValue(orderFixture);
-    prismaMock.payment.findUnique.mockResolvedValue(paymentFixture);
+    prismaMock.payment.findFirst.mockResolvedValue(paymentFixture);
     prismaMock.payment.update.mockResolvedValue({ ...paymentFixture, status: 'FAILED' });
     const res = await request(app)
       .post(`/api/v1/orders/me/${ORDER_ID}/verify-payment`)
@@ -170,7 +272,7 @@ describe('POST /api/v1/orders/me/:id/verify-payment', () => {
 
   it('12. the Order update on success only ever touches status — never total/subtotal (historical amount preserved)', async () => {
     prismaMock.order.findUnique.mockResolvedValue(orderFixture);
-    prismaMock.payment.findUnique.mockResolvedValue(paymentFixture);
+    prismaMock.payment.findFirst.mockResolvedValue(paymentFixture);
     prismaMock.payment.update.mockResolvedValue({ ...paymentFixture, status: 'PAID' });
     prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
     const signature = crypto.createHmac('sha256', env.razorpayKeySecret).update('order_test123|pay_test123').digest('hex');
@@ -183,7 +285,7 @@ describe('POST /api/v1/orders/me/:id/verify-payment', () => {
 
   it('is idempotent — verifying an already-PAID payment again is a no-op, not a re-processing', async () => {
     prismaMock.order.findUnique.mockResolvedValue(orderFixture);
-    prismaMock.payment.findUnique.mockResolvedValue({ ...paymentFixture, status: 'PAID' });
+    prismaMock.payment.findFirst.mockResolvedValue({ ...paymentFixture, status: 'PAID' });
     const res = await request(app)
       .post(`/api/v1/orders/me/${ORDER_ID}/verify-payment`)
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
@@ -210,45 +312,48 @@ describe('POST /api/v1/payments/webhook/razorpay', () => {
   it('rejects a request with an invalid/missing signature', async () => {
     const res = await request(app).post('/api/v1/payments/webhook/razorpay').set('x-razorpay-signature', 'bad-signature').send(capturedEvent);
     expect(res.status).toBe(401);
-    expect(prismaMock.payment.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.payment.findMany).not.toHaveBeenCalled();
   });
 
   it('10. processes a valid payment.captured event — Payment PAID, Order CONFIRMED', async () => {
-    prismaMock.payment.findUnique.mockResolvedValue(paymentFixture);
-    prismaMock.payment.update.mockResolvedValue({ ...paymentFixture, status: 'PAID' });
-    prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
+    prismaMock.payment.findMany.mockResolvedValue([paymentFixture]);
+    prismaMock.payment.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.order.updateMany.mockResolvedValue({ count: 1 });
+    // cascadeBookingStatus re-reads the now-CONFIRMED orders (updateMany doesn't return rows) —
+    // this fixture is type:'PRODUCT' so the cascade itself is a no-op, but the read must resolve.
+    prismaMock.order.findMany.mockResolvedValue([orderFixture]);
     const signature = signWebhook(capturedEvent);
     const res = await request(app).post('/api/v1/payments/webhook/razorpay').set('x-razorpay-signature', signature).send(capturedEvent);
     expect(res.status).toBe(200);
-    expect(prismaMock.payment.update).toHaveBeenCalledWith(
+    expect(prismaMock.payment.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'PAID', providerPaymentId: 'pay_test123' }) }),
     );
-    expect(prismaMock.order.update).toHaveBeenCalledWith({ where: { id: ORDER_ID }, data: { status: 'CONFIRMED' } });
+    expect(prismaMock.order.updateMany).toHaveBeenCalledWith({ where: { id: { in: [ORDER_ID] } }, data: { status: 'CONFIRMED' } });
   });
 
   it('6. processes a valid payment.failed event — Payment FAILED with the provider reason, Order untouched', async () => {
-    prismaMock.payment.findUnique.mockResolvedValue(paymentFixture);
-    prismaMock.payment.update.mockResolvedValue({ ...paymentFixture, status: 'FAILED', failureReason: 'Card declined' });
+    prismaMock.payment.findMany.mockResolvedValue([paymentFixture]);
+    prismaMock.payment.updateMany.mockResolvedValue({ count: 1 });
     const signature = signWebhook(failedEvent);
     const res = await request(app).post('/api/v1/payments/webhook/razorpay').set('x-razorpay-signature', signature).send(failedEvent);
     expect(res.status).toBe(200);
-    expect(prismaMock.payment.update).toHaveBeenCalledWith(
+    expect(prismaMock.payment.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED', failureReason: 'Card declined' }) }),
     );
-    expect(prismaMock.order.update).not.toHaveBeenCalled();
+    expect(prismaMock.order.updateMany).not.toHaveBeenCalled();
   });
 
   it('9. a duplicate delivery of the same event is a no-op (idempotent)', async () => {
-    prismaMock.payment.findUnique.mockResolvedValue({ ...paymentFixture, status: 'PAID' }); // already processed
+    prismaMock.payment.findMany.mockResolvedValue([{ ...paymentFixture, status: 'PAID' }]); // already processed
     const signature = signWebhook(capturedEvent);
     const res = await request(app).post('/api/v1/payments/webhook/razorpay').set('x-razorpay-signature', signature).send(capturedEvent);
     expect(res.status).toBe(200);
-    expect(prismaMock.payment.update).not.toHaveBeenCalled();
-    expect(prismaMock.order.update).not.toHaveBeenCalled();
+    expect(prismaMock.payment.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.order.updateMany).not.toHaveBeenCalled();
   });
 
   it('never creates anything from an unknown/unrecognized providerOrderId — never trusts payload identifiers alone', async () => {
-    prismaMock.payment.findUnique.mockResolvedValue(null);
+    prismaMock.payment.findMany.mockResolvedValue([]);
     const signature = signWebhook(capturedEvent);
     const res = await request(app).post('/api/v1/payments/webhook/razorpay').set('x-razorpay-signature', signature).send(capturedEvent);
     expect(res.status).toBe(200); // still ack — Razorpay would retry forever on a non-2xx for an event we simply don't recognize

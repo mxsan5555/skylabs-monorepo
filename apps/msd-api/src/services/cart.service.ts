@@ -1,9 +1,19 @@
 import type { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
+import type { Prisma } from '../generated/prisma-client';
 import type { CartAddItemSchema } from '../schemas/cart.schema';
 
 type CartAddItemInput = z.infer<typeof CartAddItemSchema>;
+
+/** Declared outside CART_INCLUDE's own `as const` (and explicitly typed, not inferred) so this
+ *  stays the mutable array Prisma's generated types expect — nesting a plain array literal
+ *  directly inside an `as const` object freezes it into a readonly tuple, which
+ *  `DealImageOrderByWithRelationInput[]`/`ProductImageOrderByWithRelationInput[]` reject (caught
+ *  by the webpack/ts-loader production build, not by a plain `tsc --noEmit` run — same gotcha as
+ *  vendor.service.ts's DEAL_PACKAGE_ORDER_BY). */
+const DEAL_IMAGE_ORDER_BY: Prisma.DealImageOrderByWithRelationInput[] = [{ isPrimary: 'desc' }, { sortOrder: 'asc' }];
+const PRODUCT_IMAGE_ORDER_BY: Prisma.ProductImageOrderByWithRelationInput[] = [{ isPrimary: 'desc' }, { sortOrder: 'asc' }];
 
 const CART_INCLUDE = {
   items: {
@@ -16,14 +26,25 @@ const CART_INCLUDE = {
           salePrice: true,
           originalPrice: true,
           images: true,
-          product: { select: { id: true, name: true, image: true, imageAlt: true } },
+          vendorId: true,
+          branchId: true,
+          vendor: { select: { id: true, businessName: true } },
+          branch: { select: { id: true, name: true } },
+          product: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              imageAlt: true,
+              mediaImages: { orderBy: PRODUCT_IMAGE_ORDER_BY },
+            },
+          },
+          mediaImages: { orderBy: DEAL_IMAGE_ORDER_BY },
         },
       },
     },
     orderBy: { createdAt: 'asc' as const },
   },
-  vendor: { select: { id: true, businessName: true } },
-  branch: { select: { id: true, name: true } },
 } as const;
 
 /** Lazily creates an empty cart for the caller if none exists — Cart.customerId is unique, so
@@ -52,19 +73,13 @@ async function getOwnedCartItemOrThrow(customerId: string, itemId: string) {
   return item;
 }
 
+/** Multi-vendor: a cart may hold product deals from any number of vendors/branches — each
+ *  CartItem's own `deal.vendorId`/`deal.branchId` is authoritative (see CART_INCLUDE), so there
+ *  is no vendor/branch conflict check here anymore. Checkout groups items by vendor when
+ *  creating the Order — see order.service.ts#createOrderFromCart. */
 export async function addItem(customerId: string, input: CartAddItemInput) {
   const deal = await assertProductDeal(input.dealId);
   const cart = await prisma.cart.upsert({ where: { customerId }, update: {}, create: { customerId } });
-
-  if (cart.vendorId && cart.vendorId !== deal.vendorId) {
-    throw new ApiError('CONFLICT', 'Your cart already has items from a different vendor — clear your cart to add items from a new vendor');
-  }
-  if (cart.branchId && cart.branchId !== deal.branchId) {
-    throw new ApiError('CONFLICT', 'Your cart already has items from a different branch — clear your cart to add items from a new branch');
-  }
-  if (!cart.vendorId) {
-    await prisma.cart.update({ where: { id: cart.id }, data: { vendorId: deal.vendorId, branchId: deal.branchId } });
-  }
 
   const existingItem = await prisma.cartItem.findUnique({ where: { cartId_dealId: { cartId: cart.id, dealId: deal.id } } });
   if (existingItem) {
@@ -91,6 +106,5 @@ export async function removeItem(customerId: string, itemId: string) {
 export async function clearCart(customerId: string) {
   const cart = await prisma.cart.upsert({ where: { customerId }, update: {}, create: { customerId } });
   await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
-  await prisma.cart.update({ where: { id: cart.id }, data: { vendorId: null, branchId: null } });
   return getOrCreateCart(customerId);
 }

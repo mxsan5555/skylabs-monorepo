@@ -113,6 +113,10 @@ enum OrderStatus {
 
 enum PaymentProvider {
   RAZORPAY
+  /// Cash on Delivery — no gateway involved; see payment.service.ts's createCodPayment. A COD
+  /// Payment row is created with status CREATED (never PAID — cash hasn't been collected yet),
+  /// while the Order itself moves to CONFIRMED so the order is placed/fulfillable.
+  COD
 }
 
 /// The minimal set Razorpay's real flow actually needs — no invented PENDING/REFUNDED (refunds
@@ -148,6 +152,7 @@ model User {
   cart                      Cart?
   bookings                  Booking[]
   orders                    Order[]
+  wishlistItems             WishlistItem[]
 
   @@index([status])
 }
@@ -337,6 +342,10 @@ model Vendor {
   /// The User who logs in and manages this business. Null until an admin-created
   /// vendor is claimed, or set immediately on self-registration (== req.user.sub).
   ownerUserId String? @unique
+  /// Public storefront URL slug (`/vendors/:slug`). Nullable — existing rows predate this
+  /// column; backfilled once in seed.ts, never required at the DB level to avoid a
+  /// backfill-before-migrate step. Unique so two vendors can never collide on one slug.
+  slug        String? @unique
 
   // Business information
   /// Nullable: the admin-create pipeline persists a Vendor after Step 1 (Vendor User)
@@ -393,15 +402,54 @@ model Vendor {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner    User?    @relation("VendorOwner", fields: [ownerUserId], references: [id])
-  branches Branch[]
-  deals    Deal[]
-  carts    Cart[]
-  bookings Booking[]
-  orders   Order[]
+  owner      User?       @relation("VendorOwner", fields: [ownerUserId], references: [id])
+  branches   Branch[]
+  deals      Deal[]
+  bookings   Booking[]
+  orders     Order[]
+  orderItems OrderItem[]
+  therapists Therapist[]
+  mediaImages VendorImage[]
+  mediaVideo  VendorVideo?
 
   @@index([status])
   @@index([ownerUserId])
+}
+
+/// One uploaded image for a Vendor's public profile — part of the shared Deal/Product/
+/// Therapist/Vendor media-upload system (see DealImage's doc comment for the full architecture
+/// rationale, identical here). `Vendor.logoUrl` stays populated as the legacy pasted-URL field
+/// and is never written to going forward; the frontend resolver prefers this table and falls
+/// back to `logoUrl` only for rows that predate it.
+model VendorImage {
+  id               String   @id @default(uuid())
+  vendorId         String
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  sortOrder        Int      @default(0)
+  isPrimary        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+}
+
+/// A Vendor's single optional profile video — one-to-one, enforced by the @unique on vendorId.
+model VendorVideo {
+  id               String   @id @default(uuid())
+  vendorId         String   @unique
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 }
 
 model Branch {
@@ -418,17 +466,132 @@ model Branch {
   phone     String?
   email     String?
   isActive  Boolean @default(true)
+  /// Loosely-structured weekly hours, e.g. {"mon":"09:00-20:00",...,"sun":"closed"} — same
+  /// no-upload-pipeline-style Json field as Vendor.kycDocuments/Deal.images. Nullable: existing
+  /// seeded branches predate this column.
+  openingHours Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  deals  Deal[]
-  carts    Cart[]
-  bookings Booking[]
-  orders   Order[]
+  vendor     Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  deals      Deal[]
+  bookings   Booking[]
+  orders     Order[]
+  orderItems OrderItem[]
+  therapists Therapist[]
 
   @@index([vendorId])
+}
+
+/// A vendor+branch's staff member — an independent, directly browsable/bookable customer-facing
+/// entity in its own right (see TherapistPackage's own doc comment), vendor+branch scoped like
+/// Deal. Carries TWO distinct name concepts, never merged into one field: `therapistType` is the
+/// service/role label a customer browses by (e.g. "Legs Therapist", "Head Massage Therapist" —
+/// backfilled to the generic 'Therapist' for rows that predate this field, never a fabricated
+/// specific guess; a vendor can edit it any time), and `personName` is the actual staff member
+/// (e.g. "Ramesh Kumar" — this column used to be plainly `name` before Therapist became
+/// independently browsable; renamed, not re-keyed, so every existing row's value carried over
+/// unchanged). No delete endpoint — like Branch, only ever soft-disabled via isActive to avoid
+/// orphaning historical Bookings that reference one.
+model Therapist {
+  id              String   @id @default(uuid())
+  vendorId        String
+  branchId        String
+  therapistType   String   @default("Therapist")
+  personName      String
+  /// Nullable — no non-fabricated default exists for rows that predate this field.
+  gender          String?
+  specialization  String?
+  bio             String?
+  experienceYears Int?
+  photoUrl        String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  vendor     Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  branch     Branch             @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  bookings   Booking[]
+  packages   TherapistPackage[]
+  orderItems OrderItem[]
+  mediaImages TherapistImage[]
+  mediaVideo  TherapistVideo?
+
+  @@index([vendorId])
+  @@index([branchId])
+}
+
+/// A therapist's own duration/price menu — deliberately independent of any specific Deal (no
+/// `dealId`): a vendor manages "Ramesh Kumar: 30 min ₹1,099, 60 min ₹1,499, 90 min ₹1,899" once,
+/// the same way Deal's own sibling-Deal-rows duration/price list is managed independently (see
+/// vendor.tsx's `groupServiceDeals` doc comment) — the two are separate, independently-CRUD'd
+/// entities, never coupled through an admin "pick a Deal" step. A customer can book this
+/// Therapist+package DIRECTLY (browsing Therapists independent of any Deal — see
+/// booking.service.ts#createBooking's Deal-less path), or combine it with a Deal booking:
+/// booking.service.ts matches the customer's selected Deal's own `durationMinutes` against this
+/// therapist's own rows by that same `durationMinutes` (never by any shared id) — if the
+/// selected therapist has no active package at that exact duration, that's an invalid
+/// combination and the booking is rejected (see resolveBookingPrice's doc comment). When a
+/// match exists, its `sellingPrice` overrides the base Deal price; therapist selection on a Deal
+/// booking is always optional — omitting one simply charges the Deal's own price. Real delete is
+/// allowed (unlike Therapist, which is only ever soft-disabled) because Booking/OrderItem never
+/// reference this row by id at read time — only nullable `therapistPackageId` traceability
+/// pointers, snapshotted immutably into priceSnapshot/durationMinutesSnapshot at booking time,
+/// so deleting a package can never alter a past booking's historical price.
+model TherapistPackage {
+  id              String   @id @default(uuid())
+  therapistId     String
+  durationMinutes Int
+  sellingPrice    Decimal  @db.Decimal(10, 2)
+  originalPrice   Decimal? @db.Decimal(10, 2)
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  therapist  Therapist   @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  bookings   Booking[]
+  orderItems OrderItem[]
+
+  @@unique([therapistId, durationMinutes])
+  @@index([therapistId])
+}
+
+/// One uploaded photo for a Therapist — part of the shared Deal/Product/Therapist media-upload
+/// system (see DealImage's doc comment for the full architecture rationale, identical here).
+/// `Therapist.photoUrl` stays populated as the legacy single-URL field and is never written to
+/// going forward; the resolver on the frontend prefers `images` (ordered by sortOrder, primary
+/// first) and falls back to `photoUrl` only for rows that predate this table.
+model TherapistImage {
+  id               String   @id @default(uuid())
+  therapistId      String
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  sortOrder        Int      @default(0)
+  isPrimary        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  therapist Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@index([therapistId])
+}
+
+/// A Therapist's single optional video — one-to-one, enforced by the @unique on therapistId.
+model TherapistVideo {
+  id               String   @id @default(uuid())
+  therapistId      String   @unique
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  therapist Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
 }
 
 /// Self-referential category tree (a row with a non-null parentId IS a subcategory) — the
@@ -506,15 +669,87 @@ model Deal {
   subcategory Category? @relation("DealSubcategory", fields: [subcategoryId], references: [id])
   service     Service?  @relation(fields: [serviceId], references: [id])
   product     Product?  @relation(fields: [productId], references: [id])
-  cartItems   CartItem[]
-  bookings    Booking[]
-  orderItems  OrderItem[]
+  cartItems     CartItem[]
+  bookings      Booking[]
+  orderItems    OrderItem[]
+  wishlistItems WishlistItem[]
+  packages      DealPackage[]
+  mediaImages   DealImage[]
+  mediaVideo    DealVideo?
 
   @@index([vendorId])
   @@index([branchId])
   @@index([serviceId])
   @@index([productId])
   @@index([status])
+}
+
+/// A service Deal's own duration/price menu — the authoritative child entity a customer actually
+/// selects and books (mirrors TherapistPackage's shape/pattern exactly, see its own doc comment).
+/// Never used for a product Deal (no serviceId, no duration concept). `Deal.durationMinutes`/
+/// `salePrice`/`originalPrice` remain on Deal itself as a synced "from price"/default-duration
+/// display cache (kept in sync with the cheapest active package by vendor.service.ts/
+/// catalog.service.ts whenever packages change) so every existing minPrice/maxPrice/sort/badge
+/// query and display continues to work unchanged — but booking/cart pricing NEVER reads those
+/// Deal fields for a service Deal that has packages; it always resolves the authoritative price
+/// from the customer's selected DealPackage (see booking.service.ts#createBookingFromDeal).
+model DealPackage {
+  id              String   @id @default(uuid())
+  dealId          String
+  durationMinutes Int
+  sellingPrice    Decimal  @db.Decimal(10, 2)
+  originalPrice   Decimal? @db.Decimal(10, 2)
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  deal       Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  bookings   Booking[]
+  orderItems OrderItem[]
+
+  @@unique([dealId, durationMinutes])
+  @@index([dealId])
+}
+
+/// One uploaded image for a Deal — part of the shared Deal/Product/Therapist media-upload
+/// system. Deliberately a real per-entity table (not a polymorphic entityType/entityId `Media`
+/// table) so the FK + `onDelete: Cascade` gives real referential integrity, matching this
+/// schema's established convention for every other child table (DealPackage, TherapistPackage).
+/// `Deal.images` (Json) stays populated as the legacy URL-array field and is never written to
+/// going forward — a one-time backfill script seeds one DealImage per legacy URL for existing
+/// rows; the frontend resolver prefers this table and falls back to the legacy field only for
+/// rows that were never re-edited after this table shipped. At most one row per dealId may have
+/// `isPrimary = true` (enforced by a partial unique index in the migration, not just app logic).
+model DealImage {
+  id               String   @id @default(uuid())
+  dealId           String
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  sortOrder        Int      @default(0)
+  isPrimary        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+}
+
+/// A Deal's single optional video — one-to-one, enforced by the @unique on dealId.
+model DealVideo {
+  id               String   @id @default(uuid())
+  dealId           String   @unique
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
 }
 
 /// Standalone retail product catalog (e.g. skincare) — unlike Deal, NOT vendor/branch-scoped;
@@ -560,8 +795,46 @@ model Product {
   category    Category  @relation("ProductCategory", fields: [categoryId], references: [id])
   subcategory Category? @relation("ProductSubcategory", fields: [subcategoryId], references: [id])
   deals       Deal[]
+  mediaImages ProductImage[]
+  mediaVideo  ProductVideo?
 
   @@index([categoryId])
+}
+
+/// One uploaded image for a Product — part of the shared Deal/Product/Therapist media-upload
+/// system (see DealImage's doc comment for the full architecture rationale, identical here).
+/// `Product.image`/`gallery` stay populated as the legacy fields and are never written to going
+/// forward; the frontend resolver prefers this table and falls back to the legacy fields only
+/// for rows that predate it.
+model ProductImage {
+  id               String   @id @default(uuid())
+  productId        String
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  sortOrder        Int      @default(0)
+  isPrimary        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+/// A Product's single optional video — one-to-one, enforced by the @unique on productId.
+model ProductVideo {
+  id               String   @id @default(uuid())
+  productId        String   @unique
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 /// Marketplace service catalog master (e.g. "Haircut") — Category/Sub-category scoped, like
@@ -598,23 +871,30 @@ model Service {
 /// One customer, one active cart, PRODUCT deals only (never a service deal — Booking is the
 /// service equivalent, see the Booking model doc comment). customerId is always req.user.sub,
 /// never client-supplied, exactly like Vendor.ownerUserId's resolution.
+/// Multi-vendor: a cart may hold product deals from any number of different vendors/branches —
+/// each CartItem's own `deal.vendorId`/`deal.branchId` is authoritative, so Cart itself carries
+/// no vendor/branch field at all (the old single-vendor-per-cart lock lived here and in
+/// cart.service.ts; both removed together). Checkout groups items by vendor when creating Order/
+/// OrderItem rows — see order.service.ts#createOrderFromCart.
 model Cart {
   id         String  @id @default(uuid())
   customerId String  @unique
-  /// Set from the first item added; every further item must match (enforced in cart.service.ts,
-  /// not a DB constraint — same style as Deal's category/subcategory checks). Restricting a cart
-  /// to one vendor+branch keeps fulfillment simple and keeps Cart structurally consistent with
-  /// Booking, which is single-vendor/branch by construction (one Deal = one vendor = one branch).
-  vendorId   String?
-  branchId   String?
+
+  /// Set when `createOrderFromCart` creates an Order from this cart's items — the cart's items
+  /// are deliberately NOT deleted at that moment (only once payment actually succeeds, via
+  /// `finalizeCartForOrder`, see order.service.ts/payment.service.ts). While set, a repeat
+  /// checkout call reuses this same Order instead of creating a duplicate (same idempotency
+  /// discipline as Payment's own createOrReusePayment). Cleared back to null either by
+  /// `finalizeCartForOrder` (success) or by `createOrderFromCart` itself, when it finds this
+  /// pointing at an Order that's since gone CANCELLED (so a fresh checkout attempt can proceed).
+  pendingOrderId String? @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  customer User       @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  vendor   Vendor?    @relation(fields: [vendorId], references: [id])
-  branch   Branch?    @relation(fields: [branchId], references: [id])
-  items    CartItem[]
+  customer    User       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items       CartItem[]
+  pendingOrder Order?    @relation(fields: [pendingOrderId], references: [id])
 }
 
 model CartItem {
@@ -638,32 +918,82 @@ model CartItem {
   @@index([dealId])
 }
 
+/// A customer's "saved for later" list — any deal type (service or product), unlike Cart which
+/// is product-only. customerId is always req.user.sub, never client-supplied, same resolution
+/// as Cart/Booking. Visibility of an item's Deal is re-checked at read time against
+/// catalog.service.ts's VISIBLE_DEAL_WHERE (not enforced here in the DB — a Deal can legitimately
+/// go inactive/rejected after being wishlisted, and the item should just stop appearing rather
+/// than being deleted, so the customer's intent isn't silently lost if the deal comes back).
+model WishlistItem {
+  id         String   @id @default(uuid())
+  customerId String
+  dealId     String
+  createdAt  DateTime @default(now())
+
+  customer User @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deal     Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, dealId])
+  @@index([customerId])
+  @@index([dealId])
+}
+
 /// One row = one appointment request for exactly one SERVICE deal (deal.serviceId != null,
-/// enforced in booking.service.ts). Deliberately no BookingItem sub-table: unlike a product
-/// cart — which exists specifically to accumulate several different deals before one checkout —
-/// a service booking is itself the commitment the moment it's created (an appointment request
-/// against a specific date+slot), so Booking is already the atomic unit, the same way Deal is
-/// already the atomic sellable unit.
+/// enforced in booking.service.ts) OR one Therapist package booked directly, independent of any
+/// Deal (see TherapistPackage's own doc comment) — exactly one of `dealId`/`therapistId` is set,
+/// never neither (enforced in booking.service.ts, no DB-level CHECK constraint, same discipline
+/// as Deal's own "exactly one of serviceId/productId"). Deliberately no BookingItem sub-table:
+/// unlike a product cart — which exists specifically to accumulate several different deals
+/// before one checkout — a service booking is itself the commitment the moment it's created (an
+/// appointment request against a specific date+slot), so Booking is already the atomic unit, the
+/// same way Deal (or a directly-booked Therapist) is already the atomic sellable unit.
 model Booking {
   id         String @id @default(uuid())
   /// Always req.user.sub, never client-supplied.
   customerId String
-  dealId     String
-  /// Denormalized from deal.vendorId/branchId at booking time, mirroring Deal's own existing
-  /// pattern — lets ownership queries (a vendor's own bookings, a later phase) skip a join.
+  /// Nullable — absent for a Therapist booked directly (no Deal involved at all); see this
+  /// model's own doc comment for the "exactly one of dealId/therapistId" invariant.
+  dealId     String?
+  /// Denormalized from deal.vendorId/branchId (or, for a Deal-less booking, from the booked
+  /// Therapist's own vendorId/branchId) at booking time, mirroring Deal's own existing pattern —
+  /// lets ownership queries (a vendor's own bookings) skip a join.
   vendorId   String
   branchId   String
+  /// Required when `dealId` is absent (a Therapist booked directly); optional otherwise — "Any
+  /// therapist" remains a valid choice for a Deal booking. When set, must belong to the same
+  /// vendor+branch as the Deal (or, for a direct booking, simply be the Therapist being booked)
+  /// and be active — enforced in booking.service.ts, never trusted from the client. No onDelete
+  /// cascade: Therapists are never hard-deleted (only soft-disabled via isActive), so this
+  /// reference can never be orphaned.
+  therapistId String?
+  /// Traceability only — which TherapistPackage priced this booking (always set for a direct
+  /// Therapist booking; set for a Deal booking only when a matching-duration therapist package
+  /// was selected), set once at creation. Never re-read for price/duration
+  /// (priceSnapshot/durationMinutesSnapshot below remain the sole source of truth, exactly like
+  /// every other Booking snapshot field); `SetNull` on delete so a vendor removing a package
+  /// later can never corrupt a past booking's history.
+  therapistPackageId String?
+  /// Which DealPackage the customer selected (required for a service Deal that has active
+  /// packages — see booking.service.ts#createBookingFromDeal). Same traceability-only discipline
+  /// and `SetNull` reasoning as therapistPackageId above.
+  dealPackageId String?
 
-  bookingDate DateTime
-  /// Free text for now (e.g. "10:00 AM"), matching the existing storefront's TIME_OPTIONS — a
-  /// real availability/slot-capacity model is a later phase.
-  timeSlot    String
+  /// Nullable — this is a service purchase, not an appointment-scheduling system; the customer
+  /// is never required to pick a date/time to complete a booking. When set, it's a customer- or
+  /// vendor-supplied preference/follow-up detail, not a slot-capacity reservation (no
+  /// availability model exists — a later phase, same as before this field became optional).
+  bookingDate DateTime?
+  /// Free text for now (e.g. "10:00 AM"), matching the existing storefront's TIME_OPTIONS.
+  /// Nullable for the same reason as bookingDate above.
+  timeSlot    String?
   quantity    Int      @default(1)
 
-  /// Immutable — copied from deal.salePrice at booking time, never re-read from Deal again, so a
-  /// later Deal price change can never alter an existing booking's historical amount.
+  /// Immutable — copied from deal.salePrice (or, when a TherapistPackage was selected/required,
+  /// from its sellingPrice) at booking time, never re-read from Deal/TherapistPackage again, so
+  /// a later price change can never alter an existing booking's historical amount.
   priceSnapshot           Decimal @db.Decimal(10, 2)
-  /// Immutable — copied from deal.durationMinutes at booking time.
+  /// Immutable — copied from deal.durationMinutes (or, for a direct Therapist booking, from the
+  /// booked TherapistPackage's own durationMinutes) at booking time.
   durationMinutesSnapshot Int?
 
   status             BookingStatus @default(PENDING)
@@ -672,16 +1002,22 @@ model Booking {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  customer User   @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  deal     Deal   @relation(fields: [dealId], references: [id])
-  vendor   Vendor @relation(fields: [vendorId], references: [id])
-  branch   Branch @relation(fields: [branchId], references: [id])
-  order    Order?
+  customer         User              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deal             Deal?             @relation(fields: [dealId], references: [id])
+  vendor           Vendor            @relation(fields: [vendorId], references: [id])
+  branch           Branch            @relation(fields: [branchId], references: [id])
+  therapist        Therapist?        @relation(fields: [therapistId], references: [id])
+  therapistPackage TherapistPackage? @relation(fields: [therapistPackageId], references: [id], onDelete: SetNull)
+  dealPackage      DealPackage?      @relation(fields: [dealPackageId], references: [id], onDelete: SetNull)
+  order            Order?
 
   @@index([customerId])
   @@index([vendorId])
   @@index([branchId])
   @@index([dealId])
+  @@index([therapistId])
+  @@index([therapistPackageId])
+  @@index([dealPackageId])
 }
 
 // ─── Order (Phase 8 — Booking/Cart convergence point) ────────────────────────
@@ -690,6 +1026,17 @@ model Booking {
 /// Order for products) — never re-reads Deal/Vendor/Branch after creation; every display field
 /// is snapshotted once (see OrderItem + vendorNameSnapshot/branchNameSnapshot below), so a later
 /// Deal price edit, Vendor rename, or Branch address change can never alter an existing Order.
+///
+/// Multi-vendor: a PRODUCT order created from a cart may span several vendors/branches in one
+/// checkout/one payment (see order.service.ts#createOrderFromCart) — the real, authoritative
+/// per-line vendor/branch lives on OrderItem below, not here. `vendorId`/`branchId`/
+/// `vendorNameSnapshot`/`branchNameSnapshot` on Order are the "primary vendor" (the first item's
+/// vendor at creation time) kept for backward compatibility with every existing single-vendor
+/// display (order-detail header, invoice header, admin list) — for a single-vendor order (still
+/// the common case: every SERVICE order, and any PRODUCT order whose cart happened to hold one
+/// vendor) these are byte-identical to every item's own vendor, so nothing about the existing
+/// single-vendor experience changes. Vendor-scoped authorization (who may list/see this order)
+/// MUST check OrderItem.vendorId, never this field alone — see order.service.ts#listOrders.
 model Order {
   id         String      @id @default(uuid())
   customerId String
@@ -702,10 +1049,23 @@ model Order {
   /// (order.service.ts additionally pre-checks this for a clean 409 instead of a raw DB error).
   bookingId String? @unique
 
-  /// Snapshotted once at creation — display must always prefer these over the live Vendor/Branch
-  /// relation (kept only for admin drill-down/traceability), exactly like OrderItem below.
+  /// Snapshotted once at creation — "primary vendor" for a multi-vendor order, see the model
+  /// doc comment above. Display must prefer these (or, for per-line vendor, OrderItem's own)
+  /// over the live Vendor/Branch relation.
   vendorNameSnapshot String
   branchNameSnapshot String
+
+  /// Checkout's "Customer Details" step — collected/confirmed once per order, before payment.
+  /// Nullable: every pre-existing Order predates this step, and it stays optional at the schema
+  /// level so it's never a breaking change for a caller that omits it; the frontend enforces
+  /// "required before payment" as UX, not a DB constraint.
+  contactName     String?
+  contactPhone    String?
+  contactEmail    String?
+  shippingAddress String?
+  shippingCity    String?
+  shippingState   String?
+  shippingPincode String?
 
   subtotal Decimal @db.Decimal(10, 2)
   /// == subtotal for now (no coupons/tax/delivery yet) — stored separately because they'll
@@ -723,6 +1083,10 @@ model Order {
   booking  Booking?    @relation(fields: [bookingId], references: [id])
   items    OrderItem[]
   payments Payment[]
+  /// Back-relation for Cart.pendingOrderId — see that field's doc comment. Nullable/optional:
+  /// most Orders (once finalized, or every Order predating this field) have no Cart pointing at
+  /// them anymore.
+  pendingForCart Cart?
 
   @@index([customerId])
   @@index([vendorId])
@@ -734,26 +1098,57 @@ model Order {
 /// its Booking's already-immutable snapshot), a PRODUCT order has one per CartItem checked out.
 /// Keeping this uniform means nothing downstream ever special-cases "service order has zero
 /// items, read order.booking instead."
+///
+/// Each item carries its OWN vendor/branch (never re-read from Deal — see Order's doc comment):
+/// a multi-vendor PRODUCT order groups items from several vendors under one Order/one Payment,
+/// and vendor-scoped authorization (a vendor's own order listing/detail) filters and matches on
+/// THESE fields, not Order.vendorId. For a SERVICE order or a single-vendor PRODUCT order this is
+/// simply identical to the parent Order's own vendorId/branchId — no behavior change there.
+/// A line item is a Deal purchase, a directly-booked Therapist purchase, or a Product purchase —
+/// exactly one of `dealId`/`therapistId` is ever set for a SERVICE item (never neither, mirrors
+/// Booking's own "exactly one" invariant — see Booking's doc comment), and neither for a PRODUCT
+/// item. `therapistPackageId` accompanies `therapistId` for a direct Therapist purchase, or
+/// stands alongside `dealId` when a Deal booking used a matching-duration therapist package.
 model OrderItem {
-  id      String @id @default(uuid())
-  orderId String
+  id        String @id @default(uuid())
+  orderId   String
+  vendorId  String
+  branchId  String
   /// Kept for admin traceability only — display must use the snapshot fields below, never
-  /// re-read Deal.
-  dealId  String
+  /// re-read Deal. Nullable — absent for a Therapist purchased directly, with no Deal involved.
+  dealId  String?
+  /// Traceability only, same discipline as Booking.therapistId/therapistPackageId — never
+  /// re-read for price/duration, the snapshot fields below remain authoritative.
+  therapistId        String?
+  therapistPackageId String?
+  /// Which DealPackage priced this line item, same traceability-only discipline. Never set for a
+  /// product line item or a Therapist-direct line item.
+  dealPackageId String?
 
-  itemName        String    // service.name or product.name at order time
-  itemType        OrderType
+  itemName           String    // service.name / therapistType+personName / product.name at order time
+  itemType            OrderType
+  vendorNameSnapshot String
+  branchNameSnapshot String
   unitPrice       Decimal   @db.Decimal(10, 2)
   quantity        Int
   lineTotal       Decimal   @db.Decimal(10, 2)
   /// Service only — never set for a product line item.
   durationMinutes Int?
 
-  deal  Deal  @relation(fields: [dealId], references: [id])
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  deal             Deal?             @relation(fields: [dealId], references: [id])
+  dealPackage      DealPackage?      @relation(fields: [dealPackageId], references: [id], onDelete: SetNull)
+  therapist        Therapist?        @relation(fields: [therapistId], references: [id])
+  therapistPackage TherapistPackage? @relation(fields: [therapistPackageId], references: [id], onDelete: SetNull)
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor           Vendor            @relation(fields: [vendorId], references: [id])
+  branch           Branch            @relation(fields: [branchId], references: [id])
 
   @@index([orderId])
   @@index([dealId])
+  @@index([vendorId])
+  @@index([therapistId])
+  @@index([therapistPackageId])
+  @@index([dealPackageId])
 }
 
 // ─── Payment (Phase 9 — Razorpay) ─────────────────────────────────────────────
@@ -767,10 +1162,15 @@ model Payment {
   orderId  String
   provider PaymentProvider @default(RAZORPAY)
 
-  /// Razorpay order_xxx — one per attempt/row.
-  providerOrderId String @unique
-  /// Razorpay pay_xxx — set only once a payment actually succeeds.
-  providerPaymentId String? @unique
+  /// Razorpay order_xxx — one per attempt/row. NOT globally unique — a combined checkout (Deal
+  /// + Therapist + Product together: one checkout action, one payment, multiple Order rows
+  /// under the hood, see payment.service.ts's `*Batch` functions) creates ONE Razorpay order
+  /// funding several msd Orders at once, so several Payment rows legitimately share the same
+  /// providerOrderId (one per Order in the batch). Indexed, not unique — lookups use `findMany`.
+  providerOrderId String
+  /// Razorpay pay_xxx — set only once a payment actually succeeds. Same batch-sharing reasoning
+  /// as providerOrderId above.
+  providerPaymentId String?
 
   /// == Order.total at the moment this Payment was created — server-computed from the
   /// authoritative Order, never a client-supplied amount.
@@ -790,4 +1190,6 @@ model Payment {
 
   @@index([orderId])
   @@index([status])
+  @@index([providerOrderId])
+  @@index([providerPaymentId])
 }

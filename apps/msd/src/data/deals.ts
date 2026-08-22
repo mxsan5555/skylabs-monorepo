@@ -9,6 +9,7 @@ export const DEALS: Deal[] = [
     slug: 'serenity-spa-summer-glow',
     title: 'Summer Glow Package',
     providerName: 'Serenity Spa & Wellness',
+    providerSlug: 'serenity-spa-wellness',
     categorySlug: 'spas-retreats',
     subcategorySlug: 'day-spa',
     description:
@@ -60,6 +61,7 @@ export const DEALS: Deal[] = [
     slug: 'urban-massage-swedish-bliss',
     title: 'Swedish Bliss',
     providerName: 'Urban Massage Studio',
+    providerSlug: 'urban-massage-studio',              
     categorySlug: 'massage',
     subcategorySlug: 'swedish',
     description: 'Swedish deep tissue and Thai massage by certified therapists in a modern studio.',
@@ -83,7 +85,7 @@ export const DEALS: Deal[] = [
     priceNote: "₹899 with code MASSAGE10",
     isOpen: true,
     isFeatured: true,
-    isHot: false,
+    isHot: true,
     features: ['Mobile Therapist'],
     included: ['Full body Swedish massage', 'Complimentary neck & shoulder focus', 'Post-session relaxation tea'],
     howToUse: ['Book your slot online.', 'Receive a therapist assignment notification.', 'Enjoy your session at the studio or at home.'],
@@ -93,6 +95,7 @@ export const DEALS: Deal[] = [
     slug: 'glow-skin-clinic-hydra-facial',
     title: 'Hydra Glow Facial',
     providerName: 'Glow Skin Clinic',
+    providerSlug: 'Glow-Skin-Clinic',
     categorySlug: 'skin-beauty',
     subcategorySlug: 'hydrafacial',
     description: 'Advanced HydraFacial with deep cleanse, extraction, and intense hydration for luminous skin.',
@@ -126,6 +129,7 @@ export const DEALS: Deal[] = [
     slug: 'tranquil-thai-full-body',
     title: 'Thai Full Body',
     providerName: 'Tranquil Thai Retreat',
+    providerSlug: 'Tranquil-Thai-Retreat',
     categorySlug: 'massage',
     subcategorySlug: 'thai',
     badge: "25% OFF",
@@ -159,6 +163,7 @@ export const DEALS: Deal[] = [
     slug: 'bliss-spa-couples-retreat',
     title: 'Couples Retreat',
     providerName: 'Bliss Spa & Resort',
+    providerSlug: 'Bliss-Spa-&-Resort',
     categorySlug: 'spas-retreats',
     subcategorySlug: 'couples',
     description: 'A romantic escape for two — side-by-side massages, jacuzzi, and candlelit relaxation lounge.',
@@ -192,14 +197,16 @@ export const DEALS: Deal[] = [
     slug: 'zen-garden-anti-ageing-peel',
     title: 'Anti-Ageing Peel',
     providerName: 'Zen Garden Salon',
+    providerSlug: 'Bliss Spa & Resort',
     categorySlug: 'skin-beauty',
     subcategorySlug: 'peel',
     description: 'Medical-grade chemical peel targeting fine lines, pigmentation, and uneven texture for visibly younger skin.',
     image: img('skin-peel'),
     imageAlt: 'Anti-ageing peel treatment at Zen Garden Salon',
     gallery: [img('skin-peel'), img('skin-peel-2')],
-    price: 2999,
     priceLevel: '$$$',
+    price: 2999,
+    originalPrice: 3999,
     priceUnit: 'per session',
     duration: 60,
     durationUnit: 'min',
@@ -223,6 +230,7 @@ export const DEALS: Deal[] = [
     slug: 'nails-by-nisha-gel-manicure',
     title: 'Gel Manicure',
     providerName: 'Nails by Nisha',
+    providerSlug: 'Nails by Nisha',
     categorySlug: 'hair-nails',
     subcategorySlug: 'manicure',
     badge: "Trending",
@@ -256,6 +264,7 @@ export const DEALS: Deal[] = [
     slug: 'pure-bliss-spa-pedicure',
     title: 'Spa Pedicure',
     providerName: 'Pure Bliss Studio',
+    providerSlug: 'Pure Bliss Studio',
     categorySlug: 'hair-nails',
     subcategorySlug: 'pedicure',
     badge: "Popular",
@@ -265,6 +274,7 @@ export const DEALS: Deal[] = [
     imageAlt: 'Spa pedicure treatment at Pure Bliss Studio',
     gallery: [img('pedicure'), img('pedicure-2')],
     price: 999,
+    originalPrice: 1299,
     priceLevel: '$',
     priceUnit: 'per session',
     duration: 60,
@@ -287,6 +297,7 @@ export const DEALS: Deal[] = [
     slug: 'mindful-yoga-morning-flow',
     title: 'Morning Flow Yoga',
     providerName: 'Mindful Yoga Studio',
+    providerSlug: 'Pure Bliss Studio',
     categorySlug: 'health-wellness',
     subcategorySlug: 'yoga',
     badge: "Recommended",
@@ -320,6 +331,7 @@ export const DEALS: Deal[] = [
     slug: 'detox-body-wrap',
     title: 'Detox Body Wrap',
     providerName: 'Serenity Spa & Wellness',
+    providerSlug: 'Serenity Spa & Wellness',
     categorySlug: 'spas-retreats',
     subcategorySlug: 'detox',
     priceNote: "₹3599 with code DETOX400",
@@ -353,6 +365,7 @@ export const DEALS: Deal[] = [
     slug: 'hot-stone-deep-relax',
     title: 'Hot Stone Relaxation',
     providerName: 'The Stone Sanctuary',
+    providerSlug: 'The Stone Sanctuary',
     categorySlug: 'massage',
     subcategorySlug: 'hot-stone',
     badge: "Best Seller",
@@ -386,6 +399,7 @@ export const DEALS: Deal[] = [
     slug: 'zenith-meditation-session',
     title: 'Guided Meditation',
     providerName: 'Zenith Wellness Centre',
+    providerSlug: 'Zenith Wellness Centre',
     categorySlug: 'health-wellness',
     subcategorySlug: 'meditation',
     badge: "Top Rated",
@@ -395,6 +409,7 @@ export const DEALS: Deal[] = [
     imageAlt: 'Guided meditation session at Zenith Wellness Centre',
     gallery: [img('meditation'), img('meditation-2')],
     price: 499,
+    originalPrice: 699,
     priceLevel: '$',
     priceUnit: 'per session',
     duration: 45,
@@ -417,6 +432,7 @@ export const DEALS: Deal[] = [
     slug: 'revive-sports-massage',
     title: 'Sports Recovery Massage',
     providerName: 'Revive Physiotherapy',
+    providerSlug: 'Zenith Wellness Centre',
     categorySlug: 'massage',
     subcategorySlug: 'sports',
     badge: "Recommended",
@@ -426,6 +442,7 @@ export const DEALS: Deal[] = [
     imageAlt: 'Sports recovery massage at Revive Physiotherapy',
     gallery: [img('sports-massage'), img('sports-massage-2')],
     price: 1799,
+    originalPrice: 2299,
     priceLevel: '$$',
     priceUnit: 'per session',
     duration: 60,
@@ -448,6 +465,7 @@ export const DEALS: Deal[] = [
     slug: 'glow-skin-classic-facial',
     title: 'Classic Brightening Facial',
     providerName: 'Glow Skin Clinic',
+    providerSlug: 'Glow Skin Clinic',
     categorySlug: 'skin-beauty',
     subcategorySlug: 'facial',
     badge: "Popular",
@@ -481,6 +499,7 @@ export const DEALS: Deal[] = [
     slug: 'serene-hair-spa',
     title: 'Keratin Hair Spa',
     providerName: 'Serene Salon & Spa',
+    providerSlug: 'Serene Salon & Spa',
     categorySlug: 'hair-nails',
     subcategorySlug: 'hair-spa',
     description: 'Intensive keratin hair spa that repairs damage, reduces frizz, and adds brilliant shine.',
@@ -509,6 +528,57 @@ export const DEALS: Deal[] = [
     included: ['Clarifying shampoo wash', 'Keratin treatment application', 'Steam processing', 'Blow-dry & iron finish', 'Leave-in conditioner'],
     howToUse: ['Do not wash hair for 72 hours after treatment.', 'Use sulphate-free shampoo to maintain results.', 'Results last 3–4 months.'],
   },
+  {
+    id: 'd-16',
+    slug: 'ayurvedic-spa-wellness',
+    title: 'Ayurvedic Wellness Spa',
+    providerName: 'Ayurveda Bliss Spa',
+    providerSlug: 'Glow Skin Clinic',
+    categorySlug: 'spas-retreats',
+    subcategorySlug: 'ayurvedic',
+    description:
+      'Traditional Ayurvedic spa therapies with herbal oils, relaxing massage, and holistic wellness treatments.',
+    image: img('ayurvedic-spa'),
+    imageAlt: 'Ayurvedic spa treatment',
+    gallery: [
+      img('ayurvedic-spa'),
+      img('ayurvedic-spa-2'),
+    ],
+    price: 1999,
+    originalPrice: 2499,
+    discount: 20,
+    priceLevel: '$$',
+    priceUnit: 'per session',
+    priceNote: '₹1699 with code MSD10',
+    duration: 90,
+    durationUnit: 'min',
+    rating: 4.8,
+    reviews: 156,
+    distance: 2.0,
+    lat: 28.5708,
+    lng: 77.3260,
+    location: 'Sector 18, Noida',
+    isOpen: true,
+    isFeatured: false,
+    isHot: true,
+    badge: 'Popular',
+    features: [
+      'Ayurvedic',
+      'Organic Products',
+      'Private Room',
+    ],
+    included: [
+      'Ayurvedic full body massage',
+      'Herbal oil therapy',
+      'Head massage',
+      'Herbal tea',
+    ],
+    howToUse: [
+      'Book your preferred slot online.',
+      'Arrive 10 minutes before your appointment.',
+      'Inform the therapist about your preferences.',
+    ],
+  },
 ];
 
 export function getDealById(id: string): Deal | undefined {
@@ -532,12 +602,27 @@ export function getHotDeals(): Deal[] {
 }
 
 export function searchDeals(query: string): Deal[] {
-  const q = query.toLowerCase();
-  return DEALS.filter(
-    (d) =>
-      d.title.toLowerCase().includes(q) ||
-      d.providerName.toLowerCase().includes(q) ||
-      d.description.toLowerCase().includes(q) ||
-      d.categorySlug.includes(q),
-  );
+  const q = query.trim().toLowerCase();
+
+  if (!q) return DEALS;
+
+  const terms = q.split(/\s+/);
+
+  return DEALS.filter((deal) => {
+    const searchableText = [
+      deal.title,
+      deal.providerName,
+      deal.description,
+      deal.categorySlug,
+      deal.subcategorySlug,
+      deal.location,
+      ...(deal.features ?? []),
+      ...(deal.included ?? []),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    return terms.every((term) => searchableText.includes(term));
+  });
 }

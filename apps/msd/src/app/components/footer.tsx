@@ -1,11 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  OutlinedTextField,
-  FilledButton,
-  Icon,
-  Divider,
-} from '@skylabs-monorepo/shared-ui/react';
+import { OutlinedTextField, FilledButton, Icon, Divider,} from '@skylabs-monorepo/shared-ui/react';
 import { inputValue } from '../../utils/format';
 import content from '../../content.json';
 import './footer.css';
@@ -37,7 +32,6 @@ const SOCIAL_ICONS: Record<string, React.ReactElement> = {
 export function Footer() {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
-
   function handleSubscribe(e: React.FormEvent) {
     e.preventDefault();
     if (email.trim()) {
@@ -45,14 +39,11 @@ export function Footer() {
       setEmail('');
     }
   }
-
   const { footer } = content.nav;
   const year = new Date().getFullYear();
-
   return (
     <footer className="site-footer" role="contentinfo">
       <div className="site-footer__inner">
-
         {/* Brand + newsletter (wide left column) */}
         <div className="site-footer__brand">
           <Link to="/" className="site-footer__logo" aria-label="MSD – MySpaDeal home">
@@ -65,7 +56,6 @@ export function Footer() {
             </span>
           </Link>
           <p className="site-footer__desc">{content.site.description}</p>
-
           <h3 className="site-footer__col-heading">{footer.headings.newsletter}</h3>
           <p className="site-footer__newsletter-sub">{footer.newsletter.sub}</p>
           {subscribed ? (
@@ -92,7 +82,6 @@ export function Footer() {
             </form>
           )}
         </div>
-
         {/* Company */}
         <nav className="site-footer__col" aria-label="Company">
           <h3 className="site-footer__col-heading">{footer.headings.company}</h3>
@@ -104,7 +93,6 @@ export function Footer() {
             ))}
           </ul>
         </nav>
-
         {/* Discover */}
         <nav className="site-footer__col" aria-label="Discover">
           <h3 className="site-footer__col-heading">{footer.headings.discover}</h3>
@@ -116,7 +104,6 @@ export function Footer() {
             ))}
           </ul>
         </nav>
-
         {/* Help & Info */}
         <nav className="site-footer__col" aria-label="Help and Info">
           <h3 className="site-footer__col-heading">{footer.headings.help}</h3>
@@ -128,11 +115,8 @@ export function Footer() {
             ))}
           </ul>
         </nav>
-
       </div>
-
       <Divider />
-
       {/* Bottom bar: copyright · legal links | social icons */}
       <div className="site-footer__bottom">
         <div className="site-footer__bottom-inner">

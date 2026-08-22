@@ -1,4 +1,6 @@
 import { apiGet, apiPost, apiPatch } from './rbac/client';
+import { notifyCartUpdated } from './cart';
+import { notifyBookingsUpdated } from './bookings';
 
 /**
  * Customer orders — authenticated, self-service only (backend gates on `authenticate` alone,
@@ -9,9 +11,17 @@ import { apiGet, apiPost, apiPatch } from './rbac/client';
 export type OrderType = 'SERVICE' | 'PRODUCT';
 export type OrderStatus = 'PENDING_PAYMENT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
 
+/** Multi-vendor: each item carries its OWN vendor/branch — a PRODUCT order created from a
+ *  multi-vendor cart groups items from several vendors under one Order/one Payment. `Order`'s own
+ *  vendorId/vendorNameSnapshot (below) is just the "primary" (first) vendor, kept for the header/
+ *  legacy single-vendor display — group `items` by `vendorId` for the real per-vendor breakdown. */
 export interface OrderItem {
   id: string;
   dealId: string;
+  vendorId: string;
+  branchId: string;
+  vendorNameSnapshot: string;
+  branchNameSnapshot: string;
   itemName: string;
   itemType: OrderType;
   unitPrice: string;
@@ -25,14 +35,26 @@ export type PaymentStatus = 'CREATED' | 'PAID' | 'FAILED' | 'CANCELLED';
 export interface PaymentSummary {
   id: string;
   status: PaymentStatus;
-  provider: 'RAZORPAY';
+  provider: 'RAZORPAY' | 'COD';
   amount: string;
   currency: string;
   failureReason: string | null;
   createdAt: string;
 }
 
-export interface Order {
+/** Checkout's "Customer Details" step — every field optional to match the backend's Zod schema
+ *  (an order created before this step existed has none of these set). */
+export interface OrderContactDetails {
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  shippingAddress?: string;
+  shippingCity?: string;
+  shippingState?: string;
+  shippingPincode?: string;
+}
+
+export interface Order extends OrderContactDetails {
   id: string;
   type: OrderType;
   status: OrderStatus;
@@ -44,7 +66,7 @@ export interface Order {
   createdAt: string;
   items: OrderItem[];
   payments: PaymentSummary[];
-  booking: { id: string; bookingDate: string; timeSlot: string } | null;
+  booking: { id: string; bookingDate: string | null; timeSlot: string | null } | null;
   branch: { id: string; name: string; address: string | null; city: string | null };
 }
 
@@ -71,12 +93,20 @@ function toQuery(params: Record<string, string | number | undefined>): string {
   return qs ? `?${qs}` : '';
 }
 
-export function checkout(token: string | null) {
-  return apiPost<Order>('/orders/checkout', token);
+export function checkout(token: string | null, contactDetails: OrderContactDetails = {}) {
+  // Checkout clears the cart server-side — notify so the header badge doesn't stay stale.
+  return apiPost<Order>('/orders/checkout', token, contactDetails).then((res) => {
+    notifyCartUpdated();
+    return res;
+  });
 }
 
-export function createOrderFromBooking(token: string | null, bookingId: string) {
-  return apiPost<Order>('/orders/from-booking', token, { bookingId });
+export function createOrderFromBooking(token: string | null, bookingId: string, contactDetails: OrderContactDetails = {}) {
+  // Consumes a PENDING booking into an Order — notify so the header badge drops accordingly.
+  return apiPost<Order>('/orders/from-booking', token, { bookingId, ...contactDetails }).then((res) => {
+    notifyBookingsUpdated();
+    return res;
+  });
 }
 
 export function listMyOrders(token: string | null, opts: { page?: number; pageSize?: number; status?: OrderStatus } = {}) {
@@ -95,6 +125,30 @@ export function pay(token: string | null, orderId: string) {
   return apiPost<PaymentIntent>(`/orders/me/${orderId}/pay`, token);
 }
 
+/** Confirms a Cash on Delivery order — no gateway, no widget. Moves the order straight to
+ *  CONFIRMED; the paired Payment stays CREATED (never PAID — cash hasn't been collected yet). */
+export function payCod(token: string | null, orderId: string) {
+  return apiPost<Order>(`/orders/me/${orderId}/pay-cod`, token);
+}
+
 export function verifyPayment(token: string | null, orderId: string, input: VerifyPaymentInput) {
   return apiPost<Order>(`/orders/me/${orderId}/verify-payment`, token, input);
+}
+
+/**
+ * Combined checkout (Deal + Therapist + Product together) — one checkout action, one payment,
+ * one combined receipt, multiple Order rows under the hood (see msd-api's payment.service.ts
+ * doc comment). These three mirror `pay`/`payCod`/`verifyPayment` above exactly, just batched
+ * across every Order created together in one checkout action.
+ */
+export function payBatch(token: string | null, orderIds: string[]) {
+  return apiPost<PaymentIntent>('/orders/pay-batch', token, { orderIds });
+}
+
+export function payBatchCod(token: string | null, orderIds: string[]) {
+  return apiPost<Order[]>('/orders/pay-batch/cod', token, { orderIds });
+}
+
+export function verifyBatchPayment(token: string | null, orderIds: string[], input: VerifyPaymentInput) {
+  return apiPost<Order[]>('/orders/pay-batch/verify', token, { orderIds, ...input });
 }

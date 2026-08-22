@@ -20,7 +20,7 @@ import {
   UserStatusUpdateSchema,
   ImpersonateRequestSchema,
 } from '../schemas/rbac.schema';
-import { ErrorObjectSchema } from '../schemas/common.schema';
+import { ErrorObjectSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
   VendorCreateSchema,
   VendorUpdateSchema,
@@ -36,15 +36,23 @@ import {
   DealUpdateSchema,
   DealStatusUpdateSchema,
   DealRejectSchema,
+  TherapistCreateSchema,
+  TherapistUpdateSchema,
+  TherapistStatusUpdateSchema,
+  TherapistPackageCreateSchema,
+  TherapistPackageUpdateSchema,
 } from '../schemas/vendor.schema';
 import { CategoryCreateSchema, CategoryUpdateSchema, CategoryStatusUpdateSchema } from '../schemas/category.schema';
 import { ProductCreateSchema, ProductUpdateSchema, ProductStatusUpdateSchema } from '../schemas/product.schema';
 import { ServiceCreateSchema, ServiceUpdateSchema, ServiceStatusUpdateSchema } from '../schemas/service.schema';
-import { CatalogDealQuerySchema } from '../schemas/catalog.schema';
+import { CatalogDealQuerySchema, CatalogTherapistQuerySchema } from '../schemas/catalog.schema';
 import { CartAddItemSchema, CartUpdateItemSchema } from '../schemas/cart.schema';
-import { BookingCreateSchema, BookingCancelSchema } from '../schemas/booking.schema';
-import { OrderFromBookingSchema, OrderCustomerCancelSchema, OrderStatusUpdateSchema } from '../schemas/order.schema';
-import { VerifyPaymentSchema } from '../schemas/payment.schema';
+import { WishlistAddItemSchema } from '../schemas/wishlist.schema';
+import { BookingCreateSchema, BookingCancelSchema, BookingVendorStatusUpdateSchema } from '../schemas/booking.schema';
+import { OrderCheckoutSchema, OrderFromBookingSchema, OrderCustomerCancelSchema, OrderStatusUpdateSchema } from '../schemas/order.schema';
+import { VerifyPaymentSchema, OrderBatchSchema, VerifyBatchPaymentSchema } from '../schemas/payment.schema';
+import { DashboardStatsResponseSchema } from '../schemas/dashboard.schema';
+import { MediaReorderSchema } from '../schemas/media.schema';
 
 export function buildOpenApiDocument() {
   const registry = new OpenAPIRegistry();
@@ -511,6 +519,16 @@ export function buildOpenApiDocument() {
   });
 
   registry.registerPath({
+    method: 'get',
+    path: '/vendors/me/customers',
+    summary: 'Distinct customers who have ordered/booked from the caller\'s own vendor',
+    tags: ['Vendors - Self-service'],
+    security: bearer,
+    request: { query: PaginationQuerySchema },
+    responses: { 200: { description: 'Customers' } },
+  });
+
+  registry.registerPath({
     method: 'post',
     path: '/vendors/me/branches',
     summary: 'Create a branch for the caller\'s own vendor',
@@ -542,6 +560,190 @@ export function buildOpenApiDocument() {
     },
     responses: { 201: { description: 'Created' }, 403: errorResponse },
   });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/vendors/me/branches/{branchId}/therapists',
+    summary: "Therapists for one of the caller's own branches",
+    tags: ['Vendors - Self-service'],
+    security: bearer,
+    request: { params: z.object({ branchId: z.string().uuid() }) },
+    responses: { 200: { description: 'Therapists' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/vendors/me/branches/{branchId}/therapists',
+    summary: "Create a therapist on one of the caller's own branches",
+    tags: ['Vendors - Self-service'],
+    security: bearer,
+    request: {
+      params: z.object({ branchId: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: TherapistCreateSchema } } },
+    },
+    responses: { 201: { description: 'Created' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/vendors/me/therapists/{therapistId}',
+    summary: "Update one of the caller's own therapists",
+    tags: ['Vendors - Self-service'],
+    security: bearer,
+    request: {
+      params: z.object({ therapistId: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: TherapistUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/vendors/me/therapists/{therapistId}/status',
+    summary: "Activate/deactivate one of the caller's own therapists (no delete — historical Bookings may reference it)",
+    tags: ['Vendors - Self-service'],
+    security: bearer,
+    request: {
+      params: z.object({ therapistId: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: TherapistStatusUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/vendors/me/therapists/{therapistId}/packages',
+    summary: "Per-therapist priced packages for one of the caller's own therapists",
+    tags: ['Vendors - Self-service'],
+    security: bearer,
+    request: { params: z.object({ therapistId: z.string().uuid() }) },
+    responses: { 200: { description: 'Packages' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/vendors/me/therapists/{therapistId}/packages',
+    summary: "Add a duration/price package to a therapist's own menu (independent of any Deal)",
+    tags: ['Vendors - Self-service'],
+    security: bearer,
+    request: {
+      params: z.object({ therapistId: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: TherapistPackageCreateSchema } } },
+    },
+    responses: { 201: { description: 'Created' }, 403: errorResponse, 404: errorResponse, 409: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/vendors/me/therapists/{therapistId}/packages/{packageId}',
+    summary: "Update one of a therapist's packages",
+    tags: ['Vendors - Self-service'],
+    security: bearer,
+    request: {
+      params: z.object({ therapistId: z.string().uuid(), packageId: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: TherapistPackageUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/vendors/me/therapists/{therapistId}/packages/{packageId}',
+    summary: "Delete one of a therapist's packages",
+    tags: ['Vendors - Self-service'],
+    security: bearer,
+    request: { params: z.object({ therapistId: z.string().uuid(), packageId: z.string().uuid() }) },
+    responses: { 200: { description: 'Deleted' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  // ─── Media routes (Deal/Product/Therapist images+video — one shared upload system, see
+  // media.service.ts's doc comment) — generated per entity rather than hand-duplicated 3x,
+  // since all 6 routes' shapes are identical modulo the base path and OpenAPI tag. Every path is
+  // still individually registered, exactly as every other route in this file is. ────────────
+  const mediaFileBody = {
+    content: {
+      'multipart/form-data': {
+        schema: z.object({ file: z.any().openapi({ type: 'string', format: 'binary' }) }),
+      },
+    },
+  };
+  const mediaEntities: Array<{ base: string; params: z.ZodRawShape; tag: string; label: string }> = [
+    {
+      base: '/vendors/me/branches/{branchId}/deals/{dealId}',
+      params: { branchId: z.string().uuid(), dealId: z.string().uuid() },
+      tag: 'Vendors - Self-service',
+      label: 'deal',
+    },
+    {
+      base: '/vendors/me/therapists/{therapistId}',
+      params: { therapistId: z.string().uuid() },
+      tag: 'Vendors - Self-service',
+      label: 'therapist',
+    },
+    {
+      base: '/products/{id}',
+      params: { id: z.string().uuid() },
+      tag: 'Products',
+      label: 'product',
+    },
+  ];
+  for (const entity of mediaEntities) {
+    const paramsSchema = z.object(entity.params);
+    registry.registerPath({
+      method: 'post',
+      path: `${entity.base}/images`,
+      summary: `Upload an image for a ${entity.label} (JPG/PNG/WEBP, 30KB–80KB)`,
+      tags: [entity.tag],
+      security: bearer,
+      request: { params: paramsSchema, body: mediaFileBody },
+      responses: { 201: { description: 'Created' }, 403: errorResponse, 404: errorResponse, 422: errorResponse },
+    });
+    registry.registerPath({
+      method: 'delete',
+      path: `${entity.base}/images/{imageId}`,
+      summary: `Delete a ${entity.label} image`,
+      tags: [entity.tag],
+      security: bearer,
+      request: { params: paramsSchema.extend({ imageId: z.string().uuid() }) },
+      responses: { 200: { description: 'Deleted' }, 403: errorResponse, 404: errorResponse },
+    });
+    registry.registerPath({
+      method: 'patch',
+      path: `${entity.base}/images/reorder`,
+      summary: `Reorder a ${entity.label}'s images`,
+      tags: [entity.tag],
+      security: bearer,
+      request: { params: paramsSchema, body: { content: { 'application/json': { schema: MediaReorderSchema } } } },
+      responses: { 200: { description: 'Reordered' }, 403: errorResponse, 404: errorResponse, 422: errorResponse },
+    });
+    registry.registerPath({
+      method: 'patch',
+      path: `${entity.base}/images/{imageId}/primary`,
+      summary: `Set a ${entity.label}'s primary image`,
+      tags: [entity.tag],
+      security: bearer,
+      request: { params: paramsSchema.extend({ imageId: z.string().uuid() }) },
+      responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse },
+    });
+    registry.registerPath({
+      method: 'post',
+      path: `${entity.base}/video`,
+      summary: `Upload/replace a ${entity.label}'s single video (MP4/WEBM/MOV, ≤1MB)`,
+      tags: [entity.tag],
+      security: bearer,
+      request: { params: paramsSchema, body: mediaFileBody },
+      responses: { 201: { description: 'Created' }, 403: errorResponse, 404: errorResponse, 422: errorResponse },
+    });
+    registry.registerPath({
+      method: 'delete',
+      path: `${entity.base}/video`,
+      summary: `Delete a ${entity.label}'s video`,
+      tags: [entity.tag],
+      security: bearer,
+      request: { params: paramsSchema },
+      responses: { 200: { description: 'Deleted' }, 403: errorResponse, 404: errorResponse },
+    });
+  }
 
   registry.registerPath({
     method: 'get',
@@ -642,6 +844,26 @@ export function buildOpenApiDocument() {
     security: bearer,
     request: { params: z.object({ vendorId: z.string().uuid() }) },
     responses: { 200: { description: 'Branches' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/vendors/{vendorId}/therapists',
+    summary: "All of a vendor's therapists, active and inactive, across every branch (admin, read-only)",
+    tags: ['Vendors - Admin'],
+    security: bearer,
+    request: { params: z.object({ vendorId: z.string().uuid() }) },
+    responses: { 200: { description: 'Therapists' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/vendors/{vendorId}/customers',
+    summary: "Distinct customers who have ordered/booked from a vendor (admin, read-only)",
+    tags: ['Vendors - Admin'],
+    security: bearer,
+    request: { params: z.object({ vendorId: z.string().uuid() }), query: PaginationQuerySchema },
+    responses: { 200: { description: 'Customers' }, 403: errorResponse },
   });
 
   registry.registerPath({
@@ -978,7 +1200,9 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/catalog/deals',
-    summary: 'Public deal listing — active/approved deals with an active vendor+branch (+active linked service/product)',
+    summary:
+      'Public deal listing — active/approved deals with an active vendor+branch (+active linked service/product); ' +
+      'sort=newest|discount (default newest), minPrice/maxPrice filter on salePrice',
     tags: ['Catalogue (public)'],
     request: { query: CatalogDealQuerySchema },
     responses: { 200: { description: 'Deals' } },
@@ -991,6 +1215,35 @@ export function buildOpenApiDocument() {
     tags: ['Catalogue (public)'],
     request: { params: z.object({ id: z.string().uuid() }) },
     responses: { 200: { description: 'Deal' }, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/vendors/{slug}',
+    summary: 'Public vendor storefront — 404s if not found or not ACTIVE; nests active branches + their active therapists (never Deals — call GET /catalog/deals?vendorId=&branchId= separately)',
+    tags: ['Catalogue (public)'],
+    request: { params: z.object({ slug: z.string() }) },
+    responses: { 200: { description: 'Vendor' }, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/therapists',
+    summary:
+      'Public therapist listing — active therapists with an active vendor+branch, independent of any Deal ' +
+      '(browsable/bookable on their own; call GET /catalog/therapists/{id} for packages)',
+    tags: ['Catalogue (public)'],
+    request: { query: CatalogTherapistQuerySchema },
+    responses: { 200: { description: 'Therapists' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/therapists/{id}',
+    summary: 'A single public therapist with its active packages — 404s if not currently visible (inactive/hidden vendor or branch)',
+    tags: ['Catalogue (public)'],
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Therapist' }, 404: errorResponse },
   });
 
   // ─── Cart (customer self-service, product deals only) ────────────────────────
@@ -1046,6 +1299,47 @@ export function buildOpenApiDocument() {
     responses: { 200: { description: 'Cleared cart' } },
   });
 
+  // ─── Wishlist (customer self-service, any deal type) ──────────────────────────
+
+  registry.registerPath({
+    method: 'get',
+    path: '/wishlist',
+    summary: "The caller's own wishlist — items whose deal is no longer visible/purchasable are omitted",
+    tags: ['Wishlist'],
+    security: bearer,
+    responses: { 200: { description: 'Wishlist items' } },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/wishlist',
+    summary: 'Add a deal to the wishlist (idempotent — re-adding an already-saved deal is a no-op)',
+    tags: ['Wishlist'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: WishlistAddItemSchema } } } },
+    responses: { 201: { description: 'Wishlist item' }, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/wishlist/check/{dealId}',
+    summary: 'Whether the caller has this deal wishlisted',
+    tags: ['Wishlist'],
+    security: bearer,
+    request: { params: z.object({ dealId: z.string().uuid() }) },
+    responses: { 200: { description: 'Wishlisted flag' } },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/wishlist/{dealId}',
+    summary: "Remove a deal from the caller's wishlist",
+    tags: ['Wishlist'],
+    security: bearer,
+    request: { params: z.object({ dealId: z.string().uuid() }) },
+    responses: { 200: { description: 'Removed' }, 404: errorResponse },
+  });
+
   // ─── Bookings (customer self-service, service deals only) ────────────────────
 
   registry.registerPath({
@@ -1060,7 +1354,9 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'post',
     path: '/bookings',
-    summary: 'Book a service deal — snapshots price/duration, vendor/branch derived from the deal',
+    summary:
+      'Book a service deal (dealId) OR a Therapist directly (therapistId+durationMinutes, no dealId) — ' +
+      'snapshots price/duration; vendor/branch derived from the deal or therapist server-side, never the client',
     tags: ['Bookings'],
     security: bearer,
     request: { body: { content: { 'application/json': { schema: BookingCreateSchema } } } },
@@ -1080,7 +1376,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'patch',
     path: '/bookings/{id}/status',
-    summary: 'Cancel a booking (the only self-service transition — confirm/complete is a later phase)',
+    summary: 'Cancel a booking (the only customer self-service transition)',
     tags: ['Bookings'],
     security: bearer,
     request: {
@@ -1088,6 +1384,40 @@ export function buildOpenApiDocument() {
       body: { content: { 'application/json': { schema: BookingCancelSchema } } },
     },
     responses: { 200: { description: 'Updated' }, 409: errorResponse },
+  });
+
+  // ─── Bookings — vendor/admin (Phase 10, reuses the existing `orders` permission) ──
+
+  registry.registerPath({
+    method: 'get',
+    path: '/bookings/vendor',
+    summary: 'List bookings (admin: all/filterable by vendorId; vendor: force-scoped to own vendor)',
+    tags: ['Bookings - Vendor/Admin'],
+    security: bearer,
+    responses: { 200: { description: 'Bookings' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/bookings/vendor/{id}',
+    summary: 'Get any booking by id (admin, or a vendor for its own booking only)',
+    tags: ['Bookings - Vendor/Admin'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Booking' }, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/bookings/vendor/{id}/status',
+    summary: 'Confirm/complete/cancel a booking (vendor: own bookings only; admin: any)',
+    tags: ['Bookings - Vendor/Admin'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: BookingVendorStatusUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse, 409: errorResponse },
   });
 
   // ─── Orders (Cart/Booking convergence — customer self-service + admin/vendor) ─
@@ -1098,6 +1428,7 @@ export function buildOpenApiDocument() {
     summary: "Create a PRODUCT order from the caller's cart (server-recalculated pricing, transactional)",
     tags: ['Orders'],
     security: bearer,
+    request: { body: { content: { 'application/json': { schema: OrderCheckoutSchema } } } },
     responses: { 201: { description: 'Created' }, 422: errorResponse, 409: errorResponse },
   });
 
@@ -1189,6 +1520,16 @@ export function buildOpenApiDocument() {
 
   registry.registerPath({
     method: 'post',
+    path: '/orders/me/{id}/pay-cod',
+    summary: 'Confirm a Cash on Delivery order — no gateway; creates a CREATED-status COD Payment and moves the Order to CONFIRMED',
+    tags: ['Payments'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Order confirmed' }, 409: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
     path: '/orders/me/{id}/verify-payment',
     summary: "Verify the checkout widget's success callback signature server-side",
     tags: ['Payments'],
@@ -1202,15 +1543,82 @@ export function buildOpenApiDocument() {
 
   registry.registerPath({
     method: 'post',
+    path: '/orders/pay-batch',
+    summary:
+      'Combined checkout (Deal + Therapist + Product together) — one Razorpay order for the SUM of several ' +
+      'Orders\' totals; one checkout action, one payment, multiple Order rows under the hood',
+    tags: ['Payments'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: OrderBatchSchema } } } },
+    responses: { 200: { description: 'Razorpay order details (providerOrderId, amount, currency, keyId)' }, 409: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/orders/pay-batch/cod',
+    summary: 'Confirm Cash on Delivery for every Order in a combined checkout batch, together in one transaction',
+    tags: ['Payments'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: OrderBatchSchema } } } },
+    responses: { 200: { description: 'Confirmed orders' }, 409: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/orders/pay-batch/verify',
+    summary: "Verify the checkout widget's success callback signature once, then confirm every Order in the batch together",
+    tags: ['Payments'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: VerifyBatchPaymentSchema } } } },
+    responses: { 200: { description: 'Confirmed orders' }, 404: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
     path: '/payments/webhook/razorpay',
     summary: 'Razorpay webhook — signature-verified, idempotent, the authoritative payment-confirmation path',
     tags: ['Payments'],
     responses: { 200: { description: 'Acknowledged' }, 401: errorResponse },
   });
 
+  // ─── Dashboard ─────────────────────────────────────────────────────────────
+
+  registry.registerPath({
+    method: 'get',
+    path: '/dashboard/stats',
+    summary: 'Aggregate marketplace counts (vendors/customers/branches/categories/subCategories/services/products/deals/orders/bookings) and revenue — gated on dashboard:view',
+    tags: ['Dashboard'],
+    security: bearer,
+    responses: {
+      200: { description: 'Aggregate stats', content: { 'application/json': { schema: DashboardStatsResponseSchema } } },
+      403: errorResponse,
+    },
+  });
+
+  // ─── Customers (SuperAdmin/staff directory, `customers:view`) ────────────────
+
+  registry.registerPath({
+    method: 'get',
+    path: '/customers',
+    summary: 'List customers (any User holding the customer role) — search/paginate',
+    tags: ['Customers'],
+    security: bearer,
+    responses: { 200: { description: 'Customers' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/customers/{id}',
+    summary: 'A single customer, with order/booking counts',
+    tags: ['Customers'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Customer' }, 404: errorResponse },
+  });
+
   // ─── Business module stubs ───────────────────────────────────────────────────
 
-  for (const tag of ['customers', 'inventory', 'reports']) {
+  for (const tag of ['inventory', 'reports']) {
     registry.registerPath({
       method: 'get',
       path: `/${tag}`,

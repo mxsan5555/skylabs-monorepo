@@ -154,8 +154,16 @@ describe('GET /api/v1/catalog/deals', () => {
     prismaMock.deal.count.mockResolvedValue(0);
     await request(app).get('/api/v1/catalog/deals');
     const call = prismaMock.deal.findMany.mock.calls[0][0];
-    expect(call.select.vendor.select).toEqual({ id: true, businessName: true, city: true, logoUrl: true });
-    expect(call.select.branch.select).toEqual({ id: true, name: true, city: true, address: true });
+    expect(call.select.vendor.select).toEqual({
+      id: true,
+      slug: true,
+      businessName: true,
+      city: true,
+      logoUrl: true,
+      mediaImages: expect.anything(),
+      mediaVideo: expect.anything(),
+    });
+    expect(call.select.branch.select).toEqual({ id: true, name: true, city: true, address: true, latitude: true, longitude: true });
     const vendorFields = Object.keys(call.select.vendor.select);
     const branchFields = Object.keys(call.select.branch.select);
     for (const forbidden of ['kycDocuments', 'kycStatus', 'ownerUserId', 'bankAccountNumber', 'bankIfsc', 'gstNumber', 'panNumber', 'businessEmail', 'businessPhone']) {
@@ -171,6 +179,58 @@ describe('GET /api/v1/catalog/deals', () => {
     expect(prismaMock.deal.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ categoryId: CATEGORY_ID, subcategoryId: SUBCATEGORY_ID }) }),
     );
+  });
+
+  it('sort=discount orders by discountPercent desc, nulls last', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([]);
+    prismaMock.deal.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/deals?sort=discount');
+    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: [{ discountPercent: { sort: 'desc', nulls: 'last' } }] }),
+    );
+  });
+
+  it('omitting sort still orders by createdAt desc (backward-compat regression guard)', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([]);
+    prismaMock.deal.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/deals');
+    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: { createdAt: 'desc' } }),
+    );
+  });
+
+  it('sort=newest explicitly also orders by createdAt desc', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([]);
+    prismaMock.deal.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/deals?sort=newest');
+    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: { createdAt: 'desc' } }),
+    );
+  });
+
+  it('minPrice/maxPrice bound results via a salePrice where-filter', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([]);
+    prismaMock.deal.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/deals?minPrice=300&maxPrice=800');
+    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ salePrice: { gte: 300, lte: 800 } }) }),
+    );
+  });
+
+  it('minPrice alone only sets gte (no lte key)', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([]);
+    prismaMock.deal.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/deals?minPrice=300');
+    const call = prismaMock.deal.findMany.mock.calls[0][0];
+    expect(call.where.salePrice).toEqual({ gte: 300 });
+  });
+
+  it('omitting both minPrice and maxPrice applies no salePrice filter at all (backward-compat regression guard)', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([]);
+    prismaMock.deal.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/deals');
+    const call = prismaMock.deal.findMany.mock.calls[0][0];
+    expect(call.where.salePrice).toBeUndefined();
   });
 });
 

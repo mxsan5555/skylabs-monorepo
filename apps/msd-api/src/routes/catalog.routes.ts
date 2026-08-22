@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { validateParams } from '../middleware/validate';
-import { CatalogDealQuerySchema } from '../schemas/catalog.schema';
+import { CatalogDealQuerySchema, CatalogTherapistQuerySchema } from '../schemas/catalog.schema';
 import { z } from 'zod';
 import * as catalogService from '../services/catalog.service';
 import { sendData } from '../lib/http';
@@ -32,8 +32,21 @@ router.get('/categories/:slug', validateParams(z.object({ slug: z.string().min(1
 
 router.get('/deals', async (req, res, next) => {
   try {
-    const { page, pageSize, categoryId, subcategoryId, type, search } = CatalogDealQuerySchema.parse(req.query);
-    const { items, total } = await catalogService.listPublicDeals({ page, pageSize, categoryId, subcategoryId, type, search });
+    const { page, pageSize, categoryId, subcategoryId, vendorId, branchId, type, search, sort, minPrice, maxPrice } =
+      CatalogDealQuerySchema.parse(req.query);
+    const { items, total } = await catalogService.listPublicDeals({
+      page,
+      pageSize,
+      categoryId,
+      subcategoryId,
+      vendorId,
+      branchId,
+      type,
+      search,
+      sort,
+      minPrice,
+      maxPrice,
+    });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);
@@ -43,6 +56,32 @@ router.get('/deals', async (req, res, next) => {
 router.get('/deals/:id', validateParams(z.object({ id: z.string().uuid() })), async (req, res, next) => {
   try {
     sendData(res, await catalogService.getPublicDealOrThrow(req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/vendors/:slug', validateParams(z.object({ slug: z.string().min(1) })), async (req, res, next) => {
+  try {
+    sendData(res, await catalogService.getPublicVendorBySlugOrThrow(req.params.slug));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/therapists', async (req, res, next) => {
+  try {
+    const { page, pageSize, vendorId, branchId, search } = CatalogTherapistQuerySchema.parse(req.query);
+    const { items, total } = await catalogService.listPublicTherapists({ page, pageSize, vendorId, branchId, search });
+    sendData(res, items, { meta: { total, page, pageSize } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/therapists/:id', validateParams(z.object({ id: z.string().uuid() })), async (req, res, next) => {
+  try {
+    sendData(res, await catalogService.getPublicTherapistOrThrow(req.params.id));
   } catch (err) {
     next(err);
   }

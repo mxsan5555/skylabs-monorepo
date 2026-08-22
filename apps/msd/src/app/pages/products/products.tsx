@@ -1,197 +1,582 @@
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  Divider,
   FilledButton,
   Icon,
-  ChipSet,
-  FilterChip,
   OutlinedSelect,
+  OutlinedTextField,
   SelectOption,
-  Divider,
 } from '@skylabs-monorepo/shared-ui/react';
-import { useCart } from '../../../cart/cart-context';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { useNavigate } from 'react-router-dom';
+
+import {
+  listCatalogDeals,
+  type CatalogDeal,
+} from '../../../api/catalog';
+import { ApiRequestError } from '../../../api/rbac/client';
+import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { PRODUCTS, getProductsByCategory, CATEGORY_LABELS } from '../../../data/products';
+
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
+
 import { formatINR } from '../../../utils/format';
+import { resolveDealMedia, primaryImage } from '../../../utils/media';
 import type { ProductSort } from '../../../types';
+
 import content from '../../../content.json';
+
 import './products.css';
 
 const { products } = content;
 
-const FILTERS = [
-  { value: 'all',        label: products.listing.filters.all },
-  { value: 'day',        label: products.listing.filters.day },
-  { value: 'night',      label: products.listing.filters.night },
-  { value: 'skin-care',  label: products.listing.filters.skinCare },
-];
+const SITE_URL =
+  (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
 
-const SITE_URL: string = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
-
+/**
+ * All product deals across every vendor/category.
+ *
+ * GET /catalog/deals?type=product
+ *
+ * CatalogDeal unifies Service and Product as one Deal entity.
+ * For this page the backend query is scoped to type=product,
+ * so deal.product is populated.
+ */
 export function ProductListing() {
-  const { addItem } = useCart();
-  const { toggle, has } = useWishlist();
-  const [activeFilter, setActiveFilter] = useState<string>('all');
-  const [sort, setSort] = useState<ProductSort>('popular');
+  const { token, isAuthenticated } = useAuth();
 
-  const filteredProducts = useMemo(() => {
-    const list = activeFilter === 'all' ? PRODUCTS : getProductsByCategory(activeFilter);
+  const {
+    has: isWishlisted,
+    toggle: toggleWishlist,
+  } = useWishlist();
+
+  const navigate = useNavigate();
+
+  const [deals, setDeals] = useState<CatalogDeal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const [search, setSearch] = useState('');
+  const [sort, setSort] =
+    useState<ProductSort>('popular');
+
+  const [actionMessage, setActionMessage] =
+    useState('');
+
+  const [actionError, setActionError] =
+    useState('');
+
+  /*
+   * Load products.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    setLoading(true);
+    setError('');
+
+    listCatalogDeals({
+      type: 'product',
+      search: search.trim() || undefined,
+      pageSize: 60,
+    })
+      .then(({ data }) => {
+        if (!cancelled) {
+          setDeals(data);
+        }
+      })
+      .catch((err: unknown) => {
+        if (cancelled) {
+          return;
+        }
+
+        setError(
+          err instanceof ApiRequestError
+            ? err.message
+            : 'Could not load products.',
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [search]);
+
+  /*
+   * Sort products locally.
+   */
+  const sortedDeals = useMemo(() => {
     switch (sort) {
-      case 'price-asc':  return [...list].sort((a, b) => a.price - b.price);
-      case 'price-desc': return [...list].sort((a, b) => b.price - a.price);
-      case 'newest':     return [...list].sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
-      default:           return [...list];
+      case 'price-asc':
+        return [...deals].sort(
+          (a, b) =>
+            Number(a.salePrice) -
+            Number(b.salePrice),
+        );
+
+      case 'price-desc':
+        return [...deals].sort(
+          (a, b) =>
+            Number(b.salePrice) -
+            Number(a.salePrice),
+        );
+
+      default:
+        return deals;
     }
-  }, [activeFilter, sort]);
+  }, [deals, sort]);
+
+  /*
+   * Authentication guard.
+   */
+  const requireAuthOrRedirect = () => {
+    if (isAuthenticated) {
+      return true;
+    }
+
+    navigate(
+      `/sign-in?next=${encodeURIComponent(
+        '/products',
+      )}`,
+    );
+
+    return false;
+  };
+
+  /*
+   * Add product to cart.
+   */
+  const addToCart = async (
+    deal: CatalogDeal,
+  ) => {
+    if (!requireAuthOrRedirect()) {
+      return;
+    }
+
+    setActionError('');
+    setActionMessage('');
+
+    try {
+      await addCartItem(
+        token,
+        deal.id,
+        1,
+      );
+
+      setActionMessage(
+        `Added "${
+          deal.product?.name ??
+          deal.title
+        }" to your cart.`,
+      );
+    } catch (err: unknown) {
+      setActionError(
+        err instanceof ApiRequestError
+          ? err.message
+          : 'Could not add to cart.',
+      );
+    }
+  };
+
+  /*
+   * Wishlist toggle.
+   */
+  const toggleFavorite = (
+    deal: CatalogDeal,
+  ) => {
+    if (!requireAuthOrRedirect()) {
+      return;
+    }
+
+    void toggleWishlist(deal.id);
+  };
 
   return (
-    <div id="main-content" className="products-page">
-      <title>{products.meta.listingTitle}</title>
-      <meta name="description" content={products.meta.listingDescription} />
-      <link rel="canonical" href={`${SITE_URL}/products`} />
-      <meta property="og:type" content="website" />
-      <meta property="og:title" content={products.meta.listingTitle} />
-      <meta property="og:description" content={products.meta.listingDescription} />
-      <meta property="og:url" content={`${SITE_URL}/products`} />
-      <meta name="twitter:card" content="summary" />
-      <meta name="twitter:title" content={products.meta.listingTitle} />
-      <meta name="twitter:description" content={products.meta.listingDescription} />
+    <div
+      id="main-content"
+      className="products-page"
+    >
+      {/* SEO */}
+      <title>
+        {products.meta.listingTitle}
+      </title>
+
+      <meta
+        name="description"
+        content={
+          products.meta.listingDescription
+        }
+      />
+
+      <link
+        rel="canonical"
+        href={`${SITE_URL}/products`}
+      />
+
+      <meta
+        property="og:type"
+        content="website"
+      />
+
+      <meta
+        property="og:title"
+        content={
+          products.meta.listingTitle
+        }
+      />
+
+      <meta
+        property="og:description"
+        content={
+          products.meta.listingDescription
+        }
+      />
+
+      <meta
+        property="og:url"
+        content={`${SITE_URL}/products`}
+      />
+
+      <meta
+        name="twitter:card"
+        content="summary"
+      />
+
+      <meta
+        name="twitter:title"
+        content={
+          products.meta.listingTitle
+        }
+      />
+
+      <meta
+        name="twitter:description"
+        content={
+          products.meta.listingDescription
+        }
+      />
+
+      {/* Breadcrumb structured data */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
-            '@context': 'https://schema.org',
+            '@context':
+              'https://schema.org',
             '@type': 'BreadcrumbList',
             itemListElement: [
-              { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/` },
-              { '@type': 'ListItem', position: 2, name: 'Products', item: `${SITE_URL}/products` },
+              {
+                '@type': 'ListItem',
+                position: 1,
+                name: 'Home',
+                item: `${SITE_URL}/`,
+              },
+              {
+                '@type': 'ListItem',
+                position: 2,
+                name: 'Products',
+                item: `${SITE_URL}/products`,
+              },
             ],
           }),
         }}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'ItemList',
-            name: products.meta.listingTitle,
-            url: `${SITE_URL}/products`,
-            numberOfItems: PRODUCTS.length,
-            itemListElement: PRODUCTS.map((p, i) => ({
-              '@type': 'ListItem',
-              position: i + 1,
-              name: p.name,
-              url: `${SITE_URL}/products/${p.id}`,
-            })),
-          }),
-        }}
-      />
+
+      {/* Product list structured data */}
+      {sortedDeals.length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context':
+                'https://schema.org',
+              '@type': 'ItemList',
+              name:
+                products.meta.listingTitle,
+              url: `${SITE_URL}/products`,
+              numberOfItems:
+                sortedDeals.length,
+              itemListElement:
+                sortedDeals.map(
+                  (deal, index) => ({
+                    '@type': 'ListItem',
+                    position: index + 1,
+                    name:
+                      deal.product?.name ??
+                      deal.title,
+                    url: `${SITE_URL}/products/${deal.id}`,
+                  }),
+                ),
+            }),
+          }}
+        />
+      )}
 
       {/* Breadcrumb */}
       <Breadcrumb
         className="products-page__breadcrumb"
         items={[
-          { label: 'Home', to: '/' },
-          { label: 'Products' },
+          {
+            label: 'Home',
+            to: '/',
+          },
+          {
+            label: 'Products',
+          },
         ]}
       />
 
       {/* Hero */}
-      <section className="products-page__hero" aria-label="Products overview">
+      <section
+        className="products-page__hero"
+        aria-label="Products overview"
+      >
         <div className="products-page__hero-inner">
-          <div className="products-page__hero-icon" aria-hidden="true">
-            <Icon>local_florist</Icon>
+          <div
+            className="products-page__hero-icon"
+            aria-hidden="true"
+          >
+            <Icon>
+              local_florist
+            </Icon>
           </div>
+
           <div>
-            <h1 className="products-page__title">{products.listing.title}</h1>
-            <p className="products-page__subtitle">{products.listing.subtitle}</p>
+            <h1 className="products-page__title">
+              {products.listing.title}
+            </h1>
+
+            <p className="products-page__subtitle">
+              {products.listing.subtitle}
+            </p>
           </div>
         </div>
       </section>
 
-      {/* Single sticky row: filter chips + sort */}
-      <div className="products-page__filter-bar" role="toolbar" aria-label="Filter and sort products">
+      {/* Search + Sort */}
+      <div
+        className="products-page__filter-bar"
+        role="toolbar"
+        aria-label="Search and sort products"
+      >
         <div className="products-page__filter-bar-inner">
-          <ChipSet aria-label="Filter by category">
-            {FILTERS.map((f) => (
-              <FilterChip
-                key={f.value}
-                label={f.label}
-                selected={activeFilter === f.value}
-                onClick={() => setActiveFilter(f.value)}
-              />
-            ))}
-          </ChipSet>
-          <span className="products-page__count" aria-live="polite" aria-atomic="true">
-            {filteredProducts.length} {products.listing.resultLabel}
+          <OutlinedTextField
+            label="Search"
+            value={search}
+            onInput={(event: Event) => {
+              const target =
+                event.target as HTMLInputElement;
+
+              setSearch(target.value);
+            }}
+          >
+            <Icon
+              slot="leading-icon"
+              aria-hidden="true"
+            >
+              search
+            </Icon>
+          </OutlinedTextField>
+
+          <span
+            className="products-page__count"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {loading
+              ? '…'
+              : `${sortedDeals.length} ${products.listing.resultLabel}`}
           </span>
+
           <OutlinedSelect
             className="products-page__sort-select"
-            label={products.listing.sortLabel}
+            label={
+              products.listing.sortLabel
+            }
             value={sort}
-            onInput={(e) => setSort((e.target as HTMLSelectElement).value as ProductSort)}
+            onInput={(event: Event) => {
+              const target =
+                event.target as HTMLSelectElement;
+
+              setSort(
+                target.value as ProductSort,
+              );
+            }}
           >
-            {products.listing.sortOptions.map((o) => (
-              <SelectOption key={o.value} value={o.value}>
-                {o.label}
-              </SelectOption>
-            ))}
+            {products.listing.sortOptions
+              .filter(
+                (option) =>
+                  option.value !==
+                  'newest',
+              )
+              .map((option) => (
+                <SelectOption
+                  key={option.value}
+                  value={option.value}
+                >
+                  {option.label}
+                </SelectOption>
+              ))}
           </OutlinedSelect>
         </div>
       </div>
 
       <Divider />
 
-      {/* Grid */}
-      <section className="products-page__grid-section" aria-label="Product results">
-        {filteredProducts.length === 0 ? (
-          <div className="products-page__empty" role="status">
+      {/* Action messages */}
+      {actionMessage && (
+        <p
+          className="field-hint"
+          role="status"
+        >
+          {actionMessage}
+        </p>
+      )}
+
+      {actionError && (
+        <p
+          className="error-state"
+          role="alert"
+        >
+          {actionError}
+        </p>
+      )}
+
+      {/* Product Grid */}
+      <section
+        className="products-page__grid-section"
+        aria-label="Product results"
+      >
+        {loading ? (
+          <p className="loading-state">
+            Loading products…
+          </p>
+        ) : error ? (
+          <p
+            className="error-state"
+            role="alert"
+          >
+            {error}
+          </p>
+        ) : sortedDeals.length === 0 ? (
+          <div
+            className="products-page__empty"
+            role="status"
+          >
             <sky-info-card
               icon="search_off"
-              heading={products.listing.emptyHeading}
-              subheading={products.listing.emptySubheading}
+              heading={
+                products.listing.emptyHeading
+              }
+              subheading={
+                products.listing
+                  .emptySubheading
+              }
             />
           </div>
         ) : (
           <div className="products-page__grid">
-            {filteredProducts.map((product) => (
-              <Link
-                key={product.id}
-                className="products-page__card-wrap"
-                to={`/products/${product.id}`}
-              >
-                <SkyProductCardWC
-                  variant="outlined"
-                  heading={product.name}
-                  eyebrow={product.brand}
-                  image={product.image}
-                  imageAlt={product.imageAlt}
-                  badge={CATEGORY_LABELS[product.categorySlug]}
-                  price={formatINR(product.price)}
-                  originalPrice={product.originalPrice ? formatINR(product.originalPrice) : undefined}
-                  discount={product.discount ? `${product.discount}% OFF` : undefined}
-                  favorite
-                  favoriteActive={has(product.id)}
-                  onFavorite={() => toggle(product.id)}
+            {sortedDeals.map((deal) => {
+              const productName =
+                deal.product?.name ??
+                deal.title;
+
+              const salePrice = Number(
+                deal.salePrice,
+              );
+
+              const originalPrice =
+                deal.originalPrice != null
+                  ? Number(
+                      deal.originalPrice,
+                    )
+                  : undefined;
+
+              const image = primaryImage(resolveDealMedia(deal));
+
+              return (
+                <div
+                  key={deal.id}
+                  className="products-page__card-wrap"
                 >
-                  <div
-                    className="products-page__card-cta"
-                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                  <SkyProductCardWC
+                    variant="outlined"
+                    heading={productName}
+                    eyebrow={
+                      deal.product?.brand ??
+                      deal.vendor
+                        ?.businessName ??
+                      undefined
+                    }
+                    image={image}
+                    imageAlt={
+                      deal.product
+                        ?.imageAlt ??
+                      productName
+                    }
+                    price={formatINR(
+                      salePrice,
+                    )}
+                    originalPrice={
+                      originalPrice !==
+                        undefined &&
+                      originalPrice !==
+                        salePrice
+                        ? formatINR(
+                            originalPrice,
+                          )
+                        : undefined
+                    }
+                    discount={
+                      deal.discountPercent
+                        ? `${deal.discountPercent}% OFF`
+                        : undefined
+                    }
+                    href={`/products/${deal.id}`}
+                    favorite
+                    favoriteActive={isWishlisted(
+                      deal.id,
+                    )}
+                    onFavorite={() =>
+                      toggleFavorite(deal)
+                    }
                   >
-                    <FilledButton
-                      className="products-page__card-btn"
-                      onClick={() => addItem(product.id)}
+                    <div
+                      className="products-page__card-cta"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
                     >
-                      <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-                      Add to Cart
-                    </FilledButton>
-                  </div>
-                </SkyProductCardWC>
-              </Link>
-            ))}
+                      <FilledButton
+                        type="button"
+                        className="products-page__card-btn"
+                        onClick={() =>
+                          void addToCart(
+                            deal,
+                          )
+                        }
+                      >
+                        <Icon
+                          slot="icon"
+                          aria-hidden="true"
+                        >
+                          shopping_bag
+                        </Icon>
+
+                        Add to Cart
+                      </FilledButton>
+                    </div>
+                  </SkyProductCardWC>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

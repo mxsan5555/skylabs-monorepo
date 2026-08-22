@@ -5,24 +5,32 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import content from '../../../content.json';
 import { requestOtp, verifyOtp } from '../../../api/rbac/auth';
 import { ApiRequestError } from '../../../api/rbac/client';
+import { resolvePostLoginPath } from '../../../auth/role-routing';
 const RESEND_SECONDS = 24;
 
 /**
  * OTP screen. Shows where the code was sent, takes the 6-digit code, and on
- * verify signs the user in and returns to `/account/dashboard`. Includes a
- * resend countdown. Wired to the real msd-api `/auth/otp/verify` endpoint —
- * `signIn()` (from `@skylabs-monorepo/shared-auth/react`) stores the token
- * and fetches `/rbac/bootstrap`, so the destination is always the same
- * regardless of the signed-in user's roles; what they can do once there is
- * driven entirely by `bootstrap.menu`/`bootstrap.permissions`.
+ * verify signs the user in. Includes a resend countdown. Wired to the real
+ * msd-api `/auth/otp/verify` endpoint — `signIn()` (from
+ * `@skylabs-monorepo/shared-auth/react`) stores the token and kicks off the
+ * `/rbac/bootstrap` fetch, but doesn't await it synchronously in a way this
+ * component can rely on (the `bootstrap` value here is only current after a
+ * re-render). So the redirect itself is driven by a `useEffect` that watches
+ * `bootstrap` becoming available post sign-in, then routes by role via
+ * `resolvePostLoginPath` — staff always land on `/account/dashboard`
+ * (unchanged), a vendor lands on the admin console, a customer lands on the
+ * storefront home, and a user holding both `customer` and `vendor` (the
+ * common case — self-registering as a vendor never removes `customer`) is
+ * sent to `/choose-experience` instead of guessing for them.
  */
 export function Otp() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn } = useAuth();
+  const { signIn, bootstrap, token } = useAuth();
   const [error, setError] = useState('');
   const otpContent = content.auth.otp;
   const [loading, setLoading] = useState(false);
+  const [awaitingBootstrap, setAwaitingBootstrap] = useState(false);
   const { identifier, method } = (location.state as {
     identifier: string;
     method: 'email' | 'phone';
@@ -36,6 +44,20 @@ export function Otp() {
   useEffect(() => {
     if (!identifier) { navigate('/sign-in', { replace: true }); }
   }, [identifier, navigate]);
+
+  // Once `signIn()` has kicked off the bootstrap fetch, wait for it to land in context, then
+  // route by role. If it fails (token cleared by `loadBootstrap`'s own error handling), fall
+  // back to an error instead of hanging on this screen forever.
+  useEffect(() => {
+    if (!awaitingBootstrap) return;
+    if (bootstrap) {
+      navigate(resolvePostLoginPath(bootstrap), { replace: true });
+    } else if (!token) {
+      setAwaitingBootstrap(false);
+      setError(otpContent.validation.invalidOtp);
+    }
+  }, [awaitingBootstrap, bootstrap, token, navigate, otpContent.validation.invalidOtp]);
+
   const verify = async () => {
     setError('');
     if (!code.trim()) {
@@ -53,8 +75,8 @@ export function Otp() {
     setLoading(true);
     try {
       const { data } = await verifyOtp(identifier, code);
-      await signIn(data.accessToken);
-      navigate('/account/dashboard', { replace: true });
+      await signIn(data.accessToken, data.refreshToken);
+      setAwaitingBootstrap(true);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : otpContent.validation.invalidOtp);
     } finally {
@@ -118,8 +140,8 @@ export function Otp() {
           }}
         />
         {error && <p className="auth-error">{error}</p>}
-        <FilledButton className="auth-submit" onClick={verify} disabled={loading || code.length !== 6}>
-          {loading ? otpContent.verifyingButton : otpContent.verifyButton}
+        <FilledButton className="auth-submit" onClick={verify} disabled={loading || awaitingBootstrap || code.length !== 6}>
+          {loading || awaitingBootstrap ? otpContent.verifyingButton : otpContent.verifyButton}
         </FilledButton>
       </div>
 

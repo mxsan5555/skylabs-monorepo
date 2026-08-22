@@ -1,4 +1,5 @@
-import { apiGet, apiPatch, apiPost } from './client';
+import { apiGet, apiPatch, apiPost, apiDelete } from './client';
+import type { MediaImage, MediaVideo } from '../media';
 
 export type VendorStatus =
   | 'PROFILE_INCOMPLETE'
@@ -69,6 +70,9 @@ export interface VendorFields {
 export interface Vendor extends Omit<VendorFields, 'businessName'> {
   id: string;
   businessName: string | null;
+  /** Public storefront URL slug (`/vendor/:slug`) — generated server-side from `businessName` at
+   *  creation time, never client-supplied or client-editable (see msd-api's `lib/slug.ts`). */
+  slug: string | null;
   ownerUserId: string | null;
   kycStatus: KycStatus;
   kycRejectionReason: string | null;
@@ -83,6 +87,11 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
   /** The existing User account this vendor is linked to — null if an admin created the
    *  profile without linking an owner yet. Never includes session/auth data. */
   owner: UserSummary | null;
+  /** Uploaded media (shared Deal/Product/Therapist/Vendor system) — the authoritative image/
+   *  video source going forward; `logoUrl` above is the legacy pasted-URL field, kept only for
+   *  rows that predate this table (see `resolveVendorMedia` in `utils/media.ts`). */
+  mediaImages?: MediaImage[];
+  mediaVideo?: MediaVideo | null;
 }
 
 export type VendorCreateInput = VendorFields & { ownerUserId?: string };
@@ -170,6 +179,38 @@ export interface Deal {
   /** Only present on the cross-vendor `GET /vendors/deals` sidebar listing. */
   vendor?: { id: string; businessName: string | null };
   branch?: { id: string; name: string };
+  /** The deal's own duration/price menu (a real child table — DealPackage — mirrors
+   *  TherapistPackage exactly). Always empty for a product deal. */
+  packages?: DealPackage[];
+  /** Uploaded media (shared Deal/Product/Therapist system) — the authoritative image/video
+   *  source going forward; `images` above is the legacy pasted-URL field, kept only for rows
+   *  that predate this table (see `resolveDealMedia` in `utils/media.ts`). */
+  mediaImages?: MediaImage[];
+  mediaVideo?: MediaVideo | null;
+}
+
+export interface DealPackage {
+  id: string;
+  dealId: string;
+  durationMinutes: number;
+  sellingPrice: string;
+  originalPrice: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** `id` present = update that existing package row; absent = create a new one — the whole array
+ *  is submitted together with the Deal create/update request and diffed server-side by `id`
+ *  (see vendor.service.ts#updateDeal). */
+export interface DealPackageInput {
+  id?: string;
+  durationMinutes: number;
+  sellingPrice: number;
+  originalPrice?: number;
+  isActive?: boolean;
+  sortOrder?: number;
 }
 
 export interface DealInput {
@@ -191,6 +232,9 @@ export interface DealInput {
   availableBookings?: number;
   startDate?: string;
   endDate?: string;
+  /** Required (>=1) for a service deal — omit entirely on update to leave existing packages
+   *  untouched. Never set for a product deal. */
+  packages?: DealPackageInput[];
 }
 
 function toQuery(params: Record<string, string | number | undefined>): string {
@@ -365,6 +409,142 @@ export function updateMyDeal(token: string | null, branchId: string, dealId: str
 
 export function setMyDealStatus(token: string | null, branchId: string, dealId: string, status: DealStatus) {
   return apiPatch<Deal>(`/vendors/me/branches/${branchId}/deals/${dealId}/status`, token, { status });
+}
+
+/** One row of the vendor's own customer list — everyone who has ordered from or booked
+ *  with this vendor. Flat, no nested objects, matching `GET /vendors/me/customers`. */
+export interface CustomerRow {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  orderCount: number;
+  bookingCount: number;
+  lastActivityAt: string;
+}
+
+/** The logged-in vendor's own customers, resolved server-side from the caller's JWT (never a
+ *  client-supplied vendorId) — same pattern as every other `/vendors/me/*` self-service route. */
+export function listMyCustomers(token: string | null, opts: { page?: number; pageSize?: number } = {}) {
+  return apiGet<CustomerRow[]>(`/vendors/me/customers${toQuery(opts)}`, token);
+}
+
+/** A vendor's customers as seen by the admin Vendor Detail view — same shape as the vendor's own
+ *  `listMyCustomers` above, scoped by an explicit `vendorId` instead of the caller's JWT. See
+ *  `GET /vendors/:vendorId/customers`, gated `vendors:view` — the same permission that already
+ *  guards this whole admin screen (mirrors `listVendorTherapistsForAdmin` below). */
+export function listVendorCustomersForAdmin(token: string | null, vendorId: string, opts: { page?: number; pageSize?: number } = {}) {
+  return apiGet<CustomerRow[]>(`/vendors/${vendorId}/customers${toQuery(opts)}`, token);
+}
+
+/** A therapist staffed at one of the vendor's own branches. Branch-scoped (not vendor-wide)
+ *  because bookings reference `vendorId`+`branchId` consistency — see `GET
+ *  /vendors/me/branches/:branchId/therapists`. */
+export interface Therapist {
+  id: string;
+  vendorId: string;
+  branchId: string;
+  /** The service/role label a customer browses by (e.g. "Legs Therapist") — distinct from
+   *  `personName` below, never merged into one field. */
+  therapistType: string;
+  /** The actual staff member (e.g. "Ramesh Kumar"). */
+  personName: string;
+  gender: string | null;
+  specialization: string | null;
+  bio: string | null;
+  experienceYears: number | null;
+  photoUrl: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  /** Uploaded media (shared Deal/Product/Therapist system) — the authoritative image/video
+   *  source going forward; `photoUrl` above is the legacy pasted-URL field, kept only for rows
+   *  that predate this table (see `resolveTherapistMedia` in `utils/media.ts`). */
+  mediaImages?: MediaImage[];
+  mediaVideo?: MediaVideo | null;
+}
+
+export interface TherapistInput {
+  therapistType: string;
+  personName: string;
+  gender?: string;
+  specialization?: string;
+  bio?: string;
+  experienceYears?: number;
+  photoUrl?: string;
+}
+
+export function listMyTherapists(token: string | null, branchId: string) {
+  return apiGet<Therapist[]>(`/vendors/me/branches/${branchId}/therapists`, token);
+}
+
+export function createTherapist(token: string | null, branchId: string, input: TherapistInput) {
+  return apiPost<Therapist>(`/vendors/me/branches/${branchId}/therapists`, token, input);
+}
+
+export function updateTherapist(token: string | null, therapistId: string, input: Partial<TherapistInput>) {
+  return apiPatch<Therapist>(`/vendors/me/therapists/${therapistId}`, token, input);
+}
+
+export function setTherapistStatus(token: string | null, therapistId: string, isActive: boolean) {
+  return apiPatch<Therapist>(`/vendors/me/therapists/${therapistId}/status`, token, { isActive });
+}
+
+/** A therapist as seen by the admin Vendor Detail view — every therapist across every branch
+ *  of a given vendor (active AND inactive; admin sees the full picture), with the branch it
+ *  belongs to nested in. See `GET /vendors/:vendorId/therapists`, gated `vendors:view` — the
+ *  same permission that already guards this whole admin screen. */
+export interface AdminTherapist extends Therapist {
+  branch: { id: string; name: string };
+}
+
+export function listVendorTherapistsForAdmin(token: string | null, vendorId: string) {
+  return apiGet<AdminTherapist[]>(`/vendors/${vendorId}/therapists`, token);
+}
+
+/** A therapist's own duration/price menu entry — independent of any Deal (no Deal picker, no
+ *  `dealId`; see msd-api's TherapistPackage schema doc comment). Combined with a Deal only at
+ *  purchase time, by matching `durationMinutes` — never by any shared id. See `GET
+ *  /vendors/me/therapists/:therapistId/packages`. */
+export interface TherapistPackage {
+  id: string;
+  therapistId: string;
+  durationMinutes: number;
+  sellingPrice: string;
+  originalPrice: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TherapistPackageInput {
+  durationMinutes: number;
+  sellingPrice: number;
+  originalPrice?: number;
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
+export function listTherapistPackages(token: string | null, therapistId: string) {
+  return apiGet<TherapistPackage[]>(`/vendors/me/therapists/${therapistId}/packages`, token);
+}
+
+export function createTherapistPackage(token: string | null, therapistId: string, input: TherapistPackageInput) {
+  return apiPost<TherapistPackage>(`/vendors/me/therapists/${therapistId}/packages`, token, input);
+}
+
+export function updateTherapistPackage(
+  token: string | null,
+  therapistId: string,
+  packageId: string,
+  input: Partial<TherapistPackageInput>,
+) {
+  return apiPatch<TherapistPackage>(`/vendors/me/therapists/${therapistId}/packages/${packageId}`, token, input);
+}
+
+export function deleteTherapistPackage(token: string | null, therapistId: string, packageId: string) {
+  return apiDelete<{ deleted: boolean }>(`/vendors/me/therapists/${therapistId}/packages/${packageId}`, token);
 }
 
 // ─── Reference lookups ────────────────────────────────────────────────────────

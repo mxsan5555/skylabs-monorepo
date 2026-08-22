@@ -4,12 +4,13 @@ import { requirePermission } from '../middleware/requirePermission';
 import { validateBody, validateParams } from '../middleware/validate';
 import { UuidParamSchema } from '../schemas/common.schema';
 import {
+  OrderCheckoutSchema,
   OrderFromBookingSchema,
   OrderCustomerCancelSchema,
   OrderStatusUpdateSchema,
   OrderListQuerySchema,
 } from '../schemas/order.schema';
-import { VerifyPaymentSchema } from '../schemas/payment.schema';
+import { VerifyPaymentSchema, OrderBatchSchema, VerifyBatchPaymentSchema } from '../schemas/payment.schema';
 import * as orderService from '../services/order.service';
 import * as paymentService from '../services/payment.service';
 import { writeAuditLog } from '../services/audit.service';
@@ -32,9 +33,9 @@ function requestMeta(req: import('express').Request) {
 
 // ─── Customer self-service ────────────────────────────────────────────────────
 
-router.post('/checkout', async (req, res, next) => {
+router.post('/checkout', validateBody(OrderCheckoutSchema), async (req, res, next) => {
   try {
-    const order = await orderService.createOrderFromCart(req.user!.sub);
+    const order = await orderService.createOrderFromCart(req.user!.sub, req.body);
     await writeAuditLog({
       actorUserId: req.user!.sub,
       action: 'order.create_from_cart',
@@ -51,7 +52,8 @@ router.post('/checkout', async (req, res, next) => {
 
 router.post('/from-booking', validateBody(OrderFromBookingSchema), async (req, res, next) => {
   try {
-    const order = await orderService.createOrderFromBooking(req.user!.sub, req.body.bookingId);
+    const { bookingId, ...contactDetails } = req.body;
+    const order = await orderService.createOrderFromBooking(req.user!.sub, bookingId, contactDetails);
     await writeAuditLog({
       actorUserId: req.user!.sub,
       action: 'order.create_from_booking',
@@ -114,6 +116,23 @@ router.post('/me/:id/pay', validateParams(UuidParamSchema), async (req, res, nex
   }
 });
 
+router.post('/me/:id/pay-cod', validateParams(UuidParamSchema), async (req, res, next) => {
+  try {
+    const { order } = await paymentService.createCodPayment(req.user!.sub, req.params.id);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'payment.cod_confirmed',
+      targetType: 'Order',
+      targetId: order.id,
+      after: { status: order.status },
+      ...requestMeta(req),
+    });
+    sendData(res, order);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post(
   '/me/:id/verify-payment',
   validateParams(UuidParamSchema),
@@ -136,12 +155,77 @@ router.post(
   },
 );
 
+// ─── Combined checkout (Deal + Therapist + Product together — one checkout action, one
+// payment, multiple Order rows under the hood; see payment.service.ts's `*Batch` functions) ──
+
+router.post('/pay-batch', validateBody(OrderBatchSchema), async (req, res, next) => {
+  try {
+    sendData(res, await paymentService.createOrReuseBatchPayment(req.user!.sub, req.body.orderIds));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/pay-batch/cod', validateBody(OrderBatchSchema), async (req, res, next) => {
+  try {
+    const { orders } = await paymentService.createCodBatchPayment(req.user!.sub, req.body.orderIds);
+    await Promise.all(
+      orders.map((order) =>
+        writeAuditLog({
+          actorUserId: req.user!.sub,
+          action: 'payment.cod_confirmed',
+          targetType: 'Order',
+          targetId: order.id,
+          after: { status: order.status },
+          ...requestMeta(req),
+        }),
+      ),
+    );
+    sendData(res, orders);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/pay-batch/verify', validateBody(VerifyBatchPaymentSchema), async (req, res, next) => {
+  try {
+    const { orderIds, ...verification } = req.body;
+    const { orders } = await paymentService.verifyBatchPayment(req.user!.sub, orderIds, verification);
+    await Promise.all(
+      orders.map((order) =>
+        writeAuditLog({
+          actorUserId: req.user!.sub,
+          action: 'payment.verified',
+          targetType: 'Order',
+          targetId: order.id,
+          after: { status: order.status },
+          ...requestMeta(req),
+        }),
+      ),
+    );
+    sendData(res, orders);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── Admin / vendor-scoped (existing `orders` permission) ────────────────────
 
 router.get('/', requirePermission('orders', 'view'), async (req, res, next) => {
   try {
-    const { page, pageSize, status, vendorId } = OrderListQuerySchema.parse(req.query);
-    const { items, total } = await orderService.listOrders(req.user!.sub, { page, pageSize, status, vendorId });
+    const { page, pageSize, status, vendorId, branchId, customerId, paymentStatus, createdFrom, createdTo, search } = OrderListQuerySchema.parse(req.query);
+    const { items, total } = await orderService.listOrders(req.user!.sub, {
+      page,
+      pageSize,
+      status,
+      vendorId,
+      branchId,
+      customerId,
+      paymentStatus,
+      createdFrom,
+      createdTo,
+      search,
+    });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);
@@ -163,7 +247,7 @@ router.patch(
   validateBody(OrderStatusUpdateSchema),
   async (req, res, next) => {
     try {
-      const order = await orderService.setOrderStatus(req.params.id, req.body.status, req.body.cancellationReason);
+      const order = await orderService.setOrderStatus(req.user!.sub, req.params.id, req.body.status, req.body.cancellationReason);
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'order.status_change',

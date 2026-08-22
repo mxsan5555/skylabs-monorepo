@@ -86,7 +86,7 @@ export function VendorUserPicker({ selectedUser, onSelect, disabled }: VendorUse
       <OutlinedTextField
         label="Search existing user by name / email / mobile"
         value={query}
-        disabled={disabled}
+        // disabled={disabled}
         onInput={(e: Event) => setQuery((e.target as HTMLInputElement).value)}
       />
       {loading && <p className="loading-state">Searching…</p>}

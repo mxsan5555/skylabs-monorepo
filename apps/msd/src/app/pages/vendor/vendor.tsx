@@ -1,7 +1,8 @@
-import { useState, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   FilledButton,
+  OutlinedButton,
   OutlinedIconButton,
   Icon,
   Divider,
@@ -9,137 +10,118 @@ import {
   ChipSet,
   FilterChip,
   SuggestionChip,
-  AssistChip,
-  Dialog,
-  TextButton,
-  OutlinedTextField,
+  Tabs,
+  PrimaryTab,
 } from '@skylabs-monorepo/shared-ui/react';
-import { getVendorBySlug } from '../../../data/vendors';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import {
+  getCatalogVendor,
+  listCatalogDeals,
+  type CatalogVendorDetail,
+  type CatalogVendorBranch,
+  type CatalogVendorTherapist,
+  type CatalogDeal,
+} from '../../../api/catalog';
+import { ApiRequestError } from '../../../api/rbac/client';
+import { addCartItem } from '../../../api/cart';
+import { createBooking } from '../../../api/bookings';
+import { useWishlist } from '../../../wishlist/wishlist-context';
+import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
+import { DurationPackageSelector } from '../../components/duration-package-selector';
+import { TherapistPackageSelector } from '../../components/therapist-package-selector';
+import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selection';
+import { useTherapistPurchaseSelection } from '../../../hooks/use-therapist-purchase-selection';
+import { formatINR, pluralize } from '../../../utils/format';
+import { resolveDealMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
+import { useToast } from '../../../toast/toast-context';
+import './vendor.css';
 
 const SITE_URL: string = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
 
-const DAY_MAP: Record<string, string> = {
-  Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday',
-  Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday',
+const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+const DAY_LABELS: Record<(typeof DAY_ORDER)[number], string> = {
+  mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday',
 };
 
-function to24h(time: string | null): string {
-  if (!time) return '00:00';
-  const [hm, period] = time.split(' ');
-  let [h, m] = hm.split(':').map(Number);
-  if (period === 'PM' && h !== 12) h += 12;
-  if (period === 'AM' && h === 12) h = 0;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+/** Builds schema.org `OpeningHoursSpecification` entries from `Branch.openingHours`
+ *  (`{ mon: "09:00-20:00", sun: "closed", ... }`) — skips closed/unset days. */
+function buildOpeningHoursSpecification(hours: Record<string, string>) {
+  return DAY_ORDER
+    .filter((day) => hours[day] && hours[day] !== 'closed')
+    .map((day) => {
+      const [opens, closes] = hours[day].split('-');
+      return {
+        '@type': 'OpeningHoursSpecification',
+        dayOfWeek: `https://schema.org/${DAY_LABELS[day]}`,
+        opens,
+        closes,
+      };
+    });
 }
-import { formatINR } from '../../../utils/format';
-import type { VendorService, DealVariant } from '../../../types';
-import './vendor.css';
 
-// ── Mock review data ───────────────────────────────────────────────────────────
+// ── Deal grouping: Category → Sub-category → one Deal per Service ─────────────
+//
+// Each Service now maps to exactly ONE Deal (DealPackage is the child table holding every
+// duration/price option — see DealPackage's schema doc comment in msd-api; the old
+// sibling-Deal-rows-per-duration pattern no longer exists). This grouping exists purely to build
+// Category/Sub-category section headers for display.
 
-interface Review {
+interface ServiceGroup {
   id: string;
-  author: string;
-  rating: number;
-  date: string;
-  comment: string;
+  name: string;
+  deal: CatalogDeal;
 }
 
-const MOCK_VENDOR_REVIEWS: Review[] = [
-  { id: 'r1', author: 'Priya S.', rating: 5, date: '15 Jul 2026', comment: 'Absolutely loved the experience! The therapists are highly skilled and the ambience is perfect.' },
-  { id: 'r2', author: 'Rahul M.', rating: 4, date: '10 Jul 2026', comment: 'Great place for a relaxing weekend. Would love if they extended Sunday hours.' },
-  { id: 'r3', author: 'Ananya K.', rating: 5, date: '3 Jul 2026', comment: 'Best spa in Koramangala. The organic products they use are top notch.' },
-];
+interface SubcategoryGroup {
+  name: string | null;
+  services: ServiceGroup[];
+}
 
-const MOCK_DEAL_REVIEWS: Record<string, Review[]> = {
-  'vs-01': [
-    { id: 'dr1', author: 'Sneha T.', rating: 5, date: '18 Jul 2026', comment: 'The Swedish massage was divine. Left feeling like a new person!' },
-    { id: 'dr2', author: 'Vikram P.', rating: 4, date: '12 Jul 2026', comment: 'Good pressure, very relaxing. The herbal tea after was a lovely touch.' },
-  ],
-  'vs-02': [
-    { id: 'dr3', author: 'Kavitha R.', rating: 5, date: '20 Jul 2026', comment: 'My back pain is completely gone after just one session. Highly recommended.' },
-  ],
-  'vs-03': [
-    { id: 'dr4', author: 'Meera D.', rating: 5, date: '22 Jul 2026', comment: 'The lavender blend was so soothing. I fell asleep halfway through — in the best way.' },
-  ],
-  'vs-04': [
-    { id: 'dr5', author: 'Rohan G.', rating: 5, date: '25 Jul 2026', comment: 'Skin looked visibly brighter the next day. Worth every rupee.' },
-    { id: 'dr6', author: 'Nisha A.', rating: 4, date: '19 Jul 2026', comment: 'Very professional. The LED therapy at the end was a nice bonus.' },
-  ],
-  'vs-05': [
-    { id: 'dr7', author: 'Divya L.', rating: 4, date: '16 Jul 2026', comment: 'Loved the gold serum. Skin felt plump and glowing for almost a week.' },
-  ],
-  'vs-06': [
-    { id: 'dr8', author: 'Arun & Pooja', rating: 5, date: '14 Jul 2026', comment: 'Best anniversary treat ever! The suite was beautifully set up for us.' },
-  ],
-  'vs-07': [
-    { id: 'dr9', author: 'Kiran B.', rating: 5, date: '11 Jul 2026', comment: 'The rose bath was magical. A truly special experience from start to finish.' },
-  ],
-};
+interface CategoryGroup {
+  name: string;
+  subcategories: SubcategoryGroup[];
+}
 
-// ── Review list sub-component ──────────────────────────────────────────────────
+function getOrCreate<K, V>(map: Map<K, V>, key: K, create: () => V): V {
+  const existing = map.get(key);
+  if (existing) return existing;
+  const created = create();
+  map.set(key, created);
+  return created;
+}
 
-function ReviewList({ reviews }: { reviews: Review[] }) {
-  if (reviews.length === 0) {
-    return <p className="vendor-page__dialog-empty">No reviews yet. Be the first!</p>;
+function groupServiceDeals(deals: CatalogDeal[]): CategoryGroup[] {
+  const categories = new Map<string, Map<string, Map<string, ServiceGroup>>>();
+  for (const deal of deals) {
+    if (!deal.service) continue;
+    const service = deal.service;
+    const categoryName = deal.category?.name ?? 'Other Services';
+    const subKey = deal.subcategory?.name ?? '';
+    const subMap = getOrCreate(categories, categoryName, () => new Map());
+    const serviceMap = getOrCreate(subMap, subKey, () => new Map());
+    // One Deal per Service — if a stray duplicate somehow exists, the first wins.
+    getOrCreate(serviceMap, service.id, () => ({ id: service.id, name: service.name, deal }));
   }
-  return (
-    <ul className="vendor-page__review-list" aria-label="Customer reviews">
-      {reviews.map((r) => (
-        <li key={r.id} className="vendor-page__review-item">
-          <div className="vendor-page__review-header">
-            <span className="vendor-page__review-author">{r.author}</span>
-            <span className="vendor-page__review-stars" aria-label={`${r.rating} out of 5 stars`}>
-              {'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}
-            </span>
-            <span className="vendor-page__review-date">{r.date}</span>
-          </div>
-          <p className="vendor-page__review-comment">{r.comment}</p>
-        </li>
-      ))}
-    </ul>
-  );
+  return Array.from(categories.entries()).map(([name, subMap]) => ({
+    name,
+    subcategories: Array.from(subMap.entries()).map(([subKey, serviceMap]) => ({
+      name: subKey === '' ? null : subKey,
+      services: Array.from(serviceMap.values()),
+    })),
+  }));
 }
 
-// ── Review form sub-component ──────────────────────────────────────────────────
+/** Cheapest active package's price, for a listing card's "From ₹X" line — falls back to the
+ *  Deal's own synced salePrice when it has no packages yet (a legacy/safety-net deal). */
+function dealFromPrice(deal: CatalogDeal): number {
+  if (deal.packages.length === 0) return Number(deal.salePrice);
+  return Math.min(...deal.packages.map((p) => Number(p.sellingPrice)));
+}
 
-function ReviewForm({
-  reviewText,
-  reviewRating,
-  onTextChange,
-  onRatingChange,
-}: {
-  reviewText: string;
-  reviewRating: number;
-  onTextChange: (v: string) => void;
-  onRatingChange: (v: number) => void;
-}) {
-  return (
-    <div className="vendor-page__review-form">
-      <p className="vendor-page__review-form-label">Add Your Review</p>
-      <div className="vendor-page__star-picker" role="group" aria-label="Select your rating">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button
-            key={n}
-            type="button"
-            className={`vendor-page__star-btn${reviewRating >= n ? ' vendor-page__star-btn--active' : ''}`}
-            onClick={() => onRatingChange(n)}
-            aria-label={`Rate ${n} star${n > 1 ? 's' : ''}`}
-            aria-pressed={reviewRating >= n}
-          >
-            ★
-          </button>
-        ))}
-      </div>
-      <OutlinedTextField
-        label="Write your review"
-        value={reviewText}
-        onInput={(e) => onTextChange((e.target as HTMLInputElement).value)}
-        className="vendor-page__review-field"
-      />
-    </div>
-  );
+function therapistFromPrice(therapist: CatalogVendorTherapist): number | null {
+  if (therapist.packages.length === 0) return null;
+  return Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)));
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -147,70 +129,151 @@ function ReviewForm({
 export function VendorPage() {
   const { slug = '' } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const { has: isWishlisted, toggle: toggleWishlist, isPending: wishlistPending } = useWishlist();
+  const { showToast } = useToast();
 
-  const vendor = getVendorBySlug(slug);
+  const [vendor, setVendor] = useState<CatalogVendorDetail | null>(null);
+  const [vendorLoading, setVendorLoading] = useState(true);
+  const [vendorError, setVendorError] = useState('');
 
-  const [activeCatSlug, setActiveCatSlug] = useState<string>('all');
+  const [branchIndex, setBranchIndex] = useState(0);
+
+  const [serviceDeals, setServiceDeals] = useState<CatalogDeal[]>([]);
+  const [productDeals, setProductDeals] = useState<CatalogDeal[]>([]);
+  const [dealsLoading, setDealsLoading] = useState(true);
+  const [dealsError, setDealsError] = useState('');
+
+  const [activeCategoryName, setActiveCategoryName] = useState('all');
+  // Exactly one of these is ever set — selecting a Deal clears the Therapist selection and vice
+  // versa (same "one selection, one side panel" flow for both — see #8 of this app's UX rules).
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
-  const [qty, setQty] = useState(1);
+  const [selectedTherapistCardId, setSelectedTherapistCardId] = useState<string | null>(null);
 
-  // Review form state
-  const [vendorReviewText, setVendorReviewText] = useState('');
-  const [vendorReviewRating, setVendorReviewRating] = useState(5);
-  const [dealReviewText, setDealReviewText] = useState('');
-  const [dealReviewRating, setDealReviewRating] = useState(5);
+  const [productActionMessage, setProductActionMessage] = useState('');
+  const [productActionError, setProductActionError] = useState('');
 
-  // Dialog refs
-  const vendorDialogRef = useRef<HTMLElement & { show(): void; close(): void }>(null);
-  const dealDialogRef = useRef<HTMLElement & { show(): void; close(): void }>(null);
+  const { token } = useAuth();
 
-  const filteredServices = useMemo<VendorService[]>(() => {
-    if (!vendor) return [];
-    if (activeCatSlug === 'all') return vendor.services;
-    return vendor.services.filter((s) => s.vendorCategorySlug === activeCatSlug);
-  }, [vendor, activeCatSlug]);
+  // ── Fetch vendor by slug ─────────────────────────────────────────────────
+  useEffect(() => {
+    setVendorLoading(true);
+    setVendorError('');
+    setVendor(null);
+    setBranchIndex(0);
+    getCatalogVendor(slug)
+      .then(({ data }) => setVendor(data))
+      .catch((err) => {
+        // A 404 here just means "unknown/inactive vendor slug" — render as not-found, not an error banner.
+        if (err instanceof ApiRequestError && err.status === 404) {
+          setVendor(null);
+        } else {
+          setVendorError(err instanceof ApiRequestError ? err.message : 'Could not load this vendor.');
+        }
+      })
+      .finally(() => setVendorLoading(false));
+  }, [slug]);
 
-  const activeService = useMemo<VendorService | null>(() => {
-    if (filteredServices.length === 0) return null;
-    return filteredServices.find((s) => s.id === selectedServiceId) ?? null;
-  }, [filteredServices, selectedServiceId]);
+  const selectedBranch: CatalogVendorBranch | null = vendor?.branches[branchIndex] ?? vendor?.branches[0] ?? null;
 
-  const activeVariant = useMemo<DealVariant | null>(() => {
-    if (!activeService) return null;
-    return (
-      activeService.variants.find((v) => v.id === selectedVariantId) ??
-      activeService.variants[0]
-    );
-  }, [activeService, selectedVariantId]);
-
-  const total = activeVariant ? activeVariant.price * qty : 0;
-
-  const dealReviews = activeService ? (MOCK_DEAL_REVIEWS[activeService.id] ?? []) : [];
-
-  const handleCategorySelect = (catSlug: string) => {
-    setActiveCatSlug(catSlug);
+  const resetSelection = () => {
+    setActiveCategoryName('all');
     setSelectedServiceId(null);
-    setSelectedVariantId(null);
-    setQty(1);
+    setSelectedTherapistCardId(null);
+    setProductActionError('');
+    setProductActionMessage('');
   };
 
-  const handleServiceSelect = (serviceId: string) => {
-    if (serviceId !== selectedServiceId) {
-      setSelectedVariantId(null);
-      setQty(1);
+  const handleBranchSelect = (index: number) => {
+    setBranchIndex(index);
+    resetSelection();
+  };
+
+  // ── Fetch services + products for the selected branch ───────────────────
+  useEffect(() => {
+    if (!vendor || !selectedBranch) return;
+    setDealsLoading(true);
+    setDealsError('');
+    Promise.all([
+      listCatalogDeals({ vendorId: vendor.id, branchId: selectedBranch.id, type: 'service', pageSize: 100 }),
+      listCatalogDeals({ vendorId: vendor.id, branchId: selectedBranch.id, type: 'product', pageSize: 100 }),
+    ])
+      .then(([services, products]) => {
+        setServiceDeals(services.data);
+        setProductDeals(products.data);
+      })
+      .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : 'Could not load services and products.'))
+      .finally(() => setDealsLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendor, selectedBranch?.id]);
+
+  const categoryGroups = useMemo(() => groupServiceDeals(serviceDeals), [serviceDeals]);
+  const categoryNames = useMemo(() => categoryGroups.map((c) => c.name), [categoryGroups]);
+  const displayedCategoryGroups = activeCategoryName === 'all'
+    ? categoryGroups
+    : categoryGroups.filter((c) => c.name === activeCategoryName);
+  const allServiceGroups = useMemo(
+    () => categoryGroups.flatMap((c) => c.subcategories.flatMap((s) => s.services)),
+    [categoryGroups],
+  );
+
+  const activeGroup = allServiceGroups.find((g) => g.id === selectedServiceId) ?? null;
+  const activeTherapist = selectedBranch?.therapists.find((t) => t.id === selectedTherapistCardId) ?? null;
+
+  const handleCategoryFilter = (name: string) => {
+    setActiveCategoryName(name);
+    setSelectedServiceId(null);
+  };
+
+  const handleServiceSelect = (group: ServiceGroup) => {
+    setSelectedServiceId(group.id);
+    setSelectedTherapistCardId(null);
+  };
+
+  const handleTherapistSelect = (therapistId: string) => {
+    setSelectedTherapistCardId(therapistId);
+    setSelectedServiceId(null);
+  };
+
+  const requireAuthOrRedirect = () => {
+    if (isAuthenticated) return true;
+    navigate(`/sign-in?next=${encodeURIComponent(`/vendor/${slug}`)}`);
+    return false;
+  };
+
+  const toggleFavorite = (deal: CatalogDeal) => {
+    if (!requireAuthOrRedirect()) return;
+    void toggleWishlist(deal.id);
+  };
+
+  const addProductToCart = async (deal: CatalogDeal) => {
+    if (!requireAuthOrRedirect()) return;
+    setProductActionError('');
+    setProductActionMessage('');
+    try {
+      await addCartItem(token, deal.id, 1);
+      const name = deal.product?.name ?? deal.title;
+      setProductActionMessage(`Added "${name}" to your cart.`);
+      showToast(`Added to cart\n${name}`);
+    } catch (err) {
+      const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
+      setProductActionError(message);
+      showToast(message, 'error');
     }
-    setSelectedServiceId(serviceId);
   };
 
-  if (!vendor) {
+  if (vendorLoading) {
+    return <p className="loading-state">Loading vendor…</p>;
+  }
+
+  if (vendorError || !vendor) {
     return (
       <div className="vendor-page vendor-page--empty">
         <title>Vendor Not Found | MSD</title>
         <sky-info-card
           icon="search_off"
           heading="Vendor not found"
-          subheading="This vendor may no longer be available."
+          subheading={vendorError || 'This vendor may no longer be available.'}
         />
         <FilledButton onClick={() => navigate('/explore')}>Browse Services</FilledButton>
       </div>
@@ -218,53 +281,43 @@ export function VendorPage() {
   }
 
   const canonicalUrl = `${SITE_URL}/vendor/${vendor.slug}`;
+  const metaDescription = vendor.businessDescription
+    ?? `Book services at ${vendor.businessName}${vendor.city ? `, ${vendor.city}` : ''}.`;
 
   return (
     <div id="main-content" className="vendor-page">
-      <title>{`${vendor.name} | MSD`}</title>
-      <meta
-        name="description"
-        content={`${vendor.tagline ?? vendor.description} — Book services at ${vendor.name}, ${vendor.location}.`}
-      />
+      <title>{`${vendor.businessName} | MSD`}</title>
+      <meta name="description" content={metaDescription} />
       <link rel="canonical" href={canonicalUrl} />
       <meta property="og:type" content="business.business" />
-      <meta property="og:title" content={`${vendor.name} | MSD`} />
-      <meta property="og:description" content={`${vendor.tagline ?? vendor.description} — Book services at ${vendor.name}, ${vendor.location}.`} />
-      <meta property="og:image" content={vendor.coverImage} />
+      <meta property="og:title" content={`${vendor.businessName} | MSD`} />
+      <meta property="og:description" content={metaDescription} />
+      {vendor.logoUrl && <meta property="og:image" content={vendor.logoUrl} />}
       <meta property="og:url" content={canonicalUrl} />
       <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content={`${vendor.name} | MSD`} />
-      <meta name="twitter:description" content={(vendor.tagline ?? vendor.description).slice(0, 155)} />
-      <meta name="twitter:image" content={vendor.coverImage} />
+      <meta name="twitter:title" content={`${vendor.businessName} | MSD`} />
+      <meta name="twitter:description" content={metaDescription.slice(0, 155)} />
+      {vendor.logoUrl && <meta name="twitter:image" content={vendor.logoUrl} />}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'LocalBusiness',
-            name: vendor.name,
-            description: vendor.description,
-            image: vendor.coverImage,
+            name: vendor.businessName,
+            description: vendor.businessDescription ?? undefined,
+            image: vendor.logoUrl ?? undefined,
             url: canonicalUrl,
             address: {
               '@type': 'PostalAddress',
-              addressLocality: vendor.location,
+              streetAddress: selectedBranch?.address ?? vendor.address ?? undefined,
+              addressLocality: selectedBranch?.city ?? vendor.city ?? undefined,
+              addressRegion: selectedBranch?.state ?? vendor.state ?? undefined,
               addressCountry: 'IN',
             },
-            aggregateRating: {
-              '@type': 'AggregateRating',
-              ratingValue: vendor.rating,
-              reviewCount: vendor.reviews,
-              bestRating: 5,
-            },
-            openingHoursSpecification: (vendor.openingHours ?? [])
-              .filter((h) => h.open && h.close)
-              .map((h) => ({
-                '@type': 'OpeningHoursSpecification',
-                dayOfWeek: `https://schema.org/${DAY_MAP[h.day] ?? h.day}`,
-                opens: to24h(h.open),
-                closes: to24h(h.close),
-              })),
+            openingHoursSpecification: selectedBranch?.openingHours
+              ? buildOpeningHoursSpecification(selectedBranch.openingHours)
+              : undefined,
           }),
         }}
       />
@@ -277,7 +330,7 @@ export function VendorPage() {
             itemListElement: [
               { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/` },
               { '@type': 'ListItem', position: 2, name: 'Explore', item: `${SITE_URL}/explore` },
-              { '@type': 'ListItem', position: 3, name: vendor.name, item: canonicalUrl },
+              { '@type': 'ListItem', position: 3, name: vendor.businessName, item: canonicalUrl },
             ],
           }),
         }}
@@ -289,13 +342,13 @@ export function VendorPage() {
         items={[
           { label: 'Home', to: '/' },
           { label: 'Explore', to: '/explore' },
-          { label: vendor.name },
+          { label: vendor.businessName },
         ]}
       />
 
-      {/* Hero — full-bleed background image */}
-      <div className="vendor-page__hero" aria-hidden="true">
-        <img src={vendor.coverImage} alt="" />
+      {/* Hero — full-bleed background image, gradient fallback when no logo */}
+      <div className={`vendor-page__hero${vendor.logoUrl ? '' : ' vendor-page__hero--placeholder'}`} aria-hidden="true">
+        {vendor.logoUrl && <img src={vendor.logoUrl} alt="" />}
       </div>
 
       {/* Two-panel body overlapping the hero */}
@@ -307,158 +360,298 @@ export function VendorPage() {
           {/* Company header */}
           <div className="vendor-page__company-row">
             <div className="vendor-page__company-info">
-              <h1 className="vendor-page__company-name">{vendor.name}</h1>
-              {vendor.tagline && (
-                <p className="vendor-page__company-tagline">{vendor.tagline}</p>
+              <h1 className="vendor-page__company-name">{vendor.businessName}</h1>
+              {vendor.businessDescription && (
+                <p className="vendor-page__company-tagline">{vendor.businessDescription}</p>
               )}
               <div className="vendor-page__company-meta">
-                <span className="vendor-page__rating-row">
-                  <span
-                    aria-label={`Rated ${vendor.rating} out of 5, ${vendor.reviews.toLocaleString()} reviews`}
-                    className="vendor-page__rating-inline"
-                  >
-                    <span className="vendor-page__star" aria-hidden="true">★</span>
-                    {vendor.rating}
-                    <span className="vendor-page__review-count">
-                      ({vendor.reviews.toLocaleString()})
-                    </span>
+                {(selectedBranch?.address || selectedBranch?.city || vendor.city) && (
+                  <span className="vendor-page__location-row">
+                    <Icon aria-hidden="true" className="vendor-page__meta-icon">location_on</Icon>
+                    {[selectedBranch?.address, selectedBranch?.city ?? vendor.city, selectedBranch?.state ?? vendor.state]
+                      .filter(Boolean)
+                      .join(', ')}
                   </span>
-                  <TextButton
-                    onClick={() => vendorDialogRef.current?.show()}
-                    aria-label="See all company reviews"
-                  >
-                    See Reviews
-                  </TextButton>
-                </span>
-                <span className="vendor-page__location-row">
-                  <Icon aria-hidden="true" className="vendor-page__meta-icon">location_on</Icon>
-                  {vendor.location}
-                </span>
-                <span role="status">
-                  <sky-badge variant={vendor.isOpen ? 'primary' : 'error'}>
-                    {vendor.isOpen ? 'Open Now' : 'Closed'}
-                  </sky-badge>
-                </span>
+                )}
               </div>
             </div>
-            <img
-              className="vendor-page__company-img"
-              src={vendor.coverImage}
-              alt={vendor.coverImageAlt}
-              loading="eager"
-            />
+            {vendor.logoUrl && (
+              <img
+                className="vendor-page__company-img"
+                src={vendor.logoUrl}
+                alt={`${vendor.businessName} logo`}
+                loading="eager"
+              />
+            )}
           </div>
 
+          {/* Branch selector — only when there's a real choice to make */}
+          {vendor.branches.length > 1 && (
+            <div className="vendor-page__branch-tabs-wrap">
+              <Tabs
+                className="vendor-page__branch-tabs"
+                onChange={(e) => handleBranchSelect((e.target as unknown as { activeTabIndex: number }).activeTabIndex)}
+              >
+                {vendor.branches.map((b, i) => (
+                  <PrimaryTab key={b.id} active={i === branchIndex}>{b.name}</PrimaryTab>
+                ))}
+              </Tabs>
+            </div>
+          )}
+
           {/* Opening hours */}
-          {vendor.openingHours && vendor.openingHours.length > 0 && (
+          {selectedBranch?.openingHours && (
             <div className="vendor-page__hours-section">
               <h2 className="vendor-page__hours-title">Working Hours</h2>
               <div className="vendor-page__hours-grid">
-                {vendor.openingHours.map(({ day, open, close }) => (
-                  <div key={day} className="vendor-page__hours-row">
-                    <span className="vendor-page__hours-day">{day}</span>
-                    <span className="vendor-page__hours-time">
-                      {open && close ? `${open} – ${close}` : 'Closed'}
-                    </span>
-                  </div>
-                ))}
+                {DAY_ORDER.map((day) => {
+                  const raw = selectedBranch.openingHours?.[day];
+                  const closed = !raw || raw === 'closed';
+                  return (
+                    <div key={day} className="vendor-page__hours-row">
+                      <span className="vendor-page__hours-day">{DAY_LABELS[day]}</span>
+                      <span className="vendor-page__hours-time">
+                        {closed ? 'Closed' : raw.replace('-', ' – ')}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
 
           <Divider />
 
-          {/* Select Service */}
-          <section className="vendor-page__section">
+          {/* Select Service (Deal) — one card per Deal, "From ₹X" is the cheapest active package */}
+          <section className="vendor-page__section" aria-label="Services">
             <h2 className="vendor-page__section-title">Select Service</h2>
-            <ChipSet aria-label="Filter by service category">
-              <FilterChip
-                label="All"
-                selected={activeCatSlug === 'all'}
-                onClick={() => handleCategorySelect('all')}
-              />
-              {vendor.categories.map((cat) => (
+
+            {categoryNames.length > 1 && (
+              <ChipSet aria-label="Filter by service category">
                 <FilterChip
-                  key={cat.slug}
-                  label={cat.name}
-                  selected={activeCatSlug === cat.slug}
-                  onClick={() => handleCategorySelect(cat.slug)}
+                  label="All"
+                  selected={activeCategoryName === 'all'}
+                  onClick={() => handleCategoryFilter('all')}
                 />
-              ))}
-            </ChipSet>
+                {categoryNames.map((name) => (
+                  <FilterChip
+                    key={name}
+                    label={name}
+                    selected={activeCategoryName === name}
+                    onClick={() => handleCategoryFilter(name)}
+                  />
+                ))}
+              </ChipSet>
+            )}
+
+            {dealsLoading ? (
+              <p className="loading-state">Loading services…</p>
+            ) : dealsError ? (
+              <p className="error-state" role="alert">{dealsError}</p>
+            ) : displayedCategoryGroups.length === 0 ? (
+              <p className="vendor-page__deal-empty">No services available at this branch.</p>
+            ) : (
+              <div className="vendor-page__deal-groups">
+                {displayedCategoryGroups.map((cat) => {
+                  const CategoryHeading = categoryNames.length > 1 ? 'h3' : null;
+                  const SubHeading = CategoryHeading ? 'h4' : 'h3';
+                  return (
+                    <div key={cat.name} className="vendor-page__category-group">
+                      {CategoryHeading && (
+                        <CategoryHeading className="vendor-page__category-heading">{cat.name}</CategoryHeading>
+                      )}
+                      {cat.subcategories.map((sub) => (
+                        <div key={sub.name ?? '__none__'} className="vendor-page__subcategory-group">
+                          {sub.name && (
+                            <SubHeading className="vendor-page__subcategory-heading">{sub.name}</SubHeading>
+                          )}
+                          <div
+                            className="vendor-page__deal-list"
+                            role="radiogroup"
+                            aria-label={`${sub.name ?? cat.name} services`}
+                          >
+                            {sub.services.map((group) => {
+                              const isSelected = group.id === selectedServiceId;
+                              const deal = group.deal;
+                              const fromPrice = dealFromPrice(deal);
+                              const thumb = primaryImage(resolveDealMedia(deal));
+                              return (
+                                <label
+                                  key={group.id}
+                                  htmlFor={`deal-${group.id}`}
+                                  className={`vendor-page__deal-card${isSelected ? ' vendor-page__deal-card--selected' : ''}`}
+                                >
+                                  <Radio
+                                    id={`deal-${group.id}`}
+                                    name="deal-selection"
+                                    value={group.id}
+                                    checked={isSelected}
+                                    onChange={() => handleServiceSelect(group)}
+                                  />
+
+                                  {thumb && (
+                                    <img
+                                      className="vendor-page__deal-card-img"
+                                      src={thumb}
+                                      alt={deal.service?.imageAlt ?? ''}
+                                      loading="lazy"
+                                      width={120}
+                                      height={80}
+                                    />
+                                  )}
+
+                                  <div className="vendor-page__deal-card-body">
+                                    <div className="vendor-page__deal-card-title">{group.name}</div>
+                                    {deal.shortDescription && (
+                                      <div className="vendor-page__deal-card-desc">{deal.shortDescription}</div>
+                                    )}
+                                    <div className="vendor-page__deal-card-meta">
+                                      <ChipSet>
+                                        {deal.packages.length > 1 && (
+                                          <SuggestionChip label={`${deal.packages.length} packages`} />
+                                        )}
+                                      </ChipSet>
+                                      <span className="vendor-page__deal-price">From {formatINR(fromPrice)}</span>
+                                    </div>
+                                  </div>
+                                  <span
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                  >
+                                    <OutlinedIconButton
+                                      aria-label={isWishlisted(deal.id) ? 'Remove from wishlist' : 'Save to wishlist'}
+                                      aria-pressed={isWishlisted(deal.id)}
+                                      disabled={wishlistPending(deal.id)}
+                                      onClick={() => toggleFavorite(deal)}
+                                    >
+                                      <Icon aria-hidden="true">{isWishlisted(deal.id) ? 'favorite' : 'favorite_border'}</Icon>
+                                    </OutlinedIconButton>
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
-          {/* Select Deal */}
-          <section className="vendor-page__section">
-            <h2 className="vendor-page__section-title">Select Deal</h2>
-            <div
-              className="vendor-page__deal-list"
-              role="radiogroup"
-              aria-label="Available services"
-            >
-              {filteredServices.length === 0 ? (
-                <p className="vendor-page__deal-empty">No services in this category.</p>
-              ) : (
-                filteredServices.map((service) => {
-                  const isSelected = service.id === selectedServiceId;
-                  const cat = vendor.categories.find(
-                    (c) => c.slug === service.vendorCategorySlug,
-                  );
+          <Divider />
+
+          {/* Products */}
+          <section className="vendor-page__section" aria-label="Products">
+            <h2 className="vendor-page__section-title">Products</h2>
+            {productActionMessage && <p className="field-hint" role="status">{productActionMessage}</p>}
+            {productActionError && <p className="error-state" role="alert">{productActionError}</p>}
+            {dealsLoading ? (
+              <p className="loading-state">Loading products…</p>
+            ) : productDeals.length === 0 ? (
+              <p className="vendor-page__deal-empty">No products available at this branch.</p>
+            ) : (
+              <ul className="vendor-page__product-grid">
+                {productDeals.map((deal) => (
+                  <li key={deal.id}>
+                    <SkyProductCardWC
+                      variant="outlined"
+                      badge="Product"
+                      eyebrow={deal.product?.brand ?? undefined}
+                      heading={deal.product?.name ?? deal.title}
+                      image={primaryImage(resolveDealMedia(deal))}
+                      imageAlt={deal.product?.imageAlt ?? undefined}
+                      price={formatINR(Number(deal.salePrice))}
+                      originalPrice={
+                        deal.originalPrice && Number(deal.originalPrice) !== Number(deal.salePrice)
+                          ? formatINR(Number(deal.originalPrice))
+                          : undefined
+                      }
+                      discount={deal.discountPercent ? `-${deal.discountPercent}%` : undefined}
+                      href={`/products/${deal.id}`}
+                      favorite
+                      favoriteActive={isWishlisted(deal.id)}
+                      onFavorite={() => toggleFavorite(deal)}
+                    >
+                      <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
+                        <FilledButton onClick={() => addProductToCart(deal)}>
+                          <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                          Add to Cart
+                        </FilledButton>
+                      </div>
+                    </SkyProductCardWC>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <Divider />
+
+          {/* Therapists — same card/select pattern as Deals above (one card per Therapist,
+              "From ₹X" is the cheapest active TherapistPackage); click selects them into the
+              SAME "Your selection" panel on the right, mutually exclusive with a Deal
+              selection — see #8/#17 of this page's UX rules: Deal and Therapist must behave
+              identically (card → click → side panel → packages → select → Book). */}
+          <section className="vendor-page__section" aria-label="Therapists">
+            <h2 className="vendor-page__section-title">Meet Our Therapists</h2>
+            {selectedBranch && selectedBranch.therapists.length > 0 ? (
+              <div className="vendor-page__deal-list" role="radiogroup" aria-label="Available therapists">
+                {selectedBranch.therapists.map((t) => {
+                  const isSelected = t.id === selectedTherapistCardId;
+                  const fromPrice = therapistFromPrice(t);
                   return (
                     <label
-                      key={service.id}
-                      htmlFor={`deal-${service.id}`}
+                      key={t.id}
+                      htmlFor={`therapist-${t.id}`}
                       className={`vendor-page__deal-card${isSelected ? ' vendor-page__deal-card--selected' : ''}`}
                     >
-                      {/* MD3 Radio */}
                       <Radio
-                        id={`deal-${service.id}`}
-                        name="deal-selection"
-                        value={service.id}
+                        id={`therapist-${t.id}`}
+                        name="therapist-selection"
+                        value={t.id}
                         checked={isSelected}
-                        onChange={() => handleServiceSelect(service.id)}
+                        onChange={() => handleTherapistSelect(t.id)}
                       />
 
-                      {/* Thumbnail */}
-                      <img
-                        className="vendor-page__deal-card-img"
-                        src={service.image}
-                        alt={service.imageAlt}
-                        loading="lazy"
-                        width={120}
-                        height={80}
-                      />
+                      {primaryImage(resolveTherapistMedia(t)) && (
+                        <img
+                          className="vendor-page__deal-card-img"
+                          src={primaryImage(resolveTherapistMedia(t))}
+                          alt=""
+                          loading="lazy"
+                          width={120}
+                          height={80}
+                        />
+                      )}
 
-                      {/* Content */}
                       <div className="vendor-page__deal-card-body">
-                        <div className="vendor-page__deal-card-title">{service.title}</div>
-                        <div className="vendor-page__deal-card-desc">{service.description}</div>
+                        {/* Type/service label and the actual staff member are always shown
+                            separately, never merged into one field. */}
+                        <div className="vendor-page__deal-card-title">{t.therapistType}</div>
+                        <div className="vendor-page__deal-card-desc">
+                          {t.personName}
+                          {t.specialization ? ` · ${t.specialization}` : ''}
+                          {t.experienceYears != null ? ` · ${t.experienceYears} ${pluralize(t.experienceYears, 'year')} experience` : ''}
+                        </div>
                         <div className="vendor-page__deal-card-meta">
                           <ChipSet>
-                            {cat && <SuggestionChip label={cat.name} />}
-                            {service.badge && <SuggestionChip label={service.badge} />}
+                            {t.packages.length > 1 && (
+                              <SuggestionChip label={`${t.packages.length} packages`} />
+                            )}
                           </ChipSet>
-                          {service.rating != null && (
-                            <span
-                              className="vendor-page__deal-rating"
-                              aria-label={`Rated ${service.rating} out of 5`}
-                            >
-                              <span aria-hidden="true">★</span>
-                              {service.rating}
-                              {service.reviews != null && (
-                                <span className="vendor-page__deal-reviews">
-                                  ({service.reviews.toLocaleString()})
-                                </span>
-                              )}
-                            </span>
-                          )}
+                          <span className="vendor-page__deal-price">
+                            {fromPrice != null ? `From ${formatINR(fromPrice)}` : 'Contact for pricing'}
+                          </span>
                         </div>
                       </div>
                     </label>
                   );
-                })
-              )}
-            </div>
+                })}
+              </div>
+            ) : (
+              <p className="vendor-page__deal-empty">No therapist profiles listed for this branch yet.</p>
+            )}
           </section>
         </div>
 
@@ -466,250 +659,346 @@ export function VendorPage() {
         <aside className="vendor-page__selection-card" aria-label="Your selection">
           <h2 className="vendor-page__selection-title">Your selection</h2>
 
-          {activeService ? (
-            <>
-              {/* Selected deal preview */}
-              <div className="vendor-page__selected-deal">
-                <img
-                  className="vendor-page__selected-thumb"
-                  src={activeService.image}
-                  alt={activeService.imageAlt}
-                  loading="lazy"
-                  width={52}
-                  height={52}
-                />
-                <div className="vendor-page__selected-info">
-                  <div className="vendor-page__selected-name">{activeService.title}</div>
-                  {activeService.rating != null && (
-                    <div
-                      className="vendor-page__selected-rating"
-                      aria-label={`Rated ${activeService.rating}`}
-                    >
-                      <span aria-hidden="true">★</span>
-                      {activeService.rating}
-                      {activeService.reviews != null && (
-                        <span className="vendor-page__selected-reviews">
-                          ({activeService.reviews.toLocaleString()})
-                        </span>
-                      )}
-                      <TextButton
-                        onClick={() => dealDialogRef.current?.show()}
-                        aria-label={`See reviews for ${activeService.title}`}
-                      >
-                        Reviews
-                      </TextButton>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <Divider />
-
-              {/* Package selection */}
-              <div>
-                <p className="vendor-page__packages-label">Select your package</p>
-                <div
-                  className="vendor-page__package-list"
-                  role="group"
-                  aria-label="Select a package"
-                >
-                  {activeService.variants.map((v) => {
-                    const isSel =
-                      v.id === (selectedVariantId ?? activeService.variants[0].id);
-                    return (
-                      <button
-                        key={v.id}
-                        className={`vendor-page__package-row${isSel ? ' vendor-page__package-row--selected' : ''}`}
-                        onClick={() => setSelectedVariantId(v.id)}
-                        aria-pressed={isSel}
-                        aria-label={`${v.label} ${v.duration} ${v.durationUnit} — ${formatINR(v.price)}`}
-                      >
-                        <span className="vendor-page__package-label">
-                          {v.label}
-                          <span className="vendor-page__package-duration">
-                            {' '}· {v.duration} {v.durationUnit}
-                          </span>
-                          {v.discount != null && (
-                            <span className="vendor-page__package-discount">
-                              {' '}{v.discount}% off
-                            </span>
-                          )}
-                        </span>
-                        <span className="vendor-page__package-price-wrap">
-                          <strong className="vendor-page__package-price">
-                            {formatINR(v.price)}
-                          </strong>
-                          {v.originalPrice != null && (
-                            <s className="vendor-page__package-orig">
-                              {formatINR(v.originalPrice)}
-                            </s>
-                          )}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <Divider />
-
-              {/* Quantity */}
-              <div className="vendor-page__stepper-row" role="group" aria-label="Quantity">
-                <span className="vendor-page__stepper-label">Quantity</span>
-                <div className="vendor-page__stepper-controls">
-                  <OutlinedIconButton
-                    onClick={() => setQty((q) => Math.max(1, q - 1))}
-                    aria-label="Decrease quantity"
-                    disabled={qty === 1}
-                  >
-                    <Icon aria-hidden="true">remove</Icon>
-                  </OutlinedIconButton>
-                  <span className="vendor-page__qty" aria-live="polite" aria-atomic="true">
-                    {qty}
-                  </span>
-                  <OutlinedIconButton
-                    onClick={() => setQty((q) => q + 1)}
-                    aria-label="Increase quantity"
-                  >
-                    <Icon aria-hidden="true">add</Icon>
-                  </OutlinedIconButton>
-                </div>
-              </div>
-
-              {/* Total */}
-              <div className="vendor-page__total-row">
-                <span>Total</span>
-                <strong className="vendor-page__total-amount">{formatINR(total)}</strong>
-              </div>
-
-              {/* CTA */}
-              <FilledButton
-                className="vendor-page__book-btn"
-                aria-label={`Book ${activeService.title} — ${formatINR(total)}`}
-              >
-                <Icon slot="icon" aria-hidden="true">calendar_month</Icon>
-                Book Now
-              </FilledButton>
-
-              <Divider />
-
-              {/* Feature chips */}
-              {activeService.features && activeService.features.length > 0 && (
-                <ChipSet aria-label="Service features">
-                  {activeService.features.map((f) => (
-                    <AssistChip key={f} label={f}>
-                      <Icon slot="icon" aria-hidden="true">check_circle</Icon>
-                    </AssistChip>
-                  ))}
-                </ChipSet>
-              )}
-
-              {/* Service tagline */}
-              {activeService.tagline && (
-                <p className="vendor-page__service-tagline">{activeService.tagline}</p>
-              )}
-
-              {/* Accordion: What's Included / How to Use / Cancellation Policy */}
-              <sky-accordion>
-                {activeService.included && activeService.included.length > 0 && (
-                  <sky-accordion-item header="What's Included" open>
-                    <ul className="vendor-page__accordion-list">
-                      {activeService.included.map((item) => (
-                        <li key={item} className="vendor-page__accordion-list-item">
-                          <Icon aria-hidden="true" className="vendor-page__check-icon">check</Icon>
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </sky-accordion-item>
-                )}
-                {activeService.howToUse && activeService.howToUse.length > 0 && (
-                  <sky-accordion-item header="How to Use">
-                    <ol className="vendor-page__accordion-list vendor-page__accordion-list--ordered">
-                      {activeService.howToUse.map((step, i) => (
-                        <li key={i} className="vendor-page__accordion-list-item">
-                          {step}
-                        </li>
-                      ))}
-                    </ol>
-                  </sky-accordion-item>
-                )}
-                {activeService.cancellationPolicy && (
-                  <sky-accordion-item header="Cancellation Policy">
-                    <p className="vendor-page__accordion-text">
-                      {activeService.cancellationPolicy}
-                    </p>
-                  </sky-accordion-item>
-                )}
-              </sky-accordion>
-            </>
+          {activeGroup ? (
+            <DealSelectionPanel
+              key={activeGroup.id}
+              group={activeGroup}
+              requireAuthOrRedirect={requireAuthOrRedirect}
+            />
+          ) : activeTherapist ? (
+            <TherapistSelectionPanel
+              key={activeTherapist.id}
+              therapist={activeTherapist}
+              requireAuthOrRedirect={requireAuthOrRedirect}
+            />
           ) : (
             <div className="vendor-page__selection-empty">
               <Icon aria-hidden="true" className="vendor-page__empty-icon">spa</Icon>
-              <p>Select a deal to see packages and pricing.</p>
+              <p>Select a service or therapist to see packages and pricing.</p>
             </div>
           )}
         </aside>
 
       </div>
-
-      {/* ── Vendor reviews dialog ────────────────────────────────────────────── */}
-      <Dialog ref={vendorDialogRef} aria-labelledby="vendor-dialog-title">
-        <div slot="headline" id="vendor-dialog-title">{vendor.name} — Reviews</div>
-        <div slot="content" className="vendor-page__dialog-body">
-          <ReviewList reviews={MOCK_VENDOR_REVIEWS} />
-          <Divider />
-          <ReviewForm
-            reviewText={vendorReviewText}
-            reviewRating={vendorReviewRating}
-            onTextChange={setVendorReviewText}
-            onRatingChange={setVendorReviewRating}
-          />
-        </div>
-        <div slot="actions">
-          <TextButton onClick={() => vendorDialogRef.current?.close()}>Cancel</TextButton>
-          <FilledButton
-            onClick={() => {
-              // In production this would POST to the API
-              setVendorReviewText('');
-              setVendorReviewRating(5);
-              vendorDialogRef.current?.close();
-            }}
-          >
-            Submit Review
-          </FilledButton>
-        </div>
-      </Dialog>
-
-      {/* ── Deal reviews dialog ──────────────────────────────────────────────── */}
-      {activeService && (
-        <Dialog ref={dealDialogRef} aria-labelledby="deal-dialog-title">
-          <div slot="headline" id="deal-dialog-title">{activeService.title} — Reviews</div>
-          <div slot="content" className="vendor-page__dialog-body">
-            <ReviewList reviews={dealReviews} />
-            <Divider />
-            <ReviewForm
-              reviewText={dealReviewText}
-              reviewRating={dealReviewRating}
-              onTextChange={setDealReviewText}
-              onRatingChange={setDealReviewRating}
-            />
-          </div>
-          <div slot="actions">
-            <TextButton onClick={() => dealDialogRef.current?.close()}>Cancel</TextButton>
-            <FilledButton
-              onClick={() => {
-                setDealReviewText('');
-                setDealReviewRating(5);
-                dealDialogRef.current?.close();
-              }}
-            >
-              Submit Review
-            </FilledButton>
-          </div>
-        </Dialog>
-      )}
     </div>
+  );
+}
+
+/**
+ * The stateful "package/price → Book Now" panel for one selected Deal — driven entirely by the
+ * canonical `useDealPurchaseSelection` hook + `DurationPackageSelector` UI (the same ones every
+ * other purchase entry point uses), keyed by `group.id` in the parent so switching services
+ * fully resets this panel's local state. Never asks for a date/time — this is a service
+ * purchase, not an appointment-scheduling system (see Booking's schema doc comment in msd-api).
+ * There is deliberately no in-flow "select a therapist" cross-selection — a Therapist is only
+ * ever selected by clicking its own card (see `TherapistSelectionPanel` below).
+ */
+function DealSelectionPanel({
+  group,
+  requireAuthOrRedirect,
+}: {
+  group: ServiceGroup;
+  requireAuthOrRedirect: () => boolean;
+}) {
+  const { token } = useAuth();
+  const { showToast } = useToast();
+  const selection = useDealPurchaseSelection(group.deal);
+  const { activePackage, unitPrice, missingSelection } = selection;
+
+  const [qty, setQty] = useState(1);
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState('');
+
+  const total = activePackage ? unitPrice * qty : 0;
+
+  const submitBooking = async (intent: 'book' | 'cart') => {
+    if (!requireAuthOrRedirect()) return;
+    if (missingSelection) {
+      setActionError(missingSelection);
+      setActionMessage('');
+      return;
+    }
+    setActionError('');
+    setActionMessage('');
+    setBookingSubmitting(true);
+    try {
+      await createBooking(token, {
+        dealId: group.deal.id,
+        quantity: qty,
+        ...(activePackage ? { dealPackageId: activePackage.id } : {}),
+      });
+      const durationLabel = activePackage ? ` — ${activePackage.durationMinutes} Minutes` : '';
+      setActionMessage(
+        intent === 'cart'
+          ? `Added "${group.name}" to your cart.`
+          : `Booked "${group.name}"${activePackage ? ` — ${activePackage.durationMinutes} min` : ''}.`,
+      );
+      // Only fires after the API call above has actually resolved — never claims success early.
+      showToast(intent === 'cart' ? `Added to cart\n${group.name}${durationLabel}` : `Booked\n${group.name}${durationLabel}`);
+    } catch (err) {
+      const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
+      setActionError(message);
+      showToast(message, 'error');
+    } finally {
+      setBookingSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      {/* Selected deal preview */}
+      <div className="vendor-page__selected-deal">
+        {primaryImage(resolveDealMedia(group.deal)) && (
+          <img
+            className="vendor-page__selected-thumb"
+            src={primaryImage(resolveDealMedia(group.deal))}
+            alt=""
+            loading="lazy"
+            width={52}
+            height={52}
+          />
+        )}
+        <div className="vendor-page__selected-info">
+          <div className="vendor-page__selected-name">{group.name}</div>
+        </div>
+      </div>
+
+      <Divider />
+
+      <DurationPackageSelector selection={selection} />
+
+      <Divider />
+
+      {/* Quantity */}
+      <div className="vendor-page__stepper-row" role="group" aria-label="Quantity">
+        <span className="vendor-page__stepper-label">Quantity</span>
+        <div className="vendor-page__stepper-controls">
+          <OutlinedIconButton
+            onClick={() => setQty((q) => Math.max(1, q - 1))}
+            aria-label="Decrease quantity"
+            disabled={qty === 1}
+          >
+            <Icon aria-hidden="true">remove</Icon>
+          </OutlinedIconButton>
+          <span className="vendor-page__qty" aria-live="polite" aria-atomic="true">
+            {qty}
+          </span>
+          <OutlinedIconButton
+            onClick={() => setQty((q) => q + 1)}
+            aria-label="Increase quantity"
+          >
+            <Icon aria-hidden="true">add</Icon>
+          </OutlinedIconButton>
+        </div>
+      </div>
+
+      {/* Total */}
+      <div className="vendor-page__total-row">
+        <span>Total</span>
+        <strong className="vendor-page__total-amount">{formatINR(total)}</strong>
+      </div>
+
+      {missingSelection && <p className="field-hint" role="status">{missingSelection}</p>}
+      {actionError && <p className="error-state" role="alert">{actionError}</p>}
+      {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
+
+      {/* CTA */}
+      <div className="vendor-page__cta-row">
+        <OutlinedButton
+          onClick={() => submitBooking('cart')}
+          disabled={bookingSubmitting || !!missingSelection}
+          aria-label={`Add ${group.name} to cart — ${formatINR(total)}`}
+        >
+          <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+          {bookingSubmitting ? 'Adding…' : 'Add to Cart'}
+        </OutlinedButton>
+        <FilledButton
+          className="vendor-page__book-btn"
+          onClick={() => submitBooking('book')}
+          disabled={bookingSubmitting || !!missingSelection}
+          aria-label={`Book ${group.name} — ${formatINR(total)}`}
+        >
+          <Icon slot="icon" aria-hidden="true">calendar_month</Icon>
+          {bookingSubmitting ? 'Booking…' : 'Book Now'}
+        </FilledButton>
+      </div>
+
+      {/* Details accordion — only what the API actually returns, nothing fabricated */}
+      {(group.deal.shortDescription || group.deal.description) && (
+        <>
+          <Divider />
+          {group.deal.shortDescription && (
+            <p className="vendor-page__service-tagline">{group.deal.shortDescription}</p>
+          )}
+          {group.deal.description && (
+            <sky-accordion>
+              <sky-accordion-item header="Details" open>
+                <p className="vendor-page__accordion-text">{group.deal.description}</p>
+              </sky-accordion-item>
+            </sky-accordion>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+/**
+ * The stateful "package/price → Book Now" panel for one selected Therapist, booked directly —
+ * no Deal involved at all (see msd-api's Booking "exactly one of dealId/therapistId" doc
+ * comment). Mirrors `DealSelectionPanel` exactly (same layout, same CTA row, same "never asks
+ * for a date/time") but sources its packages from the Therapist's own `packages`, via the same
+ * `useTherapistPurchaseSelection`/`TherapistPackageSelector` pair every other Therapist purchase
+ * entry point uses.
+ */
+function TherapistSelectionPanel({
+  therapist,
+  requireAuthOrRedirect,
+}: {
+  therapist: CatalogVendorTherapist;
+  requireAuthOrRedirect: () => boolean;
+}) {
+  const { token } = useAuth();
+  const { showToast } = useToast();
+  const selection = useTherapistPurchaseSelection(therapist.packages);
+  const { activePackage, unitPrice, missingSelection } = selection;
+
+  const [qty, setQty] = useState(1);
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState('');
+
+  const displayName = `${therapist.therapistType} — ${therapist.personName}`;
+  const total = activePackage ? unitPrice * qty : 0;
+
+  const submitBooking = async (intent: 'book' | 'cart') => {
+    if (!requireAuthOrRedirect()) return;
+    if (missingSelection || !activePackage) {
+      setActionError(missingSelection ?? 'Select a package.');
+      setActionMessage('');
+      return;
+    }
+    setActionError('');
+    setActionMessage('');
+    setBookingSubmitting(true);
+    try {
+      await createBooking(token, {
+        therapistId: therapist.id,
+        durationMinutes: activePackage.durationMinutes,
+        quantity: qty,
+      });
+      setActionMessage(
+        intent === 'cart'
+          ? `Added "${displayName}" to your cart.`
+          : `Booked "${displayName}" — ${activePackage.durationMinutes} min.`,
+      );
+      // Only fires after the API call above has actually resolved — never claims success early.
+      const label = `${therapist.personName} — ${activePackage.durationMinutes} Minutes`;
+      showToast(intent === 'cart' ? `Added to cart\n${label}` : `Booked\n${label}`);
+    } catch (err) {
+      const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
+      setActionError(message);
+      showToast(message, 'error');
+    } finally {
+      setBookingSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      {/* Selected therapist preview */}
+      <div className="vendor-page__selected-deal">
+        {primaryImage(resolveTherapistMedia(therapist)) && (
+          <img
+            className="vendor-page__selected-thumb"
+            src={primaryImage(resolveTherapistMedia(therapist))}
+            alt=""
+            loading="lazy"
+            width={52}
+            height={52}
+          />
+        )}
+        <div className="vendor-page__selected-info">
+          <div className="vendor-page__selected-name">{displayName}</div>
+        </div>
+      </div>
+
+      <Divider />
+
+      <TherapistPackageSelector selection={selection} />
+
+      <Divider />
+
+      {/* Quantity */}
+      <div className="vendor-page__stepper-row" role="group" aria-label="Quantity">
+        <span className="vendor-page__stepper-label">Quantity</span>
+        <div className="vendor-page__stepper-controls">
+          <OutlinedIconButton
+            onClick={() => setQty((q) => Math.max(1, q - 1))}
+            aria-label="Decrease quantity"
+            disabled={qty === 1}
+          >
+            <Icon aria-hidden="true">remove</Icon>
+          </OutlinedIconButton>
+          <span className="vendor-page__qty" aria-live="polite" aria-atomic="true">
+            {qty}
+          </span>
+          <OutlinedIconButton
+            onClick={() => setQty((q) => q + 1)}
+            aria-label="Increase quantity"
+          >
+            <Icon aria-hidden="true">add</Icon>
+          </OutlinedIconButton>
+        </div>
+      </div>
+
+      {/* Total */}
+      <div className="vendor-page__total-row">
+        <span>Total</span>
+        <strong className="vendor-page__total-amount">{formatINR(total)}</strong>
+      </div>
+
+      {missingSelection && <p className="field-hint" role="status">{missingSelection}</p>}
+      {actionError && <p className="error-state" role="alert">{actionError}</p>}
+      {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
+
+      {/* CTA */}
+      <div className="vendor-page__cta-row">
+        <OutlinedButton
+          onClick={() => submitBooking('cart')}
+          disabled={bookingSubmitting || !!missingSelection}
+          aria-label={`Add ${displayName} to cart — ${formatINR(total)}`}
+        >
+          <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+          {bookingSubmitting ? 'Adding…' : 'Add to Cart'}
+        </OutlinedButton>
+        <FilledButton
+          className="vendor-page__book-btn"
+          onClick={() => submitBooking('book')}
+          disabled={bookingSubmitting || !!missingSelection}
+          aria-label={`Book ${displayName} — ${formatINR(total)}`}
+        >
+          <Icon slot="icon" aria-hidden="true">calendar_month</Icon>
+          {bookingSubmitting ? 'Booking…' : 'Book Now'}
+        </FilledButton>
+      </div>
+
+      {/* Details — only what the API actually returns, nothing fabricated */}
+      {(therapist.specialization || therapist.bio) && (
+        <>
+          <Divider />
+          {therapist.specialization && <p className="vendor-page__service-tagline">{therapist.specialization}</p>}
+          {therapist.bio && (
+            <sky-accordion>
+              <sky-accordion-item header="About" open>
+                <p className="vendor-page__accordion-text">{therapist.bio}</p>
+              </sky-accordion-item>
+            </sky-accordion>
+          )}
+        </>
+      )}
+    </>
   );
 }
 

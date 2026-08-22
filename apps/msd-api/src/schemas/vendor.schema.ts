@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { PaginationQuerySchema } from './common.schema';
+import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 
 extendZodWithOpenApi(z);
 
@@ -19,6 +20,12 @@ export const CrossVendorListQuerySchema = PaginationQuerySchema.extend({
   search: z.string().max(200).optional(),
 });
 
+/** Route param for the admin-scoped `/:vendorId/...` sub-resources — same shape as
+ *  `UuidParamSchema` in `common.schema.ts`, just keyed `vendorId` to match the param name. */
+export const VendorIdParamSchema = z.object({
+  vendorId: z.string().uuid(),
+});
+
 const decimalString = z
   .string()
   .regex(/^\d+(\.\d{1,2})?$/, 'must be a plain decimal amount with up to 2 places, e.g. "199.00"');
@@ -35,6 +42,54 @@ const kycDocumentSchema = z.object({
   uploadedAt: z.string().datetime().optional(),
 });
 
+// ─── Vendor field-format validation ───────────────────────────────────────────
+// GST/PAN/pincode/phone were previously `z.string().max(N).optional()` with no format check at
+// all. An empty string ("") is treated as "field cleared" and bypasses the regex — these fields
+// stay optional (never newly required); only a *non-empty* value must match the expected shape.
+
+const GSTIN_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}\d{1}[Z]{1}[A-Z\d]{1}$/;
+const PAN_REGEX = /^[A-Z]{5}\d{4}[A-Z]{1}$/;
+const PINCODE_REGEX = /^\d{6}$/;
+/** Canonical Indian mobile rule — first digit 6-9, exactly 10 digits after the `+91` this
+ *  schema's own `normalizeIdentifier()` transform always prepends. Matches the frontend's
+ *  `INDIA_MOBILE_REGEX` in `vendor-profile-form.tsx` (applied there to the plain 10-digit value
+ *  before this schema ever sees it) — same canonical rule, same digit class, on both sides. */
+const INDIA_MOBILE_REGEX = /^\+91[6-9]\d{9}$/;
+
+const gstNumberSchema = z
+  .string()
+  .max(30)
+  .transform((v) => v.toUpperCase())
+  .refine((v) => v === '' || GSTIN_REGEX.test(v), { message: 'Enter a valid 15-character GST number' })
+  .optional();
+
+const panNumberSchema = z
+  .string()
+  .max(20)
+  .transform((v) => v.toUpperCase())
+  .refine((v) => v === '' || PAN_REGEX.test(v), { message: 'Enter a valid 10-character PAN number' })
+  .optional();
+
+const vendorPincodeSchema = z
+  .string()
+  .max(20)
+  .refine((v) => v === '' || PINCODE_REGEX.test(v), { message: 'Enter a valid 6-digit pincode' })
+  .optional();
+
+/**
+ * Vendor contact-phone fields (businessPhone/alternatePhone/ownerMobile/alternateOwnerMobile) —
+ * NOT login identifiers/User.phone, so there's no duplicate-*user* risk here. Still reuses
+ * `normalizeIdentifier()` (see lib/normalizeIdentifier.ts, applied at the OTP auth boundary) so
+ * a bare 10-digit number and an already-`+91`-prefixed number are both accepted and always
+ * stored the same way, matching that same normalize-then-validate discipline.
+ */
+const vendorPhoneSchema = z
+  .string()
+  .max(30)
+  .transform((v) => (v === '' ? v : normalizeIdentifier(v)))
+  .refine((v) => v === '' || INDIA_MOBILE_REGEX.test(v), { message: 'Enter a valid 10-digit mobile number' })
+  .optional();
+
 // ─── Vendor ──────────────────────────────────────────────────────────────────
 
 /**
@@ -49,27 +104,27 @@ const VendorFieldsSchema = z.object({
   businessType: z.string().max(100).optional(),
   businessDescription: z.string().max(2000).optional(),
   businessEmail: z.string().email().optional(),
-  businessPhone: z.string().max(30).optional(),
-  alternatePhone: z.string().max(30).optional(),
+  businessPhone: vendorPhoneSchema,
+  alternatePhone: vendorPhoneSchema,
   website: z.string().url().optional(),
   logoUrl: z.string().url().optional(),
 
   ownerName: z.string().max(150).optional(),
   contactPerson: z.string().max(150).optional(),
   ownerEmail: z.string().email().optional(),
-  ownerMobile: z.string().max(30).optional(),
-  alternateOwnerMobile: z.string().max(30).optional(),
+  ownerMobile: vendorPhoneSchema,
+  alternateOwnerMobile: vendorPhoneSchema,
 
   address: z.string().max(500).optional(),
   city: z.string().max(100).optional(),
   state: z.string().max(100).optional(),
   country: z.string().max(100).optional(),
-  pincode: z.string().max(20).optional(),
+  pincode: vendorPincodeSchema,
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
 
-  gstNumber: z.string().max(30).optional(),
-  panNumber: z.string().max(20).optional(),
+  gstNumber: gstNumberSchema,
+  panNumber: panNumberSchema,
   businessRegistrationNumber: z.string().max(100).optional(),
   kycDocuments: z.array(kycDocumentSchema).optional(),
 
@@ -123,13 +178,21 @@ export const VendorKycReviewSchema = z
 
 // ─── Branch ──────────────────────────────────────────────────────────────────
 
+/** Same 6-digit-only rule as Vendor's own PINCODE_REGEX above — Branch previously had no format
+ *  check at all here (`z.string().max(20)`), unlike Vendor. */
+const branchPincodeSchema = z
+  .string()
+  .max(20)
+  .refine((v) => v === '' || PINCODE_REGEX.test(v), { message: 'Enter a valid 6-digit pincode' })
+  .optional();
+
 const BranchFieldsSchema = z.object({
   name: z.string().min(1).max(150),
   address: z.string().max(500).optional(),
   city: z.string().max(100).optional(),
   state: z.string().max(100).optional(),
   country: z.string().max(100).optional(),
-  pincode: z.string().max(20).optional(),
+  pincode: branchPincodeSchema,
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
   phone: z.string().max(30).optional(),
@@ -139,6 +202,55 @@ const BranchFieldsSchema = z.object({
 export const BranchCreateSchema = BranchFieldsSchema.openapi('BranchCreate');
 export const BranchUpdateSchema = BranchFieldsSchema.partial().openapi('BranchUpdate');
 export const BranchStatusUpdateSchema = z.object({ isActive: z.boolean() }).openapi('BranchStatusUpdate');
+
+// ─── Therapist ───────────────────────────────────────────────────────────────
+
+const TherapistFieldsSchema = z.object({
+  /** The service/role label a customer browses by (e.g. "Legs Therapist") — distinct from
+   *  `personName` below, never merged into one field. */
+  therapistType: z.string().min(1).max(200),
+  /** The actual staff member (e.g. "Ramesh Kumar"). */
+  personName: z.string().min(1).max(200),
+  gender: z.string().max(50).optional(),
+  specialization: z.string().max(200).optional(),
+  bio: z.string().max(2000).optional(),
+  experienceYears: z.number().int().min(0).max(60).optional(),
+  /** URL only — matches Vendor.logoUrl/Deal.images' existing validation in this file; no
+   *  upload pipeline exists yet. */
+  photoUrl: z.string().url().optional(),
+});
+
+export const TherapistCreateSchema = TherapistFieldsSchema.openapi('TherapistCreate');
+export const TherapistUpdateSchema = TherapistFieldsSchema.partial().openapi('TherapistUpdate');
+export const TherapistStatusUpdateSchema = z.object({ isActive: z.boolean() }).openapi('TherapistStatusUpdate');
+
+// ─── TherapistPackage (a therapist's own duration/price menu — independent of any Deal) ───
+
+/** `durationMinutes` identifies the package (unique per therapist) — editable on update too
+ *  (mirrors sellingPrice/originalPrice/isActive/sortOrder), subject to the same uniqueness
+ *  constraint the database enforces (see vendor.service.ts#updateTherapistPackage). */
+const TherapistPackageFieldsSchema = z.object({
+  durationMinutes: z.number().int().positive(),
+  sellingPrice: z.number().min(0),
+  originalPrice: z.number().min(0).optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).optional(),
+});
+
+export const TherapistPackageCreateSchema = TherapistPackageFieldsSchema
+  .refine((data) => data.originalPrice === undefined || data.originalPrice >= data.sellingPrice, {
+    message: 'originalPrice must be greater than or equal to sellingPrice',
+    path: ['originalPrice'],
+  })
+  .openapi('TherapistPackageCreate');
+
+export const TherapistPackageUpdateSchema = TherapistPackageFieldsSchema
+  .partial()
+  .refine((data) => data.originalPrice === undefined || data.sellingPrice === undefined || data.originalPrice >= data.sellingPrice, {
+    message: 'originalPrice must be greater than or equal to sellingPrice',
+    path: ['originalPrice'],
+  })
+  .openapi('TherapistPackageUpdate');
 
 // ─── Deal ────────────────────────────────────────────────────────────────────
 
@@ -168,8 +280,56 @@ const DealFieldsSchema = z.object({
   endDate: z.string().datetime().optional(),
 });
 
-export const DealCreateSchema = DealFieldsSchema.openapi('DealCreate');
-export const DealUpdateSchema = DealFieldsSchema.partial().openapi('DealUpdate');
+/** A service Deal's own duration/price menu — mirrors TherapistPackageFieldsSchema exactly (see
+ *  DealPackage's own schema doc comment for the full rationale). `id` present = update that
+ *  existing package row; absent = create a new one. Never used for a product deal. */
+const DealPackageFieldsSchema = z.object({
+  id: z.string().uuid().optional(),
+  durationMinutes: z.number().int().positive(),
+  sellingPrice: z.number().min(0),
+  originalPrice: z.number().min(0).optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).optional(),
+});
+
+export const DealCreateSchema = DealFieldsSchema.extend({
+  /** Required (>=1) for a service deal — the customer always books a specific package, never
+   *  the Deal's own price directly (see booking.service.ts#createBookingFromDeal). Must be
+   *  absent/empty for a product deal — no duration/package concept applies there. */
+  packages: z.array(DealPackageFieldsSchema).optional(),
+})
+  .refine((data) => !data.serviceId || (data.packages && data.packages.length > 0), {
+    message: 'At least one package (duration + price) is required for a service deal.',
+    path: ['packages'],
+  })
+  .refine((data) => !data.productId || !data.packages || data.packages.length === 0, {
+    message: 'Packages only apply to service deals, never a product deal.',
+    path: ['packages'],
+  })
+  .refine((data) => (data.packages ?? []).every((p) => p.originalPrice === undefined || p.originalPrice >= p.sellingPrice), {
+    message: "Each package's originalPrice must be greater than or equal to its sellingPrice.",
+    path: ['packages'],
+  })
+  .openapi('DealCreate');
+
+export const DealUpdateSchema = DealFieldsSchema.partial()
+  .extend({
+    /** Omit entirely to leave existing packages untouched. When present, replaces the full set
+     *  (diff by `id` — entries with an id update that row, entries without one are created, any
+     *  existing row whose id is no longer present is deleted — see
+     *  vendor.service.ts#updateDeal) and must have >=1 entry (a service deal can never be left
+     *  with zero packages via update either). */
+    packages: z.array(DealPackageFieldsSchema).optional(),
+  })
+  .refine((data) => data.packages === undefined || data.packages.length > 0, {
+    message: 'A service deal must have at least one package — omit `packages` to leave them unchanged instead of clearing them.',
+    path: ['packages'],
+  })
+  .refine((data) => (data.packages ?? []).every((p) => p.originalPrice === undefined || p.originalPrice >= p.sellingPrice), {
+    message: "Each package's originalPrice must be greater than or equal to its sellingPrice.",
+    path: ['packages'],
+  })
+  .openapi('DealUpdate');
 
 export const DealStatusUpdateSchema = z
   .object({ status: z.enum(['DRAFT', 'ACTIVE', 'INACTIVE', 'EXPIRED']) })

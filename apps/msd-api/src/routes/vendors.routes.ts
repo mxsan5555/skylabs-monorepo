@@ -7,7 +7,7 @@ import { requirePermission } from '../middleware/requirePermission';
 import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
 import { sendError } from '../lib/http';
 import { validateBody, validateParams } from '../middleware/validate';
-import { UuidParamSchema } from '../schemas/common.schema';
+import { UuidParamSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
   VendorCreateSchema,
   VendorUpdateSchema,
@@ -26,10 +26,18 @@ import {
   DealUpdateSchema,
   DealStatusUpdateSchema,
   DealRejectSchema,
+  TherapistCreateSchema,
+  TherapistUpdateSchema,
+  TherapistStatusUpdateSchema,
+  TherapistPackageCreateSchema,
+  TherapistPackageUpdateSchema,
+  VendorIdParamSchema,
 } from '../schemas/vendor.schema';
+import { MediaReorderSchema } from '../schemas/media.schema';
+import { imageUpload, videoUpload } from '../lib/media-upload.middleware';
 import * as vendorService from '../services/vendor.service';
 import { writeAuditLog } from '../services/audit.service';
-import { sendData } from '../lib/http';
+import { sendData, ApiError } from '../lib/http';
 
 const router = Router();
 router.use(authenticate);
@@ -180,6 +188,119 @@ router.patch(
   },
 );
 
+// ─── Vendor media, self-service (shared upload system — see media.service.ts's doc comment) ──
+
+router.post(
+  '/me/images',
+  requirePermission('vendors', 'custom'),
+  imageUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const image = await vendorService.addVendorImage(vendor.id, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_image.create',
+        targetType: 'VendorImage',
+        targetId: image.id,
+        ...requestMeta(req),
+      });
+      sendData(res, image, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete('/me/images/:imageId', requirePermission('vendors', 'custom'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    await vendorService.deleteVendorImage(vendor.id, req.params.imageId);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'vendor_image.delete',
+      targetType: 'VendorImage',
+      targetId: req.params.imageId,
+      ...requestMeta(req),
+    });
+    sendData(res, { deleted: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch(
+  '/me/images/reorder',
+  requirePermission('vendors', 'custom'),
+  validateBody(MediaReorderSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.reorderVendorImages(vendor.id, req.body.imageIds);
+      sendData(res, { reordered: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch('/me/images/:imageId/primary', requirePermission('vendors', 'custom'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    await vendorService.setVendorPrimaryImage(vendor.id, req.params.imageId);
+    sendData(res, { primary: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/me/video',
+  requirePermission('vendors', 'custom'),
+  videoUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const video = await vendorService.replaceVendorVideo(vendor.id, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_video.upsert',
+        targetType: 'VendorVideo',
+        targetId: video.id,
+        ...requestMeta(req),
+      });
+      sendData(res, video, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete('/me/video', requirePermission('vendors', 'custom'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    await vendorService.deleteVendorVideo(vendor.id);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'vendor_video.delete',
+      targetType: 'VendorVideo',
+      targetId: vendor.id,
+      ...requestMeta(req),
+    });
+    sendData(res, { deleted: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/me/submit', requirePermission('vendors', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.submitForVerification(req.user!.sub);
@@ -201,6 +322,22 @@ router.get('/me/branches', requirePermission('vendors', 'custom'), async (req, r
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     sendData(res, await vendorService.listBranches(vendor.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Distinct customers who have ordered/booked from the caller's own vendor — for the vendor-facing
+ * "Customers" screen. Derived entirely from existing Order/Booking rows (no new table); paginates
+ * the merged distinct-customer list, not the raw Order/Booking rows.
+ */
+router.get('/me/customers', requirePermission('vendors', 'custom'), async (req, res, next) => {
+  try {
+    const { page, pageSize } = PaginationQuerySchema.parse(req.query);
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    const { items, total } = await vendorService.listMyCustomers(vendor.id, { page, pageSize });
+    sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);
   }
@@ -353,6 +490,414 @@ router.patch(
   },
 );
 
+// ─── Deal media (shared upload system — see media.service.ts's doc comment) ─────────────────
+
+router.post(
+  '/me/branches/:branchId/deals/:dealId/images',
+  requirePermission('vendors', 'custom'),
+  imageUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const image = await vendorService.addDealImage(vendor.id, req.params.branchId, req.params.dealId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'deal_image.create',
+        targetType: 'DealImage',
+        targetId: image.id,
+        ...requestMeta(req),
+      });
+      sendData(res, image, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/me/branches/:branchId/deals/:dealId/images/:imageId',
+  requirePermission('vendors', 'custom'),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.deleteDealImage(vendor.id, req.params.branchId, req.params.dealId, req.params.imageId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'deal_image.delete',
+        targetType: 'DealImage',
+        targetId: req.params.imageId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/branches/:branchId/deals/:dealId/images/reorder',
+  requirePermission('vendors', 'custom'),
+  validateBody(MediaReorderSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.reorderDealImages(vendor.id, req.params.branchId, req.params.dealId, req.body.imageIds);
+      sendData(res, { reordered: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/branches/:branchId/deals/:dealId/images/:imageId/primary',
+  requirePermission('vendors', 'custom'),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.setDealPrimaryImage(vendor.id, req.params.branchId, req.params.dealId, req.params.imageId);
+      sendData(res, { primary: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/me/branches/:branchId/deals/:dealId/video',
+  requirePermission('vendors', 'custom'),
+  videoUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const video = await vendorService.replaceDealVideo(vendor.id, req.params.branchId, req.params.dealId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'deal_video.upsert',
+        targetType: 'DealVideo',
+        targetId: video.id,
+        ...requestMeta(req),
+      });
+      sendData(res, video, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/me/branches/:branchId/deals/:dealId/video',
+  requirePermission('vendors', 'custom'),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.deleteDealVideo(vendor.id, req.params.branchId, req.params.dealId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'deal_video.delete',
+        targetType: 'DealVideo',
+        targetId: req.params.dealId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── Therapist (self-service — mirrors Branch's exact pattern) ──────────────
+
+router.get('/me/branches/:branchId/therapists', requirePermission('vendors', 'custom'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    sendData(res, await vendorService.listTherapists(vendor.id, req.params.branchId));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/me/branches/:branchId/therapists',
+  requirePermission('vendors', 'custom'),
+  validateBody(TherapistCreateSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const therapist = await vendorService.createTherapist(vendor.id, req.params.branchId, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist.create',
+        targetType: 'Therapist',
+        targetId: therapist.id,
+        after: therapist,
+        ...requestMeta(req),
+      });
+      sendData(res, therapist, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/therapists/:therapistId',
+  requirePermission('vendors', 'custom'),
+  validateBody(TherapistUpdateSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const therapist = await vendorService.updateTherapist(vendor.id, req.params.therapistId, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist.update',
+        targetType: 'Therapist',
+        targetId: therapist.id,
+        after: therapist,
+        ...requestMeta(req),
+      });
+      sendData(res, therapist);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/therapists/:therapistId/status',
+  requirePermission('vendors', 'custom'),
+  validateBody(TherapistStatusUpdateSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const therapist = await vendorService.setTherapistStatus(vendor.id, req.params.therapistId, req.body.isActive);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist.status_change',
+        targetType: 'Therapist',
+        targetId: therapist.id,
+        after: { isActive: therapist.isActive },
+        ...requestMeta(req),
+      });
+      sendData(res, therapist);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── TherapistPackage (per-therapist price for one specific service Deal) ────
+
+router.get('/me/therapists/:therapistId/packages', requirePermission('vendors', 'custom'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    sendData(res, await vendorService.listTherapistPackages(vendor.id, req.params.therapistId));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/me/therapists/:therapistId/packages',
+  requirePermission('vendors', 'custom'),
+  validateBody(TherapistPackageCreateSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const pkg = await vendorService.createTherapistPackage(vendor.id, req.params.therapistId, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_package.create',
+        targetType: 'TherapistPackage',
+        targetId: pkg.id,
+        after: pkg,
+        ...requestMeta(req),
+      });
+      sendData(res, pkg, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/therapists/:therapistId/packages/:packageId',
+  requirePermission('vendors', 'custom'),
+  validateBody(TherapistPackageUpdateSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const pkg = await vendorService.updateTherapistPackage(vendor.id, req.params.therapistId, req.params.packageId, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_package.update',
+        targetType: 'TherapistPackage',
+        targetId: pkg.id,
+        after: pkg,
+        ...requestMeta(req),
+      });
+      sendData(res, pkg);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/me/therapists/:therapistId/packages/:packageId',
+  requirePermission('vendors', 'custom'),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.deleteTherapistPackage(vendor.id, req.params.therapistId, req.params.packageId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_package.delete',
+        targetType: 'TherapistPackage',
+        targetId: req.params.packageId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── Therapist media (shared upload system — see media.service.ts's doc comment) ────────────
+
+router.post(
+  '/me/therapists/:therapistId/images',
+  requirePermission('vendors', 'custom'),
+  imageUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const image = await vendorService.addTherapistImage(vendor.id, req.params.therapistId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_image.create',
+        targetType: 'TherapistImage',
+        targetId: image.id,
+        ...requestMeta(req),
+      });
+      sendData(res, image, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/me/therapists/:therapistId/images/:imageId',
+  requirePermission('vendors', 'custom'),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.deleteTherapistImage(vendor.id, req.params.therapistId, req.params.imageId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_image.delete',
+        targetType: 'TherapistImage',
+        targetId: req.params.imageId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/therapists/:therapistId/images/reorder',
+  requirePermission('vendors', 'custom'),
+  validateBody(MediaReorderSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.reorderTherapistImages(vendor.id, req.params.therapistId, req.body.imageIds);
+      sendData(res, { reordered: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/therapists/:therapistId/images/:imageId/primary',
+  requirePermission('vendors', 'custom'),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.setTherapistPrimaryImage(vendor.id, req.params.therapistId, req.params.imageId);
+      sendData(res, { primary: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/me/therapists/:therapistId/video',
+  requirePermission('vendors', 'custom'),
+  videoUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const video = await vendorService.replaceTherapistVideo(vendor.id, req.params.therapistId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_video.upsert',
+        targetType: 'TherapistVideo',
+        targetId: video.id,
+        ...requestMeta(req),
+      });
+      sendData(res, video, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/me/therapists/:therapistId/video',
+  requirePermission('vendors', 'custom'),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorService.deleteTherapistVideo(vendor.id, req.params.therapistId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_video.delete',
+        targetType: 'TherapistVideo',
+        targetId: req.params.therapistId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // ─── Admin/SuperAdmin surface ─────────────────────────────────────────────────
 
 router.get('/', requirePermission('vendors', 'view'), async (req, res, next) => {
@@ -407,6 +952,131 @@ router.patch(
         ...requestMeta(req),
       });
       sendData(res, withCompletion(vendor));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── Vendor media, admin (shared upload system — see media.service.ts's doc comment) ─────────
+
+router.post(
+  '/:id/images',
+  requirePermission('vendors', 'edit'),
+  validateParams(UuidParamSchema),
+  imageUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const image = await vendorService.addVendorImage(req.params.id, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_image.create',
+        targetType: 'VendorImage',
+        targetId: image.id,
+        ...requestMeta(req),
+      });
+      sendData(res, image, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/:id/images/:imageId',
+  requirePermission('vendors', 'edit'),
+  validateParams(UuidParamSchema),
+  async (req, res, next) => {
+    try {
+      await vendorService.deleteVendorImage(req.params.id, req.params.imageId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_image.delete',
+        targetType: 'VendorImage',
+        targetId: req.params.imageId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/:id/images/reorder',
+  requirePermission('vendors', 'edit'),
+  validateParams(UuidParamSchema),
+  validateBody(MediaReorderSchema),
+  async (req, res, next) => {
+    try {
+      await vendorService.reorderVendorImages(req.params.id, req.body.imageIds);
+      sendData(res, { reordered: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/:id/images/:imageId/primary',
+  requirePermission('vendors', 'edit'),
+  validateParams(UuidParamSchema),
+  async (req, res, next) => {
+    try {
+      await vendorService.setVendorPrimaryImage(req.params.id, req.params.imageId);
+      sendData(res, { primary: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/:id/video',
+  requirePermission('vendors', 'edit'),
+  validateParams(UuidParamSchema),
+  videoUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const video = await vendorService.replaceVendorVideo(req.params.id, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_video.upsert',
+        targetType: 'VendorVideo',
+        targetId: video.id,
+        ...requestMeta(req),
+      });
+      sendData(res, video, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/:id/video',
+  requirePermission('vendors', 'edit'),
+  validateParams(UuidParamSchema),
+  async (req, res, next) => {
+    try {
+      await vendorService.deleteVendorVideo(req.params.id);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_video.delete',
+        targetType: 'VendorVideo',
+        targetId: req.params.id,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
     } catch (err) {
       next(err);
     }
@@ -511,6 +1181,50 @@ router.get('/:vendorId/branches', requirePermission('vendors', 'view'), async (r
     next(err);
   }
 });
+
+/**
+ * All of a vendor's therapists (active AND inactive, across every branch) for the admin's
+ * vendor detail page. Deliberately read-only — create/update/status-change stay self-service-only
+ * (`/me/branches/:branchId/therapists`, `/me/therapists/:therapistId[/status]`), which resolve the
+ * vendor from the caller's own `ownerUserId` and so are unreachable by a non-owner admin. Gated on
+ * the same `vendors:view` every other purely-admin vendor read in this file already uses — no new
+ * permission key needed.
+ */
+router.get(
+  '/:vendorId/therapists',
+  requirePermission('vendors', 'view'),
+  validateParams(VendorIdParamSchema),
+  async (req, res, next) => {
+    try {
+      sendData(res, await vendorService.listVendorTherapistsForAdmin(req.params.vendorId));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * Distinct customers who have ordered/booked from a vendor, for the admin's vendor detail page.
+ * Reuses the exact same `listMyCustomers` the self-service `/me/customers` route calls — that
+ * function takes `vendorId` as a plain parameter and does no ownership resolution internally
+ * (ownership is only relevant to the self-service route's `getMyVendorOrThrow` lookup), so no new
+ * service logic is needed here. Deliberately read-only, same as `/:vendorId/therapists`, and
+ * gated on the same `vendors:view` every other purely-admin vendor read in this file already uses.
+ */
+router.get(
+  '/:vendorId/customers',
+  requirePermission('vendors', 'view'),
+  validateParams(VendorIdParamSchema),
+  async (req, res, next) => {
+    try {
+      const { page, pageSize } = PaginationQuerySchema.parse(req.query);
+      const { items, total } = await vendorService.listMyCustomers(req.params.vendorId, { page, pageSize });
+      sendData(res, items, { meta: { total, page, pageSize } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.post(
   '/:vendorId/branches',
