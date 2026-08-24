@@ -13,6 +13,7 @@ import {
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCatalogCategory, listCatalogDeals, type CatalogCategoryWithChildren, type CatalogDeal } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
+import { DealCard, type DealCardDeal } from '../../components/deal-card';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
@@ -189,7 +190,7 @@ export function Category() {
       {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
       {actionError && <p className="error-state" role="alert">{actionError}</p>}
 
-      <section className="category-page__grid-wrap"  aria-label={`${category.name} ${content.category.dealsAriaLabelSuffix}`}>
+      <section className="category-page__grid-wrap" aria-label={`${category.name} ${content.category.dealsAriaLabelSuffix}`}>
         <div className="category-page__grid-inner">
           {dealsLoading ? (
             <p className="loading-state">{content.category.loadingDeals}</p>
@@ -203,39 +204,55 @@ export function Category() {
             <ul className="category-page__grid">
               {deals.map((deal) => (
                 <li key={deal.id}>
-                  <SkyProductCardWC
-                    variant="outlined"
-                    badge={deal.service ? content.category.offeringLabels.service : content.category.offeringLabels.product}
-                    eyebrow={[deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · ')}
-                    eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
-                    heading={deal.service?.name ?? deal.product?.name ?? deal.title}
-                    image={primaryImage(resolveDealMedia(deal))}
-                    imageAlt={deal.service?.imageAlt ?? deal.product?.imageAlt ?? undefined}
-                    price={formatINR(Number(deal.salePrice))}
-                    originalPrice={
-                      deal.originalPrice && Number(deal.originalPrice) !== Number(deal.salePrice)
-                        ? formatINR(Number(deal.originalPrice))
+                  <DealCard
+                    deal={{
+                      id: deal.id,
+                      title: deal.service?.name ?? deal.product?.name ?? deal.title,
+                      image: primaryImage(resolveDealMedia(deal)) ?? '',
+                      imageAlt:
+                        deal.service?.imageAlt ??
+                        deal.product?.imageAlt ??
+                        '',
+                      gallery: resolveDealMedia(deal).images,
+                      badge: deal.service
+                        ? content.category.offeringLabels.service
+                        : content.category.offeringLabels.product,
+                      providerName: [deal.vendor?.businessName, deal.branch?.name]
+                        .filter(Boolean)
+                        .join(' · '),
+                      price: Number(deal.salePrice),
+                      originalPrice:
+                        deal.originalPrice &&
+                          Number(deal.originalPrice) !== Number(deal.salePrice)
+                          ? Number(deal.originalPrice)
+                          : undefined,
+                      discount: deal.discountPercent
+                        ? Number(deal.discountPercent)
+                        : undefined,
+                      priceNote: deal.durationMinutes
+                        ? `${deal.durationMinutes} ${content.category.durationSuffix}`
+                        : undefined,
+                      isProduct: !deal.service,
+                    }}
+                    eyebrowHref={
+                      deal.vendor?.slug
+                        ? `/vendor/${deal.vendor.slug}`
                         : undefined
                     }
-                    discount={deal.discountPercent ? `-${deal.discountPercent}%` : undefined}
-                    priceNote={deal.durationMinutes ? `${deal.durationMinutes} ${content.category.durationSuffix}` : undefined}
-                    href={deal.service ? `/deal/${deal.id}` : `/products/${deal.id}`}
-                    favorite
                     favoriteActive={isWishlisted(deal.id)}
                     onFavorite={() => toggleFavorite(deal)}
-                  >
-                    <div
-                      className="category-page__card-actions"
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
-                    >
-                      {deal.service ? (
+                    actions={
+                      deal.service ? (
                         <DealBookingDialog
                           deal={deal}
                           onBooked={(booking, intent) =>
                             setActionMessage(
                               intent === 'cart'
                                 ? `Added "${deal.service?.name ?? deal.title}" to your cart.`
-                                : `Booked "${deal.service?.name ?? deal.title}" — ${formatBookingSchedule(booking.bookingDate, booking.timeSlot)}.`,
+                                : `Booked "${deal.service?.name ?? deal.title}" — ${formatBookingSchedule(
+                                  booking.bookingDate,
+                                  booking.timeSlot,
+                                )}.`,
                             )
                           }
                           renderTrigger={(open) => (
@@ -244,19 +261,24 @@ export function Category() {
                                 if (requireAuthOrRedirect()) open();
                               }}
                             >
-                              <Icon slot="icon" aria-hidden="true">event_available</Icon>
+                              <Icon slot="icon" aria-hidden="true">
+                                event_available
+                              </Icon>
                               Book
                             </OutlinedButton>
                           )}
                         />
                       ) : (
                         <FilledButton onClick={() => addToCart(deal)}>
-                          <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                          <Icon slot="icon" aria-hidden="true">
+                            shopping_bag
+                          </Icon>
                           {content.category.actions.addToCart}
                         </FilledButton>
-                      )}
-                    </div>
-                  </SkyProductCardWC>
+                      )
+                    }
+                  />
+
                 </li>
               ))}
             </ul>

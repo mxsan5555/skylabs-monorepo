@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
-
+import { DealCard, type DealCardDeal } from '../../components/deal-card';
 import {
   Dialog,
   Divider,
@@ -48,6 +48,7 @@ export function DealDetail() {
   const [deal, setDeal] = useState<CatalogDeal | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
   const [related, setRelated] = useState<CatalogDeal[]>([]);
   const [activeImg, setActiveImg] = useState(0);
   const [addedToCart, setAddedToCart] = useState(false);
@@ -222,7 +223,19 @@ export function DealDetail() {
 
     void toggleWishlist(dealId);
   }
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
 
+      setCopied(true);
+
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
   return (
     <div className="deal-detail">
       <title>
@@ -478,7 +491,9 @@ export function DealDetail() {
                       if (requireAuthOrRedirect()) open();
                     }}
                   >
-                    <Icon slot="icon" aria-hidden="true">event_available</Icon>
+                    <Icon slot="icon" aria-hidden="true">
+                      event_available
+                    </Icon>
                     Book Now
                   </FilledButton>
                 )}
@@ -489,13 +504,8 @@ export function DealDetail() {
                 className="deal-detail__add-btn"
                 onClick={addToCart}
               >
-                <Icon
-                  slot="icon"
-                  aria-hidden="true"
-                >
-                  {addedToCart
-                    ? 'check'
-                    : 'shopping_bag'}
+                <Icon slot="icon" aria-hidden="true">
+                  {addedToCart ? 'check' : 'shopping_bag'}
                 </Icon>
 
                 {addedToCart
@@ -504,24 +514,37 @@ export function DealDetail() {
               </FilledButton>
             )}
 
+            {/* Wishlist */}
             <OutlinedIconButton
+              className="deal-detail__action-icon"
               aria-label={
                 isWishlisted(dealId)
                   ? dealDetail.wishlist.remove
                   : dealDetail.wishlist.save
               }
-              aria-pressed={isWishlisted(
-                dealId,
-              )}
-              disabled={wishlistPending(
-                dealId,
-              )}
+              aria-pressed={isWishlisted(dealId)}
+              disabled={wishlistPending(dealId)}
               onClick={toggleFavorite}
             >
               <Icon aria-hidden="true">
                 {isWishlisted(dealId)
                   ? 'favorite'
                   : 'favorite_border'}
+              </Icon>
+            </OutlinedIconButton>
+
+            {/* Share */}
+            <OutlinedIconButton
+              className="deal-detail__action-icon"
+              aria-label={
+                copied
+                  ? 'Link copied'
+                  : 'Share deal'
+              }
+              onClick={copyLink}
+            >
+              <Icon aria-hidden="true">
+                {copied ? 'check' : 'link'}
               </Icon>
             </OutlinedIconButton>
           </div>
@@ -634,94 +657,54 @@ export function DealDetail() {
                 free-mode="true"
                 grab-cursor="true"
               >
-                {related.map((item) => (
-                  <swiper-slide
-                    key={item.id}
-                    style={{
-                      width: '260px',
-                      height: 'auto',
-                    }}
-                  >
-                    <SkyProductCardWC
-                      variant="outlined"
-                      badge={
-                        item.service
-                          ? dealDetail.serviceType.service : dealDetail.serviceType.product
-                      }
-                      eyebrow={
-                        item.vendor
-                          ?.businessName ??
-                        undefined
-                      }
-                      eyebrowHref={
-                        item.vendor?.slug
-                          ? `/vendor/${item.vendor.slug}`
-                          : undefined
-                      }
-                      heading={
-                        item.service?.name ??
-                        item.product?.name ??
-                        item.title
-                      }
-                      image={
-                        item.service?.image ??
-                        item.product?.image ??
-                        undefined
-                      }
-                      imageAlt={
-                        item.service?.imageAlt ??
-                        item.product?.imageAlt ??
-                        undefined
-                      }
-                      price={formatINR(
-                        Number(
-                          item.salePrice,
-                        ),
-                      )}
-                      originalPrice={
-                        item.originalPrice !=
-                          null &&
-                          Number(
-                            item.originalPrice,
-                          ) !==
-                          Number(
-                            item.salePrice,
-                          )
-                          ? formatINR(
-                            Number(
-                              item.originalPrice,
-                            ),
-                          )
-                          : undefined
-                      }
-                      discount={
-                        item.discountPercent
-                          ? `-${item.discountPercent}%`
-                          : undefined
-                      }
-                      href={
-                        item.service
-                          ? `/deal/${item.id}`
-                          : `/products/${item.id}`
-                      }
-                      favorite
-                      favoriteActive={isWishlisted(
-                        item.id,
-                      )}
-                      onFavorite={() => {
-                        if (
-                          !requireAuthOrRedirect()
-                        ) {
-                          return;
-                        }
+                {related.map((item) => {
+                  const media = resolveDealMedia(item);
 
-                        void toggleWishlist(
-                          item.id,
-                        );
-                      }}
-                    />
-                  </swiper-slide>
-                ))}
+                  const relatedDeal: DealCardDeal = {
+                    id: item.id,
+                    title: item.service?.name ?? item.product?.name ?? item.title,
+                    image: media.images[0] ?? '',
+                    imageAlt:
+                      item.service?.imageAlt ??
+                      item.product?.imageAlt ??
+                      (item.service?.name ?? item.product?.name ?? item.title),
+                    gallery: media.images.length ? media.images : undefined,
+                    video: media.video,
+                    badge: item.service
+                      ? dealDetail.serviceType.service
+                      : dealDetail.serviceType.product,
+                    providerName: item.vendor?.businessName ?? undefined,
+                    price: Number(item.salePrice),
+                    originalPrice:
+                      item.originalPrice != null &&
+                        Number(item.originalPrice) !== Number(item.salePrice)
+                        ? Number(item.originalPrice)
+                        : undefined,
+                    discount: item.discountPercent ?? undefined,
+                    isProduct: !item.service,
+                  };
+
+                  return (
+                    <swiper-slide
+                      key={item.id}
+                      style={{ width: '260px', height: 'auto' }}
+                    >
+                      <DealCard
+                        deal={relatedDeal}
+                        eyebrowHref={
+                          item.vendor?.slug
+                            ? `/vendor/${item.vendor.slug}`
+                            : undefined
+                        }
+                        favoriteActive={isWishlisted(item.id)}
+                        onFavorite={() => {
+                          if (!requireAuthOrRedirect()) return;
+                          void toggleWishlist(item.id);
+                        }}
+                      />
+                    </swiper-slide>
+                  );
+                })}
               </swiper-container>
             </div>
           </div>

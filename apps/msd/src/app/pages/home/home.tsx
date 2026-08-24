@@ -167,58 +167,58 @@ export function Home() {
   // just caps the showcase to a sensible carousel length.
   const safeDealsData = dealsData ?? [];
 
-const featuredDeals = useMemo(
-  () => safeDealsData.slice(0, 12),
-  [safeDealsData],
-);
+  const featuredDeals = useMemo(
+    () => safeDealsData.slice(0, 12),
+    [safeDealsData],
+  );
 
-const hotDeals = useMemo(
-  () =>
-    [...safeDealsData].sort(
-      (a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0),
-    ),
-  [safeDealsData],
-);
+  const hotDeals = useMemo(
+    () =>
+      [...safeDealsData].sort(
+        (a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0),
+      ),
+    [safeDealsData],
+  );
 
-const massageDeals = useMemo(
-  () =>
-    safeDealsData
-      .filter((d) => dealMatchesMockSlug(d, 'massage'))
-      .slice(0, spaFinder.limits.massage),
-  [safeDealsData, spaFinder.limits.massage],
-);
+  const massageDeals = useMemo(
+    () =>
+      safeDealsData
+        .filter((d) => dealMatchesMockSlug(d, 'massage'))
+        .slice(0, spaFinder.limits.massage),
+    [safeDealsData, spaFinder.limits.massage],
+  );
 
-const skinDeals = useMemo(
-  () =>
-    safeDealsData
-      .filter((d) => dealMatchesMockSlug(d, 'skin-beauty'))
-      .slice(0, 6),
-  [safeDealsData],
-);
+  const skinDeals = useMemo(
+    () =>
+      safeDealsData
+        .filter((d) => dealMatchesMockSlug(d, 'skin-beauty'))
+        .slice(0, 6),
+    [safeDealsData],
+  );
 
-const nailDeals = useMemo(
-  () =>
-    safeDealsData
-      .filter((d) => dealMatchesMockSlug(d, 'hair-nails'))
-      .slice(0, 6),
-  [safeDealsData],
-);
+  const nailDeals = useMemo(
+    () =>
+      safeDealsData
+        .filter((d) => dealMatchesMockSlug(d, 'hair-nails'))
+        .slice(0, 6),
+    [safeDealsData],
+  );
 
-const spaDeals = useMemo(
-  () =>
-    safeDealsData
-      .filter((d) => dealMatchesMockSlug(d, 'spas-retreats'))
-      .slice(0, 6),
-  [safeDealsData],
-);
+  const spaDeals = useMemo(
+    () =>
+      safeDealsData
+        .filter((d) => dealMatchesMockSlug(d, 'spas-retreats'))
+        .slice(0, 6),
+    [safeDealsData],
+  );
 
-const wellnessDeals = useMemo(
-  () =>
-    safeDealsData
-      .filter((d) => dealMatchesMockSlug(d, 'health-wellness'))
-      .slice(0, 6),
-  [safeDealsData],
-);// client-side substring match over mock `DEALS`. One request per keystroke-debounce (not per
+  const wellnessDeals = useMemo(
+    () =>
+      safeDealsData
+        .filter((d) => dealMatchesMockSlug(d, 'health-wellness'))
+        .slice(0, 6),
+    [safeDealsData],
+  );// client-side substring match over mock `DEALS`. One request per keystroke-debounce (not per
   // item), so this is not an N+1 concern.
   useEffect(() => {
     const query = searchQuery.trim();
@@ -270,9 +270,9 @@ const wellnessDeals = useMemo(
     setActionMessage('');
     try {
       await addCartItem(token, deal.id, 1);
-      setActionMessage( home.ui.messages.addToCartSuccess.replace('{item}', deal.product?.name ?? deal.title,));
+      setActionMessage(home.ui.messages.addToCartSuccess.replace('{item}', deal.product?.name ?? deal.title,));
     } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message :  home.ui.messages.addToCartError);
+      setActionError(err instanceof ApiRequestError ? err.message : home.ui.messages.addToCartError);
     }
   }
 
@@ -280,6 +280,7 @@ const wellnessDeals = useMemo(
     return (
       <div className="home-carousel">
         <swiper-container
+          navigation="true"
           slides-per-view="auto"
           space-between={16}
           free-mode="true"
@@ -444,14 +445,14 @@ const wellnessDeals = useMemo(
             <div
               className="home__premium-tabs"
               role="navigation"
-             aria-label={home.ui.accessibility.browseWellnessCategories}
+              aria-label={home.ui.accessibility.browseWellnessCategories}
             >
               {premiumHero.tabs.map((tab) => (
                 <NavLink
                   key={tab.label}
                   to={tab.to}
                   className="premium-category-link"
-                  aria-label={home.ui.accessibility.exploreCategory.replace('{category}',tab.label,)}
+                  aria-label={home.ui.accessibility.exploreCategory.replace('{category}', tab.label,)}
                 >
                   <AssistChip className="premium-category-chip">
                     <Icon slot="icon">{tab.icon}</Icon>
@@ -601,29 +602,29 @@ const wellnessDeals = useMemo(
             seeAll={home.sections.browseByCategory.seeAll}
             seeAllTo={home.sections.browseByCategory.seeAllTo}
           />
-        <div className="home__category-grid">
-  {(categories ?? []).map((cat) => (
-    <NavLink
-      key={cat.id}
-      to={`/category/${cat.slug}`}
-      className="category-card"
-    >
-      <div className="category-card__icon-wrap">
-        <Icon className="category-card__icon" aria-hidden="true">
-          category
-        </Icon>
-      </div>
+          <div className="home__category-grid">
+            {(categories ?? []).map((cat) => (
+              <NavLink
+                key={cat.id}
+                to={`/category/${cat.slug}`}
+                className="category-card"
+              >
+                <div className="category-card__icon-wrap">
+                  <Icon className="category-card__icon" aria-hidden="true">
+                    category
+                  </Icon>
+                </div>
 
-      <div className="category-card__content">
-        <h3>{cat.name}</h3>
-       <p>{categoryDealCount(cat.id)} {home.ui.labels.services}</p>
-      </div>
-      <div className="category-card__arrow">
-        <Icon>arrow_forward</Icon>
-      </div>
-    </NavLink>
-  ))}
-</div>
+                <div className="category-card__content">
+                  <h3>{cat.name}</h3>
+                  <p>{categoryDealCount(cat.id)} {home.ui.labels.services}</p>
+                </div>
+                <div className="category-card__arrow">
+                  <Icon>arrow_forward</Icon>
+                </div>
+              </NavLink>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -880,7 +881,7 @@ const wellnessDeals = useMemo(
       {/* ── Welcome Offer CTA ──────────────────────────────────────────── */}
       <section
         className="home-section home-section--alt"
-     aria-label={home.ui.accessibility.welcomeOfferPromotion}
+        aria-label={home.ui.accessibility.welcomeOfferPromotion}
       >
         <div className="home-section__container">
           <sky-card

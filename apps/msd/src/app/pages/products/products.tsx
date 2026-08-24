@@ -9,7 +9,7 @@ import {
 } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { useNavigate } from 'react-router-dom';
-
+import { DealCard } from '../../components/deal-card';
 import {
   listCatalogDeals,
   type CatalogDeal,
@@ -498,81 +498,55 @@ export function ProductListing() {
                   )
                   : undefined;
 
-              const image = primaryImage(resolveDealMedia(deal));
+              const media = resolveDealMedia(deal);
+
+              const image = primaryImage(media);
 
               return (
                 <div
                   key={deal.id}
                   className="products-page__card-wrap"
                 >
-                  <SkyProductCardWC
-                    variant="outlined"
-                    heading={productName}
-                    eyebrow={
-                      deal.product?.brand ??
-                      deal.vendor
-                        ?.businessName ??
-                      undefined
-                    }
-                    image={image}
-                    imageAlt={
-                      deal.product
-                        ?.imageAlt ??
-                      productName
-                    }
-                    price={formatINR(
-                      salePrice,
-                    )}
-                    originalPrice={
-                      originalPrice !==
-                        undefined &&
-                        originalPrice !==
-                        salePrice
-                        ? formatINR(
-                          originalPrice,
-                        )
-                        : undefined
-                    }
-                    discount={
-                      deal.discountPercent
-                        ? `${deal.discountPercent}% ${products.listing.offSuffix}`
-                        : undefined
-                    }
-                    href={`/products/${deal.id}`}
-                    favorite
-                    favoriteActive={isWishlisted(
-                      deal.id,
-                    )}
-                    onFavorite={() =>
-                      toggleFavorite(deal)
-                    }
-                  >
-                    <div
-                      className="products-page__card-cta"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                      }}
-                    >
-                      <FilledButton
-                        type="button"
-                        className="products-page__card-btn"
-                        onClick={() =>
-                          void addToCart(
-                            deal,
-                          )
-                        }
-                      >
-                        <Icon
-                          slot="icon"
-                          aria-hidden="true"
-                        >
-                          shopping_bag
-                        </Icon>
-                        {products.listing.addToCart}
-                      </FilledButton>
-                    </div>
-                  </SkyProductCardWC>
+               <DealCard
+  deal={{
+    id: deal.id,
+    title: productName,
+    image: image ?? '',
+    imageAlt:
+      deal.product?.imageAlt ?? productName,
+    gallery: media.images,
+    badge: 'Product',
+    providerName:
+      deal.product?.brand ??
+      deal.vendor?.businessName ??
+      undefined,
+    price: salePrice,
+    originalPrice:
+      originalPrice !== undefined &&
+      originalPrice !== salePrice
+        ? originalPrice
+        : undefined,
+    discount: deal.discountPercent
+      ? Number(deal.discountPercent)
+      : undefined,
+    isProduct: true,
+  }}
+  favoriteActive={isWishlisted(deal.id)}
+  onFavorite={() => toggleFavorite(deal)}
+  actions={
+    <FilledButton
+      type="button"
+      className="products-page__card-btn"
+      onClick={() => void addToCart(deal)}
+    >
+      <Icon slot="icon" aria-hidden="true">
+        shopping_bag
+      </Icon>
+
+      {products.listing.addToCart}
+    </FilledButton>
+  }
+/>
                 </div>
               );
             })}

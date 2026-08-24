@@ -82,8 +82,10 @@ export function OrderDetail() {
             </div>
             {order.booking && (
               <div className="cart-summary__row">
-                <span>{orderDetail.labels.appointment}</span>
-                <span>{new Date(order.booking.bookingDate).toLocaleDateString()}{' '}{orderDetail.labels.timeConnector}{' '}{order.booking.timeSlot}</span></div>
+                {/* <span>{orderDetail.labels.appointment}</span>
+                <span>{new Date(order.booking.bookingDate).toLocaleDateString()}{' '}{orderDetail.labels.timeConnector}{' '}{order.booking.timeSlot}</span>
+                 */}
+                </div>
             )}
             <Divider />
             {vendorGroups.map((group) => (

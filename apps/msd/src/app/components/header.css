@@ -273,24 +273,110 @@ main {
 }
 
 @media (max-width: 480px) {
+
   .site-header__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 8px;
-    padding-inline: 20px;
+    width: 100%;
+    min-height: 64px;
+    padding: 8px 12px;
+    box-sizing: border-box;
   }
 
-  .site-header__actions {
-    gap: 15px;
+  /* Mobile menu */
+  .site-header__menu-btn {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+  }
+
+  /* Logo */
+  .site-header__brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .site-header__logo--desktop {
+    display: none;
   }
 
   .site-header__logo--mobile {
-    width: 50px;
-    height: 50px;
-    padding-right: 110px;
+    display: block;
+    width: 44px;
+    height: 44px;
+    max-width: 44px;
+    object-fit: contain;
+    padding: 0;
+  }
+
+  /* Hide desktop categories on mobile */
+  .header-categories {
+    display: none;
+  }
+
+  /* Wishlist + Cart + Profile */
+  .site-header__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  .site-header__cart {
+    --md-filled-tonal-icon-button-container-width: 40px;
+    --md-filled-tonal-icon-button-container-height: 40px;
+
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    padding: 0;
+  }
+
+  .site-header__cart md-icon {
+    font-size: 21px;
+  }
+
+  /* Badge */
+  .site-header__cart-badge {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 3px;
+    border-radius: 50%;
+    font-size: 9px;
+    line-height: 15px;
+    text-align: center;
+  }
+
+  /* Profile */
+  .site-header__profile {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+  }
+
+  .profile-menu {
+    display: flex;
+    align-items: center;
   }
 
   .profile-button {
     --md-filled-tonal-icon-button-container-width: 40px;
     --md-filled-tonal-icon-button-container-height: 40px;
+
+    width: 40px;
+    height: 40px;
+    padding: 0;
   }
 
   .profile-button md-icon {
@@ -299,5 +385,13 @@ main {
 
   .profile-arrow {
     display: none;
+  }
+
+  /* Sign In button for guest */
+  .site-header__profile > md-filled-button {
+    min-width: 72px;
+    height: 40px;
+    padding-inline: 10px;
+    font-size: 13px;
   }
 }

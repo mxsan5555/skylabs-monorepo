@@ -402,8 +402,8 @@ export function ProductDetail() {
                   key={img + index}
                   type="button"
                   className={`product-detail__thumb${index === activeImg
-                      ? ' product-detail__thumb--active'
-                      : ''
+                    ? ' product-detail__thumb--active'
+                    : ''
                     }`}
                   onClick={() =>
                     setActiveImg(index)
@@ -544,37 +544,61 @@ export function ProductDetail() {
               </Icon>
             </OutlinedIconButton>
           </div>
-
           {/* Action buttons */}
           <div className="product-detail__actions">
-            <FilledButton
-              className="product-detail__add-btn"
-              onClick={handleAddToCart}
-            >
-              <Icon
-                slot="icon"
-                aria-hidden="true"
+            <div className="product-detail__primary-actions">
+              <FilledButton
+                className="product-detail__add-btn"
+                onClick={handleAddToCart}
               >
-                {addedToCart
-                  ? 'check'
-                  : 'shopping_bag'}
-              </Icon>
+                <Icon slot="icon" aria-hidden="true">
+                  {addedToCart ? 'check' : 'shopping_bag'}
+                </Icon>
 
-              {addedToCart
-                ? products.detail.addedToCart
-                : products.detail.addToCart}
-            </FilledButton>
+                {addedToCart
+                  ? products.detail.addedToCart
+                  : products.detail.addToCart}
+              </FilledButton>
+
+              <OutlinedIconButton
+                className="product-detail__action-icon"
+                aria-label={
+                  isWishlisted(dealId)
+                    ? products.detail.removeFromWishlist
+                    : products.detail.saveToWishlist
+                }
+                aria-pressed={isWishlisted(dealId)}
+                disabled={wishlistPending(dealId)}
+                onClick={toggleFavorite}
+              >
+                <Icon aria-hidden="true">
+                  {isWishlisted(dealId)
+                    ? 'favorite'
+                    : 'favorite_border'}
+                </Icon>
+              </OutlinedIconButton>
+
+              <OutlinedIconButton
+                className="product-detail__action-icon"
+                aria-label={
+                  copied
+                    ? products.detail.linkCopied
+                    : products.detail.copyProductLink
+                }
+                onClick={copyLink}
+              >
+                <Icon aria-hidden="true">
+                  {copied ? 'check' : 'link'}
+                </Icon>
+              </OutlinedIconButton>
+            </div>
 
             {addError && (
-              <p
-                className="error-state"
-                role="alert"
-              >
+              <p className="error-state" role="alert">
                 {addError}
               </p>
             )}
 
-            {/* Stock + share */}
             <div className="product-detail__secondary-actions">
               <span className="product-detail__stock">
                 <Icon
@@ -586,49 +610,6 @@ export function ProductDetail() {
 
                 {products.detail.inStock}
               </span>
-
-              <div
-                className="product-detail__share"
-                aria-label={products.detail.shareAriaLabel}
-              >
-                <OutlinedIconButton
-                  aria-label={
-                    isWishlisted(dealId)
-                      ? products.detail.removeFromWishlist
-                      : products.detail.saveToWishlist
-                  }
-                  aria-pressed={isWishlisted(
-                    dealId,
-                  )}
-                  disabled={wishlistPending(
-                    dealId,
-                  )}
-                  onClick={toggleFavorite}
-                >
-                  <Icon aria-hidden="true">
-                    {isWishlisted(dealId)
-                      ? 'favorite'
-                      : 'favorite_border'}
-                  </Icon>
-                </OutlinedIconButton>
-
-                <span className="product-detail__share-label">
-                  {products.detail.shareLabel}
-                </span>
-
-                <OutlinedIconButton
-                  aria-label={
-                    copied
-                      ? products.detail.linkCopied
-                      : products.detail.copyProductLink
-                  }
-                  onClick={copyLink}
-                >
-                  <Icon aria-hidden="true">
-                    {copied ? 'check' : 'link'}
-                  </Icon>
-                </OutlinedIconButton>
-              </div>
             </div>
           </div>
 
