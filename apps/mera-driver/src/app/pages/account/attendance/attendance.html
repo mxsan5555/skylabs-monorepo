@@ -64,9 +64,9 @@
             
             <!-- 1. Primary Attendance Details -->
             <sky-card class="p-6 block">
-              <div class="section-heading-box">
-                <h3>1. Primary Attendance Details</h3>
-              </div>
+              <sky-card variant="filled" class="p-3 block bg-blue-50 border-l-4 border-[#2563eb] mb-5 rounded-r-md">
+                  <h3 class="text-sm font-bold text-slate-800 m-0">1. Primary Attendance Details</h3>
+                </sky-card>
               <div class="grid grid-cols-3 gap-4 max-md:grid-cols-2 max-sm:grid-cols-1 w-full">
                 <md-outlined-text-field label="Driver ID *" required [value]="inputDriverId()" (input)="onInputChange('driver_id', $event)" placeholder="e.g. 501"></md-outlined-text-field>
 
@@ -83,9 +83,9 @@
 
             <!-- 2. Check-In & Shift Location -->
             <sky-card class="p-6 block">
-              <div class="section-heading-box">
-                <h3>2. Check-In & Shift Location</h3>
-              </div>
+              <sky-card variant="filled" class="p-3 block bg-blue-50 border-l-4 border-[#2563eb] mb-5 rounded-r-md">
+                  <h3 class="text-sm font-bold text-slate-800 m-0">2. Check-In & Shift Location</h3>
+                </sky-card>
               <div class="grid grid-cols-4 gap-4 max-md:grid-cols-2 max-sm:grid-cols-1 w-full">
                 <md-outlined-text-field label="Check-In Time" [value]="inputCheckInTime()" (input)="onInputChange('check_in_time', $event)" placeholder="YYYY-MM-DD HH:MM"></md-outlined-text-field>
 
@@ -107,9 +107,9 @@
 
             <!-- 3. Leave Management & Notes -->
             <sky-card class="p-6 block">
-              <div class="section-heading-box">
-                <h3>3. Leave Management & Notes</h3>
-              </div>
+              <sky-card variant="filled" class="p-3 block bg-blue-50 border-l-4 border-[#2563eb] mb-5 rounded-r-md">
+                  <h3 class="text-sm font-bold text-slate-800 m-0">3. Leave Management & Notes</h3>
+                </sky-card>
               <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
                 <md-outlined-text-field label="Leave Type (if on leave)" [value]="inputLeaveType()" (input)="onInputChange('leave_type', $event)" placeholder="e.g. Sick Leave, Casual Leave"></md-outlined-text-field>
 

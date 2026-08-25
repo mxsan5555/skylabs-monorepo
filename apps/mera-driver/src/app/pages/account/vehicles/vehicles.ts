@@ -29,7 +29,7 @@ interface Vehicle {
   standalone: true,
   imports: [AdminPage],
   templateUrl: './vehicles.html',
-  styleUrl: './vehicles.css',
+  styleUrl: '../masters/masters.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class Vehicles implements OnInit {

@@ -37,7 +37,9 @@
           <div class="flex flex-col gap-y-6 w-full">
             <!-- 1. Booking & Participant Information -->
             <sky-card class="p-6 block">
-              <div class="section-heading-box"><h3>1. Booking & Participant Information</h3></div>
+              <sky-card variant="filled" class="p-3 block bg-blue-50 border-l-4 border-[#2563eb] mb-5 rounded-r-md">
+                  <h3 class="text-sm font-bold text-slate-800 m-0">1. Booking & Participant Information</h3>
+                </sky-card>
               <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
                 <md-outlined-text-field label="Booking Code *" required [value]="inputCode()" (input)="inputCode.set($any($event.target).value)"></md-outlined-text-field>
                 
@@ -63,7 +65,9 @@
 
             <!-- 2. Route, Coordinates & Schedule -->
             <sky-card class="p-6 block">
-              <div class="section-heading-box"><h3>2. Route, Coordinates & Schedule</h3></div>
+              <sky-card variant="filled" class="p-3 block bg-blue-50 border-l-4 border-[#2563eb] mb-5 rounded-r-md">
+                  <h3 class="text-sm font-bold text-slate-800 m-0">2. Route, Coordinates & Schedule</h3>
+                </sky-card>
               <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
                 <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Pickup Address *" required [value]="inputPickup()" (input)="inputPickup.set($any($event.target).value)" placeholder="Enter full pickup location"></md-outlined-text-field>
                 
@@ -82,7 +86,9 @@
 
             <!-- 3. Distance, Fares & Status -->
             <sky-card class="p-6 block">
-              <div class="section-heading-box"><h3>3. Distance, Fares & Status</h3></div>
+              <sky-card variant="filled" class="p-3 block bg-blue-50 border-l-4 border-[#2563eb] mb-5 rounded-r-md">
+                  <h3 class="text-sm font-bold text-slate-800 m-0">3. Distance, Fares & Status</h3>
+                </sky-card>
               <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
                 <md-outlined-text-field label="Est. Distance (km)" type="number" step="0.1" [value]="inputEstDistance()" (input)="inputEstDistance.set($any($event.target).value)"></md-outlined-text-field>
                 <md-outlined-text-field label="Est. Duration (mins)" type="number" [value]="inputEstDuration()" (input)="inputEstDuration.set($any($event.target).value)"></md-outlined-text-field>
