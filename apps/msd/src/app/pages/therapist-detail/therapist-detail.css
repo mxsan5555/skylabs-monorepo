@@ -1,0 +1,241 @@
+.therapist-detail {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.therapist-detail__breadcrumb {
+  width: 100%;
+}
+
+/* Main Layout */
+.therapist-detail__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+  width: 100%;
+  padding: 28px 24px;
+  box-sizing: border-box;
+}
+
+/* Gallery */
+.therapist-detail__gallery {
+  width: 100%;
+  min-width: 0;
+}
+
+.therapist-detail__main-img-wrap {
+  width: 100%;
+  height: 360px;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.therapist-detail__main-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 18px;
+}
+
+/* Thumbnails */
+.therapist-detail__thumbs {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.therapist-detail__thumb {
+  flex: 0 0 auto;
+  width: 68px;
+  height: 52px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  background: transparent;
+  cursor: pointer;
+}
+
+.therapist-detail__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.therapist-detail__thumb--active {
+  border-color: #367343;
+}
+
+/* Video */
+.therapist-detail__video {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  margin-top: 14px;
+  border-radius: 18px;
+}
+
+/* Information */
+.therapist-detail__info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.therapist-detail__meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.therapist-detail__provider {
+  color: #367343;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.therapist-detail__title {
+  margin: 0 0 18px;
+  font-size: 34px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.therapist-detail__dist,
+.therapist-detail__duration {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.therapist-detail__dist mwc-icon,
+.therapist-detail__duration mwc-icon {
+  flex-shrink: 0;
+}
+
+.therapist-detail__info > p {
+  margin: 0 0 12px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.therapist-detail__price-row {
+  margin: 14px 0;
+}
+
+.therapist-detail__price {
+  color: #367343;
+  font-size: 32px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.therapist-detail__cta {
+  width: 100%;
+  margin-top: 2px;
+}
+
+.therapist-detail__add-btn {
+  width: 100%;
+}
+
+.therapist-detail__info .field-hint {
+  margin-top: 8px;
+}
+
+/* Empty State */
+.therapist-detail--empty {
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 60vh;
+  padding: 32px 20px;
+  box-sizing: border-box;
+}
+
+/* Tablet */
+@media (max-width: 900px) {
+  .therapist-detail__layout {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 24px 20px;
+  }
+
+  .therapist-detail__main-img-wrap {
+    height: 340px;
+  }
+
+  .therapist-detail__title {
+    font-size: 32px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .therapist-detail__layout {
+    gap: 20px;
+    padding: 20px 14px;
+  }
+
+  .therapist-detail__main-img-wrap {
+    height: 240px;
+    border-radius: 14px;
+  }
+
+  .therapist-detail__main-img {
+    border-radius: 14px;
+  }
+
+  .therapist-detail__thumbs {
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .therapist-detail__thumb {
+    width: 60px;
+    height: 46px;
+    border-radius: 7px;
+  }
+
+  .therapist-detail__provider {
+    font-size: 16px;
+  }
+
+  .therapist-detail__title {
+    margin-bottom: 14px;
+    font-size: 26px;
+  }
+
+  .therapist-detail__dist,
+  .therapist-detail__duration {
+    margin-bottom: 10px;
+    font-size: 15px;
+  }
+
+  .therapist-detail__info > p {
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .therapist-detail__price-row {
+    margin: 12px 0;
+  }
+
+  .therapist-detail__price {
+    font-size: 28px;
+  }
+
+  .therapist-detail__video {
+    margin-top: 12px;
+    border-radius: 14px;
+  }
+}

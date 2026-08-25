@@ -3,7 +3,8 @@ import type { MenuNode } from '@skylabs-monorepo/shared-types';
 import { Icon, TextButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { isDualRoleUser, setExperienceMode } from '../../auth/role-routing';
-
+import logo from '../../assets/logo.jpg';
+import logo2 from '../../assets/logo2.jpg';
 /**
  * Console navigation, built directly from `bootstrap.menu` — the server has
  * already pruned it down to what the caller's permissions allow, so this
@@ -34,15 +35,20 @@ export function Sidebar() {
 
   return (
     <aside className="admin-sidebar">
-      <div className="admin-sidebar__brand">
-        <span className="admin-sidebar__logo">
-          <Icon aria-hidden="true">spa</Icon>
-        </span>
-        <span>
-          <div className="admin-sidebar__brand-name">MSD</div>
-          <div className="admin-sidebar__brand-sub">Wellness console</div>
-        </span>
-      </div>
+   <div className="admin-sidebar__brand">
+  <span className="admin-sidebar__logo">
+    <img
+      src={logo}
+      alt="MySpaDeal"
+      className="admin-sidebar__logo-image admin-sidebar__logo-image--desktop"
+    />
+    <img
+      src={logo2}
+      alt="MySpaDeal"
+      className="admin-sidebar__logo-image admin-sidebar__logo-image--mobile"
+    />
+  </span>
+</div>
 
       <nav className="admin-sidebar__nav" aria-label="Console">
         {visibleMenu.map((node) => <MenuNodeItem key={node.id} node={node} />)}

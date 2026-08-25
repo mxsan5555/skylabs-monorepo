@@ -303,8 +303,19 @@ export function Home() {
                   actions={
                     deal.product ? (
                       <FilledButton onClick={() => addToCart(deal)}>
-                        <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                        <Icon slot="icon" aria-hidden="true">
+                          shopping_bag
+                        </Icon>
                         Add to Cart
+                      </FilledButton>
+                    ) : deal.service ? (
+                      <FilledButton
+                        onClick={() => navigate(`/deal/${deal.id}`)}
+                      >
+                        <Icon slot="icon" aria-hidden="true">
+                          calendar_month
+                        </Icon>
+                        Book
                       </FilledButton>
                     ) : undefined
                   }
@@ -447,17 +458,20 @@ export function Home() {
               role="navigation"
               aria-label={home.ui.accessibility.browseWellnessCategories}
             >
-              {premiumHero.tabs.map((tab) => (
+              {categories.map((category) => (
                 <NavLink
-                  key={tab.label}
-                  to={tab.to}
+                  key={category.id}
+                  to={`/category/${category.slug}`}
                   className="premium-category-link"
-                  aria-label={home.ui.accessibility.exploreCategory.replace('{category}', tab.label,)}
+                  aria-label={home.ui.accessibility.exploreCategory.replace(
+                    '{category}',
+                    category.name,
+                  )}
                 >
                   <AssistChip className="premium-category-chip">
-                    <Icon slot="icon">{tab.icon}</Icon>
+                    <Icon slot="icon">category</Icon>
 
-                    <span>{tab.label}</span>
+                    <span>{category.name}</span>
 
                     <Icon slot="trailing-icon">
                       arrow_forward

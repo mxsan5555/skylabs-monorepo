@@ -1477,12 +1477,22 @@
 }
 
 @media (max-width: 768px) {
-    .vacation-slider {
-        padding: 8px 42px 20px;
+     .vacation-slider {
+        width: 100%;
+        padding: 8px 0 20px;
+        overflow: visible;
     }
 
-    .vacation-slider swiper-slide {
-        width: 220px;
+    .vacation-slider swiper-container {
+        width: 100%;
+        overflow: visible;
+    }
+
+    .vacation-slider swiper-slide,
+    .home-stays-slide {
+        width: 220px !important;
+        max-width: 220px;
+        flex-shrink: 0;
     }
 
     .vacation-slider swiper-container::part(button-prev),
@@ -1493,11 +1503,11 @@
     }
 
     .vacation-slider swiper-container::part(button-prev) {
-        left: 0;
+        left: 4px;
     }
 
     .vacation-slider swiper-container::part(button-next) {
-        right: 0;
+        right: 4px;
     }
 
     .home__category-grid {
@@ -2493,11 +2503,6 @@
   }
 }
 
-
-/* =============================================================
-   VERY SMALL PHONES — 320px / 360px
-============================================================= */
-
 @media (max-width: 360px) {
 
   .home-section {
@@ -2589,6 +2594,21 @@
   .home__offer-title {
     font-size: 1.3rem;
   }
+   .vacation-slider {
+        padding: 6px 0 14px;
+    }
+
+    .vacation-slider swiper-slide,
+    .home-stays-slide {
+        width: 205px !important;
+        max-width: 205px;
+    }
+
+    .vacation-slider swiper-container::part(button-prev),
+    .vacation-slider swiper-container::part(button-next) {
+        width: 32px;
+        height: 32px;
+    }
 }
 
 @media (max-width: 992px) {
