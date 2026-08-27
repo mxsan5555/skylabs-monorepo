@@ -95,9 +95,12 @@ export class Drivers implements OnInit {
   // --- View Switcher (Page vs Form) & Tab Controls ---
   readonly showAddForm = signal<boolean>(false);
   readonly activeFormTab = signal<number>(0);
+  readonly activeSubSection = signal<number>(0);
   readonly editingDriverId = signal<number | null>(null);
 
   // --- Form Input Signals (Tab 1: Personal) ---
+  readonly inputAppNo = signal<string>('');
+  readonly inputJoiningDate = signal<string>('');
   readonly inputFirstName = signal<string>('');
   readonly inputLastName = signal<string>('');
   readonly inputFatherName = signal<string>('');
@@ -612,6 +615,18 @@ export class Drivers implements OnInit {
     }
   }
 
+  clearDocFile(category: 'personal' | 'health' | 'education' | 'police', idx: number): void {
+    if (category === 'personal') {
+      this.personalDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: '' } : doc));
+    } else if (category === 'health') {
+      this.healthDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: '' } : doc));
+    } else if (category === 'education') {
+      this.educationDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: '' } : doc));
+    } else if (category === 'police') {
+      this.policeDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: '' } : doc));
+    }
+  }
+
   resetForm(): void {
     this.editingDriverId.set(null);
     this.inputFirstName.set('');
@@ -772,6 +787,7 @@ export class Drivers implements OnInit {
   openAddDriverForm(): void {
     this.showAddForm.set(true);
     this.activeFormTab.set(0);
+    this.activeSubSection.set(0);
   }
 
   closeAddDriverForm(): void {
@@ -782,12 +798,52 @@ export class Drivers implements OnInit {
   onFormTabChange(event: Event): void {
     const index = (event.target as HTMLElement & { activeTabIndex: number }).activeTabIndex;
     this.activeFormTab.set(index);
+    this.activeSubSection.set(0);
+  }
+
+  // --- Step Navigation Actions ---
+  isLastStep(): boolean {
+    return this.activeFormTab() === 3 && this.activeSubSection() === 2;
+  }
+
+  onSaveAndNext(): void {
+    if (this.isLastStep()) {
+      this.addDriver();
+      return;
+    }
+
+    const currentTab = this.activeFormTab();
+    const currentSub = this.activeSubSection();
+    const maxSubs = [4, 2, 6, 3]; // Sub-section counts for Tab 0, 1, 2, 3
+
+    if (currentSub < maxSubs[currentTab] - 1) {
+      this.activeSubSection.set(currentSub + 1);
+    } else if (currentTab < 3) {
+      this.activeFormTab.set(currentTab + 1);
+      this.activeSubSection.set(0);
+    }
+  }
+
+  onPrevSubSection(): void {
+    const currentTab = this.activeFormTab();
+    const currentSub = this.activeSubSection();
+    const maxSubs = [4, 2, 6, 3];
+
+    if (currentSub > 0) {
+      this.activeSubSection.set(currentSub - 1);
+    } else if (currentTab > 0) {
+      const prevTab = currentTab - 1;
+      this.activeFormTab.set(prevTab);
+      this.activeSubSection.set(maxSubs[prevTab] - 1);
+    }
   }
 
   // --- Input Handlers ---
   onInputChange(field: string, event: Event): void {
     const val = (event.target as any).value || '';
     switch(field) {
+      case 'appNo': this.inputAppNo.set(val); break;
+      case 'joiningDate': this.inputJoiningDate.set(val); break;
       case 'firstName': this.inputFirstName.set(val); break;
       case 'lastName': this.inputLastName.set(val); break;
       case 'fatherName': this.inputFatherName.set(val); break;
