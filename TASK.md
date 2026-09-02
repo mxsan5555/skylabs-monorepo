@@ -31,7 +31,7 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] Wired CartProvider + WishlistProvider in main.tsx — 2026-07-12
 
 ### Content pages — both apps (`pages/` + route)
-- [ ] Contact page
+- [ ] Contact page~
 - [ ] Blog category (filtered list)
 
 ### Account & admin — both apps (remaining)

@@ -1,386 +1,163 @@
-@if (isLoading()) {
-  <header class="flex items-center justify-between gap-[8px] px-3 sm:px-6 border-b border-slate-200 bg-white z-20 sticky top-0 min-h-[64px] animate-pulse">
-    <!-- Brand Logo Skeleton -->
-    <div class="flex items-center gap-[8px] sm:gap-6">
-      <div class="flex items-center gap-[8px]">
-        <div class="w-9 h-9 rounded-lg bg-slate-200"></div>
-        <div class="h-5 bg-slate-200 rounded w-24 hidden sm:block"></div>
-      </div>
-      <div class="w-24 h-8 rounded-full bg-slate-200 hidden sm:block"></div>
-    </div>
-    <!-- Desktop Navigation Skeleton -->
-    <nav class="hidden lg:flex items-center gap-3 mr-auto ml-8">
-      <div class="w-16 h-8 rounded bg-slate-200"></div>
-      <div class="w-24 h-8 rounded bg-slate-200"></div>
-      <div class="w-16 h-8 rounded bg-slate-200"></div>
-      <div class="w-20 h-8 rounded bg-slate-200"></div>
-    </nav>
-    <!-- Right side Skeleton -->
-    <div class="flex items-center gap-[8px] sm:gap-4">
-      <div class="w-20 h-8 rounded bg-slate-200"></div>
-      <div class="w-9 h-9 rounded-full bg-slate-200"></div>
-    </div>
-  </header>
-} @else {
-  <header class="flex items-center justify-between gap-[8px] px-3 sm:px-6 border-b border-slate-200 bg-white z-20 sticky top-0 min-h-[64px]">
-    <!-- Brand: Logo icon + name & Location Selector & Drivers Counter -->
-    <div class="flex items-center gap-[8px] sm:gap-6">
-      <a routerLink="/" class="flex items-center gap-[8px] text-lg font-bold no-underline text-blue-600">
-        <span class="w-9 h-9 rounded-lg flex items-center justify-center bg-blue-600 text-white shrink-0">
-          <md-icon aria-hidden="true" class="[--md-icon-size:22px]">directions_car</md-icon>
-        </span>
-        <span class="hidden sm:inline">{{ brandName() }}</span>
-      </a>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="site-header__brand" routerLink="/" (click)="openMenu.set(null)">
+      <span class="site-header__logo" aria-hidden="true">
+        <md-icon>local_taxi</md-icon>
+      </span>
+      mera-driver
+    </a>
 
-      <!-- Location Selector (100% Material Outlined Button) -->
-      <md-outlined-button 
-        routerLink="/location" 
-        class="inline-flex text-xs [--md-outlined-button-container-shape:9999px] [--md-outlined-button-label-text-color:#334155] [--md-outlined-button-outline-color:#cbd5e1] hover:[--md-outlined-button-outline-color:#94a3b8]"
-      >
-        <md-icon slot="icon" class="[--md-icon-size:16px] text-blue-600">location_on</md-icon>
-        <span class="hidden sm:inline">New Delhi</span>
-      </md-outlined-button>
-
-      <!-- Live Drivers Online Counter (100% Material Text Button - visible on lg/xl) -->
-      <md-text-button class="hidden lg:inline-flex text-xs [--md-text-button-label-text-color:#16a34a] cursor-default">
-        <span slot="icon" class="relative flex h-2 w-2">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-        </span>
-        {{ driversOnlineCount() }} {{ driversOnlineLabel() }}
-      </md-text-button>
-    </div>
-
-    <!-- Desktop Navigation (100% Material Button Active/Inactive Switch) -->
-    <nav class="hidden lg:flex items-center gap-3 mr-auto ml-8" aria-label="Primary">
-      @for (link of navLinks(); track link.route) {
-        @if (link.subItems) {
-          <!-- Services Dropdown menu -->
-          <span 
-            class="relative"
-            (mouseenter)="onMouseEnter()"
-            (mouseleave)="onMouseLeave()"
-          >
-            <md-text-button 
-              id="services-menu-anchor" 
-              class="text-sm transition-all duration-200" 
-              [style.color]="servicesMenuOpen() ? '#1175BC' : 'inherit'"
-              (click)="toggleServicesMenu($event)"
-            >
-              <md-icon slot="icon" class="[--md-icon-size:16px]">{{ link.icon }}</md-icon>
-              {{ link.label }}
-              <md-icon class="ml-1 [--md-icon-size:16px] transition-transform duration-300" [class.rotate-180]="servicesMenuOpen()">expand_more</md-icon>
-            </md-text-button>
-            <md-menu 
-              [quick]="true"
-              y-offset="12"
-              class="services-menu"
-              anchor="services-menu-anchor" 
-              positioning="popover" 
-              [open]="servicesMenuOpen()" 
-              (closed)="servicesMenuOpen.set(false)"
-              (mouseenter)="onMouseEnter()"
-              (mouseleave)="onMouseLeave()"
-              style="--md-menu-container-color: #ffffff; --md-menu-container-shape: 0px 0px 4px 4px; --md-menu-container-elevation: 0; min-width: 200px;"
-            >
-              @for (sub of link.subItems; track sub.route; let last = $last) {
-                <md-menu-item [routerLink]="sub.route" (click)="servicesMenuOpen.set(false)">
-                  <md-icon slot="start" class="[--md-icon-size:16px]">{{ sub.icon }}</md-icon>
-                  <div slot="headline">{{ sub.label }}</div>
-                </md-menu-item>
-                @if (!last) {
-                  <md-divider class="menu-divider"></md-divider>
-                }
-              }
-            </md-menu>
-          </span>
-        } @else {
-          <a 
-            [routerLink]="link.route" 
-            #rla="routerLinkActive"
-            routerLinkActive
-            [routerLinkActiveOptions]="{ exact: link.route === '/' }"
-            class="no-underline"
-          >
-            @if (rla.isActive) {
-              <md-filled-button class="text-sm">
-                <md-icon slot="icon" class="[--md-icon-size:16px]">{{ link.icon }}</md-icon>
-                {{ link.label }}
-              </md-filled-button>
-            } @else {
-              <md-text-button class="text-sm">
-                <md-icon slot="icon" class="[--md-icon-size:16px]">{{ link.icon }}</md-icon>
-                {{ link.label }}
-              </md-text-button>
-            }
-          </a>
-        }
-      }
-    </nav>
-
-    <!-- Right side: Auth actions + Mobile Hamburger Menu -->
-    <div class="flex items-center gap-[8px] sm:gap-4">
-
-      @if (auth.isAuthenticated()) {
-
-        <!-- User profile menu -->
-        <span 
-          class="relative"
-          (mouseenter)="onProfileMouseEnter()"
-          (mouseleave)="onProfileMouseLeave()"
-        >
-          <md-text-button 
-            id="profile-menu-anchor" 
-            class="text-sm transition-all duration-200" 
-            [style.color]="profileMenuOpen() ? '#1175BC' : 'inherit'"
-            (click)="toggleProfileMenu($event)"
-          >
-            <md-icon slot="icon" class="[--md-icon-size:16px]">account_circle</md-icon>
-            Account
-            <md-icon class="ml-1 [--md-icon-size:16px] transition-transform duration-300" [class.rotate-180]="profileMenuOpen()">expand_more</md-icon>
-          </md-text-button>
-
-          <md-menu 
-            [quick]="true"
-            y-offset="12"
-            class="profile-menu"
-            anchor="profile-menu-anchor" 
-            positioning="popover" 
-            [open]="profileMenuOpen()" 
-            (closed)="profileMenuOpen.set(false)"
-            (mouseenter)="onProfileMouseEnter()"
-            (mouseleave)="onProfileMouseLeave()"
-            style="--md-menu-container-color: #ffffff; --md-menu-container-shape: 0px 0px 4px 4px; --md-menu-container-elevation: 0; min-width: 200px;"
-          >
-            <md-menu-item (click)="goAccount(); profileMenuOpen.set(false)">
-              <md-icon slot="start" class="[--md-icon-size:16px]">person</md-icon>
-              <div slot="headline">My Account</div>
-            </md-menu-item>
-            <md-divider class="menu-divider"></md-divider>
-            <md-menu-item (click)="goDashboard(); profileMenuOpen.set(false)">
-              <md-icon slot="start" class="[--md-icon-size:16px]">dashboard</md-icon>
-              <div slot="headline">Dashboard</div>
-            </md-menu-item>
-            <md-divider class="menu-divider"></md-divider>
-            <md-menu-item (click)="auth.signOut(); profileMenuOpen.set(false)">
-              <md-icon slot="start" class="[--md-icon-size:16px]">logout</md-icon>
-              <div slot="headline">Log out</div>
-            </md-menu-item>
-          </md-menu>
-        </span>
-      } @else {
-        <md-filled-button (click)="goSignIn()">
-          <md-icon slot="icon">login</md-icon>
-          <span class="hidden sm:inline">Sign in</span>
-        </md-filled-button>
-      }
-
-      <!-- Hamburger Menu Button (Only visible on mobile/tablet) -->
-      <div class="relative lg:hidden">
-        <md-icon-button aria-label="Navigation Menu" (click)="mobileMenuOpen.set(true)">
-          <md-icon>menu</md-icon>
-        </md-icon-button>
-      </div>
-    </div>
-  </header>
-}
-
-<!-- Premium Left Navigation Drawer Overlay -->
-@if (mobileMenuOpen()) {
-  <!-- Backdrop overlay with fade-in -->
-  <div 
-    class="fixed inset-0 z-[999] drawer-backdrop-animate lg:hidden"
-    (click)="mobileMenuOpen.set(false)"
-  ></div>
-
-  <!-- Drawer Panel with slide-in -->
-  <div class="fixed top-0 left-0 h-full w-[280px] bg-white shadow-2xl z-[1000] flex flex-col border-r border-slate-200 drawer-panel-animate lg:hidden">
-    <!-- Drawer Header -->
-    <div class="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
-      <div class="flex items-center gap-[8px] text-blue-600 font-extrabold text-base">
-        <span class="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-600 text-white">
-          <md-icon aria-hidden="true" class="[--md-icon-size:18px]">directions_car</md-icon>
-        </span>
-        <span>Mera Driver</span>
-      </div>
-      <md-icon-button aria-label="Close menu" (click)="mobileMenuOpen.set(false)">
-        <md-icon>close</md-icon>
-      </md-icon-button>
-    </div>
-
-    <!-- Drawer Links List -->
-    <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-1.5">
-      @for (link of navLinks(); track link.route) {
-        @if (link.subItems) {
-          <!-- Mobile Sub-section Header -->
-          <div class="px-3 pt-3 pb-1 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            {{ link.label }}
-          </div>
-          @for (sub of link.subItems; track sub.route) {
-            @if (sub.route === '#') {
-              <div class="flex items-center gap-3 p-3 rounded-xl text-slate-400 select-none">
-                <md-icon class="[--md-icon-size:20px]">{{ sub.icon }}</md-icon>
-                <span class="text-sm">{{ sub.label }}</span>
-              </div>
-            } @else {
-              <a 
-                [routerLink]="sub.route" 
-                [queryParams]="sub.queryParams"
-                #drawerRla="routerLinkActive"
-                routerLinkActive
-                [routerLinkActiveOptions]="{ exact: false }"
-                class="flex items-center gap-3 p-3 rounded-xl no-underline transition-all duration-150"
-                [class]="drawerRla.isActive ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'"
-                (click)="mobileMenuOpen.set(false)"
-              >
-                <md-icon class="[--md-icon-size:20px]">{{ sub.icon }}</md-icon>
-                <span class="text-sm">{{ sub.label }}</span>
-              </a>
-            }
-          }
-        } @else {
-          <a 
-            [routerLink]="link.route" 
-            #drawerRla="routerLinkActive"
-            routerLinkActive
-            [routerLinkActiveOptions]="{ exact: link.route === '/' }"
-            class="flex items-center gap-3 p-3 rounded-xl no-underline transition-all duration-150"
-            [class]="drawerRla.isActive ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'"
-            (click)="mobileMenuOpen.set(false)"
-          >
-            <md-icon class="[--md-icon-size:20px]">{{ link.icon }}</md-icon>
-            <span class="text-sm">{{ link.label }}</span>
-          </a>
-        }
-      }
-    </div>
-
-    <!-- Drawer Footer -->
-    <div class="p-4 border-t border-slate-100 bg-slate-50 flex flex-col gap-3">
-      <!-- Live Drivers Status -->
-      <div class="flex items-center gap-[8px] px-3 py-1.5 bg-green-50 border border-green-100 rounded-lg text-green-700 text-xs font-medium">
-        <span class="relative flex h-2 w-2">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-        </span>
-        <span>{{ driversOnlineCount() }} {{ driversOnlineLabel() }}</span>
-      </div>
-
-      <!-- Helpline Support -->
-      <button 
-        (click)="callHelpline()"
-        class="flex items-center justify-center gap-[8px] w-full py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-xs font-semibold cursor-pointer transition-colors duration-150"
-      >
-        <md-icon class="[--md-icon-size:16px] text-blue-600">phone</md-icon>
-        <span>{{ helplineLabel() }}</span>
+    <!-- Desktop primary nav -->
+    <nav class="site-nav" aria-label="Primary">
+      <button type="button" class="site-nav__link" (click)="go('/ride')">
+        Find Drivers
       </button>
 
-      <!-- Optional User Info / Auth status inside drawer -->
-      <div class="border-t border-slate-200 pt-3 mt-1 flex flex-col gap-[8px]">
-        @if (auth.isAuthenticated()) {
-          <button 
-            (click)="goAccount(); mobileMenuOpen.set(false)"
-            class="flex items-center gap-2.5 w-full py-2 px-2 hover:bg-slate-100 rounded-lg text-left border-none bg-transparent cursor-pointer transition-colors duration-150"
-          >
-            <md-icon class="text-slate-500 [--md-icon-size:20px]">person</md-icon>
-            <span class="text-xs font-semibold text-slate-800">My Account</span>
-          </button>
-          <button 
-            (click)="auth.signOut(); mobileMenuOpen.set(false)"
-            class="flex items-center gap-2.5 w-full py-2 px-2 hover:bg-red-50 text-red-600 rounded-lg text-left border-none bg-transparent cursor-pointer transition-colors duration-150"
-          >
-            <md-icon class="[--md-icon-size:20px]">logout</md-icon>
-            <span class="text-xs font-semibold">Log out</span>
-          </button>
-        } @else {
-          <button 
-            (click)="goSignIn(); mobileMenuOpen.set(false)"
-            class="flex items-center justify-center gap-[8px] w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors duration-150 border-none shadow-sm"
-          >
-            <md-icon class="[--md-icon-size:16px]">login</md-icon>
-            <span>Sign in</span>
-          </button>
+      <div class="site-nav__group">
+        <button
+          type="button"
+          class="site-nav__link"
+          aria-haspopup="true"
+          [attr.aria-expanded]="openMenu() === 'services'"
+          (click)="toggleMenu('services')"
+        >
+          Services
+          <md-icon aria-hidden="true">expand_more</md-icon>
+        </button>
+        @if (openMenu() === 'services') {
+          <div class="site-menu" role="menu" aria-label="Services">
+            @for (s of services; track s.label) {
+              <button
+                type="button"
+                class="site-menu__item"
+                role="menuitem"
+                (click)="go(s.path, s.query)"
+              >
+                <span class="site-menu__icon">
+                  <md-icon aria-hidden="true">{{ s.icon }}</md-icon>
+                </span>
+                <span class="site-menu__text">
+                  <span class="site-menu__label">{{ s.label }}</span>
+                  <span class="site-menu__desc">{{ s.desc }}</span>
+                </span>
+              </button>
+            }
+          </div>
         }
       </div>
+
+      <div class="site-nav__group">
+        <button
+          type="button"
+          class="site-nav__link"
+          aria-haspopup="true"
+          [attr.aria-expanded]="openMenu() === 'staffing'"
+          (click)="toggleMenu('staffing')"
+        >
+          Long-Term Staffing
+          <md-icon aria-hidden="true">expand_more</md-icon>
+        </button>
+        @if (openMenu() === 'staffing') {
+          <div class="site-menu" role="menu" aria-label="Long-Term Staffing">
+            @for (s of staffing; track s.label) {
+              <button
+                type="button"
+                class="site-menu__item"
+                role="menuitem"
+                (click)="go(s.path, s.query)"
+              >
+                <span class="site-menu__icon">
+                  <md-icon aria-hidden="true">{{ s.icon }}</md-icon>
+                </span>
+                <span class="site-menu__text">
+                  <span class="site-menu__label">{{ s.label }}</span>
+                  <span class="site-menu__desc">{{ s.desc }}</span>
+                </span>
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      <button type="button" class="site-nav__link" (click)="goSafety()">
+        Safety &amp; Trust
+      </button>
+    </nav>
+
+    <!-- Desktop auth actions -->
+    <div class="site-header__actions">
+      @if (auth.isAuthenticated()) {
+        <md-text-button (click)="go('/account')">My account</md-text-button>
+        <md-filled-button (click)="signOut()">Log out</md-filled-button>
+      } @else {
+        <md-outlined-button (click)="goDriver()">Become a Driver</md-outlined-button>
+        <md-filled-button (click)="go('/sign-in')">Login / Sign Up</md-filled-button>
+      }
     </div>
+
+    <!-- Mobile hamburger -->
+    <md-icon-button
+      class="site-header__burger"
+      aria-label="Open menu"
+      (click)="openDrawer()"
+    >
+      <md-icon aria-hidden="true">menu</md-icon>
+    </md-icon-button>
   </div>
-}
 
-<style>
-@keyframes drawerFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes drawerSlideIn {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(0); }
-}
-.drawer-backdrop-animate {
-  animation: drawerFadeIn 0.2s ease-out forwards;
-}
-.drawer-panel-animate {
-  animation: drawerSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
+  <!-- Mobile slide-in drawer -->
+  @if (drawerOpen()) {
+    <div class="site-drawer">
+      <div class="site-drawer__scrim" (click)="closeDrawer()"></div>
+      <aside class="site-drawer__panel" role="dialog" aria-modal="true" aria-label="Menu">
+        <div class="site-drawer__head">
+          <span class="site-header__brand">mera-driver</span>
+          <md-icon-button aria-label="Close menu" (click)="closeDrawer()">
+            <md-icon aria-hidden="true">close</md-icon>
+          </md-icon-button>
+        </div>
 
-/* Services and Profile Menu Dropdown Styles */
-.services-menu, .profile-menu {
-  opacity: 0;
-  transform: translateY(10px);
-  transition: opacity 0.2s ease, transform 0.2s ease !important;
-  outline: none !important;
-  --md-menu-top-space: 0px;
-  --md-menu-bottom-space: 0px;
-  --md-menu-container-elevation: 0 !important;
-}
-.services-menu[open], .profile-menu[open] {
-  opacity: 1;
-  transform: translateY(0);
-}
-.services-menu md-menu-item, .services-menu .menu-divider,
-.profile-menu md-menu-item, .profile-menu .menu-divider {
-  border-left: 1px solid rgba(0, 0, 0, 0.15) !important;
-  border-right: 1px solid rgba(0, 0, 0, 0.15) !important;
-  margin: 0px !important;
-}
-.services-menu md-menu-item:first-of-type, .profile-menu md-menu-item:first-of-type {
-  border-top: 3px solid #1175BC !important;
-  padding-top: 8px !important;
-}
-.services-menu md-menu-item:last-of-type, .profile-menu md-menu-item:last-of-type {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.15) !important;
-  border-radius: 0px 0px 4px 4px !important;
-  padding-bottom: 8px !important;
-}
+        <nav class="site-drawer__nav" aria-label="Mobile">
+          <button type="button" class="site-drawer__link" (click)="go('/ride')">
+            <md-icon aria-hidden="true">search</md-icon> Find Drivers
+          </button>
 
-.services-menu md-menu-item, .profile-menu md-menu-item {
-  --md-menu-item-label-text-size: 16px;
-  --md-menu-item-label-text-weight: 500;
-  --md-menu-item-label-text-color: #212121;
-  --md-menu-item-start-icon-color: #212121;
-  --md-menu-item-one-line-container-height: 40px; /* spacious padding */
-  --md-menu-item-leading-space: 20px; /* spacious side space */
-  --md-menu-item-trailing-space: 20px;
-  --md-menu-item-hover-state-layer-color: transparent;
-  --md-menu-item-hover-state-layer-opacity: 0;
-  --md-menu-item-pressed-state-layer-opacity: 0;
-  --md-menu-item-focus-state-layer-opacity: 0;
-  --md-focus-ring-color: transparent !important;
-  --md-focus-ring-active-width: 0px !important;
-  --md-focus-ring-width: 0px !important;
-  outline: none !important;
-}
-.services-menu md-menu-item:hover, .profile-menu md-menu-item:hover {
-  background-color: transparent !important;
-  --md-menu-item-label-text-color: #1175BC !important;
-  --md-menu-item-start-icon-color: #1175BC !important;
-}
-#services-menu-anchor, #profile-menu-anchor {
-  --md-focus-ring-color: transparent !important;
-  --md-focus-ring-active-width: 0px !important;
-  --md-focus-ring-width: 0px !important;
-  outline: none !important;
-}
-.services-menu .menu-divider, .profile-menu .menu-divider {
-  --md-divider-color: rgba(0, 0, 0, 0.08);
-}
-</style>
+          <sky-accordion>
+            <sky-accordion-item header="Services" variant="filled">
+              <div class="site-drawer__sub">
+                @for (s of services; track s.label) {
+                  <button type="button" class="site-drawer__sublink" (click)="go(s.path, s.query)">
+                    <md-icon aria-hidden="true">{{ s.icon }}</md-icon> {{ s.label }}
+                  </button>
+                }
+              </div>
+            </sky-accordion-item>
+            <sky-accordion-item header="Long-Term Staffing" variant="filled">
+              <div class="site-drawer__sub">
+                @for (s of staffing; track s.label) {
+                  <button type="button" class="site-drawer__sublink" (click)="go(s.path, s.query)">
+                    <md-icon aria-hidden="true">{{ s.icon }}</md-icon> {{ s.label }}
+                  </button>
+                }
+              </div>
+            </sky-accordion-item>
+          </sky-accordion>
+
+          <button type="button" class="site-drawer__link" (click)="goSafety()">
+            <md-icon aria-hidden="true">shield</md-icon> Safety &amp; Trust
+          </button>
+        </nav>
+
+        <div class="site-drawer__cta">
+          @if (auth.isAuthenticated()) {
+            <md-outlined-button (click)="go('/account')">My account</md-outlined-button>
+            <md-filled-button (click)="signOut()">Log out</md-filled-button>
+          } @else {
+            <md-outlined-button (click)="goDriver()">Become a Driver</md-outlined-button>
+            <md-filled-button (click)="go('/sign-in')">Login / Sign Up</md-filled-button>
+          }
+        </div>
+      </aside>
+    </div>
+  }
+</header>

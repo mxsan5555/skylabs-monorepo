@@ -395,7 +395,7 @@ export class SkyDataTable extends LitElement {
 </style></head><body>
 ${this.caption ? `<h2>${this.caption}</h2>` : ''}
 <table><thead><tr>${headers}</tr></thead><tbody>${body}</tbody></table>
-<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}<\/script>
+<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script>
 </body></html>`;
     const win = window.open('', '_blank', 'width=900,height=700');
     if (win) { win.document.write(markup); win.document.close(); }

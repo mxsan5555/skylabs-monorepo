@@ -1,395 +1,292 @@
-<!-- Redesigned Hero Section (Uber-Style Stacking) -->
-<section class="relative w-full bg-[var(--md-sys-color-surface-container-lowest,#ffffff)] border-b border-[var(--md-sys-color-outline-variant,#e2e8f0)] pt-4 sm:pt-6 md:pt-8 pb-10 sm:pb-14">
-  <div class="max-w-[1280px] mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-    
-    <!-- Left Column (Grid cols 1 to 5): Heading, Subtitle, and Booking Card Stacked -->
-    <div class="lg:col-span-5 w-full flex flex-col gap-6 z-10">
-      
-      <!-- Headings Stack (Clean Title Only) -->
-      <h1 class="m-0 text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight leading-tight text-[var(--md-sys-color-on-background)]">
-        {{ content().hero.title }}
-      </h1>
+<div class="landing">
+  <!-- 1 · Hero — Find drivers -->
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero__form">
+      <p class="hero__city">
+        <md-icon aria-hidden="true">location_on</md-icon>
+        Bengaluru, IN <a routerLink="/ride">Change city</a>
+      </p>
+      <h1 id="hero-title" class="hero__title">Book a trusted driver, your way</h1>
 
-      <!-- Booking Card Widget -->
-      <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200/80 flex flex-col">
-        <!-- Trip Type Tabs -->
-        <div class="flex border-b border-slate-200 bg-slate-50">
-          <button type="button"
-            class="flex-1 py-3.5 text-center text-xs font-bold transition-all duration-200 border-b-2 outline-none cursor-pointer flex items-center justify-center gap-1.5"
-            [class.bg-white]="tripType() === 'one-way'"
-            [class.text-[#1175bc]]="tripType() === 'one-way'"
-            [class.border-[#1175bc]]="tripType() === 'one-way'"
-            [class.text-slate-500]="tripType() !== 'one-way'"
-            [class.border-transparent]="tripType() !== 'one-way'"
-            (click)="tripType.set('one-way')">
-            <md-icon style="--md-icon-size: 15px;">east</md-icon>
-            One Way
-          </button>
-          <button type="button"
-            class="flex-1 py-3.5 text-center text-xs font-bold transition-all duration-200 border-b-2 outline-none cursor-pointer flex items-center justify-center gap-1.5"
-            [class.bg-white]="tripType() === 'round-trip'"
-            [class.text-[#1175bc]]="tripType() === 'round-trip'"
-            [class.border-[#1175bc]]="tripType() === 'round-trip'"
-            [class.text-slate-500]="tripType() !== 'round-trip'"
-            [class.border-transparent]="tripType() !== 'round-trip'"
-            (click)="tripType.set('round-trip')">
-            <md-icon style="--md-icon-size: 15px;">sync</md-icon>
-            Round Trip
-          </button>
-          <button type="button"
-            class="flex-1 py-3.5 text-center text-xs font-bold transition-all duration-200 border-b-2 outline-none cursor-pointer flex items-center justify-center gap-1.5"
-            [class.bg-white]="tripType() === 'outstation'"
-            [class.text-[#1175bc]]="tripType() === 'outstation'"
-            [class.border-[#1175bc]]="tripType() === 'outstation'"
-            [class.text-slate-500]="tripType() !== 'outstation'"
-            [class.border-transparent]="tripType() !== 'outstation'"
-            (click)="tripType.set('outstation')">
-            <md-icon style="--md-icon-size: 15px;">explore</md-icon>
-            Outstation
-          </button>
+      <md-tabs class="hero__tabs" aria-label="Trip type" (change)="onTripTab($event)">
+        <md-secondary-tab [attr.aria-selected]="tripType() === 'one-way'">One way</md-secondary-tab>
+        <md-secondary-tab [attr.aria-selected]="tripType() === 'round-trip'">Round trip</md-secondary-tab>
+      </md-tabs>
+
+      <div class="hero__seg" role="group" aria-label="When">
+        <button
+          type="button"
+          class="hero__seg-btn"
+          [class.active]="timing() === 'now'"
+          [attr.aria-pressed]="timing() === 'now'"
+          (click)="setTiming('now')"
+        >
+          <md-icon aria-hidden="true">bolt</md-icon> Pickup now
+        </button>
+        <button
+          type="button"
+          class="hero__seg-btn"
+          [class.active]="timing() === 'later'"
+          [attr.aria-pressed]="timing() === 'later'"
+          (click)="setTiming('later')"
+        >
+          <md-icon aria-hidden="true">event</md-icon> Schedule later
+        </button>
+      </div>
+
+      @if (timing() === 'later') {
+        <div class="hero__schedule">
+          <label class="hero__field">
+            <span>Date</span>
+            <input type="date" [value]="scheduleDate" (input)="scheduleDate = $any($event.target).value" />
+          </label>
+          <label class="hero__field">
+            <span>Time</span>
+            <input type="time" [value]="scheduleTime" (input)="scheduleTime = $any($event.target).value" />
+          </label>
         </div>
+      }
 
-        <!-- Booking Fields Panel -->
-        <div class="flex flex-col gap-4 p-5">
-          
-          <!-- Spacious Location Input Fields -->
-          <div class="flex flex-col gap-4 relative">
-            
-            <!-- Pickup Location Field -->
-            <div class="relative flex flex-col gap-1.5">
-              <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pickup Point</label>
-              <div class="flex items-center bg-[#f3f3f3] border border-transparent rounded-xl p-3.5 transition-all duration-150 focus-within:bg-white focus-within:border-[#1175bc] focus-within:shadow-sm"
-                   [class.border-[#1175bc]]="activeInput() === 'pickup' && showSuggestions()"
-                   [class.bg-white]="activeInput() === 'pickup' && showSuggestions()"
-                   [class.shadow-sm]="activeInput() === 'pickup' && showSuggestions()">
-                <md-icon class="text-[#1175bc] mr-2 [--md-icon-size:18px]">my_location</md-icon>
-                <input 
-                  type="text" 
-                  class="flex-1 border-none outline-none bg-transparent text-xs text-slate-800 font-semibold placeholder-slate-400"
-                  placeholder="Enter pickup location (e.g. Sector 37 Noida)" 
-                  [value]="activeInput() === 'pickup' && showSuggestions() ? autocompleteQuery() : pickupAddress()"
-                  (focus)="onActiveInputFocus('pickup')"
-                  (input)="onAutocompleteInputChange($event)"
-                />
-              </div>
-              
-              <!-- Suggestions Dropdown for Pickup -->
-              @if (activeInput() === 'pickup' && showSuggestions() && suggestions().length > 0) {
-                <md-list class="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-[999] max-h-[180px] overflow-y-auto">
-                  @for (place of suggestions(); track place.placeId) {
-                    <md-list-item (click)="selectLocation(place)" type="button">
-                      <md-icon slot="start">location_on</md-icon>
-                      <div slot="headline" class="text-xs font-semibold">{{ place.name }}</div>
-                      <div slot="supporting-text" class="text-[10px]">{{ place.address }}</div>
-                    </md-list-item>
-                  }
-                </md-list>
-              }
-            </div>
+      <div class="rider-route hero__route">
+        <div class="rider-route__rail" aria-hidden="true">
+          <span class="rider-route__dot"></span>
+          <span class="rider-route__line"></span>
+          <span class="rider-route__dot rider-route__dot--square"></span>
+        </div>
+        <div>
+          <input
+            class="rider-route__field"
+            type="text"
+            aria-label="Pickup location"
+            autocomplete="off"
+            [value]="pickupText"
+            (input)="pickupText = $any($event.target).value"
+            placeholder="Pickup location"
+          />
+          <input
+            class="rider-route__field"
+            type="text"
+            aria-label="Dropoff location"
+            autocomplete="off"
+            [value]="dropoffText"
+            (input)="dropoffText = $any($event.target).value"
+            placeholder="Dropoff location"
+          />
+        </div>
+      </div>
 
-            <!-- Drop Location Field (with smooth slide/fade transition) -->
-            <div class="transition-all duration-300 ease-in-out overflow-hidden"
-                 [class.max-h-0]="tripType() === 'round-trip'"
-                 [class.opacity-0]="tripType() === 'round-trip'"
-                 [class.max-h-[100px]]="tripType() !== 'round-trip'"
-                 [class.opacity-100]="tripType() !== 'round-trip'"
-                 [class.mt-0]="tripType() === 'round-trip'"
-                 [class.mt-1]="tripType() !== 'round-trip'">
-              <div class="relative flex flex-col gap-1.5">
-                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Destination</label>
-                <div class="flex items-center bg-[#f3f3f3] border border-transparent rounded-xl p-3.5 transition-all duration-150 focus-within:bg-white focus-within:border-[#1175bc] focus-within:shadow-sm"
-                     [class.border-[#1175bc]]="activeInput() === 'drop' && showSuggestions()"
-                     [class.bg-white]="activeInput() === 'drop' && showSuggestions()"
-                     [class.shadow-sm]="activeInput() === 'drop' && showSuggestions()">
-                  <md-icon class="text-red-500 mr-2 [--md-icon-size:18px]">location_on</md-icon>
-                  <input 
-                    type="text" 
-                    class="flex-1 border-none outline-none bg-transparent text-xs text-slate-800 font-semibold placeholder-slate-400"
-                    placeholder="Enter destination location" 
-                    [value]="activeInput() === 'drop' && showSuggestions() ? autocompleteQuery() : dropAddress()"
-                    (focus)="onActiveInputFocus('drop')"
-                    (input)="onAutocompleteInputChange($event)"
-                  />
-                </div>
-                
-                <!-- Suggestions Dropdown for Drop -->
-                @if (activeInput() === 'drop' && showSuggestions() && suggestions().length > 0) {
-                  <md-list class="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-[999] max-h-[180px] overflow-y-auto">
-                    @for (place of suggestions(); track place.placeId) {
-                      <md-list-item (click)="selectLocation(place)" type="button">
-                        <md-icon slot="start">location_on</md-icon>
-                        <div slot="headline" class="text-xs font-semibold">{{ place.name }}</div>
-                        <div slot="supporting-text" class="text-[10px]">{{ place.address }}</div>
-                      </md-list-item>
-                    }
-                  </md-list>
-                }
-              </div>
-            </div>
+      <div class="hero__actions">
+        <md-filled-button (click)="seePrices()">See prices</md-filled-button>
+        <a class="hero__link" routerLink="/sign-in">Log in to see your recent activity</a>
+      </div>
+    </div>
+
+    <div class="hero__map">
+      <md-ride-map
+        [pickup]="booking.pickup()?.coord ?? null"
+        label="Map showing your current pickup area"
+      ></md-ride-map>
+    </div>
+  </section>
+
+  <!-- 2 · Explore services -->
+  <section class="section" aria-labelledby="services-title">
+    <h2 id="services-title" class="section__title">Explore what you can do with mera-driver</h2>
+    <div class="service-grid">
+      @for (s of serviceCards; track s.title) {
+        <article class="service-card">
+          <div class="service-card__body">
+            <h3 class="service-card__title">{{ s.title }}</h3>
+            <p class="service-card__desc">{{ s.desc }}</p>
+            <button type="button" class="service-card__link" (click)="openService(s.category)">
+              Details <md-icon aria-hidden="true">arrow_forward</md-icon>
+            </button>
           </div>
-
-          <md-filled-button (click)="onSubmitBooking()" [disabled]="isSearching()" class="w-full mt-2 font-semibold">
-            @if (isSearching()) {
-              Searching Drivers...
-            } @else {
-              Search Drivers
-            }
-          </md-filled-button>
-          
-        </div>
-      </div>
-    </div>
-
-    <!-- Right Column (Grid cols 6 to 12): Premium Chauffeur Graphic Showcase -->
-    <div class="lg:col-span-7 w-full flex flex-col justify-center">
-      <img 
-        src="/slides/premium_hero.png" 
-        alt="Professional verified chauffeur waiting at premium car door" 
-        class="w-full aspect-[4/3] lg:aspect-[16/10] object-cover object-[center_35%] rounded-2xl block"
-      />
-    </div>
-    
-  </div>
-</section>
-
-<div class="w-full max-w-[1280px] mx-auto py-8 px-3 sm:px-6 flex flex-col gap-10">
-
-  <!-- Featured Driver Services -->
-  @if (filteredFeaturedServices().length > 0) {
-    <section class="flex flex-col gap-3 w-full">
-      <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().featuredServices.title }}</h2>
-      <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-6 w-full"> 
-        @for (card of filteredFeaturedServices(); track card.heading) {
-          <sky-product-card
-            variant="outlined"
-            [href]="card.href || '/location'"
-            [image]="card.image"
-            [image-alt]="card.imageAlt"
-            [badge]="card.badge || ''"
-            favorite
-            [eyebrow]="card.eyebrow"
-            [heading]="card.heading"
-            [location]="card.location"
-            [distance]="card.distance || ''"
-            [rating]="card.rating || ''"
-            [score]="card.score || ''"
-            [score-label]="card.scoreLabel || ''"
-            [reviews]="card.reviews"
-            [price-prefix]="card.pricePrefix || ''"
-            [original-price]="card.originalPrice || ''"
-            [price]="card.price"
-            [discount]="card.discount || ''"
-          ></sky-product-card>
-        }
-      </div>
-    </section>
-  }
-
-  <!-- Popular Ride Types -->
-  @if (popularRideTypes().length > 0) {
-    <section class="flex flex-col gap-3 w-full">
-      <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().popularRideTypes.title }}</h2>
-      <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-6 w-full">
-        @for (card of popularRideTypes(); track card.heading) {
-          <sky-product-card
-            variant="outlined"
-            [href]="card.href || '/location'"
-            [image]="card.image"
-            [image-alt]="card.imageAlt"
-            [badge]="card.badge || ''"
-            favorite
-            [eyebrow]="card.eyebrow"
-            [heading]="card.heading"
-            [location]="card.location"
-            [distance]="card.distance || ''"
-            [rating]="card.rating || ''"
-            [score]="card.score || ''"
-            [score-label]="card.scoreLabel || ''"
-            [reviews]="card.reviews"
-            [price-prefix]="card.pricePrefix || ''"
-            [original-price]="card.originalPrice || ''"
-            [price]="card.price"
-            [discount]="card.discount || ''"
-          ></sky-product-card>
-        }
-      </div>
-    </section>
-  }
-
-  <!-- How It Works -->
-  @if (content().howItWorks) {
-    <section class="flex flex-col gap-6 w-full mt-2 mb-2">
-      <div class="flex flex-col gap-2 items-center text-center">
-        <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().howItWorks.title }}</h2>
-        @if (content().howItWorks.subtitle) {
-          <p class="m-0 text-sm text-[var(--md-sys-color-on-surface-variant,#42474e)]">{{ content().howItWorks.subtitle }}</p>
-        }
-      </div>
-      
-      <div class="w-full h-px bg-[var(--md-sys-color-outline-variant,#c2c7ce)]"></div>
-      
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-2 justify-items-center">
-        @for (card of content().howItWorks.cards; track card.heading) {
-          <sky-card variant="elevated" class="w-full h-full text-center hover:shadow-md transition-all duration-200">
-            <div class="h-full flex flex-col items-center">
-              <div class="shadow-sm !mx-0 mb-3" style="background-color: var(--md-sys-color-primary-container); border-radius:12px; width:56px; height:56px; display:flex; align-items:center; justify-content:center;">
-                <md-icon style="--md-icon-size:28px; color: var(--md-sys-color-primary);">{{ card.icon }}</md-icon>
-              </div>
-              <h3 class="m-0 text-base font-bold text-[var(--md-sys-color-on-surface)]">{{ card.heading }}</h3>
-              <p class="m-0 mt-1.5 text-sm text-[var(--md-sys-color-on-surface-variant,#42474e)] leading-relaxed">{{ card.subheading }}</p>
-            </div>
-          </sky-card>
-        }
-      </div>
-    </section>
-  }
-
-  <!-- Top Packages -->
-  @if (filteredPackages().length > 0) {
-    <section class="flex flex-col gap-3 w-full mt-2">
-      <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().packages.title }}</h2>
-      <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-6 w-full">
-        @for (card of filteredPackages(); track card.heading) {
-          <sky-product-card
-            variant="outlined"
-            [href]="card.href || '/location'"
-            [image]="card.image"
-            [image-alt]="card.imageAlt"
-            favorite
-            [eyebrow]="card.eyebrow"
-            [heading]="card.heading"
-            [location]="card.location"
-            [score]="card.score || ''"
-            [score-label]="card.scoreLabel || ''"
-            [reviews]="card.reviews"
-            [price-prefix]="card.pricePrefix || ''"
-            [original-price]="card.originalPrice || ''"
-            [price]="card.price"
-            [discount]="card.discount || ''"
-          ></sky-product-card>
-        }
-      </div>
-    </section>
-  }
-
-  <!-- No Results Found Banner -->
-  @if (filteredFeaturedServices().length === 0 && filteredPackages().length === 0) {
-    <div class="w-full py-16 px-4 flex flex-col items-center justify-center text-center gap-4 bg-[var(--md-sys-color-surface-container-low,#f0f4f9)] rounded-2xl border border-[var(--md-sys-color-outline-variant,#c2c7ce)]">
-      <md-icon class="text-[var(--md-sys-color-primary,#3a693c)] text-5xl" style="--md-icon-size: 48px;">search_off</md-icon>
-      <div class="flex flex-col gap-1">
-        <h3 class="m-0 text-lg font-bold text-[var(--md-sys-color-on-background)]">{{ content().noResults.title }}</h3>
-        <p class="m-0 text-sm text-[var(--md-sys-color-on-surface-variant,#42474e)] max-w-[350px]">
-          {{ content().noResults.message.replace('{query}', searchQuery()) }}
-        </p>
-      </div>
-
-      <md-filled-button (click)="activeFilter.set('all'); searchQuery.set(''); activeSearchQuery.set('');" class="mt-2 rounded-full font-semibold">
-        {{ content().noResults.btnReset }}
-      </md-filled-button>
-    </div>
-  }
-
-  <!-- Safety & Guarantees -->
-  <section class="flex flex-col gap-3 w-full mt-2">
-    <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().whyChooseUs.title }}</h2>
-    <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-6 w-full"> 
-      @for (card of content().whyChooseUs.cards; track card.heading) {
-        <sky-info-card
-          [align]="card.align || 'center'"
-          [icon]="card.icon"
-          [heading]="card.heading"
-          [subheading]="card.subheading"
-        ></sky-info-card>
+          <span class="service-card__icon" aria-hidden="true">
+            <md-icon>{{ s.icon }}</md-icon>
+          </span>
+        </article>
       }
     </div>
   </section>
 
-  <!-- Customer Testimonials (Success Stories Carousel) -->
-  @if (isDataLoaded() && content().testimonials) {
-    <section class="flex flex-col gap-6 w-full mt-4 items-center justify-center">
-      
-      <!-- Section Heading from JSON -->
-      <div class="flex flex-col gap-2 items-center text-center">
-        <h2 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-background)]">{{ content().testimonials.title }}</h2>
-        @if (content().testimonials.subtitle) {
-          <p class="m-0 text-sm text-[var(--md-sys-color-on-surface-variant,#42474e)]">{{ content().testimonials.subtitle }}</p>
+  <!-- 3 · Customer CTA -->
+  <section class="promo" aria-labelledby="cust-title">
+    <div class="promo__art" aria-hidden="true">
+      <svg class="promo__svg" viewBox="0 0 400 400" role="presentation" focusable="false" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="cust-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffd7a1" />
+            <stop offset="0.55" stop-color="#ff9e6d" />
+            <stop offset="1" stop-color="#e97a58" />
+          </linearGradient>
+        </defs>
+        <!-- warm sunset sky -->
+        <rect width="400" height="400" fill="url(#cust-sky)" />
+        <!-- sun -->
+        <circle cx="200" cy="150" r="62" fill="#fff2cf" opacity="0.9" />
+        <!-- distant hills -->
+        <path d="M0 292 Q90 250 180 288 T400 276 V400 H0 Z" fill="#d9633f" opacity="0.55" />
+        <path d="M0 316 Q120 286 240 316 T400 306 V400 H0 Z" fill="#b64a2c" opacity="0.6" />
+        <!-- road -->
+        <path d="M150 400 L184 300 H216 L250 400 Z" fill="#3a2418" opacity="0.85" />
+        <rect x="196" y="312" width="8" height="20" rx="4" fill="#ffe9b0" />
+        <rect x="194" y="352" width="12" height="26" rx="6" fill="#ffe9b0" />
+        <!-- car body (brand) -->
+        <g>
+          <rect x="96" y="238" width="208" height="86" rx="30" fill="var(--md-sys-color-primary)" />
+          <rect x="120" y="214" width="160" height="62" rx="26" fill="var(--md-sys-color-primary)" />
+          <!-- windshield -->
+          <path d="M138 268 L156 230 H244 L262 268 Z" fill="var(--md-sys-color-primary-container)" />
+          <line x1="200" y1="230" x2="200" y2="268" stroke="var(--md-sys-color-primary)" stroke-width="5" />
+          <!-- driver silhouette -->
+          <circle cx="172" cy="252" r="13" fill="var(--md-sys-color-on-primary)" opacity="0.85" />
+          <!-- wheels -->
+          <circle cx="146" cy="324" r="26" fill="#241a12" />
+          <circle cx="146" cy="324" r="11" fill="var(--md-sys-color-primary-container)" />
+          <circle cx="254" cy="324" r="26" fill="#241a12" />
+          <circle cx="254" cy="324" r="11" fill="var(--md-sys-color-primary-container)" />
+          <!-- headlight glow -->
+          <circle cx="298" cy="290" r="9" fill="#fff2cf" />
+        </g>
+      </svg>
+    </div>
+    <div class="promo__body">
+      <h2 id="cust-title" class="promo__title">Get a driver as per your need</h2>
+      <p class="promo__desc">
+        Ride on your schedule with hourly, outstation, or monthly drivers. Use your
+        own car or book one of ours — you're always in control.
+      </p>
+      <div class="promo__actions">
+        <md-filled-button (click)="go('/sign-in')">Get started</md-filled-button>
+        <a class="hero__link" routerLink="/sign-in">Already have an account? Sign in</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · Driver CTA -->
+  <section class="promo promo--reverse" aria-labelledby="drv-title">
+    <div class="promo__art" aria-hidden="true">
+      <svg class="promo__svg" viewBox="0 0 400 400" role="presentation" focusable="false" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="drv-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="var(--md-sys-color-primary-container)" />
+            <stop offset="1" stop-color="var(--md-sys-color-surface-container-highest)" />
+          </linearGradient>
+        </defs>
+        <!-- bright city sky -->
+        <rect width="400" height="400" fill="url(#drv-sky)" />
+        <circle cx="312" cy="86" r="34" fill="#fff2cf" opacity="0.85" />
+        <!-- cityscape buildings -->
+        <g fill="var(--md-sys-color-primary)">
+          <rect x="20" y="150" width="58" height="180" rx="4" />
+          <rect x="150" y="120" width="52" height="210" rx="4" />
+          <rect x="330" y="170" width="52" height="160" rx="4" />
+        </g>
+        <g fill="var(--md-sys-color-secondary)" opacity="0.85">
+          <rect x="86" y="196" width="56" height="134" rx="4" />
+          <rect x="210" y="168" width="54" height="162" rx="4" />
+          <rect x="272" y="210" width="50" height="120" rx="4" />
+        </g>
+        <!-- lit windows -->
+        <g fill="var(--md-sys-color-primary-container)">
+          <rect x="34" y="168" width="12" height="14" rx="2" /><rect x="52" y="168" width="12" height="14" rx="2" />
+          <rect x="34" y="196" width="12" height="14" rx="2" /><rect x="52" y="196" width="12" height="14" rx="2" />
+          <rect x="164" y="140" width="12" height="14" rx="2" /><rect x="180" y="140" width="12" height="14" rx="2" />
+          <rect x="164" y="168" width="12" height="14" rx="2" /><rect x="180" y="168" width="12" height="14" rx="2" />
+          <rect x="224" y="188" width="12" height="14" rx="2" /><rect x="240" y="188" width="12" height="14" rx="2" />
+          <rect x="344" y="190" width="12" height="14" rx="2" /><rect x="362" y="190" width="12" height="14" rx="2" />
+        </g>
+        <!-- street -->
+        <rect x="0" y="330" width="400" height="70" fill="var(--md-sys-color-on-surface)" opacity="0.16" />
+        <rect x="0" y="330" width="400" height="70" fill="var(--md-sys-color-surface-container-high)" opacity="0.5" />
+        <g stroke="var(--md-sys-color-on-surface-variant)" stroke-width="5" stroke-dasharray="26 22" opacity="0.7">
+          <line x1="0" y1="364" x2="400" y2="364" />
+        </g>
+        <!-- car on the street (brand) -->
+        <g>
+          <rect x="128" y="316" width="150" height="52" rx="20" fill="var(--md-sys-color-primary)" />
+          <rect x="150" y="298" width="106" height="40" rx="18" fill="var(--md-sys-color-primary)" />
+          <rect x="164" y="306" width="34" height="24" rx="8" fill="var(--md-sys-color-primary-container)" />
+          <rect x="208" y="306" width="34" height="24" rx="8" fill="var(--md-sys-color-primary-container)" />
+          <circle cx="164" cy="368" r="19" fill="#241a12" />
+          <circle cx="164" cy="368" r="8" fill="var(--md-sys-color-primary-container)" />
+          <circle cx="242" cy="368" r="19" fill="#241a12" />
+          <circle cx="242" cy="368" r="8" fill="var(--md-sys-color-primary-container)" />
+        </g>
+      </svg>
+    </div>
+    <div class="promo__body">
+      <h2 id="drv-title" class="promo__title">Are you a driver and want to join mera-driver?</h2>
+      <p class="promo__desc">
+        Earn on your terms with flexible trips and long-term placements. Clear a quick
+        background check and start driving with a platform that has your back.
+      </p>
+      <div class="promo__actions">
+        <md-filled-button (click)="go('/sign-in', { role: 'driver' })">Get started</md-filled-button>
+        <a class="hero__link" routerLink="/ride" fragment="safety">Check out our solutions</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · Safety & Trust -->
+  <section id="safety" class="section safety" aria-labelledby="safety-title">
+    <div class="safety__box">
+      <h2 id="safety-title" class="safety__title">Safety &amp; trust, built in</h2>
+      <p class="safety__intro">
+        Safety isn't a feature we add on top — it's built into every trip, from the
+        first tap to the moment you arrive.
+      </p>
+      <ul class="safety__list">
+        <li class="safety__item">
+          <span class="safety__icon"><md-icon aria-hidden="true">verified_user</md-icon></span>
+          <div class="safety__text">
+            <h3>Police-verified drivers</h3>
+            <p>Every driver clears a background and document check before their first trip.</p>
+          </div>
+        </li>
+        <li class="safety__item">
+          <span class="safety__icon"><md-icon aria-hidden="true">health_and_safety</md-icon></span>
+          <div class="safety__text">
+            <h3>Insured rides</h3>
+            <p>Trips are covered end to end, with 24/7 support if anything goes wrong.</p>
+          </div>
+        </li>
+        <li class="safety__item">
+          <span class="safety__icon"><md-icon aria-hidden="true">shield</md-icon></span>
+          <div class="safety__text">
+            <h3>Trip OTP &amp; live share</h3>
+            <p>Start with a one-time code and share your live status with people you trust.</p>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 6 · App download / QR -->
+  <section class="apps" aria-labelledby="apps-title">
+    <h2 id="apps-title" class="section__title">It's easier in the apps</h2>
+    <div class="apps__grid">
+      <div class="app-card">
+        @if (customerQr()) {
+          <img class="app-card__qr" [src]="customerQr()" alt="QR code to download the mera-driver customer app" width="96" height="96" />
         }
+        <div class="app-card__body">
+          <div class="app-card__title">Download the mera-driver app</div>
+          <div class="app-card__sub">Scan to download</div>
+        </div>
+        <md-icon class="app-card__arrow" aria-hidden="true">arrow_forward</md-icon>
       </div>
-      
-      <!-- Centered 8-Column Layout Grid (Leaves 2 columns blank on left and right) -->
-      <div class="grid grid-cols-12 w-full mt-4 items-center">
-        
-        <!-- Left Custom Navigation Button -->
-        <div class="col-span-2 md:col-start-2 md:col-span-1 flex justify-end">
-          <md-icon-button (click)="swiper.swiper.slidePrev()" class="[--md-icon-button-icon-color:var(--md-sys-color-primary)]">
-            <md-icon>chevron_left</md-icon>
-          </md-icon-button>
+      <div class="app-card">
+        @if (driverQr()) {
+          <img class="app-card__qr" [src]="driverQr()" alt="QR code to download the mera-driver driver app" width="96" height="96" />
+        }
+        <div class="app-card__body">
+          <div class="app-card__title">Download the Driver app</div>
+          <div class="app-card__sub">Scan to download</div>
         </div>
-
-        <!-- Carousel Content (8 Columns) -->
-        <div class="col-span-8 md:col-span-8 px-2">
-          <swiper-container 
-            #swiper
-            init="false"
-            observer="true"
-            observe-parents="true"
-            resize-observer="true"
-            autoplay="true"
-            autoplay-delay="3500"
-            autoplay-disable-on-interaction="false"
-            loop="true"
-            pagination="true"
-            style="display: block; width: 100%; min-height: 280px;"
-            class="w-full py-4"
-          >
-            @for (card of content().testimonials.cards; track card.name) {
-              <swiper-slide class="w-full flex flex-col items-center text-center px-4 sm:px-8 py-6">
-                <img 
-                  [src]="card.avatar" 
-                  [alt]="card.name" 
-                  class="w-20 h-20 rounded-full border-2 border-[var(--md-sys-color-primary)] shadow-md object-cover mb-3"
-                />
-                
-                <h4 class="m-0 text-base font-bold text-[var(--md-sys-color-on-surface)] flex items-center justify-center gap-1">
-                  {{ card.name }}
-                  <md-icon style="--md-icon-size: 16px; color: #10b981;">verified</md-icon>
-                </h4>
-                <p class="m-0 text-xs text-[var(--md-sys-color-on-surface-variant,#42474e)] tracking-wide flex items-center justify-center gap-1 mt-1">
-                  <md-icon style="--md-icon-size:12px; color: var(--md-sys-color-on-surface-variant);">location_on</md-icon>
-                  {{ card.location }}
-                </p>
-                
-                <div class="flex justify-center gap-1 mt-2.5 mb-4">
-                  @for (star of [1,2,3,4,5]; track star) {
-                    @if (star <= card.rating) {
-                      <md-icon style="--md-icon-size:16px; color: #f59e0b;">star</md-icon>
-                    } @else {
-                      <md-icon style="--md-icon-size:16px; color: var(--md-sys-color-outline-variant);">star</md-icon>
-                    }
-                  }
-                </div>
-                
-                <!-- Quote Icon (Stylized brand color watermark) -->
-                <md-icon class="text-[var(--md-sys-color-primary)] opacity-10 mb-2" style="--md-icon-size: 56px;">format_quote</md-icon>
-                
-                <p class="m-0 text-base sm:text-lg md:text-xl text-[var(--md-sys-color-on-background)] font-medium italic leading-relaxed w-full max-w-[650px] mx-auto">
-                  "{{ card.review }}"
-                </p>
-              </swiper-slide>
-            }
-          </swiper-container>
-        </div>
-
-        <!-- Right Custom Navigation Button -->
-        <div class="col-span-2 md:col-span-1 flex justify-start">
-          <md-icon-button (click)="swiper.swiper.slideNext()" class="[--md-icon-button-icon-color:var(--md-sys-color-primary)]">
-            <md-icon>chevron_right</md-icon>
-          </md-icon-button>
-        </div>
-        
+        <md-icon class="app-card__arrow" aria-hidden="true">arrow_forward</md-icon>
       </div>
-    </section>
-  }
-
-
+    </div>
+  </section>
 </div>

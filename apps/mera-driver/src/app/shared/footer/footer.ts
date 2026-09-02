@@ -1,95 +1,83 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, OnInit, inject } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
-import layoutDefaults from '../../../../public/data/layout.json';
+import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
-/** App footer. Presentational; pairs with the app shell. */
+/** One link in a footer column. Internal links use `to` (+ optional `fragment`); external / mailto links use `href`. */
+interface FooterLink {
+  label: string;
+  to?: string;
+  fragment?: string;
+  href?: string;
+}
+
+interface FooterColumn {
+  heading: string;
+  links: FooterLink[];
+}
+
+/**
+ * Site footer for the marketing shell (PublicLayout).
+ *
+ * Four columns — Driver, Customer, mera-driver (company), and Get the app
+ * (store buttons + language) — over a bottom bar with legal links,
+ * copyright, and social icons. Data-driven so columns stay easy to edit.
+ */
 @Component({
   selector: 'md-footer',
   imports: [RouterLink],
   templateUrl: './footer.html',
+  styleUrl: './footer.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  host: {
-    'class': 'block'
-  }
 })
 export class Footer implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   protected readonly year = new Date().getFullYear();
 
-  protected isHomePage(): boolean {
-    return this.router.url === '/' || this.router.url === '/home';
-  }
+  protected readonly columns: FooterColumn[] = [
+    {
+      heading: 'Driver',
+      links: [
+        { label: 'Become a Driver', to: '/sign-in' },
+        { label: 'Driver requirements', to: '/', fragment: 'requirements' },
+        { label: 'Earnings', to: '/', fragment: 'earnings' },
+        { label: 'Safety & Trust', to: '/', fragment: 'safety' },
+        { label: 'Driver blog', to: '/blog' },
+        { label: 'Help', href: 'mailto:hello@mera-driver.app' },
+      ],
+    },
+    {
+      heading: 'Customer',
+      links: [
+        { label: 'Book a ride', to: '/ride' },
+        { label: 'Pricing', to: '/', fragment: 'pricing' },
+        { label: 'Cities', to: '/', fragment: 'cities' },
+        { label: 'Safety & Trust', to: '/', fragment: 'safety' },
+        { label: 'Gift a ride', to: '/', fragment: 'gift' },
+        { label: 'Help', href: 'mailto:hello@mera-driver.app' },
+      ],
+    },
+    {
+      heading: 'mera-driver',
+      links: [
+        { label: 'About us', to: '/', fragment: 'about' },
+        { label: 'Careers', to: '/', fragment: 'careers' },
+        { label: 'Blog', to: '/blog' },
+        { label: 'Business', to: '/', fragment: 'business' },
+        { label: 'Component showcase', to: '/showcase' },
+        { label: 'Press', to: '/', fragment: 'press' },
+      ],
+    },
+  ];
 
-  /** Dynamic Copy Signals initialized as empty */
-  protected readonly isLoading = signal<boolean>(true);
-  protected readonly tagline = signal<string>('');
-  protected readonly quickLinksTitle = signal<string>('');
-  protected readonly accountLinksTitle = signal<string>('');
-  protected readonly contactTitle = signal<string>('');
-  protected readonly navLinks = signal<any[]>([]);
-  protected readonly serviceLinks = signal<any[]>([]);
-  protected readonly accountLinks = signal<any[]>([]);
-  protected readonly contactInfo = signal<any>(null);
-  protected readonly appPromoTagline = signal<string>('');
-  protected readonly appPromoTitle = signal<string>('');
-  protected readonly appPromoDescription = signal<string>('');
-  protected readonly playStoreUrl = signal<string>('');
-  protected readonly appStoreUrl = signal<string>('');
-  protected readonly appPromoRatingText = signal<string>('');
+  /** Store badges. `href` is a placeholder until the apps ship. */
+  protected readonly apps: { label: string; icon: string; href: string }[] = [
+    { label: 'Download on the App Store', icon: 'phone_iphone', href: '#' },
+    { label: 'Get it on Google Play', icon: 'android', href: '#' },
+  ];
 
-  ngOnInit(): void {
-    this.http.get<any>('/data/layout.json').subscribe({
-      next: (data) => {
-        if (data?.footer) {
-          const f = data.footer;
-          const d = layoutDefaults.footer;
-          this.tagline.set(f.tagline || d.tagline);
-          this.quickLinksTitle.set(f.quickLinksTitle || d.quickLinksTitle);
-          this.accountLinksTitle.set(f.accountLinksTitle || d.accountLinksTitle);
-          this.contactTitle.set(f.contactTitle || d.contactTitle);
-          this.navLinks.set((f as any).quickLinks || (d as any).quickLinks);
-          this.accountLinks.set(f.accountLinks || d.accountLinks);
-          this.contactInfo.set(f.contactInfo || d.contactInfo);
-          this.appPromoTagline.set((f as any).appPromo?.tagline || (d as any).appPromo?.tagline);
-          this.appPromoTitle.set((f as any).appPromo?.title || (d as any).appPromo?.title);
-          this.appPromoDescription.set((f as any).appPromo?.description || (d as any).appPromo?.description);
-          this.playStoreUrl.set((f as any).appPromo?.playStoreUrl || (d as any).appPromo?.playStoreUrl);
-          this.appStoreUrl.set((f as any).appPromo?.appStoreUrl || (d as any).appPromo?.appStoreUrl);
-          this.appPromoRatingText.set((f as any).appPromo?.ratingText || (d as any).appPromo?.ratingText);
-        }
-        if (data?.header?.navLinks) {
-          const s = data.header.navLinks.find((l: any) => l.label === 'Services');
-          if (s && s.subItems) {
-            this.serviceLinks.set(s.subItems);
-          }
-        }
-        this.isLoading.set(false);
-      },
-      error: (err) => {
-        console.error('Failed to load footer layout from json', err);
-        const f = layoutDefaults.footer;
-        this.tagline.set(f.tagline);
-        this.quickLinksTitle.set(f.quickLinksTitle);
-        this.accountLinksTitle.set(f.accountLinksTitle);
-        this.contactTitle.set(f.contactTitle);
-        this.navLinks.set((f as any).quickLinks);
-        this.accountLinks.set(f.accountLinks);
-        this.contactInfo.set(f.contactInfo);
-        this.appPromoTagline.set(f.appPromo.tagline);
-        this.appPromoTitle.set(f.appPromo.title);
-        this.appPromoDescription.set(f.appPromo.description);
-        this.playStoreUrl.set(f.appPromo.playStoreUrl);
-        this.appStoreUrl.set(f.appPromo.appStoreUrl);
-        this.appPromoRatingText.set(f.appPromo.ratingText);
-
-        const s = layoutDefaults.header.navLinks.find((l: any) => l.label === 'Services');
-        if (s && s.subItems) {
-          this.serviceLinks.set(s.subItems);
-        }
-        this.isLoading.set(false);
-      }
-    });
-  }
+  protected readonly social: { label: string; icon: string; href: string }[] = [
+    { label: 'mera-driver on X', icon: 'tag', href: '#' },
+    { label: 'mera-driver on Instagram', icon: 'photo_camera', href: '#' },
+    { label: 'mera-driver on LinkedIn', icon: 'work', href: '#' },
+  ];
 }

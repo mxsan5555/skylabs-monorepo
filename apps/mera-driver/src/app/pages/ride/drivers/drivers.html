@@ -1,0 +1,83 @@
+<section class="rider-screen" aria-labelledby="drivers-title">
+  <div class="rider-topbar">
+    <md-icon-button aria-label="Go back" (click)="back()">
+      <md-icon aria-hidden="true">arrow_back</md-icon>
+    </md-icon-button>
+    <h1 id="drivers-title" class="rider-topbar__title">Choose a driver</h1>
+  </div>
+
+  @if (booking.ride(); as ride) {
+    <p class="drivers-context">
+      {{ ride.title }} · from {{ booking.pickup()?.label }} to
+      {{ booking.drop()?.label }}
+    </p>
+  }
+
+  <ul class="rider-list drivers-list" role="list">
+    @for (driver of booking.drivers(); track driver.id) {
+      <li>
+        <button
+          type="button"
+          class="driver-card"
+          [class.selected]="selectedId() === driver.id"
+          [attr.aria-pressed]="selectedId() === driver.id"
+          (click)="pick(driver)"
+        >
+          <img
+            class="driver-card__photo"
+            [src]="driver.photo"
+            [alt]="'Photo of ' + driver.name"
+            loading="lazy"
+            width="56"
+            height="56"
+          />
+          <span class="driver-card__body">
+            <span class="driver-card__row">
+              <span class="driver-card__name">{{ driver.name }}</span>
+              <span class="driver-card__rating">
+                <md-icon aria-hidden="true">star</md-icon>
+                {{ driver.rating }}
+                <span class="driver-card__reviews">({{ driver.reviews }})</span>
+              </span>
+            </span>
+            <span class="driver-card__sub">{{ driver.vehicle }} · {{ driver.plate }}</span>
+            <span class="driver-card__tags">
+              @if (driver.policeVerified) {
+                <span class="driver-pill driver-pill--verified">
+                  <md-icon aria-hidden="true">verified_user</md-icon>
+                  Police verified
+                </span>
+              } @else {
+                <span class="driver-pill driver-pill--pending">
+                  <md-icon aria-hidden="true">pending</md-icon>
+                  Verification pending
+                </span>
+              }
+              <span class="driver-card__eta">{{ driver.etaMinutes }} min away</span>
+            </span>
+          </span>
+          <span class="driver-card__aside">
+            <md-icon-button
+              [attr.aria-label]="
+                (driver.bookmarked ? 'Remove ' : 'Bookmark ') + driver.name
+              "
+              [attr.aria-pressed]="driver.bookmarked"
+              (click)="toggleBookmark($event, driver.id)"
+            >
+              <md-icon [attr.aria-hidden]="true">{{
+                driver.bookmarked ? 'bookmark' : 'bookmark_border'
+              }}</md-icon>
+            </md-icon-button>
+            <span class="driver-card__price">₹{{ driver.priceINR }}</span>
+          </span>
+        </button>
+      </li>
+    }
+  </ul>
+
+  <div class="rider-cta">
+    <md-filled-button [disabled]="!selectedId()" (click)="confirm()">
+      Request driver
+    </md-filled-button>
+  </div>
+</section>

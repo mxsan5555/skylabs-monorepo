@@ -4,6 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthApiService } from '../../core/auth/auth-api.service';
 
 type Method = 'email' | 'phone';
+type Persona = 'customer' | 'driver';
 
 /**
  * Sign-in screen. Choose Email or Phone, enter the destination, and request a
@@ -22,43 +23,16 @@ export class SignIn implements OnInit {
   private readonly http = inject(HttpClient);
 
   protected readonly method = signal<Method>('phone');
+  /** Which persona is signing up — preset from the header CTA (router state). */
+  protected readonly role = signal<Persona>(
+    (history.state as { role?: Persona } | null)?.role === 'driver'
+      ? 'driver'
+      : 'customer',
+  );
   protected value = '';
 
-  protected readonly loading = signal(false);
-  protected readonly error = signal<string | null>(null);
-  protected readonly emailError = signal('');
-  protected readonly phoneError = signal('');
-
-  protected readonly googleUrl = this.authApi.googleSignInUrl();
-
-  protected readonly content = signal({
-    title: 'Sign in',
-    subtitle: 'Choose your preferred sign-in method.',
-    tabEmail: 'Email',
-    tabPhone: 'Phone',
-    labelPhone: 'Phone number',
-    labelEmail: 'Email address',
-    btnSendOtp: 'Send OTP',
-    dividerText: 'or',
-    btnGoogle: 'Continue with Google',
-    disclaimer: 'By continuing, you agree to our Terms of Service.'
-  });
-
-  ngOnInit(): void {
-    // Load copy strings dynamically
-    this.http.get<any>('data/auth.json').subscribe({
-      next: (data) => {
-        if (data && data.signin) {
-          this.content.set({
-            ...this.content(),
-            ...data.signin
-          });
-        }
-      },
-      error: (err) => {
-        console.error('Failed to load Sign-In copy, using defaults', err);
-      }
-    });
+  protected setRole(role: Persona): void {
+    this.role.set(role);
   }
 
   protected onTabChange(event: Event): void {
@@ -78,41 +52,12 @@ export class SignIn implements OnInit {
   }
 
   protected sendOtp(): void {
-    const identifier = this.value.trim();
-    if (!identifier) {
-      this.error.set(
-        this.method() === 'phone' ? 'Enter your phone number.' : 'Enter your email address.',
-      );
-      return;
-    }
-
-    // Frontend validation
-    if (this.method() === 'phone') {
-      const phoneRegex = /^[6-9]\d{9}$/;
-      if (!phoneRegex.test(identifier)) {
-        this.phoneError.set('Please enter a valid 10-digit mobile number.');
-        return;
-      }
-    } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(identifier)) {
-        this.emailError.set('Please enter a valid email address.');
-        return;
-      }
-    }
-
-    this.error.set(null);
-    this.loading.set(true);
-    this.authApi.requestOtp(identifier, 'login').subscribe({
-      next: () => {
-        this.loading.set(false);
-        this.router.navigate(['/otp'], {
-          state: { destination: identifier, method: this.method() },
-        });
-      },
-      error: (err) => {
-        this.loading.set(false);
-        this.error.set(err.message || 'Could not send the code right now. Please try again.');
+    const fallback = this.method() === 'phone' ? '4564' : 'you@email.com';
+    this.router.navigate(['/otp'], {
+      state: {
+        destination: this.value || fallback,
+        method: this.method(),
+        role: this.role(),
       },
     });
   }
