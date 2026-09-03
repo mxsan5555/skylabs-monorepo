@@ -1,0 +1,83 @@
+<md-admin-page title="FAQs" subtitle="Frequently asked questions shown in-app.">
+  <div class="relative w-full">
+    @if (!showAddForm()) {
+      <div class="w-full mt-4">
+        <sky-card class="p-6 block">
+          <sky-data-table
+            [columns]="tableColumns"
+            [rows]="tableRowsString()"
+            [total]="faqList().length"
+            selectable
+            exportable
+            searchable
+            [actions]="tableActions"
+            (sky-dt-row-action)="onRowAction($event)"
+            caption="FAQ Management Database"
+          >
+            <md-icon-button slot="toolbar-actions" aria-label="Add FAQ" title="Add FAQ" (click)="startAdd()">
+              <md-icon>add</md-icon>
+            </md-icon-button>
+          </sky-data-table>
+        </sky-card>
+      </div>
+    } @else {
+      <div class="flex flex-col gap-6 w-full mt-2">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="text-xs text-slate-500 font-semibold tracking-wide">
+            Home / <span class="text-[#2e7d32]">{{ editingId() !== null && editingId() !== 'new' ? 'Edit FAQ' : 'Add FAQ' }}</span>
+          </div>
+          <md-outlined-button (click)="cancelEdit()">
+            <md-icon slot="icon">arrow_back</md-icon>
+            Back to List
+          </md-outlined-button>
+        </div>
+
+        <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm block">
+          <div class="flex flex-col gap-y-6 w-full">
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>1. FAQ Details</h3>
+              </div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-select label="Category" [value]="inputCategory()" (change)="inputCategory.set($any($event.target).value)">
+                  @for (opt of categoryOptions(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                  }
+                </md-outlined-select>
+
+                <md-outlined-text-field label="Display Order" type="number" [value]="inputDisplayOrder()" (input)="inputDisplayOrder.set($any($event.target).value)" placeholder="e.g. 1"></md-outlined-text-field>
+
+                <md-outlined-text-field
+                  class="col-span-2 max-sm:col-span-1"
+                  label="Question"
+                  required
+                  [value]="inputQuestion()"
+                  (input)="inputQuestion.set($any($event.target).value)"
+                  placeholder="Enter frequently asked question"
+                ></md-outlined-text-field>
+
+                <md-outlined-text-field
+                  class="col-span-2 max-sm:col-span-1"
+                  label="Answer Content"
+                  type="textarea"
+                  rows="3"
+                  required
+                  [value]="inputAnswer()"
+                  (input)="inputAnswer.set($any($event.target).value)"
+                  placeholder="Enter detailed answer text"
+                ></md-outlined-text-field>
+              </div>
+            </sky-card>
+          </div>
+
+          <div class="flex gap-2 mt-6 justify-end border-t border-slate-100 pt-4">
+            <md-outlined-button (click)="cancelEdit()">Cancel</md-outlined-button>
+            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;">
+              <md-icon slot="icon">save</md-icon> Save
+            </md-filled-button>
+          </div>
+        </sky-card>
+      </div>
+    }
+  </div>
+</md-admin-page>

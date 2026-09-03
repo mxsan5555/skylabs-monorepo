@@ -7,21 +7,21 @@
     <div class="auth-brand__logo">
       <md-icon aria-hidden="true">sms</md-icon>
     </div>
-    <h1 class="auth-brand__title">Verify your {{ method === 'phone' ? 'phone' : 'email' }}</h1>
-    <p class="auth-brand__subtitle">We sent a 6-digit code to</p>
+    <h1 class="auth-brand__title">{{ method === 'email' ? content().titleEmail : content().titlePhone }}</h1>
+    <p class="auth-brand__subtitle">{{ content().subtitle }}</p>
     <span class="auth-destination">
-      <md-icon aria-hidden="true">{{ method === 'phone' ? 'call' : 'mail' }}</md-icon>
+      <md-icon aria-hidden="true">{{ method === 'email' ? 'mail' : 'call' }}</md-icon>
       {{ destination }}
     </span>
   </div>
 
   <div class="auth-card">
-    <h2>Enter the code</h2>
-    <p>The code expires in a few minutes.</p>
+    <h2>{{ content().cardTitle }}</h2>
+    <p>{{ content().cardSubtitle }}</p>
 
     <md-outlined-text-field
       class="otp-field"
-      label="6-digit code"
+      [label]="content().inputLabel"
       type="text"
       inputmode="numeric"
       autocomplete="one-time-code"
@@ -35,16 +35,16 @@
     }
 
     <md-filled-button class="auth-submit" [disabled]="verifying()" (click)="verify()">
-      {{ verifying() ? 'Verifying…' : 'Verify & Continue' }}
+      {{ verifying() ? 'Verifying…' : content().btnVerify }}
     </md-filled-button>
   </div>
 
   <p class="otp-resend">
-    Didn’t receive the code?
+    {{ content().resendText }}
     @if (seconds() > 0) {
-      <span class="otp-muted">Resend in {{ seconds() }}s</span>
+      <span class="otp-muted">{{ content().resendCooldown }} {{ seconds() }}s</span>
     } @else {
-      <md-text-button (click)="resend()">Resend code</md-text-button>
+      <md-text-button (click)="resend()">{{ content().btnResend }}</md-text-button>
     }
   </p>
 </div>

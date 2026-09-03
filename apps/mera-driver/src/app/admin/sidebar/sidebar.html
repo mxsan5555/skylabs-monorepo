@@ -19,18 +19,41 @@
   <nav class="admin-sidebar__nav" aria-label="Console">
     @for (node of menu(); track node.id) {
       @if (node.children && node.children.length > 0) {
-        <div class="admin-nav-group">
-          <p class="admin-nav-group__label">{{ node.title }}</p>
-          @for (child of node.children; track child.id) {
-            <a
-              class="admin-nav-item pl-6"
-              [routerLink]="accountPath(child)"
-              routerLinkActive="active"
+        <div class="admin-nav-group flex flex-col w-full mb-2">
+          <button
+            type="button"
+            class="admin-nav-item flex items-center justify-between w-full cursor-pointer"
+            (click)="toggleGroup(node)"
+          >
+            <span class="flex items-center gap-2">
+              @if (node.icon) {
+                <md-icon aria-hidden="true">{{ node.icon }}</md-icon>
+              }
+              <span class="admin-nav-group__label" style="font-size: 0.75rem; margin: 0; padding: 0; line-height: 1;">{{ node.title }}</span>
+            </span>
+            <md-icon
+              style="font-size: 20px; --md-icon-size: 20px; color: var(--md-sys-color-on-surface-variant); transition: transform 0.2s;"
+              [style.transform]="isGroupExpanded(node) ? 'rotate(180deg)' : 'rotate(0deg)'"
             >
-              <md-icon aria-hidden="true">{{ child.icon }}</md-icon>
-              {{ child.title }}
-            </a>
-          }
+              expand_more
+            </md-icon>
+          </button>
+
+          <div
+            class="admin-sidebar__group-children flex flex-col gap-0.5 mt-1 overflow-hidden transition-all duration-200"
+            [class.hidden]="!isGroupExpanded(node)"
+          >
+            @for (child of node.children; track child.id) {
+              <a
+                class="admin-nav-item pl-8"
+                [routerLink]="accountPath(child)"
+                routerLinkActive="active"
+              >
+                <md-icon aria-hidden="true">{{ child.icon }}</md-icon>
+                {{ child.title }}
+              </a>
+            }
+          </div>
         </div>
       } @else {
         <a

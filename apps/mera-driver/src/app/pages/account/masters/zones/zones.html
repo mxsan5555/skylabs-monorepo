@@ -1,0 +1,206 @@
+<md-admin-page title="Service Zones" subtitle="Manage configuration values for driver service zones.">
+  <div class="relative w-full">
+
+    <!-- VIEW 1: DATA TABLE LIST -->
+    @if (!showAddForm()) {
+      <div class="w-full mt-4">
+        <sky-card class="p-6 block">
+          <sky-data-table
+            [columns]="tableColumns"
+            [rows]="tableRowsString()"
+            [total]="options().length"
+            selectable
+            exportable
+            searchable
+            [actions]="tableActions"
+            (sky-dt-row-action)="onRowAction($event)"
+            caption="Service Zones Configuration Database"
+          >
+            <!-- Projected Add button -->
+            <md-icon-button
+              slot="toolbar-actions"
+              aria-label="Add Option"
+              title="Add Option"
+              (click)="startAdd()"
+            >
+              <md-icon>add</md-icon>
+            </md-icon-button>
+          </sky-data-table>
+        </sky-card>
+      </div>
+    }
+
+    <!-- VIEW 2: ADD / EDIT FORM VIEW -->
+    @else {
+      <div class="flex flex-col gap-6 w-full mt-2">
+        <!-- Breadcrumb / Back Button bar -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="text-xs text-slate-500 font-semibold tracking-wide">
+            Home / <span class="text-[#2e7d32]">{{ editingId() !== null && editingId() !== 'new' ? 'Edit Option' : 'Add Option' }}</span>
+          </div>
+          <md-outlined-button (click)="cancelEdit()">
+            <md-icon slot="icon">arrow_back</md-icon>
+            Back to List
+          </md-outlined-button>
+        </div>
+
+        <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm block">
+          <div class="flex flex-col gap-y-6 w-full">
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>1. Option Details</h3>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <!-- Zone Name -->
+                <md-outlined-text-field
+                  label="Zone Name"
+                  required
+                  [value]="inputZoneName()"
+                  (input)="inputZoneName.set($any($event.target).value)"
+                  placeholder="e.g. Mumbai Downtown"
+                ></md-outlined-text-field>
+
+                <!-- Zone Code -->
+                <md-outlined-text-field
+                  label="Zone Code"
+                  required
+                  [value]="inputZoneCode()"
+                  (input)="inputZoneCode.set($any($event.target).value)"
+                  placeholder="e.g. MUM_DOWN"
+                ></md-outlined-text-field>
+
+                <!-- Zone Type -->
+                <md-outlined-select
+                  label="Zone Type"
+                  [value]="inputZoneType()"
+                  (change)="inputZoneType.set($any($event.target).value)"
+                >
+                  <md-select-option value="City">
+                    <div slot="headline">City</div>
+                  </md-select-option>
+                  <md-select-option value="Area">
+                    <div slot="headline">Area</div>
+                  </md-select-option>
+                  <md-select-option value="Pincode">
+                    <div slot="headline">Pincode</div>
+                  </md-select-option>
+                  <md-select-option value="Custom">
+                    <div slot="headline">Custom</div>
+                  </md-select-option>
+                </md-outlined-select>
+
+                <!-- State ID -->
+                <md-outlined-text-field
+                  label="State ID"
+                  type="number"
+                  [value]="inputStateId() !== null ? inputStateId()!.toString() : ''"
+                  (input)="inputStateId.set($any($event.target).value ? +$any($event.target).value : null)"
+                  placeholder="State Database ID"
+                ></md-outlined-text-field>
+
+                <!-- City ID -->
+                <md-outlined-text-field
+                  label="City ID"
+                  type="number"
+                  [value]="inputCityId() !== null ? inputCityId()!.toString() : ''"
+                  (input)="inputCityId.set($any($event.target).value ? +$any($event.target).value : null)"
+                  placeholder="City Database ID"
+                ></md-outlined-text-field>
+
+                <!-- Pincode -->
+                <md-outlined-text-field
+                  label="Pincode"
+                  [value]="inputPincode()"
+                  (input)="inputPincode.set($any($event.target).value)"
+                  placeholder="Pincode if pincode-based"
+                ></md-outlined-text-field>
+
+                <!-- Area Name -->
+                <md-outlined-text-field
+                  class="col-span-2 max-sm:col-span-1"
+                  label="Area Name / Specific Locality"
+                  [value]="inputAreaName()"
+                  (input)="inputAreaName.set($any($event.target).value)"
+                  placeholder="e.g. Bandra West, Whitefield"
+                ></md-outlined-text-field>
+
+                <!-- Service Radius -->
+                <md-outlined-text-field
+                  label="Radius (km)"
+                  type="number"
+                  step="0.01"
+                  [value]="inputRadiusKm() !== null ? inputRadiusKm()!.toString() : ''"
+                  (input)="inputRadiusKm.set($any($event.target).value ? +$any($event.target).value : null)"
+                  placeholder="Service radius in km"
+                ></md-outlined-text-field>
+
+                <!-- Latitude -->
+                <md-outlined-text-field
+                  label="Latitude"
+                  type="number"
+                  step="0.0000001"
+                  [value]="inputLatitude() !== null ? inputLatitude()!.toString() : ''"
+                  (input)="inputLatitude.set($any($event.target).value ? +$any($event.target).value : null)"
+                  placeholder="Center Latitude"
+                ></md-outlined-text-field>
+
+                <!-- Longitude -->
+                <md-outlined-text-field
+                  label="Longitude"
+                  type="number"
+                  step="0.0000001"
+                  [value]="inputLongitude() !== null ? inputLongitude()!.toString() : ''"
+                  (input)="inputLongitude.set($any($event.target).value ? +$any($event.target).value : null)"
+                  placeholder="Center Longitude"
+                ></md-outlined-text-field>
+
+                <!-- Status -->
+                <md-outlined-select
+                  label="Status"
+                  [value]="inputStatus()"
+                  (change)="inputStatus.set($any($event.target).value)"
+                >
+                  <md-select-option value="Active">
+                    <div slot="headline">Active</div>
+                  </md-select-option>
+                  <md-select-option value="Inactive">
+                    <div slot="headline">Inactive</div>
+                  </md-select-option>
+                </md-outlined-select>
+
+                <!-- Notes / Admin Remarks -->
+                <md-outlined-text-field
+                  class="col-span-2 max-sm:col-span-1"
+                  label="Notes / Admin Remarks"
+                  [value]="inputNotes()"
+                  (input)="inputNotes.set($any($event.target).value)"
+                  placeholder="Enter internal notes..."
+                ></md-outlined-text-field>
+
+                <!-- Boundary Data JSON -->
+                <md-outlined-text-field
+                  class="col-span-2 max-sm:col-span-1"
+                  label="Boundary Data (JSON Polygon / Custom Map Bounds)"
+                  type="textarea"
+                  rows="2"
+                  [value]="inputBoundaryData()"
+                  (input)="inputBoundaryData.set($any($event.target).value)"
+                  placeholder='e.g. {"type": "Polygon", "coordinates": [...] }'
+                ></md-outlined-text-field>
+              </div>
+            </sky-card>
+          </div>
+
+          <div class="flex gap-2 mt-6 justify-end border-t border-slate-100 pt-4">
+            <md-outlined-button (click)="cancelEdit()">Cancel</md-outlined-button>
+            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;">
+              <md-icon slot="icon">save</md-icon> Save
+            </md-filled-button>
+          </div>
+        </sky-card>
+      </div>
+    }
+
+  </div>
+</md-admin-page>

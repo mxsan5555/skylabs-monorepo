@@ -1,0 +1,38 @@
+<div class="rider-shell">
+  <div class="rider-viewport">
+    <router-outlet></router-outlet>
+
+    @if (showNav()) {
+      <nav class="rider-nav" aria-label="Primary">
+        <button
+          type="button"
+          class="rider-nav__item"
+          [class.active]="isActive('/ride')"
+          [attr.aria-current]="isActive('/ride') ? 'page' : null"
+          (click)="go('/ride')"
+        >
+          <md-icon aria-hidden="true">home</md-icon>
+          Home
+        </button>
+        <button
+          type="button"
+          class="rider-nav__item"
+          [class.active]="isActive('/account/dashboard')"
+          (click)="go('/account/dashboard')"
+        >
+          <md-icon aria-hidden="true">receipt_long</md-icon>
+          Activity
+        </button>
+        <button
+          type="button"
+          class="rider-nav__item"
+          [class.active]="isActive('/account/profile')"
+          (click)="go('/account/profile')"
+        >
+          <md-icon aria-hidden="true">person</md-icon>
+          Account
+        </button>
+      </nav>
+    }
+  </div>
+</div>

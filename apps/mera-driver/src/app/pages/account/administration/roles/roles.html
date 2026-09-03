@@ -169,15 +169,15 @@
                     {{ widget.title }}
                   </label>
                   @if (isWidgetChecked(widget.id)) {
-                    <label class="flex items-center gap-1 text-xs">
-                      Order
-                      <input
+                    <label class="flex items-center gap-2 text-xs">
+                      Order:
+                      <md-outlined-text-field
                         type="number"
                         min="0"
-                        class="w-14 rounded border border-[var(--md-sys-color-outline-variant,#c4c7c5)] px-1 py-0.5"
-                        [value]="selectedWidgetOrders().get(widget.id)"
+                        class="w-24"
+                        [value]="selectedWidgetOrders().get(widget.id)?.toString() || '0'"
                         (input)="setWidgetOrder(widget.id, +$any($event.target).value)"
-                      />
+                      ></md-outlined-text-field>
                     </label>
                   }
                 </li>

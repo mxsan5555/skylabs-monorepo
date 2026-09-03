@@ -1,0 +1,71 @@
+<section class="rider-map-screen" aria-labelledby="options-title">
+  <div class="rider-map">
+    <md-ride-map
+      [pickup]="booking.pickup()?.coord ?? null"
+      [drop]="booking.drop()?.coord ?? null"
+      label="Map showing the route from pickup to destination"
+    ></md-ride-map>
+
+    <md-icon-button class="rider-fab rider-fab--back" aria-label="Go back" (click)="back()">
+      <md-icon aria-hidden="true">arrow_back</md-icon>
+    </md-icon-button>
+  </div>
+
+  <div class="rider-sheet">
+    <div class="rider-sheet__handle" aria-hidden="true"></div>
+    <h1 id="options-title" class="rider-sheet__title">Choose a ride</h1>
+
+    <md-tabs
+      class="rider-tabs"
+      aria-label="Ride categories"
+      [activeTabIndex]="categoryIndex()"
+      (change)="pickCategory($any($event.target).activeTabIndex)"
+    >
+      @for (c of categories; track c.id) {
+        <md-secondary-tab [attr.aria-selected]="category() === c.id">
+          {{ c.label }}
+        </md-secondary-tab>
+      }
+    </md-tabs>
+
+    <ul class="rider-list rider-options" role="list">
+      @for (option of options(); track option.id) {
+        <li>
+          <button
+            type="button"
+            class="rider-option"
+            [class.selected]="selected()?.id === option.id"
+            [attr.aria-pressed]="selected()?.id === option.id"
+            (click)="pick(option)"
+          >
+            <span class="rider-option__icon">
+              <md-icon aria-hidden="true">{{ option.icon }}</md-icon>
+            </span>
+            <span class="rider-option__body">
+              <span class="rider-option__title">
+                {{ option.title }}
+                @if (option.recommended) {
+                  <sky-badge variant="primary">Recommended</sky-badge>
+                }
+              </span>
+              <span class="rider-option__sub">{{ option.subtitle }}</span>
+              <span class="rider-option__seats">
+                <md-icon aria-hidden="true">person</md-icon>{{ option.seats }}
+                @if (option.etaMinutes > 0) {
+                  · {{ option.etaMinutes }} min away
+                }
+              </span>
+            </span>
+            <span class="rider-option__price">₹{{ option.priceINR }}</span>
+          </button>
+        </li>
+      }
+    </ul>
+
+    <div class="rider-cta">
+      <md-filled-button [disabled]="!selected()" (click)="confirm()">
+        Choose {{ selected()?.title ?? 'a ride' }}
+      </md-filled-button>
+    </div>
+  </div>
+</section>

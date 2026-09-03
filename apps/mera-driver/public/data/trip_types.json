@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "name": "One-Way City Ride",
+    "description": "Standard point-to-point city transfer.",
+    "status": "Active"
+  },
+  {
+    "id": 2,
+    "name": "Hourly Rental",
+    "description": "Flexible hourly driver package with multiple stops.",
+    "status": "Active"
+  },
+  {
+    "id": 3,
+    "name": "Outstation Roundtrip",
+    "description": "Intercity outstation trip with overnight allowance.",
+    "status": "Active"
+  }
+]

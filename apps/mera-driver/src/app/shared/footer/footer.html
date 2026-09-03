@@ -1,0 +1,74 @@
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <a class="site-footer__brand" routerLink="/">
+      <span class="site-footer__logo" aria-hidden="true">
+        <md-icon>local_taxi</md-icon>
+      </span>
+      mera-driver
+    </a>
+
+    <div class="site-footer__cols">
+      <!-- Columns 1–3: Driver, Customer, mera-driver -->
+      @for (col of columns; track col.heading) {
+        <nav class="site-footer__col" [attr.aria-label]="col.heading">
+          <h2 class="site-footer__heading">{{ col.heading }}</h2>
+          <ul class="site-footer__list">
+            @for (link of col.links; track link.label) {
+              <li>
+                @if (link.to) {
+                  <a [routerLink]="link.to" [fragment]="link.fragment">{{ link.label }}</a>
+                } @else {
+                  <a [href]="link.href">{{ link.label }}</a>
+                }
+              </li>
+            }
+          </ul>
+        </nav>
+      }
+
+      <!-- Column 4: download app + language -->
+      <div class="site-footer__col site-footer__col--app">
+        <h2 class="site-footer__heading">Get the app</h2>
+        <div class="site-footer__apps">
+          @for (app of apps; track app.label) {
+            <a
+              class="site-footer__app"
+              [href]="app.href"
+              [attr.aria-label]="app.label"
+            >
+              <md-icon aria-hidden="true">{{ app.icon }}</md-icon>
+              <span>{{ app.label }}</span>
+            </a>
+          }
+        </div>
+
+        <div class="site-footer__lang">
+          <md-icon aria-hidden="true">language</md-icon>
+          <label class="sr-only" for="footer-lang">Language</label>
+          <!-- TODO: wire to i18n once translations land -->
+          <select id="footer-lang" class="site-footer__select">
+            <option value="en">English</option>
+            <option value="hi">हिंदी</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="site-footer__bottom">
+      <div class="site-footer__legal">
+        <a routerLink="/" fragment="terms">Terms</a>
+        <a routerLink="/" fragment="privacy">Privacy</a>
+        <a routerLink="/" fragment="accessibility">Accessibility</a>
+        <span class="site-footer__copy">© {{ year }} mera-driver. All rights reserved.</span>
+      </div>
+
+      <div class="site-footer__social">
+        @for (s of social; track s.label) {
+          <a [href]="s.href" [attr.aria-label]="s.label">
+            <md-icon aria-hidden="true">{{ s.icon }}</md-icon>
+          </a>
+        }
+      </div>
+    </div>
+  </div>
+</footer>
