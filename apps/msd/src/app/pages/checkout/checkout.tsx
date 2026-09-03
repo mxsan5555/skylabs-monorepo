@@ -2,9 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedButton, Icon, Divider, OutlinedTextField, Radio,} from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { checkout, createOrderFromBooking, getMyOrder, payBatch, payBatchCod, verifyBatchPayment, type Order, type OrderContactDetails, type PaymentIntent,} from '../../../api/orders';
-import { getCart } from '../../../api/cart';
-import { listBookings } from '../../../api/bookings';
+
+import {
+  checkout,
+  getMyOrder,
+  pay,
+  payCod,
+  verifyPayment,
+  type Order,
+  type OrderContactDetails,
+  type PaymentIntent,
+} from '../../../api/orders';
+
 import { ApiRequestError } from '../../../api/rbac/client';
 import { loadRazorpayScript } from '../../../utils/razorpay';
 import { formatINR } from '../../../utils/format';
@@ -18,10 +27,6 @@ interface CheckoutLocationState {
    * Used from Order Detail → Pay Now.
    */
   orderId?: string;
-  /**
-   * Create a SERVICE order from an existing booking.
-   */
-  bookingId?: string;
 }
 type Step = 'details' | 'payment';
 type PaymentMethod = 'online' | 'cod';
@@ -35,15 +40,17 @@ export function Checkout() {
   const [step, setStep] = useState<Step>(
     isRetryPayment ? 'payment' : 'details',
   );
-  // Deal + Therapist + Product together: ONE checkout action, ONE payment, ONE combined
-  // receipt — multiple Order rows under the hood (see msd-api's payment.service.ts doc
-  // comment). `orders` always holds every Order created/loaded for this checkout action —
-  // exactly one for a retry-payment or single-booking checkout, one-per-vendor-cart-plus-
-  // one-per-pending-booking for the default (Cart page) combined checkout.
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [placedOrders, setPlacedOrders] = useState<Order[] | null>(null);
-  const [paymentIntent, setPaymentIntent] = useState<PaymentIntent | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('online');
+
+  // Deal + Product + Therapist together: ONE checkout action, ONE payment, ONE Order — every
+  // cart line (whichever kind) becomes an OrderItem on this same Order (see msd-api's
+  // order.service.ts#createOrderFromCart doc comment; there is no separate Booking flow).
+  const [order, setOrder] = useState<Order | null>(null);
+  const [paymentIntent, setPaymentIntent] =
+    useState<PaymentIntent | null>(null);
+
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentMethod>('online');
+
   const [loading, setLoading] = useState(isRetryPayment);
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
@@ -87,8 +94,10 @@ export function Checkout() {
       setLoading(true);
       setError('');
       try {
-        const currentOrder = (await getMyOrder(token, orderId)).data;
-        setOrders([currentOrder]);
+        const currentOrder =
+          (await getMyOrder(token, orderId)).data;
+
+        setOrder(currentOrder);
       } catch (err) {
         setError( err instanceof ApiRequestError ? err.message : 'Could not start checkout.', );
       } finally { setLoading(false);
@@ -97,8 +106,8 @@ export function Checkout() {
   }, []);
   useEffect(() => {
     if (
-      orders.length === 0 ||
-      !orders.every((o) => o.status === 'PENDING_PAYMENT') ||
+      !order ||
+      order.status !== 'PENDING_PAYMENT' ||
       paymentMethod !== 'online' ||
       paymentIntent
     ) {
@@ -107,13 +116,22 @@ export function Checkout() {
     (async () => {
       setError('');
       try {
-        const intent = (await payBatch(token, orders.map((o) => o.id))).data;
+        const intent =
+          (await pay(token, order.id)).data;
+
         setPaymentIntent(intent);
       } catch (err) {
         setError( err instanceof ApiRequestError ? err.message : 'Could not prepare payment.',  );
       }
     })();
-  }, [orders, paymentMethod]);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order, paymentMethod]);
+
+  // ---------------------------------------------------------------------------
+  // Validation
+  // ---------------------------------------------------------------------------
+
   function validateDetails(): boolean {
     const errors: FieldErrors = {};
     if (!contactName.trim()) {  errors.contactName = 'Name is required.'; }
@@ -158,33 +176,13 @@ export function Checkout() {
       shippingState: shippingState.trim(),
       shippingPincode: shippingPincode.trim(),
     };
-    try {let newOrders: Order[];
-      if (state.bookingId) {
-        // Single-booking checkout (e.g. Bookings page "Pay Now") — unchanged, one Order.
-        newOrders = [(await createOrderFromBooking(token, state.bookingId, contactDetails)).data];
-      } else {
-        // Default: the combined checkout from /cart — Deal + Therapist + Product together.
-        // ONE checkout action creates an Order from the Product cart (if non-empty) AND one
-        // Order per PENDING Booking (Deal or Therapist booked directly), all with the same
-        // contact/shipping details, feeding into ONE combined payment below.
-        const [{ data: cart }, { data: pendingBookings }] = await Promise.all([
-          getCart(token),
-          listBookings(token, { status: 'PENDING', pageSize: 50 }),
-        ]);
-        if (cart.items.length === 0 && pendingBookings.length === 0) {
-          setError('Your cart is empty — add a product, deal, or therapist booking first.');
-          setDetailsSubmitting(false);
-          return;
-        }
-        newOrders = [];
-        if (cart.items.length > 0) {
-          newOrders.push((await checkout(token, contactDetails)).data);
-        }
-        for (const booking of pendingBookings) {
-          newOrders.push((await createOrderFromBooking(token, booking.id, contactDetails)).data);
-        }
-      }
-      setOrders(newOrders);
+
+    try {
+      // The cart may hold Deal, Product, and Therapist lines together — checkout always
+      // produces exactly ONE Order from it (see order.service.ts#createOrderFromCart).
+      const newOrder = (await checkout(token, contactDetails)).data;
+
+      setOrder(newOrder);
       setStep('payment');
     } catch (err) {
       setError(  err instanceof ApiRequestError  ? err.message : 'Could not start checkout.', );
@@ -195,25 +193,35 @@ export function Checkout() {
   };
 const openRazorpay = async () => {
     if (payingRef.current) return;
-    if (orders.length === 0 || !paymentIntent) {
+    if (!order || !paymentIntent) {
       return;
     }
     payingRef.current = true;
     setError('');
     setPaying(true);
-    const orderIds = orders.map((o) => o.id);
     try {
       await loadRazorpayScript();
       if (!window.Razorpay) {
         throw new Error( 'Payment gateway unavailable.',
         );
       }
-      const rzp = new window.Razorpay({ key: paymentIntent.keyId,
-        order_id: paymentIntent.providerOrderId,
-        amount: Math.round(  Number(paymentIntent.amount) * 100, ),
-        currency: paymentIntent.currency, name: 'MSD',
-        description: orders
-          .flatMap((o) => o.items)
+
+      const rzp = new window.Razorpay({
+        key: paymentIntent.keyId,
+
+        order_id:
+          paymentIntent.providerOrderId,
+
+        amount:
+          Math.round(
+            Number(paymentIntent.amount) * 100,
+          ),
+
+        currency: paymentIntent.currency,
+
+        name: 'MSD',
+
+        description: order.items
           .map((item) => item.itemName)
           .join(', '),
         theme: {
@@ -226,17 +234,13 @@ const openRazorpay = async () => {
           },
         },
         handler: (response) => {
-          verifyBatchPayment(
+          verifyPayment(
             token,
-            orderIds,
+            order.id,
             response,
           )
             .then(({ data }) => {
-              if (data.length === 1) {
-                navigate(`/orders/${data[0].id}`);
-              } else {
-                setPlacedOrders(data);
-              }
+              navigate(`/orders/${data.id}`);
             })
             .catch((err) => {
               setError(
@@ -262,7 +266,7 @@ const openRazorpay = async () => {
   };
  const placeCodOrder = async () => {
     if (payingRef.current) return;
-    if (orders.length === 0) {
+    if (!order) {
       return;
     }
     payingRef.current = true;
@@ -270,12 +274,9 @@ const openRazorpay = async () => {
     setPaying(true);
     try {
       const { data } =
-        await payBatchCod(token, orders.map((o) => o.id));
-      if (data.length === 1) {
-        navigate(`/orders/${data[0].id}`);
-      } else {
-        setPlacedOrders(data);
-      }
+        await payCod(token, order.id);
+
+      navigate(`/orders/${data.id}`);
     } catch (err) {
       setError(
         err instanceof ApiRequestError
@@ -287,15 +288,17 @@ const openRazorpay = async () => {
       setPaying(false);
     }
   };
-  // The single order most of this page's display logic still reads from (contact/shipping
-  // details are identical across every Order in the batch, since they're created together
-  // from the same submitDetails call) — null only before any Order exists yet.
-  const order = orders[0] ?? null;
-  // Multi-vendor AND multi-order: purely a display grouping across every Order's already-flat
-  // items[] — see utils/order-items.ts. A combined checkout's Product Order and each Booking's
-  // own Order are flattened together into one list here.
-  const vendorGroups = groupOrderItemsByVendor(orders.flatMap((o) => o.items));
-  const combinedTotal = orders.reduce((sum, o) => sum + Number(o.total), 0);
+
+  // Multi-vendor: purely a display grouping across the Order's already-flat items[] — see
+  // utils/order-items.ts. A single checkout may still span several vendors (Deal from one,
+  // Product from another, Therapist from a third) — all under this one Order.
+  const vendorGroups = groupOrderItemsByVendor(order?.items ?? []);
+  const combinedTotal = Number(order?.total ?? 0);
+
+  // ---------------------------------------------------------------------------
+  // Loading
+  // ---------------------------------------------------------------------------
+
   if (loading) {
     return (
       <div className="checkout-page checkout-page--empty">
@@ -327,46 +330,9 @@ const openRazorpay = async () => {
     );
   }
   // ---------------------------------------------------------------------------
-  // Combined confirmation — one checkout action, one payment, one combined receipt,
-  // multiple Order rows under the hood. Shown only when the batch produced more than one
-  // Order (a single-order checkout keeps the existing behavior of navigating straight to
-  // /orders/:id, unchanged from before this combined checkout existed).
+  // Header
   // ---------------------------------------------------------------------------
-  if (placedOrders) {
-    const placedTotal = placedOrders.reduce((sum, o) => sum + Number(o.total), 0);
-    return (
-      <div className="checkout-page checkout-page--empty">
-        <title>Order Placed | MSD</title>
-        <meta name="robots" content="noindex" />
-        <div className="checkout-empty-state">
-          <div className="checkout-empty-state__icon">
-            <Icon>check_circle</Icon>
-          </div>
-          <h1>Orders placed successfully</h1>
-          <p>
-            Your Deal, Therapist, and Product purchases have been placed together in one payment —
-            {' '}{formatINR(placedTotal)} across {placedOrders.length} orders.
-          </p>
-          <ul className="entity-list">
-            {placedOrders.map((placed) => (
-              <li key={placed.id}>
-                <div className="entity-list__item">
-                  <span className="role-list__name">
-                    Order #{placed.id.slice(0, 8)}
-                    <span className="field-hint">
-                      {' '}· {placed.vendorNameSnapshot} · {formatINR(Number(placed.total))}
-                    </span>
-                  </span>
-                  <FilledButton onClick={() => navigate(`/orders/${placed.id}`)}>View</FilledButton>
-                </div>
-              </li>
-            ))}
-          </ul>
-          <FilledButton onClick={() => navigate('/orders')}>View My Orders</FilledButton>
-        </div>
-      </div>
-    );
-  }
+
   return (
     <div className="checkout-page">
       <title> {content.meta.checkout.title} </title>

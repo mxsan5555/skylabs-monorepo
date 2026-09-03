@@ -81,6 +81,28 @@ export function installMaterialJsdomPolyfills(): void {
     };
   }
 
+  // `<md-dialog>` wraps a native `<dialog>` in its shadow root and calls `showModal()`/`close()`
+  // on it directly (see `@material/web/dialog/internal/dialog.js`) — jsdom parses `<dialog>` as
+  // a real `HTMLDialogElement` but has never implemented its imperative API (`show`/`showModal`/
+  // `close` are all `undefined`), so opening any Material dialog under jsdom throws
+  // "dialog.showModal is not a function" without this stub. Mirrors the real element's `open`
+  // attribute/property bookkeeping (enough for `md-dialog`'s own open/close logic to work) without
+  // any actual modality/focus-trapping, which jsdom can't provide anyway.
+  if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.showModal) {
+    HTMLDialogElement.prototype.show = function show() {
+      this.setAttribute('open', '');
+    };
+    HTMLDialogElement.prototype.showModal = function showModal() {
+      this.setAttribute('open', '');
+    };
+    HTMLDialogElement.prototype.close = function close(returnValue?: string) {
+      const wasOpen = this.hasAttribute('open');
+      this.removeAttribute('open');
+      if (returnValue !== undefined) this.returnValue = returnValue;
+      if (wasOpen) this.dispatchEvent(new Event('close'));
+    };
+  }
+
   if (typeof window !== 'undefined' && !window.matchMedia) {
     window.matchMedia = (query: string) =>
       ({

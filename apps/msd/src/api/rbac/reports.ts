@@ -2,8 +2,8 @@ import { apiGet } from './client';
 
 /** Generic (rather than a fixed `Record<string, ...>` param) so a named interface like
  *  `ReportFilters` — which has no index signature of its own — can be passed directly without
- *  hitting TS's "index signature is missing" strictness gap (see `orders.ts`/`bookings.ts`'s
- *  own `toQuery`, which has exactly that pre-existing gap with their own named opts interfaces). */
+ *  hitting TS's "index signature is missing" strictness gap (see `orders.ts`'s own `toQuery`,
+ *  which has exactly that pre-existing gap with its own named opts interface). */
 function toQuery<T extends object>(params: T): string {
   const usp = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {

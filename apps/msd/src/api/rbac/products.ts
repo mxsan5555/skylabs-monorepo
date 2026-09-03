@@ -1,10 +1,18 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from './client';
+import { apiGet } from './client';
 import type { MediaImage, MediaVideo } from '../media';
 
+/**
+ * Superadmin, cross-vendor, READ-ONLY oversight client — Product is now vendor-owned
+ * (`vendorId` required, see the direct-category-access migration). Create/update/delete/status
+ * are vendor-scoped only (self-service `/vendors/me/products`, admin-on-behalf
+ * `/vendors/:id/products` — see products.routes.ts/vendors.routes.ts in msd-api), never this
+ * `/products` client, which only ever exposes `GET /products` and `GET /products/:id`.
+ */
 export interface Product {
   id: string;
   name: string;
   slug: string;
+  vendorId: string;
   brand?: string | null;
   categoryId: string;
   subcategoryId: string | null;
@@ -35,29 +43,6 @@ export interface Product {
   mediaVideo?: MediaVideo | null;
 }
 
-export interface ProductInput {
-  name: string;
-  slug: string;
-  brand?: string;
-  categoryId: string;
-  subcategoryId?: string;
-  description?: string;
-  summary?: string;
-  benefits?: string[];
-  howToUse?: string[];
-  ingredients?: string;
-  returnPolicy?: string;
-  image?: string;
-  gallery?: string[];
-  imageAlt?: string;
-  badge?: string;
-  price: string;
-  originalPrice?: string;
-  discount?: number;
-  isNew?: boolean;
-  isFeatured?: boolean;
-}
-
 function toQuery(params: Record<string, string | number | undefined>): string {
   const usp = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -69,23 +54,20 @@ function toQuery(params: Record<string, string | number | undefined>): string {
 
 export function listProducts(
   token: string | null,
-  opts: { page?: number; pageSize?: number; search?: string; categoryId?: string; subcategoryId?: string; status?: 'active' | 'inactive' } = {},
+  opts: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    /** Superadmin oversight only — narrows to one vendor's products. */
+    vendorId?: string;
+    categoryId?: string;
+    subcategoryId?: string;
+    status?: 'active' | 'inactive';
+  } = {},
 ) {
   return apiGet<Product[]>(`/products${toQuery(opts)}`, token);
 }
 
-export function createProduct(token: string | null, input: ProductInput) {
-  return apiPost<Product>('/products', token, input);
-}
-
-export function updateProduct(token: string | null, id: string, input: Partial<ProductInput>) {
-  return apiPatch<Product>(`/products/${id}`, token, input);
-}
-
-export function setProductStatus(token: string | null, id: string, isActive: boolean) {
-  return apiPatch<Product>(`/products/${id}/status`, token, { isActive });
-}
-
-export function deleteProduct(token: string | null, id: string) {
-  return apiDelete<null>(`/products/${id}`, token);
+export function getProduct(token: string | null, id: string) {
+  return apiGet<Product>(`/products/${id}`, token);
 }

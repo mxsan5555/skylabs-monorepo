@@ -701,6 +701,16 @@
         "apply": "Apply",
         "browseAll": "Browse all categories →"
       },
+      "location": {
+        "label": "Location",
+        "dialogTitle": "Filter by Location",
+        "stateLabel": "State",
+        "stateAll": "All states",
+        "cityLabel": "City",
+        "cityAll": "All cities",
+        "clear": "Clear",
+        "apply": "Apply"
+      },
       "clearAll": "Clear filters"
     },
     "results": {

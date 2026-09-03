@@ -1,23 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import type { MdDialog } from '@material/web/dialog/dialog.js';
-import { Dialog, Divider, FilledButton, Icon } from '@skylabs-monorepo/shared-ui/react';
+import { Divider, FilledButton, Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCatalogTherapist, type CatalogTherapist } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
-import type { Booking } from '../../../api/bookings';
 import { Breadcrumb } from '../../components/breadcrumb';
-import { TherapistBookingDialog } from '../../components/therapist-booking-dialog';
-import { formatBookingSchedule, bookingDisplayName, pluralize } from '../../../utils/format';
+import { TherapistAddToCartDialog } from '../../components/therapist-add-to-cart-dialog';
+import { pluralize } from '../../../utils/format';
 import { resolveTherapistMedia } from '../../../utils/media';
 import './therapist-detail.css';
 /**
  * Therapist Detail — GET /catalog/therapists/:id. The customer-facing purchase entry point for
- * booking a Therapist directly: Therapist Listing → here → select a package → Book Now, entirely
- * independent of Deal (never requires selecting a Deal first — see msd-api's Therapist schema
- * doc comment). Reuses `deal-detail.css`'s layout classes for visual consistency with the Deal
- * detail page, without pulling in any Deal-specific logic (siblings, cart, wishlist — none of
- * those concepts apply to a Therapist purchased directly).
+ * adding a Therapist to cart directly: Therapist Listing → here → select a package → Add to
+ * Cart, entirely independent of Deal (never requires selecting a Deal first — see msd-api's
+ * Therapist schema doc comment). A Therapist is a normal purchasable OrderItem exactly like a
+ * Deal or Product — there is no Book Now path. Reuses `deal-detail.css`'s layout classes for
+ * visual consistency with the Deal detail page, without pulling in any Deal-specific logic
+ * (siblings, wishlist — none of those concepts apply to a Therapist purchased directly).
  */
 export function TherapistDetail() {
   const { id = '' } = useParams<{ id: string }>();
@@ -26,13 +25,10 @@ export function TherapistDetail() {
   const [therapist, setTherapist] = useState<CatalogTherapist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
+
   const [actionMessage, setActionMessage] = useState('');
   const [activeImg, setActiveImg] = useState(0);
-  const resultDialogRef = useRef<MdDialog>(null);
-  useEffect(() => {
-    if (confirmedBooking) resultDialogRef.current?.show();
-  }, [confirmedBooking]);
+
   useEffect(() => {
     if (!id) {
       setTherapist(null);
@@ -148,15 +144,9 @@ export function TherapistDetail() {
             </div>
           )}
           <div className="therapist-detail__cta">
-            <TherapistBookingDialog
+            <TherapistAddToCartDialog
               therapist={therapist}
-              onBooked={(booking, intent) => {
-                if (intent === 'cart') {
-                  setActionMessage(`Added "${therapist.therapistType} — ${therapist.personName}" to your cart.`);
-                } else {
-                  setConfirmedBooking(booking);
-                }
-              }}
+              onAdded={(label) => setActionMessage(`Added "${label}" to your cart.`)}
               renderTrigger={(open) => (
                 <FilledButton
                   type="button"
@@ -166,33 +156,16 @@ export function TherapistDetail() {
                     if (requireAuthOrRedirect()) open();
                   }}
                 >
-                  <Icon slot="icon" aria-hidden="true">event_available</Icon>
-                  Book Now
+                  <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                  Add to Cart
                 </FilledButton>
               )}
             />
           </div>
           {therapist.packages.length === 0 && (
-            <p className="field-hint">This therapist has no bookable packages yet.</p>
+            <p className="field-hint">This therapist has no purchasable packages yet.</p>
           )}
           {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
-          <Dialog ref={resultDialogRef} onClose={() => setConfirmedBooking(null)}>
-            {confirmedBooking && (
-              <>
-                <span slot="headline">Booking confirmed successfully.</span>
-                <div slot="content" className="form-grid">
-                  <p><strong>{bookingDisplayName(confirmedBooking)}</strong></p>
-                  {confirmedBooking.vendor.businessName && <p>{confirmedBooking.vendor.businessName}</p>}
-                  <p>{confirmedBooking.branch.name}</p>
-                  <p>{formatBookingSchedule(confirmedBooking.bookingDate, confirmedBooking.timeSlot)}</p>
-                  <p className="field-hint">Booking ID: {confirmedBooking.id}</p>
-                </div>
-                <div slot="actions">
-                  <FilledButton onClick={() => resultDialogRef.current?.close()}>Done</FilledButton>
-                </div>
-              </>
-            )}
-          </Dialog>
         </div>
       </div>
     </div>

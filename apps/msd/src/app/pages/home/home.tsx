@@ -16,65 +16,20 @@ import Map from "../../components/map/map";
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 const { home } = content;
 const premiumHero = home.premiumHero;
-const hotTabs = home.sections.hotRightNow.tabs;
 const heroImages = home.heroImages as string[];
-
-/**
- * Real `Category` rows are admin-editable at runtime (`masters.categories`/`masters.sub-categories`
- * CRUD — see CLAUDE.md's RBAC section), so a fixed slug lookup would be brittle: this workspace's
- * own dev database currently has a top-level category literally renamed to "Massage" that
- * actually contains Skin Care/Hair sub-categories (from prior admin-CRUD testing), while the
- * *real* massage sub-category now lives under a "Health & Wellness" top-level category. Matching
- * by keyword against the deal's own category/subcategory **name** (case-insensitive substring)
- * is resilient to that kind of rename/drift, and checking sub-category name first (falling back
- * to the top-level category name only for the deliberately-broad 'health-wellness'/'spas-retreats'
- * buckets) avoids exactly the false-positive above — a facial deal filed under the mislabeled
- * "Massage" top-level category is still correctly bucketed as skin/beauty, not massage, because
- * its *sub*-category ("Skin Care") is what gets checked for the 'massage' bucket, and it doesn't
- * contain "massage".
- *
- *  - 'massage'         -> sub-category name/slug containing "massage" — e.g. real "Massage".
- *  - 'skin-beauty'      -> sub-category name/slug containing "skin"/"facial"/"beauty".
- *  - 'hair-nails'       -> sub-category name/slug containing "hair"/"nail".
- *  - 'spas-retreats'    -> top-level category name/slug containing "spa"/"retreat" — nothing
- *                          seeded currently satisfies this (the real 'spa-wellness'/'salon-
- *                          grooming' categories exist but no Deal is filed under them), so the
- *                          section/tab naturally disappears via the existing `.length > 0` check.
- *  - 'health-wellness'  -> top-level category name/slug containing "wellness"/"health" — broader
- *                          than the 'massage' bucket on purpose (also catches Body Care/Therapy
- *                          deals with no massage-specific sub-category), so some overlap with the
- *                          'massage' carousel is expected, not a bug.
- */
-const MOCK_CATEGORY_MATCH: Record<string, { field: 'subcategory' | 'category'; keywords: string[] }> = {
-  massage: { field: 'subcategory', keywords: ['massage'] },
-  'skin-beauty': { field: 'subcategory', keywords: ['skin', 'facial', 'beauty'] },
-  'hair-nails': { field: 'subcategory', keywords: ['hair', 'nail'] },
-  'spas-retreats': { field: 'category', keywords: ['spa', 'retreat'] },
-  'health-wellness': { field: 'category', keywords: ['wellness', 'health'] },
-};
-
-function includesKeyword(text: string | null | undefined, keywords: string[]): boolean {
-  if (!text) return false;
-  const lower = text.toLowerCase();
-  return keywords.some((kw) => lower.includes(kw));
-}
-
-function dealMatchesMockSlug(deal: CatalogDeal, mockSlug: string): boolean {
-  const rule = MOCK_CATEGORY_MATCH[mockSlug];
-  if (!rule) return false;
-  const node = rule.field === 'subcategory' ? deal.subcategory : deal.category;
-  return includesKeyword(node?.name, rule.keywords) || includesKeyword(node?.slug, rule.keywords);
-}
 
 /**
  * Adapts a real `CatalogDeal` into the shape `DealCard` renders. Real deals carry no
  * rating/reviews/distance/location/badge (no such fields exist on the real `Deal` model) — those
  * are simply left `undefined` here rather than fabricated; `SkyProductCardWC` already renders
  * nothing for an absent optional prop.
+ *
+ * A Deal is a **product** deal iff it has a linked `product` — the old `Service` master row (and
+ * `Deal.service`) no longer exists (see the direct-category-access migration), a **service** deal
+ * now carries its own title/description directly on `Deal` with no separate catalog item to join.
  */
 function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
-  const item = deal.service ?? deal.product ?? undefined;
-  const title = item?.name ?? deal.title;
+  const title = deal.product?.name ?? deal.title;
   const salePrice = Number(deal.salePrice);
   const originalPrice = deal.originalPrice ? Number(deal.originalPrice) : undefined;
   const media = resolveDealMedia(deal);
@@ -82,7 +37,7 @@ function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
     id: deal.id,
     title,
     image: media.images[0] ?? '',
-    imageAlt: item?.imageAlt ?? title,
+    imageAlt: deal.product?.imageAlt ?? title,
     gallery: media.images.length > 0 ? media.images : undefined,
     video: media.video,
     providerName: deal.vendor?.businessName ?? undefined,
@@ -90,7 +45,8 @@ function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
     originalPrice: originalPrice && originalPrice !== salePrice ? originalPrice : undefined,
     discount: deal.discountPercent ?? undefined,
     priceNote: deal.durationMinutes ? `${deal.durationMinutes} min` : undefined,
-    isProduct: !deal.service,
+    isProduct: !!deal.product,
+    tag: deal.popularTags?.[0]?.name ?? deal.product?.popularTags?.[0]?.name,
   };
 }
 
@@ -130,12 +86,12 @@ export function Home() {
   const { location } = useCurrentLocation();
   const shortLocation = location?.split(",")[2]?.trim() ?? location;
 
-  // Single batched fetch on mount — every section below (category grid, featured, hot, the 5
-  // per-category carousels, and each category card's service count) derives from these two
+  // Single batched fetch on mount — every section below (category grid, featured, hot, the
+  // per-popular-category carousels, and each category card's deal count) derives from these two
   // already-fetched arrays via client-side grouping/filtering, never a per-section API call.
   // Includes both services and products (real Cart Add-to-Cart action needs real product deals
   // to attach to) — `DealCard`'s `href`/`isProduct` correctly routes each to `/deal/:id` or
-  // `/products/:id`; `categoryDealCount` below stays service-scoped so "N Services" is unchanged.
+  // `/products/:id`.
   useEffect(() => {
     let cancelled = false;
     setCatalogLoading(true);
@@ -177,46 +133,39 @@ export function Home() {
     [safeDealsData],
   );
 
-  const massageDeals = useMemo(
+  // Real `Category.isPopular` rows (admin-toggled — see `masters/categories.tsx`'s Popular
+  // switch), sorted by the same `sortOrder` the admin screen exposes. Replaces the old
+  // `MOCK_CATEGORY_MATCH` keyword-guessing table entirely — no more brittle name/slug matching.
+  const popularCategories = useMemo(
     () =>
-      safeDealsData
-        .filter((d) => dealMatchesMockSlug(d, 'massage'))
-        .slice(0, spaFinder.limits.massage),
-    [safeDealsData, spaFinder.limits.massage],
+      [...categories]
+        .filter((c) => c.isPopular)
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+    [categories],
   );
 
-  const skinDeals = useMemo(
+  // One horizontal carousel per popular category — client-side filtered from the already-
+  // batched `dealsData` fetch (a Deal's own `categoryId` is always the top-level category, same
+  // filter a server-side `listCatalogDeals({ categoryId })` call would apply).
+  const popularCategoryDeals = useMemo(
     () =>
-      safeDealsData
-        .filter((d) => dealMatchesMockSlug(d, 'skin-beauty'))
-        .slice(0, 6),
-    [safeDealsData],
+      popularCategories.map((cat) => ({
+        category: cat,
+        deals: safeDealsData.filter((d) => d.category?.id === cat.id).slice(0, 6),
+      })),
+    [popularCategories, safeDealsData],
   );
 
-  const nailDeals = useMemo(
-    () =>
-      safeDealsData
-        .filter((d) => dealMatchesMockSlug(d, 'hair-nails'))
-        .slice(0, 6),
-    [safeDealsData],
+  // "Hot Right Now" tabs are now the popular categories themselves (plus "All Deals") instead of
+  // the old fixed keyword-bucket list — a service/product deal is filtered by its real
+  // `category.id`, never a name/slug guess.
+  const hotTabs = useMemo(
+    () => [
+      { label: home.sections.hotRightNow.tabs[0]?.label ?? 'All Deals', value: 'all' },
+      ...popularCategories.map((cat) => ({ label: cat.name, value: cat.id })),
+    ],
+    [popularCategories],
   );
-
-  const spaDeals = useMemo(
-    () =>
-      safeDealsData
-        .filter((d) => dealMatchesMockSlug(d, 'spas-retreats'))
-        .slice(0, 6),
-    [safeDealsData],
-  );
-
-  const wellnessDeals = useMemo(
-    () =>
-      safeDealsData
-        .filter((d) => dealMatchesMockSlug(d, 'health-wellness'))
-        .slice(0, 6),
-    [safeDealsData],
-  );// client-side substring match over mock `DEALS`. One request per keystroke-debounce (not per
-  // item), so this is not an N+1 concern.
   useEffect(() => {
     const query = searchQuery.trim();
     if (!query) {
@@ -248,11 +197,13 @@ export function Home() {
     if (selectedTab === 'all') {
       return hotDeals;
     }
-    return hotDeals.filter((deal) => dealMatchesMockSlug(deal, selectedTab));
+    return hotDeals.filter((deal) => deal.category?.id === selectedTab);
   }, [selectedTab, hotDeals]);
 
+  // "Services" count for the category grid — a service deal is any Deal with no linked Product
+  // (the old `Service` master row is gone; see `toDealCardDeal`'s doc comment).
   function categoryDealCount(categoryId: string) {
-    return dealsData.filter((d) => d.category?.id === categoryId && d.service).length;
+    return dealsData.filter((d) => d.category?.id === categoryId && !d.product).length;
   }
 
   function requireAuthOrRedirect() {
@@ -266,7 +217,7 @@ export function Home() {
     setActionError('');
     setActionMessage('');
     try {
-      await addCartItem(token, deal.id, 1);
+      await addCartItem(token, { dealId: deal.id, quantity: 1 });
       setActionMessage(home.ui.messages.addToCartSuccess.replace('{item}', deal.product?.name ?? deal.title,));
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : home.ui.messages.addToCartError);
@@ -305,7 +256,7 @@ export function Home() {
                         </Icon>
                         Add to Cart
                       </FilledButton>
-                    ) : deal.service ? (
+                    ) : (
                       <FilledButton
                         onClick={() => navigate(`/deal/${deal.id}`)}
                       >
@@ -314,7 +265,7 @@ export function Home() {
                         </Icon>
                         Book
                       </FilledButton>
-                    ) : undefined
+                    )
                   }
                 />
               </swiper-slide>
@@ -408,14 +359,14 @@ export function Home() {
                             key={deal.id}
                             type="button"
                             onClick={() => {
-                              navigate(deal.service ? `/deal/${deal.id}` : `/products/${deal.id}`);
+                              navigate(deal.product ? `/products/${deal.id}` : `/deal/${deal.id}`);
                               setSearchQuery("");
                               setShowSuggestions(false);
                             }}
                           >
                             <Icon slot="start">  search </Icon>
                             <div>
-                              <strong>{deal.service?.name ?? deal.product?.name ?? deal.title}</strong>
+                              <strong>{deal.product?.name ?? deal.title}</strong>
                               <small> {deal.vendor?.businessName} • {deal.branch?.city} </small>
                             </div>
                           </ListItem>
@@ -525,14 +476,14 @@ export function Home() {
                         type="button"
                         className="search-suggestion"
                         onClick={() => {
-                          navigate(deal.service ? `/deal/${deal.id}` : `/products/${deal.id}`);
+                          navigate(deal.product ? `/products/${deal.id}` : `/deal/${deal.id}`);
                           setSearchQuery("");
                           setShowSuggestions(false);
                         }}
                       >
                         <Icon slot="start">  search </Icon>
                         <div>
-                          <strong>{deal.service?.name ?? deal.product?.name ?? deal.title}</strong>
+                          <strong>{deal.product?.name ?? deal.title}</strong>
                           <small>{deal.vendor?.businessName} • {deal.branch?.city} </small>
                         </div>
                       </ListItem>
@@ -544,7 +495,8 @@ export function Home() {
               )}
             </sky-card>
             <div className="home__premium-popular">
-              <span className="popular-label"> {home.ui.labels.popular}</span>
+              {/* <span className="popular-label"> {home.ui.labels.popular}</span> */}
+
               {premiumHero.popular.map((item) => (
                 <AssistChip
                   key={item}
@@ -766,22 +718,20 @@ export function Home() {
         </div>
       </section>
 
-      {/* ── Per-category horizontal sections ──────────────────────────── */}
-      {
-        massageDeals.length > 0 && (
-          <section className="home-section" aria-labelledby="massage-heading">
-            <div className="home-section__container">
-              <SectionHeader
-                id="massage-heading"
-                heading={home.sections.massageTherapy.heading}
-                seeAll={home.sections.massageTherapy.seeAll}
-                seeAllTo={home.sections.massageTherapy.seeAllTo}
-              />
-              {renderDealCarousel(massageDeals)}
-            </div>
-          </section>
-        )
-      }
+      {/* ── Per-popular-category horizontal sections ──────────────────── */}
+      {popularCategoryDeals[0] && popularCategoryDeals[0].deals.length > 0 && (
+        <section className="home-section" aria-labelledby={`popular-category-${popularCategoryDeals[0].category.id}-heading`}>
+          <div className="home-section__container">
+            <SectionHeader
+              id={`popular-category-${popularCategoryDeals[0].category.id}-heading`}
+              heading={popularCategoryDeals[0].category.name}
+              seeAll="See all"
+              seeAllTo={`/category/${popularCategoryDeals[0].category.slug}`}
+            />
+            {renderDealCarousel(popularCategoryDeals[0].deals)}
+          </div>
+        </section>
+      )}
       <section className="home-section">
         <div className="home-section__container">
 
@@ -820,69 +770,25 @@ export function Home() {
 
         </div>
       </section>
-      {
-        skinDeals.length > 0 && (
-          <section className="home-section home-section--alt" aria-labelledby="facial-heading">
+      {popularCategoryDeals.slice(1).map(({ category, deals }, index) =>
+        deals.length > 0 ? (
+          <section
+            key={category.id}
+            className={index % 2 === 0 ? 'home-section home-section--alt' : 'home-section'}
+            aria-labelledby={`popular-category-${category.id}-heading`}
+          >
             <div className="home-section__container">
               <SectionHeader
-                id="facial-heading"
-                heading={home.sections.facialSkin.heading}
-                seeAll={home.sections.facialSkin.seeAll}
-                seeAllTo={home.sections.facialSkin.seeAllTo}
+                id={`popular-category-${category.id}-heading`}
+                heading={category.name}
+                seeAll="See all"
+                seeAllTo={`/category/${category.slug}`}
               />
-              {renderDealCarousel(skinDeals)}
+              {renderDealCarousel(deals)}
             </div>
           </section>
-        )
-      }
-
-      {
-        nailDeals.length > 0 && (
-          <section className="home-section" aria-labelledby="nail-heading">
-            <div className="home-section__container">
-              <SectionHeader
-                id="nail-heading"
-                heading={home.sections.nailCare.heading}
-                seeAll={home.sections.nailCare.seeAll}
-                seeAllTo={home.sections.nailCare.seeAllTo}
-              />
-              {renderDealCarousel(nailDeals)}
-            </div>
-          </section>
-        )
-      }
-
-      {
-        spaDeals.length > 0 && (
-          <section className="home-section home-section--alt" aria-labelledby="spa-heading">
-            <div className="home-section__container">
-              <SectionHeader
-                id="spa-heading"
-                heading={home.sections.spasRetreats.heading}
-                seeAll={home.sections.spasRetreats.seeAll}
-                seeAllTo={home.sections.spasRetreats.seeAllTo}
-              />
-              {renderDealCarousel(spaDeals)}
-            </div>
-          </section>
-        )
-      }
-
-      {
-        wellnessDeals.length > 0 && (
-          <section className="home-section" aria-labelledby="wellness-heading">
-            <div className="home-section__container">
-              <SectionHeader
-                id="wellness-heading"
-                heading={home.sections.healthWellness.heading}
-                seeAll={home.sections.healthWellness.seeAll}
-                seeAllTo={home.sections.healthWellness.seeAllTo}
-              />
-              {renderDealCarousel(wellnessDeals)}
-            </div>
-          </section>
-        )
-      }
+        ) : null,
+      )}
 
       {/* ── Welcome Offer CTA ──────────────────────────────────────────── */}
       <section

@@ -165,8 +165,7 @@ export function ProductListing() {
     try {
       await addCartItem(
         token,
-        deal.id,
-        1,
+        { dealId: deal.id, quantity: 1 },
       );
 
       setActionMessage(
@@ -530,6 +529,7 @@ export function ProductListing() {
       ? Number(deal.discountPercent)
       : undefined,
     isProduct: true,
+    tag: deal.popularTags?.[0]?.name ?? deal.product?.popularTags?.[0]?.name,
   }}
   favoriteActive={isWishlisted(deal.id)}
   onFavorite={() => toggleFavorite(deal)}

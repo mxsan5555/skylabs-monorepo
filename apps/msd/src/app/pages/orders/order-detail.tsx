@@ -9,9 +9,9 @@ import content from '../../../content.json';
 import { groupOrderItemsByVendor } from '../../../utils/order-items';
 import '../cart/cart.css';
 
-/** Order confirmation / detail — the landing page after checkout or "confirm booking",
- *  reusing `cart.css`'s summary-card classes for a consistent look. Relocated here from
- *  the old marketplace order-detail route now that the marketplace route namespace is retired.
+/** Order confirmation / detail — the landing page after checkout, reusing `cart.css`'s
+ *  summary-card classes for a consistent look. Relocated here from the old marketplace
+ *  order-detail route now that the marketplace route namespace is retired.
  *  Multi-vendor: items are grouped by their own vendor (see utils/order-items.ts) — for a
  *  single-vendor order (still the common case) this renders exactly one group, unchanged. */
 export function OrderDetail() {
@@ -80,13 +80,6 @@ export function OrderDetail() {
               <span>{orderDetail.labels.branch}</span>
               <span>{order.branchNameSnapshot}</span>
             </div>
-            {order.booking && (
-              <div className="cart-summary__row">
-                {/* <span>{orderDetail.labels.appointment}</span>
-                <span>{new Date(order.booking.bookingDate).toLocaleDateString()}{' '}{orderDetail.labels.timeConnector}{' '}{order.booking.timeSlot}</span>
-                 */}
-                </div>
-            )}
             <Divider />
             {vendorGroups.map((group) => (
               <div key={group.vendorId}>

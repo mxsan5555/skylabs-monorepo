@@ -8,7 +8,6 @@ const CUSTOMER_COLUMNS = JSON.stringify([
   { key: 'Phone', label: 'Phone' },
   { key: 'Email', label: 'Email' },
   { key: 'Orders', label: 'Orders' },
-  { key: 'Bookings', label: 'Bookings' },
   { key: 'Last Activity', label: 'Last Activity' },
 ]);
 
@@ -24,7 +23,6 @@ function toCustomerRow(customer: CustomerRow): Record<string, string | number> {
     Phone: customer.phone || '—',
     Email: customer.email || '—',
     Orders: customer.orderCount,
-    Bookings: customer.bookingCount,
     'Last Activity': new Date(customer.lastActivityAt).toLocaleDateString(),
   };
 }

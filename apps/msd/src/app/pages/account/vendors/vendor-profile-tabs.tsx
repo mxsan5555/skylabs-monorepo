@@ -6,10 +6,13 @@ import { MediaUploader } from '../../../components/media-uploader';
 
 type VendorProfileTab = VendorFormSection | 'media';
 
+// Owner Information and Address are deliberately not tabs here — a self-service vendor no
+// longer edits them from this Vendor Profile UI (Branch already carries its own address; owner
+// info is still collected/reviewed wherever KYC/onboarding actually needs it — the admin
+// onboarding wizard's Step 1, see vendor-pipeline.tsx — never removed from VendorProfileForm
+// itself, only from this tab list).
 const TAB_DEFS: { key: VendorProfileTab; label: string }[] = [
   { key: 'business', label: 'Business Information' },
-  { key: 'owner', label: 'Owner Information' },
-  { key: 'address', label: 'Address' },
   { key: 'kyc', label: 'KYC & Documents' },
   { key: 'bank', label: 'Bank Information' },
   { key: 'media', label: 'Profile Image' },
@@ -17,9 +20,11 @@ const TAB_DEFS: { key: VendorProfileTab; label: string }[] = [
 
 /**
  * The Business/Owner/Address/KYC/Bank/Profile-Image tabbed editor for an *existing* Vendor row
- * — shared by the admin `VendorPipeline` (any vendor, `/vendors/:id/*`) and self-service
- * `VendorBusinessProfile` (the caller's own vendor, `/vendors/me/*`), replacing what used to be
- * two separately-hand-rolled, near-identical locked numbered-step-pill wizards. All tabs are
+ * — now used only by self-service `VendorBusinessProfile` (the caller's own vendor,
+ * `/vendors/me/*`). The admin surface (`VendorPipeline`, `/account/vendors/new` and the Vendor
+ * Management "Overview" tab) moved off this tabbed layout onto a proper 6-step onboarding
+ * wizard (`vendor-pipeline.tsx`) — its Step 1 renders `VendorProfileForm` directly (all
+ * sections at once, no tab bar) instead of reusing this component. All tabs here are still
  * freely switchable — no artificial step-locking — since each tab independently PATCHes just
  * its own section via the existing `VendorProfileForm`; there is no meaningful "must finish tab
  * N before tab N+1" ordering once the vendor row itself exists. The "Profile Image" tab is the
@@ -83,6 +88,8 @@ export function VendorProfileTabs({
           canEdit={canEdit}
           canReviewKyc={activeTab === 'kyc' && Boolean(canReviewKyc)}
           saving={saving}
+          token={token}
+          selfService={selfService}
           sections={[activeTab]}
           saveLabel="Save"
           onSave={onSave}

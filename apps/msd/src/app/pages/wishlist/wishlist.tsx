@@ -40,7 +40,7 @@ export function Wishlist() {
     setCartMessage('');
     setAddingId(deal.id);
     try {
-      await addCartItem(token, deal.id, 1);
+      await addCartItem(token, { dealId: deal.id, quantity: 1 });
       setCartMessage(`Added "${deal.product?.name ?? deal.title}" to your cart.`);
     } catch (err) {
       setCartError(err instanceof ApiRequestError ? err.message : wishlistContent.addToCartError);
@@ -85,12 +85,12 @@ export function Wishlist() {
               <li key={dealId} className="wishlist-grid__item">
                 <SkyProductCardWC
                   variant="outlined"
-                  badge={deal.service ? wishlistContent.serviceLabel : wishlistContent.productLabel}
+                  badge={deal.product ? wishlistContent.productLabel : wishlistContent.serviceLabel}
                   eyebrow={[deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · ') || undefined}
                   eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
-                  heading={deal.service?.name ?? deal.product?.name ?? deal.title}
+                  heading={deal.product?.name ?? deal.title}
                   image={primaryImage(resolveDealMedia(deal))}
-                  imageAlt={deal.service?.imageAlt ?? deal.product?.imageAlt ?? undefined}
+                  imageAlt={deal.product?.imageAlt ?? undefined}
                   price={formatINR(Number(deal.salePrice))}
                   originalPrice={
                     deal.originalPrice && Number(deal.originalPrice) !== Number(deal.salePrice)
@@ -99,12 +99,12 @@ export function Wishlist() {
                   }
                   discount={deal.discountPercent ? `-${deal.discountPercent}%` : undefined}
                   priceNote={deal.durationMinutes ? `${deal.durationMinutes} min` : undefined}
-                  href={deal.service ? `/deal/${deal.id}` : `/products/${deal.id}`}
+                  href={deal.product ? `/products/${deal.id}` : `/deal/${deal.id}`}
                   favorite
                   favoriteActive={true}
                   onFavorite={() => remove(dealId)}
                 />
-                {deal.service ? (
+                {!deal.product ? (
                   <OutlinedButton
                     className="wishlist-grid__add-btn"
                     onClick={() => navigate(`/deal/${deal.id}`)}

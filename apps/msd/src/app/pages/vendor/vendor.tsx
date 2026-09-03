@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FilledButton,OutlinedButton, OutlinedIconButton, Icon, Divider, Radio, ChipSet, FilterChip, SuggestionChip, Tabs, PrimaryTab, OutlinedTextField, } from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedIconButton, Icon, Divider, Radio, ChipSet, FilterChip, SuggestionChip, Tabs, PrimaryTab, OutlinedTextField, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { getCatalogVendor, listCatalogDeals, type CatalogVendorDetail, type CatalogVendorBranch, type CatalogDeal, } from '../../../api/catalog';
+import { getCatalogVendor, listCatalogDeals, type CatalogVendorDetail, type CatalogVendorBranch, type CatalogDeal, type CatalogVendorTherapist, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
-import { createBooking } from '../../../api/bookings';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
@@ -76,14 +75,17 @@ function getOrCreate<K, V>(map: Map<K, V>, key: K, create: () => V): V {
 function groupServiceDeals(deals: CatalogDeal[]): CategoryGroup[] {
   const categories = new Map<string, Map<string, Map<string, ServiceGroup>>>();
   for (const deal of deals) {
-    if (!deal.service) continue;
-    const service = deal.service;
+    // A service deal has no `product` (see Deal's own schema doc comment) — the old Service
+    // master-row model (`deal.service`) is gone entirely, so a service deal is identified purely
+    // by the absence of `product`, never by a truthy `deal.service` (always null now).
+    if (deal.product) continue;
     const categoryName = deal.category?.name ?? 'Other Services';
     const subKey = deal.subcategory?.name ?? '';
     const subMap = getOrCreate(categories, categoryName, () => new Map());
     const serviceMap = getOrCreate(subMap, subKey, () => new Map());
-    // One Deal per Service — if a stray duplicate somehow exists, the first wins.
-    getOrCreate(serviceMap, service.id, () => ({ id: service.id, name: service.name, deal }));
+    // Keyed by the deal's own id — each Deal is its own offering now, no shared Service row to
+    // dedupe against.
+    getOrCreate(serviceMap, deal.id, () => ({ id: deal.id, name: deal.title, deal }));
   }
   return Array.from(categories.entries()).map(([name, subMap]) => ({
     name,
@@ -233,7 +235,7 @@ export function VendorPage() {
     setProductActionError('');
     setProductActionMessage('');
     try {
-      await addCartItem(token, deal.id, 1);
+      await addCartItem(token, { dealId: deal.id, quantity: 1 });
       const name = deal.product?.name ?? deal.title;
       setProductActionMessage(`Added "${name}" to your cart.`);
       showToast(`Added to cart\n${name}`);
@@ -475,7 +477,7 @@ export function VendorPage() {
                                     <img
                                       className="vendor-page__deal-card-img"
                                       src={thumb}
-                                      alt={deal.service?.imageAlt ?? ''}
+                                      alt={deal.title}
                                       loading="lazy"
                                       width={120}
                                       height={80}
@@ -663,13 +665,13 @@ export function VendorPage() {
 }
 
 /**
- * The stateful "package/price → Book Now" panel for one selected Deal — driven entirely by the
- * canonical `useDealPurchaseSelection` hook + `DurationPackageSelector` UI (the same ones every
- * other purchase entry point uses), keyed by `group.id` in the parent so switching services
- * fully resets this panel's local state. Never asks for a date/time — this is a service
- * purchase, not an appointment-scheduling system (see Booking's schema doc comment in msd-api).
- * There is deliberately no in-flow "select a therapist" cross-selection — a Therapist is only
- * ever selected by clicking its own card (see `TherapistSelectionPanel` below).
+ * The stateful "package/price → Add to Cart" panel for one selected Deal — driven entirely by
+ * the canonical `useDealPurchaseSelection` hook + `DurationPackageSelector` UI (the same ones
+ * every other purchase entry point uses), keyed by `group.id` in the parent so switching services
+ * fully resets this panel's local state. A service Deal is a normal purchasable OrderItem exactly
+ * like a Product or Therapist — there is no Book Now path, only Add to Cart. There is deliberately
+ * no in-flow "select a therapist" cross-selection — a Therapist is only ever selected by clicking
+ * its own card (see `TherapistSelectionPanel` below).
  */
 function DealSelectionPanel({
   group,
@@ -684,13 +686,13 @@ function DealSelectionPanel({
   const { activePackage, unitPrice, missingSelection } = selection;
 
   const [qty, setQty] = useState(1);
-  const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
 
   const total = activePackage ? unitPrice * qty : 0;
 
-  const submitBooking = async (intent: 'book' | 'cart') => {
+  const addToCart = async () => {
     if (!requireAuthOrRedirect()) return;
     if (missingSelection) {
       setActionError(missingSelection);
@@ -699,27 +701,23 @@ function DealSelectionPanel({
     }
     setActionError('');
     setActionMessage('');
-    setBookingSubmitting(true);
+    setSubmitting(true);
     try {
-      await createBooking(token, {
+      await addCartItem(token, {
         dealId: group.deal.id,
         quantity: qty,
         ...(activePackage ? { dealPackageId: activePackage.id } : {}),
       });
       const durationLabel = activePackage ? ` — ${activePackage.durationMinutes} Minutes` : '';
-      setActionMessage(
-        intent === 'cart'
-          ? `Added "${group.name}" to your cart.`
-          : `Booked "${group.name}"${activePackage ? ` — ${activePackage.durationMinutes} min` : ''}.`,
-      );
+      setActionMessage(`Added "${group.name}" to your cart.`);
       // Only fires after the API call above has actually resolved — never claims success early.
-      showToast(intent === 'cart' ? `Added to cart\n${group.name}${durationLabel}` : `Booked\n${group.name}${durationLabel}`);
+      showToast(`Added to cart\n${group.name}${durationLabel}`);
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setActionError(message);
       showToast(message, 'error');
     } finally {
-      setBookingSubmitting(false);
+      setSubmitting(false);
     }
   };
 
@@ -783,22 +781,13 @@ function DealSelectionPanel({
 
       {/* CTA */}
       <div className="vendor-page__cta-row">
-        <OutlinedButton
-          onClick={() => submitBooking('cart')}
-          disabled={bookingSubmitting || !!missingSelection}
+        <FilledButton
+          onClick={addToCart}
+          disabled={submitting || !!missingSelection}
           aria-label={`Add ${group.name} to cart — ${formatINR(total)}`}
         >
           <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-          {bookingSubmitting ? 'Adding…' : 'Add to Cart'}
-        </OutlinedButton>
-        <FilledButton
-          className="vendor-page__book-btn"
-          onClick={() => submitBooking('book')}
-          disabled={bookingSubmitting || !!missingSelection}
-          aria-label={`Book ${group.name} — ${formatINR(total)}`}
-        >
-          <Icon slot="icon" aria-hidden="true">calendar_month</Icon>
-          {bookingSubmitting ? 'Booking…' : 'Book Now'}
+          {submitting ? 'Adding…' : 'Add to Cart'}
         </FilledButton>
       </div>
 
@@ -823,12 +812,12 @@ function DealSelectionPanel({
 }
 
 /**
- * The stateful "package/price → Book Now" panel for one selected Therapist, booked directly —
- * no Deal involved at all (see msd-api's Booking "exactly one of dealId/therapistId" doc
- * comment). Mirrors `DealSelectionPanel` exactly (same layout, same CTA row, same "never asks
- * for a date/time") but sources its packages from the Therapist's own `packages`, via the same
- * `useTherapistPurchaseSelection`/`TherapistPackageSelector` pair every other Therapist purchase
- * entry point uses.
+ * The stateful "package/price → Add to Cart" panel for one selected Therapist, added directly —
+ * no Deal involved at all (see msd-api's CartItem "exactly one of three shapes" doc comment).
+ * Mirrors `DealSelectionPanel` exactly (same layout, same CTA row) but sources its packages from
+ * the Therapist's own `packages`, via the same `useTherapistPurchaseSelection`/
+ * `TherapistPackageSelector` pair every other Therapist purchase entry point uses. A Therapist is
+ * a normal purchasable OrderItem exactly like a Deal or Product — there is no Book Now path.
  */
 function TherapistSelectionPanel({
   therapist,
@@ -843,14 +832,14 @@ function TherapistSelectionPanel({
   const { activePackage, unitPrice, missingSelection } = selection;
 
   const [qty, setQty] = useState(1);
-  const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
 
   const displayName = `${therapist.therapistType} — ${therapist.personName}`;
   const total = activePackage ? unitPrice * qty : 0;
 
-  const submitBooking = async (intent: 'book' | 'cart') => {
+  const addToCart = async () => {
     if (!requireAuthOrRedirect()) return;
     if (missingSelection || !activePackage) {
       setActionError(missingSelection ?? 'Select a package.');
@@ -859,27 +848,23 @@ function TherapistSelectionPanel({
     }
     setActionError('');
     setActionMessage('');
-    setBookingSubmitting(true);
+    setSubmitting(true);
     try {
-      await createBooking(token, {
+      await addCartItem(token, {
         therapistId: therapist.id,
-        durationMinutes: activePackage.durationMinutes,
+        therapistPackageId: activePackage.id,
         quantity: qty,
       });
-      setActionMessage(
-        intent === 'cart'
-          ? `Added "${displayName}" to your cart.`
-          : `Booked "${displayName}" — ${activePackage.durationMinutes} min.`,
-      );
+      setActionMessage(`Added "${displayName}" to your cart.`);
       // Only fires after the API call above has actually resolved — never claims success early.
       const label = `${therapist.personName} — ${activePackage.durationMinutes} Minutes`;
-      showToast(intent === 'cart' ? `Added to cart\n${label}` : `Booked\n${label}`);
+      showToast(`Added to cart\n${label}`);
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setActionError(message);
       showToast(message, 'error');
     } finally {
-      setBookingSubmitting(false);
+      setSubmitting(false);
     }
   };
 
@@ -943,22 +928,13 @@ function TherapistSelectionPanel({
 
       {/* CTA */}
       <div className="vendor-page__cta-row">
-        <OutlinedButton
-          onClick={() => submitBooking('cart')}
-          disabled={bookingSubmitting || !!missingSelection}
+        <FilledButton
+          onClick={addToCart}
+          disabled={submitting || !!missingSelection}
           aria-label={`Add ${displayName} to cart — ${formatINR(total)}`}
         >
           <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-          {bookingSubmitting ? 'Adding…' : 'Add to Cart'}
-        </OutlinedButton>
-        <FilledButton
-          className="vendor-page__book-btn"
-          onClick={() => submitBooking('book')}
-          disabled={bookingSubmitting || !!missingSelection}
-          aria-label={`Book ${displayName} — ${formatINR(total)}`}
-        >
-          <Icon slot="icon" aria-hidden="true">calendar_month</Icon>
-          {bookingSubmitting ? 'Booking…' : 'Book Now'}
+          {submitting ? 'Adding…' : 'Add to Cart'}
         </FilledButton>
       </div>
 

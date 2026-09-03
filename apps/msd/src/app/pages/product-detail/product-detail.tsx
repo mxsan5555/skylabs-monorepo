@@ -108,7 +108,7 @@ export function ProductDetail() {
     );
   }
 
-  if (error || !deal) {
+  if (error || !deal || !deal.product) {
     return (
       <div className="product-detail product-detail--empty">
         <title>{products.detail.notFound.metaTitle}</title>
@@ -167,7 +167,7 @@ export function ProductDetail() {
     setAddError('');
 
     try {
-      await addCartItem(token, dealId, qty);
+      await addCartItem(token, { dealId, quantity: qty });
 
       setAddedToCart(true);
 

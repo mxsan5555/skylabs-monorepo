@@ -6,10 +6,10 @@ import { listMyOrders, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
 import '../category/category.css';
 import content from '../../../content.json';
-/** Customer's own orders — the Cart/Booking convergence point. Reuses `entity-list`/
- *  `status-pill` exactly like `bookings.tsx`. Relocated here from the old marketplace orders
- *  route now that the marketplace route namespace is retired — this page never had a
- *  mock/static equivalent, so it moved rather than merged. */
+/** Customer's own orders — the Cart convergence point (every purchase kind, Deal/Product/
+ *  Therapist alike, becomes an Order here). Reuses `entity-list`/`status-pill`. Relocated here
+ *  from the old marketplace orders route now that the marketplace route namespace is retired —
+ *  this page never had a mock/static equivalent, so it moved rather than merged. */
  
 export function Orders() {
   const { token } = useAuth();
