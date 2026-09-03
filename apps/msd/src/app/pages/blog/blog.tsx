@@ -63,17 +63,14 @@ export function Blog() {
   const [filters, setFilters] = useState<Filters>(EMPTY);
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [params, setParams] = useSearchParams();
-
   const categories = categoryList();
   const authors = authorList();
   const tags = tagList();
-
   const total = queryPosts({ ...filters }).total;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(Math.max(1, Number(params.get('page')) || 1), totalPages);
   const { items } = queryPosts({ ...filters, page });
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
-
   const activeCount =
     (filters.search ? 1 : 0) +
     (filters.sort !== 'newest' ? 1 : 0) +
@@ -81,7 +78,6 @@ export function Blog() {
     filters.categories.length +
     filters.authors.length +
     filters.tags.length;
-
   const resetPage = () => {
     if (params.get('page')) setParams({}, { replace: true });
   };
@@ -94,7 +90,6 @@ export function Blog() {
     resetPage();
   };
   const goTo = (n: number) => setParams(n > 1 ? { page: String(n) } : {});
-
   function viewButton(mode: 'grid' | 'list', icon: string, label: string) {
     const active = view === mode;
     const Btn = active ? FilledTonalButton : OutlinedButton;
@@ -113,9 +108,7 @@ export function Blog() {
         name="description"
         content="Wellness tips, massage guides, and ways to get more from every session."
       />
-
       <h1 className="blog__h1">From the blog</h1>
-
       <div className="blog__layout">
         <aside className="blog__filters" aria-label="Filter and sort">
           <div className="blog__filters-head">
@@ -124,7 +117,6 @@ export function Blog() {
               <TextButton onClick={clearAll}>Clear ({activeCount})</TextButton>
             )}
           </div>
-
           <sky-accordion>
             <sky-accordion-item header="Sort by" open>
               <div className="facet" role="radiogroup" aria-label="Sort by">
@@ -141,7 +133,6 @@ export function Blog() {
                 ))}
               </div>
             </sky-accordion-item>
-
             <sky-accordion-item header="Category" open>
               <div className="facet" role="group" aria-label="Category">
                 {categories.map((c) => (
@@ -157,7 +148,6 @@ export function Blog() {
                 ))}
               </div>
             </sky-accordion-item>
-
             <sky-accordion-item header="Reading time">
               <div className="facet" role="radiogroup" aria-label="Reading time">
                 {READING_OPTIONS.map((o) => (
@@ -173,7 +163,6 @@ export function Blog() {
                 ))}
               </div>
             </sky-accordion-item>
-
             <sky-accordion-item header="Author">
               <div className="facet" role="group" aria-label="Author">
                 {authors.map((a) => (
@@ -189,7 +178,6 @@ export function Blog() {
                 ))}
               </div>
             </sky-accordion-item>
-
             <sky-accordion-item header="Tag">
               <div className="facet" role="group" aria-label="Tag">
                 {tags.map((t) => (
@@ -205,7 +193,6 @@ export function Blog() {
             </sky-accordion-item>
           </sky-accordion>
         </aside>
-
         <div className="blog__main">
           <div className="blog__toolbar">
             <form
@@ -230,11 +217,9 @@ export function Blog() {
               {viewButton('list', 'view_list', 'List')}
             </div>
           </div>
-
           <p className="results__count" role="status" aria-live="polite">
             {total} {total === 1 ? 'article' : 'articles'}
           </p>
-
           {items.length === 0 ? (
             <p className="results__empty">
               No articles match your filters. Try clearing some.
@@ -278,7 +263,6 @@ export function Blog() {
               </ul>
             </section>
           )}
-
           {totalPages > 1 && (
             <nav className="pagination" aria-label="Blog pages">
               <OutlinedButton disabled={page <= 1} onClick={() => goTo(page - 1)}>
@@ -314,5 +298,4 @@ export function Blog() {
     </main>
   );
 }
-
 export default Blog;

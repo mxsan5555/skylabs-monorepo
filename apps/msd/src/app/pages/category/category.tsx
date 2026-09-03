@@ -1,30 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Icon,
-  Tabs,
-  PrimaryTab,
-  ChipSet,
-  FilterChip,
-  OutlinedTextField,
-  FilledButton,
-  OutlinedButton,
-} from '@skylabs-monorepo/shared-ui/react';
+import { Icon, Tabs, PrimaryTab, ChipSet, FilterChip, OutlinedTextField, FilledButton, OutlinedButton, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCatalogCategory, listCatalogDeals, type CatalogCategoryWithChildren, type CatalogDeal } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { DealCard, type DealCardDeal } from '../../components/deal-card';
+import { DealCard } from '../../components/deal-card';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { DealBookingDialog } from '../../components/deal-booking-dialog';
-import { formatINR, formatBookingSchedule } from '../../../utils/format';
+import { formatBookingSchedule } from '../../../utils/format';
 import { resolveDealMedia, primaryImage } from '../../../utils/media';
 import './category.css';
 import content from '../../../content.json';
 type OfferingFilter = 'all' | 'service' | 'product';
-
 /**
  * Category → Sub Category → Service/Product → Deal discovery page — the customer catalogue's
  * single canonical entry point (formerly split between this static-data page and the
@@ -54,7 +43,6 @@ export function Category() {
   const [deals, setDeals] = useState<CatalogDeal[]>([]);
   const [dealsLoading, setDealsLoading] = useState(true);
   const [dealsError, setDealsError] = useState('');
-
   useEffect(() => {
     setCategoryLoading(true);
     setCategoryError('');
@@ -71,15 +59,12 @@ export function Category() {
       })
       .finally(() => setCategoryLoading(false));
   }, [slug]);
-
   const activeSubcategory = subcategoryIdx === 0 ? undefined : category?.children[subcategoryIdx - 1];
-
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
     navigate(`/sign-in?next=${encodeURIComponent(`/category/${slug}`)}`);
     return false;
   };
-
   const addToCart = async (deal: CatalogDeal) => {
     if (!requireAuthOrRedirect()) return;
     setActionError('');
@@ -91,12 +76,10 @@ export function Category() {
       setActionError(err instanceof ApiRequestError ? err.message : content.category.errors.addToCart);
     }
   };
-
   const toggleFavorite = (deal: CatalogDeal) => {
     if (!requireAuthOrRedirect()) return;
     void toggleWishlist(deal.id);
   };
-
   useEffect(() => {
     if (!category) return;
     setDealsLoading(true);
@@ -113,11 +96,9 @@ export function Category() {
       .finally(() => setDealsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category, activeSubcategory?.id, offeringFilter, search]);
-
   if (categoryLoading) {
     return <p className="loading-state"> {content.category.loading}</p>;
   }
-
   if (categoryError || !category) {
     return (
       <div className="category-page category-page--empty">
@@ -127,12 +108,10 @@ export function Category() {
       </div>
     );
   }
-
   return (
     <div className="category-page">
       <title>{`${category.name}${content.category.metaTitleSuffix}`}</title>
       <meta name="description" content={category.description ?? content.category.metaDescriptionTemplate.replace('{category}', category.name)} />
-
       <Breadcrumb
         className="category-page__breadcrumb"
         items={[
@@ -140,7 +119,6 @@ export function Category() {
           { label: content.category.breadcrumb.categories, to: '/categories' },
           { label: category.name }
         ]} />
-
       <header className="category-page__hero">
         <div className="category-page__hero-inner">
           <div className="category-page__hero-icon" aria-hidden="true">
@@ -152,7 +130,6 @@ export function Category() {
           </div>
         </div>
       </header>
-
       {category.children.length > 0 && (
         <div className="category-page__tabs-wrap">
           <Tabs
@@ -168,7 +145,6 @@ export function Category() {
           </Tabs>
         </div>
       )}
-
       <div className="category-page__sort">
         <div className="category-page__sort-inner">
           <ChipSet aria-label={content.category.filter.ariaLabel}>
@@ -186,10 +162,8 @@ export function Category() {
           </p>
         </div>
       </div>
-
       {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
       {actionError && <p className="error-state" role="alert">{actionError}</p>}
-
       <section className="category-page__grid-wrap" aria-label={`${category.name} ${content.category.dealsAriaLabelSuffix}`}>
         <div className="category-page__grid-inner">
           {dealsLoading ? (
@@ -278,7 +252,6 @@ export function Category() {
                       )
                     }
                   />
-
                 </li>
               ))}
             </ul>
@@ -288,5 +261,4 @@ export function Category() {
     </div>
   );
 }
-
 export default Category;

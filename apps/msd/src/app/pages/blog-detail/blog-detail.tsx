@@ -4,7 +4,6 @@ import type { BlogBlock } from '../../../types';
 import { getPost, categoryName, formatDate } from '../../../blog/blog';
 import './blog-detail.css';
 import content from '../../../content.json';
-
 /** Render one article body block with the right semantic element. */
 function renderBlock(block: BlogBlock, i: number) {
   switch (block.type) {
@@ -24,12 +23,10 @@ function renderBlock(block: BlogBlock, i: number) {
       return <p key={i}>{block.text}</p>;
   }
 }
-
 /** Blog detail: a single article, looked up by `:slug`. */
 export function BlogDetail() {
   const { slug } = useParams();
   const post = slug ? getPost(slug) : undefined;
-
   if (!post) {
     return (
       <main className="post post--missing">
@@ -41,12 +38,10 @@ export function BlogDetail() {
       </main>
     );
   }
-
   return (
     <main className="post">
       <title> {`${post.title}${content.blog.detail.metaTitleSuffix}`}</title>
       <meta name="description" content={post.excerpt} />
-
       <article>
         <nav
           className="post__crumb"
@@ -57,11 +52,8 @@ export function BlogDetail() {
             {content.blog.detail.blogLabel}
           </Link>
         </nav>
-
         <header className="post__header">
-          <sky-badge variant="secondary">
-            {categoryName(post.categorySlug)}
-          </sky-badge>
+          <sky-badge variant="secondary"> {categoryName(post.categorySlug)}</sky-badge>
           <h1>{post.title}</h1>
           <p className="post__meta">
             <span>By {post.author}</span>
@@ -74,7 +66,6 @@ export function BlogDetail() {
             </span>
           </p>
         </header>
-
         <img
           className="post__cover"
           src={post.coverImage}
@@ -82,9 +73,7 @@ export function BlogDetail() {
           width={800}
           height={480}
         />
-
         <div className="post__body">{post.body.map(renderBlock)}</div>
-
         <footer className="post__footer">
           {post.tags.length > 0 && (
             <ul className="post__tags" aria-label={content.blog.detail.tagsLabel}>
@@ -106,5 +95,4 @@ export function BlogDetail() {
     </main>
   );
 }
-
 export default BlogDetail;

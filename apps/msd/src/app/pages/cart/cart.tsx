@@ -28,7 +28,6 @@ export function Cart() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   const load = useCallback(() => {
     setLoading(true);
     setError('');
@@ -40,17 +39,14 @@ export function Cart() {
       .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not load your cart.'))
       .finally(() => setLoading(false));
   }, [token]);
-
   useEffect(() => {
     load();
   }, [load]);
-
   const items = cart?.items ?? [];
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0) + bookings.length;
   const productSubtotal = items.reduce((sum, i) => sum + Number(i.deal.salePrice) * i.quantity, 0);
   const bookingSubtotal = bookings.reduce((sum, b) => sum + Number(b.priceSnapshot) * b.quantity, 0);
   const subtotal = productSubtotal + bookingSubtotal;
-
   const removeBooking = async (booking: Booking) => {
     setError('');
     try {
@@ -60,7 +56,6 @@ export function Cart() {
       setError(err instanceof ApiRequestError ? err.message : 'Could not remove this booking.');
     }
   };
-
   // Group by vendor purely for display — checkout still sends/creates one flat order.
   const vendorGroups = items.reduce<{ vendorId: string; vendorName: string; branchName: string | undefined; items: typeof items }[]>(
     (groups, item) => {
@@ -76,10 +71,8 @@ export function Cart() {
         });
       }
       return groups;
-    },
-    [],
+    }, [],
   );
-
   const changeQty = async (itemId: string, quantity: number) => {
     if (quantity < 1) return;
     setError('');
@@ -90,7 +83,6 @@ export function Cart() {
       setError(err instanceof ApiRequestError ? err.message : content.cart.error.updateQuantity);
     }
   };
-
   const remove = async (itemId: string) => {
     setError('');
     try {
@@ -100,28 +92,22 @@ export function Cart() {
       setError(err instanceof ApiRequestError ? err.message : content.cart.error.removeItem);
     }
   };
-
   const doCheckout = () => {
     // The real order-creation call happens on /checkout itself, so a page refresh mid-payment
     // retries against the same Order instead of silently creating another one here.
     navigate('/checkout');
   };
-
   if (loading) return <p className="loading-state"> {content.cart.loading}</p>;
-
   return (
     <div className="cart-page">
       <title>{content.meta.cart.title}</title>
       <meta name="robots" content="noindex" />
-
       <div className="cart-page__inner">
         <h1 className="cart-page__title">
           {content.cart.title}
           {totalItems > 0 && <span className="cart-page__count">({totalItems} {pluralize(totalItems, 'item')})</span>}
         </h1>
-
         {error && <p className="error-state" role="alert">{error}</p>}
-
         {items.length === 0 && bookings.length === 0 ? (
           <div className="cart-page__empty">
             <sky-info-card icon="shopping_bag" heading="Your cart is empty" subheading="Browse categories to add products, deals, or therapists." />
@@ -163,7 +149,6 @@ export function Cart() {
                   </ul>
                 </div>
               )}
-
               {vendorGroups.map((group) => (
                 <div key={group.vendorId} className="cart-vendor-group">
                   <p className="cart-vendor-group__heading">
@@ -219,7 +204,6 @@ export function Cart() {
                 </OutlinedButton>
               )}
             </section>
-
             <aside className="cart-page__summary" aria-label={content.cart.orderSummaryHeading}>
               <sky-card variant="outlined" className="cart-summary-card">
                 <div className="cart-summary">
@@ -235,7 +219,7 @@ export function Cart() {
                   </div>
                   <p className="field-hint"> {content.cart.serverPriceNote}</p>
                   <FilledButton className="cart-summary__checkout-btn" onClick={doCheckout}>
-                   {content.cart.checkoutCta}
+                    {content.cart.checkoutCta}
                     <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
                   </FilledButton>
                   <OutlinedButton className="cart-summary__continue-btn" onClick={() => navigate('/categories')}>
@@ -246,7 +230,6 @@ export function Cart() {
             </aside>
           </div>
         )}
-
         <Link to="/bookings" className="field-hint">{content.cart.links.bookings}</Link>{' '}
         <Link to="/orders" className="field-hint">{content.cart.links.orders}</Link>
       </div>

@@ -7,7 +7,6 @@ import { ApiRequestError } from '../../../api/rbac/client';
 import { formatBookingSchedule, bookingDisplayName } from '../../../utils/format';
 import '../category/category.css';
 import content from '../../../content.json';
-
 /** Customer's own service bookings — reuses the admin-console's `entity-list`/`status-pill`
  *  classes (global, defined once in `styles.css`, not admin-scoped) for a consistent list look
  *  without inventing a new one. Relocated here from the old marketplace bookings route now that
@@ -18,7 +17,6 @@ export function Bookings() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   const load = useCallback(() => {
     setLoading(true);
     setError('');
@@ -27,11 +25,9 @@ export function Bookings() {
       .catch((err) => setError(err instanceof ApiRequestError ? err.message : content.bookings.error.load))
       .finally(() => setLoading(false));
   }, [token]);
-
   useEffect(() => {
     load();
   }, [load]);
-
   const cancel = async (booking: Booking) => {
     if (!window.confirm(`Cancel your booking for "${bookingDisplayName(booking)}"?`)) return;
     setError('');
@@ -42,18 +38,15 @@ export function Bookings() {
       setError(err instanceof ApiRequestError ? err.message : content.bookings.error.cancel);
     }
   };
-
   const orderNow = (booking: Booking) => {
     // The real order-creation call happens on /checkout itself. If this booking already has an
     // order, checkout.tsx's own error handling surfaces that 409 plainly.
     navigate('/checkout', { state: { bookingId: booking.id } });
   };
-
   return (
     <div className="category-page">
       <title>{content.bookings.metaTitle}</title>
       <meta name="robots" content="noindex" />
-
       <header className="category-page__hero">
         <div className="category-page__hero-inner">
           <div>
@@ -62,7 +55,6 @@ export function Bookings() {
           </div>
         </div>
       </header>
-
       <section className="category-page__grid-wrap">
         <div className="category-page__grid-inner">
           {loading ? (
@@ -109,11 +101,9 @@ export function Bookings() {
           )}
         </div>
       </section>
-
       <Link to="/cart" className="field-hint"> {content.bookings.links.cart}</Link>{' '}
       <Link to="/orders" className="field-hint">{content.bookings.links.orders}</Link>
     </div>
   );
 }
-
 export default Bookings;

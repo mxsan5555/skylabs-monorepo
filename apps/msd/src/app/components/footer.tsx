@@ -31,47 +31,30 @@ const SOCIAL_ICONS: Record<string, React.ReactElement> = {
     </svg>
   ),
 };
-
 export function Footer() {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [categories, setCategories] = useState<CatalogCategoryWithChildren[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
-
   useEffect(() => {
     let cancelled = false;
-
     listCatalogCategories()
       .then(({ data }) => {
-        if (!cancelled) {
-          setCategories(data);
-        }
+        if (!cancelled) { setCategories(data); }
       })
       .catch((err) => {
         if (!cancelled) {
-          console.error(
-            err instanceof ApiRequestError
-              ? err.message
-              : 'Failed to load footer categories',
-          );
+          console.error(err instanceof ApiRequestError ? err.message : 'Failed to load footer categories',);
           setCategories([]);
-
         }
       })
       .finally(() => {
-        if (!cancelled) {
-          setCategoriesLoading(false);
-        }
+        if (!cancelled) { setCategoriesLoading(false); }
       });
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
-
   function handleSubscribe(e: React.FormEvent) {
     e.preventDefault();
-
     if (email.trim()) {
       setSubscribed(true);
       setEmail('');
@@ -82,7 +65,6 @@ export function Footer() {
   return (
     <footer className="site-footer" role="contentinfo">
       <div className="site-footer__inner">
-        {/* Brand + newsletter (wide left column) */}
         <div className="site-footer__brand">
           <Link to="/" className="site-footer__logo" aria-label="MSD – MySpaDeal home">
             <img
@@ -123,7 +105,6 @@ export function Footer() {
             </form>
           )}
         </div>
-        {/* Company */}
         <nav className="site-footer__col" aria-label="Company">
           <h3 className="site-footer__col-heading">{footer.headings.company}</h3>
           <ul className="site-footer__list">
@@ -134,18 +115,11 @@ export function Footer() {
             ))}
           </ul>
         </nav>
-        {/* Discover */}
-        {/* Discover */}
         <nav className="site-footer__col" aria-label="Discover">
-          <h3 className="site-footer__col-heading">
-            {footer.headings.discover}
-          </h3>
-
+          <h3 className="site-footer__col-heading">{footer.headings.discover}</h3>
           <ul className="site-footer__list">
             {categoriesLoading ? (
-              <li className="site-footer__link">
-                Loading...
-              </li>
+              <li className="site-footer__link">Loading...</li>
             ) : (
               categories.map((category) => (
                 <li key={category.id}>
@@ -158,22 +132,14 @@ export function Footer() {
                 </li>
               ))
             )}
-
-            {/* Static */}
             <li>
-              <Link to="/therapists" className="site-footer__link">
-                Therapists
-              </Link>
+              <Link to="/therapists" className="site-footer__link"> Therapists</Link>
             </li>
-
             <li>
-              <Link to="/products" className="site-footer__link">
-                Products
-              </Link>
+              <Link to="/products" className="site-footer__link"> Products </Link>
             </li>
           </ul>
         </nav>
-        {/* Help & Info */}
         <nav className="site-footer__col" aria-label="Help and Info">
           <h3 className="site-footer__col-heading">{footer.headings.help}</h3>
           <ul className="site-footer__list">
@@ -186,19 +152,14 @@ export function Footer() {
         </nav>
       </div>
       <Divider />
-      {/* Bottom bar: copyright · legal links | social icons */}
       <div className="site-footer__bottom">
         <div className="site-footer__bottom-inner">
-          <address className="site-footer__address">
-            © {year} {footer.copyright}
-          </address>
+          <address className="site-footer__address"> © {year} {footer.copyright} </address>
           <nav className="site-footer__legal" aria-label="Legal links">
             {footer.legal.map((item, i) => (
               <span key={item.to}>
                 {i > 0 && <span aria-hidden="true"> · </span>}
-                <Link to={item.to} className="site-footer__link site-footer__link--legal">
-                  {item.label}
-                </Link>
+                <Link to={item.to} className="site-footer__link site-footer__link--legal"> {item.label}</Link>
               </span>
             ))}
           </nav>

@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
 import { Dialog, Divider, FilledButton, Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-
 import { getCatalogTherapist, type CatalogTherapist } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import type { Booking } from '../../../api/bookings';
@@ -12,7 +11,6 @@ import { TherapistBookingDialog } from '../../components/therapist-booking-dialo
 import { formatBookingSchedule, bookingDisplayName, pluralize } from '../../../utils/format';
 import { resolveTherapistMedia } from '../../../utils/media';
 import './therapist-detail.css';
-
 /**
  * Therapist Detail — GET /catalog/therapists/:id. The customer-facing purchase entry point for
  * booking a Therapist directly: Therapist Listing → here → select a package → Book Now, entirely
@@ -25,20 +23,16 @@ export function TherapistDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-
   const [therapist, setTherapist] = useState<CatalogTherapist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
   const [actionMessage, setActionMessage] = useState('');
   const [activeImg, setActiveImg] = useState(0);
   const resultDialogRef = useRef<MdDialog>(null);
-
   useEffect(() => {
     if (confirmedBooking) resultDialogRef.current?.show();
   }, [confirmedBooking]);
-
   useEffect(() => {
     if (!id) {
       setTherapist(null);
@@ -59,11 +53,9 @@ export function TherapistDetail() {
       })
       .finally(() => setLoading(false));
   }, [id]);
-
   if (loading) {
     return <p className="loading-state">Loading therapist…</p>;
   }
-
   if (error || !therapist) {
     return (
       <div className="therapist-detail therapist-detail--empty">
@@ -73,16 +65,13 @@ export function TherapistDetail() {
       </div>
     );
   }
-
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
     navigate(`/sign-in?next=${encodeURIComponent(`/therapist/${id}`)}`);
     return false;
   };
-
   const fromPrice = therapist.packages.length > 0 ? Math.min(...therapist.packages.map((p) => Number(p.sellingPrice))) : null;
   const media = resolveTherapistMedia(therapist);
-
   return (
     <div className="therapist-detail">
       <title>{`${therapist.therapistType} — ${therapist.personName} | MSD`}</title>
@@ -90,7 +79,6 @@ export function TherapistDetail() {
         name="description"
         content={`Book ${therapist.therapistType} ${therapist.personName}${therapist.vendor?.businessName ? ` at ${therapist.vendor.businessName}` : ''}.`}
       />
-
       <Breadcrumb
         className="therapist-detail__breadcrumb"
         items={[
@@ -99,7 +87,6 @@ export function TherapistDetail() {
           { label: therapist.therapistType },
         ]}
       />
-
       <div className="therapist-detail__layout">
         <div className="therapist-detail__gallery">
           <div className="therapist-detail__main-img-wrap">
@@ -107,7 +94,6 @@ export function TherapistDetail() {
               <img className="therapist-detail__main-img" src={media.images[activeImg]} alt={therapist.personName} width={800} height={450} />
             )}
           </div>
-
           {media.images.length > 1 && (
             <div className="therapist-detail__thumbs" aria-label="Gallery thumbnails">
               {media.images.map((image, index) => (
@@ -124,10 +110,8 @@ export function TherapistDetail() {
               ))}
             </div>
           )}
-
           {media.video && <video className="therapist-detail__video" controls src={media.video} />}
         </div>
-
         <div className="therapist-detail__info">
           <div className="therapist-detail__meta-row">
             {therapist.vendor?.businessName && (
@@ -135,34 +119,27 @@ export function TherapistDetail() {
             )}
             <sky-badge variant="primary" size="small">Therapist</sky-badge>
           </div>
-
-          {/* Type + Person are always shown separately, never merged into one field. */}
           <h1 className="therapist-detail__title">{therapist.therapistType}</h1>
           <p className="therapist-detail__dist" aria-label="Therapist name">
             <Icon aria-hidden="true">person</Icon>
             {therapist.personName}
             {therapist.gender ? ` · ${therapist.gender}` : ''}
           </p>
-
           {(therapist.branch?.city || therapist.branch?.address) && (
             <p className="therapist-detail__dist" aria-label="Location">
               <Icon aria-hidden="true">near_me</Icon>
               {[therapist.branch?.name, therapist.branch?.address ?? therapist.branch?.city].filter(Boolean).join(' · ')}
             </p>
           )}
-
           {therapist.experienceYears != null && (
             <p className="therapist-detail__duration">
               <Icon aria-hidden="true">schedule</Icon>
               {therapist.experienceYears} {pluralize(therapist.experienceYears, 'year')} experience
             </p>
           )}
-
           {therapist.specialization && <p>{therapist.specialization}</p>}
           {therapist.bio && <p>{therapist.bio}</p>}
-
           <Divider />
-
           {fromPrice != null && (
             <div className="therapist-detail__price-row">
               <div>
@@ -170,7 +147,6 @@ export function TherapistDetail() {
               </div>
             </div>
           )}
-
           <div className="therapist-detail__cta">
             <TherapistBookingDialog
               therapist={therapist}
@@ -196,13 +172,10 @@ export function TherapistDetail() {
               )}
             />
           </div>
-
           {therapist.packages.length === 0 && (
             <p className="field-hint">This therapist has no bookable packages yet.</p>
           )}
-
           {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
-
           <Dialog ref={resultDialogRef} onClose={() => setConfirmedBooking(null)}>
             {confirmedBooking && (
               <>
@@ -225,5 +198,4 @@ export function TherapistDetail() {
     </div>
   );
 }
-
 export default TherapistDetail;
