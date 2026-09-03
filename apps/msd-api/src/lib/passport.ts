@@ -20,7 +20,11 @@ export function configurePassport(): void {
       (_accessToken, _refreshToken, profile, done) => {
         const email = profile.emails?.[0]?.value;
         if (!email) {
-          done(new Error('Google profile did not include a verified email'));
+          // `done(null, false, info)` is a clean auth failure — Passport resolves it via the
+          // route's existing `failureRedirect` (401-equivalent). `done(err, ...)` (the previous
+          // behavior) is treated as a genuine server error and bypasses failureRedirect entirely,
+          // hitting the generic 500 branch instead.
+          done(null, false, { message: 'Google account has no verified email.' });
           return;
         }
         // The strategy's `done(err, user)` types `user` as `Express.User` (our JWT

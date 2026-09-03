@@ -19,13 +19,12 @@ const resolveMock = vi.mocked(resolveGrantedPermissionKeys);
 const prismaMock = vi.mocked(prisma, true);
 
 const CATEGORY_ID = 'a0a0a0a0-0000-4000-8000-000000000001';
-const SUBCATEGORY_ID = 'b0b0b0b0-0000-4000-8000-000000000002';
+const VENDOR_ID = 'e0e0e0e0-0000-4000-8000-000000000009';
 const PRODUCT_ID = 'c0c0c0c0-0000-4000-8000-000000000003';
 
-const categoryFixture = { id: CATEGORY_ID, name: 'Skin Care', parentId: null };
-const subcategoryFixture = { id: SUBCATEGORY_ID, name: 'Masks', parentId: CATEGORY_ID };
 const productFixture = {
   id: PRODUCT_ID,
+  vendorId: VENDOR_ID,
   name: 'Gelling Mask',
   slug: 'gelling-mask',
   categoryId: CATEGORY_ID,
@@ -41,7 +40,13 @@ beforeEach(() => {
   prismaMock.auditLog.create.mockResolvedValue({});
 });
 
-describe('GET /api/v1/products', () => {
+/**
+ * Product is now vendor-owned (see the `direct_category_access` migration) — this router is
+ * only the cross-vendor, READ-ONLY superadmin oversight surface. Create/update/status/delete/
+ * media are vendor-scoped and tested in vendors.routes.test.ts instead (self-service under
+ * `/vendors/me/products`, admin-on-behalf under `/vendors/:vendorId/products`).
+ */
+describe('GET /api/v1/products (superadmin oversight)', () => {
   it('returns 401 with no token', async () => {
     const res = await request(app).get('/api/v1/products');
     expect(res.status).toBe(401);
@@ -55,7 +60,7 @@ describe('GET /api/v1/products', () => {
     expect(res.status).toBe(403);
   });
 
-  it('returns 200 with the product list', async () => {
+  it('returns 200 with the cross-vendor product list', async () => {
     resolveMock.mockResolvedValue(['products:view']);
     prismaMock.product.findMany.mockResolvedValue([productFixture]);
     prismaMock.product.count.mockResolvedValue(1);
@@ -66,113 +71,37 @@ describe('GET /api/v1/products', () => {
     expect(res.body.data).toHaveLength(1);
   });
 
-  it("a vendor-role token (products:view only) can also list, matching the existing vendor grant", async () => {
+  it('supports filtering by vendorId', async () => {
     resolveMock.mockResolvedValue(['products:view']);
-    prismaMock.product.findMany.mockResolvedValue([]);
-    prismaMock.product.count.mockResolvedValue(0);
+    prismaMock.product.findMany.mockResolvedValue([productFixture]);
+    prismaMock.product.count.mockResolvedValue(1);
     const res = await request(app)
-      .get('/api/v1/products')
-      .set('Authorization', bearerFor({ sub: 'vendor-1', roles: ['vendor'] }));
-    expect(res.status).toBe(200);
-  });
-});
-
-describe('POST /api/v1/products', () => {
-  it('creates a product and writes an audit log entry', async () => {
-    resolveMock.mockResolvedValue(['products:create']);
-    prismaMock.product.findUnique.mockResolvedValue(null); // slug free
-    prismaMock.category.findUnique.mockResolvedValue(categoryFixture); // categoryId exists
-    prismaMock.product.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: PRODUCT_ID, ...data }),
-    );
-    const res = await request(app)
-      .post('/api/v1/products')
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ name: 'Gelling Mask', slug: 'gelling-mask', categoryId: CATEGORY_ID, price: '3368.00' });
-    expect(res.status).toBe(201);
-    expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
-  });
-
-  it('returns 409 when the slug already exists', async () => {
-    resolveMock.mockResolvedValue(['products:create']);
-    prismaMock.product.findUnique.mockResolvedValue(productFixture);
-    const res = await request(app)
-      .post('/api/v1/products')
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ name: 'Gelling Mask', slug: 'gelling-mask', categoryId: CATEGORY_ID, price: '3368.00' });
-    expect(res.status).toBe(409);
-  });
-
-  it('returns 422 when subcategoryId is not a child of categoryId', async () => {
-    resolveMock.mockResolvedValue(['products:create']);
-    prismaMock.product.findUnique.mockResolvedValue(null);
-    prismaMock.category.findUnique
-      .mockResolvedValueOnce(categoryFixture) // categoryId lookup
-      .mockResolvedValueOnce({ id: 'unrelated', name: 'Other', parentId: null }); // subcategory lookup: wrong parent
-    const res = await request(app)
-      .post('/api/v1/products')
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ name: 'Gelling Mask', slug: 'gelling-mask', categoryId: CATEGORY_ID, subcategoryId: SUBCATEGORY_ID, price: '3368.00' });
-    expect(res.status).toBe(422);
-    expect(prismaMock.product.create).not.toHaveBeenCalled();
-  });
-
-  it('returns 422 for a non-decimal price', async () => {
-    resolveMock.mockResolvedValue(['products:create']);
-    const res = await request(app)
-      .post('/api/v1/products')
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ name: 'Gelling Mask', slug: 'gelling-mask', categoryId: CATEGORY_ID, price: '33.6.8' });
-    expect(res.status).toBe(422);
-  });
-
-  it('creates successfully with a valid category/subcategory pair', async () => {
-    resolveMock.mockResolvedValue(['products:create']);
-    prismaMock.product.findUnique.mockResolvedValue(null);
-    prismaMock.category.findUnique
-      .mockResolvedValueOnce(categoryFixture)
-      .mockResolvedValueOnce(subcategoryFixture);
-    prismaMock.product.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: PRODUCT_ID, ...data }),
-    );
-    const res = await request(app)
-      .post('/api/v1/products')
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ name: 'Gelling Mask', slug: 'gelling-mask', categoryId: CATEGORY_ID, subcategoryId: SUBCATEGORY_ID, price: '3368.00' });
-    expect(res.status).toBe(201);
-  });
-});
-
-describe('PATCH /api/v1/products/:id/status and DELETE', () => {
-  it('toggles status', async () => {
-    resolveMock.mockResolvedValue(['products:edit']);
-    prismaMock.product.findUnique.mockResolvedValue(productFixture);
-    prismaMock.product.update.mockResolvedValue({ ...productFixture, isActive: false });
-    const res = await request(app)
-      .patch(`/api/v1/products/${PRODUCT_ID}/status`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ isActive: false });
-    expect(res.status).toBe(200);
-    expect(res.body.data.isActive).toBe(false);
-  });
-
-  it('deletes a product', async () => {
-    resolveMock.mockResolvedValue(['products:delete']);
-    prismaMock.product.findUnique.mockResolvedValue(productFixture);
-    prismaMock.product.delete.mockResolvedValue(productFixture);
-    const res = await request(app)
-      .delete(`/api/v1/products/${PRODUCT_ID}`)
+      .get(`/api/v1/products?vendorId=${VENDOR_ID}`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
     expect(res.status).toBe(200);
-    expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
+    expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ vendorId: VENDOR_ID }) }),
+    );
+  });
+});
+
+describe('GET /api/v1/products/:id (superadmin oversight)', () => {
+  it('returns a product by id', async () => {
+    resolveMock.mockResolvedValue(['products:view']);
+    prismaMock.product.findUnique.mockResolvedValue(productFixture);
+    const res = await request(app)
+      .get(`/api/v1/products/${PRODUCT_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data.id).toBe(PRODUCT_ID);
   });
 
-  it('returns 403 for a vendor-role token attempting to delete (no products:delete grant)', async () => {
+  it('404s for a missing product', async () => {
     resolveMock.mockResolvedValue(['products:view']);
+    prismaMock.product.findUnique.mockResolvedValue(null);
     const res = await request(app)
-      .delete(`/api/v1/products/${PRODUCT_ID}`)
-      .set('Authorization', bearerFor({ sub: 'vendor-1', roles: ['vendor'] }));
-    expect(res.status).toBe(403);
-    expect(prismaMock.product.delete).not.toHaveBeenCalled();
+      .get(`/api/v1/products/${PRODUCT_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(404);
   });
 });

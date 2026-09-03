@@ -7,7 +7,7 @@ const ORDER_COLUMNS = JSON.stringify([
   { key: 'Order ID', label: 'Order ID', width: '110px' },
   { key: 'Customer', label: 'Customer' },
   { key: 'Branch', label: 'Branch' },
-  { key: 'Type', label: 'Type' },
+  { key: 'Composition', label: 'Composition' },
   { key: 'Item', label: 'Item' },
   { key: 'Amount', label: 'Amount' },
   {
@@ -27,6 +27,16 @@ const ORDER_COLUMNS = JSON.stringify([
 
 const ORDER_ACTIONS = JSON.stringify([{ icon: 'visibility', label: 'View', event: '__view_detail__' }]);
 
+/**
+ * "Deal Order" / "Product Order" / "Therapist Order" / "Mixed Order" — computed from the
+ * composition of the order's own items, never stored (mirrors msd-api's
+ * order.service.ts#describeOrderComposition exactly).
+ */
+function describeOrderComposition(order: Order): string {
+  const kinds = new Set(order.items.map((item) => (item.therapistId ? 'Therapist' : item.dealId ? 'Deal' : 'Product')));
+  return kinds.size === 1 ? `${[...kinds][0]} Order` : 'Mixed Order';
+}
+
 /** Flat row for <sky-data-table> — same shape as orders.tsx's admin list, minus the now-redundant
  *  "Vendor" column (every row on this tab already belongs to the one selected vendor). */
 function toOrderRow(order: Order): Record<string, string | number> {
@@ -37,6 +47,7 @@ function toOrderRow(order: Order): Record<string, string | number> {
     'Order ID': order.id,
     Customer: order.customer.name,
     Branch: order.branchNameSnapshot,
+    Composition: describeOrderComposition(order),
     Type: order.type,
     Item: order.items.map((i) => i.itemName).join(', ') || '—',
     Amount: `₹${order.total}`,
@@ -51,9 +62,6 @@ function toOrderRow(order: Order): Record<string, string | number> {
     'Payment Provider': latestPayment?.provider ?? '—',
     'Payment Failure Reason': latestPayment?.failureReason ?? '—',
     'Cancellation Reason': order.cancellationReason ?? '—',
-    'Booking Date': order.booking?.bookingDate ? new Date(order.booking.bookingDate).toLocaleDateString() : '—',
-    'Booking Time Slot': order.booking?.timeSlot ?? '—',
-    'Booking Status': order.booking?.status ?? '—',
   };
 }
 

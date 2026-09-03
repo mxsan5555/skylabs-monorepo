@@ -23,6 +23,7 @@ export class SkyCategoryCard extends LitElement {
     subheading: { type: String },
     href: { type: String },
     align: { type: String, reflect: true },
+    tag: { type: String },
   };
 
   declare image?: string;
@@ -30,6 +31,9 @@ export class SkyCategoryCard extends LitElement {
   declare heading?: string;
   declare subheading?: string;
   declare href?: string;
+  /** Optional Popular Tag label (e.g. "Trending") shown as a pill over the image — same visual
+   *  treatment as `sky-product-card`'s own `badge`. Omitted entirely when unset. */
+  declare tag?: string;
   /** Content alignment: 'left' (default) | 'center' | 'right'. */
   declare align: 'left' | 'center' | 'right';
 
@@ -48,10 +52,25 @@ export class SkyCategoryCard extends LitElement {
       gap: 8px;
     }
     .media {
+      position: relative;
       aspect-ratio: 1 / 1;
       overflow: hidden;
       border-radius: 16px;
       background-color: var(--md-sys-color-surface-variant);
+    }
+    .tag {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background-color: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      font-size: 0.75rem;
+      font-weight: 600;
     }
     .media img {
       width: 100%;
@@ -94,6 +113,7 @@ export class SkyCategoryCard extends LitElement {
           ${this.image
             ? html`<img src=${this.image} alt=${this.imageAlt ?? ''} />`
             : nothing}
+          ${this.tag ? html`<span class="tag">${this.tag}</span>` : nothing}
         </div>
         ${this.heading || this.subheading
           ? html`<figcaption>

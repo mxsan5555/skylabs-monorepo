@@ -45,6 +45,15 @@
     "order": 3.2
   },
   {
+    "id": "therapists",
+    "title": "Therapists",
+    "icon": "badge",
+    "route": "/account/therapists",
+    "permissionKey": "vendors",
+    "parent": null,
+    "order": 3.25
+  },
+  {
     "id": "vendor-business-profile",
     "title": "Business Profile",
     "icon": "business_center",
@@ -99,24 +108,6 @@
     "order": 4
   },
   {
-    "id": "bookings",
-    "title": "Bookings",
-    "icon": "event_available",
-    "route": "/account/bookings",
-    "permissionKey": "orders",
-    "parent": null,
-    "order": 4.1
-  },
-  {
-    "id": "services",
-    "title": "Services",
-    "icon": "design_services",
-    "route": "/account/services",
-    "permissionKey": "services",
-    "parent": null,
-    "order": 4.5
-  },
-  {
     "id": "products",
     "title": "Products",
     "icon": "inventory_2",
@@ -161,9 +152,15 @@
         "parent": "masters",
         "order": 2
       },
-
-     
-      
+      {
+        "id": "masters-category-types",
+        "title": "Category Types",
+        "icon": "category",
+        "route": "/account/masters/category-types",
+        "permissionKey": "masters.categories",
+        "parent": "masters",
+        "order": 3
+      },
       {
         "id": "masters-tags",
         "title": "Marketing Tags",

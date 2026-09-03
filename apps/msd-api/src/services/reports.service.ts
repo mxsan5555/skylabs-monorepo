@@ -366,10 +366,10 @@ export function getTopProducts(filters: ReportFilters, limit: number): Promise<T
   return topItemsByType(filters, 'PRODUCT', limit);
 }
 
-/** Scoped to Deal-based service line items (`dealId` set) — a Therapist booked directly (no
- *  Deal involved, see Booking's own "exactly one of dealId/therapistId" doc comment) isn't a
+/** Scoped to Deal-based service line items (`dealId` set) — a Therapist purchased directly (no
+ *  Deal involved, see OrderItem's own "exactly one of dealId/therapistId" doc comment) isn't a
  *  "Deal/Service" by this report's own naming, so it's intentionally excluded here rather than
- *  conflated with Deal-based bookings under one row. */
+ *  conflated with Deal-based purchases under one row. */
 export function getTopServices(filters: ReportFilters, limit: number): Promise<TopItemRow[]> {
   return topItemsByType(filters, 'SERVICE', limit);
 }

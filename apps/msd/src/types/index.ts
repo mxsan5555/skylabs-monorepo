@@ -65,7 +65,6 @@ export interface BlogQuery {
   pageSize?: number;
 }
 // ─── Consumer storefront types ────────────────────────────────────────────────
-export type BookingStatus = 'confirmed' | 'cancelled';
 export type PriceLevel = '$' | '$$' | '$$$';
 export type SearchView = 'list' | 'grid' | 'map';
 export type CheckoutStep = 'details' | 'datetime' | 'payment';
@@ -128,29 +127,6 @@ export interface CartItem {
   quantity: number;
   selectedDate?: string;
   selectedTime?: string;
-}
-export interface BookingItem {
-  type: 'deal' | 'product';
-  id: string;
-  title: string;
-  image: string;
-  imageAlt: string;
-  price: number;
-  quantity: number;
-}
-export interface Booking {
-  id: string;
-  customer: {
-    name: string;
-    phone: string;
-    email: string;
-  };
-  date: string;
-  time: string;
-  items: BookingItem[];
-  total: number;
-  status: BookingStatus;
-  createdAt: string;
 }
 export interface WishlistItem {
   dealId: string;

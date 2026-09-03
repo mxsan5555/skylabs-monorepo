@@ -26,7 +26,6 @@ export const ADMIN_MENU: MenuGroup[] = [
     items: [
       { label: 'Dashboard', icon: 'dashboard', to: '/account/dashboard', roles: EVERYONE },
       { label: 'My Account', icon: 'person', to: '/account/profile', roles: EVERYONE },
-      { label: 'My Bookings', icon: 'calendar_month', to: '/account/bookings', roles: EVERYONE, },
     ],
   },
   {

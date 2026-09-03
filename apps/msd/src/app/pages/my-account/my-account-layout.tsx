@@ -16,7 +16,6 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/my-account', label: 'Profile & Addresses', icon: 'person', end: true },
   { to: '/orders', label: 'Orders', icon: 'receipt_long' },
-  { to: '/bookings', label: 'Bookings', icon: 'event_available' },
   { to: '/wishlist', label: 'Wishlist', icon: 'favorite_border' },
   { to: '/cart', label: 'Cart', icon: 'shopping_cart' },
   { to: '/my-account/payments', label: 'Payment History', icon: 'payments' },

@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import type { MdDialog } from '@material/web/dialog/dialog.js';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import {
   OutlinedTextField,
+  OutlinedSelect,
+  SelectOption,
   ChipSet,
   FilterChip,
   Icon,
@@ -15,18 +18,20 @@ import {
   Divider,
 } from '@skylabs-monorepo/shared-ui/react';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
-import { DealBookingDialog } from '../../components/deal-booking-dialog';
+import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { addCartItem } from '../../../api/cart';
 import {
   listCatalogCategories,
   listCatalogDeals,
+  listCatalogLocations,
   type CatalogCategoryWithChildren,
   type CatalogDeal,
+  type CatalogLocation,
 } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { formatINR, formatBookingSchedule } from '../../../utils/format';
+import { formatINR } from '../../../utils/format';
 import { resolveDealMedia, primaryImage } from '../../../utils/media';
 import content from '../../../content.json';
 import './search.css';
@@ -35,7 +40,7 @@ import { Map } from '../../components/map';
 const { search: searchContent } = content;
 
 type View = 'list' | 'grid' | 'map';
-type ActiveDialog = 'price' | 'category' | null;
+type ActiveDialog = 'price' | 'category' | 'location' | null;
 
 /**
  * Customer catalogue search / explore page — reads the real public catalogue
@@ -67,6 +72,8 @@ export function Search() {
   const [query, setQuery] = useState(params.get('q') ?? '');
   const [selectedCategory, setSelectedCategory] = useState(params.get('category') ?? '');
   const [suggested, setSuggested] = useState(params.get('sort') === 'discount');
+  const [selectedState, setSelectedState] = useState(params.get('state') ?? '');
+  const [selectedCity, setSelectedCity] = useState(params.get('city') ?? '');
   // Only the upper bound is adjustable (single-thumb slider, matching the
   // real UI below) — the lower bound is never sent to the API since no
   // control ever changes it.
@@ -74,6 +81,7 @@ export function Search() {
 
   const priceDialogRef = useRef<MdDialog>(null);
   const categoryDialogRef = useRef<MdDialog>(null);
+  const locationDialogRef = useRef<MdDialog>(null);
   useEffect(() => {
     if (activeDialog === 'price') {
       priceDialogRef.current?.show();
@@ -81,6 +89,10 @@ export function Search() {
 
     if (activeDialog === 'category') {
       categoryDialogRef.current?.show();
+    }
+
+    if (activeDialog === 'location') {
+      locationDialogRef.current?.show();
     }
   }, [activeDialog]);
   // Browser back/forward (or a fresh load) changes `params` out from under
@@ -91,6 +103,8 @@ export function Search() {
     setQuery(params.get('q') ?? '');
     setSelectedCategory(params.get('category') ?? '');
     setSuggested(params.get('sort') === 'discount');
+    setSelectedState(params.get('state') ?? '');
+    setSelectedCity(params.get('city') ?? '');
   }, [params]);
 
   function updateParams(patch: Record<string, string | undefined>) {
@@ -117,6 +131,24 @@ export function Search() {
 
   const selectedCategoryEntry = categories.find((c) => c.slug === selectedCategory);
 
+  // ── Locations (for the State/City picker dialog) — distinct {state, city} pairs from active
+  // branches, not the full static `india-locations.ts` list, so the picker only ever offers
+  // combinations that can actually return results. ─────────────────────────────────────────
+  const [locations, setLocations] = useState<CatalogLocation[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(true);
+
+  useEffect(() => {
+    listCatalogLocations()
+      .then(({ data }) => setLocations(data))
+      .catch(() => setLocations([]))
+      .finally(() => setLocationsLoading(false));
+  }, []);
+
+  const availableStates = Array.from(new Set(locations.map((l) => l.state))).sort();
+  const citiesForSelectedState = Array.from(
+    new Set(locations.filter((l) => l.state === selectedState).map((l) => l.city)),
+  ).sort();
+
   // ── Deals (real, server-filtered/sorted) ────────────────────────────────
   const [deals, setDeals] = useState<CatalogDeal[]>([]);
   const [dealsLoading, setDealsLoading] = useState(true);
@@ -133,13 +165,15 @@ export function Search() {
       categoryId: selectedCategoryEntry?.id,
       sort: suggested ? 'discount' : undefined,
       maxPrice: priceMax < searchContent.filters.price.max ? priceMax : undefined,
+      state: selectedState || undefined,
+      city: selectedCity || undefined,
       pageSize: 100,
     })
       .then(({ data }) => setDeals(data))
       .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : searchContent.errors.loadDeals))
       .finally(() => setDealsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedCategoryEntry?.id, suggested, priceMax, categoriesLoading]);
+  }, [query, selectedCategoryEntry?.id, suggested, priceMax, selectedState, selectedCity, categoriesLoading]);
 
   function selectCategory(slug: string) {
     setSelectedCategory(slug);
@@ -151,15 +185,35 @@ export function Search() {
     setSuggested(next);
     updateParams({ sort: next ? 'discount' : undefined });
   }
+
+  function selectState(state: string) {
+    setSelectedState(state);
+    setSelectedCity('');
+    updateParams({ state: state || undefined, city: undefined });
+  }
+
+  function selectCity(city: string) {
+    setSelectedCity(city);
+    updateParams({ city: city || undefined });
+  }
+
+  function clearLocation() {
+    setSelectedState('');
+    setSelectedCity('');
+    updateParams({ state: undefined, city: undefined });
+  }
+
   function clearAllFilters() {
     setQuery('');
     setPriceMax(searchContent.filters.price.max);
     setSuggested(false);
     setSelectedCategory('');
+    setSelectedState('');
+    setSelectedCity('');
     setParams({});
   }
   const hasActiveFilters =
-    suggested || selectedCategory !== '' || priceMax < searchContent.filters.price.max;
+    suggested || selectedCategory !== '' || priceMax < searchContent.filters.price.max || selectedState !== '';
 
   const { toggle: wishlistToggle, has: wishlistHas } = useWishlist();
 
@@ -174,7 +228,7 @@ export function Search() {
     setActionError('');
     setActionMessage('');
     try {
-      await addCartItem(token, deal.id, 1);
+      await addCartItem(token, { dealId: deal.id, quantity: 1 });
       setActionMessage(`Added "${deal.product?.name ?? deal.title}" to your cart.`);
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : 'Could not add to cart.');
@@ -284,6 +338,18 @@ export function Search() {
             >
               <Icon slot="icon" aria-hidden="true">category</Icon>
             </FilterChip>
+            {/* Location */}
+            <FilterChip
+              label={
+                selectedCity
+                  ? `${selectedCity}, ${selectedState}`
+                  : selectedState || searchContent.filters.location.label
+              }
+              selected={!!selectedState}
+              onClick={() => setActiveDialog('location')}
+            >
+              <Icon slot="icon" aria-hidden="true">location_on</Icon>
+            </FilterChip>
           </ChipSet>
           {hasActiveFilters && (
             <TextButton onClick={clearAllFilters} className="search-page__clear">
@@ -320,9 +386,9 @@ export function Search() {
               <section aria-label={searchContent.results.listAriaLabel}>
                 <ul className="search-results-list">
                   {deals.map((deal) => {
-                    const heading = deal.service?.name ?? deal.product?.name ?? deal.title;
+                    const heading = deal.product?.name ?? deal.title;
                     const image = primaryImage(resolveDealMedia(deal));
-                    const imageAlt = deal.service?.imageAlt ?? deal.product?.imageAlt ?? heading;
+                    const imageAlt = deal.product?.imageAlt ?? heading;
                     return (
                       <li key={deal.id} className="search-results-list__item">
                         <article className="search-result-card">
@@ -369,23 +435,17 @@ export function Search() {
                               </span>
                             </div>
                             <div className="search-result-card__actions">
-                              {deal.service ? (
-                                <DealBookingDialog
+                              {!deal.product ? (
+                                <DealAddToCartDialog
                                   deal={deal}
-                                  onBooked={(booking, intent) =>
-                                    setActionMessage(
-                                      intent === 'cart'
-                                        ? `Added "${deal.service?.name ?? deal.title}" to your cart.`
-                                        : `Booked "${deal.service?.name ?? deal.title}" — ${formatBookingSchedule(booking.bookingDate, booking.timeSlot)}.`,
-                                    )
-                                  }
+                                  onAdded={(label) => setActionMessage(`Added "${label}" to your cart.`)}
                                   renderTrigger={(open) => (
                                     <FilledTonalButton
                                       onClick={() => {
                                         if (requireAuthOrRedirect()) open();
                                       }}
                                     >
-                                      Book
+                                      Add to Cart
                                     </FilledTonalButton>
                                   )}
                                 />
@@ -424,12 +484,13 @@ export function Search() {
                     <li key={deal.id}>
                       <SkyProductCardWC
                         image={primaryImage(resolveDealMedia(deal))}
-                        imageAlt={deal.service?.imageAlt ?? deal.product?.imageAlt ?? undefined}
-                        badge={deal.service
-                          ? searchContent.labels.service
-                          : searchContent.labels.product
+                        imageAlt={deal.product?.imageAlt ?? undefined}
+                        badge={deal.product
+                          ? searchContent.labels.product
+                          : searchContent.labels.service
                         }
-                        heading={deal.service?.name ?? deal.product?.name ?? deal.title}
+                        tag={deal.popularTags?.[0]?.name ?? deal.product?.popularTags?.[0]?.name}
+                        heading={deal.product?.name ?? deal.title}
                         eyebrow={[deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · ')}
                         eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
                         priceNote={deal.durationMinutes ? `${deal.durationMinutes}${searchContent.labels.durationSuffix}` : undefined}
@@ -441,7 +502,7 @@ export function Search() {
                         }
                         favorite={true}
                         favoriteActive={wishlistHas(deal.id)}
-                        href={deal.service ? `/deal/${deal.id}` : `/products/${deal.id}`}
+                        href={deal.product ? `/products/${deal.id}` : `/deal/${deal.id}`}
                         onFavorite={() => wishlistToggle(deal.id)}
                       />
                     </li>
@@ -466,9 +527,9 @@ export function Search() {
                         {dealsWithCoords
                           .slice(0, 5)
                           .map((deal) => {
-                            const heading = deal.service?.name ?? deal.product?.name ?? deal.title;
+                            const heading = deal.product?.name ?? deal.title;
                             const image = primaryImage(resolveDealMedia(deal));
-                            const imageAlt = deal.service?.imageAlt ?? deal.product?.imageAlt ?? heading;
+                            const imageAlt = deal.product?.imageAlt ?? heading;
                             return (
                               <li key={deal.id} className="search-map__list-item">
                                 <Link to={`/deal/${deal.id}`} className="search-map__list-link">
@@ -560,6 +621,57 @@ export function Search() {
         <div slot="actions">
           <TextButton onClick={() => selectCategory('')}>{searchContent.filters.category.clear}</TextButton>
           <FilledButton onClick={() => setActiveDialog(null)}>{searchContent.filters.category.apply}</FilledButton>
+        </div>
+      </Dialog>
+
+      {/* ── Location Dialog ────────────────────────────────────────────── */}
+      <Dialog
+        ref={locationDialogRef}
+        onClose={() => setActiveDialog(null)}
+      >
+        <span slot="headline">{searchContent.filters.location.dialogTitle}</span>
+        <div slot="content" className="filter-dialog">
+          {locationsLoading ? (
+            <p className="loading-state">{searchContent.loading.categories}</p>
+          ) : (
+            <>
+              <OutlinedSelect
+                label={searchContent.filters.location.stateLabel}
+                value={selectedState}
+                onChange={(e: Event) => selectState((e.target as HTMLSelectElement).value)}
+              >
+                <SelectOption value="">
+                  <div slot="headline">{searchContent.filters.location.stateAll}</div>
+                </SelectOption>
+                {availableStates.map((state) => (
+                  <SelectOption key={state} value={state}>
+                    <div slot="headline">{state}</div>
+                  </SelectOption>
+                ))}
+              </OutlinedSelect>
+
+              {selectedState && citiesForSelectedState.length > 0 && (
+                <OutlinedSelect
+                  label={searchContent.filters.location.cityLabel}
+                  value={selectedCity}
+                  onChange={(e: Event) => selectCity((e.target as HTMLSelectElement).value)}
+                >
+                  <SelectOption value="">
+                    <div slot="headline">{searchContent.filters.location.cityAll}</div>
+                  </SelectOption>
+                  {citiesForSelectedState.map((city) => (
+                    <SelectOption key={city} value={city}>
+                      <div slot="headline">{city}</div>
+                    </SelectOption>
+                  ))}
+                </OutlinedSelect>
+              )}
+            </>
+          )}
+        </div>
+        <div slot="actions">
+          <TextButton onClick={clearLocation}>{searchContent.filters.location.clear}</TextButton>
+          <FilledButton onClick={() => setActiveDialog(null)}>{searchContent.filters.location.apply}</FilledButton>
         </div>
       </Dialog>
     </div>

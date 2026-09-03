@@ -17,8 +17,12 @@ export function VendorBranchesDeals() {
   const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
-    listCategories(token).then(({ data }) => setCategories(data)).catch(() => setCategories([]));
-  }, [token]);
+    if (!vendor) {
+      setCategories([]);
+      return;
+    }
+    listCategories(token, { type: 'SERVICE', vendorId: vendor.id }).then(({ data }) => setCategories(data)).catch(() => setCategories([]));
+  }, [token, vendor?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on id, not object identity
 
   if (loading) {
     return (

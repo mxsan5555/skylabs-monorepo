@@ -26,7 +26,6 @@ import { VendorBranches } from './vendor-branches';
 import { VendorPipeline } from './vendor-pipeline';
 import { VendorDetailCustomers } from './vendor-detail-customers';
 import { VendorDetailOrders } from './vendor-detail-orders';
-import { VendorDetailBookings } from './vendor-detail-bookings';
 
 /**
  * Vendor Management. Two audiences share this one page/route (`/account/vendors`):
@@ -48,12 +47,6 @@ export function VendorManagement() {
   const canReject = can('vendors', 'reject');
   const canStatusChange = can('vendors', 'status_change');
 
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  useEffect(() => {
-    listCategories(token).then(({ data }) => setCategories(data)).catch(() => setCategories([]));
-  }, [token]);
-
   if (canView) {
     return (
       <AdminVendorManagement
@@ -63,13 +56,12 @@ export function VendorManagement() {
         canApprove={canApprove}
         canReject={canReject}
         canStatusChange={canStatusChange}
-        categories={categories}
       />
     );
   }
 
   if (canCustom) {
-    return <SelfVendorManagement token={token} categories={categories} />;
+    return <SelfVendorManagement token={token} />;
   }
 
   return <p className="empty-state">You do not have access to Vendor Management.</p>;
@@ -106,8 +98,9 @@ function toTherapistRow(t: AdminTherapist): Record<string, string | number> {
 /** Vendor Detail tab order — Overview (profile) first, then the two genuinely-coupled
  *  Branches & Deals (kept as one tab, same reasoning already applied to the vendor
  *  self-service side: a branch and its deals are one browsing flow, not two), then the
- *  read-only contextual views (Therapists/Customers/Orders/Bookings). */
-const VENDOR_DETAIL_TABS = ['Overview', 'Branches & Deals', 'Therapists', 'Customers', 'Orders', 'Bookings'] as const;
+ *  read-only contextual views (Therapists/Customers/Orders — Orders already covers every
+ *  purchase kind, Deal/Product/Therapist alike, so there is no separate Bookings tab). */
+const VENDOR_DETAIL_TABS = ['Overview', 'Branches & Deals', 'Therapists', 'Customers', 'Orders'] as const;
 
 function AdminVendorManagement({
   token,
@@ -116,7 +109,6 @@ function AdminVendorManagement({
   canApprove,
   canReject,
   canStatusChange,
-  categories,
 }: {
   token: string | null;
   canCreate: boolean;
@@ -124,7 +116,6 @@ function AdminVendorManagement({
   canApprove: boolean;
   canReject: boolean;
   canStatusChange: boolean;
-  categories: Category[];
 }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -138,8 +129,19 @@ function AdminVendorManagement({
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState(0);
+  // The selected vendor's granted SERVICE categories — a service Deal picks directly from these
+  // (see vendor-branches.tsx's DealDialog); scoped per-vendor since access is vendor-specific.
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const selectedVendor = useMemo(() => vendors.find((v) => v.id === selectedId) ?? null, [vendors, selectedId]);
+
+  useEffect(() => {
+    if (!selectedVendor) {
+      setCategories([]);
+      return;
+    }
+    listCategories(token, { type: 'SERVICE', vendorId: selectedVendor.id }).then(({ data }) => setCategories(data)).catch(() => setCategories([]));
+  }, [token, selectedVendor?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on id, not object identity
 
   const loadVendors = useCallback(async () => {
     setLoading(true);
@@ -327,6 +329,10 @@ function AdminVendorManagement({
                 onVendorChange={handlePipelineChange}
                 canReviewKyc={canApprove}
                 onKycReview={doKycReview}
+                canApprove={canApprove && selectedVendor.status !== 'ACTIVE'}
+                canReject={canReject && selectedVendor.status !== 'REJECTED'}
+                onApprove={doApprove}
+                onReject={doReject}
               />
             </div>
           )}
@@ -371,11 +377,6 @@ function AdminVendorManagement({
             </div>
           )}
 
-          {activeTab === 5 && (
-            <div className="admin-tab-panel" aria-label="Bookings">
-              <VendorDetailBookings token={token} vendorId={selectedVendor.id} />
-            </div>
-          )}
         </section>
       )}
 
@@ -468,8 +469,17 @@ export function useMyVendor(token: string | null): UseMyVendorResult {
   return { vendor, notFound, loading, saving, message, error, fieldErrors, save, submit };
 }
 
-function SelfVendorManagement({ token, categories }: { token: string | null; categories: Category[] }) {
+function SelfVendorManagement({ token }: { token: string | null }) {
   const { vendor, notFound, loading, saving, message, error, fieldErrors, save, submit } = useMyVendor(token);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    if (!vendor) {
+      setCategories([]);
+      return;
+    }
+    listCategories(token, { type: 'SERVICE', vendorId: vendor.id }).then(({ data }) => setCategories(data)).catch(() => setCategories([]));
+  }, [token, vendor?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on id, not object identity
 
   if (loading) {
     return (
@@ -492,11 +502,18 @@ function SelfVendorManagement({ token, categories }: { token: string | null; cat
       {message && <p className="field-hint" role="status">{message}</p>}
       {error && <p className="error-state" role="alert">{error}</p>}
 
+      {/* Owner Information and Address are intentionally excluded here — see
+          vendor-profile-tabs.tsx's own doc comment on why this self-service Vendor Profile UI
+          no longer shows those two sections (Branch already carries its own address; owner info
+          is still collected wherever KYC/onboarding actually needs it). */}
       <VendorProfileForm
         vendor={vendor}
         canEdit
         canReviewKyc={false}
         saving={saving}
+        token={token}
+        selfService
+        sections={['business', 'kyc', 'bank']}
         onSave={save}
         onSubmitForVerification={submit}
         serverFieldErrors={fieldErrors}

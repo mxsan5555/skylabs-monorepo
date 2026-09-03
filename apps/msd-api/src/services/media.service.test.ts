@@ -92,6 +92,27 @@ describe('media.service.addImage', () => {
       expect.objectContaining({ data: expect.objectContaining({ therapistId: 'therapist-1' }) }),
     );
   });
+
+  it('routes Category through the same generic core (covers all 3 depth tiers — same table)', async () => {
+    prismaMock.categoryImage.count.mockResolvedValue(0);
+    prismaMock.categoryImage.create.mockResolvedValue({ id: 'c-img-1' });
+    await mediaService.addImage('category', 'category-1', { buffer: jpegBuffer(), originalname: 'g.jpg' });
+    expect(prismaMock.categoryImage.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ categoryId: 'category-1' }) }),
+    );
+  });
+});
+
+describe('media.service category has no video support', () => {
+  it('throws a clear VALIDATION_ERROR instead of crashing on an undefined delegate', async () => {
+    const mp4 = Buffer.alloc(500 * 1024, 0);
+    mp4.write('ftyp', 4, 'ascii');
+    mp4.write('isom', 8, 'ascii');
+    await expect(
+      mediaService.replaceVideo('category', 'category-1', { buffer: mp4, originalname: 'v.mp4' }),
+    ).rejects.toThrow(ApiError);
+    await expect(mediaService.deleteVideo('category', 'category-1')).rejects.toThrow(ApiError);
+  });
 });
 
 describe('media.service.deleteImage', () => {
@@ -131,6 +152,20 @@ describe('media.service.deleteImage', () => {
     await mediaService.deleteImage('deal', 'deal-1', 'img-1');
 
     expect(prismaMock.dealImage.update).not.toHaveBeenCalled();
+  });
+
+  it('still runs the primary-image-reassignment step when the physical file delete fails (non-ENOENT)', async () => {
+    prismaMock.dealImage.findUnique.mockResolvedValue({ id: 'img-1', dealId: 'deal-1', isPrimary: true, storageKey: 'x' });
+    prismaMock.dealImage.delete.mockResolvedValue({ storageKey: 'x' });
+    prismaMock.dealImage.findMany.mockResolvedValue([{ id: 'img-2', dealId: 'deal-1', isPrimary: false, sortOrder: 1, storageKey: 'y' }]);
+    prismaMock.dealImage.update.mockResolvedValue({});
+    deleteMediaFileMock.mockRejectedValueOnce(Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }));
+
+    // The DB delete already committed; a disk-level failure deleting the file must not abort
+    // the function or skip promoting the next image to primary.
+    await expect(mediaService.deleteImage('deal', 'deal-1', 'img-1')).resolves.toBeUndefined();
+
+    expect(prismaMock.dealImage.update).toHaveBeenCalledWith({ where: { id: 'img-2' }, data: { isPrimary: true } });
   });
 });
 
@@ -187,6 +222,28 @@ describe('media.service video (replace/delete)', () => {
 
     expect(prismaMock.dealVideo.upsert).toHaveBeenCalled();
     expect(deleteMediaFileMock).toHaveBeenCalledWith('deals/deal-1/old.mp4');
+  });
+
+  it('does not delete the newly-written video file when only the OLD file delete fails (non-ENOENT)', async () => {
+    prismaMock.dealVideo.findUnique.mockResolvedValue({ id: 'vid-1', storageKey: 'deals/deal-1/old.mp4' });
+    prismaMock.dealVideo.upsert.mockResolvedValue({ id: 'vid-1' });
+    // Only the OLD-file delete call should fail — the upsert itself succeeded, so the DB row
+    // now correctly points at the NEW file (deals/deal-1/fake.jpg per this file's writeMediaFile
+    // mock). Before the fix, this failure was caught by the upsert's own rollback try/catch and
+    // wrongly deleted that new file, corrupting an already-successful replace.
+    deleteMediaFileMock.mockImplementation(async (storageKey: string) => {
+      if (storageKey === 'deals/deal-1/old.mp4') throw Object.assign(new Error('EACCES'), { code: 'EACCES' });
+    });
+
+    const mp4 = Buffer.alloc(500 * 1024, 0);
+    mp4.write('ftyp', 4, 'ascii');
+    mp4.write('isom', 8, 'ascii');
+
+    await expect(mediaService.replaceVideo('deal', 'deal-1', { buffer: mp4, originalname: 'v.mp4' })).resolves.toEqual({ id: 'vid-1' });
+
+    // The new file (returned by the writeMediaFile mock at the top of this file) must never be
+    // deleted — only the old one was attempted (and failed).
+    expect(deleteMediaFileMock).not.toHaveBeenCalledWith('deals/deal-1/fake.jpg');
   });
 
   it('404s deleting a video that does not exist', async () => {

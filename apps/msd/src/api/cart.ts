@@ -13,6 +13,7 @@ export interface CartDealSummary {
   slug: string;
   salePrice: string;
   originalPrice: string;
+  durationMinutes: number | null;
   images: string[] | null;
   vendorId: string;
   branchId: string;
@@ -22,13 +23,43 @@ export interface CartDealSummary {
   mediaImages?: MediaImage[];
 }
 
+export interface CartPackageSummary {
+  id: string;
+  durationMinutes: number;
+  sellingPrice: string;
+}
+
+export interface CartTherapistSummary {
+  id: string;
+  therapistType: string;
+  personName: string;
+  photoUrl: string | null;
+  vendorId: string;
+  branchId: string;
+  vendor: { id: string; businessName: string | null } | null;
+  branch: { id: string; name: string } | null;
+}
+
+/**
+ * One unified purchase-intent line — discriminated by which of `dealId`/`dealPackageId`/
+ * `therapistId`/`therapistPackageId` are set, mirroring msd-api's CartItem schema doc comment:
+ *   - Product line:      `dealId` set, `dealPackageId`/`therapist*` all null.
+ *   - Service-Deal line: `dealId` + `dealPackageId` both set, `therapist*` null.
+ *   - Therapist line:    `therapistId` + `therapistPackageId` both set, `deal*` null.
+ */
 export interface CartItem {
   id: string;
   cartId: string;
-  dealId: string;
+  dealId: string | null;
+  dealPackageId: string | null;
+  therapistId: string | null;
+  therapistPackageId: string | null;
   quantity: number;
   unitPrice: string;
-  deal: CartDealSummary;
+  deal: CartDealSummary | null;
+  dealPackage: CartPackageSummary | null;
+  therapist: CartTherapistSummary | null;
+  therapistPackage: CartPackageSummary | null;
 }
 
 /** Multi-vendor: a cart may hold items from any number of vendors/branches — each item's own
@@ -64,8 +95,15 @@ export function notifyCartUpdated() {
   listeners.forEach((listener) => listener());
 }
 
-export function addCartItem(token: string | null, dealId: string, quantity = 1) {
-  return apiPost<Cart>('/cart/items', token, { dealId, quantity }).then((res) => {
+export type AddCartItemInput =
+  | { dealId: string; dealPackageId?: string; quantity?: number }
+  | { therapistId: string; therapistPackageId: string; quantity?: number };
+
+/** Product line: `{ dealId }`. Service-Deal line: `{ dealId, dealPackageId }`. Therapist line:
+ *  `{ therapistId, therapistPackageId }` — identical "Add to Cart" call for all three, no
+ *  special-casing per purchase kind (see msd-api's CartAddItemSchema doc comment). */
+export function addCartItem(token: string | null, input: AddCartItemInput) {
+  return apiPost<Cart>('/cart/items', token, { quantity: 1, ...input }).then((res) => {
     notifyCartUpdated();
     return res;
   });

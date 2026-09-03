@@ -55,6 +55,7 @@ export function RoleManagement() {
 
   const [widgetsCatalog, setWidgetsCatalog] = useState<DashboardWidgetRecord[]>([]);
   const [widgetsCatalogLoading, setWidgetsCatalogLoading] = useState(true);
+  const [widgetsCatalogError, setWidgetsCatalogError] = useState('');
 
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [selectedPermissionIds, setSelectedPermissionIds] = useState<Set<string>>(new Set());
@@ -108,8 +109,10 @@ export function RoleManagement() {
   useEffect(() => {
     let cancelled = false;
     setWidgetsCatalogLoading(true);
+    setWidgetsCatalogError('');
     listDashboardWidgetsCatalog(token)
       .then(({ data }) => !cancelled && setWidgetsCatalog(data))
+      .catch((err) => !cancelled && setWidgetsCatalogError(err instanceof ApiRequestError ? err.message : 'Could not load the widget catalog.'))
       .finally(() => !cancelled && setWidgetsCatalogLoading(false));
     return () => {
       cancelled = true;
@@ -354,6 +357,8 @@ export function RoleManagement() {
               <h2 className="section-title">Dashboard widgets</h2>
               {widgetsCatalogLoading ? (
                 <p className="loading-state">Loading widget catalog…</p>
+              ) : widgetsCatalogError ? (
+                <p className="error-state">{widgetsCatalogError}</p>
               ) : (
                 <>
                   <WidgetAssignments

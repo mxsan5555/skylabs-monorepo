@@ -25,7 +25,7 @@ export async function requestOtp(identifier: string, purpose: OtpPurpose): Promi
   });
 
   if (isPhoneIdentifier(identifier)) {
-    console.log("Sending OTP:", otp, "to:", identifier);
+    console.log("Sending OTP to:", identifier);
     const delivered = await sendSmsOtp(identifier, otp);
     if (!delivered) {
       throw new ApiError('SERVER_ERROR', 'Failed to send OTP via SMS provider');

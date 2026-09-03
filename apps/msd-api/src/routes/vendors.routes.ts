@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import type { Request, Response, NextFunction } from 'express';
 import type { PermissionAction } from '@skylabs-monorepo/shared-types';
 import { can } from '@skylabs-monorepo/shared-permissions';
@@ -6,7 +7,7 @@ import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/requirePermission';
 import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
 import { sendError } from '../lib/http';
-import { validateBody, validateParams } from '../middleware/validate';
+import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
   VendorCreateSchema,
@@ -31,11 +32,18 @@ import {
   TherapistStatusUpdateSchema,
   TherapistPackageCreateSchema,
   TherapistPackageUpdateSchema,
+  VendorModulesAndCategoryAccessSchema,
   VendorIdParamSchema,
+  VendorDocumentTypeParamSchema,
+  VendorDocumentAdminParamSchema,
 } from '../schemas/vendor.schema';
+import { ProductCreateSchema, ProductUpdateSchema, ProductStatusUpdateSchema, ProductListQuerySchema } from '../schemas/product.schema';
 import { MediaReorderSchema } from '../schemas/media.schema';
-import { imageUpload, videoUpload } from '../lib/media-upload.middleware';
+import { imageUpload, videoUpload, documentUpload } from '../lib/media-upload.middleware';
+import type { VendorDocumentType } from '../generated/prisma-client';
 import * as vendorService from '../services/vendor.service';
+import * as vendorDocumentService from '../services/vendor-document.service';
+import * as productService from '../services/product.service';
 import { writeAuditLog } from '../services/audit.service';
 import { sendData, ApiError } from '../lib/http';
 
@@ -81,9 +89,15 @@ function requireAnyPermission(menuKey: string, actions: PermissionAction[]) {
 
 // ─── Reference lookups ───────────────────────────────────────────────────────
 
-router.get('/categories', async (_req, res, next) => {
+const VendorCategoriesQuerySchema = z.object({
+  type: z.enum(['SERVICE', 'PRODUCT', 'THERAPY']).optional(),
+  vendorId: z.string().uuid().optional(),
+});
+
+router.get('/categories', validateQuery(VendorCategoriesQuerySchema), async (req, res, next) => {
   try {
-    sendData(res, await vendorService.listCategories());
+    const { type, vendorId } = req.validatedQuery as ReturnType<typeof VendorCategoriesQuerySchema.parse>;
+    sendData(res, await vendorService.listCategories({ type, vendorId }));
   } catch (err) {
     next(err);
   }
@@ -98,9 +112,9 @@ router.get('/categories', async (_req, res, next) => {
  * vendor) — filtered server-side in `searchEligibleOwnerCandidates`, never left to the
  * frontend to exclude.
  */
-router.get('/users/search', requireAnyPermission('vendors', ['create', 'edit']), async (req, res, next) => {
+router.get('/users/search', requireAnyPermission('vendors', ['create', 'edit']), validateQuery(VendorUserSearchQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, q } = VendorUserSearchQuerySchema.parse(req.query);
+    const { page, pageSize, q } = req.validatedQuery as ReturnType<typeof VendorUserSearchQuerySchema.parse>;
     const { items, total } = await vendorService.searchEligibleOwnerCandidates(q, page, pageSize);
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
@@ -113,9 +127,9 @@ router.get('/users/search', requireAnyPermission('vendors', ['create', 'edit']),
  * the existing `vendors:view` (the same permission the "Vendors" sidebar item already uses, so
  * no new permission key or seed grant is needed; the `vendor` role still never holds this).
  */
-router.get('/branches', requirePermission('vendors', 'view'), async (req, res, next) => {
+router.get('/branches', requirePermission('vendors', 'view'), validateQuery(CrossVendorListQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, search } = CrossVendorListQuerySchema.parse(req.query);
+    const { page, pageSize, search } = req.validatedQuery as ReturnType<typeof CrossVendorListQuerySchema.parse>;
     const { items, total } = await vendorService.listAllBranches({ page, pageSize, search });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
@@ -123,10 +137,20 @@ router.get('/branches', requirePermission('vendors', 'view'), async (req, res, n
   }
 });
 
-router.get('/deals', requirePermission('vendors', 'view'), async (req, res, next) => {
+router.get('/deals', requirePermission('vendors', 'view'), validateQuery(CrossVendorListQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, search } = CrossVendorListQuerySchema.parse(req.query);
+    const { page, pageSize, search } = req.validatedQuery as ReturnType<typeof CrossVendorListQuerySchema.parse>;
     const { items, total } = await vendorService.listAllDeals({ page, pageSize, search });
+    sendData(res, items, { meta: { total, page, pageSize } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/therapists', requirePermission('vendors', 'view'), validateQuery(CrossVendorListQuerySchema), async (req, res, next) => {
+  try {
+    const { page, pageSize, search } = req.validatedQuery as ReturnType<typeof CrossVendorListQuerySchema.parse>;
+    const { items, total } = await vendorService.listAllTherapists({ page, pageSize, search });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);
@@ -258,6 +282,67 @@ router.patch('/me/images/:imageId/primary', requirePermission('vendors', 'custom
   }
 });
 
+// ─── Vendor KYC documents, self-service (real file upload — GST/PAN/Aadhaar, one active file
+// per type; replaces the deprecated `kycDocuments` pasted-URL list) ──────────────────────────
+
+router.get('/me/kyc-documents', requirePermission('vendors', 'custom'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    sendData(res, await vendorDocumentService.listVendorDocuments(vendor.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/me/kyc-documents/:documentType',
+  requirePermission('vendors', 'custom'),
+  validateParams(VendorDocumentTypeParamSchema),
+  documentUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const document = await vendorDocumentService.uploadVendorDocument(vendor.id, req.params.documentType as VendorDocumentType, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_document.upload',
+        targetType: 'VendorDocument',
+        targetId: document.id,
+        ...requestMeta(req),
+      });
+      sendData(res, document, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/me/kyc-documents/:documentType',
+  requirePermission('vendors', 'custom'),
+  validateParams(VendorDocumentTypeParamSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await vendorDocumentService.deleteVendorDocument(vendor.id, req.params.documentType as VendorDocumentType);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_document.delete',
+        targetType: 'VendorDocument',
+        targetId: req.params.documentType,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 router.post(
   '/me/video',
   requirePermission('vendors', 'custom'),
@@ -327,14 +412,49 @@ router.get('/me/branches', requirePermission('vendors', 'custom'), async (req, r
   }
 });
 
-/**
- * Distinct customers who have ordered/booked from the caller's own vendor — for the vendor-facing
- * "Customers" screen. Derived entirely from existing Order/Booking rows (no new table); paginates
- * the merged distinct-customer list, not the raw Order/Booking rows.
- */
-router.get('/me/customers', requirePermission('vendors', 'custom'), async (req, res, next) => {
+// ─── Business modules + Category access (onboarding wizard Step 2) ──────────────────────────
+// Replace-the-full-set pattern, same shape as rbac.routes.ts's PUT /roles/:id/permissions.
+
+router.get('/me/category-access', requirePermission('vendors', 'custom'), async (req, res, next) => {
   try {
-    const { page, pageSize } = PaginationQuerySchema.parse(req.query);
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    sendData(res, await vendorService.getVendorCategoryAccess(vendor.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put(
+  '/me/category-access',
+  requirePermission('vendors', 'custom'),
+  validateBody(VendorModulesAndCategoryAccessSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const result = await vendorService.setVendorModulesAndCategoryAccess(vendor.id, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor.category_access.update',
+        targetType: 'Vendor',
+        targetId: vendor.id,
+        after: req.body,
+        ...requestMeta(req),
+      });
+      sendData(res, result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * Distinct customers who have ordered from the caller's own vendor — for the vendor-facing
+ * "Customers" screen. Derived entirely from existing Order rows (no new table); paginates the
+ * distinct-customer list, not the raw Order rows.
+ */
+router.get('/me/customers', requirePermission('vendors', 'custom'), validateQuery(PaginationQuerySchema), async (req, res, next) => {
+  try {
+    const { page, pageSize } = req.validatedQuery as ReturnType<typeof PaginationQuerySchema.parse>;
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     const { items, total } = await vendorService.listMyCustomers(vendor.id, { page, pageSize });
     sendData(res, items, { meta: { total, page, pageSize } });
@@ -898,11 +1018,231 @@ router.delete(
   },
 );
 
+// ─── Product (self-service — vendor-owned catalog, mirrors Branch/Therapist's exact split) ──
+
+router.get('/me/products', requirePermission('products', 'view'), validateQuery(ProductListQuerySchema), async (req, res, next) => {
+  try {
+    const { page, pageSize, search, categoryId, subcategoryId, status } = req.validatedQuery as ReturnType<typeof ProductListQuerySchema.parse>;
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    const { items, total } = await productService.listProducts({ page, pageSize, search, categoryId, subcategoryId, status, vendorId: vendor.id });
+    sendData(res, items, { meta: { total, page, pageSize } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/me/products',
+  requirePermission('products', 'create'),
+  validateBody(ProductCreateSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const product = await productService.createProduct(vendor.id, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'product.create',
+        targetType: 'Product',
+        targetId: product.id,
+        after: product,
+        ...requestMeta(req),
+      });
+      sendData(res, product, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/products/:productId',
+  requirePermission('products', 'edit'),
+  validateBody(ProductUpdateSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const product = await productService.updateProduct(vendor.id, req.params.productId, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'product.update',
+        targetType: 'Product',
+        targetId: product.id,
+        after: product,
+        ...requestMeta(req),
+      });
+      sendData(res, product);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/me/products/:productId/status',
+  requirePermission('products', 'edit'),
+  validateBody(ProductStatusUpdateSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      const product = await productService.setProductStatus(vendor.id, req.params.productId, req.body.isActive);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'product.status_change',
+        targetType: 'Product',
+        targetId: product.id,
+        after: { isActive: product.isActive },
+        ...requestMeta(req),
+      });
+      sendData(res, product);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete('/me/products/:productId', requirePermission('products', 'delete'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    const before = await productService.getProductScopedOrThrow(vendor.id, req.params.productId);
+    await productService.deleteProduct(vendor.id, req.params.productId);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'product.delete',
+      targetType: 'Product',
+      targetId: req.params.productId,
+      before,
+      ...requestMeta(req),
+    });
+    sendData(res, null);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Product media (self-service — shared upload system, see media.service.ts's doc comment) ─
+
+router.post(
+  '/me/products/:productId/images',
+  requirePermission('products', 'edit'),
+  imageUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await productService.getProductScopedOrThrow(vendor.id, req.params.productId);
+      const image = await productService.addProductImage(req.params.productId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'product_image.create',
+        targetType: 'ProductImage',
+        targetId: image.id,
+        ...requestMeta(req),
+      });
+      sendData(res, image, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete('/me/products/:productId/images/:imageId', requirePermission('products', 'edit'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    await productService.getProductScopedOrThrow(vendor.id, req.params.productId);
+    await productService.deleteProductImage(req.params.productId, req.params.imageId);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'product_image.delete',
+      targetType: 'ProductImage',
+      targetId: req.params.imageId,
+      ...requestMeta(req),
+    });
+    sendData(res, { deleted: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch(
+  '/me/products/:productId/images/reorder',
+  requirePermission('products', 'edit'),
+  validateBody(MediaReorderSchema),
+  async (req, res, next) => {
+    try {
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await productService.getProductScopedOrThrow(vendor.id, req.params.productId);
+      await productService.reorderProductImages(req.params.productId, req.body.imageIds);
+      sendData(res, { reordered: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch('/me/products/:productId/images/:imageId/primary', requirePermission('products', 'edit'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    await productService.getProductScopedOrThrow(vendor.id, req.params.productId);
+    await productService.setProductPrimaryImage(req.params.productId, req.params.imageId);
+    sendData(res, { primary: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/me/products/:productId/video',
+  requirePermission('products', 'edit'),
+  videoUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+      await productService.getProductScopedOrThrow(vendor.id, req.params.productId);
+      const video = await productService.replaceProductVideo(req.params.productId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'product_video.upsert',
+        targetType: 'ProductVideo',
+        targetId: video.id,
+        ...requestMeta(req),
+      });
+      sendData(res, video, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete('/me/products/:productId/video', requirePermission('products', 'edit'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    await productService.getProductScopedOrThrow(vendor.id, req.params.productId);
+    await productService.deleteProductVideo(req.params.productId);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'product_video.delete',
+      targetType: 'ProductVideo',
+      targetId: req.params.productId,
+      ...requestMeta(req),
+    });
+    sendData(res, { deleted: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── Admin/SuperAdmin surface ─────────────────────────────────────────────────
 
-router.get('/', requirePermission('vendors', 'view'), async (req, res, next) => {
+router.get('/', requirePermission('vendors', 'view'), validateQuery(VendorListQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, search, status } = VendorListQuerySchema.parse(req.query);
+    const { page, pageSize, search, status } = req.validatedQuery as ReturnType<typeof VendorListQuerySchema.parse>;
     const { items, total } = await vendorService.listVendors({ page, pageSize, search, status });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
@@ -1083,6 +1423,63 @@ router.delete(
   },
 );
 
+// ─── Vendor KYC documents, admin-on-behalf (real file upload) ───────────────────────────────
+
+router.get('/:id/kyc-documents', requirePermission('vendors', 'view'), validateParams(UuidParamSchema), async (req, res, next) => {
+  try {
+    sendData(res, await vendorDocumentService.listVendorDocuments(req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/:id/kyc-documents/:documentType',
+  requirePermission('vendors', 'edit'),
+  validateParams(VendorDocumentAdminParamSchema),
+  documentUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const document = await vendorDocumentService.uploadVendorDocument(req.params.id, req.params.documentType as VendorDocumentType, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_document.upload',
+        targetType: 'VendorDocument',
+        targetId: document.id,
+        ...requestMeta(req),
+      });
+      sendData(res, document, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/:id/kyc-documents/:documentType',
+  requirePermission('vendors', 'edit'),
+  validateParams(VendorDocumentAdminParamSchema),
+  async (req, res, next) => {
+    try {
+      await vendorDocumentService.deleteVendorDocument(req.params.id, req.params.documentType as VendorDocumentType);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor_document.delete',
+        targetType: 'VendorDocument',
+        targetId: req.params.documentType,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 router.patch(
   '/:id/approve',
   requirePermission('vendors', 'approve'),
@@ -1182,13 +1579,50 @@ router.get('/:vendorId/branches', requirePermission('vendors', 'view'), async (r
   }
 });
 
+router.get(
+  '/:vendorId/category-access',
+  requirePermission('vendors', 'view'),
+  validateParams(VendorIdParamSchema),
+  async (req, res, next) => {
+    try {
+      sendData(res, await vendorService.getVendorCategoryAccess(req.params.vendorId));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.put(
+  '/:vendorId/category-access',
+  requirePermission('vendors', 'edit'),
+  validateParams(VendorIdParamSchema),
+  validateBody(VendorModulesAndCategoryAccessSchema),
+  async (req, res, next) => {
+    try {
+      const result = await vendorService.setVendorModulesAndCategoryAccess(req.params.vendorId, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'vendor.category_access.update',
+        targetType: 'Vendor',
+        targetId: req.params.vendorId,
+        after: req.body,
+        ...requestMeta(req),
+      });
+      sendData(res, result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 /**
  * All of a vendor's therapists (active AND inactive, across every branch) for the admin's
- * vendor detail page. Deliberately read-only — create/update/status-change stay self-service-only
- * (`/me/branches/:branchId/therapists`, `/me/therapists/:therapistId[/status]`), which resolve the
- * vendor from the caller's own `ownerUserId` and so are unreachable by a non-owner admin. Gated on
- * the same `vendors:view` every other purely-admin vendor read in this file already uses — no new
- * permission key needed.
+ * vendor detail page. Read-only — the admin-on-behalf create/update/status-change variants live
+ * further down (`/:vendorId/branches/:branchId/therapists`, `/:vendorId/therapists/:therapistId
+ * [/status]`), right after Branch/Deal's own admin-on-behalf routes, since a non-owner admin
+ * can't reach the `/me/*` self-service paths (those resolve the vendor from the caller's own
+ * `ownerUserId`). Gated on the same `vendors:view` every other purely-admin vendor read in this
+ * file already uses — no new permission key needed.
  */
 router.get(
   '/:vendorId/therapists',
@@ -1215,9 +1649,10 @@ router.get(
   '/:vendorId/customers',
   requirePermission('vendors', 'view'),
   validateParams(VendorIdParamSchema),
+  validateQuery(PaginationQuerySchema),
   async (req, res, next) => {
     try {
-      const { page, pageSize } = PaginationQuerySchema.parse(req.query);
+      const { page, pageSize } = req.validatedQuery as ReturnType<typeof PaginationQuerySchema.parse>;
       const { items, total } = await vendorService.listMyCustomers(req.params.vendorId, { page, pageSize });
       sendData(res, items, { meta: { total, page, pageSize } });
     } catch (err) {
@@ -1409,6 +1844,184 @@ router.patch(
         ...requestMeta(req),
       });
       sendData(res, deal);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── Therapist (admin-on-behalf — mirrors Branch/Deal's exact admin split) ──────────────────
+// vendorId comes from the URL (not a JWT-derived `getMyVendorOrThrow`), so an admin/salesperson
+// can create/edit a Therapist before the vendor has ever logged in (onboarding wizard Step 4).
+// Reuses the exact same createTherapist/updateTherapist/setTherapistStatus service functions the
+// self-service `/me/*` routes call — those already take vendorId as a plain parameter and do no
+// ownership resolution internally, so the `specializationCategoryId` -> assertVendorHasCategoryAccess
+// (THERAPY) check inside them runs unchanged for this path too; no bypass.
+
+router.post(
+  '/:vendorId/branches/:branchId/therapists',
+  requirePermission('vendors', 'create'),
+  validateBody(TherapistCreateSchema),
+  async (req, res, next) => {
+    try {
+      const therapist = await vendorService.createTherapist(req.params.vendorId, req.params.branchId, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist.create',
+        targetType: 'Therapist',
+        targetId: therapist.id,
+        after: therapist,
+        ...requestMeta(req),
+      });
+      sendData(res, therapist, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/:vendorId/therapists/:therapistId',
+  requirePermission('vendors', 'edit'),
+  validateBody(TherapistUpdateSchema),
+  async (req, res, next) => {
+    try {
+      const therapist = await vendorService.updateTherapist(req.params.vendorId, req.params.therapistId, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist.update',
+        targetType: 'Therapist',
+        targetId: therapist.id,
+        after: therapist,
+        ...requestMeta(req),
+      });
+      sendData(res, therapist);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/:vendorId/therapists/:therapistId/status',
+  requirePermission('vendors', 'status_change'),
+  validateBody(TherapistStatusUpdateSchema),
+  async (req, res, next) => {
+    try {
+      const therapist = await vendorService.setTherapistStatus(req.params.vendorId, req.params.therapistId, req.body.isActive);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist.status_change',
+        targetType: 'Therapist',
+        targetId: therapist.id,
+        after: { isActive: therapist.isActive },
+        ...requestMeta(req),
+      });
+      sendData(res, therapist);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── Product (admin-on-behalf — mirrors Branch/Deal's exact admin split) ─────────────────────
+
+router.get('/:vendorId/products', requirePermission('products', 'view'), validateParams(VendorIdParamSchema), validateQuery(ProductListQuerySchema), async (req, res, next) => {
+  try {
+    const { page, pageSize, search, categoryId, subcategoryId, status } = req.validatedQuery as ReturnType<typeof ProductListQuerySchema.parse>;
+    const { items, total } = await productService.listProducts({ page, pageSize, search, categoryId, subcategoryId, status, vendorId: req.params.vendorId });
+    sendData(res, items, { meta: { total, page, pageSize } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/:vendorId/products',
+  requirePermission('products', 'create'),
+  validateParams(VendorIdParamSchema),
+  validateBody(ProductCreateSchema),
+  async (req, res, next) => {
+    try {
+      const product = await productService.createProduct(req.params.vendorId, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'product.create',
+        targetType: 'Product',
+        targetId: product.id,
+        after: product,
+        ...requestMeta(req),
+      });
+      sendData(res, product, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/:vendorId/products/:productId',
+  requirePermission('products', 'edit'),
+  validateParams(VendorIdParamSchema),
+  validateBody(ProductUpdateSchema),
+  async (req, res, next) => {
+    try {
+      const product = await productService.updateProduct(req.params.vendorId, req.params.productId, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'product.update',
+        targetType: 'Product',
+        targetId: product.id,
+        after: product,
+        ...requestMeta(req),
+      });
+      sendData(res, product);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/:vendorId/products/:productId/status',
+  requirePermission('products', 'edit'),
+  validateParams(VendorIdParamSchema),
+  validateBody(ProductStatusUpdateSchema),
+  async (req, res, next) => {
+    try {
+      const product = await productService.setProductStatus(req.params.vendorId, req.params.productId, req.body.isActive);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'product.status_change',
+        targetType: 'Product',
+        targetId: product.id,
+        after: { isActive: product.isActive },
+        ...requestMeta(req),
+      });
+      sendData(res, product);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/:vendorId/products/:productId',
+  requirePermission('products', 'delete'),
+  validateParams(VendorIdParamSchema),
+  async (req, res, next) => {
+    try {
+      const before = await productService.getProductScopedOrThrow(req.params.vendorId, req.params.productId);
+      await productService.deleteProduct(req.params.vendorId, req.params.productId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'product.delete',
+        targetType: 'Product',
+        targetId: req.params.productId,
+        before,
+        ...requestMeta(req),
+      });
+      sendData(res, null);
     } catch (err) {
       next(err);
     }

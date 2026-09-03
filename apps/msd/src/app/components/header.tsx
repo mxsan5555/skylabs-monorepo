@@ -3,7 +3,6 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { FilledButton, TextButton, IconButton, FilledTonalIconButton, Icon, Menu, MenuItem, Divider, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCart, subscribeCartUpdated, clearCart, } from '../../api/cart';
-import { listBookings, subscribeBookingsUpdated, } from '../../api/bookings';
 import { useWishlist } from '../../wishlist/wishlist-context';
 import { listCatalogCategories, type CatalogCategoryWithChildren, } from '../../api/catalog';
 import { isCustomerUser, isStaffUser, } from '../../auth/role-routing';
@@ -78,18 +77,11 @@ export function Header() {
     }
     let cancelled = false;
     const loadCount = () => {
-      Promise.all([
-        getCart(token),
-        listBookings(token, { status: 'PENDING', pageSize: 50 }),
-      ])
-        .then(([cartRes, bookingsRes]) => {
-          console.log('CART RESPONSE:', cartRes);
-          console.log('BOOKINGS RESPONSE:', bookingsRes);
+      getCart(token)
+        .then(({ data }) => {
           if (!cancelled) {
-            const cartItemCount = cartRes.data.items.reduce((sum, item) => sum + item.quantity, 0);
-            console.log('CART ITEM COUNT:', cartItemCount);
-            console.log('BOOKING COUNT:', bookingsRes.data.length);
-            setTotalItems(cartItemCount + bookingsRes.data.length);
+            const cartItemCount = data.items.reduce((sum, item) => sum + item.quantity, 0);
+            setTotalItems(cartItemCount);
           }
         })
         .catch(() => {
@@ -98,11 +90,9 @@ export function Header() {
     };
     loadCount();
     const unsubscribeCart = subscribeCartUpdated(loadCount);
-    const unsubscribeBookings = subscribeBookingsUpdated(loadCount);
     return () => {
       cancelled = true;
       unsubscribeCart();
-      unsubscribeBookings();
     };
   }, [isAuthenticated, token,]);
   const handleSignOut = () => {
@@ -164,25 +154,7 @@ export function Header() {
                 </NavLink>
               ))}
 
-              {/* Static Product link */}
-              <NavLink
-                to="/products"
-                className={({ isActive }) =>
-                  `header-category-link${isActive ? ' header-category-link--active' : ''}`
-                }
-              >
-                <span>Products</span>
-              </NavLink>
-
-              {/* Static Therapist link */}
-              <NavLink
-                to="/therapists"
-                className={({ isActive }) =>
-                  `header-category-link${isActive ? ' header-category-link--active' : ''}`
-                }
-              >
-                <span>Therapists</span>
-              </NavLink>
+             
             </div>
           </div>
           <div className="site-header__actions">
@@ -240,17 +212,6 @@ export function Header() {
                         <Icon slot="start">person </Icon>
                         {content.header.profileMenu.profile}
                       </MenuItem>
-                      {isCustomer && (
-                        <MenuItem
-                          onClick={() => {
-                            navigate('/bookings',);
-                            setProfileMenuOpen(false,);
-                          }}
-                        >
-                          <Icon slot="start"> calendar_month</Icon>
-                          {content.header.profileMenu.bookings}
-                        </MenuItem>
-                      )}
                       {isCustomer && (
                         <MenuItem
                           onClick={() => {
@@ -364,14 +325,6 @@ export function Header() {
               <ul className="nav-drawer__links">
                 <li>
                   <NavLink
-                    to="/bookings"
-                    className="nav-drawer__link"
-                    onClick={closeDrawer}
-                  > Bookings
-                  </NavLink>
-                </li>
-                <li>
-                  <NavLink
                     to="/orders"
                     className="nav-drawer__link"
                     onClick={closeDrawer}
@@ -412,11 +365,6 @@ export function Header() {
                 >
                   {content.header.myAccount}
                 </FilledButton>
-                {isCustomer && (
-                  <TextButton onClick={() => { navigate('/bookings',); closeDrawer(); }}>
-                    Bookings
-                  </TextButton>
-                )}
                 {isCustomer && (
                   <TextButton onClick={() => { navigate('/orders',); closeDrawer(); }} >
                     Orders

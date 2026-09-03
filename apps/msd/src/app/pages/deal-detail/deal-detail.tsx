@@ -1,14 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { MdDialog } from '@material/web/dialog/dialog.js';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
 import {
-  Dialog,
   Divider,
   FilledButton,
   Icon,
   OutlinedIconButton,
-  TextButton,
 } from '@skylabs-monorepo/shared-ui/react';
 
 import '@skylabs-monorepo/shared-ui/carousel';
@@ -16,21 +13,19 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCatalogDeal, listCatalogDeals, type CatalogDeal, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
-import type { Booking } from '../../../api/bookings';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
-import { DealBookingDialog } from '../../components/deal-booking-dialog';
+import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 
-import { formatINR, formatBookingSchedule, bookingDisplayName } from '../../../utils/format';
+import { formatINR } from '../../../utils/format';
 import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
 import './deal-detail.css';
 /**
- * A single Deal — GET /catalog/deals/:id.
- *
- * Reachable for either a service deal (booking flow)
- * or a product deal (cart flow).
+ * A single Deal — GET /catalog/deals/:id. Reachable for either a service deal or a product
+ * deal — both go through the same unified Add to Cart flow (see msd-api's CartItem schema doc
+ * comment; there is no separate Booking flow).
  *
  * /category/:slug links service deals here.
  * Product deals link to /products/:id.
@@ -54,13 +49,6 @@ export function DealDetail() {
   const [addedToCart, setAddedToCart] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
-  const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
-  const resultDialogRef = useRef<MdDialog>(null);
-  useEffect(() => {
-    if (confirmedBooking) {
-      resultDialogRef.current?.show();
-    }
-  }, [confirmedBooking]);
 
   useEffect(() => {
     if (!id) {
@@ -101,7 +89,7 @@ export function DealDetail() {
     }
     listCatalogDeals({
       categoryId: deal.category.id,
-      type: deal.service ? 'service' : 'product',
+      type: deal.product ? 'product' : 'service',
       pageSize: 7,
     })
       .then(({ data }) => {
@@ -158,7 +146,6 @@ export function DealDetail() {
   };
 
   const name =
-    deal.service?.name ??
     deal.product?.name ??
     deal.title;
 
@@ -200,7 +187,7 @@ export function DealDetail() {
     setActionMessage('');
 
     try {
-      await addCartItem(token, dealId, 1);
+      await addCartItem(token, { dealId, quantity: 1 });
 
       setAddedToCart(true);
 
@@ -258,9 +245,9 @@ export function DealDetail() {
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org',
-            '@type': deal.service
-              ? 'Service'
-              : 'Product',
+            '@type': deal.product
+              ? 'Product'
+              : 'Service',
             name,
             description,
             provider:
@@ -312,7 +299,6 @@ export function DealDetail() {
                 className="deal-detail__main-img"
                 src={gallery[activeImg]}
                 alt={
-                  deal.service?.imageAlt ??
                   deal.product?.imageAlt ??
                   name
                 }
@@ -400,7 +386,7 @@ export function DealDetail() {
               variant="primary"
               size="small"
             >
-              {deal.service ? dealDetail.serviceType.service : dealDetail.serviceType.product}
+              {deal.product ? dealDetail.serviceType.product : dealDetail.serviceType.service}
             </sky-badge>
           </div>
 
@@ -473,16 +459,10 @@ export function DealDetail() {
 
           {/* CTA */}
           <div className="deal-detail__cta">
-            {deal.service ? (
-              <DealBookingDialog
+            {!deal.product ? (
+              <DealAddToCartDialog
                 deal={deal}
-                onBooked={(booking, intent) => {
-                  if (intent === 'cart') {
-                    setActionMessage(`Added "${name}" to your cart.`);
-                  } else {
-                    setConfirmedBooking(booking);
-                  }
-                }}
+                onAdded={(label) => setActionMessage(`Added "${label}" to your cart.`)}
                 renderTrigger={(open) => (
                   <FilledButton
                     type="button"
@@ -492,9 +472,9 @@ export function DealDetail() {
                     }}
                   >
                     <Icon slot="icon" aria-hidden="true">
-                      event_available
+                      shopping_bag
                     </Icon>
-                    Book Now
+                    Add to Cart
                   </FilledButton>
                 )}
               />
@@ -567,47 +547,6 @@ export function DealDetail() {
             </p>
           )}
 
-          <Dialog
-            ref={resultDialogRef}
-            onClose={() => setConfirmedBooking(null)}
-          >
-            {confirmedBooking && (
-              <>
-                <span slot="headline"> {dealDetail.booking.confirmationTitle}</span>
-                <div slot="content" className="form-grid">
-                  <p>
-                    <strong>
-                      {bookingDisplayName(confirmedBooking)}
-                    </strong>
-                  </p>
-                  {confirmedBooking.vendor.businessName && (
-                    <p>{confirmedBooking.vendor.businessName}</p>
-                  )}
-                  <p>{confirmedBooking.branch.name}</p>
-                  <p>{formatBookingSchedule(confirmedBooking.bookingDate, confirmedBooking.timeSlot)}</p>
-                  {confirmedBooking.therapist && (
-                    <p>Therapist: {confirmedBooking.therapist.therapistType} — {confirmedBooking.therapist.personName}</p>
-                  )}
-                  <p className="field-hint">{dealDetail.booking.bookingId}: {confirmedBooking.id}</p>
-                </div>
-              </>
-            )}
-            <div slot="actions">
-              <TextButton
-                type="button"
-                onClick={() => navigate('/categories')}
-              >
-                {dealDetail.booking.continueShopping}
-              </TextButton>
-              <FilledButton
-                type="button"
-                onClick={() => navigate('/bookings')}
-              >
-                {dealDetail.booking.viewBooking}
-              </FilledButton>
-            </div>
-          </Dialog>
-
           <Divider />
 
           {/* Description + policy */}
@@ -662,17 +601,16 @@ export function DealDetail() {
 
                   const relatedDeal: DealCardDeal = {
                     id: item.id,
-                    title: item.service?.name ?? item.product?.name ?? item.title,
+                    title: item.product?.name ?? item.title,
                     image: media.images[0] ?? '',
                     imageAlt:
-                      item.service?.imageAlt ??
                       item.product?.imageAlt ??
-                      (item.service?.name ?? item.product?.name ?? item.title),
+                      (item.product?.name ?? item.title),
                     gallery: media.images.length ? media.images : undefined,
                     video: media.video,
-                    badge: item.service
-                      ? dealDetail.serviceType.service
-                      : dealDetail.serviceType.product,
+                    badge: item.product
+                      ? dealDetail.serviceType.product
+                      : dealDetail.serviceType.service,
                     providerName: item.vendor?.businessName ?? undefined,
                     price: Number(item.salePrice),
                     originalPrice:
@@ -681,7 +619,7 @@ export function DealDetail() {
                         ? Number(item.originalPrice)
                         : undefined,
                     discount: item.discountPercent ?? undefined,
-                    isProduct: !item.service,
+                    isProduct: !!item.product,
                   };
 
                   return (

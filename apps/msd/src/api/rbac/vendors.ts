@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost, apiDelete } from './client';
+import { apiGet, apiPatch, apiPost, apiPut, apiDelete, apiPostForm } from './client';
 import type { MediaImage, MediaVideo } from '../media';
 
 export type VendorStatus =
@@ -14,10 +14,25 @@ export type KycStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 export type DealStatus = 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'EXPIRED';
 export type DealApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
+/** Deprecated — the old pasted-URL KYC shape, kept only so `Vendor.kycDocuments` (legacy rows)
+ *  still types correctly. Real KYC documents are `VendorDocument` below. */
 export interface KycDocument {
   type: string;
   url: string;
   uploadedAt?: string;
+}
+
+export type VendorDocumentType = 'GST' | 'PAN' | 'AADHAAR';
+
+/** A real uploaded KYC document — one per `documentType`, replacing the deprecated
+ *  `KycDocument`/pasted-URL shape (see msd-api's `VendorDocument` model doc comment). */
+export interface VendorDocument {
+  id: string;
+  documentType: VendorDocumentType;
+  originalFilename: string | null;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
 }
 
 /** Minimal, non-sensitive summary of a User — no session/token data — used both by the
@@ -44,12 +59,17 @@ export interface VendorFields {
   alternatePhone?: string;
   website?: string;
   logoUrl?: string;
+  /** Deprecated — kept only for rows that predate the First/Last name split (see
+   *  `ownerFirstName`/`ownerLastName`); no longer written to by the current form. */
   ownerName?: string;
+  ownerFirstName?: string;
+  ownerLastName?: string;
   contactPerson?: string;
   ownerEmail?: string;
   ownerMobile?: string;
   alternateOwnerMobile?: string;
   address?: string;
+  addressLine2?: string;
   city?: string;
   state?: string;
   country?: string;
@@ -81,6 +101,12 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
   createdByUserId: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Business modules — bound to the onboarding wizard's Step 2 checkboxes; each `true` module
+   *  must be backed by at least one `VendorCategoryAccess` grant of the matching `type` before
+   *  the vendor can be submitted for verification (see msd-api's `submitForVerification`). */
+  offersService: boolean;
+  offersProduct: boolean;
+  offersTherapy: boolean;
   _count?: { branches: number };
   /** Only present on `GET /vendors/me` — the self-service "complete your profile" checklist. */
   profileCompletion?: { percent: number; sections: { key: string; label: string; complete: boolean }[] };
@@ -92,12 +118,60 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
    *  rows that predate this table (see `resolveVendorMedia` in `utils/media.ts`). */
   mediaImages?: MediaImage[];
   mediaVideo?: MediaVideo | null;
+  /** Real uploaded KYC documents (GST/PAN/Aadhaar) — see `VendorDocument`'s own doc comment.
+   *  `kycDocuments` above is the deprecated pasted-URL shape, kept only for old rows. */
+  documents?: VendorDocument[];
 }
 
 export type VendorCreateInput = VendorFields & { ownerUserId?: string };
 export type VendorUpdateInput = Partial<VendorCreateInput>;
 export type VendorSelfInput = Partial<VendorFields> & Pick<VendorFields, 'businessName'>;
 export type VendorSelfUpdateInput = Partial<VendorFields>;
+
+// ─── KYC documents (real file upload) — self-service ─────────────────────────────────────────
+
+export function listMyKycDocuments(token: string | null) {
+  return apiGet<VendorDocument[]>('/vendors/me/kyc-documents', token);
+}
+
+export function uploadMyKycDocument(token: string | null, documentType: VendorDocumentType, file: Blob, filename: string) {
+  const formData = new FormData();
+  formData.append('file', file, filename);
+  return apiPostForm<VendorDocument>(`/vendors/me/kyc-documents/${documentType}`, token, formData);
+}
+
+export function deleteMyKycDocument(token: string | null, documentType: VendorDocumentType) {
+  return apiDelete<{ deleted: true }>(`/vendors/me/kyc-documents/${documentType}`, token);
+}
+
+// ─── KYC documents (real file upload) — admin-on-behalf ──────────────────────────────────────
+
+export function listVendorKycDocuments(token: string | null, vendorId: string) {
+  return apiGet<VendorDocument[]>(`/vendors/${vendorId}/kyc-documents`, token);
+}
+
+export function uploadVendorKycDocument(token: string | null, vendorId: string, documentType: VendorDocumentType, file: Blob, filename: string) {
+  const formData = new FormData();
+  formData.append('file', file, filename);
+  return apiPostForm<VendorDocument>(`/vendors/${vendorId}/kyc-documents/${documentType}`, token, formData);
+}
+
+export function deleteVendorKycDocument(token: string | null, vendorId: string, documentType: VendorDocumentType) {
+  return apiDelete<{ deleted: true }>(`/vendors/${vendorId}/kyc-documents/${documentType}`, token);
+}
+
+/** One weekday's opening hours — `open: false` means closed all day (start/end are then
+ *  ignored/omitted). Stored as `Branch.openingHours` Json — this shape is a frontend convention
+ *  only, not enforced by a backend schema (the column is a loosely-structured `Json?`). */
+export interface DayHours {
+  open: boolean;
+  start?: string;
+  end?: string;
+}
+
+export type WeekdayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+export type OpeningHours = Partial<Record<WeekdayKey, DayHours>>;
 
 export interface Branch {
   id: string;
@@ -112,6 +186,7 @@ export interface Branch {
   longitude?: number | null;
   phone?: string | null;
   email?: string | null;
+  openingHours?: OpeningHours | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -131,7 +206,10 @@ export interface BranchInput {
   longitude?: number;
   phone?: string;
   email?: string;
+  openingHours?: OpeningHours;
 }
+
+export type CategoryType = 'SERVICE' | 'PRODUCT' | 'THERAPY';
 
 export interface Category {
   id: string;
@@ -139,6 +217,28 @@ export interface Category {
   slug: string;
   parentId: string | null;
   isActive: boolean;
+  /** Only ever set on a top-level row (`parentId: null`) — a subcategory inherits its parent's
+   *  type by join, never duplicated here (see msd-api's `category.service.ts`). */
+  type?: CategoryType | null;
+  isPopular?: boolean;
+}
+
+/** A vendor's direct grant of access to one top-level Category — see msd-api's
+ *  `VendorCategoryAccess` model doc comment. Granting a top-level category implicitly grants
+ *  every one of its active subcategories, so only top-level rows ever appear here. */
+export interface VendorCategoryAccessRow {
+  id: string;
+  vendorId: string;
+  categoryId: string;
+  createdAt: string;
+  category: Category;
+}
+
+export interface VendorModulesAndCategoryAccessInput {
+  offersService: boolean;
+  offersProduct: boolean;
+  offersTherapy: boolean;
+  categoryIds: string[];
 }
 
 export interface Deal {
@@ -147,10 +247,9 @@ export interface Deal {
   branchId: string;
   categoryId: string;
   subcategoryId: string | null;
-  /** Exactly one of serviceId/productId — every deal represents one catalog item (Service or
-   *  Product), enforced server-side. Nullable only because deals created before this field
-   *  existed have neither. */
-  serviceId: string | null;
+  /** Unset = a service deal — the Deal's own title/description/durationMinutes/packages ARE the
+   *  offering directly (no master catalog row at all; the old `Service` model is gone). Set = a
+   *  product deal, pointing at one of the vendor's own vendor-scoped Product rows. */
   productId: string | null;
   title: string;
   slug: string;
@@ -174,7 +273,6 @@ export interface Deal {
   updatedAt: string;
   category?: Category;
   subcategory?: Category | null;
-  service?: { id: string; name: string } | null;
   product?: { id: string; name: string } | null;
   /** Only present on the cross-vendor `GET /vendors/deals` sidebar listing. */
   vendor?: { id: string; businessName: string | null };
@@ -216,7 +314,6 @@ export interface DealPackageInput {
 export interface DealInput {
   categoryId: string;
   subcategoryId?: string;
-  serviceId?: string;
   productId?: string;
   title: string;
   slug: string;
@@ -263,6 +360,11 @@ export function listAllBranches(token: string | null, opts: { page?: number; pag
 /** Cross-vendor deal list for the sidebar's standalone "Deals" page. */
 export function listAllDeals(token: string | null, opts: { page?: number; pageSize?: number; search?: string } = {}) {
   return apiGet<Deal[]>(`/vendors/deals${toQuery(opts)}`, token);
+}
+
+/** Cross-vendor therapist list for the sidebar's standalone "Therapists" page. */
+export function listAllTherapists(token: string | null, opts: { page?: number; pageSize?: number; search?: string } = {}) {
+  return apiGet<CrossVendorTherapist[]>(`/vendors/therapists${toQuery(opts)}`, token);
 }
 
 export function createVendor(token: string | null, input: VendorCreateInput) {
@@ -411,15 +513,15 @@ export function setMyDealStatus(token: string | null, branchId: string, dealId: 
   return apiPatch<Deal>(`/vendors/me/branches/${branchId}/deals/${dealId}/status`, token, { status });
 }
 
-/** One row of the vendor's own customer list — everyone who has ordered from or booked
- *  with this vendor. Flat, no nested objects, matching `GET /vendors/me/customers`. */
+/** One row of the vendor's own customer list — everyone who has ordered from this vendor
+ *  (Deal, Product, or Therapist alike — every purchase kind is an OrderItem). Flat, no nested
+ *  objects, matching `GET /vendors/me/customers`. */
 export interface CustomerRow {
   id: string;
   name: string | null;
   phone: string | null;
   email: string | null;
   orderCount: number;
-  bookingCount: number;
   lastActivityAt: string;
 }
 
@@ -438,7 +540,7 @@ export function listVendorCustomersForAdmin(token: string | null, vendorId: stri
 }
 
 /** A therapist staffed at one of the vendor's own branches. Branch-scoped (not vendor-wide)
- *  because bookings reference `vendorId`+`branchId` consistency — see `GET
+ *  because CartItem/OrderItem reference `vendorId`+`branchId` consistency — see `GET
  *  /vendors/me/branches/:branchId/therapists`. */
 export interface Therapist {
   id: string;
@@ -450,7 +552,12 @@ export interface Therapist {
   /** The actual staff member (e.g. "Ramesh Kumar"). */
   personName: string;
   gender: string | null;
+  /** Free-text, historical display only — kept for backward compatibility with rows created
+   *  before `specializationCategoryId` existed; new create/update flows should prefer it. */
   specialization: string | null;
+  /** Restricted choice — a top-level Category with `type: THERAPY` (or one of its subcategories)
+   *  that this vendor has been granted access to; validated server-side. */
+  specializationCategoryId?: string | null;
   bio: string | null;
   experienceYears: number | null;
   photoUrl: string | null;
@@ -469,6 +576,7 @@ export interface TherapistInput {
   personName: string;
   gender?: string;
   specialization?: string;
+  specializationCategoryId?: string;
   bio?: string;
   experienceYears?: number;
   photoUrl?: string;
@@ -500,6 +608,31 @@ export interface AdminTherapist extends Therapist {
 
 export function listVendorTherapistsForAdmin(token: string | null, vendorId: string) {
   return apiGet<AdminTherapist[]>(`/vendors/${vendorId}/therapists`, token);
+}
+
+/** A therapist as seen by the sidebar's standalone cross-vendor "Therapists" page — same shape
+ *  as `AdminTherapist` plus the owning vendor, mirroring `Branch`/`Deal`'s own `vendor` field
+ *  above. See `GET /vendors/therapists`, gated `vendors:view`. */
+export interface CrossVendorTherapist extends AdminTherapist {
+  vendor?: { id: string; businessName: string | null };
+  _count?: { packages: number };
+}
+
+/** Admin-on-behalf create/update/status — lets an admin/salesperson staff a Therapist for a
+ *  vendor that hasn't logged in yet (onboarding wizard Step 4). Mirrors the self-service
+ *  create/update/status functions above exactly, scoped by an explicit `vendorId` instead of
+ *  the caller's own JWT-derived vendor. See `POST /vendors/:vendorId/branches/:branchId/therapists`,
+ *  `PATCH /vendors/:vendorId/therapists/:therapistId[/status]`. */
+export function createVendorTherapist(token: string | null, vendorId: string, branchId: string, input: TherapistInput) {
+  return apiPost<Therapist>(`/vendors/${vendorId}/branches/${branchId}/therapists`, token, input);
+}
+
+export function updateVendorTherapist(token: string | null, vendorId: string, therapistId: string, input: Partial<TherapistInput>) {
+  return apiPatch<Therapist>(`/vendors/${vendorId}/therapists/${therapistId}`, token, input);
+}
+
+export function setVendorTherapistStatus(token: string | null, vendorId: string, therapistId: string, isActive: boolean) {
+  return apiPatch<Therapist>(`/vendors/${vendorId}/therapists/${therapistId}/status`, token, { isActive });
 }
 
 /** A therapist's own duration/price menu entry — independent of any Deal (no Deal picker, no
@@ -549,6 +682,133 @@ export function deleteTherapistPackage(token: string | null, therapistId: string
 
 // ─── Reference lookups ────────────────────────────────────────────────────────
 
-export function listCategories(token: string | null) {
-  return apiGet<Category[]>('/vendors/categories', token);
+/**
+ * The lean, active-only category lookup every vendor-facing category dropdown uses (Deal/
+ * Product/Therapist create, the onboarding wizard's category-grant step). `type` alone (no
+ * `vendorId`) is the "grant categories" screen — every active category of that module,
+ * regardless of what's granted yet. `vendorId` additionally scopes to only categories this
+ * vendor currently holds a `VendorCategoryAccess` grant for (plus their active children) — use
+ * this everywhere a vendor picks a category to create against, once grants already exist.
+ */
+export function listCategories(token: string | null, opts: { type?: CategoryType; vendorId?: string } = {}) {
+  return apiGet<Category[]>(`/vendors/categories${toQuery(opts)}`, token);
+}
+
+// ─── Business modules + Category access (onboarding wizard Step 2) ──────────
+
+export function getMyVendorCategoryAccess(token: string | null) {
+  return apiGet<VendorCategoryAccessRow[]>('/vendors/me/category-access', token);
+}
+
+export function setMyVendorModulesAndCategoryAccess(token: string | null, input: VendorModulesAndCategoryAccessInput) {
+  return apiPut<VendorCategoryAccessRow[]>('/vendors/me/category-access', token, input);
+}
+
+export function getVendorCategoryAccess(token: string | null, vendorId: string) {
+  return apiGet<VendorCategoryAccessRow[]>(`/vendors/${vendorId}/category-access`, token);
+}
+
+export function setVendorModulesAndCategoryAccess(token: string | null, vendorId: string, input: VendorModulesAndCategoryAccessInput) {
+  return apiPut<VendorCategoryAccessRow[]>(`/vendors/${vendorId}/category-access`, token, input);
+}
+
+// ─── Product (vendor-owned catalog — self-service + admin-on-behalf, mirrors Branch/Deal) ───
+
+export interface VendorProduct {
+  id: string;
+  vendorId: string;
+  name: string;
+  slug: string;
+  brand?: string | null;
+  categoryId: string;
+  subcategoryId: string | null;
+  description?: string | null;
+  summary?: string | null;
+  benefits?: string[] | null;
+  howToUse?: string[] | null;
+  ingredients?: string | null;
+  returnPolicy?: string | null;
+  image?: string | null;
+  gallery?: string[] | null;
+  imageAlt?: string | null;
+  badge?: string | null;
+  price: string;
+  originalPrice?: string | null;
+  discount?: number | null;
+  isNew: boolean;
+  isFeatured: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  category?: { id: string; name: string };
+  subcategory?: { id: string; name: string } | null;
+  mediaImages?: MediaImage[];
+  mediaVideo?: MediaVideo | null;
+}
+
+export interface VendorProductInput {
+  name: string;
+  slug: string;
+  brand?: string;
+  categoryId: string;
+  subcategoryId?: string;
+  description?: string;
+  summary?: string;
+  benefits?: string[];
+  howToUse?: string[];
+  ingredients?: string;
+  returnPolicy?: string;
+  image?: string;
+  gallery?: string[];
+  imageAlt?: string;
+  badge?: string;
+  price: string;
+  originalPrice?: string;
+  discount?: number;
+  isNew?: boolean;
+  isFeatured?: boolean;
+}
+
+export function listMyProducts(token: string | null, opts: { page?: number; pageSize?: number; search?: string; status?: 'active' | 'inactive' } = {}) {
+  return apiGet<VendorProduct[]>(`/vendors/me/products${toQuery(opts)}`, token);
+}
+
+export function createMyProduct(token: string | null, input: VendorProductInput) {
+  return apiPost<VendorProduct>('/vendors/me/products', token, input);
+}
+
+export function updateMyProduct(token: string | null, productId: string, input: Partial<VendorProductInput>) {
+  return apiPatch<VendorProduct>(`/vendors/me/products/${productId}`, token, input);
+}
+
+export function setMyProductStatus(token: string | null, productId: string, isActive: boolean) {
+  return apiPatch<VendorProduct>(`/vendors/me/products/${productId}/status`, token, { isActive });
+}
+
+export function deleteMyProduct(token: string | null, productId: string) {
+  return apiDelete<null>(`/vendors/me/products/${productId}`, token);
+}
+
+export function listVendorProducts(
+  token: string | null,
+  vendorId: string,
+  opts: { page?: number; pageSize?: number; search?: string; status?: 'active' | 'inactive' } = {},
+) {
+  return apiGet<VendorProduct[]>(`/vendors/${vendorId}/products${toQuery(opts)}`, token);
+}
+
+export function createVendorProduct(token: string | null, vendorId: string, input: VendorProductInput) {
+  return apiPost<VendorProduct>(`/vendors/${vendorId}/products`, token, input);
+}
+
+export function updateVendorProduct(token: string | null, vendorId: string, productId: string, input: Partial<VendorProductInput>) {
+  return apiPatch<VendorProduct>(`/vendors/${vendorId}/products/${productId}`, token, input);
+}
+
+export function setVendorProductStatus(token: string | null, vendorId: string, productId: string, isActive: boolean) {
+  return apiPatch<VendorProduct>(`/vendors/${vendorId}/products/${productId}/status`, token, { isActive });
+}
+
+export function deleteVendorProduct(token: string | null, vendorId: string, productId: string) {
+  return apiDelete<null>(`/vendors/${vendorId}/products/${productId}`, token);
 }

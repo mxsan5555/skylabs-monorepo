@@ -4,7 +4,7 @@ import { razorpay } from '../lib/razorpay';
 import { env } from '../config/env';
 import { ApiError } from '../lib/http';
 import { Prisma } from '../generated/prisma-client';
-import { getMyOrderOrThrow, cascadeBookingStatus, finalizeCartForOrder } from './order.service';
+import { getMyOrderOrThrow, finalizeCartForOrder } from './order.service';
 
 /**
  * Razorpay integration for the existing Order (Phase 8) — see the Phase 9 architecture plan.
@@ -12,6 +12,25 @@ import { getMyOrderOrThrow, cascadeBookingStatus, finalizeCartForOrder } from '.
  * row against the SAME Order, never a new Order. Amount always comes from the server-read
  * `Order.total` — never a client-supplied number.
  */
+
+/**
+ * Constant-time comparison of two hex-encoded HMAC digests — defense-in-depth against timing
+ * attacks on signature verification (`===`/`!==` short-circuits on the first differing byte,
+ * leaking comparison time). Both sides are fixed-length hex by construction (same HMAC-SHA256
+ * algorithm on both sides), so lengths always match in practice; `timingSafeEqual` throws on a
+ * length mismatch instead of returning false, so that case is treated as "not equal" rather
+ * than letting the exception escape.
+ */
+function timingSafeEqualHex(a: string, b: string): boolean {
+  try {
+    const bufA = Buffer.from(a, 'hex');
+    const bufB = Buffer.from(b, 'hex');
+    if (bufA.length !== bufB.length) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Wraps every `razorpay.orders.create` call in this file. An uncaught SDK error (bad
@@ -95,11 +114,7 @@ export async function createCodPayment(customerId: string, orderId: string) {
       },
     });
     const updatedOrder = await tx.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } });
-    // Consumes the linked Booking out of the customer's "pending cart" — see
-    // cascadeBookingStatus's own doc comment in order.service.ts.
-    await cascadeBookingStatus(tx, updatedOrder, 'CONFIRMED');
-    // And, symmetrically, finalizes the linked Cart's items — see finalizeCartForOrder's own
-    // doc comment. No-op for a SERVICE order/booking-linked order (nothing to finalize).
+    // Finalizes the linked Cart's items — see finalizeCartForOrder's own doc comment.
     await finalizeCartForOrder(tx, updatedOrder.id);
     return { payment, updatedOrder };
   });
@@ -110,8 +125,8 @@ export async function createCodPayment(customerId: string, orderId: string) {
 // ─── Batch (combined checkout — Deal + Therapist + Product together) ─────────
 //
 // One checkout action, one payment, one combined receipt — multiple Order rows under the hood
-// (see the marketplace architecture plan's Phase 11 decision). `Order`/`Booking`/`Payment`'s own
-// per-Order shape is unchanged; this is purely an orchestration layer that creates one Razorpay
+// (see the marketplace architecture plan's Phase 11 decision). `Order`/`Payment`'s own per-Order
+// shape is unchanged; this is purely an orchestration layer that creates one Razorpay
 // order for the SUM of several Orders' totals, and one Payment row per Order pointing at that
 // same providerOrderId (Payment.providerOrderId is no longer globally unique — see its own
 // schema doc comment).
@@ -195,10 +210,7 @@ export async function createCodBatchPayment(customerId: string, orderIds: string
         },
       });
       const updatedOrder = await tx.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } });
-      // Consumes each linked Booking out of the customer's "pending cart" — see
-      // cascadeBookingStatus's own doc comment in order.service.ts.
-      await cascadeBookingStatus(tx, updatedOrder, 'CONFIRMED');
-      // And, symmetrically, finalizes each linked Cart's items — see finalizeCartForOrder.
+      // Finalizes each linked Cart's items — see finalizeCartForOrder.
       await finalizeCartForOrder(tx, updatedOrder.id);
       results.push(updatedOrder);
     }
@@ -247,7 +259,7 @@ export async function verifyBatchPayment(customerId: string, orderIds: string[],
     .update(`${input.razorpay_order_id}|${input.razorpay_payment_id}`)
     .digest('hex');
 
-  if (expectedSignature !== input.razorpay_signature) {
+  if (!timingSafeEqualHex(expectedSignature, input.razorpay_signature)) {
     await prisma.payment.updateMany({
       where: { id: { in: payments.map((p) => p.id) } },
       data: { status: 'FAILED', failureReason: 'Signature verification failed' },
@@ -263,10 +275,7 @@ export async function verifyBatchPayment(customerId: string, orderIds: string[],
     const results = [];
     for (const order of orders) {
       const updatedOrder = await tx.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } });
-      // Consumes each linked Booking out of the customer's "pending cart" — see
-      // cascadeBookingStatus's own doc comment in order.service.ts.
-      await cascadeBookingStatus(tx, updatedOrder, 'CONFIRMED');
-      // And, symmetrically, finalizes each linked Cart's items — see finalizeCartForOrder.
+      // Finalizes each linked Cart's items — see finalizeCartForOrder.
       await finalizeCartForOrder(tx, updatedOrder.id);
       results.push(updatedOrder);
     }
@@ -324,7 +333,7 @@ export async function verifyPayment(customerId: string, orderId: string, input: 
     .update(`${input.razorpay_order_id}|${input.razorpay_payment_id}`)
     .digest('hex');
 
-  if (expectedSignature !== input.razorpay_signature) {
+  if (!timingSafeEqualHex(expectedSignature, input.razorpay_signature)) {
     await prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED', failureReason: 'Signature verification failed' } });
     throw new ApiError('VALIDATION_ERROR', 'Payment signature verification failed');
   }
@@ -335,10 +344,7 @@ export async function verifyPayment(customerId: string, orderId: string, input: 
       data: { status: 'PAID', providerPaymentId: input.razorpay_payment_id, signatureVerified: true },
     });
     const updatedOrder = await tx.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } });
-    // Consumes the linked Booking out of the customer's "pending cart" — see
-    // cascadeBookingStatus's own doc comment in order.service.ts.
-    await cascadeBookingStatus(tx, updatedOrder, 'CONFIRMED');
-    // And, symmetrically, finalizes the linked Cart's items — see finalizeCartForOrder.
+    // Finalizes the linked Cart's items — see finalizeCartForOrder.
     await finalizeCartForOrder(tx, updatedOrder.id);
     return { updatedPayment, updatedOrder };
   });
@@ -352,7 +358,7 @@ export async function verifyPayment(customerId: string, orderId: string, input: 
 export function verifyWebhookSignature(rawBody: Buffer, signature: string): boolean {
   if (!signature) return false;
   const expected = crypto.createHmac('sha256', env.razorpayWebhookSecret).update(rawBody).digest('hex');
-  return expected === signature;
+  return timingSafeEqualHex(expected, signature);
 }
 
 interface RazorpayWebhookBody {
@@ -414,13 +420,10 @@ export async function handleWebhookEvent(body: RazorpayWebhookBody): Promise<voi
       });
       const orderIds = [...new Set(live.map((p) => p.orderId))];
       await tx.order.updateMany({ where: { id: { in: orderIds } }, data: { status: 'CONFIRMED' } });
-      // Consumes each linked Booking out of the customer's "pending cart" — see
-      // cascadeBookingStatus's own doc comment in order.service.ts. Re-reads the (now-updated)
-      // orders since updateMany doesn't return rows.
+      // Re-reads the (now-updated) orders since updateMany doesn't return rows, then finalizes
+      // each linked Cart's items — see finalizeCartForOrder.
       const updatedOrders = await tx.order.findMany({ where: { id: { in: orderIds } } });
       for (const order of updatedOrders) {
-        await cascadeBookingStatus(tx, order, 'CONFIRMED');
-        // And, symmetrically, finalizes each linked Cart's items — see finalizeCartForOrder.
         await finalizeCartForOrder(tx, order.id);
       }
     });

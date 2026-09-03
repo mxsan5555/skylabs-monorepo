@@ -15,7 +15,7 @@ export interface Customer {
   email: string | null;
   status: CustomerStatus;
   createdAt: string;
-  _count: { orders: number; bookings: number };
+  _count: { orders: number };
 }
 
 function toQuery(params: Record<string, string | number | undefined>): string {

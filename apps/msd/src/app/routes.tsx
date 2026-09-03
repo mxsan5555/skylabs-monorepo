@@ -23,16 +23,16 @@ import { VendorNewPage } from './pages/account/vendors/vendor-new-page';
 import { CustomerManagement } from './pages/account/customers/customers';
 import { BranchList } from './pages/account/vendors/branch-list';
 import { DealList } from './pages/account/vendors/deal-list';
+import { TherapistList } from './pages/account/vendors/therapist-list';
 import { VendorBusinessProfile } from './pages/account/vendors/vendor-business-profile';
 import { VendorBranchesDeals } from './pages/account/vendors/vendor-branches-deals';
 import { VendorCustomers } from './pages/account/vendors/vendor-customers';
 import { VendorTherapists } from './pages/account/vendors/vendor-therapists';
 import { VendorDeals } from './pages/account/vendors/vendor-deals';
 import { CategoryManagement } from './pages/account/masters/categories';
+import { PopularTagManagement } from './pages/account/masters/popular-tags';
 import { ProductManagement } from './pages/account/products/products';
-import { ServiceManagement } from './pages/account/services/services';
 import { OrderManagement } from './pages/account/orders/orders';
-import { BookingManagement } from './pages/account/bookings/bookings';
 import { Reports } from './pages/account/reports/reports';
 import Search from './pages/search/search';
 import Category from './pages/category/category';
@@ -40,7 +40,6 @@ import { CategoriesIndex } from './pages/categories/categories';
 import { Orders } from './pages/orders/orders';
 import { OrderDetail } from './pages/orders/order-detail';
 import { Invoice } from './pages/invoice/invoice';
-import { Bookings } from './pages/bookings/bookings';
 import DealDetail from './pages/deal-detail/deal-detail';
 import {Cart} from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
@@ -63,6 +62,7 @@ import { MyAccountPayments } from './pages/my-account/payments';
  * OR-of-three-actions guard instead — kept local here rather than changing the shared
  * `RequirePermission` component used by every other route in the app.
  */
+
 function VendorsRouteGuard({ children }: { children: ReactNode }) {
   const { can } = useAuth();
   if (!can('vendors', 'view') && !can('vendors', 'custom') && !can('vendor-portal', 'view')) {
@@ -121,9 +121,9 @@ export function AppRoutes() {
           }
         />
 
-        {/* Customer account pages (Orders/Order Detail/Bookings) — nested INSIDE PublicLayout so
+        {/* Customer account pages (Orders/Order Detail) — nested INSIDE PublicLayout so
             the site Header/Footer stay mounted around them, reusing the SAME existing
-            `MyAccountLayout` (full sidebar: Profile & Addresses/Orders/Bookings/Wishlist/Cart/
+            `MyAccountLayout` (full sidebar: Profile & Addresses/Orders/Wishlist/Cart/
             Payment History/Invoices/Settings — see my-account-layout.tsx's NAV_ITEMS) that
             `/my-account/*` uses below, not a cut-down sidebar. `MyAccountLayout` itself never
             renders a header/footer, so nesting it here (inside PublicLayout) is what keeps
@@ -165,7 +165,6 @@ export function AppRoutes() {
   <Route path="/orders" element={<Orders />} />
   <Route path="/orders/:id" element={<OrderDetail />} />
   <Route path="/orders/:id/invoice" element={<Invoice />} />
-  <Route path="/bookings" element={<Bookings />} />
 </Route>
 
         {/* ── Content pages ── */}
@@ -180,7 +179,7 @@ export function AppRoutes() {
       {/* ── "My Account" (Profile/Payments/Invoices/Settings) — MyAccountLayout used bare, on its
           own, exactly as before (no PublicLayout wrapper, no header/footer — see
           MyAccountLayout's own doc comment for why). This is the ORIGINAL, unmodified placement;
-          the Orders/Bookings block above just nests the same layout a second time, inside
+          the Orders block above just nests the same layout a second time, inside
           PublicLayout, for its own routes. ── */}
     
       {/* Auth screens use a minimal centered shell (no header/footer). */}
@@ -284,7 +283,7 @@ export function AppRoutes() {
         />
         {/* Vendor-facing Customers list — reuses `vendor-portal:view` too, so it's visible with
             zero seed.ts/permission changes (same one-permissionKey-many-nodes pattern as
-            orders/bookings above). Data itself is scoped `vendors:custom` server-side. */}
+            orders above). Data itself is scoped `vendors:custom` server-side. */}
         <Route
           path="/account/vendor-customers"
           element={
@@ -320,26 +319,18 @@ export function AppRoutes() {
           }
         />
         <Route
+          path="/account/therapists"
+          element={
+            <RequirePermission menuKey="vendors">
+              <TherapistList />
+            </RequirePermission>
+          }
+        />
+        <Route
           path="/account/orders"
           element={
             <RequirePermission menuKey="orders">
               <OrderManagement />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/bookings"
-          element={
-            <RequirePermission menuKey="orders">
-              <BookingManagement />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/services"
-          element={
-            <RequirePermission menuKey="services">
-              <ServiceManagement />
             </RequirePermission>
           }
         />
@@ -384,6 +375,15 @@ export function AppRoutes() {
             </RequirePermission>
           }
         />
+
+        <Route
+          path="/account/masters/category-types"
+          element={
+            <RequirePermission menuKey="masters.categories">
+              <CategoryManagement scope="leaf" />
+            </RequirePermission>
+          }
+        />
          <Route
           path="/account/masters/deals"
           element={
@@ -396,7 +396,7 @@ export function AppRoutes() {
           path="/account/masters/tags"
           element={
             <RequirePermission menuKey="masters.tags">
-              <AdminPage title="Marketing Tags" subtitle="Module coming soon." />
+              <PopularTagManagement />
             </RequirePermission>
           }
         />

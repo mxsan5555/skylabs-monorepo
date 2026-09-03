@@ -18,9 +18,10 @@ dotenv.config({ path: path.join(__dirname, '../.env.local') });
 import { PrismaClient, Prisma } from '../src/generated/prisma-client';
 import type { PermissionAction, MenuNode } from '@skylabs-monorepo/shared-types';
 import { permissionKeyFor } from '@skylabs-monorepo/shared-permissions';
-import { ensureUniqueSlug } from '../src/lib/slug';
+import { ensureUniqueSlug, slugify } from '../src/lib/slug';
 import { getMenuForApp } from '@skylabs-monorepo/shared-menu';
 import { normalizeIdentifier } from '../src/lib/normalizeIdentifier';
+import { CATEGORY_TAXONOMY } from './category-taxonomy';
 
 const prisma = new PrismaClient();
 
@@ -199,10 +200,9 @@ async function grantStarterPermissions(
   // gates only the ownership-scoped `/vendors/me*` self-service surface. 'vendor-portal:view'
   // is a separate, narrower menu key that only surfaces the "My Business" sidebar item —
   // never granted to admin/customer/etc., so it can't leak the admin Vendors/Branches/Deals nav.
-  // 'orders:status_change' lets a vendor confirm/complete/cancel its OWN orders and the
-  // bookings behind them (Phase 10) — order.service.ts/booking.service.ts still enforce
-  // vendor-ownership scoping and a narrower transition set server-side; the permission alone
-  // only gates whether the action UI/route is reachable at all.
+  // 'orders:status_change' lets a vendor confirm/complete/cancel its OWN orders —
+  // order.service.ts still enforces vendor-ownership scoping and a narrower transition set
+  // server-side; the permission alone only gates whether the action UI/route is reachable at all.
   await grant('vendor', ['dashboard:view', 'orders:view', 'orders:status_change', 'products:view', 'services:view', 'vendors:custom', 'vendor-portal:view']);
 }
 
@@ -223,7 +223,6 @@ async function seedDashboardWidgets(roles: Map<string, { id: string; isSuperAdmi
     { key: 'services-count', title: 'Total Services', module: 'services', description: 'Count of bookable services.' },
     { key: 'products-count', title: 'Total Products', module: 'products', description: 'Count of purchasable products.' },
     { key: 'deals-count', title: 'Total Deals', module: 'vendors', description: 'Count of deals/packages across all vendors.' },
-    { key: 'bookings-count', title: 'Total Bookings', module: 'orders', description: 'Total number of service bookings.' },
   ];
 
   const widgetIdByKey = new Map<string, string>();
@@ -265,7 +264,6 @@ async function seedDashboardWidgets(roles: Map<string, { id: string; isSuperAdmi
     'services-count',
     'products-count',
     'deals-count',
-    'bookings-count',
   ]);
   await assign('sales', ['revenue-summary', 'orders-recent']);
   await assign('marketing', ['customers-count']);
@@ -321,35 +319,52 @@ async function seedSuperAdminUser(roles: Map<string, { id: string; isSuperAdmin:
 }
 
 /**
- * A starter handful of categories/subcategories — real admin CRUD (`masters.categories`/
- * `masters.sub-categories`) manages the rest from here; this just seeds enough rows so the
- * Deal form and the Category/Sub-category admin lists aren't empty on first run.
+ * The canonical 8-category taxonomy (Category → Subcategory → Type — see
+ * `prisma/category-taxonomy.ts`'s own doc comment for the naming/depth rules) — find-or-create
+ * by slug at every one of the 152 rows (8 top + 30 sub + 114 type), same discipline as every
+ * other seed function in this file: `name`/`description` are admin-editable via `masters.
+ * categories` CRUD, so a rerun must never revert an admin's rename. Returns a Map of EVERY
+ * node's slug -> id (top-level, Subcategory, and Type alike) so downstream seed data can look up
+ * a Deal/Product's `categoryId` (always a top-level slug) and `subcategoryId` (whichever deeper
+ * tier — Subcategory or Type — was actually chosen) from the same one Map.
  */
-async function seedCategories() {
-  const parents = [
-    { name: 'Spa & Wellness', slug: 'spa-wellness' },
-    { name: 'Salon & Grooming', slug: 'salon-grooming' },
-  ];
-  const parentIdBySlug = new Map<string, string>();
-  for (const parent of parents) {
-    // Find-or-create, never blind-update: Category.name/description are admin-editable via
-    // masters.categories CRUD, and re-running seed must never revert an admin's rename.
-    const row = (await prisma.category.findUnique({ where: { slug: parent.slug } }))
-      ?? (await prisma.category.create({ data: parent }));
-    parentIdBySlug.set(parent.slug, row.id);
-  }
+/** Every row here comes from the fixed canonical taxonomy (`category-taxonomy.ts`), so it must
+ *  always be reachable in the storefront — `upsert`+force `isActive: true` on every run (not the
+ *  old find-or-create-only pattern) so a taxonomy row that got deactivated by some other process
+ *  (e.g. a vendor-reset side effect) is unconditionally restored, rather than silently staying
+ *  hidden until someone notices and hand-fixes the DB row again. Never touches `name`/`slug`/
+ *  `type` on the update path — only the activeness guarantee. */
+async function seedCategoryTaxonomy(): Promise<Map<string, string>> {
+  const categoryIdBySlug = new Map<string, string>();
 
-  const children = [
-    { name: 'Massage Therapy', slug: 'massage-therapy', parentSlug: 'spa-wellness' },
-    { name: 'Facial & Skincare', slug: 'facial-skincare', parentSlug: 'salon-grooming' },
-  ];
-  for (const child of children) {
-    const parentId = parentIdBySlug.get(child.parentSlug)!;
-    const existing = await prisma.category.findUnique({ where: { slug: child.slug } });
-    if (!existing) {
-      await prisma.category.create({ data: { name: child.name, slug: child.slug, parentId } });
+  for (const top of CATEGORY_TAXONOMY) {
+    const topRow = await prisma.category.upsert({
+      where: { slug: top.slug },
+      update: { isActive: true },
+      create: { name: top.name, slug: top.slug, type: top.type },
+    });
+    categoryIdBySlug.set(top.slug, topRow.id);
+
+    for (const [subIdx, sub] of top.children.entries()) {
+      const subRow = await prisma.category.upsert({
+        where: { slug: sub.slug },
+        update: { isActive: true },
+        create: { name: sub.name, slug: sub.slug, parentId: topRow.id, sortOrder: subIdx },
+      });
+      categoryIdBySlug.set(sub.slug, subRow.id);
+
+      for (const [leafIdx, leaf] of sub.children.entries()) {
+        const leafRow = await prisma.category.upsert({
+          where: { slug: leaf.slug },
+          update: { isActive: true },
+          create: { name: leaf.name, slug: leaf.slug, parentId: subRow.id, sortOrder: leafIdx },
+        });
+        categoryIdBySlug.set(leaf.slug, leafRow.id);
+      }
     }
   }
+
+  return categoryIdBySlug;
 }
 
 /** lowercase, non-alphanumeric runs -> single '-', leading/trailing '-' trimmed. */
@@ -399,149 +414,68 @@ async function backfillBranchOpeningHours(): Promise<number> {
 }
 
 // ─── Demo marketplace dataset ────────────────────────────────────────────────
-// Category → Sub-category → Service/Product → Deal → Vendor → Branch → Cart/Booking →
+// Category → Sub-category → Product → Deal/Therapist → Vendor → Branch → Cart →
 // Checkout → Order → Payment, all as real rows the real APIs already serve — no mock data, no
-// parallel demo system. Every function below is safe to re-run: upsert on the model's real
-// unique key where one exists (User.phone, Category/Product/Service/Deal.slug, Cart.customerId,
-// CartItem's (cartId,dealId), Payment.providerOrderId, Order.bookingId), or a
-// findFirst-then-create-if-missing guard where it doesn't (Branch, Booking, non-booking Order).
-// Never `deleteMany` against any of these tables — this only ever layers demo rows on top of
-// whatever's already there.
-
-interface CategorySeed {
-  name: string;
-  slug: string;
-  description?: string;
-}
-
-/**
- * Extends `seedCategories()`'s starter pair with a broader two-level taxonomy (Beauty /
- * Wellness / Home Services, each with several subcategories) so the Deal form, the admin
- * Category/Sub-category lists, and the public storefront have real breadth — without touching
- * the original Spa & Wellness / Salon & Grooming rows. Deliberately only one level deep: every
- * subcategory's parentId points at one of the three top-level rows here, never at another
- * subcategory.
- */
-async function seedCatalogTaxonomy(): Promise<Map<string, string>> {
-  const categoryIdBySlug = new Map<string, string>();
-
-  const topLevel: CategorySeed[] = [
-    { name: 'Beauty', slug: 'beauty', description: 'Hair, skin, makeup, and nail care.' },
-    { name: 'Wellness', slug: 'wellness', description: 'Massage, therapy, and body care.' },
-    { name: 'Home Services', slug: 'home-services', description: 'Cleaning and appliance repair at home.' },
-  ];
-  for (const cat of topLevel) {
-    // Find-or-create — see seedCategories()'s comment; never overwrite an admin rename.
-    const row = (await prisma.category.findUnique({ where: { slug: cat.slug } }))
-      ?? (await prisma.category.create({ data: cat }));
-    categoryIdBySlug.set(cat.slug, row.id);
-  }
-
-  const subLevel: (CategorySeed & { parentSlug: string })[] = [
-    { name: 'Hair', slug: 'hair', parentSlug: 'beauty' },
-    { name: 'Skin Care', slug: 'skin-care', parentSlug: 'beauty' },
-    { name: 'Makeup', slug: 'makeup', parentSlug: 'beauty' },
-    { name: 'Nails', slug: 'nails', parentSlug: 'beauty' },
-    { name: 'Spa', slug: 'spa', parentSlug: 'beauty' },
-    { name: 'Massage', slug: 'massage', parentSlug: 'wellness' },
-    { name: 'Therapy', slug: 'therapy', parentSlug: 'wellness' },
-    { name: 'Body Care', slug: 'body-care', parentSlug: 'wellness' },
-    { name: 'Cleaning', slug: 'cleaning', parentSlug: 'home-services' },
-    { name: 'Appliance Repair', slug: 'appliance-repair', parentSlug: 'home-services' },
-  ];
-  for (const cat of subLevel) {
-    const parentId = categoryIdBySlug.get(cat.parentSlug)!;
-    const row = (await prisma.category.findUnique({ where: { slug: cat.slug } }))
-      ?? (await prisma.category.create({ data: { name: cat.name, slug: cat.slug, parentId } }));
-    categoryIdBySlug.set(cat.slug, row.id);
-  }
-
-  return categoryIdBySlug;
-}
-
-interface ServiceSeed {
-  name: string;
-  slug: string;
-  categorySlug: string;
-  subcategorySlug: string;
-  description: string;
-  defaultDurationMinutes: number;
-}
-
-/** Service catalog masters — deliberately unpriced (see Service's schema doc comment); the
- *  Deal rows created in `seedDeals()` carry the actual price/duration per vendor offering. */
-const SERVICE_SEEDS: ServiceSeed[] = [
-  { name: 'Haircut', slug: 'haircut', categorySlug: 'beauty', subcategorySlug: 'hair', description: 'Precision haircut styled to your preference.', defaultDurationMinutes: 30 },
-  { name: 'Hair Styling', slug: 'hair-styling', categorySlug: 'beauty', subcategorySlug: 'hair', description: 'Blow-dry and styling for any occasion.', defaultDurationMinutes: 45 },
-  { name: 'Hair Coloring', slug: 'hair-coloring', categorySlug: 'beauty', subcategorySlug: 'hair', description: 'Full or partial hair color application.', defaultDurationMinutes: 90 },
-  { name: 'Hair Spa', slug: 'hair-spa', categorySlug: 'beauty', subcategorySlug: 'hair', description: 'Deep-conditioning hair spa treatment.', defaultDurationMinutes: 60 },
-  { name: 'Facial', slug: 'facial', categorySlug: 'beauty', subcategorySlug: 'skin-care', description: 'Cleansing and rejuvenating facial treatment.', defaultDurationMinutes: 60 },
-  { name: 'Cleanup', slug: 'cleanup', categorySlug: 'beauty', subcategorySlug: 'skin-care', description: 'Quick refresh facial cleanup.', defaultDurationMinutes: 30 },
-  { name: 'Acne Treatment', slug: 'acne-treatment', categorySlug: 'beauty', subcategorySlug: 'skin-care', description: 'Targeted treatment for acne-prone skin.', defaultDurationMinutes: 45 },
-  { name: 'Swedish Massage', slug: 'swedish-massage', categorySlug: 'wellness', subcategorySlug: 'massage', description: 'Relaxing full-body Swedish massage.', defaultDurationMinutes: 60 },
-  { name: 'Deep Tissue Massage', slug: 'deep-tissue-massage', categorySlug: 'wellness', subcategorySlug: 'massage', description: 'Therapeutic deep-tissue massage for tension relief.', defaultDurationMinutes: 75 },
-  { name: 'Head Massage', slug: 'head-massage', categorySlug: 'wellness', subcategorySlug: 'massage', description: 'Relaxing scalp and head massage.', defaultDurationMinutes: 30 },
-  { name: 'Home Deep Cleaning', slug: 'home-deep-cleaning', categorySlug: 'home-services', subcategorySlug: 'cleaning', description: 'Thorough deep cleaning for the whole home.', defaultDurationMinutes: 120 },
-  { name: 'AC Repair', slug: 'ac-repair', categorySlug: 'home-services', subcategorySlug: 'appliance-repair', description: 'Diagnosis and repair for home air conditioners.', defaultDurationMinutes: 60 },
-];
-
-async function seedServices(categoryIdBySlug: Map<string, string>): Promise<Map<string, string>> {
-  const serviceIdBySlug = new Map<string, string>();
-  for (const svc of SERVICE_SEEDS) {
-    const data = {
-      name: svc.name,
-      categoryId: categoryIdBySlug.get(svc.categorySlug)!,
-      subcategoryId: categoryIdBySlug.get(svc.subcategorySlug)!,
-      description: svc.description,
-      defaultDurationMinutes: svc.defaultDurationMinutes,
-      image: `https://picsum.photos/seed/service-${svc.slug}/600/400`,
-      imageAlt: svc.name,
-      isActive: true,
-    };
-    // Find-or-create: Service name/description/duration are admin-editable — never overwrite.
-    const row = (await prisma.service.findUnique({ where: { slug: svc.slug } }))
-      ?? (await prisma.service.create({ data: { ...data, slug: svc.slug } }));
-    serviceIdBySlug.set(svc.slug, row.id);
-  }
-  return serviceIdBySlug;
-}
+// parallel demo system, and no separate Booking flow (Deal/Product/Therapist all become
+// OrderItems directly). Every function below is safe to re-run: upsert on the model's real
+// unique key where one exists (User.phone, Category/Product/Deal.slug, Cart.customerId,
+// DealPackage's (dealId,durationMinutes), TherapistPackage's (therapistId,durationMinutes),
+// Payment.providerOrderId), or a findFirst-then-create-if-missing guard where it doesn't (Branch,
+// Therapist, CartItem, Order). Never `deleteMany` against any of these tables — this only ever
+// layers demo rows on top of whatever's already there.
 
 interface ProductSeed {
   name: string;
   slug: string;
   categorySlug: string;
   subcategorySlug: string;
+  /** Which seeded vendor (see VENDOR_SEEDS' own `key`) owns this Product — Product is now
+   *  vendor-scoped (see the `direct_category_access` migration), never a shared global master. */
+  vendorKey: string;
   brand: string;
   description: string;
   price: number;
   originalPrice: number;
 }
 
-/** Standalone retail catalog masters — NOT vendor-scoped (see Product's schema doc comment).
- *  `price` here is just the catalog reference price; the storefront actually charges each
- *  Deal's own `salePrice` (see `PRODUCT_DEAL_SEEDS` below). */
+/** Vendor-owned retail catalog (see Product's schema doc comment). `price` here is just the
+ *  catalog reference price; the storefront actually charges each Deal's own `salePrice` (see
+ *  `PRODUCT_DEAL_SEEDS` below). Every entry's `categorySlug` is the single new PRODUCT-typed
+ *  top-level ("product") — `subcategorySlug` goes all the way to the specific Type-tier row
+ *  under it (e.g. "shampoo" under Product > Hair Care), matching the "categoryId is always
+ *  top-level, subcategoryId is whichever deeper tier was actually chosen" rule the rest of the
+ *  reset taxonomy follows (see `prisma/category-taxonomy.ts`). */
 const PRODUCT_SEEDS: ProductSeed[] = [
-  { name: 'Hair Shampoo', slug: 'hair-shampoo', categorySlug: 'beauty', subcategorySlug: 'hair', brand: 'GlowCare', description: 'Sulphate-free shampoo for everyday use.', price: 499, originalPrice: 599 },
-  { name: 'Hair Conditioner', slug: 'hair-conditioner', categorySlug: 'beauty', subcategorySlug: 'hair', brand: 'GlowCare', description: 'Deep-conditioning formula for smooth, frizz-free hair.', price: 449, originalPrice: 549 },
-  { name: 'Hair Serum', slug: 'hair-serum', categorySlug: 'beauty', subcategorySlug: 'hair', brand: 'GlowCare', description: 'Lightweight serum for shine and split-end control.', price: 699, originalPrice: 799 },
-  { name: 'Face Wash', slug: 'face-wash', categorySlug: 'beauty', subcategorySlug: 'skin-care', brand: 'PureSkin', description: 'Gentle daily face wash for all skin types.', price: 299, originalPrice: 349 },
-  { name: 'Moisturizer', slug: 'moisturizer', categorySlug: 'beauty', subcategorySlug: 'skin-care', brand: 'PureSkin', description: 'Hydrating moisturizer for soft, supple skin.', price: 599, originalPrice: 699 },
-  { name: 'Body Scrub', slug: 'body-scrub', categorySlug: 'wellness', subcategorySlug: 'body-care', brand: 'UrbanSpa', description: 'Exfoliating body scrub for smoother skin.', price: 399, originalPrice: 499 },
-  { name: 'Massage Oil', slug: 'massage-oil', categorySlug: 'wellness', subcategorySlug: 'massage', brand: 'UrbanSpa', description: 'Aromatic massage oil for relaxation.', price: 349, originalPrice: 429 },
+  { name: 'Hair Shampoo', slug: 'hair-shampoo', categorySlug: 'product', subcategorySlug: 'shampoo', vendorKey: 'glow', brand: 'GlowCare', description: 'Sulphate-free shampoo for everyday use.', price: 499, originalPrice: 599 },
+  { name: 'Hair Conditioner', slug: 'hair-conditioner', categorySlug: 'product', subcategorySlug: 'conditioner', vendorKey: 'glow', brand: 'GlowCare', description: 'Deep-conditioning formula for smooth, frizz-free hair.', price: 449, originalPrice: 549 },
+  { name: 'Hair Serum', slug: 'hair-serum', categorySlug: 'product', subcategorySlug: 'hair-serum', vendorKey: 'glow', brand: 'GlowCare', description: 'Lightweight serum for shine and split-end control.', price: 699, originalPrice: 799 },
+  { name: 'Face Wash', slug: 'face-wash', categorySlug: 'product', subcategorySlug: 'face-wash', vendorKey: 'glow', brand: 'PureSkin', description: 'Gentle daily face wash for all skin types.', price: 299, originalPrice: 349 },
+  { name: 'Moisturizer', slug: 'moisturizer', categorySlug: 'product', subcategorySlug: 'moisturizer', vendorKey: 'glow', brand: 'PureSkin', description: 'Hydrating moisturizer for soft, supple skin.', price: 599, originalPrice: 699 },
+  { name: 'Body Scrub', slug: 'body-scrub', categorySlug: 'product', subcategorySlug: 'body-scrub-product', vendorKey: 'urban', brand: 'UrbanSpa', description: 'Exfoliating body scrub for smoother skin.', price: 399, originalPrice: 499 },
+  { name: 'Massage Oil', slug: 'massage-oil', categorySlug: 'product', subcategorySlug: 'massage-oil', vendorKey: 'urban', brand: 'UrbanSpa', description: 'Aromatic massage oil for relaxation.', price: 349, originalPrice: 429 },
+  { name: 'Spa Kit', slug: 'spa-kit', categorySlug: 'product', subcategorySlug: 'spa-kit', vendorKey: 'serenity', brand: 'SerenityHome', description: 'At-home spa essentials kit for a relaxing retreat.', price: 799, originalPrice: 999 },
+  { name: 'Essential Oil Blend', slug: 'essential-oil-blend', categorySlug: 'product', subcategorySlug: 'essential-oils', vendorKey: 'serenity', brand: 'SerenityHome', description: 'Calming essential oil blend for aromatherapy.', price: 599, originalPrice: 749 },
+  { name: 'Daily Sunscreen', slug: 'daily-sunscreen', categorySlug: 'product', subcategorySlug: 'sunscreen', vendorKey: 'vitality', brand: 'VitalityCare', description: 'Broad-spectrum daily sunscreen, SPF 50.', price: 399, originalPrice: 499 },
+  { name: 'Personal Care Kit', slug: 'personal-care-kit', categorySlug: 'product', subcategorySlug: 'personal-care', vendorKey: 'vitality', brand: 'VitalityCare', description: 'Everyday personal care essentials kit.', price: 899, originalPrice: 1099 },
 ];
 
-async function seedProducts(categoryIdBySlug: Map<string, string>): Promise<Map<string, string>> {
+async function seedProducts(categoryIdBySlug: Map<string, string>, vendorIdByKey: Map<string, string>): Promise<Map<string, string>> {
   const productIdBySlug = new Map<string, string>();
   for (const prod of PRODUCT_SEEDS) {
     const discount = Math.round(((prod.originalPrice - prod.price) / prod.originalPrice) * 100);
     const data = {
+      vendorId: vendorIdByKey.get(prod.vendorKey)!,
       name: prod.name,
       brand: prod.brand,
       categoryId: categoryIdBySlug.get(prod.categorySlug)!,
       subcategoryId: categoryIdBySlug.get(prod.subcategorySlug)!,
       description: prod.description,
       summary: prod.description,
-      benefits: [`Improves ${prod.categorySlug === 'wellness' ? 'relaxation' : 'skin/hair health'}`] as Prisma.InputJsonValue,
+      // Was keyed off `categorySlug` (which distinguished "beauty-products" vs "wellness-products"
+      // pre-reset) — every PRODUCT_SEEDS entry now shares the single new "product" top-level, so
+      // this keys off `subcategorySlug` (the Type-tier row) instead, which still carries the
+      // same relaxation-vs-skin/hair distinction.
+      benefits: [`Improves ${['massage-oil', 'body-scrub-product'].includes(prod.subcategorySlug) ? 'relaxation' : 'skin/hair health'}`] as Prisma.InputJsonValue,
       howToUse: ['Apply as directed', 'Use regularly for best results'] as Prisma.InputJsonValue,
       ingredients: 'See packaging for full ingredient list.',
       returnPolicy: '7-day return if unopened.',
@@ -573,7 +507,8 @@ interface VendorSeed {
   branches: { key: string; name: string; address: string; pincode: string; phone: string; email: string; latitude: number; longitude: number }[];
 }
 
-/** At least 3 approved, active vendors so the public catalogue has real sellers to browse —
+/** Exactly 5 approved, active vendors (the maximum this dev dataset seeds) so the public
+ *  catalogue has real sellers to browse across every top-level category —
  *  `status: 'ACTIVE'` + `kycStatus: 'VERIFIED'` are required for a vendor's deals to ever be
  *  publicly visible (see `VISIBLE_DEAL_WHERE` in catalog.service.ts). Each branch's
  *  `latitude`/`longitude` are real-world approximate coordinates for its actual named locality
@@ -620,6 +555,32 @@ const VENDOR_SEEDS: VendorSeed[] = [
     branches: [
       { key: 'elite-rustampur', name: 'Rustampur Branch', address: 'Rustampur', pincode: '273001', phone: '+919810000031', email: 'rustampur@elitehome.seed.msd.local', latitude: 26.7429, longitude: 83.3947 },
       { key: 'elite-mohaddipur', name: 'Mohaddipur Branch', address: 'Mohaddipur', pincode: '273010', phone: '+919810000032', email: 'mohaddipur@elitehome.seed.msd.local', latitude: 26.7213, longitude: 83.3961 },
+    ],
+  },
+  {
+    key: 'serenity',
+    ownerName: 'Kavita Nair',
+    ownerPhone: '+919810000004',
+    ownerEmail: 'kavita.serenityspa@seed.msd.local',
+    businessName: 'Serenity Spa & Retreat',
+    businessType: 'Spa & Retreats',
+    city: 'Gorakhpur',
+    state: 'Uttar Pradesh',
+    branches: [
+      { key: 'serenity-betiahata', name: 'Betiahata Branch', address: 'Betiahata', pincode: '273001', phone: '+919810000041', email: 'betiahata@serenityspa.seed.msd.local', latitude: 26.7508, longitude: 83.3897 },
+    ],
+  },
+  {
+    key: 'vitality',
+    ownerName: 'Arjun Malhotra',
+    ownerPhone: '+919810000005',
+    ownerEmail: 'arjun.vitalityfitness@seed.msd.local',
+    businessName: 'Vitality Fitness & Wellness',
+    businessType: 'Health & Wellness',
+    city: 'Gorakhpur',
+    state: 'Uttar Pradesh',
+    branches: [
+      { key: 'vitality-paadribazar', name: 'Paadri Bazar Branch', address: 'Paadri Bazar', pincode: '273001', phone: '+919810000051', email: 'paadribazar@vitalityfitness.seed.msd.local', latitude: 26.7554, longitude: 83.3781 },
     ],
   },
 ];
@@ -712,7 +673,6 @@ async function seedVendorsAndBranches(
 interface ServiceDealSeed {
   slug: string;
   title: string;
-  serviceSlug: string;
   categorySlug: string;
   subcategorySlug: string;
   vendorKey: string;
@@ -722,15 +682,20 @@ interface ServiceDealSeed {
   durationMinutes: number;
 }
 
-/** Bookable service offerings — price/duration live here, never on Service itself. */
+/** Bookable service offerings — no master Service row at all (see Deal's own schema doc
+ *  comment); the Deal's own title/description/duration/packages ARE the offering. */
 const SERVICE_DEAL_SEEDS: ServiceDealSeed[] = [
-  { slug: 'haircut-glow-golghar', title: 'Haircut at Glow Beauty Studio — Golghar', serviceSlug: 'haircut', categorySlug: 'beauty', subcategorySlug: 'hair', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 299, originalPrice: 399, durationMinutes: 30 },
-  { slug: 'hair-spa-glow-taramandal', title: 'Hair Spa at Glow Beauty Studio — Taramandal', serviceSlug: 'hair-spa', categorySlug: 'beauty', subcategorySlug: 'hair', vendorKey: 'glow', branchKey: 'glow-taramandal', salePrice: 799, originalPrice: 999, durationMinutes: 60 },
-  { slug: 'facial-glow-golghar', title: 'Facial at Glow Beauty Studio — Golghar', serviceSlug: 'facial', categorySlug: 'beauty', subcategorySlug: 'skin-care', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 999, originalPrice: 1299, durationMinutes: 60 },
-  { slug: 'swedish-massage-urban-civillines', title: 'Swedish Massage at Urban Wellness Spa — Civil Lines', serviceSlug: 'swedish-massage', categorySlug: 'wellness', subcategorySlug: 'massage', vendorKey: 'urban', branchKey: 'urban-civillines', salePrice: 1499, originalPrice: 1899, durationMinutes: 60 },
-  { slug: 'deep-tissue-massage-urban-medicalroad', title: 'Deep Tissue Massage at Urban Wellness Spa — Medical College Road', serviceSlug: 'deep-tissue-massage', categorySlug: 'wellness', subcategorySlug: 'massage', vendorKey: 'urban', branchKey: 'urban-medicalroad', salePrice: 1799, originalPrice: 2199, durationMinutes: 75 },
-  { slug: 'home-deep-cleaning-elite-rustampur', title: 'Home Deep Cleaning by Elite Home Services — Rustampur', serviceSlug: 'home-deep-cleaning', categorySlug: 'home-services', subcategorySlug: 'cleaning', vendorKey: 'elite', branchKey: 'elite-rustampur', salePrice: 1299, originalPrice: 1599, durationMinutes: 120 },
-  { slug: 'ac-repair-elite-mohaddipur', title: 'AC Repair by Elite Home Services — Mohaddipur', serviceSlug: 'ac-repair', categorySlug: 'home-services', subcategorySlug: 'appliance-repair', vendorKey: 'elite', branchKey: 'elite-mohaddipur', salePrice: 899, originalPrice: 1099, durationMinutes: 60 },
+  { slug: 'haircut-glow-golghar', title: 'Haircut at Glow Beauty Studio — Golghar', categorySlug: 'hair-nails', subcategorySlug: 'haircut', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 299, originalPrice: 399, durationMinutes: 30 },
+  { slug: 'hair-spa-glow-taramandal', title: 'Hair Spa at Glow Beauty Studio — Taramandal', categorySlug: 'hair-nails', subcategorySlug: 'hair-spa', vendorKey: 'glow', branchKey: 'glow-taramandal', salePrice: 799, originalPrice: 999, durationMinutes: 60 },
+  { slug: 'facial-glow-golghar', title: 'Facial at Glow Beauty Studio — Golghar', categorySlug: 'skin-beauty', subcategorySlug: 'classic-facial', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 999, originalPrice: 1299, durationMinutes: 60 },
+  { slug: 'swedish-massage-urban-civillines', title: 'Swedish Massage at Urban Wellness Spa — Civil Lines', categorySlug: 'massage', subcategorySlug: 'swedish-massage', vendorKey: 'urban', branchKey: 'urban-civillines', salePrice: 1499, originalPrice: 1899, durationMinutes: 60 },
+  { slug: 'deep-tissue-massage-urban-medicalroad', title: 'Deep Tissue Massage at Urban Wellness Spa — Medical College Road', categorySlug: 'massage', subcategorySlug: 'deep-tissue-massage', vendorKey: 'urban', branchKey: 'urban-medicalroad', salePrice: 1799, originalPrice: 2199, durationMinutes: 75 },
+  { slug: 'home-deep-cleaning-elite-rustampur', title: 'Home Deep Cleaning by Elite Home Services — Rustampur', categorySlug: 'home-services', subcategorySlug: 'cleaning', vendorKey: 'elite', branchKey: 'elite-rustampur', salePrice: 1299, originalPrice: 1599, durationMinutes: 120 },
+  { slug: 'ac-repair-elite-mohaddipur', title: 'AC Repair by Elite Home Services — Mohaddipur', categorySlug: 'home-services', subcategorySlug: 'appliance-repair', vendorKey: 'elite', branchKey: 'elite-mohaddipur', salePrice: 899, originalPrice: 1099, durationMinutes: 60 },
+  { slug: 'full-body-spa-serenity-betiahata', title: 'Full Body Spa at Serenity Spa & Retreat — Betiahata', categorySlug: 'spa-retreats', subcategorySlug: 'full-body-spa', vendorKey: 'serenity', branchKey: 'serenity-betiahata', salePrice: 1899, originalPrice: 2399, durationMinutes: 90 },
+  { slug: 'couple-spa-serenity-betiahata', title: 'Couple Spa at Serenity Spa & Retreat — Betiahata', categorySlug: 'spa-retreats', subcategorySlug: 'couple-spa', vendorKey: 'serenity', branchKey: 'serenity-betiahata', salePrice: 3499, originalPrice: 4299, durationMinutes: 120 },
+  { slug: 'personal-training-vitality-paadribazar', title: 'Personal Training at Vitality Fitness & Wellness — Paadri Bazar', categorySlug: 'health-wellness', subcategorySlug: 'personal-training', vendorKey: 'vitality', branchKey: 'vitality-paadribazar', salePrice: 999, originalPrice: 1299, durationMinutes: 60 },
+  { slug: 'yoga-session-vitality-paadribazar', title: 'Yoga Session at Vitality Fitness & Wellness — Paadri Bazar', categorySlug: 'health-wellness', subcategorySlug: 'yoga', vendorKey: 'vitality', branchKey: 'vitality-paadribazar', salePrice: 499, originalPrice: 649, durationMinutes: 60 },
 ];
 
 interface ProductDealSeed {
@@ -747,19 +712,25 @@ interface ProductDealSeed {
 
 /** Sellable product offerings. Grouped by vendor+branch deliberately so the demo Cart (single
  *  vendor+branch) and each demo PRODUCT Order (its own distinct vendor+branch combo, since
- *  that's the idempotency key for a non-booking Order) each have a clean, non-colliding set. */
+ *  that's the idempotency key for an Order with no other natural unique key) each have a clean,
+ *  non-colliding set.
+ *  Every `vendorKey` here matches the owning Product's own `vendorKey` in `PRODUCT_SEEDS` —
+ *  a product deal's vendor must always be the Product's actual owner now. */
 const PRODUCT_DEAL_SEEDS: ProductDealSeed[] = [
-  { slug: 'hair-shampoo-glow-golghar', title: 'Hair Shampoo — Glow Beauty Studio', productSlug: 'hair-shampoo', categorySlug: 'beauty', subcategorySlug: 'hair', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 499, originalPrice: 599 },
-  { slug: 'face-wash-glow-golghar', title: 'Face Wash — Glow Beauty Studio', productSlug: 'face-wash', categorySlug: 'beauty', subcategorySlug: 'skin-care', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 299, originalPrice: 349 },
-  { slug: 'moisturizer-glow-taramandal', title: 'Moisturizer — Glow Beauty Studio', productSlug: 'moisturizer', categorySlug: 'beauty', subcategorySlug: 'skin-care', vendorKey: 'glow', branchKey: 'glow-taramandal', salePrice: 599, originalPrice: 699 },
-  { slug: 'hair-serum-glow-taramandal', title: 'Hair Serum — Glow Beauty Studio', productSlug: 'hair-serum', categorySlug: 'beauty', subcategorySlug: 'hair', vendorKey: 'glow', branchKey: 'glow-taramandal', salePrice: 699, originalPrice: 799 },
-  { slug: 'massage-oil-urban-civillines', title: 'Massage Oil — Urban Wellness Spa', productSlug: 'massage-oil', categorySlug: 'wellness', subcategorySlug: 'massage', vendorKey: 'urban', branchKey: 'urban-civillines', salePrice: 349, originalPrice: 429 },
-  { slug: 'body-scrub-urban-civillines', title: 'Body Scrub — Urban Wellness Spa', productSlug: 'body-scrub', categorySlug: 'wellness', subcategorySlug: 'body-care', vendorKey: 'urban', branchKey: 'urban-civillines', salePrice: 399, originalPrice: 499 },
+  { slug: 'hair-shampoo-glow-golghar', title: 'Hair Shampoo — Glow Beauty Studio', productSlug: 'hair-shampoo', categorySlug: 'product', subcategorySlug: 'shampoo', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 499, originalPrice: 599 },
+  { slug: 'face-wash-glow-golghar', title: 'Face Wash — Glow Beauty Studio', productSlug: 'face-wash', categorySlug: 'product', subcategorySlug: 'face-wash', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 299, originalPrice: 349 },
+  { slug: 'moisturizer-glow-taramandal', title: 'Moisturizer — Glow Beauty Studio', productSlug: 'moisturizer', categorySlug: 'product', subcategorySlug: 'moisturizer', vendorKey: 'glow', branchKey: 'glow-taramandal', salePrice: 599, originalPrice: 699 },
+  { slug: 'hair-serum-glow-taramandal', title: 'Hair Serum — Glow Beauty Studio', productSlug: 'hair-serum', categorySlug: 'product', subcategorySlug: 'hair-serum', vendorKey: 'glow', branchKey: 'glow-taramandal', salePrice: 699, originalPrice: 799 },
+  { slug: 'massage-oil-urban-civillines', title: 'Massage Oil — Urban Wellness Spa', productSlug: 'massage-oil', categorySlug: 'product', subcategorySlug: 'massage-oil', vendorKey: 'urban', branchKey: 'urban-civillines', salePrice: 349, originalPrice: 429 },
+  { slug: 'body-scrub-urban-civillines', title: 'Body Scrub — Urban Wellness Spa', productSlug: 'body-scrub', categorySlug: 'product', subcategorySlug: 'body-scrub-product', vendorKey: 'urban', branchKey: 'urban-civillines', salePrice: 399, originalPrice: 499 },
+  { slug: 'spa-kit-serenity-betiahata', title: 'Spa Kit — Serenity Spa & Retreat', productSlug: 'spa-kit', categorySlug: 'product', subcategorySlug: 'spa-kit', vendorKey: 'serenity', branchKey: 'serenity-betiahata', salePrice: 799, originalPrice: 999 },
+  { slug: 'essential-oil-blend-serenity-betiahata', title: 'Essential Oil Blend — Serenity Spa & Retreat', productSlug: 'essential-oil-blend', categorySlug: 'product', subcategorySlug: 'essential-oils', vendorKey: 'serenity', branchKey: 'serenity-betiahata', salePrice: 599, originalPrice: 749 },
+  { slug: 'daily-sunscreen-vitality-paadribazar', title: 'Daily Sunscreen — Vitality Fitness & Wellness', productSlug: 'daily-sunscreen', categorySlug: 'product', subcategorySlug: 'sunscreen', vendorKey: 'vitality', branchKey: 'vitality-paadribazar', salePrice: 399, originalPrice: 499 },
+  { slug: 'personal-care-kit-vitality-paadribazar', title: 'Personal Care Kit — Vitality Fitness & Wellness', productSlug: 'personal-care-kit', categorySlug: 'product', subcategorySlug: 'personal-care', vendorKey: 'vitality', branchKey: 'vitality-paadribazar', salePrice: 899, originalPrice: 1099 },
 ];
 
 async function seedDeals(
   categoryIdBySlug: Map<string, string>,
-  serviceIdBySlug: Map<string, string>,
   productIdBySlug: Map<string, string>,
   vendorIdByKey: Map<string, string>,
   branchIdByKey: Map<string, string>,
@@ -773,7 +744,6 @@ async function seedDeals(
       branchId: branchIdByKey.get(d.branchKey)!,
       categoryId: categoryIdBySlug.get(d.categorySlug)!,
       subcategoryId: categoryIdBySlug.get(d.subcategorySlug)!,
-      serviceId: serviceIdBySlug.get(d.serviceSlug)!,
       productId: null,
       title: d.title,
       shortDescription: `Book ${d.title} now.`,
@@ -801,7 +771,6 @@ async function seedDeals(
       branchId: branchIdByKey.get(d.branchKey)!,
       categoryId: categoryIdBySlug.get(d.categorySlug)!,
       subcategoryId: categoryIdBySlug.get(d.subcategorySlug)!,
-      serviceId: null,
       productId: productIdBySlug.get(d.productSlug)!,
       title: d.title,
       shortDescription: `Buy ${d.title} now.`,
@@ -824,10 +793,69 @@ async function seedDeals(
   return dealIdBySlug;
 }
 
+/**
+ * Seeds `VendorCategoryAccess` + the three business-module booleans for every seeded vendor, so
+ * local dev/test data works immediately with the new category-access gate: the vendor(s) with
+ * service deals get `offersService: true` + access to the top-level categories their deals use;
+ * the vendor(s) with product deals/products get `offersProduct: true` + access to their
+ * products' top-level categories. Also grants `offersTherapy` + all THERAPY categories to the
+ * wellness vendor, as a demo of the Therapist.specializationCategoryId flow.
+ */
+async function seedVendorModulesAndCategoryAccess(
+  vendorIdByKey: Map<string, string>,
+  categoryIdBySlug: Map<string, string>,
+): Promise<void> {
+  const grant = async (vendorKey: string, opts: { offersService?: boolean; offersProduct?: boolean; offersTherapy?: boolean }, categorySlugs: string[]) => {
+    const vendorId = vendorIdByKey.get(vendorKey);
+    if (!vendorId) return;
+    await prisma.vendor.update({
+      where: { id: vendorId },
+      data: {
+        offersService: opts.offersService ?? false,
+        offersProduct: opts.offersProduct ?? false,
+        offersTherapy: opts.offersTherapy ?? false,
+      },
+    });
+    for (const slug of categorySlugs) {
+      const categoryId = categoryIdBySlug.get(slug);
+      if (!categoryId) continue;
+      await prisma.vendorCategoryAccess.upsert({
+        where: { vendorId_categoryId: { vendorId, categoryId } },
+        update: {},
+        create: { vendorId, categoryId },
+      });
+    }
+  };
+
+  // Glow Beauty Studio: sells Hair & Nails services (Haircut/Hair Spa), Skin & Beauty services
+  // (Facial), AND Product-typed items (Hair Shampoo/Face Wash/Moisturizer/Hair Serum) — three
+  // separate top-level grants, since VendorCategoryAccess is always top-level-only and the new
+  // taxonomy has exactly one PRODUCT-typed top-level ("product") regardless of what's sold.
+  await grant('glow', { offersService: true, offersProduct: true }, ['hair-nails', 'skin-beauty', 'product']);
+  // Urban Wellness Spa: sells Massage services, Product-typed items (Body Scrub/Massage Oil),
+  // plus demo Therapy access — the new taxonomy collapses the old per-specialization THERAPY
+  // top-levels (physiotherapy/sports-therapy/deep-tissue/stress-relief) into subcategory/Type
+  // rows under the single new "Therapy" top-level, so this is now one grant, not four.
+  await grant('urban', { offersService: true, offersProduct: true, offersTherapy: true }, ['massage', 'product', 'therapy']);
+  // Elite Home Services: services only, no product/therapy catalog. Slug unchanged by the reset.
+  await grant('elite', { offersService: true }, ['home-services']);
+  // Serenity Spa & Retreat: Spa & Retreats services, Product-typed items, plus Therapy access
+  // for its spa therapists.
+  await grant('serenity', { offersService: true, offersProduct: true, offersTherapy: true }, ['spa-retreats', 'product', 'therapy']);
+  // Vitality Fitness & Wellness: Health & Wellness services, Product-typed items, plus Therapy
+  // access for its personal trainers/instructors.
+  await grant('vitality', { offersService: true, offersProduct: true, offersTherapy: true }, ['health-wellness', 'product', 'therapy']);
+}
+
 interface TherapistSeed {
   branchKey: string;
   name: string;
   specialization: string;
+  /** Restricted-choice counterpart to the free-text `specialization` above — only set for the
+   *  handful of therapists whose specialization is genuinely a THERAPY-category concept (massage/
+   *  bodywork); every beauty-domain therapist (hairstylist, makeup artist, cleaning technician)
+   *  legitimately has none, per Therapist.specializationCategoryId's own schema doc comment. */
+  specializationCategorySlug?: string;
   bio: string;
   experienceYears: number;
 }
@@ -838,22 +866,32 @@ const THERAPIST_SEEDS: TherapistSeed[] = [
   { branchKey: 'glow-golghar', name: 'Simran Kaur', specialization: 'Skincare & Facials', bio: 'Certified skincare therapist focused on facials and rejuvenation treatments.', experienceYears: 4 },
   { branchKey: 'glow-taramandal', name: 'Neha Gupta', specialization: 'Hair Spa & Coloring', bio: 'Expert in hair spa treatments and coloring techniques.', experienceYears: 5 },
   { branchKey: 'glow-taramandal', name: 'Pooja Yadav', specialization: 'Bridal Makeup', bio: 'Bridal and party makeup specialist with an eye for detail.', experienceYears: 7 },
-  { branchKey: 'urban-civillines', name: 'Ramesh Kumar', specialization: 'Swedish Massage', bio: 'Trained massage therapist specializing in relaxation therapies.', experienceYears: 8 },
-  { branchKey: 'urban-civillines', name: 'Suresh Chandra', specialization: 'Deep Tissue Massage', bio: 'Focuses on therapeutic deep-tissue massage for muscle tension relief.', experienceYears: 6 },
-  { branchKey: 'urban-medicalroad', name: 'Vikram Singh', specialization: 'Aromatherapy', bio: 'Aromatherapy and full-body massage specialist.', experienceYears: 5 },
-  { branchKey: 'urban-medicalroad', name: 'Deepak Joshi', specialization: 'Head & Shoulder Massage', bio: 'Specializes in head, neck, and shoulder massage therapy.', experienceYears: 3 },
+  // specializationCategorySlug values updated to the reset taxonomy's Therapy tree (see
+  // prisma/category-taxonomy.ts) — the old per-specialization THERAPY top-levels
+  // (stress-relief/deep-tissue/physiotherapy) no longer exist; 'physiotherapy' happens to survive
+  // unchanged as a Type-tier slug under Therapy > Physical Therapy, the others are remapped to
+  // the closest new Therapy-tree equivalent.
+  { branchKey: 'urban-civillines', name: 'Ramesh Kumar', specialization: 'Swedish Massage', bio: 'Trained massage therapist specializing in relaxation therapies.', experienceYears: 8, specializationCategorySlug: 'stress-therapy' },
+  { branchKey: 'urban-civillines', name: 'Suresh Chandra', specialization: 'Deep Tissue Massage', bio: 'Focuses on therapeutic deep-tissue massage for muscle tension relief.', experienceYears: 6, specializationCategorySlug: 'rehabilitation-therapy' },
+  { branchKey: 'urban-medicalroad', name: 'Vikram Singh', specialization: 'Aromatherapy', bio: 'Aromatherapy and full-body massage specialist.', experienceYears: 5, specializationCategorySlug: 'stress-therapy' },
+  { branchKey: 'urban-medicalroad', name: 'Deepak Joshi', specialization: 'Head & Shoulder Massage', bio: 'Specializes in head, neck, and shoulder massage therapy.', experienceYears: 3, specializationCategorySlug: 'physiotherapy' },
   { branchKey: 'elite-rustampur', name: 'Manoj Tiwari', specialization: 'Home Deep Cleaning', bio: 'Experienced home cleaning technician with a strong attention to detail.', experienceYears: 4 },
   { branchKey: 'elite-rustampur', name: 'Sanjay Pandey', specialization: 'Sanitization', bio: 'Focused on deep sanitization and hygiene-first cleaning.', experienceYears: 3 },
   { branchKey: 'elite-mohaddipur', name: 'Ajay Rai', specialization: 'AC Repair', bio: 'Certified appliance technician specializing in AC repair and servicing.', experienceYears: 9 },
   { branchKey: 'elite-mohaddipur', name: 'Vinod Shukla', specialization: 'Electrical Appliance Repair', bio: 'Skilled in diagnosing and repairing home electrical appliances.', experienceYears: 6 },
+  { branchKey: 'serenity-betiahata', name: 'Meera Joshi', specialization: 'Spa Therapy', bio: 'Spa therapist specializing in full-body relaxation treatments.', experienceYears: 7, specializationCategorySlug: 'stress-therapy' },
+  { branchKey: 'serenity-betiahata', name: 'Ritu Agarwal', specialization: 'Wellness Retreats', bio: 'Curates and delivers wellness retreat experiences for couples and groups.', experienceYears: 5, specializationCategorySlug: 'stress-therapy' },
+  { branchKey: 'vitality-paadribazar', name: 'Rohan Kapoor', specialization: 'Personal Training', bio: 'Certified personal trainer focused on strength and conditioning.', experienceYears: 6 },
+  { branchKey: 'vitality-paadribazar', name: 'Sneha Kapoor', specialization: 'Yoga Instruction', bio: 'Registered yoga instructor specializing in Hatha and Vinyasa styles.', experienceYears: 8 },
 ];
 
 /** Therapist has no natural unique key besides `id` — idempotent via the same
- *  findFirst-then-create-if-missing guard already used for Branch/Booking/non-booking Order in
- *  this file, keyed on (branchId, name). */
+ *  findFirst-then-create-if-missing guard already used for Branch/Order in this file, keyed on
+ *  (branchId, personName). */
 async function seedTherapists(
   vendorIdByKey: Map<string, string>,
   branchIdByKey: Map<string, string>,
+  categoryIdBySlug: Map<string, string>,
 ): Promise<number> {
   const vendorKeyByBranchKey = new Map<string, string>();
   for (const v of VENDOR_SEEDS) {
@@ -865,14 +903,15 @@ async function seedTherapists(
     const branchId = branchIdByKey.get(t.branchKey)!;
     const vendorId = vendorIdByKey.get(vendorKeyByBranchKey.get(t.branchKey)!)!;
 
-    const existing = await prisma.therapist.findFirst({ where: { branchId, name: t.name } });
+    const existing = await prisma.therapist.findFirst({ where: { branchId, personName: t.name } });
     if (!existing) {
       await prisma.therapist.create({
         data: {
           vendorId,
           branchId,
-          name: t.name,
+          personName: t.name,
           specialization: t.specialization,
+          specializationCategoryId: t.specializationCategorySlug ? categoryIdBySlug.get(t.specializationCategorySlug) : undefined,
           bio: t.bio,
           experienceYears: t.experienceYears,
           photoUrl: `https://picsum.photos/seed/therapist-${slugify(t.name)}/300/300`,
@@ -905,77 +944,69 @@ async function seedDemoCustomer(roles: Map<string, { id: string; isSuperAdmin: b
   return user.id;
 }
 
-/** Truncated to local midnight (not raw `Date.now()`) so re-running the seed within the same
- *  day always produces the exact same `Date` value — otherwise the millisecond-precision
- *  timestamp would differ on every run and the Booking findFirst-by-(customerId, dealId,
- *  bookingDate, timeSlot) idempotency check below would never match, silently creating a new
- *  Booking (and, downstream, a new Order/Payment) on every re-run. */
-function daysFromNow(days: number): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + days);
-  return d;
-}
+const PACKAGE_DURATIONS = [30, 60, 90] as const;
+const PACKAGE_MULTIPLIERS = [1, 1.6, 2.2] as const;
 
-interface BookingSeed {
-  dealSlug: string;
-  vendorKey: string;
-  branchKey: string;
-  bookingDate: Date;
-  timeSlot: string;
-  status: 'PENDING' | 'CONFIRMED' | 'COMPLETED';
-}
-
-/** Mixed booking statuses for the demo customer — one in the past (COMPLETED, feeds the demo
- *  SERVICE order below), one confirmed near-future, one still pending near-future. */
-async function seedBookings(
-  customerId: string,
-  dealIdBySlug: Map<string, string>,
-  vendorIdByKey: Map<string, string>,
-  branchIdByKey: Map<string, string>,
-): Promise<Map<string, string>> {
-  const bookingSeeds: BookingSeed[] = [
-    { dealSlug: 'haircut-glow-golghar', vendorKey: 'glow', branchKey: 'glow-golghar', bookingDate: daysFromNow(-5), timeSlot: '10:00 AM', status: 'COMPLETED' },
-    { dealSlug: 'swedish-massage-urban-civillines', vendorKey: 'urban', branchKey: 'urban-civillines', bookingDate: daysFromNow(3), timeSlot: '02:00 PM', status: 'CONFIRMED' },
-    { dealSlug: 'facial-glow-golghar', vendorKey: 'glow', branchKey: 'glow-golghar', bookingDate: daysFromNow(5), timeSlot: '11:00 AM', status: 'PENDING' },
-  ];
-
-  const bookingIdByDealSlug = new Map<string, string>();
-  for (const b of bookingSeeds) {
-    const dealId = dealIdBySlug.get(b.dealSlug)!;
-    const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
-
-    let booking = await prisma.booking.findFirst({
-      where: { customerId, dealId, bookingDate: b.bookingDate, timeSlot: b.timeSlot },
-    });
-    if (!booking) {
-      booking = await prisma.booking.create({
+/** Every SERVICE deal gets a real 30/60/90-minute package menu — the unified Cart/Order flow
+ *  requires selecting a package before a service Deal can be added to cart (see CartItem's own
+ *  schema doc comment), so demo data needs real packages to exercise that flow. Priced as a
+ *  multiple of the deal's own base price, rounded to a clean ten. Idempotent via DealPackage's
+ *  own `@@unique([dealId, durationMinutes])` upsert key. */
+async function seedDealPackages(): Promise<number> {
+  const serviceDeals = await prisma.deal.findMany({ where: { productId: null }, select: { id: true, salePrice: true, originalPrice: true } });
+  let created = 0;
+  for (const deal of serviceDeals) {
+    const base = deal.salePrice.toNumber();
+    const baseOriginal = deal.originalPrice ? deal.originalPrice.toNumber() : null;
+    for (const [i, durationMinutes] of PACKAGE_DURATIONS.entries()) {
+      const existing = await prisma.dealPackage.findUnique({ where: { dealId_durationMinutes: { dealId: deal.id, durationMinutes } } });
+      if (existing) continue;
+      const multiplier = PACKAGE_MULTIPLIERS[i];
+      await prisma.dealPackage.create({
         data: {
-          customerId,
-          dealId,
-          vendorId: vendorIdByKey.get(b.vendorKey)!,
-          branchId: branchIdByKey.get(b.branchKey)!,
-          bookingDate: b.bookingDate,
-          timeSlot: b.timeSlot,
-          quantity: 1,
-          priceSnapshot: deal.salePrice,
-          durationMinutesSnapshot: deal.durationMinutes,
-          status: b.status,
+          dealId: deal.id,
+          durationMinutes,
+          sellingPrice: Math.round((base * multiplier) / 10) * 10,
+          originalPrice: baseOriginal ? Math.round((baseOriginal * multiplier) / 10) * 10 : null,
+          sortOrder: i,
         },
       });
+      created++;
     }
-    bookingIdByDealSlug.set(b.dealSlug, booking.id);
   }
-  return bookingIdByDealSlug;
+  return created;
 }
 
-/** One Cart, two PRODUCT-deal CartItems, both from the same vendor+branch (Cart is
- *  single-vendor/branch by construction — see Cart's schema doc comment). */
-/** Multi-vendor cart, deliberately: two items from Glow Beauty Studio plus one from Urban
- *  Wellness Spa, demonstrating (and exercising, on every seed run) the real multi-vendor
- *  checkout — a cart has no vendor/branch of its own since the schema migration that removed
- *  the single-vendor lock (see Cart's schema doc comment); each item's own deal.vendorId is
- *  authoritative. */
+/** Every Therapist gets a real 30/60/90-minute package menu, entirely independent of any Deal
+ *  (see TherapistPackage's own schema doc comment) — same "must have a package to be added to
+ *  cart" requirement as seedDealPackages above. Idempotent via TherapistPackage's own
+ *  `@@unique([therapistId, durationMinutes])` upsert key. */
+async function seedTherapistPackages(): Promise<number> {
+  const therapists = await prisma.therapist.findMany({ select: { id: true } });
+  const basePriceByDuration = [1099, 1499, 1899];
+  let created = 0;
+  for (const t of therapists) {
+    for (const [i, durationMinutes] of PACKAGE_DURATIONS.entries()) {
+      const existing = await prisma.therapistPackage.findUnique({ where: { therapistId_durationMinutes: { therapistId: t.id, durationMinutes } } });
+      if (existing) continue;
+      await prisma.therapistPackage.create({
+        data: { therapistId: t.id, durationMinutes, sellingPrice: basePriceByDuration[i], sortOrder: i },
+      });
+      created++;
+    }
+  }
+  return created;
+}
+
+/** Multi-vendor, multi-kind cart, deliberately: two Product lines from Glow Beauty Studio plus
+ *  one from Urban Wellness Spa, one Service-Deal line (Swedish Massage, with a package), and one
+ *  Therapist line (Ramesh Kumar, with a package) — demonstrating (and exercising, on every seed
+ *  run) the real unified Deal/Product/Therapist cart, all headed to ONE checkout/ONE Order (see
+ *  CartItem's own schema doc comment; there is no separate Booking flow). A cart has no vendor/
+ *  branch of its own — each item's own deal/therapist relation is authoritative. Idempotent via
+ *  an explicit `findFirst` match on the exact line shape, same discipline as
+ *  cart.service.ts#addItem (the compound unique index can't serve as an upsert key here since
+ *  Postgres treats NULLs as pairwise-distinct). */
 async function seedCart(
   customerId: string,
   dealIdBySlug: Map<string, string>,
@@ -986,20 +1017,43 @@ async function seedCart(
     create: { customerId },
   });
 
-  const cartItemSeeds = [
+  const upsertLine = async (line: { dealId?: string; dealPackageId?: string; therapistId?: string; therapistPackageId?: string; quantity: number; unitPrice: number }) => {
+    const where = {
+      cartId: cart.id,
+      dealId: line.dealId ?? null,
+      dealPackageId: line.dealPackageId ?? null,
+      therapistId: line.therapistId ?? null,
+      therapistPackageId: line.therapistPackageId ?? null,
+    };
+    const existing = await prisma.cartItem.findFirst({ where });
+    if (existing) {
+      await prisma.cartItem.update({ where: { id: existing.id }, data: { quantity: line.quantity, unitPrice: line.unitPrice } });
+    } else {
+      await prisma.cartItem.create({ data: { ...where, quantity: line.quantity, unitPrice: line.unitPrice } });
+    }
+  };
+
+  // Product lines.
+  const productLineSeeds = [
     { dealSlug: 'hair-shampoo-glow-golghar', quantity: 2 },
     { dealSlug: 'face-wash-glow-golghar', quantity: 1 },
     { dealSlug: 'massage-oil-urban-civillines', quantity: 1 },
   ];
-  for (const item of cartItemSeeds) {
+  for (const item of productLineSeeds) {
     const dealId = dealIdBySlug.get(item.dealSlug)!;
     const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
-    await prisma.cartItem.upsert({
-      where: { cartId_dealId: { cartId: cart.id, dealId } },
-      update: { quantity: item.quantity, unitPrice: deal.salePrice },
-      create: { cartId: cart.id, dealId, quantity: item.quantity, unitPrice: deal.salePrice },
-    });
+    await upsertLine({ dealId, quantity: item.quantity, unitPrice: deal.salePrice.toNumber() });
   }
+
+  // Service-Deal line — Swedish Massage, 60-minute package.
+  const massageDealId = dealIdBySlug.get('swedish-massage-urban-civillines')!;
+  const massagePackage = await prisma.dealPackage.findFirstOrThrow({ where: { dealId: massageDealId, durationMinutes: 60 } });
+  await upsertLine({ dealId: massageDealId, dealPackageId: massagePackage.id, quantity: 1, unitPrice: massagePackage.sellingPrice.toNumber() });
+
+  // Therapist line — Ramesh Kumar, 30-minute package.
+  const ramesh = await prisma.therapist.findFirstOrThrow({ where: { personName: 'Ramesh Kumar' } });
+  const rameshPackage = await prisma.therapistPackage.findFirstOrThrow({ where: { therapistId: ramesh.id, durationMinutes: 30 } });
+  await upsertLine({ therapistId: ramesh.id, therapistPackageId: rameshPackage.id, quantity: 1, unitPrice: rameshPackage.sellingPrice.toNumber() });
 }
 
 /** 2 demo wishlist items (one service deal, one product deal) — deliberately distinct from the
@@ -1018,48 +1072,80 @@ async function seedWishlist(customerId: string, dealIdBySlug: Map<string, string
   }
 }
 
-/** SERVICE order tied 1:1 to a Booking — idempotent via Order.bookingId's real @unique column. */
-async function seedServiceOrderFromBooking(customerId: string, bookingId: string): Promise<string> {
-  const existing = await prisma.order.findUnique({ where: { bookingId } });
+interface OrderLineInput {
+  itemName: string;
+  itemType: 'PRODUCT' | 'SERVICE';
+  unitPrice: number;
+  quantity: number;
+  durationMinutes?: number;
+  dealId?: string;
+  dealPackageId?: string;
+  therapistId?: string;
+  therapistPackageId?: string;
+  vendorId: string;
+  branchId: string;
+  vendorNameSnapshot: string;
+  branchNameSnapshot: string;
+}
+
+/**
+ * A Deal(service)/Therapist/Product order created directly from real selections — mirrors what
+ * order.service.ts#createOrderFromCart now produces at checkout for exactly this reason (there
+ * is no Booking model anymore; every purchase kind becomes an OrderItem directly). Order.type is
+ * PRODUCT only if every item is a Product line, else SERVICE — same rule as
+ * order.service.ts#createOrderFromCart — so a Deal+Product+Therapist order here is a genuine
+ * "Mixed" order by `describeOrderComposition`'s reading of its items, exactly like a real
+ * checkout would produce. Idempotent the same way as seedProductOrder — findFirst-by-(customerId,
+ * primary vendorId, primary branchId, type) then create-if-missing, so each demo order below uses
+ * its own distinct vendor+branch combo.
+ */
+async function seedOrder(
+  customerId: string,
+  primaryVendorId: string,
+  primaryBranchId: string,
+  primaryVendorNameSnapshot: string,
+  primaryBranchNameSnapshot: string,
+  status: 'PENDING_PAYMENT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED',
+  items: OrderLineInput[],
+): Promise<string> {
+  const type = items.every((it) => it.itemType === 'PRODUCT') ? 'PRODUCT' : 'SERVICE';
+  const existing = await prisma.order.findFirst({ where: { customerId, vendorId: primaryVendorId, branchId: primaryBranchId, type } });
   if (existing) return existing.id;
 
-  const booking = await prisma.booking.findUniqueOrThrow({
-    where: { id: bookingId },
-    include: { deal: { include: { service: true } }, vendor: true, branch: true },
+  let subtotal = 0;
+  const itemsData = items.map((it) => {
+    const lineTotal = it.unitPrice * it.quantity;
+    subtotal += lineTotal;
+    return {
+      dealId: it.dealId ?? null,
+      dealPackageId: it.dealPackageId ?? null,
+      therapistId: it.therapistId ?? null,
+      therapistPackageId: it.therapistPackageId ?? null,
+      vendorId: it.vendorId,
+      branchId: it.branchId,
+      vendorNameSnapshot: it.vendorNameSnapshot,
+      branchNameSnapshot: it.branchNameSnapshot,
+      itemName: it.itemName,
+      itemType: it.itemType,
+      unitPrice: it.unitPrice,
+      quantity: it.quantity,
+      lineTotal,
+      durationMinutes: it.durationMinutes ?? null,
+    };
   });
-
-  const unitPrice = booking.priceSnapshot.toNumber();
-  const lineTotal = unitPrice * booking.quantity;
 
   const order = await prisma.order.create({
     data: {
       customerId,
-      vendorId: booking.vendorId,
-      branchId: booking.branchId,
-      type: 'SERVICE',
-      status: 'COMPLETED',
-      bookingId: booking.id,
-      vendorNameSnapshot: booking.vendor.businessName ?? 'Vendor',
-      branchNameSnapshot: booking.branch.name,
-      subtotal: lineTotal,
-      total: lineTotal,
-      items: {
-        create: [
-          {
-            dealId: booking.dealId,
-            vendorId: booking.vendorId,
-            branchId: booking.branchId,
-            vendorNameSnapshot: booking.vendor.businessName ?? 'Vendor',
-            branchNameSnapshot: booking.branch.name,
-            itemName: booking.deal.service?.name ?? booking.deal.title,
-            itemType: 'SERVICE',
-            unitPrice,
-            quantity: booking.quantity,
-            lineTotal,
-            durationMinutes: booking.durationMinutesSnapshot,
-          },
-        ],
-      },
+      vendorId: primaryVendorId,
+      branchId: primaryBranchId,
+      type,
+      status,
+      vendorNameSnapshot: primaryVendorNameSnapshot,
+      branchNameSnapshot: primaryBranchNameSnapshot,
+      subtotal,
+      total: subtotal,
+      items: { create: itemsData },
     } as unknown as Prisma.OrderUncheckedCreateInput,
   });
 
@@ -1073,7 +1159,7 @@ interface ProductOrderItemInput {
   quantity: number;
 }
 
-/** A non-booking PRODUCT order has no natural unique key — idempotency is
+/** A PRODUCT order has no natural unique key — idempotency is
  *  findFirst-by-(customerId,vendorId,branchId,type) then create-if-missing, per the task spec.
  *  This means each demo PRODUCT order below deliberately uses its own distinct vendor+branch
  *  combo so they never collide with each other on a re-run. */
@@ -1127,34 +1213,52 @@ async function seedProductOrder(
   return order.id;
 }
 
-/** Fake, clearly-demo, deterministic Razorpay-shaped ids — `demo_`-prefixed so they can never
- *  collide with or be mistaken for a real Razorpay order/payment id. Never calls Razorpay. */
+/**
+ * Fake, clearly-demo, deterministic Razorpay-shaped ids — `demo_`-prefixed so they can never
+ * collide with or be mistaken for a real Razorpay order/payment id. Never calls Razorpay.
+ *
+ * Idempotent via findFirst-then-create/update-if-missing (NOT `upsert`) — unlike this file's
+ * other upserts, `Payment.providerOrderId` is deliberately not `@unique` (a combined multi-order
+ * checkout batch shares one Razorpay order across several Payment rows — see Payment's own
+ * schema doc comment), so there is no unique key `upsert`'s `where` could use here.
+ */
 async function seedPayment(orderId: string, status: 'CREATED' | 'PAID', amount: number): Promise<void> {
   const providerOrderId = `demo_order_${orderId.slice(0, 18)}`;
   const providerPaymentId = status === 'PAID' ? `demo_pay_${orderId.slice(0, 18)}` : null;
-  await prisma.payment.upsert({
-    where: { providerOrderId },
-    update: { status, amount, providerPaymentId, signatureVerified: status === 'PAID' },
-    create: {
-      orderId,
-      provider: 'RAZORPAY',
-      providerOrderId,
-      providerPaymentId,
-      amount,
-      currency: 'INR',
-      status,
-      signatureVerified: status === 'PAID',
-    },
-  });
+  const data = {
+    status,
+    amount,
+    providerPaymentId,
+    signatureVerified: status === 'PAID',
+  };
+  const existing = await prisma.payment.findFirst({ where: { orderId, providerOrderId } });
+  if (existing) {
+    await prisma.payment.update({ where: { id: existing.id }, data });
+  } else {
+    await prisma.payment.create({
+      data: {
+        orderId,
+        provider: 'RAZORPAY',
+        providerOrderId,
+        currency: 'INR',
+        ...data,
+      },
+    });
+  }
 }
 
 /**
- * Ties the demo customer's Bookings/Cart/Orders/Payments together:
- *  1. SERVICE order (COMPLETED) tied 1:1 to the COMPLETED Haircut booking, with a PAID payment.
- *  2. PRODUCT order (CONFIRMED, Glow/Taramandal) with a PAID payment.
- *  3. PRODUCT order (PENDING_PAYMENT, Urban/Civil Lines) with a CREATED (unpaid) payment.
- *  4. PRODUCT order (CANCELLED, Glow/Golghar) with no payment.
- * Each PRODUCT order uses its own vendor+branch combo — see `seedProductOrder`'s doc comment.
+ * Ties the demo customer's Cart/Orders/Payments together — every purchase kind (Deal, Product,
+ * Therapist) is an OrderItem directly, no Booking involved:
+ *  1. MIXED order (COMPLETED, Glow/Golghar: Haircut Deal + Hair Shampoo Product + Anjali Mehta
+ *     Therapist, all in ONE order) with a PAID payment — the canonical "one checkout, one Order,
+ *     several kinds of item" example.
+ *  2. THERAPIST order (CONFIRMED, Urban/Civil Lines: Ramesh Kumar) with a PAID payment.
+ *  3. DEAL order (CONFIRMED, Urban/Medical College Road: Deep Tissue Massage) with a PAID payment.
+ *  4. PRODUCT order (CONFIRMED, Glow/Taramandal) with a PAID payment.
+ *  5. PRODUCT order (PENDING_PAYMENT, Urban/Civil Lines) with a CREATED (unpaid) payment.
+ *  6. PRODUCT order (CANCELLED, Glow/Golghar) with no payment.
+ * Each order uses its own distinct vendor+branch+type combo — see `seedOrder`'s doc comment.
  */
 async function seedDemoCustomerActivity(
   roles: Map<string, { id: string; isSuperAdmin: boolean }>,
@@ -1163,17 +1267,132 @@ async function seedDemoCustomerActivity(
   branchIdByKey: Map<string, string>,
 ): Promise<string> {
   const customerId = await seedDemoCustomer(roles);
-  const bookingIdByDealSlug = await seedBookings(customerId, dealIdBySlug, vendorIdByKey, branchIdByKey);
   await seedCart(customerId, dealIdBySlug);
   await seedWishlist(customerId, dealIdBySlug);
 
-  // 1) SERVICE order — COMPLETED, from the COMPLETED Haircut booking.
-  const completedBookingId = bookingIdByDealSlug.get('haircut-glow-golghar')!;
-  const serviceOrderId = await seedServiceOrderFromBooking(customerId, completedBookingId);
-  const serviceOrder = await prisma.order.findUniqueOrThrow({ where: { id: serviceOrderId } });
-  await seedPayment(serviceOrder.id, 'PAID', serviceOrder.total.toNumber());
+  const glowGolgharId = vendorIdByKey.get('glow')!;
+  const glowGolgharBranchId = branchIdByKey.get('glow-golghar')!;
 
-  // 2) PRODUCT order — CONFIRMED (Glow Beauty Studio, Taramandal Branch), PAID.
+  // 1) MIXED order — COMPLETED (Glow Beauty Studio, Golghar Branch): Deal + Product + Therapist.
+  const haircutDealId = dealIdBySlug.get('haircut-glow-golghar')!;
+  const haircutPackage = await prisma.dealPackage.findFirstOrThrow({ where: { dealId: haircutDealId, durationMinutes: 30 } });
+  const shampooDealId = dealIdBySlug.get('hair-shampoo-glow-golghar')!;
+  const shampooDeal = await prisma.deal.findUniqueOrThrow({ where: { id: shampooDealId } });
+  const anjali = await prisma.therapist.findFirstOrThrow({ where: { personName: 'Anjali Mehta' } });
+  const anjaliPackage = await prisma.therapistPackage.findFirstOrThrow({ where: { therapistId: anjali.id, durationMinutes: 60 } });
+  const mixedOrderId = await seedOrder(
+    customerId,
+    glowGolgharId,
+    glowGolgharBranchId,
+    'Glow Beauty Studio',
+    'Golghar Branch',
+    'COMPLETED',
+    [
+      {
+        dealId: haircutDealId,
+        dealPackageId: haircutPackage.id,
+        itemName: 'Haircut at Glow Beauty Studio — Golghar',
+        itemType: 'SERVICE',
+        unitPrice: haircutPackage.sellingPrice.toNumber(),
+        quantity: 1,
+        durationMinutes: haircutPackage.durationMinutes,
+        vendorId: glowGolgharId,
+        branchId: glowGolgharBranchId,
+        vendorNameSnapshot: 'Glow Beauty Studio',
+        branchNameSnapshot: 'Golghar Branch',
+      },
+      {
+        dealId: shampooDealId,
+        itemName: 'Hair Shampoo',
+        itemType: 'PRODUCT',
+        unitPrice: shampooDeal.salePrice.toNumber(),
+        quantity: 1,
+        vendorId: glowGolgharId,
+        branchId: glowGolgharBranchId,
+        vendorNameSnapshot: 'Glow Beauty Studio',
+        branchNameSnapshot: 'Golghar Branch',
+      },
+      {
+        therapistId: anjali.id,
+        therapistPackageId: anjaliPackage.id,
+        itemName: `${anjali.therapistType} — ${anjali.personName}`,
+        itemType: 'SERVICE',
+        unitPrice: anjaliPackage.sellingPrice.toNumber(),
+        quantity: 1,
+        durationMinutes: anjaliPackage.durationMinutes,
+        vendorId: glowGolgharId,
+        branchId: glowGolgharBranchId,
+        vendorNameSnapshot: 'Glow Beauty Studio',
+        branchNameSnapshot: 'Golghar Branch',
+      },
+    ],
+  );
+  const mixedOrder = await prisma.order.findUniqueOrThrow({ where: { id: mixedOrderId } });
+  await seedPayment(mixedOrder.id, 'PAID', mixedOrder.total.toNumber());
+
+  // 2) THERAPIST order — CONFIRMED (Urban Wellness Spa, Civil Lines Branch): Ramesh Kumar.
+  const urbanCivilLinesId = vendorIdByKey.get('urban')!;
+  const urbanCivilLinesBranchId = branchIdByKey.get('urban-civillines')!;
+  const ramesh = await prisma.therapist.findFirstOrThrow({ where: { personName: 'Ramesh Kumar' } });
+  const rameshPackage = await prisma.therapistPackage.findFirstOrThrow({ where: { therapistId: ramesh.id, durationMinutes: 60 } });
+  const therapistOrderId = await seedOrder(
+    customerId,
+    urbanCivilLinesId,
+    urbanCivilLinesBranchId,
+    'Urban Wellness Spa',
+    'Civil Lines Branch',
+    'CONFIRMED',
+    [
+      {
+        therapistId: ramesh.id,
+        therapistPackageId: rameshPackage.id,
+        itemName: `${ramesh.therapistType} — ${ramesh.personName}`,
+        itemType: 'SERVICE',
+        unitPrice: rameshPackage.sellingPrice.toNumber(),
+        quantity: 1,
+        durationMinutes: rameshPackage.durationMinutes,
+        vendorId: urbanCivilLinesId,
+        branchId: urbanCivilLinesBranchId,
+        vendorNameSnapshot: 'Urban Wellness Spa',
+        branchNameSnapshot: 'Civil Lines Branch',
+      },
+    ],
+  );
+  const therapistOrder = await prisma.order.findUniqueOrThrow({ where: { id: therapistOrderId } });
+  await seedPayment(therapistOrder.id, 'PAID', therapistOrder.total.toNumber());
+
+  // 3) DEAL order — CONFIRMED (Urban Wellness Spa, Medical College Road Branch): Deep Tissue Massage.
+  const urbanMedicalRoadId = vendorIdByKey.get('urban')!;
+  const urbanMedicalRoadBranchId = branchIdByKey.get('urban-medicalroad')!;
+  const massageDealId = dealIdBySlug.get('deep-tissue-massage-urban-medicalroad')!;
+  const massagePackage = await prisma.dealPackage.findFirstOrThrow({ where: { dealId: massageDealId, durationMinutes: 90 } });
+  const dealOrderId = await seedOrder(
+    customerId,
+    urbanMedicalRoadId,
+    urbanMedicalRoadBranchId,
+    'Urban Wellness Spa',
+    'Medical College Road Branch',
+    'CONFIRMED',
+    [
+      {
+        dealId: massageDealId,
+        dealPackageId: massagePackage.id,
+        itemName: 'Deep Tissue Massage at Urban Wellness Spa — Medical College Road',
+        itemType: 'SERVICE',
+        unitPrice: massagePackage.sellingPrice.toNumber(),
+        quantity: 1,
+        durationMinutes: massagePackage.durationMinutes,
+        vendorId: urbanMedicalRoadId,
+        branchId: urbanMedicalRoadBranchId,
+        vendorNameSnapshot: 'Urban Wellness Spa',
+        branchNameSnapshot: 'Medical College Road Branch',
+      },
+    ],
+  );
+  const dealOrder = await prisma.order.findUniqueOrThrow({ where: { id: dealOrderId } });
+  await seedPayment(dealOrder.id, 'PAID', dealOrder.total.toNumber());
+
+  // 4) PRODUCT order — CONFIRMED (Glow Beauty Studio, Taramandal Branch), PAID.
   const confirmedOrderId = await seedProductOrder(
     customerId,
     vendorIdByKey.get('glow')!,
@@ -1189,7 +1408,7 @@ async function seedDemoCustomerActivity(
   const confirmedOrder = await prisma.order.findUniqueOrThrow({ where: { id: confirmedOrderId } });
   await seedPayment(confirmedOrder.id, 'PAID', confirmedOrder.total.toNumber());
 
-  // 3) PRODUCT order — PENDING_PAYMENT (Urban Wellness Spa, Civil Lines Branch), unpaid.
+  // 5) PRODUCT order — PENDING_PAYMENT (Urban Wellness Spa, Civil Lines Branch), unpaid.
   const pendingOrderId = await seedProductOrder(
     customerId,
     vendorIdByKey.get('urban')!,
@@ -1205,7 +1424,7 @@ async function seedDemoCustomerActivity(
   const pendingOrder = await prisma.order.findUniqueOrThrow({ where: { id: pendingOrderId } });
   await seedPayment(pendingOrder.id, 'CREATED', pendingOrder.total.toNumber());
 
-  // 4) PRODUCT order — CANCELLED (Glow Beauty Studio, Golghar Branch), no payment.
+  // 6) PRODUCT order — CANCELLED (Glow Beauty Studio, Golghar Branch), no payment.
   await seedProductOrder(
     customerId,
     vendorIdByKey.get('glow')!,
@@ -1227,62 +1446,64 @@ async function main() {
   await grantStarterPermissions(roles, permissionIdByKey);
   await seedDashboardWidgets(roles);
   await seedSuperAdminUser(roles);
-  await seedCategories();
   console.log(`Seeded ${roles.size} roles and ${permissionIdByKey.size} permissions.`);
 
-  const categoryIdBySlug = await seedCatalogTaxonomy();
-  const serviceIdBySlug = await seedServices(categoryIdBySlug);
-  const productIdBySlug = await seedProducts(categoryIdBySlug);
+  const categoryIdBySlug = await seedCategoryTaxonomy();
+  // Vendors must exist before Products (Product.vendorId is required — see the
+  // direct_category_access migration), unlike the old shared-master-row model's ordering.
   const { vendorIdByKey, branchIdByKey } = await seedVendorsAndBranches(roles);
-  const dealIdBySlug = await seedDeals(categoryIdBySlug, serviceIdBySlug, productIdBySlug, vendorIdByKey, branchIdByKey);
-  const demoCustomerId = await seedDemoCustomerActivity(roles, dealIdBySlug, vendorIdByKey, branchIdByKey);
+  const productIdBySlug = await seedProducts(categoryIdBySlug, vendorIdByKey);
+  const dealIdBySlug = await seedDeals(categoryIdBySlug, productIdBySlug, vendorIdByKey, branchIdByKey);
+  await seedVendorModulesAndCategoryAccess(vendorIdByKey, categoryIdBySlug);
 
   const backfilledSlugs = await backfillVendorSlugs();
   const backfilledHours = await backfillBranchOpeningHours();
-  const therapistsCreated = await seedTherapists(vendorIdByKey, branchIdByKey);
+  const therapistsCreated = await seedTherapists(vendorIdByKey, branchIdByKey, categoryIdBySlug);
+  // Every SERVICE deal and every Therapist needs a real 30/60/90-min package before the demo
+  // customer's cart/orders below (or the unified Add-to-Cart flow) can select one.
+  const dealPackagesCreated = await seedDealPackages();
+  const therapistPackagesCreated = await seedTherapistPackages();
+  const demoCustomerId = await seedDemoCustomerActivity(roles, dealIdBySlug, vendorIdByKey, branchIdByKey);
 
   const [
     categoryCount,
     subcategoryCount,
-    serviceCount,
     productCount,
     vendorCount,
     branchCount,
     serviceDealCount,
     productDealCount,
-    bookingCount,
     cartItemCount,
     wishlistItemCount,
     orderCount,
     paymentCount,
     therapistCount,
+    vendorCategoryAccessCount,
   ] = await Promise.all([
     prisma.category.count(),
     prisma.category.count({ where: { parentId: { not: null } } }),
-    prisma.service.count(),
     prisma.product.count(),
     prisma.vendor.count(),
     prisma.branch.count(),
-    prisma.deal.count({ where: { serviceId: { not: null } } }),
+    prisma.deal.count({ where: { productId: null } }),
     prisma.deal.count({ where: { productId: { not: null } } }),
-    prisma.booking.count({ where: { customerId: demoCustomerId } }),
     prisma.cartItem.count({ where: { cart: { customerId: demoCustomerId } } }),
     prisma.wishlistItem.count({ where: { customerId: demoCustomerId } }),
     prisma.order.count({ where: { customerId: demoCustomerId } }),
     prisma.payment.count({ where: { order: { customerId: demoCustomerId } } }),
     prisma.therapist.count(),
+    prisma.vendorCategoryAccess.count(),
   ]);
 
   console.log('\n── Demo marketplace dataset ──────────────────────────────');
   console.log(`Categories:      ${categoryCount} (${subcategoryCount} sub-categories)`);
-  console.log(`Services:        ${serviceCount}`);
   console.log(`Products:        ${productCount}`);
+  console.log(`Vendor category grants: ${vendorCategoryAccessCount}`);
   console.log(`Vendors:         ${vendorCount} (${VENDOR_SEEDS.length} vendor owner users, ${backfilledSlugs} slug(s) backfilled)`);
   console.log(`Branches:        ${branchCount} (${backfilledHours} openingHours backfilled)`);
-  console.log(`Service deals:   ${serviceDealCount}`);
+  console.log(`Service deals:   ${serviceDealCount} (${dealPackagesCreated} packages created this run)`);
   console.log(`Product deals:   ${productDealCount}`);
-  console.log(`Therapists:      ${therapistCount} (${therapistsCreated} created this run)`);
-  console.log(`Bookings:        ${bookingCount} (demo customer)`);
+  console.log(`Therapists:      ${therapistCount} (${therapistsCreated} created this run, ${therapistPackagesCreated} packages created this run)`);
   console.log(`Cart items:      ${cartItemCount} (demo customer)`);
   console.log(`Wishlist items:  ${wishlistItemCount} (demo customer)`);
   console.log(`Orders:          ${orderCount} (demo customer)`);

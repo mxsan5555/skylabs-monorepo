@@ -8,6 +8,14 @@ declare global {
   namespace Express {
     // eslint-disable-next-line @typescript-eslint/no-empty-object-type
     interface User extends AccessTokenPayload {}
+
+    interface Request {
+      // Set by middleware/validate.ts's `validateQuery` — the Zod-parsed, coerced/defaulted
+      // form of `req.query` (which itself is a getter-only object on some Express/Node
+      // versions and can't be reassigned in place). Callers cast this to the specific
+      // schema's inferred shape, e.g. `req.validatedQuery as ReturnType<typeof FooSchema.parse>`.
+      validatedQuery?: unknown;
+    }
   }
 }
 

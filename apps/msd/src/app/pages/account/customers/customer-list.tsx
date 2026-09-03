@@ -32,7 +32,6 @@ const CUSTOMER_COLUMNS = JSON.stringify([
   { key: 'Email', label: 'Email' },
   { key: 'Status', label: 'Status', type: 'status', statusMap: CUSTOMER_STATUS_MAP },
   { key: 'Orders', label: 'Orders' },
-  { key: 'Bookings', label: 'Bookings' },
   { key: 'Created At', label: 'Created At' },
 ]);
 
@@ -48,7 +47,6 @@ function toCustomerRow(customer: Customer): Record<string, string | number> {
     Email: customer.email ?? '—',
     Status: customer.status,
     Orders: customer._count.orders,
-    Bookings: customer._count.bookings,
     'Created At': new Date(customer.createdAt).toLocaleDateString(),
   };
 }

@@ -15,8 +15,30 @@ export interface CatalogCategory {
   description: string | null;
 }
 
+/** One active Popular Tag mapping (Superadmin-managed, e.g. "Trending") — inactive tags are
+ *  already filtered out server-side, never left to the frontend to hide (see msd-api's
+ *  `getActiveTagNamesFor`). */
+export interface CatalogPopularTag {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+/** Only ever present on a top-level row (see msd-api's `Category.type` schema doc comment) —
+ *  `undefined` for a subcategory entry (which never appears at the top of the tree anyway). */
 export interface CatalogCategoryWithChildren extends CatalogCategory {
+  type?: 'SERVICE' | 'PRODUCT' | 'THERAPY' | null;
+  isPopular?: boolean;
+  sortOrder?: number;
+  popularTags?: CatalogPopularTag[];
   children: CatalogCategory[];
+}
+
+/** `GET /catalog/locations` — distinct `{state, city}` pairs from active branches, used to
+ *  populate the public location picker without a full branch fetch. */
+export interface CatalogLocation {
+  state: string;
+  city: string;
 }
 
 export interface CatalogDealSummary {
@@ -32,6 +54,7 @@ export interface CatalogProductSummary extends CatalogDealSummary {
   brand?: string | null;
   mediaImages?: MediaImage[];
   mediaVideo?: MediaVideo | null;
+  popularTags?: CatalogPopularTag[];
 }
 
 /** A service Deal's own duration/price menu entry — a real child row (DealPackage), never a
@@ -52,7 +75,7 @@ export interface CatalogDeal {
   description: string | null;
   /** A synced "from price"/default-duration display cache (kept in sync with the cheapest
    *  active `packages[]` entry server-side — see DealPackage's own schema doc comment in
-   *  msd-api) — accurate for listing/sort/filter display, but NEVER the authoritative booking
+   *  msd-api) — accurate for listing/sort/filter display, but NEVER the authoritative cart/order
    *  price for a service deal that has packages; the customer's selected `packages[].id` is. */
   originalPrice: string;
   salePrice: string;
@@ -61,7 +84,9 @@ export interface CatalogDeal {
   images: string[] | null;
   category: CatalogCategory | null;
   subcategory: CatalogCategory | null;
-  service: CatalogDealSummary | null;
+  /** No `service` field — the old Service master-row model is gone entirely (see msd-api's Deal
+   *  schema doc comment). A service deal is identified purely by `product` being `null`, never by
+   *  a separate truthy/falsy discriminator field. */
   product: CatalogProductSummary | null;
   vendor: { id: string; slug: string | null; businessName: string | null; city: string | null; logoUrl: string | null } | null;
   /** `latitude`/`longitude` are Decimal → string over the wire (same convention as
@@ -71,6 +96,7 @@ export interface CatalogDeal {
   packages: CatalogDealPackage[];
   mediaImages?: MediaImage[];
   mediaVideo?: MediaVideo | null;
+  popularTags?: CatalogPopularTag[];
 }
 
 /** `Branch.openingHours` shape — keys are lowercase 3-letter day codes (`mon`…`sun`), values are
@@ -103,6 +129,7 @@ export interface CatalogVendorTherapist {
   packages: CatalogTherapistPackage[];
   mediaImages?: MediaImage[];
   mediaVideo?: MediaVideo | null;
+  popularTags?: CatalogPopularTag[];
 }
 
 /** The flat, independently-browsable Therapist listing entry (`GET /catalog/therapists`) —
@@ -164,6 +191,8 @@ export function listCatalogDeals(opts: {
   branchId?: string;
   type?: 'service' | 'product';
   search?: string;
+  state?: string;
+  city?: string;
   sort?: 'newest' | 'discount';
   minPrice?: number;
   maxPrice?: number;
@@ -175,11 +204,19 @@ export function getCatalogDeal(id: string) {
   return apiGet<CatalogDeal>(`/catalog/deals/${id}`, null);
 }
 
-export function getCatalogVendor(slug: string) {
-  return apiGet<CatalogVendorDetail>(`/catalog/vendors/${encodeURIComponent(slug)}`, null);
+/** Distinct `{state, city}` pairs from active branches — drives the public State/City picker
+ *  (Explore's location filter, etc.) without fetching every branch. */
+export function listCatalogLocations() {
+  return apiGet<CatalogLocation[]>('/catalog/locations', null);
 }
 
-export function listCatalogTherapists(opts: { page?: number; pageSize?: number; vendorId?: string; branchId?: string; search?: string } = {}) {
+export function getCatalogVendor(slug: string, opts: { state?: string; city?: string } = {}) {
+  return apiGet<CatalogVendorDetail>(`/catalog/vendors/${encodeURIComponent(slug)}${toQuery(opts)}`, null);
+}
+
+export function listCatalogTherapists(
+  opts: { page?: number; pageSize?: number; categoryId?: string; subcategoryId?: string; vendorId?: string; branchId?: string; search?: string } = {},
+) {
   return apiGet<CatalogTherapist[]>(`/catalog/therapists${toQuery(opts)}`, null);
 }
 

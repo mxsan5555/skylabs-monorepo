@@ -15,11 +15,11 @@ const nf = (n: number) => n.toLocaleString('en-IN');
 const STAGES: Stage[] = [
   { key: 'category', label: 'Category', value: (s) => nf(s.categories) },
   { key: 'sub-category', label: 'Sub Category', value: (s) => nf(s.subCategories) },
-  { key: 'service-product', label: 'Service / Product', value: (s) => `${nf(s.services)} services, ${nf(s.products)} products` },
+  { key: 'product', label: 'Product', value: (s) => `${nf(s.products)} products` },
   { key: 'vendor', label: 'Vendor', value: (s) => nf(s.vendors) },
   { key: 'branch', label: 'Branch', value: (s) => nf(s.branches) },
   { key: 'deal-package', label: 'Deal / Package', value: (s) => nf(s.deals) },
-  { key: 'booking-order', label: 'Customer Booking / Order', value: (s) => `${nf(s.orders)} orders, ${nf(s.bookings)} bookings` },
+  { key: 'customer-order', label: 'Customer Order', value: (s) => `${nf(s.orders)} orders` },
   { key: 'payment-revenue', label: 'Payment / Revenue', value: (s) => formatINR(Number(s.revenue)) },
 ];
 
@@ -31,7 +31,7 @@ interface DashboardProcessFlowProps {
 
 /**
  * Marketplace-wide "how a listing turns into revenue" overview: Category → Sub Category →
- * Service/Product → Vendor → Branch → Deal/Package → Customer Booking/Order → Payment/Revenue.
+ * Product → Vendor → Branch → Deal/Package → Customer Order → Payment/Revenue.
  * Gated by the caller (`dashboard.tsx`, on a permission check, not a role-name check) — this
  * component just renders whatever `stats` it's handed and its own loading/error/empty states.
  */

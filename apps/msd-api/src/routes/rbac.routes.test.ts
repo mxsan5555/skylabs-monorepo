@@ -114,6 +114,40 @@ describe('POST /api/v1/rbac/roles', () => {
   });
 });
 
+describe('POST /api/v1/rbac/users', () => {
+  const validBody = { name: 'Nikita Sharma', email: 'nikita@example.com', roleIds: [ROLE_ID] };
+
+  it('returns 409 (not a raw 500) when the email/phone unique constraint is hit at the DB, previously an unhandled P2002', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:create']);
+    prismaMock.role.count.mockResolvedValue(1);
+    const { Prisma } = await import('../generated/prisma-client');
+    prismaMock.user.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' }),
+    );
+    const res = await request(app)
+      .post('/api/v1/rbac/users')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send(validBody);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('CONFLICT');
+  });
+
+  it('still returns 201 with the created user when the audit-log write itself fails', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:create']);
+    prismaMock.role.count.mockResolvedValue(1);
+    prismaMock.user.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: TARGET_USER_ID, ...data, roles: [] }),
+    );
+    prismaMock.auditLog.create.mockRejectedValue(new Error('audit db unreachable'));
+    const res = await request(app)
+      .post('/api/v1/rbac/users')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send(validBody);
+    expect(res.status).toBe(201);
+    expect(res.body.data.id).toBe(TARGET_USER_ID);
+  });
+});
+
 describe('PATCH /api/v1/rbac/roles/:id', () => {
   it('returns 401 with no token', async () => {
     const res = await request(app).patch(`/api/v1/rbac/roles/${ROLE_ID}`).send({ name: 'New name' });

@@ -7,11 +7,9 @@ export interface DashboardStats {
   branches: number;
   categories: number;
   subCategories: number;
-  services: number;
   products: number;
   deals: number;
   orders: number;
-  bookings: number;
   revenue: string;
 }
 
@@ -36,11 +34,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     branches,
     categories,
     subCategories,
-    services,
     products,
     deals,
     orders,
-    bookings,
     revenueAgg,
   ] = await Promise.all([
     prisma.vendor.count(),
@@ -48,15 +44,13 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     prisma.branch.count(),
     prisma.category.count({ where: { parentId: null } }),
     prisma.category.count({ where: { parentId: { not: null } } }),
-    prisma.service.count(),
     prisma.product.count(),
     prisma.deal.count(),
     prisma.order.count(),
-    prisma.booking.count(),
     prisma.payment.aggregate({ _sum: { amount: true }, where: { status: 'PAID' } }),
   ]);
 
   const revenue = (revenueAgg._sum.amount ?? new Prisma.Decimal(0)).toString();
 
-  return { vendors, customers, branches, categories, subCategories, services, products, deals, orders, bookings, revenue };
+  return { vendors, customers, branches, categories, subCategories, products, deals, orders, revenue };
 }

@@ -49,8 +49,10 @@ export function MediaUploader({
   entityId,
   branchId,
   selfService,
+  vendorId,
   existingImages,
   existingVideo,
+  hideVideo,
   token,
   onImagesChange,
   onVideoChange,
@@ -58,10 +60,18 @@ export function MediaUploader({
   entityType: MediaEntityType;
   entityId: string | null;
   branchId?: string;
-  /** Vendor only — see api/media.ts's `EntityRef.selfService` doc comment. */
+  /** Vendor/Product only — see api/media.ts's `EntityRef.selfService` doc comment. */
   selfService?: boolean;
+  /** Product (admin-on-behalf) only — see api/media.ts's `EntityRef.vendorId` doc comment. */
+  vendorId?: string;
   existingImages: MediaImage[];
   existingVideo: MediaVideo | null;
+  /** Category only — the backend has no video adapter registered for `entityType="category"`
+   *  (image-only, see `media.service.ts`'s adapter config map), so hitting `/video` for it would
+   *  404/error. Hides the entire Video section (upload button + hidden file input) rather than
+   *  merely leaving it unwired, so there's no dead control a category editor could click into an
+   *  error. Every other entity keeps the section (defaults to `false`). */
+  hideVideo?: boolean;
   token: string | null;
   onImagesChange?: (images: MediaImage[]) => void;
   onVideoChange?: (video: MediaVideo | null) => void;
@@ -76,7 +86,7 @@ export function MediaUploader({
   const videoInputRef = useRef<HTMLInputElement>(null);
   const previousEntityId = useRef(entityId);
 
-  const ref = { entityType, entityId: entityId ?? '', branchId, selfService };
+  const ref = { entityType, entityId: entityId ?? '', branchId, selfService, vendorId };
 
   useEffect(() => {
     setImages(existingImages);
@@ -97,7 +107,7 @@ export function MediaUploader({
   }, [entityId]);
 
   async function flushStaged(readyEntityId: string) {
-    const liveRef = { entityType, entityId: readyEntityId, branchId, selfService };
+    const liveRef = { entityType, entityId: readyEntityId, branchId, selfService, vendorId };
     setBusy(true);
     for (const item of staged) {
       try {
@@ -113,7 +123,7 @@ export function MediaUploader({
         setStaged((prev) => prev.map((s) => (s.key === item.key ? { ...s, error: describeError(err) } : s)));
       }
     }
-    if (stagedVideo) {
+    if (stagedVideo && !hideVideo) {
       try {
         const res = await apiUploadVideo(token, liveRef, stagedVideo.file, stagedVideo.file.name);
         setVideo(res.data);
@@ -323,39 +333,41 @@ export function MediaUploader({
         <p className="field-hint">JPG, PNG, or WEBP — 30 KB to 80 KB each (compressed automatically).</p>
       </div>
 
-      <div className="media-uploader__section">
-        <p className="field-hint">Video</p>
-        {(video || stagedVideo) && (
-          <div className="media-uploader__video">
-            <video controls src={video ? resolveMediaUrl(video.storageKey) : stagedVideo?.previewUrl} />
-            <div className="media-uploader__actions">
-              <span className="media-uploader__filename">
-                {video?.originalFilename ?? stagedVideo?.file.name ?? 'video'}
-                {stagedVideo && ' — will upload on save'}
-              </span>
+      {!hideVideo && (
+        <div className="media-uploader__section">
+          <p className="field-hint">Video</p>
+          {(video || stagedVideo) && (
+            <div className="media-uploader__video">
+              <video controls src={video ? resolveMediaUrl(video.storageKey) : stagedVideo?.previewUrl} />
+              <div className="media-uploader__actions">
+                <span className="media-uploader__filename">
+                  {video?.originalFilename ?? stagedVideo?.file.name ?? 'video'}
+                  {stagedVideo && ' — will upload on save'}
+                </span>
+                <OutlinedButton onClick={() => videoInputRef.current?.click()} disabled={busy}>
+                  <Icon slot="icon" aria-hidden="true">videocam</Icon>
+                  Replace video
+                </OutlinedButton>
+                <OutlinedButton onClick={video ? removeVideo : () => setStagedVideo(null)} disabled={busy}>
+                  <Icon slot="icon" aria-hidden="true">delete</Icon>
+                  Remove video
+                </OutlinedButton>
+              </div>
+              {stagedVideo?.error && <p className="error-state" role="alert">{stagedVideo.error}</p>}
+            </div>
+          )}
+          <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" hidden onChange={(e) => handleVideoSelected(e.target.files)} />
+          {!video && !stagedVideo && (
+            <>
               <OutlinedButton onClick={() => videoInputRef.current?.click()} disabled={busy}>
                 <Icon slot="icon" aria-hidden="true">videocam</Icon>
-                Replace video
+                Upload video
               </OutlinedButton>
-              <OutlinedButton onClick={video ? removeVideo : () => setStagedVideo(null)} disabled={busy}>
-                <Icon slot="icon" aria-hidden="true">delete</Icon>
-                Remove video
-              </OutlinedButton>
-            </div>
-            {stagedVideo?.error && <p className="error-state" role="alert">{stagedVideo.error}</p>}
-          </div>
-        )}
-        <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" hidden onChange={(e) => handleVideoSelected(e.target.files)} />
-        {!video && !stagedVideo && (
-          <>
-            <OutlinedButton onClick={() => videoInputRef.current?.click()} disabled={busy}>
-              <Icon slot="icon" aria-hidden="true">videocam</Icon>
-              Upload video
-            </OutlinedButton>
-            <p className="field-hint">MP4, WEBM, or MOV — up to 1 MB.</p>
-          </>
-        )}
-      </div>
+              <p className="field-hint">MP4, WEBM, or MOV — up to 1 MB.</p>
+            </>
+          )}
+        </div>
+      )}
 
       {error && <p className="error-state" role="alert">{error}</p>}
     </fieldset>
