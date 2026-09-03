@@ -507,7 +507,7 @@ function TopItemsSection({ data }: { data: AllReportData }) {
 
       <h3 className="section-title">Top Services / Deals</h3>
       {data.topServices.length === 0 ? (
-        <p className="empty-state">No service bookings match these filters.</p>
+        <p className="empty-state">No service orders match these filters.</p>
       ) : (
         <div className="data-table-wrap">
           <table className="data-table">
@@ -515,7 +515,7 @@ function TopItemsSection({ data }: { data: AllReportData }) {
               <tr>
                 <th scope="col">Deal / Service</th>
                 <th scope="col">Vendor</th>
-                <th scope="col">Bookings</th>
+                <th scope="col">Orders</th>
                 <th scope="col">Revenue</th>
               </tr>
             </thead>

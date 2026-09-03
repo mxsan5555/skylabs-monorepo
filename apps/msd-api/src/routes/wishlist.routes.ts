@@ -7,7 +7,7 @@ import { sendData } from '../lib/http';
 
 /**
  * Customer wishlist — self-service only, gated on `authenticate` alone (no `requirePermission`).
- * This mirrors `cart.routes.ts`/`booking.routes.ts`: not a staff/admin module restricted to
+ * This mirrors `cart.routes.ts`: not a staff/admin module restricted to
  * specific roles, it's a base capability of any signed-in account. `customerId` is always
  * `req.user.sub`, never a param/body value.
  */

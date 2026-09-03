@@ -1,7 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import { revokeAllRefreshTokens } from './token.service';
-import type { UserStatus } from '../generated/prisma-client';
+import { Prisma, type UserStatus } from '../generated/prisma-client';
 
 export async function listUsers(page: number, pageSize: number, search?: string) {
   const where = {
@@ -80,16 +80,23 @@ export async function createUser(input: {
     throw new ApiError('VALIDATION_ERROR', 'One or more roleIds do not exist');
   }
 
-  const user = await prisma.user.create({
-    data: {
-      name: input.name,
-      email: input.email,
-      phone: input.phone,
-      roles: { create: input.roleIds.map((roleId) => ({ roleId })) },
-    },
-    include: { roles: { include: { role: true } } },
-  });
-  return serializeUser(user);
+  try {
+    const user = await prisma.user.create({
+      data: {
+        name: input.name,
+        email: input.email,
+        phone: input.phone,
+        roles: { create: input.roleIds.map((roleId) => ({ roleId })) },
+      },
+      include: { roles: { include: { role: true } } },
+    });
+    return serializeUser(user);
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      throw new ApiError('CONFLICT', 'A user with this email or phone already exists.');
+    }
+    throw err;
+  }
 }
 
 export async function updateUser(id: string, input: { name?: string; email?: string; phone?: string }) {

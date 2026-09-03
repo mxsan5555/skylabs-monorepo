@@ -68,12 +68,12 @@ function toVendorRow(vendor: Vendor): Record<string, string | number> {
 }
 
 /** Left-hand vendor picker for the admin surface — sky-data-table pattern, mirrors
- *  orders.tsx/bookings.tsx exactly (ref + sky-dt-params-change + sky-dt-row-action).
+ *  orders.tsx exactly (ref + sky-dt-params-change + sky-dt-row-action).
  *  Presenter-only: pagination/search state and the actual `listVendors` fetch stay owned by
  *  the parent (AdminVendorManagement in vendors.tsx); this component only renders and forwards
  *  table events. `selectedId` is accepted for API-contract parity with the previous
  *  hand-rolled list but sky-data-table has no non-checkbox "current row" highlight concept, so
- *  it is intentionally unused here — consistent with Order/Booking's table, not a regression. */
+ *  it is intentionally unused here — consistent with Order's table, not a regression. */
 export function VendorList({ vendors, onSelect, total, page, pageSize, loading, onParamsChange }: VendorListProps) {
   const tableRef = useRef<HTMLElement>(null);
   const rows = useMemo(() => JSON.stringify(vendors.map(toVendorRow)), [vendors]);

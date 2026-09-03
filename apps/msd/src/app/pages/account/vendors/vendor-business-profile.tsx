@@ -63,6 +63,9 @@ export function VendorBusinessProfile() {
           canEdit
           canReviewKyc={false}
           saving={saving}
+          token={token}
+          selfService
+          sections={['business', 'owner', 'address', 'kyc']}
           onSave={save}
           serverFieldErrors={fieldErrors}
         />

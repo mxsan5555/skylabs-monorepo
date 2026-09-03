@@ -128,6 +128,25 @@ describe('sky-category-card', () => {
     });
   });
 
+  describe('tag prop', () => {
+    it('renders a tag pill over the image when set', async () => {
+      const el = createElement();
+      el.image = 'https://example.com/la.jpg';
+      el.tag = 'Trending';
+      await el.updateComplete;
+      const tag = el.shadowRoot?.querySelector('.media .tag');
+      expect(tag?.textContent?.trim()).toBe('Trending');
+    });
+
+    it('does not render a tag pill when unset', async () => {
+      const el = createElement();
+      el.image = 'https://example.com/la.jpg';
+      await el.updateComplete;
+      const tag = el.shadowRoot?.querySelector('.media .tag');
+      expect(tag).toBeNull();
+    });
+  });
+
   describe('align prop', () => {
     it('reflects align attribute on host', async () => {
       const el = createElement();

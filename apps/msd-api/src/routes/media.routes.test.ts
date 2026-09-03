@@ -149,71 +149,88 @@ describe('POST /api/v1/vendors/me/therapists/:therapistId/images', () => {
   });
 });
 
-describe('POST /api/v1/products/:id/images', () => {
-  it('uploads a valid image for a Product (permission-gated only, no vendor scoping)', async () => {
-    resolveMock.mockResolvedValue(['products:edit']);
-    prismaMock.product.findUnique.mockResolvedValue(productFixture);
+describe('POST /api/v1/vendors/me/products/:productId/images', () => {
+  it("uploads a valid image for the caller's own product", async () => {
+    resolveMock.mockResolvedValue(['products:edit', 'vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.product.findUnique.mockResolvedValue({ ...productFixture, vendorId: VENDOR_A_ID });
     prismaMock.productImage.count.mockResolvedValue(0);
     prismaMock.productImage.create.mockResolvedValue({ id: IMAGE_ID, isPrimary: true });
 
     const res = await request(app)
-      .post(`/api/v1/products/${PRODUCT_ID}/images`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['admin'] }))
+      .post(`/api/v1/vendors/me/products/${PRODUCT_ID}/images`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
       .attach('file', validJpeg(), { filename: 'photo.jpg', contentType: 'image/jpeg' });
 
     expect(res.status).toBe(201);
   });
 
-  it('404s uploading to a Product that does not exist', async () => {
-    resolveMock.mockResolvedValue(['products:edit']);
+  it('404s uploading to a product that does not exist', async () => {
+    resolveMock.mockResolvedValue(['products:edit', 'vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.product.findUnique.mockResolvedValue(null);
 
     const res = await request(app)
-      .post(`/api/v1/products/${PRODUCT_ID}/images`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['admin'] }))
+      .post(`/api/v1/vendors/me/products/${PRODUCT_ID}/images`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
       .attach('file', validJpeg(), { filename: 'photo.jpg', contentType: 'image/jpeg' });
 
     expect(res.status).toBe(404);
   });
 
-  it('403s without the products:edit permission', async () => {
-    resolveMock.mockResolvedValue([]);
+  it("403s uploading to another vendor's product", async () => {
+    resolveMock.mockResolvedValue(['products:edit', 'vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.product.findUnique.mockResolvedValue({ ...productFixture, vendorId: VENDOR_B_ID });
 
     const res = await request(app)
-      .post(`/api/v1/products/${PRODUCT_ID}/images`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['admin'] }))
+      .post(`/api/v1/vendors/me/products/${PRODUCT_ID}/images`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+      .attach('file', validJpeg(), { filename: 'photo.jpg', contentType: 'image/jpeg' });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('403s without the products:edit permission', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+
+    const res = await request(app)
+      .post(`/api/v1/vendors/me/products/${PRODUCT_ID}/images`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
       .attach('file', validJpeg(), { filename: 'photo.jpg', contentType: 'image/jpeg' });
 
     expect(res.status).toBe(403);
   });
 });
 
-describe('PATCH /api/v1/products/:id/images/reorder and DELETE', () => {
-  it('reorders images for a Product', async () => {
+describe('PATCH /api/v1/vendors/me/products/:productId/images/reorder and DELETE', () => {
+  it('reorders images for the caller\'s own product', async () => {
     const imgId1 = 'f1f1f1f1-0000-4000-8000-000000000101';
     const imgId2 = 'f1f1f1f1-0000-4000-8000-000000000102';
-    resolveMock.mockResolvedValue(['products:edit']);
-    prismaMock.product.findUnique.mockResolvedValue(productFixture);
+    resolveMock.mockResolvedValue(['products:edit', 'vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.product.findUnique.mockResolvedValue({ ...productFixture, vendorId: VENDOR_A_ID });
     prismaMock.productImage.findMany.mockResolvedValue([{ id: imgId1 }, { id: imgId2 }]);
     prismaMock.productImage.update.mockResolvedValue({});
 
     const res = await request(app)
-      .patch(`/api/v1/products/${PRODUCT_ID}/images/reorder`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['admin'] }))
+      .patch(`/api/v1/vendors/me/products/${PRODUCT_ID}/images/reorder`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
       .send({ imageIds: [imgId2, imgId1] });
 
     expect(res.status).toBe(200);
   });
 
-  it('deletes an image for a Product', async () => {
-    resolveMock.mockResolvedValue(['products:edit']);
-    prismaMock.product.findUnique.mockResolvedValue(productFixture);
+  it('deletes an image for the caller\'s own product', async () => {
+    resolveMock.mockResolvedValue(['products:edit', 'vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.product.findUnique.mockResolvedValue({ ...productFixture, vendorId: VENDOR_A_ID });
     prismaMock.productImage.findUnique.mockResolvedValue({ id: IMAGE_ID, productId: PRODUCT_ID, isPrimary: false, storageKey: 'x' });
     prismaMock.productImage.delete.mockResolvedValue({ storageKey: 'x' });
 
     const res = await request(app)
-      .delete(`/api/v1/products/${PRODUCT_ID}/images/${IMAGE_ID}`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['admin'] }));
+      .delete(`/api/v1/vendors/me/products/${PRODUCT_ID}/images/${IMAGE_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
 
     expect(res.status).toBe(200);
   });

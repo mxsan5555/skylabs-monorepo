@@ -25,6 +25,8 @@ const OTHER_CUSTOMER_ID = 'b0b0b0b0-0000-4000-8000-000000000002';
 const ORDER_ID = 'c0c0c0c0-0000-4000-8000-000000000003';
 const PAYMENT_ID = 'd0d0d0d0-0000-4000-8000-000000000004';
 
+const ORDER_ID_2 = 'e0e0e0e0-0000-4000-8000-000000000005';
+
 const orderFixture = {
   id: ORDER_ID,
   customerId: CUSTOMER_ID,
@@ -35,6 +37,8 @@ const orderFixture = {
   total: '398.00',
   items: [],
 };
+
+const orderFixture2 = { ...orderFixture, id: ORDER_ID_2, total: '199.00' };
 
 const paymentFixture = {
   id: PAYMENT_ID,
@@ -194,18 +198,6 @@ describe('POST /api/v1/orders/me/:id/pay-cod', () => {
     expect(prismaMock.payment.create).not.toHaveBeenCalled();
   });
 
-  it('consumes the linked Booking (PENDING -> CONFIRMED) when a SERVICE order is COD-confirmed', async () => {
-    const serviceOrderFixture = { ...orderFixture, type: 'SERVICE', bookingId: 'booking-1' };
-    prismaMock.order.findUnique.mockResolvedValue(serviceOrderFixture);
-    prismaMock.payment.create.mockResolvedValue({ ...paymentFixture, provider: 'COD', status: 'CREATED' });
-    prismaMock.order.update.mockResolvedValue({ ...serviceOrderFixture, status: 'CONFIRMED' });
-    prismaMock.booking.findUnique.mockResolvedValue({ id: 'booking-1', status: 'PENDING' });
-    const res = await request(app)
-      .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
-      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
-    expect(res.status).toBe(200);
-    expect(prismaMock.booking.update).toHaveBeenCalledWith({ where: { id: 'booking-1' }, data: { status: 'CONFIRMED' } });
-  });
 });
 
 describe('POST /api/v1/orders/me/:id/verify-payment', () => {
@@ -226,37 +218,6 @@ describe('POST /api/v1/orders/me/:id/verify-payment', () => {
     );
   });
 
-  it('consumes the linked Booking (PENDING -> CONFIRMED) when a SERVICE order is paid — the purchased item must stop counting toward the customer\'s pending cart', async () => {
-    const serviceOrderFixture = { ...orderFixture, type: 'SERVICE', bookingId: 'booking-1' };
-    prismaMock.order.findUnique.mockResolvedValue(serviceOrderFixture);
-    prismaMock.payment.findFirst.mockResolvedValue(paymentFixture);
-    prismaMock.payment.update.mockResolvedValue({ ...paymentFixture, status: 'PAID' });
-    prismaMock.order.update.mockResolvedValue({ ...serviceOrderFixture, status: 'CONFIRMED' });
-    prismaMock.booking.findUnique.mockResolvedValue({ id: 'booking-1', status: 'PENDING' });
-    const signature = crypto.createHmac('sha256', env.razorpayKeySecret).update('order_test123|pay_test123').digest('hex');
-    const res = await request(app)
-      .post(`/api/v1/orders/me/${ORDER_ID}/verify-payment`)
-      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
-      .send({ razorpay_order_id: 'order_test123', razorpay_payment_id: 'pay_test123', razorpay_signature: signature });
-    expect(res.status).toBe(200);
-    expect(prismaMock.booking.update).toHaveBeenCalledWith({ where: { id: 'booking-1' }, data: { status: 'CONFIRMED' } });
-  });
-
-  it('never re-confirms an already-terminal (COMPLETED/CANCELLED) Booking on payment success', async () => {
-    const serviceOrderFixture = { ...orderFixture, type: 'SERVICE', bookingId: 'booking-1' };
-    prismaMock.order.findUnique.mockResolvedValue(serviceOrderFixture);
-    prismaMock.payment.findFirst.mockResolvedValue(paymentFixture);
-    prismaMock.payment.update.mockResolvedValue({ ...paymentFixture, status: 'PAID' });
-    prismaMock.order.update.mockResolvedValue({ ...serviceOrderFixture, status: 'CONFIRMED' });
-    prismaMock.booking.findUnique.mockResolvedValue({ id: 'booking-1', status: 'CANCELLED' });
-    const signature = crypto.createHmac('sha256', env.razorpayKeySecret).update('order_test123|pay_test123').digest('hex');
-    await request(app)
-      .post(`/api/v1/orders/me/${ORDER_ID}/verify-payment`)
-      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
-      .send({ razorpay_order_id: 'order_test123', razorpay_payment_id: 'pay_test123', razorpay_signature: signature });
-    expect(prismaMock.booking.update).not.toHaveBeenCalled();
-  });
-
   it('5/11. rejects an invalid signature — Payment marked FAILED, Order untouched', async () => {
     prismaMock.order.findUnique.mockResolvedValue(orderFixture);
     prismaMock.payment.findFirst.mockResolvedValue(paymentFixture);
@@ -268,6 +229,23 @@ describe('POST /api/v1/orders/me/:id/verify-payment', () => {
     expect(res.status).toBe(422);
     expect(prismaMock.payment.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED' }) }));
     expect(prismaMock.order.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a same-length-but-wrong hex signature (exercises the crypto.timingSafeEqual code path, not just the length-mismatch fallback)', async () => {
+    prismaMock.order.findUnique.mockResolvedValue(orderFixture);
+    prismaMock.payment.findFirst.mockResolvedValue(paymentFixture);
+    prismaMock.payment.update.mockResolvedValue({ ...paymentFixture, status: 'FAILED' });
+    // Real signature is a 64-char hex (sha256 digest) — flip its first hex char so length
+    // matches exactly but content doesn't, forcing the comparison through
+    // crypto.timingSafeEqual itself rather than the defensive length pre-check.
+    const realSignature = crypto.createHmac('sha256', env.razorpayKeySecret).update('order_test123|pay_test123').digest('hex');
+    const wrongSameLength = (realSignature[0] === 'a' ? 'b' : 'a') + realSignature.slice(1);
+    const res = await request(app)
+      .post(`/api/v1/orders/me/${ORDER_ID}/verify-payment`)
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ razorpay_order_id: 'order_test123', razorpay_payment_id: 'pay_test123', razorpay_signature: wrongSameLength });
+    expect(res.status).toBe(422);
+    expect(prismaMock.payment.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED' }) }));
   });
 
   it('12. the Order update on success only ever touches status — never total/subtotal (historical amount preserved)', async () => {
@@ -305,6 +283,190 @@ describe('POST /api/v1/orders/me/:id/verify-payment', () => {
   });
 });
 
+/**
+ * Feature: Combined checkout batch payment (Deal + Therapist + Product together — one checkout
+ * action, one Razorpay payment intent, multiple Order rows under the hood).
+ * Scenario: /pay-batch, /pay-batch/cod, /pay-batch/verify — previously zero test coverage
+ * despite payment.service.ts's `*Batch` functions mirroring the well-tested single-order path.
+ *
+ * Given: a customer with 2 PENDING_PAYMENT orders from one combined checkout
+ * When: they pay for the batch (Razorpay or COD) and, for Razorpay, verify the signature
+ * Then: a single Razorpay order intent covers the whole batch (or, for COD, both orders move
+ *       straight to CONFIRMED together)
+ *
+ * Edge cases:
+ * - one order in the batch not owned by the caller -> 404, nothing charged
+ * - one order in the batch not PENDING_PAYMENT -> 409, nothing charged
+ * - an invalid batch signature marks every payment in the batch FAILED, no order confirmed
+ */
+describe('POST /api/v1/orders/pay-batch', () => {
+  function findOrderById(orders: Record<string, unknown>[]) {
+    return ({ where }: { where: { id: string } }) => Promise.resolve(orders.find((o) => o.id === where.id) ?? null);
+  }
+
+  it('returns 401 with no token', async () => {
+    const res = await request(app).post('/api/v1/orders/pay-batch').send({ orderIds: [ORDER_ID, ORDER_ID_2] });
+    expect(res.status).toBe(401);
+  });
+
+  it('creates a single Razorpay order covering the combined total of every order in the batch', async () => {
+    prismaMock.order.findUnique.mockImplementation(findOrderById([orderFixture, orderFixture2]));
+    prismaMock.payment.findFirst.mockResolvedValue(null);
+    razorpayMock.orders.create.mockResolvedValue({ id: 'order_batch123', amount: 59700, currency: 'INR' });
+    prismaMock.payment.createMany.mockResolvedValue({ count: 2 });
+    const res = await request(app)
+      .post('/api/v1/orders/pay-batch')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ orderIds: [ORDER_ID, ORDER_ID_2] });
+    expect(res.status).toBe(200);
+    expect(razorpayMock.orders.create).toHaveBeenCalledWith(expect.objectContaining({ amount: 59700 })); // 398 + 199 in paise
+    expect(prismaMock.payment.createMany).toHaveBeenCalled();
+  });
+
+  it('404s (not 500) when one order in the batch belongs to a different customer', async () => {
+    prismaMock.order.findUnique.mockImplementation(findOrderById([orderFixture, { ...orderFixture2, customerId: OTHER_CUSTOMER_ID }]));
+    const res = await request(app)
+      .post('/api/v1/orders/pay-batch')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ orderIds: [ORDER_ID, ORDER_ID_2] });
+    expect(res.status).toBe(404);
+    expect(razorpayMock.orders.create).not.toHaveBeenCalled();
+  });
+
+  it('returns a clean 409 (not a raw 500) when one order in the batch is not PENDING_PAYMENT', async () => {
+    prismaMock.order.findUnique.mockImplementation(findOrderById([orderFixture, { ...orderFixture2, status: 'CONFIRMED' }]));
+    const res = await request(app)
+      .post('/api/v1/orders/pay-batch')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ orderIds: [ORDER_ID, ORDER_ID_2] });
+    expect(res.status).toBe(409);
+    expect(razorpayMock.orders.create).not.toHaveBeenCalled();
+  });
+
+  it('422s an empty orderIds array (schema-level, before touching Prisma)', async () => {
+    const res = await request(app)
+      .post('/api/v1/orders/pay-batch')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ orderIds: [] });
+    expect(res.status).toBe(422);
+    expect(prismaMock.order.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/v1/orders/pay-batch/cod', () => {
+  function findOrderById(orders: Record<string, unknown>[]) {
+    return ({ where }: { where: { id: string } }) => Promise.resolve(orders.find((o) => o.id === where.id) ?? null);
+  }
+
+  it('returns 401 with no token', async () => {
+    const res = await request(app).post('/api/v1/orders/pay-batch/cod').send({ orderIds: [ORDER_ID, ORDER_ID_2] });
+    expect(res.status).toBe(401);
+  });
+
+  it('confirms every order in the batch together via COD, never marking any of them PAID', async () => {
+    prismaMock.order.findUnique.mockImplementation(findOrderById([orderFixture, orderFixture2]));
+    prismaMock.$transaction.mockImplementation(async (cb: (tx: typeof prismaMock) => unknown) => cb(prismaMock));
+    prismaMock.payment.create.mockResolvedValue({ ...paymentFixture, provider: 'COD', status: 'CREATED' });
+    prismaMock.order.update.mockImplementation(({ where }: { where: { id: string } }) =>
+      Promise.resolve({ ...(where.id === ORDER_ID ? orderFixture : orderFixture2), status: 'CONFIRMED' }),
+    );
+    const res = await request(app)
+      .post('/api/v1/orders/pay-batch/cod')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ orderIds: [ORDER_ID, ORDER_ID_2] });
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(2);
+    expect(res.body.data.every((o: { status: string }) => o.status === 'CONFIRMED')).toBe(true);
+    expect(prismaMock.payment.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'PAID' }) }),
+    );
+  });
+
+  it('returns a clean 409 (not a raw 500) when one order in the batch is not PENDING_PAYMENT', async () => {
+    prismaMock.order.findUnique.mockImplementation(findOrderById([orderFixture, { ...orderFixture2, status: 'CANCELLED' }]));
+    const res = await request(app)
+      .post('/api/v1/orders/pay-batch/cod')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ orderIds: [ORDER_ID, ORDER_ID_2] });
+    expect(res.status).toBe(409);
+    expect(prismaMock.payment.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/v1/orders/pay-batch/verify', () => {
+  function findOrderById(orders: Record<string, unknown>[]) {
+    return ({ where }: { where: { id: string } }) => Promise.resolve(orders.find((o) => o.id === where.id) ?? null);
+  }
+  const batchPaymentA = { ...paymentFixture, id: 'pay-a', orderId: ORDER_ID, providerOrderId: 'order_batch123' };
+  const batchPaymentB = { ...paymentFixture, id: 'pay-b', orderId: ORDER_ID_2, providerOrderId: 'order_batch123' };
+
+  it('returns 401 with no token', async () => {
+    const res = await request(app)
+      .post('/api/v1/orders/pay-batch/verify')
+      .send({ orderIds: [ORDER_ID, ORDER_ID_2], razorpay_order_id: 'x', razorpay_payment_id: 'y', razorpay_signature: 'z' });
+    expect(res.status).toBe(401);
+  });
+
+  it('verifies a correct batch signature, marking every Payment PAID and every Order CONFIRMED together', async () => {
+    prismaMock.order.findUnique.mockImplementation(findOrderById([orderFixture, orderFixture2]));
+    prismaMock.payment.findMany.mockResolvedValue([batchPaymentA, batchPaymentB]);
+    prismaMock.$transaction.mockImplementation(async (cb: (tx: typeof prismaMock) => unknown) => cb(prismaMock));
+    prismaMock.payment.updateMany.mockResolvedValue({ count: 2 });
+    prismaMock.order.update.mockImplementation(({ where }: { where: { id: string } }) =>
+      Promise.resolve({ ...(where.id === ORDER_ID ? orderFixture : orderFixture2), status: 'CONFIRMED' }),
+    );
+    const signature = crypto.createHmac('sha256', env.razorpayKeySecret).update('order_batch123|pay_test123').digest('hex');
+    const res = await request(app)
+      .post('/api/v1/orders/pay-batch/verify')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ orderIds: [ORDER_ID, ORDER_ID_2], razorpay_order_id: 'order_batch123', razorpay_payment_id: 'pay_test123', razorpay_signature: signature });
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(2);
+    expect(prismaMock.payment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'PAID' }) }),
+    );
+  });
+
+  it('rejects an invalid batch signature — every Payment in the batch marked FAILED, no Order confirmed', async () => {
+    prismaMock.order.findUnique.mockImplementation(findOrderById([orderFixture, orderFixture2]));
+    prismaMock.payment.findMany.mockResolvedValue([batchPaymentA, batchPaymentB]);
+    prismaMock.payment.updateMany.mockResolvedValue({ count: 2 });
+    const res = await request(app)
+      .post('/api/v1/orders/pay-batch/verify')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ orderIds: [ORDER_ID, ORDER_ID_2], razorpay_order_id: 'order_batch123', razorpay_payment_id: 'pay_test123', razorpay_signature: 'not-the-real-signature' });
+    expect(res.status).toBe(422);
+    expect(prismaMock.payment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED' }) }),
+    );
+    expect(prismaMock.order.update).not.toHaveBeenCalled();
+  });
+
+  it('returns a clean 409 (not a raw 500) when one order in the batch was already settled by a different payment attempt', async () => {
+    prismaMock.order.findUnique.mockImplementation(findOrderById([orderFixture, { ...orderFixture2, status: 'CONFIRMED' }]));
+    prismaMock.payment.findMany.mockResolvedValue([batchPaymentA, batchPaymentB]);
+    prismaMock.payment.updateMany.mockResolvedValue({ count: 2 });
+    const signature = crypto.createHmac('sha256', env.razorpayKeySecret).update('order_batch123|pay_test123').digest('hex');
+    const res = await request(app)
+      .post('/api/v1/orders/pay-batch/verify')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ orderIds: [ORDER_ID, ORDER_ID_2], razorpay_order_id: 'order_batch123', razorpay_payment_id: 'pay_test123', razorpay_signature: signature });
+    expect(res.status).toBe(409);
+    expect(prismaMock.payment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED' }) }),
+    );
+  });
+
+  it('404s (not 500) verifying a batch where one order does not belong to the caller', async () => {
+    prismaMock.order.findUnique.mockImplementation(findOrderById([orderFixture, { ...orderFixture2, customerId: OTHER_CUSTOMER_ID }]));
+    const res = await request(app)
+      .post('/api/v1/orders/pay-batch/verify')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ orderIds: [ORDER_ID, ORDER_ID_2], razorpay_order_id: 'order_batch123', razorpay_payment_id: 'pay_test123', razorpay_signature: 'irrelevant' });
+    expect(res.status).toBe(404);
+  });
+});
+
 describe('POST /api/v1/payments/webhook/razorpay', () => {
   const capturedEvent = { event: 'payment.captured', payload: { payment: { entity: { id: 'pay_test123', order_id: 'order_test123' } } } };
   const failedEvent = { event: 'payment.failed', payload: { payment: { entity: { id: 'pay_test123', order_id: 'order_test123', error_description: 'Card declined' } } } };
@@ -319,8 +481,9 @@ describe('POST /api/v1/payments/webhook/razorpay', () => {
     prismaMock.payment.findMany.mockResolvedValue([paymentFixture]);
     prismaMock.payment.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.order.updateMany.mockResolvedValue({ count: 1 });
-    // cascadeBookingStatus re-reads the now-CONFIRMED orders (updateMany doesn't return rows) —
-    // this fixture is type:'PRODUCT' so the cascade itself is a no-op, but the read must resolve.
+    // handleWebhookEvent re-reads the now-CONFIRMED orders (updateMany doesn't return rows) so
+    // it can finalize each one's linked Cart — the read must resolve even though this fixture's
+    // Cart has no pendingOrderId pointing at it (finalizeCartForOrder is then a no-op).
     prismaMock.order.findMany.mockResolvedValue([orderFixture]);
     const signature = signWebhook(capturedEvent);
     const res = await request(app).post('/api/v1/payments/webhook/razorpay').set('x-razorpay-signature', signature).send(capturedEvent);

@@ -1,26 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import type { MdDialog } from '@material/web/dialog/dialog.js';
-import { Dialog, Divider, FilledButton, Icon } from '@skylabs-monorepo/shared-ui/react';
+import { Divider, FilledButton, Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 
 import { getCatalogTherapist, type CatalogTherapist } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
-import type { Booking } from '../../../api/bookings';
 import { Breadcrumb } from '../../components/breadcrumb';
-import { TherapistBookingDialog } from '../../components/therapist-booking-dialog';
-import { formatBookingSchedule, bookingDisplayName, pluralize } from '../../../utils/format';
+import { TherapistAddToCartDialog } from '../../components/therapist-add-to-cart-dialog';
+import { pluralize } from '../../../utils/format';
 import { resolveTherapistMedia } from '../../../utils/media';
-
-import '../deal-detail/deal-detail.css';
+import './therapist-detail.css';
 
 /**
  * Therapist Detail — GET /catalog/therapists/:id. The customer-facing purchase entry point for
- * booking a Therapist directly: Therapist Listing → here → select a package → Book Now, entirely
- * independent of Deal (never requires selecting a Deal first — see msd-api's Therapist schema
- * doc comment). Reuses `deal-detail.css`'s layout classes for visual consistency with the Deal
- * detail page, without pulling in any Deal-specific logic (siblings, cart, wishlist — none of
- * those concepts apply to a Therapist purchased directly).
+ * adding a Therapist to cart directly: Therapist Listing → here → select a package → Add to
+ * Cart, entirely independent of Deal (never requires selecting a Deal first — see msd-api's
+ * Therapist schema doc comment). A Therapist is a normal purchasable OrderItem exactly like a
+ * Deal or Product — there is no Book Now path. Reuses `deal-detail.css`'s layout classes for
+ * visual consistency with the Deal detail page, without pulling in any Deal-specific logic
+ * (siblings, wishlist — none of those concepts apply to a Therapist purchased directly).
  */
 export function TherapistDetail() {
   const { id = '' } = useParams<{ id: string }>();
@@ -31,14 +29,8 @@ export function TherapistDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
   const [actionMessage, setActionMessage] = useState('');
   const [activeImg, setActiveImg] = useState(0);
-  const resultDialogRef = useRef<MdDialog>(null);
-
-  useEffect(() => {
-    if (confirmedBooking) resultDialogRef.current?.show();
-  }, [confirmedBooking]);
 
   useEffect(() => {
     if (!id) {
@@ -67,7 +59,7 @@ export function TherapistDetail() {
 
   if (error || !therapist) {
     return (
-      <div className="deal-detail deal-detail--empty">
+      <div className="therapist-detail therapist-detail--empty">
         <title>Therapist Not Found | MSD</title>
         <sky-info-card icon="search_off" heading="Therapist not found" subheading={error || 'This therapist may no longer be available.'} />
         <FilledButton type="button" onClick={() => navigate('/therapists')}>Browse Therapists</FilledButton>
@@ -85,7 +77,7 @@ export function TherapistDetail() {
   const media = resolveTherapistMedia(therapist);
 
   return (
-    <div className="deal-detail">
+    <div className="therapist-detail">
       <title>{`${therapist.therapistType} — ${therapist.personName} | MSD`}</title>
       <meta
         name="description"
@@ -93,7 +85,7 @@ export function TherapistDetail() {
       />
 
       <Breadcrumb
-        className="deal-detail__breadcrumb"
+        className="therapist-detail__breadcrumb"
         items={[
           { label: 'Home', to: '/' },
           { label: 'Therapists', to: '/therapists' },
@@ -101,21 +93,21 @@ export function TherapistDetail() {
         ]}
       />
 
-      <div className="deal-detail__layout">
-        <div className="deal-detail__gallery">
-          <div className="deal-detail__main-img-wrap">
+      <div className="therapist-detail__layout">
+        <div className="therapist-detail__gallery">
+          <div className="therapist-detail__main-img-wrap">
             {media.images[activeImg] && (
-              <img className="deal-detail__main-img" src={media.images[activeImg]} alt={therapist.personName} width={800} height={450} />
+              <img className="therapist-detail__main-img" src={media.images[activeImg]} alt={therapist.personName} width={800} height={450} />
             )}
           </div>
 
           {media.images.length > 1 && (
-            <div className="deal-detail__thumbs" aria-label="Gallery thumbnails">
+            <div className="therapist-detail__thumbs" aria-label="Gallery thumbnails">
               {media.images.map((image, index) => (
                 <button
                   key={`${image}-${index}`}
                   type="button"
-                  className={`deal-detail__thumb${index === activeImg ? ' deal-detail__thumb--active' : ''}`}
+                  className={`therapist-detail__thumb${index === activeImg ? 'therapist-detail__thumb--active' : ''}`}
                   onClick={() => setActiveImg(index)}
                   aria-label={`View image ${index + 1}`}
                   aria-pressed={index === activeImg}
@@ -126,34 +118,34 @@ export function TherapistDetail() {
             </div>
           )}
 
-          {media.video && <video className="deal-detail__video" controls src={media.video} />}
+          {media.video && <video className="therapist-detail__video" controls src={media.video} />}
         </div>
 
-        <div className="deal-detail__info">
-          <div className="deal-detail__meta-row">
+        <div className="therapist-detail__info">
+          <div className="therapist-detail__meta-row">
             {therapist.vendor?.businessName && (
-              <span className="deal-detail__provider">{therapist.vendor.businessName}</span>
+              <span className="therapist-detail__provider">{therapist.vendor.businessName}</span>
             )}
             <sky-badge variant="primary" size="small">Therapist</sky-badge>
           </div>
 
           {/* Type + Person are always shown separately, never merged into one field. */}
-          <h1 className="deal-detail__title">{therapist.therapistType}</h1>
-          <p className="deal-detail__dist" aria-label="Therapist name">
+          <h1 className="therapist-detail__title">{therapist.therapistType}</h1>
+          <p className="therapist-detail__dist" aria-label="Therapist name">
             <Icon aria-hidden="true">person</Icon>
             {therapist.personName}
             {therapist.gender ? ` · ${therapist.gender}` : ''}
           </p>
 
           {(therapist.branch?.city || therapist.branch?.address) && (
-            <p className="deal-detail__dist" aria-label="Location">
+            <p className="therapist-detail__dist" aria-label="Location">
               <Icon aria-hidden="true">near_me</Icon>
               {[therapist.branch?.name, therapist.branch?.address ?? therapist.branch?.city].filter(Boolean).join(' · ')}
             </p>
           )}
 
           {therapist.experienceYears != null && (
-            <p className="deal-detail__duration">
+            <p className="therapist-detail__duration">
               <Icon aria-hidden="true">schedule</Icon>
               {therapist.experienceYears} {pluralize(therapist.experienceYears, 'year')} experience
             </p>
@@ -165,62 +157,38 @@ export function TherapistDetail() {
           <Divider />
 
           {fromPrice != null && (
-            <div className="deal-detail__price-row">
+            <div className="therapist-detail__price-row">
               <div>
-                <span className="deal-detail__price">From ₹{fromPrice.toLocaleString('en-IN')}</span>
+                <span className="therapist-detail__price">From ₹{fromPrice.toLocaleString('en-IN')}</span>
               </div>
             </div>
           )}
 
-          <div className="deal-detail__cta">
-            <TherapistBookingDialog
+          <div className="therapist-detail__cta">
+            <TherapistAddToCartDialog
               therapist={therapist}
-              onBooked={(booking, intent) => {
-                if (intent === 'cart') {
-                  setActionMessage(`Added "${therapist.therapistType} — ${therapist.personName}" to your cart.`);
-                } else {
-                  setConfirmedBooking(booking);
-                }
-              }}
+              onAdded={(label) => setActionMessage(`Added "${label}" to your cart.`)}
               renderTrigger={(open) => (
                 <FilledButton
                   type="button"
-                  className="deal-detail__add-btn"
+                  className="therapist-detail__add-btn"
                   disabled={therapist.packages.length === 0}
                   onClick={() => {
                     if (requireAuthOrRedirect()) open();
                   }}
                 >
-                  <Icon slot="icon" aria-hidden="true">event_available</Icon>
-                  Book Now
+                  <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                  Add to Cart
                 </FilledButton>
               )}
             />
           </div>
 
           {therapist.packages.length === 0 && (
-            <p className="field-hint">This therapist has no bookable packages yet.</p>
+            <p className="field-hint">This therapist has no purchasable packages yet.</p>
           )}
 
           {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
-
-          <Dialog ref={resultDialogRef} onClose={() => setConfirmedBooking(null)}>
-            {confirmedBooking && (
-              <>
-                <span slot="headline">Booking confirmed successfully.</span>
-                <div slot="content" className="form-grid">
-                  <p><strong>{bookingDisplayName(confirmedBooking)}</strong></p>
-                  {confirmedBooking.vendor.businessName && <p>{confirmedBooking.vendor.businessName}</p>}
-                  <p>{confirmedBooking.branch.name}</p>
-                  <p>{formatBookingSchedule(confirmedBooking.bookingDate, confirmedBooking.timeSlot)}</p>
-                  <p className="field-hint">Booking ID: {confirmedBooking.id}</p>
-                </div>
-                <div slot="actions">
-                  <FilledButton onClick={() => resultDialogRef.current?.close()}>Done</FilledButton>
-                </div>
-              </>
-            )}
-          </Dialog>
         </div>
       </div>
     </div>

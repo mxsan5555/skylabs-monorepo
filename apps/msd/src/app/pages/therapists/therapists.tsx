@@ -79,6 +79,7 @@ export function Therapists() {
                       heading={t.therapistType}
                       subheading={`${t.personName} · ${details}`}
                       href={`/therapist/${t.id}`}
+                      tag={t.popularTags?.[0]?.name}
                     />
                   </li>
                 );

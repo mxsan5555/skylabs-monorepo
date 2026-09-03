@@ -12,7 +12,8 @@ export type SniffedMediaType =
   | 'image/webp'
   | 'video/mp4'
   | 'video/webm'
-  | 'video/quicktime';
+  | 'video/quicktime'
+  | 'application/pdf';
 
 function bytesMatch(buffer: Buffer, offset: number, signature: number[]): boolean {
   if (buffer.length < offset + signature.length) return false;
@@ -31,6 +32,7 @@ export function sniffMediaType(buffer: Buffer): SniffedMediaType | null {
   if (bytesMatch(buffer, 0, [0xff, 0xd8, 0xff])) return 'image/jpeg';
   if (bytesMatch(buffer, 0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'image/png';
   if (asciiAt(buffer, 0, 'RIFF') && asciiAt(buffer, 8, 'WEBP')) return 'image/webp';
+  if (asciiAt(buffer, 0, '%PDF-')) return 'application/pdf';
   if (bytesMatch(buffer, 0, [0x1a, 0x45, 0xdf, 0xa3])) return 'video/webm';
   // MP4 and MOV/QuickTime are both ISO-BMFF containers — an `ftyp` box at offset 4 is the real
   // signal that this is a valid media container (rejecting a renamed non-media file is the
@@ -45,6 +47,10 @@ export function sniffMediaType(buffer: Buffer): SniffedMediaType | null {
 
 export const IMAGE_MIME_TYPES: SniffedMediaType[] = ['image/jpeg', 'image/png', 'image/webp'];
 export const VIDEO_MIME_TYPES: SniffedMediaType[] = ['video/mp4', 'video/webm', 'video/quicktime'];
+/** JPG/JPEG/PNG/PDF — the KYC-document allow-list (GST/PAN/Aadhaar uploads), per this file's own
+ *  "never trust a client-declared mimetype" rule. No WEBP — vendors upload scans/photos of real
+ *  documents, not web-optimized images. */
+export const DOCUMENT_MIME_TYPES: SniffedMediaType[] = ['image/jpeg', 'image/png', 'application/pdf'];
 
 const EXTENSION_BY_TYPE: Record<SniffedMediaType, string> = {
   'image/jpeg': '.jpg',
@@ -53,6 +59,7 @@ const EXTENSION_BY_TYPE: Record<SniffedMediaType, string> = {
   'video/mp4': '.mp4',
   'video/webm': '.webm',
   'video/quicktime': '.mov',
+  'application/pdf': '.pdf',
 };
 
 export function extensionFor(type: SniffedMediaType): string {

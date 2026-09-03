@@ -6,7 +6,6 @@ import { listCustomers, getCustomer, type Customer } from '../../../../api/rbac/
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { CustomerList } from './customer-list';
 import { CustomerDetailOrders } from './customer-detail-orders';
-import { CustomerDetailBookings } from './customer-detail-bookings';
 
 interface CustomerTableParams {
   page: number;
@@ -16,7 +15,7 @@ interface CustomerTableParams {
 
 const DEFAULT_PARAMS: CustomerTableParams = { page: 1, pageSize: 10, search: '' };
 
-const CUSTOMER_DETAIL_TABS = ['Overview', 'Orders', 'Bookings'] as const;
+const CUSTOMER_DETAIL_TABS = ['Overview', 'Orders'] as const;
 
 /**
  * SuperAdmin/staff Customer directory (`/account/customers`, `customers:view`) — read-only:
@@ -92,7 +91,7 @@ export function CustomerManagement() {
       <header className="page-head">
         <div>
           <h1>Customer Management</h1>
-          <p>Every signed-up customer, with their orders and bookings.</p>
+          <p>Every signed-up customer, with their orders.</p>
         </div>
       </header>
 
@@ -155,10 +154,6 @@ export function CustomerManagement() {
                       <p className="stat-card__value">{selectedCustomer._count.orders}</p>
                     </div>
                     <div className="stat-card">
-                      <p className="stat-card__title">Total Bookings</p>
-                      <p className="stat-card__value">{selectedCustomer._count.bookings}</p>
-                    </div>
-                    <div className="stat-card">
                       <p className="stat-card__title">Customer Since</p>
                       <p className="stat-card__value">{new Date(selectedCustomer.createdAt).toLocaleDateString()}</p>
                     </div>
@@ -169,12 +164,6 @@ export function CustomerManagement() {
               {activeTab === 1 && (
                 <div className="admin-tab-panel" aria-label="Orders">
                   <CustomerDetailOrders token={token} customerId={selectedCustomer.id} />
-                </div>
-              )}
-
-              {activeTab === 2 && (
-                <div className="admin-tab-panel" aria-label="Bookings">
-                  <CustomerDetailBookings token={token} customerId={selectedCustomer.id} />
                 </div>
               )}
             </>

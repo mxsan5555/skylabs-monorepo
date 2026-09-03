@@ -1,30 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  FilledButton,
-  OutlinedButton,
-  OutlinedIconButton,
-  Icon,
-  Divider,
-  Radio,
-  ChipSet,
-  FilterChip,
-  SuggestionChip,
-  Tabs,
-  PrimaryTab,
-} from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedIconButton, Icon, Divider, Radio, ChipSet, FilterChip, SuggestionChip, Tabs, PrimaryTab, OutlinedTextField, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import {
-  getCatalogVendor,
-  listCatalogDeals,
-  type CatalogVendorDetail,
-  type CatalogVendorBranch,
-  type CatalogVendorTherapist,
-  type CatalogDeal,
-} from '../../../api/catalog';
+import { getCatalogVendor, listCatalogDeals, type CatalogVendorDetail, type CatalogVendorBranch, type CatalogDeal, type CatalogVendorTherapist, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
-import { createBooking } from '../../../api/bookings';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
@@ -36,13 +16,14 @@ import { formatINR, pluralize } from '../../../utils/format';
 import { resolveDealMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import { useToast } from '../../../toast/toast-context';
 import './vendor.css';
+import content from '../../../content.json';
 
+const vendorContent = content.vendor;
 const SITE_URL: string = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
+const TIME_SLOTS = content.category.timeSlots;
 
 const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
-const DAY_LABELS: Record<(typeof DAY_ORDER)[number], string> = {
-  mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday',
-};
+const DAY_LABELS = vendorContent.days;
 
 /** Builds schema.org `OpeningHoursSpecification` entries from `Branch.openingHours`
  *  (`{ mon: "09:00-20:00", sun: "closed", ... }`) — skips closed/unset days. */
@@ -94,14 +75,17 @@ function getOrCreate<K, V>(map: Map<K, V>, key: K, create: () => V): V {
 function groupServiceDeals(deals: CatalogDeal[]): CategoryGroup[] {
   const categories = new Map<string, Map<string, Map<string, ServiceGroup>>>();
   for (const deal of deals) {
-    if (!deal.service) continue;
-    const service = deal.service;
+    // A service deal has no `product` (see Deal's own schema doc comment) — the old Service
+    // master-row model (`deal.service`) is gone entirely, so a service deal is identified purely
+    // by the absence of `product`, never by a truthy `deal.service` (always null now).
+    if (deal.product) continue;
     const categoryName = deal.category?.name ?? 'Other Services';
     const subKey = deal.subcategory?.name ?? '';
     const subMap = getOrCreate(categories, categoryName, () => new Map());
     const serviceMap = getOrCreate(subMap, subKey, () => new Map());
-    // One Deal per Service — if a stray duplicate somehow exists, the first wins.
-    getOrCreate(serviceMap, service.id, () => ({ id: service.id, name: service.name, deal }));
+    // Keyed by the deal's own id — each Deal is its own offering now, no shared Service row to
+    // dedupe against.
+    getOrCreate(serviceMap, deal.id, () => ({ id: deal.id, name: deal.title, deal }));
   }
   return Array.from(categories.entries()).map(([name, subMap]) => ({
     name,
@@ -168,7 +152,7 @@ export function VendorPage() {
         if (err instanceof ApiRequestError && err.status === 404) {
           setVendor(null);
         } else {
-          setVendorError(err instanceof ApiRequestError ? err.message : 'Could not load this vendor.');
+          setVendorError(err instanceof ApiRequestError ? err.message : vendorContent.errors.loadVendor);
         }
       })
       .finally(() => setVendorLoading(false));
@@ -202,7 +186,7 @@ export function VendorPage() {
         setServiceDeals(services.data);
         setProductDeals(products.data);
       })
-      .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : 'Could not load services and products.'))
+      .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : vendorContent.errors.loadServicesProducts))
       .finally(() => setDealsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendor, selectedBranch?.id]);
@@ -251,7 +235,7 @@ export function VendorPage() {
     setProductActionError('');
     setProductActionMessage('');
     try {
-      await addCartItem(token, deal.id, 1);
+      await addCartItem(token, { dealId: deal.id, quantity: 1 });
       const name = deal.product?.name ?? deal.title;
       setProductActionMessage(`Added "${name}" to your cart.`);
       showToast(`Added to cart\n${name}`);
@@ -263,19 +247,19 @@ export function VendorPage() {
   };
 
   if (vendorLoading) {
-    return <p className="loading-state">Loading vendor…</p>;
+    return <p className="loading-state"> {vendorContent.loading.vendor}</p>;
   }
 
   if (vendorError || !vendor) {
     return (
       <div className="vendor-page vendor-page--empty">
-        <title>Vendor Not Found | MSD</title>
+        <title>{vendorContent.notFound.metaTitle}</title>
         <sky-info-card
           icon="search_off"
-          heading="Vendor not found"
-          subheading={vendorError || 'This vendor may no longer be available.'}
+          heading={vendorContent.notFound.heading}
+          subheading={vendorError || vendorContent.notFound.subheading}
         />
-        <FilledButton onClick={() => navigate('/explore')}>Browse Services</FilledButton>
+        <FilledButton onClick={() => navigate('/explore')}> {vendorContent.notFound.cta}</FilledButton>
       </div>
     );
   }
@@ -340,8 +324,8 @@ export function VendorPage() {
       <Breadcrumb
         className="vendor-page__breadcrumb"
         items={[
-          { label: 'Home', to: '/' },
-          { label: 'Explore', to: '/explore' },
+          { label: vendorContent.breadcrumb.home, to: '/' },
+          { label: vendorContent.breadcrumb.explore, to: '/explore' },
           { label: vendor.businessName },
         ]}
       />
@@ -402,7 +386,7 @@ export function VendorPage() {
           {/* Opening hours */}
           {selectedBranch?.openingHours && (
             <div className="vendor-page__hours-section">
-              <h2 className="vendor-page__hours-title">Working Hours</h2>
+              <h2 className="vendor-page__hours-title">{vendorContent.labels.workingHours}</h2>
               <div className="vendor-page__hours-grid">
                 {DAY_ORDER.map((day) => {
                   const raw = selectedBranch.openingHours?.[day];
@@ -411,7 +395,7 @@ export function VendorPage() {
                     <div key={day} className="vendor-page__hours-row">
                       <span className="vendor-page__hours-day">{DAY_LABELS[day]}</span>
                       <span className="vendor-page__hours-time">
-                        {closed ? 'Closed' : raw.replace('-', ' – ')}
+                        {closed ? vendorContent.labels.closed : raw.replace('-', ' – ')}
                       </span>
                     </div>
                   );
@@ -422,14 +406,14 @@ export function VendorPage() {
 
           <Divider />
 
-          {/* Select Service (Deal) — one card per Deal, "From ₹X" is the cheapest active package */}
-          <section className="vendor-page__section" aria-label="Services">
-            <h2 className="vendor-page__section-title">Select Service</h2>
+          {/* Select Service */}
+          <section className="vendor-page__section" aria-label={vendorContent.accessibility.services}>
+            <h2 className="vendor-page__section-title"> {vendorContent.labels.selectService}</h2>
 
             {categoryNames.length > 1 && (
-              <ChipSet aria-label="Filter by service category">
+              <ChipSet aria-label={vendorContent.filters.filterByServiceCategory}>
                 <FilterChip
-                  label="All"
+                  label={vendorContent.filters.all}
                   selected={activeCategoryName === 'all'}
                   onClick={() => handleCategoryFilter('all')}
                 />
@@ -445,11 +429,11 @@ export function VendorPage() {
             )}
 
             {dealsLoading ? (
-              <p className="loading-state">Loading services…</p>
+              <p className="loading-state">{vendorContent.loading.services}</p>
             ) : dealsError ? (
               <p className="error-state" role="alert">{dealsError}</p>
             ) : displayedCategoryGroups.length === 0 ? (
-              <p className="vendor-page__deal-empty">No services available at this branch.</p>
+              <p className="vendor-page__deal-empty"> {vendorContent.empty.noServices}</p>
             ) : (
               <div className="vendor-page__deal-groups">
                 {displayedCategoryGroups.map((cat) => {
@@ -493,7 +477,7 @@ export function VendorPage() {
                                     <img
                                       className="vendor-page__deal-card-img"
                                       src={thumb}
-                                      alt={deal.service?.imageAlt ?? ''}
+                                      alt={deal.title}
                                       loading="lazy"
                                       width={120}
                                       height={80}
@@ -542,21 +526,21 @@ export function VendorPage() {
           <Divider />
 
           {/* Products */}
-          <section className="vendor-page__section" aria-label="Products">
+          <section className="vendor-page__section" aria-label={vendorContent.accessibility.products}>
             <h2 className="vendor-page__section-title">Products</h2>
             {productActionMessage && <p className="field-hint" role="status">{productActionMessage}</p>}
             {productActionError && <p className="error-state" role="alert">{productActionError}</p>}
             {dealsLoading ? (
-              <p className="loading-state">Loading products…</p>
+              <p className="loading-state">{vendorContent.loading.products}</p>
             ) : productDeals.length === 0 ? (
-              <p className="vendor-page__deal-empty">No products available at this branch.</p>
+              <p className="vendor-page__deal-empty">{vendorContent.empty.noProducts}</p>
             ) : (
               <ul className="vendor-page__product-grid">
                 {productDeals.map((deal) => (
                   <li key={deal.id}>
                     <SkyProductCardWC
                       variant="outlined"
-                      badge="Product"
+                      badge={vendorContent.labels.products}
                       eyebrow={deal.product?.brand ?? undefined}
                       heading={deal.product?.name ?? deal.title}
                       image={primaryImage(resolveDealMedia(deal))}
@@ -576,7 +560,7 @@ export function VendorPage() {
                       <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
                         <FilledButton onClick={() => addProductToCart(deal)}>
                           <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-                          Add to Cart
+                          {vendorContent.actions.addToCart}
                         </FilledButton>
                       </div>
                     </SkyProductCardWC>
@@ -588,12 +572,8 @@ export function VendorPage() {
 
           <Divider />
 
-          {/* Therapists — same card/select pattern as Deals above (one card per Therapist,
-              "From ₹X" is the cheapest active TherapistPackage); click selects them into the
-              SAME "Your selection" panel on the right, mutually exclusive with a Deal
-              selection — see #8/#17 of this page's UX rules: Deal and Therapist must behave
-              identically (card → click → side panel → packages → select → Book). */}
-          <section className="vendor-page__section" aria-label="Therapists">
+          {/* Therapists */}
+          <section className="vendor-page__section" aria-label={vendorContent.accessibility.therapists}>
             <h2 className="vendor-page__section-title">Meet Our Therapists</h2>
             {selectedBranch && selectedBranch.therapists.length > 0 ? (
               <div className="vendor-page__deal-list" role="radiogroup" aria-label="Available therapists">
@@ -650,14 +630,14 @@ export function VendorPage() {
                 })}
               </div>
             ) : (
-              <p className="vendor-page__deal-empty">No therapist profiles listed for this branch yet.</p>
+              <p className="vendor-page__deal-empty">{vendorContent.empty.noTherapists}</p>
             )}
           </section>
         </div>
 
         {/* ── Right: Your selection card ───────────────────────────────────── */}
-        <aside className="vendor-page__selection-card" aria-label="Your selection">
-          <h2 className="vendor-page__selection-title">Your selection</h2>
+        <aside className="vendor-page__selection-card" aria-label={vendorContent.accessibility.yourSelection}>
+          <h2 className="vendor-page__selection-title"> {vendorContent.labels.yourSelection}</h2>
 
           {activeGroup ? (
             <DealSelectionPanel
@@ -685,13 +665,13 @@ export function VendorPage() {
 }
 
 /**
- * The stateful "package/price → Book Now" panel for one selected Deal — driven entirely by the
- * canonical `useDealPurchaseSelection` hook + `DurationPackageSelector` UI (the same ones every
- * other purchase entry point uses), keyed by `group.id` in the parent so switching services
- * fully resets this panel's local state. Never asks for a date/time — this is a service
- * purchase, not an appointment-scheduling system (see Booking's schema doc comment in msd-api).
- * There is deliberately no in-flow "select a therapist" cross-selection — a Therapist is only
- * ever selected by clicking its own card (see `TherapistSelectionPanel` below).
+ * The stateful "package/price → Add to Cart" panel for one selected Deal — driven entirely by
+ * the canonical `useDealPurchaseSelection` hook + `DurationPackageSelector` UI (the same ones
+ * every other purchase entry point uses), keyed by `group.id` in the parent so switching services
+ * fully resets this panel's local state. A service Deal is a normal purchasable OrderItem exactly
+ * like a Product or Therapist — there is no Book Now path, only Add to Cart. There is deliberately
+ * no in-flow "select a therapist" cross-selection — a Therapist is only ever selected by clicking
+ * its own card (see `TherapistSelectionPanel` below).
  */
 function DealSelectionPanel({
   group,
@@ -706,13 +686,13 @@ function DealSelectionPanel({
   const { activePackage, unitPrice, missingSelection } = selection;
 
   const [qty, setQty] = useState(1);
-  const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
 
   const total = activePackage ? unitPrice * qty : 0;
 
-  const submitBooking = async (intent: 'book' | 'cart') => {
+  const addToCart = async () => {
     if (!requireAuthOrRedirect()) return;
     if (missingSelection) {
       setActionError(missingSelection);
@@ -721,27 +701,23 @@ function DealSelectionPanel({
     }
     setActionError('');
     setActionMessage('');
-    setBookingSubmitting(true);
+    setSubmitting(true);
     try {
-      await createBooking(token, {
+      await addCartItem(token, {
         dealId: group.deal.id,
         quantity: qty,
         ...(activePackage ? { dealPackageId: activePackage.id } : {}),
       });
       const durationLabel = activePackage ? ` — ${activePackage.durationMinutes} Minutes` : '';
-      setActionMessage(
-        intent === 'cart'
-          ? `Added "${group.name}" to your cart.`
-          : `Booked "${group.name}"${activePackage ? ` — ${activePackage.durationMinutes} min` : ''}.`,
-      );
+      setActionMessage(`Added "${group.name}" to your cart.`);
       // Only fires after the API call above has actually resolved — never claims success early.
-      showToast(intent === 'cart' ? `Added to cart\n${group.name}${durationLabel}` : `Booked\n${group.name}${durationLabel}`);
+      showToast(`Added to cart\n${group.name}${durationLabel}`);
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setActionError(message);
       showToast(message, 'error');
     } finally {
-      setBookingSubmitting(false);
+      setSubmitting(false);
     }
   };
 
@@ -805,22 +781,13 @@ function DealSelectionPanel({
 
       {/* CTA */}
       <div className="vendor-page__cta-row">
-        <OutlinedButton
-          onClick={() => submitBooking('cart')}
-          disabled={bookingSubmitting || !!missingSelection}
+        <FilledButton
+          onClick={addToCart}
+          disabled={submitting || !!missingSelection}
           aria-label={`Add ${group.name} to cart — ${formatINR(total)}`}
         >
           <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-          {bookingSubmitting ? 'Adding…' : 'Add to Cart'}
-        </OutlinedButton>
-        <FilledButton
-          className="vendor-page__book-btn"
-          onClick={() => submitBooking('book')}
-          disabled={bookingSubmitting || !!missingSelection}
-          aria-label={`Book ${group.name} — ${formatINR(total)}`}
-        >
-          <Icon slot="icon" aria-hidden="true">calendar_month</Icon>
-          {bookingSubmitting ? 'Booking…' : 'Book Now'}
+          {submitting ? 'Adding…' : 'Add to Cart'}
         </FilledButton>
       </div>
 
@@ -845,12 +812,12 @@ function DealSelectionPanel({
 }
 
 /**
- * The stateful "package/price → Book Now" panel for one selected Therapist, booked directly —
- * no Deal involved at all (see msd-api's Booking "exactly one of dealId/therapistId" doc
- * comment). Mirrors `DealSelectionPanel` exactly (same layout, same CTA row, same "never asks
- * for a date/time") but sources its packages from the Therapist's own `packages`, via the same
- * `useTherapistPurchaseSelection`/`TherapistPackageSelector` pair every other Therapist purchase
- * entry point uses.
+ * The stateful "package/price → Add to Cart" panel for one selected Therapist, added directly —
+ * no Deal involved at all (see msd-api's CartItem "exactly one of three shapes" doc comment).
+ * Mirrors `DealSelectionPanel` exactly (same layout, same CTA row) but sources its packages from
+ * the Therapist's own `packages`, via the same `useTherapistPurchaseSelection`/
+ * `TherapistPackageSelector` pair every other Therapist purchase entry point uses. A Therapist is
+ * a normal purchasable OrderItem exactly like a Deal or Product — there is no Book Now path.
  */
 function TherapistSelectionPanel({
   therapist,
@@ -865,14 +832,14 @@ function TherapistSelectionPanel({
   const { activePackage, unitPrice, missingSelection } = selection;
 
   const [qty, setQty] = useState(1);
-  const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
 
   const displayName = `${therapist.therapistType} — ${therapist.personName}`;
   const total = activePackage ? unitPrice * qty : 0;
 
-  const submitBooking = async (intent: 'book' | 'cart') => {
+  const addToCart = async () => {
     if (!requireAuthOrRedirect()) return;
     if (missingSelection || !activePackage) {
       setActionError(missingSelection ?? 'Select a package.');
@@ -881,27 +848,23 @@ function TherapistSelectionPanel({
     }
     setActionError('');
     setActionMessage('');
-    setBookingSubmitting(true);
+    setSubmitting(true);
     try {
-      await createBooking(token, {
+      await addCartItem(token, {
         therapistId: therapist.id,
-        durationMinutes: activePackage.durationMinutes,
+        therapistPackageId: activePackage.id,
         quantity: qty,
       });
-      setActionMessage(
-        intent === 'cart'
-          ? `Added "${displayName}" to your cart.`
-          : `Booked "${displayName}" — ${activePackage.durationMinutes} min.`,
-      );
+      setActionMessage(`Added "${displayName}" to your cart.`);
       // Only fires after the API call above has actually resolved — never claims success early.
       const label = `${therapist.personName} — ${activePackage.durationMinutes} Minutes`;
-      showToast(intent === 'cart' ? `Added to cart\n${label}` : `Booked\n${label}`);
+      showToast(`Added to cart\n${label}`);
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setActionError(message);
       showToast(message, 'error');
     } finally {
-      setBookingSubmitting(false);
+      setSubmitting(false);
     }
   };
 
@@ -965,22 +928,13 @@ function TherapistSelectionPanel({
 
       {/* CTA */}
       <div className="vendor-page__cta-row">
-        <OutlinedButton
-          onClick={() => submitBooking('cart')}
-          disabled={bookingSubmitting || !!missingSelection}
+        <FilledButton
+          onClick={addToCart}
+          disabled={submitting || !!missingSelection}
           aria-label={`Add ${displayName} to cart — ${formatINR(total)}`}
         >
           <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-          {bookingSubmitting ? 'Adding…' : 'Add to Cart'}
-        </OutlinedButton>
-        <FilledButton
-          className="vendor-page__book-btn"
-          onClick={() => submitBooking('book')}
-          disabled={bookingSubmitting || !!missingSelection}
-          aria-label={`Book ${displayName} — ${formatINR(total)}`}
-        >
-          <Icon slot="icon" aria-hidden="true">calendar_month</Icon>
-          {bookingSubmitting ? 'Booking…' : 'Book Now'}
+          {submitting ? 'Adding…' : 'Add to Cart'}
         </FilledButton>
       </div>
 

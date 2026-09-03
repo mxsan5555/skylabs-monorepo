@@ -16,6 +16,9 @@ const slugString = z
 
 export const ProductListQuerySchema = PaginationQuerySchema.extend({
   search: z.string().max(200).optional(),
+  /** Superadmin oversight list only — self-service reads are always implicitly scoped to the
+   *  caller's own vendor and never accept this from the query string. */
+  vendorId: z.string().uuid().optional(),
   categoryId: z.string().uuid().optional(),
   subcategoryId: z.string().uuid().optional(),
   status: z.enum(['active', 'inactive']).optional(),

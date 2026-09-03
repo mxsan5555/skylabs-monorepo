@@ -9,7 +9,6 @@ const CUSTOMER_COLUMNS = JSON.stringify([
   { key: 'Phone', label: 'Phone' },
   { key: 'Email', label: 'Email' },
   { key: 'Orders', label: 'Orders' },
-  { key: 'Bookings', label: 'Bookings' },
   { key: 'Last Activity', label: 'Last Activity' },
 ]);
 
@@ -24,7 +23,6 @@ function toCustomerRow(customer: CustomerRow): Record<string, string | number> {
     Phone: customer.phone || '—',
     Email: customer.email || '—',
     Orders: customer.orderCount,
-    Bookings: customer.bookingCount,
     'Last Activity': new Date(customer.lastActivityAt).toLocaleDateString(),
   };
 }
@@ -36,8 +34,8 @@ interface TableParams {
 
 const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 20 };
 
-/** Vendor self-service "Customers" page — everyone who has ordered from or booked with the
- *  logged-in vendor, resolved server-side from the JWT (`GET /vendors/me/customers`, gated
+/** Vendor self-service "Customers" page — everyone who has ordered from the logged-in vendor,
+ *  resolved server-side from the JWT (`GET /vendors/me/customers`, gated
  *  `vendors:custom` — the same permission every other vendor self-service route already
  *  uses). The backend doesn't support a search param on this endpoint, so `searchable` is
  *  intentionally omitted rather than inventing a new query param. */

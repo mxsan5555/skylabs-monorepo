@@ -74,6 +74,7 @@ declare module 'react' {
         subheading?: string;
         href?: string;
         align?: 'left' | 'center' | 'right';
+        tag?: string;
       }>;
 
       // ── sky-info-card ──────────────────────────────────────────────────────

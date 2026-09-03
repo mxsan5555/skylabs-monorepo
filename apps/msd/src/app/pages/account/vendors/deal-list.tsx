@@ -40,7 +40,7 @@ const DEAL_ACTIONS = JSON.stringify([{ icon: 'open_in_new', label: 'View vendor'
  *  create multiple confusing cards for the same logical Deal" instruction). */
 function packagesSummary(deal: Deal): string {
   const active = (deal.packages ?? []).filter((p) => p.isActive);
-  if (active.length === 0) return deal.service ? '—' : 'N/A';
+  if (active.length === 0) return deal.product ? 'N/A' : '—';
   const cheapest = active.reduce((min, p) => (Number(p.sellingPrice) < Number(min.sellingPrice) ? p : min), active[0]);
   const label = active.length > 1 ? `${active.length} packages` : `${cheapest.durationMinutes} min`;
   return `${label} · From ₹${cheapest.sellingPrice}`;
@@ -60,7 +60,7 @@ function startingPrice(deal: Deal): string {
 function toDealRow(deal: Deal): Record<string, string | number> {
   return {
     'Deal Name': deal.title,
-    Service: (deal.service ?? deal.product)?.name ?? '—',
+    Service: deal.product?.name ?? 'Service',
     Vendor: deal.vendor?.businessName ?? '—',
     Branch: deal.branch?.name ?? '—',
     Category: deal.category?.name ?? '—',
@@ -83,7 +83,7 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
 
 /** Cross-vendor Deals sidebar page — read list only; editing a deal happens on its vendor's
  *  own page (`VendorBranches`, reused there), reached via the "View vendor" action. Mirrors
- *  orders.tsx/bookings.tsx's <sky-data-table> pattern exactly. */
+ *  orders.tsx's <sky-data-table> pattern exactly. */
 export function DealList() {
   const { token } = useAuth();
   const navigate = useNavigate();

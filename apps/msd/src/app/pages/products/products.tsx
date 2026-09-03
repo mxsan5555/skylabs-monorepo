@@ -9,7 +9,7 @@ import {
 } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { useNavigate } from 'react-router-dom';
-
+import { DealCard } from '../../components/deal-card';
 import {
   listCatalogDeals,
   type CatalogDeal,
@@ -94,7 +94,7 @@ export function ProductListing() {
         setError(
           err instanceof ApiRequestError
             ? err.message
-            : 'Could not load products.',
+            : products.listing.errors.load,
         );
       })
       .finally(() => {
@@ -165,21 +165,20 @@ export function ProductListing() {
     try {
       await addCartItem(
         token,
-        deal.id,
-        1,
+        { dealId: deal.id, quantity: 1 },
       );
 
       setActionMessage(
-        `Added "${
-          deal.product?.name ??
-          deal.title
-        }" to your cart.`,
+        products.listing.addToCartSuccess.replace(
+          '{item}',
+          deal.product?.name ?? deal.title,
+        ),
       );
     } catch (err: unknown) {
       setActionError(
         err instanceof ApiRequestError
           ? err.message
-          : 'Could not add to cart.',
+          : products.listing.addToCartError,
       );
     }
   };
@@ -323,11 +322,11 @@ export function ProductListing() {
         className="products-page__breadcrumb"
         items={[
           {
-            label: 'Home',
+            label: products.listing.breadcrumb.home,
             to: '/',
           },
           {
-            label: 'Products',
+            label: products.listing.breadcrumb.products,
           },
         ]}
       />
@@ -363,11 +362,11 @@ export function ProductListing() {
       <div
         className="products-page__filter-bar"
         role="toolbar"
-        aria-label="Search and sort products"
+        aria-label={products.listing.filterAriaLabel}
       >
         <div className="products-page__filter-bar-inner">
           <OutlinedTextField
-            label="Search"
+            label={products.listing.searchLabel}
             value={search}
             onInput={(event: Event) => {
               const target =
@@ -451,11 +450,11 @@ export function ProductListing() {
       {/* Product Grid */}
       <section
         className="products-page__grid-section"
-        aria-label="Product results"
+        aria-label={products.listing.resultsAriaLabel}
       >
         {loading ? (
           <p className="loading-state">
-            Loading products…
+            {products.listing.loading}
           </p>
         ) : error ? (
           <p
@@ -494,86 +493,60 @@ export function ProductListing() {
               const originalPrice =
                 deal.originalPrice != null
                   ? Number(
-                      deal.originalPrice,
-                    )
+                    deal.originalPrice,
+                  )
                   : undefined;
 
-              const image = primaryImage(resolveDealMedia(deal));
+              const media = resolveDealMedia(deal);
+
+              const image = primaryImage(media);
 
               return (
                 <div
                   key={deal.id}
                   className="products-page__card-wrap"
                 >
-                  <SkyProductCardWC
-                    variant="outlined"
-                    heading={productName}
-                    eyebrow={
-                      deal.product?.brand ??
-                      deal.vendor
-                        ?.businessName ??
-                      undefined
-                    }
-                    image={image}
-                    imageAlt={
-                      deal.product
-                        ?.imageAlt ??
-                      productName
-                    }
-                    price={formatINR(
-                      salePrice,
-                    )}
-                    originalPrice={
-                      originalPrice !==
-                        undefined &&
-                      originalPrice !==
-                        salePrice
-                        ? formatINR(
-                            originalPrice,
-                          )
-                        : undefined
-                    }
-                    discount={
-                      deal.discountPercent
-                        ? `${deal.discountPercent}% OFF`
-                        : undefined
-                    }
-                    href={`/products/${deal.id}`}
-                    favorite
-                    favoriteActive={isWishlisted(
-                      deal.id,
-                    )}
-                    onFavorite={() =>
-                      toggleFavorite(deal)
-                    }
-                  >
-                    <div
-                      className="products-page__card-cta"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                      }}
-                    >
-                      <FilledButton
-                        type="button"
-                        className="products-page__card-btn"
-                        onClick={() =>
-                          void addToCart(
-                            deal,
-                          )
-                        }
-                      >
-                        <Icon
-                          slot="icon"
-                          aria-hidden="true"
-                        >
-                          shopping_bag
-                        </Icon>
+               <DealCard
+  deal={{
+    id: deal.id,
+    title: productName,
+    image: image ?? '',
+    imageAlt:
+      deal.product?.imageAlt ?? productName,
+    gallery: media.images,
+    badge: 'Product',
+    providerName:
+      deal.product?.brand ??
+      deal.vendor?.businessName ??
+      undefined,
+    price: salePrice,
+    originalPrice:
+      originalPrice !== undefined &&
+      originalPrice !== salePrice
+        ? originalPrice
+        : undefined,
+    discount: deal.discountPercent
+      ? Number(deal.discountPercent)
+      : undefined,
+    isProduct: true,
+    tag: deal.popularTags?.[0]?.name ?? deal.product?.popularTags?.[0]?.name,
+  }}
+  favoriteActive={isWishlisted(deal.id)}
+  onFavorite={() => toggleFavorite(deal)}
+  actions={
+    <FilledButton
+      type="button"
+      className="products-page__card-btn"
+      onClick={() => void addToCart(deal)}
+    >
+      <Icon slot="icon" aria-hidden="true">
+        shopping_bag
+      </Icon>
 
-                        Add to Cart
-                      </FilledButton>
-                    </div>
-                  </SkyProductCardWC>
+      {products.listing.addToCart}
+    </FilledButton>
+  }
+/>
                 </div>
               );
             })}

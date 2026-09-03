@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Request } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/requirePermission';
-import { validateBody, validateParams } from '../middleware/validate';
+import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
   RoleCreateSchema,
@@ -265,9 +265,9 @@ router.post(
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 
-router.get('/users', requirePermission('rbac.users', 'view'), async (req, res, next) => {
+router.get('/users', requirePermission('rbac.users', 'view'), validateQuery(PaginationQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize } = PaginationQuerySchema.parse(req.query);
+    const { page, pageSize } = req.validatedQuery as ReturnType<typeof PaginationQuerySchema.parse>;
     const { items, total } = await userService.listUsers(page, pageSize);
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
@@ -452,9 +452,10 @@ router.get(
   '/users/:id/login-history',
   requirePermission('rbac.users', 'view'),
   validateParams(UuidParamSchema),
+  validateQuery(PaginationQuerySchema),
   async (req, res, next) => {
     try {
-      const { page, pageSize } = PaginationQuerySchema.parse(req.query);
+      const { page, pageSize } = req.validatedQuery as ReturnType<typeof PaginationQuerySchema.parse>;
       const { items, total } = await userService.getLoginHistory(req.params.id, page, pageSize);
       sendData(res, items, { meta: { total, page, pageSize } });
     } catch (err) {
@@ -478,10 +479,10 @@ router.get(
 
 // ─── Audit logs ──────────────────────────────────────────────────────────────
 
-router.get('/audit-logs', requirePermission('rbac.audit-logs', 'view'), async (req, res, next) => {
+router.get('/audit-logs', requirePermission('rbac.audit-logs', 'view'), validateQuery(PaginationQuerySchema), async (req, res, next) => {
   try {
     const targetUserId = typeof req.query.targetUserId === 'string' ? req.query.targetUserId : undefined;
-    const { page, pageSize } = PaginationQuerySchema.parse(req.query);
+    const { page, pageSize } = req.validatedQuery as ReturnType<typeof PaginationQuerySchema.parse>;
     const where = targetUserId ? { targetType: 'User', targetId: targetUserId } : {};
     const [items, total] = await Promise.all([
       prisma.auditLog.findMany({

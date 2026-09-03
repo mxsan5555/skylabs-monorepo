@@ -48,7 +48,7 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
 
 /** Cross-vendor Branches sidebar page — read list only; editing a branch happens on its
  *  vendor's own page (`VendorBranches`, reused there), reached via the "View vendor" action.
- *  Mirrors orders.tsx/bookings.tsx's <sky-data-table> pattern exactly. */
+ *  Mirrors orders.tsx's <sky-data-table> pattern exactly. */
 export function BranchList() {
   const { token } = useAuth();
   const navigate = useNavigate();

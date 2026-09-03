@@ -34,6 +34,10 @@ export interface DealCardDeal {
    *  `onAddToCart` is supplied, shows a real "Add to Cart" action instead of the default
    *  click-through-only card. A service deal (the default) still routes to `/deal/:id`. */
   isProduct?: boolean;
+  /** The first active Popular Tag mapped onto this deal (or its linked Product, for a product
+   *  deal) — e.g. "Trending". `sky-product-card`'s `tag` slot is single-value, so only the
+   *  highest-priority (first) active tag is ever shown; omitted entirely when none are mapped. */
+  tag?: string;
 }
 
 interface DealCardProps {
@@ -62,6 +66,7 @@ export function DealCard({
     <SkyProductCardWC
       imageAlt={deal.imageAlt}
       badge={deal.badge}
+      tag={deal.tag}
       favorite
       favoriteActive={favoriteActive}
       onFavorite={onFavorite}

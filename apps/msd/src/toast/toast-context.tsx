@@ -24,8 +24,8 @@ const AUTO_DISMISS_MS = 3500;
  * App-wide toast — mounted once at the root (see `app.tsx`). Any component calls `useToast()`
  * and fires `showToast(message, variant)` right after an API call actually resolves — never
  * before, so a toast can never claim success for a request that hasn't confirmed yet (see e.g.
- * `DealBookingDialog`/`TherapistBookingDialog`'s `submit`, which only calls this inside the
- * `try` block's success path, after `await createBooking(...)` resolves).
+ * `DealAddToCartDialog`/`TherapistAddToCartDialog`'s `submit`, which only calls this inside the
+ * `try` block's success path, after `await addCartItem(...)` resolves).
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastEntry[]>([]);

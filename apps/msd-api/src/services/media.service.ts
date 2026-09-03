@@ -3,7 +3,10 @@ import { ApiError } from '../lib/http';
 import { deleteMediaFile, writeMediaFile } from '../lib/media-storage';
 import { validateMediaFile, MAX_IMAGES_PER_ENTITY } from './media-validation.service';
 
-export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor';
+/** `category` covers all three Category depth tiers (Category/Subcategory/Type are all just
+ *  Category rows — see category.service.ts's module doc comment) with one shared `CategoryImage`
+ *  table, image-only (no `videoAdapter` entry — see `CategoryImage`'s schema doc comment). */
+export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor' | 'category';
 
 export interface MediaFile {
   buffer: Buffer;
@@ -43,6 +46,7 @@ function imageAdapter(entityType: MediaEntityType): ImageAdapter {
     product: { subdir: 'products', column: 'productId', delegate: 'productImage' },
     therapist: { subdir: 'therapists', column: 'therapistId', delegate: 'therapistImage' },
     vendor: { subdir: 'vendors', column: 'vendorId', delegate: 'vendorImage' },
+    category: { subdir: 'categories', column: 'categoryId', delegate: 'categoryImage' },
   };
   const { subdir, column, delegate } = config[entityType];
   return {
@@ -52,14 +56,20 @@ function imageAdapter(entityType: MediaEntityType): ImageAdapter {
   };
 }
 
+/** Partial, not a full `Record<MediaEntityType, ...>` — `category` has no video model (see
+ *  `CategoryImage`'s schema doc comment), so it deliberately has no entry here; calling
+ *  `replaceVideo`/`deleteVideo` with `'category'` throws a clear error instead of crashing on an
+ *  undefined Prisma delegate. */
 function videoAdapter(entityType: MediaEntityType): VideoAdapter {
-  const config: Record<MediaEntityType, { subdir: string; column: string; delegate: string }> = {
+  const config: Partial<Record<MediaEntityType, { subdir: string; column: string; delegate: string }>> = {
     deal: { subdir: 'deals', column: 'dealId', delegate: 'dealVideo' },
     product: { subdir: 'products', column: 'productId', delegate: 'productVideo' },
     therapist: { subdir: 'therapists', column: 'therapistId', delegate: 'therapistVideo' },
     vendor: { subdir: 'vendors', column: 'vendorId', delegate: 'vendorVideo' },
   };
-  const { subdir, column, delegate } = config[entityType];
+  const entry = config[entityType];
+  if (!entry) throw new ApiError('VALIDATION_ERROR', `${entityType} does not support video uploads.`);
+  const { subdir, column, delegate } = entry;
   return {
     storageSubdir: subdir,
     parentIdColumn: column,
@@ -102,7 +112,14 @@ export async function deleteImage(entityType: MediaEntityType, parentId: string,
     throw new ApiError('NOT_FOUND', 'Image not found');
   }
   await adapter.delegate.delete({ where: { id: imageId } });
-  await deleteMediaFile(image.storageKey);
+  // The DB delete already committed — a non-ENOENT failure deleting the physical file (disk
+  // issue, permissions) must not skip the primary-image-reassignment step below; log and
+  // continue rather than let it propagate.
+  try {
+    await deleteMediaFile(image.storageKey);
+  } catch (err) {
+    console.error({ err, context: 'deleteImage: failed to delete image file', entityType, parentId, imageId, storageKey: image.storageKey });
+  }
 
   if (image.isPrimary) {
     const next = await adapter.delegate.findMany({
@@ -148,8 +165,9 @@ export async function replaceVideo(entityType: MediaEntityType, parentId: string
   const validated = validateMediaFile(file.buffer, 'video');
   const existing = await adapter.delegate.findUnique({ where: { [adapter.parentIdColumn]: parentId } as never });
   const { storageKey, sizeBytes } = await writeMediaFile(adapter.storageSubdir, parentId, file.buffer, validated.extension);
+  let upserted;
   try {
-    const upserted = await adapter.delegate.upsert({
+    upserted = await adapter.delegate.upsert({
       where: { [adapter.parentIdColumn]: parentId },
       create: {
         [adapter.parentIdColumn]: parentId,
@@ -165,12 +183,26 @@ export async function replaceVideo(entityType: MediaEntityType, parentId: string
         sizeBytes,
       },
     });
-    if (existing) await deleteMediaFile(existing.storageKey);
-    return upserted;
   } catch (err) {
+    // The upsert itself failed — the DB never got the new storageKey, so the just-written new
+    // file is genuinely orphaned and safe to clean up.
     await deleteMediaFile(storageKey);
     throw err;
   }
+
+  // The upsert succeeded — the DB row now correctly points at the new file. A non-ENOENT
+  // failure deleting the OLD file must not be caught by the rollback logic above (which would
+  // wrongly delete the NEW file the DB now points to, corrupting an already-successful
+  // replace); log and continue instead.
+  if (existing) {
+    try {
+      await deleteMediaFile(existing.storageKey);
+    } catch (err) {
+      console.error({ err, context: 'replaceVideo: failed to delete old video file', entityType, parentId, storageKey: existing.storageKey });
+    }
+  }
+
+  return upserted;
 }
 
 export async function deleteVideo(entityType: MediaEntityType, parentId: string) {

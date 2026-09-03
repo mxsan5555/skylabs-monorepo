@@ -1,32 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { MdFilledButton } from '@material/web/button/filled-button.js';
 import { FilledButton, OutlinedButton, OutlinedTextField, Icon } from '@skylabs-monorepo/shared-ui/react';
-import type { KycDocument, Vendor, VendorFields } from '../../../../api/rbac/vendors';
+import type { Vendor, VendorFields, VendorDocument, VendorDocumentType } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { VendorDocumentUpload } from '../../../components/vendor-document-upload';
 
 const EMPTY_FORM: VendorFields = {
   businessName: '',
-  legalName: '',
-  businessType: '',
   businessDescription: '',
   businessEmail: '',
   businessPhone: '',
-  alternatePhone: '',
-  website: '',
-  logoUrl: '',
-  ownerName: '',
-  contactPerson: '',
+  ownerFirstName: '',
+  ownerLastName: '',
   ownerEmail: '',
   ownerMobile: '',
-  alternateOwnerMobile: '',
   address: '',
+  addressLine2: '',
   city: '',
   state: '',
-  country: '',
   pincode: '',
-  gstNumber: '',
-  panNumber: '',
-  businessRegistrationNumber: '',
-  kycDocuments: [],
+  latitude: undefined,
+  longitude: undefined,
   bankAccountHolder: '',
   bankName: '',
   bankAccountNumber: '',
@@ -40,7 +34,7 @@ const EMPTY_FORM: VendorFields = {
  *  saved vendor must be stripped before it ever reaches form state — otherwise editing an
  *  existing vendor starts from a 13-character `+91XXXXXXXXXX` string instead of a clean
  *  10-digit one, which is what made a correct-looking edit intermittently fail validation. */
-const PHONE_FIELDS: (keyof VendorFields)[] = ['businessPhone', 'alternatePhone', 'ownerMobile', 'alternateOwnerMobile'];
+const PHONE_FIELDS: (keyof VendorFields)[] = ['businessPhone', 'ownerMobile'];
 
 function stripIndiaPrefix(value: string): string {
   const digitsOnly = value.replace(/\D/g, '');
@@ -52,7 +46,7 @@ function toFormFields(vendor: Vendor | null): VendorFields {
   const fields = { ...EMPTY_FORM };
   for (const key of Object.keys(EMPTY_FORM) as (keyof VendorFields)[]) {
     // Skip both undefined (field simply absent from the response) and null (e.g. businessName
-    // before Step 2 is filled in) — either way the EMPTY_FORM default ('' / []) is correct.
+    // before Step 2 is filled in) — either way the EMPTY_FORM default ('' / undefined) is correct.
     if (vendor[key] !== undefined && vendor[key] !== null) {
       const raw = vendor[key];
       (fields as Record<string, unknown>)[key] =
@@ -62,32 +56,61 @@ function toFormFields(vendor: Vendor | null): VendorFields {
   return fields;
 }
 
+/** Only ever picks the given keys off `form` — used to scope a save to exactly the currently
+ *  visible section(s)' own fields (see `SECTION_FIELDS`), never the whole form state. This is
+ *  the actual fix for a hidden/other section's stale or incomplete data riding along in a save
+ *  it has nothing to do with (previously the real cause of a same-looking-but-unrelated 422). */
+function pick<T extends object>(obj: T, keys: (keyof T)[]): Partial<T> {
+  const result: Partial<T> = {};
+  for (const key of keys) {
+    if (key in obj) result[key] = obj[key];
+  }
+  return result;
+}
+
 /** Strips empty-string optional fields so PATCH bodies don't send `""` where the API expects `undefined`. */
-function cleanForSubmit(form: VendorFields): VendorFields {
+function cleanForSubmit(form: Partial<VendorFields>): Partial<VendorFields> {
   const entries = Object.entries(form).filter(([, value]) => value !== '');
-  return Object.fromEntries(entries) as VendorFields;
+  return Object.fromEntries(entries) as Partial<VendorFields>;
 }
 
 export type VendorFormSection = 'business' | 'owner' | 'address' | 'kyc' | 'bank';
 const ALL_SECTIONS: VendorFormSection[] = ['business', 'owner', 'address', 'kyc', 'bank'];
 
-/** Which `VendorFields` keys render in each section — used to scope Save-time validation to
- *  only the fields the user can currently see, matching `sections`. */
+/** Which `VendorFields` keys render in each section — used to scope Save-time validation AND
+ *  submission to only the fields the user can currently see, matching `sections`. `kyc` has no
+ *  scalar fields any more (see `VendorDocumentUpload` below) — its "at least one required" rule
+ *  is enforced separately, based on real uploaded/staged documents, not a form field. */
 const SECTION_FIELDS: Record<VendorFormSection, (keyof VendorFields)[]> = {
-  business: ['businessName', 'legalName', 'businessType', 'businessDescription', 'businessEmail', 'businessPhone', 'alternatePhone', 'website', 'logoUrl'],
-  owner: ['ownerName', 'contactPerson', 'ownerEmail', 'ownerMobile', 'alternateOwnerMobile'],
-  address: ['address', 'city', 'state', 'country', 'pincode'],
-  kyc: ['gstNumber', 'panNumber', 'businessRegistrationNumber'],
+  business: ['businessName', 'businessDescription', 'businessEmail', 'businessPhone'],
+  owner: ['ownerFirstName', 'ownerLastName', 'ownerEmail', 'ownerMobile'],
+  address: ['address', 'addressLine2', 'city', 'state', 'pincode', 'latitude', 'longitude'],
+  kyc: [],
   bank: ['bankAccountHolder', 'bankName', 'bankAccountNumber', 'bankIfsc', 'upiId'],
 };
+
+/** Required (non-empty) fields per section — everything else in `SECTION_FIELDS` is optional.
+ *  Drives both the inline "this field is required" messages and the Save/Create-Vendor button's
+ *  enablement (see `canSubmit` below). `kyc`/`bank` have no required scalar fields. */
+const REQUIRED_FIELDS: Record<VendorFormSection, (keyof VendorFields)[]> = {
+  business: ['businessName', 'businessEmail', 'businessPhone'],
+  owner: ['ownerFirstName', 'ownerLastName', 'ownerEmail', 'ownerMobile'],
+  address: ['address', 'city', 'state', 'pincode', 'latitude', 'longitude'],
+  kyc: [],
+  bank: [],
+};
+
+const KYC_DOCUMENT_TYPES: { type: VendorDocumentType; label: string }[] = [
+  { type: 'GST', label: 'GST Certificate' },
+  { type: 'PAN', label: 'PAN Card' },
+  { type: 'AADHAAR', label: 'Aadhaar Card' },
+];
 
 // ─── Field-level validation (UX only) ─────────────────────────────────────────
 // Mirrors `VendorFieldsSchema` in msd-api's `vendor.schema.ts` exactly — same regexes, same
 // messages — so the user sees the problem before submitting instead of only after a 422. The
 // backend re-validates and remains the authority; this is not a security layer.
 
-const GSTIN_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}\d{1}[Z]{1}[A-Z\d]{1}$/;
-const PAN_REGEX = /^[A-Z]{5}\d{4}[A-Z]{1}$/;
 const PINCODE_REGEX = /^\d{6}$/;
 /** Canonical Indian mobile rule (the ONLY mobile regex in this file — matches msd-api's
  *  `INDIA_MOBILE_LOCAL_REGEX` in `vendor.schema.ts` character-for-character, just applied to
@@ -98,17 +121,6 @@ const INDIA_MOBILE_REGEX = /^[6-9]\d{9}$/;
  *  closely enough to catch obviously-invalid input before submit; the backend remains the
  *  authority (see this section's own doc comment above). */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const URL_REGEX = /^https?:\/\/.+/i;
-
-function validateGstNumber(value: string): string | null {
-  if (!value) return null;
-  return GSTIN_REGEX.test(value.toUpperCase()) ? null : 'Enter a valid 15-character GST number';
-}
-
-function validatePanNumber(value: string): string | null {
-  if (!value) return null;
-  return PAN_REGEX.test(value.toUpperCase()) ? null : 'Enter a valid 10-character PAN number';
-}
 
 function validatePincode(value: string): string | null {
   if (!value) return null;
@@ -125,22 +137,12 @@ function validateEmail(value: string): string | null {
   return EMAIL_REGEX.test(value) ? null : 'Enter a valid email address';
 }
 
-function validateWebsite(value: string): string | null {
-  if (!value) return null;
-  return URL_REGEX.test(value) ? null : 'Enter a valid URL (starting with http:// or https://)';
-}
-
 const FIELD_VALIDATORS: Partial<Record<keyof VendorFields, (value: string) => string | null>> = {
-  gstNumber: validateGstNumber,
-  panNumber: validatePanNumber,
   pincode: validatePincode,
   businessPhone: validateMobileNumber,
-  alternatePhone: validateMobileNumber,
   ownerMobile: validateMobileNumber,
-  alternateOwnerMobile: validateMobileNumber,
   businessEmail: validateEmail,
   ownerEmail: validateEmail,
-  website: validateWebsite,
 };
 
 /** Extracts a flat `{field: message}` map from a 422's Zod-flattened `details.fieldErrors`
@@ -165,6 +167,9 @@ interface VendorProfileFormProps {
   canEdit: boolean;
   canReviewKyc: boolean;
   saving: boolean;
+  /** Needed for the KYC document upload/delete calls (see `VendorDocumentUpload`) — every other
+   *  save in this form goes through the parent's own `onSave`/`onKycReview` callbacks instead. */
+  token: string | null;
   onSave: (input: VendorFields) => void;
   onKycReview?: (kycStatus: 'VERIFIED' | 'REJECTED', rejectionReason?: string) => void;
   onSubmitForVerification?: () => void;
@@ -178,10 +183,13 @@ interface VendorProfileFormProps {
    *  frontend's own `FIELD_VALIDATORS` missed still gets a correct inline error instead of only
    *  a generic top-level toast. */
   serverFieldErrors?: VendorFieldErrors | null;
+  /** Self-service (`/vendors/me/kyc-documents/...`) vs. admin-on-behalf
+   *  (`/vendors/:id/kyc-documents/...`) — only matters when `show('kyc')`. */
+  selfService?: boolean;
 }
 
 /**
- * The Business/Owner/Address/KYC/Bank multi-section form — reused for both admin
+ * The Business/Personal/Address/KYC/Bank multi-section form — reused for both admin
  * create-or-edit-any-vendor (one section at a time, via `sections`, in the onboarding
  * pipeline) and vendor self-service create-or-edit-own-profile (all sections at once).
  */
@@ -190,22 +198,51 @@ export function VendorProfileForm({
   canEdit,
   canReviewKyc,
   saving,
+  token,
   onSave,
   onKycReview,
   onSubmitForVerification,
   sections = ALL_SECTIONS,
   saveLabel,
   serverFieldErrors,
+  selfService = false,
 }: VendorProfileFormProps) {
   const [form, setForm] = useState<VendorFields>(() => toFormFields(vendor));
   const [kycRejectReason, setKycRejectReason] = useState('');
   const [errors, setErrors] = useState<VendorFieldErrors>({});
+  // Whether each of the 3 KYC slots currently has a file — staged (pre-creation) or really
+  // uploaded — reported up by each VendorDocumentUpload. Drives "at least one KYC document"
+  // for the Save/Create-Vendor button, independent of `form` (KYC is file-based, not a field).
+  const [kycSlotHasFile, setKycSlotHasFile] = useState<Record<VendorDocumentType, boolean>>({
+    GST: false,
+    PAN: false,
+    AADHAAR: false,
+  });
+  const [documents, setDocuments] = useState<VendorDocument[]>(vendor?.documents ?? []);
   const show = (section: VendorFormSection) => sections.includes(section);
+
+  // Same double-submit guard used by every other create flow in this app (DealDialog,
+  // ProductFormDialog, TherapistFormDialog, categories.tsx) — the `saving` prop alone is a React
+  // state re-render and can't stop a second click/tap/Enter that fires before that re-render
+  // commits. `onSave` here is fire-and-forget (the parent owns the async lifecycle and reports
+  // completion back via the `saving` prop going false again), so the guard resets itself off of
+  // that prop rather than a local try/finally.
+  const submittingRef = useRef(false);
+  // Belt-and-suspenders on top of submittingRef: disables the actual DOM element synchronously,
+  // in the same tick as the click, rather than waiting on React's `disabled={saving}` re-render
+  // to commit — see vendor-branches.tsx's `DealDialog` for the reference implementation this
+  // mirrors.
+  const saveButtonRef = useRef<MdFilledButton>(null);
 
   useEffect(() => {
     setForm(toFormFields(vendor));
+    setDocuments(vendor?.documents ?? []);
     setErrors({});
   }, [vendor]);
+
+  useEffect(() => {
+    if (!saving) submittingRef.current = false;
+  }, [saving]);
 
   useEffect(() => {
     if (serverFieldErrors && Object.keys(serverFieldErrors).length > 0) {
@@ -229,9 +266,14 @@ export function VendorProfileForm({
     const digitsOnly = (e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 10);
     set(key, digitsOnly as never);
   };
-
-  const businessNameError =
-    show('business') && !(form.businessName ?? '').trim() ? 'This field is required' : null;
+  /** Latitude/Longitude are `number | undefined` on `VendorFields` (not strings, unlike every
+   *  other field here) — parses the raw input text, storing `undefined` for an empty/invalid
+   *  value rather than `NaN` riding into the payload. */
+  const numberInput = (key: 'latitude' | 'longitude') => (e: Event) => {
+    const raw = (e.target as HTMLInputElement).value;
+    const parsed = raw.trim() === '' ? undefined : Number(raw);
+    set(key, (parsed === undefined || Number.isNaN(parsed) ? undefined : parsed) as never);
+  };
 
   /** Validates every field in the currently rendered `sections` only — fields the user can't
    *  see right now are never checked, matching how each admin-pipeline/self-service step
@@ -250,16 +292,39 @@ export function VendorProfileForm({
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSave = () => {
-    if (!validateVisibleFields()) return;
-    onSave(cleanForSubmit(form));
-  };
-
-  const documents: KycDocument[] = form.kycDocuments ?? [];
-  const setDocuments = (docs: KycDocument[]) => set('kycDocuments', docs);
-
   const canSubmitForVerification =
     Boolean(onSubmitForVerification) && vendor && (vendor.status === 'PROFILE_INCOMPLETE' || vendor.status === 'REJECTED');
+
+  /** Required-field-non-empty AND no active inline error, across every currently-shown
+   *  section — plus, when `show('kyc')`, at least one of the 3 KYC slots has a file (uploaded or
+   *  staged pre-creation). This is what actually gates the Save/Create-Vendor button now,
+   *  replacing the old "businessName only" check. Also re-checked inside `handleSave` itself
+   *  (not just the button's `disabled` prop) — belt-and-suspenders against anything that could
+   *  invoke it despite the button appearing disabled (e.g. an Enter keypress). */
+  const requiredFieldsFilled = sections.every((section) =>
+    REQUIRED_FIELDS[section].every((key) => {
+      const value = form[key];
+      return value !== undefined && value !== null && String(value).trim() !== '';
+    }),
+  );
+  const noActiveErrors = Object.values(errors).every((message) => !message);
+  const kycSatisfied = !show('kyc') || Object.values(kycSlotHasFile).some(Boolean);
+  const canSubmit = requiredFieldsFilled && noActiveErrors && kycSatisfied;
+
+  const handleSave = () => {
+    if (submittingRef.current) return;
+    if (!validateVisibleFields()) return;
+    if (!canSubmit) return;
+    submittingRef.current = true;
+    // Disables the real DOM element in the same synchronous tick, rather than waiting on
+    // React's `disabled={saving}` re-render to commit — see saveButtonRef's own doc comment.
+    if (saveButtonRef.current) saveButtonRef.current.disabled = true;
+    // Only the currently visible section(s)' own fields are ever submitted — the actual fix for
+    // a hidden section's stale/incomplete data riding along in an unrelated save (see `pick`'s
+    // own doc comment).
+    const visibleKeys = sections.flatMap((s) => SECTION_FIELDS[s]);
+    onSave(cleanForSubmit(pick(form, visibleKeys)) as VendorFields);
+  };
 
   return (
     <div className="form-grid">
@@ -291,13 +356,19 @@ export function VendorProfileForm({
             value={form.businessName ?? ''}
             disabled={!canEdit}
             onInput={text('businessName')}
-            error={Boolean(businessNameError)}
+            error={Boolean(errors.businessName)}
           />
-          {businessNameError && <p className="error-state" role="alert">{businessNameError}</p>}
-          <OutlinedTextField label="Legal name" value={form.legalName ?? ''} disabled={!canEdit} onInput={text('legalName')} />
-          <OutlinedTextField label="Business type" value={form.businessType ?? ''} disabled={!canEdit} onInput={text('businessType')} />
+          {errors.businessName && <p className="error-state" role="alert">{errors.businessName}</p>}
           <OutlinedTextField label="Description" value={form.businessDescription ?? ''} disabled={!canEdit} onInput={text('businessDescription')} />
-          <OutlinedTextField label="Business email" type="email" value={form.businessEmail ?? ''} disabled={!canEdit} onInput={text('businessEmail')} />
+          <OutlinedTextField
+            label="Business email"
+            type="email"
+            value={form.businessEmail ?? ''}
+            disabled={!canEdit}
+            onInput={text('businessEmail')}
+            error={Boolean(errors.businessEmail)}
+          />
+          {errors.businessEmail && <p className="error-state" role="alert">{errors.businessEmail}</p>}
           <OutlinedTextField
             label="Business phone"
             type="tel"
@@ -309,29 +380,16 @@ export function VendorProfileForm({
             error={Boolean(errors.businessPhone)}
           />
           {errors.businessPhone && <p className="error-state" role="alert">{errors.businessPhone}</p>}
-          <OutlinedTextField
-            label="Alternate phone"
-            type="tel"
-            inputMode="numeric"
-            maxLength={10}
-            value={form.alternatePhone ?? ''}
-            disabled={!canEdit}
-            onInput={phoneInput('alternatePhone')}
-            error={Boolean(errors.alternatePhone)}
-          />
-          {errors.alternatePhone && <p className="error-state" role="alert">{errors.alternatePhone}</p>}
-          <OutlinedTextField label="Website" value={form.website ?? ''} disabled={!canEdit} onInput={text('website')} />
         </>
       )}
 
       {show('owner') && (
         <>
-          <h3 className="section-title">Owner Details</h3>
-          <OutlinedTextField label="Owner name" value={form.ownerName ?? ''} disabled={!canEdit} onInput={text('ownerName')} />
-          <OutlinedTextField label="Contact person" value={form.contactPerson ?? ''} disabled={!canEdit} onInput={text('contactPerson')} />
-          <OutlinedTextField label="Owner email" type="email" value={form.ownerEmail ?? ''} disabled={!canEdit} onInput={text('ownerEmail')} />
+          <h3 className="section-title">Personal Information</h3>
+          <OutlinedTextField label="First Name" value={form.ownerFirstName ?? ''} disabled={!canEdit} onInput={text('ownerFirstName')} />
+          <OutlinedTextField label="Last Name" value={form.ownerLastName ?? ''} disabled={!canEdit} onInput={text('ownerLastName')} />
           <OutlinedTextField
-            label="Owner mobile"
+            label="Phone Number"
             type="tel"
             inputMode="numeric"
             maxLength={10}
@@ -342,89 +400,67 @@ export function VendorProfileForm({
           />
           {errors.ownerMobile && <p className="error-state" role="alert">{errors.ownerMobile}</p>}
           <OutlinedTextField
-            label="Alternate mobile"
-            type="tel"
-            inputMode="numeric"
-            maxLength={10}
-            value={form.alternateOwnerMobile ?? ''}
+            label="Email"
+            type="email"
+            value={form.ownerEmail ?? ''}
             disabled={!canEdit}
-            onInput={phoneInput('alternateOwnerMobile')}
-            error={Boolean(errors.alternateOwnerMobile)}
+            onInput={text('ownerEmail')}
+            error={Boolean(errors.ownerEmail)}
           />
-          {errors.alternateOwnerMobile && <p className="error-state" role="alert">{errors.alternateOwnerMobile}</p>}
+          {errors.ownerEmail && <p className="error-state" role="alert">{errors.ownerEmail}</p>}
         </>
       )}
 
       {show('address') && (
         <>
-          <h3 className="section-title">Address</h3>
-          <OutlinedTextField label="Address" value={form.address ?? ''} disabled={!canEdit} onInput={text('address')} />
+          <h3 className="section-title">Registered Address</h3>
+          <OutlinedTextField label="Address 1" value={form.address ?? ''} disabled={!canEdit} onInput={text('address')} />
+          <OutlinedTextField label="Address 2" value={form.addressLine2 ?? ''} disabled={!canEdit} onInput={text('addressLine2')} />
           <OutlinedTextField label="City" value={form.city ?? ''} disabled={!canEdit} onInput={text('city')} />
           <OutlinedTextField label="State" value={form.state ?? ''} disabled={!canEdit} onInput={text('state')} />
-          <OutlinedTextField label="Country" value={form.country ?? ''} disabled={!canEdit} onInput={text('country')} />
           <OutlinedTextField
-            label="Pincode"
+            label="PIN Code"
             value={form.pincode ?? ''}
             disabled={!canEdit}
             onInput={text('pincode')}
             error={Boolean(errors.pincode)}
           />
           {errors.pincode && <p className="error-state" role="alert">{errors.pincode}</p>}
+          <OutlinedTextField
+            label="Latitude"
+            type="number"
+            value={form.latitude !== undefined ? String(form.latitude) : ''}
+            disabled={!canEdit}
+            onInput={numberInput('latitude')}
+          />
+          <OutlinedTextField
+            label="Longitude"
+            type="number"
+            value={form.longitude !== undefined ? String(form.longitude) : ''}
+            disabled={!canEdit}
+            onInput={numberInput('longitude')}
+          />
         </>
       )}
 
       {show('kyc') && (
         <>
-          <h3 className="section-title">Business / KYC</h3>
-          <OutlinedTextField
-            label="GST number"
-            value={form.gstNumber ?? ''}
-            disabled={!canEdit}
-            onInput={text('gstNumber')}
-            error={Boolean(errors.gstNumber)}
-          />
-          {errors.gstNumber && <p className="error-state" role="alert">{errors.gstNumber}</p>}
-          <OutlinedTextField
-            label="PAN number"
-            value={form.panNumber ?? ''}
-            disabled={!canEdit}
-            onInput={text('panNumber')}
-            error={Boolean(errors.panNumber)}
-          />
-          {errors.panNumber && <p className="error-state" role="alert">{errors.panNumber}</p>}
-          <OutlinedTextField label="Business registration no." value={form.businessRegistrationNumber ?? ''} disabled={!canEdit} onInput={text('businessRegistrationNumber')} />
-
-          <fieldset>
-            <legend>KYC documents</legend>
-            {documents.map((doc, i) => (
-              <div className="form-grid" key={i}>
-                <OutlinedTextField
-                  label="Document type"
-                  value={doc.type}
-                  disabled={!canEdit}
-                  onInput={(e: Event) => setDocuments(documents.map((d, idx) => (idx === i ? { ...d, type: (e.target as HTMLInputElement).value } : d)))}
-                />
-                <OutlinedTextField
-                  label="Document URL"
-                  value={doc.url}
-                  disabled={!canEdit}
-                  onInput={(e: Event) => setDocuments(documents.map((d, idx) => (idx === i ? { ...d, url: (e.target as HTMLInputElement).value } : d)))}
-                />
-                {canEdit && (
-                  <OutlinedButton onClick={() => setDocuments(documents.filter((_, idx) => idx !== i))}>
-                    <Icon slot="icon" aria-hidden="true">delete</Icon>
-                    Remove
-                  </OutlinedButton>
-                )}
-              </div>
-            ))}
-            {canEdit && (
-              <OutlinedButton onClick={() => setDocuments([...documents, { type: '', url: '' }])}>
-                <Icon slot="icon" aria-hidden="true">add</Icon>
-                Add document
-              </OutlinedButton>
-            )}
-          </fieldset>
+          <h3 className="section-title">KYC Documents</h3>
+          <p className="field-hint">Upload any ONE of the following.</p>
+          {KYC_DOCUMENT_TYPES.map(({ type, label }) => (
+            <VendorDocumentUpload
+              key={type}
+              documentType={type}
+              label={label}
+              vendorId={vendor?.id ?? null}
+              selfService={selfService}
+              existingDocument={documents.find((d) => d.documentType === type)}
+              token={token}
+              onUploaded={(doc) => setDocuments((prev) => [...prev.filter((d) => d.documentType !== type), doc])}
+              onDeleted={() => setDocuments((prev) => prev.filter((d) => d.documentType !== type))}
+              onStagedChange={(hasFile) => setKycSlotHasFile((prev) => ({ ...prev, [type]: hasFile }))}
+            />
+          ))}
 
           {canReviewKyc && onKycReview && (
             <fieldset>
@@ -457,8 +493,9 @@ export function VendorProfileForm({
       {canEdit && (
         <div className="form-actions">
           <FilledButton
+            ref={saveButtonRef}
             onClick={handleSave}
-            disabled={saving || (show('business') && !(form.businessName ?? '').trim())}
+            disabled={saving || !canSubmit}
           >
             {saving ? 'Saving…' : (saveLabel ?? (vendor ? 'Save profile' : 'Create vendor'))}
           </FilledButton>
@@ -470,3 +507,5 @@ export function VendorProfileForm({
     </div>
   );
 }
+
+export default VendorProfileForm;

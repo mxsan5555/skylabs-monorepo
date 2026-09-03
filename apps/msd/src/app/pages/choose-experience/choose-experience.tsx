@@ -4,6 +4,7 @@ import { FilledButton, OutlinedButton, Icon } from '@skylabs-monorepo/shared-ui/
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { isDualRoleUser, resolvePostLoginPath, setExperienceMode } from '../../../auth/role-routing';
 import './choose-experience.css';
+import content from '../../../content.json';
 
 /**
  * "Continue as" chooser — the only place a user who holds both `customer` and `vendor` roles
@@ -42,30 +43,28 @@ export function ChooseExperience() {
 
   return (
     <div className="auth-screen">
-      <title>Choose your experience · MSD</title>
+      <title>{content.chooseExperience.pageTitle}</title>
       <meta name="robots" content="noindex, nofollow" />
 
       <div className="auth-brand">
         <div className="auth-brand__logo">
           <Icon aria-hidden="true">spa</Icon>
         </div>
-        <h1 className="auth-brand__title">Welcome back, {bootstrap.user.name}</h1>
-        <p className="auth-brand__subtitle">
-          Your account is set up as both a customer and a vendor. Choose how you'd like to continue.
-        </p>
+        <h1 className="auth-brand__title">{content.chooseExperience.brandTitle.replace('{name}',bootstrap.user.name)}</h1>
+        <p className="auth-brand__subtitle">{content.chooseExperience.brandSubtitle}</p>
       </div>
 
       <div className="auth-card">
-        <h2>Continue as</h2>
-        <p>You can switch between the two later from your account menu.</p>
+       <h2>{content.chooseExperience.cardHeading}</h2>
+       <p>{content.chooseExperience.cardDescription}</p>
         <div className="choose-experience-actions">
           <FilledButton className="auth-submit" onClick={chooseCustomer}>
             <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-            Continue as Customer
+           {content.chooseExperience.customerLabel}
           </FilledButton>
           <OutlinedButton className="auth-submit" onClick={chooseVendor}>
             <Icon slot="icon" aria-hidden="true">storefront</Icon>
-            Continue as Vendor
+           {content.chooseExperience.vendorLabel}
           </OutlinedButton>
         </div>
       </div>

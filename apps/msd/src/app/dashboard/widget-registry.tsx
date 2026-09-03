@@ -55,11 +55,9 @@ const VendorsCountWidget = makeCountWidget('vendors', 'VendorsCountWidget');
 const BranchesCountWidget = makeCountWidget('branches', 'BranchesCountWidget');
 const CategoriesCountWidget = makeCountWidget('categories', 'CategoriesCountWidget');
 const SubCategoriesCountWidget = makeCountWidget('subCategories', 'SubCategoriesCountWidget');
-const ServicesCountWidget = makeCountWidget('services', 'ServicesCountWidget');
 const ProductsCountWidget = makeCountWidget('products', 'ProductsCountWidget');
 const DealsCountWidget = makeCountWidget('deals', 'DealsCountWidget');
 const OrdersCountWidget = makeCountWidget('orders', 'OrdersCountWidget');
-const BookingsCountWidget = makeCountWidget('bookings', 'BookingsCountWidget');
 
 function RevenueSummaryWidget({ title, stats, statsLoading, statsError }: WidgetProps) {
   const value = stats ? formatINR(Number(stats.revenue)) : undefined;
@@ -93,8 +91,6 @@ export const WIDGET_REGISTRY: Record<string, ComponentType<WidgetProps>> = {
   'branches-count': BranchesCountWidget,
   'categories-count': CategoriesCountWidget,
   'subcategories-count': SubCategoriesCountWidget,
-  'services-count': ServicesCountWidget,
   'products-count': ProductsCountWidget,
   'deals-count': DealsCountWidget,
-  'bookings-count': BookingsCountWidget,
 };

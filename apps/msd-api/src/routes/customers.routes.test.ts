@@ -28,7 +28,7 @@ const customerFixture = {
   email: 'priya@example.com',
   status: 'active',
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
-  _count: { orders: 3, bookings: 2 },
+  _count: { orders: 3 },
 };
 
 beforeEach(() => {
@@ -50,7 +50,7 @@ describe('GET /api/v1/customers', () => {
     expect(res.status).toBe(403);
   });
 
-  it('lists customers with order/booking counts, scoped to the customer role', async () => {
+  it('lists customers with order counts, scoped to the customer role', async () => {
     prismaMock.user.findMany.mockResolvedValue([customerFixture]);
     prismaMock.user.count.mockResolvedValue(1);
     const res = await request(app)
@@ -58,7 +58,7 @@ describe('GET /api/v1/customers', () => {
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
-    expect(res.body.data[0]._count).toEqual({ orders: 3, bookings: 2 });
+    expect(res.body.data[0]._count).toEqual({ orders: 3 });
     expect(prismaMock.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ roles: { some: { role: { key: 'customer' } } } }),
@@ -80,7 +80,7 @@ describe('GET /api/v1/customers', () => {
       email: true,
       status: true,
       createdAt: true,
-      _count: { select: { orders: true, bookings: true } },
+      _count: { select: { orders: true } },
     });
   });
 
@@ -108,13 +108,13 @@ describe('GET /api/v1/customers/:id', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns the customer with order/booking counts', async () => {
+  it('returns the customer with order counts', async () => {
     prismaMock.user.findFirst.mockResolvedValue(customerFixture);
     const res = await request(app)
       .get(`/api/v1/customers/${CUSTOMER_ID}`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
     expect(res.status).toBe(200);
     expect(res.body.data.name).toBe('Priya Sharma');
-    expect(res.body.data._count).toEqual({ orders: 3, bookings: 2 });
+    expect(res.body.data._count).toEqual({ orders: 3 });
   });
 });

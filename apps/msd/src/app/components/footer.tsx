@@ -1,10 +1,13 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { OutlinedTextField, FilledButton, Icon, Divider,} from '@skylabs-monorepo/shared-ui/react';
+import { useState, useEffect } from 'react';
+import { Link, } from 'react-router-dom';
+import { OutlinedTextField, FilledButton, Icon, Divider, } from '@skylabs-monorepo/shared-ui/react';
 import { inputValue } from '../../utils/format';
 import content from '../../content.json';
 import './footer.css';
-
+import logo from "../../assets/logo.jpg";
+import logo2 from "../../assets/logo2.jpg";
+import { listCatalogCategories, type CatalogCategoryWithChildren, } from '../../api/catalog';
+import { ApiRequestError } from '../../api/rbac/client';
 const SOCIAL_ICONS: Record<string, React.ReactElement> = {
   facebook: (
     <svg viewBox="0 0 200 200" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
@@ -32,8 +35,43 @@ const SOCIAL_ICONS: Record<string, React.ReactElement> = {
 export function Footer() {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [categories, setCategories] = useState<CatalogCategoryWithChildren[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    listCatalogCategories()
+      .then(({ data }) => {
+        if (!cancelled) {
+          setCategories(data);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.error(
+            err instanceof ApiRequestError
+              ? err.message
+              : 'Failed to load footer categories',
+          );
+          setCategories([]);
+
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCategoriesLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   function handleSubscribe(e: React.FormEvent) {
     e.preventDefault();
+
     if (email.trim()) {
       setSubscribed(true);
       setEmail('');
@@ -47,13 +85,16 @@ export function Footer() {
         {/* Brand + newsletter (wide left column) */}
         <div className="site-footer__brand">
           <Link to="/" className="site-footer__logo" aria-label="MSD – MySpaDeal home">
-            <span className="site-footer__logo-icon" aria-hidden="true">
-              <Icon>spa</Icon>
-            </span>
-            <span>
-              <strong className="site-footer__logo-name">{content.site.name}</strong>
-              <span className="site-footer__logo-sub">{content.site.fullName}</span>
-            </span>
+            <img
+              src={logo}
+              alt="MySpaDeal"
+              className="site-footer__logo-image site-footer__logo-image--desktop"
+            />
+            <img
+              src={logo2}
+              alt="MySpaDeal"
+              className="site-footer__logo-image site-footer__logo-image--mobile"
+            />
           </Link>
           <p className="site-footer__desc">{content.site.description}</p>
           <h3 className="site-footer__col-heading">{footer.headings.newsletter}</h3>
@@ -94,14 +135,42 @@ export function Footer() {
           </ul>
         </nav>
         {/* Discover */}
+        {/* Discover */}
         <nav className="site-footer__col" aria-label="Discover">
-          <h3 className="site-footer__col-heading">{footer.headings.discover}</h3>
+          <h3 className="site-footer__col-heading">
+            {footer.headings.discover}
+          </h3>
+
           <ul className="site-footer__list">
-            {footer.discover.map((link) => (
-              <li key={link.to}>
-                <Link to={link.to} className="site-footer__link">{link.label}</Link>
+            {categoriesLoading ? (
+              <li className="site-footer__link">
+                Loading...
               </li>
-            ))}
+            ) : (
+              categories.map((category) => (
+                <li key={category.id}>
+                  <Link
+                    to={`/category/${category.slug}`}
+                    className="site-footer__link"
+                  >
+                    {category.name}
+                  </Link>
+                </li>
+              ))
+            )}
+
+            {/* Static */}
+            <li>
+              <Link to="/therapists" className="site-footer__link">
+                Therapists
+              </Link>
+            </li>
+
+            <li>
+              <Link to="/products" className="site-footer__link">
+                Products
+              </Link>
+            </li>
           </ul>
         </nav>
         {/* Help & Info */}

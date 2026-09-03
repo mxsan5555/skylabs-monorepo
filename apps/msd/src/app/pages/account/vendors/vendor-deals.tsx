@@ -5,18 +5,19 @@ import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   createMyDeal,
+  getMyVendor,
   listCategories,
   listMyBranches,
   listMyDeals,
+  listMyProducts,
   setMyDealStatus,
   updateMyDeal,
   type Branch,
   type Category,
   type Deal,
   type DealInput,
+  type VendorProduct,
 } from '../../../../api/rbac/vendors';
-import { listServices, type Service } from '../../../../api/rbac/services';
-import { listProducts, type Product } from '../../../../api/rbac/products';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { DealDialog } from './vendor-branches';
 
@@ -49,8 +50,8 @@ interface DealWithBranch extends Deal {
 function toRow(d: DealWithBranch): Record<string, string | number> {
   return {
     Deal: d.title,
-    Type: d.serviceId ? 'Service' : 'Product',
-    Item: d.service?.name ?? d.product?.name ?? '—',
+    Type: d.productId ? 'Product' : 'Service',
+    Item: d.product?.name ?? '—',
     Branch: d.branchName,
     Price: `₹${d.salePrice}`,
     Duration: d.durationMinutes ? `${d.durationMinutes} min` : '—',
@@ -79,8 +80,7 @@ export function VendorDeals() {
   const { token } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [deals, setDeals] = useState<DealWithBranch[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<VendorProduct[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -94,9 +94,11 @@ export function VendorDeals() {
 
   useEffect(() => {
     // pageSize is capped at 100 server-side (PaginationQuerySchema) — 200 here 500s.
-    listServices(token, { status: 'active', pageSize: 100 }).then(({ data }) => setServices(data)).catch(() => setServices([]));
-    listProducts(token, { status: 'active', pageSize: 100 }).then(({ data }) => setProducts(data)).catch(() => setProducts([]));
-    listCategories(token).then(({ data }) => setCategories(data)).catch(() => setCategories([]));
+    listMyProducts(token, { status: 'active', pageSize: 100 }).then(({ data }) => setProducts(data)).catch(() => setProducts([]));
+    getMyVendor(token)
+      .then(({ data }) => listCategories(token, { type: 'SERVICE', vendorId: data.id }))
+      .then(({ data }) => setCategories(data))
+      .catch(() => setCategories([]));
   }, [token]);
 
   const load = useCallback(async () => {
@@ -183,7 +185,7 @@ export function VendorDeals() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deals]);
 
-  const canAdd = branches.length > 0 && (services.length > 0 || products.length > 0);
+  const canAdd = branches.length > 0 && (categories.length > 0 || products.length > 0);
 
   return (
     <div className="admin-page admin-page--wide">
@@ -225,7 +227,6 @@ export function VendorDeals() {
       {canAdd && (
         <DealDialog
           categories={categories}
-          services={services}
           products={products}
           branches={branches}
           token={token}
@@ -240,7 +241,6 @@ export function VendorDeals() {
           key={editingDeal.id}
           deal={editingDeal}
           categories={categories}
-          services={services}
           products={products}
           branches={branches}
           token={token}

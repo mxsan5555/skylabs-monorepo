@@ -63,3 +63,30 @@
 .deal-card__actions md-filled-button {
     width: 100%;
 }
+.deal-card-slider {
+  width: 100%;
+  height: 180px;
+  min-height: 180px;
+  max-height: 180px;
+  overflow: hidden;
+  position: relative;
+}
+
+.deal-card-slider swiper-container {
+  width: 100%;
+  height: 100%;
+}
+
+.deal-card-slider swiper-slide {
+  width: 100%;
+  height: 100%;
+}
+
+.deal-card-slider img {
+  width: 100%;
+  height: 180px;
+  min-height: 180px;
+  max-height: 180px;
+  object-fit: cover;
+  display: block;
+}
