@@ -288,6 +288,25 @@ export async function reviewKyc(id: string, kycStatus: Extract<KycStatus, 'VERIF
   return serializeVendor(vendor);
 }
 
+/** Superadmin-only hard delete. `Branch`/`Deal`/`Therapist`/`Product`/`VendorDocument`/
+ *  `VendorImage`/`VendorVideo`/`VendorCategoryAccess` all cascade away with the vendor
+ *  (`onDelete: Cascade` on their `vendor` relation), but `Order`/`OrderItem`'s `vendor` relation
+ *  has no `onDelete` (Postgres default = restrict) — a vendor with any real order history can
+ *  never be hard-deleted, only deactivated/suspended via `setVendorStatus`. Mirrors this
+ *  codebase's own established "catch a known Prisma error code, translate to a specific
+ *  ApiError" convention (see the P2002-to-CONFLICT catches elsewhere in this file). */
+export async function deleteVendor(id: string) {
+  await getVendorOrThrow(id);
+  try {
+    await prisma.vendor.delete({ where: { id } });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+      throw new ApiError('CONFLICT', 'Cannot delete this vendor because it has existing orders or other records referencing it. Deactivate it instead.');
+    }
+    throw err;
+  }
+}
+
 // ─── Vendor: self-service surface ────────────────────────────────────────────
 
 /** Never throws — callers decide whether "no vendor yet" means 404 or "show onboarding." */
@@ -416,7 +435,28 @@ export async function submitForVerification(ownerUserId: string) {
   if (missing.length > 0) {
     throw new ApiError('VALIDATION_ERROR', 'Profile is incomplete', { missing });
   }
-  return prisma.vendor.update({ where: { id: vendor.id }, data: { status: 'PENDING_VERIFICATION', statusReason: null } });
+
+  // Runs in the same transaction as the status flip so a rolled-back submission can never leave a
+  // stray notification behind (mirrors createDeal's own notifySuperAdmins call-site pattern). The
+  // precondition above (status must currently be PROFILE_INCOMPLETE/REJECTED) means this function
+  // can only ever succeed once per submission cycle, which is also the notification's own
+  // duplicate-prevention — a vendor editing/saving again while PENDING_VERIFICATION never reaches
+  // this code path again.
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.vendor.update({
+      where: { id: vendor.id },
+      data: { status: 'PENDING_VERIFICATION', statusReason: null },
+    });
+    await notificationService.notifySuperAdmins(tx, {
+      type: 'VENDOR_PENDING_APPROVAL',
+      title: 'Vendor Profile Pending Approval',
+      message: `${vendor.businessName ?? 'A vendor'} completed their profile and is waiting for approval.`,
+      entityType: 'VENDOR',
+      entityId: vendor.id,
+      metadata: { vendorId: vendor.id },
+    });
+    return updated;
+  });
 }
 
 /**
@@ -640,11 +680,26 @@ export async function updateTherapist(vendorId: string, therapistId: string, inp
   });
 }
 
-/** No delete — like Branch, a Therapist is only ever soft-disabled via isActive, never
- *  hard-deleted, to avoid orphaning historical CartItem/OrderItem rows that reference one. */
+/** Soft-disable — the everyday way to take a Therapist off the storefront without losing the row. */
 export async function setTherapistStatus(vendorId: string, therapistId: string, isActive: boolean) {
   await getTherapistScopedOrThrow(vendorId, therapistId);
   return prisma.therapist.update({ where: { id: therapistId }, data: { isActive } });
+}
+
+/** Superadmin-only hard delete. `CartItem`/`OrderItem`'s `therapist` relation has no `onDelete`
+ *  (Postgres default = restrict), so a Therapist currently sitting in any real order or active
+ *  cart can never be hard-deleted — Postgres itself blocks it with a clean P2003, translated here
+ *  to a specific CONFLICT (never silently orphans a historical order line). */
+export async function deleteTherapist(vendorId: string, therapistId: string) {
+  await getTherapistScopedOrThrow(vendorId, therapistId);
+  try {
+    await prisma.therapist.delete({ where: { id: therapistId } });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+      throw new ApiError('CONFLICT', 'Cannot delete this therapist because it has existing orders or carts referencing it. Deactivate it instead.');
+    }
+    throw err;
+  }
 }
 
 // ─── TherapistPackage (a therapist's own duration/price menu — independent of any Deal) ──
@@ -1145,6 +1200,22 @@ export async function rejectDeal(vendorId: string, branchId: string, dealId: str
     where: { id: dealId },
     data: { approvalStatus: 'REJECTED' as DealApprovalStatus, status: 'INACTIVE', approvalRejectionReason: reason },
   });
+}
+
+/** Superadmin-only hard delete. `CartItem`/`OrderItem`'s `deal` relation has no `onDelete`
+ *  (Postgres default = restrict), so a Deal with any real order/cart history can never be
+ *  hard-deleted — Postgres blocks it with a clean P2003, translated here to a specific CONFLICT
+ *  (use `setDealStatus`'s INACTIVE instead for a deal that has already sold). */
+export async function deleteDeal(vendorId: string, branchId: string, dealId: string) {
+  await getDealScopedOrThrow(vendorId, branchId, dealId);
+  try {
+    await prisma.deal.delete({ where: { id: dealId } });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+      throw new ApiError('CONFLICT', 'Cannot delete this deal because it has existing orders or carts referencing it. Deactivate it instead.');
+    }
+    throw err;
+  }
 }
 
 // ─── Deal media (shared upload system — see media.service.ts's doc comment for the full

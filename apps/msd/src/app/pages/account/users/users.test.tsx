@@ -34,8 +34,9 @@ vi.mock('../../../../api/rbac/users', () => ({
   getSessions: (...args: unknown[]) => getSessionsMock(...args),
 }));
 
+const listRolesMock = vi.fn();
 vi.mock('../../../../api/rbac/roles', () => ({
-  listRoles: vi.fn().mockResolvedValue({ data: [] }),
+  listRoles: (...args: unknown[]) => listRolesMock(...args),
 }));
 
 import { UserManagement } from './users';
@@ -57,6 +58,7 @@ beforeEach(() => {
   loginAsUserMock.mockResolvedValue(undefined);
   getLoginHistoryMock.mockResolvedValue({ data: [] });
   getSessionsMock.mockResolvedValue({ data: [] });
+  listRolesMock.mockResolvedValue({ data: [] });
 });
 
 async function selectSampleUser() {
@@ -109,6 +111,42 @@ describe('UserManagement — "Login as" (impersonation) gating', () => {
 
     await waitFor(() => expect(loginAsUserMock).toHaveBeenCalledExactlyOnceWith('user-1'));
     await waitFor(() => expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/account/dashboard'));
+  });
+});
+
+/**
+ * Feature: User Management role filter (Vendor Validation/Permissions audit, Phase 6)
+ * Scenario: the role filter dropdown is driven off the real seeded role list (`GET /rbac/roles`),
+ * never a hardcoded array, and never offers the Superadmin role as an option — filtering by it
+ * would always return zero rows since Superadmin users are excluded server-side
+ * (`user.service.ts#listUsers`'s own doc comment).
+ *
+ * NOTE: like `vendor-branches.test.tsx`/`categories.test.tsx`'s own documented limitation, a live
+ * select interaction can't be simulated under this jsdom + `@lit/react` + React 19 combination —
+ * verified via the rendered option labels (an already-resolved, real DOM query) rather than
+ * driving a live pick; `listUsers`'s `roleKey` plumbing itself is covered by the backend's own
+ * `user.service.test.ts`/`rbac.routes.test.ts` suites.
+ */
+describe('UserManagement — role filter', () => {
+  const VENDOR_ROLE = { id: 'role-vendor', key: 'vendor', name: 'Vendor', isSuperAdmin: false };
+  const CUSTOMER_ROLE = { id: 'role-customer', key: 'customer', name: 'Customer', isSuperAdmin: false };
+  const SUPERADMIN_ROLE = { id: 'role-superadmin', key: 'super_admin', name: 'Super Admin', isSuperAdmin: true };
+
+  it('lists every real seeded role as a filter option except Superadmin, plus "All"', async () => {
+    grantedPermissions = new Set();
+    listRolesMock.mockResolvedValue({ data: [VENDOR_ROLE, CUSTOMER_ROLE, SUPERADMIN_ROLE] });
+    listUsersMock.mockResolvedValue({ data: [], meta: { total: 0 } });
+    render(<UserManagement />);
+
+    await waitFor(() => expect(listRolesMock).toHaveBeenCalled());
+    const optionLabels = await waitFor(() => {
+      const select = document.querySelector('md-outlined-select');
+      if (!select) throw new Error('Role select not found');
+      const labels = Array.from(select.querySelectorAll('md-select-option')).map((o) => o.textContent?.trim());
+      if (labels.length === 0) throw new Error('Role options not rendered yet');
+      return labels;
+    });
+    expect(optionLabels).toEqual(['All', 'Vendor', 'Customer']);
   });
 });
 

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { PERMISSION_ACTIONS, type PermissionAction } from '@skylabs-monorepo/shared-types';
+import { PaginationQuerySchema } from './common.schema';
 
 extendZodWithOpenApi(z);
 
@@ -77,6 +78,15 @@ export const DashboardWidgetCreateSchema = z
   .openapi('DashboardWidgetCreate');
 
 // ─── Users ───────────────────────────────────────────────────────────────────
+
+/** `roleKey` filters to users holding that specific `Role.key` (e.g. `vendor`, `customer`,
+ *  `admin`) — see `userService.listUsers`'s own doc comment for why this joins through
+ *  `UserRole -> Role.key`, never a role name string compare on `User` itself (no such column
+ *  exists; a user's roles are a many-to-many, not a scalar field). */
+export const UserListQuerySchema = PaginationQuerySchema.extend({
+  search: z.string().max(200).optional(),
+  roleKey: z.string().max(100).optional(),
+});
 
 export const UserCreateSchema = z
   .object({

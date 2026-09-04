@@ -52,6 +52,18 @@ const ORDER_NOTIFICATION: Notification = {
   isRead: true,
 };
 
+const VENDOR_APPROVAL_NOTIFICATION: Notification = {
+  ...DEAL_NOTIFICATION,
+  id: 'notif-3',
+  type: 'VENDOR_PENDING_APPROVAL',
+  title: 'Vendor Profile Pending Approval',
+  message: 'ABC Spa completed their profile and is waiting for approval.',
+  entityType: 'VENDOR',
+  entityId: 'vendor-1',
+  metadata: { vendorId: 'vendor-1' },
+  isRead: false,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   markNotificationReadMock.mockResolvedValue({ data: { updated: true } });
@@ -137,6 +149,19 @@ describe('NotificationBell', () => {
 
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/orders?orderId=order-1'));
     expect(markNotificationReadMock).not.toHaveBeenCalled();
+  });
+
+  it('clicking a VENDOR_PENDING_APPROVAL notification marks it read and navigates to that vendor\'s profile', async () => {
+    listNotificationsMock.mockResolvedValue({ data: [VENDOR_APPROVAL_NOTIFICATION], meta: { total: 1, unreadCount: 1 } });
+    render(<NotificationBell />);
+    await waitFor(() => expect(listNotificationsMock).toHaveBeenCalled());
+    fireEvent.click(bellButton());
+    await waitFor(() => expect(screen.getByText('Vendor Profile Pending Approval')).toBeTruthy());
+
+    fireEvent.click(screen.getByText('Vendor Profile Pending Approval'));
+
+    await waitFor(() => expect(markNotificationReadMock).toHaveBeenCalledWith('test-token', 'notif-3'));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/vendors?vendorId=vendor-1'));
   });
 
   it('"Mark all read" calls markAllNotificationsRead and refetches', async () => {

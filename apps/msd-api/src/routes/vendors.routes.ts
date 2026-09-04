@@ -1548,6 +1548,24 @@ router.patch(
   },
 );
 
+router.delete('/:id', requirePermission('vendors', 'delete'), validateParams(UuidParamSchema), async (req, res, next) => {
+  try {
+    const before = await vendorService.getVendorOrThrow(req.params.id);
+    await vendorService.deleteVendor(req.params.id);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'vendor.delete',
+      targetType: 'Vendor',
+      targetId: req.params.id,
+      before,
+      ...requestMeta(req),
+    });
+    sendData(res, null);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.patch(
   '/:id/kyc-review',
   requirePermission('vendors', 'approve'),
@@ -1850,6 +1868,28 @@ router.patch(
   },
 );
 
+router.delete(
+  '/:vendorId/branches/:branchId/deals/:dealId',
+  requirePermission('vendors', 'delete'),
+  async (req, res, next) => {
+    try {
+      const before = await vendorService.getDealScopedOrThrow(req.params.vendorId, req.params.branchId, req.params.dealId);
+      await vendorService.deleteDeal(req.params.vendorId, req.params.branchId, req.params.dealId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'deal.delete',
+        targetType: 'Deal',
+        targetId: req.params.dealId,
+        before,
+        ...requestMeta(req),
+      });
+      sendData(res, null);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // ─── Therapist (admin-on-behalf — mirrors Branch/Deal's exact admin split) ──────────────────
 // vendorId comes from the URL (not a JWT-derived `getMyVendorOrThrow`), so an admin/salesperson
 // can create/edit a Therapist before the vendor has ever logged in (onboarding wizard Step 4).
@@ -1923,6 +1963,24 @@ router.patch(
     }
   },
 );
+
+router.delete('/:vendorId/therapists/:therapistId', requirePermission('vendors', 'delete'), async (req, res, next) => {
+  try {
+    const before = await vendorService.getTherapistScopedOrThrow(req.params.vendorId, req.params.therapistId);
+    await vendorService.deleteTherapist(req.params.vendorId, req.params.therapistId);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'therapist.delete',
+      targetType: 'Therapist',
+      targetId: req.params.therapistId,
+      before,
+      ...requestMeta(req),
+    });
+    sendData(res, null);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ─── Product (admin-on-behalf — mirrors Branch/Deal's exact admin split) ─────────────────────
 

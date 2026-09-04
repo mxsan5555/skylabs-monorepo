@@ -190,6 +190,30 @@ describe('VendorProfileForm — Create Vendor button gating', () => {
     expect(saveButton.disabled).toBe(false);
   });
 
+  it('shows Approval Status as a distinct label from Profile Completion — 100% complete is never conflated with approved', () => {
+    const pendingVendor: Vendor = {
+      ...BASE_VENDOR,
+      status: 'PENDING_VERIFICATION',
+      profileCompletion: {
+        percent: 100,
+        sections: [{ key: 'business', label: 'Business Details', complete: true }],
+      },
+    };
+    render(
+      <VendorProfileForm
+        vendor={pendingVendor}
+        canEdit
+        canReviewKyc={false}
+        saving={false}
+        token="tok"
+        sections={['business']}
+        onSave={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Approval Status: Pending Approval')).toBeTruthy();
+    expect(screen.getByText('Profile Completion: 100%')).toBeTruthy();
+  });
+
   it('never renders Legal Name / Business Type / GST / PAN text fields — KYC is file upload only', () => {
     render(
       <VendorProfileForm
@@ -210,5 +234,109 @@ describe('VendorProfileForm — Create Vendor button gating', () => {
     expect(screen.getByText('GST Certificate')).toBeTruthy();
     expect(screen.getByText('PAN Card')).toBeTruthy();
     expect(screen.getByText('Aadhaar Card')).toBeTruthy();
+  });
+});
+
+/**
+ * Feature: VendorProfileForm — a stale error left on a tab that's no longer visible must never
+ * poison Save on a DIFFERENT tab (the actual root cause of "Save button stays disabled after an
+ * error with no way to retry" — `vendor-profile-tabs.tsx` reuses ONE `VendorProfileForm` instance
+ * across every tab, and `errors` state is only reset when the `vendor` identity changes, never on
+ * a tab switch, so a server/inline error recorded for a field that isn't part of the currently
+ * visible `sections` used to keep `canSubmit` false everywhere, with no visible message anywhere
+ * to explain why.
+ */
+describe('VendorProfileForm — a stale other-section error never blocks the current section\'s Save', () => {
+  it('an ownerMobile error left over from the Owner tab does not disable Save once the Business tab (with valid data) is shown', async () => {
+    const onSave = vi.fn();
+    const { rerender } = render(
+      <VendorProfileForm
+        vendor={BASE_VENDOR}
+        canEdit
+        canReviewKyc={false}
+        saving={false}
+        token="tok"
+        sections={['owner']}
+        serverFieldErrors={{ ownerMobile: 'Enter a valid 10-digit mobile number' }}
+        onSave={onSave}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText('Enter a valid 10-digit mobile number')).toBeTruthy());
+
+    // Simulate switching tabs — the SAME VendorProfileForm instance, just a different `sections`
+    // prop, exactly like vendor-profile-tabs.tsx does (no `key` change, so React reuses state).
+    rerender(
+      <VendorProfileForm
+        vendor={BASE_VENDOR}
+        canEdit
+        canReviewKyc={false}
+        saving={false}
+        token="tok"
+        sections={['business']}
+        serverFieldErrors={{ ownerMobile: 'Enter a valid 10-digit mobile number' }}
+        onSave={onSave}
+      />,
+    );
+
+    const saveButton = await waitFor(() => {
+      const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Save profile'));
+      if (!button) throw new Error('Save button not found');
+      return button as HTMLElement & { disabled?: boolean };
+    });
+    expect(saveButton.disabled).toBe(false);
+
+    fireEvent.click(saveButton);
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+  });
+});
+
+/**
+ * Feature: VendorProfileForm — latitude/longitude Decimal-as-string coercion
+ * `Vendor.latitude`/`longitude` are Prisma `Decimal` columns, which this API serializes as
+ * STRINGS over JSON even though the `Vendor` TS type claims `number` — a saved vendor's real,
+ * valid coordinates arriving as `"26.7606"` used to ride straight into the submit payload as a
+ * string (since the user never retypes an already-correct field), tripping the backend's
+ * `z.number()` check with "Invalid input: expected number, received string" for perfectly valid,
+ * unedited data.
+ */
+describe('VendorProfileForm — latitude/longitude Decimal-as-string coercion', () => {
+  it('saving the Address tab without touching lat/long sends real numbers, not the Decimal-as-string values loaded from the API', async () => {
+    const vendorWithStringCoords: Vendor = {
+      ...BASE_VENDOR,
+      address: '123 Main St',
+      city: 'Gorakhpur',
+      state: 'Uttar Pradesh',
+      pincode: '273001',
+      // Simulates the real API response shape for a Prisma Decimal field — a string, not a number.
+      latitude: '26.7606' as unknown as number,
+      longitude: '83.3732' as unknown as number,
+    };
+    const onSave = vi.fn();
+    render(
+      <VendorProfileForm
+        vendor={vendorWithStringCoords}
+        canEdit
+        canReviewKyc={false}
+        saving={false}
+        token="tok"
+        sections={['address']}
+        onSave={onSave}
+      />,
+    );
+
+    const saveButton = await waitFor(() => {
+      const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Save profile'));
+      if (!button) throw new Error('Save button not found');
+      return button as HTMLElement & { disabled?: boolean };
+    });
+    expect(saveButton.disabled).toBe(false);
+
+    fireEvent.click(saveButton);
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    const submitted = onSave.mock.calls[0][0];
+    expect(submitted.latitude).toBe(26.7606);
+    expect(submitted.longitude).toBe(83.3732);
+    expect(typeof submitted.latitude).toBe('number');
+    expect(typeof submitted.longitude).toBe('number');
   });
 });
