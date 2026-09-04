@@ -19,12 +19,19 @@ export class SkyBadge extends LitElement {
   static override properties = {
     variant: { type: String, reflect: true },
     size: { type: String, reflect: true },
+    label: { type: String },
   };
 
   /** Color role: 'primary' | 'secondary' | 'tertiary' | 'error'. */
   declare variant: 'primary' | 'secondary' | 'tertiary' | 'error';
   /** Visual size: 'small' | 'medium' | 'large'. */
   declare size: 'small' | 'medium' | 'large';
+  /**
+   * Accessible label for icon-only or numeric badges whose meaning is
+   * colour-only (e.g. label="12 unread notifications"). When slotted text
+   * is present and self-explanatory, this prop can be omitted.
+   */
+  declare label?: string;
 
   constructor() {
     super();
@@ -34,8 +41,8 @@ export class SkyBadge extends LitElement {
 
   static override styles = css`
     :host {
-      --_bg: var(--md-sys-color-primary, #3a693c);
-      --_fg: var(--md-sys-color-on-primary, #fff);
+      --_bg: var(--md-sys-color-primary);
+      --_fg: var(--md-sys-color-on-primary);
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -54,16 +61,16 @@ export class SkyBadge extends LitElement {
       user-select: none;
     }
     :host([variant='secondary']) {
-      --_bg: var(--md-sys-color-secondary, #52634f);
-      --_fg: var(--md-sys-color-on-secondary, #fff);
+      --_bg: var(--md-sys-color-secondary);
+      --_fg: var(--md-sys-color-on-secondary);
     }
     :host([variant='tertiary']) {
-      --_bg: var(--md-sys-color-tertiary, #38656a);
-      --_fg: var(--md-sys-color-on-tertiary, #fff);
+      --_bg: var(--md-sys-color-tertiary);
+      --_fg: var(--md-sys-color-on-tertiary);
     }
     :host([variant='error']) {
-      --_bg: var(--md-sys-color-error, #ba1a1a);
-      --_fg: var(--md-sys-color-on-error, #fff);
+      --_bg: var(--md-sys-color-error);
+      --_fg: var(--md-sys-color-on-error);
     }
     :host([size='small']) {
       height: 1.125rem;
@@ -80,7 +87,11 @@ export class SkyBadge extends LitElement {
   `;
 
   protected override render() {
-    return html`<slot></slot>`;
+    // When a label is supplied the span surfaces it to AT; slotted text is
+    // still visible but the label gives the full context (e.g. "12 unread").
+    return this.label
+      ? html`<span aria-label=${this.label}><slot></slot></span>`
+      : html`<span><slot></slot></span>`;
   }
 }
 

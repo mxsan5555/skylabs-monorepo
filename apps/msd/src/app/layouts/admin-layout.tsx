@@ -1,26 +1,40 @@
 import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import { IconButton, Icon } from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, IconButton, Icon } from '@skylabs-monorepo/shared-ui/react';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { AccountProvider } from '../../account/account-context';
 import { Sidebar } from '../admin/sidebar';
-import { findMenuItem } from '../admin/menu';
+import { findMenuNodeByRoute } from '../admin/menu-utils';
+import { NotificationBell } from '../components/notification-bell';
 
 /**
- * Console shell shown after login / "My account": role-filtered sidebar + a
- * main column with a collapsible-sidebar toggle, breadcrumb, and centered
- * content. Wraps the area in AccountProvider so the sidebar and pages share
- * the profile.
+ * Console shell shown after login / "My account": permission-filtered sidebar
+ * (built from `bootstrap.menu`) + a main column with a collapsible-sidebar
+ * toggle, breadcrumb, and centered content. Still wraps the area in
+ * `AccountProvider` — that's a separate localStorage-backed profile/address
+ * store the profile page uses, unrelated to RBAC. Shows a persistent "Login
+ * As" preview banner while a SuperAdmin is impersonating another user.
  */
 export function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  const current = findMenuItem(location.pathname);
+  const { bootstrap, isPreviewing, returnToSuperAdmin } = useAuth();
+  const current = findMenuNodeByRoute(bootstrap?.menu ?? [], location.pathname);
 
   return (
     <AccountProvider>
       <div className={`admin-layout${collapsed ? ' is-collapsed' : ''}`}>
         <Sidebar />
         <div className="admin-main">
+          {isPreviewing && (
+            <div className="preview-banner" role="status">
+              <Icon aria-hidden="true">visibility</Icon>
+              <span>
+                Previewing as <strong>{bootstrap?.user.name}</strong> — actions are logged to the audit trail.
+              </span>
+              <FilledButton onClick={() => returnToSuperAdmin()}>Return to SuperAdmin</FilledButton>
+            </div>
+          )}
           <div className="admin-topbar">
             <IconButton
               aria-label={collapsed ? 'Show sidebar' : 'Hide sidebar'}
@@ -31,9 +45,10 @@ export function AdminLayout() {
             <nav aria-label="Breadcrumb">
               <ol className="admin-breadcrumb">
                 <li>Account</li>
-                {current && <li aria-current="page">{current.label}</li>}
+                {current && <li aria-current="page">{current.title}</li>}
               </ol>
             </nav>
+            <NotificationBell />
           </div>
           <main className="admin-content">
             <Outlet />

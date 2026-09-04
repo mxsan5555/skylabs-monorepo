@@ -5,18 +5,6 @@
  * package). When a NestJS/Express backend lands, these mirror its contract.
  */
 
-/** Access roles. The backend supplies these in the JWT; the UI only gates on them. */
-export type UserRole = 'user' | 'admin' | 'marketing' | 'sales';
-
-export const ALL_ROLES: UserRole[] = ['user', 'admin', 'marketing', 'sales'];
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  roles: UserRole[];
-}
-
 export interface Address {
   id: string;
   label: string;
@@ -27,26 +15,22 @@ export interface Address {
   postalCode: string;
   country: string;
 }
-
 export interface AccountProfile {
   name: string;
   email: string;
   phone: string;
 }
-
 export interface BlogCategory {
   id: string;
   slug: string;
   name: string;
 }
-
 /** A block of article body content. Maps cleanly to a CMS/API block model. */
 export type BlogBlock =
   | { type: 'paragraph'; text: string }
   | { type: 'heading'; text: string }
   | { type: 'list'; items: string[] }
   | { type: 'quote'; text: string };
-
 export interface BlogPost {
   id: string;
   slug: string;
@@ -61,17 +45,14 @@ export interface BlogPost {
   tags: string[];
   body: BlogBlock[];
 }
-
 export interface Paginated<T> {
   items: T[];
   total: number;
   page: number;
   pageSize: number;
 }
-
 export type BlogSort = 'newest' | 'oldest' | 'title';
 export type ReadingBucket = 'any' | 'short' | 'long';
-
 /** Blog list query — mirrors the future `GET /posts?...` request. */
 export interface BlogQuery {
   search?: string;
@@ -83,9 +64,7 @@ export interface BlogQuery {
   page?: number;
   pageSize?: number;
 }
-
 // ─── Consumer storefront types ────────────────────────────────────────────────
-
 export type PriceLevel = '$' | '$$' | '$$$';
 export type SearchView = 'list' | 'grid' | 'map';
 export type CheckoutStep = 'details' | 'datetime' | 'payment';
@@ -108,12 +87,12 @@ export interface Category {
   imageAlt: string;
   subcategories: Subcategory[];
 }
-
 export interface Deal {
   id: string;
   slug: string;
   title: string;
   providerName: string;
+  providerSlug: string;
   categorySlug: string;
   subcategorySlug: string;
   description: string;
@@ -142,18 +121,43 @@ export interface Deal {
   included: string[];
   howToUse: string[];
 }
-
 export interface CartItem {
-  dealId: string;
+  dealId?: string;
+  productId?: string;
   quantity: number;
   selectedDate?: string;
   selectedTime?: string;
 }
-
 export interface WishlistItem {
   dealId: string;
 }
-
+// ─── Product types ────────────────────────────────────────────────────────────
+export type ProductSort = 'popular' | 'price-asc' | 'price-desc' | 'newest';
+export interface Product {
+  id: string;
+  slug: string;
+  name: string;
+  brand: string;
+  categorySlug: string;
+  description: string;
+  summary: string;
+  benefits: string[];
+  howToUse: string[];
+  ingredients: string;
+  returnPolicy: string;
+  image: string;
+  gallery: string[];
+  imageAlt: string;
+  badge?: string;
+  price: number;
+  originalPrice?: number;
+  rating: number;
+  reviews: number;
+  affiliateUrl: string;
+  discount?: number;
+  isNew: boolean;
+  isFeatured: boolean;
+}
 export interface SearchFilter {
   query: string;
   priceMin?: number;

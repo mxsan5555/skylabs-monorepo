@@ -1,273 +1,382 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import {
-  FilledButton,
-  TextButton,
-  IconButton,
-  FilledTonalIconButton,
-  Icon,
-  OutlinedTextField,
-  Divider,
-  SkyAccordionReact,
-  SkyAccordionItemReact,
-} from '@skylabs-monorepo/shared-ui/react';
-import { useAuth } from '../../auth/auth-context';
-import { useCart } from '../../cart/cart-context';
-import content from '../../content.json'
+import { FilledButton, TextButton, IconButton, FilledTonalIconButton, Icon, Menu, MenuItem, Divider, } from '@skylabs-monorepo/shared-ui/react';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { getCart, subscribeCartUpdated, clearCart, } from '../../api/cart';
+import { useWishlist } from '../../wishlist/wishlist-context';
+import { listCatalogCategories, type CatalogCategoryWithChildren, } from '../../api/catalog';
+import { isCustomerUser, isStaffUser, } from '../../auth/role-routing';
+import content from '../../content.json';
 import './header.css';
-
+import logo from "../../assets/logo.jpg";
+import logo2 from "../../assets/logo2.jpg";
 export function Header() {
-  const { isAuthenticated, signOut } = useAuth();
-  const { totalItems } = useCart();
+  const {
+    isAuthenticated,
+    signOut,
+    token,
+    bootstrap,
+  } = useAuth();
   const navigate = useNavigate();
+  const { ids: wishlistIds } = useWishlist();
+  const isCustomer = !!bootstrap && isCustomerUser(bootstrap) && !isStaffUser(bootstrap);
+  const isStaff = !!bootstrap && isStaffUser(bootstrap);
+  const myAccountPath = isCustomer ? '/my-account' : '/account';
+  const [totalItems, setTotalItems] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const searchRef = useRef<HTMLInputElement>(null);
-
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [categories, setCategories] = useState<CatalogCategoryWithChildren[]>([]);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const wishlistCount = wishlistIds ? wishlistIds.size : 0;
+  const cartCount = totalItems;
+  const toggleProfileMenu = () => { setProfileMenuOpen((state) => !state); };
+  const closeDrawer = () => { setDrawerOpen(false); };
   useEffect(() => {
-    if (searchOpen) {
-      setTimeout(() => searchRef.current?.focus(), 50);
-    }
-  }, [searchOpen]);
-
-  useEffect(() => {
-    if (!drawerOpen) return;
-    const close = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setDrawerOpen(false);
+    const loadCategories = async () => {
+      try {
+        const response = await listCatalogCategories();
+        console.log('CATEGORIES RESPONSE:', response);
+        setCategories(response.data);
+      } catch (error) { console.error('Failed to load categories:', error); }
     };
-    document.addEventListener('keydown', close);
-    return () => document.removeEventListener('keydown', close);
+    loadCategories();
+  }, []);
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent,
+    ) => {
+      if (profileRef.current && !profileRef.current.contains(
+        event.target as Node,
+      )
+      ) { setProfileMenuOpen(false); }
+    };
+    document.addEventListener('mousedown', handleClickOutside,);
+    return () => document.removeEventListener('mousedown', handleClickOutside,);
+  }, []);
+  useEffect(() => {
+    if (!drawerOpen) {
+      return;
+    }
+    const handleEsc = (
+      event: KeyboardEvent,
+    ) => {
+      if (event.key === 'Escape') { setDrawerOpen(false); }
+    };
+    document.addEventListener('keydown', handleEsc,
+    );
+    return () =>
+      document.removeEventListener('keydown', handleEsc,);
   }, [drawerOpen]);
-
   useEffect(() => {
     document.body.style.overflow = drawerOpen ? 'hidden' : '';
-    return () => {
-      document.body.style.overflow = '';
-    };
+    return () => { document.body.style.overflow = ''; };
   }, [drawerOpen]);
-
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery('');
-      setSearchOpen(false);
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setTotalItems(0);
+      return;
     }
-  }
-
+    let cancelled = false;
+    const loadCount = () => {
+      getCart(token)
+        .then(({ data }) => {
+          if (!cancelled) {
+            const cartItemCount = data.items.reduce((sum, item) => sum + item.quantity, 0);
+            setTotalItems(cartItemCount);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) { setTotalItems(0); }
+        });
+    };
+    loadCount();
+    const unsubscribeCart = subscribeCartUpdated(loadCount);
+    return () => {
+      cancelled = true;
+      unsubscribeCart();
+    };
+  }, [isAuthenticated, token,]);
+  const handleSignOut = () => {
+    signOut();
+    setProfileMenuOpen(false);
+    setDrawerOpen(false);
+    setTotalItems(0);
+  };
+  const goToCustomerPage = (
+    path: string,
+  ) => {
+    if (!isCustomer) {
+      navigate('/account');
+      return;
+    }
+    navigate(path);
+    setProfileMenuOpen(false);
+    setDrawerOpen(false);
+  };
   return (
     <>
-      {/* Skip to main content — accessibility */}
-      <a className="skip-link" href="#main-content">
-        {content.header.skipToContent}
-      </a>
-
-      <header className="site-header" role="banner">
-        <div className="site-header__inner">
-          {/* Mobile: hamburger */}
-          <FilledTonalIconButton
-            className="site-header__hamburger"
-            aria-label={content.header.openNavigation}
-            aria-expanded={drawerOpen}
-            aria-controls="nav-drawer"
+      <a className="skip-link" href="#main-content"> {content.header.skipToContent} </a>
+      <header className="site-header" role="banner" >
+        <div className="site-header__top">
+          <IconButton
+            className="site-header__menu-btn"
+            aria-label={content.header.openMenu}
             onClick={() => setDrawerOpen(true)}
           >
-            <Icon aria-hidden="true">menu</Icon>
-          </FilledTonalIconButton>
-
-          {/* Brand */}
-          <NavLink to="/" className="site-header__brand" aria-label={`${content.site.name} – ${content.site.fullName} home`}>
-            <span className="site-header__brand-icon" aria-hidden="true">
-              <Icon>spa</Icon>
-            </span>
-            <span className="site-header__brand-text">
-              <span className="site-header__brand-name">{content.site.name}</span>
-              <span className="site-header__brand-tagline">{content.site.fullName}</span>
-            </span>
+            <Icon>menu</Icon>
+          </IconButton>
+          <NavLink
+            to="/"
+            className="site-header__brand"
+            aria-label={content.header.homeAriaLabel}
+          >
+            <img
+              src={logo}
+              alt={content.site.name}
+              className="site-header__logo site-header__logo--desktop"
+            />
+            <img
+              src={logo2}
+              alt={content.site.name}
+              className="site-header__logo site-header__logo--mobile"
+            />
           </NavLink>
+          <div className="header-categories">
+            <div className="header-categories">
+              {categories.map((category) => (
+                <NavLink
+                  key={category.id}
+                  to={`/category/${category.slug}`}
+                  className={({ isActive }) =>
+                    `header-category-link${isActive ? ' header-category-link--active' : ''}`
+                  }
+                >
+                  <span>{category.name}</span>
+                </NavLink>
+              ))}
 
-          {/* Desktop primary nav */}
-          <nav className="site-header__nav" aria-label="Primary">
-            {content.nav.primary.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  `site-header__nav-link${isActive ? ' site-header__nav-link--active' : ''
-                  }`
-                }
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-
-          {/* Desktop search */}
-          {/* <form
-            className={`site-header__search-form${searchOpen ? ' site-header__search-form--open' : ''}`}
-            role="search"
-            aria-label="Site search"
-            onSubmit={handleSearch}
-          >
-            <OutlinedTextField
-              className="site-header__search-field"
-              label={content.search.placeholder}
-              value={searchQuery}
-              onInput={(e) =>
-                setSearchQuery((e.target as unknown as { value: string }).value)
-              }
+             
+            </div>
+          </div>
+          <div className="site-header__actions">
+            <FilledTonalIconButton
+              className="site-header__cart"
+              aria-label={`Wishlist, ${wishlistCount} item${wishlistCount !== 1
+                ? 's'
+                : ''
+                }`}
+              onClick={() => navigate('/wishlist')}
             >
-              <Icon slot="leading-icon" aria-hidden="true">search</Icon>
-            </OutlinedTextField>
-          </form> */}
-
-          {/* Mobile search toggle */}
-          <IconButton
-            className="site-header__search-toggle"
-            aria-label={searchOpen ? 'Close search' : 'Open search'}
-            onClick={() => setSearchOpen((v) => !v)}
-          >
-            <Icon aria-hidden="true">{searchOpen ? 'close' : 'search'}</Icon>
-          </IconButton>
-
-          {/* Cart */}
-          <IconButton
-            className="site-header__cart"
-            aria-label={`Cart, ${totalItems} item${totalItems !== 1 ? 's' : ''}`}
-            onClick={() => navigate('/cart')}
-          >
-            <Icon aria-hidden="true">shopping_bag</Icon>
-            {totalItems > 0 && (
-              <span className="site-header__cart-badge" aria-hidden="true">
-                {totalItems}
-              </span>
-            )}
-          </IconButton>
-          <IconButton
-            className="site-header__cart"
-            aria-label={`Cart, ${totalItems} item${totalItems !== 1 ? 's' : ''}`}
-            onClick={() => navigate('/wishlist')}
-          >
-            <Icon aria-hidden="true">favorite_border</Icon>
-            {totalItems > 0 && (
-              <span className="site-header__cart-badge" aria-hidden="true">
-                {totalItems}
-              </span>
-            )}
-          </IconButton>
-
-          {/* Auth */}
-          <div className="site-header__auth">
-            {isAuthenticated ? (
-              <>
-                <TextButton onClick={() => navigate('/account')}>My Account</TextButton>
-                <TextButton onClick={signOut}>Sign Out</TextButton>
-              </>
-            ) : (
-              <FilledButton onClick={() => navigate('/sign-in')}>Sign In</FilledButton>
-            )}
+              <Icon> favorite_border  </Icon>
+              {wishlistCount > 0 && (
+                <span className="site-header__cart-badge"> {wishlistCount} </span>
+              )}
+            </FilledTonalIconButton>
+            <FilledTonalIconButton
+              className="site-header__cart"
+              aria-label={`Cart, ${cartCount} item${cartCount !== 1
+                ? 's'
+                : ''
+                }`}
+              onClick={() => navigate('/cart')}
+            >
+              <Icon> shopping_bag </Icon>
+              {cartCount > 0 && (
+                <span className="site-header__cart-badge"> {cartCount}</span>
+              )}
+            </FilledTonalIconButton>
+            <div className="site-header__profile">
+              {isAuthenticated ? (
+                <div className="profile-menu" ref={profileRef} >
+                  <FilledTonalIconButton
+                    id="profile-button"
+                    className="profile-button"
+                    onClick={toggleProfileMenu}
+                    aria-label="My Account"
+                  >
+                    <Icon> person </Icon>
+                  </FilledTonalIconButton>
+                  {profileMenuOpen && (
+                    <Menu
+                      open
+                      anchor="profile-button"
+                      xOffset={-120}
+                      yOffset={16}
+                      onClosed={() => setProfileMenuOpen(false)}
+                    >
+                      <MenuItem
+                        onClick={() => {
+                          navigate(myAccountPath,);
+                          setProfileMenuOpen(false,);
+                        }}
+                      >
+                        <Icon slot="start">person </Icon>
+                        {content.header.profileMenu.profile}
+                      </MenuItem>
+                      {isCustomer && (
+                        <MenuItem
+                          onClick={() => {
+                            navigate('/orders',);
+                            setProfileMenuOpen(false,);
+                          }}
+                        >
+                          <Icon slot="start">receipt_long</Icon>
+                          Orders
+                        </MenuItem>
+                      )}
+                      <MenuItem
+                        onClick={handleSignOut}
+                      >
+                        <Icon slot="start"> logout
+                        </Icon>
+                        {content.header.profileMenu.signOut}
+                      </MenuItem>
+                    </Menu>
+                  )}
+                </div>
+              ) : (
+                <FilledButton onClick={() => navigate('/sign-in',)} > Sign In</FilledButton>
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Mobile search bar (expanded) */}
-        {searchOpen && (
-          <div className="site-header__mobile-search">
-            <form role="search" aria-label="Site search" onSubmit={handleSearch}>
-              <OutlinedTextField
-                className="site-header__search-field site-header__search-field--mobile"
-                label={content.search.placeholder}
-                value={searchQuery}
-                onInput={(e) =>
-                  setSearchQuery((e.target as unknown as { value: string }).value)
-                }
-              >
-                <Icon slot="leading-icon" aria-hidden="true">search</Icon>
-              </OutlinedTextField>
-            </form>
-          </div>
-        )}
       </header>
-
-      {/* Mobile nav drawer */}
       {drawerOpen && (
         <div
           className="nav-drawer-backdrop"
           aria-hidden="true"
-          onClick={() => setDrawerOpen(false)}
+          onClick={closeDrawer}
         />
       )}
       <nav
         id="nav-drawer"
         className={`nav-drawer${drawerOpen ? ' nav-drawer--open' : ''}`}
-        aria-label="Navigation drawer"
+        aria-label={content.header.drawerLabel}
         aria-hidden={!drawerOpen}
       >
         <div className="nav-drawer__header">
-          <span className="nav-drawer__brand">
-            <Icon aria-hidden="true" className="nav-drawer__brand-icon">spa</Icon>
-            <span>
-              <strong>MSD</strong>
-              <small>MySpaDeal</small>
-            </span>
-          </span>
-          <IconButton aria-label={content.header.closeNavigation} onClick={() => setDrawerOpen(false)}>
-            <Icon aria-hidden="true">close</Icon>
+          <NavLink
+            to="/"
+            className="nav-drawer__brand"
+            onClick={closeDrawer}
+            aria-label={content.header.homeAriaLabel}
+          >
+            <img
+              src={logo}
+              alt={content.site.name}
+              className="nav-drawer__logo nav-drawer__logo--desktop"
+            />
+            <img
+              src={logo2}
+              alt={content.site.name}
+              className="nav-drawer__logo nav-drawer__logo--mobile"
+            />
+          </NavLink>
+          <IconButton
+            aria-label={content.header.closeNavigation}
+            onClick={closeDrawer}
+          >
+            <Icon>close</Icon>
           </IconButton>
         </div>
-
         <Divider />
-
         <div className="nav-drawer__body">
-          <SkyAccordionReact>
-            {/* <SkyAccordionItemReact header={content.nav.drawerCategoryHeader} open>
-              <ul className="nav-drawer__cat-list">
-                {content.nav.categories.map((cat) => (
-                  <li key={cat.to}>
-                    <NavLink
-                      to={cat.to}
-                      className="nav-drawer__cat-link"
-                      onClick={() => setDrawerOpen(false)}
-                    >
-                      {cat.label}
-                      <span className="nav-drawer__cat-count">{cat.count} services</span>
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            </SkyAccordionItemReact> */}
-          </SkyAccordionReact>
-
+          <sky-accordion />
           <Divider />
-
           <ul className="nav-drawer__links">
-            {content.nav.primary.map((item) => (
-              <li key={item.to}>
+            <ul className="nav-drawer__links">
+              {categories.map((category) => (
+                <li key={category.id}>
+                  <NavLink
+                    to={`/category/${category.slug}`}
+                    className="nav-drawer__link"
+                    onClick={closeDrawer}
+                  >
+                    {category.name}
+                  </NavLink>
+                </li>
+              ))}
+
+              {/* Static Product */}
+              <li>
                 <NavLink
-                  to={item.to}
+                  to="/products"
                   className="nav-drawer__link"
-                  onClick={() => setDrawerOpen(false)}
+                  onClick={closeDrawer}
                 >
-                  {item.label}
+                  Products
                 </NavLink>
               </li>
-            ))}
+
+              {/* Static Therapists */}
+              <li>
+                <NavLink
+                  to="/therapists"
+                  className="nav-drawer__link"
+                  onClick={closeDrawer}
+                >
+                  Therapists
+                </NavLink>
+              </li>
+            </ul>
           </ul>
-
           <Divider />
-
+          {isCustomer && (
+            <>
+              <ul className="nav-drawer__links">
+                <li>
+                  <NavLink
+                    to="/orders"
+                    className="nav-drawer__link"
+                    onClick={closeDrawer}
+                  >
+                    Orders
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink
+                    to="/cart"
+                    className="nav-drawer__link"
+                    onClick={closeDrawer}
+                  >
+                    Cart
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink
+                    to="/wishlist"
+                    className="nav-drawer__link"
+                    onClick={closeDrawer}
+                  >
+                    Wishlist
+                  </NavLink>
+                </li>
+              </ul>
+              <Divider />
+            </>
+          )}
           <div className="nav-drawer__auth">
             {isAuthenticated ? (
               <>
-                <FilledButton onClick={() => { navigate('/account'); setDrawerOpen(false); }}>
+                <FilledButton
+                  onClick={() => {
+                    navigate(myAccountPath,);
+                    closeDrawer();
+                  }}
+                >
                   {content.header.myAccount}
                 </FilledButton>
-                <TextButton onClick={() => { signOut(); setDrawerOpen(false); }}>
+                {isCustomer && (
+                  <TextButton onClick={() => { navigate('/orders',); closeDrawer(); }} >
+                    Orders
+                  </TextButton>
+                )}
+                <TextButton onClick={handleSignOut} >
                   {content.header.signOut}
                 </TextButton>
               </>
             ) : (
-              <FilledButton onClick={() => { navigate('/sign-in'); setDrawerOpen(false); }}>
+              <FilledButton
+                onClick={() => { navigate('/sign-in',); closeDrawer(); }} >
                 {content.header.signIn}
               </FilledButton>
             )}
@@ -277,3 +386,4 @@ export function Header() {
     </>
   );
 }
+export default Header;

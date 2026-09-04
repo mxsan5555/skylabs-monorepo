@@ -1,0 +1,10 @@
+.error-boundary-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  min-height: 100vh;
+  padding: 40px 20px;
+  text-align: center;
+}

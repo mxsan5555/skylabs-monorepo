@@ -1,6 +1,6 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
-import { AuthService } from '../../core/auth/auth.service';
+import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
 
 /**
  * App header: brand, primary nav, and auth action. App-specific (it knows the

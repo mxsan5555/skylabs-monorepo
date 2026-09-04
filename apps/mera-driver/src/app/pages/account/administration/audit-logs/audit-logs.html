@@ -1,0 +1,34 @@
+<md-admin-page title="Audit Logs" subtitle="Every role, permission, and user-management change, in order.">
+  <div class="flex flex-col gap-4">
+    <sky-card>
+      <div class="flex flex-wrap items-end gap-2">
+        <md-outlined-text-field
+          label="Filter by target user ID"
+          [value]="targetUserId"
+          (input)="targetUserId = $any($event.target).value"
+        ></md-outlined-text-field>
+        <md-filled-button (click)="applyTargetUserFilter()">Apply</md-filled-button>
+        <md-text-button (click)="clearTargetUserFilter()">Clear</md-text-button>
+      </div>
+    </sky-card>
+
+    @if (loadError()) {
+      <p role="alert" class="auth-error">{{ loadError() }}</p>
+    } @else if (!loading() && rows().length === 0) {
+      <sky-info-card icon="history" heading="No audit entries" subheading="Nothing has been logged for this filter yet."></sky-info-card>
+    } @else {
+      <sky-data-table
+        caption="Audit logs"
+        [columns]="columnsJson"
+        [rows]="rowsJson()"
+        [total]="total()"
+        [page]="page()"
+        [pageSize]="pageSize()"
+        [loading]="loading()"
+        [actions]="actionsJson"
+        exportable
+        (sky-dt-params-change)="onParamsChange($event)"
+      ></sky-data-table>
+    }
+  </div>
+</md-admin-page>

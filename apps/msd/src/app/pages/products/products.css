@@ -1,0 +1,204 @@
+/* ─── Page shell ──────────────────────────────────────────────────────────── */
+.products-page {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Breadcrumb ──────────────────────────────────────────────────────────── */
+.products-page__breadcrumb {
+  background: var(--md-sys-color-surface-container-low);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  padding: 10px 20px;
+}
+
+/* ─── Hero ────────────────────────────────────────────────────────────────── */
+.products-page__hero {
+  background: linear-gradient(
+    135deg,
+    var(--md-sys-color-primary-container) 0%,
+    var(--md-sys-color-secondary-container) 100%
+  );
+  padding: 40px 20px;
+}
+
+.products-page__hero-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.products-page__hero-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  font-size: 36px;
+  flex-shrink: 0;
+}
+
+.products-page__title {
+  margin: 0 0 6px;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-weight: 700;
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.products-page__subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--md-sys-color-on-surface-variant);
+  line-height: 1.5;
+}
+
+/* ─── Row 1: Sticky filter bar ────────────────────────────────────────────── */
+.products-page__filter-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  width: 100%;
+  background: var(--md-sys-color-surface-container);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.products-page__filter-bar-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.products-page__count {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.products-page__sort-select {
+  min-width: 160px;
+  flex-shrink: 0;
+}
+
+/* ─── Grid section ────────────────────────────────────────────────────────── */
+.products-page__grid-section {
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 32px 20px 64px;
+  box-sizing: border-box;
+}
+
+.products-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 24px;
+}
+
+/* ─── Card wrap ───────────────────────────────────────────────────────────── */
+.products-page__card-wrap {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  
+}
+
+.products-page__card-wrap:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--md-sys-color-shadow) 10%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .products-page__card-wrap {
+    transition: none;
+    transform: none;
+  }
+}
+
+.products-page__card-wrap sky-product-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+}
+
+/* CTA slotted inside card body — padding only, no border or background */
+.products-page__card-cta {
+  padding: 8px 0 4px;
+}
+
+.products-page__card-btn {
+  width: 100%;
+}
+
+/* ─── Empty state ─────────────────────────────────────────────────────────── */
+.products-page__empty {
+  display: flex;
+  justify-content: center;
+  padding: 64px 0;
+}
+
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 599px) {
+  .products-page__hero {
+    padding: 24px 16px;
+  }
+
+  .products-page__hero-icon {
+    width: 52px;
+    height: 52px;
+    font-size: 26px;
+    border-radius: 14px;
+  }
+
+  .products-page__filter-bar-inner {
+    padding: 8px 12px;
+    flex-wrap: wrap;
+  }
+
+  .products-page__grid-section {
+    padding: 20px 12px 48px;
+  }
+
+ .products-page__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .products-page__card-wrap {
+        min-width: 0;
+        height: auto;
+    }
+
+    .products-page__card-wrap sky-product-card {
+        display: block;
+        width: 100%;
+        min-width: 0;
+        height: auto;
+    }
+      .products-page {
+    padding-top: 15px;
+}
+}
+
+@media (min-width: 600px) and (max-width: 1239px) {
+  .products-page__grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+  .products-page {
+    padding-top: 20px;
+}
+}
