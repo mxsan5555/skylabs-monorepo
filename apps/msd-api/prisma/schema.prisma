@@ -131,6 +131,18 @@ enum PaymentStatus {
   CANCELLED
 }
 
+/// Display/classification hint on a Notification row — the actual recipient is always a real
+/// `User` (see Notification's own doc comment), never a polymorphic reference keyed by this enum.
+enum NotificationRecipientType {
+  SUPERADMIN
+  VENDOR
+}
+
+enum NotificationType {
+  DEAL_PENDING_APPROVAL
+  ORDER_RECEIVED
+}
+
 // ─── Core identity & RBAC ───────────────────────────────────────────────────
 
 model User {
@@ -155,6 +167,7 @@ model User {
   cart                      Cart?
   orders                    Order[]
   wishlistItems             WishlistItem[]
+  notifications             Notification[]          @relation("NotificationRecipient")
 
   @@index([status])
 }
@@ -303,6 +316,33 @@ model AuditLog {
 
   @@index([actorUserId])
   @@index([targetType, targetId])
+}
+
+/// A recipient is always a real User row — a Vendor notification resolves to `Vendor.ownerUserId`,
+/// a Superadmin notification resolves to every User whose Role has `isSuperAdmin` — `recipientType`
+/// is a display/classification hint only, never a polymorphic key. `entityType`/`entityId` mirror
+/// AuditLog's `targetType`/`targetId` pattern for "what this notification is about" (e.g. "DEAL"/
+/// dealId), with `metadata` for anything else the frontend's click-to-navigate needs (e.g. vendorId).
+model Notification {
+  id              String                    @id @default(uuid())
+  recipientUserId String
+  recipientType   NotificationRecipientType
+  type            NotificationType
+  title           String
+  message         String
+  entityType      String?
+  entityId        String?
+  metadata        Json?
+  isRead          Boolean                   @default(false)
+  readAt          DateTime?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  recipient User @relation("NotificationRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  @@index([recipientUserId])
+  @@index([recipientUserId, isRead])
+  @@index([entityType, entityId])
 }
 
 model LoginHistory {
@@ -835,6 +875,8 @@ model Deal {
   /// Product deal.
   durationMinutes          Int?
   termsAndConditions       String?
+  notes                    String?
+  policy                   String?
   /// URLs only for this MVP — string[] of hosted image URLs, no upload pipeline.
   images                   Json?
   maxBookings              Int?

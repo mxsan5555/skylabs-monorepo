@@ -280,6 +280,13 @@ input[type='checkbox'] {
   font-weight: 600;
 }
 
+/* The row a notification deep-link (?dealId=) scrolled to and is pointing the admin at. */
+.entity-list__item--highlighted {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: -2px;
+  background-color: var(--md-sys-color-primary-container, #d7e3ff);
+}
+
 /* Status pill */
 .status-pill {
   display: inline-flex;

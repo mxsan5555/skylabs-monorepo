@@ -8,6 +8,7 @@ import { listActiveCategories, assertCategoryChildOf, assertVendorHasCategoryAcc
 import { getProductScopedOrThrow } from './product.service';
 import * as mediaService from './media.service';
 import type { MediaFile } from './media.service';
+import * as notificationService from './notification.service';
 import { Prisma, type CategoryType, type VendorStatus, type KycStatus, type DealStatus, type DealApprovalStatus } from '../generated/prisma-client';
 import type {
   VendorCreateSchema,
@@ -1018,6 +1019,21 @@ export async function createDeal(
           })),
         });
         await syncDealPriceFromPackages(tx, deal.id);
+      }
+
+      // A vendor-created (never admin-created) deal needs Superadmin review before it goes live
+      // — see the `approvalStatus` gate above. Runs inside this same transaction so a rolled-back
+      // deal creation (e.g. the P2002 slug race below) can never leave a stray notification behind.
+      if (!actorIsAdmin) {
+        const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { businessName: true } });
+        await notificationService.notifySuperAdmins(tx, {
+          type: 'DEAL_PENDING_APPROVAL',
+          title: 'New Deal Pending Approval',
+          message: `${vendor?.businessName ?? 'A vendor'} submitted "${deal.title}" for approval.`,
+          entityType: 'DEAL',
+          entityId: deal.id,
+          metadata: { vendorId, branchId },
+        });
       }
 
       return tx.deal.findUniqueOrThrow({ where: { id: deal.id }, include: OFFERING_INCLUDE });

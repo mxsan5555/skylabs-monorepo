@@ -27,12 +27,11 @@ import { MediaUploader } from '../../../components/media-uploader';
 
 interface CategoryManagementProps {
   /** 'top' → the Categories page (parentId: null rows); 'sub' → Sub Categories (parentId set,
-   *  parent itself top-level); 'leaf' → Category Types (parentId set, and that parent's own
-   *  parentId is set too — the 3rd, Type tier, e.g. "Swedish Massage" under "Body Massage" under
-   *  "Massage"). NAMING NOTE: this "Type" tier is unrelated to the `Category.type` enum
-   *  (SERVICE/PRODUCT/THERAPY, business-module classification, top-level-only) — see
-   *  msd-api's `category.service.ts` module doc comment. */
-  scope: 'top' | 'sub' | 'leaf';
+   *  parent itself top-level). The former 3rd, "Category Types" tier (Type rows nested under a
+   *  Subcategory) has been removed as its own Master screen — existing Type-tier Category rows
+   *  are untouched and still selectable wherever they were before (e.g. Product's own category
+   *  picker), only this dedicated CRUD screen and Deal's optional Type picker are gone. */
+  scope: 'top' | 'sub';
 }
 
 const STATUS_COLUMN = { key: 'Status', label: 'Status', type: 'status', statusMap: { Active: 'success', Inactive: 'error' } };
@@ -61,32 +60,19 @@ const SUB_COLUMNS = JSON.stringify([
   STATUS_COLUMN,
 ]);
 
-// Reuses the same `Parent Category` row field as SUB_COLUMNS (it's already `category.parent?.name`
-// — for a Type-tier row that immediate parent IS the Subcategory), just relabeled for this tier.
-const LEAF_COLUMNS = JSON.stringify([
-  { key: 'Name', label: 'Name' },
-  { key: 'Slug', label: 'Slug' },
-  { key: 'Parent Category', label: 'Subcategory' },
-  { key: 'Sort Order', label: 'Sort Order' },
-  STATUS_COLUMN,
-]);
-
 const TITLES: Record<CategoryManagementProps['scope'], string> = {
   top: 'Categories',
   sub: 'Sub Categories',
-  leaf: 'Category Types',
 };
 
 const DESCRIPTIONS: Record<CategoryManagementProps['scope'], string> = {
   top: 'Top-level marketplace categories.',
   sub: 'Subcategories, grouped under a parent category.',
-  leaf: 'Types, grouped under a parent subcategory (e.g. "Swedish Massage" under "Body Massage").',
 };
 
 const ADD_LABELS: Record<CategoryManagementProps['scope'], string> = {
   top: 'Add category',
   sub: 'Add subcategory',
-  leaf: 'Add type',
 };
 
 interface TableParams {
@@ -98,14 +84,12 @@ interface TableParams {
 const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
 
 /**
- * Categories, Sub Categories, AND Category Types share this one component/page — same underlying
- * Category table (a row with a parentId IS a subcategory or a Type, depending on depth), just a
- * different `scope` filter and, for `scope="sub"`/`scope="leaf"`, a parent selector in the
- * Add/Edit dialog (a single "Parent category" dropdown for `sub`; a 2-step Category→Subcategory
- * cascade for `leaf`, since a Type row's `parentId` must point at a Subcategory, not a top-level
- * row). Standardized onto the same <sky-data-table> used by Orders/Services/Products.
- * The Category list endpoint has no server-side active/inactive filter (unlike Services/
- * Products), so no status filter is wired here — only search + pagination.
+ * Categories AND Sub Categories share this one component/page — same underlying Category table
+ * (a row with a parentId IS a subcategory), just a different `scope` filter and, for
+ * `scope="sub"`, a "Parent category" selector in the Add/Edit dialog. Standardized onto the same
+ * <sky-data-table> used by Orders/Services/Products. The Category list endpoint has no
+ * server-side active/inactive filter (unlike Services/Products), so no status filter is wired
+ * here — only search + pagination.
  */
 export function CategoryManagement({ scope }: CategoryManagementProps) {
   const { token, can } = useAuth();
@@ -114,11 +98,8 @@ export function CategoryManagement({ scope }: CategoryManagementProps) {
   const canDelete = can('masters.categories', 'delete');
 
   const [categories, setCategories] = useState<Category[]>([]);
-  // scope='sub': top-level categories only, for the single "Parent category" picker.
-  // scope='leaf': top-level categories (1st picker) + ALL subcategories in the system (2nd
-  // picker, filtered client-side by the chosen top-level id) — see `loadParentOptions` below.
+  // scope='sub' only: top-level categories, for the single "Parent category" picker.
   const [parentOptions, setParentOptions] = useState<Category[]>([]);
-  const [subOptions, setSubOptions] = useState<Category[]>([]);
   const [parentOptionsLoading, setParentOptionsLoading] = useState(false);
   const [parentOptionsError, setParentOptionsError] = useState('');
   const [total, setTotal] = useState(0);
@@ -157,24 +138,15 @@ export function CategoryManagement({ scope }: CategoryManagementProps) {
     load();
   }, [load]);
 
-  // Sub Categories needs the top-level list to populate its single "Parent category" selector;
-  // Category Types needs both the top-level list AND every subcategory (to drive the 2-step
-  // Category → Subcategory cascade — a Type row's `parentId` must be a Subcategory id).
+  // Sub Categories needs the top-level list to populate its single "Parent category" selector.
   const loadParentOptions = useCallback(() => {
     if (scope === 'top') return;
     setParentOptionsLoading(true);
     setParentOptionsError('');
-    // pageSize is capped at 100 server-side (PaginationQuerySchema) — 200 here 500s.
-    const loadTop = listCategories(token, { scope: 'top', pageSize: 100 });
-    const loadSub = scope === 'leaf' ? listCategories(token, { scope: 'sub', pageSize: 100 }) : Promise.resolve({ data: [] as Category[] });
-    Promise.all([loadTop, loadSub])
-      .then(([top, sub]) => {
-        setParentOptions(top.data);
-        setSubOptions(sub.data);
-      })
+    listCategories(token, { scope: 'top', pageSize: 100 })
+      .then(({ data }) => setParentOptions(data))
       .catch((err) => {
         setParentOptions([]);
-        setSubOptions([]);
         setParentOptionsError(err instanceof ApiRequestError ? err.message : 'Unable to load categories.');
       })
       .finally(() => setParentOptionsLoading(false));
@@ -283,7 +255,7 @@ export function CategoryManagement({ scope }: CategoryManagementProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories]);
 
-  const columns = scope === 'top' ? TOP_COLUMNS : scope === 'sub' ? SUB_COLUMNS : LEAF_COLUMNS;
+  const columns = scope === 'top' ? TOP_COLUMNS : SUB_COLUMNS;
 
   return (
     <div className="admin-page admin-page--wide">
@@ -324,7 +296,6 @@ export function CategoryManagement({ scope }: CategoryManagementProps) {
         <CategoryFormDialog
           scope={scope}
           parentOptions={parentOptions}
-          subOptions={subOptions}
           parentOptionsLoading={parentOptionsLoading}
           parentOptionsError={parentOptionsError}
           onRetryParentOptions={loadParentOptions}
@@ -339,7 +310,6 @@ export function CategoryManagement({ scope }: CategoryManagementProps) {
           key={editingCategory?.id ?? 'edit-empty'}
           scope={scope}
           parentOptions={parentOptions}
-          subOptions={subOptions}
           parentOptionsLoading={parentOptionsLoading}
           parentOptionsError={parentOptionsError}
           onRetryParentOptions={loadParentOptions}
@@ -357,7 +327,6 @@ export function CategoryManagement({ scope }: CategoryManagementProps) {
 function CategoryFormDialog({
   scope,
   parentOptions,
-  subOptions,
   parentOptionsLoading,
   parentOptionsError,
   onRetryParentOptions,
@@ -367,14 +336,9 @@ function CategoryFormDialog({
   onSave,
   onClose,
 }: {
-  scope: 'top' | 'sub' | 'leaf';
-  /** Top-level categories — the "Parent category" options for `scope="sub"`, and the 1st-tier
-   *  picker's options for `scope="leaf"`. */
+  scope: 'top' | 'sub';
+  /** Top-level categories — the "Parent category" options for `scope="sub"`. */
   parentOptions: Category[];
-  /** Every subcategory in the system (`scope="leaf"` only) — filtered client-side by the chosen
-   *  top-level id to drive the 2nd-tier "Subcategory" picker, whose value becomes the new Type
-   *  row's actual `parentId`. */
-  subOptions: Category[];
   parentOptionsLoading: boolean;
   parentOptionsError: string;
   onRetryParentOptions: () => void;
@@ -384,16 +348,6 @@ function CategoryFormDialog({
   onSave: (input: CategoryInput) => Promise<Category | void>;
   onClose?: () => void;
 }) {
-  // scope='leaf' only — the 1st-tier ("Category") picker's UI-only selection; never submitted
-  // directly, it just narrows `subOptions` down to the 2nd tier. Editing an existing Type row
-  // derives it from the row's own parent (a Subcategory)'s `parentId`. Lazy initializer so this
-  // only runs once per mount (the Edit dialog remounts fresh per row via its `key`, same as the
-  // rest of this dialog's per-row state).
-  const [topCategoryId, setTopCategoryId] = useState<string | undefined>(() => {
-    if (scope !== 'leaf' || !category?.parentId) return undefined;
-    return subOptions.find((s) => s.id === category.parentId)?.parentId ?? undefined;
-  });
-
   const [form, setForm] = useState<CategoryInput>({
     name: category?.name ?? '',
     slug: category?.slug ?? '',
@@ -418,35 +372,18 @@ function CategoryFormDialog({
   const [savedCategory, setSavedCategory] = useState<Category | undefined>(category);
 
   // The Add dialog is a single long-lived instance (no `key`, unlike the Edit dialog above,
-  // which remounts per row) — its `form`/`topCategoryId` useState initializers only ever run
-  // once, against whatever `parentOptions`/`subOptions` happened to be at that first mount
-  // (usually still `[]`, since they load asynchronously). Without this, "Add subcategory"/
-  // "Add type" permanently shows nothing selected even after categories finish loading. Only
-  // applies in Add mode, and only until the user has picked something themselves.
+  // which remounts per row) — its `form` useState initializer only ever runs once, against
+  // whatever `parentOptions` happened to be at that first mount (usually still `[]`, since it
+  // loads asynchronously). Without this, "Add subcategory" permanently shows nothing selected
+  // even after categories finish loading. Only applies in Add mode, and only until the user has
+  // picked something themselves.
   useEffect(() => {
     if (category) return;
     if (scope === 'sub' && !form.parentId && parentOptions.length > 0) {
       setForm((f) => ({ ...f, parentId: parentOptions[0].id }));
     }
-    if (scope === 'leaf' && !topCategoryId && parentOptions.length > 0) {
-      setTopCategoryId(parentOptions[0].id);
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentOptions, scope, category]);
-
-  // Once a 1st-tier Category is selected (Add mode only), default the 2nd-tier "Subcategory"
-  // picker to its first available option — same async-load timing rationale as above, one tier
-  // down. Also re-runs whenever `topCategoryId` changes so switching the top selection clears a
-  // now-stale subcategory pick.
-  useEffect(() => {
-    if (category || scope !== 'leaf' || !topCategoryId) return;
-    if (form.parentId && subOptions.some((s) => s.id === form.parentId && s.parentId === topCategoryId)) return;
-    const firstMatch = subOptions.find((s) => s.parentId === topCategoryId);
-    setForm((f) => ({ ...f, parentId: firstMatch?.id }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topCategoryId, subOptions, scope, category]);
-
-  const subcategoryChoices = subOptions.filter((s) => s.parentId === topCategoryId);
 
   const submit = async () => {
     if (submittingRef.current) return;
@@ -458,10 +395,6 @@ function CategoryFormDialog({
       setError('Select a parent category.');
       return;
     }
-    if (scope === 'leaf' && (!topCategoryId || !form.parentId)) {
-      setError('Select a category and a subcategory.');
-      return;
-    }
     if (scope === 'top' && !form.type) {
       setError('Select a type.');
       return;
@@ -470,7 +403,7 @@ function CategoryFormDialog({
     if (saveButtonRef.current) saveButtonRef.current.disabled = true;
     setSubmitting(true);
     setError('');
-    // `type`/`isPopular` only ever apply to a top-level row — a subcategory/Type row inherits its
+    // `type`/`isPopular` only ever apply to a top-level row — a subcategory row inherits its
     // top-level ancestor's type by join and never carries its own (see msd-api's
     // category.schema.ts doc comment), so both are omitted from a non-top payload.
     const payload: CategoryInput = scope === 'top' ? form : { ...form, type: undefined, isPopular: undefined };
@@ -518,46 +451,6 @@ function CategoryFormDialog({
               </SelectOption>
             ))}
           </OutlinedSelect>
-        )}
-
-        {scope === 'leaf' && !parentOptionsLoading && !parentOptionsError && parentOptions.length > 0 && (
-          <>
-            <OutlinedSelect
-              label="Category"
-              value={topCategoryId ?? ''}
-              onChange={(e: Event) => {
-                const value = (e.target as HTMLSelectElement).value;
-                setTopCategoryId(value);
-                setForm((f) => ({ ...f, parentId: undefined }));
-              }}
-            >
-              {parentOptions.map((p) => (
-                <SelectOption key={p.id} value={p.id}>
-                  <div slot="headline">{p.name}</div>
-                </SelectOption>
-              ))}
-            </OutlinedSelect>
-
-            {subcategoryChoices.length > 0 ? (
-              <OutlinedSelect
-                label="Subcategory"
-                value={form.parentId ?? ''}
-                onChange={(e: Event) => setForm((f) => ({ ...f, parentId: (e.target as HTMLSelectElement).value }))}
-              >
-                {subcategoryChoices.map((s) => (
-                  <SelectOption key={s.id} value={s.id}>
-                    <div slot="headline">{s.name}</div>
-                  </SelectOption>
-                ))}
-              </OutlinedSelect>
-            ) : (
-              topCategoryId && (
-                <p className="empty-state">
-                  This category has no subcategories yet — add one under Sub Categories first.
-                </p>
-              )
-            )}
-          </>
         )}
 
         <OutlinedTextField label="Name" value={form.name} onInput={(e: Event) => setForm((f) => ({ ...f, name: (e.target as HTMLInputElement).value }))} />

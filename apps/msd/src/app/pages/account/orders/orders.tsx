@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
+import { useSearchParams } from 'react-router-dom';
 import { Dialog, FilledButton, OutlinedSelect, SelectOption, TextButton } from '@skylabs-monorepo/shared-ui/react';
 import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { listOrders, setOrderStatus, type Order, type OrderStatus } from '../../../../api/rbac/orders';
+import { listOrders, getOrder, setOrderStatus, type Order, type OrderStatus } from '../../../../api/rbac/orders';
 import { ApiRequestError } from '../../../../api/rbac/client';
 
 const ALLOWED_NEXT: Record<OrderStatus, OrderStatus[]> = {
@@ -122,6 +123,27 @@ export function OrderManagement() {
   const statusDialogRef = useRef<MdDialog>(null);
 
   const tableRef = useRef<HTMLElement>(null);
+
+  // Deep-link support for a "New Order Received" notification click (see notification-bell.tsx)
+  // — `sky-data-table`'s own row-detail drawer has no public API to open it programmatically, so
+  // this fetches the same order via the existing GET /orders/:id and shows it in its own small
+  // read-only Dialog (same key/value shape as the table's own drawer, via toOrderRow below).
+  const [searchParams] = useSearchParams();
+  const orderIdParam = searchParams.get('orderId');
+  const [deepLinkOrder, setDeepLinkOrder] = useState<Order | null>(null);
+  const [deepLinkError, setDeepLinkError] = useState('');
+  const deepLinkDialogRef = useRef<MdDialog>(null);
+
+  useEffect(() => {
+    if (!orderIdParam) return;
+    getOrder(token, orderIdParam)
+      .then(({ data }) => {
+        setDeepLinkOrder(data);
+        deepLinkDialogRef.current?.show();
+      })
+      .catch((err) => setDeepLinkError(err instanceof ApiRequestError ? err.message : 'Could not load this order.'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderIdParam]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -274,6 +296,22 @@ export function OrderManagement() {
               {statusSubmitting ? 'Saving…' : 'Save'}
             </FilledButton>
           )}
+        </div>
+      </Dialog>
+
+      <Dialog ref={deepLinkDialogRef} onClose={() => setDeepLinkOrder(null)}>
+        <div slot="headline">Order detail</div>
+        <div slot="content" className="form-grid">
+          {deepLinkError && <p className="error-state" role="alert">{deepLinkError}</p>}
+          {deepLinkOrder &&
+            Object.entries(toOrderRow(deepLinkOrder)).map(([key, value]) => (
+              <p key={key} className="field-hint">
+                <strong>{key}:</strong> {value}
+              </p>
+            ))}
+        </div>
+        <div slot="actions">
+          <TextButton onClick={() => deepLinkDialogRef.current?.close()}>Close</TextButton>
         </div>
       </Dialog>
     </div>

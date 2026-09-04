@@ -153,15 +153,6 @@
         "order": 2
       },
       {
-        "id": "masters-category-types",
-        "title": "Category Types",
-        "icon": "category",
-        "route": "/account/masters/category-types",
-        "permissionKey": "masters.categories",
-        "parent": "masters",
-        "order": 3
-      },
-      {
         "id": "masters-tags",
         "title": "Marketing Tags",
         "icon": "sell",

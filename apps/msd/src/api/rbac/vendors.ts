@@ -29,6 +29,7 @@ export type VendorDocumentType = 'GST' | 'PAN' | 'AADHAAR';
 export interface VendorDocument {
   id: string;
   documentType: VendorDocumentType;
+  storageKey: string;
   originalFilename: string | null;
   mimeType: string;
   sizeBytes: number;
@@ -261,6 +262,8 @@ export interface Deal {
   /** Only meaningful for a service deal (bookable duration) — never required for a product deal. */
   durationMinutes?: number | null;
   termsAndConditions?: string | null;
+  notes?: string | null;
+  policy?: string | null;
   images?: string[] | null;
   maxBookings?: number | null;
   availableBookings?: number | null;
@@ -324,6 +327,8 @@ export interface DealInput {
   discountPercent?: number;
   durationMinutes?: number;
   termsAndConditions?: string;
+  notes?: string;
+  policy?: string;
   images?: string[];
   maxBookings?: number;
   availableBookings?: number;

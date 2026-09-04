@@ -544,6 +544,22 @@ export function DealDetail() {
               </sky-accordion-item>
             )}
 
+            {deal.notes && (
+              <sky-accordion-item header="Notes">
+                <p className="deal-detail__desc">
+                  {deal.notes}
+                </p>
+              </sky-accordion-item>
+            )}
+
+            {deal.policy && (
+              <sky-accordion-item header="Policy">
+                <p className="deal-detail__policy">
+                  {deal.policy}
+                </p>
+              </sky-accordion-item>
+            )}
+
             <sky-accordion-item
               header={
                 dealDetail.cancellationPolicy
@@ -553,6 +569,14 @@ export function DealDetail() {
                 {dealDetail.cancellationText}
               </p>
             </sky-accordion-item>
+
+            {deal.termsAndConditions && (
+              <sky-accordion-item header="Terms & Conditions">
+                <p className="deal-detail__policy">
+                  {deal.termsAndConditions}
+                </p>
+              </sky-accordion-item>
+            )}
           </sky-accordion>
         </div>
       </div>

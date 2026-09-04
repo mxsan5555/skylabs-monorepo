@@ -64,6 +64,10 @@ const baseProductDealBody = { categoryId: PRODUCT_CATEGORY_ID, title: 'Face Crea
 beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.auditLog.create.mockResolvedValue({});
+  // createDeal now also calls notifySuperAdmins for a vendor (non-admin) submission — harmless
+  // default (zero superadmins to notify) for every test in this file that isn't specifically
+  // asserting notification behavior (see the dedicated describe block below).
+  prismaMock.user.findMany.mockResolvedValue([]);
 });
 
 describe('GET /api/v1/vendors/me', () => {
@@ -916,6 +920,76 @@ describe('Deal offering integration (direct category access)', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.salePrice).toBe('249.00');
     expect(prismaMock.vendorCategoryAccess.findUnique).not.toHaveBeenCalled();
+  });
+
+  describe('Superadmin notification on vendor deal submission', () => {
+    it('a vendor (non-admin) creating a deal notifies every Superadmin — DEAL_PENDING_APPROVAL, PENDING approvalStatus', async () => {
+      resolveMock.mockResolvedValue(['vendors:custom']);
+      prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture); // both getMyVendorOrThrow AND the notification's own businessName lookup
+      prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
+      prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(serviceGrantFixture);
+      prismaMock.deal.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+        Promise.resolve({ id: DEAL_A_ID, ...data }),
+      );
+      prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_A_ID, vendorId: VENDOR_A_ID, approvalStatus: 'PENDING', packages: [] });
+      prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }, { id: 'superadmin-2' }]);
+
+      const res = await request(app)
+        .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals`)
+        .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+        .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
+
+      expect(res.status).toBe(201);
+      expect(prismaMock.notification.create).toHaveBeenCalledTimes(2); // one per Superadmin user
+      expect(prismaMock.notification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            recipientUserId: 'superadmin-1',
+            recipientType: 'SUPERADMIN',
+            type: 'DEAL_PENDING_APPROVAL',
+            title: 'New Deal Pending Approval',
+            message: expect.stringContaining('Vendor A Spa'),
+            entityType: 'DEAL',
+            entityId: DEAL_A_ID,
+          }),
+        }),
+      );
+    });
+
+    it('an admin-created (auto-approved) deal does NOT notify any Superadmin', async () => {
+      resolveMock.mockResolvedValue(['vendors:create']);
+      prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
+      prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(serviceGrantFixture);
+      prismaMock.deal.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+        Promise.resolve({ id: DEAL_A_ID, ...data }),
+      );
+      prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_A_ID, approvalStatus: 'APPROVED', packages: [] });
+      prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
+
+      const res = await request(app)
+        .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+        .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
+
+      expect(res.status).toBe(201);
+      expect(prismaMock.notification.create).not.toHaveBeenCalled();
+    });
+
+    it('a deal creation that fails validation (no category access) creates zero notifications — never a stray row on a rolled-back deal', async () => {
+      resolveMock.mockResolvedValue(['vendors:custom']);
+      prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+      prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
+      prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(null); // no grant -> rejected before the transaction even opens
+
+      const res = await request(app)
+        .post(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals`)
+        .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+        .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
+
+      expect(res.status).toBe(422);
+      expect(prismaMock.deal.create).not.toHaveBeenCalled();
+      expect(prismaMock.notification.create).not.toHaveBeenCalled();
+    });
   });
 });
 

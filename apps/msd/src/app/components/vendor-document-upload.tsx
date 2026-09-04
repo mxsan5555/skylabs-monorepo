@@ -9,6 +9,7 @@ import {
   type VendorDocumentType,
 } from '../../api/rbac/vendors';
 import { ApiRequestError } from '../../api/rbac/client';
+import { resolveMediaUrl } from '../../api/media';
 import './vendor-document-upload.css';
 
 const DOCUMENT_MAX_BYTES = 5 * 1024 * 1024;
@@ -163,6 +164,15 @@ export function VendorDocumentUpload({
               {document && ' — uploaded'}
             </span>
           </div>
+          {document && (
+            // Same link serves both "View" (self-service) and Superadmin's "View/Download" KYC
+            // review requirement — a same-tab open lets the browser handle PDF preview or
+            // download per its own MIME handling, matching every other media link in this app.
+            <OutlinedButton href={resolveMediaUrl(document.storageKey)} target="_blank" rel="noreferrer">
+              <Icon slot="icon" aria-hidden="true">visibility</Icon>
+              View
+            </OutlinedButton>
+          )}
           <OutlinedButton onClick={() => inputRef.current?.click()} disabled={busy}>
             <Icon slot="icon" aria-hidden="true">upload_file</Icon>
             Replace

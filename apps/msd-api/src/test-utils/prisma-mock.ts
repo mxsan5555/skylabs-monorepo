@@ -309,6 +309,12 @@ export function createPrismaMock() {
       aggregate: vi.fn(),
       groupBy: vi.fn(),
     },
+    notification: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+      updateMany: vi.fn(),
+    },
     // Default behavior mirrors real Prisma: array-form runs the (already-invoked, since JS
     // evaluates arguments eagerly) promises concurrently; callback-form invokes the callback
     // with the same mock standing in for `tx`. Override with mockResolvedValueOnce/etc. per test.

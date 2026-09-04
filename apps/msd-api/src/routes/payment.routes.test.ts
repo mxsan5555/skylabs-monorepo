@@ -59,6 +59,11 @@ function signWebhook(body: unknown): string {
 beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.auditLog.create.mockResolvedValue({});
+  // Every successful payment path now also calls notifyOrderConfirmed (see notification.service.ts)
+  // — harmless no-op defaults here (zero order items -> zero vendors to notify, zero superadmins)
+  // for every test in this file that isn't specifically asserting notification behavior.
+  prismaMock.orderItem.findMany.mockResolvedValue([]);
+  prismaMock.user.findMany.mockResolvedValue([]);
 });
 
 describe('POST /api/v1/orders/me/:id/pay', () => {
@@ -198,6 +203,61 @@ describe('POST /api/v1/orders/me/:id/pay-cod', () => {
     expect(prismaMock.payment.create).not.toHaveBeenCalled();
   });
 
+  describe('order-confirmed notifications', () => {
+    it('a successful COD confirmation notifies the order\'s vendor(s) + Superadmin', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(orderFixture);
+      prismaMock.payment.create.mockResolvedValue({ ...paymentFixture, provider: 'COD', status: 'CREATED' });
+      prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
+      prismaMock.orderItem.findMany.mockResolvedValue([{ vendorId: 'vendor-1' }]);
+      prismaMock.vendor.findUnique.mockResolvedValue({ ownerUserId: 'vendor-1-owner' });
+      prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
+
+      const res = await request(app)
+        .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
+        .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+
+      expect(res.status).toBe(200);
+      expect(prismaMock.notification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ recipientUserId: 'vendor-1-owner', recipientType: 'VENDOR', type: 'ORDER_RECEIVED', entityType: 'ORDER', entityId: ORDER_ID }),
+        }),
+      );
+      expect(prismaMock.notification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ recipientUserId: 'superadmin-1', recipientType: 'SUPERADMIN', type: 'ORDER_RECEIVED' }),
+        }),
+      );
+    });
+
+    it('a multi-vendor order notifies each distinct vendor exactly once, never duplicated', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(orderFixture);
+      prismaMock.payment.create.mockResolvedValue({ ...paymentFixture, provider: 'COD', status: 'CREATED' });
+      prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
+      prismaMock.orderItem.findMany.mockResolvedValue([{ vendorId: 'vendor-A' }, { vendorId: 'vendor-A' }, { vendorId: 'vendor-B' }]);
+      prismaMock.vendor.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
+        Promise.resolve({ ownerUserId: where.id === 'vendor-A' ? 'owner-A' : 'owner-B' }),
+      );
+      prismaMock.user.findMany.mockResolvedValue([]);
+
+      const res = await request(app)
+        .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
+        .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+
+      expect(res.status).toBe(200);
+      const vendorNotifications = prismaMock.notification.create.mock.calls.filter(
+        ([arg]) => arg.data.recipientType === 'VENDOR',
+      );
+      expect(vendorNotifications).toHaveLength(2); // vendor-A once, vendor-B once — never 3
+    });
+
+    it('a rejected COD confirmation (not PENDING_PAYMENT) creates zero notifications', async () => {
+      prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
+      await request(app)
+        .post(`/api/v1/orders/me/${ORDER_ID}/pay-cod`)
+        .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+      expect(prismaMock.notification.create).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('POST /api/v1/orders/me/:id/verify-payment', () => {
@@ -513,6 +573,23 @@ describe('POST /api/v1/payments/webhook/razorpay', () => {
     expect(res.status).toBe(200);
     expect(prismaMock.payment.updateMany).not.toHaveBeenCalled();
     expect(prismaMock.order.updateMany).not.toHaveBeenCalled();
+    // Already-terminal (PAID) is filtered out before any write — a retry must never create a
+    // second notification for the same real confirmation event.
+    expect(prismaMock.notification.create).not.toHaveBeenCalled();
+  });
+
+  it('a real payment.captured event notifies the order\'s vendor(s) + Superadmin exactly once', async () => {
+    prismaMock.payment.findMany.mockResolvedValue([paymentFixture]);
+    prismaMock.payment.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.order.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.order.findMany.mockResolvedValue([orderFixture]);
+    prismaMock.orderItem.findMany.mockResolvedValue([{ vendorId: 'vendor-1' }]);
+    prismaMock.vendor.findUnique.mockResolvedValue({ ownerUserId: 'vendor-1-owner' });
+    prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
+    const signature = signWebhook(capturedEvent);
+    const res = await request(app).post('/api/v1/payments/webhook/razorpay').set('x-razorpay-signature', signature).send(capturedEvent);
+    expect(res.status).toBe(200);
+    expect(prismaMock.notification.create).toHaveBeenCalledTimes(2); // 1 vendor + 1 superadmin, never duplicated
   });
 
   it('never creates anything from an unknown/unrecognized providerOrderId — never trusts payload identifiers alone', async () => {
