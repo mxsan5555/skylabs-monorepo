@@ -9,7 +9,12 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 
 ## In progress
 
-- _(none)_
+### Deployment (Vercel) — code done, dashboard config pending
+- [ ] In Vercel, per project (msd, mera-driver): set Root Directory to the app
+      folder, Production Branch = `main`, attach the bought domain to Production,
+      add env vars (`VITE_API_URL` etc.) — see `DEPLOYMENT.md`
+- [ ] Validate the `../../` paths in `vercel.json` on a first preview deploy
+- [ ] Add the CI check as a required status check in branch protection
 
 ## Backlog
 
@@ -67,9 +72,7 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 ### Quality & ops
 - [ ] e2e tests (Playwright) for the auth flow — add `playwright.config.ts` at repo root (config template in `.claude/skills/skylabs-testing.md`)
 - [ ] Error tracking (Sentry free tier)
-- [ ] CI gates (GitHub Actions: lint + test + build)
 - [ ] `.env.example` per app and per API (msd-api, mera-driver-api) — see env var list in `.claude/skills/skylabs-auth.md` and `skylabs-api.md`
-- [ ] Fix `nx.json` `defaultBase` (`master` → `main`) if using `nx affected`
 
 ### AI dev team (`.claude/`)
 - [ ] Add `playwright.config.ts` at repo root so `skylabs-dev` can run e2e tests against both apps
@@ -120,6 +123,13 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] Accessibility: landmarks, labelled controls, `aria-hidden` icons, `autocomplete`, semantic destination pill, breadcrumb/list semantics
 - [x] SEO: per-route titles, default meta description, `noindex` on auth pages
 - [x] DRY: shared `layout.css` (shell + auth + admin), shared test setup, config-driven menus/forms
+
+### Deployment (Vercel + CI)
+- [x] `nx.json`: `defaultBase` `master` → `main` + `release` config (independent, conventional commits) — 2026-09-04
+- [x] `apps/msd/vercel.json` + `apps/mera-driver/vercel.json` (build/output/`nx-ignore`/SPA rewrite) — 2026-09-04
+- [x] `.github/workflows/ci.yml` — `nx affected -t lint test build` PR gate on develop/release/main — 2026-09-04
+- [x] `DEPLOYMENT.md` (source of truth + Mermaid flowchart) + root `README.md` — 2026-09-04
+- [x] Deployment docs into `CLAUDE.md` / `PLANNING.md` — 2026-09-04
 
 ### Docs
 - [x] `ARCHITECTURE.md`, `PLANNING.md`, `TASK.md`, updated `CLAUDE.md`

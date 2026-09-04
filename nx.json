@@ -1,7 +1,18 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
-  "defaultBase": "master",
+  "defaultBase": "main",
   "analytics": true,
+  "release": {
+    "projects": ["msd", "mera-driver"],
+    "projectsRelationship": "independent",
+    "version": {
+      "conventionalCommits": true
+    },
+    "changelog": {
+      "projectChangelogs": true,
+      "workspaceChangelog": false
+    }
+  },
   "plugins": [
     {
       "plugin": "@nx/js/typescript",
