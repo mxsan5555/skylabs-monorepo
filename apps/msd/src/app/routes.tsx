@@ -34,6 +34,7 @@ import { PopularTagManagement } from './pages/account/masters/popular-tags';
 import { ProductManagement } from './pages/account/products/products';
 import { OrderManagement } from './pages/account/orders/orders';
 import { Reports } from './pages/account/reports/reports';
+import { NotificationsPage } from './pages/account/notifications/notifications';
 import Search from './pages/search/search';
 import Category from './pages/category/category';
 import { CategoriesIndex } from './pages/categories/categories';
@@ -358,6 +359,11 @@ export function AppRoutes() {
             </RequirePermission>
           }
         />
+        {/* No RequirePermission wrapper — every authenticated console user (Vendor or Superadmin
+            alike) is entitled to their own notification inbox regardless of RBAC permissions;
+            deliberately not in shared-menu's sidebar either, reachable only via the header
+            bell's "View all notifications" link (see notification-bell.tsx). */}
+        <Route path="/account/notifications" element={<NotificationsPage />} />
         <Route
           path="/account/masters/categories"
           element={
@@ -376,14 +382,6 @@ export function AppRoutes() {
           }
         />
 
-        <Route
-          path="/account/masters/category-types"
-          element={
-            <RequirePermission menuKey="masters.categories">
-              <CategoryManagement scope="leaf" />
-            </RequirePermission>
-          }
-        />
          <Route
           path="/account/masters/deals"
           element={

@@ -22,6 +22,7 @@ import productsRoutes from './routes/products.routes';
 import inventoryRoutes from './routes/inventory.routes';
 import reportsRoutes from './routes/reports.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import notificationsRoutes from './routes/notifications.routes';
 
 /**
  * The Express app, wired up but not listening. Split out of main.ts so Supertest can
@@ -68,6 +69,7 @@ export function createApp(): express.Express {
   api.use('/inventory', inventoryRoutes);
   api.use('/reports', reportsRoutes);
   api.use('/dashboard', dashboardRoutes);
+  api.use('/notifications', notificationsRoutes);
 
   app.use('/api/v1', api);
 

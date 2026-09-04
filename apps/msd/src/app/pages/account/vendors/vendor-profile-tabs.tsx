@@ -6,13 +6,15 @@ import { MediaUploader } from '../../../components/media-uploader';
 
 type VendorProfileTab = VendorFormSection | 'media';
 
-// Owner Information and Address are deliberately not tabs here — a self-service vendor no
-// longer edits them from this Vendor Profile UI (Branch already carries its own address; owner
-// info is still collected/reviewed wherever KYC/onboarding actually needs it — the admin
-// onboarding wizard's Step 1, see vendor-pipeline.tsx — never removed from VendorProfileForm
-// itself, only from this tab list).
+// Every VendorProfileForm section is its own tab here — Superadmin's Create/Edit Vendor form
+// (vendor-pipeline.tsx Step 1) and this self-service "My Profile" editor must expose the exact
+// same fields (same labels, same validation, same KYC handling) per this app's "no duplicate
+// vendor profile form" rule — only the layout differs (a tab bar here vs. all sections at once
+// in the onboarding wizard), never the field set.
 const TAB_DEFS: { key: VendorProfileTab; label: string }[] = [
   { key: 'business', label: 'Business Information' },
+  { key: 'owner', label: 'Owner Information' },
+  { key: 'address', label: 'Address' },
   { key: 'kyc', label: 'KYC & Documents' },
   { key: 'bank', label: 'Bank Information' },
   { key: 'media', label: 'Profile Image' },
@@ -20,17 +22,17 @@ const TAB_DEFS: { key: VendorProfileTab; label: string }[] = [
 
 /**
  * The Business/Owner/Address/KYC/Bank/Profile-Image tabbed editor for an *existing* Vendor row
- * — now used only by self-service `VendorBusinessProfile` (the caller's own vendor,
- * `/vendors/me/*`). The admin surface (`VendorPipeline`, `/account/vendors/new` and the Vendor
- * Management "Overview" tab) moved off this tabbed layout onto a proper 6-step onboarding
- * wizard (`vendor-pipeline.tsx`) — its Step 1 renders `VendorProfileForm` directly (all
- * sections at once, no tab bar) instead of reusing this component. All tabs here are still
- * freely switchable — no artificial step-locking — since each tab independently PATCHes just
- * its own section via the existing `VendorProfileForm`; there is no meaningful "must finish tab
- * N before tab N+1" ordering once the vendor row itself exists. The "Profile Image" tab is the
- * one exception: it doesn't render `VendorProfileForm` at all, it renders the same
- * `MediaUploader` already used for Deal/Product/Therapist (see that component's own doc comment)
- * with `entityType="vendor"`.
+ * — used by self-service `VendorBusinessProfile` (the caller's own vendor, `/vendors/me/*`).
+ * The admin surface (`VendorPipeline`, `/account/vendors/new` and the Vendor Management
+ * "Overview" tab) moved off this tabbed layout onto a proper 6-step onboarding wizard
+ * (`vendor-pipeline.tsx`) — its Step 1 renders `VendorProfileForm` directly (all sections at
+ * once, no tab bar) instead of reusing this component, but exposes the identical section set.
+ * All tabs here are freely switchable — no artificial step-locking — since each tab
+ * independently PATCHes just its own section via the existing `VendorProfileForm`; there is no
+ * meaningful "must finish tab N before tab N+1" ordering once the vendor row itself exists. The
+ * "Profile Image" tab is the one exception: it doesn't render `VendorProfileForm` at all, it
+ * renders the same `MediaUploader` already used for Deal/Product/Therapist (see that
+ * component's own doc comment) with `entityType="vendor"`.
  */
 export function VendorProfileTabs({
   vendor,

@@ -33,6 +33,7 @@ import {
 import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR } from '../../../utils/format';
 import { resolveDealMedia, primaryImage } from '../../../utils/media';
+import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import content from '../../../content.json';
 import './search.css';
 import { Map } from '../../components/map';
@@ -153,6 +154,7 @@ export function Search() {
   const [deals, setDeals] = useState<CatalogDeal[]>([]);
   const [dealsLoading, setDealsLoading] = useState(true);
   const [dealsError, setDealsError] = useState('');
+  const { coords } = useCurrentLocation();
 
   useEffect(() => {
     // Wait for categories to resolve slug → id before fetching, so a
@@ -168,12 +170,14 @@ export function Search() {
       state: selectedState || undefined,
       city: selectedCity || undefined,
       pageSize: 100,
+      latitude: coords?.latitude,
+      longitude: coords?.longitude,
     })
       .then(({ data }) => setDeals(data))
       .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : searchContent.errors.loadDeals))
       .finally(() => setDealsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedCategoryEntry?.id, suggested, priceMax, selectedState, selectedCity, categoriesLoading]);
+  }, [query, selectedCategoryEntry?.id, suggested, priceMax, selectedState, selectedCity, categoriesLoading, coords?.latitude, coords?.longitude]);
 
   function selectCategory(slug: string) {
     setSelectedCategory(slug);
@@ -493,6 +497,8 @@ export function Search() {
                         heading={deal.product?.name ?? deal.title}
                         eyebrow={[deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · ')}
                         eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
+                        location={deal.branch?.city ?? undefined}
+                        distance={deal.distanceKm != null ? `${(Math.round(deal.distanceKm * 10) / 10)} km` : undefined}
                         priceNote={deal.durationMinutes ? `${deal.durationMinutes}${searchContent.labels.durationSuffix}` : undefined}
                         price={formatINR(Number(deal.salePrice))}
                         originalPrice={

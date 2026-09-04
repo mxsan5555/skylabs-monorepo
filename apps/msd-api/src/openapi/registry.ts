@@ -56,6 +56,7 @@ import { CartAddItemSchema, CartUpdateItemSchema } from '../schemas/cart.schema'
 import { WishlistAddItemSchema } from '../schemas/wishlist.schema';
 import { OrderCheckoutSchema, OrderCustomerCancelSchema, OrderStatusUpdateSchema } from '../schemas/order.schema';
 import { VerifyPaymentSchema, OrderBatchSchema, VerifyBatchPaymentSchema } from '../schemas/payment.schema';
+import { NotificationListQuerySchema } from '../schemas/notification.schema';
 import { DashboardStatsResponseSchema } from '../schemas/dashboard.schema';
 import { MediaReorderSchema } from '../schemas/media.schema';
 
@@ -1651,6 +1652,37 @@ export function buildOpenApiDocument() {
       200: { description: 'Aggregate stats', content: { 'application/json': { schema: DashboardStatsResponseSchema } } },
       403: errorResponse,
     },
+  });
+
+  // ─── Notifications (caller's own inbox — ownership-scoped, not RBAC-scoped) ──
+
+  registry.registerPath({
+    method: 'get',
+    path: '/notifications',
+    summary: "List the caller's own notifications, newest first",
+    tags: ['Notifications'],
+    security: bearer,
+    request: { query: NotificationListQuerySchema },
+    responses: { 200: { description: 'Notifications' } },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/notifications/{id}/read',
+    summary: 'Mark one of the caller\'s own notifications as read',
+    tags: ['Notifications'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Updated' }, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/notifications/read-all',
+    summary: "Mark all of the caller's own notifications as read",
+    tags: ['Notifications'],
+    security: bearer,
+    responses: { 200: { description: 'Updated' } },
   });
 
   // ─── Customers (SuperAdmin/staff directory, `customers:view`) ────────────────

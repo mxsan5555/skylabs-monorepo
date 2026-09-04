@@ -32,7 +32,7 @@ router.get('/categories/:slug', validateParams(z.object({ slug: z.string().min(1
 
 router.get('/deals', validateQuery(CatalogDealQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, categoryId, subcategoryId, vendorId, branchId, type, search, state, city, sort, minPrice, maxPrice } =
+    const { page, pageSize, categoryId, subcategoryId, vendorId, branchId, type, search, state, city, sort, minPrice, maxPrice, latitude, longitude } =
       req.validatedQuery as ReturnType<typeof CatalogDealQuerySchema.parse>;
     const { items, total } = await catalogService.listPublicDeals({
       page,
@@ -48,6 +48,8 @@ router.get('/deals', validateQuery(CatalogDealQuerySchema), async (req, res, nex
       sort,
       minPrice,
       maxPrice,
+      latitude,
+      longitude,
     });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
@@ -82,9 +84,9 @@ router.get('/vendors/:slug', validateParams(z.object({ slug: z.string().min(1) }
 
 router.get('/therapists', validateQuery(CatalogTherapistQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, categoryId, subcategoryId, vendorId, branchId, search } =
+    const { page, pageSize, categoryId, subcategoryId, vendorId, branchId, search, latitude, longitude } =
       req.validatedQuery as ReturnType<typeof CatalogTherapistQuerySchema.parse>;
-    const { items, total } = await catalogService.listPublicTherapists({ page, pageSize, categoryId, subcategoryId, vendorId, branchId, search });
+    const { items, total } = await catalogService.listPublicTherapists({ page, pageSize, categoryId, subcategoryId, vendorId, branchId, search, latitude, longitude });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);

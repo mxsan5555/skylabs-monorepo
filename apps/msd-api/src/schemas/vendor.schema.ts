@@ -312,6 +312,8 @@ const DealFieldsSchema = z.object({
    *  vendor.service.ts's assertDurationRequiredForService). */
   durationMinutes: z.number().int().min(1).max(1440).optional(),
   termsAndConditions: z.string().max(5000).optional(),
+  notes: z.string().max(5000).optional(),
+  policy: z.string().max(5000).optional(),
   images: z.array(z.string().url()).optional(),
   maxBookings: z.number().int().min(0).optional(),
   availableBookings: z.number().int().min(0).optional(),

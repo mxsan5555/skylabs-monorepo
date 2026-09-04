@@ -242,6 +242,44 @@ describe('GET /api/v1/catalog/deals', () => {
     );
   });
 
+  it('latitude/longitude present: computes real distanceKm per branch and sorts nearest-first, ignoring page skip/take (full-set sort)', async () => {
+    // Gorakhpur (near) vs. Delhi (far) — a customer standing at the Gorakhpur coordinates should
+    // see the Gorakhpur-branch deal first with a small distanceKm, the Delhi one after it with a
+    // much larger one, regardless of `findMany`'s own array order (never a fabricated ordering).
+    const nearDeal = { ...serviceDealFixture, id: 'near-deal', branch: { ...serviceDealFixture.branch, latitude: '26.7606', longitude: '83.3732' } };
+    const farDeal = { ...productDealFixture, id: 'far-deal', branch: { ...productDealFixture.branch, latitude: '28.6139', longitude: '77.2090' } };
+    prismaMock.deal.findMany.mockResolvedValue([farDeal, nearDeal]);
+    prismaMock.deal.count.mockResolvedValue(2);
+    const res = await request(app).get('/api/v1/catalog/deals?latitude=26.7606&longitude=83.3732');
+    expect(res.status).toBe(200);
+    expect(res.body.data.map((d: { id: string }) => d.id)).toEqual(['near-deal', 'far-deal']);
+    expect(res.body.data[0].distanceKm).toBeCloseTo(0, 1);
+    expect(res.body.data[1].distanceKm).toBeGreaterThan(500);
+    // The full matching set is fetched (no skip/take) so distance sort/pagination is correct
+    // across the whole result set, not just whatever page-sized slice the DB would have returned.
+    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(expect.not.objectContaining({ skip: expect.anything(), take: expect.anything() }));
+  });
+
+  it('a branch with no coordinates gets distanceKm: null even when the caller supplies coordinates — never fabricated', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([serviceDealFixture]);
+    prismaMock.deal.count.mockResolvedValue(1);
+    const res = await request(app).get('/api/v1/catalog/deals?latitude=26.7606&longitude=83.3732');
+    expect(res.body.data[0].distanceKm).toBeNull();
+  });
+
+  it('omitting latitude/longitude leaves distanceKm null and preserves the original DB order/pagination (backward-compat regression guard)', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([serviceDealFixture]);
+    prismaMock.deal.count.mockResolvedValue(1);
+    const res = await request(app).get('/api/v1/catalog/deals');
+    expect(res.body.data[0].distanceKm).toBeNull();
+    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 0, take: expect.any(Number) }));
+  });
+
+  it('422s an out-of-range latitude instead of crashing', async () => {
+    const res = await request(app).get('/api/v1/catalog/deals?latitude=999&longitude=83.37');
+    expect(res.status).toBe(422);
+  });
+
   it('minPrice alone only sets gte (no lte key)', async () => {
     prismaMock.deal.findMany.mockResolvedValue([]);
     prismaMock.deal.count.mockResolvedValue(0);
@@ -347,7 +385,7 @@ describe('GET /api/v1/catalog/therapists', () => {
     prismaMock.therapist.count.mockResolvedValue(1);
     const res = await request(app).get('/api/v1/catalog/therapists');
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual([{ ...therapistFixture, popularTags: [] }]);
+    expect(res.body.data).toEqual([{ ...therapistFixture, popularTags: [], distanceKm: null }]);
     expect(prismaMock.therapist.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ isActive: true, vendor: { status: 'ACTIVE' }, branch: { isActive: true } }),

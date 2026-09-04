@@ -502,10 +502,9 @@ function SelfVendorManagement({ token }: { token: string | null }) {
       {message && <p className="field-hint" role="status">{message}</p>}
       {error && <p className="error-state" role="alert">{error}</p>}
 
-      {/* Owner Information and Address are intentionally excluded here — see
-          vendor-profile-tabs.tsx's own doc comment on why this self-service Vendor Profile UI
-          no longer shows those two sections (Branch already carries its own address; owner info
-          is still collected wherever KYC/onboarding actually needs it). */}
+      {/* Same field set as Superadmin's Create/Edit Vendor form (vendor-pipeline.tsx Step 1) —
+          this app's "no duplicate vendor profile form" rule means every section is present here
+          too, not a trimmed-down subset. */}
       <VendorProfileForm
         vendor={vendor}
         canEdit
@@ -513,7 +512,7 @@ function SelfVendorManagement({ token }: { token: string | null }) {
         saving={saving}
         token={token}
         selfService
-        sections={['business', 'kyc', 'bank']}
+        sections={['business', 'owner', 'address', 'kyc', 'bank']}
         onSave={save}
         onSubmitForVerification={submit}
         serverFieldErrors={fieldErrors}
