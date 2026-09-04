@@ -22,6 +22,7 @@ import {
   type VendorFields,
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { useToast } from '../../../../toast/toast-context';
 import { VendorList } from './vendor-list';
 import { VendorProfileForm, extractVendorFieldErrors, type VendorFieldErrors } from './vendor-profile-form';
 import { VendorBranches } from './vendor-branches';
@@ -126,6 +127,7 @@ function AdminVendorManagement({
   canDelete: boolean;
 }) {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [searchParams] = useSearchParams();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [total, setTotal] = useState(0);
@@ -282,7 +284,7 @@ function AdminVendorManagement({
     try {
       const { data } = await reviewVendorKyc(token, selectedVendor.id, kycStatus, rejectionReason);
       setVendors((prev) => prev.map((v) => (v.id === data.id ? data : v)));
-      setMessage(`KYC ${kycStatus.toLowerCase()}.`);
+      showToast(kycStatus === 'VERIFIED' ? 'KYC verified successfully.' : 'KYC rejected.');
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not review KYC.');
     }

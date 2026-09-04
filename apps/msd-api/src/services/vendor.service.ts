@@ -945,6 +945,11 @@ export async function listDeals(vendorId: string, branchId: string) {
       category: true,
       subcategory: true,
       product: true,
+      // Root cause of "packages not showing in Deal Edit": this list response (the only source
+      // the Edit dialog is ever populated from — there is no single-deal GET) omitted `packages`
+      // entirely, unlike `OFFERING_INCLUDE` below (used by create/update). `DealDialog` seeds its
+      // package-editor state straight from `deal.packages`, so it was always `undefined` → `[]`.
+      packages: { orderBy: DEAL_PACKAGE_ORDER_BY },
       mediaImages: { orderBy: DEAL_IMAGE_ORDER_BY },
       mediaVideo: true,
     },

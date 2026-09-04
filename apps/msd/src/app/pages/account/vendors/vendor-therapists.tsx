@@ -409,6 +409,7 @@ function TherapistFormDialog({
         <MediaUploader
           entityType="therapist"
           entityId={savedTherapist?.id ?? null}
+          selfService
           existingImages={savedTherapist?.mediaImages ?? []}
           existingVideo={savedTherapist?.mediaVideo ?? null}
           token={token}
