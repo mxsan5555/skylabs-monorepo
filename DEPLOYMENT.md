@@ -135,6 +135,23 @@ Nx output path.
 
 No secrets in `environment.*.ts` — public API base URL only.
 
+### Environment variables — where each one lives
+
+| Variable | Local (`.env.local`) | GitHub Actions | Vercel | Notes |
+|----------|:--------------------:|:--------------:|:------:|-------|
+| `VITE_API_URL` (msd) | ✅ dev value | ❌ | ✅ msd project (scope Prod vs Preview) | baked into the client bundle at build |
+| `VITE_GOOGLE_MAPS_API_KEY` (msd) | ✅ | ❌ | ✅ msd project | **public** — restrict by HTTP referrer in Google Cloud Console |
+| mera-driver API URL | ❌ (in `environment.ts`) | ❌ | ❌ (in `environment.prod.ts`) | compile-time; only needs Vercel vars if staging/dev split off |
+| API secrets (`DATABASE_URL`, JWT, OAuth, OTP mailer) | API's own `.env.local` | ❌ | ❌ | live on the **API host** (Railway/Fly), never Vercel/GitHub |
+
+- **Local:** only `apps/msd` needs a `.env.local` (copy `apps/msd/.env.example`).
+  mera-driver reads committed `environment.*.ts`, no local env file.
+- **GitHub Actions:** none required — CI runs `nx affected -t lint test build`,
+  which compiles fine with `VITE_*` unset (only relevant at deploy, not in CI).
+  Add a secret only if you later adopt Nx Cloud (`NX_CLOUD_ACCESS_TOKEN`).
+- **Vercel:** set the `VITE_*` vars on the **msd** project only. `VITE_*` values
+  ship to the browser — never store a real secret in one.
+
 ## Versioning (`nx release`)
 
 Apps aren't published to a registry, so `nx release` is purely for traceability:
