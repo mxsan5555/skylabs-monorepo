@@ -5,6 +5,7 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { AccountProvider } from '../../account/account-context';
 import { Sidebar } from '../admin/sidebar';
 import { findMenuNodeByRoute } from '../admin/menu-utils';
+import { NotificationBell } from '../components/notification-bell';
 
 /**
  * Console shell shown after login / "My account": permission-filtered sidebar
@@ -47,6 +48,7 @@ export function AdminLayout() {
                 {current && <li aria-current="page">{current.title}</li>}
               </ol>
             </nav>
+            <NotificationBell />
           </div>
           <main className="admin-content">
             <Outlet />

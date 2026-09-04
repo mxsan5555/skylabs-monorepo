@@ -65,7 +65,7 @@ export function VendorBusinessProfile() {
           saving={saving}
           token={token}
           selfService
-          sections={['business', 'owner', 'address', 'kyc']}
+          sections={['business', 'owner', 'address', 'kyc', 'bank']}
           onSave={save}
           serverFieldErrors={fieldErrors}
         />

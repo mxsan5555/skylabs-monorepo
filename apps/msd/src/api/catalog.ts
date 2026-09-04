@@ -73,6 +73,9 @@ export interface CatalogDeal {
   slug: string;
   shortDescription: string | null;
   description: string | null;
+  termsAndConditions: string | null;
+  notes: string | null;
+  policy: string | null;
   /** A synced "from price"/default-duration display cache (kept in sync with the cheapest
    *  active `packages[]` entry server-side — see DealPackage's own schema doc comment in
    *  msd-api) — accurate for listing/sort/filter display, but NEVER the authoritative cart/order
@@ -97,6 +100,11 @@ export interface CatalogDeal {
   mediaImages?: MediaImage[];
   mediaVideo?: MediaVideo | null;
   popularTags?: CatalogPopularTag[];
+  /** Real Haversine distance (km) to this deal's own branch coordinates, computed only when the
+   *  caller passed `latitude`/`longitude` to `listCatalogDeals` — `null` whenever either side's
+   *  coordinates are unavailable, never fabricated. Optional (not just nullable) since existing
+   *  test fixtures typed as `CatalogDeal` predate this field. */
+  distanceKm?: number | null;
 }
 
 /** `Branch.openingHours` shape — keys are lowercase 3-letter day codes (`mon`…`sun`), values are
@@ -139,6 +147,8 @@ export interface CatalogVendorTherapist {
 export interface CatalogTherapist extends CatalogVendorTherapist {
   vendor: { id: string; slug: string | null; businessName: string | null; city: string | null; logoUrl: string | null } | null;
   branch: { id: string; name: string; city: string | null; address: string | null; latitude: string | null; longitude: string | null } | null;
+  /** See `CatalogDeal`'s identical field doc comment. */
+  distanceKm?: number | null;
 }
 
 export interface CatalogVendorBranch {
@@ -196,6 +206,10 @@ export function listCatalogDeals(opts: {
   sort?: 'newest' | 'discount';
   minPrice?: number;
   maxPrice?: number;
+  /** From `useCurrentLocation`'s raw `coords` — when both are present, results come back
+   *  nearest-first with a real `distanceKm` per item; omitted → unchanged behavior. */
+  latitude?: number;
+  longitude?: number;
 } = {}) {
   return apiGet<CatalogDeal[]>(`/catalog/deals${toQuery(opts)}`, null);
 }
@@ -215,7 +229,18 @@ export function getCatalogVendor(slug: string, opts: { state?: string; city?: st
 }
 
 export function listCatalogTherapists(
-  opts: { page?: number; pageSize?: number; categoryId?: string; subcategoryId?: string; vendorId?: string; branchId?: string; search?: string } = {},
+  opts: {
+    page?: number;
+    pageSize?: number;
+    categoryId?: string;
+    subcategoryId?: string;
+    vendorId?: string;
+    branchId?: string;
+    search?: string;
+    /** See `listCatalogDeals`'s identical param doc comment. */
+    latitude?: number;
+    longitude?: number;
+  } = {},
 ) {
   return apiGet<CatalogTherapist[]>(`/catalog/therapists${toQuery(opts)}`, null);
 }

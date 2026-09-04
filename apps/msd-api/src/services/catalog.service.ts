@@ -6,6 +6,49 @@ import { getActiveTagNamesFor } from './popular-tag.service';
 
 type TagRef = { id: string; name: string; slug: string };
 
+/** Great-circle distance in kilometers between two lat/lng points — the one, reused distance
+ *  calculation for every "near me" catalog query (never a per-query reimplementation). */
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return earthRadiusKm * 2 * Math.asin(Math.sqrt(a));
+}
+
+/** Attaches `distanceKm` (real Haversine distance to the row's own `branch.latitude`/
+ *  `longitude`, `null` when either the caller's coordinates or the branch's own coordinates are
+ *  unavailable — never fabricated) to each row. When `latitude`/`longitude` are both supplied,
+ *  also sorts nearest-first (nulls — no branch coordinates — sorted last); otherwise returns the
+ *  rows in their original (already correctly ordered) order, matching every pre-existing caller
+ *  that never passes coordinates. */
+function withDistance<T extends { branch: { latitude: Prisma.Decimal | null; longitude: Prisma.Decimal | null } | null }>(
+  rows: T[],
+  latitude?: number,
+  longitude?: number,
+): (T & { distanceKm: number | null })[] {
+  const withDist = rows.map((row) => {
+    // `Number(decimal)` (not `.toNumber()`) — matches this codebase's existing Decimal-to-number
+    // convention (e.g. `Number(deal.salePrice)`), and works uniformly whether `branch.latitude`
+    // is a real Prisma Decimal instance or a plain string/number (as in this file's own tests).
+    const branchLat = row.branch?.latitude != null ? Number(row.branch.latitude) : null;
+    const branchLng = row.branch?.longitude != null ? Number(row.branch.longitude) : null;
+    const distanceKm =
+      latitude !== undefined && longitude !== undefined && branchLat !== null && branchLng !== null
+        ? haversineKm(latitude, longitude, branchLat, branchLng)
+        : null;
+    return { ...row, distanceKm };
+  });
+  if (latitude === undefined || longitude === undefined) return withDist;
+  return withDist.sort((a, b) => {
+    if (a.distanceKm === null) return b.distanceKm === null ? 0 : 1;
+    if (b.distanceKm === null) return -1;
+    return a.distanceKm - b.distanceKm;
+  });
+}
+
 /** Enriches Deal rows with `popularTags` (mapped via `PopularTagDeal`, keyed on the Deal's own
  *  id) and — separately, when a linked Product exists — the Product's OWN `popularTags` (mapped
  *  via `PopularTagProduct`, keyed on `Product.id`). A "Product" card on the storefront is
@@ -200,6 +243,9 @@ export const PUBLIC_DEAL_SELECT = {
   slug: true,
   shortDescription: true,
   description: true,
+  termsAndConditions: true,
+  notes: true,
+  policy: true,
   originalPrice: true,
   salePrice: true,
   discountPercent: true,
@@ -330,6 +376,12 @@ export async function listPublicDeals(opts: {
   sort?: 'newest' | 'discount';
   minPrice?: number;
   maxPrice?: number;
+  /** The customer's own browser-geolocation coordinates (see `useCurrentLocation`'s doc comment)
+   *  — reuses the vendor's/branch's already-existing `latitude`/`longitude` columns for the
+   *  distance calc, never persisted, never a new location model. Omitted → completely unchanged
+   *  behavior (byte-identical to every pre-existing caller). */
+  latitude?: number;
+  longitude?: number;
 }) {
   const where = {
     ...VISIBLE_DEAL_WHERE,
@@ -367,6 +419,24 @@ export async function listPublicDeals(opts: {
     opts.sort === 'discount'
       ? [{ discountPercent: { sort: 'desc' as const, nulls: 'last' as const } }]
       : { createdAt: 'desc' as const };
+  // With coordinates, "nearest first" replaces whatever `sort` would otherwise apply — there is
+  // no existing radius/city-state priority system to layer on top of (confirmed by research), so
+  // per this app's own "keep it simple" fallback rule this is a plain full-set distance sort, not
+  // a new business rule. Distance can't be computed/sorted in SQL without a raw query per row's
+  // Decimal lat/lng, and the realistic result-set size here is small, so the full matching set is
+  // fetched, sorted in memory, then paginated — never a per-page-only (and therefore wrong)
+  // nearest-first ordering.
+  if (opts.latitude !== undefined && opts.longitude !== undefined) {
+    const [allRows, total] = await Promise.all([
+      prisma.deal.findMany({ where, select: PUBLIC_DEAL_SELECT }),
+      prisma.deal.count({ where }),
+    ]);
+    const sorted = withDistance(allRows, opts.latitude, opts.longitude);
+    const page = sorted.slice((opts.page - 1) * opts.pageSize, (opts.page - 1) * opts.pageSize + opts.pageSize);
+    const items = await withDealPopularTags(page);
+    return { items, total };
+  }
+
   const [rows, total] = await Promise.all([
     prisma.deal.findMany({
       where,
@@ -377,7 +447,7 @@ export async function listPublicDeals(opts: {
     }),
     prisma.deal.count({ where }),
   ]);
-  const items = await withDealPopularTags(rows);
+  const items = await withDealPopularTags(withDistance(rows));
   return { items, total };
 }
 
@@ -451,6 +521,9 @@ export async function listPublicTherapists(opts: {
   vendorId?: string;
   branchId?: string;
   search?: string;
+  /** See `listPublicDeals`'s identical param doc comment. */
+  latitude?: number;
+  longitude?: number;
 }) {
   // Therapist has one FK (`specializationCategoryId`), not Deal's separate categoryId/
   // subcategoryId pair — per its schema doc comment it may point at a top-level THERAPY
@@ -485,6 +558,18 @@ export async function listPublicTherapists(opts: {
         }
       : {}),
   };
+  // See `listPublicDeals`'s identical "keep it simple" doc comment on this same branch.
+  if (opts.latitude !== undefined && opts.longitude !== undefined) {
+    const [allRows, total] = await Promise.all([
+      prisma.therapist.findMany({ where, select: PUBLIC_THERAPIST_LISTING_SELECT }),
+      prisma.therapist.count({ where }),
+    ]);
+    const sorted = withDistance(allRows, opts.latitude, opts.longitude);
+    const page = sorted.slice((opts.page - 1) * opts.pageSize, (opts.page - 1) * opts.pageSize + opts.pageSize);
+    const items = await withTherapistPopularTags(page);
+    return { items, total };
+  }
+
   const [rows, total] = await Promise.all([
     prisma.therapist.findMany({
       where,
@@ -495,7 +580,7 @@ export async function listPublicTherapists(opts: {
     }),
     prisma.therapist.count({ where }),
   ]);
-  const items = await withTherapistPopularTags(rows);
+  const items = await withTherapistPopularTags(withDistance(rows));
   return { items, total };
 }
 

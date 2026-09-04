@@ -3,7 +3,6 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { ListItem, List, FilledTonalIconButton, FilledButton, TextButton, Icon, Tabs, SecondaryTab, OutlinedTextField, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { DEALS } from '../../../data/deals';
 import { listCatalogCategories, listCatalogDeals, type CatalogCategoryWithChildren, type CatalogDeal } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
@@ -13,7 +12,6 @@ import content from '../../../content.json';
 import './home.css';
 
 import { useCurrentLocation } from "../../../hooks/useCurrentLocation";
-import Map from "../../components/map/map";
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 const { home } = content;
 const premiumHero = home.premiumHero;
@@ -21,9 +19,11 @@ const heroImages = home.heroImages as string[];
 
 /**
  * Adapts a real `CatalogDeal` into the shape `DealCard` renders. Real deals carry no
- * rating/reviews/distance/location/badge (no such fields exist on the real `Deal` model) — those
- * are simply left `undefined` here rather than fabricated; `SkyProductCardWC` already renders
- * nothing for an absent optional prop.
+ * rating/reviews (no such fields exist on the real `Deal` model) — those stay `undefined` here
+ * rather than fabricated. `location`/`distance` ARE real when available: `location` is the
+ * deal's own branch city, `distance` is the real Haversine `distanceKm` computed server-side only
+ * when the caller's coordinates were sent (see `useCurrentLocation`) — both stay `undefined`
+ * rather than a fake placeholder when the underlying data isn't there.
  *
  * A Deal is a **product** deal iff it has a linked `product` — the old `Service` master row (and
  * `Deal.service`) no longer exists (see the direct-category-access migration), a **service** deal
@@ -42,6 +42,8 @@ function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
     gallery: media.images.length > 0 ? media.images : undefined,
     video: media.video,
     providerName: deal.vendor?.businessName ?? undefined,
+    location: deal.branch?.city ?? undefined,
+    distance: deal.distanceKm != null ? Math.round(deal.distanceKm * 10) / 10 : undefined,
     price: salePrice,
     originalPrice: originalPrice && originalPrice !== salePrice ? originalPrice : undefined,
     discount: deal.discountPercent ?? undefined,
@@ -74,7 +76,6 @@ export function Home() {
   const { toggle, has } = useWishlist();
   const spaFinder = content.home.spaFinderHero;
   const [selectedTab, setSelectedTab] = useState('all');
-  const spaFinderDeals = DEALS.slice(0, spaFinder.mapDealsLimit);
   const [categories, setCategories] = useState<CatalogCategoryWithChildren[]>([]);
   const [dealsData, setDealsData] = useState<CatalogDeal[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -84,12 +85,14 @@ export function Home() {
   const [suggestions, setSuggestions] = useState<CatalogDeal[]>([]);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
-  const { location } = useCurrentLocation();
+  const { location, coords } = useCurrentLocation();
   const shortLocation = location?.split(",")[2]?.trim() ?? location;
 
-  // Single batched fetch on mount — every section below (category grid, featured, hot, the
-  // per-popular-category carousels, and each category card's deal count) derives from these two
-  // already-fetched arrays via client-side grouping/filtering, never a per-section API call.
+  // Single batched fetch — re-runs the moment real coordinates arrive (permission granted after
+  // the first render, or denied/unavailable and staying null forever) so the page refreshes to
+  // nearest-first data without a full reload; every section below (category grid, featured, hot,
+  // the per-popular-category carousels, and each category card's deal count) derives from these
+  // two already-fetched arrays via client-side grouping/filtering, never a per-section API call.
   // Includes both services and products (real Cart Add-to-Cart action needs real product deals
   // to attach to) — `DealCard`'s `href`/`isProduct` correctly routes each to `/deal/:id` or
   // `/products/:id`.
@@ -99,7 +102,7 @@ export function Home() {
     setCatalogError('');
     Promise.all([
       listCatalogCategories(),
-      listCatalogDeals({ pageSize: 100 }),
+      listCatalogDeals({ pageSize: 100, latitude: coords?.latitude, longitude: coords?.longitude }),
     ])
       .then(([categoriesRes, dealsRes]) => {
         if (cancelled) return;
@@ -116,7 +119,7 @@ export function Home() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [coords?.latitude, coords?.longitude]);
 
   // "Featured" = newest real deals — no `isFeatured` flag exists on the real `Deal` model. The
   // batched fetch above already comes back in the backend's default `sort=newest` order, so this
@@ -302,103 +305,6 @@ export function Home() {
       <meta name="description" content={content.meta.home.description} />
       {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
       {actionError && <p className="error-state" role="alert">{actionError}</p>}
-      {   /*spafinder like*/}
-      {false && (
-        <section className="home__spa-finder">
-          <div className="home__spa-finder-left">
-            <span className="home__spa-badge">  {spaFinder.title}</span>
-            <h2 className="home__spa-title"> {spaFinder.heading} </h2>
-            <p className="home__spa-subtitle"> {spaFinder.subheading} </p>
-            <Tabs className="home__spa-tabs">
-              {spaFinder.tabs.map((tab: any) => (
-                <SecondaryTab key={tab.label} active={tab.label === spaFinder.defaultTab}>
-                  <Icon slot="icon">{tab.icon}</Icon>
-                  {tab.label}
-                </SecondaryTab>
-              ))}
-            </Tabs>
-            <sky-card variant="filled" className="home__spa-search-card">
-              <form
-                className="home__spa-search"
-                role="search"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (searchQuery.trim()) { navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`); }
-                  else { navigate("/explore"); }
-                  setShowSuggestions(false);
-                }}
-              >
-                <TextButton type="button" className="home__spa-location" >
-                  <Icon>location_on</Icon>
-                  <span>{shortLocation ?? spaFinder.search.locationPlaceholder}</span>
-                </TextButton>
-                <div className="home__spa-search-input">
-                  <OutlinedTextField
-                    className="premium-field"
-                    value={searchQuery}
-                    label={spaFinder.search.servicePlaceholder}
-                    onInput={(e) => {
-                      const target = e.currentTarget as HTMLInputElement;
-                      setSearchQuery(target.value);
-                      setShowSuggestions(true);
-                    }}
-                  >
-                    <Icon slot="leading-icon">  search </Icon>
-                    {searchQuery && (
-                      <Icon
-                        slot="trailing-icon"
-                        style={{ cursor: "pointer" }}
-                        onClick={() => setSearchQuery("")}
-                      >
-                        close
-                      </Icon>
-                    )}
-                  </OutlinedTextField>
-                  {showSuggestions && (
-                    <List className="search-suggestions">
-                      {suggestions.length > 0 ? (
-                        suggestions.map((deal) => (
-                          <ListItem
-                            key={deal.id}
-                            type="button"
-                            onClick={() => {
-                              navigate(deal.product ? `/products/${deal.id}` : `/deal/${deal.id}`);
-                              setSearchQuery("");
-                              setShowSuggestions(false);
-                            }}
-                          >
-                            <Icon slot="start">  search </Icon>
-                            <div>
-                              <strong>{deal.product?.name ?? deal.title}</strong>
-                              <small> {deal.vendor?.businessName} • {deal.branch?.city} </small>
-                            </div>
-                          </ListItem>
-                        ))
-                      ) : (
-                        <ListItem disabled>  {home.ui.messages.loading}</ListItem>
-                      )}
-                    </List>
-                  )}
-                </div>
-                <FilledButton type="submit"> Search
-                  <Icon slot="trailing-icon">  arrow_forward </Icon>
-                </FilledButton>
-              </form>
-
-            </sky-card>
-            <div className="home__spa-popular">
-              {spaFinder.popular.map((item: string) => (
-                <AssistChip key={item}> {item} </AssistChip>
-              ))}
-            </div>
-          </div>
-          <div className="home__spa-finder-right">
-            <Map deals={spaFinderDeals} />
-          </div>
-        </section>
-      )}
-      {/*premm-hero*/}
-      {/* {false && ( */}
       <section className="home__premium-hero">
         <div className="home__premium-content">
           <div className="home__premium-left">
@@ -524,7 +430,6 @@ export function Home() {
           </div>
         </div>
       </section>
-      {/* )} */}
       {/* ── Hero / Search ──────────────────────────────────────────────── */}
       {false && (
         <section className="home__hero" aria-labelledby="hero-heading">

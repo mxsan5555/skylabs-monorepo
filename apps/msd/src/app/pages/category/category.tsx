@@ -26,6 +26,7 @@ import { Breadcrumb } from '../../components/breadcrumb';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { formatINR } from '../../../utils/format';
 import { resolveDealMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
+import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import './category.css';
 import content from '../../../content.json';
 
@@ -68,6 +69,7 @@ export function Category() {
   const [dealsLoading, setDealsLoading] = useState(true);
   const [dealsError, setDealsError] = useState('');
   const [therapists, setTherapists] = useState<CatalogTherapist[]>([]);
+  const { coords } = useCurrentLocation();
 
   useEffect(() => {
     setCategoryLoading(true);
@@ -123,6 +125,8 @@ export function Category() {
         subcategoryId: activeSubcategory?.id,
         search: search || undefined,
         pageSize: 60,
+        latitude: coords?.latitude,
+        longitude: coords?.longitude,
       })
         .then(({ data }) => setTherapists(data))
         .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : content.category.errors.loadDeals))
@@ -138,12 +142,14 @@ export function Category() {
       type: category.type === 'PRODUCT' ? 'product' : 'service',
       search: search || undefined,
       pageSize: 60,
+      latitude: coords?.latitude,
+      longitude: coords?.longitude,
     })
       .then(({ data }) => setDeals(data))
       .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : content.category.errors.loadDeals))
       .finally(() => setDealsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, activeSubcategory?.id, search]);
+  }, [category, activeSubcategory?.id, search, coords?.latitude, coords?.longitude]);
 
   if (categoryLoading) {
     return <p className="loading-state"> {content.category.loading}</p>;
@@ -235,17 +241,19 @@ export function Category() {
               <ul className="category-page__grid">
                 {therapists.map((t) => {
                   const price = therapistFromPrice(t);
-                  const details = [t.vendor?.businessName, price != null ? `From ${formatINR(price)}` : 'Contact for pricing']
-                    .filter(Boolean)
-                    .join(' · ');
                   return (
                     <li key={t.id}>
-                      <sky-category-card
+                      <SkyProductCardWC
                         image={primaryImage(resolveTherapistMedia(t))}
+                        eyebrow={t.personName}
+                        eyebrowHref={t.vendor?.slug ? `/vendor/${t.vendor.slug}` : undefined}
                         heading={t.therapistType}
-                        subheading={`${t.personName} · ${details}`}
-                        href={`/therapist/${t.id}`}
+                        location={t.branch?.city ?? undefined}
+                        distance={t.distanceKm != null ? `${(Math.round(t.distanceKm * 10) / 10)} km` : undefined}
                         tag={t.popularTags?.[0]?.name}
+                        pricePrefix={price != null ? 'From' : undefined}
+                        price={price != null ? formatINR(price) : undefined}
+                        href={`/therapist/${t.id}`}
                       />
                     </li>
                   );
@@ -275,6 +283,8 @@ export function Category() {
                       providerName: [deal.vendor?.businessName, deal.branch?.name]
                         .filter(Boolean)
                         .join(' · '),
+                      location: deal.branch?.city ?? undefined,
+                      distance: deal.distanceKm != null ? Math.round(deal.distanceKm * 10) / 10 : undefined,
                       price: Number(deal.salePrice),
                       originalPrice:
                         deal.originalPrice &&

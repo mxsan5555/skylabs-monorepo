@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listProducts, type Product } from '../../../../api/rbac/products';
-import { listCategories, type Category } from '../../../../api/rbac/categories';
 import { listVendors, type Vendor } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 
@@ -44,7 +43,6 @@ export function ProductManagement() {
   const { token } = useAuth();
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -78,11 +76,9 @@ export function ProductManagement() {
 
   useEffect(() => {
     // pageSize is capped at 100 server-side (PaginationQuerySchema) — 200 here 500s.
-    listCategories(token, { pageSize: 100 }).then(({ data }) => setCategories(data)).catch(() => setCategories([]));
     listVendors(token, { pageSize: 100 }).then(({ data }) => setVendors(data)).catch(() => setVendors([]));
   }, [token]);
 
-  const categoryName = useCallback((id: string) => categories.find((c) => c.id === id)?.name ?? id, [categories]);
   const vendorName = useCallback(
     (id: string) => vendors.find((v) => v.id === id)?.businessName ?? id,
     [vendors],
@@ -96,14 +92,14 @@ export function ProductManagement() {
           Name: product.name,
           Vendor: vendorName(product.vendorId),
           Brand: product.brand ?? '—',
-          Category: categoryName(product.categoryId),
-          Subcategory: product.subcategoryId ? categoryName(product.subcategoryId) : '—',
+          Category: product.category?.name ?? '—',
+          Subcategory: product.subcategory?.name ?? '—',
           Price: `₹${product.price}`,
           Discount: product.discount ? `${product.discount}%` : '—',
           Status: product.isActive ? 'Active' : 'Inactive',
         })),
       ),
-    [products, categoryName, vendorName],
+    [products, vendorName],
   );
 
   useEffect(() => {

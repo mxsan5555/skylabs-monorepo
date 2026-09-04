@@ -268,7 +268,7 @@ export function VendorPipeline({
             saving={saving}
             token={token}
             selfService={false}
-            sections={['business', 'owner', 'address', 'kyc']}
+            sections={['business', 'owner', 'address', 'kyc', 'bank']}
             saveLabel="Save"
             onSave={saveSection}
             onKycReview={onKycReview}

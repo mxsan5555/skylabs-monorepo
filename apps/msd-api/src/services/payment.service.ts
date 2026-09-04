@@ -5,6 +5,7 @@ import { env } from '../config/env';
 import { ApiError } from '../lib/http';
 import { Prisma } from '../generated/prisma-client';
 import { getMyOrderOrThrow, finalizeCartForOrder } from './order.service';
+import { notifyOrderConfirmed } from './notification.service';
 
 /**
  * Razorpay integration for the existing Order (Phase 8) — see the Phase 9 architecture plan.
@@ -116,6 +117,8 @@ export async function createCodPayment(customerId: string, orderId: string) {
     const updatedOrder = await tx.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } });
     // Finalizes the linked Cart's items — see finalizeCartForOrder's own doc comment.
     await finalizeCartForOrder(tx, updatedOrder.id);
+    // Notifies each vendor involved + Superadmin — see notifyOrderConfirmed's own doc comment.
+    await notifyOrderConfirmed(tx, updatedOrder.id);
     return { payment, updatedOrder };
   });
 
@@ -212,6 +215,8 @@ export async function createCodBatchPayment(customerId: string, orderIds: string
       const updatedOrder = await tx.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } });
       // Finalizes each linked Cart's items — see finalizeCartForOrder.
       await finalizeCartForOrder(tx, updatedOrder.id);
+      // Notifies each vendor involved + Superadmin — see notifyOrderConfirmed's own doc comment.
+      await notifyOrderConfirmed(tx, updatedOrder.id);
       results.push(updatedOrder);
     }
     return results;
@@ -277,6 +282,8 @@ export async function verifyBatchPayment(customerId: string, orderIds: string[],
       const updatedOrder = await tx.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } });
       // Finalizes each linked Cart's items — see finalizeCartForOrder.
       await finalizeCartForOrder(tx, updatedOrder.id);
+      // Notifies each vendor involved + Superadmin — see notifyOrderConfirmed's own doc comment.
+      await notifyOrderConfirmed(tx, updatedOrder.id);
       results.push(updatedOrder);
     }
     return results;
@@ -346,6 +353,8 @@ export async function verifyPayment(customerId: string, orderId: string, input: 
     const updatedOrder = await tx.order.update({ where: { id: order.id }, data: { status: 'CONFIRMED' } });
     // Finalizes the linked Cart's items — see finalizeCartForOrder.
     await finalizeCartForOrder(tx, updatedOrder.id);
+    // Notifies each vendor involved + Superadmin — see notifyOrderConfirmed's own doc comment.
+    await notifyOrderConfirmed(tx, updatedOrder.id);
     return { updatedPayment, updatedOrder };
   });
 
@@ -425,6 +434,8 @@ export async function handleWebhookEvent(body: RazorpayWebhookBody): Promise<voi
       const updatedOrders = await tx.order.findMany({ where: { id: { in: orderIds } } });
       for (const order of updatedOrders) {
         await finalizeCartForOrder(tx, order.id);
+        // Notifies each vendor involved + Superadmin — see notifyOrderConfirmed's own doc comment.
+        await notifyOrderConfirmed(tx, order.id);
       }
     });
   } else if (body.event === 'payment.failed') {

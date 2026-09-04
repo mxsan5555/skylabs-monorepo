@@ -22,6 +22,12 @@ export const CatalogDealQuerySchema = PaginationQuerySchema.extend({
   sort: z.enum(['newest', 'discount']).optional().default('newest'),
   minPrice: z.coerce.number().min(0).optional(),
   maxPrice: z.coerce.number().min(0).optional(),
+  /** The customer's own browser-geolocation coordinates (see `useCurrentLocation`) — when both
+   *  are present, results are re-sorted nearest-first by real distance to each result's own
+   *  branch coordinates (see `listPublicDeals`'s own doc comment); omitted → unchanged behavior.
+   *  Never persisted — used only for this request's own distance calc. */
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
 }).openapi('CatalogDealQuery');
 
 export const CatalogTherapistQuerySchema = PaginationQuerySchema.extend({
@@ -34,6 +40,9 @@ export const CatalogTherapistQuerySchema = PaginationQuerySchema.extend({
   vendorId: z.string().uuid().optional(),
   branchId: z.string().uuid().optional(),
   search: z.string().max(200).optional(),
+  /** See `CatalogDealQuerySchema`'s identical param doc comment. */
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
 }).openapi('CatalogTherapistQuery');
 
 /** `GET /catalog/vendors/:slug` — narrows the nested active-branches list, same state/city

@@ -165,5 +165,5 @@ export interface DeviceSession {
 export interface ApiEnvelope<T> {
   data: T | null;
   error: { code: string; message: string; details?: unknown } | null;
-  meta?: { total?: number; page?: number; pageSize?: number };
+  meta?: { total?: number; page?: number; pageSize?: number; unreadCount?: number };
 }

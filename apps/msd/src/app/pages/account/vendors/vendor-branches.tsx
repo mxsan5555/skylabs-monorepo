@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
 import type { MdFilledButton } from '@material/web/button/filled-button.js';
 import { Dialog, FilledButton, OutlinedButton, OutlinedTextField, OutlinedSelect, SelectOption, TextButton, Icon, Tabs, PrimaryTab } from '@skylabs-monorepo/shared-ui/react';
@@ -69,6 +70,12 @@ export function groupBranchesByState(branches: Branch[]): { state: string; branc
 /** Branch list + nested Deal list for a single vendor — reused for both the admin
  *  (`/vendors/:vendorId/branches...`) and self-service (`/vendors/me/branches...`) surfaces. */
 export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDeal, categories }: VendorBranchesProps) {
+  // Deep-link support for a "New Deal Pending Approval" notification click (see
+  // notification-bell.tsx) — both params are optional and purely additive; this page behaves
+  // exactly as before when neither is present.
+  const [searchParams] = useSearchParams();
+  const dealIdParam = searchParams.get('dealId');
+  const branchIdParam = searchParams.get('branchId');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchesLoading, setBranchesLoading] = useState(true);
   const [error, setError] = useState('');
@@ -139,6 +146,21 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
   }, [token, vendorId, isSelf, selectedBranchId]);
 
   const stateGroups = useMemo(() => groupBranchesByState(branches), [branches]);
+
+  // Auto-selects the branch a notification deep-link points at, once branches have loaded —
+  // a no-op when `branchIdParam` is absent or doesn't match a real branch (e.g. stale link).
+  useEffect(() => {
+    if (branchIdParam && branches.some((b) => b.id === branchIdParam)) {
+      setSelectedBranchId(branchIdParam);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branches, branchIdParam]);
+
+  // Scrolls to the deal a notification deep-link points at, once that branch's deals have loaded.
+  useEffect(() => {
+    if (!dealIdParam || deals.length === 0) return;
+    document.getElementById(`deal-${dealIdParam}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [deals, dealIdParam]);
 
   const reloadDeals = () => {
     if (!selectedBranchId) return;
@@ -282,8 +304,8 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
             ) : (
               <ul className="entity-list">
                 {deals.map((deal) => (
-                  <li key={deal.id}>
-                    <div className="entity-list__item">
+                  <li key={deal.id} id={`deal-${deal.id}`}>
+                    <div className={`entity-list__item${deal.id === dealIdParam ? ' entity-list__item--highlighted' : ''}`}>
                       <span className="role-list__name">
                         {deal.title}
                         <span className="field-hint">
@@ -560,9 +582,13 @@ type OfferingType = 'service' | 'product';
  * a Product (no duration) — never both, never neither (enforced server-side in
  * vendor.service.ts). There is no global Service master any more (see the direct-category-access
  * plan): a service deal picks its own `categoryId`/`subcategoryId` directly, restricted to the
- * `categories` prop (the vendor's granted SERVICE categories); a product deal's categoryId/
- * subcategoryId are still derived from whichever vendor-owned Product is picked, since a Product
- * already carries its own category.
+ * `categories` prop (the vendor's granted SERVICE categories).
+ *
+ * This dialog no longer offers a way to pick or change a Product — it only ever creates a Service
+ * deal. Opening it on a pre-existing Product deal (created before this removal, or via whatever
+ * flow the Product module itself provides) still renders that deal's Pricing tab/price fields/
+ * category display correctly, unchanged, since `offeringType` is still derived from the loaded
+ * deal's own stored `productId` — there is simply no control to set a fresh one.
  *
  * Exported so the flat, cross-branch "Deals / Packages" page (`vendor-deals.tsx`) can reuse
  * this exact form instead of duplicating it. That page isn't already scoped to a single
@@ -631,10 +657,16 @@ export function DealDialog({
     salePrice: deal?.salePrice ?? '',
     durationMinutes: deal?.durationMinutes ?? undefined,
     shortDescription: deal?.shortDescription ?? undefined,
+    description: deal?.description ?? undefined,
+    notes: deal?.notes ?? undefined,
+    policy: deal?.policy ?? undefined,
+    termsAndConditions: deal?.termsAndConditions ?? undefined,
   });
-  // Derived, never independently set — a Product picked in the always-visible "Product" select
-  // below IS the signal (matches the backend's own `productId`-presence convention exactly, see
-  // this component's own module doc comment). No separate "Offering type" UI control exists.
+  // Derived, never independently set. There is no Product picker in this dialog any more (removed
+  // — a Product deal can no longer be created or re-targeted here); `form.productId` only ever
+  // gets a value by loading an existing Product deal (`deal?.productId` above), so this correctly
+  // stays 'service' for every new deal while still rendering an existing Product deal's Pricing
+  // tab/validation/payload shape unchanged when one is opened for editing.
   const offeringType: OfferingType = form.productId ? 'product' : 'service';
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -673,33 +705,15 @@ export function DealDialog({
   const addPackage = () => setPackages((prev) => [...prev, { durationMinutes: 30, sellingPrice: 0 }]);
   const removePackage = (index: number) => setPackages((prev) => prev.filter((_, i) => i !== index));
 
-  /** Picking a real Product derives the Deal's categoryId/subcategoryId from it (a Product
-   *  already carries its own category, the same way a Service picker used to, before the
-   *  global Service master was removed) and switches this dialog into product mode. Picking
-   *  "None" (`id === ''`) clears `productId` — the symmetric reset back to service mode, doing
-   *  the same job the old separate "Offering type" toggle's `onChange` used to. */
-  const selectProduct = (id: string) => {
-    if (!id) {
-      setForm((f) => ({ ...f, productId: undefined, categoryId: '', subcategoryId: undefined, durationMinutes: undefined }));
-      return;
-    }
-    const product = products.find((p) => p.id === id);
-    setForm((f) => ({
-      ...f,
-      productId: id,
-      categoryId: product?.categoryId ?? f.categoryId,
-      subcategoryId: product?.subcategoryId ?? undefined,
-      durationMinutes: undefined,
-    }));
-  };
-
-  /** Service offering only — category/subcategory/(optional) type are picked directly (no
-   *  catalog item to derive them from any more), restricted to the vendor's granted SERVICE
-   *  categories. `subcategoryTierId`/`selectedTypeId` split apart whatever `form.subcategoryId`
-   *  currently holds — see `resolveCategoryTiers`'s doc comment for why no separate UI-only
-   *  state is needed to track the extra tier. */
+  /** Service offering only — category/subcategory are picked directly (no catalog item to
+   *  derive them from any more), restricted to the vendor's granted SERVICE categories. This
+   *  form no longer offers a 3rd, Type-tier picker (removed — see the "Category Types" Master
+   *  screen's own removal) — `subcategoryTierId` still resolves the correct Subcategory-select
+   *  display value even for a pre-existing Deal whose stored `subcategoryId` happens to be a
+   *  Type-tier id from before that picker existed (untouched unless the vendor re-picks a
+   *  Subcategory here). */
   const parentCategories = categories.filter((c) => !c.parentId);
-  const { subcategoryOptions, typeOptions, subcategoryTierId, selectedTypeId } = resolveCategoryTiers(
+  const { subcategoryOptions, subcategoryTierId } = resolveCategoryTiers(
     categories,
     form.categoryId,
     form.subcategoryId,
@@ -713,10 +727,6 @@ export function DealDialog({
     }
     if (!form.title.trim() || !form.slug.trim() || !form.categoryId) {
       setError('Title, slug, and category are required.');
-      return;
-    }
-    if (offeringType === 'product' && !form.productId) {
-      setError('Select a product.');
       return;
     }
     if (offeringType === 'product' && (!form.originalPrice || !form.salePrice)) {
@@ -774,10 +784,9 @@ export function DealDialog({
       const result = await onSave(payload, branches ? branchId : undefined);
       // Fired only here, after the API call has actually resolved — never optimistically, and
       // never for a failed request (see the catch block below, which shows an inline error
-      // instead). Wording distinguishes Service vs Product per the offering type actually
-      // submitted, and create vs update, matching what the caller just did.
-      const kind = offeringType === 'service' ? 'Service' : 'Product';
-      showToast(`${kind} ${deal ? 'updated' : 'added'} successfully`);
+      // instead); `submittingRef`/`saveButtonRef` above already guard against a double-submit
+      // firing this twice.
+      showToast(`Deal ${deal ? 'updated' : 'created'} successfully`);
       if (!deal && result) {
         // A fresh create — keep the dialog open so MediaUploader can flush any staged photos/
         // video against the new id; an edit's dialog closes immediately as before, since
@@ -831,25 +840,13 @@ export function DealDialog({
                   </OutlinedSelect>
                 )
               )}
-              {/* No separate "Offering type" control — picking a real Product here IS the
-                  signal (matches the backend's own productId-presence convention exactly, see
-                  this component's own module doc comment); leaving it at "None" is a service
-                  deal, reached via the Category/Subcategory/Type pickers below instead. */}
-              <OutlinedSelect
-                label="Product (leave as None for a service deal)"
-                value={form.productId ?? ''}
-                onChange={(e: Event) => selectProduct((e.target as HTMLSelectElement).value)}
-              >
-                <SelectOption value="">
-                  <div slot="headline">— None (Service deal) —</div>
-                </SelectOption>
-                {products.map((p) => (
-                  <SelectOption key={p.id} value={p.id}>
-                    <div slot="headline">{p.name}</div>
-                  </SelectOption>
-                ))}
-              </OutlinedSelect>
-
+              {/* The Product picker that used to live here has been removed — this dialog now
+                  only ever creates a Service deal (see this component's own module doc comment).
+                  Editing a pre-existing Product deal (created before this removal, or via the
+                  Product module's own flow) still works correctly: `form.productId`/`offeringType`
+                  are hydrated from `deal` below exactly as before, so the Pricing tab / price
+                  validation / payload shape for that existing deal are all unchanged — there is
+                  simply no UI to pick or clear a product going forward. */}
               {offeringType === 'service' ? (
                 <>
                   <OutlinedSelect
@@ -884,30 +881,6 @@ export function DealDialog({
                     </OutlinedSelect>
                   )}
 
-                  {/* 3rd, Type tier (e.g. "Swedish Massage" under "Body Massage") — optional and
-                      only shown once the chosen Subcategory actually has children; a Subcategory
-                      with none (e.g. "Cleaning") skips straight to using it as-is, unchanged from
-                      before. Picking a Type here becomes the Deal's own `subcategoryId` (see
-                      `resolveCategoryTiers`'s doc comment). */}
-                  {typeOptions.length > 0 && (
-                    <OutlinedSelect
-                      label="Type (optional)"
-                      value={selectedTypeId ?? ''}
-                      onChange={(e: Event) => {
-                        const value = (e.target as HTMLSelectElement).value;
-                        setForm((f) => ({ ...f, subcategoryId: value || subcategoryTierId }));
-                      }}
-                    >
-                      <SelectOption value="">
-                        <div slot="headline">None</div>
-                      </SelectOption>
-                      {typeOptions.map((c) => (
-                        <SelectOption key={c.id} value={c.id}>
-                          <div slot="headline">{c.name}</div>
-                        </SelectOption>
-                      ))}
-                    </OutlinedSelect>
-                  )}
                   {parentCategories.length === 0 && (
                     <p className="empty-state">This business has no granted Service categories yet — grant one under Business Modules &amp; Category Access first.</p>
                   )}
@@ -921,6 +894,34 @@ export function DealDialog({
               <OutlinedTextField label="Title" value={form.title} onInput={(e: Event) => setForm((f) => ({ ...f, title: (e.target as HTMLInputElement).value }))} />
               <OutlinedTextField label="Slug" value={form.slug} onInput={(e: Event) => setForm((f) => ({ ...f, slug: (e.target as HTMLInputElement).value }))} />
               <OutlinedTextField label="Short description" value={form.shortDescription ?? ''} onInput={(e: Event) => setForm((f) => ({ ...f, shortDescription: (e.target as HTMLInputElement).value }))} />
+              <OutlinedTextField
+                label="Description"
+                type="textarea"
+                rows={4}
+                value={form.description ?? ''}
+                onInput={(e: Event) => setForm((f) => ({ ...f, description: (e.target as HTMLTextAreaElement).value }))}
+              />
+              <OutlinedTextField
+                label="Notes"
+                type="textarea"
+                rows={3}
+                value={form.notes ?? ''}
+                onInput={(e: Event) => setForm((f) => ({ ...f, notes: (e.target as HTMLTextAreaElement).value }))}
+              />
+              <OutlinedTextField
+                label="Policy"
+                type="textarea"
+                rows={3}
+                value={form.policy ?? ''}
+                onInput={(e: Event) => setForm((f) => ({ ...f, policy: (e.target as HTMLTextAreaElement).value }))}
+              />
+              <OutlinedTextField
+                label="Terms & Conditions"
+                type="textarea"
+                rows={3}
+                value={form.termsAndConditions ?? ''}
+                onInput={(e: Event) => setForm((f) => ({ ...f, termsAndConditions: (e.target as HTMLTextAreaElement).value }))}
+              />
             </div>
           )}
 
