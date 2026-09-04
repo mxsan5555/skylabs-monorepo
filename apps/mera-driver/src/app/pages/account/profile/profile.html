@@ -1,0 +1,96 @@
+<md-admin-page
+  title="My Account"
+  subtitle="Manage your contact details and saved addresses."
+>
+  <section class="account-card">
+    <div class="account-card__head">
+      <h2>Contact details</h2>
+      @if (saved()) {
+        <span class="otp-muted" role="status">Saved</span>
+      }
+    </div>
+    <div class="account-fields">
+      <md-outlined-text-field
+        label="Email"
+        type="email"
+        autocomplete="email"
+        [value]="email"
+        (input)="email = $any($event.target).value"
+      ></md-outlined-text-field>
+      <md-outlined-text-field
+        label="Phone"
+        type="tel"
+        autocomplete="tel"
+        [value]="phone"
+        (input)="phone = $any($event.target).value"
+      ></md-outlined-text-field>
+    </div>
+    <div>
+      <md-filled-button (click)="saveProfile()">Save changes</md-filled-button>
+    </div>
+  </section>
+
+  <section class="account-card">
+    <div class="account-card__head">
+      <h2>Addresses</h2>
+      @if (editingId() === null) {
+        <md-outlined-button (click)="startAdd()">
+          <md-icon slot="icon" aria-hidden="true">add</md-icon>
+          Add address
+        </md-outlined-button>
+      }
+    </div>
+
+    @if (editingId() !== null) {
+      <div class="address-form">
+        @for (f of addressFields; track f.key) {
+          <md-outlined-text-field
+            [class.span-2]="f.span2"
+            [label]="f.label"
+            [value]="draft()[f.key] ?? ''"
+            (input)="setDraft(f.key, $any($event.target).value)"
+          ></md-outlined-text-field>
+        }
+        <div class="address-form__actions">
+          <md-text-button (click)="editingId.set(null)">Cancel</md-text-button>
+          <md-filled-button (click)="submit()">
+            {{ editingId() === 'new' ? 'Add' : 'Save' }}
+          </md-filled-button>
+        </div>
+      </div>
+    }
+
+    @if (account.addresses().length === 0 && editingId() === null) {
+      <p class="address-empty">No addresses yet.</p>
+    } @else {
+      <ul class="address-list">
+        @for (a of account.addresses(); track a.id) {
+          <li class="address-card">
+            <div>
+              <div class="address-card__label">{{ a.label }}</div>
+              <div class="address-card__lines">
+                {{ a.line1 }}{{ a.line2 ? ', ' + a.line2 : '' }}<br />
+                {{ a.city }}, {{ a.state }} {{ a.postalCode }}<br />
+                {{ a.country }}
+              </div>
+            </div>
+            <div class="address-card__actions">
+              <md-icon-button
+                [attr.aria-label]="'Edit ' + a.label + ' address'"
+                (click)="startEdit(a)"
+              >
+                <md-icon aria-hidden="true">edit</md-icon>
+              </md-icon-button>
+              <md-icon-button
+                [attr.aria-label]="'Delete ' + a.label + ' address'"
+                (click)="account.removeAddress(a.id)"
+              >
+                <md-icon aria-hidden="true">delete</md-icon>
+              </md-icon-button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+</md-admin-page>

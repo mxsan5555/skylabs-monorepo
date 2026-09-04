@@ -1,0 +1,36 @@
+<div class="admin-layout" [class.is-collapsed]="collapsed()">
+  <md-sidebar></md-sidebar>
+  <div class="admin-main">
+    @if (auth.isPreviewing()) {
+      <div
+        class="flex items-center justify-between gap-3 bg-[var(--md-sys-color-tertiary-container,#ffd8e4)] px-5 py-2 text-sm text-[var(--md-sys-color-on-tertiary-container,#31111d)]"
+        role="status"
+      >
+        <span class="flex items-center gap-2">
+          <md-icon aria-hidden="true">visibility</md-icon>
+          Previewing as {{ auth.bootstrap()?.user?.name }} — Return to SuperAdmin
+        </span>
+        <md-text-button (click)="returnToSuperAdmin()">Return to SuperAdmin</md-text-button>
+      </div>
+    }
+    <div class="admin-topbar">
+      <md-icon-button
+        [attr.aria-label]="collapsed() ? 'Show sidebar' : 'Hide sidebar'"
+        (click)="toggle()"
+      >
+        <md-icon aria-hidden="true">dock_to_right</md-icon>
+      </md-icon-button>
+      <nav aria-label="Breadcrumb">
+        <ol class="admin-breadcrumb">
+          <li>Account</li>
+          @if (currentLabel()) {
+            <li aria-current="page">{{ currentLabel() }}</li>
+          }
+        </ol>
+      </nav>
+    </div>
+    <main class="admin-content">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>

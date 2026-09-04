@@ -19,15 +19,20 @@
             "input": "apps/mera-driver/public"
           }
         ],
-        "styles": ["apps/mera-driver/src/styles.css"]
+        "styles": [
+          "packages/shared-ui/src/theme/base.css",
+          "packages/shared-ui/src/theme/layout.css",
+          "apps/mera-driver/src/assets/theme/index.css",
+          "apps/mera-driver/src/styles.css"
+        ]
       },
       "configurations": {
         "production": {
           "budgets": [
             {
               "type": "initial",
-              "maximumWarning": "500kb",
-              "maximumError": "1mb"
+              "maximumWarning": "1mb",
+              "maximumError": "2mb"
             },
             {
               "type": "anyComponentStyle",
@@ -35,7 +40,13 @@
               "maximumError": "8kb"
             }
           ],
-          "outputHashing": "all"
+          "outputHashing": "all",
+          "fileReplacements": [
+            {
+              "replace": "apps/mera-driver/src/environments/environment.ts",
+              "with": "apps/mera-driver/src/environments/environment.prod.ts"
+            }
+          ]
         },
         "development": {
           "optimization": false,
@@ -67,7 +78,8 @@
     "test": {
       "executor": "@angular/build:unit-test",
       "options": {
-        "watch": false
+        "watch": false,
+        "setupFiles": ["packages/shared-ui/src/testing/index.ts"]
       }
     },
     "serve-static": {

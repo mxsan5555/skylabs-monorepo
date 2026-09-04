@@ -2,4 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* You can add global styles to this file, and also import other style files */
+/* The app-shell and auth-screen layout classes come from
+   @skylabs-monorepo/shared-ui/layout.css (see project.json build "styles").
+   Add mera-driver-only global overrides here. */
+
+/* Inline form error text (sign-in / OTP) — shared-ui's layout.css has no
+   error-state class for the auth screens, so this is app-local. */
+.auth-error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--md-sys-color-error, #b3261e);
+}
+

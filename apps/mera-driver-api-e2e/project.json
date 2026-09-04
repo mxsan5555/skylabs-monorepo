@@ -1,0 +1,17 @@
+{
+  "name": "mera-driver-api-e2e",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "implicitDependencies": ["mera-driver-api"],
+  "projectType": "application",
+  "targets": {
+    "e2e": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{e2eProjectRoot}"],
+      "options": {
+        "jestConfig": "apps/mera-driver-api-e2e/jest.config.cts",
+        "passWithNoTests": true
+      },
+      "dependsOn": ["mera-driver-api:build", "mera-driver-api:serve"]
+    }
+  }
+}

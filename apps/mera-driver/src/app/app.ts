@@ -1,8 +1,12 @@
 import { Component } from '@angular/core';
-import { RouterModule } from '@angular/router';
+import { RouterOutlet } from '@angular/router';
 
+/**
+ * Root shell. Renders the routed layout/pages via <router-outlet>. App-wide
+ * providers live in app.config.ts.
+ */
 @Component({
-  imports: [RouterModule],
+  imports: [RouterOutlet],
   selector: 'md-root',
   templateUrl: './app.html',
   styleUrl: './app.css',

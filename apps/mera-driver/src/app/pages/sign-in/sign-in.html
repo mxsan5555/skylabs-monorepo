@@ -1,0 +1,70 @@
+<div class="auth-screen">
+  <div class="auth-brand">
+    <div class="auth-brand__logo">
+      <md-icon aria-hidden="true">directions_car</md-icon>
+    </div>
+    <h1 class="auth-brand__title">mera-driver</h1>
+    <p class="auth-brand__subtitle">Your ride, your way</p>
+  </div>
+
+  <div class="auth-card">
+    <h2>Sign in</h2>
+    <p>Enter your details to receive a one-time code.</p>
+
+    <md-tabs
+      class="auth-tabs"
+      [activeTabIndex]="method() === 'phone' ? 1 : 0"
+      (change)="onTabChange($event)"
+    >
+      <md-primary-tab>
+        <md-icon slot="icon" aria-hidden="true">mail</md-icon>
+        Email
+      </md-primary-tab>
+      <md-primary-tab>
+        <md-icon slot="icon" aria-hidden="true">call</md-icon>
+        Phone
+      </md-primary-tab>
+    </md-tabs>
+
+    @if (method() === 'phone') {
+      <md-outlined-text-field
+        class="auth-field"
+        label="Phone number"
+        type="tel"
+        autocomplete="tel"
+        [value]="value"
+        (input)="value = $any($event.target).value"
+      >
+        <md-icon slot="leading-icon" aria-hidden="true">call</md-icon>
+      </md-outlined-text-field>
+    } @else {
+      <md-outlined-text-field
+        class="auth-field"
+        label="Email"
+        type="email"
+        autocomplete="email"
+        [value]="value"
+        (input)="value = $any($event.target).value"
+      >
+        <md-icon slot="leading-icon" aria-hidden="true">mail</md-icon>
+      </md-outlined-text-field>
+    }
+
+    @if (error()) {
+      <p class="auth-error" role="alert">{{ error() }}</p>
+    }
+
+    <md-filled-button class="auth-submit" [disabled]="loading()" (click)="sendOtp()">
+      {{ loading() ? 'Sending…' : 'Send OTP' }}
+    </md-filled-button>
+  </div>
+
+  <div class="auth-divider"><span>or continue with</span></div>
+
+  <md-outlined-button class="auth-google" href="{{ googleUrl }}">
+    <md-icon slot="icon" aria-hidden="true">language</md-icon>
+    Continue with Google
+  </md-outlined-button>
+
+  <p class="auth-note">New users are registered automatically.</p>
+</div>

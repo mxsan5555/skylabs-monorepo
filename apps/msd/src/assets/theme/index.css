@@ -1,0 +1,12 @@
+/**
+ * msd brand theme (Material Theme Builder export, seed #007C2B / green).
+ * Each variant scopes its --md-sys-color-* tokens under a class selector
+ * (.light, .dark, .light-medium-contrast, ...). applyTheme() from
+ * @skylabs-monorepo/shared-ui toggles the matching class on <html>.
+ */
+@import './css/light.css';
+@import './css/light-mc.css';
+@import './css/light-hc.css';
+@import './css/dark.css';
+@import './css/dark-mc.css';
+@import './css/dark-hc.css';

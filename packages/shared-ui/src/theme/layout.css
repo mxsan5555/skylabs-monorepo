@@ -1,0 +1,585 @@
+/**
+ * Shared app-layout styles: the app shell (header/footer) and the auth screens.
+ * Identical across apps and driven entirely by --md-sys-color-* tokens, so each
+ * app inherits its own brand palette. Load it once per app:
+ *
+ *   // msd (Vite) — main.tsx
+ *   import '@skylabs-monorepo/shared-ui/layout.css';
+ *
+ *   // mera-driver (Angular) — project.json build "styles"
+ *   "packages/shared-ui/src/theme/layout.css"
+ *
+ * Page-specific styles stay in each app/page.
+ */
+
+/* App shell: header / scrollable content / footer. */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface, #fafdfb);
+}
+
+.app-header__brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--md-sys-color-primary);
+}
+
+.app-header__nav {
+  display: flex;
+  gap: 16px;
+  margin-right: auto;
+}
+
+.app-header__nav a {
+  text-decoration: none;
+  color: var(--md-sys-color-on-surface, #1a1c19);
+}
+
+.app-header__nav a.active {
+  color: var(--md-sys-color-primary);
+  font-weight: 600;
+}
+
+.app-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  color: var(--md-sys-color-on-surface-variant, #43483e);
+  font-size: 0.875rem;
+}
+
+/* Auth screens (sign-in, otp). Layout follows the design reference; all colors
+   come from the active M3 theme. */
+.auth-layout {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  background-color: var(--md-sys-color-background);
+}
+
+.auth-layout__inner {
+  width: 100%;
+  max-width: 420px;
+  padding: 24px 16px 48px;
+}
+
+.auth-screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.auth-brand__logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-brand__logo-image {
+  object-fit: contain;
+}
+
+.auth-brand__logo-image--desktop {
+  display: block;
+  width: auto;
+  height: 64px;
+}
+
+.auth-brand__logo-image--mobile {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .auth-brand__logo-image--desktop {
+    display: none;
+  }
+
+  .auth-brand__logo-image--mobile {
+    display: block;
+    width: 48px;
+    height: 48px;
+  }
+}
+.auth-brand__title {
+  margin: 4px 0 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-background);
+}
+
+.auth-brand__subtitle {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Non-interactive pill showing where the code was sent (semantic span, not a
+   chip — it is display-only, so it must not be announced as a button). */
+.auth-destination {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  font-size: 0.875rem;
+  font-weight: 600;
+  --md-icon-size: 18px;
+}
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  padding: 30px;
+  border-radius: 20px;
+  background-color: var(--md-sys-color-surface-container);
+}
+
+.auth-card h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--md-sys-color-on-surface);
+}
+
+.auth-card > p {
+  margin: 0 0 4px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.auth-field,
+.otp-field,
+.auth-submit,
+.auth-google {
+  width: 100%;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.875rem;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background-color: var(--md-sys-color-outline-variant);
+}
+
+.auth-note {
+  margin: 4px 0 0;
+  text-align: center;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.875rem;
+}
+
+.otp-back {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+}
+
+.otp-resend {
+  margin: 4px 0 0;
+  text-align: center;
+  color: var(--md-sys-color-on-surface);
+  font-size: 0.875rem;
+}
+
+.otp-muted {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ------------------------------------------------------------------ *
+ * Admin / account console: sidebar + centered content. Reused for every
+ * role (user/admin/marketing/sales). Themed by --md-sys-color-* tokens.
+ * ------------------------------------------------------------------ */
+.admin-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 264px 1fr;
+  background-color: var(--md-sys-color-surface-container-lowest, #fff);
+}
+
+.admin-layout.is-collapsed {
+  grid-template-columns: 0 1fr;
+}
+
+/* Sidebar */
+.admin-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 12px;
+  border-right: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface, #fafdfb);
+}
+
+.admin-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 4px;
+}
+.admin-sidebar__brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+.admin-sidebar__logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: 56px;
+}
+
+.admin-sidebar__logo-image {
+  object-fit: contain;
+}
+
+.admin-sidebar__logo-image--desktop {
+  display: block;
+  width: auto;
+  height: 56px;
+}
+
+.admin-sidebar__logo-image--mobile {
+  display: none;
+}
+.admin-sidebar__brand-name {
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--md-sys-color-on-surface);
+}
+
+.admin-sidebar__brand-sub {
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.admin-sidebar__search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface-container-low, #f3f4f9);
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.admin-sidebar__nav {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-nav-group__label {
+  padding: 0 8px;
+  margin: 0 0 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.admin-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  margin-bottom: 2px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  text-decoration: none;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: left;
+  --md-icon-size: 20px;
+}
+
+.admin-nav-item:hover {
+  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+}
+
+.admin-nav-item.active {
+  background-color: var(--md-sys-color-secondary-container, #d7e3ff);
+  color: var(--md-sys-color-on-secondary-container, #101c2b);
+  font-weight: 600;
+}
+
+.admin-sidebar__user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-top: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+}
+
+.admin-sidebar__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background-color: var(--md-sys-color-primary-container, #cee5ff);
+  color: var(--md-sys-color-on-primary-container, #001d33);
+  font-weight: 700;
+  flex: none;
+}
+
+.admin-sidebar__user-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.admin-sidebar__user-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-sidebar__user-mail {
+  font-size: 0.72rem;
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-roleswitch {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px 0;
+}
+
+.admin-roleswitch label {
+  font-size: 0.68rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.admin-roleswitch select {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface-container-low, #f3f4f9);
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+/* Main column */
+.admin-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.admin-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+}
+
+.admin-breadcrumb {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.admin-breadcrumb li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-breadcrumb li + li::before {
+  content: '\203A'; /* › separator, decorative */
+  color: var(--md-sys-color-outline, #74796d);
+}
+
+.admin-breadcrumb li[aria-current] {
+  color: var(--md-sys-color-on-surface);
+  font-weight: 600;
+}
+
+.admin-content {
+  flex: 1;
+  padding: 32px 20px 64px;
+  overflow-y: auto;
+}
+
+/* Centered page with headline + subheadline */
+.admin-page {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.admin-page__head {
+  text-align: center;
+}
+
+.admin-page__title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+.admin-page__subtitle {
+  margin: 6px 0 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Account / profile content */
+.account-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 16px;
+  background-color: var(--md-sys-color-surface-container, #eef1f6);
+}
+
+.account-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-card__head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--md-sys-color-on-surface);
+}
+
+.account-fields {
+  display: grid;
+  gap: 14px;
+}
+
+.account-fields md-outlined-text-field,
+.account-fields md-filled-text-field {
+  width: 100%;
+}
+
+.address-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.address-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface, #fafdfb);
+}
+
+.address-card__label {
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+}
+
+.address-card__lines {
+  margin-top: 2px;
+  font-size: 0.9rem;
+  color: var(--md-sys-color-on-surface-variant);
+  line-height: 1.4;
+}
+
+.address-card__actions {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+
+.address-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.address-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.address-form md-outlined-text-field {
+  width: 100%;
+}
+
+.address-form .span-2 {
+  grid-column: 1 / -1;
+}
+
+.address-form__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

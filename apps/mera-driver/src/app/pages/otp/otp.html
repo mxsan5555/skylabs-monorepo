@@ -1,0 +1,50 @@
+<div class="auth-screen otp-screen">
+  <md-icon-button class="otp-back" aria-label="Go back" (click)="back()">
+    <md-icon aria-hidden="true">arrow_back</md-icon>
+  </md-icon-button>
+
+  <div class="auth-brand">
+    <div class="auth-brand__logo">
+      <md-icon aria-hidden="true">sms</md-icon>
+    </div>
+    <h1 class="auth-brand__title">Verify your {{ method === 'phone' ? 'phone' : 'email' }}</h1>
+    <p class="auth-brand__subtitle">We sent a 6-digit code to</p>
+    <span class="auth-destination">
+      <md-icon aria-hidden="true">{{ method === 'phone' ? 'call' : 'mail' }}</md-icon>
+      {{ destination }}
+    </span>
+  </div>
+
+  <div class="auth-card">
+    <h2>Enter the code</h2>
+    <p>The code expires in a few minutes.</p>
+
+    <md-outlined-text-field
+      class="otp-field"
+      label="6-digit code"
+      type="text"
+      inputmode="numeric"
+      autocomplete="one-time-code"
+      maxlength="6"
+      [value]="code"
+      (input)="code = $any($event.target).value"
+    ></md-outlined-text-field>
+
+    @if (error()) {
+      <p class="auth-error" role="alert">{{ error() }}</p>
+    }
+
+    <md-filled-button class="auth-submit" [disabled]="verifying()" (click)="verify()">
+      {{ verifying() ? 'Verifying…' : 'Verify & Continue' }}
+    </md-filled-button>
+  </div>
+
+  <p class="otp-resend">
+    Didn’t receive the code?
+    @if (seconds() > 0) {
+      <span class="otp-muted">Resend in {{ seconds() }}s</span>
+    } @else {
+      <md-text-button (click)="resend()">Resend code</md-text-button>
+    }
+  </p>
+</div>

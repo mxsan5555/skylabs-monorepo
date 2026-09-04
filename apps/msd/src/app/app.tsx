@@ -1,50 +1,39 @@
-import './app.css';
-import NxWelcome from './nx-welcome';
+import { AuthProvider } from '@skylabs-monorepo/shared-auth/react';
+import { WishlistProvider } from '../wishlist/wishlist-context';
+import { ToastProvider } from '../toast/toast-context';
+import { ErrorBoundary } from './components/error-boundary';
+import { AppRoutes } from './routes';
 
-import { Route, Routes, Link } from 'react-router-dom';
-
+/**
+ * Root component: app-wide providers wrap the route tree. `appPrefix="msd"` is
+ * this app's own localStorage namespace (`msd_auth_token` / `msd_auth_real_token`)
+ * — there is no separate admin app to namespace against. Add more providers
+ * (query client, theme switcher) here as the app grows.
+ *
+ * `WishlistProvider` must sit *inside* `AuthProvider` because it calls `useAuth()` to load the
+ * signed-in customer's real wishlist from the API and to reload it on sign-in/sign-out. There is
+ * deliberately no `CartProvider` here at all — the cart is real, backend-driven state
+ * (`api/cart.ts`, read directly via `getCart` wherever needed, with a lightweight pub/sub so the
+ * header badge refetches on every mutation — see `subscribeCartUpdated`), never a second
+ * client-side store.
+ * `ToastProvider` doesn't need auth, but sits innermost anyway so its fixed-position stack
+ * always mounts closest to the route tree that calls `useToast()`. `ErrorBoundary` wraps only
+ * `<AppRoutes />`, inside every provider, so a render-phase crash anywhere in the route tree
+ * falls back to a friendly full-page message instead of unmounting the providers themselves
+ * (auth state, toasts, wishlist) along with it — see `error-boundary.tsx`'s own doc comment.
+ */
 export function App() {
   return (
-    <div>
-      <NxWelcome title="msd" />
-
-      {/* START: routes */}
-      {/* These routes and navigation have been generated for you */}
-      {/* Feel free to move and update them to fit your needs */}
-      <br />
-      <hr />
-      <br />
-      <div role="navigation">
-        <ul>
-          <li>
-            <Link to="/">Home</Link>
-          </li>
-          <li>
-            <Link to="/page-2">Page 2</Link>
-          </li>
-        </ul>
-      </div>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <div>
-              This is the generated root route.{' '}
-              <Link to="/page-2">Click here for page 2.</Link>
-            </div>
-          }
-        />
-        <Route
-          path="/page-2"
-          element={
-            <div>
-              <Link to="/">Click here to go back to root page.</Link>
-            </div>
-          }
-        />
-      </Routes>
-      {/* END: routes */}
-    </div>
+    <AuthProvider appPrefix="msd" apiBaseUrl={import.meta.env.VITE_API_URL}>
+      <WishlistProvider>
+        <ToastProvider>
+          <ErrorBoundary>
+            <AppRoutes />
+          </ErrorBoundary>
+        </ToastProvider>
+      </WishlistProvider>
+    </AuthProvider>
   );
 }
+
 export default App;

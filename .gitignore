@@ -12,6 +12,16 @@ out/
 .next/
 .nuxt/
 
+# Generated Prisma clients (per-app custom output, regenerated via `prisma generate`)
+apps/*/src/generated/
+
+# Local media-upload storage (Deal/Product/Therapist images+video) — never committed
+apps/msd-api/uploads/
+
+# Ad-hoc pre-migration data backups (JSON dumps for rollback reference) — never committed
+apps/msd-api/.scratch-backup/
+apps/mera-driver-api/.scratch-backup/
+
 # Environment variables
 .env
 .env.local

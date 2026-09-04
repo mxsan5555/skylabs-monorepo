@@ -1,0 +1,29 @@
+<div class="home">
+  <section class="home__hero">
+    <sky-badge variant="primary">mera-driver</sky-badge>
+    <h1>Welcome to mera-driver</h1>
+    <p>
+      An Angular app built on the shared Material 3 design system. Pages live
+      here; reusable UI lives in <code>shared-ui</code>.
+    </p>
+    <div class="home__actions">
+      <md-filled-button (click)="go('/showcase')">
+        View component showcase
+      </md-filled-button>
+      <md-outlined-button (click)="go('/blog')">
+        Read the blog
+      </md-outlined-button>
+    </div>
+  </section>
+
+  <section class="home__cards">
+    <sky-card variant="elevated">
+      <h2>Reusable UI</h2>
+      <p>Material Web + custom LIT components, themed per app.</p>
+    </sky-card>
+    <sky-card variant="outlined">
+      <h2>App-owned pages</h2>
+      <p>Routing, auth, and data stay native to each framework.</p>
+    </sky-card>
+  </section>
+</div>

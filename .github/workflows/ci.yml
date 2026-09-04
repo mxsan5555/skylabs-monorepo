@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, release, main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  affected:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Derives NX_BASE / NX_HEAD so `nx affected` only runs the changed graph.
+      - uses: nrwl/nx-set-shas@v4
+      - run: npx nx affected -t lint test build
