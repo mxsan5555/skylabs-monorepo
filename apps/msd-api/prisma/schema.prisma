@@ -141,6 +141,7 @@ enum NotificationRecipientType {
 enum NotificationType {
   DEAL_PENDING_APPROVAL
   ORDER_RECEIVED
+  VENDOR_PENDING_APPROVAL
 }
 
 // ─── Core identity & RBAC ───────────────────────────────────────────────────

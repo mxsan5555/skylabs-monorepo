@@ -1,7 +1,7 @@
 import { apiGet, apiPatch } from './rbac/client';
 
 export type NotificationRecipientType = 'SUPERADMIN' | 'VENDOR';
-export type NotificationType = 'DEAL_PENDING_APPROVAL' | 'ORDER_RECEIVED';
+export type NotificationType = 'DEAL_PENDING_APPROVAL' | 'ORDER_RECEIVED' | 'VENDOR_PENDING_APPROVAL';
 
 export interface Notification {
   id: string;

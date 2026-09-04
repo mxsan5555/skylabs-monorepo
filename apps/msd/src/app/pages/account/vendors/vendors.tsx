@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FilledButton, OutlinedButton, Icon, Tabs, PrimaryTab } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   approveVendor,
   createMyVendor,
+  deleteVendor,
+  deleteVendorTherapist,
   getMyVendor,
   listCategories,
   listVendors,
@@ -46,6 +48,7 @@ export function VendorManagement() {
   const canApprove = can('vendors', 'approve');
   const canReject = can('vendors', 'reject');
   const canStatusChange = can('vendors', 'status_change');
+  const canDelete = can('vendors', 'delete');
 
   if (canView) {
     return (
@@ -56,6 +59,7 @@ export function VendorManagement() {
         canApprove={canApprove}
         canReject={canReject}
         canStatusChange={canStatusChange}
+        canDelete={canDelete}
       />
     );
   }
@@ -84,6 +88,8 @@ const THERAPIST_COLUMNS = JSON.stringify([
   { key: 'Status', label: 'Status', type: 'status', statusMap: { Active: 'success', Inactive: 'error' } },
 ]);
 
+const THERAPIST_ADMIN_DELETE_ACTIONS = JSON.stringify([{ icon: 'delete', label: 'Delete', event: 'delete' }]);
+
 function toTherapistRow(t: AdminTherapist): Record<string, string | number> {
   return {
     Type: t.therapistType,
@@ -109,6 +115,7 @@ function AdminVendorManagement({
   canApprove,
   canReject,
   canStatusChange,
+  canDelete,
 }: {
   token: string | null;
   canCreate: boolean;
@@ -116,6 +123,7 @@ function AdminVendorManagement({
   canApprove: boolean;
   canReject: boolean;
   canStatusChange: boolean;
+  canDelete: boolean;
 }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -197,6 +205,33 @@ function AdminVendorManagement({
     loadTherapists();
   }, [loadTherapists]);
 
+  const therapistsTableRef = useRef<HTMLElement>(null);
+
+  const doDeleteTherapist = async (therapist: AdminTherapist) => {
+    if (!selectedVendor) return;
+    if (!window.confirm(`Delete "${therapist.personName}"? This cannot be undone.`)) return;
+    try {
+      await deleteVendorTherapist(token, selectedVendor.id, therapist.id);
+      loadTherapists();
+    } catch (err) {
+      setTherapistsError(err instanceof ApiRequestError ? err.message : 'Could not delete therapist.');
+    }
+  };
+
+  useEffect(() => {
+    const el = therapistsTableRef.current;
+    if (!el || !canDelete) return;
+    const onRowAction = (e: Event) => {
+      const detail = (e as CustomEvent<{ action: string; row: Record<string, unknown>; rowIndex: number }>).detail;
+      const therapist = therapists[detail.rowIndex];
+      if (!therapist) return;
+      if (detail.action === 'delete') doDeleteTherapist(therapist);
+    };
+    el.addEventListener('sky-dt-row-action', onRowAction);
+    return () => el.removeEventListener('sky-dt-row-action', onRowAction);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [therapists, canDelete]);
+
   /** Passed to VendorPipeline — fires after every successful per-step save, whether that
    *  step just created the vendor (Step 1, first save) or updated an existing one. */
   const handlePipelineChange = (vendor: Vendor) => {
@@ -253,6 +288,19 @@ function AdminVendorManagement({
     }
   };
 
+  const doDelete = async () => {
+    if (!selectedVendor) return;
+    if (!window.confirm(`Delete "${selectedVendor.businessName || 'this vendor'}"? This cannot be undone.`)) return;
+    try {
+      await deleteVendor(token, selectedVendor.id);
+      setVendors((prev) => prev.filter((v) => v.id !== selectedVendor.id));
+      setSelectedId(null);
+      setMessage('Vendor deleted.');
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'Could not delete vendor.');
+    }
+  };
+
   return (
     <div className="admin-page admin-page--wide">
       <title>Vendor Management · MSD</title>
@@ -305,6 +353,7 @@ function AdminVendorManagement({
               {canStatusChange && selectedVendor.status !== 'SUSPENDED' && (
                 <OutlinedButton onClick={() => doStatusChange('SUSPENDED')}>Suspend</OutlinedButton>
               )}
+              {canDelete && <OutlinedButton onClick={doDelete}>Delete</OutlinedButton>}
             </div>
           </div>
 
@@ -345,6 +394,7 @@ function AdminVendorManagement({
                 isSelf={false}
                 canEdit={canEditAny}
                 canApproveDeal={canApprove}
+                canDeleteDeal={canDelete}
                 categories={categories}
               />
             </div>
@@ -354,6 +404,7 @@ function AdminVendorManagement({
             <div className="admin-tab-panel" aria-label="Therapists">
               {therapistsError && <p className="error-state" role="alert">{therapistsError}</p>}
               <sky-data-table
+                ref={therapistsTableRef as RefObject<HTMLElement>}
                 caption="Therapists"
                 columns={THERAPIST_COLUMNS}
                 rows={JSON.stringify(therapists.map(toTherapistRow))}
@@ -361,6 +412,7 @@ function AdminVendorManagement({
                 page={1}
                 page-size={Math.max(therapists.length, 10)}
                 loading={therapistsLoading}
+                actions={canDelete ? THERAPIST_ADMIN_DELETE_ACTIONS : undefined}
               />
             </div>
           )}

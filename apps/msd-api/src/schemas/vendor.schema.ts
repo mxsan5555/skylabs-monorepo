@@ -59,7 +59,9 @@ const kycDocumentSchema = z.object({
 // all. An empty string ("") is treated as "field cleared" and bypasses the regex — these fields
 // stay optional (never newly required); only a *non-empty* value must match the expected shape.
 
-const GSTIN_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}\d{1}[Z]{1}[A-Z\d]{1}$/;
+// 9th character is the entity/registration code — alphanumeric (a PAN with multiple GST
+// registrations in one state gets 2, 3, ... up through a letter there), never digit-only.
+const GSTIN_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[A-Z\d]{1}$/;
 const PAN_REGEX = /^[A-Z]{5}\d{4}[A-Z]{1}$/;
 const PINCODE_REGEX = /^\d{6}$/;
 /** Canonical Indian mobile rule — first digit 6-9, exactly 10 digits after the `+91` this

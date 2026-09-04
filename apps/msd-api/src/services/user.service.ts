@@ -3,18 +3,34 @@ import { ApiError } from '../lib/http';
 import { revokeAllRefreshTokens } from './token.service';
 import { Prisma, type UserStatus } from '../generated/prisma-client';
 
-export async function listUsers(page: number, pageSize: number, search?: string) {
-  const where = {
+/**
+ * `roleKey` joins through `UserRole -> Role.key` (a user's roles are many-to-many; there is no
+ * scalar role column on `User` itself to filter on directly). Superadmin-flagged users are
+ * excluded from every call here by default — a Superadmin manages their own profile via the
+ * separate `/rbac/users/me` self-service surface (see Phase 7), not as a row an admin can edit/
+ * delete/reassign in this general staff/vendor/customer list. Checked via `Role.isSuperAdmin`,
+ * never a role-key string compare (same discipline as `notifySuperAdmins`/
+ * `permission-resolver.service.ts`).
+ */
+export async function listUsers(page: number, pageSize: number, opts: { search?: string; roleKey?: string } = {}) {
+  const { search, roleKey } = opts;
+  const where: Prisma.UserWhereInput = {
     deletedAt: null,
-    ...(search
-      ? {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' as const } },
-            { email: { contains: search, mode: 'insensitive' as const } },
-            { phone: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
-      : {}),
+    AND: [
+      { roles: { none: { role: { isSuperAdmin: true } } } },
+      ...(roleKey ? [{ roles: { some: { role: { key: roleKey } } } } as Prisma.UserWhereInput] : []),
+      ...(search
+        ? [
+            {
+              OR: [
+                { name: { contains: search, mode: 'insensitive' as const } },
+                { email: { contains: search, mode: 'insensitive' as const } },
+                { phone: { contains: search, mode: 'insensitive' as const } },
+              ],
+            } as Prisma.UserWhereInput,
+          ]
+        : []),
+    ],
   };
   const [items, total] = await Promise.all([
     prisma.user.findMany({

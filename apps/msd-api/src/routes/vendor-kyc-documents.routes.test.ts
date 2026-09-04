@@ -163,10 +163,58 @@ describe('POST /api/v1/vendors/me/submit', () => {
     prismaMock.branch.findMany.mockResolvedValue([{ state: 'Uttar Pradesh' }]);
     prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([{ category: { type: 'SERVICE' } }]);
     prismaMock.vendor.update.mockResolvedValue({ ...completeVendor, status: 'PENDING_VERIFICATION' });
+    prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
     const res = await request(app)
       .post('/api/v1/vendors/me/submit')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
     expect(res.status).toBe(200);
+  });
+
+  /**
+   * Feature: submitting a complete profile creates exactly one VENDOR_PENDING_APPROVAL
+   * notification per Superadmin, atomically with the status flip — mirrors createDeal's own
+   * notifySuperAdmins call-site pattern. `submitForVerification`'s own precondition (status must
+   * currently be PROFILE_INCOMPLETE/REJECTED) is the duplicate-prevention: a second submit
+   * attempt on an already-PENDING_VERIFICATION vendor 409s before ever reaching this code, so it
+   * can never create a second notification for the same submission.
+   */
+  it('creates one VENDOR_PENDING_APPROVAL notification per Superadmin, inside the same transaction as the status update', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(completeVendor);
+    prismaMock.vendorDocument.count.mockResolvedValue(1);
+    prismaMock.branch.findMany.mockResolvedValue([{ state: 'Uttar Pradesh' }]);
+    prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([{ category: { type: 'SERVICE' } }]);
+    prismaMock.vendor.update.mockResolvedValue({ ...completeVendor, status: 'PENDING_VERIFICATION' });
+    prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }, { id: 'superadmin-2' }]);
+    prismaMock.notification.create.mockResolvedValue({});
+
+    const res = await request(app)
+      .post('/api/v1/vendors/me/submit')
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.notification.create).toHaveBeenCalledTimes(2);
+    expect(prismaMock.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          recipientUserId: 'superadmin-1',
+          recipientType: 'SUPERADMIN',
+          type: 'VENDOR_PENDING_APPROVAL',
+          entityType: 'VENDOR',
+          entityId: VENDOR_A_ID,
+        }),
+      }),
+    );
+  });
+
+  it('does not create a duplicate notification when re-submitting an already-pending vendor — blocked by the existing status precondition', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue({ ...completeVendor, status: 'PENDING_VERIFICATION' });
+    const res = await request(app)
+      .post('/api/v1/vendors/me/submit')
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
+    expect(res.status).toBe(409);
+    expect(prismaMock.notification.create).not.toHaveBeenCalled();
   });
 
   it('rejects when no KYC document exists at all (neither real nor legacy)', async () => {
@@ -192,6 +240,7 @@ describe('POST /api/v1/vendors/me/submit', () => {
     prismaMock.branch.findMany.mockResolvedValue([{ state: 'Uttar Pradesh' }]);
     prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([{ category: { type: 'SERVICE' } }]);
     prismaMock.vendor.update.mockResolvedValue({ ...completeVendor, status: 'PENDING_VERIFICATION' });
+    prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
     const res = await request(app)
       .post('/api/v1/vendors/me/submit')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));

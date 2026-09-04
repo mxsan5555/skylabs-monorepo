@@ -91,6 +91,7 @@ export function createPrismaMock() {
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
       count: vi.fn(),
     },
     branch: {
@@ -107,6 +108,7 @@ export function createPrismaMock() {
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
       count: vi.fn(),
     },
     dealPackage: {
@@ -271,6 +273,7 @@ export function createPrismaMock() {
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
       count: vi.fn(),
     },
     therapistPackage: {

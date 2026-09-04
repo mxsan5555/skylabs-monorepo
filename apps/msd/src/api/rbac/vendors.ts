@@ -416,6 +416,12 @@ export function reviewVendorKyc(
   return apiPatch<Vendor>(`/vendors/${id}/kyc-review`, token, { kycStatus, rejectionReason });
 }
 
+/** Hard delete — blocked (409) if the vendor has real order history; use `setVendorStatus` to
+ *  deactivate/suspend instead in that case. */
+export function deleteVendor(token: string | null, id: string) {
+  return apiDelete<null>(`/vendors/${id}`, token);
+}
+
 export function listBranches(token: string | null, vendorId: string) {
   return apiGet<Branch[]>(`/vendors/${vendorId}/branches`, token);
 }
@@ -466,6 +472,12 @@ export function approveDeal(token: string | null, vendorId: string, branchId: st
 
 export function rejectDeal(token: string | null, vendorId: string, branchId: string, dealId: string, rejectionReason: string) {
   return apiPatch<Deal>(`/vendors/${vendorId}/branches/${branchId}/deals/${dealId}/reject`, token, { rejectionReason });
+}
+
+/** Hard delete (admin-on-behalf) — blocked (409) if the deal has real order/cart history; use
+ *  `setDealStatus`'s INACTIVE instead in that case. */
+export function deleteDeal(token: string | null, vendorId: string, branchId: string, dealId: string) {
+  return apiDelete<null>(`/vendors/${vendorId}/branches/${branchId}/deals/${dealId}`, token);
 }
 
 // ─── Self-service surface ─────────────────────────────────────────────────────
@@ -638,6 +650,12 @@ export function updateVendorTherapist(token: string | null, vendorId: string, th
 
 export function setVendorTherapistStatus(token: string | null, vendorId: string, therapistId: string, isActive: boolean) {
   return apiPatch<Therapist>(`/vendors/${vendorId}/therapists/${therapistId}/status`, token, { isActive });
+}
+
+/** Hard delete (admin-on-behalf) — blocked (409) if the therapist has real order/cart history;
+ *  use `setVendorTherapistStatus`'s isActive=false instead in that case. */
+export function deleteVendorTherapist(token: string | null, vendorId: string, therapistId: string) {
+  return apiDelete<null>(`/vendors/${vendorId}/therapists/${therapistId}`, token);
 }
 
 /** A therapist's own duration/price menu entry — independent of any Deal (no Deal picker, no

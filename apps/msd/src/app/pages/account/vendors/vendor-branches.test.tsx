@@ -5,29 +5,26 @@ import type { Category, Deal } from '../../../../api/rbac/vendors';
 import { DealDialog } from './vendor-branches';
 
 /**
- * Feature: DealDialog — Category/Subcategory selects (2-level only)
- * Scenario: a service Deal picks a Category then an optional Subcategory. The former 3rd,
- * Type-tier picker ("Swedish Massage" under "Body Massage") has been removed along with the
- * "Category Types" Master screen it depended on — a Deal's `subcategoryId` is only ever set via
- * the Subcategory select now. A pre-existing Deal whose stored `subcategoryId` happens to be an
- * old Type-tier id (from before this removal) must still resolve to the correct Subcategory
- * selection for display, without crashing or losing the value.
+ * Feature: DealDialog — Product picker removed, Service-only creation
+ * Scenario: the Deal Add/Edit form no longer offers any way to pick or clear a Product — it only
+ * ever creates a Service deal now. Category/Subcategory selects work exactly as before for a
+ * Service deal; opening the dialog on a pre-existing Product deal (created before this removal)
+ * still shows that deal's own read-only category hint and Pricing tab, unchanged, since
+ * `offeringType` is still derived from the loaded deal's own stored `productId` — there is simply
+ * no control left to set, change, or clear one.
  *
- * Given: the vendor's granted SERVICE categories include a Subcategory with Type-tier children
- *        that pre-date this removal, and a 2-level-only branch
- * When: DealDialog renders (fresh Add, or editing an existing Deal at either depth)
- * Then: only Product + Category + (optional) Subcategory selects ever render — never a 3rd Type
- *       select, regardless of the underlying category tree's depth
- *
- * Edge cases:
- * - a fresh Add dialog (no category picked yet) shows neither Subcategory
- * - editing a Deal whose stored subcategoryId is an old Type-tier row still shows the correct
- *   Subcategory pre-selected, with no Type select appearing
- * - a Product-offering deal never shows any of the Service category selects at all (regression)
+ * Given: the vendor's granted SERVICE categories (2- and 3-level branches, including a legacy
+ *        Type-tier row from before the "Category Types" master screen was removed)
+ * When: DealDialog renders (fresh Add, editing a Service deal, or editing a pre-existing Product
+ *       deal)
+ * Then: no "Product" select, no "— None (Service deal) —" option, and no "Select a product"/
+ *       "Offering type" text ever appear, regardless of which deal (if any) is being edited
  *
  * NOTE: like `categories.test.tsx`'s suite, live select-interaction can't be simulated under this
  * jsdom + `@lit/react` + React 19 combination (documented in `search.test.tsx`), so this suite
- * verifies via each dialog's already-resolved initial state rather than driving a live pick.
+ * verifies via each dialog's already-resolved initial state rather than driving a live pick or a
+ * full submit — the toast wording change (`Deal created/updated successfully`) is a one-line
+ * string change verified by direct code review + manual/live testing, not re-asserted here.
  */
 
 const TOP_MASSAGE: Category = { id: 'top-massage', name: 'Massage', slug: 'massage', parentId: null, isActive: true, type: 'SERVICE' };
@@ -66,53 +63,44 @@ function renderDialog(deal?: Deal) {
   );
 }
 
-describe('DealDialog — Category/Subcategory selects (no Type-tier picker)', () => {
-  it('a fresh Add dialog (no category picked yet) shows only the Product + Category selects — no Subcategory', () => {
+describe('DealDialog — Product picker removed (Service-only creation)', () => {
+  it('a fresh Add dialog shows only the Category select — no Product select, no Subcategory yet', () => {
     renderDialog();
     const selects = document.querySelectorAll('md-outlined-select');
-    expect(selects.length).toBe(2); // Product (always visible, no separate "Offering type" toggle), Category
-    const categorySelect = selects[1];
-    expect(optionLabelsOf(categorySelect)).toEqual(['Select a category', 'Massage', 'Home Services']);
+    expect(selects.length).toBe(1);
+    expect(optionLabelsOf(selects[0])).toEqual(['Select a category', 'Massage', 'Home Services']);
   });
 
-  it('editing a Deal whose subcategoryId is a legacy Type-tier row (Swedish Massage) resolves the correct Subcategory, with no Type select rendered', () => {
+  it('editing a Deal whose subcategoryId is a legacy Type-tier row (Swedish Massage) resolves the correct Subcategory, with no Product/Type select rendered', () => {
     renderDialog({ ...DEAL_BASE, categoryId: TOP_MASSAGE.id, subcategoryId: LEGACY_TYPE_SWEDISH.id, productId: null });
     const selects = document.querySelectorAll('md-outlined-select');
-    expect(selects.length).toBe(3); // Product, Category, Subcategory — never a 3rd Type select
-    const subcategorySelect = selects[2];
-    expect(optionLabelsOf(subcategorySelect)).toEqual(['None', 'Body Massage']);
-    expect(screen.queryByText('Type (optional)')).toBeNull();
+    expect(selects.length).toBe(2); // Category, Subcategory — never a Product or Type select
+    expect(optionLabelsOf(selects[1])).toEqual(['None', 'Body Massage']);
   });
 
-  it('editing a Deal whose subcategoryId is a real Subcategory (Body Massage) shows exactly Product/Category/Subcategory, no Type select', () => {
+  it('editing a Deal whose subcategoryId is a real Subcategory (Body Massage) shows exactly Category/Subcategory', () => {
     renderDialog({ ...DEAL_BASE, categoryId: TOP_MASSAGE.id, subcategoryId: SUB_BODY_MASSAGE.id, productId: null });
     const selects = document.querySelectorAll('md-outlined-select');
-    expect(selects.length).toBe(3);
-    expect(screen.queryByText('Type (optional)')).toBeNull();
+    expect(selects.length).toBe(2);
   });
 
-  // Regression / core edge case: a 2-level-only branch (Home Services -> Cleaning) keeps working.
-  it('editing a Deal under a 2-level-only branch (Home Services -> Cleaning) shows Product/Category/Subcategory only', () => {
+  it('editing a Deal under a 2-level-only branch (Home Services -> Cleaning) shows Category/Subcategory only', () => {
     renderDialog({ ...DEAL_BASE, categoryId: TOP_HOME.id, subcategoryId: SUB_CLEANING.id, productId: null });
     const selects = document.querySelectorAll('md-outlined-select');
-    expect(selects.length).toBe(3);
+    expect(selects.length).toBe(2);
   });
 
-  // Regression: a Product-offering deal never renders any of the Service category selects.
-  it('a Product-offering deal shows only the Product picker, not the Service Category/Subcategory cascade', () => {
+  it('editing a pre-existing Product deal shows a read-only category hint and NO selects at all — no way to change or clear the product', () => {
     renderDialog({ ...DEAL_BASE, categoryId: TOP_MASSAGE.id, subcategoryId: null, productId: 'product-1' });
     const selects = document.querySelectorAll('md-outlined-select');
-    expect(selects.length).toBe(1); // Product only — no separate "Offering type" toggle exists
-    expect(screen.queryByText('Type (optional)')).toBeNull();
+    expect(selects.length).toBe(0);
+    expect(screen.getByText(/Category:/)).toBeTruthy();
   });
 
-  // Root-cause regression check for the removed "Offering type" toggle itself: there is no
-  // control with that label anywhere — picking a Product (or leaving it at "None") is the only
-  // signal, matching the backend's own productId-presence convention.
-  it('never renders an "Offering type" control — Service vs Product is derived from the Product picker alone', () => {
-    renderDialog();
+  it('never renders a Product select, "— None (Service deal) —" option, "Select a product" hint, or "Offering type" control, for any deal', () => {
+    renderDialog({ ...DEAL_BASE, categoryId: TOP_MASSAGE.id, subcategoryId: null, productId: 'product-1' });
+    expect(screen.queryByText('Product (leave as None for a service deal)')).toBeNull();
+    expect(screen.queryByText('— None (Service deal) —')).toBeNull();
     expect(screen.queryByText('Offering type')).toBeNull();
-    const productSelect = document.querySelectorAll('md-outlined-select')[0];
-    expect(optionLabelsOf(productSelect)[0]).toBe('— None (Service deal) —');
   });
 });
