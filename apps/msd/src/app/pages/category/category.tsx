@@ -19,6 +19,7 @@ import {
 } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { DealCard } from '../../components/deal-card';
+import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { Breadcrumb } from '../../components/breadcrumb';
