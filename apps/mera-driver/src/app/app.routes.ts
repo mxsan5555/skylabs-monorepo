@@ -3,8 +3,7 @@ import { PublicLayout } from './layouts/public-layout/public-layout';
 import { AuthLayout } from './layouts/auth-layout/auth-layout';
 import { AdminLayout } from './layouts/admin-layout/admin-layout';
 import { RiderLayout } from './layouts/rider-layout/rider-layout';
-import { authGuard } from './core/auth/auth.guard';
-import { roleGuard } from './core/auth/role.guard';
+import { authGuard, permissionGuard } from '@skylabs-monorepo/shared-auth/angular';
 
 /**
  * Route table.

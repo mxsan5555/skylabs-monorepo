@@ -30,6 +30,25 @@ export class SignIn implements OnInit {
       : 'customer',
   );
   protected value = '';
+  protected readonly emailError = signal('');
+  protected readonly phoneError = signal('');
+  protected readonly error = signal<string | null>(null);
+  protected readonly loading = signal(false);
+  protected readonly googleUrl = signal('/auth/google');
+  protected readonly content = signal({
+    labelCustomer: 'Customer',
+    labelDriver: 'Driver',
+    tabEmail: 'Email',
+    tabPhone: 'Phone',
+    labelPhone: 'Phone Number',
+    labelEmail: 'Email Address',
+    btnSendOtp: 'Send OTP',
+    dividerText: 'or',
+    btnGoogle: 'Continue with Google',
+    disclaimer: 'By signing in, you agree to our Terms of Service & Privacy Policy',
+  });
+
+  ngOnInit(): void {}
 
   protected setRole(role: Persona): void {
     this.role.set(role);
