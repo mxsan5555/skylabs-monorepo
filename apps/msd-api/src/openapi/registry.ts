@@ -323,6 +323,25 @@ export function buildOpenApiDocument() {
   });
 
   registry.registerPath({
+    method: 'get',
+    path: '/rbac/users/me',
+    summary: "The caller's own user row + roles — every authenticated user, no rbac.users:* permission needed",
+    tags: ['RBAC - Users'],
+    security: bearer,
+    responses: { 200: { description: 'The caller\'s own user' } },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/rbac/users/me',
+    summary: "Update the caller's own name/email/phone — role can never be changed through this route, for any caller",
+    tags: ['RBAC - Users'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: UserUpdateSchema } } } },
+    responses: { 200: { description: 'Updated' } },
+  });
+
+  registry.registerPath({
     method: 'patch',
     path: '/rbac/users/{id}',
     summary: 'Update a user',
@@ -843,6 +862,16 @@ export function buildOpenApiDocument() {
   });
 
   registry.registerPath({
+    method: 'delete',
+    path: '/vendors/{id}',
+    summary: 'Hard-delete a vendor (blocked if it has real order history)',
+    tags: ['Vendors - Admin'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Deleted' }, 409: errorResponse },
+  });
+
+  registry.registerPath({
     method: 'get',
     path: '/vendors/{vendorId}/branches',
     summary: "A vendor's branches (admin)",
@@ -981,6 +1010,16 @@ export function buildOpenApiDocument() {
       body: { content: { 'application/json': { schema: DealRejectSchema } } },
     },
     responses: { 200: { description: 'Rejected' } },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/vendors/{vendorId}/branches/{branchId}/deals/{dealId}',
+    summary: 'Hard-delete a deal (blocked if it has real order/cart history)',
+    tags: ['Vendors - Admin'],
+    security: bearer,
+    request: { params: z.object({ vendorId: z.string().uuid(), branchId: z.string().uuid(), dealId: z.string().uuid() }) },
+    responses: { 200: { description: 'Deleted' }, 409: errorResponse },
   });
 
   // ─── Categories / Sub Categories ──────────────────────────────────────────────

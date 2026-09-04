@@ -14,6 +14,7 @@ import SignIn from './pages/sign-in/sign-in';
 import Otp from './pages/otp/otp';
 import { ChooseExperience } from './pages/choose-experience/choose-experience';
 import Profile from './pages/account/profile';
+import { MyProfileSettings } from './pages/account/settings/settings';
 import Dashboard from './pages/account/dashboard';
 import { RoleManagement } from './pages/account/roles/roles';
 import { UserManagement } from './pages/account/users/users';
@@ -426,7 +427,7 @@ export function AppRoutes() {
           path="/account/settings"
           element={
             <RequirePermission menuKey="settings">
-              <AdminPage title="Settings" subtitle="Module coming soon." />
+              <MyProfileSettings />
             </RequirePermission>
           }
         />

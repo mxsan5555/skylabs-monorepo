@@ -9,6 +9,7 @@ import {
   createDeal,
   createMyBranch,
   createMyDeal,
+  deleteDeal,
   listBranches,
   listDeals,
   listMyBranches,
@@ -46,6 +47,9 @@ interface VendorBranchesProps {
   isSelf: boolean;
   canEdit: boolean;
   canApproveDeal: boolean;
+  /** Superadmin-only hard delete — no self-service equivalent exists (vendors can only
+   *  Activate/Deactivate their own deals), so this is always `false` on the `isSelf` surface. */
+  canDeleteDeal?: boolean;
   /** The vendor's granted SERVICE categories (`listCategories({ type: 'SERVICE', vendorId })`)
    *  — a service Deal picks directly from these, no global Service master any more. */
   categories: Category[];
@@ -69,7 +73,7 @@ export function groupBranchesByState(branches: Branch[]): { state: string; branc
 
 /** Branch list + nested Deal list for a single vendor — reused for both the admin
  *  (`/vendors/:vendorId/branches...`) and self-service (`/vendors/me/branches...`) surfaces. */
-export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDeal, categories }: VendorBranchesProps) {
+export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDeal, canDeleteDeal = false, categories }: VendorBranchesProps) {
   // Deep-link support for a "New Deal Pending Approval" notification click (see
   // notification-bell.tsx) — both params are optional and purely additive; this page behaves
   // exactly as before when neither is present.
@@ -237,6 +241,17 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
     reloadDeals();
   };
 
+  const doDeleteDeal = async (deal: Deal) => {
+    if (!selectedBranchId) return;
+    if (!window.confirm(`Delete "${deal.title}"? This cannot be undone.`)) return;
+    try {
+      await deleteDeal(token, vendorId, selectedBranchId, deal.id);
+      reloadDeals();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'Could not delete deal.');
+    }
+  };
+
   return (
     <div className="two-pane">
       <section className="panel" aria-label="Branches">
@@ -334,6 +349,7 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
                           <OutlinedButton onClick={() => doRejectDeal(deal)}>Reject</OutlinedButton>
                         </>
                       )}
+                      {canDeleteDeal && <OutlinedButton onClick={() => doDeleteDeal(deal)}>Delete</OutlinedButton>}
                     </div>
                   </li>
                 ))}

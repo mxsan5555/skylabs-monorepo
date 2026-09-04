@@ -632,6 +632,65 @@ describe('PATCH /api/v1/vendors/:id/approve + /reject', () => {
   });
 });
 
+/**
+ * Feature: Superadmin hard-delete for Vendor (Vendor Validation/Delete audit, Phase 4).
+ * `Order`/`OrderItem`'s `vendor` relation has no `onDelete` (Postgres default = restrict), so a
+ * vendor with any real order history can never be hard-deleted — Postgres blocks it with a clean
+ * P2003, translated to CONFLICT (use `/status` to deactivate/suspend instead).
+ */
+describe('DELETE /api/v1/vendors/:id', () => {
+  it('deletes a vendor and writes an audit log entry', async () => {
+    resolveMock.mockResolvedValue(['vendors:delete']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.vendor.delete.mockResolvedValue(vendorAFixture);
+    const res = await request(app)
+      .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(prismaMock.vendor.delete).toHaveBeenCalledWith({ where: { id: VENDOR_A_ID } });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
+  });
+
+  it('404s (not 500) when the vendor does not exist', async () => {
+    resolveMock.mockResolvedValue(['vendors:delete']);
+    prismaMock.vendor.findUnique.mockResolvedValue(null);
+    const res = await request(app)
+      .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(404);
+    expect(prismaMock.vendor.delete).not.toHaveBeenCalled();
+  });
+
+  it('returns a clean 409 (not a raw 500) when the vendor has real order history blocking the delete', async () => {
+    resolveMock.mockResolvedValue(['vendors:delete']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    const { Prisma } = await import('../generated/prisma-client');
+    prismaMock.vendor.delete.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Foreign key constraint failed', { code: 'P2003', clientVersion: 'test' }),
+    );
+    const res = await request(app)
+      .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(409);
+  });
+
+  it('403s without vendors:delete', async () => {
+    resolveMock.mockResolvedValue(['vendors:view']);
+    const res = await request(app)
+      .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(403);
+  });
+
+  it('a vendor cannot delete its own vendor profile', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    const res = await request(app)
+      .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('PATCH /api/v1/vendors/:id/kyc-review', () => {
   it('requires rejectionReason when rejecting KYC', async () => {
     resolveMock.mockResolvedValue(['vendors:approve']);
@@ -685,6 +744,60 @@ describe('Admin nested branch/deal approval', () => {
       .get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_B_ID}/deals`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
     expect(res.status).toBe(403);
+  });
+
+  /**
+   * Feature: Superadmin hard-delete for Deal (Vendor Validation/Delete audit, Phase 4).
+   * `CartItem`/`OrderItem`'s `deal` relation has no `onDelete` (Postgres default = restrict), so a
+   * Deal referenced by any real order/cart can never be hard-deleted — Postgres blocks it with a
+   * clean P2003, translated to CONFLICT.
+   */
+  describe('DELETE /api/v1/vendors/:vendorId/branches/:branchId/deals/:dealId', () => {
+    it('deletes a deal and writes an audit log entry', async () => {
+      resolveMock.mockResolvedValue(['vendors:delete']);
+      prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
+      prismaMock.deal.findUnique.mockResolvedValue(dealAFixture);
+      prismaMock.deal.delete.mockResolvedValue(dealAFixture);
+      const res = await request(app)
+        .delete(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+      expect(res.status).toBe(200);
+      expect(prismaMock.deal.delete).toHaveBeenCalledWith({ where: { id: DEAL_A_ID } });
+      expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
+    });
+
+    it('403s (not a raw delete) when the deal belongs to a different vendor than the URL claims', async () => {
+      resolveMock.mockResolvedValue(['vendors:delete']);
+      prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
+      prismaMock.deal.findUnique.mockResolvedValue({ ...dealAFixture, vendorId: VENDOR_B_ID });
+      const res = await request(app)
+        .delete(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+      expect(res.status).toBe(403);
+      expect(prismaMock.deal.delete).not.toHaveBeenCalled();
+    });
+
+    it('returns a clean 409 (not a raw 500) when the deal has real order/cart history blocking the delete', async () => {
+      resolveMock.mockResolvedValue(['vendors:delete']);
+      prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
+      prismaMock.deal.findUnique.mockResolvedValue(dealAFixture);
+      const { Prisma } = await import('../generated/prisma-client');
+      prismaMock.deal.delete.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Foreign key constraint failed', { code: 'P2003', clientVersion: 'test' }),
+      );
+      const res = await request(app)
+        .delete(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+      expect(res.status).toBe(409);
+    });
+
+    it('403s without vendors:delete', async () => {
+      resolveMock.mockResolvedValue(['vendors:view']);
+      const res = await request(app)
+        .delete(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+      expect(res.status).toBe(403);
+    });
   });
 });
 
@@ -1360,6 +1473,57 @@ describe('Therapist (admin-on-behalf — mirrors Branch/Deal exact admin split)'
 
     expect(res.status).toBe(422);
     expect(prismaMock.therapist.create).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Feature: Superadmin hard-delete for Therapist (Vendor Validation/Delete audit, Phase 4).
+   * `CartItem`/`OrderItem`'s `therapist` relation has no `onDelete` (Postgres default = restrict),
+   * so a Therapist referenced by any real order/cart can never be hard-deleted — Postgres blocks
+   * it with a clean P2003, translated to CONFLICT (never a raw 500, never silent data loss).
+   */
+  describe('DELETE /api/v1/vendors/:vendorId/therapists/:therapistId', () => {
+    it('deletes a therapist and writes an audit log entry', async () => {
+      resolveMock.mockResolvedValue(['vendors:delete']);
+      prismaMock.therapist.findUnique.mockResolvedValue(therapistAFixture);
+      prismaMock.therapist.delete.mockResolvedValue(therapistAFixture);
+      const res = await request(app)
+        .delete(`/api/v1/vendors/${VENDOR_A_ID}/therapists/${THERAPIST_A_ID}`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+      expect(res.status).toBe(200);
+      expect(prismaMock.therapist.delete).toHaveBeenCalledWith({ where: { id: THERAPIST_A_ID } });
+      expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
+    });
+
+    it('403s (not a raw delete) when the therapist belongs to a different vendor than the URL claims', async () => {
+      resolveMock.mockResolvedValue(['vendors:delete']);
+      prismaMock.therapist.findUnique.mockResolvedValue({ ...therapistAFixture, vendorId: VENDOR_B_ID });
+      const res = await request(app)
+        .delete(`/api/v1/vendors/${VENDOR_A_ID}/therapists/${THERAPIST_A_ID}`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+      expect(res.status).toBe(403);
+      expect(prismaMock.therapist.delete).not.toHaveBeenCalled();
+    });
+
+    it('returns a clean 409 (not a raw 500) when the therapist has real order/cart history blocking the delete', async () => {
+      resolveMock.mockResolvedValue(['vendors:delete']);
+      prismaMock.therapist.findUnique.mockResolvedValue(therapistAFixture);
+      const { Prisma } = await import('../generated/prisma-client');
+      prismaMock.therapist.delete.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Foreign key constraint failed', { code: 'P2003', clientVersion: 'test' }),
+      );
+      const res = await request(app)
+        .delete(`/api/v1/vendors/${VENDOR_A_ID}/therapists/${THERAPIST_A_ID}`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+      expect(res.status).toBe(409);
+    });
+
+    it('403s without vendors:delete', async () => {
+      resolveMock.mockResolvedValue(['vendors:view']);
+      const res = await request(app)
+        .delete(`/api/v1/vendors/${VENDOR_A_ID}/therapists/${THERAPIST_A_ID}`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+      expect(res.status).toBe(403);
+    });
   });
 });
 

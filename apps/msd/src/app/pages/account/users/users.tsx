@@ -35,6 +35,10 @@ export function UserManagement() {
   const [usersLoading, setUsersLoading] = useState(true);
   const [usersError, setUsersError] = useState('');
   const [search, setSearch] = useState('');
+  /** '' = All. Superadmin itself is never offered here — that role is excluded from this list
+   *  server-side (see `user.service.ts#listUsers`'s own doc comment), so filtering by it would
+   *  always return zero rows. */
+  const [roleFilter, setRoleFilter] = useState('');
 
   const [allRoles, setAllRoles] = useState<Role[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -65,7 +69,7 @@ export function UserManagement() {
     setUsersLoading(true);
     setUsersError('');
     try {
-      const { data, meta } = await listUsers(token, page, PAGE_SIZE);
+      const { data, meta } = await listUsers(token, page, PAGE_SIZE, roleFilter || undefined);
       setUsers(data);
       setTotal(meta?.total ?? data.length);
     } catch (err) {
@@ -73,11 +77,15 @@ export function UserManagement() {
     } finally {
       setUsersLoading(false);
     }
-  }, [token, page]);
+  }, [token, page, roleFilter]);
 
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [roleFilter]);
 
   useEffect(() => {
     listRoles(token)
@@ -234,6 +242,22 @@ export function UserManagement() {
             value={search}
             onInput={(e: Event) => setSearch((e.target as HTMLInputElement).value)}
           />
+          <OutlinedSelect
+            label="Role"
+            value={roleFilter}
+            onChange={(e: Event) => setRoleFilter((e.target as HTMLSelectElement).value)}
+          >
+            <SelectOption value="">
+              <div slot="headline">All</div>
+            </SelectOption>
+            {allRoles
+              .filter((r) => !r.isSuperAdmin)
+              .map((r) => (
+                <SelectOption key={r.id} value={r.key}>
+                  <div slot="headline">{r.name}</div>
+                </SelectOption>
+              ))}
+          </OutlinedSelect>
           {usersLoading ? (
             <p className="loading-state">Loading users…</p>
           ) : usersError ? (
