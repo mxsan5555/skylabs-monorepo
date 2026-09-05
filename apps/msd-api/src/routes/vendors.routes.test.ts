@@ -13,6 +13,18 @@ vi.mock('../services/permission-resolver.service', () => ({
   resolveGrantedPermissionKeys: vi.fn(),
 }));
 
+// Same mock shape as vendor-kyc-documents.routes.test.ts / media.routes.test.ts / categories.
+// routes.test.ts — without this, the image/video upload routes tested below would write real
+// files under the real uploads directory on every test run.
+vi.mock('../lib/media-storage', () => ({
+  getUploadRoot: vi.fn(() => '/fake/uploads/media'),
+  writeMediaFile: vi.fn(async (subdir: string, parentId: string, buffer: Buffer) => ({
+    storageKey: `${subdir}/${parentId}/fake.jpg`,
+    sizeBytes: buffer.length,
+  })),
+  deleteMediaFile: vi.fn(async () => undefined),
+}));
+
 import app from '../app';
 import { prisma } from '../lib/prisma';
 import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
@@ -60,6 +72,25 @@ const productGrantFixture = { id: 'grant-product', vendorId: VENDOR_A_ID, catego
 
 const baseServiceDealBody = { categoryId: CATEGORY_ID, title: 'Haircut deal', slug: 'haircut-deal', originalPrice: '399.00', salePrice: '299.00' };
 const baseProductDealBody = { categoryId: PRODUCT_CATEGORY_ID, title: 'Face Cream deal', slug: 'face-cream-deal', originalPrice: '399.00', salePrice: '299.00' };
+
+/** A byte-exact, magic-byte-valid JPEG buffer, well under any size ceiling — same helper shape as
+ *  categories.routes.test.ts's own `validJpeg()`. */
+function validJpeg(): Buffer {
+  const buffer = Buffer.alloc(50 * 1024, 0);
+  buffer[0] = 0xff;
+  buffer[1] = 0xd8;
+  buffer[2] = 0xff;
+  return buffer;
+}
+
+/** A byte-exact, magic-byte-valid MP4 buffer (an `ftyp` ISO-BMFF box at offset 4, non-`qt  ` major
+ *  brand — see media-magic-bytes.ts's `sniffMediaType`), well under the 1MB video ceiling. */
+function validMp4(): Buffer {
+  const buffer = Buffer.alloc(1024, 0);
+  buffer.write('ftyp', 4, 'ascii');
+  buffer.write('isom', 8, 'ascii');
+  return buffer;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -423,6 +454,63 @@ describe('POST /api/v1/vendors/:vendorId/branches — latitude/longitude/pincode
   });
 });
 
+/**
+ * Feature: Branch working-hours persistence (Branch schedule audit). Root cause of "branch hours
+ * never save, frontend shows nothing dynamic": `BranchFieldsSchema` had no `openingHours` field
+ * at all, so `validateBody` (which replaces `req.body` with Zod's parsed output, silently
+ * dropping any undeclared key) stripped it before `createBranch`/`updateBranch` ever ran — the
+ * edit form itself was already correct; the value just never reached the database.
+ */
+describe('POST/PATCH /api/v1/vendors/:vendorId/branches — openingHours persistence', () => {
+  const openingHours = {
+    mon: { open: true, start: '10:00', end: '20:00' },
+    wed: { open: false },
+    sun: { open: false },
+  };
+
+  it('POST persists openingHours instead of silently stripping it', async () => {
+    resolveMock.mockResolvedValue(['vendors:create']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.branch.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: BRANCH_A_ID, ...data }),
+    );
+    const res = await request(app)
+      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ name: 'Golghar Branch', openingHours });
+    expect(res.status).toBe(201);
+    expect(res.body.data.openingHours).toEqual(openingHours);
+    expect(prismaMock.branch.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ openingHours }) }),
+    );
+  });
+
+  it('PATCH persists an openingHours update the same way', async () => {
+    resolveMock.mockResolvedValue(['vendors:edit']);
+    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
+    prismaMock.branch.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ ...branchAFixture, ...data }),
+    );
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ openingHours });
+    expect(res.status).toBe(200);
+    expect(res.body.data.openingHours).toEqual(openingHours);
+  });
+
+  it('rejects a malformed time string (not 24-hour HH:MM) with a 422, not a silent strip', async () => {
+    resolveMock.mockResolvedValue(['vendors:create']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    const res = await request(app)
+      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ name: 'Golghar Branch', openingHours: { mon: { open: true, start: '10 AM', end: '20:00' } } });
+    expect(res.status).toBe(422);
+    expect(prismaMock.branch.create).not.toHaveBeenCalled();
+  });
+});
+
 describe('GET /api/v1/vendors/users/search', () => {
   it('returns 403 without vendors:create', async () => {
     resolveMock.mockResolvedValue([]);
@@ -711,6 +799,235 @@ describe('PATCH /api/v1/vendors/:id/kyc-review', () => {
       .send({ kycStatus: 'VERIFIED' });
     expect(res.status).toBe(200);
     expect(res.body.data.kycStatus).toBe('VERIFIED');
+  });
+});
+
+/**
+ * Feature: Vendor KYC/Profile — removing the profile image (self-service, `/me/images/:imageId`).
+ * Verified separately from the admin-on-behalf routes below: this route never had the
+ * `validateParams(UuidParamSchema)` param-stripping bug (no `validateParams` call at all here),
+ * but had zero direct test coverage. Also covers the "physical file already missing" requirement
+ * — `deleteMediaFile` already swallows ENOENT and `mediaService.deleteImage` already catches any
+ * other file-deletion error after the DB delete has committed, so a missing/already-deleted file
+ * must never turn a genuine removal into a failed one.
+ */
+describe('Self-service vendor image removal (Vendor login)', () => {
+  const IMAGE_ID = 'bbbbbbbb-0000-4000-8000-000000000088';
+
+  it('a vendor can remove their own profile image', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.vendorImage.findUnique.mockResolvedValue({ id: IMAGE_ID, vendorId: VENDOR_A_ID, isPrimary: false, storageKey: 'vendors/x/a.jpg' });
+    prismaMock.vendorImage.delete.mockResolvedValue({ id: IMAGE_ID });
+    const res = await request(app)
+      .delete(`/api/v1/vendors/me/images/${IMAGE_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
+    expect(res.status).toBe(200);
+    expect(prismaMock.vendorImage.delete).toHaveBeenCalledWith({ where: { id: IMAGE_ID } });
+  });
+
+  it('succeeds even when the physical file is already missing from disk (ENOENT swallowed, DB update still commits)', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.vendorImage.findUnique.mockResolvedValue({ id: IMAGE_ID, vendorId: VENDOR_A_ID, isPrimary: false, storageKey: 'vendors/x/already-gone.jpg' });
+    prismaMock.vendorImage.delete.mockResolvedValue({ id: IMAGE_ID });
+    const { deleteMediaFile } = await import('../lib/media-storage');
+    vi.mocked(deleteMediaFile).mockRejectedValueOnce(Object.assign(new Error('not found'), { code: 'ENOENT' }));
+    const res = await request(app)
+      .delete(`/api/v1/vendors/me/images/${IMAGE_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
+    expect(res.status).toBe(200);
+    expect(prismaMock.vendorImage.delete).toHaveBeenCalledWith({ where: { id: IMAGE_ID } });
+  });
+
+  it('404s (not 500) removing an image id that does not exist', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.vendorImage.findUnique.mockResolvedValue(null);
+    const res = await request(app)
+      .delete(`/api/v1/vendors/me/images/${IMAGE_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
+    expect(res.status).toBe(404);
+  });
+
+  it('403s (not 500) removing an image that belongs to a different vendor', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.vendorImage.findUnique.mockResolvedValue({ id: IMAGE_ID, vendorId: VENDOR_B_ID, isPrimary: false, storageKey: 'vendors/y/a.jpg' });
+    const res = await request(app)
+      .delete(`/api/v1/vendors/me/images/${IMAGE_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
+    expect(res.status).toBe(404); // deleteImage 404s on parentId mismatch, never leaks another vendor's row
+  });
+});
+
+/**
+ * Feature: admin vendor-image routes — `imageId` route-param regression.
+ * `validateParams` replaces `req.params` with Zod's parsed output, and Zod silently strips any
+ * key not declared on the schema. `DELETE /:id/images/:imageId` and
+ * `PATCH /:id/images/:imageId/primary` used the bare `UuidParamSchema` (only `id`), so
+ * `req.params.imageId` was always `undefined` — the actual root cause of "removing a vendor
+ * profile image throws an error." `VendorImageIdParamSchema` declares both params.
+ */
+describe('Admin vendor image routes — imageId param regression', () => {
+  const IMAGE_ID = 'aaaaaaaa-0000-4000-8000-000000000099';
+
+  it('DELETE /:id/images/:imageId reaches the service with the real imageId, not undefined', async () => {
+    resolveMock.mockResolvedValue(['vendors:edit']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.vendorImage.findUnique.mockResolvedValue({ id: IMAGE_ID, vendorId: VENDOR_A_ID, isPrimary: false, storageKey: 'vendors/x/a.jpg' });
+    prismaMock.vendorImage.delete.mockResolvedValue({ id: IMAGE_ID });
+    const res = await request(app)
+      .delete(`/api/v1/vendors/${VENDOR_A_ID}/images/${IMAGE_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(prismaMock.vendorImage.findUnique).toHaveBeenCalledWith({ where: { id: IMAGE_ID } });
+    expect(prismaMock.vendorImage.delete).toHaveBeenCalledWith({ where: { id: IMAGE_ID } });
+  });
+
+  it('PATCH /:id/images/:imageId/primary reaches the service with the real imageId, not undefined', async () => {
+    resolveMock.mockResolvedValue(['vendors:edit']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.vendorImage.findUnique.mockResolvedValue({ id: IMAGE_ID, vendorId: VENDOR_A_ID, isPrimary: false });
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}/images/${IMAGE_ID}/primary`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(prismaMock.vendorImage.findUnique).toHaveBeenCalledWith({ where: { id: IMAGE_ID } });
+  });
+
+  it('422s (not a 500) for a malformed imageId instead of silently stripping it', async () => {
+    resolveMock.mockResolvedValue(['vendors:edit']);
+    const res = await request(app)
+      .delete(`/api/v1/vendors/${VENDOR_A_ID}/images/not-a-uuid`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(422);
+  });
+});
+
+/**
+ * Feature: admin product routes — `productId` route-param regression, same bug class as the
+ * vendor-image one above. `PATCH /:vendorId/products/:productId[/status]` and
+ * `DELETE /:vendorId/products/:productId` used the bare `VendorIdParamSchema` (only `vendorId`),
+ * so `req.params.productId` was always `undefined` — the actual root cause behind "editing a
+ * product" failing from the Superadmin console (not just its media upload).
+ */
+describe('Admin product routes — productId param regression', () => {
+  it('PATCH /:vendorId/products/:productId reaches the service with the real productId, not undefined', async () => {
+    resolveMock.mockResolvedValue(['products:edit']);
+    prismaMock.product.findUnique.mockResolvedValue(productFixture);
+    prismaMock.product.update.mockResolvedValue({ ...productFixture, name: 'Updated Name' });
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}/products/${PRODUCT_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ name: 'Updated Name' });
+    expect(res.status).toBe(200);
+    expect(prismaMock.product.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: PRODUCT_ID } }),
+    );
+  });
+
+  it('DELETE /:vendorId/products/:productId reaches the service with the real productId, not undefined', async () => {
+    resolveMock.mockResolvedValue(['products:delete']);
+    prismaMock.product.findUnique.mockResolvedValue(productFixture);
+    prismaMock.product.delete.mockResolvedValue(productFixture);
+    const res = await request(app)
+      .delete(`/api/v1/vendors/${VENDOR_A_ID}/products/${PRODUCT_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(prismaMock.product.delete).toHaveBeenCalledWith({ where: { id: PRODUCT_ID } });
+  });
+
+  it('422s (not a 500) for a malformed productId instead of silently stripping it', async () => {
+    resolveMock.mockResolvedValue(['products:edit']);
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}/products/not-a-uuid`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ name: 'X' });
+    expect(res.status).toBe(422);
+  });
+});
+
+/**
+ * Feature: admin-on-behalf product media routes — these never existed on the backend at all,
+ * which was the actual root cause of "upload fails when adding/editing a product" from the
+ * Superadmin console: `apps/msd/src/api/media.ts`'s `basePath()` always targets
+ * `/vendors/:vendorId/products/:productId/images` here (the admin product wizard never passes
+ * `selfService`), so every such request 404'd before reaching any multer/Zod validation.
+ */
+describe('Admin-on-behalf product media routes (previously missing entirely)', () => {
+  it('POST /:vendorId/products/:productId/images uploads successfully', async () => {
+    resolveMock.mockResolvedValue(['products:edit']);
+    prismaMock.product.findUnique.mockResolvedValue(productFixture);
+    prismaMock.productImage.create.mockResolvedValue({ id: 'img-1', productId: PRODUCT_ID, storageKey: 'products/x/a.jpg' });
+    prismaMock.productImage.count.mockResolvedValue(0);
+    const res = await request(app)
+      .post(`/api/v1/vendors/${VENDOR_A_ID}/products/${PRODUCT_ID}/images`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .attach('file', validJpeg(), 'photo.png');
+    expect(res.status).toBe(201);
+  });
+
+  it('DELETE /:vendorId/products/:productId/images/:imageId deletes successfully', async () => {
+    resolveMock.mockResolvedValue(['products:edit']);
+    prismaMock.product.findUnique.mockResolvedValue(productFixture);
+    prismaMock.productImage.findUnique.mockResolvedValue({ id: 'img-1', productId: PRODUCT_ID, isPrimary: false, storageKey: 'products/x/a.jpg' });
+    prismaMock.productImage.delete.mockResolvedValue({ id: 'img-1' });
+    const res = await request(app)
+      .delete(`/api/v1/vendors/${VENDOR_A_ID}/products/${PRODUCT_ID}/images/img-1`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(200);
+  });
+
+  it('404s (not a raw 500) creating media for a product that does not belong to the URL vendor', async () => {
+    resolveMock.mockResolvedValue(['products:edit']);
+    prismaMock.product.findUnique.mockResolvedValue(null);
+    const res = await request(app)
+      .post(`/api/v1/vendors/${VENDOR_A_ID}/products/${PRODUCT_ID}/images`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .attach('file', validJpeg(), 'photo.png');
+    expect(res.status).toBe(404);
+  });
+});
+
+/**
+ * Feature: `listDeals` includes `packages` (Deal Edit "packages not showing" fix).
+ * The Edit dialog is always seeded from this list response (there is no single-deal GET), so if
+ * this `include` ever omits `packages` again, every existing DealPackage silently disappears from
+ * the Edit form even though the rows are still in the database untouched.
+ */
+describe('GET .../branches/:branchId/deals — includes packages (regression)', () => {
+  const packagesFixture = [
+    { id: 'pkg-1', dealId: DEAL_A_ID, durationMinutes: 30, sellingPrice: '500.00', originalPrice: null, isActive: true, sortOrder: 0 },
+    { id: 'pkg-2', dealId: DEAL_A_ID, durationMinutes: 60, sellingPrice: '900.00', originalPrice: null, isActive: true, sortOrder: 1 },
+  ];
+
+  it('self-service GET /me/branches/:branchId/deals includes each deal\'s packages', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
+    prismaMock.deal.findMany.mockResolvedValue([{ ...dealAFixture, packages: packagesFixture }]);
+    const res = await request(app)
+      .get(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/deals`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].packages).toHaveLength(2);
+    expect(res.body.data[0].packages[0].durationMinutes).toBe(30);
+    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ include: expect.objectContaining({ packages: expect.anything() }) }),
+    );
+  });
+
+  it('admin-on-behalf GET /:vendorId/branches/:branchId/deals also includes each deal\'s packages', async () => {
+    resolveMock.mockResolvedValue(['vendors:view']);
+    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
+    prismaMock.deal.findMany.mockResolvedValue([{ ...dealAFixture, packages: packagesFixture }]);
+    const res = await request(app)
+      .get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].packages).toHaveLength(2);
+    expect(res.body.data[0].packages[1].sellingPrice).toBe('900.00');
   });
 });
 
@@ -1033,6 +1350,108 @@ describe('Deal offering integration (direct category access)', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.salePrice).toBe('249.00');
     expect(prismaMock.vendorCategoryAccess.findUnique).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Feature: Deal Edit — existing packages must never be silently deleted (the actual data-loss
+   * risk behind "packages disappear after refresh"). Root cause was `listDeals` omitting
+   * `packages` from its `include` (fixed separately) — DealDialog always seeds its package state
+   * from `deal.packages` and always resubmits the full current array on every save of a service
+   * deal, so once the load-side bug was fixed, a correctly-loaded existing package's real `id`
+   * flows straight back into the PATCH body and `updateDeal`'s diff-by-id logic below updates it
+   * in place. These tests lock in that guarantee at the API layer, independent of the frontend.
+   */
+  describe('13. Deal packages — update never silently deletes existing rows', () => {
+    const EXISTING_PKG_A = 'e1e1e1e1-0000-4000-8000-0000000000f1';
+    const EXISTING_PKG_B = 'e2e2e2e2-0000-4000-8000-0000000000f2';
+
+    it('PATCH with no `packages` key at all leaves existing packages completely untouched', async () => {
+      resolveMock.mockResolvedValue(['vendors:edit']);
+      prismaMock.deal.findUnique.mockResolvedValue(dealAFixture);
+      prismaMock.deal.update.mockResolvedValue({ ...dealAFixture, title: 'Renamed' });
+      prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ ...dealAFixture, title: 'Renamed', packages: [] });
+      const res = await request(app)
+        .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+        .send({ title: 'Renamed' });
+      expect(res.status).toBe(200);
+      expect(prismaMock.dealPackage.findMany).not.toHaveBeenCalled();
+      expect(prismaMock.dealPackage.deleteMany).not.toHaveBeenCalled();
+      expect(prismaMock.dealPackage.update).not.toHaveBeenCalled();
+      expect(prismaMock.dealPackage.create).not.toHaveBeenCalled();
+    });
+
+    it('PATCH resubmitting existing packages by id (unchanged values) updates each in place — never deletes, never recreates', async () => {
+      resolveMock.mockResolvedValue(['vendors:edit']);
+      prismaMock.deal.findUnique.mockResolvedValue(dealAFixture);
+      prismaMock.deal.update.mockResolvedValue(dealAFixture);
+      prismaMock.dealPackage.findMany.mockResolvedValue([{ id: EXISTING_PKG_A }, { id: EXISTING_PKG_B }]);
+      prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ ...dealAFixture, packages: [] });
+      const res = await request(app)
+        .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+        .send({
+          packages: [
+            { id: EXISTING_PKG_A, durationMinutes: 30, sellingPrice: 500 },
+            { id: EXISTING_PKG_B, durationMinutes: 60, sellingPrice: 900 },
+          ],
+        });
+      expect(res.status).toBe(200);
+      expect(prismaMock.dealPackage.deleteMany).not.toHaveBeenCalled();
+      expect(prismaMock.dealPackage.create).not.toHaveBeenCalled();
+      expect(prismaMock.dealPackage.update).toHaveBeenCalledTimes(2);
+      expect(prismaMock.dealPackage.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: EXISTING_PKG_A } }),
+      );
+      expect(prismaMock.dealPackage.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: EXISTING_PKG_B } }),
+      );
+    });
+
+    it('A modified + B unchanged + C newly added + D removed → A/B updated, C created, D deleted (nothing else touched)', async () => {
+      const EXISTING_PKG_D = 'e3e3e3e3-0000-4000-8000-0000000000f3';
+      resolveMock.mockResolvedValue(['vendors:edit']);
+      prismaMock.deal.findUnique.mockResolvedValue(dealAFixture);
+      prismaMock.deal.update.mockResolvedValue(dealAFixture);
+      // D existed before this save but is absent from the submitted array below — must be deleted.
+      prismaMock.dealPackage.findMany.mockResolvedValue([{ id: EXISTING_PKG_A }, { id: EXISTING_PKG_B }, { id: EXISTING_PKG_D }]);
+      prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ ...dealAFixture, packages: [] });
+      const res = await request(app)
+        .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+        .send({
+          packages: [
+            { id: EXISTING_PKG_A, durationMinutes: 45, sellingPrice: 600 }, // modified
+            { id: EXISTING_PKG_B, durationMinutes: 60, sellingPrice: 900 }, // unchanged
+            { durationMinutes: 90, sellingPrice: 1200 }, // new, no id
+          ],
+        });
+      expect(res.status).toBe(200);
+      expect(prismaMock.dealPackage.update).toHaveBeenCalledTimes(2);
+      expect(prismaMock.dealPackage.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: EXISTING_PKG_A }, data: expect.objectContaining({ durationMinutes: 45 }) }),
+      );
+      expect(prismaMock.dealPackage.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: EXISTING_PKG_B }, data: expect.objectContaining({ durationMinutes: 60 }) }),
+      );
+      expect(prismaMock.dealPackage.create).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ data: expect.objectContaining({ dealId: DEAL_A_ID, durationMinutes: 90 }) }),
+      );
+      expect(prismaMock.dealPackage.deleteMany).toHaveBeenCalledExactlyOnceWith({ where: { id: { in: [EXISTING_PKG_D] } } });
+    });
+
+    it('PATCH with an empty packages array ([]) is rejected at validation (422) before it can ever reach the delete logic — DealUpdateSchema\'s own existing safety net', async () => {
+      resolveMock.mockResolvedValue(['vendors:edit']);
+      const res = await request(app)
+        .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+        .send({ packages: [] });
+      expect(res.status).toBe(422);
+      expect(JSON.stringify(res.body.error)).toMatch(/omit `packages` to leave them unchanged/);
+      // Never even reaches the deal lookup, let alone the package diff/delete logic.
+      expect(prismaMock.deal.findUnique).not.toHaveBeenCalled();
+      expect(prismaMock.dealPackage.deleteMany).not.toHaveBeenCalled();
+    });
   });
 
   describe('Superadmin notification on vendor deal submission', () => {
@@ -1473,6 +1892,68 @@ describe('Therapist (admin-on-behalf — mirrors Branch/Deal exact admin split)'
 
     expect(res.status).toBe(422);
     expect(prismaMock.therapist.create).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Feature: admin-on-behalf therapist media routes (previously missing entirely) — the actual
+   * root cause of "Superadmin's Add Therapist form has no image/video upload". Superadmin's
+   * `WizardTherapistFormDialog` always targets `/vendors/:vendorId/therapists/:therapistId/...`
+   * (never the self-service `/me/...` routes), so before these routes existed every such request
+   * 404'd before reaching any multer/validation.
+   */
+  describe('Admin-on-behalf therapist media routes (previously missing entirely)', () => {
+    it('POST /:vendorId/therapists/:therapistId/images uploads successfully', async () => {
+      resolveMock.mockResolvedValue(['vendors:edit']);
+      prismaMock.therapist.findUnique.mockResolvedValue(therapistAFixture);
+      prismaMock.therapistImage.create.mockResolvedValue({ id: 'timg-1', therapistId: THERAPIST_A_ID, storageKey: 'therapists/x/a.jpg' });
+      prismaMock.therapistImage.count.mockResolvedValue(0);
+      const res = await request(app)
+        .post(`/api/v1/vendors/${VENDOR_A_ID}/therapists/${THERAPIST_A_ID}/images`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+        .attach('file', validJpeg(), 'photo.jpg');
+      expect(res.status).toBe(201);
+    });
+
+    it('DELETE /:vendorId/therapists/:therapistId/images/:imageId deletes successfully', async () => {
+      resolveMock.mockResolvedValue(['vendors:edit']);
+      prismaMock.therapist.findUnique.mockResolvedValue(therapistAFixture);
+      prismaMock.therapistImage.findUnique.mockResolvedValue({ id: 'timg-1', therapistId: THERAPIST_A_ID, isPrimary: false, storageKey: 'therapists/x/a.jpg' });
+      prismaMock.therapistImage.delete.mockResolvedValue({ id: 'timg-1' });
+      const res = await request(app)
+        .delete(`/api/v1/vendors/${VENDOR_A_ID}/therapists/${THERAPIST_A_ID}/images/timg-1`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+      expect(res.status).toBe(200);
+    });
+
+    it('POST /:vendorId/therapists/:therapistId/video uploads successfully', async () => {
+      resolveMock.mockResolvedValue(['vendors:edit']);
+      prismaMock.therapist.findUnique.mockResolvedValue(therapistAFixture);
+      prismaMock.therapistVideo.upsert.mockResolvedValue({ id: 'tvid-1', therapistId: THERAPIST_A_ID, storageKey: 'therapists/x/v.mp4' });
+      const res = await request(app)
+        .post(`/api/v1/vendors/${VENDOR_A_ID}/therapists/${THERAPIST_A_ID}/video`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+        .attach('file', validMp4(), 'clip.mp4');
+      expect(res.status).toBe(201);
+    });
+
+    it('404s (not a raw 500) uploading media for a therapist that does not belong to the URL vendor', async () => {
+      resolveMock.mockResolvedValue(['vendors:edit']);
+      prismaMock.therapist.findUnique.mockResolvedValue(null);
+      const res = await request(app)
+        .post(`/api/v1/vendors/${VENDOR_A_ID}/therapists/${THERAPIST_A_ID}/images`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+        .attach('file', validJpeg(), 'photo.jpg');
+      expect(res.status).toBe(404);
+    });
+
+    it('403s without vendors:edit', async () => {
+      resolveMock.mockResolvedValue(['vendors:view']);
+      const res = await request(app)
+        .post(`/api/v1/vendors/${VENDOR_A_ID}/therapists/${THERAPIST_A_ID}/images`)
+        .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+        .attach('file', validJpeg(), 'photo.jpg');
+      expect(res.status).toBe(403);
+    });
   });
 
   /**

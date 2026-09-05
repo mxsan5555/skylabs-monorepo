@@ -19,10 +19,12 @@ import {
   type AdminTherapist,
   type Branch,
   type Category,
+  type Therapist,
   type TherapistInput,
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useToast } from '../../../../toast/toast-context';
+import { MediaUploader } from '../../../components/media-uploader';
 
 interface VendorTherapistsStepProps {
   token: string | null;
@@ -39,24 +41,17 @@ interface VendorTherapistsStepProps {
 }
 
 /**
- * Onboarding wizard Step 4 — Therapist CRUD, admin-on-behalf. msd-api has grown
+ * Onboarding wizard Step 4 — Therapist CRUD, admin-on-behalf. msd-api has
  * `POST /vendors/:vendorId/branches/:branchId/therapists` and `PATCH
  * /vendors/:vendorId/therapists/:therapistId[/status]` (mirroring Branch/Deal/Product's existing
  * self-service + admin-on-behalf split — see `createVendorTherapist`/`updateVendorTherapist`/
- * `setVendorTherapistStatus` in `api/rbac/vendors.ts`), closing the gap this file used to flag in
- * its own doc comment. This step is no longer read-only.
- *
- * Deliberately does NOT reuse `vendor-therapists.tsx`'s self-service `TherapistFormDialog`
- * verbatim (unlike `VendorBranchListStep`'s reuse of `BranchDialog`): that dialog embeds a
- * `MediaUploader` pointed at the therapist media routes, which are still self-service-only
- * (`/vendors/me/therapists/:id/...` — see `api/media.ts`'s `basePath`, whose `therapist` case has
- * no `vendorId` branch the way `product`'s does). Reusing it here would silently upload any photo
- * the admin picks against the ADMIN'S OWN therapist record instead of the vendor being onboarded
- * — exactly the misdirection the admin-on-behalf routes exist to avoid. So this step has its own
- * form (same field set and specialization-category picker as the self-service one) and simply
- * omits media upload until msd-api grows an admin-on-behalf therapist media route — mirroring how
- * `VendorProductsStep`'s own `ProductFormDialog` only wires `MediaUploader` with a `vendorId`
- * because Product's media routes actually support that split.
+ * `setVendorTherapistStatus` in `api/rbac/vendors.ts`). msd-api has since also grown
+ * `POST/DELETE /vendors/:vendorId/therapists/:therapistId/images[...]` and `/video` (mirroring
+ * Product's own admin-on-behalf media split — see `api/media.ts`'s `basePath`, whose `therapist`
+ * case now has a `vendorId` branch the same way `product`'s does), so this step's own form wires
+ * `MediaUploader` with a `vendorId` exactly like `VendorProductsStep`'s `ProductFormDialog`
+ * — no more media-upload gap, and no duplicate upload system: the same shared `MediaUploader`
+ * component every other entity type uses.
  */
 export function VendorTherapistsStep({
   token,
@@ -94,18 +89,17 @@ export function VendorTherapistsStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, vendorId]);
 
-  // Returns void, not the saved row — the dialog doesn't need it back (no staged-media flow to
-  // key off it, unlike `ProductFormDialog`'s `savedProduct`); `load()` already refreshes the
-  // admin-shaped list (with `branch` nested in) that the list view and `onTherapistsChange`
-  // consume.
+  // Returns the saved row (like `VendorProductsStep`'s own `save`) so `WizardTherapistFormDialog`
+  // can key its `MediaUploader` off a real id right after a fresh create — `load()` separately
+  // refreshes the admin-shaped list (with `branch` nested in) that the list view and
+  // `onTherapistsChange` consume.
   const save = async (input: TherapistInput, branchId: string, existing?: AdminTherapist) => {
-    if (existing) {
-      await updateVendorTherapist(token, vendorId, existing.id, input);
-    } else {
-      await createVendorTherapist(token, vendorId, branchId, input);
-    }
+    const { data } = existing
+      ? await updateVendorTherapist(token, vendorId, existing.id, input)
+      : await createVendorTherapist(token, vendorId, branchId, input);
     showToast(existing ? 'Therapist updated.' : 'Therapist added.');
     await load();
+    return data;
   };
 
   const toggleStatus = async (therapist: AdminTherapist) => {
@@ -183,6 +177,8 @@ export function VendorTherapistsStep({
       {canAdd && (
         <WizardTherapistFormDialog
           dialogRef={addDialogRef}
+          vendorId={vendorId}
+          token={token}
           branches={branches}
           specializationCategories={categories}
           onSave={(input, branchId) => save(input, branchId)}
@@ -192,6 +188,8 @@ export function VendorTherapistsStep({
         <WizardTherapistFormDialog
           key={editingTherapist.id}
           dialogRef={editDialogRef}
+          vendorId={vendorId}
+          token={token}
           branches={branches}
           specializationCategories={categories}
           therapist={editingTherapist}
@@ -207,6 +205,8 @@ const EMPTY_INPUT: TherapistInput = { therapistType: '', personName: '' };
 
 function WizardTherapistFormDialog({
   dialogRef,
+  vendorId,
+  token,
   branches,
   specializationCategories,
   therapist,
@@ -214,15 +214,19 @@ function WizardTherapistFormDialog({
   onClose,
 }: {
   dialogRef: RefObject<MdDialog | null>;
+  /** Admin-on-behalf — the vendor this therapist belongs to, passed to `MediaUploader` so its
+   *  image/video requests hit `/vendors/:vendorId/therapists/:therapistId/...`, never the
+   *  self-service `/vendors/me/...` routes (which would upload against the wrong vendor). */
+  vendorId: string;
+  token: string | null;
   branches: Branch[];
   /** The vendor's granted THERAPY categories — restricts the Specialization picker instead of a
    *  free-text field (see `Therapist.specializationCategoryId`'s own doc comment). */
   specializationCategories: Category[];
   therapist?: AdminTherapist;
-  // The dialog never needs the saved row back — `VendorTherapistsStep.save` always reloads the
-  // full admin-shaped list (with `branch` nested in) after a mutation, so this simply discards
-  // whatever `Therapist` shape the underlying create/update call resolves with.
-  onSave: (input: TherapistInput, branchId: string) => Promise<void>;
+  // Returns the saved row (like `ProductFormDialog`'s own `onSave`) so `savedTherapist` below can
+  // pick up a real id right after a fresh create, for `MediaUploader` to upload against.
+  onSave: (input: TherapistInput, branchId: string) => Promise<Therapist | void>;
   onClose?: () => void;
 }) {
   const [form, setForm] = useState<TherapistInput>(
@@ -241,6 +245,9 @@ function WizardTherapistFormDialog({
   const [branchId, setBranchId] = useState(therapist?.branchId ?? branches[0]?.id ?? '');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Tracks the entity MediaUploader should upload against — see ProductFormDialog's identical
+  // `savedProduct` state for the full staged-upload-after-create rationale.
+  const [savedTherapist, setSavedTherapist] = useState<Therapist | undefined>(therapist);
   // Checked/set synchronously at the very top of submit(), before any await — a `submitting`
   // state guard alone can't stop a second click/tap/Enter that fires before React commits the
   // disabling re-render (same double-submit gap fixed elsewhere in this file family — see
@@ -270,8 +277,15 @@ function WizardTherapistFormDialog({
     setSubmitting(true);
     setError('');
     try {
-      await onSave(form, branchId);
-      dialogRef.current?.close();
+      const result = await onSave(form, branchId);
+      if (!therapist && result) {
+        // A fresh create — keep the dialog open so MediaUploader can flush any staged photos/
+        // video against the new id; an edit's dialog closes immediately as before, since
+        // MediaUploader already had a real entityId the whole time (nothing was staged).
+        setSavedTherapist(result);
+      } else {
+        dialogRef.current?.close();
+      }
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not save therapist.');
     } finally {
@@ -348,6 +362,15 @@ function WizardTherapistFormDialog({
           type="number"
           value={form.experienceYears !== undefined ? String(form.experienceYears) : ''}
           onInput={(e: Event) => set('experienceYears', Number((e.target as HTMLInputElement).value) || undefined)}
+        />
+
+        <MediaUploader
+          entityType="therapist"
+          entityId={savedTherapist?.id ?? null}
+          vendorId={vendorId}
+          existingImages={savedTherapist?.mediaImages ?? []}
+          existingVideo={savedTherapist?.mediaVideo ?? null}
+          token={token}
         />
 
         {error && <p className="error-state" role="alert">{error}</p>}

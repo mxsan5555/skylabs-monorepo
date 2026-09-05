@@ -35,14 +35,14 @@ interface EntityRef {
   entityId: string;
   /** Deal only — its routes nest under `/vendors/me/branches/:branchId/deals/:dealId/...`. */
   branchId?: string;
-  /** Vendor/Product only — the caller's own vendor/product (self-service, `/vendors/me/...`,
-   *  gated on `vendors:custom`/`products:*`) vs. an admin managing a different vendor's
-   *  profile/product (`/vendors/:id/...`, gated on `vendors:edit`/`products:*`) hit different
-   *  route surfaces. */
+  /** Vendor/Product/Therapist only — the caller's own vendor/product/therapist (self-service,
+   *  `/vendors/me/...`, gated on `vendors:custom`/`products:*`) vs. an admin managing a different
+   *  vendor's profile/product/therapist (`/vendors/:id/...`, gated on `vendors:edit`/
+   *  `products:*`) hit different route surfaces. */
   selfService?: boolean;
-  /** Product (admin-on-behalf) only — the vendor id the product belongs to, when `selfService`
-   *  is false. Product is vendor-owned (see the `direct_category_access` migration); there is
-   *  no vendor-agnostic `/products/:id/...` media route any more. */
+  /** Product/Therapist (admin-on-behalf) only — the vendor id the product/therapist belongs to,
+   *  when `selfService` is false. Both are vendor-owned; there is no vendor-agnostic
+   *  `/products/:id/...` or `/therapists/:id/...` media route. */
   vendorId?: string;
 }
 
@@ -51,7 +51,7 @@ function basePath(ref: EntityRef): string {
     case 'deal':
       return `/vendors/me/branches/${ref.branchId}/deals/${ref.entityId}`;
     case 'therapist':
-      return `/vendors/me/therapists/${ref.entityId}`;
+      return ref.selfService ? `/vendors/me/therapists/${ref.entityId}` : `/vendors/${ref.vendorId}/therapists/${ref.entityId}`;
     case 'product':
       return ref.selfService ? `/vendors/me/products/${ref.entityId}` : `/vendors/${ref.vendorId}/products/${ref.entityId}`;
     case 'vendor':

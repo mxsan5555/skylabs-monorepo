@@ -107,9 +107,18 @@ export interface CatalogDeal {
   distanceKm?: number | null;
 }
 
-/** `Branch.openingHours` shape — keys are lowercase 3-letter day codes (`mon`…`sun`), values are
- *  either `"HH:MM-HH:MM"` or `"closed"`. Absent (`null`) for branches that haven't set hours yet. */
-export type CatalogOpeningHours = Record<string, string>;
+/** `Branch.openingHours` shape — keys are lowercase 3-letter day codes (`mon`…`sun`); `open:
+ *  false` means closed all day (start/end are then meaningless). Mirrors the vendor-facing edit
+ *  form's own `DayHours`/`OpeningHours` types (`apps/msd/src/api/rbac/vendors.ts`) exactly — kept
+ *  as an independent type here (not imported) since this is the public, unauthenticated catalog
+ *  API surface, never the authenticated RBAC vendor client. Absent (`null`) for branches that
+ *  haven't set hours yet, or missing a given day's key if only some days were configured. */
+export interface CatalogDayHours {
+  open: boolean;
+  start?: string;
+  end?: string;
+}
+export type CatalogOpeningHours = Partial<Record<'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun', CatalogDayHours>>;
 
 /** A therapist's own duration/price menu entry — independent of any Deal (see msd-api's
  *  TherapistPackage schema doc comment). Combined with a Deal only at purchase time, by matching
