@@ -36,6 +36,8 @@ import {
   VendorIdParamSchema,
   VendorDocumentTypeParamSchema,
   VendorDocumentAdminParamSchema,
+  VendorImageIdParamSchema,
+  VendorProductIdParamSchema,
 } from '../schemas/vendor.schema';
 import { ProductCreateSchema, ProductUpdateSchema, ProductStatusUpdateSchema, ProductListQuerySchema } from '../schemas/product.schema';
 import { MediaReorderSchema } from '../schemas/media.schema';
@@ -1329,7 +1331,7 @@ router.post(
 router.delete(
   '/:id/images/:imageId',
   requirePermission('vendors', 'edit'),
-  validateParams(UuidParamSchema),
+  validateParams(VendorImageIdParamSchema),
   async (req, res, next) => {
     try {
       await vendorService.deleteVendorImage(req.params.id, req.params.imageId);
@@ -1365,7 +1367,7 @@ router.patch(
 router.patch(
   '/:id/images/:imageId/primary',
   requirePermission('vendors', 'edit'),
-  validateParams(UuidParamSchema),
+  validateParams(VendorImageIdParamSchema),
   async (req, res, next) => {
     try {
       await vendorService.setVendorPrimaryImage(req.params.id, req.params.imageId);
@@ -1982,6 +1984,128 @@ router.delete('/:vendorId/therapists/:therapistId', requirePermission('vendors',
   }
 });
 
+// ─── Therapist media (admin-on-behalf — mirrors the self-service block above exactly; these
+// routes never existed, which was the actual root cause of "Superadmin's Add Therapist form has
+// no image/video upload": `apps/msd/src/api/media.ts`'s `basePath()` for `'therapist'` had no
+// admin/`vendorId` branch at all — same bug class as Product's own previously-fixed gap) ────────
+
+router.post(
+  '/:vendorId/therapists/:therapistId/images',
+  requirePermission('vendors', 'edit'),
+  imageUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const image = await vendorService.addTherapistImage(req.params.vendorId, req.params.therapistId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_image.create',
+        targetType: 'TherapistImage',
+        targetId: image.id,
+        ...requestMeta(req),
+      });
+      sendData(res, image, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/:vendorId/therapists/:therapistId/images/:imageId',
+  requirePermission('vendors', 'edit'),
+  async (req, res, next) => {
+    try {
+      await vendorService.deleteTherapistImage(req.params.vendorId, req.params.therapistId, req.params.imageId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_image.delete',
+        targetType: 'TherapistImage',
+        targetId: req.params.imageId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/:vendorId/therapists/:therapistId/images/reorder',
+  requirePermission('vendors', 'edit'),
+  validateBody(MediaReorderSchema),
+  async (req, res, next) => {
+    try {
+      await vendorService.reorderTherapistImages(req.params.vendorId, req.params.therapistId, req.body.imageIds);
+      sendData(res, { reordered: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/:vendorId/therapists/:therapistId/images/:imageId/primary',
+  requirePermission('vendors', 'edit'),
+  async (req, res, next) => {
+    try {
+      await vendorService.setTherapistPrimaryImage(req.params.vendorId, req.params.therapistId, req.params.imageId);
+      sendData(res, { primary: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/:vendorId/therapists/:therapistId/video',
+  requirePermission('vendors', 'edit'),
+  videoUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const video = await vendorService.replaceTherapistVideo(req.params.vendorId, req.params.therapistId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_video.upsert',
+        targetType: 'TherapistVideo',
+        targetId: video.id,
+        ...requestMeta(req),
+      });
+      sendData(res, video, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/:vendorId/therapists/:therapistId/video',
+  requirePermission('vendors', 'edit'),
+  async (req, res, next) => {
+    try {
+      await vendorService.deleteTherapistVideo(req.params.vendorId, req.params.therapistId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'therapist_video.delete',
+        targetType: 'TherapistVideo',
+        targetId: req.params.therapistId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // ─── Product (admin-on-behalf — mirrors Branch/Deal's exact admin split) ─────────────────────
 
 router.get('/:vendorId/products', requirePermission('products', 'view'), validateParams(VendorIdParamSchema), validateQuery(ProductListQuerySchema), async (req, res, next) => {
@@ -2020,7 +2144,7 @@ router.post(
 router.patch(
   '/:vendorId/products/:productId',
   requirePermission('products', 'edit'),
-  validateParams(VendorIdParamSchema),
+  validateParams(VendorProductIdParamSchema),
   validateBody(ProductUpdateSchema),
   async (req, res, next) => {
     try {
@@ -2043,7 +2167,7 @@ router.patch(
 router.patch(
   '/:vendorId/products/:productId/status',
   requirePermission('products', 'edit'),
-  validateParams(VendorIdParamSchema),
+  validateParams(VendorProductIdParamSchema),
   validateBody(ProductStatusUpdateSchema),
   async (req, res, next) => {
     try {
@@ -2066,7 +2190,7 @@ router.patch(
 router.delete(
   '/:vendorId/products/:productId',
   requirePermission('products', 'delete'),
-  validateParams(VendorIdParamSchema),
+  validateParams(VendorProductIdParamSchema),
   async (req, res, next) => {
     try {
       const before = await productService.getProductScopedOrThrow(req.params.vendorId, req.params.productId);
@@ -2080,6 +2204,141 @@ router.delete(
         ...requestMeta(req),
       });
       sendData(res, null);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── Product media (admin-on-behalf — mirrors the self-service block above exactly; these routes
+// never existed, which was the actual root cause of "upload fails when adding/editing a product"
+// from the Superadmin console: apps/msd/src/api/media.ts's `basePath()` always targets
+// `/vendors/:vendorId/products/:productId/...` here (no `selfService` prop is ever passed from
+// the admin product wizard), so every such request 404'd before reaching any validation) ────────
+
+router.post(
+  '/:vendorId/products/:productId/images',
+  requirePermission('products', 'edit'),
+  validateParams(VendorProductIdParamSchema),
+  imageUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      await productService.getProductScopedOrThrow(req.params.vendorId, req.params.productId);
+      const image = await productService.addProductImage(req.params.productId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'product_image.create',
+        targetType: 'ProductImage',
+        targetId: image.id,
+        ...requestMeta(req),
+      });
+      sendData(res, image, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/:vendorId/products/:productId/images/:imageId',
+  requirePermission('products', 'edit'),
+  validateParams(VendorProductIdParamSchema),
+  async (req, res, next) => {
+    try {
+      await productService.getProductScopedOrThrow(req.params.vendorId, req.params.productId);
+      await productService.deleteProductImage(req.params.productId, req.params.imageId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'product_image.delete',
+        targetType: 'ProductImage',
+        targetId: req.params.imageId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/:vendorId/products/:productId/images/reorder',
+  requirePermission('products', 'edit'),
+  validateParams(VendorProductIdParamSchema),
+  validateBody(MediaReorderSchema),
+  async (req, res, next) => {
+    try {
+      await productService.getProductScopedOrThrow(req.params.vendorId, req.params.productId);
+      await productService.reorderProductImages(req.params.productId, req.body.imageIds);
+      sendData(res, { reordered: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/:vendorId/products/:productId/images/:imageId/primary',
+  requirePermission('products', 'edit'),
+  validateParams(VendorProductIdParamSchema),
+  async (req, res, next) => {
+    try {
+      await productService.getProductScopedOrThrow(req.params.vendorId, req.params.productId);
+      await productService.setProductPrimaryImage(req.params.productId, req.params.imageId);
+      sendData(res, { primary: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/:vendorId/products/:productId/video',
+  requirePermission('products', 'edit'),
+  validateParams(VendorProductIdParamSchema),
+  videoUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      await productService.getProductScopedOrThrow(req.params.vendorId, req.params.productId);
+      const video = await productService.replaceProductVideo(req.params.productId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'product_video.upsert',
+        targetType: 'ProductVideo',
+        targetId: video.id,
+        ...requestMeta(req),
+      });
+      sendData(res, video, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/:vendorId/products/:productId/video',
+  requirePermission('products', 'edit'),
+  validateParams(VendorProductIdParamSchema),
+  async (req, res, next) => {
+    try {
+      await productService.getProductScopedOrThrow(req.params.vendorId, req.params.productId);
+      await productService.deleteProductVideo(req.params.productId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'product_video.delete',
+        targetType: 'ProductVideo',
+        targetId: req.params.productId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
     } catch (err) {
       next(err);
     }

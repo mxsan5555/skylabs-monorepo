@@ -1488,7 +1488,8 @@
       "packages": "packages",
       "minutes": "min",
       "yearsExperience": "years experience",
-      "closed": "Closed"
+      "closed": "Closed",
+      "timingsNotAvailable": "Timings not available"
     },
     "actions": {
       "browseServices": "Browse Services",

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedIconButton, Icon, Divider, Radio, ChipSet, FilterChip, SuggestionChip, Tabs, PrimaryTab, OutlinedTextField, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { getCatalogVendor, listCatalogDeals, type CatalogVendorDetail, type CatalogVendorBranch, type CatalogDeal, type CatalogVendorTherapist, } from '../../../api/catalog';
+import { getCatalogVendor, listCatalogDeals, type CatalogVendorDetail, type CatalogVendorBranch, type CatalogDeal, type CatalogVendorTherapist, type CatalogOpeningHours, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
@@ -12,7 +12,7 @@ import { DurationPackageSelector } from '../../components/duration-package-selec
 import { TherapistPackageSelector } from '../../components/therapist-package-selector';
 import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selection';
 import { useTherapistPurchaseSelection } from '../../../hooks/use-therapist-purchase-selection';
-import { formatINR, pluralize } from '../../../utils/format';
+import { formatINR, pluralize, formatTime12h } from '../../../utils/format';
 import { resolveDealMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import { useToast } from '../../../toast/toast-context';
 import './vendor.css';
@@ -26,19 +26,18 @@ const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 const DAY_LABELS = vendorContent.days;
 
 /** Builds schema.org `OpeningHoursSpecification` entries from `Branch.openingHours`
- *  (`{ mon: "09:00-20:00", sun: "closed", ... }`) — skips closed/unset days. */
-function buildOpeningHoursSpecification(hours: Record<string, string>) {
+ *  (`{ mon: { open: true, start: "09:00", end: "20:00" }, sun: { open: false }, ... }`) — skips
+ *  closed/unset days. schema.org's own `opens`/`closes` fields are always 24-hour HH:MM, so this
+ *  reads `start`/`end` directly (never the 12-hour display string). */
+function buildOpeningHoursSpecification(hours: CatalogOpeningHours) {
   return DAY_ORDER
-    .filter((day) => hours[day] && hours[day] !== 'closed')
-    .map((day) => {
-      const [opens, closes] = hours[day].split('-');
-      return {
-        '@type': 'OpeningHoursSpecification',
-        dayOfWeek: `https://schema.org/${DAY_LABELS[day]}`,
-        opens,
-        closes,
-      };
-    });
+    .filter((day) => hours[day]?.open && hours[day]?.start && hours[day]?.end)
+    .map((day) => ({
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: `https://schema.org/${DAY_LABELS[day]}`,
+      opens: hours[day]!.start,
+      closes: hours[day]!.end,
+    }));
 }
 
 // ── Deal grouping: Category → Sub-category → one Deal per Service ─────────────
@@ -383,26 +382,32 @@ export function VendorPage() {
             </div>
           )}
 
-          {/* Opening hours */}
-          {selectedBranch?.openingHours && (
-            <div className="vendor-page__hours-section">
-              <h2 className="vendor-page__hours-title">{vendorContent.labels.workingHours}</h2>
+          {/* Opening hours — always rendered (never silently omitted) so a branch with no
+              schedule set yet still tells the customer that, instead of just vanishing. Reads
+              this SELECTED branch's own `openingHours` object fresh on every render (never a
+              hardcoded day/time literal), so switching branch tabs always shows that branch's
+              own real schedule, never a stale/different branch's. */}
+          <div className="vendor-page__hours-section">
+            <h2 className="vendor-page__hours-title">{vendorContent.labels.workingHours}</h2>
+            {selectedBranch?.openingHours && Object.keys(selectedBranch.openingHours).length > 0 ? (
               <div className="vendor-page__hours-grid">
                 {DAY_ORDER.map((day) => {
-                  const raw = selectedBranch.openingHours?.[day];
-                  const closed = !raw || raw === 'closed';
+                  const dayHours = selectedBranch.openingHours?.[day];
+                  const closed = !dayHours || !dayHours.open || !dayHours.start || !dayHours.end;
                   return (
                     <div key={day} className="vendor-page__hours-row">
                       <span className="vendor-page__hours-day">{DAY_LABELS[day]}</span>
                       <span className="vendor-page__hours-time">
-                        {closed ? vendorContent.labels.closed : raw.replace('-', ' – ')}
+                        {closed ? vendorContent.labels.closed : `${formatTime12h(dayHours.start!)} – ${formatTime12h(dayHours.end!)}`}
                       </span>
                     </div>
                   );
                 })}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="vendor-page__hours-empty">{vendorContent.labels.timingsNotAvailable}</p>
+            )}
+          </div>
 
           <Divider />
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatINR, pluralize, inputValue } from './format';
+import { formatINR, pluralize, inputValue, formatTime12h } from './format';
 
 describe('formatINR', () => {
   it('formats a number as INR', () => {
@@ -34,6 +34,31 @@ describe('pluralize', () => {
 
   it('supports a custom plural form', () => {
     expect(pluralize(2, 'category', 'categories')).toBe('categories');
+  });
+});
+
+/** Feature: Branch working-hours 12-hour display (Branch schedule audit) — the only place a
+ *  stored "HH:MM" opening/closing time is ever converted to the 12-hour format the storefront
+ *  actually shows the customer. */
+describe('formatTime12h', () => {
+  it('formats the exact example from the bug report — 10:00 → 10:00 AM, 20:00 → 08:00 PM', () => {
+    expect(formatTime12h('10:00')).toBe('10:00 AM');
+    expect(formatTime12h('20:00')).toBe('08:00 PM');
+  });
+
+  it('handles midnight and noon correctly (the classic 12-hour edge cases)', () => {
+    expect(formatTime12h('00:00')).toBe('12:00 AM');
+    expect(formatTime12h('12:00')).toBe('12:00 PM');
+  });
+
+  it('handles the last minute of the morning/evening correctly', () => {
+    expect(formatTime12h('11:59')).toBe('11:59 AM');
+    expect(formatTime12h('23:59')).toBe('11:59 PM');
+  });
+
+  it('returns the raw input unchanged for anything that is not a valid HH:MM 24-hour string', () => {
+    expect(formatTime12h('closed')).toBe('closed');
+    expect(formatTime12h('')).toBe('');
   });
 });
 

@@ -38,6 +38,25 @@ export const VendorDocumentAdminParamSchema = z.object({
   documentType: z.enum(['GST', 'PAN', 'AADHAAR']),
 });
 
+/** Route param for the admin vendor-image sub-resources (`/:id/images/:imageId[...]`). Using the
+ *  bare `UuidParamSchema` (only `id`) here was a real bug: `validateParams` replaces `req.params`
+ *  with Zod's parsed output, and Zod strips any key not declared on the schema — so `imageId`
+ *  silently became `undefined` on every request, and `deleteVendorImage`/`setVendorPrimaryImage`
+ *  received an undefined id, throwing an uncaught Prisma error. Every multi-param route must
+ *  declare every param it reads. */
+export const VendorImageIdParamSchema = z.object({
+  id: z.string().uuid(),
+  imageId: z.string().uuid(),
+});
+
+/** Route param for the admin product sub-resources (`/:vendorId/products/:productId[...]`) —
+ *  same "every param must be declared" fix as `VendorImageIdParamSchema` above. `VendorIdParamSchema`
+ *  (only `vendorId`) was silently stripping `productId` on every PATCH/DELETE here. */
+export const VendorProductIdParamSchema = z.object({
+  vendorId: z.string().uuid(),
+  productId: z.string().uuid(),
+});
+
 const decimalString = z
   .string()
   .regex(/^\d+(\.\d{1,2})?$/, 'must be a plain decimal amount with up to 2 places, e.g. "199.00"');
@@ -220,6 +239,31 @@ const branchPincodeSchema = z
   .refine((v) => v === '' || PINCODE_REGEX.test(v), { message: 'Enter a valid 6-digit pincode' })
   .optional();
 
+/** One weekday's hours — mirrors the frontend's own `DayHours` shape exactly
+ *  (`apps/msd/src/api/rbac/vendors.ts`). `open: false` means closed all day; `start`/`end` are
+ *  then meaningless and simply not validated. */
+const DayHoursSchema = z.object({
+  open: z.boolean(),
+  start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use 24-hour HH:MM').optional(),
+  end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use 24-hour HH:MM').optional(),
+});
+
+/** Every key optional — a branch need not set every day (e.g. only weekdays configured so far).
+ *  Root cause of "branch hours never save": this field didn't exist on `BranchFieldsSchema` at
+ *  all, so `validateBody` (which replaces `req.body` with Zod's parsed output, silently dropping
+ *  any undeclared key) stripped `openingHours` before it ever reached `createBranch`/
+ *  `updateBranch` — the vendor's saved hours simply never persisted, regardless of the edit form
+ *  itself working correctly. */
+const OpeningHoursSchema = z.object({
+  mon: DayHoursSchema.optional(),
+  tue: DayHoursSchema.optional(),
+  wed: DayHoursSchema.optional(),
+  thu: DayHoursSchema.optional(),
+  fri: DayHoursSchema.optional(),
+  sat: DayHoursSchema.optional(),
+  sun: DayHoursSchema.optional(),
+});
+
 const BranchFieldsSchema = z.object({
   name: z.string().min(1).max(150),
   address: z.string().max(500).optional(),
@@ -231,6 +275,7 @@ const BranchFieldsSchema = z.object({
   longitude: z.number().min(-180).max(180).optional(),
   phone: z.string().max(30).optional(),
   email: z.string().email().optional(),
+  openingHours: OpeningHoursSchema.optional(),
 });
 
 export const BranchCreateSchema = BranchFieldsSchema.openapi('BranchCreate');

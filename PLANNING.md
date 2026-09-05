@@ -39,6 +39,9 @@ share UI but **not** backends, databases, or business logic.
   Chosen because the team knows Express and is learning OpenAPI; no Supabase (cost).
 - **Auth (in-house)**: JWT · phone/email OTP (SMS/email provider) · Google OAuth.
 - **Tooling**: Nx 22.7.5 (npm) · ESLint · Vitest / Angular unit-test · GitHub Actions.
+- **Deployment**: two frontends → two independent **Vercel** projects, self-selecting
+  per push via `nx-ignore`; branch flow `feature→develop→release→main`; `nx release`
+  for version tags. APIs host off Vercel (Railway/Fly). Full detail: `DEPLOYMENT.md`.
 
 ## Access control (RBAC)
 
@@ -132,6 +135,9 @@ Full agent file map: `.claude/agents/` · Full skill file map: `.claude/skills/`
 5. **Account extras** — logout from console, admin/marketing/sales feature pages 🔜
 6. **Backends** — `apps/msd-api`, `apps/mera-driver-api` (Express + Postgres + Prisma + OpenAPI) ⏳ deferred until pages need real data
 7. **Auth integration** — wire OTP/Google + real roles to the backend (replace mock token + demo role switcher) ⏳
-8. **Hardening** — tests, error tracking, CI gates, deployment ⏳
+8. **Hardening** — tests, error tracking, CI gate + deployment 🔜
+   - Deployment wired: two Vercel projects (msd, mera-driver), `nx-ignore` per
+     project, `main`=Production, `nx release` on `release`, CI gate on PRs. See
+     `DEPLOYMENT.md`. Remaining: e2e tests, error tracking (Sentry).
 
 Current focus: **frontend pages first** (step 4), backends deferred.

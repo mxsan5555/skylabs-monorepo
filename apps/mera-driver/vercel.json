@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd ../.. && npx nx build mera-driver",
+  "installCommand": "cd ../.. && npm ci",
+  "outputDirectory": "../../dist/apps/mera-driver/browser",
+  "ignoreCommand": "cd ../.. && npx nx-ignore mera-driver",
+  "framework": null,
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
