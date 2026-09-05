@@ -1,0 +1,41 @@
+.vendor-document-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 8px;
+  background: var(--md-sys-color-surface-container-low);
+}
+
+.vendor-document-upload__label {
+  margin: 0;
+  font-weight: 600;
+}
+
+.vendor-document-upload__file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.vendor-document-upload__file-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.vendor-document-upload__filename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+}
+
+.vendor-document-upload__filesize {
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+}

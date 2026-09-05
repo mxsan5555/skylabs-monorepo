@@ -1,31 +1,38 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedTextField, Icon, IconButton, TextButton, } from '@skylabs-monorepo/shared-ui/react';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import content from '../../../content.json';
-import { useAuth } from '../../../auth/auth-context';
+import { requestOtp, verifyOtp } from '../../../api/rbac/auth';
+import { ApiRequestError } from '../../../api/rbac/client';
+import { resolvePostLoginPath } from '../../../auth/role-routing';
 const RESEND_SECONDS = 24;
 
 /**
  * OTP screen. Shows where the code was sent, takes the 6-digit code, and on
- * verify signs the user in and returns home. Includes a resend countdown.
- * Wired to the real auth context (mock token until the auth API exists).
+ * verify signs the user in. Includes a resend countdown. Wired to the real
+ * msd-api `/auth/otp/verify` endpoint — `signIn()` (from
+ * `@skylabs-monorepo/shared-auth/react`) stores the token and kicks off the
+ * `/rbac/bootstrap` fetch, but doesn't await it synchronously in a way this
+ * component can rely on (the `bootstrap` value here is only current after a
+ * re-render). So the redirect itself is driven by a `useEffect` that watches
+ * `bootstrap` becoming available post sign-in, then routes by role via
+ * `resolvePostLoginPath` — staff always land on `/account/dashboard`
+ * (unchanged), a vendor lands on the admin console, a customer lands on the
+ * storefront home, and a user holding both `customer` and `vendor` (the
+ * common case — self-registering as a vendor never removes `customer`) is
+ * sent to `/choose-experience` instead of guessing for them.
  */
 export function Otp() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn } = useAuth();
+  const { signIn, bootstrap, token } = useAuth();
   const [error, setError] = useState('');
   const otpContent = content.auth.otp;
   const [loading, setLoading] = useState(false);
-  const { user, destination } = (location.state as {
-    user: {
-      id: number;
-      email: string;
-      mobile: string;
-      role: string;
-      otp: string;
-    };
-    destination: string;
+  const [awaitingBootstrap, setAwaitingBootstrap] = useState(false);
+  const { identifier, method } = (location.state as {
+    identifier: string;
     method: 'email' | 'phone';
   }) || {};
   const [code, setCode] = useState('');
@@ -35,52 +42,63 @@ export function Otp() {
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {
-    if (!user) { navigate('/sign-in', { replace: true }); }
-  }, [user, navigate]);
+    if (!identifier) { navigate('/sign-in', { replace: true }); }
+  }, [identifier, navigate]);
+
+  // Once `signIn()` has kicked off the bootstrap fetch, wait for it to land in context, then
+  // route by role. If it fails (token cleared by `loadBootstrap`'s own error handling), fall
+  // back to an error instead of hanging on this screen forever.
+  useEffect(() => {
+    if (!awaitingBootstrap) return;
+    if (bootstrap) {
+      navigate(resolvePostLoginPath(bootstrap), { replace: true });
+    } else if (!token) {
+      setAwaitingBootstrap(false);
+      setError(otpContent.validation.invalidOtp);
+    }
+  }, [awaitingBootstrap, bootstrap, token, navigate, otpContent.validation.invalidOtp]);
+
   const verify = async () => {
-    setLoading(true);
     setError('');
+    if (!code.trim()) {
+      setError(otpContent.validation.emptyOtp);
+      return;
+    }
+    if (code.length !== 6) {
+      setError(otpContent.validation.invalidOtp);
+      return;
+    }
+    if (!identifier) {
+      navigate('/sign-in');
+      return;
+    }
+    setLoading(true);
     try {
-      if (!code.trim()) {
-        setError(otpContent.validation.emptyOtp);
-        return;
-      }
-      if (code.length !== 6) {
-        setError(otpContent.validation.invalidOtp);
-        return;
-      }
-      if (!user) {
-        navigate('/sign-in');
-        return;
-      }
-      if (code !== user.otp) {
-        setError(otpContent.validation.invalidOtp);
-        return;
-      }
-      // Optional: simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      signIn('mock-token');
-      switch (user.role) {
-        case 'admin':
-          navigate('/admin');
-          break;
-        case 'marketing':
-          navigate('/marketing');
-          break;
-        case 'sales':
-          navigate('/sales');
-          break;
-        default:
-          navigate('/account');
-      }
+      const { data } = await verifyOtp(identifier, code);
+      await signIn(data.accessToken, data.refreshToken);
+      setAwaitingBootstrap(true);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : otpContent.validation.invalidOtp);
     } finally {
       setLoading(false);
     }
   };
 
+  const resend = async () => {
+    setSeconds(RESEND_SECONDS);
+    try {
+      await requestOtp(identifier, 'login');
+    } catch {
+      // Resend failures are non-fatal — the countdown still resets so the user can retry.
+    }
+  };
+
+  if (!identifier) return null;
+
   return (
     <div className="auth-screen otp-screen">
       <title>{otpContent.pageTitle}</title>
+      <meta name="robots" content="noindex, nofollow" />
       <IconButton
         className="otp-back"
         aria-label={otpContent.backAriaLabel}
@@ -96,8 +114,8 @@ export function Otp() {
         <h1 className="auth-brand__title">{otpContent.heading}</h1>
         <p className="auth-brand__subtitle">{otpContent.subtitle}</p>
         <span className="auth-destination">
-          <Icon aria-hidden="true">{otpContent.icons.destination}</Icon>
-          {destination}
+          <Icon aria-hidden="true">{method === 'phone' ? otpContent.icons.destination : 'mail'}</Icon>
+          {identifier}
         </span>
       </div>
 
@@ -122,8 +140,8 @@ export function Otp() {
           }}
         />
         {error && <p className="auth-error">{error}</p>}
-        <FilledButton className="auth-submit" onClick={verify} disabled={loading || code.length !== 6}>
-          {loading ? otpContent.verifyingButton : otpContent.verifyButton}
+        <FilledButton className="auth-submit" onClick={verify} disabled={loading || awaitingBootstrap || code.length !== 6}>
+          {loading || awaitingBootstrap ? otpContent.verifyingButton : otpContent.verifyButton}
         </FilledButton>
       </div>
 
@@ -132,7 +150,7 @@ export function Otp() {
         {seconds > 0 ? (
           <span className="otp-muted">{otpContent.resend.countdown} {seconds}s</span>
         ) : (
-          <TextButton onClick={() => setSeconds(RESEND_SECONDS)}>
+          <TextButton onClick={resend}>
             {otpContent.resend.button}
           </TextButton>
         )}

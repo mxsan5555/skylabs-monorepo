@@ -1,0 +1,8 @@
+/* Small scoped stylesheet for the "Continue as" chooser — the auth shell (`auth-screen`,
+   `auth-brand`, `auth-card`) is reused as-is from `@skylabs-monorepo/shared-ui/layout.css`;
+   this only adds the vertical stack for the two choice buttons. */
+.choose-experience-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

@@ -5,16 +5,14 @@
  * package). When the Express backend lands, these mirror its contract.
  */
 
-/** Access roles. The base user is a customer or driver; staff roles are added on top. */
-export type UserRole = 'customer' | 'driver' | 'admin' | 'marketing' | 'sales';
-
-export const ALL_ROLES: UserRole[] = [
-  'customer',
-  'driver',
-  'admin',
-  'marketing',
-  'sales',
-];
+/**
+ * Access roles are dynamic now — real roles + granted permissions come from
+ * `GET /rbac/bootstrap` (see `@skylabs-monorepo/shared-auth/angular`'s `AuthService`
+ * and `@skylabs-monorepo/shared-types`'s `Role`/`BootstrapResponse`). This loose
+ * alias exists only so older call sites that reference the *type name* `UserRole`
+ * still compile — nothing in the app may branch on a specific role string.
+ */
+export type UserRole = string;
 
 export interface User {
   id: string;

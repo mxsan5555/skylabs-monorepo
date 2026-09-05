@@ -1,0 +1,92 @@
+.deal-card-slider {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.deal-card-slider swiper-container {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.deal-card-slider swiper-slide {
+    display: flex;
+}
+
+.deal-card-slider img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.slider-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    opacity: 0;
+    transition: opacity .2s ease;
+}
+.deal-card-slider:hover .slider-btn {
+  opacity: 1;
+}
+
+.slider-btn--prev {
+    left: 8px;
+}
+
+.slider-btn--next {
+    right: 8px;
+}
+
+.deal-card-slider::part(button-prev),
+.deal-card-slider::part(button-next) {
+    display: none !important;
+}
+
+.slider-btn::part(outline) {
+    display: none;
+}
+
+/* Same technique sky-product-card's own .favorite button uses to escape the card's
+   stretched-link overlay (`.heading a::after`, z-index: 1, covering the whole card) — without
+   this, the button is visually correct but hit-tested behind the stretched link and every click
+   falls through to the card's own href navigation instead of the action. */
+.deal-card__actions {
+    position: relative;
+    z-index: 2;
+    padding: 0 4px 4px;
+}
+
+.deal-card__actions md-filled-button {
+    width: 100%;
+}
+.deal-card-slider {
+  width: 100%;
+  height: 180px;
+  min-height: 180px;
+  max-height: 180px;
+  overflow: hidden;
+  position: relative;
+}
+
+.deal-card-slider swiper-container {
+  width: 100%;
+  height: 100%;
+}
+
+.deal-card-slider swiper-slide {
+  width: 100%;
+  height: 100%;
+}
+
+.deal-card-slider img {
+  width: 100%;
+  height: 180px;
+  min-height: 180px;
+  max-height: 180px;
+  object-fit: cover;
+  display: block;
+}

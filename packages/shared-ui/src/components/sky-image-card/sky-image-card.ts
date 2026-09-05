@@ -1,5 +1,5 @@
 import { LitElement, html, css, nothing } from 'lit';
-import { hostBase } from '../shared-styles.js';
+import { hostBase, stretchLink } from '../shared-styles.js';
 
 /**
  * <sky-image-card> — full-bleed image with a bottom overlay label.
@@ -45,9 +45,9 @@ export class SkyImageCard extends LitElement {
       margin: 0;
       display: block;
       overflow: hidden;
-      border-radius: 16px;
+      border-radius: var(--md-sys-shape-corner-large, 16px);
       aspect-ratio: var(--_ratio, 3 / 4);
-      background-color: var(--md-sys-color-surface-variant, #dde4d8);
+      background-color: var(--md-sys-color-surface-variant);
     }
     .card img {
       width: 100%;
@@ -61,8 +61,8 @@ export class SkyImageCard extends LitElement {
       inset: 0;
       background: linear-gradient(
         to top,
-        rgba(0, 0, 0, 0.55) 0%,
-        rgba(0, 0, 0, 0) 45%
+        color-mix(in srgb, var(--md-sys-color-scrim) 55%, transparent) 0%,
+        transparent 45%
       );
     }
     .label {
@@ -71,10 +71,10 @@ export class SkyImageCard extends LitElement {
       right: 14px;
       bottom: 12px;
       z-index: 1;
-      color: #fff;
+      color: var(--md-sys-color-surface);
       font-size: 1.15rem;
       font-weight: 700;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+      text-shadow: 0 1px 3px color-mix(in srgb, var(--md-sys-color-scrim) 40%, transparent);
     }
     :host([align='center']) .label {
       text-align: center;
@@ -83,15 +83,7 @@ export class SkyImageCard extends LitElement {
       text-align: right;
     }
     /* Stretched link: covers the figure, carries the accessible name. */
-    .stretch {
-      position: absolute;
-      inset: 0;
-      z-index: 2;
-    }
-    .stretch:focus-visible {
-      outline: 2px solid var(--md-sys-color-primary, #3a693c);
-      outline-offset: 2px;
-    }
+    ${stretchLink}
   `;
 
   protected override render() {

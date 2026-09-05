@@ -1,0 +1,154 @@
+<md-admin-page title="User Management" subtitle="Search, create, and manage users, their roles, and their sessions.">
+  <div class="flex flex-col gap-4">
+    <sky-card *appHasPermission="{ menuKey: 'rbac.users', action: 'create' }">
+      <h2 class="m-0 mb-2 text-base font-semibold">Create user</h2>
+      <div class="flex flex-wrap items-start gap-2">
+        <md-outlined-text-field label="Name" [value]="newUserName" (input)="newUserName = $any($event.target).value"></md-outlined-text-field>
+        <md-outlined-text-field label="Email (optional)" type="email" [value]="newUserEmail" (input)="newUserEmail = $any($event.target).value"></md-outlined-text-field>
+        <md-outlined-text-field label="Phone (optional)" type="tel" [value]="newUserPhone" (input)="newUserPhone = $any($event.target).value"></md-outlined-text-field>
+        <md-filled-button [disabled]="creating()" (click)="createUser()">
+          {{ creating() ? 'Creating…' : 'Create user' }}
+        </md-filled-button>
+      </div>
+      @if (createError()) {
+        <p role="alert" class="auth-error mt-2">{{ createError() }}</p>
+      }
+    </sky-card>
+
+    @if (loadError()) {
+      <p role="alert" class="auth-error">{{ loadError() }}</p>
+    } @else if (!loading() && allUsers().length === 0) {
+      <sky-info-card icon="group" heading="No users yet" subheading="Create the first user above."></sky-info-card>
+    } @else {
+      <sky-data-table
+        caption="Users"
+        [columns]="columnsJson"
+        [rows]="rowsJson()"
+        [total]="total()"
+        [page]="page()"
+        [pageSize]="pageSize()"
+        [loading]="loading()"
+        searchable
+        search-placeholder="Search by name, email, or phone…"
+        [actions]="actionsJson"
+        (sky-dt-params-change)="onParamsChange($event)"
+        (sky-dt-row-action)="onRowAction($event)"
+      ></sky-data-table>
+    }
+
+    @if (selectedUser(); as user) {
+      <sky-card>
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <h2 class="m-0 text-base font-semibold">{{ user.name }}</h2>
+            <p class="m-0 text-xs text-[var(--md-sys-color-on-surface-variant)]">
+              {{ user.email ?? user.phone }} · {{ user.status }}
+            </p>
+          </div>
+          <md-icon-button aria-label="Close user details" (click)="closeDetail()">
+            <md-icon aria-hidden="true">close</md-icon>
+          </md-icon-button>
+        </div>
+
+        @if (detailError()) {
+          <p role="alert" class="auth-error mt-2">{{ detailError() }}</p>
+        }
+        @if (detailMessage()) {
+          <p role="status" class="mt-2 text-[var(--md-sys-color-primary)]">{{ detailMessage() }}</p>
+        }
+
+        <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <section>
+            <h3 class="m-0 mb-2 text-sm font-semibold">Roles</h3>
+            <ul class="m-0 mb-2 flex list-none flex-col gap-1 p-0">
+              @for (link of user.roles; track link.role.id) {
+                <li class="flex min-h-11 items-center justify-between gap-2 text-sm">
+                  {{ link.role.name }}
+                  <button
+                    *appHasPermission="{ menuKey: 'rbac.users', action: 'assign' }"
+                    type="button"
+                    class="underline text-[var(--md-sys-color-error,#b3261e)]"
+                    [disabled]="detailBusy()"
+                    (click)="removeRole(link.role.id)"
+                  >
+                    Remove
+                  </button>
+                </li>
+              }
+            </ul>
+            <div *appHasPermission="{ menuKey: 'rbac.users', action: 'assign' }" class="flex items-center gap-2">
+              <select
+                class="rounded border border-[var(--md-sys-color-outline-variant,#c4c7c5)] px-2 py-2 text-sm"
+                aria-label="Add role"
+                [value]="addRoleId"
+                (change)="addRoleId = $any($event.target).value"
+              >
+                <option value="">Choose a role…</option>
+                @for (role of roles(); track role.id) {
+                  <option [value]="role.id">{{ role.name }}</option>
+                }
+              </select>
+              <md-text-button [disabled]="!addRoleId || detailBusy()" (click)="assignRole()">Add</md-text-button>
+            </div>
+          </section>
+
+          <section>
+            <h3 class="m-0 mb-2 text-sm font-semibold">Status &amp; access</h3>
+            <div class="flex flex-wrap gap-2" *appHasPermission="{ menuKey: 'rbac.users', action: 'status_change' }">
+              <md-outlined-button [disabled]="detailBusy() || user.status === 'active'" (click)="setStatus('active')">Activate</md-outlined-button>
+              <md-outlined-button [disabled]="detailBusy() || user.status === 'inactive'" (click)="setStatus('inactive')">Deactivate</md-outlined-button>
+              <md-outlined-button [disabled]="detailBusy() || user.status === 'blocked'" (click)="setStatus('blocked')">Block</md-outlined-button>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-2" *appHasPermission="{ menuKey: 'rbac.users', action: 'edit' }">
+              <md-text-button [disabled]="detailBusy()" (click)="revokeSessions()">Reset session</md-text-button>
+              <md-text-button [disabled]="detailBusy()" (click)="resetOtp()">Reset OTP</md-text-button>
+            </div>
+            @if (canLoginAs()) {
+              <div class="mt-3">
+                <md-filled-tonal-button [disabled]="detailBusy()" (click)="loginAsUser()">
+                  <md-icon slot="icon" aria-hidden="true">visibility</md-icon>
+                  Login as this user
+                </md-filled-tonal-button>
+              </div>
+            }
+            <div class="mt-3" *appHasPermission="{ menuKey: 'rbac.users', action: 'delete' }">
+              <md-text-button [disabled]="detailBusy()" (click)="deleteUser()">Delete user</md-text-button>
+            </div>
+          </section>
+
+          <section>
+            <h3 class="m-0 mb-2 text-sm font-semibold">Login history</h3>
+            <md-text-button (click)="loadLoginHistory()">Load login history</md-text-button>
+            @if (loginHistory(); as history) {
+              @if (history.length === 0) {
+                <p class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]">No login attempts recorded.</p>
+              } @else {
+                <ul class="m-0 mt-2 flex list-none flex-col gap-1 p-0 text-xs">
+                  @for (entry of history; track entry.id) {
+                    <li>{{ entry.createdAt }} · {{ entry.method }} · {{ entry.success ? 'success' : 'failed' }}</li>
+                  }
+                </ul>
+              }
+            }
+          </section>
+
+          <section>
+            <h3 class="m-0 mb-2 text-sm font-semibold">Device sessions</h3>
+            <md-text-button (click)="loadSessions()">Load sessions</md-text-button>
+            @if (sessions(); as list) {
+              @if (list.length === 0) {
+                <p class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]">No active sessions.</p>
+              } @else {
+                <ul class="m-0 mt-2 flex list-none flex-col gap-1 p-0 text-xs">
+                  @for (session of list; track session.id) {
+                    <li>{{ session.deviceInfo ?? session.ip ?? 'Unknown device' }} · expires {{ session.expiresAt }}</li>
+                  }
+                </ul>
+              }
+            }
+          </section>
+        </div>
+      </sky-card>
+    }
+  </div>
+</md-admin-page>

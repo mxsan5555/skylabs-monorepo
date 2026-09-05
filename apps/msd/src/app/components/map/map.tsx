@@ -4,12 +4,22 @@ import {
     OverlayView,
 } from "@react-google-maps/api";
 import "./map.css";
-import type { Deal } from "../../../types";
 import { formatINR } from "../../../utils/format";
 import { useNavigate } from "react-router-dom";
 import { useCallback } from "react";
+
+/** Only the fields this component actually plots — real `lat`/`lng` (never fabricated) plus
+ *  enough to link/label a marker. Decoupled from the old mock `Deal` type so real catalogue
+ *  data (which has no top-level lat/lng) can be mapped into this shape by the caller. */
+interface MapDeal {
+    id: string;
+    lat: number;
+    lng: number;
+    price: number;
+}
+
 interface MapProps {
-    deals: Deal[];
+    deals: MapDeal[];
 }
 
 export function Map({ deals }: MapProps) {
@@ -42,8 +52,11 @@ export function Map({ deals }: MapProps) {
     if (!isLoaded) {
         return <p>Loading map...</p>;
     }
-    return (
-        <GoogleMap
+return (
+
+<div className="map">
+
+    <GoogleMap
             onLoad={onLoad}
             zoom={11}
             center={center}
@@ -75,8 +88,11 @@ export function Map({ deals }: MapProps) {
     </button>
   </OverlayView>
 ))}
-        </GoogleMap>
-    );
+           </GoogleMap>
+
+</div>
+
+);
 }
 
 export default Map;

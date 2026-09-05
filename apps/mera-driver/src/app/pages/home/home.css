@@ -27,7 +27,7 @@
 .home__hero p {
   margin: 0;
   max-width: 56ch;
-  color: var(--md-sys-color-on-surface-variant, #42474e);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 .home__actions {
@@ -50,5 +50,5 @@
 
 .home__cards p {
   margin: 0;
-  color: var(--md-sys-color-on-surface-variant, #42474e);
+  color: var(--md-sys-color-on-surface-variant);
 }

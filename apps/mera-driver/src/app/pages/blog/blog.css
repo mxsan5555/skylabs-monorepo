@@ -16,7 +16,7 @@
 .blog__header p {
   margin: 6px 0 0;
   max-width: 60ch;
-  color: var(--md-sys-color-on-surface-variant, #42474e);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 /* Responsive preview grid. */
@@ -44,7 +44,7 @@
   object-fit: cover;
   border-radius: 10px;
   display: block;
-  background-color: var(--md-sys-color-surface-variant, #dde2e8);
+  background-color: var(--md-sys-color-surface-variant);
 }
 
 .post-card__body {
@@ -61,7 +61,7 @@
 }
 
 .post-card__title a {
-  color: var(--md-sys-color-on-surface, #191c1f);
+  color: var(--md-sys-color-on-surface);
   text-decoration: none;
 }
 
@@ -73,14 +73,14 @@
 }
 
 .post-card__title a:focus-visible::after {
-  outline: 2px solid var(--md-sys-color-primary, #1175bc);
+  outline: 2px solid var(--md-sys-color-primary);
   outline-offset: 2px;
   border-radius: 12px;
 }
 
 .post-card__excerpt {
   margin: 0;
-  color: var(--md-sys-color-on-surface-variant, #42474e);
+  color: var(--md-sys-color-on-surface-variant);
   display: -webkit-box;
   -webkit-line-clamp: 3;
   line-clamp: 3;
@@ -94,7 +94,7 @@
   align-items: center;
   gap: 6px;
   font-size: 0.8125rem;
-  color: var(--md-sys-color-on-surface-variant, #42474e);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 .post-card__read {

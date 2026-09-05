@@ -1,7 +1,10 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import type { MdDialog } from '@material/web/dialog/dialog.js';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import {
   OutlinedTextField,
+  OutlinedSelect,
+  SelectOption,
   ChipSet,
   FilterChip,
   Icon,
@@ -11,137 +14,258 @@ import {
   FilledButton,
   TextButton,
   Slider,
-  Checkbox,
   Radio,
   Divider,
-  SkyProductCardReact,
-  SkyBadgeReact,
 } from '@skylabs-monorepo/shared-ui/react';
+import { SkyProductCardWC } from '../../components/sky-product-card-wc';
+import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { useCart } from '../../../cart/cart-context';
-import { DEALS } from '../../../data/deals';
-import { CATEGORIES } from '../../../data/categories';
-import type { SearchView, PriceLevel } from '../../../types';
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { addCartItem } from '../../../api/cart';
+import {
+  listCatalogCategories,
+  listCatalogDeals,
+  listCatalogLocations,
+  type CatalogCategoryWithChildren,
+  type CatalogDeal,
+  type CatalogLocation,
+} from '../../../api/catalog';
+import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR } from '../../../utils/format';
+import { resolveDealMedia, primaryImage } from '../../../utils/media';
+import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import content from '../../../content.json';
 import './search.css';
 import { Map } from '../../components/map';
 
 const { search: searchContent } = content;
-const DISTANCE_MAX = searchContent.filters.distance.max;
 
-type ActiveDialog = 'price' | 'category' | 'features' | 'distance' | null;
+type View = 'list' | 'grid' | 'map';
+type ActiveDialog = 'price' | 'category' | 'location' | null;
 
-const PRICE_LEVELS: { value: PriceLevel; label: string }[] =
-  searchContent.filters.price.priceLevels as { value: PriceLevel; label: string }[];
-
+/**
+ * Customer catalogue search / explore page — reads the real public catalogue
+ * (`GET /catalog/categories`, `GET /catalog/deals`) instead of the mock
+ * `DEALS`/`CATEGORIES` fixtures. The URL (`q`, `category`, `sort`) is the
+ * source of truth: it's read on mount (so refresh / back-forward restore
+ * state) and written on every filter change, merging into whatever params
+ * are already present rather than replacing them wholesale.
+ *
+ * Filters with no real-data equivalent — price level ($/$$/$$$), features,
+ * and distance — are removed rather than fed fake data, per the "never
+ * fabricate" rule. The Map view is restored and plots each deal's real
+ * `branch.latitude`/`longitude` (now exposed by the public catalogue API) —
+ * most branches have no coordinates set yet, so a deal is only plotted when
+ * its branch's lat/lng are both non-null; if none of the current results
+ * have coordinates, the map falls back to the existing empty state instead
+ * of guessing a location.
+ */
 export function Search() {
+  const navigate = useNavigate();
+  const { token, isAuthenticated } = useAuth();
   const [params, setParams] = useSearchParams();
-  const [view, setView] = useState<SearchView>('list');
+  const [view, setView] = useState<View>('list');
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState('');
 
-  // Filter state
+  // ── Filter state (mirrors the URL; kept in sync both ways) ─────────────
   const [query, setQuery] = useState(params.get('q') ?? '');
-  const [priceRange, setPriceRange] = useState<[number, number]>([
-    searchContent.filters.price.min,
-    searchContent.filters.price.max,
-  ]);
-  const [selectedPriceLevels, setSelectedPriceLevels] = useState<PriceLevel[]>([]);
-  const [suggested, setSuggested] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(params.get('category') ?? '');
-  const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
-  const [distanceMax, setDistanceMax] = useState(DISTANCE_MAX);
+  const [suggested, setSuggested] = useState(params.get('sort') === 'discount');
+  const [selectedState, setSelectedState] = useState(params.get('state') ?? '');
+  const [selectedCity, setSelectedCity] = useState(params.get('city') ?? '');
+  // Only the upper bound is adjustable (single-thumb slider, matching the
+  // real UI below) — the lower bound is never sent to the API since no
+  // control ever changes it.
+  const [priceMax, setPriceMax] = useState(searchContent.filters.price.max);
 
-  const priceDialogRef = useRef<{ show: () => void; close: () => void } | null>(null);
-  const categoryDialogRef = useRef<{ show: () => void; close: () => void } | null>(null);
-  const featuresDialogRef = useRef<{ show: () => void; close: () => void } | null>(null);
-  const distanceDialogRef = useRef<{ show: () => void; close: () => void } | null>(null);
-
+  const priceDialogRef = useRef<MdDialog>(null);
+  const categoryDialogRef = useRef<MdDialog>(null);
+  const locationDialogRef = useRef<MdDialog>(null);
   useEffect(() => {
-    const map: Record<NonNullable<ActiveDialog>, React.MutableRefObject<{ show: () => void; close: () => void } | null>> = {
-      price: priceDialogRef,
-      category: categoryDialogRef,
-      features: featuresDialogRef,
-      distance: distanceDialogRef,
-    };
-    if (activeDialog) {
-      map[activeDialog].current?.show();
+    if (activeDialog === 'price') {
+      priceDialogRef.current?.show();
+    }
+
+    if (activeDialog === 'category') {
+      categoryDialogRef.current?.show();
+    }
+
+    if (activeDialog === 'location') {
+      locationDialogRef.current?.show();
     }
   }, [activeDialog]);
+  // Browser back/forward (or a fresh load) changes `params` out from under
+  // us — resync local filter state from the URL whenever that happens. Our
+  // own `updateParams()` calls also flow back through here, which is a
+  // no-op since the values already match.
+  useEffect(() => {
+    setQuery(params.get('q') ?? '');
+    setSelectedCategory(params.get('category') ?? '');
+    setSuggested(params.get('sort') === 'discount');
+    setSelectedState(params.get('state') ?? '');
+    setSelectedCity(params.get('city') ?? '');
+  }, [params]);
 
-  const filtered = useMemo(() => {
-    let list = [...DEALS];
-    const q = query.toLowerCase().trim();
-    if (q) {
-      list = list.filter(
-        (d) =>
-          d.title.toLowerCase().includes(q) ||
-          d.providerName.toLowerCase().includes(q) ||
-          d.description.toLowerCase().includes(q),
-      );
-    }
-    if (selectedCategory) {
-      list = list.filter((d) => d.categorySlug === selectedCategory);
-    }
-    if (selectedPriceLevels.length > 0) {
-      list = list.filter((d) => selectedPriceLevels.includes(d.priceLevel));
-    }
-    list = list.filter((d) => d.price >= priceRange[0] && d.price <= priceRange[1]);
-    if (selectedFeatures.length > 0) {
-      list = list.filter((d) =>
-        selectedFeatures.every((f) => d.features.includes(f)),
-      );
-    }
-    list = list.filter((d) => d.distance <= distanceMax);
-    if (suggested) {
-      list = [...list].sort((a, b) => b.rating - a.rating);
-    }
-    return list;
-  }, [query, selectedCategory, selectedPriceLevels, priceRange, selectedFeatures, distanceMax, suggested]);
+  function updateParams(patch: Record<string, string | undefined>) {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      for (const [key, value] of Object.entries(patch)) {
+        if (value === undefined || value === '') next.delete(key);
+        else next.set(key, value);
+      }
+      return next;
+    });
+  }
 
-  function toggleFeature(f: string) {
-    setSelectedFeatures((prev) =>
-      prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f],
-    );
+  // ── Categories (for the category picker dialog) ────────────────────────
+  const [categories, setCategories] = useState<CatalogCategoryWithChildren[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+
+  useEffect(() => {
+    listCatalogCategories()
+      .then(({ data }) => setCategories(data))
+      .catch(() => setCategories([]))
+      .finally(() => setCategoriesLoading(false));
+  }, []);
+
+  const selectedCategoryEntry = categories.find((c) => c.slug === selectedCategory);
+
+  // ── Locations (for the State/City picker dialog) — distinct {state, city} pairs from active
+  // branches, not the full static `india-locations.ts` list, so the picker only ever offers
+  // combinations that can actually return results. ─────────────────────────────────────────
+  const [locations, setLocations] = useState<CatalogLocation[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(true);
+
+  useEffect(() => {
+    listCatalogLocations()
+      .then(({ data }) => setLocations(data))
+      .catch(() => setLocations([]))
+      .finally(() => setLocationsLoading(false));
+  }, []);
+
+  const availableStates = Array.from(new Set(locations.map((l) => l.state))).sort();
+  const citiesForSelectedState = Array.from(
+    new Set(locations.filter((l) => l.state === selectedState).map((l) => l.city)),
+  ).sort();
+
+  // ── Deals (real, server-filtered/sorted) ────────────────────────────────
+  const [deals, setDeals] = useState<CatalogDeal[]>([]);
+  const [dealsLoading, setDealsLoading] = useState(true);
+  const [dealsError, setDealsError] = useState('');
+  const { coords } = useCurrentLocation();
+
+  useEffect(() => {
+    // Wait for categories to resolve slug → id before fetching, so a
+    // `?category=<slug>` in the URL isn't dropped on the first request.
+    if (categoriesLoading) return;
+    setDealsLoading(true);
+    setDealsError('');
+    listCatalogDeals({
+      search: query || undefined,
+      categoryId: selectedCategoryEntry?.id,
+      sort: suggested ? 'discount' : undefined,
+      maxPrice: priceMax < searchContent.filters.price.max ? priceMax : undefined,
+      state: selectedState || undefined,
+      city: selectedCity || undefined,
+      pageSize: 100,
+      latitude: coords?.latitude,
+      longitude: coords?.longitude,
+    })
+      .then(({ data }) => setDeals(data))
+      .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : searchContent.errors.loadDeals))
+      .finally(() => setDealsLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, selectedCategoryEntry?.id, suggested, priceMax, selectedState, selectedCity, categoriesLoading, coords?.latitude, coords?.longitude]);
+
+  function selectCategory(slug: string) {
+    setSelectedCategory(slug);
+    updateParams({ category: slug || undefined });
+  }
+
+  function toggleSuggested() {
+    const next = !suggested;
+    setSuggested(next);
+    updateParams({ sort: next ? 'discount' : undefined });
+  }
+
+  function selectState(state: string) {
+    setSelectedState(state);
+    setSelectedCity('');
+    updateParams({ state: state || undefined, city: undefined });
+  }
+
+  function selectCity(city: string) {
+    setSelectedCity(city);
+    updateParams({ city: city || undefined });
+  }
+
+  function clearLocation() {
+    setSelectedState('');
+    setSelectedCity('');
+    updateParams({ state: undefined, city: undefined });
   }
 
   function clearAllFilters() {
     setQuery('');
-    setSelectedPriceLevels([]);
-    setPriceRange([searchContent.filters.price.min, searchContent.filters.price.max]);
+    setPriceMax(searchContent.filters.price.max);
     setSuggested(false);
     setSelectedCategory('');
-    setSelectedFeatures([]);
-    setDistanceMax(DISTANCE_MAX);
+    setSelectedState('');
+    setSelectedCity('');
     setParams({});
   }
-
   const hasActiveFilters =
-    selectedPriceLevels.length > 0 ||
-    suggested ||
-    selectedCategory !== '' ||
-    selectedFeatures.length > 0 ||
-    distanceMax < DISTANCE_MAX;
+    suggested || selectedCategory !== '' || priceMax < searchContent.filters.price.max || selectedState !== '';
 
   const { toggle: wishlistToggle, has: wishlistHas } = useWishlist();
-  const { addItem } = useCart();
+
+  const requireAuthOrRedirect = () => {
+    if (isAuthenticated) return true;
+    navigate(`/sign-in?next=${encodeURIComponent('/explore')}`);
+    return false;
+  };
+
+  const addToCart = async (deal: CatalogDeal) => {
+    if (!requireAuthOrRedirect()) return;
+    setActionError('');
+    setActionMessage('');
+    try {
+      await addCartItem(token, { dealId: deal.id, quantity: 1 });
+      setActionMessage(`Added "${deal.product?.name ?? deal.title}" to your cart.`);
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : 'Could not add to cart.');
+    }
+  };
+
+  // ── Map view — only deals whose branch has real, non-fabricated coordinates ──
+  const dealsWithCoords = deals.filter(
+    (deal): deal is CatalogDeal & { branch: { latitude: string; longitude: string } } =>
+      deal.branch?.latitude != null && deal.branch?.longitude != null
+  );
+  const mappableDeals = dealsWithCoords.map((deal) => ({
+    id: deal.id,
+    lat: Number(deal.branch.latitude),
+    lng: Number(deal.branch.longitude),
+    price: Number(deal.salePrice),
+  }));
 
   return (
     <div className="search-page">
       <title>{content.meta.explore.title}</title>
       <meta name="description" content={content.meta.explore.description} />
       <meta name="robots" content="noindex" />
-
       {/* ── Search bar ─────────────────────────────────────────────────── */}
       <div className="search-page__bar-wrap">
         <div className="search-page__bar">
           <form
             role="search"
-            aria-label="Search deals"
+            aria-label={searchContent.ariaLabel}
             className="search-page__form"
             onSubmit={(e) => {
               e.preventDefault();
-              setParams(query ? { q: query } : {});
+              updateParams({ q: query || undefined });
             }}
           >
             <OutlinedTextField
@@ -155,11 +279,10 @@ export function Search() {
               <Icon slot="leading-icon" aria-hidden="true">search</Icon>
             </OutlinedTextField>
           </form>
-
           {/* View toggle */}
-          <div className="search-page__view-toggle" role="group" aria-label="Results view">
+          <div className="search-page__view-toggle" role="group" aria-label={searchContent.view.groupLabel}>
             <IconButton
-              aria-label="List view"
+              aria-label={searchContent.view.list}
               aria-pressed={view === 'list'}
               onClick={() => setView('list')}
               className={view === 'list' ? 'search-page__view-btn--active' : ''}
@@ -167,7 +290,7 @@ export function Search() {
               <Icon aria-hidden="true">view_list</Icon>
             </IconButton>
             <IconButton
-              aria-label="Grid view"
+              aria-label={searchContent.view.grid}
               aria-pressed={view === 'grid'}
               onClick={() => setView('grid')}
               className={view === 'grid' ? 'search-page__view-btn--active' : ''}
@@ -175,7 +298,7 @@ export function Search() {
               <Icon aria-hidden="true">grid_view</Icon>
             </IconButton>
             <IconButton
-              aria-label="Map view"
+              aria-label={searchContent.view.map}
               aria-pressed={view === 'map'}
               onClick={() => setView('map')}
               className={view === 'map' ? 'search-page__view-btn--active' : ''}
@@ -184,16 +307,20 @@ export function Search() {
             </IconButton>
           </div>
         </div>
-
         {/* ── Filter chips ──────────────────────────────────────────────── */}
         <div className="search-page__chips">
           <ChipSet>
             {/* Price */}
             <FilterChip
-              label={selectedPriceLevels.length > 0
-                ? `Price (${selectedPriceLevels.join(', ')})`
-                : searchContent.filters.price.label}
-              selected={selectedPriceLevels.length > 0}
+              label={
+                priceMax < searchContent.filters.price.max
+                  ? searchContent.filters.price.activeLabel.replace(
+                    '{price}',
+                    formatINR(priceMax)
+                  )
+                  : searchContent.filters.price.label
+              }
+              selected={priceMax < searchContent.filters.price.max}
               onClick={() => setActiveDialog('price')}
             >
               <Icon slot="icon" aria-hidden="true">payments</Icon>
@@ -203,54 +330,39 @@ export function Search() {
             <FilterChip
               label={searchContent.filters.suggested.label}
               selected={suggested}
-              onClick={() => setSuggested((v) => !v)}
+              onClick={toggleSuggested}
             >
               <Icon slot="icon" aria-hidden="true">auto_awesome</Icon>
             </FilterChip>
-
             {/* Category */}
             <FilterChip
-              label={selectedCategory
-                ? (CATEGORIES.find((c) => c.slug === selectedCategory)?.name ?? searchContent.filters.category.label)
-                : searchContent.filters.category.label}
+              label={selectedCategoryEntry?.name ?? searchContent.filters.category.label}
               selected={!!selectedCategory}
               onClick={() => setActiveDialog('category')}
             >
               <Icon slot="icon" aria-hidden="true">category</Icon>
             </FilterChip>
-
-            {/* Features */}
+            {/* Location */}
             <FilterChip
-              label={selectedFeatures.length > 0
-                ? `Features (${selectedFeatures.length})`
-                : searchContent.filters.features.label}
-              selected={selectedFeatures.length > 0}
-              onClick={() => setActiveDialog('features')}
+              label={
+                selectedCity
+                  ? `${selectedCity}, ${selectedState}`
+                  : selectedState || searchContent.filters.location.label
+              }
+              selected={!!selectedState}
+              onClick={() => setActiveDialog('location')}
             >
-              <Icon slot="icon" aria-hidden="true">tune</Icon>
-            </FilterChip>
-
-            {/* Distance */}
-            <FilterChip
-              label={distanceMax < DISTANCE_MAX
-                ? `Within ${distanceMax} km`
-                : searchContent.filters.distance.label}
-              selected={distanceMax < 50}
-              onClick={() => setActiveDialog('distance')}
-            >
-              <Icon slot="icon" aria-hidden="true">near_me</Icon>
+              <Icon slot="icon" aria-hidden="true">location_on</Icon>
             </FilterChip>
           </ChipSet>
-
           {hasActiveFilters && (
             <TextButton onClick={clearAllFilters} className="search-page__clear">
               <Icon slot="icon" aria-hidden="true">close</Icon>
-              Clear filters
+              {searchContent.filters.clearAll}
             </TextButton>
           )}
         </div>
       </div>
-
       {/* ── Results header ─────────────────────────────────────────────── */}
       <div className="search-page__content">
         <p
@@ -259,296 +371,313 @@ export function Search() {
           aria-live="polite"
           aria-atomic="true"
         >
-          {filtered.length} {searchContent.resultLabel}
+          {dealsLoading ? '…' : `${deals.length} ${searchContent.resultLabel}`}
         </p>
 
-        {/* ── List view ─────────────────────────────────────────────────── */}
-        {view === 'list' && (
-          <section aria-label="Search results list">
-            {filtered.length === 0 ? (
-              <p className="search-page__empty">{searchContent.noResults}</p>
-            ) : (
-              <ul className="search-results-list">
-                {filtered.map((deal) => (
-                  <li key={deal.id} className="search-results-list__item">
-                    <article className="search-result-card">
-                      <Link
-                        to={`/deal/${deal.id}`}
-                        className="search-result-card__img-link"
-                        tabIndex={-1}
-                        aria-hidden="true"
-                      >
-                        <img
-                          className="search-result-card__img"
-                          src={deal.image}
-                          alt={deal.imageAlt}
-                          width={140}
-                          height={140}
-                          loading="lazy"
-                        />
-                      </Link>
-                      <div className="search-result-card__body">
-                        <div className="search-result-card__top">
-                          <div>
-                            <h3 className="search-result-card__title">
-                              <Link to={`/deal/${deal.id}`}>
-                                {deal.title}
-                              </Link>
-                            </h3>
-                            <p className="search-result-card__provider">{deal.providerName}</p>
-                            <p className="search-result-card__price-tier">{deal.priceLevel}</p>
+        {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
+        {actionError && <p className="error-state" role="alert">{actionError}</p>}
+
+        {dealsLoading ? (
+          <p className="loading-state"> {searchContent.loading.deals}</p>
+        ) : dealsError ? (
+          <p className="error-state" role="alert">{dealsError}</p>
+        ) : deals.length === 0 ? (
+          <p className="search-page__empty">{searchContent.noResults}</p>
+        ) : (
+          <>
+            {/* ── List view ───────────────────────────────────────────── */}
+            {view === 'list' && (
+              <section aria-label={searchContent.results.listAriaLabel}>
+                <ul className="search-results-list">
+                  {deals.map((deal) => {
+                    const heading = deal.product?.name ?? deal.title;
+                    const image = primaryImage(resolveDealMedia(deal));
+                    const imageAlt = deal.product?.imageAlt ?? heading;
+                    return (
+                      <li key={deal.id} className="search-results-list__item">
+                        <article className="search-result-card">
+                          <Link
+                            to={`/deal/${deal.id}`}
+                            className="search-result-card__img-link"
+                            tabIndex={-1}
+                            aria-hidden="true"
+                          >
+                            {image && (
+                              <img
+                                className="search-result-card__img"
+                                src={image}
+                                alt={imageAlt}
+                                width={140}
+                                height={140}
+                                loading="lazy"
+                              />
+                            )}
+                          </Link>
+                          <div className="search-result-card__body">
+                            <div className="search-result-card__top">
+                              <div>
+                                <h3 className="search-result-card__title">
+                                  <Link to={`/deal/${deal.id}`}>{heading}</Link>
+                                </h3>
+                                {deal.vendor?.businessName && (
+                                  <p className="search-result-card__provider">
+                                    {deal.vendor.slug ? (
+                                      <Link to={`/vendor/${deal.vendor.slug}`}>{deal.vendor.businessName}</Link>
+                                    ) : (
+                                      deal.vendor.businessName
+                                    )}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <p className="search-result-card__desc">
+                              {deal.shortDescription ?? deal.description}
+                            </p>
+                            <div className="search-result-card__meta">
+                              <span className="search-result-card__price">
+                                {formatINR(Number(deal.salePrice))}
+                              </span>
+                            </div>
+                            <div className="search-result-card__actions">
+                              {!deal.product ? (
+                                <DealAddToCartDialog
+                                  deal={deal}
+                                  onAdded={(label) => setActionMessage(`Added "${label}" to your cart.`)}
+                                  renderTrigger={(open) => (
+                                    <FilledTonalButton
+                                      onClick={() => {
+                                        if (requireAuthOrRedirect()) open();
+                                      }}
+                                    >
+                                      Add to Cart
+                                    </FilledTonalButton>
+                                  )}
+                                />
+                              ) : (
+                                <FilledTonalButton onClick={() => addToCart(deal)}>
+                                  Add to Cart
+                                </FilledTonalButton>
+                              )}
+                              <IconButton
+                                aria-label={
+                                  wishlistHas(deal.id)
+                                    ? searchContent.labels.removeWishlist
+                                    : searchContent.labels.saveWishlist
+                                }
+                                onClick={() => wishlistToggle(deal.id)}
+                              >
+                                <Icon aria-hidden="true">
+                                  {wishlistHas(deal.id) ? 'favorite' : 'favorite_border'}
+                                </Icon>
+                              </IconButton>
+                            </div>
                           </div>
-                        </div>
-                        <p className="search-result-card__desc">{deal.description}</p>
-                        <div className="search-result-card__meta">
-                          <SkyBadgeReact
-                            variant={deal.isOpen ? 'primary' : 'secondary'}
-                            size="small"
-                          >
-                            {deal.isOpen ? 'Open' : 'Closed'}
-                          </SkyBadgeReact>
-                          <span className="search-result-card__rating" aria-label={`Rating ${deal.rating}`}>
-                            <Icon aria-hidden="true" className="search-result-card__star">star</Icon>
-                            {deal.rating}
-                          </span>
-                          <span className="search-result-card__dist" aria-label={`${deal.distance} km away`}>
-                            <Icon aria-hidden="true">near_me</Icon>
-                            {deal.distance} km
-                          </span>
-                          <span className="search-result-card__price">
-                            {formatINR(deal.price)}
-                          </span>
-                        </div>
-                        <div className="search-result-card__actions">
-                          <FilledTonalButton onClick={() => addItem(deal.id)}>
-                            Book
-                          </FilledTonalButton>
-                          <IconButton
-                            aria-label={wishlistHas(deal.id) ? 'Remove from wishlist' : 'Save to wishlist'}
-                            onClick={() => wishlistToggle(deal.id)}
-                          >
-                            <Icon aria-hidden="true">
-                              {wishlistHas(deal.id) ? 'favorite' : 'favorite_border'}
-                            </Icon>
-                          </IconButton>
-                        </div>
-                      </div>
-                    </article>
-                  </li>
-                ))}
-              </ul>
+                        </article>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
             )}
-          </section>
-        )}
 
-        {/* ── Grid view ─────────────────────────────────────────────────── */}
-        {view === 'grid' && (
-          <section aria-label="Search results grid">
-            {filtered.length === 0 ? (
-              <p className="search-page__empty">{searchContent.noResults}</p>
-            ) : (
-              <ul className="search-results-grid">
-                {filtered.map((deal) => (
-                  <li key={deal.id}>
-                    <SkyProductCardReact
-                      image={deal.image}
-                      imageAlt={deal.imageAlt}
-                      badge={deal.badge}
-                      heading={deal.title}
-                      eyebrow={deal.providerName}
-                      location={`${deal.duration} ${deal.durationUnit}`}
-                      price={formatINR(deal.price)}
-                      originalPrice={deal.originalPrice ? formatINR(deal.originalPrice) : undefined}
-                      rating={deal.rating}
-                      reviews={deal.reviews}
-                      favorite={true}
-                      favoriteActive={wishlistHas(deal.id)}
-                      href={`/deal/${deal.id}`}
-                      onFavorite={() => wishlistToggle(deal.id)}
-                    />
-                  </li>
-                ))}
-              </ul>
+            {/* ── Grid view ───────────────────────────────────────────── */}
+            {view === 'grid' && (
+              <section aria-label={searchContent.results.gridAriaLabel}>
+                <ul className="search-results-grid">
+                  {deals.map((deal) => (
+                    <li key={deal.id}>
+                      <SkyProductCardWC
+                        image={primaryImage(resolveDealMedia(deal))}
+                        imageAlt={deal.product?.imageAlt ?? undefined}
+                        badge={deal.product
+                          ? searchContent.labels.product
+                          : searchContent.labels.service
+                        }
+                        tag={deal.popularTags?.[0]?.name ?? deal.product?.popularTags?.[0]?.name}
+                        heading={deal.product?.name ?? deal.title}
+                        eyebrow={[deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · ')}
+                        eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
+                        location={deal.branch?.city ?? undefined}
+                        distance={deal.distanceKm != null ? `${(Math.round(deal.distanceKm * 10) / 10)} km` : undefined}
+                        priceNote={deal.durationMinutes ? `${deal.durationMinutes}${searchContent.labels.durationSuffix}` : undefined}
+                        price={formatINR(Number(deal.salePrice))}
+                        originalPrice={
+                          deal.originalPrice && Number(deal.originalPrice) !== Number(deal.salePrice)
+                            ? formatINR(Number(deal.originalPrice))
+                            : undefined
+                        }
+                        favorite={true}
+                        favoriteActive={wishlistHas(deal.id)}
+                        href={deal.product ? `/products/${deal.id}` : `/deal/${deal.id}`}
+                        onFavorite={() => wishlistToggle(deal.id)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
-          </section>
-        )}
 
-        {/* ── Map view ──────────────────────────────────────────────────── */}
-        {view === 'map' && (
-          <section aria-label="Search results map" className="search-map">
-            <div className="search-map__canvas" role="img" aria-label="Map showing deal locations">
-              {/* {filtered.map((deal, i) => (
-                <button
-                  key={deal.id}
-                  className="search-map__pin"
-                  style={{
-                    left: `${15 + (i % 5) * 17}%`,
-                    top: `${20 + Math.floor(i / 5) * 28}%`,
-                  }}
-                  aria-label={`${deal.title} — ${formatINR(deal.price)}`}
-                >
-                  <span className="search-map__pin-label">
-                    {formatINR(Math.round(deal.price / 100) * 100)}
-                  </span>
-                </button>
-              ))} */}
-              <Map deals={filtered} />
-            </div>
-            <div className="search-map__sidebar">
-              <p className="search-map__sidebar-count">{filtered.length} results in view</p>
-              <ul className="search-map__list">
-                {filtered.slice(0, 5).map((deal) => (
-                  <li key={deal.id} className="search-map__list-item">
-                    <Link to={`/deal/${deal.id}`} className="search-map__list-link">
-                      <img src={deal.image} alt={deal.imageAlt} width={64} height={64} loading="lazy" />
-                      <span>
-                        <strong>{deal.title}</strong>
-                        <small>{deal.providerName}</small>
-                        <small>{formatINR(deal.price)} · {deal.distance} km</small>
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
+            {/* ── Map view ────────────────────────────────────────────── */}
+            {view === 'map' && (
+              <section aria-label={searchContent.results.mapAriaLabel} className="search-map">
+                {mappableDeals.length === 0 ? (
+                  <p className="search-page__empty">{searchContent.noResults}</p>
+                ) : (
+                  <>
+                    <div className="search-map__canvas" role="img" aria-label={searchContent.results.mapImageLabel}>
+                      <Map deals={mappableDeals} />
+                    </div>
+                    <div className="search-map__sidebar">
+                      <p className="search-map__sidebar-count">{mappableDeals.length}  {searchContent.results.mapResultsSuffix}</p>
+                      <ul className="search-map__list">
+                        {dealsWithCoords
+                          .slice(0, 5)
+                          .map((deal) => {
+                            const heading = deal.product?.name ?? deal.title;
+                            const image = primaryImage(resolveDealMedia(deal));
+                            const imageAlt = deal.product?.imageAlt ?? heading;
+                            return (
+                              <li key={deal.id} className="search-map__list-item">
+                                <Link to={`/deal/${deal.id}`} className="search-map__list-link">
+                                  {image && (
+                                    <img src={image} alt={imageAlt} width={64} height={64} loading="lazy" />
+                                  )}
+                                  <span>
+                                    <strong>{heading}</strong>
+                                    {deal.vendor?.businessName && <small>{deal.vendor.businessName}</small>}
+                                    <small>{formatINR(Number(deal.salePrice))}</small>
+                                  </span>
+                                </Link>
+                              </li>
+                            );
+                          })}
+                      </ul>
+                    </div>
+                  </>
+                )}
+              </section>
+            )}
+          </>
         )}
       </div>
-
       {/* ── Price Dialog ───────────────────────────────────────────────── */}
       <Dialog
-        ref={priceDialogRef as unknown as React.Ref<HTMLElement>}
+        ref={priceDialogRef}
         onClose={() => setActiveDialog(null)}
       >
-        <span slot="headline">Filter by Price</span>
+        <span slot="headline"> {searchContent.filters.price.dialogTitle}</span>
         <div slot="content" className="filter-dialog">
-          <p className="filter-dialog__label">Price levels</p>
-          <div className="filter-dialog__checks">
-            {PRICE_LEVELS.map((level) => (
-              <label key={level.value} className="filter-dialog__check-opt">
-                <Checkbox
-                  checked={selectedPriceLevels.includes(level.value)}
-                  onChange={() =>
-                    setSelectedPriceLevels((prev) =>
-                      prev.includes(level.value)
-                        ? prev.filter((x) => x !== level.value)
-                        : [...prev, level.value],
-                    )
-                  }
-                />
-                <span>{level.label}</span>
-              </label>
-            ))}
-          </div>
-          <Divider />
           <p className="filter-dialog__label">
-            Price range: {formatINR(priceRange[0])} – {formatINR(priceRange[1])}
+            {searchContent.filters.price.priceUpTo} {formatINR(priceMax)}
           </p>
           <Slider
             min={searchContent.filters.price.min}
             max={searchContent.filters.price.max}
-            value={priceRange[1]}
+            value={priceMax}
             step={500}
-            onInput={(e) =>
-              setPriceRange([priceRange[0], (e.target as unknown as { value: number }).value])
-            }
+            onInput={(e) => setPriceMax((e.target as unknown as { value: number }).value)}
           />
         </div>
         <div slot="actions">
-          <TextButton onClick={() => { setSelectedPriceLevels([]); setPriceRange([searchContent.filters.price.min, searchContent.filters.price.max]); }}>
-            Clear
+          <TextButton onClick={() => setPriceMax(searchContent.filters.price.max)}>
+            {searchContent.filters.price.clear}
           </TextButton>
-          <FilledButton onClick={() => setActiveDialog(null)}>Apply</FilledButton>
+          <FilledButton onClick={() => setActiveDialog(null)}> {searchContent.filters.price.apply}</FilledButton>
         </div>
       </Dialog>
 
       {/* ── Category Dialog ────────────────────────────────────────────── */}
       <Dialog
-        ref={categoryDialogRef as unknown as React.Ref<HTMLElement>}
+        ref={categoryDialogRef}
         onClose={() => setActiveDialog(null)}
       >
-        <span slot="headline">Select Category</span>
+        <span slot="headline"> {searchContent.filters.category.dialogTitle}</span>
         <div slot="content" className="filter-dialog">
-          <div role="radiogroup" aria-label="Category" className="filter-dialog__checks">
+          <div role="radiogroup" aria-label={searchContent.filters.category.ariaLabel} className="filter-dialog__checks">
             <label className="filter-dialog__check-opt">
               <Radio
                 name="category"
                 value=""
                 checked={selectedCategory === ''}
-                onChange={() => setSelectedCategory('')}
+                onChange={() => selectCategory('')}
               />
-              <span>All categories</span>
+              <span>{searchContent.filters.category.all}</span>
             </label>
-            {CATEGORIES.map((cat) => (
-              <label key={cat.id} className="filter-dialog__check-opt">
-                <Radio
-                  name="category"
-                  value={cat.slug}
-                  checked={selectedCategory === cat.slug}
-                  onChange={() => setSelectedCategory(cat.slug)}
-                />
-                <span>
-                  {cat.name}
-                  <span className="filter-dialog__count">({cat.serviceCount})</span>
-                </span>
-              </label>
-            ))}
+            {categoriesLoading ? (
+              <p className="loading-state">
+                {searchContent.loading.categories}
+              </p>
+            ) : (
+              categories.map((cat) => (
+                <label key={cat.id} className="filter-dialog__check-opt">
+                  <Radio
+                    name="category"
+                    value={cat.slug}
+                    checked={selectedCategory === cat.slug}
+                    onChange={() => selectCategory(cat.slug)}
+                  />
+                  <span>{cat.name}</span>
+                </label>
+              ))
+            )}
           </div>
+          <Divider />
+          <Link to="/categories" className="field-hint">{searchContent.filters.category.browseAll}</Link>
         </div>
         <div slot="actions">
-          <TextButton onClick={() => setSelectedCategory('')}>Clear</TextButton>
-          <FilledButton onClick={() => setActiveDialog(null)}>Apply</FilledButton>
+          <TextButton onClick={() => selectCategory('')}>{searchContent.filters.category.clear}</TextButton>
+          <FilledButton onClick={() => setActiveDialog(null)}>{searchContent.filters.category.apply}</FilledButton>
         </div>
       </Dialog>
 
-      {/* ── Features Dialog ────────────────────────────────────────────── */}
+      {/* ── Location Dialog ────────────────────────────────────────────── */}
       <Dialog
-        ref={featuresDialogRef as unknown as React.Ref<HTMLElement>}
+        ref={locationDialogRef}
         onClose={() => setActiveDialog(null)}
       >
-        <span slot="headline">Filter by Features</span>
+        <span slot="headline">{searchContent.filters.location.dialogTitle}</span>
         <div slot="content" className="filter-dialog">
-          <div role="group" aria-label="Features" className="filter-dialog__checks">
-            {searchContent.filters.features.options.map((f) => (
-              <label key={f} className="filter-dialog__check-opt">
-                <Checkbox
-                  checked={selectedFeatures.includes(f)}
-                  onChange={() => toggleFeature(f)}
-                />
-                <span>{f}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-        <div slot="actions">
-          <TextButton onClick={() => setSelectedFeatures([])}>Clear</TextButton>
-          <FilledButton onClick={() => setActiveDialog(null)}>Apply</FilledButton>
-        </div>
-      </Dialog>
+          {locationsLoading ? (
+            <p className="loading-state">{searchContent.loading.categories}</p>
+          ) : (
+            <>
+              <OutlinedSelect
+                label={searchContent.filters.location.stateLabel}
+                value={selectedState}
+                onChange={(e: Event) => selectState((e.target as HTMLSelectElement).value)}
+              >
+                <SelectOption value="">
+                  <div slot="headline">{searchContent.filters.location.stateAll}</div>
+                </SelectOption>
+                {availableStates.map((state) => (
+                  <SelectOption key={state} value={state}>
+                    <div slot="headline">{state}</div>
+                  </SelectOption>
+                ))}
+              </OutlinedSelect>
 
-      {/* ── Distance Dialog ────────────────────────────────────────────── */}
-      <Dialog
-        ref={distanceDialogRef as unknown as React.Ref<HTMLElement>}
-        onClose={() => setActiveDialog(null)}
-      >
-        <span slot="headline">Filter by Distance</span>
-        <div slot="content" className="filter-dialog">
-          <p className="filter-dialog__label">
-            Within {distanceMax} km
-          </p>
-          <Slider
-            min={1}
-            max={searchContent.filters.distance.max}
-            value={distanceMax}
-            step={1}
-            onInput={(e) =>
-              setDistanceMax((e.target as unknown as { value: number }).value)
-            }
-          />
+              {selectedState && citiesForSelectedState.length > 0 && (
+                <OutlinedSelect
+                  label={searchContent.filters.location.cityLabel}
+                  value={selectedCity}
+                  onChange={(e: Event) => selectCity((e.target as HTMLSelectElement).value)}
+                >
+                  <SelectOption value="">
+                    <div slot="headline">{searchContent.filters.location.cityAll}</div>
+                  </SelectOption>
+                  {citiesForSelectedState.map((city) => (
+                    <SelectOption key={city} value={city}>
+                      <div slot="headline">{city}</div>
+                    </SelectOption>
+                  ))}
+                </OutlinedSelect>
+              )}
+            </>
+          )}
         </div>
         <div slot="actions">
-          <TextButton onClick={() => setDistanceMax(DISTANCE_MAX)}>Clear</TextButton>
-          <FilledButton onClick={() => setActiveDialog(null)}>Apply</FilledButton>
+          <TextButton onClick={clearLocation}>{searchContent.filters.location.clear}</TextButton>
+          <FilledButton onClick={() => setActiveDialog(null)}>{searchContent.filters.location.apply}</FilledButton>
         </div>
       </Dialog>
     </div>

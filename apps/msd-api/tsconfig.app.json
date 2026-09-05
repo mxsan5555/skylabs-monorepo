@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist/out-tsc",
+    "module": "commonjs",
+    "resolveJsonModule": true,
+    "types": ["node", "express"]
+  },
+  "exclude": [
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts",
+    "src/test-utils/**/*.ts",
+    "vite.config.ts"
+  ],
+  "include": ["src/**/*.ts"]
+}
