@@ -114,6 +114,165 @@ describe('POST /api/v1/rbac/roles', () => {
   });
 });
 
+/**
+ * Feature: User Management role filter + Superadmin exclusion (Vendor Validation/Permissions
+ * audit, Phase 6). `listUsers` joins through `UserRole -> Role.key` for the `roleKey` filter and
+ * excludes any Superadmin-flagged role's users from every call by default — Superadmin manages
+ * their own profile via the separate `/rbac/users/me` surface (Phase 7), not as a row here.
+ */
+describe('GET /api/v1/rbac/users', () => {
+  const nonSuperadminUser = {
+    id: TARGET_USER_ID,
+    name: 'Priya Vendor',
+    email: 'priya@example.com',
+    phone: null,
+    status: 'active',
+    lastLoginAt: null,
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    updatedAt: new Date('2026-01-01T00:00:00Z'),
+    roles: [{ role: { id: ROLE_ID, key: 'vendor', name: 'Vendor' } }],
+  };
+
+  it('returns 401 with no token', async () => {
+    const res = await request(app).get('/api/v1/rbac/users');
+    expect(res.status).toBe(401);
+  });
+
+  it('excludes Superadmin-flagged users by default, never a role-key string compare', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:view']);
+    prismaMock.user.findMany.mockResolvedValue([nonSuperadminUser]);
+    prismaMock.user.count.mockResolvedValue(1);
+    const res = await request(app)
+      .get('/api/v1/rbac/users')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([{ roles: { none: { role: { isSuperAdmin: true } } } }]),
+        }),
+      }),
+    );
+  });
+
+  it('filters by roleKey via a UserRole -> Role.key join, never a client-supplied vendorId-style trust', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:view']);
+    prismaMock.user.findMany.mockResolvedValue([nonSuperadminUser]);
+    prismaMock.user.count.mockResolvedValue(1);
+    const res = await request(app)
+      .get('/api/v1/rbac/users?roleKey=vendor')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([{ roles: { some: { role: { key: 'vendor' } } } }]),
+        }),
+      }),
+    );
+  });
+});
+
+/**
+ * Feature: Superadmin (and every other authenticated user's) own profile self-service (Vendor
+ * Validation/Permissions audit, Phase 7). Authenticate-only — no `rbac.users:*` permission is
+ * required, since every signed-in user (Superadmin included) must be able to view/edit their own
+ * row. `UserUpdateSchema` has no `role`/`roleIds` field at all, so a role change can never be
+ * smuggled through this route for any caller, Superadmin included — this is a blanket rule by
+ * construction, not a Superadmin-specific carve-out.
+ */
+describe('GET/PATCH /api/v1/rbac/users/me', () => {
+  const selfUser = {
+    id: USER_ID,
+    name: 'Self User',
+    email: 'self@example.com',
+    phone: null,
+    status: 'active',
+    lastLoginAt: null,
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    updatedAt: new Date('2026-01-01T00:00:00Z'),
+    roles: [{ role: { id: ROLE_ID, key: 'super_admin', name: 'Super Admin' } }],
+  };
+
+  it('GET returns 401 with no token', async () => {
+    const res = await request(app).get('/api/v1/rbac/users/me');
+    expect(res.status).toBe(401);
+  });
+
+  it('GET returns the caller\'s own row with no rbac.users:* permission granted at all', async () => {
+    resolveMock.mockResolvedValue([]);
+    prismaMock.user.findFirst.mockResolvedValue(selfUser);
+    const res = await request(app)
+      .get('/api/v1/rbac/users/me')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['super_admin'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data.id).toBe(USER_ID);
+  });
+
+  it('PATCH updates name/email/phone for a Superadmin caller with no rbac.users:* permission needed', async () => {
+    resolveMock.mockResolvedValue([]);
+    prismaMock.user.findFirst.mockResolvedValue(selfUser);
+    prismaMock.user.update.mockResolvedValue({ ...selfUser, name: 'Updated Name' });
+    const res = await request(app)
+      .patch('/api/v1/rbac/users/me')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['super_admin'] }))
+      .send({ name: 'Updated Name' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.name).toBe('Updated Name');
+    expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: USER_ID } }),
+    );
+  });
+
+  it('PATCH silently ignores a roleIds field in the body — role can never be changed through this route', async () => {
+    resolveMock.mockResolvedValue([]);
+    prismaMock.user.findFirst.mockResolvedValue(selfUser);
+    prismaMock.user.update.mockResolvedValue(selfUser);
+    const res = await request(app)
+      .patch('/api/v1/rbac/users/me')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['super_admin'] }))
+      .send({ name: 'Self User', roleIds: [OTHER_ROLE_ID] });
+    expect(res.status).toBe(200);
+    expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.not.objectContaining({ roleIds: expect.anything() }) }),
+    );
+  });
+});
+
+describe('POST /api/v1/rbac/users', () => {
+  const validBody = { name: 'Nikita Sharma', email: 'nikita@example.com', roleIds: [ROLE_ID] };
+
+  it('returns 409 (not a raw 500) when the email/phone unique constraint is hit at the DB, previously an unhandled P2002', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:create']);
+    prismaMock.role.count.mockResolvedValue(1);
+    const { Prisma } = await import('../generated/prisma-client');
+    prismaMock.user.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' }),
+    );
+    const res = await request(app)
+      .post('/api/v1/rbac/users')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send(validBody);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('CONFLICT');
+  });
+
+  it('still returns 201 with the created user when the audit-log write itself fails', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:create']);
+    prismaMock.role.count.mockResolvedValue(1);
+    prismaMock.user.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: TARGET_USER_ID, ...data, roles: [] }),
+    );
+    prismaMock.auditLog.create.mockRejectedValue(new Error('audit db unreachable'));
+    const res = await request(app)
+      .post('/api/v1/rbac/users')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send(validBody);
+    expect(res.status).toBe(201);
+    expect(res.body.data.id).toBe(TARGET_USER_ID);
+  });
+});
+
 describe('PATCH /api/v1/rbac/roles/:id', () => {
   it('returns 401 with no token', async () => {
     const res = await request(app).patch(`/api/v1/rbac/roles/${ROLE_ID}`).send({ name: 'New name' });

@@ -27,8 +27,12 @@ const SERVICE_DEAL_ID = 'f0f0f0f0-0000-4000-8000-000000000006';
 const VENDOR_A_ID = 'a1a1a1a1-0000-4000-8000-000000000007';
 const VENDOR_B_ID = 'a2a2a2a2-0000-4000-8000-000000000008';
 const BRANCH_A_ID = 'a3a3a3a3-0000-4000-8000-000000000009';
-const BOOKING_ID = 'a4a4a4a4-0000-4000-8000-00000000000a';
 const ORDER_ID = 'a5a5a5a5-0000-4000-8000-00000000000b';
+const DEAL_PACKAGE_ID = 'a6a6a6a6-0000-4000-8000-00000000000c';
+const THERAPIST_ID = 'a7a7a7a7-0000-4000-8000-00000000000d';
+const THERAPIST_PACKAGE_ID = 'a8a8a8a8-0000-4000-8000-00000000000e';
+const SERVICE_CART_ITEM_ID = 'a9a9a9a9-0000-4000-8000-00000000000f';
+const THERAPIST_CART_ITEM_ID = 'b0b0c0c0-0000-4000-8000-000000000010';
 
 const vendorAFixture = { id: VENDOR_A_ID, businessName: 'ABC Salon', status: 'ACTIVE' };
 const branchAFixture = { id: BRANCH_A_ID, name: 'Gorakhpur Branch', isActive: true };
@@ -53,28 +57,28 @@ const productDealFixture = {
 
 const serviceDealFixture = {
   id: SERVICE_DEAL_ID,
-  serviceId: 'svc-1',
   productId: null,
   vendorId: VENDOR_A_ID,
   branchId: BRANCH_A_ID,
-  service: { name: 'Haircut' },
   title: 'Haircut deal',
-};
-
-const bookingFixture = {
-  id: BOOKING_ID,
-  customerId: CUSTOMER_ID,
-  dealId: SERVICE_DEAL_ID,
-  vendorId: VENDOR_A_ID,
-  branchId: BRANCH_A_ID,
-  status: 'PENDING',
-  quantity: 1,
-  priceSnapshot: '299.00',
-  durationMinutesSnapshot: 30,
-  deal: serviceDealFixture,
   vendor: vendorAFixture,
   branch: branchAFixture,
 };
+
+const dealPackageFixture = { id: DEAL_PACKAGE_ID, dealId: SERVICE_DEAL_ID, isActive: true, sellingPrice: '299.00', durationMinutes: 30 };
+
+const therapistFixture = {
+  id: THERAPIST_ID,
+  isActive: true,
+  vendorId: VENDOR_A_ID,
+  branchId: BRANCH_A_ID,
+  therapistType: 'Therapist',
+  personName: 'Ramesh Kumar',
+  vendor: vendorAFixture,
+  branch: branchAFixture,
+};
+
+const therapistPackageFixture = { id: THERAPIST_PACKAGE_ID, therapistId: THERAPIST_ID, isActive: true, sellingPrice: '499.00', durationMinutes: 60 };
 
 const orderFixture = {
   id: ORDER_ID,
@@ -252,64 +256,45 @@ describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
   });
 });
 
-describe('POST /api/v1/orders/from-booking — Service Booking -> Order', () => {
-  it('2. creates a SERVICE order from a booking', async () => {
-    prismaMock.booking.findUnique.mockResolvedValue(bookingFixture);
-    prismaMock.order.findUnique.mockResolvedValue(null); // no existing order for this booking
-    prismaMock.order.create.mockResolvedValue({ ...orderFixture, type: 'SERVICE', bookingId: BOOKING_ID });
-    const res = await request(app)
-      .post('/api/v1/orders/from-booking')
-      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
-      .send({ bookingId: BOOKING_ID });
-    expect(res.status).toBe(201);
-    expect(res.body.data.type).toBe('SERVICE');
-  });
-
-  it('7. snapshots duration from the booking (never re-reads Deal)', async () => {
-    prismaMock.booking.findUnique.mockResolvedValue(bookingFixture);
-    prismaMock.order.findUnique.mockResolvedValue(null);
+describe('POST /api/v1/orders/checkout — mixed cart (Deal + Product + Therapist -> ONE Order)', () => {
+  it('creates ONE order with a Deal, a Product, and a Therapist line, each snapshotted from its own live price', async () => {
+    const mixedCart = {
+      id: CART_ID,
+      customerId: CUSTOMER_ID,
+      items: [
+        { id: CART_ITEM_ID, cartId: CART_ID, dealId: PRODUCT_DEAL_ID, dealPackageId: null, therapistId: null, therapistPackageId: null, quantity: 2, unitPrice: '150.00' },
+        { id: SERVICE_CART_ITEM_ID, cartId: CART_ID, dealId: SERVICE_DEAL_ID, dealPackageId: DEAL_PACKAGE_ID, therapistId: null, therapistPackageId: null, quantity: 1, unitPrice: '299.00' },
+        { id: THERAPIST_CART_ITEM_ID, cartId: CART_ID, dealId: null, dealPackageId: null, therapistId: THERAPIST_ID, therapistPackageId: THERAPIST_PACKAGE_ID, quantity: 1, unitPrice: '499.00' },
+      ],
+    };
+    prismaMock.cart.findUnique.mockResolvedValue(mixedCart);
+    prismaMock.deal.findFirst.mockImplementation(({ where }: { where: { id: string } }) =>
+      Promise.resolve(where.id === PRODUCT_DEAL_ID ? productDealFixture : serviceDealFixture),
+    );
+    prismaMock.dealPackage.findUnique.mockResolvedValue(dealPackageFixture);
+    prismaMock.therapist.findFirst.mockResolvedValue(therapistFixture);
+    prismaMock.therapistPackage.findUnique.mockResolvedValue(therapistPackageFixture);
     prismaMock.order.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: ORDER_ID, ...data }));
-    await request(app)
-      .post('/api/v1/orders/from-booking')
-      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
-      .send({ bookingId: BOOKING_ID });
-    const call = prismaMock.order.create.mock.calls[0][0];
-    expect(call.data.items.create[0].durationMinutes).toBe(30);
-    expect(call.data.items.create[0].unitPrice.toString()).toBe('299');
-    expect(prismaMock.deal.findFirst).not.toHaveBeenCalled();
-    expect(prismaMock.deal.findUnique).not.toHaveBeenCalled();
-  });
 
-  it('14. a repeat request for a booking that already has an order reuses it idempotently, instead of erroring or duplicating', async () => {
-    // A retried checkout request (double-click, refresh, browser back/forward) must not throw a
-    // conflict — it gets the SAME existing order back, exactly as if this were its first call.
-    prismaMock.booking.findUnique.mockResolvedValue(bookingFixture);
-    prismaMock.order.findUnique.mockResolvedValue({ id: 'existing-order', bookingId: BOOKING_ID });
     const res = await request(app)
-      .post('/api/v1/orders/from-booking')
-      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
-      .send({ bookingId: BOOKING_ID });
+      .post('/api/v1/orders/checkout')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+
     expect(res.status).toBe(201);
-    expect(res.body.data.id).toBe('existing-order');
-    expect(prismaMock.order.create).not.toHaveBeenCalled();
-  });
-
-  it('rejects a booking that is already CANCELLED', async () => {
-    prismaMock.booking.findUnique.mockResolvedValue({ ...bookingFixture, status: 'CANCELLED' });
-    const res = await request(app)
-      .post('/api/v1/orders/from-booking')
-      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
-      .send({ bookingId: BOOKING_ID });
-    expect(res.status).toBe(409);
-  });
-
-  it("3. 404s for another customer's booking (customer isolation)", async () => {
-    prismaMock.booking.findUnique.mockResolvedValue({ ...bookingFixture, customerId: OTHER_CUSTOMER_ID });
-    const res = await request(app)
-      .post('/api/v1/orders/from-booking')
-      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
-      .send({ bookingId: BOOKING_ID });
-    expect(res.status).toBe(404);
+    expect(prismaMock.order.create).toHaveBeenCalledTimes(1);
+    const call = prismaMock.order.create.mock.calls[0][0];
+    expect(call.data.type).toBe('SERVICE'); // not every item is PRODUCT
+    interface ItemCreate {
+      itemType: string;
+      unitPrice: { toString(): string };
+      dealPackage?: { connect: { id: string } };
+      therapist?: { connect: { id: string } };
+    }
+    const items: ItemCreate[] = call.data.items.create;
+    expect(items).toHaveLength(3);
+    expect(items.find((i) => i.itemType === 'PRODUCT' && !i.dealPackage)!.unitPrice.toString()).toBe('199');
+    expect(items.find((i) => i.dealPackage?.connect.id === DEAL_PACKAGE_ID)!.unitPrice.toString()).toBe('299');
+    expect(items.find((i) => i.therapist?.connect.id === THERAPIST_ID)!.unitPrice.toString()).toBe('499');
   });
 });
 
@@ -432,6 +417,15 @@ describe('GET /api/v1/orders/:id — vendor isolation', () => {
 });
 
 describe('PATCH /api/v1/orders/:id/status — admin', () => {
+  // Pre-existing test-order-pollution guard: `vi.clearAllMocks()` (the outer beforeEach) clears
+  // call history but NOT a prior test's `.mockResolvedValue()` implementation — a preceding
+  // describe block ("GET /api/v1/orders/:id — vendor isolation") leaves
+  // `vendor.findUnique` resolved to a vendor fixture, which would otherwise leak into these
+  // admin-context tests and make `setOrderStatus` treat 'admin-1' as a vendor caller.
+  beforeEach(() => {
+    prismaMock.vendor.findUnique.mockResolvedValue(null);
+  });
+
   it('18. returns 403 without orders:status_change', async () => {
     resolveMock.mockResolvedValue(['orders:view']);
     const res = await request(app)

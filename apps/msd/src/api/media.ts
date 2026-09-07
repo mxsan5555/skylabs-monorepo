@@ -1,13 +1,16 @@
 import { apiPostForm, apiDelete, apiPatch } from './rbac/client';
 
 /**
- * Media-upload API client for the shared Deal/Product/Therapist upload system (see
- * `apps/msd/src/app/components/media-uploader.tsx`) — one client, parameterized by entityType,
- * mirroring `media.service.ts`'s shared backend core. Deal's route nests under a branch (see
- * `vendors.routes.ts`), so it alone needs a `branchId` too.
+ * Media-upload API client for the shared Deal/Product/Therapist/Vendor/Category upload system
+ * (see `apps/msd/src/app/components/media-uploader.tsx`) — one client, parameterized by
+ * entityType, mirroring `media.service.ts`'s shared backend core. Deal's route nests under a
+ * branch (see `vendors.routes.ts`), so it alone needs a `branchId` too. Category is image-only
+ * (no video adapter registered server-side) — `MediaUploader`'s `hideVideo` prop keeps its
+ * `/video` endpoint unreachable from the UI rather than relying on callers to simply never wire
+ * `onVideoChange`.
  */
 
-export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor';
+export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor' | 'category';
 
 export interface MediaImage {
   id: string;
@@ -32,10 +35,15 @@ interface EntityRef {
   entityId: string;
   /** Deal only — its routes nest under `/vendors/me/branches/:branchId/deals/:dealId/...`. */
   branchId?: string;
-  /** Vendor only — the caller's own vendor (self-service, `/vendors/me/...`, gated on
-   *  `vendors:custom`) vs. an admin managing a different vendor's profile
-   *  (`/vendors/:id/...`, gated on `vendors:edit`) hit different route surfaces. */
+  /** Vendor/Product/Therapist only — the caller's own vendor/product/therapist (self-service,
+   *  `/vendors/me/...`, gated on `vendors:custom`/`products:*`) vs. an admin managing a different
+   *  vendor's profile/product/therapist (`/vendors/:id/...`, gated on `vendors:edit`/
+   *  `products:*`) hit different route surfaces. */
   selfService?: boolean;
+  /** Product/Therapist (admin-on-behalf) only — the vendor id the product/therapist belongs to,
+   *  when `selfService` is false. Both are vendor-owned; there is no vendor-agnostic
+   *  `/products/:id/...` or `/therapists/:id/...` media route. */
+  vendorId?: string;
 }
 
 function basePath(ref: EntityRef): string {
@@ -43,11 +51,17 @@ function basePath(ref: EntityRef): string {
     case 'deal':
       return `/vendors/me/branches/${ref.branchId}/deals/${ref.entityId}`;
     case 'therapist':
-      return `/vendors/me/therapists/${ref.entityId}`;
+      return ref.selfService ? `/vendors/me/therapists/${ref.entityId}` : `/vendors/${ref.vendorId}/therapists/${ref.entityId}`;
     case 'product':
-      return `/products/${ref.entityId}`;
+      return ref.selfService ? `/vendors/me/products/${ref.entityId}` : `/vendors/${ref.vendorId}/products/${ref.entityId}`;
     case 'vendor':
       return ref.selfService ? '/vendors/me' : `/vendors/${ref.entityId}`;
+    case 'category':
+      // Category's image routes are top-level (`/categories/:id/images...`, see
+      // `categories.routes.ts`) — no branch/vendor nesting, and image-only (no `/video` route
+      // exists server-side; `MediaUploader`'s `hideVideo` prop keeps that endpoint unreachable
+      // from the Category dialogs).
+      return `/categories/${ref.entityId}`;
   }
 }
 

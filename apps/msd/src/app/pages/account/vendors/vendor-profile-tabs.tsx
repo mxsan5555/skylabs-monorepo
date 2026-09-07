@@ -6,6 +6,11 @@ import { MediaUploader } from '../../../components/media-uploader';
 
 type VendorProfileTab = VendorFormSection | 'media';
 
+// Every VendorProfileForm section is its own tab here — Superadmin's Create/Edit Vendor form
+// (vendor-pipeline.tsx Step 1) and this self-service "My Profile" editor must expose the exact
+// same fields (same labels, same validation, same KYC handling) per this app's "no duplicate
+// vendor profile form" rule — only the layout differs (a tab bar here vs. all sections at once
+// in the onboarding wizard), never the field set.
 const TAB_DEFS: { key: VendorProfileTab; label: string }[] = [
   { key: 'business', label: 'Business Information' },
   { key: 'owner', label: 'Owner Information' },
@@ -17,15 +22,17 @@ const TAB_DEFS: { key: VendorProfileTab; label: string }[] = [
 
 /**
  * The Business/Owner/Address/KYC/Bank/Profile-Image tabbed editor for an *existing* Vendor row
- * — shared by the admin `VendorPipeline` (any vendor, `/vendors/:id/*`) and self-service
- * `VendorBusinessProfile` (the caller's own vendor, `/vendors/me/*`), replacing what used to be
- * two separately-hand-rolled, near-identical locked numbered-step-pill wizards. All tabs are
- * freely switchable — no artificial step-locking — since each tab independently PATCHes just
- * its own section via the existing `VendorProfileForm`; there is no meaningful "must finish tab
- * N before tab N+1" ordering once the vendor row itself exists. The "Profile Image" tab is the
- * one exception: it doesn't render `VendorProfileForm` at all, it renders the same
- * `MediaUploader` already used for Deal/Product/Therapist (see that component's own doc comment)
- * with `entityType="vendor"`.
+ * — used by self-service `VendorBusinessProfile` (the caller's own vendor, `/vendors/me/*`).
+ * The admin surface (`VendorPipeline`, `/account/vendors/new` and the Vendor Management
+ * "Overview" tab) moved off this tabbed layout onto a proper 6-step onboarding wizard
+ * (`vendor-pipeline.tsx`) — its Step 1 renders `VendorProfileForm` directly (all sections at
+ * once, no tab bar) instead of reusing this component, but exposes the identical section set.
+ * All tabs here are freely switchable — no artificial step-locking — since each tab
+ * independently PATCHes just its own section via the existing `VendorProfileForm`; there is no
+ * meaningful "must finish tab N before tab N+1" ordering once the vendor row itself exists. The
+ * "Profile Image" tab is the one exception: it doesn't render `VendorProfileForm` at all, it
+ * renders the same `MediaUploader` already used for Deal/Product/Therapist (see that
+ * component's own doc comment) with `entityType="vendor"`.
  */
 export function VendorProfileTabs({
   vendor,
@@ -83,6 +90,8 @@ export function VendorProfileTabs({
           canEdit={canEdit}
           canReviewKyc={activeTab === 'kyc' && Boolean(canReviewKyc)}
           saving={saving}
+          token={token}
+          selfService={selfService}
           sections={[activeTab]}
           saveLabel="Save"
           onSave={onSave}

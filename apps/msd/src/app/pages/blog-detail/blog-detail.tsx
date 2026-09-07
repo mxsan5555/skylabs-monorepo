@@ -3,6 +3,7 @@ import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import type { BlogBlock } from '../../../types';
 import { getPost, categoryName, formatDate } from '../../../blog/blog';
 import './blog-detail.css';
+import content from '../../../content.json';
 
 /** Render one article body block with the right semantic element. */
 function renderBlock(block: BlogBlock, i: number) {
@@ -32,25 +33,28 @@ export function BlogDetail() {
   if (!post) {
     return (
       <main className="post post--missing">
-        <title>Article not found · MSD</title>
+        <title>{content.blog.detail.articleNotFoundTitle}</title>
         <meta name="robots" content="noindex" />
-        <h1>Article not found</h1>
-        <p>We couldn&apos;t find that article. It may have moved.</p>
-        <Link to="/blog">Back to the blog</Link>
+        <h1>{content.blog.detail.articleNotFoundHeading}</h1>
+        <p>{content.blog.detail.articleNotFoundMessage}</p>
+        <Link to="/blog">{content.blog.detail.backToBlog}</Link>
       </main>
     );
   }
 
   return (
     <main className="post">
-      <title>{`${post.title} · MSD`}</title>
+      <title> {`${post.title}${content.blog.detail.metaTitleSuffix}`}</title>
       <meta name="description" content={post.excerpt} />
 
       <article>
-        <nav className="post__crumb" aria-label="Breadcrumb">
+        <nav
+          className="post__crumb"
+          aria-label={content.blog.detail.breadcrumbLabel}
+        >
           <Link to="/blog">
             <Icon aria-hidden="true">arrow_back</Icon>
-            Blog
+            {content.blog.detail.blogLabel}
           </Link>
         </nav>
 
@@ -66,7 +70,7 @@ export function BlogDetail() {
             <span aria-hidden="true">·</span>
             <span className="post__read">
               <Icon aria-hidden="true">schedule</Icon>
-              {post.readMinutes} min read
+              {post.readMinutes} {content.blog.detail.readMinutesSuffix}
             </span>
           </p>
         </header>
@@ -83,7 +87,7 @@ export function BlogDetail() {
 
         <footer className="post__footer">
           {post.tags.length > 0 && (
-            <ul className="post__tags" aria-label="Tags">
+            <ul className="post__tags" aria-label={content.blog.detail.tagsLabel}>
               {post.tags.map((t) => (
                 <li key={t}>
                   <sky-badge variant="tertiary" size="small">
@@ -95,7 +99,7 @@ export function BlogDetail() {
           )}
           <Link className="post__back" to="/blog">
             <Icon aria-hidden="true">arrow_back</Icon>
-            Back to all articles
+            {content.blog.detail.backToAllArticles}
           </Link>
         </footer>
       </article>

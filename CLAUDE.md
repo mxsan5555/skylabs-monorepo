@@ -212,6 +212,20 @@ role name ever appears in any of these three places.
 - Auth (in-house): JWT + phone/email OTP + Google OAuth (`passport-google-oauth20`).
 - CI/CD: GitHub Actions.
 
+## Deployment
+
+Branch flow: `feature/* → develop → release → main`. The two **frontends** deploy
+to **two independent Vercel projects** (`apps/msd`, `apps/mera-driver`); each runs
+`npx nx-ignore <app>` as its Ignored Build Step, so a push only rebuilds the app(s)
+its Nx graph actually affects — `main` never routes which project deploys. `main`
+is Production (bought custom domain); `release`/`develop` use Vercel preview URLs.
+Versioning is `npx nx release --skip-publish` run on the `release` branch (not
+`main`), tagging only changed apps (`msd@x.y.z`, `mera-driver@x.y.z`). The two
+Express APIs host **off Vercel** (Railway/Fly — long-running servers). CI gate:
+`.github/workflows/ci.yml` runs `nx affected -t lint test build` on every PR.
+Full detail (Vercel `vercel.json` per app, dashboard settings, domains, env vars):
+see **`DEPLOYMENT.md`**.
+
 ## AI Dev Team
 
 This project ships with a set of project-scoped agents, skills, and commands under `.claude/`. They are loaded automatically when Claude Code is opened in this repo.
@@ -276,4 +290,5 @@ Frontends read the API base from an env var (e.g. `VITE_API_URL`); secrets go in
 
 ## Notes
 
-- `nx.json` `defaultBase` is `"master"` but the active branch is `main` — update it if `nx affected` is used in CI.
+- `nx.json` `defaultBase` is `"main"` (matches the active branch) — `nx affected`
+  in CI and `nx-ignore` on Vercel both compare against it. See `DEPLOYMENT.md`.

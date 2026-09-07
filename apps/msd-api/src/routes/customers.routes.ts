@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/requirePermission';
-import { validateParams } from '../middleware/validate';
+import { validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema } from '../schemas/common.schema';
 import { CustomerListQuerySchema } from '../schemas/customer.schema';
 import * as customerService from '../services/customer.service';
@@ -15,9 +15,9 @@ import { sendData } from '../lib/http';
 const router = Router();
 router.use(authenticate);
 
-router.get('/', requirePermission('customers', 'view'), async (req, res, next) => {
+router.get('/', requirePermission('customers', 'view'), validateQuery(CustomerListQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, search, status } = CustomerListQuerySchema.parse(req.query);
+    const { page, pageSize, search, status } = req.validatedQuery as ReturnType<typeof CustomerListQuerySchema.parse>;
     const { items, total } = await customerService.listCustomers({ page, pageSize, search, status });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {

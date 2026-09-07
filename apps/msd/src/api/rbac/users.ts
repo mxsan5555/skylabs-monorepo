@@ -26,8 +26,9 @@ export interface UserUpdateInput {
   phone?: string;
 }
 
-export function listUsers(token: string | null, page = 1, pageSize = 20) {
-  return apiGet<UserRecord[]>(`/rbac/users?page=${page}&pageSize=${pageSize}`, token);
+export function listUsers(token: string | null, page = 1, pageSize = 20, roleKey?: string) {
+  const roleParam = roleKey ? `&roleKey=${encodeURIComponent(roleKey)}` : '';
+  return apiGet<UserRecord[]>(`/rbac/users?page=${page}&pageSize=${pageSize}${roleParam}`, token);
 }
 
 export function createUser(token: string | null, input: UserCreateInput) {

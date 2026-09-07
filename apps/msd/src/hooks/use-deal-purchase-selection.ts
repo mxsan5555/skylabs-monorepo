@@ -24,10 +24,17 @@ export function useDealPurchaseSelection(deal: CatalogDeal) {
 
   const unitPrice = activePackage
     ? Number(activePackage.sellingPrice)
-    : Number(deal.salePrice); // legacy/safety-net: a deal with zero packages still has a price
+    : Number(deal.salePrice); // display-only fallback — never charged without a real package (see missingSelection below)
 
-  const missingSelection = packages.length > 0 && !activePackage
-    ? 'Please select a duration.'
+  // A service deal (no `product`) always requires a real DealPackage to add to cart — the
+  // backend's cart.service.ts#assertServiceDeal has no "fall back to Deal.salePrice" path
+  // anymore (that only ever existed for the old Booking flow). A product deal has no package
+  // concept at all, so it never hits this guard. Also fires for a service deal a vendor forgot
+  // to attach any package to (`packages.length === 0`) — that used to silently "work" against
+  // the old booking price fallback and would otherwise reproduce msd-api's
+  // "Only product deals can be added to a cart this way" error.
+  const missingSelection = !deal.product && !activePackage
+    ? (packages.length === 0 ? 'This deal has no bookable packages yet.' : 'Please select a duration.')
     : null;
 
   const selectPackage = (packageId: string) => setSelectedPackageId(packageId);

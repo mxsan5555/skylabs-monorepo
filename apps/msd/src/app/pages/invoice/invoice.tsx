@@ -5,6 +5,7 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getMyOrder, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR } from '../../../utils/format';
+import content from '../../../content.json';
 import { groupOrderItemsByVendor } from '../../../utils/order-items';
 import './invoice.css';
 
@@ -31,24 +32,24 @@ export function Invoice() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
+  const { invoice } = content;
   useEffect(() => {
     setLoading(true);
     setError('');
     getMyOrder(token, id)
       .then(({ data }) => setOrder(data))
-      .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not load this invoice.'))
+      .catch((err) => setError(err instanceof ApiRequestError ? err.message : invoice.loadError))
       .finally(() => setLoading(false));
   }, [token, id]);
 
-  if (loading) return <p className="loading-state">Loading invoice…</p>;
+  if (loading) return <p className="loading-state">{invoice.loading}</p>;
 
   if (error || !order) {
     return (
       <div className="invoice-page invoice-page--empty">
-        <title>Invoice Not Found | MSD</title>
-        <sky-info-card icon="receipt_long" heading="Invoice not found" subheading={error || 'It may belong to a different account.'} />
-        <FilledButton onClick={() => navigate('/orders')}>My Orders</FilledButton>
+        <title>{invoice.notFound.metaTitle}</title>
+        <sky-info-card icon="receipt_long" heading={invoice.notFound.heading} subheading={error || invoice.notFound.subheading} />
+        <FilledButton onClick={() => navigate('/orders')}> {invoice.notFound.cta}</FilledButton>
       </div>
     );
   }
@@ -61,17 +62,17 @@ export function Invoice() {
 
   return (
     <div className="invoice-page">
-      <title>{`Invoice ${order.id} | MSD`}</title>
+      <title> {invoice.metaTitleTemplate.replace('{id}', order.id)}</title>
       <meta name="robots" content="noindex" />
 
       <div className="invoice-page__actions">
         <OutlinedButton onClick={() => navigate(`/orders/${order.id}`)}>
           <Icon slot="icon" aria-hidden="true">arrow_back</Icon>
-          Back to Order
+          {invoice.backToOrder}
         </OutlinedButton>
         <FilledButton onClick={() => window.print()}>
           <Icon slot="icon" aria-hidden="true">download</Icon>
-          Download / Print
+          {invoice.downloadPrint}
         </FilledButton>
       </div>
 
@@ -84,9 +85,9 @@ export function Invoice() {
             {!isMultiVendor && <p className="invoice__branch">{order.branchNameSnapshot}</p>}
           </div>
           <div className="invoice__meta">
-            <h2 className="invoice__title">Invoice</h2>
-            <p>Order ID: {order.id}</p>
-            <p>Invoice date: {new Date(order.createdAt).toLocaleDateString()}</p>
+            <h2 className="invoice__title">{invoice.title}</h2>
+            <p>{invoice.labels.orderId}  {order.id}</p>
+            <p> {invoice.labels.invoiceDate}{' '} {new Date(order.createdAt).toLocaleDateString()}</p>
           </div>
         </header>
 
@@ -94,14 +95,14 @@ export function Invoice() {
 
         <section className="invoice__parties">
           <div>
-            <h3>Billed to</h3>
+            <h3>{invoice.labels.billedTo}</h3>
             <p>{order.contactName || '—'}</p>
             {order.contactPhone && <p>{order.contactPhone}</p>}
             {order.contactEmail && <p>{order.contactEmail}</p>}
           </div>
           {order.shippingAddress && (
             <div>
-              <h3>Shipping address</h3>
+              <h3>{invoice.labels.shippingAddress}</h3>
               <p>{order.shippingAddress}</p>
               <p>
                 {[order.shippingCity, order.shippingState, order.shippingPincode].filter(Boolean).join(', ')}
@@ -115,10 +116,10 @@ export function Invoice() {
         <table className="invoice__items">
           <thead>
             <tr>
-              <th>Item</th>
-              <th>Qty</th>
-              <th>Unit Price</th>
-              <th>Line Total</th>
+              <th>{invoice.labels.item}</th>
+              <th>{invoice.labels.quantity}</th>
+              <th>{invoice.labels.unitPrice}</th>
+              <th>{invoice.labels.lineTotal}</th>
             </tr>
           </thead>
           <tbody>
@@ -147,11 +148,11 @@ export function Invoice() {
 
         <div className="invoice__totals">
           <div className="invoice__totals-row">
-            <span>Subtotal</span>
+            <span>{invoice.labels.subtotal}</span>
             <span>{formatINR(Number(order.subtotal))}</span>
           </div>
           <div className="invoice__totals-row invoice__totals-row--grand">
-            <span>Total</span>
+            <span>{invoice.labels.total}</span>
             <span>{formatINR(Number(order.total))}</span>
           </div>
         </div>
@@ -160,15 +161,15 @@ export function Invoice() {
 
         <section className="invoice__payment">
           <div>
-            <h3>Payment method</h3>
-            <p>{latestPayment?.provider === 'COD' ? 'Cash on Delivery' : latestPayment?.provider ?? '—'}</p>
+            <h3>{invoice.labels.paymentMethod}</h3>
+            <p>{latestPayment?.provider === 'COD' ? invoice.labels.cashOnDelivery : latestPayment?.provider ?? '—'}</p>
           </div>
           <div>
-            <h3>Payment status</h3>
+            <h3>{invoice.labels.paymentStatus}</h3>
             <p>{latestPayment?.status ?? '—'}</p>
           </div>
           <div>
-            <h3>Order status</h3>
+            <h3>{invoice.labels.orderStatus}</h3>
             <p>{order.status}</p>
           </div>
         </section>

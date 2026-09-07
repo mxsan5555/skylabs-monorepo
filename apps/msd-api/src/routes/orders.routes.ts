@@ -1,11 +1,10 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/requirePermission';
-import { validateBody, validateParams } from '../middleware/validate';
+import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema } from '../schemas/common.schema';
 import {
   OrderCheckoutSchema,
-  OrderFromBookingSchema,
   OrderCustomerCancelSchema,
   OrderStatusUpdateSchema,
   OrderListQuerySchema,
@@ -17,12 +16,12 @@ import { writeAuditLog } from '../services/audit.service';
 import { sendData } from '../lib/http';
 
 /**
- * Orders — the Cart/Booking convergence point (Phase 8). Two access surfaces on one router:
- * `/orders/checkout`, `/orders/from-booking`, `/orders/me*` are customer self-service
- * (`authenticate` only, no RBAC — mirrors `cart.routes.ts`/`booking.routes.ts` exactly).
- * `/orders` (list/get) and `/orders/:id/status` reuse the EXISTING `orders` permission key —
- * `orders:view` (already granted to admin/vendor/sales) and `orders:status_change` (admin only)
- * — no new permission was needed or added.
+ * Orders — the Cart convergence point: every purchase (Deal, Product, Therapist alike) becomes
+ * one Order via `/orders/checkout`, never a separate Booking flow. Two access surfaces on one
+ * router: `/orders/checkout`, `/orders/me*` are customer self-service (`authenticate` only, no
+ * RBAC — mirrors `cart.routes.ts` exactly). `/orders` (list/get) and `/orders/:id/status` reuse
+ * the EXISTING `orders` permission key — `orders:view` (already granted to admin/vendor/sales)
+ * and `orders:status_change` (admin only) — no new permission was needed or added.
  */
 const router = Router();
 router.use(authenticate);
@@ -50,27 +49,9 @@ router.post('/checkout', validateBody(OrderCheckoutSchema), async (req, res, nex
   }
 });
 
-router.post('/from-booking', validateBody(OrderFromBookingSchema), async (req, res, next) => {
+router.get('/me', validateQuery(OrderListQuerySchema), async (req, res, next) => {
   try {
-    const { bookingId, ...contactDetails } = req.body;
-    const order = await orderService.createOrderFromBooking(req.user!.sub, bookingId, contactDetails);
-    await writeAuditLog({
-      actorUserId: req.user!.sub,
-      action: 'order.create_from_booking',
-      targetType: 'Order',
-      targetId: order.id,
-      after: order,
-      ...requestMeta(req),
-    });
-    sendData(res, order, { status: 201 });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.get('/me', async (req, res, next) => {
-  try {
-    const { page, pageSize, status } = OrderListQuerySchema.parse(req.query);
+    const { page, pageSize, status } = req.validatedQuery as ReturnType<typeof OrderListQuerySchema.parse>;
     const { items, total } = await orderService.listMyOrders(req.user!.sub, { page, pageSize, status });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
@@ -211,9 +192,9 @@ router.post('/pay-batch/verify', validateBody(VerifyBatchPaymentSchema), async (
 
 // ─── Admin / vendor-scoped (existing `orders` permission) ────────────────────
 
-router.get('/', requirePermission('orders', 'view'), async (req, res, next) => {
+router.get('/', requirePermission('orders', 'view'), validateQuery(OrderListQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, status, vendorId, branchId, customerId, paymentStatus, createdFrom, createdTo, search } = OrderListQuerySchema.parse(req.query);
+    const { page, pageSize, status, vendorId, branchId, customerId, paymentStatus, createdFrom, createdTo, search } = req.validatedQuery as ReturnType<typeof OrderListQuerySchema.parse>;
     const { items, total } = await orderService.listOrders(req.user!.sub, {
       page,
       pageSize,

@@ -3,7 +3,7 @@ import { formatINR } from '../../utils/format';
 import './duration-package-selector.css';
 
 /**
- * THE canonical package/price selection UI for booking a Therapist directly — reuses
+ * THE canonical package/price selection UI for adding a Therapist to cart directly — reuses
  * `duration-package-selector.css`'s `.dps` classes so it reads identically to the Deal purchase
  * flow, but lists the Therapist's OWN packages (never a Deal's sibling rows). Presentational
  * only, driven entirely by `useTherapistPurchaseSelection`'s output.

@@ -1,5 +1,5 @@
 import multer from 'multer';
-import { IMAGE_MAX_BYTES, VIDEO_MAX_BYTES } from '../services/media-validation.service';
+import { IMAGE_MAX_BYTES, VIDEO_MAX_BYTES, DOCUMENT_MAX_BYTES } from '../services/media-validation.service';
 
 /**
  * Shared multer instances for every media route (Deal/Product/Therapist, image+video) — memory
@@ -17,4 +17,9 @@ export const imageUpload = multer({
 export const videoUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: VIDEO_MAX_BYTES * 2 },
+});
+
+export const documentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: DOCUMENT_MAX_BYTES * 2 },
 });

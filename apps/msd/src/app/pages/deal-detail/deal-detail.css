@@ -212,7 +212,16 @@ a.deal-detail__provider:focus-visible {
 .deal-detail__add-btn {
   flex: 1;
 }
+.deal-detail__action-icon {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
 
+.deal-detail__action-icon md-icon,
+.deal-detail__action-icon sky-icon {
+  font-size: 24px;
+}
 .deal-detail__features {
   display: flex;
   flex-wrap: wrap;
@@ -365,13 +374,25 @@ a.deal-detail__provider:focus-visible {
     padding: 20px 16px;
   }
 }
-
 @media (max-width: 480px) {
   .deal-detail__cta {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 8px;
   }
 
   .deal-detail__add-btn {
     width: 100%;
+  }
+
+  .deal-detail__action-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .deal-detail__action-icon md-icon,
+  .deal-detail__action-icon sky-icon {
+    font-size: 22px;
   }
 }

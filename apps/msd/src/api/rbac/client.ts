@@ -12,6 +12,7 @@ export interface ApiMeta {
   total?: number;
   page?: number;
   pageSize?: number;
+  unreadCount?: number;
 }
 
 export interface ApiResult<T> {

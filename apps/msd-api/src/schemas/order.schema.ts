@@ -6,8 +6,8 @@ extendZodWithOpenApi(z);
 
 /**
  * Checkout's "Customer Details" step — collected once, before payment. Every field is optional
- * at the schema level (pre-existing `/checkout`/`/from-booking` callers send none at all, and
- * that must keep working) — the frontend enforces "required before payment" as UX. The backend's
+ * at the schema level (pre-existing `/checkout` callers send none at all, and that must keep
+ * working) — the frontend enforces "required before payment" as UX. The backend's
  * job is only to reject a malformed value if one IS sent, never to silently persist garbage.
  */
 export const OrderContactDetailsSchema = z.object({
@@ -25,12 +25,8 @@ export const OrderContactDetailsSchema = z.object({
 
 export const OrderCheckoutSchema = OrderContactDetailsSchema.openapi('OrderCheckout');
 
-export const OrderFromBookingSchema = OrderContactDetailsSchema.extend({
-  bookingId: z.string().uuid(),
-}).openapi('OrderFromBooking');
-
 /** Customer self-service may only ever cancel — confirm/complete is admin-only (existing
- *  `orders:status_change`), matching Booking's equivalent split. */
+ *  `orders:status_change`). */
 export const OrderCustomerCancelSchema = z
   .object({
     status: z.literal('CANCELLED'),

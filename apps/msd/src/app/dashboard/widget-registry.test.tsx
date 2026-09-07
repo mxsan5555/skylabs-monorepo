@@ -26,18 +26,15 @@ const STATS: DashboardStats = {
   branches: 11,
   categories: 9,
   subCategories: 24,
-  services: 40,
   products: 18,
   deals: 33,
   orders: 512,
-  bookings: 301,
   revenue: '420000',
 };
 
 describe('WIDGET_REGISTRY', () => {
   it('maps every documented widget key to a component', () => {
     expect(Object.keys(WIDGET_REGISTRY).sort()).toEqual([
-      'bookings-count',
       'branches-count',
       'categories-count',
       'customers-count',
@@ -45,7 +42,6 @@ describe('WIDGET_REGISTRY', () => {
       'orders-recent',
       'products-count',
       'revenue-summary',
-      'services-count',
       'subcategories-count',
       'vendor-profile',
       'vendors-count',
@@ -103,11 +99,6 @@ describe('WIDGET_REGISTRY', () => {
     expect(screen.getByText('24')).toBeTruthy();
   });
 
-  it('renders the real service count ("services-count")', () => {
-    render(<>{renderFromRegistry('services-count', { stats: STATS })}</>);
-    expect(screen.getByText('40')).toBeTruthy();
-  });
-
   it('renders the real product count ("products-count")', () => {
     render(<>{renderFromRegistry('products-count', { stats: STATS })}</>);
     expect(screen.getByText('18')).toBeTruthy();
@@ -116,11 +107,6 @@ describe('WIDGET_REGISTRY', () => {
   it('renders the real deals count ("deals-count")', () => {
     render(<>{renderFromRegistry('deals-count', { stats: STATS })}</>);
     expect(screen.getByText('33')).toBeTruthy();
-  });
-
-  it('renders the real bookings count ("bookings-count")', () => {
-    render(<>{renderFromRegistry('bookings-count', { stats: STATS })}</>);
-    expect(screen.getByText('301')).toBeTruthy();
   });
 
   it('renders the component for a known widget key ("vendor-profile"), linking to /account/vendors', () => {

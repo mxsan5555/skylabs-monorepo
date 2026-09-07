@@ -21,8 +21,9 @@ export function validateQuery(schema: ZodSchema) {
       sendError(res, 'VALIDATION_ERROR', 'Invalid query parameters', result.error.flatten());
       return;
     }
-    // req.query is a getter-only object on some Express/Node versions; store parsed separately.
-    (req as Request & { validatedQuery?: unknown }).validatedQuery = result.data;
+    // req.query is a getter-only object on some Express/Node versions; store parsed separately
+    // (see the `validatedQuery` augmentation in types/express.d.ts).
+    req.validatedQuery = result.data;
     next();
   };
 }

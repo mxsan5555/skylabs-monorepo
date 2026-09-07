@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Request } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/requirePermission';
-import { validateBody, validateParams } from '../middleware/validate';
+import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
   RoleCreateSchema,
@@ -12,6 +12,7 @@ import {
   RolePermissionsUpdateSchema,
   RoleWidgetsUpdateSchema,
   DashboardWidgetCreateSchema,
+  UserListQuerySchema,
   UserCreateSchema,
   UserUpdateSchema,
   UserStatusUpdateSchema,
@@ -265,10 +266,10 @@ router.post(
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 
-router.get('/users', requirePermission('rbac.users', 'view'), async (req, res, next) => {
+router.get('/users', requirePermission('rbac.users', 'view'), validateQuery(UserListQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize } = PaginationQuerySchema.parse(req.query);
-    const { items, total } = await userService.listUsers(page, pageSize);
+    const { page, pageSize, search, roleKey } = req.validatedQuery as ReturnType<typeof UserListQuerySchema.parse>;
+    const { items, total } = await userService.listUsers(page, pageSize, { search, roleKey });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);
@@ -296,6 +297,41 @@ router.post(
     }
   },
 );
+
+// Registered BEFORE `/users/:id` below — Express matches by registration order, and `:id` would
+// otherwise swallow the literal path segment "me" and 422 on `UuidParamSchema`.
+//
+// Authenticate-only (like `/notifications`), never gated on `rbac.users:*` — every signed-in
+// user, Superadmin included, can view/edit their OWN row this way. `UserUpdateSchema` only ever
+// has `name`/`email`/`phone` (no `role`/`roleIds` field exists on it at all), so "a caller can
+// never change their own role through this route" holds for every caller by construction, not as
+// a Superadmin-specific carve-out — the same schema already used by the admin-on-behalf
+// `PATCH /users/:id` below.
+router.get('/users/me', async (req, res, next) => {
+  try {
+    const user = await userService.getUserOrThrow(req.user!.sub);
+    sendData(res, userService.serializeUser(user));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/users/me', validateBody(UserUpdateSchema), async (req, res, next) => {
+  try {
+    const user = await userService.updateUser(req.user!.sub, req.body);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'user.update',
+      targetType: 'User',
+      targetId: user.id,
+      after: user,
+      ...requestMeta(req),
+    });
+    sendData(res, user);
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.patch(
   '/users/:id',
@@ -452,9 +488,10 @@ router.get(
   '/users/:id/login-history',
   requirePermission('rbac.users', 'view'),
   validateParams(UuidParamSchema),
+  validateQuery(PaginationQuerySchema),
   async (req, res, next) => {
     try {
-      const { page, pageSize } = PaginationQuerySchema.parse(req.query);
+      const { page, pageSize } = req.validatedQuery as ReturnType<typeof PaginationQuerySchema.parse>;
       const { items, total } = await userService.getLoginHistory(req.params.id, page, pageSize);
       sendData(res, items, { meta: { total, page, pageSize } });
     } catch (err) {
@@ -478,10 +515,10 @@ router.get(
 
 // ─── Audit logs ──────────────────────────────────────────────────────────────
 
-router.get('/audit-logs', requirePermission('rbac.audit-logs', 'view'), async (req, res, next) => {
+router.get('/audit-logs', requirePermission('rbac.audit-logs', 'view'), validateQuery(PaginationQuerySchema), async (req, res, next) => {
   try {
     const targetUserId = typeof req.query.targetUserId === 'string' ? req.query.targetUserId : undefined;
-    const { page, pageSize } = PaginationQuerySchema.parse(req.query);
+    const { page, pageSize } = req.validatedQuery as ReturnType<typeof PaginationQuerySchema.parse>;
     const where = targetUserId ? { targetType: 'User', targetId: targetUserId } : {};
     const [items, total] = await Promise.all([
       prisma.auditLog.findMany({

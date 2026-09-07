@@ -1,23 +1,33 @@
 import { apiGet, apiPost, apiPatch } from './rbac/client';
 import { notifyCartUpdated } from './cart';
-import { notifyBookingsUpdated } from './bookings';
 
 /**
  * Customer orders — authenticated, self-service only (backend gates on `authenticate` alone,
- * no RBAC permission — see msd-api's `orders.routes.ts` doc comment), mirroring `api/cart.ts`/
- * `api/bookings.ts`. This is the Cart/Booking convergence point (Phase 8).
+ * no RBAC permission — see msd-api's `orders.routes.ts` doc comment), mirroring `api/cart.ts`.
+ * This is the Cart convergence point — every purchase (Deal, Product, Therapist alike) becomes
+ * one Order, never a separate Booking flow.
  */
 
 export type OrderType = 'SERVICE' | 'PRODUCT';
 export type OrderStatus = 'PENDING_PAYMENT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
 
-/** Multi-vendor: each item carries its OWN vendor/branch — a PRODUCT order created from a
- *  multi-vendor cart groups items from several vendors under one Order/one Payment. `Order`'s own
- *  vendorId/vendorNameSnapshot (below) is just the "primary" (first) vendor, kept for the header/
- *  legacy single-vendor display — group `items` by `vendorId` for the real per-vendor breakdown. */
+/**
+ * Multi-vendor: each item carries its OWN vendor/branch — an order created from a multi-vendor
+ * cart groups items from several vendors under one Order/one Payment. `Order`'s own
+ * vendorId/vendorNameSnapshot (below) is just the "primary" (first) vendor, kept for the header/
+ * legacy single-vendor display — group `items` by `vendorId` for the real per-vendor breakdown.
+ *
+ * A line is a Deal purchase if `dealId` is set, a Therapist purchase if `therapistId` is set
+ * (mutually exclusive for a SERVICE item, per msd-api's OrderItem schema doc comment), or a
+ * Product purchase if neither is set. `dealPackageId`/`therapistPackageId` accompany whichever
+ * package priced the line.
+ */
 export interface OrderItem {
   id: string;
-  dealId: string;
+  dealId: string | null;
+  dealPackageId: string | null;
+  therapistId: string | null;
+  therapistPackageId: string | null;
   vendorId: string;
   branchId: string;
   vendorNameSnapshot: string;
@@ -66,7 +76,6 @@ export interface Order extends OrderContactDetails {
   createdAt: string;
   items: OrderItem[];
   payments: PaymentSummary[];
-  booking: { id: string; bookingDate: string | null; timeSlot: string | null } | null;
   branch: { id: string; name: string; address: string | null; city: string | null };
 }
 
@@ -101,14 +110,6 @@ export function checkout(token: string | null, contactDetails: OrderContactDetai
   });
 }
 
-export function createOrderFromBooking(token: string | null, bookingId: string, contactDetails: OrderContactDetails = {}) {
-  // Consumes a PENDING booking into an Order — notify so the header badge drops accordingly.
-  return apiPost<Order>('/orders/from-booking', token, { bookingId, ...contactDetails }).then((res) => {
-    notifyBookingsUpdated();
-    return res;
-  });
-}
-
 export function listMyOrders(token: string | null, opts: { page?: number; pageSize?: number; status?: OrderStatus } = {}) {
   return apiGet<Order[]>(`/orders/me${toQuery(opts)}`, token);
 }
@@ -133,22 +134,4 @@ export function payCod(token: string | null, orderId: string) {
 
 export function verifyPayment(token: string | null, orderId: string, input: VerifyPaymentInput) {
   return apiPost<Order>(`/orders/me/${orderId}/verify-payment`, token, input);
-}
-
-/**
- * Combined checkout (Deal + Therapist + Product together) — one checkout action, one payment,
- * one combined receipt, multiple Order rows under the hood (see msd-api's payment.service.ts
- * doc comment). These three mirror `pay`/`payCod`/`verifyPayment` above exactly, just batched
- * across every Order created together in one checkout action.
- */
-export function payBatch(token: string | null, orderIds: string[]) {
-  return apiPost<PaymentIntent>('/orders/pay-batch', token, { orderIds });
-}
-
-export function payBatchCod(token: string | null, orderIds: string[]) {
-  return apiPost<Order[]>('/orders/pay-batch/cod', token, { orderIds });
-}
-
-export function verifyBatchPayment(token: string | null, orderIds: string[], input: VerifyPaymentInput) {
-  return apiPost<Order[]>('/orders/pay-batch/verify', token, { orderIds, ...input });
 }

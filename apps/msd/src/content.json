@@ -1,4 +1,10 @@
 {
+  "notFound": {
+    "metaTitle": "Page not found · MSD",
+    "title": "Page not found",
+    "message": "The page you’re looking for doesn’t exist or has moved.",
+    "backToHome": "Back to home"
+  },
   "site": {
     "name": "MSD",
     "fullName": "MySpaDeal",
@@ -624,6 +630,26 @@
           "subtitle": "1M+ ratings on our app"
         }
       ]
+    },
+    "ui": {
+      "accessibility": {
+        "browseWellnessCategories": "Browse wellness categories",
+        "exploreCategory": "Explore {category}",
+        "memberPromotion": "Member promotion",
+        "giftCardsPromotion": "Gift cards promotion",
+        "welcomeOfferPromotion": "Welcome offer promotion"
+      },
+      "labels": {
+        "services": "Services",
+        "popular": "Popular:"
+      },
+      "messages": {
+        "loading": "Loading…",
+        "loadError": "Could not load home page content.",
+        "noResults": "No results found.",
+        "addToCartSuccess": "Added \"{item}\" to your cart.",
+        "addToCartError": "Could not add to cart."
+      }
     }
   },
   "search": {
@@ -632,11 +658,18 @@
     "resultLabel": "results",
     "noResults": "No results found. Try adjusting your filters.",
     "emptySuggestion": "No spas found",
+    "view": {
+      "groupLabel": "Results view",
+      "list": "List view",
+      "grid": "Grid view",
+      "map": "Map view"
+    },
     "filters": {
       "price": {
         "label": "Price",
         "min": 499,
         "max": 15000,
+        "activeLabel": "Price (up to {price})",
         "priceLevels": [
           {
             "value": "$",
@@ -650,33 +683,58 @@
             "value": "$$$",
             "label": "Premium (₹5,000+)"
           }
-        ]
+        ],
+        "dialogTitle": "Filter by Price",
+        "priceUpTo": "Price up to:",
+        "clear": "Clear",
+        "apply": "Apply"
       },
       "suggested": {
         "label": "Suggested"
       },
       "category": {
-        "label": "Category"
+        "label": "Category",
+        "dialogTitle": "Select Category",
+        "ariaLabel": "Category",
+        "all": "All categories",
+        "clear": "Clear",
+        "apply": "Apply",
+        "browseAll": "Browse all categories →"
       },
-      "features": {
-        "label": "Features",
-        "options": [
-          "Couples",
-          "Group",
-          "Mobile Therapist",
-          "Organic Products",
-          "Private Room",
-          "Pool Access",
-          "Outdoor",
-          "Steam Room",
-          "Sauna"
-        ]
+      "location": {
+        "label": "Location",
+        "dialogTitle": "Filter by Location",
+        "stateLabel": "State",
+        "stateAll": "All states",
+        "cityLabel": "City",
+        "cityAll": "All cities",
+        "clear": "Clear",
+        "apply": "Apply"
       },
-      "distance": {
-        "label": "Distance",
-        "max": 50,
-        "unit": "km"
-      }
+      "clearAll": "Clear filters"
+    },
+    "results": {
+      "listAriaLabel": "Search results list",
+      "gridAriaLabel": "Search results grid",
+      "mapAriaLabel": "Search results map",
+      "mapImageLabel": "Map showing deal locations",
+      "mapResultsSuffix": "results in view"
+    },
+    "labels": {
+      "addToCart": "Add to Cart",
+      "service": "Service",
+      "product": "Product",
+      "durationSuffix": "min",
+      "book": "Book",
+      "removeWishlist": "Remove from wishlist",
+      "saveWishlist": "Save to wishlist"
+    },
+    "loading": {
+      "deals": "Loading deals…",
+      "categories": "Loading categories…"
+    },
+    "errors": {
+      "loadDeals": "Could not load deals."
     }
   },
   "category": {
@@ -701,16 +759,172 @@
         "value": "distance",
         "label": "Nearest First"
       }
-    ]
+    ],
+    "timeSlots": [
+      "9:00 AM",
+      "10:00 AM",
+      "11:00 AM",
+      "12:00 PM",
+      "1:00 PM",
+      "2:00 PM",
+      "3:00 PM",
+      "4:00 PM",
+      "5:00 PM",
+      "6:00 PM"
+    ],
+    "metaTitleSuffix": " Deals | MSD",
+    "metaDescriptionTemplate": "Browse {category} services and products near you.",
+    "breadcrumb": {
+      "home": "Home",
+      "categories": "Categories"
+    },
+    "tabs": {
+      "all": "All"
+    },
+    "filter": {
+      "ariaLabel": "Filter by offering type",
+      "all": "All",
+      "services": "Services",
+      "products": "Products"
+    },
+    "searchLabel": "Search",
+    "dealCount": {
+      "singular": "deal",
+      "plural": "deals"
+    },
+    "dealsAriaLabelSuffix": "deals",
+    "loading": "Loading category…",
+    "loadingDeals": "Loading deals…",
+    "durationSuffix": "min",
+    "offeringLabels": {
+      "service": "Service",
+      "product": "Product"
+    },
+    "actions": {
+      "addToCart": "Add to Cart"
+    },
+    "messages": {
+      "addToCartSuccess": "Added \"{item}\" to your cart.",
+      "bookingSuccess": "Booked \"{item}\" for {date} at {time}."
+    },
+    "errors": {
+      "loadCategory": "Could not load category.",
+      "addToCart": "Could not add to cart.",
+      "loadDeals": "Could not load deals."
+    },
+    "notFound": {
+      "metaTitle": "Category Not Found | MSD",
+      "heading": "Category not found",
+      "subheading": "Try browsing all categories.",
+      "cta": "Browse Categories"
+    },
+    "emptyDeals": {
+      "heading": "No deals found",
+      "subheading": "Try a different sub-category or filter."
+    },
+    "booking": {
+      "button": "Book",
+      "headlinePrefix": "Book",
+      "dateLabel": "Date",
+      "timeSlotLabel": "Time slot",
+      "timeSlotAriaLabel": "Select a time slot",
+      "selectDateTime": "Select a date and time.",
+      "cancel": "Cancel",
+      "submitting": "Booking…",
+      "confirm": "Confirm booking",
+      "error": "Could not book this service."
+    }
   },
   "dealDetail": {
+    "loading": "Loading deal…",
     "addToCart": "Add to Cart",
+    "addedToCart": "Added to Cart!",
     "bookNow": "Book Now",
-    "whatIncluded": "What's Included",
-    "howToUse": "How to Use",
+    "description": "Description",
     "cancellationPolicy": "Cancellation Policy",
     "cancellationText": "Cancel up to 24 hours before your appointment for a full refund. Same-day cancellations are non-refundable.",
-    "relatedDeals": "You May Also Like"
+    "relatedDeals": "You May Also Like",
+    "errors": {
+      "invalidDeal": "Invalid deal.",
+      "loadDeal": "Could not load this deal.",
+      "addToCart": "Could not add to cart.",
+      "bookService": "Could not book this service."
+    },
+    "notFound": {
+      "metaTitle": "Deal Not Found | MSD",
+      "heading": "Deal not found",
+      "subheading": "This deal may no longer be available.",
+      "cta": "Browse Categories"
+    },
+    "wishlist": {
+      "remove": "Remove from wishlist",
+      "save": "Save to wishlist"
+    },
+    "meta": {
+      "titleSuffix": " | MSD",
+      "defaultDescription": "Book {name} at MSD.",
+      "locationPrefix": "in"
+    },
+    "gallery": {
+      "thumbnailsLabel": "Gallery thumbnails",
+      "viewImage": "View image"
+    },
+    "labels": {
+      "off": "OFF",
+      "originalPrice": "Original price",
+      "location": "Location",
+      "service": "Service",
+      "product": "Product",
+      "durationSuffix": "min"
+    },
+    "booking": {
+      "timeConnector": "at",
+      "headlinePrefix": "Book",
+      "confirmationTitle": "Booking confirmed successfully.",
+      "alreadyBookedTitle": "Already booked",
+      "alreadyBookedMessage": "Already booked. Your existing booking is still active.",
+      "continueShopping": "Continue Shopping",
+      "viewBooking": "View Booking",
+      "bookingId": "Booking ID",
+      "therapist": "Therapist:",
+      "selectDateTime": "Select a date and time.",
+      "date": "Date",
+      "timeSlot": "Time slot",
+      "timeSlotAriaLabel": "Select a time slot",
+      "cancel": "Cancel",
+      "submitting": "Booking…",
+      "confirm": "Confirm booking"
+    },
+    "serviceType": {
+      "service": "Service",
+      "product": "Product"
+    },
+    "timeSlots": [
+      "9:00 AM",
+      "10:00 AM",
+      "11:00 AM",
+      "12:00 PM",
+      "1:00 PM",
+      "2:00 PM",
+      "3:00 PM",
+      "4:00 PM",
+      "5:00 PM",
+      "6:00 PM"
+    ]
+  },
+  "blog": {
+    "detail": {
+      "articleNotFoundTitle": "Article not found · MSD",
+      "articleNotFoundHeading": "Article not found",
+      "articleNotFoundMessage": "We couldn't find that article. It may have moved.",
+      "backToBlog": "Back to the blog",
+      "breadcrumbLabel": "Breadcrumb",
+      "blogLabel": "Blog",
+      "readMinutesSuffix": "min read",
+      "tagsLabel": "Tags",
+      "backToAllArticles": "Back to all articles",
+      "metaTitleSuffix": " · MSD"
+    }
   },
   "productDetail": {
     "buyNow": "Buy Now",
@@ -725,6 +939,7 @@
   "cart": {
     "title": "My Cart",
     "emptyHeading": "Your cart is empty",
+    "loading": "Loading your cart…",
     "emptySubheading": "Browse our deals and add something you love.",
     "emptyCtaLabel": "Explore Deals",
     "checkoutCta": "Proceed to Checkout",
@@ -733,15 +948,45 @@
     "subtotal": "Subtotal",
     "discount": "Discount",
     "total": "Total",
-    "giftCardPlaceholder": "Enter coupon code"
+    "giftCardPlaceholder": "Enter coupon code",
+    "itemsAriaLabel": "Cart items",
+    "quantityLabel": "Quantity for",
+    "decreaseQuantity": "Decrease quantity",
+    "increaseQuantity": "Increase quantity",
+    "quantityInCart": "in cart",
+    "removeItem": "Remove",
+    "fromCart": "from cart",
+    "clearCart": "Clear cart",
+    "allItemsFrom": "All items from",
+    "serverPriceNote": "Price is recalculated server-side at checkout, before payment.",
+    "links": {
+      "bookings": "View your bookings →",
+      "orders": "View your orders →"
+    },
+    "error": {
+      "load": "Could not load your cart.",
+      "updateQuantity": "Could not update quantity.",
+      "removeItem": "Could not remove item."
+    }
   },
-  "wishlist": {
-    "title": "Saved Deals",
-    "emptyHeading": "No saved deals yet",
-    "emptySubheading": "Tap the heart on any deal to save it here for later.",
-    "emptyCtaLabel": "Browse Deals",
-    "addToCartLabel": "Add to Cart"
-  },
+"wishlist": {
+  "title": "Saved Deals",
+  "emptyHeading": "No saved deals yet",
+  "emptySubheading": "Tap the heart on any deal to save it here for later.",
+  "emptyCtaLabel": "Browse Deals",
+  "addToCartLabel": "Add to Cart",
+  "loading": "Loading your wishlist…",
+  "savedDealsLabel": "Saved deals",
+  "serviceLabel": "Service",
+  "productLabel": "Product",
+  "bookLabel": "Book",
+  "addingLabel": "Adding…",
+  "addToCartError": "Could not add to cart.",
+  "dealSingular": "deal",
+  "dealPlural": "deals",
+  "removeFromWishlist": "Remove from wishlist",
+  "saveToWishlist": "Save to wishlist"
+},
   "checkout": {
     "title": "Checkout",
     "steps": [
@@ -761,13 +1006,22 @@
     "backLabel": "Back",
     "nextLabel": "Continue",
     "placeOrderLabel": "Place Order",
+    "loadingOrder": "Preparing your order…",
+    "backToCategories": "Back to Categories",
+    "pleaseWait": "Please wait…",
     "orderSummaryHeading": "Order Summary",
-    "emptyCartMessage": "Your cart is empty.",
-    "securePaymentNote": "Your payment is secured by 256-bit SSL encryption.",
+    "orderStatusPrefix": "This order is already",
+    "securePaymentNote": "Payments are handled securely by Razorpay — card/UPI/netbanking details never touch MSD's servers.",
+    "durationSuffix": "min",
+    "deliveringTo": "Delivering to",
     "fields": {
       "name": "Full Name",
       "phone": "Mobile Number",
       "email": "Email Address",
+      "address": "Address",
+      "city": "City",
+      "state": "State",
+      "pincode": "Pincode",
       "cardNumber": "Card Number",
       "expiry": "MM / YY",
       "cvv": "CVV",
@@ -780,6 +1034,10 @@
       "invalidPhone": "Please enter a valid 10-digit mobile number.",
       "emptyEmail": "Please enter your email address.",
       "invalidEmail": "Please enter a valid email address.",
+      "emptyAddress": "Please enter your address.",
+      "emptyCity": "Please enter your city.",
+      "emptyState": "Please enter your state.",
+      "invalidPincode": "Please enter a valid 6-digit pincode.",
       "emptyCardName": "Please enter the name on your card.",
       "invalidCardName": "Please enter a valid cardholder name.",
       "emptyCardNumber": "Please enter your card number.",
@@ -789,6 +1047,24 @@
       "emptyCvv": "Please enter your CVV.",
       "invalidCvv": "CVV must contain 3 or 4 digits."
     },
+    "payment": {
+      "methodHeading": "Payment Method",
+      "methodAriaLabel": "Payment method",
+      "online": "Online Payment (Razorpay)",
+      "cod": "Cash on Delivery",
+      "openingPayment": "Opening payment…",
+      "placingOrder": "Placing order…",
+      "payPrefix": "Pay",
+      "payingTo": "You're paying {amount} to {vendor} ({branch})."
+    },
+    "errors": {
+      "startCheckout": "Could not start checkout.",
+      "preparePayment": "Could not prepare payment.",
+      "gatewayUnavailable": "Payment gateway unavailable.",
+      "verificationFailed": "Payment verification failed — if an amount was deducted, contact support with your order id.",
+      "openGateway": "Could not open the payment gateway.",
+      "placeOrder": "Could not place your order. Please try again."
+    },
     "successHeading": "Booking Confirmed!",
     "successBody": "We have sent your booking details to your email. You'll hear from the spa within 2 hours."
   },
@@ -796,7 +1072,25 @@
     "metaTitle": "My Bookings | MSD",
     "title": "My Bookings",
     "subtitle": "View and manage your spa bookings.",
+    "loading": "Loading bookings…",
     "bookAnotherLabel": "Book Another",
+    "error": {
+      "load": "Could not load your bookings.",
+      "cancel": "Could not cancel booking."
+    },
+    "cancelConfirmation": "Cancel your booking for \"{deal}\"?",
+    "durationSuffix": "min",
+    "timeConnector": "at",
+    "currency": "₹",
+    "cancelledPrefix": "Cancelled:",
+    "actions": {
+      "createOrder": "Create order",
+      "cancelBooking": "Cancel booking"
+    },
+    "links": {
+      "cart": "View your cart →",
+      "orders": "View your orders →"
+    },
     "empty": {
       "title": "No bookings yet",
       "description": "You haven't made any spa bookings yet. Explore our deals and find your next relaxing experience.",
@@ -810,6 +1104,65 @@
       "quantityLabel": "Quantity",
       "totalLabel": "Total Amount",
       "statusIconLabel": "Booking confirmed"
+    }
+  },
+  "orders": {
+    "metaTitle": "My Orders | MSD",
+    "title": "My Orders",
+    "subtitle": "Your product and service orders.",
+    "loading": "Loading orders…",
+    "empty": {
+      "title": "No orders yet",
+      "description": "Orders you place will show up here.",
+      "cta": "Browse Categories"
+    },
+    "links": {
+      "viewDetails": "View details →"
+    },
+    "errors": {
+      "load": "Could not load your orders."
+    }
+  },
+  "orderDetail": {
+    "loading": "Loading order…",
+    "notFound": {
+      "metaTitle": "Order Not Found | MSD",
+      "heading": "Order not found",
+      "subheading": "It may belong to a different account.",
+      "cta": "My Orders"
+    },
+    "metaTitle": "Order Confirmed | MSD",
+    "title": {
+      "prefix": "Order",
+      "placed": "placed"
+    },
+    "labels": {
+      "vendor": "Vendor",
+      "branch": "Branch",
+      "appointment": "Appointment",
+      "timeConnector": "at",
+      "durationSuffix": "min",
+      "total": "Total",
+      "cancelled": "Cancelled:",
+      "paymentFailed": "Payment failed:",
+      "retryPayment": "Please try again."
+    },
+    "actions": {
+      "payPrefix": "Pay",
+      "cancelOrder": "Cancel order",
+      "downloadInvoice": "Download Invoice",
+      "myOrders": "My Orders",
+      "continueShopping": "Continue Shopping"
+    },
+    "errors": {
+      "load": "Could not load this order.",
+      "cancel": "Could not cancel this order."
+    },
+    "cancelDialog": {
+      "title": "Cancel order",
+      "message": "Cancel this order?",
+      "cancel": "Keep order",
+      "confirm": "Cancel order"
     }
   },
   "meta": {
@@ -947,15 +1300,39 @@
       }
     }
   },
+  "chooseExperience": {
+    "pageTitle": "Choose your experience · MSD",
+    "brandTitle": "Welcome back, {name}",
+    "brandSubtitle": "Your account is set up as both a customer and a vendor. Choose how you'd like to continue.",
+    "cardHeading": "Continue as",
+    "cardDescription": "You can switch between the two later from your account menu.",
+    "customerLabel": "Continue as Customer",
+    "vendorLabel": "Continue as Vendor"
+  },
   "products": {
     "listing": {
       "title": "Wellness Products",
       "subtitle": "Oils, creams, masks and kits — shop top-rated skincare and wellness products.",
+      "loading": "Loading products…",
+      "searchLabel": "Search",
+      "resultsAriaLabel": "Product results",
+      "filterAriaLabel": "Search and sort products",
+      "addToCart": "Add to Cart",
+      "addToCartSuccess": "Added \"{item}\" to your cart.",
+      "addToCartError": "Could not add to cart.",
+      "offSuffix": "OFF",
       "filters": {
         "all": "All",
         "day": "Day",
         "night": "Night",
         "skinCare": "Skin Care"
+      },
+      "errors": {
+        "load": "Could not load products."
+      },
+      "breadcrumb": {
+        "home": "Home",
+        "products": "Products"
       },
       "sortOptions": [
         {
@@ -981,11 +1358,41 @@
       "emptySubheading": "Try selecting a different category or check back later."
     },
     "detail": {
+      "loading": "Loading product…",
       "addToCart": "Add to Cart",
-      "shareLabel": "Share this product",
+      "addedToCart": "Added to Cart!",
+      "shareLabel": "Share",
+      "shareAriaLabel": "Share",
       "inStock": "In stock and ready to ship",
       "quantityLabel": "Quantity",
+      "decreaseQuantity": "Decrease quantity",
+      "increaseQuantity": "Increase quantity",
+      "saveToWishlist": "Save to wishlist",
+      "removeFromWishlist": "Remove from wishlist",
+      "copyProductLink": "Copy product link",
+      "linkCopied": "Link copied!",
+      "offSuffix": "OFF",
+      "originalPrice": "Original price",
       "relatedProducts": "You May Also Like",
+      "gallery": {
+        "thumbnailsLabel": "Gallery thumbnails",
+        "viewImage": "View image"
+      },
+      "breadcrumb": {
+        "home": "Home",
+        "products": "Products"
+      },
+      "errors": {
+        "invalidProduct": "Invalid product.",
+        "loadProduct": "Could not load this product.",
+        "addToCart": "Could not add to cart."
+      },
+      "notFound": {
+        "metaTitle": "Product Not Found | MSD",
+        "heading": "Product not found",
+        "subheading": "This product may no longer be available.",
+        "cta": "Browse Products"
+      },
       "accordionSummary": "Summary",
       "accordionBenefits": "Benefits",
       "accordionHowToUse": "How To Use",
@@ -995,6 +1402,162 @@
     "meta": {
       "listingTitle": "Wellness Products | MSD – MySpaDeal",
       "listingDescription": "Shop massage oils, face masks, body scrubs, aromatherapy sets and wellness kits from top Indian wellness brands."
+    }
+  },
+  "categories": {
+    "metaTitle": "Browse Categories | MSD",
+    "metaDescription": "Browse services and products by category — compare vendors, branches, and prices.",
+    "breadcrumb": {
+      "home": "Home",
+      "categories": "Categories"
+    },
+    "title": "Categories",
+    "subtitle": "Browse services and products by category from vendors near you.",
+    "ariaLabel": "Categories",
+    "loading": "Loading categories…",
+    "error": {
+      "load": "Could not load categories."
+    },
+    "empty": {
+      "title": "No categories yet",
+      "description": "Check back soon."
+    },
+    "subcategory": {
+      "singular": "subcategory",
+      "plural": "subcategories"
+    }
+  },
+  "invoice": {
+    "loading": "Loading invoice…",
+    "title": "Invoice",
+    "metaTitleTemplate": "Invoice {id} | MSD",
+    "loadError": "Could not load this invoice.",
+    "backToOrder": "Back to Order",
+    "downloadPrint": "Download / Print",
+    "notFound": {
+      "metaTitle": "Invoice Not Found | MSD",
+      "heading": "Invoice not found",
+      "subheading": "It may belong to a different account.",
+      "cta": "My Orders"
+    },
+    "labels": {
+      "orderId": "Order ID:",
+      "invoiceDate": "Invoice date:",
+      "billedTo": "Billed to",
+      "shippingAddress": "Shipping address",
+      "item": "Item",
+      "quantity": "Qty",
+      "unitPrice": "Unit Price",
+      "lineTotal": "Line Total",
+      "subtotal": "Subtotal",
+      "total": "Total",
+      "paymentMethod": "Payment method",
+      "paymentStatus": "Payment status",
+      "orderStatus": "Order status",
+      "durationSuffix": "min",
+      "cashOnDelivery": "Cash on Delivery"
+    }
+  },
+  "vendor": {
+    "meta": {
+      "titleSuffix": " | MSD",
+      "defaultDescription": "Book services at {vendor}{location}.",
+      "notFoundTitle": "Vendor Not Found | MSD",
+      "vendorTitleSuffix": " | MSD"
+    },
+    "breadcrumb": {
+      "home": "Home",
+      "explore": "Explore"
+    },
+    "labels": {
+      "workingHours": "Working Hours",
+      "selectService": "Select Service",
+      "services": "Services",
+      "products": "Products",
+      "therapists": "Meet Our Therapists",
+      "yourSelection": "Your selection",
+      "selectPackage": "Select your package",
+      "selectTherapist": "Select a therapist",
+      "anyTherapist": "Any therapist",
+      "date": "Date",
+      "timeSlot": "Time slot",
+      "quantity": "Quantity",
+      "total": "Total",
+      "details": "Details",
+      "from": "From",
+      "packages": "packages",
+      "minutes": "min",
+      "yearsExperience": "years experience",
+      "closed": "Closed",
+      "timingsNotAvailable": "Timings not available"
+    },
+    "actions": {
+      "browseServices": "Browse Services",
+      "bookNow": "Book Now",
+      "cancel": "Cancel",
+      "addToCart": "Add to Cart",
+      "select": "Select"
+    },
+    "filters": {
+      "all": "All",
+      "filterByServiceCategory": "Filter by service category"
+    },
+    "empty": {
+      "noServices": "No services available at this branch.",
+      "noProducts": "No products available at this branch.",
+      "noTherapists": "No therapist profiles listed for this branch yet.",
+      "selectService": "Select a service to see packages and pricing."
+    },
+    "loading": {
+      "vendor": "Loading vendor…",
+      "services": "Loading services…",
+      "products": "Loading products…"
+    },
+    "errors": {
+      "loadVendor": "Could not load this vendor.",
+      "loadServicesProducts": "Could not load services and products.",
+      "addToCart": "Could not add to cart.",
+      "bookService": "Could not book this service.",
+      "selectDateTime": "Select a date and time slot."
+    },
+    "notFound": {
+      "metaTitle": "Vendor Not Found | MSD",
+      "heading": "Vendor not found",
+      "subheading": "This vendor may no longer be available.",
+      "cta": "Browse Services"
+    },
+    "booking": {
+      "bookedPrefix": "Booked",
+      "for": "for",
+      "at": "at",
+      "bookingNow": "Booking…",
+      "bookNow": "Book Now",
+      "ariaLabel": "Book {service} — {amount}"
+    },
+    "accessibility": {
+      "services": "Services",
+      "products": "Products",
+      "therapists": "Therapists",
+      "yourSelection": "Your selection",
+      "selectTimeSlot": "Select a time slot",
+      "selectTherapist": "Select a therapist",
+      "selectPackage": "Select a package",
+      "decreaseQuantity": "Decrease quantity",
+      "increaseQuantity": "Increase quantity",
+      "quantity": "Quantity"
+    },
+    "days": {
+      "mon": "Monday",
+      "tue": "Tuesday",
+      "wed": "Wednesday",
+      "thu": "Thursday",
+      "fri": "Friday",
+      "sat": "Saturday",
+      "sun": "Sunday"
+    },
+    "messages": {
+      "addToCartSuccess": "Added \"{item}\" to your cart.",
+      "bookingSuccess": "Booked \"{service}\" for {date} at {time}."
     }
   }
 }

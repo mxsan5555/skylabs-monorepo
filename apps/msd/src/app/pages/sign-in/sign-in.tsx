@@ -4,7 +4,8 @@ import { FilledButton, OutlinedButton, OutlinedTextField, Tabs, PrimaryTab, Icon
 import content from '../../../content.json';
 import { googleSignInUrl, requestOtp } from '../../../api/rbac/auth';
 import { ApiRequestError } from '../../../api/rbac/client';
-
+import logo from '../../../assets/logo.jpg';
+import logo2 from '../../../assets/logo2.jpg';
 type Method = 'email' | 'phone';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -69,10 +70,19 @@ export function SignIn() {
       <meta name="robots" content="noindex, nofollow" />
       <div className="auth-brand">
         <div className="auth-brand__logo">
-          <Icon aria-hidden="true"> {auth.brand.logoIcon}</Icon>
+          <img
+            src={logo}
+            alt="MySpaDeal"
+            className="auth-brand__logo-image auth-brand__logo-image--desktop"
+          />
+          <img
+            src={logo2}
+            alt="MySpaDeal"
+            className="auth-brand__logo-image auth-brand__logo-image--mobile"
+          />
         </div>
-        <h1 className="auth-brand__title"> {auth.brand.title}</h1>
-        <p className="auth-brand__subtitle"> {auth.brand.subtitle}</p>
+        <h1 className="auth-brand__title">{auth.brand.title}</h1>
+        <p className="auth-brand__subtitle">{auth.brand.subtitle}</p>
       </div>
 
       <div className="auth-card">

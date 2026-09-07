@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
+import { useSearchParams } from 'react-router-dom';
 import { Dialog, FilledButton, OutlinedSelect, SelectOption, TextButton } from '@skylabs-monorepo/shared-ui/react';
 import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { listOrders, setOrderStatus, type Order, type OrderStatus } from '../../../../api/rbac/orders';
+import { listOrders, getOrder, setOrderStatus, type Order, type OrderStatus } from '../../../../api/rbac/orders';
 import { ApiRequestError } from '../../../../api/rbac/client';
 
 const ALLOWED_NEXT: Record<OrderStatus, OrderStatus[]> = {
@@ -18,7 +19,7 @@ const ORDER_COLUMNS = JSON.stringify([
   { key: 'Customer', label: 'Customer' },
   { key: 'Vendor', label: 'Vendor' },
   { key: 'Branch', label: 'Branch' },
-  { key: 'Type', label: 'Type' },
+  { key: 'Composition', label: 'Composition' },
   { key: 'Item', label: 'Item' },
   { key: 'Amount', label: 'Amount' },
   {
@@ -43,6 +44,18 @@ const ORDER_FILTERS = JSON.stringify([
   { label: 'Cancelled', value: 'CANCELLED' },
 ]);
 
+/**
+ * "Deal Order" / "Product Order" / "Therapist Order" / "Mixed Order" — computed from the
+ * composition of the order's own items, never stored (mirrors msd-api's
+ * order.service.ts#describeOrderComposition exactly). A line is a Deal purchase if `dealId` is
+ * set, a Therapist purchase if `therapistId` is set (mutually exclusive for a SERVICE item), or
+ * a Product purchase if neither is set.
+ */
+function describeOrderComposition(order: Order): string {
+  const kinds = new Set(order.items.map((item) => (item.therapistId ? 'Therapist' : item.dealId ? 'Deal' : 'Product')));
+  return kinds.size === 1 ? `${[...kinds][0]} Order` : 'Mixed Order';
+}
+
 /** Flat row for <sky-data-table> — every key here is human-readable because the component's
  *  built-in detail drawer renders Object.entries(row) verbatim (raw key as label, no
  *  formatting), so extra (non-column) keys double as the "Order Detail" view. */
@@ -64,6 +77,7 @@ function toOrderRow(order: Order): Record<string, string | number> {
     Customer: order.customer.name,
     Vendor: singleVendorItem?.vendorNameSnapshot ?? order.vendorNameSnapshot,
     Branch: singleVendorItem?.branchNameSnapshot ?? order.branchNameSnapshot,
+    Composition: describeOrderComposition(order),
     Type: order.type,
     Item: order.items.map((i) => i.itemName).join(', ') || '—',
     Amount: `₹${order.total}`,
@@ -78,9 +92,6 @@ function toOrderRow(order: Order): Record<string, string | number> {
     'Payment Provider': latestPayment?.provider ?? '—',
     'Payment Failure Reason': latestPayment?.failureReason ?? '—',
     'Cancellation Reason': order.cancellationReason ?? '—',
-    'Booking Date': order.booking?.bookingDate ? new Date(order.booking.bookingDate).toLocaleDateString() : '—',
-    'Booking Time Slot': order.booking?.timeSlot ?? '—',
-    'Booking Status': order.booking?.status ?? '—',
   };
 }
 
@@ -112,6 +123,27 @@ export function OrderManagement() {
   const statusDialogRef = useRef<MdDialog>(null);
 
   const tableRef = useRef<HTMLElement>(null);
+
+  // Deep-link support for a "New Order Received" notification click (see notification-bell.tsx)
+  // — `sky-data-table`'s own row-detail drawer has no public API to open it programmatically, so
+  // this fetches the same order via the existing GET /orders/:id and shows it in its own small
+  // read-only Dialog (same key/value shape as the table's own drawer, via toOrderRow below).
+  const [searchParams] = useSearchParams();
+  const orderIdParam = searchParams.get('orderId');
+  const [deepLinkOrder, setDeepLinkOrder] = useState<Order | null>(null);
+  const [deepLinkError, setDeepLinkError] = useState('');
+  const deepLinkDialogRef = useRef<MdDialog>(null);
+
+  useEffect(() => {
+    if (!orderIdParam) return;
+    getOrder(token, orderIdParam)
+      .then(({ data }) => {
+        setDeepLinkOrder(data);
+        deepLinkDialogRef.current?.show();
+      })
+      .catch((err) => setDeepLinkError(err instanceof ApiRequestError ? err.message : 'Could not load this order.'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderIdParam]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -204,7 +236,7 @@ export function OrderManagement() {
       <header className="page-head">
         <div>
           <h1>Orders</h1>
-          <p>Every order from the marketplace catalogue (Booking or Cart checkout).</p>
+          <p>Every order from the marketplace catalogue — Deal, Product, and Therapist alike.</p>
         </div>
       </header>
 
@@ -264,6 +296,22 @@ export function OrderManagement() {
               {statusSubmitting ? 'Saving…' : 'Save'}
             </FilledButton>
           )}
+        </div>
+      </Dialog>
+
+      <Dialog ref={deepLinkDialogRef} onClose={() => setDeepLinkOrder(null)}>
+        <div slot="headline">Order detail</div>
+        <div slot="content" className="form-grid">
+          {deepLinkError && <p className="error-state" role="alert">{deepLinkError}</p>}
+          {deepLinkOrder &&
+            Object.entries(toOrderRow(deepLinkOrder)).map(([key, value]) => (
+              <p key={key} className="field-hint">
+                <strong>{key}:</strong> {value}
+              </p>
+            ))}
+        </div>
+        <div slot="actions">
+          <TextButton onClick={() => deepLinkDialogRef.current?.close()}>Close</TextButton>
         </div>
       </Dialog>
     </div>

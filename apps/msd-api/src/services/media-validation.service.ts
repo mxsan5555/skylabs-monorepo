@@ -2,6 +2,7 @@ import { ApiError } from '../lib/http';
 import {
   IMAGE_MIME_TYPES,
   VIDEO_MIME_TYPES,
+  DOCUMENT_MIME_TYPES,
   extensionFor,
   sniffMediaType,
   type SniffedMediaType,
@@ -11,6 +12,9 @@ export const IMAGE_MIN_BYTES = 30 * 1024;
 export const IMAGE_MAX_BYTES = 80 * 1024;
 export const VIDEO_MAX_BYTES = 1 * 1024 * 1024;
 export const MAX_IMAGES_PER_ENTITY = 8;
+/** A KYC document is a scanned/photographed real document, not a compressed web image — no
+ *  minimum size, and a much larger ceiling than the 30-80KB product-image window. */
+export const DOCUMENT_MAX_BYTES = 5 * 1024 * 1024;
 
 export interface ValidatedMediaFile {
   sniffedType: SniffedMediaType;
@@ -26,20 +30,22 @@ export interface ValidatedMediaFile {
  */
 export function validateMediaFile(
   buffer: Buffer,
-  kind: 'image' | 'video',
+  kind: 'image' | 'video' | 'document',
 ): ValidatedMediaFile {
   const sniffedType = sniffMediaType(buffer);
   if (!sniffedType) {
     throw new ApiError('VALIDATION_ERROR', 'Unrecognized or unsupported file format.');
   }
 
-  const allowList = kind === 'image' ? IMAGE_MIME_TYPES : VIDEO_MIME_TYPES;
+  const allowList = kind === 'image' ? IMAGE_MIME_TYPES : kind === 'video' ? VIDEO_MIME_TYPES : DOCUMENT_MIME_TYPES;
   if (!allowList.includes(sniffedType)) {
     throw new ApiError(
       'VALIDATION_ERROR',
       kind === 'image'
         ? 'Images must be JPG, JPEG, PNG, or WEBP.'
-        : 'Videos must be MP4, WEBM, or MOV.',
+        : kind === 'video'
+          ? 'Videos must be MP4, WEBM, or MOV.'
+          : 'Documents must be PDF, JPG, JPEG, or PNG.',
     );
   }
 
@@ -47,9 +53,13 @@ export function validateMediaFile(
     if (buffer.length < IMAGE_MIN_BYTES || buffer.length > IMAGE_MAX_BYTES) {
       throw new ApiError('VALIDATION_ERROR', 'Image size must be between 30 KB and 80 KB.');
     }
-  } else {
+  } else if (kind === 'video') {
     if (buffer.length > VIDEO_MAX_BYTES) {
       throw new ApiError('VALIDATION_ERROR', 'Video size must not exceed 1 MB.');
+    }
+  } else {
+    if (buffer.length > DOCUMENT_MAX_BYTES) {
+      throw new ApiError('VALIDATION_ERROR', 'Document size must not exceed 5 MB.');
     }
   }
 

@@ -91,6 +91,7 @@ export function createPrismaMock() {
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
       count: vi.fn(),
     },
     branch: {
@@ -107,6 +108,7 @@ export function createPrismaMock() {
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
       count: vi.fn(),
     },
     dealPackage: {
@@ -175,6 +177,13 @@ export function createPrismaMock() {
       upsert: vi.fn(),
       delete: vi.fn(),
     },
+    vendorDocument: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+      upsert: vi.fn(),
+      delete: vi.fn(),
+    },
     category: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
@@ -185,6 +194,15 @@ export function createPrismaMock() {
       delete: vi.fn(),
       count: vi.fn(),
     },
+    categoryImage: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+      delete: vi.fn(),
+    },
     product: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
@@ -193,13 +211,41 @@ export function createPrismaMock() {
       delete: vi.fn(),
       count: vi.fn(),
     },
-    service: {
+    vendorCategoryAccess: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      createMany: vi.fn(),
+      deleteMany: vi.fn(),
+      count: vi.fn(),
+    },
+    popularTag: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
       count: vi.fn(),
+    },
+    popularTagCategory: {
+      findMany: vi.fn(),
+      upsert: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+    popularTagDeal: {
+      findMany: vi.fn(),
+      upsert: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+    popularTagProduct: {
+      findMany: vi.fn(),
+      upsert: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+    popularTagTherapist: {
+      findMany: vi.fn(),
+      upsert: vi.fn(),
+      deleteMany: vi.fn(),
     },
     cart: {
       findUnique: vi.fn(),
@@ -208,6 +254,7 @@ export function createPrismaMock() {
     },
     cartItem: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
@@ -220,20 +267,14 @@ export function createPrismaMock() {
       create: vi.fn(),
       deleteMany: vi.fn(),
     },
-    booking: {
-      findUnique: vi.fn(),
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      count: vi.fn(),
-    },
     therapist: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn(),
     },
     therapistPackage: {
       findUnique: vi.fn(),
@@ -270,6 +311,12 @@ export function createPrismaMock() {
       count: vi.fn(),
       aggregate: vi.fn(),
       groupBy: vi.fn(),
+    },
+    notification: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+      updateMany: vi.fn(),
     },
     // Default behavior mirrors real Prisma: array-form runs the (already-invoked, since JS
     // evaluates arguments eagerly) promises concurrently; callback-form invokes the callback

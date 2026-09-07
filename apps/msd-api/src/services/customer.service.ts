@@ -19,7 +19,7 @@ const CUSTOMER_SELECT = {
   email: true,
   status: true,
   createdAt: true,
-  _count: { select: { orders: true, bookings: true } },
+  _count: { select: { orders: true } },
 } as const;
 
 const CUSTOMER_ROLE_FILTER = { roles: { some: { role: { key: 'customer' } } } } as const;

@@ -14,6 +14,7 @@ import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   createTherapist,
+  getMyVendorCategoryAccess,
   listMyBranches,
   listMyTherapists,
   setTherapistStatus,
@@ -23,6 +24,7 @@ import {
   updateTherapistPackage,
   deleteTherapistPackage,
   type Branch,
+  type Category,
   type Therapist,
   type TherapistInput,
   type TherapistPackage,
@@ -82,6 +84,9 @@ export function VendorTherapists() {
   const { token } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [therapists, setTherapists] = useState<TherapistWithBranch[]>([]);
+  // The vendor's granted THERAPY categories — flat, top-level only (see plan decision #6), used
+  // to restrict the Specialization picker instead of the old free-text field.
+  const [specializationCategories, setSpecializationCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -118,6 +123,14 @@ export function VendorTherapists() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    // The `getMyVendorCategoryAccess` grant rows already nest the category — no separate
+    // vendorId-scoped `listCategories` call needed for this self-service-only page.
+    getMyVendorCategoryAccess(token)
+      .then(({ data }) => setSpecializationCategories(data.filter((row) => row.category.type === 'THERAPY').map((row) => row.category)))
+      .catch(() => setSpecializationCategories([]));
+  }, [token]);
 
   const save = async (input: TherapistInput, branchId: string, existing?: TherapistWithBranch) => {
     if (existing) {
@@ -219,7 +232,13 @@ export function VendorTherapists() {
       )}
 
       {branches.length > 0 && (
-        <TherapistFormDialog dialogRef={addDialogRef} branches={branches} token={token} onSave={(input, branchId) => save(input, branchId)} />
+        <TherapistFormDialog
+          dialogRef={addDialogRef}
+          branches={branches}
+          specializationCategories={specializationCategories}
+          token={token}
+          onSave={(input, branchId) => save(input, branchId)}
+        />
       )}
 
       {editingTherapist && (
@@ -227,6 +246,7 @@ export function VendorTherapists() {
           key={editingTherapist.id}
           dialogRef={editDialogRef}
           branches={branches}
+          specializationCategories={specializationCategories}
           therapist={editingTherapist}
           token={token}
           onSave={(input) => save(input, editingTherapist.branchId, editingTherapist)}
@@ -251,6 +271,7 @@ const EMPTY_INPUT: TherapistInput = { therapistType: '', personName: '' };
 function TherapistFormDialog({
   dialogRef,
   branches,
+  specializationCategories,
   therapist,
   token,
   onSave,
@@ -258,6 +279,9 @@ function TherapistFormDialog({
 }: {
   dialogRef: RefObject<MdDialog>;
   branches: Branch[];
+  /** The vendor's granted THERAPY categories — restricts the Specialization picker instead of
+   *  the old free-text field (see `Therapist.specializationCategoryId`'s own doc comment). */
+  specializationCategories: Category[];
   therapist?: TherapistWithBranch;
   token: string | null;
   onSave: (input: TherapistInput, branchId: string) => Promise<TherapistWithBranch | void>;
@@ -270,6 +294,7 @@ function TherapistFormDialog({
           personName: therapist.personName,
           gender: therapist.gender ?? undefined,
           specialization: therapist.specialization ?? undefined,
+          specializationCategoryId: therapist.specializationCategoryId ?? undefined,
           bio: therapist.bio ?? undefined,
           experienceYears: therapist.experienceYears ?? undefined,
         }
@@ -344,11 +369,29 @@ function TherapistFormDialog({
           </OutlinedSelect>
         )}
 
-        <OutlinedTextField
-          label="Specialization"
-          value={form.specialization ?? ''}
-          onInput={(e: Event) => set('specialization', (e.target as HTMLInputElement).value || undefined)}
-        />
+        {specializationCategories.length > 0 ? (
+          <OutlinedSelect
+            label="Specialization"
+            value={form.specializationCategoryId ?? ''}
+            onChange={(e: Event) => set('specializationCategoryId', (e.target as HTMLSelectElement).value || undefined)}
+          >
+            <SelectOption value="">
+              <div slot="headline">None</div>
+            </SelectOption>
+            {specializationCategories.map((c) => (
+              <SelectOption key={c.id} value={c.id}>
+                <div slot="headline">{c.name}</div>
+              </SelectOption>
+            ))}
+          </OutlinedSelect>
+        ) : (
+          <p className="empty-state">
+            No Therapy categories have been granted to this business yet — grant one under Business Modules &amp; Category Access first.
+          </p>
+        )}
+        {therapist?.specialization && (
+          <p className="field-hint">Previously recorded specialization (historical, read-only): {therapist.specialization}</p>
+        )}
 
         <OutlinedTextField
           label="Bio"
@@ -366,6 +409,7 @@ function TherapistFormDialog({
         <MediaUploader
           entityType="therapist"
           entityId={savedTherapist?.id ?? null}
+          selfService
           existingImages={savedTherapist?.mediaImages ?? []}
           existingVideo={savedTherapist?.mediaVideo ?? null}
           token={token}

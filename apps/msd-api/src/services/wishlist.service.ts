@@ -5,7 +5,7 @@ import { PUBLIC_DEAL_SELECT, VISIBLE_DEAL_WHERE } from './catalog.service';
 
 /**
  * Customer wishlist ("saved for later") — self-service only, gated on `authenticate` alone (no
- * `requirePermission`), exactly like Cart/Booking. `customerId` is always `req.user.sub`, never a
+ * `requirePermission`), exactly like Cart. `customerId` is always `req.user.sub`, never a
  * param/body value (route layer). Unlike Cart, a wishlisted deal can be either a service or a
  * product — there's no purchase-type restriction here, it's just a saved-items list.
  */

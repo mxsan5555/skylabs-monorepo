@@ -12,11 +12,9 @@ export interface DashboardStats {
   branches: number;
   categories: number;
   subCategories: number;
-  services: number;
   products: number;
   deals: number;
   orders: number;
-  bookings: number;
   revenue: string;
 }
 

@@ -280,6 +280,13 @@ input[type='checkbox'] {
   font-weight: 600;
 }
 
+/* The row a notification deep-link (?dealId=) scrolled to and is pointing the admin at. */
+.entity-list__item--highlighted {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: -2px;
+  background-color: var(--md-sys-color-primary-container, #d7e3ff);
+}
+
 /* Status pill */
 .status-pill {
   display: inline-flex;
@@ -487,4 +494,109 @@ input[type='checkbox'] {
   margin: -8px 0 0;
   font-size: 0.75rem;
   color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Branch operating-hours editor (vendor-branches.tsx's OpeningHoursEditor) — one row per
+   weekday, each at least a 44px touch target per the app's accessibility baseline. */
+.opening-hours-editor__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  flex-wrap: wrap;
+}
+
+.opening-hours-editor__day {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 140px;
+}
+
+.opening-hours-editor__row input[type='time'] {
+  min-height: 44px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background: var(--md-sys-color-surface, #fff);
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+}
+
+/* Onboarding wizard step-pills (vendor-pipeline.tsx) — a horizontally-scrolling row of
+   labelled, numbered steps; the active step is filled, completed steps get a check mark. */
+.wizard-steps {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 20px;
+  list-style: none;
+}
+
+.wizard-steps__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 8px 16px;
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wizard-steps__item:hover {
+  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+}
+
+.wizard-steps__item[aria-current='step'] {
+  background-color: var(--md-sys-color-primary-container, #cee5ff);
+  color: var(--md-sys-color-on-primary-container, #001d33);
+  border-color: transparent;
+}
+
+.wizard-steps__item--done {
+  color: var(--md-sys-color-primary);
+}
+
+.wizard-steps__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+  font-size: 0.7rem;
+}
+
+.wizard-steps__item[aria-current='step'] .wizard-steps__num {
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+
+/* Category Access grant grid (vendor-wizard-modules.tsx) — one checkbox list per enabled
+   business module. */
+.category-grant-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.category-grant-grid__group {
+  border-radius: 12px;
+  background-color: var(--md-sys-color-surface-container, #eef1f6);
+  padding: 12px 16px;
+}
+
+.category-grant-grid__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
 }

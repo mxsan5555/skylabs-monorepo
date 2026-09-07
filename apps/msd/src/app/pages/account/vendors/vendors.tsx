@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FilledButton, OutlinedButton, Icon, Tabs, PrimaryTab } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   approveVendor,
   createMyVendor,
+  deleteVendor,
+  deleteVendorTherapist,
   getMyVendor,
   listCategories,
   listVendors,
@@ -20,13 +22,13 @@ import {
   type VendorFields,
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { useToast } from '../../../../toast/toast-context';
 import { VendorList } from './vendor-list';
 import { VendorProfileForm, extractVendorFieldErrors, type VendorFieldErrors } from './vendor-profile-form';
 import { VendorBranches } from './vendor-branches';
 import { VendorPipeline } from './vendor-pipeline';
 import { VendorDetailCustomers } from './vendor-detail-customers';
 import { VendorDetailOrders } from './vendor-detail-orders';
-import { VendorDetailBookings } from './vendor-detail-bookings';
 
 /**
  * Vendor Management. Two audiences share this one page/route (`/account/vendors`):
@@ -47,12 +49,7 @@ export function VendorManagement() {
   const canApprove = can('vendors', 'approve');
   const canReject = can('vendors', 'reject');
   const canStatusChange = can('vendors', 'status_change');
-
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  useEffect(() => {
-    listCategories(token).then(({ data }) => setCategories(data)).catch(() => setCategories([]));
-  }, [token]);
+  const canDelete = can('vendors', 'delete');
 
   if (canView) {
     return (
@@ -63,13 +60,13 @@ export function VendorManagement() {
         canApprove={canApprove}
         canReject={canReject}
         canStatusChange={canStatusChange}
-        categories={categories}
+        canDelete={canDelete}
       />
     );
   }
 
   if (canCustom) {
-    return <SelfVendorManagement token={token} categories={categories} />;
+    return <SelfVendorManagement token={token} />;
   }
 
   return <p className="empty-state">You do not have access to Vendor Management.</p>;
@@ -92,6 +89,8 @@ const THERAPIST_COLUMNS = JSON.stringify([
   { key: 'Status', label: 'Status', type: 'status', statusMap: { Active: 'success', Inactive: 'error' } },
 ]);
 
+const THERAPIST_ADMIN_DELETE_ACTIONS = JSON.stringify([{ icon: 'delete', label: 'Delete', event: 'delete' }]);
+
 function toTherapistRow(t: AdminTherapist): Record<string, string | number> {
   return {
     Type: t.therapistType,
@@ -106,8 +105,9 @@ function toTherapistRow(t: AdminTherapist): Record<string, string | number> {
 /** Vendor Detail tab order — Overview (profile) first, then the two genuinely-coupled
  *  Branches & Deals (kept as one tab, same reasoning already applied to the vendor
  *  self-service side: a branch and its deals are one browsing flow, not two), then the
- *  read-only contextual views (Therapists/Customers/Orders/Bookings). */
-const VENDOR_DETAIL_TABS = ['Overview', 'Branches & Deals', 'Therapists', 'Customers', 'Orders', 'Bookings'] as const;
+ *  read-only contextual views (Therapists/Customers/Orders — Orders already covers every
+ *  purchase kind, Deal/Product/Therapist alike, so there is no separate Bookings tab). */
+const VENDOR_DETAIL_TABS = ['Overview', 'Branches & Deals', 'Therapists', 'Customers', 'Orders'] as const;
 
 function AdminVendorManagement({
   token,
@@ -116,7 +116,7 @@ function AdminVendorManagement({
   canApprove,
   canReject,
   canStatusChange,
-  categories,
+  canDelete,
 }: {
   token: string | null;
   canCreate: boolean;
@@ -124,9 +124,10 @@ function AdminVendorManagement({
   canApprove: boolean;
   canReject: boolean;
   canStatusChange: boolean;
-  categories: Category[];
+  canDelete: boolean;
 }) {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [searchParams] = useSearchParams();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [total, setTotal] = useState(0);
@@ -138,8 +139,19 @@ function AdminVendorManagement({
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState(0);
+  // The selected vendor's granted SERVICE categories — a service Deal picks directly from these
+  // (see vendor-branches.tsx's DealDialog); scoped per-vendor since access is vendor-specific.
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const selectedVendor = useMemo(() => vendors.find((v) => v.id === selectedId) ?? null, [vendors, selectedId]);
+
+  useEffect(() => {
+    if (!selectedVendor) {
+      setCategories([]);
+      return;
+    }
+    listCategories(token, { type: 'SERVICE', vendorId: selectedVendor.id }).then(({ data }) => setCategories(data)).catch(() => setCategories([]));
+  }, [token, selectedVendor?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on id, not object identity
 
   const loadVendors = useCallback(async () => {
     setLoading(true);
@@ -195,6 +207,33 @@ function AdminVendorManagement({
     loadTherapists();
   }, [loadTherapists]);
 
+  const therapistsTableRef = useRef<HTMLElement>(null);
+
+  const doDeleteTherapist = async (therapist: AdminTherapist) => {
+    if (!selectedVendor) return;
+    if (!window.confirm(`Delete "${therapist.personName}"? This cannot be undone.`)) return;
+    try {
+      await deleteVendorTherapist(token, selectedVendor.id, therapist.id);
+      loadTherapists();
+    } catch (err) {
+      setTherapistsError(err instanceof ApiRequestError ? err.message : 'Could not delete therapist.');
+    }
+  };
+
+  useEffect(() => {
+    const el = therapistsTableRef.current;
+    if (!el || !canDelete) return;
+    const onRowAction = (e: Event) => {
+      const detail = (e as CustomEvent<{ action: string; row: Record<string, unknown>; rowIndex: number }>).detail;
+      const therapist = therapists[detail.rowIndex];
+      if (!therapist) return;
+      if (detail.action === 'delete') doDeleteTherapist(therapist);
+    };
+    el.addEventListener('sky-dt-row-action', onRowAction);
+    return () => el.removeEventListener('sky-dt-row-action', onRowAction);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [therapists, canDelete]);
+
   /** Passed to VendorPipeline — fires after every successful per-step save, whether that
    *  step just created the vendor (Step 1, first save) or updated an existing one. */
   const handlePipelineChange = (vendor: Vendor) => {
@@ -245,9 +284,22 @@ function AdminVendorManagement({
     try {
       const { data } = await reviewVendorKyc(token, selectedVendor.id, kycStatus, rejectionReason);
       setVendors((prev) => prev.map((v) => (v.id === data.id ? data : v)));
-      setMessage(`KYC ${kycStatus.toLowerCase()}.`);
+      showToast(kycStatus === 'VERIFIED' ? 'KYC verified successfully.' : 'KYC rejected.');
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not review KYC.');
+    }
+  };
+
+  const doDelete = async () => {
+    if (!selectedVendor) return;
+    if (!window.confirm(`Delete "${selectedVendor.businessName || 'this vendor'}"? This cannot be undone.`)) return;
+    try {
+      await deleteVendor(token, selectedVendor.id);
+      setVendors((prev) => prev.filter((v) => v.id !== selectedVendor.id));
+      setSelectedId(null);
+      setMessage('Vendor deleted.');
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'Could not delete vendor.');
     }
   };
 
@@ -303,6 +355,7 @@ function AdminVendorManagement({
               {canStatusChange && selectedVendor.status !== 'SUSPENDED' && (
                 <OutlinedButton onClick={() => doStatusChange('SUSPENDED')}>Suspend</OutlinedButton>
               )}
+              {canDelete && <OutlinedButton onClick={doDelete}>Delete</OutlinedButton>}
             </div>
           </div>
 
@@ -327,6 +380,10 @@ function AdminVendorManagement({
                 onVendorChange={handlePipelineChange}
                 canReviewKyc={canApprove}
                 onKycReview={doKycReview}
+                canApprove={canApprove && selectedVendor.status !== 'ACTIVE'}
+                canReject={canReject && selectedVendor.status !== 'REJECTED'}
+                onApprove={doApprove}
+                onReject={doReject}
               />
             </div>
           )}
@@ -339,6 +396,7 @@ function AdminVendorManagement({
                 isSelf={false}
                 canEdit={canEditAny}
                 canApproveDeal={canApprove}
+                canDeleteDeal={canDelete}
                 categories={categories}
               />
             </div>
@@ -348,6 +406,7 @@ function AdminVendorManagement({
             <div className="admin-tab-panel" aria-label="Therapists">
               {therapistsError && <p className="error-state" role="alert">{therapistsError}</p>}
               <sky-data-table
+                ref={therapistsTableRef as RefObject<HTMLElement>}
                 caption="Therapists"
                 columns={THERAPIST_COLUMNS}
                 rows={JSON.stringify(therapists.map(toTherapistRow))}
@@ -355,6 +414,7 @@ function AdminVendorManagement({
                 page={1}
                 page-size={Math.max(therapists.length, 10)}
                 loading={therapistsLoading}
+                actions={canDelete ? THERAPIST_ADMIN_DELETE_ACTIONS : undefined}
               />
             </div>
           )}
@@ -371,11 +431,6 @@ function AdminVendorManagement({
             </div>
           )}
 
-          {activeTab === 5 && (
-            <div className="admin-tab-panel" aria-label="Bookings">
-              <VendorDetailBookings token={token} vendorId={selectedVendor.id} />
-            </div>
-          )}
         </section>
       )}
 
@@ -468,8 +523,17 @@ export function useMyVendor(token: string | null): UseMyVendorResult {
   return { vendor, notFound, loading, saving, message, error, fieldErrors, save, submit };
 }
 
-function SelfVendorManagement({ token, categories }: { token: string | null; categories: Category[] }) {
+function SelfVendorManagement({ token }: { token: string | null }) {
   const { vendor, notFound, loading, saving, message, error, fieldErrors, save, submit } = useMyVendor(token);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    if (!vendor) {
+      setCategories([]);
+      return;
+    }
+    listCategories(token, { type: 'SERVICE', vendorId: vendor.id }).then(({ data }) => setCategories(data)).catch(() => setCategories([]));
+  }, [token, vendor?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on id, not object identity
 
   if (loading) {
     return (
@@ -492,11 +556,17 @@ function SelfVendorManagement({ token, categories }: { token: string | null; cat
       {message && <p className="field-hint" role="status">{message}</p>}
       {error && <p className="error-state" role="alert">{error}</p>}
 
+      {/* Same field set as Superadmin's Create/Edit Vendor form (vendor-pipeline.tsx Step 1) —
+          this app's "no duplicate vendor profile form" rule means every section is present here
+          too, not a trimmed-down subset. */}
       <VendorProfileForm
         vendor={vendor}
         canEdit
         canReviewKyc={false}
         saving={saving}
+        token={token}
+        selfService
+        sections={['business', 'owner', 'address', 'kyc', 'bank']}
         onSave={save}
         onSubmitForVerification={submit}
         serverFieldErrors={fieldErrors}

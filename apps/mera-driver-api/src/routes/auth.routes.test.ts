@@ -80,8 +80,8 @@ describe('auth.routes', () => {
     });
 
     it('routes a phone identifier through the SMS provider, not the email provider', async () => {
-      await request(app).post('/auth/otp/request').send({ identifier: '9889259224', purpose: 'login' });
-      expect(sendSmsOtpMock).toHaveBeenCalledWith('9889259224', expect.any(String));
+      await request(app).post('/auth/otp/request').send({ identifier: '7234882093', purpose: 'login' });
+      expect(sendSmsOtpMock).toHaveBeenCalledWith('7234882093', expect.any(String));
       expect(sendOtpEmailMock).not.toHaveBeenCalled();
     });
 

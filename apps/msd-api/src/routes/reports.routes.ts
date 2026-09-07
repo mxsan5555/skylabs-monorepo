@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/requirePermission';
+import { validateQuery } from '../middleware/validate';
 import { sendData } from '../lib/http';
 import { ReportFiltersQuerySchema, TopListQuerySchema, TopVendorsQuerySchema } from '../schemas/reports.schema';
 import * as reportsService from '../services/reports.service';
@@ -15,81 +16,81 @@ import * as reportsService from '../services/reports.service';
 const router = Router();
 router.use(authenticate, requirePermission('reports', 'view'));
 
-router.get('/summary', async (req, res, next) => {
+router.get('/summary', validateQuery(ReportFiltersQuerySchema), async (req, res, next) => {
   try {
-    const filters = ReportFiltersQuerySchema.parse(req.query);
+    const filters = req.validatedQuery as ReturnType<typeof ReportFiltersQuerySchema.parse>;
     sendData(res, await reportsService.getOverallSummary(filters));
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/vendor-wise', async (req, res, next) => {
+router.get('/vendor-wise', validateQuery(ReportFiltersQuerySchema), async (req, res, next) => {
   try {
-    const filters = ReportFiltersQuerySchema.parse(req.query);
+    const filters = req.validatedQuery as ReturnType<typeof ReportFiltersQuerySchema.parse>;
     sendData(res, await reportsService.getVendorWiseReport(filters));
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/branch-wise', async (req, res, next) => {
+router.get('/branch-wise', validateQuery(ReportFiltersQuerySchema), async (req, res, next) => {
   try {
-    const filters = ReportFiltersQuerySchema.parse(req.query);
+    const filters = req.validatedQuery as ReturnType<typeof ReportFiltersQuerySchema.parse>;
     sendData(res, await reportsService.getBranchWiseReport(filters));
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/month-wise', async (req, res, next) => {
+router.get('/month-wise', validateQuery(ReportFiltersQuerySchema), async (req, res, next) => {
   try {
-    const filters = ReportFiltersQuerySchema.parse(req.query);
+    const filters = req.validatedQuery as ReturnType<typeof ReportFiltersQuerySchema.parse>;
     sendData(res, await reportsService.getMonthWiseReport(filters));
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/service-vs-product', async (req, res, next) => {
+router.get('/service-vs-product', validateQuery(ReportFiltersQuerySchema), async (req, res, next) => {
   try {
-    const filters = ReportFiltersQuerySchema.parse(req.query);
+    const filters = req.validatedQuery as ReturnType<typeof ReportFiltersQuerySchema.parse>;
     sendData(res, await reportsService.getServiceVsProductReport(filters));
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/top-vendors', async (req, res, next) => {
+router.get('/top-vendors', validateQuery(TopVendorsQuerySchema), async (req, res, next) => {
   try {
-    const { limit, by, ...filters } = TopVendorsQuerySchema.parse(req.query);
+    const { limit, by, ...filters } = req.validatedQuery as ReturnType<typeof TopVendorsQuerySchema.parse>;
     sendData(res, await reportsService.getTopVendors(filters, by, limit));
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/top-products', async (req, res, next) => {
+router.get('/top-products', validateQuery(TopListQuerySchema), async (req, res, next) => {
   try {
-    const { limit, ...filters } = TopListQuerySchema.parse(req.query);
+    const { limit, ...filters } = req.validatedQuery as ReturnType<typeof TopListQuerySchema.parse>;
     sendData(res, await reportsService.getTopProducts(filters, limit));
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/top-services', async (req, res, next) => {
+router.get('/top-services', validateQuery(TopListQuerySchema), async (req, res, next) => {
   try {
-    const { limit, ...filters } = TopListQuerySchema.parse(req.query);
+    const { limit, ...filters } = req.validatedQuery as ReturnType<typeof TopListQuerySchema.parse>;
     sendData(res, await reportsService.getTopServices(filters, limit));
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/payment-method', async (req, res, next) => {
+router.get('/payment-method', validateQuery(ReportFiltersQuerySchema), async (req, res, next) => {
   try {
-    const filters = ReportFiltersQuerySchema.parse(req.query);
+    const filters = req.validatedQuery as ReturnType<typeof ReportFiltersQuerySchema.parse>;
     sendData(res, await reportsService.getPaymentMethodReport(filters));
   } catch (err) {
     next(err);

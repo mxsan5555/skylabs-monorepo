@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { validateParams } from '../middleware/validate';
-import { CatalogDealQuerySchema, CatalogTherapistQuerySchema } from '../schemas/catalog.schema';
+import { validateParams, validateQuery } from '../middleware/validate';
+import { CatalogDealQuerySchema, CatalogTherapistQuerySchema, CatalogVendorQuerySchema } from '../schemas/catalog.schema';
 import { z } from 'zod';
 import * as catalogService from '../services/catalog.service';
 import { sendData } from '../lib/http';
@@ -30,10 +30,10 @@ router.get('/categories/:slug', validateParams(z.object({ slug: z.string().min(1
   }
 });
 
-router.get('/deals', async (req, res, next) => {
+router.get('/deals', validateQuery(CatalogDealQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, categoryId, subcategoryId, vendorId, branchId, type, search, sort, minPrice, maxPrice } =
-      CatalogDealQuerySchema.parse(req.query);
+    const { page, pageSize, categoryId, subcategoryId, vendorId, branchId, type, search, state, city, sort, minPrice, maxPrice, latitude, longitude } =
+      req.validatedQuery as ReturnType<typeof CatalogDealQuerySchema.parse>;
     const { items, total } = await catalogService.listPublicDeals({
       page,
       pageSize,
@@ -43,9 +43,13 @@ router.get('/deals', async (req, res, next) => {
       branchId,
       type,
       search,
+      state,
+      city,
       sort,
       minPrice,
       maxPrice,
+      latitude,
+      longitude,
     });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
@@ -61,18 +65,28 @@ router.get('/deals/:id', validateParams(z.object({ id: z.string().uuid() })), as
   }
 });
 
-router.get('/vendors/:slug', validateParams(z.object({ slug: z.string().min(1) })), async (req, res, next) => {
+router.get('/locations', async (_req, res, next) => {
   try {
-    sendData(res, await catalogService.getPublicVendorBySlugOrThrow(req.params.slug));
+    sendData(res, await catalogService.listPublicLocations());
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/therapists', async (req, res, next) => {
+router.get('/vendors/:slug', validateParams(z.object({ slug: z.string().min(1) })), validateQuery(CatalogVendorQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, vendorId, branchId, search } = CatalogTherapistQuerySchema.parse(req.query);
-    const { items, total } = await catalogService.listPublicTherapists({ page, pageSize, vendorId, branchId, search });
+    const { state, city } = req.validatedQuery as ReturnType<typeof CatalogVendorQuerySchema.parse>;
+    sendData(res, await catalogService.getPublicVendorBySlugOrThrow(req.params.slug, { state, city }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/therapists', validateQuery(CatalogTherapistQuerySchema), async (req, res, next) => {
+  try {
+    const { page, pageSize, categoryId, subcategoryId, vendorId, branchId, search, latitude, longitude } =
+      req.validatedQuery as ReturnType<typeof CatalogTherapistQuerySchema.parse>;
+    const { items, total } = await catalogService.listPublicTherapists({ page, pageSize, categoryId, subcategoryId, vendorId, branchId, search, latitude, longitude });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);

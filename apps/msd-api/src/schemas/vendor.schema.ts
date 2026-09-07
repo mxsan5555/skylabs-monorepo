@@ -26,6 +26,37 @@ export const VendorIdParamSchema = z.object({
   vendorId: z.string().uuid(),
 });
 
+/** Route param for the real KYC file-upload endpoints — `:documentType` must be one of the
+ *  three real `VendorDocumentType` enum values (see schema.prisma), never a free-text label
+ *  like the deprecated `kycDocuments` JSON blob's `type` field. */
+export const VendorDocumentTypeParamSchema = z.object({
+  documentType: z.enum(['GST', 'PAN', 'AADHAAR']),
+});
+
+export const VendorDocumentAdminParamSchema = z.object({
+  id: z.string().uuid(),
+  documentType: z.enum(['GST', 'PAN', 'AADHAAR']),
+});
+
+/** Route param for the admin vendor-image sub-resources (`/:id/images/:imageId[...]`). Using the
+ *  bare `UuidParamSchema` (only `id`) here was a real bug: `validateParams` replaces `req.params`
+ *  with Zod's parsed output, and Zod strips any key not declared on the schema — so `imageId`
+ *  silently became `undefined` on every request, and `deleteVendorImage`/`setVendorPrimaryImage`
+ *  received an undefined id, throwing an uncaught Prisma error. Every multi-param route must
+ *  declare every param it reads. */
+export const VendorImageIdParamSchema = z.object({
+  id: z.string().uuid(),
+  imageId: z.string().uuid(),
+});
+
+/** Route param for the admin product sub-resources (`/:vendorId/products/:productId[...]`) —
+ *  same "every param must be declared" fix as `VendorImageIdParamSchema` above. `VendorIdParamSchema`
+ *  (only `vendorId`) was silently stripping `productId` on every PATCH/DELETE here. */
+export const VendorProductIdParamSchema = z.object({
+  vendorId: z.string().uuid(),
+  productId: z.string().uuid(),
+});
+
 const decimalString = z
   .string()
   .regex(/^\d+(\.\d{1,2})?$/, 'must be a plain decimal amount with up to 2 places, e.g. "199.00"');
@@ -47,7 +78,9 @@ const kycDocumentSchema = z.object({
 // all. An empty string ("") is treated as "field cleared" and bypasses the regex — these fields
 // stay optional (never newly required); only a *non-empty* value must match the expected shape.
 
-const GSTIN_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}\d{1}[Z]{1}[A-Z\d]{1}$/;
+// 9th character is the entity/registration code — alphanumeric (a PAN with multiple GST
+// registrations in one state gets 2, 3, ... up through a letter there), never digit-only.
+const GSTIN_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[A-Z\d]{1}$/;
 const PAN_REGEX = /^[A-Z]{5}\d{4}[A-Z]{1}$/;
 const PINCODE_REGEX = /^\d{6}$/;
 /** Canonical Indian mobile rule — first digit 6-9, exactly 10 digits after the `+91` this
@@ -110,12 +143,15 @@ const VendorFieldsSchema = z.object({
   logoUrl: z.string().url().optional(),
 
   ownerName: z.string().max(150).optional(),
+  ownerFirstName: z.string().max(75).optional(),
+  ownerLastName: z.string().max(75).optional(),
   contactPerson: z.string().max(150).optional(),
   ownerEmail: z.string().email().optional(),
   ownerMobile: vendorPhoneSchema,
   alternateOwnerMobile: vendorPhoneSchema,
 
   address: z.string().max(500).optional(),
+  addressLine2: z.string().max(500).optional(),
   city: z.string().max(100).optional(),
   state: z.string().max(100).optional(),
   country: z.string().max(100).optional(),
@@ -176,6 +212,23 @@ export const VendorKycReviewSchema = z
   })
   .openapi('VendorKycReview');
 
+/**
+ * Onboarding wizard Step 2's "Business Modules + Category Access" save — replace-the-full-set
+ * semantics (same shape as rbac.schema.ts's RolePermissionsUpdateSchema). Each `categoryIds`
+ * entry must be a top-level category whose `type` matches one of the *true* module flags below
+ * (validated server-side in vendor.service.ts#setVendorModulesAndCategoryAccess — a module
+ * checked with zero granted categories is a valid intermediate state, e.g. mid-wizard, but the
+ * Step 6 submission gate requires >=1 category per enabled module).
+ */
+export const VendorModulesAndCategoryAccessSchema = z
+  .object({
+    offersService: z.boolean(),
+    offersProduct: z.boolean(),
+    offersTherapy: z.boolean(),
+    categoryIds: z.array(z.string().uuid()).default([]),
+  })
+  .openapi('VendorModulesAndCategoryAccess');
+
 // ─── Branch ──────────────────────────────────────────────────────────────────
 
 /** Same 6-digit-only rule as Vendor's own PINCODE_REGEX above — Branch previously had no format
@@ -185,6 +238,31 @@ const branchPincodeSchema = z
   .max(20)
   .refine((v) => v === '' || PINCODE_REGEX.test(v), { message: 'Enter a valid 6-digit pincode' })
   .optional();
+
+/** One weekday's hours — mirrors the frontend's own `DayHours` shape exactly
+ *  (`apps/msd/src/api/rbac/vendors.ts`). `open: false` means closed all day; `start`/`end` are
+ *  then meaningless and simply not validated. */
+const DayHoursSchema = z.object({
+  open: z.boolean(),
+  start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use 24-hour HH:MM').optional(),
+  end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use 24-hour HH:MM').optional(),
+});
+
+/** Every key optional — a branch need not set every day (e.g. only weekdays configured so far).
+ *  Root cause of "branch hours never save": this field didn't exist on `BranchFieldsSchema` at
+ *  all, so `validateBody` (which replaces `req.body` with Zod's parsed output, silently dropping
+ *  any undeclared key) stripped `openingHours` before it ever reached `createBranch`/
+ *  `updateBranch` — the vendor's saved hours simply never persisted, regardless of the edit form
+ *  itself working correctly. */
+const OpeningHoursSchema = z.object({
+  mon: DayHoursSchema.optional(),
+  tue: DayHoursSchema.optional(),
+  wed: DayHoursSchema.optional(),
+  thu: DayHoursSchema.optional(),
+  fri: DayHoursSchema.optional(),
+  sat: DayHoursSchema.optional(),
+  sun: DayHoursSchema.optional(),
+});
 
 const BranchFieldsSchema = z.object({
   name: z.string().min(1).max(150),
@@ -197,6 +275,7 @@ const BranchFieldsSchema = z.object({
   longitude: z.number().min(-180).max(180).optional(),
   phone: z.string().max(30).optional(),
   email: z.string().email().optional(),
+  openingHours: OpeningHoursSchema.optional(),
 });
 
 export const BranchCreateSchema = BranchFieldsSchema.openapi('BranchCreate');
@@ -212,7 +291,14 @@ const TherapistFieldsSchema = z.object({
   /** The actual staff member (e.g. "Ramesh Kumar"). */
   personName: z.string().min(1).max(200),
   gender: z.string().max(50).optional(),
+  /** Free-text, historical display only — kept for backward compatibility, never validated
+   *  against the category catalog. New create/update flows should prefer
+   *  `specializationCategoryId` below. */
   specialization: z.string().max(200).optional(),
+  /** Restricted choice — must be a top-level Category with `type: THERAPY` (or one of its
+   *  subcategories) that this vendor has been granted access to; validated in
+   *  vendor.service.ts via assertVendorHasCategoryAccess. */
+  specializationCategoryId: z.string().uuid().optional(),
   bio: z.string().max(2000).optional(),
   experienceYears: z.number().int().min(0).max(60).optional(),
   /** URL only — matches Vendor.logoUrl/Deal.images' existing validation in this file; no
@@ -257,10 +343,10 @@ export const TherapistPackageUpdateSchema = TherapistPackageFieldsSchema
 const DealFieldsSchema = z.object({
   categoryId: z.string().uuid(),
   subcategoryId: z.string().uuid().optional(),
-  /** Exactly one of serviceId/productId must be set — enforced in vendor.service.ts (needs a
-   *  DB read to check existence + category match, so it can't live in this schema alone; see
-   *  assertExactlyOneOffering/assertOfferingMatchesCatalogItem). */
-  serviceId: z.string().uuid().optional(),
+  /** Absent = a service deal (the Deal's own title/description/durationMinutes/packages ARE the
+   *  offering — no master catalog row, see Deal's own schema doc comment). Set = a product deal,
+   *  pointing at one of the vendor's OWN vendor-scoped Product rows — checked in
+   *  vendor.service.ts via assertProductMatchesDealCategory/assertVendorHasCategoryAccess. */
   productId: z.string().uuid().optional(),
   title: z.string().min(1).max(200),
   slug: slugString,
@@ -273,6 +359,8 @@ const DealFieldsSchema = z.object({
    *  vendor.service.ts's assertDurationRequiredForService). */
   durationMinutes: z.number().int().min(1).max(1440).optional(),
   termsAndConditions: z.string().max(5000).optional(),
+  notes: z.string().max(5000).optional(),
+  policy: z.string().max(5000).optional(),
   images: z.array(z.string().url()).optional(),
   maxBookings: z.number().int().min(0).optional(),
   availableBookings: z.number().int().min(0).optional(),
@@ -293,12 +381,12 @@ const DealPackageFieldsSchema = z.object({
 });
 
 export const DealCreateSchema = DealFieldsSchema.extend({
-  /** Required (>=1) for a service deal — the customer always books a specific package, never
-   *  the Deal's own price directly (see booking.service.ts#createBookingFromDeal). Must be
+  /** Required (>=1) for a service deal — the customer always selects a specific package to add
+   *  to cart, never the Deal's own price directly (see cart.service.ts#addItem). Must be
    *  absent/empty for a product deal — no duration/package concept applies there. */
   packages: z.array(DealPackageFieldsSchema).optional(),
 })
-  .refine((data) => !data.serviceId || (data.packages && data.packages.length > 0), {
+  .refine((data) => data.productId || (data.packages && data.packages.length > 0), {
     message: 'At least one package (duration + price) is required for a service deal.',
     path: ['packages'],
   })
