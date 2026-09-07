@@ -48,6 +48,7 @@
                 class="admin-nav-item pl-8"
                 [routerLink]="accountPath(child)"
                 routerLinkActive="active"
+                [routerLinkActiveOptions]="{ exact: true }"
               >
                 <md-icon aria-hidden="true">{{ child.icon }}</md-icon>
                 {{ child.title }}

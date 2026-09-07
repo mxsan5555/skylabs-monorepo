@@ -152,9 +152,14 @@ export const appRoutes: Routes = [
       // Payments Section
       {
         path: 'payments',
+        pathMatch: 'full',
+        redirectTo: 'payments/payments',
+      },
+      {
+        path: 'payments/payments',
         title: 'Payments · mera-driver',
         canActivate: [permissionGuard],
-        data: { permission: { menuKey: 'payments.overview', action: 'view' }, title: 'Payments', subtitle: 'Fares, payouts, and reconciliation.' },
+        data: { permission: { menuKey: 'payments.overview', action: 'view' }, title: 'Payments', subtitle: 'Fares, receipts, and payment transactions.' },
         loadComponent: () =>
           import('./pages/account/payments/payments').then((m) => m.Payments),
       },

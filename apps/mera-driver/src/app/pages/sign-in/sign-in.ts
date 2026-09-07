@@ -71,12 +71,40 @@ export class SignIn implements OnInit {
   }
 
   protected sendOtp(): void {
-    const fallback = this.method() === 'phone' ? '4564' : 'you@email.com';
-    this.router.navigate(['/otp'], {
-      state: {
-        destination: this.value || fallback,
-        method: this.method(),
-        role: this.role(),
+    const val = this.value.trim();
+    if (!val) {
+      if (this.method() === 'phone') {
+        this.phoneError.set('Please enter a valid phone number.');
+      } else {
+        this.emailError.set('Please enter a valid email address.');
+      }
+      return;
+    }
+
+    this.loading.set(true);
+    this.error.set(null);
+
+    this.authApi.requestOtp(val, 'login').subscribe({
+      next: () => {
+        this.loading.set(false);
+        this.router.navigate(['/otp'], {
+          state: {
+            destination: val,
+            method: this.method(),
+            role: this.role(),
+          },
+        });
+      },
+      error: () => {
+        this.loading.set(false);
+        // Navigate to OTP page so user can verify code
+        this.router.navigate(['/otp'], {
+          state: {
+            destination: val,
+            method: this.method(),
+            role: this.role(),
+          },
+        });
       },
     });
   }

@@ -98,6 +98,106 @@ export class Drivers implements OnInit {
   readonly activeSubSection = signal<number>(0);
   readonly editingDriverId = signal<number | null>(null);
 
+  // --- Form Validation Signals & Helpers ---
+  readonly formSubmitted = signal<boolean>(false);
+  readonly touchedFields = signal<Record<string, boolean>>({});
+
+  markTouched(field: string): void {
+    this.touchedFields.update(prev => ({ ...prev, [field]: true }));
+  }
+
+  isTouched(field: string): boolean {
+    return this.formSubmitted() || !!this.touchedFields()[field];
+  }
+
+  readonly firstNameError = computed(() => {
+    if (!this.isTouched('firstName')) return '';
+    const val = this.inputFirstName().trim();
+    if (!val) return 'First Name is required';
+    return '';
+  });
+
+  readonly genderError = computed(() => {
+    if (!this.isTouched('gender')) return '';
+    const val = this.inputGender().trim();
+    if (!val) return 'Gender is required';
+    return '';
+  });
+
+  readonly emailError = computed(() => {
+    if (!this.isTouched('email')) return '';
+    const val = this.inputEmail().trim();
+    if (!val) return 'Email address is required';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(val)) return 'Enter a valid email address';
+    return '';
+  });
+
+  readonly phoneError = computed(() => {
+    if (!this.isTouched('phone')) return '';
+    const val = this.inputPhone().trim();
+    if (!val) return 'Phone number is required';
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(val)) return 'Enter a valid 10-digit mobile number';
+    return '';
+  });
+
+  readonly appNoError = computed(() => {
+    if (!this.isTouched('appNo')) return '';
+    const val = this.inputAppNo().trim();
+    if (!val) return 'Application No. is required';
+    return '';
+  });
+
+  readonly statusError = computed(() => {
+    if (!this.isTouched('status')) return '';
+    const val = this.inputStatus().trim();
+    if (!val) return 'Category status is required';
+    return '';
+  });
+
+  readonly driverTypeError = computed(() => {
+    if (!this.isTouched('driverType')) return '';
+    const val = this.inputDriverType().trim();
+    if (!val) return 'Driver type is required';
+    return '';
+  });
+
+  readonly dlNoError = computed(() => {
+    if (!this.isTouched('dlNo')) return '';
+    const val = this.inputDlNo().trim();
+    if (!val) return 'Driving License No. is required';
+    return '';
+  });
+
+  validateCurrentStep(): boolean {
+    const tab = this.activeFormTab();
+    const sub = this.activeSubSection();
+
+    if (tab === 0) {
+      if (sub === 0) {
+        this.markTouched('firstName');
+        this.markTouched('gender');
+        return !this.firstNameError() && !this.genderError();
+      } else if (sub === 1) {
+        this.markTouched('email');
+        this.markTouched('phone');
+        return !this.emailError() && !this.phoneError();
+      } else if (sub === 3) {
+        this.markTouched('appNo');
+        this.markTouched('status');
+        this.markTouched('driverType');
+        return !this.appNoError() && !this.statusError() && !this.driverTypeError();
+      }
+    } else if (tab === 2) {
+      if (sub === 0) {
+        this.markTouched('dlNo');
+        return !this.dlNoError();
+      }
+    }
+    return true;
+  }
+
   // --- Form Input Signals (Tab 1: Personal) ---
   readonly inputAppNo = signal<string>('');
   readonly inputJoiningDate = signal<string>('');
@@ -110,7 +210,7 @@ export class Drivers implements OnInit {
   readonly inputEmergencyNumber = signal<string>('');
   readonly inputDob = signal<string>('');
   readonly inputMaritalStatus = signal<string>('Unmarried');
-  readonly inputGender = signal<string>('Male');
+  readonly inputGender = signal<string>('');
   readonly inputPassportNumber = signal<string>('');
   readonly inputReligion = signal<string>('Hindu');
   readonly inputColor = signal<string>('Light Skin');
@@ -119,8 +219,8 @@ export class Drivers implements OnInit {
   readonly inputState = signal<string>('');
   readonly inputPincode = signal<string>('');
   readonly inputAddress = signal<string>('');
-  readonly inputDriverType = signal<string>('Personal driver');
-  readonly inputStatus = signal<string>('Non-Verified');
+  readonly inputDriverType = signal<string>('');
+  readonly inputStatus = signal<string>('');
   readonly inputSourceType = signal<string>('WalkIn');
   readonly inputVehicle = signal<string>('Personal Sedan');
 
@@ -462,15 +562,16 @@ export class Drivers implements OnInit {
 
   // --- Add New Driver Action ---
   addDriver(): void {
+    this.formSubmitted.set(true);
+    if (this.firstNameError() || this.genderError() || this.phoneError() || this.emailError() || this.appNoError() || this.statusError() || this.driverTypeError()) {
+      this.activeFormTab.set(0);
+      return;
+    }
+
     const firstName = this.inputFirstName().trim();
     const lastName = this.inputLastName().trim();
     const phone = this.inputPhone().trim();
     const email = this.inputEmail().trim();
-
-    if (!firstName || !phone || !email) {
-      alert(this.content().errorEmptyFields);
-      return;
-    }
 
     const newDriver: Driver = {
       id: Date.now(),
@@ -628,6 +729,8 @@ export class Drivers implements OnInit {
   }
 
   resetForm(): void {
+    this.formSubmitted.set(false);
+    this.touchedFields.set({});
     this.editingDriverId.set(null);
     this.inputFirstName.set('');
     this.inputLastName.set('');
@@ -638,7 +741,7 @@ export class Drivers implements OnInit {
     this.inputEmergencyNumber.set('');
     this.inputDob.set('');
     this.inputMaritalStatus.set('Unmarried');
-    this.inputGender.set('Male');
+    this.inputGender.set('');
     this.inputPassportNumber.set('');
     this.inputReligion.set('Hindu');
     this.inputColor.set('Light Skin');
@@ -650,8 +753,8 @@ export class Drivers implements OnInit {
     this.inputState.set('');
     this.inputPincode.set('');
     this.inputAddress.set('');
-    this.inputDriverType.set('Personal driver');
-    this.inputStatus.set('Non-Verified');
+    this.inputDriverType.set('');
+    this.inputStatus.set('');
     this.inputSourceType.set('WalkIn');
     this.inputVehicle.set('Personal Sedan');
     this.inputEducation.set('No Formal Education');
@@ -807,6 +910,10 @@ export class Drivers implements OnInit {
   }
 
   onSaveAndNext(): void {
+    if (!this.validateCurrentStep()) {
+      return;
+    }
+
     if (this.isLastStep()) {
       this.addDriver();
       return;

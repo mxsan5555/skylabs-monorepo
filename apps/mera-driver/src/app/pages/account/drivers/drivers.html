@@ -77,13 +77,17 @@
               <!-- 1. Personal & Identity Details -->
               @if (activeSubSection() === 0) {
                 <sky-card class="p-6 block">
-                  <div class="mb-5">
-                    <md-assist-chip label="1. Personal & Identity Details">
-                      <md-icon slot="icon">badge</md-icon>
-                    </md-assist-chip>
-                  </div>
-                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
-                    <md-outlined-text-field label="First Name" required [value]="inputFirstName()" (input)="onInputChange('firstName', $event)" placeholder="Enter first name"></md-outlined-text-field>
+                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
+                    <md-outlined-text-field
+                      label="First Name *"
+                      required
+                      [value]="inputFirstName()"
+                      (input)="onInputChange('firstName', $event)"
+                      (blur)="markTouched('firstName')"
+                      [error]="!!firstNameError()"
+                      [errorText]="firstNameError()"
+                      placeholder="Enter first name"
+                    ></md-outlined-text-field>
                     
                     <md-outlined-text-field label="Last Name" [value]="inputLastName()" (input)="onInputChange('lastName', $event)" placeholder="Enter last name"></md-outlined-text-field>
 
@@ -91,7 +95,16 @@
 
                     <md-outlined-text-field label="Mother Name" [value]="inputMotherName()" (input)="onInputChange('motherName', $event)" placeholder="Enter mother's name"></md-outlined-text-field>
 
-                    <md-outlined-select label="Gender" [value]="inputGender()" (change)="onInputChange('gender', $event)">
+                    <md-outlined-select
+                      label="Gender *"
+                      required
+                      [value]="inputGender()"
+                      (change)="onInputChange('gender', $event)"
+                      (blur)="markTouched('gender')"
+                      [error]="!!genderError()"
+                      [errorText]="genderError()"
+                    >
+                      <md-select-option value=""><div slot="headline">Select Gender</div></md-select-option>
                       @for (opt of genders(); track opt) {
                         <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                       }
@@ -103,7 +116,7 @@
                       }
                     </md-outlined-select>
 
-                    <md-outlined-select class="col-span-2 max-sm:col-span-1" label="Language Spoken" [value]="inputLanguage()" (change)="onInputChange('language', $event)">
+                    <md-outlined-select label="Language Spoken" [value]="inputLanguage()" (change)="onInputChange('language', $event)">
                       @for (opt of languages(); track opt) {
                         <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                       }
@@ -115,15 +128,29 @@
               <!-- 2. Contact & Address Information -->
               @if (activeSubSection() === 1) {
                 <sky-card class="p-6 block">
-                  <div class="mb-5">
-                    <md-assist-chip label="2. Contact & Address Information">
-                      <md-icon slot="icon">contacts</md-icon>
-                    </md-assist-chip>
-                  </div>
-                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
-                    <md-outlined-text-field label="Email" type="email" required [value]="inputEmail()" (input)="onInputChange('email', $event)" placeholder="Enter email address"></md-outlined-text-field>
+                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
+                    <md-outlined-text-field
+                      label="Email *"
+                      type="email"
+                      required
+                      [value]="inputEmail()"
+                      (input)="onInputChange('email', $event)"
+                      (blur)="markTouched('email')"
+                      [error]="!!emailError()"
+                      [errorText]="emailError()"
+                      placeholder="Enter email address"
+                    ></md-outlined-text-field>
 
-                    <md-outlined-text-field label="Phone" required [value]="inputPhone()" (input)="onInputChange('phone', $event)" placeholder="Enter phone number"></md-outlined-text-field>
+                    <md-outlined-text-field
+                      label="Phone *"
+                      required
+                      [value]="inputPhone()"
+                      (input)="onInputChange('phone', $event)"
+                      (blur)="markTouched('phone')"
+                      [error]="!!phoneError()"
+                      [errorText]="phoneError()"
+                      placeholder="Enter phone number"
+                    ></md-outlined-text-field>
 
                     <md-outlined-text-field label="Emergency Number" [value]="inputEmergencyNumber()" (input)="onInputChange('emergencyNumber', $event)" placeholder="Enter emergency number"></md-outlined-text-field>
 
@@ -141,12 +168,7 @@
               <!-- 3. Physical Attributes & Demographics -->
               @if (activeSubSection() === 2) {
                 <sky-card class="p-6 block">
-                  <div class="mb-5">
-                    <md-assist-chip label="3. Physical Attributes & Demographics">
-                      <md-icon slot="icon">straighten</md-icon>
-                    </md-assist-chip>
-                  </div>
-                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
                     <md-outlined-text-field label="Date of Birth" type="date" [value]="inputDob()" (input)="onInputChange('dob', $event)"></md-outlined-text-field>
 
                     <md-outlined-text-field label="Age" [value]="inputAge()" (input)="onInputChange('age', $event)" placeholder="Enter age"></md-outlined-text-field>
@@ -173,13 +195,17 @@
               <!-- 4. Account & Lead Information -->
               @if (activeSubSection() === 3) {
                 <sky-card class="p-6 block">
-                  <div class="mb-5">
-                    <md-assist-chip label="4. Account & Lead Information">
-                      <md-icon slot="icon">account_circle</md-icon>
-                    </md-assist-chip>
-                  </div>
-                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
-                    <md-outlined-text-field label="Application No." required [value]="inputAppNo()" (input)="onInputChange('appNo', $event)" placeholder="e.g. APP-10029"></md-outlined-text-field>
+                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
+                    <md-outlined-text-field
+                      label="Application No. *"
+                      required
+                      [value]="inputAppNo()"
+                      (input)="onInputChange('appNo', $event)"
+                      (blur)="markTouched('appNo')"
+                      [error]="!!appNoError()"
+                      [errorText]="appNoError()"
+                      placeholder="e.g. APP-10029"
+                    ></md-outlined-text-field>
 
                     <md-outlined-text-field label="Joining Date" type="date" [value]="inputJoiningDate()" (input)="onInputChange('joiningDate', $event)"></md-outlined-text-field>
 
@@ -191,7 +217,15 @@
                       }
                     </md-outlined-select>
 
-                    <md-outlined-select label="Category Status" [value]="inputStatus()" (change)="onInputChange('status', $event)">
+                    <md-outlined-select
+                      label="Category Status *"
+                      required
+                      [value]="inputStatus()"
+                      (change)="onInputChange('status', $event)"
+                      (blur)="markTouched('status')"
+                      [error]="!!statusError()"
+                      [errorText]="statusError()"
+                    >
                       <md-select-option value="Non-Verified"><div slot="headline">Non-Verified</div></md-select-option>
                       <md-select-option value="Verified"><div slot="headline">Verified</div></md-select-option>
                       <md-select-option value="Partially Verified (P)"><div slot="headline">Partially Verified (PAYMENT)</div></md-select-option>
@@ -201,7 +235,15 @@
                       <md-select-option value="Not Useful"><div slot="headline">Not Useful</div></md-select-option>
                     </md-outlined-select>
 
-                    <md-outlined-select label="Driver Type" required [value]="inputDriverType()" (change)="onInputChange('driverType', $event)">
+                    <md-outlined-select
+                      label="Driver Type *"
+                      required
+                      [value]="inputDriverType()"
+                      (change)="onInputChange('driverType', $event)"
+                      (blur)="markTouched('driverType')"
+                      [error]="!!driverTypeError()"
+                      [errorText]="driverTypeError()"
+                    >
                       <md-select-option value="Personal driver"><div slot="headline">Personal driver</div></md-select-option>
                       <md-select-option value="Car Driver"><div slot="headline">Car Driver</div></md-select-option>
                       <md-select-option value="Bike Rider"><div slot="headline">Bike Rider</div></md-select-option>
@@ -216,7 +258,7 @@
 
           <!-- TAB 2: Education & Health Details (Card Sections) -->
           @if (activeFormTab() === 1) {
-            <div class="flex flex-col gap-y-6 w-full pb-36">
+            <div class="flex flex-col gap-y-6 w-full">
               
               <!-- Sub-Section Navigation Chips -->
               <md-chip-set class="mb-2">
@@ -227,12 +269,7 @@
               <!-- 1. Education & Training Profile -->
               @if (activeSubSection() === 0) {
                 <sky-card class="p-6 block">
-                  <div class="mb-5">
-                    <md-assist-chip label="1. Education & Training Profile">
-                      <md-icon slot="icon">school</md-icon>
-                    </md-assist-chip>
-                  </div>
-                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
                     <md-outlined-select label="Education" [value]="inputEducation()" (change)="onInputChange('education', $event)">
                       @for (opt of educationLevels(); track opt) {
                         <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
@@ -253,12 +290,7 @@
               <!-- 2. Health & Medical Specifications -->
               @if (activeSubSection() === 1) {
                 <sky-card class="p-6 block">
-                  <div class="mb-5">
-                    <md-assist-chip label="2. Health & Medical Specifications">
-                      <md-icon slot="icon">medical_services</md-icon>
-                    </md-assist-chip>
-                  </div>
-                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
                     <md-outlined-select label="Eye Vision" [value]="inputEyeVision()" (change)="onInputChange('eyeVision', $event)">
                       @for (opt of eyeVisions(); track opt) {
                         <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
@@ -299,12 +331,7 @@
               <!-- 1. Driving License Details -->
               @if (activeSubSection() === 0) {
                 <sky-card class="p-6 block">
-                  <div class="mb-5">
-                    <md-assist-chip label="1. Driving License Details">
-                      <md-icon slot="icon">badge</md-icon>
-                    </md-assist-chip>
-                  </div>
-                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
                     <md-outlined-select label="License Details" [value]="inputLicenseDetails()" (change)="onInputChange('licenseDetails', $event)">
                       @for (opt of licenseDetailsOptions(); track opt) {
                         <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
@@ -317,7 +344,16 @@
                       }
                     </md-outlined-select>
 
-                    <md-outlined-text-field label="Driving License No" [value]="inputDlNo()" (input)="onInputChange('dlNo', $event)" placeholder="e.g. DL-1420110012345"></md-outlined-text-field>
+                    <md-outlined-text-field
+                      label="Driving License No *"
+                      required
+                      [value]="inputDlNo()"
+                      (input)="onInputChange('dlNo', $event)"
+                      (blur)="markTouched('dlNo')"
+                      [error]="!!dlNoError()"
+                      [errorText]="dlNoError()"
+                      placeholder="e.g. DL-1420110012345"
+                    ></md-outlined-text-field>
 
                     <md-outlined-text-field label="DL Issue Date" type="date" [value]="inputDlIssueDate()" (input)="onInputChange('dlIssueDate', $event)"></md-outlined-text-field>
 
@@ -329,12 +365,7 @@
               <!-- 2. Police Verification & Employment Details -->
               @if (activeSubSection() === 1) {
                 <sky-card class="p-6 block">
-                  <div class="mb-5">
-                    <md-assist-chip label="2. Police Verification & Employment Details">
-                      <md-icon slot="icon">verified_user</md-icon>
-                    </md-assist-chip>
-                  </div>
-                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
                     <md-outlined-select label="Police Verified Status" [value]="inputPoliceVerifiedStatus()" (change)="onInputChange('policeVerifiedStatus', $event)">
                       @for (opt of policeVerifiedStatuses(); track opt) {
                         <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
@@ -369,11 +400,6 @@
               <!-- 3. Personal & Category Documents -->
               @if (activeSubSection() === 2) {
                 <sky-card class="p-6 block">
-                  <div class="mb-5">
-                    <md-assist-chip label="3. Personal & Category Documents">
-                      <md-icon slot="icon">folder</md-icon>
-                    </md-assist-chip>
-                  </div>
                   <div class="flex flex-col gap-y-4">
                     @for (doc of personalDocs(); track $index) {
                       <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
@@ -429,11 +455,6 @@
               <!-- 4. Health Documents -->
               @if (activeSubSection() === 3) {
                 <sky-card class="p-6 block">
-                  <div class="mb-5">
-                    <md-assist-chip label="4. Health Documents">
-                      <md-icon slot="icon">health_and_safety</md-icon>
-                    </md-assist-chip>
-                  </div>
                   <div class="flex flex-col gap-y-4">
                     @for (doc of healthDocs(); track $index) {
                       <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
@@ -490,11 +511,6 @@
               <!-- 5. Education Documents -->
               @if (activeSubSection() === 4) {
                 <sky-card class="p-6 block">
-                  <div class="mb-5">
-                    <md-assist-chip label="5. Education Documents">
-                      <md-icon slot="icon">workspace_premium</md-icon>
-                    </md-assist-chip>
-                  </div>
                   <div class="flex flex-col gap-y-4">
                     @for (doc of educationDocs(); track $index) {
                       <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
@@ -546,11 +562,6 @@
               <!-- 6. Police Verification Documents -->
               @if (activeSubSection() === 5) {
                 <sky-card class="p-6 block">
-                  <div class="mb-5">
-                    <md-assist-chip label="6. Police Verification Documents">
-                      <md-icon slot="icon">gavel</md-icon>
-                    </md-assist-chip>
-                  </div>
                   <div class="flex flex-col gap-y-4">
                     @for (doc of policeDocs(); track $index) {
                       <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
@@ -621,13 +632,8 @@
               <!-- 1. Payment Plan & Settings -->
               @if (activeSubSection() === 0) {
                 <sky-card class="p-6 block">
-                  <div class="mb-5">
-                    <md-assist-chip label="1. Payment Plan & Settings">
-                      <md-icon slot="icon">payments</md-icon>
-                    </md-assist-chip>
-                  </div>
                   <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
-                    <md-outlined-select class="col-span-2 max-sm:col-span-1" label="Preferred Payment Mode" [value]="inputPreferredPaymentMode()" (change)="onInputChange('preferredPaymentMode', $event)">
+                    <md-outlined-select label="Preferred Payment Mode" [value]="inputPreferredPaymentMode()" (change)="onInputChange('preferredPaymentMode', $event)">
                       @for (opt of paymentModes(); track opt) {
                         <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                       }
@@ -643,11 +649,6 @@
               <!-- 2. Bank Account Details -->
               @if (activeSubSection() === 1) {
                 <sky-card class="p-6 block">
-                  <div class="mb-5">
-                    <md-assist-chip label="2. Bank Account Details">
-                      <md-icon slot="icon">account_balance</md-icon>
-                    </md-assist-chip>
-                  </div>
                   <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
                     <md-outlined-text-field label="Bank Name" [value]="inputBankName()" (input)="onInputChange('bankName', $event)" placeholder="Enter bank name"></md-outlined-text-field>
 
@@ -663,11 +664,6 @@
               <!-- 3. Digital / UPI / Instrument Details -->
               @if (activeSubSection() === 2) {
                 <sky-card class="p-6 block">
-                  <div class="mb-5">
-                    <md-assist-chip label="3. Digital / UPI / Instrument Details">
-                      <md-icon slot="icon">qr_code_2</md-icon>
-                    </md-assist-chip>
-                  </div>
                   <div class="grid grid-cols-1 gap-4 w-full">
                     <md-outlined-text-field label="UPI ID / Cheque No" [value]="inputUpiIdOrChequeNo()" (input)="onInputChange('upiIdOrChequeNo', $event)" placeholder="Enter UPI ID or Cheque No"></md-outlined-text-field>
                   </div>

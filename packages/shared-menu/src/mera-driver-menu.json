@@ -111,7 +111,7 @@
         "id": "payments-overview",
         "title": "Payments",
         "icon": "receipt_long",
-        "route": "/payments",
+        "route": "/payments/payments",
         "permissionKey": "payments.overview",
         "parent": "payments-group",
         "order": 1
