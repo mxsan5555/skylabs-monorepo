@@ -467,11 +467,11 @@ export async function submitForVerification(ownerUserId: string) {
  */
 const COMPLETION_SECTIONS: { key: string; label: string; check: (v: Record<string, unknown>) => boolean }[] = [
   { key: 'user', label: 'Vendor User', check: (v) => Boolean(v.ownerUserId) },
-  { key: 'business', label: 'Business Details', check: (v) => Boolean(v.businessName && v.businessEmail && v.businessPhone) },
-  { key: 'owner', label: 'Personal Information', check: (v) => Boolean(v.ownerFirstName && v.ownerLastName && v.ownerMobile && v.ownerEmail) },
-  { key: 'address', label: 'Registered Address', check: (v) => Boolean(v.address && v.city && v.state && v.pincode && v.latitude != null && v.longitude != null) },
-  { key: 'kyc', label: 'KYC Documents', check: (v) => Array.isArray(v.documents) && (v.documents as unknown[]).length > 0 },
-  { key: 'bank', label: 'Bank Details', check: (v) => Boolean(v.bankAccountHolder && v.bankAccountNumber && v.bankIfsc) },
+  { key: 'business', label: 'Business Information', check: (v) => Boolean(v.businessName && v.businessEmail && v.businessPhone) },
+  { key: 'owner', label: 'Owner Information', check: (v) => Boolean(v.ownerFirstName && v.ownerLastName && v.ownerMobile && v.ownerEmail) },
+  { key: 'address', label: 'Address', check: (v) => Boolean(v.address && v.city && v.state && v.pincode && v.latitude != null && v.longitude != null) },
+  { key: 'kyc', label: 'KYC & Documents', check: (v) => Array.isArray(v.documents) && (v.documents as unknown[]).length > 0 },
+  { key: 'bank', label: 'Bank Information', check: (v) => Boolean(v.bankAccountHolder && v.bankAccountNumber && v.bankIfsc) },
 ];
 
 export function computeProfileCompletion(vendor: Record<string, unknown>) {
