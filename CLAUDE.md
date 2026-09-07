@@ -220,11 +220,17 @@ to **two independent Vercel projects** (`apps/msd`, `apps/mera-driver`); each ru
 its Nx graph actually affects — `main` never routes which project deploys. `main`
 is Production (bought custom domain); `release`/`develop` use Vercel preview URLs.
 Versioning is `npx nx release --skip-publish` run on the `release` branch (not
-`main`), tagging only changed apps (`msd@x.y.z`, `mera-driver@x.y.z`). The two
-Express APIs host **off Vercel** (Railway/Fly — long-running servers). CI gate:
+`main`), tagging only changed apps (`msd@x.y.z`, `mera-driver@x.y.z`; each app has
+a minimal `package.json` with a `version` field so Nx has a manifest to bump). The
+two Express APIs host **off Vercel** (Railway/Fly — long-running servers). CI gate:
 `.github/workflows/ci.yml` runs `nx affected -t lint test build` on every PR.
-Full detail (Vercel `vercel.json` per app, dashboard settings, domains, env vars):
-see **`DEPLOYMENT.md`**.
+
+**Developer workflow:** always branch new work off `develop` (never `main`);
+`develop` is the daily source of truth, `main` is production-only. After every
+`release → main`, **back-merge into `develop`** (`git checkout develop && git pull
+&& git pull origin main --no-edit && git push`) so the release's version bump +
+changelog don't leave `develop` behind. Full detail (Vercel `vercel.json` per app,
+dashboard settings, domains, env vars, back-merge): see **`DEPLOYMENT.md`**.
 
 ## AI Dev Team
 
