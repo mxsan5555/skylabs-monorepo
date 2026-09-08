@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { validateParams, validateQuery } from '../middleware/validate';
 import { CatalogDealQuerySchema, CatalogTherapistQuerySchema, CatalogVendorQuerySchema } from '../schemas/catalog.schema';
+import { PublicBlogPostListQuerySchema } from '../schemas/blog-post.schema';
 import { z } from 'zod';
 import * as catalogService from '../services/catalog.service';
 import { sendData } from '../lib/http';
@@ -96,6 +97,44 @@ router.get('/therapists', validateQuery(CatalogTherapistQuerySchema), async (req
 router.get('/therapists/:id', validateParams(z.object({ id: z.string().uuid() })), async (req, res, next) => {
   try {
     sendData(res, await catalogService.getPublicTherapistOrThrow(req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── CMS (Blog Posts / About Us / Contact Us) — same "no authenticate/requirePermission, only
+// ever reads through explicit public functions" discipline as every other route in this file
+// (see the module doc comment above). ────────────────────────────────────────────────────────
+
+router.get('/blog-posts', validateQuery(PublicBlogPostListQuerySchema), async (req, res, next) => {
+  try {
+    const { page, pageSize, search, categorySlug } = req.validatedQuery as ReturnType<typeof PublicBlogPostListQuerySchema.parse>;
+    const { items, total } = await catalogService.listPublicBlogPosts({ page, pageSize, search, categorySlug });
+    sendData(res, items, { meta: { total, page, pageSize } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/blog-posts/:slug', validateParams(z.object({ slug: z.string().min(1) })), async (req, res, next) => {
+  try {
+    sendData(res, await catalogService.getPublicBlogPostBySlug(req.params.slug));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/about-us', async (_req, res, next) => {
+  try {
+    sendData(res, await catalogService.getPublicAboutUs());
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/contact-us', async (_req, res, next) => {
+  try {
+    sendData(res, await catalogService.getPublicContactUs());
   } catch (err) {
     next(err);
   }

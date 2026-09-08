@@ -75,8 +75,11 @@ export interface VendorFields {
   state?: string;
   country?: string;
   pincode?: string;
-  latitude?: number;
-  longitude?: number;
+  /** A pasted Google Maps URL — the server resolves it into `latitude`/`longitude` (see
+   *  `googleMapsUrlResolver.provider.ts` in msd-api). Replaces the old directly-editable
+   *  `latitude`/`longitude` number fields; those remain on the `Vendor` read shape below
+   *  (still returned, still Decimal-as-string over JSON) but are no longer client-supplied. */
+  mapLocationUrl?: string;
   gstNumber?: string;
   panNumber?: string;
   businessRegistrationNumber?: string;
@@ -94,6 +97,11 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
   /** Public storefront URL slug (`/vendor/:slug`) — generated server-side from `businessName` at
    *  creation time, never client-supplied or client-editable (see msd-api's `lib/slug.ts`). */
   slug: string | null;
+  /** Still returned by the API (Decimal columns, serialized as strings over JSON — same
+   *  convention as every other Decimal field in this codebase) even though `mapLocationUrl` is
+   *  now the only client-editable location input; resolved server-side from `mapLocationUrl`. */
+  latitude?: number | null;
+  longitude?: number | null;
   ownerUserId: string | null;
   kycStatus: KycStatus;
   kycRejectionReason: string | null;
@@ -185,6 +193,9 @@ export interface Branch {
   pincode?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  /** Still returned by the API — the pasted URL the vendor supplied, from which `latitude`/
+   *  `longitude` above were resolved server-side (see `googleMapsUrlResolver.provider.ts`). */
+  mapLocationUrl?: string | null;
   phone?: string | null;
   email?: string | null;
   openingHours?: OpeningHours | null;
@@ -203,8 +214,9 @@ export interface BranchInput {
   state?: string;
   country?: string;
   pincode?: string;
-  latitude?: number;
-  longitude?: number;
+  /** A pasted Google Maps URL — the server resolves it into `latitude`/`longitude`. Replaces the
+   *  old directly-editable `latitude`/`longitude` number fields. */
+  mapLocationUrl?: string;
   phone?: string;
   email?: string;
   openingHours?: OpeningHours;

@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import type { Vendor } from '../../../../api/rbac/vendors';
+import { ApiRequestError } from '../../../../api/rbac/client';
 
 // `vi.mock` calls are hoisted above all imports — this runs before `VendorDocumentUpload`'s own
 // `../../api/rbac/vendors` import resolves (same convention as media-uploader.test.tsx).
@@ -15,7 +16,7 @@ vi.mock('../../../../api/rbac/vendors', async () => {
   };
 });
 
-import { VendorProfileForm } from './vendor-profile-form';
+import { VendorProfileForm, extractVendorFieldErrors } from './vendor-profile-form';
 
 const BASE_VENDOR: Vendor = {
   id: 'vendor-1',
@@ -165,6 +166,7 @@ describe('VendorProfileForm — Create Vendor button gating', () => {
       city: 'Gorakhpur',
       state: 'Uttar Pradesh',
       pincode: '273001',
+      mapLocationUrl: 'https://maps.app.goo.gl/abc123',
       latitude: 26.76,
       longitude: 83.37,
       documents: [{ id: 'doc-1', documentType: 'GST', originalFilename: 'gst.pdf', mimeType: 'application/pdf', sizeBytes: 1024, createdAt: '2026-01-01T00:00:00Z' }],
@@ -291,30 +293,29 @@ describe('VendorProfileForm — a stale other-section error never blocks the cur
 });
 
 /**
- * Feature: VendorProfileForm — latitude/longitude Decimal-as-string coercion
- * `Vendor.latitude`/`longitude` are Prisma `Decimal` columns, which this API serializes as
- * STRINGS over JSON even though the `Vendor` TS type claims `number` — a saved vendor's real,
- * valid coordinates arriving as `"26.7606"` used to ride straight into the submit payload as a
- * string (since the user never retypes an already-correct field), tripping the backend's
- * `z.number()` check with "Invalid input: expected number, received string" for perfectly valid,
- * unedited data.
+ * Feature: VendorProfileForm — Map Location URL replaces directly-editable latitude/longitude
+ * `latitude`/`longitude` are no longer client-editable — the Address section now takes a single
+ * pasted Google Maps URL (`mapLocationUrl`), which the server resolves into coordinates (see
+ * `googleMapsUrlResolver.provider.ts` in msd-api). `Vendor.latitude`/`longitude` remain on the
+ * read shape (still returned, still Decimal-as-string over JSON) but are display-only now.
  */
-describe('VendorProfileForm — latitude/longitude Decimal-as-string coercion', () => {
-  it('saving the Address tab without touching lat/long sends real numbers, not the Decimal-as-string values loaded from the API', async () => {
-    const vendorWithStringCoords: Vendor = {
+describe('VendorProfileForm — Map Location URL', () => {
+  it('saving the Address tab submits the pasted mapLocationUrl, never a latitude/longitude pair', async () => {
+    const vendorWithLocation: Vendor = {
       ...BASE_VENDOR,
       address: '123 Main St',
       city: 'Gorakhpur',
       state: 'Uttar Pradesh',
       pincode: '273001',
-      // Simulates the real API response shape for a Prisma Decimal field — a string, not a number.
+      mapLocationUrl: 'https://maps.app.goo.gl/abc123',
+      // Still present on the read shape (Decimal-as-string over JSON) but purely display data now.
       latitude: '26.7606' as unknown as number,
       longitude: '83.3732' as unknown as number,
     };
     const onSave = vi.fn();
     render(
       <VendorProfileForm
-        vendor={vendorWithStringCoords}
+        vendor={vendorWithLocation}
         canEdit
         canReviewKyc={false}
         saving={false}
@@ -334,9 +335,53 @@ describe('VendorProfileForm — latitude/longitude Decimal-as-string coercion', 
     fireEvent.click(saveButton);
     await waitFor(() => expect(onSave).toHaveBeenCalled());
     const submitted = onSave.mock.calls[0][0];
-    expect(submitted.latitude).toBe(26.7606);
-    expect(submitted.longitude).toBe(83.3732);
-    expect(typeof submitted.latitude).toBe('number');
-    expect(typeof submitted.longitude).toBe('number');
+    expect(submitted.mapLocationUrl).toBe('https://maps.app.goo.gl/abc123');
+    expect(submitted).not.toHaveProperty('latitude');
+    expect(submitted).not.toHaveProperty('longitude');
+  });
+
+  it('renders exactly 6 text fields in the Address section (Address 1/2, City, State, PIN, Map Location) — never a separate Latitude/Longitude field', () => {
+    render(
+      <VendorProfileForm
+        vendor={BASE_VENDOR}
+        canEdit
+        canReviewKyc={false}
+        saving={false}
+        token="tok"
+        sections={['address']}
+        onSave={vi.fn()}
+      />,
+    );
+    expect(document.querySelectorAll('md-outlined-text-field').length).toBe(6);
+    expect(screen.queryByText('Latitude')).toBeNull();
+    expect(screen.queryByText('Longitude')).toBeNull();
+  });
+
+  /**
+   * The resolver's rejection (`ApiError('VALIDATION_ERROR', message)`, thrown with no
+   * `details.fieldErrors` — it's a single hand-written message, not a Zod field-error map) must
+   * NOT be picked up by `extractVendorFieldErrors` — if it were, the parent page (see
+   * `useMyVendor.save` in `vendors.tsx`, all 4 `VendorProfileForm` call sites) would wrongly
+   * clear its own generic-banner `error` and show nothing there, while also never actually
+   * wiring `errors.mapLocationUrl` inline (unlike `BranchDialog`, `VendorProfileForm` has no such
+   * per-field catch of its own). Confirms the resolver's message instead only ever reaches the
+   * caller's generic `{error && <p role="alert">{error}</p>}` banner (see e.g.
+   * `vendor-business-profile.tsx`), which every one of the 4 call sites already renders from
+   * `err.message` on any `ApiRequestError`, regardless of `details`.
+   */
+  it('extractVendorFieldErrors returns null for a resolver VALIDATION_ERROR (no fieldErrors) — it surfaces via the generic banner, not an inline field error', () => {
+    const resolverError = new ApiRequestError(
+      'VALIDATION_ERROR',
+      "We couldn't resolve this Google Maps link. Please check the link and try again.",
+      422,
+    );
+    expect(extractVendorFieldErrors(resolverError)).toBeNull();
+  });
+
+  it('extractVendorFieldErrors still extracts a real Zod fieldErrors map for an unrelated 422 (e.g. a bad businessEmail)', () => {
+    const zodError = new ApiRequestError('VALIDATION_ERROR', 'Invalid request body', 422, {
+      fieldErrors: { businessEmail: ['Enter a valid email address'] },
+    });
+    expect(extractVendorFieldErrors(zodError)).toEqual({ businessEmail: 'Enter a valid email address' });
   });
 });

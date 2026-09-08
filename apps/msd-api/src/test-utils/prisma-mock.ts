@@ -318,6 +318,43 @@ export function createPrismaMock() {
       count: vi.fn(),
       updateMany: vi.fn(),
     },
+    blogPost: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn(),
+    },
+    blogPostImage: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+      delete: vi.fn(),
+    },
+    aboutUsContent: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      upsert: vi.fn(),
+    },
+    aboutUsImage: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+      delete: vi.fn(),
+    },
+    contactUsContent: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      upsert: vi.fn(),
+    },
     // Default behavior mirrors real Prisma: array-form runs the (already-invoked, since JS
     // evaluates arguments eagerly) promises concurrently; callback-form invokes the callback
     // with the same mock standing in for `tx`. Override with mockResolvedValueOnce/etc. per test.

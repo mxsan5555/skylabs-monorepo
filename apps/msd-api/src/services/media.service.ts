@@ -5,8 +5,11 @@ import { validateMediaFile, MAX_IMAGES_PER_ENTITY } from './media-validation.ser
 
 /** `category` covers all three Category depth tiers (Category/Subcategory/Type are all just
  *  Category rows — see category.service.ts's module doc comment) with one shared `CategoryImage`
- *  table, image-only (no `videoAdapter` entry — see `CategoryImage`'s schema doc comment). */
-export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor' | 'category';
+ *  table, image-only (no `videoAdapter` entry — see `CategoryImage`'s schema doc comment).
+ *  `blog` (BlogPost) and `about-us` (the singleton AboutUsContent row) are the CMS module's
+ *  entries — both image-only, same as `category` (no `videoAdapter` entry for either — see
+ *  `BlogPostImage`/`AboutUsImage`'s schema doc comments). */
+export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor' | 'category' | 'blog' | 'about-us';
 
 export interface MediaFile {
   buffer: Buffer;
@@ -47,6 +50,8 @@ function imageAdapter(entityType: MediaEntityType): ImageAdapter {
     therapist: { subdir: 'therapists', column: 'therapistId', delegate: 'therapistImage' },
     vendor: { subdir: 'vendors', column: 'vendorId', delegate: 'vendorImage' },
     category: { subdir: 'categories', column: 'categoryId', delegate: 'categoryImage' },
+    blog: { subdir: 'blog-posts', column: 'blogPostId', delegate: 'blogPostImage' },
+    'about-us': { subdir: 'about-us', column: 'aboutUsId', delegate: 'aboutUsImage' },
   };
   const { subdir, column, delegate } = config[entityType];
   return {

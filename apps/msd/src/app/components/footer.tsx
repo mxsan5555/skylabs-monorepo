@@ -132,12 +132,7 @@ export function Footer() {
                 </li>
               ))
             )}
-            <li>
-              <Link to="/therapists" className="site-footer__link"> Therapists</Link>
-            </li>
-            <li>
-              <Link to="/products" className="site-footer__link"> Products </Link>
-            </li>
+           
           </ul>
         </nav>
         <nav className="site-footer__col" aria-label="Help and Info">

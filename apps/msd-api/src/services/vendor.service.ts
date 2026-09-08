@@ -3,6 +3,7 @@ import type { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import { ensureUniqueSlug } from '../lib/slug';
+import { resolveGoogleMapsLocation } from '../providers/maps/googleMapsUrlResolver.provider';
 import { assignRole, serializeUser } from './user.service';
 import { listActiveCategories, assertCategoryChildOf, assertVendorHasCategoryAccess } from './category.service';
 import { getProductScopedOrThrow } from './product.service';
@@ -40,6 +41,38 @@ type TherapistPackageUpdateInput = z.infer<typeof TherapistPackageUpdateSchema>;
 
 /** Fields that, once edited after a KYC rejection, mean the vendor is resubmitting. */
 const KYC_RELEVANT_FIELDS = ['gstNumber', 'panNumber', 'businessRegistrationNumber', 'kycDocuments'] as const;
+
+/**
+ * Resolves `mapLocationUrl` into `latitude`/`longitude` for a Vendor/Branch CREATE — a no-op
+ * (returns `{}`) when the caller didn't supply a map link at all, matching today's
+ * optional-coordinates behavior (a vendor/branch can still be created with no location set).
+ */
+async function resolveMapLocationForCreate(
+  mapLocationUrl: string | undefined,
+): Promise<{ mapLocationUrl?: string; latitude?: number; longitude?: number }> {
+  if (!mapLocationUrl) return {};
+  const { latitude, longitude } = await resolveGoogleMapsLocation(mapLocationUrl);
+  return { mapLocationUrl, latitude, longitude };
+}
+
+/**
+ * Resolves `mapLocationUrl` into `latitude`/`longitude` for a Vendor/Branch UPDATE.
+ * - `mapLocationUrl` absent from the input entirely → `{}`, existing `mapLocationUrl`/
+ *   `latitude`/`longitude` untouched (today's "don't touch what wasn't sent" behavior).
+ * - `mapLocationUrl` present but byte-identical to what's already stored → `{}` too — avoids an
+ *   unnecessary re-resolve (network hop + redirect chase) when nothing actually changed.
+ * - `mapLocationUrl` present and different (including "was empty, now set") → re-resolve and
+ *   return the fresh `mapLocationUrl`/`latitude`/`longitude` trio.
+ */
+async function resolveMapLocationForUpdate(
+  input: { mapLocationUrl?: string },
+  currentMapLocationUrl: string | null | undefined,
+): Promise<{ mapLocationUrl?: string; latitude?: number; longitude?: number }> {
+  if (input.mapLocationUrl === undefined) return {};
+  if (input.mapLocationUrl === currentMapLocationUrl) return {};
+  const { latitude, longitude } = await resolveGoogleMapsLocation(input.mapLocationUrl);
+  return { mapLocationUrl: input.mapLocationUrl, latitude, longitude };
+}
 
 /** Minimal, non-sensitive summary of the linked User — no session/token/auth data — shown as
  *  "Vendor Account" in the admin UI so it's unambiguous which login owns a given vendor. */
@@ -222,9 +255,11 @@ export async function createVendor(input: VendorCreateInput, createdByUserId: st
   const slug = await ensureUniqueSlug(input.businessName || id, id, (candidate) =>
     prisma.vendor.findUnique({ where: { slug: candidate } }).then(Boolean),
   );
+  const mapLocation = await resolveMapLocationForCreate(input.mapLocationUrl);
   const vendor = await prisma.vendor.create({
     data: {
       ...input,
+      ...mapLocation,
       id,
       slug,
       status: heuristicInitialStatus(input),
@@ -250,6 +285,7 @@ export async function updateVendor(id: string, input: VendorUpdateInput) {
       prisma.vendor.findUnique({ where: { slug: candidate } }).then((v) => Boolean(v) && v!.id !== id),
     );
   }
+  Object.assign(data, await resolveMapLocationForUpdate(input, existing.mapLocationUrl));
   const vendor = await prisma.vendor.update({
     where: { id },
     data,
@@ -330,9 +366,11 @@ export async function createSelfVendor(ownerUserId: string, input: VendorSelfCre
   const slug = await ensureUniqueSlug(input.businessName, id, (candidate) =>
     prisma.vendor.findUnique({ where: { slug: candidate } }).then(Boolean),
   );
+  const mapLocation = await resolveMapLocationForCreate(input.mapLocationUrl);
   return prisma.vendor.create({
     data: {
       ...input,
+      ...mapLocation,
       id,
       slug,
       ownerUserId,
@@ -350,6 +388,7 @@ export async function updateSelfVendor(ownerUserId: string, input: VendorSelfUpd
     data.kycStatus = 'PENDING';
     data.kycRejectionReason = null;
   }
+  Object.assign(data, await resolveMapLocationForUpdate(input, vendor.mapLocationUrl));
   return prisma.vendor.update({
     where: { id: vendor.id },
     data: data as Prisma.VendorUncheckedUpdateInput,
@@ -581,12 +620,17 @@ export async function getBranchScopedOrThrow(vendorId: string, branchId: string)
 
 export async function createBranch(vendorId: string, input: BranchCreateInput) {
   await getVendorOrThrow(vendorId);
-  return prisma.branch.create({ data: { ...input, vendorId } as Prisma.BranchUncheckedCreateInput });
+  const mapLocation = await resolveMapLocationForCreate(input.mapLocationUrl);
+  return prisma.branch.create({
+    data: { ...input, ...mapLocation, vendorId } as Prisma.BranchUncheckedCreateInput,
+  });
 }
 
 export async function updateBranch(vendorId: string, branchId: string, input: BranchUpdateInput) {
-  await getBranchScopedOrThrow(vendorId, branchId);
-  return prisma.branch.update({ where: { id: branchId }, data: input as Prisma.BranchUncheckedUpdateInput });
+  const existing = await getBranchScopedOrThrow(vendorId, branchId);
+  const data: Prisma.BranchUncheckedUpdateInput = { ...input } as Prisma.BranchUncheckedUpdateInput;
+  Object.assign(data, await resolveMapLocationForUpdate(input, existing.mapLocationUrl));
+  return prisma.branch.update({ where: { id: branchId }, data });
 }
 
 export async function setBranchStatus(vendorId: string, branchId: string, isActive: boolean) {
