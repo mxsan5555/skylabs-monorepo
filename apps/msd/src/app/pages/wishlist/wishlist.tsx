@@ -5,14 +5,12 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { addCartItem } from '../../../api/cart';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import type { CatalogDeal } from '../../../api/catalog';
-import { formatINR, pluralize } from '../../../utils/format';
-import { resolveDealMedia, primaryImage } from '../../../utils/media';
+import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
 import './wishlist.css';
+import { DealCard, type DealCardDeal } from '../../components/deal-card';
 const { wishlist: wishlistContent } = content;
-
 /**
  * Real, backend-driven wishlist (`GET /wishlist` via `WishlistProvider`) — same layout, empty
  * state, and grid CSS as the previous mock/localStorage page, just fed from `useWishlist()`'s
@@ -21,6 +19,27 @@ const { wishlist: wishlistContent } = content;
  * doesn't carry the mock's `rating`/`distance`/`location` fields — this is the exact same card
  * component `category.tsx`/`vendor.tsx` already use for real deals, so no new card was invented.
  */
+function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
+  const title = deal.product?.name ?? deal.title;
+  const salePrice = Number(deal.salePrice);
+  const originalPrice = deal.originalPrice ? Number(deal.originalPrice) : undefined;
+  const media = resolveDealMedia(deal);
+  return {
+    id: deal.id,
+    title,
+    image: media.images[0] ?? '',
+    imageAlt: deal.product?.imageAlt ?? title,
+    gallery: media.images.length > 0 ? media.images : undefined,
+    video: media.video,
+    providerName: deal.vendor?.businessName ?? undefined,
+    location: deal.branch?.city ?? undefined,
+    price: salePrice,
+    originalPrice: originalPrice && originalPrice !== salePrice ? originalPrice : undefined,
+    discount: deal.discountPercent ?? undefined,
+    priceNote: deal.durationMinutes ? `${deal.durationMinutes} min` : undefined,
+    isProduct: !!deal.product, tag: deal.popularTags?.[0]?.name ?? deal.product?.popularTags?.[0]?.name,
+  };
+}
 export function Wishlist() {
   const { items, loading, remove } = useWishlist();
   const { token, isAuthenticated } = useAuth();
@@ -33,7 +52,6 @@ export function Wishlist() {
     navigate(`/sign-in?next=${encodeURIComponent('/wishlist')}`);
     return false;
   };
-
   async function handleAddToCart(deal: CatalogDeal) {
     if (!requireAuthOrRedirect() || addingId) return;
     setCartError('');
@@ -48,7 +66,6 @@ export function Wishlist() {
       setAddingId(null);
     }
   }
-
   return (
     <div className="wishlist-page">
       <title>{content.meta.wishlist.title}</title>
@@ -83,26 +100,11 @@ export function Wishlist() {
           <ul className="wishlist-grid" aria-label="Saved deals">
             {items.map(({ deal, dealId }) => (
               <li key={dealId} className="wishlist-grid__item">
-                <SkyProductCardWC
-                  variant="outlined"
-                  badge={deal.product ? wishlistContent.productLabel : wishlistContent.serviceLabel}
-                  eyebrow={[deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · ') || undefined}
-                  eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
-                  heading={deal.product?.name ?? deal.title}
-                  image={primaryImage(resolveDealMedia(deal))}
-                  imageAlt={deal.product?.imageAlt ?? undefined}
-                  price={formatINR(Number(deal.salePrice))}
-                  originalPrice={
-                    deal.originalPrice && Number(deal.originalPrice) !== Number(deal.salePrice)
-                      ? formatINR(Number(deal.originalPrice))
-                      : undefined
-                  }
-                  discount={deal.discountPercent ? `-${deal.discountPercent}%` : undefined}
-                  priceNote={deal.durationMinutes ? `${deal.durationMinutes} min` : undefined}
-                  href={deal.product ? `/products/${deal.id}` : `/deal/${deal.id}`}
-                  favorite
+                <DealCard
+                  deal={toDealCardDeal(deal)}
                   favoriteActive={true}
                   onFavorite={() => remove(dealId)}
+                  eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
                 />
                 {!deal.product ? (
                   <OutlinedButton

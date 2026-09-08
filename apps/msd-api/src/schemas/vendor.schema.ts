@@ -156,8 +156,13 @@ const VendorFieldsSchema = z.object({
   state: z.string().max(100).optional(),
   country: z.string().max(100).optional(),
   pincode: vendorPincodeSchema,
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
+  /** A pasted Google Maps share URL (e.g. `https://maps.app.goo.gl/...`) — replaces manual
+   *  latitude/longitude entry. Resolved server-side into `latitude`/`longitude` (see
+   *  vendor.service.ts + providers/maps/googleMapsUrlResolver.provider.ts); this schema no
+   *  longer accepts raw lat/lng from the client at all — `latitude`/`longitude` are stripped
+   *  from any request body that still sends them (default Zod `z.object()` "strip unknown
+   *  keys" behavior, not `.strict()`, so this is a silent ignore, not a 422). */
+  mapLocationUrl: z.string().url().optional(),
 
   gstNumber: gstNumberSchema,
   panNumber: panNumberSchema,
@@ -271,8 +276,9 @@ const BranchFieldsSchema = z.object({
   state: z.string().max(100).optional(),
   country: z.string().max(100).optional(),
   pincode: branchPincodeSchema,
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
+  /** Same Map Location URL contract as `VendorFieldsSchema.mapLocationUrl` above — see that
+   *  field's doc comment. */
+  mapLocationUrl: z.string().url().optional(),
   phone: z.string().max(30).optional(),
   email: z.string().email().optional(),
   openingHours: OpeningHoursSchema.optional(),

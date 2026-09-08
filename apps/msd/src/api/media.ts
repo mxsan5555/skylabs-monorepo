@@ -10,7 +10,7 @@ import { apiPostForm, apiDelete, apiPatch } from './rbac/client';
  * `onVideoChange`.
  */
 
-export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor' | 'category';
+export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor' | 'category' | 'blog' | 'about-us';
 
 export interface MediaImage {
   id: string;
@@ -62,6 +62,15 @@ function basePath(ref: EntityRef): string {
       // exists server-side; `MediaUploader`'s `hideVideo` prop keeps that endpoint unreachable
       // from the Category dialogs).
       return `/categories/${ref.entityId}`;
+    case 'blog':
+      // Blog Post image routes are top-level (`/blog-posts/:id/images...`, see
+      // blog-posts.routes.ts) — no branch/vendor nesting, image-only (no `/video` route exists
+      // server-side for `blog`, same as `category` above).
+      return `/blog-posts/${ref.entityId}`;
+    case 'about-us':
+      // About Us is a singleton row — its image routes have no `:id` param at all
+      // (`/about-us/images...`, see site-content.routes.ts), so `entityId` is ignored here.
+      return '/about-us';
   }
 }
 

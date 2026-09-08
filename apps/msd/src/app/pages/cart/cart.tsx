@@ -60,7 +60,6 @@ export function Cart() {
   const [cart, setCart] = useState<CartData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   const load = useCallback(() => {
     setLoading(true);
     setError('');
@@ -69,11 +68,9 @@ export function Cart() {
       .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not load your cart.'))
       .finally(() => setLoading(false));
   }, [token]);
-
   useEffect(() => {
     load();
   }, [load]);
-
   const items = cart?.items ?? [];
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const subtotal = items.reduce((sum, i) => sum + Number(i.unitPrice) * i.quantity, 0);
@@ -94,10 +91,8 @@ export function Cart() {
         });
       }
       return groups;
-    },
-    [],
+    }, [],
   );
-
   const changeQty = async (itemId: string, quantity: number) => {
     if (quantity < 1) return;
     setError('');
@@ -108,7 +103,6 @@ export function Cart() {
       setError(err instanceof ApiRequestError ? err.message : content.cart.error.updateQuantity);
     }
   };
-
   const remove = async (itemId: string) => {
     setError('');
     try {
@@ -118,26 +112,21 @@ export function Cart() {
       setError(err instanceof ApiRequestError ? err.message : content.cart.error.removeItem);
     }
   };
-
   const doCheckout = () => {
     // The real order-creation call happens on /checkout itself, so a page refresh mid-payment
     // retries against the same Order instead of silently creating another one here.
     navigate('/checkout');
   };
-
   if (loading) return <p className="loading-state"> {content.cart.loading}</p>;
-
   return (
     <div className="cart-page">
       <title>{content.meta.cart.title}</title>
       <meta name="robots" content="noindex" />
-
       <div className="cart-page__inner">
         <h1 className="cart-page__title">
           {content.cart.title}
           {totalItems > 0 && <span className="cart-page__count">({totalItems} {pluralize(totalItems, 'item')})</span>}
         </h1>
-
         {error && <p className="error-state" role="alert">{error}</p>}
 
         {items.length === 0 ? (
@@ -208,7 +197,6 @@ export function Cart() {
                 Clear cart
               </OutlinedButton>
             </section>
-
             <aside className="cart-page__summary" aria-label={content.cart.orderSummaryHeading}>
               <sky-card variant="outlined" className="cart-summary-card">
                 <div className="cart-summary">
@@ -224,7 +212,7 @@ export function Cart() {
                   </div>
                   <p className="field-hint"> {content.cart.serverPriceNote}</p>
                   <FilledButton className="cart-summary__checkout-btn" onClick={doCheckout}>
-                   {content.cart.checkoutCta}
+                    {content.cart.checkoutCta}
                     <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
                   </FilledButton>
                   <OutlinedButton className="cart-summary__continue-btn" onClick={() => navigate('/categories')}>
@@ -235,7 +223,6 @@ export function Cart() {
             </aside>
           </div>
         )}
-
         <Link to="/orders" className="field-hint">{content.cart.links.orders}</Link>
       </div>
     </div>

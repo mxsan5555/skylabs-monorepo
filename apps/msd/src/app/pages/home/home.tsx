@@ -10,7 +10,6 @@ import { DealCard, type DealCardDeal } from '../../components/deal-card';
 import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
 import './home.css';
-
 import { useCurrentLocation } from "../../../hooks/useCurrentLocation";
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 const { home } = content;
@@ -133,9 +132,7 @@ export function Home() {
 
   const hotDeals = useMemo(
     () =>
-      [...safeDealsData].sort(
-        (a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0),
-      ),
+      [...safeDealsData].sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0),),
     [safeDealsData],
   );
 
@@ -327,12 +324,8 @@ export function Home() {
                 >
                   <AssistChip className="premium-category-chip">
                     <Icon slot="icon">category</Icon>
-
                     <span>{category.name}</span>
-
-                    <Icon slot="trailing-icon">
-                      arrow_forward
-                    </Icon>
+                    <Icon slot="trailing-icon"> arrow_forward </Icon>
                   </AssistChip>
                 </NavLink>
               ))}

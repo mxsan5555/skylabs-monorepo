@@ -1,5 +1,6 @@
 import { apiGet } from './rbac/client';
 import type { MediaImage, MediaVideo } from './media';
+import type { BlogBlock } from '../types';
 
 /**
  * Public, unauthenticated customer catalogue client — mirrors msd-api's `/catalog/*` routes.
@@ -256,4 +257,50 @@ export function listCatalogTherapists(
 
 export function getCatalogTherapist(id: string) {
   return apiGet<CatalogTherapist>(`/catalog/therapists/${id}`, null);
+}
+
+// ─── CMS (About Us / Contact Us) — same "no auth, one function per public GET" discipline as
+// every other function in this file. Blog Post reads live in `apps/msd/src/blog/blog.ts`
+// instead (that module's own doc comment anticipates being the one file that swaps from static
+// data to the real API), so they are not duplicated here. ─────────────────────────────────────
+
+/** Singleton row (see msd-api's `AboutUsContent` schema doc comment) — `GET /catalog/about-us`
+ *  always returns the current saved content, created on first admin save. */
+export interface CatalogAboutUs {
+  id: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  missionStatement: string;
+  body: BlogBlock[];
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  updatedAt: string;
+  mediaImages: MediaImage[];
+}
+
+export interface CatalogSocialLink {
+  platform: string;
+  url: string;
+}
+
+/** Same singleton-row convention as `CatalogAboutUs` above — no media (a contact page has no
+ *  gallery need, see msd-api's `ContactUsContent` schema doc comment). */
+export interface CatalogContactUs {
+  id: string;
+  address: string;
+  phone: string;
+  email: string;
+  mapEmbedUrl: string;
+  socialLinks: CatalogSocialLink[];
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  updatedAt: string;
+}
+
+export function getCatalogAboutUs() {
+  return apiGet<CatalogAboutUs>('/catalog/about-us', null);
+}
+
+export function getCatalogContactUs() {
+  return apiGet<CatalogContactUs>('/catalog/contact-us', null);
 }

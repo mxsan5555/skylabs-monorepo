@@ -19,8 +19,7 @@ const EMPTY_FORM: VendorFields = {
   city: '',
   state: '',
   pincode: '',
-  latitude: undefined,
-  longitude: undefined,
+  mapLocationUrl: '',
   bankAccountHolder: '',
   bankName: '',
   bankAccountNumber: '',
@@ -36,25 +35,9 @@ const EMPTY_FORM: VendorFields = {
  *  10-digit one, which is what made a correct-looking edit intermittently fail validation. */
 const PHONE_FIELDS: (keyof VendorFields)[] = ['businessPhone', 'ownerMobile'];
 
-/** `Vendor.latitude`/`longitude` are Prisma `Decimal` columns, which this API always serializes
- *  as STRINGS over JSON (same as every other Decimal field in this codebase) even though the
- *  `Vendor` TypeScript type optimistically declares them as `number`. Copying `raw` straight
- *  through here (as every other non-phone field does) left an EXISTING vendor's already-saved,
- *  perfectly valid coordinates sitting in form state as a string, riding unconverted into the
- *  submit payload unless the user happened to retype that exact field — tripping the backend's
- *  `z.number()` check with "expected number, received string" for data that was never actually
- *  invalid. Coerce on the way in, exactly once, right here. */
-const NUMERIC_FIELDS: (keyof VendorFields)[] = ['latitude', 'longitude'];
-
 function stripIndiaPrefix(value: string): string {
   const digitsOnly = value.replace(/\D/g, '');
   return digitsOnly.length === 12 && digitsOnly.startsWith('91') ? digitsOnly.slice(2) : digitsOnly;
-}
-
-function toNumberOrUndefined(raw: unknown): number | undefined {
-  if (raw === '' || raw === undefined || raw === null) return undefined;
-  const num = typeof raw === 'number' ? raw : Number(raw);
-  return Number.isFinite(num) ? num : undefined;
 }
 
 function toFormFields(vendor: Vendor | null): VendorFields {
@@ -65,11 +48,9 @@ function toFormFields(vendor: Vendor | null): VendorFields {
     // before Step 2 is filled in) — either way the EMPTY_FORM default ('' / undefined) is correct.
     if (vendor[key] !== undefined && vendor[key] !== null) {
       const raw = vendor[key];
-      (fields as Record<string, unknown>)[key] = NUMERIC_FIELDS.includes(key)
-        ? toNumberOrUndefined(raw)
-        : PHONE_FIELDS.includes(key) && typeof raw === 'string'
-          ? stripIndiaPrefix(raw)
-          : raw;
+      (fields as Record<string, unknown>)[key] = PHONE_FIELDS.includes(key) && typeof raw === 'string'
+        ? stripIndiaPrefix(raw)
+        : raw;
     }
   }
   return fields;
@@ -103,7 +84,7 @@ const ALL_SECTIONS: VendorFormSection[] = ['business', 'owner', 'address', 'kyc'
 const SECTION_FIELDS: Record<VendorFormSection, (keyof VendorFields)[]> = {
   business: ['businessName', 'businessDescription', 'businessEmail', 'businessPhone'],
   owner: ['ownerFirstName', 'ownerLastName', 'ownerEmail', 'ownerMobile'],
-  address: ['address', 'addressLine2', 'city', 'state', 'pincode', 'latitude', 'longitude'],
+  address: ['address', 'addressLine2', 'city', 'state', 'pincode', 'mapLocationUrl'],
   kyc: [],
   bank: ['bankAccountHolder', 'bankName', 'bankAccountNumber', 'bankIfsc', 'upiId'],
 };
@@ -114,7 +95,7 @@ const SECTION_FIELDS: Record<VendorFormSection, (keyof VendorFields)[]> = {
 const REQUIRED_FIELDS: Record<VendorFormSection, (keyof VendorFields)[]> = {
   business: ['businessName', 'businessEmail', 'businessPhone'],
   owner: ['ownerFirstName', 'ownerLastName', 'ownerEmail', 'ownerMobile'],
-  address: ['address', 'city', 'state', 'pincode', 'latitude', 'longitude'],
+  address: ['address', 'city', 'state', 'pincode', 'mapLocationUrl'],
   kyc: [],
   bank: [],
 };
@@ -171,22 +152,18 @@ function validateEmail(value: string): string | null {
   return EMAIL_REGEX.test(value) ? null : 'Enter a valid email address';
 }
 
-/** `value` is actually a `number | undefined` at runtime for these two fields (see the doc
- *  comment on `NUMERIC_FIELDS` above) despite `FIELD_VALIDATORS`' string-only signature —
- *  `Number(...)` handles both a real number and its stringified form identically. Mirrors the
- *  backend's `z.number().min(-90).max(90)` / `.min(-180).max(180)` exactly. */
-function validateLatitude(value: string): string | null {
-  if (value === '') return null;
-  const num = Number(value);
-  if (Number.isNaN(num)) return 'Enter a valid latitude';
-  return num >= -90 && num <= 90 ? null : 'Latitude must be between -90 and 90';
-}
-
-function validateLongitude(value: string): string | null {
-  if (value === '') return null;
-  const num = Number(value);
-  if (Number.isNaN(num)) return 'Enter a valid longitude';
-  return num >= -180 && num <= 180 ? null : 'Longitude must be between -180 and 180';
+/** A light, client-side "does this look like a URL" check only — the real validation (host,
+ *  whether the link resolves to a place) happens server-side in
+ *  `googleMapsUrlResolver.provider.ts`; its error message is surfaced via `serverFieldErrors`/
+ *  the submit handler's catch block (see `vendor-business-profile.tsx` and friends), not here. */
+function validateMapLocationUrl(value: string): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? null : 'Enter a valid Google Maps link';
+  } catch {
+    return 'Enter a valid Google Maps link';
+  }
 }
 
 const FIELD_VALIDATORS: Partial<Record<keyof VendorFields, (value: string) => string | null>> = {
@@ -195,8 +172,7 @@ const FIELD_VALIDATORS: Partial<Record<keyof VendorFields, (value: string) => st
   ownerMobile: validateMobileNumber,
   businessEmail: validateEmail,
   ownerEmail: validateEmail,
-  latitude: validateLatitude,
-  longitude: validateLongitude,
+  mapLocationUrl: validateMapLocationUrl,
 };
 
 /** Extracts a flat `{field: message}` map from a 422's Zod-flattened `details.fieldErrors`
@@ -320,15 +296,6 @@ export function VendorProfileForm({
     const digitsOnly = (e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 10);
     set(key, digitsOnly as never);
   };
-  /** Latitude/Longitude are `number | undefined` on `VendorFields` (not strings, unlike every
-   *  other field here) — parses the raw input text, storing `undefined` for an empty/invalid
-   *  value rather than `NaN` riding into the payload. */
-  const numberInput = (key: 'latitude' | 'longitude') => (e: Event) => {
-    const raw = (e.target as HTMLInputElement).value;
-    const parsed = raw.trim() === '' ? undefined : Number(raw);
-    set(key, (parsed === undefined || Number.isNaN(parsed) ? undefined : parsed) as never);
-  };
-
   /** Validates every field in the currently rendered `sections` only — fields the user can't
    *  see right now are never checked, matching how each admin-pipeline/self-service step
    *  saves one section at a time. Returns whether the visible fields are all valid. */
@@ -493,23 +460,15 @@ export function VendorProfileForm({
           />
           {errors.pincode && <p className="error-state" role="alert">{errors.pincode}</p>}
           <OutlinedTextField
-            label="Latitude"
-            type="number"
-            value={form.latitude !== undefined ? String(form.latitude) : ''}
+            label="Map Location"
+            type="url"
+            placeholder="Paste Google Maps location link"
+            value={form.mapLocationUrl ?? ''}
             disabled={!canEdit}
-            onInput={numberInput('latitude')}
-            error={Boolean(errors.latitude)}
+            onInput={text('mapLocationUrl')}
+            error={Boolean(errors.mapLocationUrl)}
           />
-          {errors.latitude && <p className="error-state" role="alert">{errors.latitude}</p>}
-          <OutlinedTextField
-            label="Longitude"
-            type="number"
-            value={form.longitude !== undefined ? String(form.longitude) : ''}
-            disabled={!canEdit}
-            onInput={numberInput('longitude')}
-            error={Boolean(errors.longitude)}
-          />
-          {errors.longitude && <p className="error-state" role="alert">{errors.longitude}</p>}
+          {errors.mapLocationUrl && <p className="error-state" role="alert">{errors.mapLocationUrl}</p>}
         </>
       )}
 
