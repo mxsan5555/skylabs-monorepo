@@ -12,6 +12,8 @@ import rbacRoutes from './routes/rbac.routes';
 import customersRoutes from './routes/customers.routes';
 import vendorsRoutes from './routes/vendors.routes';
 import categoriesRoutes from './routes/categories.routes';
+import blogPostsRoutes from './routes/blog-posts.routes';
+import siteContentRoutes from './routes/site-content.routes';
 import popularTagsRoutes from './routes/popular-tags.routes';
 import catalogRoutes from './routes/catalog.routes';
 import cartRoutes from './routes/cart.routes';
@@ -59,6 +61,11 @@ export function createApp(): express.Express {
   api.use('/customers', customersRoutes);
   api.use('/vendors', vendorsRoutes);
   api.use('/categories', categoriesRoutes);
+  api.use('/blog-posts', blogPostsRoutes);
+  // site-content.routes.ts declares its own full paths (`/about-us`, `/contact-us`) rather than
+  // living under a shared resource prefix — see that file's own doc comment — so it mounts at
+  // the API root, not a sub-path, to avoid double-prefixing (e.g. NOT /site-content/about-us).
+  api.use('/', siteContentRoutes);
   api.use('/popular-tags', popularTagsRoutes);
   api.use('/catalog', catalogRoutes);
   api.use('/cart', cartRoutes);

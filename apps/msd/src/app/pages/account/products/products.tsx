@@ -82,6 +82,7 @@ export function ProductManagement() {
   const vendorName = useCallback(
     (id: string) => vendors.find((v) => v.id === id)?.businessName ?? id,
     [vendors],
+    
   );
 
   /** Flat row for <sky-data-table>; row index is used to map a click back to `products`. */

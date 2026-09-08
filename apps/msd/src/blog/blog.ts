@@ -1,220 +1,121 @@
 /**
  * Blog data + access functions for msd.
  *
- * Static content for now; the function signatures mirror the future API
- * (`listPosts` → `GET /posts?page`, `getPost` → `GET /posts/:slug`), so swapping
- * to the backend is a one-file change — pages never read the raw array.
+ * Backed by msd-api's public, unauthenticated CMS catalogue (`GET /catalog/blog-posts`,
+ * `GET /catalog/blog-posts/:slug` — see `catalog.routes.ts`). This was previously a static
+ * in-memory array with the same function signatures (`listPosts` → `GET /posts?page`, `getPost`
+ * → `GET /posts/:slug`) by design, so this is that anticipated one-file swap — every call site
+ * (`blog.tsx`/`blog-detail.tsx`) keeps calling these same exported names, just `await`ed now.
+ *
+ * The public list endpoint only accepts `search`/`categorySlug`/`page`/`pageSize` server-side
+ * (see msd-api's `PublicBlogPostListQuerySchema` — deliberately no facet/author/tag/reading-time
+ * filter param, and no dedicated "list all categories/authors/tags" endpoint). `sort`, `reading`,
+ * multi-category, `authors`, and `tags` are therefore applied client-side over whichever single
+ * page the server returned, and `categoryList()`/`authorList()`/`tagList()` are derived from that
+ * same last-fetched page — an accepted limitation carried over from the static-data version
+ * (which faceted its whole array; this one facets its current page), not a new one introduced by
+ * this swap. Building dedicated facet endpoints is out of scope here.
  */
+import { apiGet, ApiRequestError } from '../api/rbac/client';
+import { resolveMediaUrl } from '../api/media';
 import type { BlogCategory, BlogPost, BlogQuery, Paginated } from '../types';
 
 export const PAGE_SIZE = 4;
 
-const CATEGORIES: BlogCategory[] = [
-  { id: 'c1', slug: 'wellness', name: 'Wellness' },
-  { id: 'c2', slug: 'massage-tips', name: 'Massage Tips' },
-  { id: 'c3', slug: 'self-care', name: 'Self-care' },
-];
+interface ApiBlogPostImage {
+  id: string;
+  storageKey: string;
+  isPrimary: boolean;
+  sortOrder: number;
+}
 
-const cover = (seed: string) =>
-  `https://picsum.photos/seed/msd-${seed}/800/480`;
+/** Shape of one row from `PUBLIC_BLOG_POST_SELECT` (msd-api's `blog-post.service.ts`) — no
+ *  `coverImage`/`imageAlt` (those are frontend-only fields on `BlogPost`, mapped in `toBlogPost`
+ *  below); `mediaImages` replaces them. */
+interface ApiBlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  categorySlug: string;
+  body: BlogPost['body'];
+  author: string;
+  readMinutes: number;
+  tags: string[];
+  publishedAt: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  mediaImages: ApiBlogPostImage[];
+}
 
-const POSTS: BlogPost[] = [
-  {
-    id: 'p1',
-    slug: 'deep-tissue-vs-swedish-massage',
-    title: 'Deep tissue vs Swedish massage: which one is right for you?',
-    excerpt:
-      'Two of the most requested treatments, side by side — how they differ and when to book each.',
-    categorySlug: 'massage-tips',
-    publishedAt: '2026-05-28',
-    coverImage: cover('deep-tissue'),
-    imageAlt: 'Therapist performing a back massage',
-    author: 'Dr. Anita Rao',
-    readMinutes: 6,
-    tags: ['deep-tissue', 'swedish', 'beginners'],
-    body: [
-      {
-        type: 'paragraph',
-        text: 'Swedish and deep tissue are the two treatments new clients ask about most. They share long, flowing strokes, but the intent and pressure differ enough to matter for your body.',
-      },
-      { type: 'heading', text: 'How they differ' },
-      {
-        type: 'list',
-        items: [
-          'Swedish uses lighter pressure to relax muscles and improve circulation.',
-          'Deep tissue targets knots and chronic tension with slower, firmer strokes.',
-          'Recovery from deep tissue can include a day of mild soreness.',
-        ],
-      },
-      {
-        type: 'paragraph',
-        text: 'If you are booking your first session, start with Swedish. Move to deep tissue once you know how your body responds.',
-      },
-      {
-        type: 'quote',
-        text: 'The best massage is the one you actually rebook — comfort beats intensity.',
-      },
-    ],
-  },
-  {
-    id: 'p2',
-    slug: 'five-stretches-before-your-appointment',
-    title: 'Five gentle stretches to do before your appointment',
-    excerpt:
-      'A five-minute warm-up that helps your therapist reach deeper tension faster.',
-    categorySlug: 'self-care',
-    publishedAt: '2026-05-20',
-    coverImage: cover('stretches'),
-    imageAlt: 'Person stretching on a yoga mat',
-    author: 'Marco Bianchi',
-    readMinutes: 4,
-    tags: ['stretching', 'preparation'],
-    body: [
-      {
-        type: 'paragraph',
-        text: 'Arriving a little loose helps your session go further. These five stretches take about five minutes and need no equipment.',
-      },
-      {
-        type: 'list',
-        items: [
-          'Neck rolls — slow half circles, both directions.',
-          'Shoulder shrugs — lift, hold, release.',
-          'Seated spinal twist — hold each side for 20 seconds.',
-          'Standing forward fold — let your arms hang.',
-          'Wrist and ankle circles — ten each way.',
-        ],
-      },
-      {
-        type: 'paragraph',
-        text: 'Breathe slowly through each one. If anything pinches, ease off — stretching should never hurt.',
-      },
-    ],
-  },
-  {
-    id: 'p3',
-    slug: 'how-often-should-you-get-a-massage',
-    title: 'How often should you actually get a massage?',
-    excerpt:
-      'Weekly, monthly, or only when something hurts — what the evidence and the therapists say.',
-    categorySlug: 'wellness',
-    publishedAt: '2026-05-12',
-    coverImage: cover('frequency'),
-    imageAlt: 'Calendar and a rolled towel on a spa table',
-    author: 'Dr. Anita Rao',
-    readMinutes: 5,
-    tags: ['routine', 'wellness'],
-    body: [
-      {
-        type: 'paragraph',
-        text: 'There is no single right answer — it depends on your goals, budget, and stress levels. Here is a simple way to think about it.',
-      },
-      { type: 'heading', text: 'A rough guide' },
-      {
-        type: 'list',
-        items: [
-          'General stress relief: once a month.',
-          'Active training or chronic pain: every one to two weeks.',
-          'A specific injury: follow your therapist or physio plan.',
-        ],
-      },
-      {
-        type: 'paragraph',
-        text: 'Consistency matters more than frequency. A monthly session you keep beats a weekly one you skip.',
-      },
-    ],
-  },
-  {
-    id: 'p4',
-    slug: 'what-to-expect-at-your-first-session',
-    title: 'What to expect at your first session',
-    excerpt:
-      'From the intake form to aftercare — a calm walkthrough so nothing feels unfamiliar.',
-    categorySlug: 'wellness',
-    publishedAt: '2026-05-04',
-    coverImage: cover('first-session'),
-    imageAlt: 'Welcoming spa reception area',
-    author: 'Priya Menon',
-    readMinutes: 7,
-    tags: ['beginners', 'guide'],
-    body: [
-      {
-        type: 'paragraph',
-        text: 'A first massage can feel like a lot of unknowns. It does not need to. Here is the whole flow, start to finish.',
-      },
-      { type: 'heading', text: 'Before you start' },
-      {
-        type: 'paragraph',
-        text: 'You will fill out a short health intake so your therapist can tailor pressure and avoid sensitive areas. Mention anything — recent injuries, allergies to oils, areas to skip.',
-      },
-      {
-        type: 'quote',
-        text: 'You stay in control the whole time. “A little lighter” is always a welcome request.',
-      },
-    ],
-  },
-  {
-    id: 'p5',
-    slug: 'reading-the-fine-print-on-spa-deals',
-    title: 'Reading the fine print on spa deals',
-    excerpt:
-      'Codes, blackout dates, and gratuity — how to spot a genuinely good offer.',
-    categorySlug: 'self-care',
-    publishedAt: '2026-04-26',
-    coverImage: cover('deals'),
-    imageAlt: 'Close-up of a discount voucher',
-    author: 'Marco Bianchi',
-    readMinutes: 3,
-    tags: ['deals', 'value'],
-    body: [
-      {
-        type: 'paragraph',
-        text: 'A headline discount is only as good as its conditions. Three things tell you whether a deal is worth booking.',
-      },
-      {
-        type: 'list',
-        items: [
-          'Does the price include gratuity, or is it added later?',
-          'Are there blackout dates around weekends and holidays?',
-          'Is the code single-use, or can you rebook at the same rate?',
-        ],
-      },
-    ],
-  },
-  {
-    id: 'p6',
-    slug: 'aftercare-the-24-hours-that-matter',
-    title: 'Aftercare: the 24 hours that matter most',
-    excerpt:
-      'Hydrate, move gently, and skip the gym — small choices that make the benefits last.',
-    categorySlug: 'self-care',
-    publishedAt: '2026-04-18',
-    coverImage: cover('aftercare'),
-    imageAlt: 'Glass of water beside a folded towel',
-    author: 'Priya Menon',
-    readMinutes: 4,
-    tags: ['aftercare', 'recovery'],
-    body: [
-      {
-        type: 'paragraph',
-        text: 'What you do after a session shapes how good you feel the next day. None of it is complicated.',
-      },
-      {
-        type: 'list',
-        items: [
-          'Drink water — massage moves fluid around and you will feel it.',
-          'Keep moving gently; avoid intense workouts for a day.',
-          'Warm bath or heat pad for any tender spots.',
-        ],
-      },
-    ],
-  },
-];
+/** Title Case display fallback for a category slug (`massage-tips` → `Massage Tips`) — the
+ *  backend's `BlogPost.categorySlug` is a plain string column with no linked display-name row
+ *  (see schema.prisma — unlike the old static `CATEGORIES` array, which hardcoded a `name` per
+ *  slug), so there is no real display name to read. This is a pure presentation transform of the
+ *  slug itself, not new data. */
+function humanizeSlug(slug: string): string {
+  return slug
+    .split('-')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+/** Resolves the cover image URL from `mediaImages` (primary image, or the first uploaded if none
+ *  is flagged primary) — empty string when no image has been uploaded yet. `sky-card`/plain
+ *  `<img>` usage on both blog pages already tolerates an empty `src` (renders no image rather
+ *  than a broken-image icon), so no placeholder asset is introduced. */
+function coverImageFor(images: ApiBlogPostImage[]): string {
+  if (images.length === 0) return '';
+  const primary = images.find((img) => img.isPrimary) ?? [...images].sort((a, b) => a.sortOrder - b.sortOrder)[0];
+  return resolveMediaUrl(primary.storageKey);
+}
+
+/** Maps one API row onto the frontend's own `BlogPost` shape (`types/index.ts`, unchanged by
+ *  this swap) — `imageAlt` falls back to the post's `title` since `BlogPostImage` has no
+ *  dedicated alt-text column (see schema.prisma). */
+function toBlogPost(post: ApiBlogPost): BlogPost {
+  return {
+    id: post.id,
+    slug: post.slug,
+    title: post.title,
+    excerpt: post.excerpt,
+    categorySlug: post.categorySlug,
+    publishedAt: post.publishedAt ?? '',
+    coverImage: coverImageFor(post.mediaImages),
+    imageAlt: post.title,
+    author: post.author,
+    readMinutes: post.readMinutes,
+    tags: post.tags,
+    body: post.body,
+  };
+}
+
+// Facet caches — derived from whichever page of posts was most recently fetched by `queryPosts`/
+// `getPost` (see this module's own doc comment on why: no dedicated facet endpoint exists).
+let lastCategories: BlogCategory[] = [];
+let lastAuthors: string[] = [];
+let lastTags: string[] = [];
+
+function updateFacets(posts: BlogPost[]) {
+  const categoryMap = new Map<string, BlogCategory>();
+  for (const p of posts) {
+    if (!categoryMap.has(p.categorySlug)) {
+      categoryMap.set(p.categorySlug, { id: p.categorySlug, slug: p.categorySlug, name: humanizeSlug(p.categorySlug) });
+    }
+  }
+  lastCategories = [...categoryMap.values()];
+  lastAuthors = [...new Set(posts.map((p) => p.author))].sort();
+  lastTags = [...new Set(posts.flatMap((p) => p.tags))].sort();
+}
 
 /**
- * GET /posts?... — filter, sort, paginate. One source of truth for the list grid
- * and its pagination. Pure over the static array; becomes the API call later.
+ * GET /catalog/blog-posts?... — filter, sort, paginate. `search` and a single `categories[0]`
+ * forward to the server; everything else (`sort`, `reading`, multi-category, `authors`, `tags`)
+ * narrows the returned page client-side (see this module's doc comment). Pure signature swap
+ * from the old static version, now `async`.
  */
-export function queryPosts(q: BlogQuery = {}): Paginated<BlogPost> {
+export async function queryPosts(q: BlogQuery = {}): Promise<Paginated<BlogPost>> {
   const {
     search = '',
     sort = 'newest',
@@ -225,56 +126,79 @@ export function queryPosts(q: BlogQuery = {}): Paginated<BlogPost> {
     page = 1,
     pageSize = PAGE_SIZE,
   } = q;
-  const term = search.trim().toLowerCase();
 
-  const filtered = POSTS.filter((p) => {
-    if (term && !`${p.title} ${p.excerpt}`.toLowerCase().includes(term))
-      return false;
-    if (categories.length && !categories.includes(p.categorySlug)) return false;
+  const params = new URLSearchParams();
+  if (search.trim()) params.set('search', search.trim());
+  if (categories.length === 1) params.set('categorySlug', categories[0]);
+  params.set('page', String(page));
+  params.set('pageSize', String(pageSize));
+
+  const { data, meta } = await apiGet<ApiBlogPost[]>(`/catalog/blog-posts?${params.toString()}`, null);
+  let items = data.map(toBlogPost);
+  updateFacets(items);
+
+  // Narrowing the server doesn't support — applied over this page's items only (see doc
+  // comment). When any of these are active, `meta.total` (the server's search/category-only
+  // count) would overstate what's actually shown, so fall back to this page's own count instead.
+  const usesUnsupportedFilter = categories.length > 1 || authors.length > 0 || tags.length > 0 || reading !== 'any';
+  items = items.filter((p) => {
+    if (categories.length > 1 && !categories.includes(p.categorySlug)) return false;
     if (authors.length && !authors.includes(p.author)) return false;
     if (tags.length && !p.tags.some((t) => tags.includes(t))) return false;
     if (reading === 'short' && p.readMinutes > 4) return false;
     if (reading === 'long' && p.readMinutes < 5) return false;
     return true;
   });
-
-  filtered.sort((a, b) => {
+  items.sort((a, b) => {
     if (sort === 'title') return a.title.localeCompare(b.title);
     const byDate = a.publishedAt.localeCompare(b.publishedAt);
     return sort === 'oldest' ? byDate : -byDate;
   });
 
-  const start = (page - 1) * pageSize;
   return {
-    items: filtered.slice(start, start + pageSize),
-    total: filtered.length,
+    items,
+    total: usesUnsupportedFilter ? items.length : (meta?.total ?? items.length),
     page,
     pageSize,
   };
 }
 
-/** Facet option lists, derived from the data (no hardcoded lists). */
+/** Facet option lists, derived from whichever page of posts was most recently fetched (see this
+ *  module's doc comment) — call after `queryPosts`/`getPost` resolves, not before. */
 export function categoryList(): BlogCategory[] {
-  return [...CATEGORIES];
+  return [...lastCategories];
 }
 export function authorList(): string[] {
-  return [...new Set(POSTS.map((p) => p.author))].sort();
+  return [...lastAuthors];
 }
 export function tagList(): string[] {
-  return [...new Set(POSTS.flatMap((p) => p.tags))].sort();
+  return [...lastTags];
 }
 
-/** GET /posts/:slug */
-export function getPost(slug: string): BlogPost | undefined {
-  return POSTS.find((p) => p.slug === slug);
+/** GET /catalog/blog-posts/:slug — returns `null` (not a thrown error) for an unpublished or
+ *  nonexistent slug, since the public endpoint's 404 is an expected, normal outcome for this
+ *  call site (an invalid/old URL), not a real error to surface. */
+export async function getPost(slug: string): Promise<BlogPost | null> {
+  try {
+    const { data } = await apiGet<ApiBlogPost>(`/catalog/blog-posts/${encodeURIComponent(slug)}`, null);
+    const post = toBlogPost(data);
+    updateFacets([post]);
+    return post;
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.code === 'NOT_FOUND') return null;
+    throw err;
+  }
 }
 
-/** Resolve a category slug to its display name (falls back to the slug). */
+/** Resolve a category slug to its display name (falls back to a Title Case rendering of the
+ *  slug itself — see `humanizeSlug`'s doc comment for why there is no real display name to read
+ *  from the backend). */
 export function categoryName(slug: string): string {
-  return CATEGORIES.find((c) => c.slug === slug)?.name ?? slug;
+  return lastCategories.find((c) => c.slug === slug)?.name ?? humanizeSlug(slug);
 }
 
-/** Locale-aware date formatting — one source of truth for both blog pages. */
+/** Locale-aware date formatting — one source of truth for both blog pages. Unchanged by this
+ *  swap (pure function, no data dependency). */
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
     year: 'numeric',

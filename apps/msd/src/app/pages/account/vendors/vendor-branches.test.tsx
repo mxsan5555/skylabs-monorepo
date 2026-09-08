@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import { ToastProvider } from '../../../../toast/toast-context';
-import type { Category, Deal } from '../../../../api/rbac/vendors';
-import { DealDialog } from './vendor-branches';
+import type { Category, Deal, Branch } from '../../../../api/rbac/vendors';
+import { ApiRequestError } from '../../../../api/rbac/client';
+import { DealDialog, BranchDialog } from './vendor-branches';
 
 /**
  * Feature: DealDialog — Product picker removed, Service-only creation
@@ -102,5 +103,93 @@ describe('DealDialog — Product picker removed (Service-only creation)', () => 
     expect(screen.queryByText('Product (leave as None for a service deal)')).toBeNull();
     expect(screen.queryByText('— None (Service deal) —')).toBeNull();
     expect(screen.queryByText('Offering type')).toBeNull();
+  });
+});
+
+/**
+ * Feature: BranchDialog — Map Location URL replaces directly-editable latitude/longitude
+ * A single "Map Location" `OutlinedTextField` (pasted Google Maps link) replaces the old
+ * Latitude/Longitude inputs — the server resolves the link into coordinates (see
+ * `googleMapsUrlResolver.provider.ts` in msd-api) and `BranchInput` no longer carries
+ * `latitude`/`longitude` at all. A resolver rejection (surfaced as an `ApiRequestError` with
+ * `code: 'VALIDATION_ERROR'`) is shown inline under the Map Location field via
+ * `errors.mapLocationUrl`, not just as a generic banner.
+ */
+function findSaveButton(): HTMLElement {
+  const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.trim() === 'Save');
+  if (!button) throw new Error('Save button not found');
+  return button as HTMLElement;
+}
+
+const BRANCH_WITH_LOCATION: Branch = {
+  id: 'branch-1',
+  vendorId: 'vendor-1',
+  name: 'Golghar Branch',
+  isActive: true,
+  mapLocationUrl: 'https://maps.app.goo.gl/existingLink',
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+};
+
+describe('BranchDialog — Map Location URL', () => {
+  // NOTE: `label`/`error` on `<md-outlined-text-field>` are properties `@lit/react` sets via a
+  // `useLayoutEffect`-timed ref callback that (per this repo's own documented gap — see
+  // `search.test.tsx`'s doc comment) never actually fires under this installed `@lit/react@1.0.8`
+  // + React 19.2.7 + jsdom combination, so neither the property nor a reflected attribute is ever
+  // observable here. Verified instead via the field COUNT (exactly 4: Branch Name, Address, PIN
+  // Code, Map Location — never a 5th/6th field for Latitude/Longitude, which this component's
+  // source contains no markup for at all) and, for the error-surfacing test below, via the
+  // `errors.mapLocationUrl && <p role="alert">` sibling paragraph, which IS plain rendered DOM
+  // text (not a custom-element property) and so is reliably queryable.
+  it('renders exactly 4 text fields (Branch Name, Address, PIN Code, Map Location) — never a separate Latitude/Longitude field — for a fresh Add dialog', () => {
+    render(<BranchDialog onSave={vi.fn()} />);
+    expect(document.querySelectorAll('md-outlined-text-field').length).toBe(4);
+    expect(screen.queryByText('Latitude')).toBeNull();
+    expect(screen.queryByText('Longitude')).toBeNull();
+  });
+
+  it('renders the same 4 fields (no lat/lng) when editing an existing branch', () => {
+    render(<BranchDialog branch={BRANCH_WITH_LOCATION} onSave={vi.fn()} />);
+    expect(document.querySelectorAll('md-outlined-text-field').length).toBe(4);
+    expect(screen.queryByText('Latitude')).toBeNull();
+    expect(screen.queryByText('Longitude')).toBeNull();
+  });
+
+  it('saving a branch with an existing mapLocationUrl submits mapLocationUrl, never latitude/longitude', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<BranchDialog branch={BRANCH_WITH_LOCATION} onSave={onSave} />);
+
+    fireEvent.click(findSaveButton());
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    const submitted = onSave.mock.calls[0][0];
+    expect(submitted.mapLocationUrl).toBe('https://maps.app.goo.gl/existingLink');
+    expect(submitted).not.toHaveProperty('latitude');
+    expect(submitted).not.toHaveProperty('longitude');
+  });
+
+  it('a resolver VALIDATION_ERROR rejection renders inline under the Map Location field, not just a generic banner', async () => {
+    const resolverMessage = "We couldn't resolve this Google Maps link. Please check the link and try again.";
+    const onSave = vi.fn().mockRejectedValue(new ApiRequestError('VALIDATION_ERROR', resolverMessage, 422));
+    render(<BranchDialog branch={BRANCH_WITH_LOCATION} onSave={onSave} />);
+
+    fireEvent.click(findSaveButton());
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText(resolverMessage)).toBeTruthy());
+    // The generic dialog-level error ("Fix the highlighted fields before saving.") is set
+    // alongside the field-level one — confirms the message lives under the field, not instead of
+    // it silently replacing the generic banner with nothing.
+    expect(screen.getByText('Fix the highlighted fields before saving.')).toBeTruthy();
+  });
+
+  it('a non-mapLocationUrl error (e.g. generic network failure) falls back to the dialog\'s generic error message, not the field-level one', async () => {
+    const onSave = vi.fn().mockRejectedValue(new Error('Network request failed'));
+    render(<BranchDialog branch={BRANCH_WITH_LOCATION} onSave={onSave} />);
+
+    fireEvent.click(findSaveButton());
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText('Could not save branch.')).toBeTruthy());
   });
 });

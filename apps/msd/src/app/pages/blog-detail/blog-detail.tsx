@@ -1,11 +1,15 @@
-﻿import { Link, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
-import type { BlogBlock } from '../../../types';
+import type { BlogBlock, BlogPost } from '../../../types';
 import { getPost, categoryName, formatDate } from '../../../blog/blog';
 import './blog-detail.css';
 import content from '../../../content.json';
-/** Render one article body block with the right semantic element. */
-function renderBlock(block: BlogBlock, i: number) {
+/** Render one article body block with the right semantic element. Exported so the public About
+ *  Us page (`pages/about/about.tsx`) can reuse the exact same block-rendering approach for its
+ *  own `body: BlogBlock[]` field — both share this app's canonical public `BlogBlock` type
+ *  (`types/index.ts`), unlike the admin CMS module's separately-declared `BlogBlock`. */
+export function renderBlock(block: BlogBlock, i: number) {
   switch (block.type) {
     case 'heading':
       return <h2 key={i}>{block.text}</h2>;
@@ -23,10 +27,46 @@ function renderBlock(block: BlogBlock, i: number) {
       return <p key={i}>{block.text}</p>;
   }
 }
-/** Blog detail: a single article, looked up by `:slug`. */
+/** Blog detail: a single article, looked up by `:slug` via `GET /catalog/blog-posts/:slug`
+ *  (see `blog/blog.ts`'s own doc comment). `getPost` resolves to `null` for an unpublished or
+ *  nonexistent slug — same "not found" state as before, just reached without a throw. */
 export function BlogDetail() {
   const { slug } = useParams();
-  const post = slug ? getPost(slug) : undefined;
+  const [post, setPost] = useState<BlogPost | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!slug) {
+      setPost(null);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    getPost(slug)
+      .then((result) => {
+        if (!cancelled) setPost(result);
+      })
+      .catch(() => {
+        if (!cancelled) setPost(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <main className="post post--missing">
+        <title>Loading… · MSD</title>
+        <p className="loading-state">Loading…</p>
+      </main>
+    );
+  }
+
   if (!post) {
     return (
       <main className="post post--missing">

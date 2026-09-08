@@ -25,13 +25,23 @@ vi.mock('../lib/media-storage', () => ({
   deleteMediaFile: vi.fn(async () => undefined),
 }));
 
+// The real resolver makes a live network call (redirect-following against Google Maps) — mocked
+// here the same way sms/email providers are mocked in auth route tests, so mapLocationUrl tests
+// stay hermetic and don't depend on network access.
+vi.mock('../providers/maps/googleMapsUrlResolver.provider', () => ({
+  resolveGoogleMapsLocation: vi.fn(),
+}));
+
 import app from '../app';
 import { prisma } from '../lib/prisma';
 import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
+import { resolveGoogleMapsLocation } from '../providers/maps/googleMapsUrlResolver.provider';
 import { bearerFor } from '../test-utils/auth-test-utils';
+import { ApiError } from '../lib/http';
 
 const resolveMock = vi.mocked(resolveGrantedPermissionKeys);
 const prismaMock = vi.mocked(prisma, true);
+const resolveMapLocationMock = vi.mocked(resolveGoogleMapsLocation);
 
 const USER_A_ID = 'a0a0a0a0-0000-4000-8000-000000000001';
 const USER_B_ID = 'b0b0b0b0-0000-4000-8000-000000000002';
@@ -415,8 +425,28 @@ describe('Vendor mobile phone validation (canonical /^[6-9]\\d{9}$/ rule)', () =
   });
 });
 
-describe('POST /api/v1/vendors/:vendorId/branches — latitude/longitude/pincode validation', () => {
-  it('accepts valid latitude/longitude and persists them', async () => {
+describe('POST /api/v1/vendors/:vendorId/branches — mapLocationUrl/pincode validation', () => {
+  it('resolves a mapLocationUrl server-side and persists the resolved latitude/longitude', async () => {
+    resolveMock.mockResolvedValue(['vendors:create']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.branch.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: BRANCH_A_ID, ...data }),
+    );
+    resolveMapLocationMock.mockResolvedValue({ latitude: 26.7606, longitude: 83.3732 });
+
+    const res = await request(app)
+      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ name: 'Golghar Branch', mapLocationUrl: 'https://maps.app.goo.gl/o3WNRifqzdctDuiF9', pincode: '273001' });
+
+    expect(res.status).toBe(201);
+    expect(resolveMapLocationMock).toHaveBeenCalledWith('https://maps.app.goo.gl/o3WNRifqzdctDuiF9');
+    expect(res.body.data.latitude).toBe(26.7606);
+    expect(res.body.data.longitude).toBe(83.3732);
+    expect(res.body.data.mapLocationUrl).toBe('https://maps.app.goo.gl/o3WNRifqzdctDuiF9');
+  });
+
+  it('silently strips legacy client-sent latitude/longitude instead of persisting them (mapLocationUrl is the only accepted input now)', async () => {
     resolveMock.mockResolvedValue(['vendors:create']);
     prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
@@ -426,18 +456,32 @@ describe('POST /api/v1/vendors/:vendorId/branches — latitude/longitude/pincode
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ name: 'Golghar Branch', latitude: 26.7606, longitude: 83.3732, pincode: '273001' });
+      .send({ name: 'Golghar Branch', latitude: 26.7606, longitude: 83.3732 });
 
     expect(res.status).toBe(201);
-    expect(res.body.data.latitude).toBe(26.7606);
-    expect(res.body.data.longitude).toBe(83.3732);
+    expect(resolveMapLocationMock).not.toHaveBeenCalled();
+    expect(prismaMock.branch.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({ latitude: expect.anything(), longitude: expect.anything() }),
+      }),
+    );
+  });
+
+  it('rejects a malformed mapLocationUrl before ever calling the resolver', async () => {
+    resolveMock.mockResolvedValue(['vendors:create']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+
+    const res = await request(app)
+      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ name: 'Golghar Branch', mapLocationUrl: 'not-a-url' });
+
+    expect(res.status).toBe(422);
+    expect(resolveMapLocationMock).not.toHaveBeenCalled();
+    expect(prismaMock.branch.create).not.toHaveBeenCalled();
   });
 
   it.each([
-    [{ latitude: 200 }, 'latitude above 90'],
-    [{ latitude: -200 }, 'latitude below -90'],
-    [{ longitude: 300 }, 'longitude above 180'],
-    [{ longitude: -300 }, 'longitude below -180'],
     [{ pincode: '12345' }, 'a 5-digit pincode'],
     [{ pincode: 'abcdef' }, 'a non-numeric pincode'],
   ])('rejects %s (%s)', async (badField) => {
@@ -451,6 +495,244 @@ describe('POST /api/v1/vendors/:vendorId/branches — latitude/longitude/pincode
 
     expect(res.status).toBe(422);
     expect(prismaMock.branch.create).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Feature: Map Location — `mapLocationUrl` on PATCH branch, on Vendor create/update (both admin
+ * and self-service), and on the read path for a pre-migration row. Extends the POST-branch
+ * coverage above with the update-time "skip re-resolve when unchanged / re-resolve when changed /
+ * leave untouched when absent" contract documented on `vendor.service.ts`'s
+ * `resolveMapLocationForUpdate`, plus the same resolver-rejection-surfaces-as-422 behavior on
+ * every entry point that accepts a `mapLocationUrl`.
+ */
+describe('mapLocationUrl — update-time resolve/skip semantics + resolver-rejection surfacing', () => {
+  const branchWithLocation = { ...branchAFixture, mapLocationUrl: 'https://maps.app.goo.gl/existing', latitude: 26.7606, longitude: 83.3732 };
+
+  it('PATCH branch with an unchanged mapLocationUrl does not call the resolver again', async () => {
+    resolveMock.mockResolvedValue(['vendors:edit']);
+    prismaMock.branch.findUnique.mockResolvedValue(branchWithLocation);
+    prismaMock.branch.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ ...branchWithLocation, ...data }),
+    );
+
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ name: 'Golghar Branch (renamed)', mapLocationUrl: branchWithLocation.mapLocationUrl });
+
+    expect(res.status).toBe(200);
+    expect(resolveMapLocationMock).not.toHaveBeenCalled();
+    expect(prismaMock.branch.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({ latitude: expect.anything(), longitude: expect.anything() }),
+      }),
+    );
+  });
+
+  it('PATCH branch with a changed mapLocationUrl re-resolves and updates latitude/longitude', async () => {
+    resolveMock.mockResolvedValue(['vendors:edit']);
+    prismaMock.branch.findUnique.mockResolvedValue(branchWithLocation);
+    resolveMapLocationMock.mockResolvedValue({ latitude: 12.9716, longitude: 77.5946 });
+    prismaMock.branch.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ ...branchWithLocation, ...data }),
+    );
+
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ mapLocationUrl: 'https://maps.app.goo.gl/brandNewLink' });
+
+    expect(res.status).toBe(200);
+    expect(resolveMapLocationMock).toHaveBeenCalledWith('https://maps.app.goo.gl/brandNewLink');
+    expect(res.body.data.latitude).toBe(12.9716);
+    expect(res.body.data.longitude).toBe(77.5946);
+    expect(prismaMock.branch.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ latitude: 12.9716, longitude: 77.5946, mapLocationUrl: 'https://maps.app.goo.gl/brandNewLink' }),
+      }),
+    );
+  });
+
+  it('PATCH branch with mapLocationUrl absent leaves the existing latitude/longitude/mapLocationUrl completely untouched', async () => {
+    resolveMock.mockResolvedValue(['vendors:edit']);
+    prismaMock.branch.findUnique.mockResolvedValue(branchWithLocation);
+    prismaMock.branch.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ ...branchWithLocation, ...data }),
+    );
+
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ name: 'Just a rename' });
+
+    expect(res.status).toBe(200);
+    expect(resolveMapLocationMock).not.toHaveBeenCalled();
+    expect(prismaMock.branch.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({ latitude: expect.anything(), longitude: expect.anything(), mapLocationUrl: expect.anything() }),
+      }),
+    );
+    expect(res.body.data.mapLocationUrl).toBe(branchWithLocation.mapLocationUrl);
+    expect(res.body.data.latitude).toBe(branchWithLocation.latitude);
+  });
+
+  it('a resolver rejection on branch create surfaces as a 422, not a 500', async () => {
+    resolveMock.mockResolvedValue(['vendors:create']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMapLocationMock.mockRejectedValue(new ApiError('VALIDATION_ERROR', "We couldn't resolve this Google Maps link. Please check the link and try again."));
+
+    const res = await request(app)
+      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ name: 'Golghar Branch', mapLocationUrl: 'https://maps.app.goo.gl/deadlink' });
+
+    expect(res.status).toBe(422);
+    expect(prismaMock.branch.create).not.toHaveBeenCalled();
+  });
+
+  it('a resolver rejection on branch update surfaces as a 422, not a 500', async () => {
+    resolveMock.mockResolvedValue(['vendors:edit']);
+    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
+    resolveMapLocationMock.mockRejectedValue(new ApiError('VALIDATION_ERROR', 'We could not find a location in that Google Maps link. Please check the link and try again.'));
+
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ mapLocationUrl: 'https://maps.app.goo.gl/deadlink' });
+
+    expect(res.status).toBe(422);
+    expect(prismaMock.branch.update).not.toHaveBeenCalled();
+  });
+
+  it('admin POST /vendors resolves a mapLocationUrl and persists the resolved latitude/longitude on the Vendor itself (not just Branch)', async () => {
+    resolveMock.mockResolvedValue(['vendors:create']);
+    resolveMapLocationMock.mockResolvedValue({ latitude: 26.7606, longitude: 83.3732 });
+    prismaMock.vendor.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: VENDOR_A_ID, ...data }),
+    );
+
+    const res = await request(app)
+      .post('/api/v1/vendors')
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ businessName: 'Golghar Spa', mapLocationUrl: 'https://maps.app.goo.gl/o3WNRifqzdctDuiF9' });
+
+    expect(res.status).toBe(201);
+    expect(resolveMapLocationMock).toHaveBeenCalledWith('https://maps.app.goo.gl/o3WNRifqzdctDuiF9');
+    expect(res.body.data.latitude).toBe(26.7606);
+    expect(res.body.data.longitude).toBe(83.3732);
+  });
+
+  it('admin PATCH /vendors/:id with an unchanged mapLocationUrl does not re-resolve', async () => {
+    resolveMock.mockResolvedValue(['vendors:edit']);
+    const existing = { ...vendorAFixture, mapLocationUrl: 'https://maps.app.goo.gl/existing', latitude: 1, longitude: 2 };
+    prismaMock.vendor.findUnique.mockResolvedValue(existing);
+    prismaMock.vendor.update.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ ...existing, ...data }));
+
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ mapLocationUrl: existing.mapLocationUrl });
+
+    expect(res.status).toBe(200);
+    expect(resolveMapLocationMock).not.toHaveBeenCalled();
+  });
+
+  it('self-service POST /vendors/me resolves a mapLocationUrl and persists it on the new self-registered vendor', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(null);
+    resolveMapLocationMock.mockResolvedValue({ latitude: 26.7606, longitude: 83.3732 });
+    prismaMock.vendor.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: VENDOR_A_ID, ...data }),
+    );
+
+    const res = await request(app)
+      .post('/api/v1/vendors/me')
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+      .send({ businessName: 'My Spa', mapLocationUrl: 'https://maps.app.goo.gl/o3WNRifqzdctDuiF9' });
+
+    expect(res.status).toBe(201);
+    expect(resolveMapLocationMock).toHaveBeenCalledWith('https://maps.app.goo.gl/o3WNRifqzdctDuiF9');
+    expect(res.body.data.latitude).toBe(26.7606);
+    expect(res.body.data.longitude).toBe(83.3732);
+  });
+
+  it('self-service PATCH /vendors/me with a changed mapLocationUrl re-resolves and updates latitude/longitude', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    const existing = { ...vendorAFixture, mapLocationUrl: 'https://maps.app.goo.gl/old', latitude: 1, longitude: 2, kycStatus: 'VERIFIED' };
+    prismaMock.vendor.findUnique.mockResolvedValue(existing);
+    resolveMapLocationMock.mockResolvedValue({ latitude: 26.7606, longitude: 83.3732 });
+    prismaMock.vendor.update.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ ...existing, ...data }));
+
+    const res = await request(app)
+      .patch('/api/v1/vendors/me')
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+      .send({ mapLocationUrl: 'https://maps.app.goo.gl/new' });
+
+    expect(res.status).toBe(200);
+    expect(resolveMapLocationMock).toHaveBeenCalledWith('https://maps.app.goo.gl/new');
+    expect(res.body.data.latitude).toBe(26.7606);
+    expect(res.body.data.longitude).toBe(83.3732);
+  });
+
+  it('self-service PATCH /vendors/me with mapLocationUrl absent leaves the existing value untouched', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    const existing = { ...vendorAFixture, mapLocationUrl: 'https://maps.app.goo.gl/old', latitude: 1, longitude: 2, kycStatus: 'VERIFIED' };
+    prismaMock.vendor.findUnique.mockResolvedValue(existing);
+    prismaMock.vendor.update.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ ...existing, ...data }));
+
+    const res = await request(app)
+      .patch('/api/v1/vendors/me')
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+      .send({ businessName: 'Renamed only' });
+
+    expect(res.status).toBe(200);
+    expect(resolveMapLocationMock).not.toHaveBeenCalled();
+    expect(res.body.data.mapLocationUrl).toBe(existing.mapLocationUrl);
+    expect(res.body.data.latitude).toBe(existing.latitude);
+  });
+
+  it('a resolver rejection on self-service vendor update surfaces as a 422, not a 500', async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMapLocationMock.mockRejectedValue(new ApiError('VALIDATION_ERROR', 'That is not a supported Google Maps URL. Please paste a link from Google Maps (e.g. maps.app.goo.gl or google.com/maps).'));
+
+    const res = await request(app)
+      .patch('/api/v1/vendors/me')
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+      .send({ mapLocationUrl: 'https://evil.com/not-maps' });
+
+    expect(res.status).toBe(422);
+    expect(prismaMock.vendor.update).not.toHaveBeenCalled();
+  });
+
+  it('GET returns a pre-migration branch row (latitude/longitude set, mapLocationUrl null) unchanged — never broken by the new resolve logic', async () => {
+    resolveMock.mockResolvedValue(['vendors:view']);
+    const preMigrationBranch = { ...branchAFixture, latitude: 26.7606, longitude: 83.3732, mapLocationUrl: null };
+    prismaMock.branch.findMany.mockResolvedValue([preMigrationBranch]);
+
+    const res = await request(app)
+      .get(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].latitude).toBe(26.7606);
+    expect(res.body.data[0].longitude).toBe(83.3732);
+    expect(res.body.data[0].mapLocationUrl).toBeNull();
+  });
+
+  it('GET returns a pre-migration vendor row (latitude/longitude set, mapLocationUrl null) unchanged', async () => {
+    resolveMock.mockResolvedValue(['vendors:view']);
+    prismaMock.vendor.findUnique.mockResolvedValue({ ...vendorAFixture, latitude: 26.7606, longitude: 83.3732, mapLocationUrl: null });
+
+    const res = await request(app)
+      .get(`/api/v1/vendors/${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.latitude).toBe(26.7606);
+    expect(res.body.data.longitude).toBe(83.3732);
+    expect(res.body.data.mapLocationUrl).toBeNull();
   });
 });
 

@@ -164,6 +164,43 @@
     ]
   },
   {
+    "id": "cms",
+    "title": "CMS",
+    "icon": "article",
+    "permissionKey": "cms",
+    "parent": null,
+    "order": 8.5,
+    "children": [
+      {
+        "id": "cms-blog",
+        "title": "Blog",
+        "icon": "article",
+        "route": "/account/cms/blog",
+        "permissionKey": "cms.blog",
+        "parent": "cms",
+        "order": 1
+      },
+      {
+        "id": "cms-about-us",
+        "title": "About Us",
+        "icon": "info",
+        "route": "/account/cms/about-us",
+        "permissionKey": "cms.about-us",
+        "parent": "cms",
+        "order": 2
+      },
+      {
+        "id": "cms-contact-us",
+        "title": "Contact Us",
+        "icon": "call",
+        "route": "/account/cms/contact-us",
+        "permissionKey": "cms.contact-us",
+        "parent": "cms",
+        "order": 3
+      }
+    ]
+  },
+  {
     "id": "administration",
     "title": "Administration",
     "icon": "admin_panel_settings",

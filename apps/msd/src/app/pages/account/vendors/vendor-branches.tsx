@@ -365,21 +365,18 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
 const BRANCH_PINCODE_REGEX = /^\d{6}$/;
 
 /** Same `(value: string) => string | null`, empty-is-valid pattern as vendor-profile-form.tsx's
- *  own `FIELD_VALIDATORS` — mirrors the backend's `BranchFieldsSchema` range checks exactly
- *  (`z.number().min(-90).max(90)`/`.min(-180).max(180)` in vendor.schema.ts) so an out-of-range
- *  value is caught before submit, not just after a 422. */
-function validateLatitude(value: string): string | null {
+ *  own `FIELD_VALIDATORS` — a light, client-side "does this look like a URL" check only. The
+ *  actual link (host, whether it resolves to a place) is validated server-side by
+ *  `googleMapsUrlResolver.provider.ts`, whose message is surfaced via `errors.mapLocationUrl`
+ *  from the submit handler's catch block (see `BranchDialog`'s `submit`). */
+function validateMapLocationUrl(value: string): string | null {
   if (!value.trim()) return null;
-  const n = Number(value);
-  if (Number.isNaN(n)) return 'Latitude must be a number';
-  return n >= -90 && n <= 90 ? null : 'Latitude must be between -90 and 90';
-}
-
-function validateLongitude(value: string): string | null {
-  if (!value.trim()) return null;
-  const n = Number(value);
-  if (Number.isNaN(n)) return 'Longitude must be a number';
-  return n >= -180 && n <= 180 ? null : 'Longitude must be between -180 and 180';
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'http:' || url.protocol === 'https:' ? null : 'Enter a valid Google Maps link';
+  } catch {
+    return 'Enter a valid Google Maps link';
+  }
 }
 
 function validateBranchPincode(value: string): string | null {
@@ -465,11 +462,10 @@ export function BranchDialog({ branch, onSave }: { branch?: Branch; onSave: (inp
     city: branch?.city ?? '',
     state: branch?.state ?? '',
     pincode: branch?.pincode ?? '',
-    latitude: branch?.latitude != null ? String(branch.latitude) : '',
-    longitude: branch?.longitude != null ? String(branch.longitude) : '',
+    mapLocationUrl: branch?.mapLocationUrl ?? '',
   });
   const [openingHours, setOpeningHours] = useState<OpeningHours>(branch?.openingHours ?? {});
-  const [errors, setErrors] = useState<Partial<Record<'pincode' | 'latitude' | 'longitude', string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<'pincode' | 'mapLocationUrl', string>>>({});
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -485,8 +481,7 @@ export function BranchDialog({ branch, onSave }: { branch?: Branch; onSave: (inp
     }
     const nextErrors: typeof errors = {
       pincode: validateBranchPincode(form.pincode) ?? undefined,
-      latitude: validateLatitude(form.latitude) ?? undefined,
-      longitude: validateLongitude(form.longitude) ?? undefined,
+      mapLocationUrl: validateMapLocationUrl(form.mapLocationUrl) ?? undefined,
     };
     setErrors(nextErrors);
     if (Object.values(nextErrors).some(Boolean)) {
@@ -503,14 +498,21 @@ export function BranchDialog({ branch, onSave }: { branch?: Branch; onSave: (inp
         city: form.city || undefined,
         state: form.state || undefined,
         pincode: form.pincode || undefined,
-        latitude: form.latitude.trim() ? Number(form.latitude) : undefined,
-        longitude: form.longitude.trim() ? Number(form.longitude) : undefined,
+        mapLocationUrl: form.mapLocationUrl.trim() || undefined,
         openingHours: Object.keys(openingHours).length > 0 ? openingHours : undefined,
       };
       await onSave(input);
       dialogRef.current?.close();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not save branch.');
+      // The Google Maps URL resolver throws a single `ApiError('VALIDATION_ERROR', message)`
+      // with no per-field `details.fieldErrors` breakdown (it's not a Zod validation error) —
+      // surface it directly under the Map Location field rather than only as a generic banner.
+      if (err instanceof ApiRequestError && err.code === 'VALIDATION_ERROR') {
+        setErrors((e) => ({ ...e, mapLocationUrl: err.message }));
+        setError('Fix the highlighted fields before saving.');
+      } else {
+        setError(err instanceof ApiRequestError ? err.message : 'Could not save branch.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -562,21 +564,14 @@ export function BranchDialog({ branch, onSave }: { branch?: Branch; onSave: (inp
           />
           {errors.pincode && <p className="error-state" role="alert">{errors.pincode}</p>}
           <OutlinedTextField
-            label="Latitude"
-            type="number"
-            value={form.latitude}
-            onInput={(e: Event) => set('latitude', (e.target as HTMLInputElement).value)}
-            error={Boolean(errors.latitude)}
+            label="Map Location"
+            type="url"
+            placeholder="Paste Google Maps location link"
+            value={form.mapLocationUrl}
+            onInput={(e: Event) => set('mapLocationUrl', (e.target as HTMLInputElement).value)}
+            error={Boolean(errors.mapLocationUrl)}
           />
-          {errors.latitude && <p className="error-state" role="alert">{errors.latitude}</p>}
-          <OutlinedTextField
-            label="Longitude"
-            type="number"
-            value={form.longitude}
-            onInput={(e: Event) => set('longitude', (e.target as HTMLInputElement).value)}
-            error={Boolean(errors.longitude)}
-          />
-          {errors.longitude && <p className="error-state" role="alert">{errors.longitude}</p>}
+          {errors.mapLocationUrl && <p className="error-state" role="alert">{errors.mapLocationUrl}</p>}
 
           <OpeningHoursEditor value={openingHours} onChange={setOpeningHours} />
 
