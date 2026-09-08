@@ -140,6 +140,22 @@ input[type='checkbox'] {
   color: var(--md-sys-color-on-surface);
 }
 
+.stat-card__values {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+.widget-grids {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0 50px 0 10px;
+  box-sizing: border-box;
+}
+.stat-card--email {
+  transform: translateX(-70px);
+}
 .stat-card__list {
   list-style: none;
   margin: 4px 0 0;

@@ -136,26 +136,26 @@ export function CustomerManagement() {
 
               {activeTab === 0 && (
                 <div className="admin-tab-panel" aria-label="Overview">
-                  <div className="widget-grid">
+                  <div className="widget-grids">
                     <div className="stat-card">
                       <p className="stat-card__title">Mobile</p>
-                      <p className="stat-card__value">{selectedCustomer.phone ?? '—'}</p>
-                    </div>
-                    <div className="stat-card">
-                      <p className="stat-card__title">Email</p>
-                      <p className="stat-card__value">{selectedCustomer.email ?? '—'}</p>
+                      <p className="stat-card__values">{selectedCustomer.phone ?? '—'}</p>
                     </div>
                     <div className="stat-card">
                       <p className="stat-card__title">Status</p>
-                      <p className="stat-card__value">{selectedCustomer.status}</p>
+                      <p className="stat-card__values">{selectedCustomer.status}</p>
+                    </div>
+                     <div className="stat-card stat-card--email">
+                      <p className="stat-card__title">Email</p>
+                      <p className="stat-card__values">{selectedCustomer.email ?? '—'}</p>
                     </div>
                     <div className="stat-card">
                       <p className="stat-card__title">Total Orders</p>
-                      <p className="stat-card__value">{selectedCustomer._count.orders}</p>
+                      <p className="stat-card__values">{selectedCustomer._count.orders}</p>
                     </div>
                     <div className="stat-card">
                       <p className="stat-card__title">Customer Since</p>
-                      <p className="stat-card__value">{new Date(selectedCustomer.createdAt).toLocaleDateString()}</p>
+                      <p className="stat-card__values">{new Date(selectedCustomer.createdAt).toLocaleDateString()}</p>
                     </div>
                   </div>
                 </div>

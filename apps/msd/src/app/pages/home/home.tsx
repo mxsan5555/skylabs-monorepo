@@ -423,39 +423,6 @@ export function Home() {
           </div>
         </div>
       </section>
-      {/* ── Hero / Search ──────────────────────────────────────────────── */}
-      {false && (
-        <section className="home__hero" aria-labelledby="hero-heading">
-          <div className="home__hero-slider">
-            {heroImages.map((image, index) => (
-              <div key={index} className="home__hero-slide"
-                style={{ backgroundImage: `url(${image})`, animationDelay: `${index * 6}s`, }}
-              />
-            ))}
-          </div>
-          <div className="home__hero-overlay"></div>
-          <div className="home__hero-content">
-            <h1 id="hero-heading" className="home__hero-heading"> {home.hero.heading}</h1>
-            <p className="home__hero-sub">{home.hero.subheading}</p>
-            <form
-              className="home__hero-search"
-              role="search"
-              aria-label="Search deals"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const q = (e.currentTarget.elements.namedItem('q') as HTMLInputElement)?.value;
-                if (q?.trim()) navigate(`/explore?q=${encodeURIComponent(q.trim())}`);
-                else navigate('/explore');
-              }}
-            >
-              <OutlinedTextField name="q" label={home.hero.searchPlaceholder} className="home__hero-search-field">
-                <Icon slot="leading-icon" aria-hidden="true">search</Icon>
-              </OutlinedTextField>
-              <FilledButton type="submit">{home.hero.ctaLabel}</FilledButton>
-            </form>
-          </div>
-        </section>
-      )}
       {/* ── Browse by Category ─────────────────────────────────────────── */}
       <section className="home-section home-section--alt" aria-labelledby="category-heading">
         <div className="home-section__container">

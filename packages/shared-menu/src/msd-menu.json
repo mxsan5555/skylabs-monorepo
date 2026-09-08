@@ -73,7 +73,7 @@
   },
   {
     "id": "vendor-deals",
-    "title": "Deals / Packages",
+    "title": "Deals",
     "icon": "sell",
     "route": "/account/vendor-deals",
     "permissionKey": "vendor-portal",
