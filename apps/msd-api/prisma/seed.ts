@@ -64,6 +64,11 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   'rbac.users': ['create', 'edit', 'delete', 'assign', 'status_change', 'custom'],
   'rbac.audit-logs': [],
   settings: ['edit'],
+  // CMS: Blog is full CRUD; About Us/Contact Us are singleton content rows — edit-only, mirrors
+  // 'settings' above exactly (no create/delete concept for a row that always exists).
+  'cms.blog': ['create', 'edit', 'delete'],
+  'cms.about-us': ['edit'],
+  'cms.contact-us': ['edit'],
 };
 
 function flattenMenu(nodes: readonly MenuNode[]): MenuNode[] {
@@ -177,6 +182,8 @@ async function grantStarterPermissions(
     'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit', 'masters.sub-categories:delete',
     'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
     'settings:view', 'settings:edit',
+    'cms:view', 'cms.blog:view', 'cms.blog:create', 'cms.blog:edit', 'cms.blog:delete',
+    'cms.about-us:view', 'cms.about-us:edit', 'cms.contact-us:view', 'cms.contact-us:edit',
   ]);
 
   await grant('marketing', [
@@ -185,6 +192,10 @@ async function grantStarterPermissions(
     'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit',
     'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
     'reports:view',
+    // No 'cms.blog:delete' — mirrors this same role's create/edit-but-no-delete grant on
+    // 'masters.categories' above.
+    'cms:view', 'cms.blog:view', 'cms.blog:create', 'cms.blog:edit',
+    'cms.about-us:view', 'cms.about-us:edit', 'cms.contact-us:view', 'cms.contact-us:edit',
   ]);
 
   await grant('sales', [

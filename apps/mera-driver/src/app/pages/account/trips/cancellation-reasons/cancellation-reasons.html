@@ -1,0 +1,75 @@
+<md-admin-page
+  [title]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit Cancellation Reason' : 'Add Cancellation Reason') : 'Cancellation Reasons'"
+  [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit cancellation reason details' : 'Add a new cancellation reason') : 'Master list of predefined cancellation reasons shown in-app.'"
+>
+  <div class="relative w-full">
+    @if (!showAddForm()) {
+      <div class="w-full mt-4">
+        <sky-card class="p-6 block">
+          <sky-data-table
+            [columns]="tableColumns"
+            [rows]="tableRowsString()"
+            [total]="list().length"
+            selectable exportable searchable
+            [actions]="tableActions"
+            (sky-dt-row-action)="onRowAction($event)"
+            caption="Cancellation Reasons Database"
+          >
+            <md-icon-button slot="toolbar-actions" aria-label="Add Reason" title="Add Reason" (click)="startAdd()">
+              <md-icon>add</md-icon>
+            </md-icon-button>
+          </sky-data-table>
+        </sky-card>
+      </div>
+    } @else {
+      <div class="flex flex-col gap-6 w-full mt-2">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="text-xs text-slate-500 font-semibold tracking-wide">
+            Home / <span class="text-[#2e7d32]">{{ editingId() !== null && editingId() !== 'new' ? 'Edit Cancellation Reason' : 'Add Cancellation Reason' }}</span>
+          </div>
+          <md-outlined-button (click)="cancelEdit()">
+            <md-icon slot="icon">arrow_back</md-icon>
+            Back to List
+          </md-outlined-button>
+        </div>
+
+        <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
+          <div class="flex flex-col gap-y-6 w-full">
+            <sky-card class="p-6 block">
+              <div class="section-heading-box"><h3>1. Reason Details</h3></div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="Reason Code *" required [value]="inputCode()" (input)="inputCode.set($any($event.target).value)" placeholder="e.g. CR-01"></md-outlined-text-field>
+
+                <md-outlined-select label="Applies To" [value]="inputAppliesTo()" (change)="inputAppliesTo.set($any($event.target).value)">
+                  <md-select-option value="Customer"><div slot="headline">Customer</div></md-select-option>
+                  <md-select-option value="Driver"><div slot="headline">Driver</div></md-select-option>
+                  <md-select-option value="Both"><div slot="headline">Both</div></md-select-option>
+                </md-outlined-select>
+
+                <md-outlined-select label="Penalty Applicable" [value]="inputPenalty()" (change)="inputPenalty.set($any($event.target).value)">
+                  <md-select-option value="Yes"><div slot="headline">Yes</div></md-select-option>
+                  <md-select-option value="No"><div slot="headline">No</div></md-select-option>
+                </md-outlined-select>
+
+                <md-outlined-select label="Status" [value]="inputStatus()" (change)="inputStatus.set($any($event.target).value)">
+                  <md-select-option value="Active"><div slot="headline">Active</div></md-select-option>
+                  <md-select-option value="Inactive"><div slot="headline">Inactive</div></md-select-option>
+                </md-outlined-select>
+
+                <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Reason Description *" required [value]="inputReason()" (input)="inputReason.set($any($event.target).value)" placeholder="Describe reason details..."></md-outlined-text-field>
+              </div>
+            </sky-card>
+          </div>
+
+          <div class="flex justify-end gap-3 mt-8 border-t border-slate-100 pt-4">
+            <md-outlined-button (click)="cancelEdit()">Cancel</md-outlined-button>
+            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;">
+              <md-icon slot="icon">save</md-icon>
+              {{ editingId() !== null && editingId() !== 'new' ? 'Save Changes' : 'Save Reason' }}
+            </md-filled-button>
+          </div>
+        </sky-card>
+      </div>
+    }
+  </div>
+</md-admin-page>

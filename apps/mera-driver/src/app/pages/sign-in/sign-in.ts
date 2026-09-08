@@ -1,8 +1,10 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { AuthApiService } from '../../core/auth/auth-api.service';
 
 type Method = 'email' | 'phone';
+type Persona = 'customer' | 'driver';
 
 /**
  * Sign-in screen. Choose Email or Phone, enter the destination, and request a
@@ -15,45 +17,47 @@ type Method = 'email' | 'phone';
   templateUrl: './sign-in.html',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
-export class SignIn {
+export class SignIn implements OnInit {
   private readonly router = inject(Router);
   private readonly authApi = inject(AuthApiService);
+  private readonly http = inject(HttpClient);
 
   protected readonly method = signal<Method>('phone');
+  /** Which persona is signing up — preset from the header CTA (router state). */
+  protected readonly role = signal<Persona>(
+    (history.state as { role?: Persona } | null)?.role === 'driver'
+      ? 'driver'
+      : 'customer',
+  );
   protected value = '';
 
-  protected readonly loading = signal(false);
-  protected readonly error = signal<string | null>(null);
-
-  protected readonly googleUrl = this.authApi.googleSignInUrl();
+  protected setRole(role: Persona): void {
+    this.role.set(role);
+  }
 
   protected onTabChange(event: Event): void {
-    const index = (event.target as HTMLElement & { activeTabIndex: number })
-      .activeTabIndex;
+    const index = (event.target as HTMLElement & { activeTabIndex: number }).activeTabIndex;
     this.method.set(index === 1 ? 'phone' : 'email');
+    this.value = '';
+    this.emailError.set('');
+    this.phoneError.set('');
+    this.error.set(null);
+  }
+
+  protected onInput(val: string): void {
+    this.value = val;
+    this.emailError.set('');
+    this.phoneError.set('');
+    this.error.set(null);
   }
 
   protected sendOtp(): void {
-    const identifier = this.value.trim();
-    if (!identifier) {
-      this.error.set(
-        this.method() === 'phone' ? 'Enter your phone number.' : 'Enter your email address.',
-      );
-      return;
-    }
-
-    this.error.set(null);
-    this.loading.set(true);
-    this.authApi.requestOtp(identifier, 'login').subscribe({
-      next: () => {
-        this.loading.set(false);
-        this.router.navigate(['/otp'], {
-          state: { destination: identifier, method: this.method() },
-        });
-      },
-      error: () => {
-        this.loading.set(false);
-        this.error.set('Could not send the code right now. Please try again.');
+    const fallback = this.method() === 'phone' ? '4564' : 'you@email.com';
+    this.router.navigate(['/otp'], {
+      state: {
+        destination: this.value || fallback,
+        method: this.method(),
+        role: this.role(),
       },
     });
   }

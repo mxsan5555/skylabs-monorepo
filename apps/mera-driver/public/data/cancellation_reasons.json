@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "code": "CR-01",
+    "reason_text": "Driver taking too long to arrive",
+    "applies_to": "Customer",
+    "penalty_applicable": "No",
+    "status": "Active"
+  },
+  {
+    "id": 2,
+    "code": "CR-02",
+    "reason_text": "Customer unreachable / No show",
+    "applies_to": "Driver",
+    "penalty_applicable": "Yes",
+    "status": "Active"
+  },
+  {
+    "id": 3,
+    "code": "CR-03",
+    "reason_text": "Vehicle mechanical issue",
+    "applies_to": "Driver",
+    "penalty_applicable": "No",
+    "status": "Active"
+  },
+  {
+    "id": 4,
+    "code": "CR-04",
+    "reason_text": "Plan changed / Booked by mistake",
+    "applies_to": "Customer",
+    "penalty_applicable": "No",
+    "status": "Active"
+  },
+  {
+    "id": 5,
+    "code": "CR-05",
+    "reason_text": "Incorrect pickup location entered",
+    "applies_to": "Customer",
+    "penalty_applicable": "No",
+    "status": "Active"
+  },
+  {
+    "id": 6,
+    "code": "CR-06",
+    "reason_text": "Emergency / Personal reason",
+    "applies_to": "Both",
+    "penalty_applicable": "No",
+    "status": "Inactive"
+  }
+]

@@ -45,6 +45,13 @@ import {
 } from '../schemas/vendor.schema';
 import { CategoryCreateSchema, CategoryUpdateSchema, CategoryStatusUpdateSchema } from '../schemas/category.schema';
 import {
+  BlogPostCreateSchema,
+  BlogPostUpdateSchema,
+  BlogPostStatusUpdateSchema,
+  PublicBlogPostListQuerySchema,
+} from '../schemas/blog-post.schema';
+import { AboutUsUpdateSchema, ContactUsUpdateSchema } from '../schemas/site-content.schema';
+import {
   PopularTagCreateSchema,
   PopularTagUpdateSchema,
   PopularTagStatusUpdateSchema,
@@ -1434,6 +1441,40 @@ export function buildOpenApiDocument() {
     responses: { 200: { description: 'Therapist' }, 404: errorResponse },
   });
 
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/blog-posts',
+    summary: 'Public blog post listing — always PUBLISHED only, never accepts a status override',
+    tags: ['Catalogue (public)'],
+    request: { query: PublicBlogPostListQuerySchema },
+    responses: { 200: { description: 'Blog posts' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/blog-posts/{slug}',
+    summary: 'A single public blog post by slug — 404s if not found or not PUBLISHED',
+    tags: ['Catalogue (public)'],
+    request: { params: z.object({ slug: z.string() }) },
+    responses: { 200: { description: 'Blog post' }, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/about-us',
+    summary: 'Public About Us content (singleton — no draft/published concept)',
+    tags: ['Catalogue (public)'],
+    responses: { 200: { description: 'About Us content' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/contact-us',
+    summary: 'Public Contact Us content (singleton — no draft/published concept)',
+    tags: ['Catalogue (public)'],
+    responses: { 200: { description: 'Contact Us content' } },
+  });
+
   // ─── Cart (customer self-service, product deals only) ────────────────────────
 
   registry.registerPath({
@@ -1743,6 +1784,195 @@ export function buildOpenApiDocument() {
     security: bearer,
     request: { params: z.object({ id: z.string().uuid() }) },
     responses: { 200: { description: 'Customer' }, 404: errorResponse },
+  });
+
+  // ─── Blog Posts (admin CRUD, mirrors Categories' registration style exactly) ─────────────────
+
+  registry.registerPath({
+    method: 'get',
+    path: '/blog-posts',
+    summary: 'List blog posts (?search=, ?status=DRAFT|PUBLISHED, ?categorySlug=)',
+    tags: ['Blog Posts'],
+    security: bearer,
+    responses: { 200: { description: 'Blog posts' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/blog-posts',
+    summary: 'Create a blog post',
+    tags: ['Blog Posts'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: BlogPostCreateSchema } } } },
+    responses: { 201: { description: 'Created' }, 409: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/blog-posts/{id}',
+    summary: 'Get a blog post by id',
+    tags: ['Blog Posts'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Blog post' }, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/blog-posts/{id}',
+    summary: 'Update a blog post',
+    tags: ['Blog Posts'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: BlogPostUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' } },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/blog-posts/{id}/status',
+    summary: 'Publish/unpublish a blog post (sets publishedAt once, on the first DRAFT -> PUBLISHED transition only)',
+    tags: ['Blog Posts'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: BlogPostStatusUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' } },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/blog-posts/{id}',
+    summary: 'Delete a blog post',
+    tags: ['Blog Posts'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Deleted' } },
+  });
+
+  // ─── Blog Post media (shared upload system — image-only, no video) ──────────────────────────
+
+  registry.registerPath({
+    method: 'post',
+    path: '/blog-posts/{id}/images',
+    summary: 'Upload an image for a blog post (JPG/PNG/WEBP, 30KB–80KB)',
+    tags: ['Blog Posts'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }), body: mediaFileBody },
+    responses: { 201: { description: 'Created' }, 403: errorResponse, 404: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/blog-posts/{id}/images/{imageId}',
+    summary: 'Delete a blog post image',
+    tags: ['Blog Posts'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid(), imageId: z.string().uuid() }) },
+    responses: { 200: { description: 'Deleted' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/blog-posts/{id}/images/reorder',
+    summary: "Reorder a blog post's images",
+    tags: ['Blog Posts'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }), body: { content: { 'application/json': { schema: MediaReorderSchema } } } },
+    responses: { 200: { description: 'Reordered' }, 403: errorResponse, 404: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/blog-posts/{id}/images/{imageId}/primary',
+    summary: "Set a blog post's primary image",
+    tags: ['Blog Posts'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid(), imageId: z.string().uuid() }) },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  // ─── About Us / Contact Us (admin — both singleton rows, no :id in any path) ────────────────
+
+  registry.registerPath({
+    method: 'get',
+    path: '/about-us',
+    summary: 'Get the About Us content (singleton — auto-created with defaults on first read)',
+    tags: ['Site Content'],
+    security: bearer,
+    responses: { 200: { description: 'About Us content' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/about-us',
+    summary: 'Update the About Us content (upserts the singleton row)',
+    tags: ['Site Content'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: AboutUsUpdateSchema } } } },
+    responses: { 200: { description: 'Updated' } },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/about-us/images',
+    summary: 'Upload an image for the About Us page (JPG/PNG/WEBP, 30KB–80KB)',
+    tags: ['Site Content'],
+    security: bearer,
+    request: { body: mediaFileBody },
+    responses: { 201: { description: 'Created' }, 403: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/about-us/images/{imageId}',
+    summary: 'Delete an About Us image',
+    tags: ['Site Content'],
+    security: bearer,
+    request: { params: z.object({ imageId: z.string().uuid() }) },
+    responses: { 200: { description: 'Deleted' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/about-us/images/reorder',
+    summary: "Reorder the About Us page's images",
+    tags: ['Site Content'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: MediaReorderSchema } } } },
+    responses: { 200: { description: 'Reordered' }, 403: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/about-us/images/{imageId}/primary',
+    summary: "Set the About Us page's primary image",
+    tags: ['Site Content'],
+    security: bearer,
+    request: { params: z.object({ imageId: z.string().uuid() }) },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/contact-us',
+    summary: 'Get the Contact Us content (singleton — auto-created with defaults on first read)',
+    tags: ['Site Content'],
+    security: bearer,
+    responses: { 200: { description: 'Contact Us content' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/contact-us',
+    summary: 'Update the Contact Us content (upserts the singleton row)',
+    tags: ['Site Content'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: ContactUsUpdateSchema } } } },
+    responses: { 200: { description: 'Updated' } },
   });
 
   // ─── Business module stubs ───────────────────────────────────────────────────

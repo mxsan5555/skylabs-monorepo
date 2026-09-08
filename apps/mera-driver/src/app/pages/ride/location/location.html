@@ -1,0 +1,24 @@
+<section class="rider-screen rider-locate" aria-labelledby="locate-title">
+  <div class="rider-locate__art" aria-hidden="true">
+    <md-icon>near_me</md-icon>
+  </div>
+
+  <h1 id="locate-title" class="rider-locate__title">Turn on your location</h1>
+  <p class="rider-locate__body">
+    Allow mera-driver to use your location so we can set your pickup, find
+    nearby drivers, and show accurate arrival times.
+  </p>
+
+  <ul class="rider-locate__points">
+    <li><md-icon aria-hidden="true">my_location</md-icon> Precise pickup, no typing</li>
+    <li><md-icon aria-hidden="true">schedule</md-icon> Live driver ETAs</li>
+    <li><md-icon aria-hidden="true">shield</md-icon> Shared only during your trip</li>
+  </ul>
+
+  <div class="rider-cta">
+    <md-filled-button [disabled]="busy()" (click)="allow()">
+      {{ busy() ? 'Locating…' : 'Allow location access' }}
+    </md-filled-button>
+    <md-text-button (click)="skip()">Not now</md-text-button>
+  </div>
+</section>

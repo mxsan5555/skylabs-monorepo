@@ -125,6 +125,9 @@ Full agent file map: `.claude/agents/` · Full skill file map: `.claude/skills/`
 - Use the AI agent team (above) for all new features — never build outside the
   defined pipeline or bypass a step (e.g. shipping without skylabs-dev tests or
   skylabs-vivek SEO on public pages).
+- Branch flow `feature/* → develop → release → main`: branch new work off
+  `develop` (never `main`), and **back-merge `main` into `develop` after every
+  release** so `develop` never trails production. Full detail: `DEPLOYMENT.md`.
 
 ## Roadmap
 

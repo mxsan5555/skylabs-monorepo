@@ -9,12 +9,11 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 
 ## In progress
 
-### Deployment (Vercel) — code done, dashboard config pending
-- [ ] In Vercel, per project (msd, mera-driver): set Root Directory to the app
-      folder, Production Branch = `main`, attach the bought domain to Production,
-      add env vars (`VITE_API_URL` etc.) — see `DEPLOYMENT.md`
-- [ ] Validate the `../../` paths in `vercel.json` on a first preview deploy
+### Deployment (Vercel) — pipeline live, hardening pending
+- [ ] Attach the bought custom domain to each project's Production (`main`) deploy
+- [ ] Add env vars in Vercel (msd: `VITE_API_URL`, `VITE_GOOGLE_MAPS_API_KEY`)
 - [ ] Add the CI check as a required status check in branch protection
+- [ ] After each `release → main`, back-merge `main → develop` (recurring — see `DEPLOYMENT.md`)
 
 ## Backlog
 
@@ -36,7 +35,7 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] Wired CartProvider + WishlistProvider in main.tsx — 2026-07-12
 
 ### Content pages — both apps (`pages/` + route)
-- [ ] Contact page
+- [ ] Contact page~
 - [ ] Blog category (filtered list)
 
 ### Account & admin — both apps (remaining)
@@ -130,6 +129,9 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] `.github/workflows/ci.yml` — `nx affected -t lint test build` PR gate on develop/release/main — 2026-09-04
 - [x] `DEPLOYMENT.md` (source of truth + Mermaid flowchart) + root `README.md` — 2026-09-04
 - [x] Deployment docs into `CLAUDE.md` / `PLANNING.md` — 2026-09-04
+- [x] Version manifests `apps/{msd,mera-driver}/package.json` so `nx release` has a version to bump — 2026-09-05
+- [x] First `nx release --skip-publish --first-release`: `msd@0.1.0` + `mera-driver@0.1.0` tags + per-app CHANGELOGs — 2026-09-05
+- [x] Validated Vercel preview/staging deploys (SPA rewrite + `nx-ignore` self-select working); documented branch-from-develop + back-merge workflow — 2026-09-05
 
 ### Docs
 - [x] `ARCHITECTURE.md`, `PLANNING.md`, `TASK.md`, updated `CLAUDE.md`

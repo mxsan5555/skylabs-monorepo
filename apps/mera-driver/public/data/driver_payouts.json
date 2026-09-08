@@ -1,0 +1,24 @@
+[
+  {
+    "id": 1,
+    "payout_code": "PO-8801",
+    "driver_name": "Rahul Verma",
+    "amount": 14500,
+    "bank_name": "State Bank of India",
+    "account_no": "332211009988",
+    "ifsc_code": "SBIN0001234",
+    "status": "Paid",
+    "payout_date": "2026-08-15"
+  },
+  {
+    "id": 2,
+    "payout_code": "PO-8802",
+    "driver_name": "Sana Kapoor",
+    "amount": 18200,
+    "bank_name": "HDFC Bank",
+    "account_no": "5010099887766",
+    "ifsc_code": "HDFC0000123",
+    "status": "Processing",
+    "payout_date": "2026-08-18"
+  }
+]

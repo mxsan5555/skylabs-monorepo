@@ -21,6 +21,31 @@ feature/*  ──PR──▶  develop  ──PR──▶  release  ──PR─�
   and stakeholders validate here. Version stamping happens on this branch.
 - **`main`** — production. Merge → Vercel deploys to the production domain.
 
+## Developer workflow (branch from develop, back-merge after release)
+
+- **Always branch new work off `develop`** — never off `main`. `develop` is the
+  daily source of truth; `main` is production-only and is not a base for feature
+  work. Pattern: `git checkout develop && git pull && git checkout -b feature/<name>`.
+- **Keep feature branches current** — merge or rebase the latest `develop` in
+  regularly so they don't drift while in progress.
+- **After every `release → main`, back-merge into `develop`.** The `nx release`
+  step commits real changes on `release`/`main` (version bump in each app's
+  `package.json`, `CHANGELOG.md`) that `develop` doesn't have. Skipping this makes
+  `develop` fall behind production and causes conflicts / wrong versions at the
+  next release. The sync:
+  ```bash
+  git checkout develop
+  git pull                        # get develop up to date first
+  git pull origin main --no-edit  # merge main (the release bump + changelogs) in
+  git push                        # share it with the team
+  ```
+  (`--no-edit` accepts the default merge-commit message instead of opening an
+  editor.) After this, `develop` = everything in production + in-flight work, and
+  the team branches fresh features off it.
+- **Tags are global refs.** `msd@x.y.z` / `mera-driver@x.y.z` are pushed once with
+  `git push --follow-tags` and are visible from every branch — there is no
+  per-branch tag sync.
+
 ## Flowchart
 
 ```mermaid

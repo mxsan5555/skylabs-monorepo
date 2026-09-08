@@ -1,0 +1,52 @@
+<section class="rider-screen rider-verify" aria-labelledby="verify-title">
+  <div class="rider-topbar">
+    <md-icon-button aria-label="Go back" (click)="back()">
+      <md-icon aria-hidden="true">arrow_back</md-icon>
+    </md-icon-button>
+  </div>
+
+  <div class="rider-verify__art" aria-hidden="true">
+    <md-icon>pin</md-icon>
+  </div>
+
+  <h1 id="verify-title" class="rider-verify__title">Enter start code</h1>
+  <p class="rider-verify__body">
+    @if (booking.driver(); as driver) {
+      Ask {{ driver.name }} for the 4-digit code and enter it to start your trip.
+    } @else {
+      Enter the 4-digit code your driver shares to start your trip.
+    }
+  </p>
+
+  <div class="rider-verify__boxes" role="group" aria-label="4-digit start code">
+    @for (digit of digits(); track $index) {
+      <input
+        [id]="'start-otp-' + $index"
+        class="rider-verify__box"
+        type="text"
+        inputmode="numeric"
+        autocomplete="one-time-code"
+        maxlength="1"
+        [attr.aria-label]="'Digit ' + ($index + 1)"
+        [value]="digit"
+        (input)="onInput($index, $event)"
+        (keydown)="onKeydown($index, $event)"
+      />
+    }
+  </div>
+
+  <p class="rider-verify__resend">
+    Didn’t get a code?
+    @if (seconds() > 0) {
+      <span class="otp-muted">Resend in {{ seconds() }}s</span>
+    } @else {
+      <md-text-button (click)="resend()">Resend code</md-text-button>
+    }
+  </p>
+
+  <div class="rider-cta">
+    <md-filled-button [disabled]="!complete()" (click)="verify()">
+      Start trip
+    </md-filled-button>
+  </div>
+</section>
