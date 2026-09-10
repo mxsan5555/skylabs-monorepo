@@ -17,7 +17,6 @@ vi.mock('../services/permission-resolver.service', () => ({
 // routes.test.ts — without this, the image/video upload routes tested below would write real
 // files under the real uploads directory on every test run.
 vi.mock('../lib/media-storage', () => ({
-  getUploadRoot: vi.fn(() => '/fake/uploads/media'),
   writeMediaFile: vi.fn(async (subdir: string, parentId: string, buffer: Buffer) => ({
     storageKey: `${subdir}/${parentId}/fake.jpg`,
     sizeBytes: buffer.length,

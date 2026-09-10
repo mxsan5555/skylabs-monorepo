@@ -49,7 +49,9 @@ Branch flow `feature/* → develop → release → main`. The two frontends depl
 `nx-ignore`, so a commit only rebuilds the app(s) it actually affects. `main` is
 Production (custom domain); `release`/`develop` use Vercel preview URLs.
 Versioning is `npx nx release --skip-publish` run on the `release` branch. The two
-Express APIs host off Vercel (Railway/Fly).
+Express APIs host **off Vercel on Railway** (always-on Node servers), reusing the
+Neon Postgres database, with image files on Cloudflare R2. Step-by-step deploy guide
+for msd-api (Railway + Neon + R2 + wiring the Vercel frontend): [`DEPLOYMENT.md`](DEPLOYMENT.md#deploying-msd-api-step-by-step).
 
 ```mermaid
 flowchart TD

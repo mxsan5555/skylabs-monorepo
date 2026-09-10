@@ -127,6 +127,11 @@ apps/<name>-api/
 └── .env.local          Never committed
 ```
 
+- **Hosting** — each API deploys **off Vercel on Railway** (always-on Node process,
+  `node dist/apps/<name>-api/main.js`). msd-api reuses the **Neon** Postgres DB (via
+  `DATABASE_URL`) and stores uploaded media on **Cloudflare R2**; mera-driver-api will
+  follow the identical pattern with its own DB + bucket. Step-by-step:
+  `DEPLOYMENT.md → Deploying msd-api`.
 - **PostgreSQL** — msd-api → db `msd`; mera-driver-api → db `mera_driver`. Never shared.
 - **Prisma**, pinned `6.19.3` (Prisma 7 dropped `datasource.url` from the schema file,
   which the classic singleton-client pattern relies on). Each app generates its client

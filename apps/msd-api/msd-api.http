@@ -1,0 +1,1487 @@
+###############################################################################
+# msd-api — all API endpoints (VS Code REST Client)
+#
+# HOW TO USE
+# 1. Install the "REST Client" VS Code extension (publisher: Huachao Mao).
+# 2. Start the API:  npx nx serve msd-api   (http://localhost:3333/api/v1)
+# 3. Run the LOGIN flow first (Auth section): send "otp/request", read the OTP,
+#    then send "otp/verify" — its response auto-fills {{accessToken}} for every
+#    other request below (via the `# @name login` capture).
+# 4. Click the "Send Request" link that appears above each `###` request.
+#
+# Notes
+# - {{baseUrl}} already includes the /api/v1 prefix.
+# - Protected routes send `Authorization: Bearer {{accessToken}}`. Public ones don't.
+# - Replace the @id placeholders (@roleId, @vendorId, …) with real IDs from list calls.
+# - Image/video uploads are multipart/form-data — one full example is shown; the rest
+#   are marked `# (multipart upload)` — copy the example's body shape for those.
+# - Full request/response schemas: open http://localhost:3333/docs (Swagger).
+###############################################################################
+
+@baseUrl = http://localhost:3333/api/v1
+@contentType = application/json
+
+# Filled automatically by the login request below. You can also paste a token here.
+@accessToken = {{login.response.body.$.data.accessToken}}
+@refreshToken = {{login.response.body.$.data.refreshToken}}
+
+# ---- ID placeholders: replace with real values from the list endpoints ----
+@roleId = 00000000-0000-0000-0000-000000000000
+@userId = 00000000-0000-0000-0000-000000000000
+@targetUserId = 00000000-0000-0000-0000-000000000000
+@widgetKey = sales_summary
+@vendorId = 00000000-0000-0000-0000-000000000000
+@branchId = 00000000-0000-0000-0000-000000000000
+@dealId = 00000000-0000-0000-0000-000000000000
+@therapistId = 00000000-0000-0000-0000-000000000000
+@packageId = 00000000-0000-0000-0000-000000000000
+@productId = 00000000-0000-0000-0000-000000000000
+@categoryId = 00000000-0000-0000-0000-000000000000
+@tagId = 00000000-0000-0000-0000-000000000000
+@blogPostId = 00000000-0000-0000-0000-000000000000
+@orderId = 00000000-0000-0000-0000-000000000000
+@cartItemId = 00000000-0000-0000-0000-000000000000
+@imageId = 00000000-0000-0000-0000-000000000000
+@notificationId = 00000000-0000-0000-0000-000000000000
+@documentType = pan
+@categorySlug = massage
+@vendorSlug = my-vendor
+@blogSlug = my-post
+
+
+###############################################################################
+# AUTH  (/auth)
+###############################################################################
+
+### Request an OTP (email or phone in `identifier`)
+POST {{baseUrl}}/auth/otp/request
+Content-Type: {{contentType}}
+
+{
+  "identifier": "san_allways@yahoo.com",
+  "purpose": "login"
+}
+
+### Verify OTP -> issues tokens. THIS auto-fills {{accessToken}} & {{refreshToken}}.
+# @name login
+POST {{baseUrl}}/auth/otp/verify
+Content-Type: {{contentType}}
+
+{
+  "identifier": "san_allways@yahoo.com",
+  "otp": "123456"
+}
+
+### Google OAuth (open in a browser, not REST Client)
+GET {{baseUrl}}/auth/google
+
+### Google OAuth callback (browser only)
+GET {{baseUrl}}/auth/google/callback
+
+### Google OAuth failure
+GET {{baseUrl}}/auth/google/failure
+
+### Refresh the access token (rotates the refresh token)
+POST {{baseUrl}}/auth/refresh
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### Logout (revoke this refresh token)
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### Logout everywhere (revoke all sessions for the user)
+POST {{baseUrl}}/auth/logout-all
+Authorization: Bearer {{accessToken}}
+
+
+###############################################################################
+# RBAC  (/rbac)  — bootstrap, roles, users, audit logs, impersonation
+###############################################################################
+
+### Bootstrap: the single source of truth the UI renders from (user+roles+perms+menu+widgets)
+GET {{baseUrl}}/rbac/bootstrap
+Authorization: Bearer {{accessToken}}
+
+### List roles
+GET {{baseUrl}}/rbac/roles
+Authorization: Bearer {{accessToken}}
+
+### Create role
+POST {{baseUrl}}/rbac/roles
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "key": "dispatcher",
+  "name": "Dispatcher",
+  "description": "Custom role"
+}
+
+### Update role
+PATCH {{baseUrl}}/rbac/roles/{{roleId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Dispatcher (renamed)",
+  "description": "Updated"
+}
+
+### Delete role
+DELETE {{baseUrl}}/rbac/roles/{{roleId}}
+Authorization: Bearer {{accessToken}}
+
+### Clone role
+POST {{baseUrl}}/rbac/roles/{{roleId}}/clone
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "key": "dispatcher-copy",
+  "name": "Dispatcher Copy"
+}
+
+### Change role status (active/inactive)
+PATCH {{baseUrl}}/rbac/roles/{{roleId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "active"
+}
+
+### Permissions catalog (menu x action matrix with real Permission.id's)
+GET {{baseUrl}}/rbac/permissions/catalog
+Authorization: Bearer {{accessToken}}
+
+### Get a role's current permission grants
+GET {{baseUrl}}/rbac/roles/{{roleId}}/permissions
+Authorization: Bearer {{accessToken}}
+
+### Set a role's permissions (send real permissionId's from the catalog)
+PUT {{baseUrl}}/rbac/roles/{{roleId}}/permissions
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "permissionIds": []
+}
+
+### Set a role's dashboard widgets
+PUT {{baseUrl}}/rbac/roles/{{roleId}}/widgets
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "widgetKeys": ["{{widgetKey}}"]
+}
+
+### List dashboard widgets
+GET {{baseUrl}}/rbac/dashboard-widgets
+Authorization: Bearer {{accessToken}}
+
+### Create dashboard widget
+POST {{baseUrl}}/rbac/dashboard-widgets
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "key": "sales_summary",
+  "title": "Sales Summary",
+  "order": 1
+}
+
+### List users
+GET {{baseUrl}}/rbac/users?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Create user
+POST {{baseUrl}}/rbac/users
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "New User",
+  "email": "newuser@example.com",
+  "phone": "9000000000",
+  "roleKeys": ["customer"]
+}
+
+### Get my own profile
+GET {{baseUrl}}/rbac/users/me
+Authorization: Bearer {{accessToken}}
+
+### Update my own profile
+PATCH {{baseUrl}}/rbac/users/me
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "My New Name"
+}
+
+### Update a user
+PATCH {{baseUrl}}/rbac/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Updated Name"
+}
+
+### Delete a user
+DELETE {{baseUrl}}/rbac/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+### Change a user's status
+PATCH {{baseUrl}}/rbac/users/{{userId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "active"
+}
+
+### Assign a role to a user
+POST {{baseUrl}}/rbac/users/{{userId}}/roles/{{roleId}}
+Authorization: Bearer {{accessToken}}
+
+### Remove a role from a user
+DELETE {{baseUrl}}/rbac/users/{{userId}}/roles/{{roleId}}
+Authorization: Bearer {{accessToken}}
+
+### Revoke all of a user's sessions
+POST {{baseUrl}}/rbac/users/{{userId}}/sessions/revoke-all
+Authorization: Bearer {{accessToken}}
+
+### Reset a user's OTP
+POST {{baseUrl}}/rbac/users/{{userId}}/otp/reset
+Authorization: Bearer {{accessToken}}
+
+### A user's login history
+GET {{baseUrl}}/rbac/users/{{userId}}/login-history
+Authorization: Bearer {{accessToken}}
+
+### A user's device sessions
+GET {{baseUrl}}/rbac/users/{{userId}}/sessions
+Authorization: Bearer {{accessToken}}
+
+### Audit logs
+GET {{baseUrl}}/rbac/audit-logs?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Impersonate ("Login As") — SuperAdmin only, returns a preview token
+POST {{baseUrl}}/rbac/impersonate
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "targetUserId": "{{targetUserId}}"
+}
+
+
+###############################################################################
+# CATALOG  (/catalog)  — PUBLIC (no token required)
+###############################################################################
+
+### Storefront categories
+GET {{baseUrl}}/catalog/categories
+
+### One category by slug
+GET {{baseUrl}}/catalog/categories/{{categorySlug}}
+
+### Search deals (query params optional)
+GET {{baseUrl}}/catalog/deals?page=1&pageSize=20&q=massage
+
+### One deal by id
+GET {{baseUrl}}/catalog/deals/{{dealId}}
+
+### Locations (cities/areas)
+GET {{baseUrl}}/catalog/locations
+
+### One vendor storefront by slug
+GET {{baseUrl}}/catalog/vendors/{{vendorSlug}}
+
+### Therapists
+GET {{baseUrl}}/catalog/therapists
+
+### One therapist by id
+GET {{baseUrl}}/catalog/therapists/{{therapistId}}
+
+### Blog posts (public)
+GET {{baseUrl}}/catalog/blog-posts?page=1&pageSize=10
+
+### One blog post by slug
+GET {{baseUrl}}/catalog/blog-posts/{{blogSlug}}
+
+### About-us content (public)
+GET {{baseUrl}}/catalog/about-us
+
+### Contact-us content (public)
+GET {{baseUrl}}/catalog/contact-us
+
+
+###############################################################################
+# CART  (/cart)  — auth
+###############################################################################
+
+### Get my cart
+GET {{baseUrl}}/cart
+Authorization: Bearer {{accessToken}}
+
+### Add an item (send one of dealId / dealPackageId / therapistId / therapistPackageId)
+POST {{baseUrl}}/cart/items
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "dealId": "{{dealId}}",
+  "quantity": 1
+}
+
+### Update a cart item (quantity)
+PATCH {{baseUrl}}/cart/items/{{cartItemId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "quantity": 2
+}
+
+### Remove a cart item
+DELETE {{baseUrl}}/cart/items/{{cartItemId}}
+Authorization: Bearer {{accessToken}}
+
+### Empty the cart
+DELETE {{baseUrl}}/cart
+Authorization: Bearer {{accessToken}}
+
+
+###############################################################################
+# WISHLIST  (/wishlist)  — auth
+###############################################################################
+
+### Get my wishlist
+GET {{baseUrl}}/wishlist
+Authorization: Bearer {{accessToken}}
+
+### Add a deal to wishlist
+POST {{baseUrl}}/wishlist
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "dealId": "{{dealId}}"
+}
+
+### Check if a deal is wishlisted
+GET {{baseUrl}}/wishlist/check/{{dealId}}
+Authorization: Bearer {{accessToken}}
+
+### Remove a deal from wishlist
+DELETE {{baseUrl}}/wishlist/{{dealId}}
+Authorization: Bearer {{accessToken}}
+
+
+###############################################################################
+# ORDERS  (/orders)  — auth (customer /me/* and admin)
+###############################################################################
+
+### Checkout (create order from cart) — body per OrderCheckoutSchema
+POST {{baseUrl}}/orders/checkout
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "contactName": "Sandeep",
+  "contactPhone": "9000000000",
+  "contactEmail": "san_allways@yahoo.com"
+}
+
+### My orders
+GET {{baseUrl}}/orders/me?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### One of my orders
+GET {{baseUrl}}/orders/me/{{orderId}}
+Authorization: Bearer {{accessToken}}
+
+### Update one of my orders' status
+PATCH {{baseUrl}}/orders/me/{{orderId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "cancelled"
+}
+
+### Pay for an order (creates a Razorpay order)
+POST {{baseUrl}}/orders/me/{{orderId}}/pay
+Authorization: Bearer {{accessToken}}
+
+### Pay for an order via Cash on Delivery
+POST {{baseUrl}}/orders/me/{{orderId}}/pay-cod
+Authorization: Bearer {{accessToken}}
+
+### Verify a Razorpay payment for an order
+POST {{baseUrl}}/orders/me/{{orderId}}/verify-payment
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "razorpayOrderId": "order_xxx",
+  "razorpayPaymentId": "pay_xxx",
+  "razorpaySignature": "sig_xxx"
+}
+
+### Pay a batch of orders (online) — body per OrderBatchSchema
+POST {{baseUrl}}/orders/pay-batch
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "orderIds": ["{{orderId}}"]
+}
+
+### Pay a batch of orders (COD)
+POST {{baseUrl}}/orders/pay-batch/cod
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "orderIds": ["{{orderId}}"]
+}
+
+### Verify a batch payment
+POST {{baseUrl}}/orders/pay-batch/verify
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "razorpayOrderId": "order_xxx",
+  "razorpayPaymentId": "pay_xxx",
+  "razorpaySignature": "sig_xxx"
+}
+
+### All orders (admin — orders:view)
+GET {{baseUrl}}/orders?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### One order (admin)
+GET {{baseUrl}}/orders/{{orderId}}
+Authorization: Bearer {{accessToken}}
+
+### Change any order's status (admin — orders:status_change)
+PATCH {{baseUrl}}/orders/{{orderId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "confirmed"
+}
+
+
+###############################################################################
+# PAYMENTS  (/payments)
+###############################################################################
+
+### Razorpay webhook (called by Razorpay; signature-verified, no bearer token)
+POST {{baseUrl}}/payments/webhook/razorpay
+Content-Type: {{contentType}}
+X-Razorpay-Signature: <hmac-signature>
+
+{
+  "event": "payment.captured",
+  "payload": {}
+}
+
+
+###############################################################################
+# CUSTOMERS  (/customers)  — admin (customers:view)
+###############################################################################
+
+### List customers
+GET {{baseUrl}}/customers?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### One customer
+GET {{baseUrl}}/customers/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+
+###############################################################################
+# PRODUCTS  (/products)  — admin (products:view)
+###############################################################################
+
+### List products
+GET {{baseUrl}}/products?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### One product
+GET {{baseUrl}}/products/{{productId}}
+Authorization: Bearer {{accessToken}}
+
+
+###############################################################################
+# CATEGORIES  (/categories)  — admin (masters.categories:*)
+###############################################################################
+
+### List categories
+GET {{baseUrl}}/categories?page=1&pageSize=50
+Authorization: Bearer {{accessToken}}
+
+### Create category
+POST {{baseUrl}}/categories
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Massage",
+  "type": "category",
+  "parentId": null
+}
+
+### One category
+GET {{baseUrl}}/categories/{{categoryId}}
+Authorization: Bearer {{accessToken}}
+
+### Update category
+PATCH {{baseUrl}}/categories/{{categoryId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Massage & Spa"
+}
+
+### Change category status
+PATCH {{baseUrl}}/categories/{{categoryId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "active"
+}
+
+### Delete category
+DELETE {{baseUrl}}/categories/{{categoryId}}
+Authorization: Bearer {{accessToken}}
+
+### Upload a category image (multipart/form-data) — EXAMPLE for all image uploads
+POST {{baseUrl}}/categories/{{categoryId}}/images
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=----Boundary
+
+------Boundary
+Content-Disposition: form-data; name="file"; filename="cat.jpg"
+Content-Type: image/jpeg
+
+< ./sample.jpg
+------Boundary--
+
+### Delete a category image
+DELETE {{baseUrl}}/categories/{{categoryId}}/images/{{imageId}}
+Authorization: Bearer {{accessToken}}
+
+### Reorder category images
+PATCH {{baseUrl}}/categories/{{categoryId}}/images/reorder
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "orderedImageIds": ["{{imageId}}"]
+}
+
+### Set a category's primary image
+PATCH {{baseUrl}}/categories/{{categoryId}}/images/{{imageId}}/primary
+Authorization: Bearer {{accessToken}}
+
+
+###############################################################################
+# POPULAR TAGS  (/popular-tags)  — admin (masters.tags:*)
+###############################################################################
+
+### List tags
+GET {{baseUrl}}/popular-tags?page=1&pageSize=50
+Authorization: Bearer {{accessToken}}
+
+### Create tag
+POST {{baseUrl}}/popular-tags
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Trending",
+  "slug": "trending"
+}
+
+### One tag
+GET {{baseUrl}}/popular-tags/{{tagId}}
+Authorization: Bearer {{accessToken}}
+
+### Update tag
+PATCH {{baseUrl}}/popular-tags/{{tagId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Hot"
+}
+
+### Change tag status
+PATCH {{baseUrl}}/popular-tags/{{tagId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "active"
+}
+
+### Delete tag
+DELETE {{baseUrl}}/popular-tags/{{tagId}}
+Authorization: Bearer {{accessToken}}
+
+### A tag's mappings (which deals/products it is attached to)
+GET {{baseUrl}}/popular-tags/{{tagId}}/mappings
+Authorization: Bearer {{accessToken}}
+
+### Add a mapping to a tag
+POST {{baseUrl}}/popular-tags/{{tagId}}/mappings
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "targetType": "deal",
+  "targetId": "{{dealId}}"
+}
+
+### Remove a mapping from a tag
+DELETE {{baseUrl}}/popular-tags/{{tagId}}/mappings/deal/{{dealId}}
+Authorization: Bearer {{accessToken}}
+
+
+###############################################################################
+# BLOG POSTS  (/blog-posts)  — admin CMS (cms.blog:*)
+###############################################################################
+
+### List blog posts
+GET {{baseUrl}}/blog-posts?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Create blog post
+POST {{baseUrl}}/blog-posts
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "title": "My First Post",
+  "slug": "my-first-post",
+  "body": "Hello world"
+}
+
+### One blog post
+GET {{baseUrl}}/blog-posts/{{blogPostId}}
+Authorization: Bearer {{accessToken}}
+
+### Update blog post
+PATCH {{baseUrl}}/blog-posts/{{blogPostId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "title": "Updated title"
+}
+
+### Change blog post status (draft/published)
+PATCH {{baseUrl}}/blog-posts/{{blogPostId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "published"
+}
+
+### Delete blog post
+DELETE {{baseUrl}}/blog-posts/{{blogPostId}}
+Authorization: Bearer {{accessToken}}
+
+### Upload a blog post image (multipart — see category image example)
+POST {{baseUrl}}/blog-posts/{{blogPostId}}/images
+Authorization: Bearer {{accessToken}}
+# (multipart upload — copy the category image body shape)
+
+### Delete a blog post image
+DELETE {{baseUrl}}/blog-posts/{{blogPostId}}/images/{{imageId}}
+Authorization: Bearer {{accessToken}}
+
+### Reorder blog post images
+PATCH {{baseUrl}}/blog-posts/{{blogPostId}}/images/reorder
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "orderedImageIds": ["{{imageId}}"]
+}
+
+### Set a blog post's primary image
+PATCH {{baseUrl}}/blog-posts/{{blogPostId}}/images/{{imageId}}/primary
+Authorization: Bearer {{accessToken}}
+
+
+###############################################################################
+# SITE CONTENT  (mounted at API root)  — admin CMS
+###############################################################################
+
+### Get about-us (admin — cms.about-us:view)
+GET {{baseUrl}}/about-us
+Authorization: Bearer {{accessToken}}
+
+### Update about-us
+PATCH {{baseUrl}}/about-us
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "body": "About our company"
+}
+
+### Upload an about-us image (multipart — see category image example)
+POST {{baseUrl}}/about-us/images
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete an about-us image
+DELETE {{baseUrl}}/about-us/images/{{imageId}}
+Authorization: Bearer {{accessToken}}
+
+### Reorder about-us images
+PATCH {{baseUrl}}/about-us/images/reorder
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "orderedImageIds": ["{{imageId}}"]
+}
+
+### Set the about-us primary image
+PATCH {{baseUrl}}/about-us/images/{{imageId}}/primary
+Authorization: Bearer {{accessToken}}
+
+### Get contact-us (admin — cms.contact-us:view)
+GET {{baseUrl}}/contact-us
+Authorization: Bearer {{accessToken}}
+
+### Update contact-us
+PATCH {{baseUrl}}/contact-us
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "email": "hello@example.com",
+  "phone": "9000000000"
+}
+
+
+###############################################################################
+# REPORTS  (/reports)  — admin (reports:view)
+###############################################################################
+
+### Overall summary
+GET {{baseUrl}}/reports/summary
+Authorization: Bearer {{accessToken}}
+
+### Vendor-wise
+GET {{baseUrl}}/reports/vendor-wise
+Authorization: Bearer {{accessToken}}
+
+### Branch-wise
+GET {{baseUrl}}/reports/branch-wise
+Authorization: Bearer {{accessToken}}
+
+### Month-wise
+GET {{baseUrl}}/reports/month-wise
+Authorization: Bearer {{accessToken}}
+
+### Service vs product
+GET {{baseUrl}}/reports/service-vs-product
+Authorization: Bearer {{accessToken}}
+
+### Top vendors
+GET {{baseUrl}}/reports/top-vendors
+Authorization: Bearer {{accessToken}}
+
+### Top products
+GET {{baseUrl}}/reports/top-products
+Authorization: Bearer {{accessToken}}
+
+### Top services
+GET {{baseUrl}}/reports/top-services
+Authorization: Bearer {{accessToken}}
+
+### Payment method breakdown
+GET {{baseUrl}}/reports/payment-method
+Authorization: Bearer {{accessToken}}
+
+
+###############################################################################
+# DASHBOARD  (/dashboard)
+###############################################################################
+
+### Dashboard stats (dashboard:view)
+GET {{baseUrl}}/dashboard/stats
+Authorization: Bearer {{accessToken}}
+
+
+###############################################################################
+# NOTIFICATIONS  (/notifications)  — auth
+###############################################################################
+
+### List notifications
+GET {{baseUrl}}/notifications?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Mark all as read
+PATCH {{baseUrl}}/notifications/read-all
+Authorization: Bearer {{accessToken}}
+
+### Mark one as read
+PATCH {{baseUrl}}/notifications/{{notificationId}}/read
+Authorization: Bearer {{accessToken}}
+
+
+###############################################################################
+# INVENTORY  (/inventory)  — stub (inventory:view)
+###############################################################################
+
+### Inventory (stub)
+GET {{baseUrl}}/inventory
+Authorization: Bearer {{accessToken}}
+
+
+###############################################################################
+# VENDORS — lookups  (/vendors/*)
+###############################################################################
+
+### Vendor category options
+GET {{baseUrl}}/vendors/categories
+Authorization: Bearer {{accessToken}}
+
+### Search users to attach as a vendor (vendors:create|edit)
+GET {{baseUrl}}/vendors/users/search?q=john
+Authorization: Bearer {{accessToken}}
+
+### All branches across vendors (vendors:view)
+GET {{baseUrl}}/vendors/branches?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### All deals across vendors (vendors:view)
+GET {{baseUrl}}/vendors/deals?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### All therapists across vendors (vendors:view)
+GET {{baseUrl}}/vendors/therapists?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+
+###############################################################################
+# VENDORS — self-service  (/vendors/me/*)  — the logged-in vendor manages itself
+###############################################################################
+
+### My vendor profile
+GET {{baseUrl}}/vendors/me
+Authorization: Bearer {{accessToken}}
+
+### Create my vendor profile
+POST {{baseUrl}}/vendors/me
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "businessName": "My Spa"
+}
+
+### Update my vendor profile
+PATCH {{baseUrl}}/vendors/me
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "businessName": "My Spa (updated)"
+}
+
+### Upload my vendor image (multipart)
+POST {{baseUrl}}/vendors/me/images
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete my vendor image
+DELETE {{baseUrl}}/vendors/me/images/{{imageId}}
+Authorization: Bearer {{accessToken}}
+
+### Reorder my vendor images
+PATCH {{baseUrl}}/vendors/me/images/reorder
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "orderedImageIds": ["{{imageId}}"] }
+
+### Set my vendor primary image
+PATCH {{baseUrl}}/vendors/me/images/{{imageId}}/primary
+Authorization: Bearer {{accessToken}}
+
+### My KYC documents
+GET {{baseUrl}}/vendors/me/kyc-documents
+Authorization: Bearer {{accessToken}}
+
+### Upload a KYC document (multipart)
+POST {{baseUrl}}/vendors/me/kyc-documents/{{documentType}}
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete a KYC document
+DELETE {{baseUrl}}/vendors/me/kyc-documents/{{documentType}}
+Authorization: Bearer {{accessToken}}
+
+### Upload my vendor video (multipart)
+POST {{baseUrl}}/vendors/me/video
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete my vendor video
+DELETE {{baseUrl}}/vendors/me/video
+Authorization: Bearer {{accessToken}}
+
+### Submit my vendor profile for approval
+POST {{baseUrl}}/vendors/me/submit
+Authorization: Bearer {{accessToken}}
+
+### My branches
+GET {{baseUrl}}/vendors/me/branches
+Authorization: Bearer {{accessToken}}
+
+### My category access
+GET {{baseUrl}}/vendors/me/category-access
+Authorization: Bearer {{accessToken}}
+
+### Set my category access
+PUT {{baseUrl}}/vendors/me/category-access
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "categoryIds": ["{{categoryId}}"] }
+
+### My customers
+GET {{baseUrl}}/vendors/me/customers?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Create a branch
+POST {{baseUrl}}/vendors/me/branches
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "name": "Main Branch", "city": "Delhi" }
+
+### Update a branch
+PATCH {{baseUrl}}/vendors/me/branches/{{branchId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "name": "Main Branch (updated)" }
+
+### Change a branch status
+PATCH {{baseUrl}}/vendors/me/branches/{{branchId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "status": "active" }
+
+### Branch deals
+GET {{baseUrl}}/vendors/me/branches/{{branchId}}/deals
+Authorization: Bearer {{accessToken}}
+
+### Create a deal in a branch
+POST {{baseUrl}}/vendors/me/branches/{{branchId}}/deals
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "title": "60-min Swedish Massage", "price": 1999 }
+
+### Update a deal
+PATCH {{baseUrl}}/vendors/me/branches/{{branchId}}/deals/{{dealId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "price": 1799 }
+
+### Change a deal status
+PATCH {{baseUrl}}/vendors/me/branches/{{branchId}}/deals/{{dealId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "status": "active" }
+
+### Upload a deal image (multipart)
+POST {{baseUrl}}/vendors/me/branches/{{branchId}}/deals/{{dealId}}/images
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete a deal image
+DELETE {{baseUrl}}/vendors/me/branches/{{branchId}}/deals/{{dealId}}/images/{{imageId}}
+Authorization: Bearer {{accessToken}}
+
+### Reorder deal images
+PATCH {{baseUrl}}/vendors/me/branches/{{branchId}}/deals/{{dealId}}/images/reorder
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "orderedImageIds": ["{{imageId}}"] }
+
+### Set a deal's primary image
+PATCH {{baseUrl}}/vendors/me/branches/{{branchId}}/deals/{{dealId}}/images/{{imageId}}/primary
+Authorization: Bearer {{accessToken}}
+
+### Upload a deal video (multipart)
+POST {{baseUrl}}/vendors/me/branches/{{branchId}}/deals/{{dealId}}/video
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete a deal video
+DELETE {{baseUrl}}/vendors/me/branches/{{branchId}}/deals/{{dealId}}/video
+Authorization: Bearer {{accessToken}}
+
+### Branch therapists
+GET {{baseUrl}}/vendors/me/branches/{{branchId}}/therapists
+Authorization: Bearer {{accessToken}}
+
+### Create a therapist in a branch
+POST {{baseUrl}}/vendors/me/branches/{{branchId}}/therapists
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "name": "Asha", "gender": "female" }
+
+### Update a therapist
+PATCH {{baseUrl}}/vendors/me/therapists/{{therapistId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "name": "Asha K." }
+
+### Change a therapist status
+PATCH {{baseUrl}}/vendors/me/therapists/{{therapistId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "status": "active" }
+
+### Therapist packages
+GET {{baseUrl}}/vendors/me/therapists/{{therapistId}}/packages
+Authorization: Bearer {{accessToken}}
+
+### Create a therapist package
+POST {{baseUrl}}/vendors/me/therapists/{{therapistId}}/packages
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "name": "60 min", "price": 1500, "durationMinutes": 60 }
+
+### Update a therapist package
+PATCH {{baseUrl}}/vendors/me/therapists/{{therapistId}}/packages/{{packageId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "price": 1600 }
+
+### Delete a therapist package
+DELETE {{baseUrl}}/vendors/me/therapists/{{therapistId}}/packages/{{packageId}}
+Authorization: Bearer {{accessToken}}
+
+### Upload a therapist image (multipart)
+POST {{baseUrl}}/vendors/me/therapists/{{therapistId}}/images
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete a therapist image
+DELETE {{baseUrl}}/vendors/me/therapists/{{therapistId}}/images/{{imageId}}
+Authorization: Bearer {{accessToken}}
+
+### Reorder therapist images
+PATCH {{baseUrl}}/vendors/me/therapists/{{therapistId}}/images/reorder
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "orderedImageIds": ["{{imageId}}"] }
+
+### Set a therapist's primary image
+PATCH {{baseUrl}}/vendors/me/therapists/{{therapistId}}/images/{{imageId}}/primary
+Authorization: Bearer {{accessToken}}
+
+### Upload a therapist video (multipart)
+POST {{baseUrl}}/vendors/me/therapists/{{therapistId}}/video
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete a therapist video
+DELETE {{baseUrl}}/vendors/me/therapists/{{therapistId}}/video
+Authorization: Bearer {{accessToken}}
+
+### My products
+GET {{baseUrl}}/vendors/me/products?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Create a product
+POST {{baseUrl}}/vendors/me/products
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "name": "Aroma Oil", "price": 499 }
+
+### Update a product
+PATCH {{baseUrl}}/vendors/me/products/{{productId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "price": 450 }
+
+### Change a product status
+PATCH {{baseUrl}}/vendors/me/products/{{productId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "status": "active" }
+
+### Delete a product
+DELETE {{baseUrl}}/vendors/me/products/{{productId}}
+Authorization: Bearer {{accessToken}}
+
+### Upload a product image (multipart)
+POST {{baseUrl}}/vendors/me/products/{{productId}}/images
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete a product image
+DELETE {{baseUrl}}/vendors/me/products/{{productId}}/images/{{imageId}}
+Authorization: Bearer {{accessToken}}
+
+### Reorder product images
+PATCH {{baseUrl}}/vendors/me/products/{{productId}}/images/reorder
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "orderedImageIds": ["{{imageId}}"] }
+
+### Set a product's primary image
+PATCH {{baseUrl}}/vendors/me/products/{{productId}}/images/{{imageId}}/primary
+Authorization: Bearer {{accessToken}}
+
+### Upload a product video (multipart)
+POST {{baseUrl}}/vendors/me/products/{{productId}}/video
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete a product video
+DELETE {{baseUrl}}/vendors/me/products/{{productId}}/video
+Authorization: Bearer {{accessToken}}
+
+
+###############################################################################
+# VENDORS — admin  (/vendors/:id and /vendors/:vendorId/*)
+###############################################################################
+
+### List vendors (vendors:view)
+GET {{baseUrl}}/vendors?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Create vendor (vendors:create)
+POST {{baseUrl}}/vendors
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "businessName": "New Vendor", "ownerUserId": "{{userId}}" }
+
+### One vendor
+GET {{baseUrl}}/vendors/{{vendorId}}
+Authorization: Bearer {{accessToken}}
+
+### Update vendor
+PATCH {{baseUrl}}/vendors/{{vendorId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "businessName": "Renamed Vendor" }
+
+### Upload vendor image (multipart)
+POST {{baseUrl}}/vendors/{{vendorId}}/images
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete vendor image
+DELETE {{baseUrl}}/vendors/{{vendorId}}/images/{{imageId}}
+Authorization: Bearer {{accessToken}}
+
+### Reorder vendor images
+PATCH {{baseUrl}}/vendors/{{vendorId}}/images/reorder
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "orderedImageIds": ["{{imageId}}"] }
+
+### Set vendor primary image
+PATCH {{baseUrl}}/vendors/{{vendorId}}/images/{{imageId}}/primary
+Authorization: Bearer {{accessToken}}
+
+### Upload vendor video (multipart)
+POST {{baseUrl}}/vendors/{{vendorId}}/video
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete vendor video
+DELETE {{baseUrl}}/vendors/{{vendorId}}/video
+Authorization: Bearer {{accessToken}}
+
+### Vendor KYC documents
+GET {{baseUrl}}/vendors/{{vendorId}}/kyc-documents
+Authorization: Bearer {{accessToken}}
+
+### Upload a vendor KYC document (multipart)
+POST {{baseUrl}}/vendors/{{vendorId}}/kyc-documents/{{documentType}}
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete a vendor KYC document
+DELETE {{baseUrl}}/vendors/{{vendorId}}/kyc-documents/{{documentType}}
+Authorization: Bearer {{accessToken}}
+
+### Approve vendor (vendors:approve)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/approve
+Authorization: Bearer {{accessToken}}
+
+### Reject vendor (vendors:reject)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/reject
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "reason": "Incomplete KYC" }
+
+### Change vendor status
+PATCH {{baseUrl}}/vendors/{{vendorId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "status": "active" }
+
+### Delete vendor
+DELETE {{baseUrl}}/vendors/{{vendorId}}
+Authorization: Bearer {{accessToken}}
+
+### KYC review (approve/reject specific documents)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/kyc-review
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "documentType": "{{documentType}}", "status": "approved" }
+
+### Vendor branches (admin)
+GET {{baseUrl}}/vendors/{{vendorId}}/branches
+Authorization: Bearer {{accessToken}}
+
+### Vendor category access (admin)
+GET {{baseUrl}}/vendors/{{vendorId}}/category-access
+Authorization: Bearer {{accessToken}}
+
+### Set vendor category access (admin)
+PUT {{baseUrl}}/vendors/{{vendorId}}/category-access
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "categoryIds": ["{{categoryId}}"] }
+
+### Vendor therapists (admin)
+GET {{baseUrl}}/vendors/{{vendorId}}/therapists
+Authorization: Bearer {{accessToken}}
+
+### Vendor customers (admin)
+GET {{baseUrl}}/vendors/{{vendorId}}/customers?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Create a branch (admin)
+POST {{baseUrl}}/vendors/{{vendorId}}/branches
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "name": "Branch A", "city": "Delhi" }
+
+### Update a branch (admin)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/branches/{{branchId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "name": "Branch A2" }
+
+### Change a branch status (admin)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/branches/{{branchId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "status": "active" }
+
+### Branch deals (admin)
+GET {{baseUrl}}/vendors/{{vendorId}}/branches/{{branchId}}/deals
+Authorization: Bearer {{accessToken}}
+
+### Create a deal (admin)
+POST {{baseUrl}}/vendors/{{vendorId}}/branches/{{branchId}}/deals
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "title": "Deal", "price": 999 }
+
+### Update a deal (admin)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/branches/{{branchId}}/deals/{{dealId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "price": 899 }
+
+### Change a deal status (admin)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/branches/{{branchId}}/deals/{{dealId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "status": "active" }
+
+### Approve a deal (admin)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/branches/{{branchId}}/deals/{{dealId}}/approve
+Authorization: Bearer {{accessToken}}
+
+### Reject a deal (admin)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/branches/{{branchId}}/deals/{{dealId}}/reject
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "reason": "Not allowed" }
+
+### Delete a deal (admin)
+DELETE {{baseUrl}}/vendors/{{vendorId}}/branches/{{branchId}}/deals/{{dealId}}
+Authorization: Bearer {{accessToken}}
+
+### Create a therapist in a branch (admin)
+POST {{baseUrl}}/vendors/{{vendorId}}/branches/{{branchId}}/therapists
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "name": "Therapist" }
+
+### Update a therapist (admin)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/therapists/{{therapistId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "name": "Therapist 2" }
+
+### Change a therapist status (admin)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/therapists/{{therapistId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "status": "active" }
+
+### Delete a therapist (admin)
+DELETE {{baseUrl}}/vendors/{{vendorId}}/therapists/{{therapistId}}
+Authorization: Bearer {{accessToken}}
+
+### Upload a therapist image (admin, multipart)
+POST {{baseUrl}}/vendors/{{vendorId}}/therapists/{{therapistId}}/images
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete a therapist image (admin)
+DELETE {{baseUrl}}/vendors/{{vendorId}}/therapists/{{therapistId}}/images/{{imageId}}
+Authorization: Bearer {{accessToken}}
+
+### Reorder therapist images (admin)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/therapists/{{therapistId}}/images/reorder
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "orderedImageIds": ["{{imageId}}"] }
+
+### Set therapist primary image (admin)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/therapists/{{therapistId}}/images/{{imageId}}/primary
+Authorization: Bearer {{accessToken}}
+
+### Upload a therapist video (admin, multipart)
+POST {{baseUrl}}/vendors/{{vendorId}}/therapists/{{therapistId}}/video
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete a therapist video (admin)
+DELETE {{baseUrl}}/vendors/{{vendorId}}/therapists/{{therapistId}}/video
+Authorization: Bearer {{accessToken}}
+
+### Vendor products (admin)
+GET {{baseUrl}}/vendors/{{vendorId}}/products?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Create a product (admin)
+POST {{baseUrl}}/vendors/{{vendorId}}/products
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "name": "Product", "price": 499 }
+
+### Update a product (admin)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/products/{{productId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "price": 450 }
+
+### Change a product status (admin)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/products/{{productId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "status": "active" }
+
+### Delete a product (admin)
+DELETE {{baseUrl}}/vendors/{{vendorId}}/products/{{productId}}
+Authorization: Bearer {{accessToken}}
+
+### Upload a product image (admin, multipart)
+POST {{baseUrl}}/vendors/{{vendorId}}/products/{{productId}}/images
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete a product image (admin)
+DELETE {{baseUrl}}/vendors/{{vendorId}}/products/{{productId}}/images/{{imageId}}
+Authorization: Bearer {{accessToken}}
+
+### Reorder product images (admin)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/products/{{productId}}/images/reorder
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "orderedImageIds": ["{{imageId}}"] }
+
+### Set product primary image (admin)
+PATCH {{baseUrl}}/vendors/{{vendorId}}/products/{{productId}}/images/{{imageId}}/primary
+Authorization: Bearer {{accessToken}}
+
+### Upload a product video (admin, multipart)
+POST {{baseUrl}}/vendors/{{vendorId}}/products/{{productId}}/video
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete a product video (admin)
+DELETE {{baseUrl}}/vendors/{{vendorId}}/products/{{productId}}/video
+Authorization: Bearer {{accessToken}}
