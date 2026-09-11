@@ -23,8 +23,6 @@ import { DealDialog } from './vendor-branches';
 
 const DEAL_COLUMNS = JSON.stringify([
   { key: 'Deal', label: 'Deal / Package' },
-  { key: 'Type', label: 'Type' },
-  { key: 'Item', label: 'Service / Product' },
   { key: 'Branch', label: 'Branch' },
   { key: 'Price', label: 'Price' },
   { key: 'Duration', label: 'Duration' },
@@ -50,8 +48,6 @@ interface DealWithBranch extends Deal {
 function toRow(d: DealWithBranch): Record<string, string | number> {
   return {
     Deal: d.title,
-    Type: d.productId ? 'Product' : 'Service',
-    Item: d.product?.name ?? '—',
     Branch: d.branchName,
     Price: `₹${d.salePrice}`,
     Duration: d.durationMinutes ? `${d.durationMinutes} min` : '—',

@@ -10,8 +10,13 @@ import {
 import {
   CreateRoleSchema,
   UpdateRoleSchema,
+  CloneRoleSchema,
+  SetRoleStatusSchema,
   SetRolePermissionsSchema,
+  SetRoleWidgetsSchema,
+  CreateDashboardWidgetSchema,
   CreateUserSchema,
+  UpdateUserSchema,
   SetUserStatusSchema,
   ImpersonateSchema,
 } from './schemas/rbac.schema';
@@ -151,6 +156,39 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'delete',
+  path: '/rbac/roles/{id}',
+  summary: 'Delete a role',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: { 200: { description: 'Role deleted', content: { 'application/json': { schema: envelope(z.object({ id: z.string().uuid() })) } } } },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/rbac/roles/{id}/clone',
+  summary: 'Clone a role under a new key/name',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string().uuid() }),
+    body: { content: { 'application/json': { schema: CloneRoleSchema } } },
+  },
+  responses: { 201: { description: 'Role cloned', content: { 'application/json': { schema: envelope(z.unknown()) } } } },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: '/rbac/roles/{id}/status',
+  summary: "Change a role's active status",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string().uuid() }),
+    body: { content: { 'application/json': { schema: SetRoleStatusSchema } } },
+  },
+  responses: { 200: { description: 'Role status updated', content: { 'application/json': { schema: envelope(z.unknown()) } } } },
+});
+
+registry.registerPath({
   method: 'put',
   path: '/rbac/roles/{id}/permissions',
   summary: "Replace a role's permission grants",
@@ -172,6 +210,44 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'get',
+  path: '/rbac/roles/{id}/permissions',
+  summary: "Get a role's current permission grants (flat permissionIds)",
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: { 200: { description: 'Permission ids', content: { 'application/json': { schema: envelope(z.object({ permissionIds: z.array(z.string().uuid()) })) } } } },
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/rbac/roles/{id}/widgets',
+  summary: "Replace a role's dashboard widget grants",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string().uuid() }),
+    body: { content: { 'application/json': { schema: SetRoleWidgetsSchema } } },
+  },
+  responses: { 200: { description: 'Widgets set', content: { 'application/json': { schema: envelope(z.array(z.unknown())) } } } },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/rbac/dashboard-widgets',
+  summary: 'List dashboard widgets catalog',
+  security: [{ bearerAuth: [] }],
+  responses: { 200: { description: 'Widget list', content: { 'application/json': { schema: envelope(z.array(z.unknown())) } } } },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/rbac/dashboard-widgets',
+  summary: 'Create a dashboard widget',
+  security: [{ bearerAuth: [] }],
+  request: { body: { content: { 'application/json': { schema: CreateDashboardWidgetSchema } } } },
+  responses: { 201: { description: 'Widget created', content: { 'application/json': { schema: envelope(z.unknown()) } } } },
+});
+
+registry.registerPath({
+  method: 'get',
   path: '/rbac/users',
   summary: 'List users',
   security: [{ bearerAuth: [] }],
@@ -189,6 +265,45 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'patch',
+  path: '/rbac/users/{id}',
+  summary: 'Update a user',
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({ id: z.string().uuid() }),
+    body: { content: { 'application/json': { schema: UpdateUserSchema } } },
+  },
+  responses: { 200: { description: 'User updated', content: { 'application/json': { schema: envelope(z.unknown()) } } } },
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/rbac/users/{id}',
+  summary: 'Soft-delete a user',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: { 200: { description: 'User deleted', content: { 'application/json': { schema: envelope(z.object({ id: z.string().uuid() })) } } } },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/rbac/users/{id}/roles/{roleId}',
+  summary: 'Assign a role to a user',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid(), roleId: z.string().uuid() }) },
+  responses: { 200: { description: 'Role assigned', content: { 'application/json': { schema: envelope(z.unknown()) } } } },
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/rbac/users/{id}/roles/{roleId}',
+  summary: 'Remove a role from a user',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid(), roleId: z.string().uuid() }) },
+  responses: { 200: { description: 'Role removed', content: { 'application/json': { schema: envelope(z.unknown()) } } } },
+});
+
+registry.registerPath({
+  method: 'patch',
   path: '/rbac/users/{id}/status',
   summary: 'Change a user\'s status',
   security: [{ bearerAuth: [] }],
@@ -197,6 +312,42 @@ registry.registerPath({
     body: { content: { 'application/json': { schema: SetUserStatusSchema } } },
   },
   responses: { 200: { description: 'User updated', content: { 'application/json': { schema: envelope(z.unknown()) } } } },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/rbac/users/{id}/sessions/revoke-all',
+  summary: 'Revoke every active refresh session for a user',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: { 200: { description: 'Sessions revoked', content: { 'application/json': { schema: envelope(z.object({ message: z.string() })) } } } },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/rbac/users/{id}/otp/reset',
+  summary: 'Invalidate a user\'s pending OTP challenges',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: { 200: { description: 'Pending OTPs invalidated', content: { 'application/json': { schema: envelope(z.object({ message: z.string() })) } } } },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/rbac/users/{id}/login-history',
+  summary: "List a user's login history",
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: { 200: { description: 'Login history', content: { 'application/json': { schema: envelope(z.array(z.unknown())) } } } },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/rbac/users/{id}/sessions',
+  summary: "List a user's active sessions",
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: { 200: { description: 'Session list', content: { 'application/json': { schema: envelope(z.array(z.unknown())) } } } },
 });
 
 registry.registerPath({

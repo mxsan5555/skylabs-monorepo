@@ -27,17 +27,27 @@ const serviceDealFixture = {
   durationMinutes: 30,
   category: { id: CATEGORY_ID, name: 'Salon & Grooming', slug: 'salon-grooming' },
   subcategory: null,
-  product: null,
   vendor: { id: 'vendor-1', businessName: 'ABC Salon', city: 'Gorakhpur' },
   branch: { id: 'branch-1', name: 'Gorakhpur Branch', city: 'Gorakhpur' },
 };
 
-const productDealFixture = {
-  ...serviceDealFixture,
-  id: 'd1d1d1d1-0000-4000-8000-000000000004',
-  title: 'Face cream deal',
-  durationMinutes: null,
-  product: { id: 'prod-1', name: 'Face Cream', slug: 'face-cream' },
+const PRODUCT_ID = 'd1d1d1d1-0000-4000-8000-000000000004';
+
+const productFixture = {
+  id: PRODUCT_ID,
+  name: 'Face Cream',
+  slug: 'face-cream',
+  brand: 'GlowCare',
+  description: null,
+  summary: null,
+  image: null,
+  imageAlt: null,
+  price: '499.00',
+  originalPrice: '599.00',
+  discount: 17,
+  category: { id: CATEGORY_ID, name: 'Salon & Grooming', slug: 'salon-grooming' },
+  subcategory: null,
+  vendor: { id: 'vendor-1', businessName: 'ABC Salon', city: 'Gorakhpur' },
 };
 
 beforeEach(() => {
@@ -98,18 +108,7 @@ describe('GET /api/v1/catalog/deals', () => {
     const res = await request(app).get('/api/v1/catalog/deals');
     expect(res.status).toBe(200);
     expect(res.body.data[0].title).toBe('Haircut deal');
-    expect(res.body.data[0].product).toBeNull();
-  });
-
-  it('4. shows a product deal', async () => {
-    prismaMock.deal.findMany.mockResolvedValue([productDealFixture]);
-    prismaMock.deal.count.mockResolvedValue(1);
-    const res = await request(app).get('/api/v1/catalog/deals?type=product');
-    expect(res.status).toBe(200);
-    expect(res.body.data[0].product.name).toBe('Face Cream');
-    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ productId: { not: null } }) }),
-    );
+    expect(res.body.data[0].product).toBeUndefined();
   });
 
   it('5/6/7/8/9. always filters to ACTIVE + APPROVED + active vendor + active branch (inactive/rejected/unapproved/inactive-vendor/inactive-branch all excluded by construction)', async () => {
@@ -128,12 +127,13 @@ describe('GET /api/v1/catalog/deals', () => {
     );
   });
 
-  it('also excludes a product deal whose linked product has itself gone inactive', async () => {
+  it('never filters by productId — Deal has no Product concept (fully independent catalog entities)', async () => {
     prismaMock.deal.findMany.mockResolvedValue([]);
     prismaMock.deal.count.mockResolvedValue(0);
     await request(app).get('/api/v1/catalog/deals');
     const call = prismaMock.deal.findMany.mock.calls[0][0];
-    expect(call.where.AND).toContainEqual({ OR: [{ productId: null }, { product: { is: { isActive: true } } }] });
+    expect(call.where).not.toHaveProperty('productId');
+    expect(call.where.AND).toBeUndefined();
   });
 
   it('10. a service deal carries durationMinutes', async () => {
@@ -141,13 +141,6 @@ describe('GET /api/v1/catalog/deals', () => {
     prismaMock.deal.count.mockResolvedValue(1);
     const res = await request(app).get('/api/v1/catalog/deals');
     expect(res.body.data[0].durationMinutes).toBe(30);
-  });
-
-  it('11. a product deal has no durationMinutes', async () => {
-    prismaMock.deal.findMany.mockResolvedValue([productDealFixture]);
-    prismaMock.deal.count.mockResolvedValue(1);
-    const res = await request(app).get('/api/v1/catalog/deals?type=product');
-    expect(res.body.data[0].durationMinutes).toBeNull();
   });
 
   it('12. shows vendor and branch correctly', async () => {
@@ -247,7 +240,7 @@ describe('GET /api/v1/catalog/deals', () => {
     // see the Gorakhpur-branch deal first with a small distanceKm, the Delhi one after it with a
     // much larger one, regardless of `findMany`'s own array order (never a fabricated ordering).
     const nearDeal = { ...serviceDealFixture, id: 'near-deal', branch: { ...serviceDealFixture.branch, latitude: '26.7606', longitude: '83.3732' } };
-    const farDeal = { ...productDealFixture, id: 'far-deal', branch: { ...productDealFixture.branch, latitude: '28.6139', longitude: '77.2090' } };
+    const farDeal = { ...serviceDealFixture, id: 'far-deal', branch: { ...serviceDealFixture.branch, latitude: '28.6139', longitude: '77.2090' } };
     prismaMock.deal.findMany.mockResolvedValue([farDeal, nearDeal]);
     prismaMock.deal.count.mockResolvedValue(2);
     const res = await request(app).get('/api/v1/catalog/deals?latitude=26.7606&longitude=83.3732');
@@ -294,6 +287,77 @@ describe('GET /api/v1/catalog/deals', () => {
     await request(app).get('/api/v1/catalog/deals');
     const call = prismaMock.deal.findMany.mock.calls[0][0];
     expect(call.where.salePrice).toBeUndefined();
+  });
+});
+
+describe('GET /api/v1/catalog/products', () => {
+  it('lists active products with an active vendor, no branch/approval concepts (Product is fully independent of Deal)', async () => {
+    prismaMock.product.findMany.mockResolvedValue([productFixture]);
+    prismaMock.product.count.mockResolvedValue(1);
+    const res = await request(app).get('/api/v1/catalog/products');
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].name).toBe('Face Cream');
+    expect(res.body.data[0].price).toBe('499.00');
+    expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ isActive: true, vendor: { status: 'ACTIVE' } }) }),
+    );
+  });
+
+  it('never requests private vendor fields from Prisma (KYC, bank, owner, audit)', async () => {
+    prismaMock.product.findMany.mockResolvedValue([]);
+    prismaMock.product.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/products');
+    const call = prismaMock.product.findMany.mock.calls[0][0];
+    const vendorFields = Object.keys(call.select.vendor.select);
+    for (const forbidden of ['kycDocuments', 'kycStatus', 'ownerUserId', 'bankAccountNumber', 'bankIfsc', 'gstNumber', 'panNumber', 'businessEmail', 'businessPhone']) {
+      expect(vendorFields).not.toContain(forbidden);
+    }
+  });
+
+  it('filters by categoryId/subcategoryId/vendorId when given', async () => {
+    prismaMock.product.findMany.mockResolvedValue([]);
+    prismaMock.product.count.mockResolvedValue(0);
+    const vendorId = 'e5e5e5e5-0000-4000-8000-000000000009';
+    await request(app).get(`/api/v1/catalog/products?categoryId=${CATEGORY_ID}&subcategoryId=${SUBCATEGORY_ID}&vendorId=${vendorId}`);
+    expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ categoryId: CATEGORY_ID, subcategoryId: SUBCATEGORY_ID, vendorId }) }),
+    );
+  });
+
+  it('sort=discount orders by discount desc, nulls last', async () => {
+    prismaMock.product.findMany.mockResolvedValue([]);
+    prismaMock.product.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/products?sort=discount');
+    expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: [{ discount: { sort: 'desc', nulls: 'last' } }] }),
+    );
+  });
+
+  it('minPrice/maxPrice bound results via a price where-filter', async () => {
+    prismaMock.product.findMany.mockResolvedValue([]);
+    prismaMock.product.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/products?minPrice=300&maxPrice=800');
+    expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ price: { gte: 300, lte: 800 } }) }),
+    );
+  });
+});
+
+describe('GET /api/v1/catalog/products/:id', () => {
+  it('returns 404 for a product that fails the visibility filter (inactive product or inactive vendor)', async () => {
+    prismaMock.product.findFirst.mockResolvedValue(null);
+    const res = await request(app).get(`/api/v1/catalog/products/${PRODUCT_ID}`);
+    expect(res.status).toBe(404);
+  });
+
+  it('returns a visible product by id', async () => {
+    prismaMock.product.findFirst.mockResolvedValue(productFixture);
+    const res = await request(app).get(`/api/v1/catalog/products/${PRODUCT_ID}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.name).toBe('Face Cream');
+    expect(prismaMock.product.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: PRODUCT_ID, isActive: true, vendor: { status: 'ACTIVE' } }) }),
+    );
   });
 });
 
