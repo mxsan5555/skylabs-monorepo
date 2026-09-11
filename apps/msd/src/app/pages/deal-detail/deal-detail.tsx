@@ -6,7 +6,6 @@ import '@skylabs-monorepo/shared-ui/carousel';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCatalogDeal, listCatalogDeals, type CatalogDeal, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
@@ -16,17 +15,16 @@ import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
 import './deal-detail.css';
 /**
- * A single Deal — GET /catalog/deals/:id. Reachable for either a service deal or a product
- * deal — both go through the same unified Add to Cart flow (see msd-api's CartItem schema doc
- * comment; there is no separate Booking flow).
+ * A single Deal — GET /catalog/deals/:id. Deal is always a service offering (Product is a fully
+ * independent catalog entity — see msd-api's Product schema doc comment) — Add to Cart always
+ * goes through `DealAddToCartDialog`'s package-selection flow.
  *
- * /category/:slug links service deals here.
- * Product deals link to /products/:id.
+ * /category/:slug links service deals here. Products link to /products/:id.
  */
 export function DealDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { token, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const {
     has: isWishlisted,
     toggle: toggleWishlist,
@@ -39,7 +37,6 @@ export function DealDetail() {
   const [copied, setCopied] = useState(false);
   const [related, setRelated] = useState<CatalogDeal[]>([]);
   const [activeImg, setActiveImg] = useState(0);
-  const [addedToCart, setAddedToCart] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
   useEffect(() => {
@@ -75,7 +72,6 @@ export function DealDetail() {
     }
     listCatalogDeals({
       categoryId: deal.category.id,
-      type: deal.product ? 'product' : 'service',
       pageSize: 7,
     })
       .then(({ data }) => {
@@ -127,9 +123,7 @@ export function DealDetail() {
     return false;
   };
 
-  const name =
-    deal.product?.name ??
-    deal.title;
+  const name = deal.title;
 
   const dealMedia = resolveDealMedia(deal);
   const gallery = dealMedia.images;
@@ -159,31 +153,6 @@ export function DealDetail() {
       : 0);
 
   const dealId = deal.id;
-
-  async function addToCart() {
-    if (!requireAuthOrRedirect()) {
-      return;
-    }
-
-    setActionError('');
-    setActionMessage('');
-
-    try {
-      await addCartItem(token, { dealId, quantity: 1 });
-
-      setAddedToCart(true);
-
-      setTimeout(() => {
-        setAddedToCart(false);
-      }, 2000);
-    } catch (err: unknown) {
-      setActionError(
-        err instanceof ApiRequestError
-          ? err.message
-          : dealDetail.errors.addToCart,
-      );
-    }
-  }
 
   function toggleFavorite() {
     if (!requireAuthOrRedirect()) {
@@ -227,9 +196,7 @@ export function DealDetail() {
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org',
-            '@type': deal.product
-              ? 'Product'
-              : 'Service',
+            '@type': 'Service',
             name,
             description,
             provider:
@@ -280,10 +247,7 @@ export function DealDetail() {
               <img
                 className="deal-detail__main-img"
                 src={gallery[activeImg]}
-                alt={
-                  deal.product?.imageAlt ??
-                  name
-                }
+                alt={name}
                 width={800}
                 height={450}
               />
@@ -368,7 +332,7 @@ export function DealDetail() {
               variant="primary"
               size="small"
             >
-              {deal.product ? dealDetail.serviceType.product : dealDetail.serviceType.service}
+              {dealDetail.serviceType.service}
             </sky-badge>
           </div>
 
@@ -441,40 +405,24 @@ export function DealDetail() {
 
           {/* CTA */}
           <div className="deal-detail__cta">
-            {!deal.product ? (
-              <DealAddToCartDialog
-                deal={deal}
-                onAdded={(label) => setActionMessage(`Added "${label}" to your cart.`)}
-                renderTrigger={(open) => (
-                  <FilledButton
-                    type="button"
-                    className="deal-detail__add-btn"
-                    onClick={() => {
-                      if (requireAuthOrRedirect()) open();
-                    }}
-                  >
-                    <Icon slot="icon" aria-hidden="true">
-                      shopping_bag
-                    </Icon>
-                    Add to Cart
-                  </FilledButton>
-                )}
-              />
-            ) : (
-              <FilledButton
-                type="button"
-                className="deal-detail__add-btn"
-                onClick={addToCart}
-              >
-                <Icon slot="icon" aria-hidden="true">
-                  {addedToCart ? 'check' : 'shopping_bag'}
-                </Icon>
-
-                {addedToCart
-                  ? dealDetail.addedToCart
-                  : dealDetail.addToCart}
-              </FilledButton>
-            )}
+            <DealAddToCartDialog
+              deal={deal}
+              onAdded={(label) => setActionMessage(`Added "${label}" to your cart.`)}
+              renderTrigger={(open) => (
+                <FilledButton
+                  type="button"
+                  className="deal-detail__add-btn"
+                  onClick={() => {
+                    if (requireAuthOrRedirect()) open();
+                  }}
+                >
+                  <Icon slot="icon" aria-hidden="true">
+                    shopping_bag
+                  </Icon>
+                  Add to Cart
+                </FilledButton>
+              )}
+            />
 
             {/* Wishlist */}
             <OutlinedIconButton
@@ -607,16 +555,12 @@ export function DealDetail() {
 
                   const relatedDeal: DealCardDeal = {
                     id: item.id,
-                    title: item.product?.name ?? item.title,
+                    title: item.title,
                     image: media.images[0] ?? '',
-                    imageAlt:
-                      item.product?.imageAlt ??
-                      (item.product?.name ?? item.title),
+                    imageAlt: item.title,
                     gallery: media.images.length ? media.images : undefined,
                     video: media.video,
-                    badge: item.product
-                      ? dealDetail.serviceType.product
-                      : dealDetail.serviceType.service,
+                    badge: dealDetail.serviceType.service,
                     providerName: item.vendor?.businessName ?? undefined,
                     price: Number(item.salePrice),
                     originalPrice:
@@ -625,7 +569,6 @@ export function DealDetail() {
                         ? Number(item.originalPrice)
                         : undefined,
                     discount: item.discountPercent ?? undefined,
-                    isProduct: !!item.product,
                   };
 
                   return (

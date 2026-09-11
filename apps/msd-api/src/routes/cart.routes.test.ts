@@ -16,7 +16,7 @@ const CUSTOMER_ID = 'a0a0a0a0-0000-4000-8000-000000000001';
 const OTHER_CUSTOMER_ID = 'b0b0b0b0-0000-4000-8000-000000000002';
 const CART_ID = 'c0c0c0c0-0000-4000-8000-000000000003';
 const ITEM_ID = 'd0d0d0d0-0000-4000-8000-000000000004';
-const PRODUCT_DEAL_ID = 'e0e0e0e0-0000-4000-8000-000000000005';
+const PRODUCT_ID = 'e0e0e0e0-0000-4000-8000-000000000005';
 const SERVICE_DEAL_ID = 'f0f0f0f0-0000-4000-8000-000000000006';
 const DEAL_PACKAGE_ID = 'f1f1f1f1-0000-4000-8000-00000000000b';
 const THERAPIST_ID = 'f2f2f2f2-0000-4000-8000-00000000000c';
@@ -27,8 +27,8 @@ const BRANCH_A_ID = 'a3a3a3a3-0000-4000-8000-000000000009';
 const BRANCH_B_ID = 'a4a4a4a4-0000-4000-8000-00000000000a';
 
 const emptyCart = { id: CART_ID, customerId: CUSTOMER_ID, items: [] };
-const productDealFixture = { id: PRODUCT_DEAL_ID, productId: 'prod-1', vendorId: VENDOR_A_ID, branchId: BRANCH_A_ID, salePrice: '299.00' };
-const serviceDealFixture = { id: SERVICE_DEAL_ID, productId: null, vendorId: VENDOR_A_ID, branchId: BRANCH_A_ID, salePrice: '499.00' };
+const productFixture = { id: PRODUCT_ID, isActive: true, vendorId: VENDOR_A_ID, vendor: { status: 'ACTIVE' }, price: '299.00' };
+const serviceDealFixture = { id: SERVICE_DEAL_ID, vendorId: VENDOR_A_ID, branchId: BRANCH_A_ID, salePrice: '499.00' };
 const dealPackageFixture = { id: DEAL_PACKAGE_ID, dealId: SERVICE_DEAL_ID, isActive: true, sellingPrice: '599.00' };
 const therapistFixture = { id: THERAPIST_ID, isActive: true, vendorId: VENDOR_A_ID, branchId: BRANCH_A_ID };
 const therapistPackageFixture = { id: THERAPIST_PACKAGE_ID, therapistId: THERAPIST_ID, isActive: true, sellingPrice: '899.00' };
@@ -52,8 +52,8 @@ describe('GET /api/v1/cart', () => {
   });
 });
 
-describe('POST /api/v1/cart/items — Product line (dealId only)', () => {
-  it('rejects a service deal sent without a dealPackageId (not a product deal)', async () => {
+describe('POST /api/v1/cart/items — Product line (productId only)', () => {
+  it('rejects a bare dealId with no dealPackageId (every Deal is a service deal now)', async () => {
     prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
     const res = await request(app)
       .post('/api/v1/cart/items')
@@ -63,55 +63,75 @@ describe('POST /api/v1/cart/items — Product line (dealId only)', () => {
     expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
   });
 
-  it('adds a product deal to an empty cart', async () => {
-    prismaMock.deal.findUnique.mockResolvedValue(productDealFixture);
+  it('rejects an inactive product', async () => {
+    prismaMock.product.findUnique.mockResolvedValue({ ...productFixture, isActive: false });
+    const res = await request(app)
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ productId: PRODUCT_ID, quantity: 1 });
+    expect(res.status).toBe(422);
+    expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a product whose vendor is inactive', async () => {
+    prismaMock.product.findUnique.mockResolvedValue({ ...productFixture, vendor: { status: 'SUSPENDED' } });
+    const res = await request(app)
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ productId: PRODUCT_ID, quantity: 1 });
+    expect(res.status).toBe(422);
+    expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
+  });
+
+  it('adds a product to an empty cart', async () => {
+    prismaMock.product.findUnique.mockResolvedValue(productFixture);
     prismaMock.cart.upsert.mockResolvedValue(emptyCart);
     prismaMock.cartItem.findFirst.mockResolvedValue(null);
     const res = await request(app)
       .post('/api/v1/cart/items')
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
-      .send({ dealId: PRODUCT_DEAL_ID, quantity: 2 });
+      .send({ productId: PRODUCT_ID, quantity: 2 });
     expect(res.status).toBe(201);
     expect(prismaMock.cartItem.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ dealId: PRODUCT_DEAL_ID, dealPackageId: null, therapistId: null, therapistPackageId: null, quantity: 2, unitPrice: '299.00' }),
+        data: expect.objectContaining({ productId: PRODUCT_ID, dealId: null, dealPackageId: null, therapistId: null, therapistPackageId: null, quantity: 2, unitPrice: '299.00' }),
       }),
     );
   });
 
-  it('increments quantity instead of duplicating a row when the same deal is added again', async () => {
-    prismaMock.deal.findUnique.mockResolvedValue(productDealFixture);
+  it('increments quantity instead of duplicating a row when the same product is added again', async () => {
+    prismaMock.product.findUnique.mockResolvedValue(productFixture);
     prismaMock.cart.upsert.mockResolvedValue(emptyCart);
-    prismaMock.cartItem.findFirst.mockResolvedValue({ id: ITEM_ID, cartId: CART_ID, dealId: PRODUCT_DEAL_ID, quantity: 2 });
+    prismaMock.cartItem.findFirst.mockResolvedValue({ id: ITEM_ID, cartId: CART_ID, productId: PRODUCT_ID, quantity: 2 });
     const res = await request(app)
       .post('/api/v1/cart/items')
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
-      .send({ dealId: PRODUCT_DEAL_ID, quantity: 1 });
+      .send({ productId: PRODUCT_ID, quantity: 1 });
     expect(res.status).toBe(201);
     expect(prismaMock.cartItem.update).toHaveBeenCalledWith({ where: { id: ITEM_ID }, data: { quantity: 3 } });
     expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
   });
 
-  it('allows adding a deal from a DIFFERENT vendor than what is already in the cart (multi-vendor cart)', async () => {
-    prismaMock.deal.findUnique.mockResolvedValue({ ...productDealFixture, vendorId: VENDOR_B_ID, branchId: BRANCH_B_ID });
+  it('allows adding a product from a DIFFERENT vendor than what is already in the cart (multi-vendor cart)', async () => {
+    prismaMock.product.findUnique.mockResolvedValue({ ...productFixture, vendorId: VENDOR_B_ID });
     prismaMock.cart.upsert.mockResolvedValue(emptyCart);
     prismaMock.cartItem.findFirst.mockResolvedValue(null);
     const res = await request(app)
       .post('/api/v1/cart/items')
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
-      .send({ dealId: PRODUCT_DEAL_ID, quantity: 1 });
+      .send({ productId: PRODUCT_ID, quantity: 1 });
     expect(res.status).toBe(201);
     expect(prismaMock.cartItem.create).toHaveBeenCalled();
   });
 });
 
 describe('POST /api/v1/cart/items — Service-Deal line (dealId + dealPackageId)', () => {
-  it('rejects a product deal sent with a dealPackageId (a product deal has no packages)', async () => {
-    prismaMock.deal.findUnique.mockResolvedValue(productDealFixture);
+  it('rejects a productId sent together with a dealPackageId (never a mix)', async () => {
+    prismaMock.product.findUnique.mockResolvedValue(productFixture);
     const res = await request(app)
       .post('/api/v1/cart/items')
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
-      .send({ dealId: PRODUCT_DEAL_ID, dealPackageId: DEAL_PACKAGE_ID, quantity: 1 });
+      .send({ productId: PRODUCT_ID, dealPackageId: DEAL_PACKAGE_ID, quantity: 1 });
     expect(res.status).toBe(422);
     expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
   });
@@ -188,7 +208,7 @@ describe('POST /api/v1/cart/items — Therapist line (therapistId + therapistPac
     const res = await request(app)
       .post('/api/v1/cart/items')
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
-      .send({ dealId: PRODUCT_DEAL_ID, therapistId: THERAPIST_ID, therapistPackageId: THERAPIST_PACKAGE_ID, quantity: 1 });
+      .send({ dealId: SERVICE_DEAL_ID, dealPackageId: DEAL_PACKAGE_ID, therapistId: THERAPIST_ID, therapistPackageId: THERAPIST_PACKAGE_ID, quantity: 1 });
     expect(res.status).toBe(422);
     expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
   });

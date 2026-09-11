@@ -12,9 +12,11 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   getCatalogCategory,
   listCatalogDeals,
+  listCatalogProducts,
   listCatalogTherapists,
   type CatalogCategoryWithChildren,
   type CatalogDeal,
+  type CatalogProduct,
   type CatalogTherapist,
 } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
@@ -25,7 +27,7 @@ import { useWishlist } from '../../../wishlist/wishlist-context';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { formatINR } from '../../../utils/format';
-import { resolveDealMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
+import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import './category.css';
 import content from '../../../content.json';
@@ -46,12 +48,12 @@ function therapistFromPrice(therapist: CatalogTherapist): number | null {
  * returned (enforced server-side in `catalog.service.ts`).
  *
  * `category.type` (`SERVICE | PRODUCT | THERAPY`) automatically determines what this page lists
- * — never a manual toggle: a SERVICE (or untyped, legacy) category shows Deal cards, a PRODUCT
- * category shows Product-typed Deal cards (still via `listCatalogDeals`, just `type: 'product'`
- * — a Product *is* a Deal with `deal.product` set, per `catalog.ts`'s own doc comment; there is
- * no separate Product listing API), and a THERAPY category shows Therapist cards (`GET
- * /catalog/therapists`, filtered by `categoryId`/`subcategoryId`). "All" (the default) shows
- * every record in the category; selecting a subcategory tab narrows to that subcategory only.
+ * — never a manual toggle: a SERVICE (or untyped, legacy) category shows Deal cards (`GET
+ * /catalog/deals`), a PRODUCT category shows Product cards (`GET /catalog/products` — Product is
+ * a fully independent catalog entity now, never a Deal), and a THERAPY category shows Therapist
+ * cards (`GET /catalog/therapists`, filtered by `categoryId`/`subcategoryId`). "All" (the
+ * default) shows every record in the category; selecting a subcategory tab narrows to that
+ * subcategory only.
  */
 export function Category() {
   const { slug = '' } = useParams<{ slug: string }>();
@@ -69,6 +71,7 @@ export function Category() {
   const [dealsLoading, setDealsLoading] = useState(true);
   const [dealsError, setDealsError] = useState('');
   const [therapists, setTherapists] = useState<CatalogTherapist[]>([]);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
   const { coords } = useCurrentLocation();
 
   useEffect(() => {
@@ -93,13 +96,13 @@ export function Category() {
     navigate(`/sign-in?next=${encodeURIComponent(`/category/${slug}`)}`);
     return false;
   };
-  const addToCart = async (deal: CatalogDeal) => {
+  const addProductToCart = async (product: CatalogProduct) => {
     if (!requireAuthOrRedirect()) return;
     setActionError('');
     setActionMessage('');
     try {
-      await addCartItem(token, { dealId: deal.id, quantity: 1 });
-      setActionMessage(content.category.messages.addToCartSuccess.replace('{item}', deal.product?.name ?? deal.title));
+      await addCartItem(token, { productId: product.id, quantity: 1 });
+      setActionMessage(content.category.messages.addToCartSuccess.replace('{item}', product.name));
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : content.category.errors.addToCart);
     }
@@ -110,6 +113,7 @@ export function Category() {
   };
 
   const isTherapyCategory = category?.type === 'THERAPY';
+  const isProductCategory = category?.type === 'PRODUCT';
 
   useEffect(() => {
     if (!category) return;
@@ -129,13 +133,23 @@ export function Category() {
         .finally(() => setDealsLoading(false));
       return;
     }
+    if (category.type === 'PRODUCT') {
+      // Product is a fully independent catalog entity now — its own listing API, never a
+      // Deal with a `type` filter (see catalog.ts's own doc comment).
+      listCatalogProducts({
+        categoryId: category.id,
+        subcategoryId: activeSubcategory?.id,
+        search: search || undefined,
+        pageSize: 60,
+      })
+        .then(({ data }) => setProducts(data))
+        .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : content.category.errors.loadDeals))
+        .finally(() => setDealsLoading(false));
+      return;
+    }
     listCatalogDeals({
       categoryId: category.id,
       subcategoryId: activeSubcategory?.id,
-      // Category.type automatically determines which half of the catalogue this is — a PRODUCT
-      // category shows Product-typed deals, everything else (SERVICE, or untyped legacy rows)
-      // shows service deals. Never a manual Service/Product toggle.
-      type: category.type === 'PRODUCT' ? 'product' : 'service',
       search: search || undefined,
       pageSize: 60,
       latitude: coords?.latitude,
@@ -208,7 +222,9 @@ export function Category() {
               ? '…'
               : isTherapyCategory
                 ? `${therapists.length} ${therapists.length === 1 ? 'therapist' : 'therapists'}`
-                : `${deals.length} ${deals.length === 1 ? content.category.dealCount.singular : content.category.dealCount.plural}`}
+                : isProductCategory
+                  ? `${products.length} ${products.length === 1 ? 'product' : 'products'}`
+                  : `${deals.length} ${deals.length === 1 ? content.category.dealCount.singular : content.category.dealCount.plural}`}
           </p>
         </div>
       </div>
@@ -248,6 +264,49 @@ export function Category() {
                 })}
               </ul>
             )
+          ) : isProductCategory ? (
+            products.length === 0 ? (
+              <div className="category-page__empty">
+                <sky-info-card icon="sentiment_dissatisfied" heading={content.category.emptyDeals.heading} subheading={content.category.emptyDeals.subheading} />
+              </div>
+            ) : (
+              <ul className="category-page__grid">
+                {products.map((product) => (
+                  <li key={product.id}>
+                    <DealCard
+                      deal={{
+                        id: product.id,
+                        title: product.name,
+                        image: primaryImage(resolveProductMedia(product)) ?? '',
+                        imageAlt: product.imageAlt ?? '',
+                        gallery: resolveProductMedia(product).images,
+                        badge: content.category.offeringLabels.product,
+                        providerName: product.vendor?.businessName ?? '',
+                        price: Number(product.price),
+                        originalPrice:
+                          product.originalPrice && Number(product.originalPrice) !== Number(product.price)
+                            ? Number(product.originalPrice)
+                            : undefined,
+                        discount: product.discount ?? undefined,
+                        tag: product.popularTags?.[0]?.name,
+                      }}
+                      href={`/products/${product.id}`}
+                      eyebrowHref={product.vendor?.slug ? `/vendor/${product.vendor.slug}` : undefined}
+                      favoriteActive={false}
+                      onFavorite={() => {}}
+                      actions={
+                        <FilledButton onClick={() => addProductToCart(product)}>
+                          <Icon slot="icon" aria-hidden="true">
+                            shopping_bag
+                          </Icon>
+                          {content.category.actions.addToCart}
+                        </FilledButton>
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
+            )
           ) : deals.length === 0 ? (
             <div className="category-page__empty">
               <sky-info-card icon="sentiment_dissatisfied" heading={content.category.emptyDeals.heading} subheading={content.category.emptyDeals.subheading} />
@@ -259,15 +318,11 @@ export function Category() {
                   <DealCard
                     deal={{
                       id: deal.id,
-                      title: deal.product?.name ?? deal.title,
+                      title: deal.title,
                       image: primaryImage(resolveDealMedia(deal)) ?? '',
-                      imageAlt:
-                        deal.product?.imageAlt ??
-                        '',
+                      imageAlt: '',
                       gallery: resolveDealMedia(deal).images,
-                      badge: deal.product
-                        ? content.category.offeringLabels.product
-                        : content.category.offeringLabels.service,
+                      badge: content.category.offeringLabels.service,
                       providerName: [deal.vendor?.businessName, deal.branch?.name]
                         .filter(Boolean)
                         .join(' · '),
@@ -285,8 +340,7 @@ export function Category() {
                       priceNote: deal.durationMinutes
                         ? `${deal.durationMinutes} ${content.category.durationSuffix}`
                         : undefined,
-                      isProduct: !!deal.product,
-                      tag: deal.popularTags?.[0]?.name ?? deal.product?.popularTags?.[0]?.name,
+                      tag: deal.popularTags?.[0]?.name,
                     }}
                     eyebrowHref={
                       deal.vendor?.slug
@@ -296,31 +350,22 @@ export function Category() {
                     favoriteActive={isWishlisted(deal.id)}
                     onFavorite={() => toggleFavorite(deal)}
                     actions={
-                      !deal.product ? (
-                        <DealAddToCartDialog
-                          deal={deal}
-                          onAdded={(label) => setActionMessage(`Added "${label}" to your cart.`)}
-                          renderTrigger={(open) => (
-                            <OutlinedButton
-                              onClick={() => {
-                                if (requireAuthOrRedirect()) open();
-                              }}
-                            >
-                              <Icon slot="icon" aria-hidden="true">
-                                shopping_bag
-                              </Icon>
-                              Add to Cart
-                            </OutlinedButton>
-                          )}
-                        />
-                      ) : (
-                        <FilledButton onClick={() => addToCart(deal)}>
-                          <Icon slot="icon" aria-hidden="true">
-                            shopping_bag
-                          </Icon>
-                          {content.category.actions.addToCart}
-                        </FilledButton>
-                      )
+                      <DealAddToCartDialog
+                        deal={deal}
+                        onAdded={(label) => setActionMessage(`Added "${label}" to your cart.`)}
+                        renderTrigger={(open) => (
+                          <OutlinedButton
+                            onClick={() => {
+                              if (requireAuthOrRedirect()) open();
+                            }}
+                          >
+                            <Icon slot="icon" aria-hidden="true">
+                              shopping_bag
+                            </Icon>
+                            Add to Cart
+                          </OutlinedButton>
+                        )}
+                      />
                     }
                   />
                 </li>

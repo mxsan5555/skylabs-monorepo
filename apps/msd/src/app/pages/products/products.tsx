@@ -11,18 +11,16 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { useNavigate } from 'react-router-dom';
 import { DealCard } from '../../components/deal-card';
 import {
-  listCatalogDeals,
-  type CatalogDeal,
+  listCatalogProducts,
+  type CatalogProduct,
 } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
-import { useWishlist } from '../../../wishlist/wishlist-context';
 
-import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
 
 import { formatINR } from '../../../utils/format';
-import { resolveDealMedia, primaryImage } from '../../../utils/media';
+import { resolveProductMedia, primaryImage } from '../../../utils/media';
 import type { ProductSort } from '../../../types';
 
 import content from '../../../content.json';
@@ -35,25 +33,17 @@ const SITE_URL =
   (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
 
 /**
- * All product deals across every vendor/category.
+ * All products across every vendor/category — Product is a fully independent, directly
+ * purchasable catalog entity now (see msd-api's Product schema doc comment), never a Deal.
  *
- * GET /catalog/deals?type=product
- *
- * CatalogDeal unifies Service and Product as one Deal entity.
- * For this page the backend query is scoped to type=product,
- * so deal.product is populated.
+ * GET /catalog/products
  */
 export function ProductListing() {
   const { token, isAuthenticated } = useAuth();
 
-  const {
-    has: isWishlisted,
-    toggle: toggleWishlist,
-  } = useWishlist();
-
   const navigate = useNavigate();
 
-  const [deals, setDeals] = useState<CatalogDeal[]>([]);
+  const [productsData, setProductsData] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -76,14 +66,13 @@ export function ProductListing() {
     setLoading(true);
     setError('');
 
-    listCatalogDeals({
-      type: 'product',
+    listCatalogProducts({
       search: search.trim() || undefined,
       pageSize: 60,
     })
       .then(({ data }) => {
         if (!cancelled) {
-          setDeals(data);
+          setProductsData(data);
         }
       })
       .catch((err: unknown) => {
@@ -111,26 +100,26 @@ export function ProductListing() {
   /*
    * Sort products locally.
    */
-  const sortedDeals = useMemo(() => {
+  const sortedProducts = useMemo(() => {
     switch (sort) {
       case 'price-asc':
-        return [...deals].sort(
+        return [...productsData].sort(
           (a, b) =>
-            Number(a.salePrice) -
-            Number(b.salePrice),
+            Number(a.price) -
+            Number(b.price),
         );
 
       case 'price-desc':
-        return [...deals].sort(
+        return [...productsData].sort(
           (a, b) =>
-            Number(b.salePrice) -
-            Number(a.salePrice),
+            Number(b.price) -
+            Number(a.price),
         );
 
       default:
-        return deals;
+        return productsData;
     }
-  }, [deals, sort]);
+  }, [productsData, sort]);
 
   /*
    * Authentication guard.
@@ -153,7 +142,7 @@ export function ProductListing() {
    * Add product to cart.
    */
   const addToCart = async (
-    deal: CatalogDeal,
+    product: CatalogProduct,
   ) => {
     if (!requireAuthOrRedirect()) {
       return;
@@ -165,13 +154,13 @@ export function ProductListing() {
     try {
       await addCartItem(
         token,
-        { dealId: deal.id, quantity: 1 },
+        { productId: product.id, quantity: 1 },
       );
 
       setActionMessage(
         products.listing.addToCartSuccess.replace(
           '{item}',
-          deal.product?.name ?? deal.title,
+          product.name,
         ),
       );
     } catch (err: unknown) {
@@ -181,19 +170,6 @@ export function ProductListing() {
           : products.listing.addToCartError,
       );
     }
-  };
-
-  /*
-   * Wishlist toggle.
-   */
-  const toggleFavorite = (
-    deal: CatalogDeal,
-  ) => {
-    if (!requireAuthOrRedirect()) {
-      return;
-    }
-
-    void toggleWishlist(deal.id);
   };
 
   return (
@@ -288,7 +264,7 @@ export function ProductListing() {
       />
 
       {/* Product list structured data */}
-      {sortedDeals.length > 0 && (
+      {sortedProducts.length > 0 && (
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -300,16 +276,14 @@ export function ProductListing() {
                 products.meta.listingTitle,
               url: `${SITE_URL}/products`,
               numberOfItems:
-                sortedDeals.length,
+                sortedProducts.length,
               itemListElement:
-                sortedDeals.map(
-                  (deal, index) => ({
+                sortedProducts.map(
+                  (product, index) => ({
                     '@type': 'ListItem',
                     position: index + 1,
-                    name:
-                      deal.product?.name ??
-                      deal.title,
-                    url: `${SITE_URL}/products/${deal.id}`,
+                    name: product.name,
+                    url: `${SITE_URL}/products/${product.id}`,
                   }),
                 ),
             }),
@@ -390,7 +364,7 @@ export function ProductListing() {
           >
             {loading
               ? '…'
-              : `${sortedDeals.length} ${products.listing.resultLabel}`}
+              : `${sortedProducts.length} ${products.listing.resultLabel}`}
           </span>
 
           <OutlinedSelect
@@ -463,7 +437,7 @@ export function ProductListing() {
           >
             {error}
           </p>
-        ) : sortedDeals.length === 0 ? (
+        ) : sortedProducts.length === 0 ? (
           <div
             className="products-page__empty"
             role="status"
@@ -481,63 +455,49 @@ export function ProductListing() {
           </div>
         ) : (
           <div className="products-page__grid">
-            {sortedDeals.map((deal) => {
-              const productName =
-                deal.product?.name ??
-                deal.title;
-
-              const salePrice = Number(
-                deal.salePrice,
-              );
+            {sortedProducts.map((product) => {
+              const salePrice = Number(product.price);
 
               const originalPrice =
-                deal.originalPrice != null
-                  ? Number(
-                    deal.originalPrice,
-                  )
+                product.originalPrice != null
+                  ? Number(product.originalPrice)
                   : undefined;
 
-              const media = resolveDealMedia(deal);
+              const media = resolveProductMedia(product);
 
               const image = primaryImage(media);
 
               return (
                 <div
-                  key={deal.id}
+                  key={product.id}
                   className="products-page__card-wrap"
                 >
                <DealCard
   deal={{
-    id: deal.id,
-    title: productName,
+    id: product.id,
+    title: product.name,
     image: image ?? '',
-    imageAlt:
-      deal.product?.imageAlt ?? productName,
+    imageAlt: product.imageAlt ?? product.name,
     gallery: media.images,
     badge: 'Product',
-    providerName:
-      deal.product?.brand ??
-      deal.vendor?.businessName ??
-      undefined,
+    providerName: product.brand ?? product.vendor?.businessName ?? undefined,
     price: salePrice,
     originalPrice:
       originalPrice !== undefined &&
       originalPrice !== salePrice
         ? originalPrice
         : undefined,
-    discount: deal.discountPercent
-      ? Number(deal.discountPercent)
-      : undefined,
-    isProduct: true,
-    tag: deal.popularTags?.[0]?.name ?? deal.product?.popularTags?.[0]?.name,
+    discount: product.discount ?? undefined,
+    tag: product.popularTags?.[0]?.name,
   }}
-  favoriteActive={isWishlisted(deal.id)}
-  onFavorite={() => toggleFavorite(deal)}
+  href={`/products/${product.id}`}
+  favoriteActive={false}
+  onFavorite={() => {}}
   actions={
     <FilledButton
       type="button"
       className="products-page__card-btn"
-      onClick={() => void addToCart(deal)}
+      onClick={() => void addToCart(product)}
     >
       <Icon slot="icon" aria-hidden="true">
         shopping_bag

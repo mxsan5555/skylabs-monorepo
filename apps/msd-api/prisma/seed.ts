@@ -449,13 +449,13 @@ interface ProductSeed {
   originalPrice: number;
 }
 
-/** Vendor-owned retail catalog (see Product's schema doc comment). `price` here is just the
- *  catalog reference price; the storefront actually charges each Deal's own `salePrice` (see
- *  `PRODUCT_DEAL_SEEDS` below). Every entry's `categorySlug` is the single new PRODUCT-typed
- *  top-level ("product") — `subcategorySlug` goes all the way to the specific Type-tier row
- *  under it (e.g. "shampoo" under Product > Hair Care), matching the "categoryId is always
- *  top-level, subcategoryId is whichever deeper tier was actually chosen" rule the rest of the
- *  reset taxonomy follows (see `prisma/category-taxonomy.ts`). */
+/** Vendor-owned retail catalog (see Product's schema doc comment) — the storefront charges this
+ *  Product's own `price` directly (Product is a fully independent, directly-purchasable catalog
+ *  entity, never a Deal). Every entry's `categorySlug` is the single new PRODUCT-typed top-level
+ *  ("product") — `subcategorySlug` goes all the way to the specific Type-tier row under it (e.g.
+ *  "shampoo" under Product > Hair Care), matching the "categoryId is always top-level,
+ *  subcategoryId is whichever deeper tier was actually chosen" rule the rest of the reset
+ *  taxonomy follows (see `prisma/category-taxonomy.ts`). */
 const PRODUCT_SEEDS: ProductSeed[] = [
   { name: 'Hair Shampoo', slug: 'hair-shampoo', categorySlug: 'product', subcategorySlug: 'shampoo', vendorKey: 'glow', brand: 'GlowCare', description: 'Sulphate-free shampoo for everyday use.', price: 499, originalPrice: 599 },
   { name: 'Hair Conditioner', slug: 'hair-conditioner', categorySlug: 'product', subcategorySlug: 'conditioner', vendorKey: 'glow', brand: 'GlowCare', description: 'Deep-conditioning formula for smooth, frizz-free hair.', price: 449, originalPrice: 549 },
@@ -625,7 +625,6 @@ async function seedVendorsAndBranches(
       businessDescription: `${v.businessName} — a demo ${v.businessType.toLowerCase()} business seeded for local development.`,
       businessEmail: v.ownerEmail,
       businessPhone: v.ownerPhone,
-      ownerName: v.ownerName,
       contactPerson: v.ownerName,
       ownerEmail: v.ownerEmail,
       ownerMobile: v.ownerPhone,
@@ -709,40 +708,8 @@ const SERVICE_DEAL_SEEDS: ServiceDealSeed[] = [
   { slug: 'yoga-session-vitality-paadribazar', title: 'Yoga Session at Vitality Fitness & Wellness — Paadri Bazar', categorySlug: 'health-wellness', subcategorySlug: 'yoga', vendorKey: 'vitality', branchKey: 'vitality-paadribazar', salePrice: 499, originalPrice: 649, durationMinutes: 60 },
 ];
 
-interface ProductDealSeed {
-  slug: string;
-  title: string;
-  productSlug: string;
-  categorySlug: string;
-  subcategorySlug: string;
-  vendorKey: string;
-  branchKey: string;
-  salePrice: number;
-  originalPrice: number;
-}
-
-/** Sellable product offerings. Grouped by vendor+branch deliberately so the demo Cart (single
- *  vendor+branch) and each demo PRODUCT Order (its own distinct vendor+branch combo, since
- *  that's the idempotency key for an Order with no other natural unique key) each have a clean,
- *  non-colliding set.
- *  Every `vendorKey` here matches the owning Product's own `vendorKey` in `PRODUCT_SEEDS` —
- *  a product deal's vendor must always be the Product's actual owner now. */
-const PRODUCT_DEAL_SEEDS: ProductDealSeed[] = [
-  { slug: 'hair-shampoo-glow-golghar', title: 'Hair Shampoo — Glow Beauty Studio', productSlug: 'hair-shampoo', categorySlug: 'product', subcategorySlug: 'shampoo', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 499, originalPrice: 599 },
-  { slug: 'face-wash-glow-golghar', title: 'Face Wash — Glow Beauty Studio', productSlug: 'face-wash', categorySlug: 'product', subcategorySlug: 'face-wash', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 299, originalPrice: 349 },
-  { slug: 'moisturizer-glow-taramandal', title: 'Moisturizer — Glow Beauty Studio', productSlug: 'moisturizer', categorySlug: 'product', subcategorySlug: 'moisturizer', vendorKey: 'glow', branchKey: 'glow-taramandal', salePrice: 599, originalPrice: 699 },
-  { slug: 'hair-serum-glow-taramandal', title: 'Hair Serum — Glow Beauty Studio', productSlug: 'hair-serum', categorySlug: 'product', subcategorySlug: 'hair-serum', vendorKey: 'glow', branchKey: 'glow-taramandal', salePrice: 699, originalPrice: 799 },
-  { slug: 'massage-oil-urban-civillines', title: 'Massage Oil — Urban Wellness Spa', productSlug: 'massage-oil', categorySlug: 'product', subcategorySlug: 'massage-oil', vendorKey: 'urban', branchKey: 'urban-civillines', salePrice: 349, originalPrice: 429 },
-  { slug: 'body-scrub-urban-civillines', title: 'Body Scrub — Urban Wellness Spa', productSlug: 'body-scrub', categorySlug: 'product', subcategorySlug: 'body-scrub-product', vendorKey: 'urban', branchKey: 'urban-civillines', salePrice: 399, originalPrice: 499 },
-  { slug: 'spa-kit-serenity-betiahata', title: 'Spa Kit — Serenity Spa & Retreat', productSlug: 'spa-kit', categorySlug: 'product', subcategorySlug: 'spa-kit', vendorKey: 'serenity', branchKey: 'serenity-betiahata', salePrice: 799, originalPrice: 999 },
-  { slug: 'essential-oil-blend-serenity-betiahata', title: 'Essential Oil Blend — Serenity Spa & Retreat', productSlug: 'essential-oil-blend', categorySlug: 'product', subcategorySlug: 'essential-oils', vendorKey: 'serenity', branchKey: 'serenity-betiahata', salePrice: 599, originalPrice: 749 },
-  { slug: 'daily-sunscreen-vitality-paadribazar', title: 'Daily Sunscreen — Vitality Fitness & Wellness', productSlug: 'daily-sunscreen', categorySlug: 'product', subcategorySlug: 'sunscreen', vendorKey: 'vitality', branchKey: 'vitality-paadribazar', salePrice: 399, originalPrice: 499 },
-  { slug: 'personal-care-kit-vitality-paadribazar', title: 'Personal Care Kit — Vitality Fitness & Wellness', productSlug: 'personal-care-kit', categorySlug: 'product', subcategorySlug: 'personal-care', vendorKey: 'vitality', branchKey: 'vitality-paadribazar', salePrice: 899, originalPrice: 1099 },
-];
-
 async function seedDeals(
   categoryIdBySlug: Map<string, string>,
-  productIdBySlug: Map<string, string>,
   vendorIdByKey: Map<string, string>,
   branchIdByKey: Map<string, string>,
 ): Promise<Map<string, string>> {
@@ -755,7 +722,6 @@ async function seedDeals(
       branchId: branchIdByKey.get(d.branchKey)!,
       categoryId: categoryIdBySlug.get(d.categorySlug)!,
       subcategoryId: categoryIdBySlug.get(d.subcategorySlug)!,
-      productId: null,
       title: d.title,
       shortDescription: `Book ${d.title} now.`,
       description: `${d.title} — a demo bookable service deal seeded for local development.`,
@@ -775,32 +741,6 @@ async function seedDeals(
     dealIdBySlug.set(d.slug, row.id);
   }
 
-  for (const d of PRODUCT_DEAL_SEEDS) {
-    const discountPercent = Math.round(((d.originalPrice - d.salePrice) / d.originalPrice) * 100);
-    const data = {
-      vendorId: vendorIdByKey.get(d.vendorKey)!,
-      branchId: branchIdByKey.get(d.branchKey)!,
-      categoryId: categoryIdBySlug.get(d.categorySlug)!,
-      subcategoryId: categoryIdBySlug.get(d.subcategorySlug)!,
-      productId: productIdBySlug.get(d.productSlug)!,
-      title: d.title,
-      shortDescription: `Buy ${d.title} now.`,
-      description: `${d.title} — a demo product deal seeded for local development.`,
-      originalPrice: d.originalPrice,
-      salePrice: d.salePrice,
-      discountPercent,
-      durationMinutes: null,
-      images: [`https://picsum.photos/seed/deal-${d.slug}/800/500`] as Prisma.InputJsonValue,
-      maxBookings: null,
-      availableBookings: null,
-      status: 'ACTIVE' as const,
-      approvalStatus: 'APPROVED' as const,
-    };
-    const row = (await prisma.deal.findUnique({ where: { slug: d.slug } }))
-      ?? (await prisma.deal.create({ data: { ...data, slug: d.slug } as unknown as Prisma.DealUncheckedCreateInput }));
-    dealIdBySlug.set(d.slug, row.id);
-  }
-
   return dealIdBySlug;
 }
 
@@ -808,9 +748,9 @@ async function seedDeals(
  * Seeds `VendorCategoryAccess` + the three business-module booleans for every seeded vendor, so
  * local dev/test data works immediately with the new category-access gate: the vendor(s) with
  * service deals get `offersService: true` + access to the top-level categories their deals use;
- * the vendor(s) with product deals/products get `offersProduct: true` + access to their
- * products' top-level categories. Also grants `offersTherapy` + all THERAPY categories to the
- * wellness vendor, as a demo of the Therapist.specializationCategoryId flow.
+ * the vendor(s) with products get `offersProduct: true` + access to their products' top-level
+ * categories. Also grants `offersTherapy` + all THERAPY categories to the wellness vendor, as a
+ * demo of the Therapist.specializationCategoryId flow.
  */
 async function seedVendorModulesAndCategoryAccess(
   vendorIdByKey: Map<string, string>,
@@ -964,7 +904,7 @@ const PACKAGE_MULTIPLIERS = [1, 1.6, 2.2] as const;
  *  multiple of the deal's own base price, rounded to a clean ten. Idempotent via DealPackage's
  *  own `@@unique([dealId, durationMinutes])` upsert key. */
 async function seedDealPackages(): Promise<number> {
-  const serviceDeals = await prisma.deal.findMany({ where: { productId: null }, select: { id: true, salePrice: true, originalPrice: true } });
+  const serviceDeals = await prisma.deal.findMany({ select: { id: true, salePrice: true, originalPrice: true } });
   let created = 0;
   for (const deal of serviceDeals) {
     const base = deal.salePrice.toNumber();
@@ -1021,6 +961,7 @@ async function seedTherapistPackages(): Promise<number> {
 async function seedCart(
   customerId: string,
   dealIdBySlug: Map<string, string>,
+  productIdBySlug: Map<string, string>,
 ): Promise<void> {
   const cart = await prisma.cart.upsert({
     where: { customerId },
@@ -1028,13 +969,14 @@ async function seedCart(
     create: { customerId },
   });
 
-  const upsertLine = async (line: { dealId?: string; dealPackageId?: string; therapistId?: string; therapistPackageId?: string; quantity: number; unitPrice: number }) => {
+  const upsertLine = async (line: { dealId?: string; dealPackageId?: string; therapistId?: string; therapistPackageId?: string; productId?: string; quantity: number; unitPrice: number }) => {
     const where = {
       cartId: cart.id,
       dealId: line.dealId ?? null,
       dealPackageId: line.dealPackageId ?? null,
       therapistId: line.therapistId ?? null,
       therapistPackageId: line.therapistPackageId ?? null,
+      productId: line.productId ?? null,
     };
     const existing = await prisma.cartItem.findFirst({ where });
     if (existing) {
@@ -1044,16 +986,17 @@ async function seedCart(
     }
   };
 
-  // Product lines.
+  // Product lines — Product is a fully independent, directly-purchasable catalog entity (see
+  // its own schema doc comment), never a Deal wrapper.
   const productLineSeeds = [
-    { dealSlug: 'hair-shampoo-glow-golghar', quantity: 2 },
-    { dealSlug: 'face-wash-glow-golghar', quantity: 1 },
-    { dealSlug: 'massage-oil-urban-civillines', quantity: 1 },
+    { productSlug: 'hair-shampoo', quantity: 2 },
+    { productSlug: 'face-wash', quantity: 1 },
+    { productSlug: 'massage-oil', quantity: 1 },
   ];
   for (const item of productLineSeeds) {
-    const dealId = dealIdBySlug.get(item.dealSlug)!;
-    const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
-    await upsertLine({ dealId, quantity: item.quantity, unitPrice: deal.salePrice.toNumber() });
+    const productId = productIdBySlug.get(item.productSlug)!;
+    const product = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
+    await upsertLine({ productId, quantity: item.quantity, unitPrice: product.price.toNumber() });
   }
 
   // Service-Deal line — Swedish Massage, 60-minute package.
@@ -1067,12 +1010,12 @@ async function seedCart(
   await upsertLine({ therapistId: ramesh.id, therapistPackageId: rameshPackage.id, quantity: 1, unitPrice: rameshPackage.sellingPrice.toNumber() });
 }
 
-/** 2 demo wishlist items (one service deal, one product deal) — deliberately distinct from the
- *  demo Cart's deals so the two features look independent in the frontend. Idempotent via
- *  WishlistItem's real `@@unique([customerId, dealId])` constraint (upsert-by-compound-key, same
- *  pattern as `seedCart`'s CartItem upsert). */
+/** 2 demo wishlist items — service deals only (WishlistItem only supports a Deal, see its own
+ *  schema doc comment; Product cannot be wishlisted). Idempotent via WishlistItem's real
+ *  `@@unique([customerId, dealId])` constraint (upsert-by-compound-key, same pattern as
+ *  `seedCart`'s CartItem upsert). */
 async function seedWishlist(customerId: string, dealIdBySlug: Map<string, string>): Promise<void> {
-  const wishlistSlugs = ['facial-glow-golghar', 'hair-serum-glow-taramandal'];
+  const wishlistSlugs = ['facial-glow-golghar', 'hair-spa-glow-taramandal'];
   for (const slug of wishlistSlugs) {
     const dealId = dealIdBySlug.get(slug)!;
     await prisma.wishlistItem.upsert({
@@ -1093,10 +1036,12 @@ interface OrderLineInput {
   dealPackageId?: string;
   therapistId?: string;
   therapistPackageId?: string;
+  productId?: string;
   vendorId: string;
-  branchId: string;
+  /** Absent for a Product line — Product has no branch (see its own schema doc comment). */
+  branchId?: string;
   vendorNameSnapshot: string;
-  branchNameSnapshot: string;
+  branchNameSnapshot?: string;
 }
 
 /**
@@ -1113,14 +1058,14 @@ interface OrderLineInput {
 async function seedOrder(
   customerId: string,
   primaryVendorId: string,
-  primaryBranchId: string,
+  primaryBranchId: string | undefined,
   primaryVendorNameSnapshot: string,
-  primaryBranchNameSnapshot: string,
+  primaryBranchNameSnapshot: string | undefined,
   status: 'PENDING_PAYMENT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED',
   items: OrderLineInput[],
 ): Promise<string> {
   const type = items.every((it) => it.itemType === 'PRODUCT') ? 'PRODUCT' : 'SERVICE';
-  const existing = await prisma.order.findFirst({ where: { customerId, vendorId: primaryVendorId, branchId: primaryBranchId, type } });
+  const existing = await prisma.order.findFirst({ where: { customerId, vendorId: primaryVendorId, branchId: primaryBranchId ?? null, type } });
   if (existing) return existing.id;
 
   let subtotal = 0;
@@ -1132,10 +1077,11 @@ async function seedOrder(
       dealPackageId: it.dealPackageId ?? null,
       therapistId: it.therapistId ?? null,
       therapistPackageId: it.therapistPackageId ?? null,
+      productId: it.productId ?? null,
       vendorId: it.vendorId,
-      branchId: it.branchId,
+      branchId: it.branchId ?? null,
       vendorNameSnapshot: it.vendorNameSnapshot,
-      branchNameSnapshot: it.branchNameSnapshot,
+      branchNameSnapshot: it.branchNameSnapshot ?? null,
       itemName: it.itemName,
       itemType: it.itemType,
       unitPrice: it.unitPrice,
@@ -1149,11 +1095,11 @@ async function seedOrder(
     data: {
       customerId,
       vendorId: primaryVendorId,
-      branchId: primaryBranchId,
+      branchId: primaryBranchId ?? null,
       type,
       status,
       vendorNameSnapshot: primaryVendorNameSnapshot,
-      branchNameSnapshot: primaryBranchNameSnapshot,
+      branchNameSnapshot: primaryBranchNameSnapshot ?? null,
       subtotal,
       total: subtotal,
       items: { create: itemsData },
@@ -1164,27 +1110,25 @@ async function seedOrder(
 }
 
 interface ProductOrderItemInput {
-  dealId: string;
+  productId: string;
   itemName: string;
   unitPrice: number;
   quantity: number;
 }
 
-/** A PRODUCT order has no natural unique key — idempotency is
- *  findFirst-by-(customerId,vendorId,branchId,type) then create-if-missing, per the task spec.
- *  This means each demo PRODUCT order below deliberately uses its own distinct vendor+branch
- *  combo so they never collide with each other on a re-run. */
+/** A PRODUCT order has no branch (Product has no branchId, see its own schema doc comment) and
+ *  no other natural unique key — idempotency is findFirst-by-(customerId,vendorId,type,status)
+ *  then create-if-missing (each demo PRODUCT order below uses its own distinct status so they
+ *  never collide with each other on a re-run, even when they share a vendor). */
 async function seedProductOrder(
   customerId: string,
   vendorId: string,
-  branchId: string,
   vendorNameSnapshot: string,
-  branchNameSnapshot: string,
   status: 'PENDING_PAYMENT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED',
   items: ProductOrderItemInput[],
   cancellationReason?: string,
 ): Promise<string> {
-  const existing = await prisma.order.findFirst({ where: { customerId, vendorId, branchId, type: 'PRODUCT' } });
+  const existing = await prisma.order.findFirst({ where: { customerId, vendorId, branchId: null, type: 'PRODUCT', status } });
   if (existing) return existing.id;
 
   let subtotal = 0;
@@ -1192,11 +1136,9 @@ async function seedProductOrder(
     const lineTotal = it.unitPrice * it.quantity;
     subtotal += lineTotal;
     return {
-      dealId: it.dealId,
+      productId: it.productId,
       vendorId,
-      branchId,
       vendorNameSnapshot,
-      branchNameSnapshot,
       itemName: it.itemName,
       itemType: 'PRODUCT' as const,
       unitPrice: it.unitPrice,
@@ -1209,11 +1151,9 @@ async function seedProductOrder(
     data: {
       customerId,
       vendorId,
-      branchId,
       type: 'PRODUCT',
       status,
       vendorNameSnapshot,
-      branchNameSnapshot,
       subtotal,
       total: subtotal,
       cancellationReason: cancellationReason ?? null,
@@ -1266,19 +1206,21 @@ async function seedPayment(orderId: string, status: 'CREATED' | 'PAID', amount: 
  *     several kinds of item" example.
  *  2. THERAPIST order (CONFIRMED, Urban/Civil Lines: Ramesh Kumar) with a PAID payment.
  *  3. DEAL order (CONFIRMED, Urban/Medical College Road: Deep Tissue Massage) with a PAID payment.
- *  4. PRODUCT order (CONFIRMED, Glow/Taramandal) with a PAID payment.
- *  5. PRODUCT order (PENDING_PAYMENT, Urban/Civil Lines) with a CREATED (unpaid) payment.
- *  6. PRODUCT order (CANCELLED, Glow/Golghar) with no payment.
- * Each order uses its own distinct vendor+branch+type combo — see `seedOrder`'s doc comment.
+ *  4. PRODUCT order (CONFIRMED, Glow Beauty Studio) with a PAID payment.
+ *  5. PRODUCT order (PENDING_PAYMENT, Urban Wellness Spa) with a CREATED (unpaid) payment.
+ *  6. PRODUCT order (CANCELLED, Glow Beauty Studio) with no payment.
+ * Each order uses its own distinct vendor+type(+status, for a PRODUCT order — no branch to
+ * disambiguate by, see `seedProductOrder`'s doc comment) combo — see `seedOrder`'s doc comment.
  */
 async function seedDemoCustomerActivity(
   roles: Map<string, { id: string; isSuperAdmin: boolean }>,
   dealIdBySlug: Map<string, string>,
+  productIdBySlug: Map<string, string>,
   vendorIdByKey: Map<string, string>,
   branchIdByKey: Map<string, string>,
 ): Promise<string> {
   const customerId = await seedDemoCustomer(roles);
-  await seedCart(customerId, dealIdBySlug);
+  await seedCart(customerId, dealIdBySlug, productIdBySlug);
   await seedWishlist(customerId, dealIdBySlug);
 
   const glowGolgharId = vendorIdByKey.get('glow')!;
@@ -1287,8 +1229,8 @@ async function seedDemoCustomerActivity(
   // 1) MIXED order — COMPLETED (Glow Beauty Studio, Golghar Branch): Deal + Product + Therapist.
   const haircutDealId = dealIdBySlug.get('haircut-glow-golghar')!;
   const haircutPackage = await prisma.dealPackage.findFirstOrThrow({ where: { dealId: haircutDealId, durationMinutes: 30 } });
-  const shampooDealId = dealIdBySlug.get('hair-shampoo-glow-golghar')!;
-  const shampooDeal = await prisma.deal.findUniqueOrThrow({ where: { id: shampooDealId } });
+  const shampooProductId = productIdBySlug.get('hair-shampoo')!;
+  const shampooProduct = await prisma.product.findUniqueOrThrow({ where: { id: shampooProductId } });
   const anjali = await prisma.therapist.findFirstOrThrow({ where: { personName: 'Anjali Mehta' } });
   const anjaliPackage = await prisma.therapistPackage.findFirstOrThrow({ where: { therapistId: anjali.id, durationMinutes: 60 } });
   const mixedOrderId = await seedOrder(
@@ -1313,15 +1255,13 @@ async function seedDemoCustomerActivity(
         branchNameSnapshot: 'Golghar Branch',
       },
       {
-        dealId: shampooDealId,
+        productId: shampooProductId,
         itemName: 'Hair Shampoo',
         itemType: 'PRODUCT',
-        unitPrice: shampooDeal.salePrice.toNumber(),
+        unitPrice: shampooProduct.price.toNumber(),
         quantity: 1,
         vendorId: glowGolgharId,
-        branchId: glowGolgharBranchId,
         vendorNameSnapshot: 'Glow Beauty Studio',
-        branchNameSnapshot: 'Golghar Branch',
       },
       {
         therapistId: anjali.id,
@@ -1403,47 +1343,41 @@ async function seedDemoCustomerActivity(
   const dealOrder = await prisma.order.findUniqueOrThrow({ where: { id: dealOrderId } });
   await seedPayment(dealOrder.id, 'PAID', dealOrder.total.toNumber());
 
-  // 4) PRODUCT order — CONFIRMED (Glow Beauty Studio, Taramandal Branch), PAID.
+  // 4) PRODUCT order — CONFIRMED (Glow Beauty Studio), PAID.
   const confirmedOrderId = await seedProductOrder(
     customerId,
     vendorIdByKey.get('glow')!,
-    branchIdByKey.get('glow-taramandal')!,
     'Glow Beauty Studio',
-    'Taramandal Branch',
     'CONFIRMED',
     [
-      { dealId: dealIdBySlug.get('moisturizer-glow-taramandal')!, itemName: 'Moisturizer', unitPrice: 599, quantity: 1 },
-      { dealId: dealIdBySlug.get('hair-serum-glow-taramandal')!, itemName: 'Hair Serum', unitPrice: 699, quantity: 1 },
+      { productId: productIdBySlug.get('moisturizer')!, itemName: 'Moisturizer', unitPrice: 599, quantity: 1 },
+      { productId: productIdBySlug.get('hair-serum')!, itemName: 'Hair Serum', unitPrice: 699, quantity: 1 },
     ],
   );
   const confirmedOrder = await prisma.order.findUniqueOrThrow({ where: { id: confirmedOrderId } });
   await seedPayment(confirmedOrder.id, 'PAID', confirmedOrder.total.toNumber());
 
-  // 5) PRODUCT order — PENDING_PAYMENT (Urban Wellness Spa, Civil Lines Branch), unpaid.
+  // 5) PRODUCT order — PENDING_PAYMENT (Urban Wellness Spa), unpaid.
   const pendingOrderId = await seedProductOrder(
     customerId,
     vendorIdByKey.get('urban')!,
-    branchIdByKey.get('urban-civillines')!,
     'Urban Wellness Spa',
-    'Civil Lines Branch',
     'PENDING_PAYMENT',
     [
-      { dealId: dealIdBySlug.get('massage-oil-urban-civillines')!, itemName: 'Massage Oil', unitPrice: 349, quantity: 1 },
-      { dealId: dealIdBySlug.get('body-scrub-urban-civillines')!, itemName: 'Body Scrub', unitPrice: 399, quantity: 1 },
+      { productId: productIdBySlug.get('massage-oil')!, itemName: 'Massage Oil', unitPrice: 349, quantity: 1 },
+      { productId: productIdBySlug.get('body-scrub')!, itemName: 'Body Scrub', unitPrice: 399, quantity: 1 },
     ],
   );
   const pendingOrder = await prisma.order.findUniqueOrThrow({ where: { id: pendingOrderId } });
   await seedPayment(pendingOrder.id, 'CREATED', pendingOrder.total.toNumber());
 
-  // 6) PRODUCT order — CANCELLED (Glow Beauty Studio, Golghar Branch), no payment.
+  // 6) PRODUCT order — CANCELLED (Glow Beauty Studio), no payment.
   await seedProductOrder(
     customerId,
     vendorIdByKey.get('glow')!,
-    branchIdByKey.get('glow-golghar')!,
     'Glow Beauty Studio',
-    'Golghar Branch',
     'CANCELLED',
-    [{ dealId: dealIdBySlug.get('hair-shampoo-glow-golghar')!, itemName: 'Hair Shampoo', unitPrice: 499, quantity: 1 }],
+    [{ productId: productIdBySlug.get('hair-shampoo')!, itemName: 'Hair Shampoo', unitPrice: 499, quantity: 1 }],
     'Customer changed their mind before payment.',
   );
 
@@ -1464,7 +1398,7 @@ async function main() {
   // direct_category_access migration), unlike the old shared-master-row model's ordering.
   const { vendorIdByKey, branchIdByKey } = await seedVendorsAndBranches(roles);
   const productIdBySlug = await seedProducts(categoryIdBySlug, vendorIdByKey);
-  const dealIdBySlug = await seedDeals(categoryIdBySlug, productIdBySlug, vendorIdByKey, branchIdByKey);
+  const dealIdBySlug = await seedDeals(categoryIdBySlug, vendorIdByKey, branchIdByKey);
   await seedVendorModulesAndCategoryAccess(vendorIdByKey, categoryIdBySlug);
 
   const backfilledSlugs = await backfillVendorSlugs();
@@ -1474,7 +1408,7 @@ async function main() {
   // customer's cart/orders below (or the unified Add-to-Cart flow) can select one.
   const dealPackagesCreated = await seedDealPackages();
   const therapistPackagesCreated = await seedTherapistPackages();
-  const demoCustomerId = await seedDemoCustomerActivity(roles, dealIdBySlug, vendorIdByKey, branchIdByKey);
+  const demoCustomerId = await seedDemoCustomerActivity(roles, dealIdBySlug, productIdBySlug, vendorIdByKey, branchIdByKey);
 
   const [
     categoryCount,
@@ -1483,7 +1417,6 @@ async function main() {
     vendorCount,
     branchCount,
     serviceDealCount,
-    productDealCount,
     cartItemCount,
     wishlistItemCount,
     orderCount,
@@ -1496,8 +1429,7 @@ async function main() {
     prisma.product.count(),
     prisma.vendor.count(),
     prisma.branch.count(),
-    prisma.deal.count({ where: { productId: null } }),
-    prisma.deal.count({ where: { productId: { not: null } } }),
+    prisma.deal.count(),
     prisma.cartItem.count({ where: { cart: { customerId: demoCustomerId } } }),
     prisma.wishlistItem.count({ where: { customerId: demoCustomerId } }),
     prisma.order.count({ where: { customerId: demoCustomerId } }),
@@ -1512,8 +1444,7 @@ async function main() {
   console.log(`Vendor category grants: ${vendorCategoryAccessCount}`);
   console.log(`Vendors:         ${vendorCount} (${VENDOR_SEEDS.length} vendor owner users, ${backfilledSlugs} slug(s) backfilled)`);
   console.log(`Branches:        ${branchCount} (${backfilledHours} openingHours backfilled)`);
-  console.log(`Service deals:   ${serviceDealCount} (${dealPackagesCreated} packages created this run)`);
-  console.log(`Product deals:   ${productDealCount}`);
+  console.log(`Deals:           ${serviceDealCount} (${dealPackagesCreated} packages created this run)`);
   console.log(`Therapists:      ${therapistCount} (${therapistsCreated} created this run, ${therapistPackagesCreated} packages created this run)`);
   console.log(`Cart items:      ${cartItemCount} (demo customer)`);
   console.log(`Wishlist items:  ${wishlistItemCount} (demo customer)`);

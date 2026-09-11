@@ -76,15 +76,17 @@ export function OrderDetail() {
               <span>{orderDetail.labels.vendor}</span>
               <span>{order.vendorNameSnapshot}</span>
             </div>
-            <div className="cart-summary__row">
-              <span>{orderDetail.labels.branch}</span>
-              <span>{order.branchNameSnapshot}</span>
-            </div>
+            {order.branchNameSnapshot && (
+              <div className="cart-summary__row">
+                <span>{orderDetail.labels.branch}</span>
+                <span>{order.branchNameSnapshot}</span>
+              </div>
+            )}
             <Divider />
             {vendorGroups.map((group) => (
               <div key={group.vendorId}>
                 {vendorGroups.length > 1 && (
-                  <p className="field-hint">{group.vendorName} · {group.branchName}</p>
+                  <p className="field-hint">{group.vendorName}{group.branchName ? ` · ${group.branchName}` : ''}</p>
                 )}
                 {group.items.map((item) => (
                   <div className="cart-summary__row" key={item.id}>

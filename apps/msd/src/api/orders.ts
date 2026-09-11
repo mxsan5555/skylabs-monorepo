@@ -17,10 +17,11 @@ export type OrderStatus = 'PENDING_PAYMENT' | 'CONFIRMED' | 'COMPLETED' | 'CANCE
  * vendorId/vendorNameSnapshot (below) is just the "primary" (first) vendor, kept for the header/
  * legacy single-vendor display — group `items` by `vendorId` for the real per-vendor breakdown.
  *
- * A line is a Deal purchase if `dealId` is set, a Therapist purchase if `therapistId` is set
- * (mutually exclusive for a SERVICE item, per msd-api's OrderItem schema doc comment), or a
- * Product purchase if neither is set. `dealPackageId`/`therapistPackageId` accompany whichever
- * package priced the line.
+ * A line is a Deal purchase if `dealId` is set, a directly-booked Therapist purchase if
+ * `therapistId` is set, or a Product purchase if `productId` is set — exactly one of the three.
+ * `dealPackageId`/`therapistPackageId` accompany whichever package priced the line.
+ * `branchId`/`branchNameSnapshot` are null for a Product line — Product has no branch (see
+ * msd-api's Product schema doc comment).
  */
 export interface OrderItem {
   id: string;
@@ -28,10 +29,11 @@ export interface OrderItem {
   dealPackageId: string | null;
   therapistId: string | null;
   therapistPackageId: string | null;
+  productId: string | null;
   vendorId: string;
-  branchId: string;
+  branchId: string | null;
   vendorNameSnapshot: string;
-  branchNameSnapshot: string;
+  branchNameSnapshot: string | null;
   itemName: string;
   itemType: OrderType;
   unitPrice: string;
@@ -69,14 +71,16 @@ export interface Order extends OrderContactDetails {
   type: OrderType;
   status: OrderStatus;
   vendorNameSnapshot: string;
-  branchNameSnapshot: string;
+  /** Null when the order is made up entirely of Product lines — Product has no branch (see
+   *  msd-api's Product schema doc comment), so there's no "primary branch" to snapshot. */
+  branchNameSnapshot: string | null;
   subtotal: string;
   total: string;
   cancellationReason: string | null;
   createdAt: string;
   items: OrderItem[];
   payments: PaymentSummary[];
-  branch: { id: string; name: string; address: string | null; city: string | null };
+  branch: { id: string; name: string; address: string | null; city: string | null } | null;
 }
 
 /** What `POST /orders/me/:id/pay` returns — enough to open the Razorpay widget, never a secret. */

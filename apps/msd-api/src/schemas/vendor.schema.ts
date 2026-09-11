@@ -142,7 +142,6 @@ const VendorFieldsSchema = z.object({
   website: z.string().url().optional(),
   logoUrl: z.string().url().optional(),
 
-  ownerName: z.string().max(150).optional(),
   ownerFirstName: z.string().max(75).optional(),
   ownerLastName: z.string().max(75).optional(),
   contactPerson: z.string().max(150).optional(),
@@ -349,11 +348,6 @@ export const TherapistPackageUpdateSchema = TherapistPackageFieldsSchema
 const DealFieldsSchema = z.object({
   categoryId: z.string().uuid(),
   subcategoryId: z.string().uuid().optional(),
-  /** Absent = a service deal (the Deal's own title/description/durationMinutes/packages ARE the
-   *  offering — no master catalog row, see Deal's own schema doc comment). Set = a product deal,
-   *  pointing at one of the vendor's OWN vendor-scoped Product rows — checked in
-   *  vendor.service.ts via assertProductMatchesDealCategory/assertVendorHasCategoryAccess. */
-  productId: z.string().uuid().optional(),
   title: z.string().min(1).max(200),
   slug: slugString,
   shortDescription: z.string().max(300).optional(),
@@ -361,8 +355,8 @@ const DealFieldsSchema = z.object({
   originalPrice: decimalString,
   salePrice: decimalString,
   discountPercent: z.number().int().min(0).max(100).optional(),
-  /** Only meaningful for a service deal — required there, ignored for a product deal (see
-   *  vendor.service.ts's assertDurationRequiredForService). */
+  /** Required — every Deal is a service offering (see vendor.service.ts's
+   *  assertDurationRequiredForService). */
   durationMinutes: z.number().int().min(1).max(1440).optional(),
   termsAndConditions: z.string().max(5000).optional(),
   notes: z.string().max(5000).optional(),
@@ -376,7 +370,7 @@ const DealFieldsSchema = z.object({
 
 /** A service Deal's own duration/price menu — mirrors TherapistPackageFieldsSchema exactly (see
  *  DealPackage's own schema doc comment for the full rationale). `id` present = update that
- *  existing package row; absent = create a new one. Never used for a product deal. */
+ *  existing package row; absent = create a new one. */
 const DealPackageFieldsSchema = z.object({
   id: z.string().uuid().optional(),
   durationMinutes: z.number().int().positive(),
@@ -387,17 +381,12 @@ const DealPackageFieldsSchema = z.object({
 });
 
 export const DealCreateSchema = DealFieldsSchema.extend({
-  /** Required (>=1) for a service deal — the customer always selects a specific package to add
-   *  to cart, never the Deal's own price directly (see cart.service.ts#addItem). Must be
-   *  absent/empty for a product deal — no duration/package concept applies there. */
+  /** Required (>=1) — the customer always selects a specific package to add to cart, never the
+   *  Deal's own price directly (see cart.service.ts#addItem). */
   packages: z.array(DealPackageFieldsSchema).optional(),
 })
-  .refine((data) => data.productId || (data.packages && data.packages.length > 0), {
+  .refine((data) => data.packages && data.packages.length > 0, {
     message: 'At least one package (duration + price) is required for a service deal.',
-    path: ['packages'],
-  })
-  .refine((data) => !data.productId || !data.packages || data.packages.length === 0, {
-    message: 'Packages only apply to service deals, never a product deal.',
     path: ['packages'],
   })
   .refine((data) => (data.packages ?? []).every((p) => p.originalPrice === undefined || p.originalPrice >= p.sellingPrice), {

@@ -5,7 +5,7 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCart, updateCartItemQuantity, removeCartItem, clearCart, type Cart as CartData, type CartItem } from '../../../api/cart';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR, pluralize } from '../../../utils/format';
-import { resolveDealMedia, primaryImage } from '../../../utils/media';
+import { resolveDealMedia, resolveProductMedia, primaryImage } from '../../../utils/media';
 import './cart.css';
 import content from '../../../content.json';
 
@@ -20,34 +20,35 @@ import content from '../../../content.json';
 
 function itemKindLabel(item: CartItem): 'Deal' | 'Product' | 'Therapist' {
   if (item.therapistId) return 'Therapist';
-  if (item.dealPackageId) return 'Deal';
-  return 'Product';
+  if (item.productId) return 'Product';
+  return 'Deal';
 }
 
 function itemTitle(item: CartItem): string {
   if (item.therapist) return `${item.therapist.therapistType} — ${item.therapist.personName}`;
-  if (item.dealPackageId) return item.deal?.title ?? 'Deal';
-  return item.deal?.product?.name ?? item.deal?.title ?? 'Product';
+  if (item.product) return item.product.name;
+  return item.deal?.title ?? 'Deal';
 }
 
 function itemSubtitle(item: CartItem): string {
   const duration = item.dealPackage?.durationMinutes ?? item.therapistPackage?.durationMinutes;
   if (item.therapist) return duration ? `${duration} min` : itemKindLabel(item);
-  if (item.dealPackageId) return duration ? `${duration} min` : itemKindLabel(item);
-  return item.deal?.title ?? itemKindLabel(item);
+  if (item.product) return itemKindLabel(item);
+  return duration ? `${duration} min` : (item.deal?.title ?? itemKindLabel(item));
 }
 
 function itemImage(item: CartItem): string | null {
   if (item.deal) return primaryImage(resolveDealMedia(item.deal)) ?? null;
+  if (item.product) return primaryImage(resolveProductMedia(item.product)) ?? null;
   return item.therapist?.photoUrl ?? null;
 }
 
 function itemVendorId(item: CartItem): string {
-  return item.therapist?.vendorId ?? item.deal?.vendorId ?? 'unknown';
+  return item.therapist?.vendorId ?? item.deal?.vendorId ?? item.product?.vendorId ?? 'unknown';
 }
 
 function itemVendorName(item: CartItem): string {
-  return item.therapist?.vendor?.businessName ?? item.deal?.vendor?.businessName ?? 'Vendor';
+  return item.therapist?.vendor?.businessName ?? item.deal?.vendor?.businessName ?? item.product?.vendor?.businessName ?? 'Vendor';
 }
 
 function itemBranchName(item: CartItem): string | undefined {

@@ -29,24 +29,19 @@ function videoUrl(video: ResolvableVideo | null | undefined): string | null {
 
 /**
  * Resolves a Deal's display media — prefers the uploaded `mediaImages`/`mediaVideo` (the shared
- * media-upload system), falling back to the legacy `images` URL array (and the linked Product's
- * own legacy `image`) for rows that predate it (see `DealImage`'s schema doc comment in msd-api).
- * One function instead of every card/page re-deriving its own `?? [x.image]` chain.
+ * media-upload system), falling back to the legacy `images` URL array for rows that predate it
+ * (see `DealImage`'s schema doc comment in msd-api). One function instead of every card/page
+ * re-deriving its own `?? [x.image]` chain.
  */
 export function resolveDealMedia(deal: {
   mediaImages?: ResolvableImage[];
   mediaVideo?: ResolvableVideo | null;
   images?: string[] | null;
-  product?: { image?: string | null; mediaImages?: ResolvableImage[]; mediaVideo?: ResolvableVideo | null } | null;
 }): ResolvedMedia {
   if (deal.mediaImages && deal.mediaImages.length > 0) {
     return { images: orderedImageUrls(deal.mediaImages), video: videoUrl(deal.mediaVideo) };
   }
-  if (deal.product?.mediaImages && deal.product.mediaImages.length > 0) {
-    return { images: orderedImageUrls(deal.product.mediaImages), video: videoUrl(deal.product.mediaVideo ?? deal.mediaVideo) };
-  }
-  const legacy = deal.images?.length ? deal.images : [deal.product?.image].filter((u): u is string => !!u);
-  return { images: legacy, video: null };
+  return { images: deal.images ?? [], video: null };
 }
 
 /** Resolves a Product's display media — same precedence rule as `resolveDealMedia`. */

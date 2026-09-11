@@ -325,8 +325,6 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
                         {deal.title}
                         <span className="field-hint">
                           {' '}
-                          · {deal.product ? `Product: ${deal.product.name}` : 'Service'}
-                          {' '}
                           · ₹{deal.salePrice} (was ₹{deal.originalPrice})
                           {deal.durationMinutes && ` · ${deal.durationMinutes} min`}
                         </span>
@@ -586,20 +584,13 @@ export function BranchDialog({ branch, onSave }: { branch?: Branch; onSave: (inp
   );
 }
 
-type OfferingType = 'service' | 'product';
-
 /**
- * A Deal always represents exactly one catalog item — a Service (bookable, needs a duration) or
- * a Product (no duration) — never both, never neither (enforced server-side in
- * vendor.service.ts). There is no global Service master any more (see the direct-category-access
- * plan): a service deal picks its own `categoryId`/`subcategoryId` directly, restricted to the
- * `categories` prop (the vendor's granted SERVICE categories).
- *
- * This dialog no longer offers a way to pick or change a Product — it only ever creates a Service
- * deal. Opening it on a pre-existing Product deal (created before this removal, or via whatever
- * flow the Product module itself provides) still renders that deal's Pricing tab/price fields/
- * category display correctly, unchanged, since `offeringType` is still derived from the loaded
- * deal's own stored `productId` — there is simply no control to set a fresh one.
+ * A Deal always represents a bookable Service — needs a duration, priced via its own child
+ * `DealPackage` rows (enforced server-side in vendor.service.ts). Product is a fully independent,
+ * directly-purchasable catalog entity now (see msd-api's Product schema doc comment), never a
+ * Deal — there is no global Service master either (see the direct-category-access plan): a deal
+ * picks its own `categoryId`/`subcategoryId` directly, restricted to the `categories` prop (the
+ * vendor's granted SERVICE categories).
  *
  * Exported so the flat, cross-branch "Deals / Packages" page (`vendor-deals.tsx`) can reuse
  * this exact form instead of duplicating it. That page isn't already scoped to a single
@@ -661,7 +652,6 @@ export function DealDialog({
   const [form, setForm] = useState<DealInput>({
     categoryId: deal?.categoryId ?? '',
     subcategoryId: deal?.subcategoryId ?? undefined,
-    productId: deal?.productId ?? undefined,
     title: deal?.title ?? '',
     slug: deal?.slug ?? '',
     originalPrice: deal?.originalPrice ?? '',
@@ -673,12 +663,6 @@ export function DealDialog({
     policy: deal?.policy ?? undefined,
     termsAndConditions: deal?.termsAndConditions ?? undefined,
   });
-  // Derived, never independently set. There is no Product picker in this dialog any more (removed
-  // — a Product deal can no longer be created or re-targeted here); `form.productId` only ever
-  // gets a value by loading an existing Product deal (`deal?.productId` above), so this correctly
-  // stays 'service' for every new deal while still rendering an existing Product deal's Pricing
-  // tab/validation/payload shape unchanged when one is opened for editing.
-  const offeringType: OfferingType = form.productId ? 'product' : 'service';
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   // Tracks the entity MediaUploader should upload against — starts as the existing deal being
@@ -688,12 +672,12 @@ export function DealDialog({
   const [savedDeal, setSavedDeal] = useState<Deal | undefined>(deal);
   // Purely a display grouping — every field still lives in the same `form`/`packages` state and
   // is still validated by `submit()` regardless of which tab is active. The "Pricing" tab shows
-  // the Packages repeater for a Service offering (that IS its pricing — see DealPackage's schema
-  // doc comment in msd-api) or the plain Original/Sale price fields for a Product.
+  // the Packages repeater (that IS a Deal's pricing — see DealPackage's schema doc comment in
+  // msd-api).
   const [activeDealTab, setActiveDealTab] = useState<'general' | 'pricing' | 'media'>('general');
   const DEAL_TAB_DEFS = [
     { key: 'general' as const, label: 'General' },
-    { key: 'pricing' as const, label: offeringType === 'service' ? 'Packages' : 'Pricing' },
+    { key: 'pricing' as const, label: 'Packages' },
     { key: 'media' as const, label: 'Media' },
   ];
 
@@ -740,50 +724,38 @@ export function DealDialog({
       setError('Title, slug, and category are required.');
       return;
     }
-    if (offeringType === 'product' && (!form.originalPrice || !form.salePrice)) {
-      setError('Original price and sale price are required.');
+    if (packages.length === 0) {
+      setError('At least one package (duration + price) is required for a deal.');
       return;
     }
-
-    let payload = { ...form };
-
-    if (offeringType === 'service') {
-      if (packages.length === 0) {
-        setError('At least one package (duration + price) is required for a service deal.');
+    for (const p of packages) {
+      if (!p.durationMinutes || p.durationMinutes <= 0) {
+        setError('Every package needs a duration greater than 0.');
         return;
       }
-      for (const p of packages) {
-        if (!p.durationMinutes || p.durationMinutes <= 0) {
-          setError('Every package needs a duration greater than 0.');
-          return;
-        }
-        if (p.sellingPrice == null || p.sellingPrice < 0) {
-          setError('Every package needs a selling price of 0 or more.');
-          return;
-        }
-        if (p.originalPrice !== undefined && p.originalPrice < p.sellingPrice) {
-          setError("Each package's original price must be greater than or equal to its selling price.");
-          return;
-        }
+      if (p.sellingPrice == null || p.sellingPrice < 0) {
+        setError('Every package needs a selling price of 0 or more.');
+        return;
       }
-      // The Deal's own originalPrice/salePrice/durationMinutes are a synced "from price"/
-      // default-duration display cache (see DealPackage's schema doc comment in msd-api) — the
-      // server re-syncs them to the cheapest active package right after save regardless, but the
-      // create/update schema still requires *some* value up front, so derive one here from the
-      // cheapest package the admin actually entered rather than asking them to fill a redundant,
-      // now-meaningless single duration+price pair.
-      const cheapest = packages.reduce((min, p) => (p.sellingPrice < min.sellingPrice ? p : min), packages[0]);
-      payload = {
-        ...payload,
-        durationMinutes: cheapest.durationMinutes,
-        salePrice: String(cheapest.sellingPrice),
-        originalPrice: String(cheapest.originalPrice ?? cheapest.sellingPrice),
-        packages,
-      };
-    } else {
-      delete payload.durationMinutes;
-      delete payload.packages;
+      if (p.originalPrice !== undefined && p.originalPrice < p.sellingPrice) {
+        setError("Each package's original price must be greater than or equal to its selling price.");
+        return;
+      }
     }
+    // The Deal's own originalPrice/salePrice/durationMinutes are a synced "from price"/
+    // default-duration display cache (see DealPackage's schema doc comment in msd-api) — the
+    // server re-syncs them to the cheapest active package right after save regardless, but the
+    // create/update schema still requires *some* value up front, so derive one here from the
+    // cheapest package the admin actually entered rather than asking them to fill a redundant,
+    // now-meaningless single duration+price pair.
+    const cheapest = packages.reduce((min, p) => (p.sellingPrice < min.sellingPrice ? p : min), packages[0]);
+    const payload: DealInput = {
+      ...form,
+      durationMinutes: cheapest.durationMinutes,
+      salePrice: String(cheapest.sellingPrice),
+      originalPrice: String(cheapest.originalPrice ?? cheapest.sellingPrice),
+      packages,
+    };
 
     submittingRef.current = true;
     // Disables the real DOM element in the same synchronous tick, rather than waiting on
@@ -851,55 +823,40 @@ export function DealDialog({
                   </OutlinedSelect>
                 )
               )}
-              {/* The Product picker that used to live here has been removed — this dialog now
-                  only ever creates a Service deal (see this component's own module doc comment).
-                  Editing a pre-existing Product deal (created before this removal, or via the
-                  Product module's own flow) still works correctly: `form.productId`/`offeringType`
-                  are hydrated from `deal` below exactly as before, so the Pricing tab / price
-                  validation / payload shape for that existing deal are all unchanged — there is
-                  simply no UI to pick or clear a product going forward. */}
-              {offeringType === 'service' ? (
-                <>
-                  <OutlinedSelect
-                    label="Category"
-                    value={form.categoryId}
-                    onChange={(e: Event) => setForm((f) => ({ ...f, categoryId: (e.target as HTMLSelectElement).value, subcategoryId: undefined }))}
-                  >
-                    <SelectOption value="">
-                      <div slot="headline">Select a category</div>
+              <OutlinedSelect
+                label="Category"
+                value={form.categoryId}
+                onChange={(e: Event) => setForm((f) => ({ ...f, categoryId: (e.target as HTMLSelectElement).value, subcategoryId: undefined }))}
+              >
+                <SelectOption value="">
+                  <div slot="headline">Select a category</div>
+                </SelectOption>
+                {parentCategories.map((c) => (
+                  <SelectOption key={c.id} value={c.id}>
+                    <div slot="headline">{c.name}</div>
+                  </SelectOption>
+                ))}
+              </OutlinedSelect>
+
+              {subcategoryOptions.length > 0 && (
+                <OutlinedSelect
+                  label="Subcategory (optional)"
+                  value={subcategoryTierId ?? ''}
+                  onChange={(e: Event) => setForm((f) => ({ ...f, subcategoryId: (e.target as HTMLSelectElement).value || undefined }))}
+                >
+                  <SelectOption value="">
+                    <div slot="headline">None</div>
+                  </SelectOption>
+                  {subcategoryOptions.map((c) => (
+                    <SelectOption key={c.id} value={c.id}>
+                      <div slot="headline">{c.name}</div>
                     </SelectOption>
-                    {parentCategories.map((c) => (
-                      <SelectOption key={c.id} value={c.id}>
-                        <div slot="headline">{c.name}</div>
-                      </SelectOption>
-                    ))}
-                  </OutlinedSelect>
+                  ))}
+                </OutlinedSelect>
+              )}
 
-                  {subcategoryOptions.length > 0 && (
-                    <OutlinedSelect
-                      label="Subcategory (optional)"
-                      value={subcategoryTierId ?? ''}
-                      onChange={(e: Event) => setForm((f) => ({ ...f, subcategoryId: (e.target as HTMLSelectElement).value || undefined }))}
-                    >
-                      <SelectOption value="">
-                        <div slot="headline">None</div>
-                      </SelectOption>
-                      {subcategoryOptions.map((c) => (
-                        <SelectOption key={c.id} value={c.id}>
-                          <div slot="headline">{c.name}</div>
-                        </SelectOption>
-                      ))}
-                    </OutlinedSelect>
-                  )}
-
-                  {parentCategories.length === 0 && (
-                    <p className="empty-state">This business has no granted Service categories yet — grant one under Business Modules &amp; Category Access first.</p>
-                  )}
-                </>
-              ) : (
-                form.categoryId && (
-                  <p className="field-hint">Category: {products.find((p) => p.id === form.productId)?.category?.name ?? form.categoryId}</p>
-                )
+              {parentCategories.length === 0 && (
+                <p className="empty-state">This business has no granted Service categories yet — grant one under Business Modules &amp; Category Access first.</p>
               )}
 
               <OutlinedTextField label="Title" value={form.title} onInput={(e: Event) => setForm((f) => ({ ...f, title: (e.target as HTMLInputElement).value }))} />
@@ -938,47 +895,40 @@ export function DealDialog({
 
           {activeDealTab === 'pricing' && (
             <div className="form-grid">
-              {offeringType === 'product' ? (
-                <>
-                  <OutlinedTextField label="Original price" value={form.originalPrice} onInput={(e: Event) => setForm((f) => ({ ...f, originalPrice: (e.target as HTMLInputElement).value }))} />
-                  <OutlinedTextField label="Sale price" value={form.salePrice} onInput={(e: Event) => setForm((f) => ({ ...f, salePrice: (e.target as HTMLInputElement).value }))} />
-                </>
-              ) : (
-                <fieldset>
-                  <legend>Packages</legend>
-                  <p className="field-hint">Every duration/price option a customer can select — at least one is required. For example: 30 Min → ₹999, 60 Min → ₹1,499.</p>
-                  {packages.map((pkg, i) => (
-                    <div className="form-grid" key={pkg.id ?? `new-${i}`}>
-                      <OutlinedTextField
-                        label="Duration (minutes)"
-                        type="number"
-                        value={pkg.durationMinutes ? String(pkg.durationMinutes) : ''}
-                        onInput={(e: Event) => setPackage(i, { durationMinutes: Number((e.target as HTMLInputElement).value) || 0 })}
-                      />
-                      <OutlinedTextField
-                        label="Selling price"
-                        type="number"
-                        value={pkg.sellingPrice ? String(pkg.sellingPrice) : ''}
-                        onInput={(e: Event) => setPackage(i, { sellingPrice: Number((e.target as HTMLInputElement).value) || 0 })}
-                      />
-                      <OutlinedTextField
-                        label="Original price (optional)"
-                        type="number"
-                        value={pkg.originalPrice !== undefined ? String(pkg.originalPrice) : ''}
-                        onInput={(e: Event) => setPackage(i, { originalPrice: Number((e.target as HTMLInputElement).value) || undefined })}
-                      />
-                      <OutlinedButton onClick={() => removePackage(i)}>
-                        <Icon slot="icon" aria-hidden="true">delete</Icon>
-                        Remove
-                      </OutlinedButton>
-                    </div>
-                  ))}
-                  <OutlinedButton onClick={addPackage}>
-                    <Icon slot="icon" aria-hidden="true">add</Icon>
-                    Add package
-                  </OutlinedButton>
-                </fieldset>
-              )}
+              <fieldset>
+                <legend>Packages</legend>
+                <p className="field-hint">Every duration/price option a customer can select — at least one is required. For example: 30 Min → ₹999, 60 Min → ₹1,499.</p>
+                {packages.map((pkg, i) => (
+                  <div className="form-grid" key={pkg.id ?? `new-${i}`}>
+                    <OutlinedTextField
+                      label="Duration (minutes)"
+                      type="number"
+                      value={pkg.durationMinutes ? String(pkg.durationMinutes) : ''}
+                      onInput={(e: Event) => setPackage(i, { durationMinutes: Number((e.target as HTMLInputElement).value) || 0 })}
+                    />
+                    <OutlinedTextField
+                      label="Selling price"
+                      type="number"
+                      value={pkg.sellingPrice ? String(pkg.sellingPrice) : ''}
+                      onInput={(e: Event) => setPackage(i, { sellingPrice: Number((e.target as HTMLInputElement).value) || 0 })}
+                    />
+                    <OutlinedTextField
+                      label="Original price (optional)"
+                      type="number"
+                      value={pkg.originalPrice !== undefined ? String(pkg.originalPrice) : ''}
+                      onInput={(e: Event) => setPackage(i, { originalPrice: Number((e.target as HTMLInputElement).value) || undefined })}
+                    />
+                    <OutlinedButton onClick={() => removePackage(i)}>
+                      <Icon slot="icon" aria-hidden="true">delete</Icon>
+                      Remove
+                    </OutlinedButton>
+                  </div>
+                ))}
+                <OutlinedButton onClick={addPackage}>
+                  <Icon slot="icon" aria-hidden="true">add</Icon>
+                  Add package
+                </OutlinedButton>
+              </fieldset>
             </div>
           )}
 

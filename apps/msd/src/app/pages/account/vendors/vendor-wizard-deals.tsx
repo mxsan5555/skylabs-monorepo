@@ -137,7 +137,7 @@ export function VendorDealsStep({ token, vendorId, canEdit, canApprove, branches
                   {deal.title}
                   <span className="field-hint">
                     {' '}
-                    · {deal.branchName} · {deal.product ? `Product: ${deal.product.name}` : 'Service'} · ₹{deal.salePrice}
+                    · {deal.branchName} · ₹{deal.salePrice}
                   </span>
                 </span>
                 <span className={`status-pill ${deal.status === 'ACTIVE' ? 'status-pill--active' : 'status-pill--inactive'}`}>

@@ -51,7 +51,6 @@ const BRANCH_A_ID = 'e0e0e0e0-0000-4000-8000-000000000005';
 const BRANCH_B_ID = 'f0f0f0f0-0000-4000-8000-000000000006';
 const DEAL_A_ID = 'a1a1a1a1-0000-4000-8000-000000000007';
 const CATEGORY_ID = 'b1b1b1b1-0000-4000-8000-000000000008'; // top-level, type SERVICE
-const OTHER_CATEGORY_ID = 'b2b2b2b2-0000-4000-8000-00000000000b'; // top-level, type SERVICE (different from CATEGORY_ID)
 const PRODUCT_CATEGORY_ID = 'b3b3b3b3-0000-4000-8000-00000000000c'; // top-level, type PRODUCT
 const PRODUCT_ID = 'd1d1d1d1-0000-4000-8000-00000000000a';
 
@@ -81,7 +80,6 @@ const serviceGrantFixture = { id: 'grant-service', vendorId: VENDOR_A_ID, catego
 const productGrantFixture = { id: 'grant-product', vendorId: VENDOR_A_ID, categoryId: PRODUCT_CATEGORY_ID };
 
 const baseServiceDealBody = { categoryId: CATEGORY_ID, title: 'Haircut deal', slug: 'haircut-deal', originalPrice: '399.00', salePrice: '299.00' };
-const baseProductDealBody = { categoryId: PRODUCT_CATEGORY_ID, title: 'Face Cream deal', slug: 'face-cream-deal', originalPrice: '399.00', salePrice: '299.00' };
 
 /** A byte-exact, magic-byte-valid JPEG buffer, well under any size ceiling — same helper shape as
  *  categories.routes.test.ts's own `validJpeg()`. */
@@ -1430,23 +1428,6 @@ describe('Deal offering integration (direct category access)', () => {
     expect(res.body.data.productId).toBeNull();
   });
 
-  it('2. creates a product deal when the vendor holds PRODUCT category access and owns the product', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
-    prismaMock.category.findUnique.mockResolvedValue(productCategoryFixture);
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(productGrantFixture);
-    prismaMock.product.findUnique.mockResolvedValue(productFixture);
-    prismaMock.deal.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: DEAL_A_ID, ...data }),
-    );
-    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_A_ID, productId: PRODUCT_ID, packages: [] });
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseProductDealBody, productId: PRODUCT_ID });
-    expect(res.status).toBe(201);
-    expect(res.body.data.productId).toBe(PRODUCT_ID);
-  });
-
   it('3. rejects a service deal when the vendor has no grant for that category', async () => {
     resolveMock.mockResolvedValue(['vendors:create']);
     prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
@@ -1455,30 +1436,6 @@ describe('Deal offering integration (direct category access)', () => {
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
       .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
-    expect(res.status).toBe(422);
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
-  });
-
-  it('4. rejects a product deal when the vendor has no grant for that category', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
-    prismaMock.category.findUnique.mockResolvedValue(productCategoryFixture);
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(null);
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseProductDealBody, productId: PRODUCT_ID });
-    expect(res.status).toBe(422);
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
-  });
-
-  it('4b. rejects a product deal whose category is SERVICE-typed (wrong module), even with some grant', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
-    prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture); // type SERVICE, not PRODUCT
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(serviceGrantFixture);
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseServiceDealBody, productId: PRODUCT_ID }); // productId set but category is SERVICE-typed
     expect(res.status).toBe(422);
     expect(prismaMock.deal.create).not.toHaveBeenCalled();
   });
@@ -1493,22 +1450,6 @@ describe('Deal offering integration (direct category access)', () => {
       .send(baseServiceDealBody);
     expect(res.status).toBe(422);
     expect(prismaMock.deal.create).not.toHaveBeenCalled();
-  });
-
-  it('6. a product deal does not require durationMinutes', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
-    prismaMock.category.findUnique.mockResolvedValue(productCategoryFixture);
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(productGrantFixture);
-    prismaMock.product.findUnique.mockResolvedValue(productFixture);
-    prismaMock.deal.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: DEAL_A_ID, ...data }),
-    );
-    prismaMock.deal.findUniqueOrThrow.mockResolvedValue({ id: DEAL_A_ID, productId: PRODUCT_ID, packages: [] });
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseProductDealBody, productId: PRODUCT_ID });
-    expect(res.status).toBe(201);
   });
 
   it('7. a vendor can create a deal for its own branch (self-service)', async () => {
@@ -1546,7 +1487,7 @@ describe('Deal offering integration (direct category access)', () => {
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseProductDealBody, productId: PRODUCT_ID });
+      .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
     expect(res.status).toBe(403);
   });
 
@@ -1556,7 +1497,7 @@ describe('Deal offering integration (direct category access)', () => {
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseProductDealBody, productId: PRODUCT_ID });
+      .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
     expect(res.status).toBe(403);
     expect(prismaMock.deal.create).not.toHaveBeenCalled();
   });
@@ -1566,9 +1507,8 @@ describe('Deal offering integration (direct category access)', () => {
     // race window) — the DB's own slug @unique constraint is what catches it, surfacing as a
     // Prisma P2002 from the create call itself.
     resolveMock.mockResolvedValue(['vendors:create']);
-    prismaMock.category.findUnique.mockResolvedValue(productCategoryFixture);
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(productGrantFixture);
-    prismaMock.product.findUnique.mockResolvedValue(productFixture);
+    prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
+    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(serviceGrantFixture);
     const { Prisma } = await import('../generated/prisma-client');
     prismaMock.deal.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: '6.19.3' }),
@@ -1576,48 +1516,9 @@ describe('Deal offering integration (direct category access)', () => {
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseProductDealBody, productId: PRODUCT_ID });
+      .send({ ...baseServiceDealBody, durationMinutes: 30, packages: baseServicePackages });
     expect(res.status).toBe(409);
     expect(res.body.error.message).toMatch(/already exists/i);
-  });
-
-  it('11a. rejects a deal whose categoryId does not match the linked product\'s own category', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
-    prismaMock.category.findUnique.mockResolvedValue(productCategoryFixture);
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(productGrantFixture);
-    prismaMock.product.findUnique.mockResolvedValue({ ...productFixture, categoryId: OTHER_CATEGORY_ID });
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseProductDealBody, productId: PRODUCT_ID });
-    expect(res.status).toBe(422);
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
-  });
-
-  it('11b. rejects a deal referencing a non-existent product', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
-    prismaMock.category.findUnique.mockResolvedValue(productCategoryFixture);
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(productGrantFixture);
-    prismaMock.product.findUnique.mockResolvedValue(null);
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseProductDealBody, productId: PRODUCT_ID });
-    expect(res.status).toBe(404);
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
-  });
-
-  it('11c. rejects a deal referencing another vendor\'s product', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
-    prismaMock.category.findUnique.mockResolvedValue(productCategoryFixture);
-    prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(productGrantFixture);
-    prismaMock.product.findUnique.mockResolvedValue({ ...productFixture, vendorId: VENDOR_B_ID });
-    const res = await request(app)
-      .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ...baseProductDealBody, productId: PRODUCT_ID });
-    expect(res.status).toBe(403);
-    expect(prismaMock.deal.create).not.toHaveBeenCalled();
   });
 
   it('12. updating only salePrice (not touching category/product/duration) does not re-validate category access', async () => {

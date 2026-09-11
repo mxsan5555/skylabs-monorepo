@@ -60,9 +60,6 @@ export interface VendorFields {
   alternatePhone?: string;
   website?: string;
   logoUrl?: string;
-  /** Deprecated — kept only for rows that predate the First/Last name split (see
-   *  `ownerFirstName`/`ownerLastName`); no longer written to by the current form. */
-  ownerName?: string;
   ownerFirstName?: string;
   ownerLastName?: string;
   contactPerson?: string;
@@ -260,10 +257,6 @@ export interface Deal {
   branchId: string;
   categoryId: string;
   subcategoryId: string | null;
-  /** Unset = a service deal — the Deal's own title/description/durationMinutes/packages ARE the
-   *  offering directly (no master catalog row at all; the old `Service` model is gone). Set = a
-   *  product deal, pointing at one of the vendor's own vendor-scoped Product rows. */
-  productId: string | null;
   title: string;
   slug: string;
   shortDescription?: string | null;
@@ -271,7 +264,8 @@ export interface Deal {
   originalPrice: string;
   salePrice: string;
   discountPercent?: number | null;
-  /** Only meaningful for a service deal (bookable duration) — never required for a product deal. */
+  /** A bookable time slot — required for every Deal (Deal is always a service offering, see
+   *  msd-api's Deal schema doc comment). */
   durationMinutes?: number | null;
   termsAndConditions?: string | null;
   notes?: string | null;
@@ -288,12 +282,11 @@ export interface Deal {
   updatedAt: string;
   category?: Category;
   subcategory?: Category | null;
-  product?: { id: string; name: string } | null;
   /** Only present on the cross-vendor `GET /vendors/deals` sidebar listing. */
   vendor?: { id: string; businessName: string | null };
   branch?: { id: string; name: string };
   /** The deal's own duration/price menu (a real child table — DealPackage — mirrors
-   *  TherapistPackage exactly). Always empty for a product deal. */
+   *  TherapistPackage exactly). */
   packages?: DealPackage[];
   /** Uploaded media (shared Deal/Product/Therapist system) — the authoritative image/video
    *  source going forward; `images` above is the legacy pasted-URL field, kept only for rows
@@ -329,7 +322,6 @@ export interface DealPackageInput {
 export interface DealInput {
   categoryId: string;
   subcategoryId?: string;
-  productId?: string;
   title: string;
   slug: string;
   shortDescription?: string;
