@@ -158,18 +158,18 @@ describe('getPaymentMethodReport', () => {
 });
 
 describe('getTopProducts', () => {
-  it('resolves display name/vendor from a representative OrderItem snapshot per dealId', async () => {
+  it('resolves display name/vendor from a representative OrderItem snapshot per productId', async () => {
     prismaMock.orderItem.groupBy.mockResolvedValue([
-      { dealId: 'deal-1', _sum: { quantity: 30, lineTotal: new Prisma.Decimal('6000') } },
+      { productId: 'product-1', _sum: { quantity: 30, lineTotal: new Prisma.Decimal('6000') } },
     ] as never);
     prismaMock.orderItem.findMany.mockResolvedValue([
-      { dealId: 'deal-1', itemName: 'Hair Shampoo', vendorNameSnapshot: 'Glow Beauty Studio' },
+      { productId: 'product-1', itemName: 'Hair Shampoo', vendorNameSnapshot: 'Glow Beauty Studio' },
     ] as never);
 
     const result = await getTopProducts({}, 10);
 
     expect(result).toEqual([
-      { dealId: 'deal-1', itemName: 'Hair Shampoo', vendorName: 'Glow Beauty Studio', quantitySold: 30, revenue: '6000' },
+      { itemId: 'product-1', itemName: 'Hair Shampoo', vendorName: 'Glow Beauty Studio', quantitySold: 30, revenue: '6000' },
     ]);
   });
 });

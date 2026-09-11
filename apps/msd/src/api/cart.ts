@@ -19,7 +19,6 @@ export interface CartDealSummary {
   branchId: string;
   vendor: { id: string; businessName: string | null } | null;
   branch: { id: string; name: string } | null;
-  product: { id: string; name: string; image: string | null; imageAlt: string | null; mediaImages?: MediaImage[] } | null;
   mediaImages?: MediaImage[];
 }
 
@@ -40,12 +39,27 @@ export interface CartTherapistSummary {
   branch: { id: string; name: string } | null;
 }
 
+/** Product is a fully independent, directly-purchasable catalog entity — no branch (Product has
+ *  no branchId, see msd-api's Product schema doc comment). */
+export interface CartProductSummary {
+  id: string;
+  name: string;
+  image: string | null;
+  imageAlt: string | null;
+  price: string;
+  originalPrice: string | null;
+  vendorId: string;
+  vendor: { id: string; businessName: string | null } | null;
+  mediaImages?: MediaImage[];
+}
+
 /**
  * One unified purchase-intent line — discriminated by which of `dealId`/`dealPackageId`/
- * `therapistId`/`therapistPackageId` are set, mirroring msd-api's CartItem schema doc comment:
- *   - Product line:      `dealId` set, `dealPackageId`/`therapist*` all null.
- *   - Service-Deal line: `dealId` + `dealPackageId` both set, `therapist*` null.
- *   - Therapist line:    `therapistId` + `therapistPackageId` both set, `deal*` null.
+ * `therapistId`/`therapistPackageId`/`productId` are set, mirroring msd-api's CartItem schema
+ * doc comment:
+ *   - Service-Deal line: `dealId` + `dealPackageId` both set, `therapist*`/`productId` null.
+ *   - Product line:      `productId` set alone, `deal*`/`therapist*` all null.
+ *   - Therapist line:    `therapistId` + `therapistPackageId` both set, `deal*`/`productId` null.
  */
 export interface CartItem {
   id: string;
@@ -54,17 +68,19 @@ export interface CartItem {
   dealPackageId: string | null;
   therapistId: string | null;
   therapistPackageId: string | null;
+  productId: string | null;
   quantity: number;
   unitPrice: string;
   deal: CartDealSummary | null;
   dealPackage: CartPackageSummary | null;
   therapist: CartTherapistSummary | null;
   therapistPackage: CartPackageSummary | null;
+  product: CartProductSummary | null;
 }
 
 /** Multi-vendor: a cart may hold items from any number of vendors/branches — each item's own
- *  `deal.vendorId`/`deal.vendor`/`deal.branch` is authoritative; Cart itself carries no
- *  vendor/branch field. Group `items` by `deal.vendorId` for a vendor-grouped display. */
+ *  `deal`/`therapist`/`product` vendor/branch fields are authoritative; Cart itself carries no
+ *  vendor/branch field. Group `items` by vendorId for a vendor-grouped display. */
 export interface Cart {
   id: string;
   customerId: string;
@@ -96,11 +112,12 @@ export function notifyCartUpdated() {
 }
 
 export type AddCartItemInput =
-  | { dealId: string; dealPackageId?: string; quantity?: number }
+  | { dealId: string; dealPackageId: string; quantity?: number }
+  | { productId: string; quantity?: number }
   | { therapistId: string; therapistPackageId: string; quantity?: number };
 
-/** Product line: `{ dealId }`. Service-Deal line: `{ dealId, dealPackageId }`. Therapist line:
- *  `{ therapistId, therapistPackageId }` — identical "Add to Cart" call for all three, no
+/** Service-Deal line: `{ dealId, dealPackageId }`. Product line: `{ productId }`. Therapist
+ *  line: `{ therapistId, therapistPackageId }` — identical "Add to Cart" call for all three, no
  *  special-casing per purchase kind (see msd-api's CartAddItemSchema doc comment). */
 export function addCartItem(token: string | null, input: AddCartItemInput) {
   return apiPost<Cart>('/cart/items', token, { quantity: 1, ...input }).then((res) => {

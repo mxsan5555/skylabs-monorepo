@@ -202,7 +202,6 @@ model RefreshSession {
 
   userId      String
   hashedToken String    @unique
-  deviceInfo  String?
   ip          String?
   userAgent   String?
   expiresAt   DateTime
@@ -262,7 +261,6 @@ model ImpersonationSession {
   superAdminUserId String
   targetUserId     String
   startedAt        DateTime  @default(now())
-  endedAt          DateTime?
   previewTokenJti  String    @unique
 
   superAdmin       User @relation("ImpersonationSuperAdmin", fields: [superAdminUserId], references: [id], onDelete: Cascade)

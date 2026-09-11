@@ -55,8 +55,8 @@ export function DealAddToCartDialog({
       setError('Please sign in to add this to your cart.');
       return;
     }
-    if (missingSelection) {
-      setError(missingSelection);
+    if (missingSelection || !activePackage) {
+      setError(missingSelection ?? 'Please select a duration.');
       return;
     }
     setSubmitting(true);
@@ -64,12 +64,12 @@ export function DealAddToCartDialog({
     try {
       await addCartItem(token, {
         dealId: deal.id,
-        ...(activePackage ? { dealPackageId: activePackage.id } : {}),
+        dealPackageId: activePackage.id,
         quantity: qty,
       });
       dialogRef.current?.close();
       // Only fires after the API call above has actually resolved — never claims success early.
-      const label = `${deal.title}${activePackage ? ` — ${activePackage.durationMinutes} Minutes` : ''}`;
+      const label = `${deal.title} — ${activePackage.durationMinutes} Minutes`;
       showToast(`Added to cart\n${label}`);
       onAdded?.(label);
     } catch (err) {

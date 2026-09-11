@@ -58,7 +58,7 @@ import {
   PopularTagMapSchema,
 } from '../schemas/popular-tag.schema';
 import { ProductCreateSchema, ProductUpdateSchema, ProductStatusUpdateSchema } from '../schemas/product.schema';
-import { CatalogDealQuerySchema, CatalogTherapistQuerySchema, CatalogVendorQuerySchema } from '../schemas/catalog.schema';
+import { CatalogDealQuerySchema, CatalogProductQuerySchema, CatalogTherapistQuerySchema, CatalogVendorQuerySchema } from '../schemas/catalog.schema';
 import { CartAddItemSchema, CartUpdateItemSchema } from '../schemas/cart.schema';
 import { WishlistAddItemSchema } from '../schemas/wishlist.schema';
 import { OrderCheckoutSchema, OrderCustomerCancelSchema, OrderStatusUpdateSchema } from '../schemas/order.schema';
@@ -66,6 +66,7 @@ import { VerifyPaymentSchema, OrderBatchSchema, VerifyBatchPaymentSchema } from 
 import { NotificationListQuerySchema } from '../schemas/notification.schema';
 import { DashboardStatsResponseSchema } from '../schemas/dashboard.schema';
 import { MediaReorderSchema } from '../schemas/media.schema';
+import { ReportFiltersQuerySchema, TopListQuerySchema, TopVendorsQuerySchema } from '../schemas/reports.schema';
 
 export function buildOpenApiDocument() {
   const registry = new OpenAPIRegistry();
@@ -1388,7 +1389,7 @@ export function buildOpenApiDocument() {
     method: 'get',
     path: '/catalog/deals',
     summary:
-      'Public deal listing — active/approved deals with an active vendor+branch (+active linked product for a product deal); ' +
+      'Public deal listing — active/approved service deals with an active vendor+branch; ' +
       'sort=newest|discount (default newest), minPrice/maxPrice filter on salePrice, state/city narrow to matching branches',
     tags: ['Catalogue (public)'],
     request: { query: CatalogDealQuerySchema },
@@ -1402,6 +1403,26 @@ export function buildOpenApiDocument() {
     tags: ['Catalogue (public)'],
     request: { params: z.object({ id: z.string().uuid() }) },
     responses: { 200: { description: 'Deal' }, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/products',
+    summary:
+      'Public product listing — Product is a fully independent catalog entity (no Deal wrapper); ' +
+      'active products with an active vendor; sort=newest|discount (default newest), minPrice/maxPrice filter on price',
+    tags: ['Catalogue (public)'],
+    request: { query: CatalogProductQuerySchema },
+    responses: { 200: { description: 'Products' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/products/{id}',
+    summary: 'A single public product — 404s if not currently visible (inactive product or inactive vendor)',
+    tags: ['Catalogue (public)'],
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Product' }, 404: errorResponse },
   });
 
   registry.registerPath({
@@ -1475,7 +1496,7 @@ export function buildOpenApiDocument() {
     responses: { 200: { description: 'Contact Us content' } },
   });
 
-  // ─── Cart (customer self-service, product deals only) ────────────────────────
+  // ─── Cart (customer self-service — service deals, products, and therapists) ──
 
   registry.registerPath({
     method: 'get',
@@ -1489,7 +1510,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'post',
     path: '/cart/items',
-    summary: 'Add a product deal to the cart (rejects service deals and mismatched vendor/branch)',
+    summary: 'Add a cart line — a service deal (dealId + dealPackageId), a product (productId), or a therapist (therapistId + therapistPackageId)',
     tags: ['Cart'],
     security: bearer,
     request: { body: { content: { 'application/json': { schema: CartAddItemSchema } } } },
@@ -1977,7 +1998,7 @@ export function buildOpenApiDocument() {
 
   // ─── Business module stubs ───────────────────────────────────────────────────
 
-  for (const tag of ['inventory', 'reports']) {
+  for (const tag of ['inventory']) {
     registry.registerPath({
       method: 'get',
       path: `/${tag}`,
@@ -1985,6 +2006,42 @@ export function buildOpenApiDocument() {
       tags: ['Business modules (stub)'],
       security: bearer,
       responses: { 200: { description: 'Empty list' }, 403: errorResponse },
+    });
+  }
+
+  // ─── Reports (real — superadmin dashboard, all gated on reports:view) ────────
+
+  for (const path of ['/reports/summary', '/reports/vendor-wise', '/reports/branch-wise', '/reports/month-wise', '/reports/service-vs-product', '/reports/payment-method']) {
+    registry.registerPath({
+      method: 'get',
+      path,
+      summary: `Reports dashboard — ${path.replace('/reports/', '').replace(/-/g, ' ')}`,
+      tags: ['Reports'],
+      security: bearer,
+      request: { query: ReportFiltersQuerySchema },
+      responses: { 200: { description: 'Report data' }, 403: errorResponse },
+    });
+  }
+
+  registry.registerPath({
+    method: 'get',
+    path: '/reports/top-vendors',
+    summary: 'Reports dashboard — top vendors by revenue or order count',
+    tags: ['Reports'],
+    security: bearer,
+    request: { query: TopVendorsQuerySchema },
+    responses: { 200: { description: 'Top vendors' }, 403: errorResponse },
+  });
+
+  for (const path of ['/reports/top-products', '/reports/top-services']) {
+    registry.registerPath({
+      method: 'get',
+      path,
+      summary: `Reports dashboard — ${path.replace('/reports/', '').replace(/-/g, ' ')}`,
+      tags: ['Reports'],
+      security: bearer,
+      request: { query: TopListQuerySchema },
+      responses: { 200: { description: 'Top list' }, 403: errorResponse },
     });
   }
 

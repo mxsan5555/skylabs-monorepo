@@ -6,7 +6,6 @@ import { HttpError } from '../middleware/errorHandler';
 const REFRESH_TTL_DAYS = Number(process.env.JWT_REFRESH_TTL_DAYS ?? 30);
 
 export interface RequestMeta {
-  deviceInfo?: string;
   ip?: string;
   userAgent?: string;
 }
@@ -26,7 +25,6 @@ export async function issueTokenPair(userId: string, roles: string[], meta: Requ
     data: {
       userId,
       hashedToken: sha256Hex(refreshToken),
-      deviceInfo: meta.deviceInfo,
       ip: meta.ip,
       userAgent: meta.userAgent,
       expiresAt,
@@ -79,7 +77,6 @@ export async function rotateRefreshToken(presentedToken: string, meta: RequestMe
     data: {
       userId: session.userId,
       hashedToken: sha256Hex(refreshToken),
-      deviceInfo: meta.deviceInfo,
       ip: meta.ip,
       userAgent: meta.userAgent,
       expiresAt,

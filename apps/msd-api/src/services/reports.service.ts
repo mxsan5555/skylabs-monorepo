@@ -208,16 +208,19 @@ export interface BranchReportRow {
   products: number;
 }
 
+/** A Product line item has no branch (Product is vendor-level, not branch-level — see its own
+ *  schema doc comment) — naturally excluded here via `branchId: { not: null }`, same as
+ *  getTopServices excludes Therapist-direct items above. */
 export async function getBranchWiseReport(filters: ReportFilters): Promise<BranchReportRow[]> {
   const itemWhere = orderItemWhere(filters);
   const grouped = await prisma.orderItem.groupBy({
     by: ['branchId', 'orderId', 'itemType'],
-    where: itemWhere,
+    where: { ...itemWhere, branchId: { not: null } },
     _sum: { lineTotal: true, quantity: true },
   });
   if (grouped.length === 0) return [];
 
-  const branchIds = [...new Set(grouped.map((g) => g.branchId))];
+  const branchIds = [...new Set(grouped.map((g) => g.branchId!))];
   const branches = await prisma.branch.findMany({
     where: { id: { in: branchIds } },
     select: { id: true, name: true, vendorId: true, vendor: { select: { businessName: true } } },
@@ -227,9 +230,10 @@ export async function getBranchWiseReport(filters: ReportFilters): Promise<Branc
   const byBranch = new Map<string, BranchReportRow>();
   const seenOrderPerBranch = new Map<string, Set<string>>();
   for (const row of grouped) {
-    const branch = branchById.get(row.branchId);
-    const existing = byBranch.get(row.branchId) ?? {
-      branchId: row.branchId,
+    const branchId = row.branchId!; // filtered to `not: null` above
+    const branch = branchById.get(branchId);
+    const existing = byBranch.get(branchId) ?? {
+      branchId,
       branchName: branch?.name ?? 'Branch',
       vendorId: branch?.vendorId ?? '',
       vendorName: branch?.vendor.businessName ?? 'Vendor',
@@ -238,16 +242,16 @@ export async function getBranchWiseReport(filters: ReportFilters): Promise<Branc
       services: 0,
       products: 0,
     };
-    const seenOrders = seenOrderPerBranch.get(row.branchId) ?? new Set<string>();
+    const seenOrders = seenOrderPerBranch.get(branchId) ?? new Set<string>();
     if (!seenOrders.has(row.orderId)) {
       seenOrders.add(row.orderId);
       existing.orders += 1;
     }
-    seenOrderPerBranch.set(row.branchId, seenOrders);
+    seenOrderPerBranch.set(branchId, seenOrders);
     existing.revenue = new Prisma.Decimal(existing.revenue).add(row._sum.lineTotal ?? 0).toString();
     if (row.itemType === 'SERVICE') existing.services += row._sum.quantity ?? 0;
     if (row.itemType === 'PRODUCT') existing.products += row._sum.quantity ?? 0;
-    byBranch.set(row.branchId, existing);
+    byBranch.set(branchId, existing);
   }
 
   return [...byBranch.values()].sort((a, b) => Number(b.revenue) - Number(a.revenue));
@@ -324,39 +328,69 @@ export async function getServiceVsProductReport(filters: ReportFilters): Promise
 // ─── Report 7/8: Top products / Top services ───────────────────────────────────
 
 export interface TopItemRow {
-  dealId: string;
+  /** The underlying Deal id for a SERVICE row, or Product id for a PRODUCT row — Deal and
+   *  Product are independent entities now (see Deal/Product's own schema doc comments), so this
+   *  is never both. */
+  itemId: string;
   itemName: string;
   vendorName: string;
   quantitySold: number;
   revenue: string;
 }
 
+/** SERVICE rows group by `dealId` (Deal-based service line items only — a Therapist purchased
+ *  directly has no Deal involved and is intentionally excluded, see getTopServices's own doc
+ *  comment). PRODUCT rows group by `productId` — a real PRODUCT OrderItem has `productId` set
+ *  and `dealId` null (Product is a fully independent catalog entity, see its own schema doc
+ *  comment). Two explicit branches (not a dynamic key) — Prisma's generated `groupBy`/`select`
+ *  types don't resolve cleanly through a union-typed computed property. */
 async function topItemsByType(filters: ReportFilters, itemType: 'PRODUCT' | 'SERVICE', limit: number): Promise<TopItemRow[]> {
-  const itemWhere = orderItemWhere(filters);
+  const itemWhere = { ...orderItemWhere(filters), itemType };
+
+  if (itemType === 'PRODUCT') {
+    const grouped = await prisma.orderItem.groupBy({
+      by: ['productId'],
+      where: { ...itemWhere, productId: { not: null } },
+      _sum: { quantity: true, lineTotal: true },
+      orderBy: { _sum: { lineTotal: 'desc' } },
+      take: limit,
+    });
+    if (grouped.length === 0) return [];
+    const ids = grouped.map((g) => g.productId!);
+    const samples = await prisma.orderItem.findMany({
+      where: { productId: { in: ids } },
+      distinct: ['productId'],
+      select: { productId: true, itemName: true, vendorNameSnapshot: true },
+    });
+    const sampleById = new Map(samples.map((s) => [s.productId, s]));
+    return grouped.map((g) => ({
+      itemId: g.productId!,
+      itemName: sampleById.get(g.productId)?.itemName ?? 'Item',
+      vendorName: sampleById.get(g.productId)?.vendorNameSnapshot ?? 'Vendor',
+      quantitySold: g._sum.quantity ?? 0,
+      revenue: (g._sum.lineTotal ?? new Prisma.Decimal(0)).toString(),
+    }));
+  }
+
   const grouped = await prisma.orderItem.groupBy({
     by: ['dealId'],
-    where: { ...itemWhere, itemType, dealId: { not: null } },
+    where: { ...itemWhere, dealId: { not: null } },
     _sum: { quantity: true, lineTotal: true },
     orderBy: { _sum: { lineTotal: 'desc' } },
     take: limit,
   });
   if (grouped.length === 0) return [];
-
-  const dealIds = grouped.map((g) => g.dealId!).filter(Boolean);
-  // One representative snapshot per deal for display — itemName/vendorNameSnapshot are already
-  // stored on OrderItem at order time (never re-read Deal/Vendor, same snapshot discipline the
-  // rest of Order/OrderItem already follows).
+  const ids = grouped.map((g) => g.dealId!);
   const samples = await prisma.orderItem.findMany({
-    where: { dealId: { in: dealIds } },
+    where: { dealId: { in: ids } },
     distinct: ['dealId'],
     select: { dealId: true, itemName: true, vendorNameSnapshot: true },
   });
-  const sampleByDealId = new Map(samples.map((s) => [s.dealId, s]));
-
+  const sampleById = new Map(samples.map((s) => [s.dealId, s]));
   return grouped.map((g) => ({
-    dealId: g.dealId!,
-    itemName: sampleByDealId.get(g.dealId)?.itemName ?? 'Item',
-    vendorName: sampleByDealId.get(g.dealId)?.vendorNameSnapshot ?? 'Vendor',
+    itemId: g.dealId!,
+    itemName: sampleById.get(g.dealId)?.itemName ?? 'Item',
+    vendorName: sampleById.get(g.dealId)?.vendorNameSnapshot ?? 'Vendor',
     quantitySold: g._sum.quantity ?? 0,
     revenue: (g._sum.lineTotal ?? new Prisma.Decimal(0)).toString(),
   }));

@@ -42,25 +42,9 @@ export interface CatalogLocation {
   city: string;
 }
 
-export interface CatalogDealSummary {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string | null;
-  image?: string | null;
-  imageAlt?: string | null;
-}
-
-export interface CatalogProductSummary extends CatalogDealSummary {
-  brand?: string | null;
-  mediaImages?: MediaImage[];
-  mediaVideo?: MediaVideo | null;
-  popularTags?: CatalogPopularTag[];
-}
-
 /** A service Deal's own duration/price menu entry — a real child row (DealPackage), never a
- *  sibling Deal row. Only active packages are ever included here. Empty for a product deal (no
- *  duration/package concept applies) or a not-yet-migrated legacy service deal. */
+ *  sibling Deal row. Only active packages are ever included here. Empty for a not-yet-migrated
+ *  legacy service deal with no packages configured yet. */
 export interface CatalogDealPackage {
   id: string;
   durationMinutes: number;
@@ -88,10 +72,6 @@ export interface CatalogDeal {
   images: string[] | null;
   category: CatalogCategory | null;
   subcategory: CatalogCategory | null;
-  /** No `service` field — the old Service master-row model is gone entirely (see msd-api's Deal
-   *  schema doc comment). A service deal is identified purely by `product` being `null`, never by
-   *  a separate truthy/falsy discriminator field. */
-  product: CatalogProductSummary | null;
   vendor: { id: string; slug: string | null; businessName: string | null; city: string | null; logoUrl: string | null } | null;
   /** `latitude`/`longitude` are Decimal → string over the wire (same convention as
    *  originalPrice/salePrice below), and nullable — most branches don't have coordinates set
@@ -209,7 +189,6 @@ export function listCatalogDeals(opts: {
   subcategoryId?: string;
   vendorId?: string;
   branchId?: string;
-  type?: 'service' | 'product';
   search?: string;
   state?: string;
   city?: string;
@@ -226,6 +205,47 @@ export function listCatalogDeals(opts: {
 
 export function getCatalogDeal(id: string) {
   return apiGet<CatalogDeal>(`/catalog/deals/${id}`, null);
+}
+
+/** Product is a fully independent, directly-purchasable catalog entity (see msd-api's Product
+ *  schema doc comment) — never nested under or fetched through a Deal. No branch/location
+ *  fields (Product has no branchId) and no `packages` (no duration/tier concept applies). */
+export interface CatalogProduct {
+  id: string;
+  name: string;
+  slug: string;
+  brand: string | null;
+  description: string | null;
+  summary: string | null;
+  image: string | null;
+  imageAlt: string | null;
+  price: string;
+  originalPrice: string | null;
+  discount: number | null;
+  category: CatalogCategory | null;
+  subcategory: CatalogCategory | null;
+  vendor: { id: string; slug: string | null; businessName: string | null; city: string | null; logoUrl: string | null } | null;
+  mediaImages?: MediaImage[];
+  mediaVideo?: MediaVideo | null;
+  popularTags?: CatalogPopularTag[];
+}
+
+export function listCatalogProducts(opts: {
+  page?: number;
+  pageSize?: number;
+  categoryId?: string;
+  subcategoryId?: string;
+  vendorId?: string;
+  search?: string;
+  sort?: 'newest' | 'discount';
+  minPrice?: number;
+  maxPrice?: number;
+} = {}) {
+  return apiGet<CatalogProduct[]>(`/catalog/products${toQuery(opts)}`, null);
+}
+
+export function getCatalogProduct(id: string) {
+  return apiGet<CatalogProduct>(`/catalog/products/${id}`, null);
 }
 
 /** Distinct `{state, city}` pairs from active branches — drives the public State/City picker
