@@ -1,4 +1,4 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal, OnInit } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal, type OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthApiService } from '../../core/auth/auth-api.service';
@@ -23,13 +23,44 @@ export class SignIn implements OnInit {
   private readonly http = inject(HttpClient);
 
   protected readonly method = signal<Method>('phone');
-  /** Which persona is signing up — preset from the header CTA (router state). */
   protected readonly role = signal<Persona>(
     (history.state as { role?: Persona } | null)?.role === 'driver'
       ? 'driver'
       : 'customer',
   );
+
+  protected readonly content = signal({
+    tabEmail: 'Email',
+    tabPhone: 'Phone',
+    labelPhone: 'Phone number',
+    labelEmail: 'Email address',
+    btnSendOtp: 'Send OTP',
+    dividerText: 'or continue with',
+    btnGoogle: 'Continue with Google',
+    disclaimer: 'We’ll never share your contact details.',
+    errorPhoneEmpty: 'Please enter your phone number.',
+    errorEmailEmpty: 'Please enter your email address.',
+    errorEmailInvalid: 'Please enter a valid email address.',
+    errorPhoneInvalid: 'Please enter a valid 10-digit phone number.',
+  });
+  protected readonly emailError = signal('');
+  protected readonly phoneError = signal('');
+  protected readonly error = signal<string | null>(null);
+  protected readonly loading = signal(false);
+  protected readonly googleUrl = this.authApi.googleSignInUrl();
+
   protected value = '';
+
+  ngOnInit(): void {
+    this.http.get<any>('data/auth.json').subscribe({
+      next: (data) => {
+        if (data?.signin) {
+          this.content.set({ ...this.content(), ...data.signin });
+        }
+      },
+      error: () => undefined,
+    });
+  }
 
   protected setRole(role: Persona): void {
     this.role.set(role);
@@ -52,12 +83,43 @@ export class SignIn implements OnInit {
   }
 
   protected sendOtp(): void {
-    const fallback = this.method() === 'phone' ? '4564' : 'you@email.com';
-    this.router.navigate(['/otp'], {
-      state: {
-        destination: this.value || fallback,
-        method: this.method(),
-        role: this.role(),
+    const destination = this.value.trim();
+    if (this.method() === 'phone') {
+      if (!destination) {
+        this.phoneError.set(this.content().errorPhoneEmpty);
+        return;
+      }
+      if (!/^\d{10}$/.test(destination)) {
+        this.phoneError.set(this.content().errorPhoneInvalid);
+        return;
+      }
+    } else {
+      if (!destination) {
+        this.emailError.set(this.content().errorEmailEmpty);
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(destination)) {
+        this.emailError.set(this.content().errorEmailInvalid);
+        return;
+      }
+    }
+
+    this.loading.set(true);
+    this.error.set(null);
+    this.authApi.requestOtp(destination, 'login').subscribe({
+      next: () => {
+        this.loading.set(false);
+        this.router.navigate(['/otp'], {
+          state: {
+            destination,
+            method: this.method(),
+            role: this.role(),
+          },
+        });
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.error.set(err instanceof Error ? err.message : 'Unable to send OTP.');
       },
     });
   }

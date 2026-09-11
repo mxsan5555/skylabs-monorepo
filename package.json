@@ -7,8 +7,11 @@
     "msd-api:prisma:migrate": "dotenv -e apps/msd-api/.env.local -- prisma migrate dev --schema=apps/msd-api/prisma/schema.prisma",
     "msd-api:prisma:validate": "dotenv -e apps/msd-api/.env.local -- prisma validate --schema=apps/msd-api/prisma/schema.prisma",
     "msd-api:prisma:studio": "dotenv -e apps/msd-api/.env.local -- prisma studio --schema=apps/msd-api/prisma/schema.prisma",
-    "msd-api:prisma:seed": "dotenv -e apps/msd-api/.env.local -- tsx --tsconfig tsconfig.base.json apps/msd-api/prisma/seed.ts"
+    "msd-api:prisma:seed": "dotenv -e apps/msd-api/.env.local -- tsx --tsconfig tsconfig.base.json apps/msd-api/prisma/seed.ts",
+    "dev": "tsx watch src/main.ts",
+    "build": "webpack-cli build --node-env=production"
   },
+  
   "devDependencies": {
     "@angular-devkit/core": "~21.2.0",
     "@angular-devkit/schematics": "~21.2.0",
