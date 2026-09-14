@@ -1,0 +1,75 @@
+.pay-profiles {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+
+.pay-profile {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1.5px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-radius: 12px;
+  background-color: var(--md-sys-color-surface, #fff);
+  font: inherit;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  --md-icon-size: 20px;
+}
+
+.pay-profile.active {
+  border-color: var(--md-sys-color-primary, #33618d);
+  border-width: 2px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.pay-wallet {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 4px;
+}
+
+.pay-expired {
+  color: var(--md-sys-color-error, #ba1a1a);
+  font-weight: 600;
+}
+
+.pay-update {
+  flex: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.pay-check {
+  flex: none;
+  color: var(--md-sys-color-primary, #33618d);
+}
+
+.pay-add {
+  color: var(--md-sys-color-primary);
+  font-weight: 600;
+}
+
+.pay-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 2px;
+  font-size: 0.95rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.pay-summary__total {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}

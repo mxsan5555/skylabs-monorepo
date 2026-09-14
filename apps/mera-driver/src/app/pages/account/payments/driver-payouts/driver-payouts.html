@@ -1,0 +1,78 @@
+<md-admin-page
+  [title]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit Payout' : 'Add Payout') : 'Driver Payouts'"
+  [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit driver payout details' : 'Add a new driver payout record') : 'Bank transfers and settlement batches for drivers.'"
+>
+  <div class="relative w-full">
+    @if (!showAddForm()) {
+      <div class="w-full mt-4">
+        <sky-card class="p-6 block">
+          <sky-data-table
+            [columns]="tableColumns"
+            [rows]="tableRowsString()"
+            [total]="totalPayouts()"
+            [page]="page()"
+            [pageSize]="pageSize()"
+            selectable exportable searchable
+            [filterLabel]="'Filter by Status'"
+            [filterOptions]="tableFilterOptions"
+            [actions]="tableActions"
+            (sky-dt-params-change)="onParamsChange($event)"
+            (sky-dt-row-action)="onRowAction($event)"
+            caption="Driver Payouts Database"
+          >
+            <md-icon-button slot="toolbar-actions" aria-label="Add Payout" title="Add Payout" (click)="startAdd()">
+              <md-icon>add</md-icon>
+            </md-icon-button>
+          </sky-data-table>
+        </sky-card>
+      </div>
+    } @else {
+      <div class="flex flex-col gap-6 w-full mt-2">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="text-xs text-slate-500 font-semibold tracking-wide">
+            Home / <span class="text-[#1175BC]">{{ editingId() !== null && editingId() !== 'new' ? 'Edit Payout' : 'Add Payout' }}</span>
+          </div>
+          <md-outlined-button (click)="cancelEdit()">
+            <md-icon slot="icon">arrow_back</md-icon>
+            Back to List
+          </md-outlined-button>
+        </div>
+
+        <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
+          <div class="flex flex-col gap-y-6 w-full">
+            <sky-card class="p-6 block">
+              <div class="section-heading-box"><h3>1. Driver Payout Details</h3></div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="Driver Name / ID *" required [value]="inputDriver()" (input)="inputDriver.set($any($event.target).value)" placeholder="Enter driver name"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Payout Amount (₹) *" type="number" step="0.01" required [value]="inputAmount()" (input)="inputAmount.set($any($event.target).value)"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Bank Account Number" [value]="inputAccount()" (input)="inputAccount.set($any($event.target).value)" placeholder="e.g. 918273645019"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Bank IFSC Code" [value]="inputIfsc()" (input)="inputIfsc.set($any($event.target).value)" placeholder="e.g. SBIN0001234"></md-outlined-text-field>
+
+                <md-outlined-select label="Payout Status *" [value]="inputStatus()" (change)="inputStatus.set($any($event.target).value)">
+                  @for (opt of statusOptions(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt | uppercase }}</div></md-select-option>
+                  }
+                </md-outlined-select>
+
+                <md-outlined-text-field label="Processed By Admin" [value]="inputProcessedBy()" (input)="inputProcessedBy.set($any($event.target).value)"></md-outlined-text-field>
+
+                <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Processed At Date & Time" type="datetime-local" [value]="inputProcessedAt()" (input)="inputProcessedAt.set($any($event.target).value)"></md-outlined-text-field>
+              </div>
+            </sky-card>
+          </div>
+
+          <div class="flex justify-end gap-3 mt-8 border-t border-slate-100 pt-4">
+            <md-outlined-button (click)="cancelEdit()">Cancel</md-outlined-button>
+            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #1175BC; --md-filled-button-label-text-color: white;">
+              <md-icon slot="icon">save</md-icon>
+              {{ editingId() !== null && editingId() !== 'new' ? 'Save Changes' : 'Add Payout' }}
+            </md-filled-button>
+          </div>
+        </sky-card>
+      </div>
+    }
+  </div>
+</md-admin-page>

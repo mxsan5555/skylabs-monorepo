@@ -1,0 +1,137 @@
+<md-admin-page
+  [title]="showAddForm() ? (editingRecordId() !== null ? 'Edit Log' : 'Add Log') : content().title"
+  [subtitle]="showAddForm() ? (editingRecordId() !== null ? 'Modify attendance entry details' : 'Log a new driver attendance entry') : content().subtitle"
+>
+  <div class="relative w-full">
+
+    <!-- VIEW 1: ATTENDANCE DATA TABLE -->
+    @if (!showAddForm()) {
+      <div class="w-full mt-4">
+        <sky-card class="p-6 block">
+          <sky-data-table
+            caption="Attendance Logs"
+            [columns]="tableColumns"
+            [rows]="tableRowsString()"
+            [total]="totalAttendance()"
+            [page]="page()"
+            [page-size]="pageSize()"
+            searchable
+            search-placeholder="Search Driver Name, ID..."
+            filter-label="Filter by Status"
+            [filter-options]="tableFilterOptions"
+            [actions]="tableActions"
+            exportable
+            selectable
+            (sky-dt-params-change)="onParamsChange($event)"
+            (sky-dt-row-action)="onRowAction($event)"
+            (sky-dt-row-select)="onRowSelect($event)"
+          >
+            <!-- Projected Add button next to download/export button in the toolbar -->
+            <md-icon-button
+              slot="toolbar-actions"
+              aria-label="Log Attendance"
+              title="Log Attendance"
+              (click)="openAddAttendanceForm()"
+            >
+              <md-icon>add</md-icon>
+            </md-icon-button>
+          </sky-data-table>
+        </sky-card>
+      </div>
+    }
+
+    <!-- VIEW 2: ADD/EDIT ATTENDANCE FORM -->
+    @else {
+      <div class="flex flex-col gap-6 w-full mt-2">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+          <div class="flex items-center gap-x-2">
+            <md-icon-button (click)="closeAddAttendanceForm()">
+              <md-icon>arrow_back</md-icon>
+            </md-icon-button>
+            <span class="form-header-title">
+              {{ editingRecordId() !== null ? 'Edit Attendance Entry' : 'Log Driver Attendance' }}
+            </span>
+          </div>
+          <md-outlined-button (click)="closeAddAttendanceForm()">
+            <md-icon slot="icon">arrow_back</md-icon>
+            Back to List
+          </md-outlined-button>
+        </div>
+
+        <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
+          
+          <div class="flex flex-col gap-y-6 w-full">
+            
+            <!-- 1. Primary Attendance Details -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>1. Primary Attendance Details</h3>
+              </div>
+              <div class="grid grid-cols-3 gap-4 max-md:grid-cols-2 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="Driver ID *" required [value]="inputDriverId()" (input)="onInputChange('driver_id', $event)" placeholder="e.g. 501"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Attendance Date *" type="date" required [value]="inputAttendanceDate()" (input)="onInputChange('attendance_date', $event)"></md-outlined-text-field>
+
+                <md-outlined-select class="max-md:col-span-2 max-sm:col-span-1" label="Status *" [value]="inputStatus()" (change)="onInputChange('status', $event)">
+                  <md-select-option value="Present"><div slot="headline">Present</div></md-select-option>
+                  <md-select-option value="Absent"><div slot="headline">Absent</div></md-select-option>
+                  <md-select-option value="Half Day"><div slot="headline">Half Day</div></md-select-option>
+                  <md-select-option value="Leave"><div slot="headline">Leave</div></md-select-option>
+                </md-outlined-select>
+              </div>
+            </sky-card>
+
+            <!-- 2. Check-In & Shift Location -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>2. Check-In & Shift Location</h3>
+              </div>
+              <div class="grid grid-cols-4 gap-4 max-md:grid-cols-2 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="Check-In Time" [value]="inputCheckInTime()" (input)="onInputChange('check_in_time', $event)" placeholder="YYYY-MM-DD HH:MM"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Check-Out Time" [value]="inputCheckOutTime()" (input)="onInputChange('check_out_time', $event)" placeholder="YYYY-MM-DD HH:MM"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Total Hours Worked" type="number" step="0.5" [value]="inputTotalHours()" (input)="onInputChange('total_hours', $event)" placeholder="e.g. 8.5"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Assigned Trip ID" [value]="inputAssignedTripId()" (input)="onInputChange('assigned_trip_id', $event)" placeholder="e.g. 9001"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Check-In Latitude" type="number" step="0.0001" [value]="inputCheckInLatitude()" (input)="onInputChange('check_in_latitude', $event)" placeholder="e.g. 28.6304"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Check-In Longitude" type="number" step="0.0001" [value]="inputCheckInLongitude()" (input)="onInputChange('check_in_longitude', $event)" placeholder="e.g. 77.2177"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Check-Out Latitude" type="number" step="0.0001" [value]="inputCheckOutLatitude()" (input)="onInputChange('check_out_latitude', $event)" placeholder="e.g. 28.6305"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Check-Out Longitude" type="number" step="0.0001" [value]="inputCheckOutLongitude()" (input)="onInputChange('check_out_longitude', $event)" placeholder="e.g. 77.2178"></md-outlined-text-field>
+              </div>
+            </sky-card>
+
+            <!-- 3. Leave Management & Notes -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>3. Leave Management & Notes</h3>
+              </div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="Leave Type (if on leave)" [value]="inputLeaveType()" (input)="onInputChange('leave_type', $event)" placeholder="e.g. Sick Leave, Casual Leave"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Remarks / Notes" [value]="inputRemarks()" (input)="onInputChange('remarks', $event)" placeholder="Enter remarks"></md-outlined-text-field>
+
+                <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Leave Reason" [value]="inputLeaveReason()" (input)="onInputChange('leave_reason', $event)" placeholder="Enter detailed reason for leave/absence"></md-outlined-text-field>
+              </div>
+            </sky-card>
+
+          </div>
+
+          <!-- Form Actions Bar -->
+          <div class="flex justify-end gap-3 mt-8 border-t border-slate-100 pt-4">
+            <md-outlined-button (click)="closeAddAttendanceForm()">Cancel</md-outlined-button>
+            <md-filled-button (click)="addAttendance()" style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;">
+              <md-icon slot="icon">save</md-icon>
+              {{ editingRecordId() !== null ? 'Save Changes' : content().btnRegister }}
+            </md-filled-button>
+          </div>
+        </sky-card>
+      </div>
+    }
+
+  </div>
+</md-admin-page>

@@ -1,0 +1,55 @@
+{
+  "header": {
+    "brand": "mera-driver",
+    "driversOnlineLabel": "Drivers Online",
+    "driversOnlineCount": 124,
+    "helplineLabel": "Helpline",
+    "helplineNumber": "+91 98765 43210",
+    "navLinks": [
+      { "label": "Home", "route": "/", "icon": "home" },
+      {
+        "label": "Services",
+        "route": "#",
+        "icon": "business_center",
+        "subItems": [
+          { "label": "One Way", "route": "/location", "icon": "trending_flat", "description": "One-way drop within the city" },
+          { "label": "Round Trip", "route": "/location", "icon": "sync", "description": "Return trip bookings" },
+          { "label": "Outstation", "route": "/location", "icon": "departure_board", "description": "Intercity travel bookings" }
+        ]
+      },
+      { "label": "Blog", "route": "/blog", "icon": "article" },
+      { "label": "Contact", "route": "/contact", "icon": "mail" }
+    ]
+  },
+  "footer": {
+    "tagline": "Your ride, your way.",
+    "quickLinksTitle": "Quick Links",
+    "quickLinks": [
+      { "label": "Home", "route": "/", "icon": "home" },
+      { "label": "Fare Estimator", "route": "/pricing", "icon": "calculate" },
+      { "label": "Blog", "route": "/blog", "icon": "article" },
+      { "label": "Contact", "route": "/contact", "icon": "mail" },
+      { "label": "Showcase", "route": "/showcase", "icon": "widgets" }
+    ],
+    "accountLinksTitle": "Account",
+    "accountLinks": [
+      { "label": "Sign In", "route": "/sign-in", "icon": "login" },
+      { "label": "My Profile", "route": "/account/profile", "icon": "person" },
+      { "label": "Dashboard", "route": "/account/dashboard", "icon": "dashboard" }
+    ],
+    "appPromo": {
+      "tagline": "Fast & Convenient",
+      "title": "Your Personal Driver is Just a Tap Away",
+      "description": "Download the Mera Driver App to book background-verified drivers instantly. Track your ride live, schedule recurring trips, and access secure payment options right from your phone.",
+      "playStoreUrl": "https://play.google.com",
+      "appStoreUrl": "https://www.apple.com/app-store/",
+      "ratingText": "⭐ 4.8★ Play Store | 4.7★ App Store"
+    },
+    "contactTitle": "Get in Touch",
+    "contactInfo": {
+      "email": "support@meradriver.com",
+      "phone": "+91 98765 43210",
+      "address": "New Delhi, India"
+    }
+  }
+}

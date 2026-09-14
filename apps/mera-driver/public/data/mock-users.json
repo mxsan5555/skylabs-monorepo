@@ -1,0 +1,42 @@
+[
+  {
+    "id": "customer-1",
+    "mail": "customer@mera-driver.com",
+    "mobile": "9999911111",
+    "role": "customer",
+    "otp": "111111",
+    "name": "Rahul Verma (Customer)"
+  },
+  {
+    "id": "driver-1",
+    "mail": "driver@mera-driver.com",
+    "mobile": "9999922222",
+    "role": "driver",
+    "otp": "222222",
+    "name": "Suresh Kumar (Driver)"
+  },
+  {
+    "id": "admin-1",
+    "mail": "admin@mera-driver.com",
+    "mobile": "9999933333",
+    "role": "admin",
+    "otp": "333333",
+    "name": "Amit Sharma (Admin)"
+  },
+  {
+    "id": "marketing-1",
+    "mail": "marketing@mera-driver.com",
+    "mobile": "9999944444",
+    "role": "marketing",
+    "otp": "444444",
+    "name": "Preeti Sen (Marketing)"
+  },
+  {
+    "id": "sales-1",
+    "mail": "sales@mera-driver.com",
+    "mobile": "9999955555",
+    "role": "sales",
+    "otp": "555555",
+    "name": "Vikram Singh (Sales)"
+  }
+]

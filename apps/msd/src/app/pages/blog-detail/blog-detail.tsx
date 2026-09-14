@@ -1,12 +1,15 @@
-﻿import { Link, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
-import type { BlogBlock } from '../../../types';
+import type { BlogBlock, BlogPost } from '../../../types';
 import { getPost, categoryName, formatDate } from '../../../blog/blog';
 import './blog-detail.css';
 import content from '../../../content.json';
-
-/** Render one article body block with the right semantic element. */
-function renderBlock(block: BlogBlock, i: number) {
+/** Render one article body block with the right semantic element. Exported so the public About
+ *  Us page (`pages/about/about.tsx`) can reuse the exact same block-rendering approach for its
+ *  own `body: BlogBlock[]` field — both share this app's canonical public `BlogBlock` type
+ *  (`types/index.ts`), unlike the admin CMS module's separately-declared `BlogBlock`. */
+export function renderBlock(block: BlogBlock, i: number) {
   switch (block.type) {
     case 'heading':
       return <h2 key={i}>{block.text}</h2>;
@@ -24,11 +27,45 @@ function renderBlock(block: BlogBlock, i: number) {
       return <p key={i}>{block.text}</p>;
   }
 }
-
-/** Blog detail: a single article, looked up by `:slug`. */
+/** Blog detail: a single article, looked up by `:slug` via `GET /catalog/blog-posts/:slug`
+ *  (see `blog/blog.ts`'s own doc comment). `getPost` resolves to `null` for an unpublished or
+ *  nonexistent slug — same "not found" state as before, just reached without a throw. */
 export function BlogDetail() {
   const { slug } = useParams();
-  const post = slug ? getPost(slug) : undefined;
+  const [post, setPost] = useState<BlogPost | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!slug) {
+      setPost(null);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    getPost(slug)
+      .then((result) => {
+        if (!cancelled) setPost(result);
+      })
+      .catch(() => {
+        if (!cancelled) setPost(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <main className="post post--missing">
+        <title>Loading… · MSD</title>
+        <p className="loading-state">Loading…</p>
+      </main>
+    );
+  }
 
   if (!post) {
     return (
@@ -41,12 +78,10 @@ export function BlogDetail() {
       </main>
     );
   }
-
   return (
     <main className="post">
       <title> {`${post.title}${content.blog.detail.metaTitleSuffix}`}</title>
       <meta name="description" content={post.excerpt} />
-
       <article>
         <nav
           className="post__crumb"
@@ -57,11 +92,8 @@ export function BlogDetail() {
             {content.blog.detail.blogLabel}
           </Link>
         </nav>
-
         <header className="post__header">
-          <sky-badge variant="secondary">
-            {categoryName(post.categorySlug)}
-          </sky-badge>
+          <sky-badge variant="secondary"> {categoryName(post.categorySlug)}</sky-badge>
           <h1>{post.title}</h1>
           <p className="post__meta">
             <span>By {post.author}</span>
@@ -74,7 +106,6 @@ export function BlogDetail() {
             </span>
           </p>
         </header>
-
         <img
           className="post__cover"
           src={post.coverImage}
@@ -82,9 +113,7 @@ export function BlogDetail() {
           width={800}
           height={480}
         />
-
         <div className="post__body">{post.body.map(renderBlock)}</div>
-
         <footer className="post__footer">
           {post.tags.length > 0 && (
             <ul className="post__tags" aria-label={content.blog.detail.tagsLabel}>
@@ -106,5 +135,4 @@ export function BlogDetail() {
     </main>
   );
 }
-
 export default BlogDetail;

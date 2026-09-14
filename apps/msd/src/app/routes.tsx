@@ -32,6 +32,10 @@ import { VendorTherapists } from './pages/account/vendors/vendor-therapists';
 import { VendorDeals } from './pages/account/vendors/vendor-deals';
 import { CategoryManagement } from './pages/account/masters/categories';
 import { PopularTagManagement } from './pages/account/masters/popular-tags';
+import { BlogList } from './pages/account/cms/blog-list';
+import { BlogDetailAdmin } from './pages/account/cms/blog-detail-admin';
+import { AboutUsPage } from './pages/account/cms/about-us';
+import { ContactUsPage } from './pages/account/cms/contact-us';
 import { ProductManagement } from './pages/account/products/products';
 import { OrderManagement } from './pages/account/orders/orders';
 import { Reports } from './pages/account/reports/reports';
@@ -39,6 +43,8 @@ import { NotificationsPage } from './pages/account/notifications/notifications';
 import Search from './pages/search/search';
 import Category from './pages/category/category';
 import { CategoriesIndex } from './pages/categories/categories';
+import About from './pages/about/about';
+import Contact from './pages/contact/contact';
 import { Orders } from './pages/orders/orders';
 import { OrderDetail } from './pages/orders/order-detail';
 import { Invoice } from './pages/invoice/invoice';
@@ -172,6 +178,8 @@ export function AppRoutes() {
         {/* ── Content pages ── */}
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogDetail />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/contact" element={<Contact />} />
         <Route path="/products/:slug" element={<ProductDetail />} />
         <Route path="/showcase" element={<Showcase />} />
         {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}
@@ -396,6 +404,38 @@ export function AppRoutes() {
           element={
             <RequirePermission menuKey="masters.tags">
               <PopularTagManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/blog"
+          element={
+            <RequirePermission menuKey="cms.blog">
+              <BlogList />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/blog/:id"
+          element={
+            <RequirePermission menuKey="cms.blog">
+              <BlogDetailAdmin />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/about-us"
+          element={
+            <RequirePermission menuKey="cms.about-us">
+              <AboutUsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/contact-us"
+          element={
+            <RequirePermission menuKey="cms.contact-us">
+              <ContactUsPage />
             </RequirePermission>
           }
         />

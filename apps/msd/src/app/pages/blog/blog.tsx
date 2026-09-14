@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Icon,
@@ -10,7 +10,7 @@ import {
   Radio,
   Checkbox,
 } from '@skylabs-monorepo/shared-ui/react';
-import type { BlogSort, ReadingBucket } from '../../../types';
+import type { BlogPost, BlogSort, ReadingBucket } from '../../../types';
 import {
   queryPosts,
   categoryName,
@@ -20,6 +20,7 @@ import {
   formatDate,
   PAGE_SIZE,
 } from '../../../blog/blog';
+import { ApiRequestError } from '../../../api/rbac/client';
 import './blog.css';
 
 type Filters = {
@@ -56,24 +57,54 @@ const toggle = (list: string[], v: string) =>
   list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
 
 /**
- * Blog index: filter/sort sidebar + search + grid/list toggle + paginated cards.
- * All data flows through `queryPosts` (static now, API later); page is in `?page`.
+ * Blog index: filter/sort sidebar + search + grid/list toggle + paginated cards. All data flows
+ * through `queryPosts` (now the real `GET /catalog/blog-posts` — see `blog/blog.ts`'s own doc
+ * comment); page is in `?page`. One `useEffect` fetch per filters/page change, with a loading
+ * state (`.loading-state`, this app's existing public-page convention — see e.g.
+ * `category.tsx`) and an empty state for zero results.
  */
 export function Blog() {
   const [filters, setFilters] = useState<Filters>(EMPTY);
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [params, setParams] = useSearchParams();
+  const [items, setItems] = useState<BlogPost[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const requestedPage = Math.max(1, Number(params.get('page')) || 1);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    queryPosts({ ...filters, page: requestedPage })
+      .then((result) => {
+        if (cancelled) return;
+        setItems(result.items);
+        setTotal(result.total);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof ApiRequestError ? err.message : 'Could not load articles.');
+        setItems([]);
+        setTotal(0);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, requestedPage]);
 
   const categories = categoryList();
   const authors = authorList();
   const tags = tagList();
-
-  const total = queryPosts({ ...filters }).total;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const page = Math.min(Math.max(1, Number(params.get('page')) || 1), totalPages);
-  const { items } = queryPosts({ ...filters, page });
+  const page = Math.min(requestedPage, totalPages);
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
-
   const activeCount =
     (filters.search ? 1 : 0) +
     (filters.sort !== 'newest' ? 1 : 0) +
@@ -81,7 +112,6 @@ export function Blog() {
     filters.categories.length +
     filters.authors.length +
     filters.tags.length;
-
   const resetPage = () => {
     if (params.get('page')) setParams({}, { replace: true });
   };
@@ -94,7 +124,6 @@ export function Blog() {
     resetPage();
   };
   const goTo = (n: number) => setParams(n > 1 ? { page: String(n) } : {});
-
   function viewButton(mode: 'grid' | 'list', icon: string, label: string) {
     const active = view === mode;
     const Btn = active ? FilledTonalButton : OutlinedButton;
@@ -113,9 +142,7 @@ export function Blog() {
         name="description"
         content="Wellness tips, massage guides, and ways to get more from every session."
       />
-
       <h1 className="blog__h1">From the blog</h1>
-
       <div className="blog__layout">
         <aside className="blog__filters" aria-label="Filter and sort">
           <div className="blog__filters-head">
@@ -124,7 +151,6 @@ export function Blog() {
               <TextButton onClick={clearAll}>Clear ({activeCount})</TextButton>
             )}
           </div>
-
           <sky-accordion>
             <sky-accordion-item header="Sort by" open>
               <div className="facet" role="radiogroup" aria-label="Sort by">
@@ -141,7 +167,6 @@ export function Blog() {
                 ))}
               </div>
             </sky-accordion-item>
-
             <sky-accordion-item header="Category" open>
               <div className="facet" role="group" aria-label="Category">
                 {categories.map((c) => (
@@ -157,7 +182,6 @@ export function Blog() {
                 ))}
               </div>
             </sky-accordion-item>
-
             <sky-accordion-item header="Reading time">
               <div className="facet" role="radiogroup" aria-label="Reading time">
                 {READING_OPTIONS.map((o) => (
@@ -173,7 +197,6 @@ export function Blog() {
                 ))}
               </div>
             </sky-accordion-item>
-
             <sky-accordion-item header="Author">
               <div className="facet" role="group" aria-label="Author">
                 {authors.map((a) => (
@@ -189,7 +212,6 @@ export function Blog() {
                 ))}
               </div>
             </sky-accordion-item>
-
             <sky-accordion-item header="Tag">
               <div className="facet" role="group" aria-label="Tag">
                 {tags.map((t) => (
@@ -205,7 +227,6 @@ export function Blog() {
             </sky-accordion-item>
           </sky-accordion>
         </aside>
-
         <div className="blog__main">
           <div className="blog__toolbar">
             <form
@@ -230,89 +251,93 @@ export function Blog() {
               {viewButton('list', 'view_list', 'List')}
             </div>
           </div>
-
-          <p className="results__count" role="status" aria-live="polite">
-            {total} {total === 1 ? 'article' : 'articles'}
-          </p>
-
-          {items.length === 0 ? (
-            <p className="results__empty">
-              No articles match your filters. Try clearing some.
-            </p>
+          {loading ? (
+            <p className="loading-state">Loading articles…</p>
+          ) : error ? (
+            <p className="error-state" role="alert">{error}</p>
           ) : (
-            <section aria-label="Articles">
-              <ul className={`results results--${view}`}>
-                {items.map((p) => (
-                  <li key={p.id}>
-                    <sky-card variant="outlined">
-                      <article className="post-card">
-                        <img
-                          className="post-card__img"
-                          src={p.coverImage}
-                          alt={p.imageAlt}
-                          width={800}
-                          height={480}
-                          loading="lazy"
-                        />
-                        <div className="post-card__body">
-                          <p className="post-card__date">
-                            <time dateTime={p.publishedAt}>
-                              {formatDate(p.publishedAt)}
-                            </time>
-                          </p>
-                          <h2 className="post-card__title">
-                            <Link to={`/blog/${p.slug}`}>{p.title}</Link>
-                          </h2>
-                          {view === 'list' && (
-                            <p className="post-card__excerpt">{p.excerpt}</p>
-                          )}
-                          <p className="post-card__cat">
-                            <Icon aria-hidden="true">sell</Icon>
-                            {categoryName(p.categorySlug)}
-                          </p>
-                        </div>
-                      </article>
-                    </sky-card>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {totalPages > 1 && (
-            <nav className="pagination" aria-label="Blog pages">
-              <OutlinedButton disabled={page <= 1} onClick={() => goTo(page - 1)}>
-                <Icon slot="icon" aria-hidden="true">chevron_left</Icon>
-                Previous
-              </OutlinedButton>
-              <ul className="pagination__pages">
-                {pageNumbers.map((n) => (
-                  <li key={n}>
-                    {n === page ? (
-                      <FilledButton aria-current="page" aria-label={`Page ${n}`}>
-                        {n}
-                      </FilledButton>
-                    ) : (
-                      <TextButton aria-label={`Page ${n}`} onClick={() => goTo(n)}>
-                        {n}
-                      </TextButton>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              <OutlinedButton
-                disabled={page >= totalPages}
-                onClick={() => goTo(page + 1)}
-              >
-                Next
-                <Icon slot="icon" aria-hidden="true">chevron_right</Icon>
-              </OutlinedButton>
-            </nav>
+            <>
+              <p className="results__count" role="status" aria-live="polite">
+                {total} {total === 1 ? 'article' : 'articles'}
+              </p>
+              {items.length === 0 ? (
+                <p className="results__empty">
+                  No articles match your filters. Try clearing some.
+                </p>
+              ) : (
+                <section aria-label="Articles">
+                  <ul className={`results results--${view}`}>
+                    {items.map((p) => (
+                      <li key={p.id}>
+                        <sky-card variant="outlined">
+                          <article className="post-card">
+                            <img
+                              className="post-card__img"
+                              src={p.coverImage}
+                              alt={p.imageAlt}
+                              width={800}
+                              height={480}
+                              loading="lazy"
+                            />
+                            <div className="post-card__body">
+                              <p className="post-card__date">
+                                <time dateTime={p.publishedAt}>
+                                  {formatDate(p.publishedAt)}
+                                </time>
+                              </p>
+                              <h2 className="post-card__title">
+                                <Link to={`/blog/${p.slug}`}>{p.title}</Link>
+                              </h2>
+                              {view === 'list' && (
+                                <p className="post-card__excerpt">{p.excerpt}</p>
+                              )}
+                              <p className="post-card__cat">
+                                <Icon aria-hidden="true">sell</Icon>
+                                {categoryName(p.categorySlug)}
+                              </p>
+                            </div>
+                          </article>
+                        </sky-card>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+              {totalPages > 1 && (
+                <nav className="pagination" aria-label="Blog pages">
+                  <OutlinedButton disabled={page <= 1} onClick={() => goTo(page - 1)}>
+                    <Icon slot="icon" aria-hidden="true">chevron_left</Icon>
+                    Previous
+                  </OutlinedButton>
+                  <ul className="pagination__pages">
+                    {pageNumbers.map((n) => (
+                      <li key={n}>
+                        {n === page ? (
+                          <FilledButton aria-current="page" aria-label={`Page ${n}`}>
+                            {n}
+                          </FilledButton>
+                        ) : (
+                          <TextButton aria-label={`Page ${n}`} onClick={() => goTo(n)}>
+                            {n}
+                          </TextButton>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <OutlinedButton
+                    disabled={page >= totalPages}
+                    onClick={() => goTo(page + 1)}
+                  >
+                    Next
+                    <Icon slot="icon" aria-hidden="true">chevron_right</Icon>
+                  </OutlinedButton>
+                </nav>
+              )}
+            </>
           )}
         </div>
       </div>
     </main>
   );
 }
-
 export default Blog;

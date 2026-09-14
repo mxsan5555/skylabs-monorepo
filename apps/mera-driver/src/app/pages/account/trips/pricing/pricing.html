@@ -1,0 +1,103 @@
+<md-admin-page
+  [title]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit Fare Rule' : 'Add Fare Rule') : 'Pricing'"
+  [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit fare rule details' : 'Add a new fare rule') : 'Fare rules by vehicle category, trip type, and zone.'"
+>
+  <div class="relative w-full">
+    @if (!showAddForm()) {
+      <div class="w-full mt-4">
+        <sky-card class="p-6 block">
+          <sky-data-table
+            [columns]="tableColumns"
+            [rows]="tableRowsString()"
+            [total]="list().length"
+            selectable exportable searchable
+            [actions]="tableActions"
+            (sky-dt-row-action)="onRowAction($event)"
+            caption="Fare Rules Database"
+          >
+            <md-icon-button slot="toolbar-actions" aria-label="Add Fare Rule" title="Add Fare Rule" (click)="startAdd()">
+              <md-icon>add</md-icon>
+            </md-icon-button>
+          </sky-data-table>
+        </sky-card>
+      </div>
+    } @else {
+      <div class="flex flex-col gap-6 w-full mt-2">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="text-xs text-slate-500 font-semibold tracking-wide">
+            Home / <span class="text-[#2e7d32]">{{ editingId() !== null && editingId() !== 'new' ? 'Edit Fare Rule' : 'Add Fare Rule' }}</span>
+          </div>
+          <md-outlined-button (click)="cancelEdit()">
+            <md-icon slot="icon">arrow_back</md-icon>
+            Back to List
+          </md-outlined-button>
+        </div>
+
+        <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
+          <div class="flex flex-col gap-y-6 w-full">
+            <!-- 1. Category, Zone & Base Rate Configuration -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box"><h3>1. Category, Zone & Base Rate Configuration</h3></div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-select label="Vehicle Category *" [value]="inputVehicle()" (change)="inputVehicle.set($any($event.target).value)">
+                  @for (opt of vehicleCategories(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                  }
+                </md-outlined-select>
+
+                <md-outlined-select label="Trip Type *" [value]="inputTripType()" (change)="inputTripType.set($any($event.target).value)">
+                  @for (opt of tripTypeOptions(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                  }
+                </md-outlined-select>
+
+                <md-outlined-select label="Service Zone" [value]="inputZone()" (change)="inputZone.set($any($event.target).value)">
+                  @for (opt of zoneOptions(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                  }
+                </md-outlined-select>
+
+                <md-outlined-text-field label="Effective From Date *" type="date" [value]="inputEffectiveFrom()" (input)="inputEffectiveFrom.set($any($event.target).value)"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Base Fare (₹) *" type="number" step="0.01" [value]="inputBaseFare()" (input)="inputBaseFare.set($any($event.target).value)"></md-outlined-text-field>
+                <md-outlined-text-field label="Minimum Fare (₹) *" type="number" step="0.01" [value]="inputMinFare()" (input)="inputMinFare.set($any($event.target).value)"></md-outlined-text-field>
+              </div>
+            </sky-card>
+
+            <!-- 2. Variable Rates, Allowances & Multipliers -->
+            <sky-card class="p-6 block">
+              <div class="section-heading-box"><h3>2. Variable Rates, Allowances & Multipliers</h3></div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="Per Km Rate (₹) *" type="number" step="0.01" [value]="inputPerKm()" (input)="inputPerKm.set($any($event.target).value)"></md-outlined-text-field>
+                <md-outlined-text-field label="Per Minute Rate (₹)" type="number" step="0.01" [value]="inputPerMin()" (input)="inputPerMin.set($any($event.target).value)"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Waiting Charge Per Min (₹)" type="number" step="0.01" [value]="inputWaitingCharge()" (input)="inputWaitingCharge.set($any($event.target).value)"></md-outlined-text-field>
+                <md-outlined-text-field label="Driver Allowance / Bata (₹)" type="number" step="0.01" [value]="inputDriverAllowance()" (input)="inputDriverAllowance.set($any($event.target).value)"></md-outlined-text-field>
+
+                <md-outlined-text-field label="Surge Multiplier" type="number" step="0.05" [value]="inputSurgeMultiplier()" (input)="inputSurgeMultiplier.set($any($event.target).value)"></md-outlined-text-field>
+
+                <md-outlined-select label="Toll Included" [value]="inputTollIncluded() ? 'Yes' : 'No'" (change)="inputTollIncluded.set($any($event.target).value === 'Yes')">
+                  <md-select-option value="Yes"><div slot="headline">Yes</div></md-select-option>
+                  <md-select-option value="No"><div slot="headline">No</div></md-select-option>
+                </md-outlined-select>
+
+                <md-outlined-select class="col-span-2 max-sm:col-span-1" label="Rule Status" [value]="inputIsActive() ? 'Active' : 'Inactive'" (change)="inputIsActive.set($any($event.target).value === 'Active')">
+                  <md-select-option value="Active"><div slot="headline">Active</div></md-select-option>
+                  <md-select-option value="Inactive"><div slot="headline">Inactive</div></md-select-option>
+                </md-outlined-select>
+              </div>
+            </sky-card>
+          </div>
+
+          <div class="flex justify-end gap-3 mt-8 border-t border-slate-100 pt-4">
+            <md-outlined-button (click)="cancelEdit()">Cancel</md-outlined-button>
+            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;">
+              <md-icon slot="icon">save</md-icon>
+              {{ editingId() !== null && editingId() !== 'new' ? 'Save Changes' : 'Save Fare Rule' }}
+            </md-filled-button>
+          </div>
+        </sky-card>
+      </div>
+    }
+  </div>
+</md-admin-page>

@@ -3,6 +3,8 @@ import { ApiError } from '../lib/http';
 import type { Prisma } from '../generated/prisma-client';
 import { listActiveCategories, getActiveCategoryBySlugOrThrow } from './category.service';
 import { getActiveTagNamesFor } from './popular-tag.service';
+import * as blogPostService from './blog-post.service';
+import * as siteContentService from './site-content.service';
 
 type TagRef = { id: string; name: string; slug: string };
 
@@ -592,4 +594,27 @@ export async function getPublicTherapistOrThrow(id: string) {
   if (!therapist) throw new ApiError('NOT_FOUND', 'Therapist not found');
   const [withTags] = await withTherapistPopularTags([therapist]);
   return withTags;
+}
+
+// ─── CMS (Blog Posts / About Us / Contact Us) — thin pass-throughs to blog-post.service.ts/
+// site-content.service.ts's own public functions, kept here (rather than importing those
+// services directly in catalog.routes.ts) so every route in that file uniformly calls only
+// `catalogService.*`, matching this file's own established pattern (e.g. getPublicCategoryTree
+// wrapping category.service.ts). The real "never trust a caller-supplied status" enforcement
+// lives in blog-post.service.ts/site-content.service.ts themselves, not here. ──────────────────
+
+export async function listPublicBlogPosts(opts: { page: number; pageSize: number; search?: string; categorySlug?: string }) {
+  return blogPostService.getPublishedBlogPosts(opts);
+}
+
+export async function getPublicBlogPostBySlug(slug: string) {
+  return blogPostService.getPublishedBlogPostBySlugOrThrow(slug);
+}
+
+export async function getPublicAboutUs() {
+  return siteContentService.getPublicAboutUs();
+}
+
+export async function getPublicContactUs() {
+  return siteContentService.getPublicContactUs();
 }

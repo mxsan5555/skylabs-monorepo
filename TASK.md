@@ -9,12 +9,29 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 
 ## In progress
 
-### Deployment (Vercel) — code done, dashboard config pending
-- [ ] In Vercel, per project (msd, mera-driver): set Root Directory to the app
-      folder, Production Branch = `main`, attach the bought domain to Production,
-      add env vars (`VITE_API_URL` etc.) — see `DEPLOYMENT.md`
-- [ ] Validate the `../../` paths in `vercel.json` on a first preview deploy
+### Deployment (Vercel) — pipeline live, hardening pending
+- [ ] Attach the bought custom domain to each project's Production (`main`) deploy
+- [ ] Add env vars in Vercel (msd: `VITE_API_URL`, `VITE_GOOGLE_MAPS_API_KEY`)
 - [ ] Add the CI check as a required status check in branch protection
+- [ ] After each `release → main`, back-merge `main → develop` (recurring — see `DEPLOYMENT.md`)
+
+### Deploy msd-api (Railway + Neon + Cloudflare R2) — see `DEPLOYMENT.md → Deploying msd-api`
+- [x] **Code:** media storage switched from local disk to Cloudflare R2 —
+      `lib/media-storage.ts` (S3 client, lazy init), removed `/media` static mount in
+      `app.ts`, added `R2_*` to `config/env.ts` + `.env.example`, added
+      `@aws-sdk/client-s3`. Frontend `resolveMediaUrl()` now prefixes
+      `VITE_MEDIA_BASE_URL` (images served directly from R2); media tests updated — 2026-09-08
+- [x] **Security:** blanked the real secrets in `apps/msd-api/.env.example` (now a
+      pure template) — 2026-09-08
+- [ ] **Security follow-up:** rotate the previously-committed secrets at each provider
+      (Gmail app password, ConnectExpress SMS key, Razorpay keys, `JWT_SECRET`) — they
+      remain in git history
+- [ ] Locally: point `DATABASE_URL` at Neon, `prisma generate` + `migrate deploy` + `seed`, verify `/docs`
+- [ ] Railway: new service from repo, build `npm ci && npx nx build msd-api`, start `node dist/apps/msd-api/main.js`, deploy step runs `prisma generate` + `migrate deploy`
+- [ ] Railway env vars: `DATABASE_URL` (Neon), JWT/OTP/OAuth/SMTP/SMS/Razorpay, `CORS_ORIGIN` (Vercel domain), `R2_*`
+- [ ] Cloudflare R2: create `msd-media` bucket + API token + public URL
+- [ ] Set `VITE_API_URL` on the msd Vercel project to the Railway origin + redeploy; update Google OAuth redirect URI
+- [ ] Verify: `/docs` on Railway, image upload lands in R2 + survives a redeploy, live msd sign-in with no CORS errors
 
 ## Backlog
 
@@ -36,7 +53,7 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] Wired CartProvider + WishlistProvider in main.tsx — 2026-07-12
 
 ### Content pages — both apps (`pages/` + route)
-- [ ] Contact page
+- [ ] Contact page~
 - [ ] Blog category (filtered list)
 
 ### Account & admin — both apps (remaining)
@@ -45,13 +62,12 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] Real role assignment + enforcement once backends exist (JWT claim + per-request API check); remove the "View as" demo switcher
 - [ ] Replace localStorage account store with profile API
 
-### Backends — one per app (deferred until pages need real data)
-- [ ] Scaffold `apps/msd-api` (Express + TS, `@nx/express`)
-- [ ] Scaffold `apps/mera-driver-api` (Express + TS)
-- [ ] PostgreSQL + Prisma schema per domain (massage deals / driver booking)
-- [ ] Zod + `zod-to-openapi` validation & spec, `swagger-ui-express` at `/docs`
-- [ ] Auth endpoints: phone/email OTP, Google OAuth, JWT issue/verify
-- [ ] Domain endpoints (blog, profile, admin, deals/bookings)
+### Backends — one per app
+- [x] `apps/msd-api` built: Express + TS, PostgreSQL + Prisma (35+ migrations), Zod +
+      `zod-to-openapi` + `swagger-ui-express` at `/docs`, OTP/Google/JWT auth, dynamic
+      RBAC, media uploads, business modules (Customers/Vendors/Orders/Products/
+      Inventory/Reports) — see `CLAUDE.md`, `ARCHITECTURE.md`, `DEVELOPER_PROCESS.md`
+- [ ] `apps/mera-driver-api` — same pattern, own DB + bucket (pending)
 
 ### Auth integration (after backends)
 - [ ] Wire sign-in / OTP / Google to real endpoints (replace mock token)
@@ -130,6 +146,9 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] `.github/workflows/ci.yml` — `nx affected -t lint test build` PR gate on develop/release/main — 2026-09-04
 - [x] `DEPLOYMENT.md` (source of truth + Mermaid flowchart) + root `README.md` — 2026-09-04
 - [x] Deployment docs into `CLAUDE.md` / `PLANNING.md` — 2026-09-04
+- [x] Version manifests `apps/{msd,mera-driver}/package.json` so `nx release` has a version to bump — 2026-09-05
+- [x] First `nx release --skip-publish --first-release`: `msd@0.1.0` + `mera-driver@0.1.0` tags + per-app CHANGELOGs — 2026-09-05
+- [x] Validated Vercel preview/staging deploys (SPA rewrite + `nx-ignore` self-select working); documented branch-from-develop + back-merge workflow — 2026-09-05
 
 ### Docs
 - [x] `ARCHITECTURE.md`, `PLANNING.md`, `TASK.md`, updated `CLAUDE.md`

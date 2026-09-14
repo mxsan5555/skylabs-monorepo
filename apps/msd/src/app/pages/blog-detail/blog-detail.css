@@ -28,7 +28,6 @@
   --md-icon-size: 18px;
 }
 
-/* --- Header --- */
 .post__header {
   display: flex;
   flex-direction: column;
@@ -76,7 +75,6 @@
   background-color: var(--md-sys-color-surface-variant, #dde4d8);
 }
 
-/* --- Body (editorial typography) --- */
 .post__body {
   display: flex;
   flex-direction: column;
@@ -86,8 +84,7 @@
   line-height: 1.75;
 }
 
-/* Lead paragraph: a touch larger to open the article. */
-.post__body > p:first-child {
+.post__body>p:first-child {
   font-size: 1.2rem;
   line-height: 1.6;
   color: var(--md-sys-color-on-surface, #1a1c19);
@@ -129,7 +126,6 @@
   line-height: 1.5;
 }
 
-/* --- Footer --- */
 .post__footer {
   margin-top: 40px;
   padding-top: 24px;

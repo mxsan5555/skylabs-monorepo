@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Home } from './home';
 import '@testing-library/jest-dom/vitest';
@@ -33,6 +33,36 @@ vi.mock('../../../api/catalog', () => ({
   listCatalogDeals: vi.fn(),
 }));
 
+const mockCategory = {
+  id: 'cat-1',
+  name: 'Massage',
+  slug: 'massage',
+  children: [],
+};
+
+const mockDeal = {
+  id: 'deal-1',
+  title: 'Relaxing Massage',
+  salePrice: '999',
+  originalPrice: '1499',
+  discountPercent: 33,
+  durationMinutes: 60,
+  category: mockCategory,
+  subcategory: {
+    id: 'sub-1',
+    name: 'Massage',
+    slug: 'massage',
+  },
+  vendor: {
+    businessName: 'Relax Spa',
+    slug: 'relax-spa',
+  },
+  service: {
+    name: 'Relaxing Massage',
+    imageAlt: 'Relaxing Massage',
+  },
+  product: undefined,
+};
 describe('Home', () => {
   it('shows loading state while catalog data is loading', () => {
     render(
@@ -62,23 +92,5 @@ describe('Home', () => {
       await screen.findByRole('alert'),
     ).toHaveTextContent(/could not load home page content/i);
   });
-  it('shows error message when catalog API fails', async () => {
-    vi.mocked(listCatalogCategories).mockRejectedValue(
-      new Error('Could not load home page content.'),
-    );
 
-    vi.mocked(listCatalogDeals).mockRejectedValue(
-      new Error('Could not load home page content.'),
-    );
-
-    render(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
-    );
-
-    expect(
-      await screen.findByRole('alert'),
-    ).toHaveTextContent(/could not load home page content/i);
-  });
 });

@@ -10,7 +10,7 @@ import { apiPostForm, apiDelete, apiPatch } from './rbac/client';
  * `onVideoChange`.
  */
 
-export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor' | 'category';
+export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor' | 'category' | 'blog' | 'about-us';
 
 export interface MediaImage {
   id: string;
@@ -62,6 +62,15 @@ function basePath(ref: EntityRef): string {
       // exists server-side; `MediaUploader`'s `hideVideo` prop keeps that endpoint unreachable
       // from the Category dialogs).
       return `/categories/${ref.entityId}`;
+    case 'blog':
+      // Blog Post image routes are top-level (`/blog-posts/:id/images...`, see
+      // blog-posts.routes.ts) — no branch/vendor nesting, image-only (no `/video` route exists
+      // server-side for `blog`, same as `category` above).
+      return `/blog-posts/${ref.entityId}`;
+    case 'about-us':
+      // About Us is a singleton row — its image routes have no `:id` param at all
+      // (`/about-us/images...`, see site-content.routes.ts), so `entityId` is ignored here.
+      return '/about-us';
   }
 }
 
@@ -94,14 +103,14 @@ export function deleteVideo(token: string | null, ref: EntityRef) {
 }
 
 /**
- * Builds the full displayable URL for a `storageKey`. Legacy backfilled rows store the original
- * external URL as their storageKey (see the backend's one-time media backfill) — pass those
- * through unchanged; a real relative storageKey gets prefixed with the API origin's `/media`
- * mount (see msd-api's `app.ts`).
+ * Builds the full displayable URL for a `storageKey`. Media bytes live in Cloudflare R2 and are
+ * served directly from the bucket's public URL (`VITE_MEDIA_BASE_URL`) — the API no longer serves
+ * them. Legacy backfilled rows store the original external URL as their storageKey (see the
+ * backend's one-time media backfill) — pass those through unchanged; a real relative storageKey
+ * gets prefixed with the R2 public base.
  */
 export function resolveMediaUrl(storageKey: string): string {
   if (/^https?:\/\//i.test(storageKey)) return storageKey;
-  const apiBase: string = import.meta.env.VITE_API_URL ?? '';
-  const origin = apiBase.replace(/\/api\/v1\/?$/, '');
-  return `${origin}/media/${storageKey}`;
+  const base: string = (import.meta.env.VITE_MEDIA_BASE_URL ?? '').replace(/\/$/, '');
+  return `${base}/${storageKey}`;
 }

@@ -523,6 +523,40 @@ input[type='checkbox'] {
   font: inherit;
 }
 
+/* CMS body-block editor (blog-block-editor.tsx) — one row per BlogBlock, reused by the Blog Post
+   form dialog and the About Us page. Same "bordered repeatable row" shape as the social-links
+   rows on the Contact Us page. */
+.block-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.block-editor__row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-radius: 12px;
+}
+
+.block-editor__row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.block-editor__row-actions {
+  display: flex;
+  gap: 4px;
+}
+
 /* Onboarding wizard step-pills (vendor-pipeline.tsx) — a horizontally-scrolling row of
    labelled, numbered steps; the active step is filled, completed steps get a check mark. */
 .wizard-steps {

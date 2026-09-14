@@ -1,5 +1,4 @@
 import type { Vendor } from '../types';
-
 export const VENDORS: Vendor[] = [
   {
     id: 'v-01',

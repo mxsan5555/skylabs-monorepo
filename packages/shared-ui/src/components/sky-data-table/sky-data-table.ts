@@ -19,10 +19,14 @@ export interface SkyDataTableColumn {
   label: string;
   sortable?: boolean;
   width?: string;
-  /** 'status' renders a sky-badge; 'text' | 'number' | 'date' render as-is. */
-  type?: 'text' | 'number' | 'date' | 'status';
+  /** 'status' renders a sky-badge; 'image' renders a round img; 'text' | 'number' | 'date' render as-is. */
+  type?: 'text' | 'number' | 'date' | 'status' | 'image';
+  /** Backwards compatibility for status columns */
+  status?: boolean;
   /** Maps status string → badge variant. Used when type === 'status'. */
   statusMap?: Record<string, 'success' | 'warning' | 'error' | 'info'>;
+  /** Starts the column as hidden in the selector */
+  hidden?: boolean;
 }
 
 export interface SkyDataTableAction {
@@ -112,6 +116,8 @@ export class SkyDataTable extends LitElement {
     _selected:         { state: true },
     _detailRow:        { state: true },
     _detailOpen:       { state: true },
+    _hiddenCols:       { state: true },
+    _showColSelector:  { state: true },
   };
 
   declare columns: string;
@@ -137,6 +143,8 @@ export class SkyDataTable extends LitElement {
   private declare _detailRow: Record<string, unknown> | null;
   private declare _detailOpen: boolean;
   private declare _lastFocus: Element | null;
+  private declare _hiddenCols: Set<string>;
+  private declare _showColSelector: boolean;
 
   private readonly _pageSizeOptions = [10, 25, 50, 100];
 
@@ -171,13 +179,19 @@ export class SkyDataTable extends LitElement {
     this._selected         = new Set();
     this._detailRow        = null;
     this._detailOpen       = false;
+    this._hiddenCols       = new Set();
+    this._showColSelector  = false;
     this._lastFocus        = null;
   }
 
   // ── Parsed getters ────────────────────────────────────────────────────────
 
-  private get _cols(): SkyDataTableColumn[] {
+  private get _allCols(): SkyDataTableColumn[] {
     try { return JSON.parse(this.columns) || []; } catch { return []; }
+  }
+
+  private get _cols(): SkyDataTableColumn[] {
+    return this._allCols.filter(col => !this._hiddenCols.has(col.key));
   }
   private get _rowData(): Record<string, unknown>[] {
     try { return JSON.parse(this.rows) || []; } catch { return []; }
@@ -290,6 +304,36 @@ export class SkyDataTable extends LitElement {
     (this._lastFocus as HTMLElement | null)?.focus();
   }
 
+  private _toggleColSelector(e: Event) {
+    e.stopPropagation();
+    this._showColSelector = !this._showColSelector;
+  }
+
+  private _onColToggle(key: string, e: Event) {
+    const checked = (e.target as any).checked;
+    const next = new Set(this._hiddenCols);
+    if (checked) {
+      next.delete(key);
+    } else {
+      if (next.size >= this._allCols.length - 1 && !this._hiddenCols.has(key)) {
+        alert("At least one column must remain visible!");
+        (e.target as any).checked = true;
+        return;
+      }
+      next.add(key);
+    }
+    this._hiddenCols = next;
+  }
+
+  private readonly _onWindowClick = (e: MouseEvent) => {
+    if (!this._showColSelector) return;
+    const path = e.composedPath();
+    const isInside = path.some(el => el instanceof HTMLElement && (el.classList.contains('col-selector-wrap') || el.classList.contains('col-selector-menu')));
+    if (!isInside) {
+      this._showColSelector = false;
+    }
+  };
+
   private readonly _onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape' && this._detailOpen) this._closeDetail();
   };
@@ -297,11 +341,30 @@ export class SkyDataTable extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     document.addEventListener('keydown', this._onKeyDown);
+    window.addEventListener('click', this._onWindowClick);
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     document.removeEventListener('keydown', this._onKeyDown);
+    window.removeEventListener('click', this._onWindowClick);
+  }
+
+  override willUpdate(changedProperties: Map<string, unknown>) {
+    if (changedProperties.has('columns')) {
+      const all = this._allCols;
+      const initialHidden = new Set(this._hiddenCols);
+      let changed = false;
+      all.forEach(col => {
+        if (col.hidden && !this._hiddenCols.has(col.key)) {
+          initialHidden.add(col.key);
+          changed = true;
+        }
+      });
+      if (changed) {
+        this._hiddenCols = initialHidden;
+      }
+    }
   }
 
   protected override updated(changed: Map<string, unknown>): void {
@@ -332,7 +395,7 @@ export class SkyDataTable extends LitElement {
 </style></head><body>
 ${this.caption ? `<h2>${this.caption}</h2>` : ''}
 <table><thead><tr>${headers}</tr></thead><tbody>${body}</tbody></table>
-<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}<\/script>
+<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script>
 </body></html>`;
     const win = window.open('', '_blank', 'width=900,height=700');
     if (win) { win.document.write(markup); win.document.close(); }
@@ -351,11 +414,18 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
   }
 
   private _cellContent(value: unknown, col: SkyDataTableColumn) {
-    if (col.type === 'status') {
+    if (col.status || col.type === 'status') {
       const str = String(value ?? '');
-      const statusVariant = col.statusMap?.[str] ?? 'info';
-      const badgeVariant  = this._statusVariant[statusVariant] ?? 'primary';
+      const statusVariant = col.statusMap?.[str] ?? (['success', 'warning', 'error', 'info'].includes(str) ? str : 'info');
+      const badgeVariant  = this._statusVariant[statusVariant as any] ?? 'primary';
       return html`<sky-badge variant=${badgeVariant} size="small">${str}</sky-badge>`;
+    }
+    if (col.type === 'image') {
+      const src = String(value ?? '');
+      if (src && src.startsWith('http')) {
+        return html`<img src="${src}" alt="${col.label}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--md-sys-color-outline-variant,#cbd5e1); display: inline-block; vertical-align: middle;" />`;
+      }
+      return html`<md-icon style="font-size: 28px; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; color: var(--md-sys-color-outline,#94a3b8); vertical-align: middle;">account_circle</md-icon>`;
     }
     return html`${value ?? ''}`;
   }
@@ -408,7 +478,11 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
     ${hostBase}
 
     /* ── Z-index custom property — consumers can override when stacking contexts conflict */
-    :host { --_overlay-z: 200; }
+    :host {
+      display: block;
+      width: 100%;
+      --_overlay-z: 200;
+    }
 
     /* ── Visually hidden (screen-reader only) ───────────────────────────── */
     .sr-only {
@@ -874,6 +948,34 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
                 <md-icon aria-hidden="true">download</md-icon>
               </md-icon-button>
             ` : nothing}
+            <slot name="toolbar-actions"></slot>
+
+            <div class="col-selector-wrap" style="position: relative; display: inline-block;">
+              <md-icon-button
+                aria-label="Select Columns"
+                title="Select Columns"
+                @click=${this._toggleColSelector}
+              >
+                <md-icon aria-hidden="true">view_column</md-icon>
+              </md-icon-button>
+              
+              ${this._showColSelector ? html`
+                <div class="col-selector-menu" style="position: absolute; right: 0; top: 48px; background: var(--md-sys-color-surface-container-high, #e7e9ee); border: 1px solid var(--md-sys-color-outline-variant, #cbd5e1); border-radius: 12px; padding: 12px; z-index: 100; min-width: 180px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-align: left;">
+                  <div style="font-size: 11px; font-weight: 700; color: var(--md-sys-color-on-surface-variant); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">
+                    Visible Columns
+                  </div>
+                  ${this._allCols.map(col => html`
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--md-sys-color-on-surface); user-select: none;">
+                      <md-checkbox
+                        ?checked=${!this._hiddenCols.has(col.key)}
+                        @change=${(e: Event) => this._onColToggle(col.key, e)}
+                      ></md-checkbox>
+                      ${col.label}
+                    </label>
+                  `)}
+                </div>
+              ` : nothing}
+            </div>
           </div>
         ` : nothing}
 
