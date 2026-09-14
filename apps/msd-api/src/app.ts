@@ -56,6 +56,11 @@ export function createApp(): express.Express {
   // (see media-storage.ts's doc comment and apps/msd/src/api/media.ts's resolveMediaUrl).
 
   const api = express.Router();
+  // Public, unauthenticated liveness probe for the process host (Railway healthcheckPath).
+  // No DB call — it only proves the process is up and serving.
+  api.get('/health', (_req, res) => {
+    res.json({ data: { status: 'ok', app: 'msd-api' }, error: null });
+  });
   api.use('/auth', authRoutes);
   api.use('/rbac', rbacRoutes);
   api.use('/customers', customersRoutes);

@@ -1,5 +1,5 @@
 import request from 'supertest';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockPrisma, resetPrismaMock } from '../test-utils/prisma-mock';
 
