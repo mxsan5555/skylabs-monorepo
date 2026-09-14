@@ -1,0 +1,157 @@
+.drivers-context {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.drivers-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Driver card — a selectable button row with photo, details and bookmark. */
+.driver-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px;
+  margin-bottom: 12px;
+  border: 1.5px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-radius: 16px;
+  background-color: var(--md-sys-color-surface, #fff);
+  font: inherit;
+  text-align: left;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+}
+
+.driver-card:hover {
+  background-color: var(--md-sys-color-surface-container-low, #f3f4f9);
+}
+
+.driver-card.selected {
+  border-color: var(--md-sys-color-primary, #33618d);
+  border-width: 2px;
+  background-color: var(--md-sys-color-primary-container, #d0e4ff);
+}
+
+.driver-card__photo {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+}
+
+.driver-card__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.driver-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.driver-card__name {
+  font-weight: 700;
+}
+
+.driver-card__rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  --md-icon-size: 18px;
+}
+
+.driver-card__rating md-icon {
+  color: #f5a623;
+}
+
+.driver-card__reviews {
+  color: var(--md-sys-color-on-surface-variant);
+  font-weight: 400;
+}
+
+.driver-card__sub {
+  font-size: 0.85rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.driver-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.driver-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px 3px 6px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  --md-icon-size: 15px;
+}
+
+.driver-pill--verified {
+  background-color: var(--md-sys-color-tertiary-container, #d5e8d4);
+  color: var(--md-sys-color-on-tertiary-container, #0b3d0b);
+}
+
+.driver-pill--pending {
+  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+  color: var(--md-sys-color-on-surface-variant, #43483e);
+}
+
+.driver-card__eta {
+  font-size: 0.72rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.driver-card__aside {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.driver-card__price {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+/* Tablet / desktop: the driver list gets more room, then two columns. */
+@media (min-width: 768px) {
+  .rider-screen {
+    max-width: 960px;
+  }
+}
+
+@media (min-width: 900px) {
+  .drivers-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-content: start;
+  }
+
+  .driver-card {
+    margin-bottom: 0;
+    height: 100%;
+  }
+}

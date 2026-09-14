@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "question": "How do I book a driver on Mera Driver?",
+    "answer": "You can book a driver instantly via the web portal or mobile app by entering your pickup location and choosing a trip package.",
+    "category": "Booking",
+    "status": "Published"
+  },
+  {
+    "id": 2,
+    "question": "What is the cancellation policy?",
+    "answer": "Free cancellation is allowed up to 15 minutes before the scheduled pickup time.",
+    "category": "Cancellation",
+    "status": "Published"
+  }
+]

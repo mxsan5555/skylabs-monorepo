@@ -495,3 +495,173 @@ describe('GET /api/v1/catalog/therapists/:id', () => {
     expect(prismaMock.therapist.findFirst).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Feature: public CMS reads (GET /catalog/blog-posts*, /catalog/about-us, /catalog/contact-us)
+ * Scenario: anonymous storefront visitors reading Blog Posts / About Us / Contact Us content.
+ *
+ * Given: an anonymous visitor with no Authorization header at all
+ * When: they list/read blog posts or read the About Us / Contact Us singleton
+ * Then: only PUBLISHED posts are ever visible, and the singleton content routes work with zero auth
+ *
+ * Edge cases:
+ * - a DRAFT post's slug 404s on direct lookup, same as a nonexistent slug — never leaks a hidden post
+ * - an empty result set still returns 200 with an empty array, not an error
+ */
+const publishedPostFixture = {
+  id: 'aa000000-0000-4000-8000-000000000001',
+  title: 'Deep Tissue Massage Benefits',
+  slug: 'deep-tissue-massage-benefits',
+  excerpt: 'Everything you need to know.',
+  categorySlug: 'wellness',
+  body: [{ type: 'paragraph', text: 'Hello world' }],
+  author: 'Jane Doe',
+  readMinutes: 4,
+  tags: ['wellness'],
+  publishedAt: new Date('2025-01-01T00:00:00.000Z'),
+  metaTitle: null,
+  metaDescription: null,
+  mediaImages: [],
+};
+
+describe('GET /api/v1/catalog/blog-posts', () => {
+  it('returns only PUBLISHED posts with no auth required', async () => {
+    prismaMock.blogPost.findMany.mockResolvedValue([publishedPostFixture]);
+    prismaMock.blogPost.count.mockResolvedValue(1);
+    const res = await request(app).get('/api/v1/catalog/blog-posts');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(prismaMock.blogPost.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ status: 'PUBLISHED' }) }),
+    );
+  });
+
+  it('never accepts a caller-supplied status override', async () => {
+    prismaMock.blogPost.findMany.mockResolvedValue([]);
+    prismaMock.blogPost.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/blog-posts?status=DRAFT');
+    const call = prismaMock.blogPost.findMany.mock.calls[0][0];
+    expect(call.where.status).toBe('PUBLISHED');
+  });
+
+  it('returns an empty array with pagination meta when nothing matches — not an error', async () => {
+    prismaMock.blogPost.findMany.mockResolvedValue([]);
+    prismaMock.blogPost.count.mockResolvedValue(0);
+    const res = await request(app).get('/api/v1/catalog/blog-posts');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.meta).toEqual(expect.objectContaining({ total: 0 }));
+  });
+
+  it('filters by categorySlug/search when given', async () => {
+    prismaMock.blogPost.findMany.mockResolvedValue([]);
+    prismaMock.blogPost.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/blog-posts?categorySlug=wellness&search=tissue');
+    expect(prismaMock.blogPost.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ categorySlug: 'wellness', title: { contains: 'tissue', mode: 'insensitive' } }),
+      }),
+    );
+  });
+});
+
+describe('GET /api/v1/catalog/blog-posts/:slug', () => {
+  it('returns the published post by slug with no auth required', async () => {
+    prismaMock.blogPost.findFirst.mockResolvedValue(publishedPostFixture);
+    const res = await request(app).get('/api/v1/catalog/blog-posts/deep-tissue-massage-benefits');
+    expect(res.status).toBe(200);
+    expect(res.body.data.slug).toBe('deep-tissue-massage-benefits');
+    expect(prismaMock.blogPost.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { slug: 'deep-tissue-massage-benefits', status: 'PUBLISHED' } }),
+    );
+  });
+
+  it('404s for a DRAFT post slug — never leaks an unpublished post by slug', async () => {
+    // getPublishedBlogPostBySlugOrThrow's `where` already folds status: 'PUBLISHED' into the
+    // query, so the mock returning null here IS the correct simulation of "this slug exists but
+    // is still a draft" — same convention as the deals/:id and therapists/:id 404 tests above.
+    prismaMock.blogPost.findFirst.mockResolvedValue(null);
+    const res = await request(app).get('/api/v1/catalog/blog-posts/still-a-draft');
+    expect(res.status).toBe(404);
+  });
+
+  it('404s for a slug that does not exist at all', async () => {
+    prismaMock.blogPost.findFirst.mockResolvedValue(null);
+    const res = await request(app).get('/api/v1/catalog/blog-posts/does-not-exist');
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/v1/catalog/about-us', () => {
+  it('returns the saved About Us content with no Authorization header at all', async () => {
+    prismaMock.aboutUsContent.findUnique.mockResolvedValue({
+      id: 'singleton',
+      heroTitle: 'Who we are',
+      heroSubtitle: '',
+      missionStatement: '',
+      body: [],
+      metaTitle: null,
+      metaDescription: null,
+      updatedAt: new Date('2025-01-01T00:00:00.000Z'),
+      mediaImages: [],
+    });
+    const res = await request(app).get('/api/v1/catalog/about-us');
+    expect(res.status).toBe(200);
+    expect(res.body.data.heroTitle).toBe('Who we are');
+  });
+
+  it('find-or-creates the singleton row when nothing has been saved yet', async () => {
+    prismaMock.aboutUsContent.findUnique.mockResolvedValue(null);
+    prismaMock.aboutUsContent.create.mockResolvedValue({
+      id: 'singleton',
+      heroTitle: '',
+      heroSubtitle: '',
+      missionStatement: '',
+      body: [],
+      metaTitle: null,
+      metaDescription: null,
+      updatedAt: new Date('2025-01-01T00:00:00.000Z'),
+      mediaImages: [],
+    });
+    const res = await request(app).get('/api/v1/catalog/about-us');
+    expect(res.status).toBe(200);
+    expect(res.body.data.heroTitle).toBe('');
+  });
+});
+
+describe('GET /api/v1/catalog/contact-us', () => {
+  it('returns the saved Contact Us content with no Authorization header at all', async () => {
+    prismaMock.contactUsContent.findUnique.mockResolvedValue({
+      id: 'singleton',
+      address: '123 Main St',
+      phone: '555-0100',
+      email: 'hello@skylabs.dev',
+      mapEmbedUrl: '',
+      socialLinks: [],
+      metaTitle: null,
+      metaDescription: null,
+      updatedAt: new Date('2025-01-01T00:00:00.000Z'),
+    });
+    const res = await request(app).get('/api/v1/catalog/contact-us');
+    expect(res.status).toBe(200);
+    expect(res.body.data.email).toBe('hello@skylabs.dev');
+  });
+
+  it('find-or-creates the singleton row when nothing has been saved yet', async () => {
+    prismaMock.contactUsContent.findUnique.mockResolvedValue(null);
+    prismaMock.contactUsContent.create.mockResolvedValue({
+      id: 'singleton',
+      address: '',
+      phone: '',
+      email: '',
+      mapEmbedUrl: '',
+      socialLinks: [],
+      metaTitle: null,
+      metaDescription: null,
+      updatedAt: new Date('2025-01-01T00:00:00.000Z'),
+    });
+    const res = await request(app).get('/api/v1/catalog/contact-us');
+    expect(res.status).toBe(200);
+    expect(res.body.data.email).toBe('');
+  });
+});

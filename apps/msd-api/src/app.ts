@@ -3,7 +3,6 @@ import express from 'express';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { env } from './config/env';
-import { getUploadRoot } from './lib/media-storage';
 import { passport, configurePassport } from './lib/passport';
 import { buildOpenApiDocument } from './openapi/registry';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
@@ -12,6 +11,8 @@ import rbacRoutes from './routes/rbac.routes';
 import customersRoutes from './routes/customers.routes';
 import vendorsRoutes from './routes/vendors.routes';
 import categoriesRoutes from './routes/categories.routes';
+import blogPostsRoutes from './routes/blog-posts.routes';
+import siteContentRoutes from './routes/site-content.routes';
 import popularTagsRoutes from './routes/popular-tags.routes';
 import catalogRoutes from './routes/catalog.routes';
 import cartRoutes from './routes/cart.routes';
@@ -49,16 +50,27 @@ export function createApp(): express.Express {
   app.use(passport.initialize());
 
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(buildOpenApiDocument()));
-  // Uploaded Deal/Product/Therapist media — served by relative storageKey, e.g.
-  // `/media/deals/<dealId>/<uuid>.jpg` (see media-storage.ts's doc comment).
-  app.use('/media', express.static(getUploadRoot()));
+  // Uploaded media (Deal/Product/Therapist/Vendor/Category/CMS images+video) lives in
+  // Cloudflare R2 and is served directly from R2's public URL — the API no longer serves the
+  // bytes. The DB stores the relative `storageKey`; the frontend prefixes `VITE_MEDIA_BASE_URL`
+  // (see media-storage.ts's doc comment and apps/msd/src/api/media.ts's resolveMediaUrl).
 
   const api = express.Router();
+  // Public, unauthenticated liveness probe for the process host (Railway healthcheckPath).
+  // No DB call — it only proves the process is up and serving.
+  api.get('/health', (_req, res) => {
+    res.json({ data: { status: 'ok', app: 'msd-api' }, error: null });
+  });
   api.use('/auth', authRoutes);
   api.use('/rbac', rbacRoutes);
   api.use('/customers', customersRoutes);
   api.use('/vendors', vendorsRoutes);
   api.use('/categories', categoriesRoutes);
+  api.use('/blog-posts', blogPostsRoutes);
+  // site-content.routes.ts declares its own full paths (`/about-us`, `/contact-us`) rather than
+  // living under a shared resource prefix — see that file's own doc comment — so it mounts at
+  // the API root, not a sub-path, to avoid double-prefixing (e.g. NOT /site-content/about-us).
+  api.use('/', siteContentRoutes);
   api.use('/popular-tags', popularTagsRoutes);
   api.use('/catalog', catalogRoutes);
   api.use('/cart', cartRoutes);

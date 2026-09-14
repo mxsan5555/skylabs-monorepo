@@ -18,10 +18,10 @@ import {
   type CatalogTherapist,
 } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { DealCard, type DealCardDeal } from '../../components/deal-card';
+import { DealCard } from '../../components/deal-card';
+import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { formatINR } from '../../../utils/format';
@@ -87,15 +87,12 @@ export function Category() {
       })
       .finally(() => setCategoryLoading(false));
   }, [slug]);
-
   const activeSubcategory = subcategoryIdx === 0 ? undefined : category?.children[subcategoryIdx - 1];
-
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
     navigate(`/sign-in?next=${encodeURIComponent(`/category/${slug}`)}`);
     return false;
   };
-
   const addToCart = async (deal: CatalogDeal) => {
     if (!requireAuthOrRedirect()) return;
     setActionError('');
@@ -107,7 +104,6 @@ export function Category() {
       setActionError(err instanceof ApiRequestError ? err.message : content.category.errors.addToCart);
     }
   };
-
   const toggleFavorite = (deal: CatalogDeal) => {
     if (!requireAuthOrRedirect()) return;
     void toggleWishlist(deal.id);
@@ -154,7 +150,6 @@ export function Category() {
   if (categoryLoading) {
     return <p className="loading-state"> {content.category.loading}</p>;
   }
-
   if (categoryError || !category) {
     return (
       <div className="category-page category-page--empty">
@@ -164,12 +159,10 @@ export function Category() {
       </div>
     );
   }
-
   return (
     <div className="category-page">
       <title>{`${category.name}${content.category.metaTitleSuffix}`}</title>
       <meta name="description" content={category.description ?? content.category.metaDescriptionTemplate.replace('{category}', category.name)} />
-
       <Breadcrumb
         className="category-page__breadcrumb"
         items={[
@@ -177,7 +170,6 @@ export function Category() {
           { label: content.category.breadcrumb.categories, to: '/categories' },
           { label: category.name }
         ]} />
-
       <header className="category-page__hero">
         <div className="category-page__hero-inner">
           <div className="category-page__hero-icon" aria-hidden="true">
@@ -189,7 +181,6 @@ export function Category() {
           </div>
         </div>
       </header>
-
       {category.children.length > 0 && (
         <div className="category-page__tabs-wrap">
           <Tabs
@@ -205,7 +196,6 @@ export function Category() {
           </Tabs>
         </div>
       )}
-
       <div className="category-page__sort">
         <div className="category-page__sort-inner">
           <OutlinedTextField
@@ -222,10 +212,8 @@ export function Category() {
           </p>
         </div>
       </div>
-
       {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
       {actionError && <p className="error-state" role="alert">{actionError}</p>}
-
       <section className="category-page__grid-wrap" aria-label={`${category.name} ${content.category.dealsAriaLabelSuffix}`}>
         <div className="category-page__grid-inner">
           {dealsLoading ? (
@@ -335,7 +323,6 @@ export function Category() {
                       )
                     }
                   />
-
                 </li>
               ))}
             </ul>
@@ -345,5 +332,4 @@ export function Category() {
     </div>
   );
 }
-
 export default Category;

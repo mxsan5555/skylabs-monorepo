@@ -1,0 +1,71 @@
+<md-admin-page title="Ratings & Reviews" subtitle="Post-trip ratings and reviews submitted by customers and drivers.">
+  <div class="relative w-full">
+    @if (!showAddForm()) {
+      <div class="w-full mt-4">
+        <sky-card class="p-6 block">
+          <sky-data-table
+            [columns]="tableColumns"
+            [rows]="tableRowsString()"
+            [total]="feedbackList().length"
+            selectable
+            exportable
+            searchable
+            [actions]="tableActions"
+            (sky-dt-row-action)="onRowAction($event)"
+            caption="Ratings & Reviews Management Database"
+          >
+            <md-icon-button slot="toolbar-actions" aria-label="Add Review" title="Add Review" (click)="startAdd()">
+              <md-icon>add</md-icon>
+            </md-icon-button>
+          </sky-data-table>
+        </sky-card>
+      </div>
+    } @else {
+      <div class="flex flex-col gap-6 w-full mt-2">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="text-xs text-slate-500 font-semibold tracking-wide">
+            Home / <span class="text-[#2e7d32]">{{ editingId() !== null && editingId() !== 'new' ? 'Edit Rating' : 'Add Rating' }}</span>
+          </div>
+          <md-outlined-button (click)="cancelEdit()">
+            <md-icon slot="icon">arrow_back</md-icon>
+            Back to List
+          </md-outlined-button>
+        </div>
+
+        <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm block">
+          <div class="flex flex-col gap-y-6 w-full">
+            <sky-card class="p-6 block">
+              <div class="section-heading-box">
+                <h3>1. Rating & Review Details</h3>
+              </div>
+              <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
+                <md-outlined-text-field label="Booking Ref" required [value]="inputBookingCode()" (input)="inputBookingCode.set($any($event.target).value)" placeholder="e.g. BK-1001"></md-outlined-text-field>
+
+                <md-outlined-select label="Given By" [value]="inputGivenBy()" (change)="inputGivenBy.set($any($event.target).value)">
+                  @for (opt of givenByOptions(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt | uppercase }}</div></md-select-option>
+                  }
+                </md-outlined-select>
+
+                <md-outlined-select class="col-span-2 max-sm:col-span-1" label="Rating (1-5 Stars)" [value]="inputRating()" (change)="inputRating.set($any($event.target).value)">
+                  @for (opt of ratingOptions(); track opt) {
+                    <md-select-option [value]="opt"><div slot="headline">{{ opt }} ⭐</div></md-select-option>
+                  }
+                </md-outlined-select>
+
+                <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Comment / Review Details" type="textarea" rows="2" [value]="inputComment()" (input)="inputComment.set($any($event.target).value)" placeholder="Feedback comment..."></md-outlined-text-field>
+              </div>
+            </sky-card>
+          </div>
+
+          <div class="flex gap-2 mt-6 justify-end border-t border-slate-100 pt-4">
+            <md-outlined-button (click)="cancelEdit()">Cancel</md-outlined-button>
+            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;">
+              <md-icon slot="icon">save</md-icon> Save
+            </md-filled-button>
+          </div>
+        </sky-card>
+      </div>
+    }
+  </div>
+</md-admin-page>

@@ -1,20 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
-import {
-  Divider,
-  FilledButton,
-  Icon,
-  OutlinedIconButton,
-} from '@skylabs-monorepo/shared-ui/react';
-
+import { Dialog, Divider, FilledButton, Icon, OutlinedIconButton, TextButton,} from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCatalogDeal, listCatalogDeals, type CatalogDeal, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 
@@ -49,7 +42,6 @@ export function DealDetail() {
   const [addedToCart, setAddedToCart] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
-
   useEffect(() => {
     if (!id) {
       setDeal(null);
@@ -72,15 +64,9 @@ export function DealDetail() {
           setDeal(null);
           return;
         }
-        setError(
-          err instanceof ApiRequestError
-            ? err.message
-            : dealDetail.errors.loadDeal
-        );
+        setError(err instanceof ApiRequestError? err.message: dealDetail.errors.loadDeal);
       })
-      .finally(() => {
-        setLoading(false);
-      });
+      .finally(() => {setLoading(false);});
   }, [id]);
   useEffect(() => {
     if (!deal?.category?.id) {
@@ -103,15 +89,11 @@ export function DealDetail() {
         setRelated([]);
       });
   }, [deal]);
-
   if (loading) {
     return (
-      <p className="loading-state">
-        {dealDetail.loading}
-      </p>
+      <p className="loading-state">{dealDetail.loading}</p>
     );
   }
-
   if (error || !deal) {
     return (
       <div className="deal-detail deal-detail--empty">

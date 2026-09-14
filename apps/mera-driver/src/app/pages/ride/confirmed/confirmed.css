@@ -1,0 +1,106 @@
+.rider-confirmed {
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+}
+
+.rider-confirmed__art {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  margin: 24px 0 8px;
+  border-radius: 50%;
+  background-color: var(--md-sys-color-tertiary-container, #d5e8d4);
+  color: var(--md-sys-color-on-tertiary-container, #0b3d0b);
+  --md-icon-size: 48px;
+}
+
+.rider-confirmed__title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+.rider-confirmed__body {
+  margin: 4px 0 16px;
+  max-width: 34ch;
+  color: var(--md-sys-color-on-surface-variant);
+  line-height: 1.5;
+}
+
+.confirmed-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 16px;
+  border-radius: 16px;
+  text-align: left;
+  background-color: var(--md-sys-color-surface-container, #eef1f6);
+}
+
+.confirmed-card__photo {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.confirmed-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.confirmed-card__name {
+  font-weight: 700;
+}
+
+.confirmed-card__sub {
+  font-size: 0.85rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.confirmed-card__meta {
+  display: flex;
+  gap: 14px;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: var(--md-sys-color-on-surface-variant);
+  --md-icon-size: 15px;
+}
+
+.confirmed-card__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.confirmed-card__price {
+  flex: none;
+  text-align: right;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+.confirmed-card__price span {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.confirmed-actions {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.confirmed-actions md-outlined-button {
+  flex: 1;
+}

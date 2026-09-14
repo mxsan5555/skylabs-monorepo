@@ -1,0 +1,19 @@
+.rider-tabs {
+  margin-bottom: 12px;
+  --md-secondary-tab-container-color: transparent;
+}
+
+/* Cap the scroll height so the sticky CTA stays reachable on small screens. */
+.rider-options {
+  max-height: 40vh;
+  overflow-y: auto;
+  margin-bottom: 4px;
+}
+
+/* In the desktop side panel the whole sheet scrolls, so drop the inner cap. */
+@media (min-width: 768px) {
+  .rider-options {
+    max-height: none;
+    overflow-y: visible;
+  }
+}

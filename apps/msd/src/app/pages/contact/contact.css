@@ -1,0 +1,79 @@
+.contact {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px 72px;
+}
+
+.contact h1 {
+  margin: 0 0 24px;
+  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--md-sys-color-on-surface, #1a1c19);
+}
+
+.contact__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 32px;
+  align-items: start;
+}
+
+.contact__details {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.contact__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  margin: 0;
+  font-size: 1rem;
+  color: var(--md-sys-color-on-surface, #1a1c19);
+}
+
+.contact__row a {
+  color: var(--md-sys-color-primary, #3a693c);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.contact__social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.contact__social-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c1c9bd);
+  color: var(--md-sys-color-on-surface, #1a1c19);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.contact__social-link:hover {
+  background-color: var(--md-sys-color-surface-container-high, #e7e8ee);
+}
+
+.contact__map {
+  border-radius: 16px;
+  overflow: hidden;
+  background-color: var(--md-sys-color-surface-variant, #dde4d8);
+}
+
+.contact__map iframe {
+  width: 100%;
+  height: 320px;
+  border: 0;
+  display: block;
+}

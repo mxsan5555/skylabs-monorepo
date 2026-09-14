@@ -1,0 +1,79 @@
+<section class="rider-map-screen" aria-labelledby="home-title">
+  <div class="rider-map">
+    <md-ride-map
+      [pickup]="booking.pickup()?.coord ?? null"
+      label="Map showing your current pickup location"
+    ></md-ride-map>
+
+    <md-filled-button class="rider-share" (click)="shareLocation()">
+      <md-icon slot="icon" aria-hidden="true">near_me</md-icon>
+      Share current location
+    </md-filled-button>
+  </div>
+
+  <div class="rider-sheet">
+    <div class="rider-sheet__handle" aria-hidden="true"></div>
+    <h1 id="home-title" class="rider-sheet__title">Plan your ride</h1>
+
+    <div class="rider-route">
+      <div class="rider-route__rail" aria-hidden="true">
+        <span class="rider-route__dot"></span>
+        <span class="rider-route__line"></span>
+        <span class="rider-route__dot rider-route__dot--square"></span>
+      </div>
+      <div>
+        <input
+          class="rider-route__field"
+          type="text"
+          aria-label="Pickup location"
+          autocomplete="off"
+          [value]="booking.pickup()?.label ?? ''"
+          placeholder="Enter pickup"
+        />
+        <input
+          class="rider-route__field"
+          type="text"
+          aria-label="Destination"
+          autocomplete="off"
+          placeholder="Where to?"
+        />
+      </div>
+    </div>
+
+    <h2 class="rider-eyebrow">Saved places</h2>
+    <ul class="rider-list">
+      @for (place of booking.savedPlaces; track place.id) {
+        <li>
+          <button type="button" class="rider-row" (click)="chooseDrop(place)">
+            <span class="rider-row__icon">
+              <md-icon aria-hidden="true">{{
+                place.id === 'work' ? 'work' : 'home'
+              }}</md-icon>
+            </span>
+            <span class="rider-row__body">
+              <span class="rider-row__title">{{ place.label }}</span>
+              <span class="rider-row__sub">{{ place.address }}</span>
+            </span>
+          </button>
+        </li>
+      }
+    </ul>
+
+    <h2 class="rider-eyebrow">Recent</h2>
+    <ul class="rider-list">
+      @for (place of booking.recentPlaces; track place.id) {
+        <li>
+          <button type="button" class="rider-row" (click)="chooseDrop(place)">
+            <span class="rider-row__icon">
+              <md-icon aria-hidden="true">location_on</md-icon>
+            </span>
+            <span class="rider-row__body">
+              <span class="rider-row__title">{{ place.label }}</span>
+              <span class="rider-row__sub">{{ place.address }}</span>
+            </span>
+          </button>
+        </li>
+      }
+    </ul>
+  </div>
+</section>

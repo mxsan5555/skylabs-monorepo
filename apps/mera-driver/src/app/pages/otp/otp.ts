@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
 import { AuthApiService } from '../../core/auth/auth-api.service';
 
@@ -28,6 +29,7 @@ export class Otp implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
   private readonly authApi = inject(AuthApiService);
+  private readonly http = inject(HttpClient);
 
   protected readonly destination =
     (history.state as { destination?: string; method?: string } | null)?.destination ?? '';
@@ -41,11 +43,47 @@ export class Otp implements OnInit, OnDestroy {
 
   private timer?: ReturnType<typeof setInterval>;
 
+  protected readonly content = signal({
+    titlePhone: 'Verify your phone',
+    titleEmail: 'Verify your email',
+    subtitle: 'We sent a 6-digit code to',
+    cardTitle: 'Enter the code',
+    cardSubtitle: 'The code expires in a few minutes.',
+    inputLabel: '6-digit code',
+    btnVerify: 'Verify & Continue',
+    resendText: 'Didn’t receive the code?',
+    resendCooldown: 'Resend in',
+    btnResend: 'Resend code',
+    errorOtpEmpty: 'Please enter the 6-digit verification code.',
+    errorOtpInvalid: 'Please enter a valid 6-digit numeric code.',
+    errorVerificationFailed: 'Verification failed: ',
+    msgOtpSent: 'OTP sent successfully',
+    msgOtpResentMock: 'OTP resent successfully (Mock)',
+    errorResendFailed: 'Failed to resend OTP: ',
+    msgSuccessNoToken: 'Verification successful, but no authentication token was returned by the server.'
+  });
+
   ngOnInit(): void {
     if (!this.destination) {
       this.router.navigate(['/sign-in']);
       return;
     }
+
+    // Load copy strings dynamically
+    this.http.get<any>('data/auth.json').subscribe({
+      next: (data) => {
+        if (data && data.otp) {
+          this.content.set({
+            ...this.content(),
+            ...data.otp
+          });
+        }
+      },
+      error: (err) => {
+        console.error('Failed to load OTP copy from auth.json, using defaults', err);
+      }
+    });
+
     this.timer = setInterval(() => {
       const s = this.seconds();
       if (s > 0) this.seconds.set(s - 1);

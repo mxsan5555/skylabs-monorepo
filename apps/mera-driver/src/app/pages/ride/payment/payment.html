@@ -1,0 +1,81 @@
+<section class="rider-screen" aria-labelledby="pay-title">
+  <div class="rider-topbar">
+    <md-icon-button aria-label="Go back" (click)="back()">
+      <md-icon aria-hidden="true">close</md-icon>
+    </md-icon-button>
+    <h1 id="pay-title" class="rider-topbar__title">Pay with</h1>
+  </div>
+
+  <div class="pay-profiles" role="tablist" aria-label="Payment profile">
+    <button type="button" class="pay-profile active" role="tab" aria-selected="true">
+      <md-icon aria-hidden="true">person</md-icon> Personal
+    </button>
+    <button type="button" class="pay-profile" role="tab" aria-selected="false">
+      <md-icon aria-hidden="true">work</md-icon> Business
+    </button>
+  </div>
+
+  <div class="pay-wallet">
+    <span class="rider-row__icon">
+      <md-icon aria-hidden="true">account_balance_wallet</md-icon>
+    </span>
+    <span class="rider-row__body">
+      <span class="rider-row__title">mera-driver balance</span>
+      <span class="rider-row__sub">₹0.00 available</span>
+    </span>
+    <md-switch aria-label="Use wallet balance"></md-switch>
+  </div>
+
+  <h2 class="rider-eyebrow">Payment methods</h2>
+  <ul class="rider-list" role="list">
+    @for (method of booking.methods(); track method.id) {
+      <li>
+        <button
+          type="button"
+          class="rider-row"
+          [disabled]="method.expired"
+          [attr.aria-pressed]="booking.payment()?.id === method.id"
+          (click)="select(method)"
+        >
+          <span class="rider-row__icon">
+            <md-icon aria-hidden="true">{{ method.icon }}</md-icon>
+          </span>
+          <span class="rider-row__body">
+            <span class="rider-row__title">{{ method.label }}</span>
+            @if (method.detail) {
+              <span
+                class="rider-row__sub"
+                [class.pay-expired]="method.expired"
+              >{{ method.detail }}</span>
+            }
+          </span>
+          @if (method.expired) {
+            <span class="pay-update">Update</span>
+          } @else if (booking.payment()?.id === method.id) {
+            <md-icon class="pay-check" aria-label="Selected">check_circle</md-icon>
+          }
+        </button>
+      </li>
+    }
+    <li>
+      <button type="button" class="rider-row pay-add">
+        <span class="rider-row__icon"><md-icon aria-hidden="true">add</md-icon></span>
+        <span class="rider-row__body">
+          <span class="rider-row__title">Add payment method</span>
+        </span>
+      </button>
+    </li>
+  </ul>
+
+  <div class="rider-cta">
+    @if (booking.ride(); as ride) {
+      <div class="pay-summary">
+        <span>{{ ride.title }} · {{ booking.driver()?.name }}</span>
+        <span class="pay-summary__total">₹{{ booking.driver()?.priceINR ?? ride.priceINR }}</span>
+      </div>
+    }
+    <md-filled-button [disabled]="!booking.payment()" (click)="confirm()">
+      Confirm booking
+    </md-filled-button>
+  </div>
+</section>

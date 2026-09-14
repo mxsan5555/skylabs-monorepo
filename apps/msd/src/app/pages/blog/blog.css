@@ -13,7 +13,6 @@
   color: var(--md-sys-color-primary);
 }
 
-/* Two-column: filter sidebar + main. Stacks on small screens. */
 .blog__layout {
   display: grid;
   grid-template-columns: 250px 1fr;
@@ -28,7 +27,6 @@
 
 }
 
-/* --- Filters --- */
 .blog__filters {
   position: sticky;
   top: 16px;
@@ -62,7 +60,6 @@
   cursor: pointer;
 }
 
-/* --- Toolbar (search + view toggle) --- */
 .blog__toolbar {
   display: flex;
   align-items: center;
@@ -85,7 +82,6 @@
   gap: 8px;
 }
 
-/* --- Results --- */
 .results__count {
   margin: 0;
   font-size: 0.875rem;
@@ -158,7 +154,6 @@
   text-decoration: none;
 }
 
-/* Stretched link: whole card is clickable via the single title link. */
 .post-card__title a::after {
   content: '';
   position: absolute;
@@ -194,7 +189,6 @@
   --md-icon-size: 16px;
 }
 
-/* List view: image left, content right. */
 .results--list .post-card {
   flex-direction: row;
   gap: 16px;
@@ -215,7 +209,6 @@
   }
 }
 
-/* --- Pagination --- */
 .pagination {
   display: flex;
   align-items: center;
