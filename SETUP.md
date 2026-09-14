@@ -148,7 +148,7 @@ projects).
 
 1. **Corporate Vercel Team → Add New → Project →** import this GitHub repo
    (authorize the corporate Vercel GitHub app on the org first).
-2. Create **two** projects following **`DEPLOYMENT.md` §4**:
+2. Create **two** projects (don't add api project) following **`DEPLOYMENT.md` §4**:
    - **msd** — Root Directory `apps/msd`
    - **mera-driver** — Root Directory `apps/mera-driver`
 
