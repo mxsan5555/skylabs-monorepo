@@ -3,11 +3,16 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "msd-api:prisma:generate": "dotenv -e apps/msd-api/.env.local -- prisma generate --schema=apps/msd-api/prisma/schema.prisma",
+    "msd-api:prisma:generate": "prisma generate --schema=apps/msd-api/prisma/schema.prisma",
+    "msd-api:prisma:validate": "prisma validate --schema=apps/msd-api/prisma/schema.prisma",
     "msd-api:prisma:migrate": "dotenv -e apps/msd-api/.env.local -- prisma migrate dev --schema=apps/msd-api/prisma/schema.prisma",
-    "msd-api:prisma:validate": "dotenv -e apps/msd-api/.env.local -- prisma validate --schema=apps/msd-api/prisma/schema.prisma",
     "msd-api:prisma:studio": "dotenv -e apps/msd-api/.env.local -- prisma studio --schema=apps/msd-api/prisma/schema.prisma",
-    "msd-api:prisma:seed": "dotenv -e apps/msd-api/.env.local -- tsx --tsconfig tsconfig.base.json apps/msd-api/prisma/seed.ts"
+    "msd-api:prisma:seed": "dotenv -e apps/msd-api/.env.local -- tsx --tsconfig tsconfig.base.json apps/msd-api/prisma/seed.ts",
+    "mera-driver-api:prisma:generate": "prisma generate --schema=apps/mera-driver-api/prisma/schema.prisma",
+    "mera-driver-api:prisma:validate": "prisma validate --schema=apps/mera-driver-api/prisma/schema.prisma",
+    "mera-driver-api:prisma:migrate": "dotenv -e apps/mera-driver-api/.env.local -- prisma migrate dev --schema=apps/mera-driver-api/prisma/schema.prisma",
+    "mera-driver-api:prisma:studio": "dotenv -e apps/mera-driver-api/.env.local -- prisma studio --schema=apps/mera-driver-api/prisma/schema.prisma",
+    "mera-driver-api:prisma:seed": "dotenv -e apps/mera-driver-api/.env.local -- tsx --tsconfig tsconfig.base.json apps/mera-driver-api/prisma/seed.ts"
   },
   "devDependencies": {
     "@angular-devkit/core": "~21.2.0",
@@ -97,6 +102,7 @@
     "@angular/platform-browser": "~21.2.0",
     "@angular/router": "~21.2.0",
     "@asteasolutions/zod-to-openapi": "^9.1.0",
+    "@aws-sdk/client-s3": "^3.1128.0",
     "@lit/react": "^1.0.7",
     "@material/web": "^2.3.0",
     "@prisma/client": "6.19.3",

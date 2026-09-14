@@ -500,3 +500,24 @@ Work through these in order:
     `@skylabs-monorepo/shared-auth`'s `useAuth()`/`AuthService`.
 12. Never write a role-name string check anywhere in this flow — if you find yourself
     wanting to, it means a permission is missing (§4, §9).
+
+---
+
+## 18. Deploying to production
+
+Full step-by-step guide (first-time Railway/Cloudflare friendly):
+**`DEPLOYMENT.md → Deploying msd-api`**. In short:
+
+- **API compute → Railway** (always-on Node): build `npm ci && npx nx build msd-api`,
+  start `node dist/apps/msd-api/main.js`, and run `prisma generate` + `prisma migrate
+  deploy` on each deploy (using the pinned Prisma 6.19.3 — never bare `npx prisma`,
+  which pulls Prisma 7 and errors on `datasource.url`).
+- **Database → Neon** Postgres, injected as `DATABASE_URL` on Railway (the same Neon
+  store attached to msd's Vercel project — not a new DB).
+- **Media files → Cloudflare R2** (Railway's disk is wiped on redeploy). Requires the
+  `lib/media-storage.ts` disk→R2 swap + `R2_*` env vars (see DEPLOYMENT.md).
+- **Frontend wiring:** set `VITE_API_URL` on the msd Vercel project to the Railway
+  origin (`https://<railway-domain>/api/v1`) and redeploy; set `CORS_ORIGIN` on
+  Railway to the Vercel domain(s); update the Google OAuth redirect URI.
+- Production secrets live only on Railway/Neon/local `.env.local` — never in
+  `.env.example` or any committed file.

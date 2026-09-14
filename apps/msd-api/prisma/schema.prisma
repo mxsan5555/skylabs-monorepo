@@ -1,6 +1,9 @@
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma-client"
+  // "native" covers the local dev OS; "debian-openssl-3.0.x" is the Railway/Nixpacks runtime, so a
+  // Linux query-engine is always generated for the deployed host (harmless locally).
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
