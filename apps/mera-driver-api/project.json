@@ -4,6 +4,18 @@
   "sourceRoot": "apps/mera-driver-api/src",
   "projectType": "application",
   "targets": {
+    "prisma-generate": {
+      "cache": true,
+      "inputs": ["{projectRoot}/prisma/schema.prisma"],
+      "outputs": ["{projectRoot}/src/generated"],
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "prisma generate --schema=apps/mera-driver-api/prisma/schema.prisma"
+      }
+    },
+    "build": {
+      "dependsOn": ["prisma-generate", "^build"]
+    },
     "prune-lockfile": {
       "dependsOn": ["build"],
       "cache": true,
@@ -33,19 +45,11 @@
     },
     "serve": {
       "continuous": true,
-     "executor":  "nx:run-commands",
-      "defaultConfiguration": "development",
+      "executor": "@nx/js:node",
+      "dependsOn": ["build"],
       "options": {
-         "command": "tsx watch src/main.ts",
-            "cwd": "apps/mera-driver-api"
-      },
-      "configurations": {
-        "development": {
-          "buildTarget": "mera-driver-api:build:development"
-        },
-        "production": {
-          "buildTarget": "mera-driver-api:build:production"
-        }
+        "buildTarget": "mera-driver-api:build",
+        "runBuildTargetDependencies": false
       }
     }
   },

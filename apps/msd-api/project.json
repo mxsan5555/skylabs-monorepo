@@ -4,6 +4,18 @@
   "sourceRoot": "apps/msd-api/src",
   "projectType": "application",
   "targets": {
+    "prisma-generate": {
+      "cache": true,
+      "inputs": ["{projectRoot}/prisma/schema.prisma"],
+      "outputs": ["{projectRoot}/src/generated"],
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "prisma generate --schema=apps/msd-api/prisma/schema.prisma"
+      }
+    },
+    "build": {
+      "dependsOn": ["prisma-generate", "^build"]
+    },
     "prune-lockfile": {
       "dependsOn": ["build"],
       "cache": true,
@@ -31,19 +43,11 @@
     },
     "serve": {
       "continuous": true,
-      "executor":  "nx:run-commands",
-      "defaultConfiguration": "development",
+      "executor": "@nx/js:node",
+      "dependsOn": ["build"],
       "options": {
-        "command": "tsx watch src/main.ts",
-            "cwd": "apps/msd-api"
-      },
-      "configurations": {
-        "development": {
-          "buildTarget": "msd-api:build:development"
-        },
-        "production": {
-          "buildTarget": "msd-api:build:production"
-        }
+        "buildTarget": "msd-api:build",
+        "runBuildTargetDependencies": false
       }
     }
   },
