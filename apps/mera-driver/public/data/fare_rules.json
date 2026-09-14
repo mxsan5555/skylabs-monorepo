@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "vehicle_type": "SEDAN",
+    "base_fare": 150,
+    "per_km_rate": 14,
+    "per_min_rate": 2,
+    "min_fare": 150,
+    "status": "Active"
+  },
+  {
+    "id": 2,
+    "vehicle_type": "SUV",
+    "base_fare": 250,
+    "per_km_rate": 18,
+    "per_min_rate": 3,
+    "min_fare": 250,
+    "status": "Active"
+  }
+]

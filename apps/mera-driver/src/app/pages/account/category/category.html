@@ -1,0 +1,92 @@
+<md-admin-page
+  title="Category"
+  subtitle="Manage service categories."
+>
+  <section class="account-card">
+    <div class="account-card__head">
+      <h2>Category List</h2>
+      @if (editingId() === null) {
+        <md-outlined-button (click)="addCategory()">
+          <md-icon slot="icon" aria-hidden="true">add</md-icon>
+          Add category
+        </md-outlined-button>
+      }
+    </div>
+
+    @if (editingId() !== null) {
+      <div class="account-fields mb-6">
+        <md-outlined-text-field
+          label="Category Name"
+          [value]="draft().name"
+          (input)="draft.update(d => ({ ...d, name: $any($event.target).value }))"
+        ></md-outlined-text-field>
+
+        <md-outlined-select
+          label="Status"
+          [value]="draft().status"
+          (change)="draft.update(d => ({ ...d, status: $any($event.target).value }))"
+        >
+          <md-select-option value="Active" [selected]="draft().status === 'Active'">
+            Active
+          </md-select-option>
+          <md-select-option value="Inactive" [selected]="draft().status === 'Inactive'">
+            Inactive
+          </md-select-option>
+        </md-outlined-select>
+
+        <div class="flex justify-end gap-2 mt-2">
+          <md-text-button (click)="cancel()">Cancel</md-text-button>
+          <md-filled-button (click)="submit()">Submit</md-filled-button>
+        </div>
+      </div>
+    }
+
+    @if (categories().length === 0) {
+      <p class="address-empty">No categories yet.</p>
+    } @else {
+      <md-list>
+        <!-- 3-Column Table Header -->
+        <md-list-item disabled>
+          <div slot="headline" class="grid grid-cols-3 w-full font-bold text-sm">
+            <span>Category</span>
+            <span>Status</span>
+            <span class="text-right">Action</span>
+          </div>
+        </md-list-item>
+        <md-divider></md-divider>
+
+        <!-- Category Rows -->
+        @for (cat of categories(); track cat.id) {
+          <md-list-item>
+            <div slot="headline" class="grid grid-cols-3 w-full items-center text-base">
+              <span class="font-semibold">{{ cat.name }}</span>
+              <span>
+                @if (cat.status === 'Active') {
+                  <sky-badge variant="primary">Active</sky-badge>
+                } @else {
+                  <sky-badge variant="error">Inactive</sky-badge>
+                }
+              </span>
+              <span class="flex justify-end gap-2" (click)="$event.stopPropagation()">
+                <md-icon-button
+                  [attr.aria-label]="'Edit ' + cat.name"
+                  (click)="editCategory(cat)"
+                >
+                  <md-icon aria-hidden="true">edit</md-icon>
+                </md-icon-button>
+                <md-icon-button
+                  [attr.aria-label]="'Delete ' + cat.name"
+                  (click)="deleteCategory(cat)"
+                >
+                  <md-icon aria-hidden="true">delete</md-icon>
+                </md-icon-button>
+              </span>
+            </div>
+          </md-list-item>
+          <md-divider></md-divider>
+        }
+      </md-list>
+    }
+  </section>
+</md-admin-page>
+

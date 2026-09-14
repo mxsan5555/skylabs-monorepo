@@ -5,7 +5,6 @@ import { ApiRequestError } from '../../../api/rbac/client';
 import { Breadcrumb } from '../../components/breadcrumb';
 import content from '../../../content.json';
 import '../category/category.css';
-
 /**
  * Customer catalogue entry point — "browse all categories" (formerly the marketplace categories
  * index, absorbed here now that the marketplace route namespace is retired). Reuses
@@ -18,17 +17,14 @@ export function CategoriesIndex() {
   const [categories, setCategories] = useState<CatalogCategoryWithChildren[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   useEffect(() => {
     setLoading(true);
     setError('');
-    
     listCatalogCategories()
       .then(({ data }) => setCategories(data))
       .catch((err) => setError(err instanceof ApiRequestError ? err.message : content.categories.error.load))
       .finally(() => setLoading(false));
   }, []);
-
   return (
     <div className="category-page">
       <title>{content.categories.metaTitle}</title>
@@ -51,7 +47,6 @@ export function CategoriesIndex() {
           </div>
         </div>
       </header>
-
       <section className="category-page__grid-wrap" aria-label={content.categories.ariaLabel}>
         <div className="category-page__grid-inner">
           {loading ? (
@@ -79,5 +74,4 @@ export function CategoriesIndex() {
     </div>
   );
 }
-
 export default CategoriesIndex;

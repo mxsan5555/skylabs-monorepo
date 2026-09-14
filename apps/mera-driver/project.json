@@ -13,6 +13,7 @@
         "outputPath": "dist/apps/mera-driver",
         "browser": "apps/mera-driver/src/main.ts",
         "tsConfig": "apps/mera-driver/tsconfig.app.json",
+        "allowedCommonJsDependencies": ["leaflet", "qrcode"],
         "assets": [
           {
             "glob": "**/*",
@@ -20,6 +21,7 @@
           }
         ],
         "styles": [
+          "node_modules/leaflet/dist/leaflet.css",
           "packages/shared-ui/src/theme/base.css",
           "packages/shared-ui/src/theme/layout.css",
           "apps/mera-driver/src/assets/theme/index.css",

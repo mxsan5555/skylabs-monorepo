@@ -1,0 +1,10 @@
+[
+  {
+    "id": 1,
+    "promo_code": "FIRST50",
+    "customer_name": "Rohan Sharma",
+    "booking_code": "BK-1001",
+    "discount_applied": 100,
+    "used_at": "2026-08-18 10:30"
+  }
+]

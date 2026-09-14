@@ -1,0 +1,47 @@
+[
+  {
+    "id": 1,
+    "report_uid": "REP-401",
+    "report_type": "Revenue",
+    "report_name": "Q2 Financial Performance Summary",
+    "generated_by": 101,
+    "generated_by_name": "Admin User",
+    "date_from": "2026-04-01",
+    "date_to": "2026-06-30",
+    "filters": "{\"region\":\"Delhi-NCR\",\"payment_method\":\"Online\"}",
+    "file_path": "/exports/reports/Q2_Revenue_Report.pdf",
+    "file_format": "PDF",
+    "status": "Completed",
+    "generated_at": "2026-07-01 10:00:00"
+  },
+  {
+    "id": 2,
+    "report_uid": "REP-402",
+    "report_type": "Trip",
+    "report_name": "Driver Idle Time Analysis",
+    "generated_by": 101,
+    "generated_by_name": "Admin User",
+    "date_from": "2026-08-01",
+    "date_to": "2026-08-10",
+    "filters": "{\"idle_time_greater_than_mins\":30}",
+    "file_path": "/exports/reports/Driver_Idle_August.xlsx",
+    "file_format": "XLSX",
+    "status": "Completed",
+    "generated_at": "2026-08-11 14:30:00"
+  },
+  {
+    "id": 3,
+    "report_uid": "REP-403",
+    "report_type": "Driver",
+    "report_name": "High Rating Drivers Incentives",
+    "generated_by": 102,
+    "generated_by_name": "Super Admin",
+    "date_from": "2026-07-01",
+    "date_to": "2026-07-31",
+    "filters": "{\"rating_greater_than\":4.5}",
+    "file_path": "",
+    "file_format": "CSV",
+    "status": "Failed",
+    "generated_at": "2026-08-01 09:15:00"
+  }
+]

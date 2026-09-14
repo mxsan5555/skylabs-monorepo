@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "code": "FIRST50",
+    "discount_percentage": 20,
+    "max_discount": 100,
+    "min_booking_amount": 300,
+    "valid_till": "2026-12-31",
+    "status": "Active"
+  },
+  {
+    "id": 2,
+    "code": "MONSOON100",
+    "discount_percentage": 15,
+    "max_discount": 150,
+    "min_booking_amount": 500,
+    "valid_till": "2026-09-30",
+    "status": "Active"
+  }
+]

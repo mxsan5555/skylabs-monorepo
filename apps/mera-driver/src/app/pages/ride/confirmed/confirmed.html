@@ -1,0 +1,50 @@
+<section class="rider-screen rider-confirmed" aria-labelledby="confirmed-title">
+  <div class="rider-confirmed__art" aria-hidden="true">
+    <md-icon>check</md-icon>
+  </div>
+
+  <h1 id="confirmed-title" class="rider-confirmed__title">Driver on the way</h1>
+  <p class="rider-confirmed__body">
+    Your booking is confirmed. Track the trip and share your live status from the
+    Activity tab.
+  </p>
+
+  @if (booking.driver(); as driver) {
+    <div class="confirmed-card">
+      <img
+        class="confirmed-card__photo"
+        [src]="driver.photo"
+        [alt]="'Photo of ' + driver.name"
+        width="56"
+        height="56"
+      />
+      <div class="confirmed-card__body">
+        <div class="confirmed-card__name">{{ driver.name }}</div>
+        <div class="confirmed-card__sub">{{ driver.vehicle }} · {{ driver.plate }}</div>
+        <div class="confirmed-card__meta">
+          <span><md-icon aria-hidden="true">schedule</md-icon> {{ driver.etaMinutes }} min away</span>
+          <span><md-icon aria-hidden="true">star</md-icon> {{ driver.rating }}</span>
+        </div>
+      </div>
+      <div class="confirmed-card__price">
+        ₹{{ driver.priceINR }}
+        <span>{{ booking.ride()?.title }}</span>
+      </div>
+    </div>
+
+    <div class="confirmed-actions">
+      <md-outlined-button>
+        <md-icon slot="icon" aria-hidden="true">call</md-icon>
+        Call
+      </md-outlined-button>
+      <md-outlined-button>
+        <md-icon slot="icon" aria-hidden="true">chat</md-icon>
+        Message
+      </md-outlined-button>
+    </div>
+  }
+
+  <div class="rider-cta">
+    <md-filled-button (click)="done()">Done</md-filled-button>
+  </div>
+</section>

@@ -1,22 +1,163 @@
-<header class="app-header">
-  <a routerLink="/" class="app-header__brand">mera-driver</a>
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="site-header__brand" routerLink="/" (click)="openMenu.set(null)">
+      <span class="site-header__logo" aria-hidden="true">
+        <md-icon>local_taxi</md-icon>
+      </span>
+      mera-driver
+    </a>
 
-  <nav class="app-header__nav" aria-label="Primary">
-    <a
-      routerLink="/"
-      routerLinkActive="active"
-      [routerLinkActiveOptions]="{ exact: true }"
-      >Home</a
+    <!-- Desktop primary nav -->
+    <nav class="site-nav" aria-label="Primary">
+      <button type="button" class="site-nav__link" (click)="go('/ride')">
+        Find Drivers
+      </button>
+
+      <div class="site-nav__group">
+        <button
+          type="button"
+          class="site-nav__link"
+          aria-haspopup="true"
+          [attr.aria-expanded]="openMenu() === 'services'"
+          (click)="toggleMenu('services')"
+        >
+          Services
+          <md-icon aria-hidden="true">expand_more</md-icon>
+        </button>
+        @if (openMenu() === 'services') {
+          <div class="site-menu" role="menu" aria-label="Services">
+            @for (s of services; track s.label) {
+              <button
+                type="button"
+                class="site-menu__item"
+                role="menuitem"
+                (click)="go(s.path, s.query)"
+              >
+                <span class="site-menu__icon">
+                  <md-icon aria-hidden="true">{{ s.icon }}</md-icon>
+                </span>
+                <span class="site-menu__text">
+                  <span class="site-menu__label">{{ s.label }}</span>
+                  <span class="site-menu__desc">{{ s.desc }}</span>
+                </span>
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="site-nav__group">
+        <button
+          type="button"
+          class="site-nav__link"
+          aria-haspopup="true"
+          [attr.aria-expanded]="openMenu() === 'staffing'"
+          (click)="toggleMenu('staffing')"
+        >
+          Long-Term Staffing
+          <md-icon aria-hidden="true">expand_more</md-icon>
+        </button>
+        @if (openMenu() === 'staffing') {
+          <div class="site-menu" role="menu" aria-label="Long-Term Staffing">
+            @for (s of staffing; track s.label) {
+              <button
+                type="button"
+                class="site-menu__item"
+                role="menuitem"
+                (click)="go(s.path, s.query)"
+              >
+                <span class="site-menu__icon">
+                  <md-icon aria-hidden="true">{{ s.icon }}</md-icon>
+                </span>
+                <span class="site-menu__text">
+                  <span class="site-menu__label">{{ s.label }}</span>
+                  <span class="site-menu__desc">{{ s.desc }}</span>
+                </span>
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      <button type="button" class="site-nav__link" (click)="goSafety()">
+        Safety &amp; Trust
+      </button>
+    </nav>
+
+    <!-- Desktop auth actions -->
+    <div class="site-header__actions">
+      @if (auth.isAuthenticated()) {
+        <md-text-button (click)="go('/account')">My account</md-text-button>
+        <md-filled-button (click)="signOut()">Log out</md-filled-button>
+      } @else {
+        <md-outlined-button (click)="goDriver()">Become a Driver</md-outlined-button>
+        <md-filled-button (click)="go('/sign-in')">Login / Sign Up</md-filled-button>
+      }
+    </div>
+
+    <!-- Mobile hamburger -->
+    <md-icon-button
+      class="site-header__burger"
+      aria-label="Open menu"
+      (click)="openDrawer()"
     >
-    <a routerLink="/blog" routerLinkActive="active">Blog</a>
-    <a routerLink="/contact" routerLinkActive="active">Contact</a>
-    <a routerLink="/showcase" routerLinkActive="active">Showcase</a>
-  </nav>
+      <md-icon aria-hidden="true">menu</md-icon>
+    </md-icon-button>
+  </div>
 
-  @if (auth.isAuthenticated()) {
-    <md-filled-button (click)="goAccount()">My account</md-filled-button>
-    <md-text-button (click)="auth.signOut()">Log out</md-text-button>
-  } @else {
-    <md-filled-button (click)="goSignIn()">Sign in</md-filled-button>
+  <!-- Mobile slide-in drawer -->
+  @if (drawerOpen()) {
+    <div class="site-drawer">
+      <div class="site-drawer__scrim" (click)="closeDrawer()"></div>
+      <aside class="site-drawer__panel" role="dialog" aria-modal="true" aria-label="Menu">
+        <div class="site-drawer__head">
+          <span class="site-header__brand">mera-driver</span>
+          <md-icon-button aria-label="Close menu" (click)="closeDrawer()">
+            <md-icon aria-hidden="true">close</md-icon>
+          </md-icon-button>
+        </div>
+
+        <nav class="site-drawer__nav" aria-label="Mobile">
+          <button type="button" class="site-drawer__link" (click)="go('/ride')">
+            <md-icon aria-hidden="true">search</md-icon> Find Drivers
+          </button>
+
+          <sky-accordion>
+            <sky-accordion-item header="Services" variant="filled">
+              <div class="site-drawer__sub">
+                @for (s of services; track s.label) {
+                  <button type="button" class="site-drawer__sublink" (click)="go(s.path, s.query)">
+                    <md-icon aria-hidden="true">{{ s.icon }}</md-icon> {{ s.label }}
+                  </button>
+                }
+              </div>
+            </sky-accordion-item>
+            <sky-accordion-item header="Long-Term Staffing" variant="filled">
+              <div class="site-drawer__sub">
+                @for (s of staffing; track s.label) {
+                  <button type="button" class="site-drawer__sublink" (click)="go(s.path, s.query)">
+                    <md-icon aria-hidden="true">{{ s.icon }}</md-icon> {{ s.label }}
+                  </button>
+                }
+              </div>
+            </sky-accordion-item>
+          </sky-accordion>
+
+          <button type="button" class="site-drawer__link" (click)="goSafety()">
+            <md-icon aria-hidden="true">shield</md-icon> Safety &amp; Trust
+          </button>
+        </nav>
+
+        <div class="site-drawer__cta">
+          @if (auth.isAuthenticated()) {
+            <md-outlined-button (click)="go('/account')">My account</md-outlined-button>
+            <md-filled-button (click)="signOut()">Log out</md-filled-button>
+          } @else {
+            <md-outlined-button (click)="goDriver()">Become a Driver</md-outlined-button>
+            <md-filled-button (click)="go('/sign-in')">Login / Sign Up</md-filled-button>
+          }
+        </div>
+      </aside>
+    </div>
   }
 </header>

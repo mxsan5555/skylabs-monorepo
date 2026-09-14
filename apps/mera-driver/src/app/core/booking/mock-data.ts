@@ -1,0 +1,296 @@
+import type {
+  DriverSummary,
+  PaymentMethod,
+  Place,
+  RideOption,
+} from '../../models';
+
+/**
+ * Mock booking data for the rider flow. Stands in for the mera-driver API until
+ * the backend lands; shapes match the models so swapping to real HTTP is a
+ * drop-in. Coordinates are around Bengaluru so the Leaflet map has a real place
+ * to draw pickup / drop / route.
+ */
+
+export const SAVED_PLACES: Place[] = [
+  {
+    id: 'home',
+    label: 'Home',
+    address: 'HSR Layout, 27th Main Rd, Bengaluru',
+    coord: { lat: 12.9121, lng: 77.6446 },
+    kind: 'saved',
+  },
+  {
+    id: 'work',
+    label: 'Work',
+    address: 'Manyata Tech Park, Nagavara, Bengaluru',
+    coord: { lat: 13.0446, lng: 77.6209 },
+    kind: 'saved',
+  },
+];
+
+export const RECENT_PLACES: Place[] = [
+  {
+    id: 'airport',
+    label: 'Kempegowda Intl. Airport',
+    address: 'KIAL Rd, Devanahalli, Bengaluru',
+    coord: { lat: 13.1986, lng: 77.7066 },
+    kind: 'recent',
+  },
+  {
+    id: 'mall',
+    label: 'Phoenix Marketcity',
+    address: 'Whitefield Main Rd, Mahadevapura, Bengaluru',
+    coord: { lat: 12.9975, lng: 77.6961 },
+    kind: 'recent',
+  },
+  {
+    id: 'station',
+    label: 'KSR Bengaluru Railway Station',
+    address: 'Majestic, Gubbi Thotadappa Rd, Bengaluru',
+    coord: { lat: 12.9784, lng: 77.5679 },
+    kind: 'recent',
+  },
+];
+
+/** Default pickup used until the rider shares their location. */
+export const DEFAULT_PICKUP: Place = {
+  id: 'current',
+  label: 'Current location',
+  address: 'Koramangala 5th Block, Bengaluru',
+  coord: { lat: 12.9352, lng: 77.6245 },
+  kind: 'recent',
+};
+
+export const RIDE_OPTIONS: RideOption[] = [
+  // Car — a straight point-to-point ride.
+  {
+    id: 'car-mini',
+    category: 'car',
+    title: 'Mini',
+    subtitle: 'Affordable hatchbacks',
+    icon: 'directions_car',
+    etaMinutes: 4,
+    priceINR: 189,
+    seats: 4,
+    recommended: true,
+  },
+  {
+    id: 'car-sedan',
+    category: 'car',
+    title: 'Sedan',
+    subtitle: 'Comfy rides with extra legroom',
+    icon: 'directions_car',
+    etaMinutes: 6,
+    priceINR: 249,
+    seats: 4,
+  },
+  {
+    id: 'car-suv',
+    category: 'car',
+    title: 'SUV',
+    subtitle: 'Spacious 6-seaters for groups',
+    icon: 'airport_shuttle',
+    etaMinutes: 8,
+    priceINR: 349,
+    seats: 6,
+  },
+  // Package — hire a driver by duration.
+  {
+    id: 'pkg-hourly',
+    category: 'package',
+    title: 'Hourly',
+    subtitle: '1 hr · 10 km included',
+    icon: 'schedule',
+    etaMinutes: 5,
+    priceINR: 299,
+    seats: 4,
+    tier: 'hourly',
+    recommended: true,
+  },
+  {
+    id: 'pkg-half',
+    category: 'package',
+    title: 'Half day',
+    subtitle: '5 hrs · 50 km included',
+    icon: 'schedule',
+    etaMinutes: 5,
+    priceINR: 1199,
+    seats: 4,
+    tier: 'half-day',
+  },
+  {
+    id: 'pkg-full',
+    category: 'package',
+    title: 'Full day',
+    subtitle: '10 hrs · 100 km included',
+    icon: 'schedule',
+    etaMinutes: 5,
+    priceINR: 2199,
+    seats: 4,
+    tier: 'full-day',
+  },
+  // Outstation — intercity round / one-way trips.
+  {
+    id: 'out-oneway',
+    category: 'outstation',
+    title: 'One way',
+    subtitle: 'Drop to another city',
+    icon: 'alt_route',
+    etaMinutes: 15,
+    priceINR: 2499,
+    seats: 4,
+    recommended: true,
+  },
+  {
+    id: 'out-round',
+    category: 'outstation',
+    title: 'Round trip',
+    subtitle: 'Driver waits and returns',
+    icon: 'sync_alt',
+    etaMinutes: 15,
+    priceINR: 3999,
+    seats: 4,
+  },
+  // Monthly — a recurring assigned driver.
+  {
+    id: 'mon-weekday',
+    category: 'monthly',
+    title: 'Weekday plan',
+    subtitle: 'Mon–Fri · office commute',
+    icon: 'calendar_month',
+    etaMinutes: 0,
+    priceINR: 14999,
+    seats: 4,
+    recommended: true,
+  },
+  {
+    id: 'mon-allweek',
+    category: 'monthly',
+    title: 'All-week plan',
+    subtitle: '7 days · dedicated driver',
+    icon: 'calendar_month',
+    etaMinutes: 0,
+    priceINR: 21999,
+    seats: 4,
+  },
+  // Language-based driver.
+  {
+    id: 'lang-hindi',
+    category: 'language',
+    title: 'Hindi-speaking',
+    subtitle: 'Driver fluent in Hindi',
+    icon: 'translate',
+    etaMinutes: 7,
+    priceINR: 219,
+    seats: 4,
+    language: 'Hindi',
+    recommended: true,
+  },
+  {
+    id: 'lang-tamil',
+    category: 'language',
+    title: 'Tamil-speaking',
+    subtitle: 'Driver fluent in Tamil',
+    icon: 'translate',
+    etaMinutes: 9,
+    priceINR: 219,
+    seats: 4,
+    language: 'Tamil',
+  },
+  {
+    id: 'lang-english',
+    category: 'language',
+    title: 'English-speaking',
+    subtitle: 'Driver fluent in English',
+    icon: 'translate',
+    etaMinutes: 6,
+    priceINR: 239,
+    seats: 4,
+    language: 'English',
+  },
+];
+
+export const DRIVERS: DriverSummary[] = [
+  {
+    id: 'd-arun',
+    name: 'Arun Kumar',
+    photo: 'https://i.pravatar.cc/160?img=12',
+    rating: 4.9,
+    reviews: 1284,
+    vehicle: 'Maruti Swift · White',
+    plate: 'KA 05 MJ 8842',
+    priceINR: 189,
+    etaMinutes: 4,
+    policeVerified: true,
+    languages: ['Hindi', 'English', 'Kannada'],
+    bookmarked: false,
+  },
+  {
+    id: 'd-priya',
+    name: 'Priya Nair',
+    photo: 'https://i.pravatar.cc/160?img=32',
+    rating: 4.8,
+    reviews: 962,
+    vehicle: 'Hyundai Aura · Silver',
+    plate: 'KA 03 NH 1170',
+    priceINR: 205,
+    etaMinutes: 5,
+    policeVerified: true,
+    languages: ['English', 'Tamil', 'Malayalam'],
+    bookmarked: true,
+  },
+  {
+    id: 'd-mohammed',
+    name: 'Mohammed Irfan',
+    photo: 'https://i.pravatar.cc/160?img=15',
+    rating: 4.7,
+    reviews: 540,
+    vehicle: 'Toyota Etios · Grey',
+    plate: 'KA 01 AB 4521',
+    priceINR: 198,
+    etaMinutes: 6,
+    policeVerified: true,
+    languages: ['Hindi', 'Urdu', 'English'],
+    bookmarked: false,
+  },
+  {
+    id: 'd-suresh',
+    name: 'Suresh Rao',
+    photo: 'https://i.pravatar.cc/160?img=52',
+    rating: 4.6,
+    reviews: 311,
+    vehicle: 'Tata Tigor · Blue',
+    plate: 'KA 09 CD 7788',
+    priceINR: 179,
+    etaMinutes: 8,
+    policeVerified: false,
+    languages: ['Kannada', 'Telugu'],
+    bookmarked: false,
+  },
+];
+
+export const PAYMENT_METHODS: PaymentMethod[] = [
+  {
+    id: 'upi',
+    kind: 'upi',
+    label: 'UPI',
+    detail: 'sandeep@okhdfcbank',
+    icon: 'account_balance',
+  },
+  {
+    id: 'card',
+    kind: 'card',
+    label: 'Mastercard ···· 8386',
+    detail: 'Expired',
+    icon: 'credit_card',
+    expired: true,
+  },
+  {
+    id: 'cash',
+    kind: 'cash',
+    label: 'Cash',
+    detail: 'Pay the driver directly',
+    icon: 'payments',
+  },
+];

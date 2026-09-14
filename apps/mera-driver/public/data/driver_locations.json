@@ -1,0 +1,57 @@
+[
+  {
+    "id": 1,
+    "driver_name": "Rahul Verma",
+    "phone": "9876543210",
+    "vehicle": "Personal Sedan (DL-01-AB-1234)",
+    "city": "New Delhi",
+    "latitude": 28.6304,
+    "longitude": 77.2177,
+    "status": "Online",
+    "recorded_at": "2026-08-20 11:30 AM"
+  },
+  {
+    "id": 2,
+    "driver_name": "Sana Kapoor",
+    "phone": "8765432109",
+    "vehicle": "Commercial SUV (DL-02-CD-5678)",
+    "city": "Noida",
+    "latitude": 28.5708,
+    "longitude": 77.3258,
+    "status": "On Trip",
+    "recorded_at": "2026-08-20 11:28 AM"
+  },
+  {
+    "id": 3,
+    "driver_name": "Vikram Singh",
+    "phone": "9988776655",
+    "vehicle": "MUV Heavy (HR-26-EF-9012)",
+    "city": "Gurugram",
+    "latitude": 28.4595,
+    "longitude": 77.0266,
+    "status": "Offline",
+    "recorded_at": "2026-08-20 10:15 AM"
+  },
+  {
+    "id": 4,
+    "driver_name": "Amit Sharma",
+    "phone": "9123456789",
+    "vehicle": "Hatchback (UP-16-GH-3456)",
+    "city": "Ghaziabad",
+    "latitude": 28.6692,
+    "longitude": 77.4538,
+    "status": "Online",
+    "recorded_at": "2026-08-20 11:32 AM"
+  },
+  {
+    "id": 5,
+    "driver_name": "Pooja Patel",
+    "phone": "9811223344",
+    "vehicle": "Sedan Luxury (DL-03-IJ-7890)",
+    "city": "Faridabad",
+    "latitude": 28.4089,
+    "longitude": 77.3178,
+    "status": "On Trip",
+    "recorded_at": "2026-08-20 11:35 AM"
+  }
+]

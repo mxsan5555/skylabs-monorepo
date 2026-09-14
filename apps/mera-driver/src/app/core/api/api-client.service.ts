@@ -16,6 +16,10 @@ export class ApiClient {
     return this.http.get<T>(`${this.base}${path}`);
   }
 
+  getBaseUrl(): string {
+    return this.base;
+  }
+
   post<T>(path: string, body: unknown): Observable<T> {
     return this.http.post<T>(`${this.base}${path}`, body);
   }

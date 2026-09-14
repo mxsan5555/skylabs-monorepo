@@ -1,0 +1,184 @@
+<div class="w-full max-w-[1280px] mx-auto px-3 sm:px-6 py-8 flex flex-col gap-10">
+  
+  <!-- Breadcrumb Section -->
+  <div class="flex items-center gap-1 text-sm bg-gray-50/50 p-2 px-4 border border-gray-100/50 self-start">
+    <a href="/" class="no-underline">
+      <md-text-button>Home</md-text-button>
+    </a>
+    <md-icon class="text-gray-400 text-sm">chevron_right</md-icon>
+    <md-text-button disabled class="opacity-70">Contact Us</md-text-button>
+  </div>
+
+  <!-- Flat Partnership Inquiry Form Layout -->
+  <div class="grid grid-cols-1 md:grid-cols-12 gap-12 items-center">
+    
+    <!-- Left Column: Support Vector Image Only (50% width) -->
+    <div class="md:col-span-6 flex items-center justify-center p-4">
+      <img 
+        src="contact_vector_support.png" 
+        alt="Customer Support Vector Illustration" 
+        class="w-[90%] md:w-[80%] lg:w-full h-auto max-h-[520px] object-contain"
+      />
+    </div>
+
+    <!-- Right Column: Interactive Form Hub (50% width) -->
+    <div #inquiryFormContainer class="md:col-span-6 flex flex-col justify-center relative">
+      @if (isSubmitting()) {
+        <md-linear-progress indeterminate class="absolute top-0 left-0 right-0 w-full z-10"></md-linear-progress>
+      }
+      @if (isSuccess()) {
+        <div class="flex flex-col items-center text-center py-10">
+          <md-icon class="text-green-600 text-6xl mb-4">check_circle</md-icon>
+          <h2 class="text-2xl font-bold text-gray-900 mb-2">{{ content().form.success.title }}</h2>
+          <p class="text-gray-500 max-w-sm mb-8 leading-relaxed text-sm">
+            {{ content().form.success.description }}
+          </p>
+          <md-filled-button (click)="resetSuccess()" class="self-center">
+            <md-icon slot="icon">arrow_back</md-icon>
+            {{ content().form.success.button }}
+          </md-filled-button>
+        </div>
+      } @else {
+        <h2 class="text-2xl font-semibold text-gray-900 mb-4">{{ content().form.title }}</h2>
+
+        <div class="flex flex-col gap-4">
+          <!-- Full Name -->
+          <md-outlined-text-field class="w-full" [label]="content().form.fields.name.label" [placeholder]="content().form.fields.name.placeholder" [value]="name()" (input)="onInputName($event)"  [error]="!!nameError()" [errorText]="nameError()" required>
+            <md-icon slot="leading-icon">person</md-icon>
+          </md-outlined-text-field>
+
+          <!-- Company Name -->
+          <md-outlined-text-field class="w-full" [label]="content().form.fields.company.label" [placeholder]="content().form.fields.company.placeholder" [value]="company()" (input)="onInputCompany($event)" [error]="!!companyError()" [errorText]="companyError()" required>
+            <md-icon slot="leading-icon">domain</md-icon>
+          </md-outlined-text-field>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Email Address -->
+            <md-outlined-text-field class="w-full" [label]="content().form.fields.email.label" [placeholder]="content().form.fields.email.placeholder" type="email" [value]="email()" (input)="onInputEmail($event)" [error]="!!emailError()" [errorText]="emailError()"required>
+              <md-icon slot="leading-icon">email</md-icon>
+            </md-outlined-text-field>
+
+            <!-- Phone Number -->
+            <md-outlined-text-field class="w-full" [label]="content().form.fields.phone.label" [placeholder]="content().form.fields.phone.placeholder" type="tel" maxlength="10" [value]="phone()" (input)="onInputPhone($event)" [error]="!!phoneError()" [errorText]="phoneError()" required>
+              <md-icon slot="leading-icon">phone</md-icon>
+            </md-outlined-text-field>
+          </div>
+
+          <!-- Purpose of Inquiry -->
+          <md-outlined-select class="w-full" [label]="content().form.fields.purpose.label" menu-positioning="absolute" [value]="subject()" (change)="onSelectSubject($event)" required>
+            <md-icon slot="leading-icon">help_outline</md-icon>
+            @for (opt of content().form.fields.purpose.options; track opt.value) {
+              <md-select-option [value]="opt.value">
+                <div slot="headline">{{ opt.label }}</div>
+              </md-select-option>
+            }
+          </md-outlined-select>
+
+          <!-- Message Textarea -->
+          <md-outlined-text-field class="w-full" [label]="content().form.fields.message.label" [placeholder]="content().form.fields.message.placeholder" type="textarea" rows="4" [value]="message()" (input)="onInputMessage($event)" [error]="!!messageError()" [errorText]="messageError()" required>
+            <md-icon slot="leading-icon">chat</md-icon>
+          </md-outlined-text-field>
+
+          <!-- Action Button & Privacy Lock -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2">
+            <md-filled-button
+              (click)="submitForm()"
+              [disabled]="isSubmitting()"
+              class="self-start"
+            >
+              <md-icon slot="icon">send</md-icon>
+              {{ isSubmitting() ? content().form.submittingButton : content().form.submitButton }}
+            </md-filled-button>
+            
+            <div class="flex items-center gap-1.5 text-xs text-gray-500">
+              <md-icon class="text-gray-400 text-sm">lock</md-icon>
+              <span>{{ content().form.privacyText }}</span>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+
+  </div>
+
+  <!-- Bottom Row: Coordinates & Map side-by-side (6*6 Grid) -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-12 mt-12 pt-12 border-t border-gray-100">
+    
+    <!-- Corporate Details (6/12) -->
+    <div class="flex flex-col gap-4">
+      <div>
+        <h2 class="text-2xl font-semibold text-gray-900 mb-2">{{ content().office.title }}</h2>
+        <p class="text-sm text-gray-600 leading-relaxed">
+          {{ content().office.description }}
+        </p>
+      </div>
+
+      <!-- Quick Coordinates List (Pure M3) -->
+      <md-list class="bg-transparent p-0">
+        <md-list-item>
+          <md-icon slot="start">business</md-icon>
+          <div slot="headline">{{ content().office.hqName }}</div>
+          <div slot="supporting-text">{{ content().office.address }}</div>
+        </md-list-item>
+
+        <md-list-item>
+          <md-icon slot="start">phone</md-icon>
+          <div slot="headline">{{ content().office.hotlineLabel }}</div>
+          <div slot="supporting-text">{{ content().office.phone }}</div>
+        </md-list-item>
+
+        <md-list-item>
+          <md-icon slot="start">email</md-icon>
+          <div slot="headline">{{ content().office.emailLabel }}</div>
+          <div slot="supporting-text">{{ content().office.email }}</div>
+        </md-list-item>
+
+        <md-list-item>
+          <md-icon slot="start">schedule</md-icon>
+          <div slot="headline">{{ content().office.hoursLabel }}</div>
+          <div slot="supporting-text">{{ content().office.hours }}</div>
+        </md-list-item>
+      </md-list>
+    </div>
+
+    <!-- Office Location Map (6/12) -->
+    <div class="flex flex-col gap-4">
+      <div>
+        <h2 class="text-2xl font-semibold text-gray-900 mb-2">{{ content().map.title }}</h2>
+        <p class="text-sm text-gray-600 leading-relaxed">
+          {{ content().map.description }}
+        </p>
+      </div>
+
+      <iframe 
+        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7008.2120651821115!2d77.34102709999999!3d28.56657855!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x390ce5b7d4af0dc1%3A0xc370dee296269b66!2sArun%20Vihar%2C%20Sector%2037%2C%20Noida%2C%20Uttar%20Pradesh%20201303!5e0!3m2!1sen!2sin!4v1782389958130!5m2!1sen!2sin"
+        class="w-full h-[320px] border-0" 
+        allowfullscreen="" 
+        loading="lazy" 
+        referrerpolicy="strict-origin-when-cross-origin"
+      ></iframe>
+    </div>
+
+  </div>
+
+  <!-- Frequently Asked Questions -->
+  <div class="flex flex-col gap-6 mt-6 border-t border-gray-100 pt-10">
+    <div class="flex flex-col gap-2 text-center max-w-xl mx-auto">
+      <span class="text-xs font-bold uppercase tracking-wider text-blue-600 font-semibold">{{ content().faqSection.tagline }}</span>
+      <h2 class="text-3xl font-extrabold text-gray-900 tracking-tight">{{ content().faqSection.title }}</h2>
+      <p class="text-sm text-gray-500 leading-relaxed">{{ content().faqSection.description }}</p>
+    </div>
+    
+    <div class="max-w-3xl w-full mx-auto mt-4">
+      <sky-accordion single style="--sky-accordion-border-radius: 0px;">
+        @for (faq of content().faqs; track faq.id) {
+          <sky-accordion-item [attr.header]="faq.question">
+            <p class="m-0 leading-relaxed text-sm text-slate-600">
+              {{ faq.answer }}
+            </p>
+          </sky-accordion-item>
+        }
+      </sky-accordion>
+    </div>
+  </div>
+</div>
