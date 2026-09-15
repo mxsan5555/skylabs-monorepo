@@ -1,11 +1,8 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, computed } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, computed, inject, OnInit } from '@angular/core';
 import { AdminPage } from '../../../../admin/admin-page/admin-page';
+import { MasterListApiService, type MasterOption } from '../../../../core/masters/master-list-api.service';
 
-interface MasterOption {
-  id: number;
-  name: string;
-  status: 'Active' | 'Inactive';
-}
+const CATEGORY = 'statuses';
 
 @Component({
   selector: 'md-statuses-master',
@@ -15,19 +12,14 @@ interface MasterOption {
   styleUrl: '../masters.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
-export class StatusesMaster {
-  readonly options = signal<MasterOption[]>([
-    { id: 1, name: 'Non-Verified', status: 'Active' },
-    { id: 2, name: 'Verified', status: 'Active' },
-    { id: 3, name: 'Partially Verified (P)', status: 'Active' },
-    { id: 4, name: 'Partially Verified (K)', status: 'Active' },
-    { id: 5, name: 'Blacklisted', status: 'Active' },
-    { id: 6, name: 'Closed', status: 'Active' },
-    { id: 7, name: 'Not Useful', status: 'Active' }
-  ]);
+export class StatusesMaster implements OnInit {
+  private readonly api = inject(MasterListApiService);
+
+  readonly options = signal<MasterOption[]>([]);
+  readonly loading = signal<boolean>(false);
 
   readonly showAddForm = signal<boolean>(false);
-  readonly editingId = signal<number | 'new' | null>(null);
+  readonly editingId = signal<string | number | 'new' | null>(null);
   readonly inputName = signal<string>('');
   readonly inputStatus = signal<'Active' | 'Inactive'>('Active');
 
@@ -43,6 +35,24 @@ export class StatusesMaster {
   ]);
 
   readonly tableRowsString = computed(() => JSON.stringify(this.options()));
+
+  ngOnInit(): void {
+    this.reload();
+  }
+
+  private reload(): void {
+    this.loading.set(true);
+    this.api.list(CATEGORY).subscribe({
+      next: (data) => {
+        this.options.set(data);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to load statuses', err);
+        this.loading.set(false);
+      }
+    });
+  }
 
   onRowAction(event: any): void {
     const detail = event.detail || event;
@@ -77,18 +87,18 @@ export class StatusesMaster {
     }
 
     const id = this.editingId();
-    if (id === 'new') {
-      const newOption: MasterOption = {
-        id: Date.now(),
-        name,
-        status: this.inputStatus()
-      };
-      this.options.update(list => [...list, newOption]);
-    } else if (typeof id === 'number') {
-      this.options.update(list => list.map(opt => opt.id === id ? { ...opt, name, status: this.inputStatus() } : opt));
-    }
-
-    this.cancelEdit();
+    const payload = { name, status: this.inputStatus() };
+    const request = id === 'new' || id === null ? this.api.create(CATEGORY, payload) : this.api.update(CATEGORY, id, payload);
+    request.subscribe({
+      next: () => {
+        this.reload();
+        this.cancelEdit();
+      },
+      error: (err) => {
+        console.error('Failed to save option', err);
+        alert('Failed to save option. Please try again.');
+      }
+    });
   }
 
   cancelEdit(): void {
@@ -100,7 +110,13 @@ export class StatusesMaster {
 
   deleteOption(option: MasterOption): void {
     if (confirm(`Are you sure you want to delete option "${option.name}"?`)) {
-      this.options.update(list => list.filter(opt => opt.id !== option.id));
+      this.api.delete(CATEGORY, option.id).subscribe({
+        next: () => this.reload(),
+        error: (err) => {
+          console.error('Failed to delete option', err);
+          alert('Failed to delete option. Please try again.');
+        }
+      });
     }
   }
 }

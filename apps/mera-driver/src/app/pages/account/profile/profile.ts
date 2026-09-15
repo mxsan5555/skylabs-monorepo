@@ -1,7 +1,7 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, effect, inject, signal } from '@angular/core';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { AccountService } from '../../../core/account/account.service';
-import type { Address } from '../../../models';
+import type { AccountProfile, Address } from '../../../models';
 
 type Draft = Omit<Address, 'id'>;
 
@@ -26,7 +26,13 @@ const ADDRESS_FIELDS: { key: keyof Draft; label: string; span2?: boolean }[] = [
   { key: 'country', label: 'Country' },
 ];
 
-/** My Account: edit email/phone and manage saved addresses (full CRUD). */
+/**
+ * My Account: edit name/email/phone (the same `User` row every authenticated role —
+ * Super Admin down to Support/KYC Verification — shares) and manage saved addresses
+ * (local-only, no backend model for those). Reachable by any signed-in user; not
+ * gated behind a permission (see `app.routes.spec.ts`'s "does not gate the profile
+ * route" check).
+ */
 @Component({
   selector: 'md-account-profile',
   imports: [AdminPage],
@@ -36,18 +42,41 @@ const ADDRESS_FIELDS: { key: keyof Draft; label: string; span2?: boolean }[] = [
 export class Profile {
   protected readonly account = inject(AccountService);
 
-  protected email = this.account.profile().email;
-  protected phone = this.account.profile().phone;
+  protected readonly draftProfile = signal<AccountProfile>({ name: '', email: '', phone: '' });
+  protected readonly saving = signal(false);
   protected readonly saved = signal(false);
+  protected readonly error = signal<string | null>(null);
 
   protected readonly editingId = signal<string | 'new' | null>(null);
   protected readonly draft = signal<Draft>({ ...EMPTY });
   protected readonly addressFields = ADDRESS_FIELDS;
 
+  constructor() {
+    // The profile loads asynchronously (real `GET /rbac/users/me`) — mirror it into the
+    // editable draft whenever it arrives or changes, rather than capturing a one-time
+    // snapshot at construction (which would race the HTTP call and freeze on `''`).
+    effect(() => this.draftProfile.set({ ...this.account.profile() }));
+  }
+
+  protected setProfileField(key: keyof AccountProfile, value: string): void {
+    this.draftProfile.update((p) => ({ ...p, [key]: value }));
+    this.saved.set(false);
+  }
+
   protected saveProfile(): void {
-    this.account.updateProfile({ email: this.email, phone: this.phone });
-    this.saved.set(true);
-    setTimeout(() => this.saved.set(false), 2000);
+    this.saving.set(true);
+    this.error.set(null);
+    this.account.updateProfile(this.draftProfile()).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.saved.set(true);
+        setTimeout(() => this.saved.set(false), 2000);
+      },
+      error: (err) => {
+        this.saving.set(false);
+        this.error.set(err?.message || 'Failed to save your profile. Please try again.');
+      },
+    });
   }
 
   protected startAdd(): void {

@@ -1,22 +1,6 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, computed } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, computed, inject, OnInit } from '@angular/core';
 import { AdminPage } from '../../../../admin/admin-page/admin-page';
-
-interface ServiceZone {
-  zone_uid: string;
-  zone_name: string;
-  zone_code: string;
-  state_id: number | null;
-  city_id: number | null;
-  area_name: string;
-  pincode: string;
-  zone_type: 'City' | 'Area' | 'Pincode' | 'Custom';
-  latitude: number | null;
-  longitude: number | null;
-  radius_km: number | null;
-  boundary_data: string; // stored as string JSON for simple form editing
-  status: 'Active' | 'Inactive';
-  notes: string;
-}
+import { ZonesApiService, type ServiceZone } from '../../../../core/masters/zones-api.service';
 
 @Component({
   selector: 'md-zones-master',
@@ -26,57 +10,11 @@ interface ServiceZone {
   styleUrl: '../masters.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
-export class ZonesMaster {
-  readonly options = signal<ServiceZone[]>([
-    {
-      zone_uid: 'zone-1',
-      zone_name: 'Mumbai Downtown',
-      zone_code: 'MUM_DOWN',
-      state_id: 27,
-      city_id: 1,
-      area_name: 'Colaba, Fort, Nariman Point',
-      pincode: '400001',
-      zone_type: 'Area',
-      latitude: 18.9268,
-      longitude: 72.8303,
-      radius_km: 5.0,
-      boundary_data: '{"type":"Circle","radius":5000}',
-      status: 'Active',
-      notes: 'South Mumbai high demand business area.'
-    },
-    {
-      zone_uid: 'zone-2',
-      zone_name: 'Delhi NCR',
-      zone_code: 'DELHI_NCR',
-      state_id: 7,
-      city_id: 2,
-      area_name: 'Delhi National Capital Region',
-      pincode: '',
-      zone_type: 'City',
-      latitude: 28.6139,
-      longitude: 77.2090,
-      radius_km: 25.0,
-      boundary_data: '',
-      status: 'Active',
-      notes: 'Covers Delhi, Gurugram, and Noida.'
-    },
-    {
-      zone_uid: 'zone-3',
-      zone_name: 'Bengaluru Tech Corridor',
-      zone_code: 'BLR_TECH',
-      state_id: 29,
-      city_id: 3,
-      area_name: 'Whitefield, Outer Ring Road',
-      pincode: '560066',
-      zone_type: 'Area',
-      latitude: 12.9698,
-      longitude: 77.7499,
-      radius_km: 8.5,
-      boundary_data: '',
-      status: 'Active',
-      notes: 'IT parks and residential high-density zone.'
-    }
-  ]);
+export class ZonesMaster implements OnInit {
+  private readonly api = inject(ZonesApiService);
+
+  readonly options = signal<ServiceZone[]>([]);
+  readonly loading = signal<boolean>(false);
 
   readonly showAddForm = signal<boolean>(false);
   readonly editingId = signal<string | 'new' | null>(null);
@@ -112,6 +50,24 @@ export class ZonesMaster {
   ]);
 
   readonly tableRowsString = computed(() => JSON.stringify(this.options()));
+
+  ngOnInit(): void {
+    this.reload();
+  }
+
+  private reload(): void {
+    this.loading.set(true);
+    this.api.list().subscribe({
+      next: (data) => {
+        this.options.set(data);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to load service zones', err);
+        this.loading.set(false);
+      }
+    });
+  }
 
   onRowAction(event: any): void {
     const detail = event.detail || event;
@@ -173,45 +129,34 @@ export class ZonesMaster {
       return;
     }
 
-    const id = this.editingId();
-    if (id === 'new') {
-      const newOption: ServiceZone = {
-        zone_uid: 'zone-' + Date.now(),
-        zone_name: zoneName,
-        zone_code: zoneCode,
-        state_id: this.inputStateId(),
-        city_id: this.inputCityId(),
-        area_name: this.inputAreaName(),
-        pincode: this.inputPincode(),
-        zone_type: this.inputZoneType(),
-        latitude: this.inputLatitude(),
-        longitude: this.inputLongitude(),
-        radius_km: this.inputRadiusKm(),
-        boundary_data: this.inputBoundaryData(),
-        status: this.inputStatus(),
-        notes: this.inputNotes()
-      };
-      this.options.update(list => [...list, newOption]);
-    } else if (id) {
-      this.options.update(list => list.map(opt => opt.zone_uid === id ? {
-        ...opt,
-        zone_name: zoneName,
-        zone_code: zoneCode,
-        state_id: this.inputStateId(),
-        city_id: this.inputCityId(),
-        area_name: this.inputAreaName(),
-        pincode: this.inputPincode(),
-        zone_type: this.inputZoneType(),
-        latitude: this.inputLatitude(),
-        longitude: this.inputLongitude(),
-        radius_km: this.inputRadiusKm(),
-        boundary_data: this.inputBoundaryData(),
-        status: this.inputStatus(),
-        notes: this.inputNotes()
-      } : opt));
-    }
+    const payload = {
+      zone_name: zoneName,
+      zone_code: zoneCode,
+      state_id: this.inputStateId(),
+      city_id: this.inputCityId(),
+      area_name: this.inputAreaName(),
+      pincode: this.inputPincode(),
+      zone_type: this.inputZoneType(),
+      latitude: this.inputLatitude(),
+      longitude: this.inputLongitude(),
+      radius_km: this.inputRadiusKm(),
+      boundary_data: this.inputBoundaryData(),
+      status: this.inputStatus(),
+      notes: this.inputNotes()
+    };
 
-    this.cancelEdit();
+    const id = this.editingId();
+    const request = id === 'new' || id === null ? this.api.create(payload) : this.api.update(id, payload);
+    request.subscribe({
+      next: () => {
+        this.reload();
+        this.cancelEdit();
+      },
+      error: (err) => {
+        console.error('Failed to save service zone', err);
+        alert('Failed to save service zone. Please try again.');
+      }
+    });
   }
 
   cancelEdit(): void {
@@ -234,7 +179,13 @@ export class ZonesMaster {
 
   deleteOption(option: ServiceZone): void {
     if (confirm(`Are you sure you want to delete service zone "${option.zone_name}"?`)) {
-      this.options.update(list => list.filter(opt => opt.zone_uid !== option.zone_uid));
+      this.api.delete(option.zone_uid).subscribe({
+        next: () => this.reload(),
+        error: (err) => {
+          console.error('Failed to delete service zone', err);
+          alert('Failed to delete service zone. Please try again.');
+        }
+      });
     }
   }
 }

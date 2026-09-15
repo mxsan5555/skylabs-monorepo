@@ -4,10 +4,11 @@ import {
   ElementRef,
   HostListener,
   inject,
+  OnInit,
   signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { AuthService } from '../../core/auth/auth.service';
+import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
 
 /** A navigation entry inside a dropdown / drawer sub-menu. */
 interface NavLink {
@@ -78,6 +79,10 @@ export class Header implements OnInit {
   protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly host = inject(ElementRef<HTMLElement>);
+
+  protected readonly helplineNumber = signal('1800-123-4567');
+
+  ngOnInit(): void {}
 
   protected readonly services = SERVICES;
   protected readonly staffing = STAFFING;

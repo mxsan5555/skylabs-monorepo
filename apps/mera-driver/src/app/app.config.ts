@@ -25,6 +25,6 @@ export const appConfig: ApplicationConfig = {
       }),
     ),
     provideHttpClient(withInterceptors([authInterceptor])),
-    provideSharedAuth({ appPrefix: 'mera_driver', apiBaseUrl: environment.apiUrl }),
+    provideSharedAuth({ appPrefix: 'mera_driver', apiBaseUrl: environment.apiUrl, unauthorizedRedirectPath: '/unauthorized' }),
   ],
 };

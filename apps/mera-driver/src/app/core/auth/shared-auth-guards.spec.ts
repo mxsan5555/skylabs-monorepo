@@ -19,61 +19,124 @@ import { Component, signal, type WritableSignal } from '@angular/core';
 import { Router, provideRouter, type ActivatedRouteSnapshot, type RouterStateSnapshot } from '@angular/router';
 import { vi } from 'vitest';
 import type { PermissionAction } from '@skylabs-monorepo/shared-types';
-import { AuthService, authGuard, permissionGuard, HasPermissionDirective } from '@skylabs-monorepo/shared-auth/angular';
+import { AUTH_CONFIG, AuthService, authGuard, permissionGuard, HasPermissionDirective } from '@skylabs-monorepo/shared-auth/angular';
 
 describe('authGuard', () => {
-  function configure(isAuthenticated: boolean) {
+  function configure(isAuthenticated: boolean, sessionExpired = false) {
     TestBed.configureTestingModule({
-      providers: [provideRouter([]), { provide: AuthService, useValue: { isAuthenticated: () => isAuthenticated } }],
+      providers: [
+        provideRouter([]),
+        {
+          provide: AuthService,
+          useValue: { isAuthenticated: () => isAuthenticated, whenReady: () => Promise.resolve(), sessionExpired: () => sessionExpired },
+        },
+      ],
     });
   }
 
-  it('redirects to /sign-in with a redirectTo query param when the caller is not authenticated', () => {
+  it('redirects to /sign-in with a redirectTo query param when the caller is not authenticated', async () => {
     configure(false);
-    const result = TestBed.runInInjectionContext(() =>
+    const result = await TestBed.runInInjectionContext(() =>
       authGuard({} as ActivatedRouteSnapshot, { url: '/account/dashboard' } as RouterStateSnapshot),
     );
     const router = TestBed.inject(Router);
     expect(result).toEqual(router.createUrlTree(['/sign-in'], { queryParams: { redirectTo: '/account/dashboard' } }));
   });
 
-  it('allows navigation when the caller is authenticated', () => {
+  it('adds sessionExpired=1 when the session ended involuntarily (dead refresh token), not on a fresh unauthenticated visit', async () => {
+    configure(false, true);
+    const result = await TestBed.runInInjectionContext(() =>
+      authGuard({} as ActivatedRouteSnapshot, { url: '/driver' } as RouterStateSnapshot),
+    );
+    const router = TestBed.inject(Router);
+    expect(result).toEqual(
+      router.createUrlTree(['/sign-in'], { queryParams: { redirectTo: '/driver', sessionExpired: 1 } }),
+    );
+  });
+
+  it('allows navigation when the caller is authenticated', async () => {
     configure(true);
-    const result = TestBed.runInInjectionContext(() =>
+    const result = await TestBed.runInInjectionContext(() =>
       authGuard({} as ActivatedRouteSnapshot, { url: '/account/dashboard' } as RouterStateSnapshot),
     );
+    expect(result).toBe(true);
+  });
+
+  it('awaits whenReady() before checking isAuthenticated (does not let a not-yet-resolved session through)', async () => {
+    let resolveReady!: () => void;
+    let isAuthenticated = false; // still "no" at the moment whenReady() is pending
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        {
+          provide: AuthService,
+          useValue: {
+            isAuthenticated: () => isAuthenticated,
+            whenReady: () => new Promise<void>((resolve) => (resolveReady = resolve)),
+          },
+        },
+      ],
+    });
+
+    const resultPromise = TestBed.runInInjectionContext(() =>
+      authGuard({} as ActivatedRouteSnapshot, { url: '/driver' } as RouterStateSnapshot),
+    );
+    isAuthenticated = true; // the session recovers while whenReady() is still pending
+    resolveReady();
+    const result = await resultPromise;
+
     expect(result).toBe(true);
   });
 });
 
 describe('permissionGuard', () => {
-  function configure(can: boolean) {
-    const authMock = { can: vi.fn().mockReturnValue(can) };
+  function configure(can: boolean, whenReady: () => Promise<void> = () => Promise.resolve()) {
+    const authMock = { can: vi.fn().mockReturnValue(can), whenReady: vi.fn(whenReady) };
     TestBed.configureTestingModule({
-      providers: [provideRouter([]), { provide: AuthService, useValue: authMock }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: authMock },
+        { provide: AUTH_CONFIG, useValue: { appPrefix: 'test', apiBaseUrl: 'http://api.test' } },
+      ],
     });
     return authMock;
   }
 
-  it('allows navigation when the route carries no `data.permission` at all', () => {
+  it('allows navigation when the route carries no `data.permission` at all', async () => {
     configure(false);
     const route = { data: {} } as unknown as ActivatedRouteSnapshot;
-    const result = TestBed.runInInjectionContext(() => permissionGuard(route, {} as RouterStateSnapshot));
+    const result = await TestBed.runInInjectionContext(() => permissionGuard(route, {} as RouterStateSnapshot));
     expect(result).toBe(true);
   });
 
-  it('redirects to /account/profile when the caller lacks the required permission', () => {
+  it('redirects to /account/profile when the caller lacks the required permission', async () => {
     configure(false);
     const route = { data: { permission: { menuKey: 'rbac.roles', action: 'view' } } } as unknown as ActivatedRouteSnapshot;
-    const result = TestBed.runInInjectionContext(() => permissionGuard(route, {} as RouterStateSnapshot));
+    const result = await TestBed.runInInjectionContext(() => permissionGuard(route, {} as RouterStateSnapshot));
     const router = TestBed.inject(Router);
     expect(result).toEqual(router.createUrlTree(['/account/profile']));
   });
 
-  it('allows navigation when the caller has the permission, defaulting the action to "view"', () => {
+  it('allows navigation when the caller has the permission, defaulting the action to "view"', async () => {
     const authMock = configure(true);
     const route = { data: { permission: { menuKey: 'rbac.roles' } } } as unknown as ActivatedRouteSnapshot;
-    const result = TestBed.runInInjectionContext(() => permissionGuard(route, {} as RouterStateSnapshot));
+    const result = await TestBed.runInInjectionContext(() => permissionGuard(route, {} as RouterStateSnapshot));
+    expect(result).toBe(true);
+    expect(authMock.can).toHaveBeenCalledWith('rbac.roles', 'view');
+  });
+
+  it('awaits whenReady() before checking permissions (does not false-deny while bootstrap is still loading)', async () => {
+    let resolveReady!: () => void;
+    const authMock = configure(true, () => new Promise<void>((resolve) => (resolveReady = resolve)));
+    const route = { data: { permission: { menuKey: 'rbac.roles' } } } as unknown as ActivatedRouteSnapshot;
+
+    const resultPromise = TestBed.runInInjectionContext(() => permissionGuard(route, {} as RouterStateSnapshot));
+    // `can()` must not be consulted yet — whenReady() hasn't resolved.
+    expect(authMock.can).not.toHaveBeenCalled();
+
+    resolveReady();
+    const result = await resultPromise;
+
     expect(result).toBe(true);
     expect(authMock.can).toHaveBeenCalledWith('rbac.roles', 'view');
   });

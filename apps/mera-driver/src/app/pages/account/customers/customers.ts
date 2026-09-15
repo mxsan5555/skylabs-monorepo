@@ -1,30 +1,6 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, computed, inject, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
-
-interface Customer {
-  customer_uid: string;
-  first_name: string;
-  last_name: string | null;
-  profile_image: string | null;
-  mobile_number: string;
-  email: string | null;
-  password_hash: string | null;
-  date_of_birth: string | null;
-  gender: string | null;
-  address_line_1: string | null;
-  address_line_2: string | null;
-  state_id: number | null;
-  city_id: number | null;
-  pincode: string | null;
-  alternate_phone: string | null;
-  customer_type: 'Individual' | 'Corporate' | null;
-  registration_source: 'Website' | 'App' | 'Admin' | 'Referral' | null;
-  verification_status: 'Pending' | 'Verified' | 'Rejected';
-  account_status: 'Active' | 'Inactive' | 'Blocked';
-  last_login_at: string | null;
-  notes: string | null;
-}
+import { CustomersApiService, type Customer } from '../../../core/customers/customers-api.service';
 
 @Component({
   selector: 'md-account-customers',
@@ -35,16 +11,24 @@ interface Customer {
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class Customers implements OnInit {
-  private readonly http = inject(HttpClient);
+  private readonly api = inject(CustomersApiService);
   readonly options = signal<Customer[]>([]);
+  readonly loading = signal<boolean>(false);
 
   ngOnInit(): void {
-    this.http.get<Customer[]>('data/customers.json').subscribe({
+    this.reload();
+  }
+
+  private reload(): void {
+    this.loading.set(true);
+    this.api.list().subscribe({
       next: (data) => {
-        this.options.set(data || []);
+        this.options.set(data);
+        this.loading.set(false);
       },
       error: (err) => {
-        console.error('Failed to load mock customers JSON', err);
+        console.error('Failed to load customers', err);
+        this.loading.set(false);
       }
     });
   }
@@ -89,7 +73,6 @@ export class Customers implements OnInit {
   ]);
 
   readonly tableRowsString = computed(() => {
-    // Return rows with full name resolved if needed, or raw options
     return JSON.stringify(this.options());
   });
 
@@ -163,57 +146,39 @@ export class Customers implements OnInit {
       return;
     }
 
-    const id = this.editingId();
-    if (id === 'new') {
-      const newOption: Customer = {
-        customer_uid: 'cust-' + Date.now(),
-        first_name: firstName,
-        last_name: this.inputLastName().trim() || null,
-        profile_image: this.inputProfileImage().trim() || null,
-        mobile_number: mobile,
-        email: this.inputEmail().trim() || null,
-        password_hash: null,
-        date_of_birth: this.inputDateOfBirth() || null,
-        gender: this.inputGender() || null,
-        address_line_1: this.inputAddress1().trim() || null,
-        address_line_2: this.inputAddress2().trim() || null,
-        state_id: this.inputStateId(),
-        city_id: this.inputCityId(),
-        pincode: this.inputPincode().trim() || null,
-        alternate_phone: this.inputAlternatePhone().trim() || null,
-        customer_type: this.inputCustomerType(),
-        registration_source: this.inputRegSource(),
-        verification_status: this.inputVerStatus(),
-        account_status: this.inputAccStatus(),
-        last_login_at: null,
-        notes: this.inputNotes().trim() || null
-      };
-      this.options.update(list => [...list, newOption]);
-    } else if (id) {
-      this.options.update(list => list.map(opt => opt.customer_uid === id ? {
-        ...opt,
-        first_name: firstName,
-        last_name: this.inputLastName().trim() || null,
-        profile_image: this.inputProfileImage().trim() || null,
-        mobile_number: mobile,
-        email: this.inputEmail().trim() || null,
-        date_of_birth: this.inputDateOfBirth() || null,
-        gender: this.inputGender() || null,
-        address_line_1: this.inputAddress1().trim() || null,
-        address_line_2: this.inputAddress2().trim() || null,
-        state_id: this.inputStateId(),
-        city_id: this.inputCityId(),
-        pincode: this.inputPincode().trim() || null,
-        alternate_phone: this.inputAlternatePhone().trim() || null,
-        customer_type: this.inputCustomerType(),
-        registration_source: this.inputRegSource(),
-        verification_status: this.inputVerStatus(),
-        account_status: this.inputAccStatus(),
-        notes: this.inputNotes().trim() || null
-      } : opt));
-    }
+    const payload = {
+      first_name: firstName,
+      last_name: this.inputLastName().trim() || null,
+      profile_image: this.inputProfileImage().trim() || null,
+      mobile_number: mobile,
+      email: this.inputEmail().trim() || null,
+      date_of_birth: this.inputDateOfBirth() || null,
+      gender: this.inputGender() || null,
+      address_line_1: this.inputAddress1().trim() || null,
+      address_line_2: this.inputAddress2().trim() || null,
+      state_id: this.inputStateId(),
+      city_id: this.inputCityId(),
+      pincode: this.inputPincode().trim() || null,
+      alternate_phone: this.inputAlternatePhone().trim() || null,
+      customer_type: this.inputCustomerType(),
+      registration_source: this.inputRegSource(),
+      verification_status: this.inputVerStatus(),
+      account_status: this.inputAccStatus(),
+      notes: this.inputNotes().trim() || null
+    };
 
-    this.cancelEdit();
+    const id = this.editingId();
+    const request = id === 'new' ? this.api.create(payload) : this.api.update(id as string, payload);
+    request.subscribe({
+      next: () => {
+        this.reload();
+        this.cancelEdit();
+      },
+      error: (err) => {
+        console.error('Failed to save customer', err);
+        alert('Failed to save customer. Please try again.');
+      }
+    });
   }
 
   cancelEdit(): void {
@@ -241,7 +206,13 @@ export class Customers implements OnInit {
 
   deleteOption(option: Customer): void {
     if (confirm(`Are you sure you want to delete customer "${option.first_name} ${option.last_name || ''}"?`)) {
-      this.options.update(list => list.filter(opt => opt.customer_uid !== option.customer_uid));
+      this.api.delete(option.customer_uid).subscribe({
+        next: () => this.reload(),
+        error: (err) => {
+          console.error('Failed to delete customer', err);
+          alert('Failed to delete customer. Please try again.');
+        }
+      });
     }
   }
 }

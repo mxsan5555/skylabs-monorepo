@@ -104,9 +104,10 @@ export class Otp implements OnInit, OnDestroy {
     this.verifying.set(true);
     this.authApi.verifyOtp(this.destination, this.code, 'login').subscribe({
       next: async (result) => {
-        await this.auth.signIn(result.accessToken);
+        await this.auth.signIn(result.accessToken, result.refreshToken);
         this.verifying.set(false);
-        this.router.navigate(['/account/dashboard']);
+        // A linked Driver account lands on the self-service portal, not the admin console.
+        this.router.navigate([this.auth.bootstrap()?.driver ? '/driver' : '/account/dashboard']);
       },
       error: () => {
         this.verifying.set(false);

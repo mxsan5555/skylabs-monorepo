@@ -229,6 +229,29 @@ export class RbacApiService {
   }
 
   // ---------------------------------------------------------------------
+  // Per-user permission overrides
+  // ---------------------------------------------------------------------
+
+  /** Role-derived grants layered with this user's overrides — what they can actually do right now. */
+  effectivePermissions(userId: string): Observable<string[]> {
+    return this.http
+      .get<ApiEnvelope<{ permissions: string[] }>>(`${this.base}/users/${userId}/permissions/effective`)
+      .pipe(map((res) => unwrap(res).permissions));
+  }
+
+  userPermissionOverrides(userId: string): Observable<{ grants: string[]; revokes: string[] }> {
+    return this.http
+      .get<ApiEnvelope<{ grants: string[]; revokes: string[] }>>(`${this.base}/users/${userId}/permission-overrides`)
+      .pipe(map(unwrap));
+  }
+
+  setUserPermissionOverrides(userId: string, grants: string[], revokes: string[]): Observable<{ grants: string[]; revokes: string[] }> {
+    return this.http
+      .put<ApiEnvelope<{ grants: string[]; revokes: string[] }>>(`${this.base}/users/${userId}/permission-overrides`, { grants, revokes })
+      .pipe(map(unwrap));
+  }
+
+  // ---------------------------------------------------------------------
   // Audit logs
   // ---------------------------------------------------------------------
 

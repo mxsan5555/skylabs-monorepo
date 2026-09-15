@@ -125,6 +125,10 @@ export interface BootstrapResponse {
     isPreview: true;
     impersonatedBy: string;
   };
+  /** The Driver record linked to this User, if any (mera-driver only — msd never populates
+   *  this). This is the ownership signal the driver self-service portal's route guard and
+   *  post-login redirect key off, not a role-name check. */
+  driver?: { id: string; firstName: string; lastName: string | null; status: string } | null;
 }
 
 export interface AuditLogEntry {
