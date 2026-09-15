@@ -46,25 +46,21 @@ export class Sidebar {
   protected readonly initial = computed(() => (this.user()?.name ?? '?').charAt(0).toUpperCase());
 
   protected isGroupExpanded(node: MenuNode): boolean {
-    // 1. If any child route is currently active, ALWAYS keep group expanded so active item is visible
-    if (node.children) {
-      const current = this.currentUrl();
-      const hasActiveChild = node.children.some((child) => {
-        const path = accountPath(child);
-        return path ? (current === path || current.startsWith(path + '/') || current.startsWith(path + '?')) : false;
-      });
-      if (hasActiveChild) {
-        return true;
-      }
-    }
-
-    // 2. If user manually toggled this group, honor user preference
+    // 1. If user manually clicked to expand/collapse this group, honor user preference first
     const toggled = this.userToggled();
     if (toggled[node.id] !== undefined) {
       return toggled[node.id];
     }
 
-    // 3. Default: Non-active groups remain collapsed to keep sidebar clean & organized
+    // 2. Default initial state: Auto-expand if current URL matches any child route in this group
+    if (node.children) {
+      const current = this.currentUrl();
+      return node.children.some((child) => {
+        const path = accountPath(child);
+        return path ? (current === path || current.startsWith(path + '/') || current.startsWith(path + '?')) : false;
+      });
+    }
+
     return false;
   }
 

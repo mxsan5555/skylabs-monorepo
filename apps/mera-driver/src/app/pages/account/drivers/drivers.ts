@@ -142,24 +142,16 @@ export class Drivers implements OnInit {
     return '';
   });
 
-  readonly appNoError = computed(() => {
-    if (!this.isTouched('appNo')) return '';
-    const val = this.inputAppNo().trim();
-    if (!val) return 'Application No. is required';
-    return '';
-  });
-
   readonly statusError = computed(() => {
     if (!this.isTouched('status')) return '';
     const val = this.inputStatus().trim();
-    if (!val) return 'Category status is required';
+    if (!val) return 'Driver status is required';
     return '';
   });
 
   readonly driverTypeError = computed(() => {
     if (!this.isTouched('driverType')) return '';
-    const val = this.inputDriverType().trim();
-    if (!val) return 'Driver type is required';
+    if (this.inputDriverTypes().length === 0) return 'At least one Driver Type is required';
     return '';
   });
 
@@ -184,10 +176,9 @@ export class Drivers implements OnInit {
         this.markTouched('phone');
         return !this.emailError() && !this.phoneError();
       } else if (sub === 3) {
-        this.markTouched('appNo');
         this.markTouched('status');
         this.markTouched('driverType');
-        return !this.appNoError() && !this.statusError() && !this.driverTypeError();
+        return !this.statusError() && !this.driverTypeError();
       }
     } else if (tab === 2) {
       if (sub === 0) {
@@ -214,15 +205,57 @@ export class Drivers implements OnInit {
   readonly inputPassportNumber = signal<string>('');
   readonly inputReligion = signal<string>('Hindu');
   readonly inputColor = signal<string>('Light Skin');
-  readonly inputLanguage = signal<string>('Hindi');
+  readonly inputLanguages = signal<string[]>(['Hindi']);
   readonly inputCountry = signal<string>('India');
   readonly inputState = signal<string>('');
   readonly inputPincode = signal<string>('');
   readonly inputAddress = signal<string>('');
-  readonly inputDriverType = signal<string>('');
+  readonly inputDriverTypes = signal<string[]>([]);
   readonly inputStatus = signal<string>('');
   readonly inputSourceType = signal<string>('WalkIn');
   readonly inputVehicle = signal<string>('Personal Sedan');
+
+  // Dropdown Open/Close Signals & Text Computeds
+  readonly isLangDropdownOpen = signal<boolean>(false);
+  readonly isDriverTypeDropdownOpen = signal<boolean>(false);
+
+  toggleLangDropdown(): void {
+    this.isLangDropdownOpen.update((v) => !v);
+  }
+
+  toggleDriverTypeDropdown(): void {
+    this.isDriverTypeDropdownOpen.update((v) => !v);
+  }
+
+  readonly selectedLanguagesText = computed(() => {
+    const list = this.inputLanguages();
+    return list.length > 0 ? list.join(', ') : 'Select Languages...';
+  });
+
+  readonly selectedDriverTypesText = computed(() => {
+    const list = this.inputDriverTypes();
+    return list.length > 0 ? list.join(', ') : 'Select Driver Types...';
+  });
+
+  // Multi-select Checkbox Helpers
+  isLanguageSelected(lang: string): boolean {
+    return this.inputLanguages().includes(lang);
+  }
+  toggleLanguage(lang: string): void {
+    this.inputLanguages.update(list =>
+      list.includes(lang) ? list.filter(l => l !== lang) : [...list, lang]
+    );
+  }
+
+  isDriverTypeSelected(type: string): boolean {
+    return this.inputDriverTypes().includes(type);
+  }
+  toggleDriverType(type: string): void {
+    this.markTouched('driverType');
+    this.inputDriverTypes.update(list =>
+      list.includes(type) ? list.filter(t => t !== type) : [...list, type]
+    );
+  }
 
   // --- Form Input Signals (Tab 2: Education & Health) ---
   readonly inputAge = signal<string>('');
@@ -252,7 +285,7 @@ export class Drivers implements OnInit {
   readonly inputDocumentUpload = signal<string>('');
 
   // --- Form Input Signals (Tab 4: Payments) ---
-  readonly inputPreferredPaymentMode = signal<string>('Cash');
+  readonly inputPreferredPaymentMode = signal<string>('Bank Account');
   readonly inputAmount = signal<string>('');
   readonly inputPaymentReceiptDate = signal<string>('');
   readonly inputBankName = signal<string>('');
@@ -269,7 +302,7 @@ export class Drivers implements OnInit {
     { type: 'Select Document Type', regNo: '', file: '' }
   ]);
   readonly educationDocs = signal<Array<{ type: string; regNo: string; file: string }>>([
-    { type: '', regNo: '', file: '' }
+    { type: 'Select Document Type', regNo: '', file: '' }
   ]);
   readonly policeDocs = signal<Array<{ type: string; regNo: string; file: string }>>([
     { type: 'Select Document Type', regNo: '', file: '' }
@@ -281,10 +314,20 @@ export class Drivers implements OnInit {
   readonly religions = signal<string[]>(['Hindu', 'Muslim', 'Christian', 'Sikh', 'Buddhist', 'Jain', 'Parsi', 'Other']);
   readonly colors = signal<string[]>(['Light Skin', 'Dark Skin']);
   readonly languages = signal<string[]>(['Hindi', 'English', 'Bhojpuri', 'Other']);
+  readonly driverTypeOptions = signal<string[]>(['Personal driver', 'Car Driver', 'Bike Rider', 'Ambulance Driver', 'Construction Vehicle Driver']);
 
   // --- Education Master Options ---
   readonly educationLevels = signal<string[]>(['No Formal Education', 'Primary School (Class 1–5)', 'Secondary School (Class 6–10)', 'Higher Secondary (Class 11–12)', 'Diploma / Certification Course', "Bachelor's Degree", "Master's Degree", 'Doctorate / PhD']);
   readonly trainingStatuses = signal<string[]>(['Yes', 'No']);
+  readonly educationDocTypes = signal<string[]>([
+    '10th Certificate / Marksheet',
+    '12th Certificate / Marksheet',
+    'Diploma / Vocational Certificate',
+    "Bachelor's Degree Certificate",
+    "Master's Degree Certificate",
+    'Training Certificate',
+    'Other Educational Certificate'
+  ]);
 
   // --- Health Master Options ---
   readonly eyeVisions = signal<string[]>(['Normal Vision', 'Wear Glasses', 'Color Blind']);
@@ -318,7 +361,7 @@ export class Drivers implements OnInit {
   readonly policeDocTypes = signal<string[]>(['Address Proof', 'Police Clearance Certificate (PCC)', 'Character Verification Form']);
 
   // --- Payment Master Options ---
-  readonly paymentModes = signal<string[]>(['Cash', 'Cheque', 'NEFT', 'RTGS', 'Online']);
+  readonly paymentModes = signal<string[]>(['Bank Account', 'UPI']);
 
   protected readonly content = signal({
     title: 'Driver Registry',
@@ -563,7 +606,7 @@ export class Drivers implements OnInit {
   // --- Add New Driver Action ---
   addDriver(): void {
     this.formSubmitted.set(true);
-    if (this.firstNameError() || this.genderError() || this.phoneError() || this.emailError() || this.appNoError() || this.statusError() || this.driverTypeError()) {
+    if (this.firstNameError() || this.genderError() || this.phoneError() || this.emailError() || this.statusError() || this.driverTypeError()) {
       this.activeFormTab.set(0);
       return;
     }
@@ -589,7 +632,7 @@ export class Drivers implements OnInit {
       passportNumber: this.inputPassportNumber().trim(),
       religion: this.inputReligion(),
       color: this.inputColor(),
-      language: this.inputLanguage(),
+      language: this.inputLanguages().join(', '),
       age: this.inputAge().trim(),
       height: this.inputHeight().trim(),
       weight: this.inputWeight().trim(),
@@ -597,7 +640,7 @@ export class Drivers implements OnInit {
       state: this.inputState().trim(),
       pincode: this.inputPincode().trim(),
       address: this.inputAddress().trim(),
-      driverType: this.inputDriverType(),
+      driverType: this.inputDriverTypes().join(', '),
       status: this.inputStatus(),
       sourceType: this.inputSourceType(),
       vehicle: this.inputVehicle().trim(),
@@ -674,7 +717,7 @@ export class Drivers implements OnInit {
   }
 
   addEducationDoc(): void {
-    this.educationDocs.update(docs => [...docs, { type: '', regNo: '', file: '' }]);
+    this.educationDocs.update(docs => [...docs, { type: 'Select Document Type', regNo: '', file: '' }]);
   }
   deleteEducationDoc(idx: number): void {
     this.educationDocs.update(docs => docs.filter((_, i) => i !== idx));
@@ -745,7 +788,7 @@ export class Drivers implements OnInit {
     this.inputPassportNumber.set('');
     this.inputReligion.set('Hindu');
     this.inputColor.set('Light Skin');
-    this.inputLanguage.set('Hindi');
+    this.inputLanguages.set(['Hindi']);
     this.inputAge.set('');
     this.inputHeight.set('');
     this.inputWeight.set('');
@@ -753,7 +796,7 @@ export class Drivers implements OnInit {
     this.inputState.set('');
     this.inputPincode.set('');
     this.inputAddress.set('');
-    this.inputDriverType.set('');
+    this.inputDriverTypes.set([]);
     this.inputStatus.set('');
     this.inputSourceType.set('WalkIn');
     this.inputVehicle.set('Personal Sedan');
@@ -779,7 +822,7 @@ export class Drivers implements OnInit {
     this.inputDocumentCategory.set('Driving License');
     this.inputDocumentUpload.set('');
     // --- Revert Payment Inputs ---
-    this.inputPreferredPaymentMode.set('Cash');
+    this.inputPreferredPaymentMode.set('Bank Account');
     this.inputAmount.set('');
     this.inputPaymentReceiptDate.set('');
     this.inputBankName.set('');
@@ -789,7 +832,7 @@ export class Drivers implements OnInit {
     this.inputUpiIdOrChequeNo.set('');
     this.personalDocs.set([{ type: 'Aadhaar / National ID', regNo: '', file: '' }]);
     this.healthDocs.set([{ type: 'Select Document Type', regNo: '', file: '' }]);
-    this.educationDocs.set([{ type: '', regNo: '', file: '' }]);
+    this.educationDocs.set([{ type: 'Select Document Type', regNo: '', file: '' }]);
     this.policeDocs.set([{ type: 'Select Document Type', regNo: '', file: '' }]);
     this.activeFormTab.set(0);
   }
@@ -832,7 +875,7 @@ export class Drivers implements OnInit {
       this.inputPassportNumber.set(row.passportNumber || '');
       this.inputReligion.set(row.religion || 'Hindu');
       this.inputColor.set(row.color || 'Light Skin');
-      this.inputLanguage.set(row.language || 'Hindi');
+      this.inputLanguages.set(row.language ? row.language.split(', ').map((s: string) => s.trim()) : ['Hindi']);
       this.inputAge.set(row.age || '');
       this.inputHeight.set(row.height || '');
       this.inputWeight.set(row.weight || '');
@@ -840,7 +883,7 @@ export class Drivers implements OnInit {
       this.inputState.set(row.state || '');
       this.inputPincode.set(row.pincode || '');
       this.inputAddress.set(row.address || '');
-      this.inputDriverType.set(row.driverType || 'Personal driver');
+      this.inputDriverTypes.set(row.driverType ? row.driverType.split(', ').map((s: string) => s.trim()) : []);
       this.inputStatus.set(row.status || 'Non-Verified');
       this.inputSourceType.set(row.sourceType || 'WalkIn');
       this.inputVehicle.set(row.vehicle || 'Personal Sedan');
@@ -864,7 +907,7 @@ export class Drivers implements OnInit {
       this.inputExpectedSalary.set(row.expectedSalary || '10000-15000');
       this.inputDocumentCategory.set(row.documentCategory || 'Driving License');
       this.inputDocumentUpload.set(row.documentUpload || '');
-      this.inputPreferredPaymentMode.set(row.preferredPaymentMode || 'Cash');
+      this.inputPreferredPaymentMode.set(row.preferredPaymentMode || 'Bank Account');
       this.inputAmount.set(row.amount || '');
       this.inputPaymentReceiptDate.set(row.paymentReceiptDate || '');
       this.inputBankName.set(row.bankName || '');
@@ -874,7 +917,7 @@ export class Drivers implements OnInit {
       this.inputUpiIdOrChequeNo.set(row.upiIdOrChequeNo || '');
       this.personalDocs.set(row.personalDocs || [{ type: 'Aadhaar / National ID', regNo: '', file: '' }]);
       this.healthDocs.set(row.healthDocs || [{ type: 'Select Document Type', regNo: '', file: '' }]);
-      this.educationDocs.set(row.educationDocs || [{ type: '', regNo: '', file: '' }]);
+      this.educationDocs.set(row.educationDocs || [{ type: 'Select Document Type', regNo: '', file: '' }]);
       this.policeDocs.set(row.policeDocs || [{ type: 'Select Document Type', regNo: '', file: '' }]);
 
       this.activeFormTab.set(0);
@@ -964,7 +1007,6 @@ export class Drivers implements OnInit {
       case 'passportNumber': this.inputPassportNumber.set(val); break;
       case 'religion': this.inputReligion.set(val); break;
       case 'color': this.inputColor.set(val); break;
-      case 'language': this.inputLanguage.set(val); break;
       case 'age': this.inputAge.set(val); break;
       case 'height': this.inputHeight.set(val); break;
       case 'weight': this.inputWeight.set(val); break;
@@ -972,7 +1014,6 @@ export class Drivers implements OnInit {
       case 'state': this.inputState.set(val); break;
       case 'pincode': this.inputPincode.set(val); break;
       case 'address': this.inputAddress.set(val); break;
-      case 'driverType': this.inputDriverType.set(val); break;
       case 'status': this.inputStatus.set(val); break;
       case 'sourceType': this.inputSourceType.set(val); break;
       case 'vehicle': this.inputVehicle.set(val); break;
