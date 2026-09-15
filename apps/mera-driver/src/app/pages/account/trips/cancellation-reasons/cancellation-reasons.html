@@ -10,6 +10,7 @@
             [columns]="tableColumns"
             [rows]="tableRowsString()"
             [total]="list().length"
+            [loading]="loading()"
             selectable exportable searchable
             [actions]="tableActions"
             (sky-dt-row-action)="onRowAction($event)"

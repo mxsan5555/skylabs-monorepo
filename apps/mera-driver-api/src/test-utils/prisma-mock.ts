@@ -39,11 +39,14 @@ function createPrismaMock() {
     permission: delegate(),
     user: delegate(),
     userRole: delegate(),
+    userPermissionOverride: delegate(),
     auditLog: delegate(),
     otpChallenge: delegate(),
     refreshSession: delegate(),
     loginHistory: delegate(),
     impersonationSession: delegate(),
+    driver: delegate(),
+    driverDocument: delegate(),
     // Supports both `$transaction([...])` (array of already-created promises — just
     // await them as Prisma would) and `$transaction(async (tx) => ...)` (callback
     // form — invoke it with the mock itself standing in for `tx`).

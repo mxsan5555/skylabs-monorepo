@@ -14,6 +14,7 @@
             [total]="totalDrivers()"
             [pageSize]="pageSize()"
             [page]="page()"
+            [loading]="loading()"
             selectable
             exportable
             searchable
@@ -37,6 +38,56 @@
           </sky-data-table>
         </sky-card>
       </div>
+
+      <md-dialog [open]="linkPanelDriver() !== null" (closed)="closeLinkPanel()">
+        @if (linkPanelDriver(); as d) {
+          <div slot="headline">
+            {{ d.linkedUser ? 'Manage portal account' : 'Link portal account' }} — {{ d.firstName }} {{ d.lastName }}
+          </div>
+          <div slot="content" class="flex flex-col gap-4">
+            @if (d.linkedUser) {
+              <p>
+                Linked to <strong>{{ d.linkedUser.name }}</strong>
+                ({{ d.linkedUser.phone || d.linkedUser.email }}). This account can sign in to the
+                driver self-service portal.
+              </p>
+              <md-outlined-button (click)="unlinkUser(d)">
+                <md-icon slot="icon" aria-hidden="true">link_off</md-icon>
+                Unlink account
+              </md-outlined-button>
+            } @else {
+              <p>
+                Linking a User account grants that user access to the driver self-service
+                portal (Profile, KYC, Documents) for this driver record. The
+                <code>driver</code> role is assigned automatically.
+              </p>
+              @if (linkError()) {
+                <p class="otp-muted" role="alert">{{ linkError() }}</p>
+              }
+              <md-outlined-select
+                label="User account"
+                [value]="linkSelectedUserId()"
+                (change)="linkSelectedUserId.set($any($event.target).value)"
+              >
+                <md-select-option value=""><div slot="headline">Select a user…</div></md-select-option>
+                @for (u of linkUsers(); track u.id) {
+                  <md-select-option [value]="u.id">
+                    <div slot="headline">{{ u.name }} — {{ u.phone || u.email }}</div>
+                  </md-select-option>
+                }
+              </md-outlined-select>
+            }
+          </div>
+          <div slot="actions">
+            <md-text-button (click)="closeLinkPanel()">Close</md-text-button>
+            @if (!d.linkedUser) {
+              <md-filled-button [disabled]="linkSaving()" (click)="confirmLink()">
+                {{ linkSaving() ? 'Linking…' : 'Link account' }}
+              </md-filled-button>
+            }
+          </div>
+        }
+      </md-dialog>
     }
 
     <!-- VIEW 2: ADD DRIVER TABS PAGE -->

@@ -6,6 +6,11 @@ import { HttpError } from '../middleware/errorHandler';
 import * as roleService from '../services/role.service';
 import * as userService from '../services/user.service';
 import * as auditService from '../services/audit.service';
+import {
+  getUserPermissionOverrides,
+  setUserPermissionOverrides,
+  getEffectivePermissionsForUserId,
+} from '../services/permission.service';
 import { impersonateUser } from '../services/impersonation.service';
 import { buildBootstrapResponse } from '../services/bootstrap.service';
 import { resetOtpForUser } from '../services/user.service';
@@ -21,6 +26,7 @@ import {
   UpdateUserSchema,
   SetUserStatusSchema,
   ImpersonateSchema,
+  SetUserPermissionOverridesSchema,
 } from '../schemas/rbac.schema';
 
 const router = Router();
@@ -390,6 +396,51 @@ router.get('/users/:id/sessions', requirePermission('rbac.users', 'view'), async
     next(err);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Per-user permission overrides — layered on top of role-derived grants at
+// resolution time (see `permission.service.ts#resolveEffectivePermissionsForUser`).
+// ---------------------------------------------------------------------------
+
+router.get('/users/:id/permissions/effective', requirePermission('rbac.users', 'view'), async (req, res, next) => {
+  try {
+    const permissions = await getEffectivePermissionsForUserId(req.params.id);
+    res.json({ data: { permissions }, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/users/:id/permission-overrides', requirePermission('rbac.users', 'view'), async (req, res, next) => {
+  try {
+    const overrides = await getUserPermissionOverrides(req.params.id);
+    res.json({ data: overrides, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put(
+  '/users/:id/permission-overrides',
+  requirePermission('rbac.users', 'assign'),
+  validateBody(SetUserPermissionOverridesSchema),
+  async (req, res, next) => {
+    try {
+      const overrides = await setUserPermissionOverrides(req.params.id, req.body.grants, req.body.revokes);
+      await auditService.writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'user.permissionOverrides.set',
+        targetType: 'User',
+        targetId: req.params.id,
+        after: overrides,
+        ...requestMeta(req),
+      });
+      res.json({ data: overrides, error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Audit logs

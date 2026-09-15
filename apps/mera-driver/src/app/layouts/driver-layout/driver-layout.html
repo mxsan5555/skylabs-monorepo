@@ -1,0 +1,65 @@
+<div class="driver-shell">
+  <header class="driver-topbar">
+    <span class="driver-topbar__title">Mera Driver</span>
+    <md-icon-button aria-label="Sign out" (click)="signOut()">
+      <md-icon aria-hidden="true">logout</md-icon>
+    </md-icon-button>
+  </header>
+
+  <div class="driver-content">
+    <router-outlet></router-outlet>
+  </div>
+
+  <nav class="rider-nav" aria-label="Primary">
+    <button
+      type="button"
+      class="rider-nav__item"
+      [class.active]="isActive('/driver')"
+      [attr.aria-current]="isActive('/driver') ? 'page' : null"
+      (click)="go('/driver')"
+    >
+      <md-icon aria-hidden="true">home</md-icon>
+      Home
+    </button>
+    <button
+      type="button"
+      class="rider-nav__item"
+      [class.active]="isActive('/driver/profile')"
+      [attr.aria-current]="isActive('/driver/profile') ? 'page' : null"
+      (click)="go('/driver/profile')"
+    >
+      <md-icon aria-hidden="true">person</md-icon>
+      Profile
+    </button>
+    <button
+      type="button"
+      class="rider-nav__item"
+      [class.active]="isActive('/driver/kyc')"
+      [attr.aria-current]="isActive('/driver/kyc') ? 'page' : null"
+      (click)="go('/driver/kyc')"
+    >
+      <md-icon aria-hidden="true">verified_user</md-icon>
+      KYC
+    </button>
+    <button
+      type="button"
+      class="rider-nav__item"
+      [class.active]="isActive('/driver/documents')"
+      [attr.aria-current]="isActive('/driver/documents') ? 'page' : null"
+      (click)="go('/driver/documents')"
+    >
+      <md-icon aria-hidden="true">folder</md-icon>
+      Documents
+    </button>
+    <button
+      type="button"
+      class="rider-nav__item"
+      [class.active]="isActive('/driver/support')"
+      [attr.aria-current]="isActive('/driver/support') ? 'page' : null"
+      (click)="go('/driver/support')"
+    >
+      <md-icon aria-hidden="true">support_agent</md-icon>
+      Support
+    </button>
+  </nav>
+</div>

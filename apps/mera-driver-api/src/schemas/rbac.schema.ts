@@ -91,3 +91,10 @@ export const ImpersonateSchema = z
     targetUserId: z.string().uuid(),
   })
   .openapi('Impersonate');
+
+export const SetUserPermissionOverridesSchema = z
+  .object({
+    grants: z.array(z.string().uuid()),
+    revokes: z.array(z.string().uuid()),
+  })
+  .openapi('SetUserPermissionOverrides');

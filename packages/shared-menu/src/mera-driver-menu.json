@@ -288,6 +288,15 @@
         "permissionKey": "masters.police-docs",
         "parent": "masters",
         "order": 10
+      },
+      {
+        "id": "masters-languages",
+        "title": "Languages",
+        "icon": "translate",
+        "route": "/masters/languages",
+        "permissionKey": "masters.languages",
+        "parent": "masters",
+        "order": 11
       }
     ]
   },

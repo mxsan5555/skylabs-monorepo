@@ -1,74 +1,8 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, inject, OnInit, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
-
-interface Driver {
-  id?: number;
-  name: string;
-  phone: string;
-  vehicle: string;
-  city?: string;
-  // --- Onboarding Leads Fields ---
-  firstName?: string;
-  lastName?: string;
-  fatherName?: string;
-  motherName?: string;
-  email?: string;
-  emergencyNumber?: string;
-  dob?: string;
-  maritalStatus?: string;
-  gender?: string;
-  passportNumber?: string;
-  religion?: string;
-  color?: string;
-  language?: string;
-  age?: string;
-  height?: string;
-  weight?: string;
-  country?: string;
-  state?: string;
-  pincode?: string;
-  address?: string;
-  driverType?: string;
-  status?: string;
-  sourceType?: string;
-  avatar?: string;
-  // --- Education & Health Fields ---
-  education?: string;
-  trainingStatus?: string;
-  trainingCertificate?: string;
-  eyeVision?: string;
-  healthInsurance?: string;
-  bloodGroup?: string;
-  // --- Documents Fields ---
-  licenseDetails?: string;
-  vehicleType?: string;
-  dlNo?: string;
-  dlIssueDate?: string;
-  dlExpiryDate?: string;
-  policeVerifiedStatus?: string;
-  policeVerifiedNo?: string;
-  policeVerifiedUpload?: string;
-  jobType?: string;
-  experience?: string;
-  currentSalary?: string;
-  expectedSalary?: string;
-  documentCategory?: string;
-  documentUpload?: string;
-  // --- Payment Fields ---
-  preferredPaymentMode?: string;
-  amount?: string;
-  paymentReceiptDate?: string;
-  bankName?: string;
-  bankAccountNo?: string;
-  ifscCode?: string;
-  branchName?: string;
-  upiIdOrChequeNo?: string;
-  personalDocs?: Array<{ type: string; regNo: string; file: string }>;
-  healthDocs?: Array<{ type: string; regNo: string; file: string }>;
-  educationDocs?: Array<{ type: string; regNo: string; file: string }>;
-  policeDocs?: Array<{ type: string; regNo: string; file: string }>;
-}
+import { DriversApiService, type Driver } from '../../../core/drivers/drivers-api.service';
+import { RbacApiService } from '../../../core/rbac/rbac-api.service';
 
 @Component({
   selector: 'md-account-drivers',
@@ -80,9 +14,19 @@ interface Driver {
 })
 export class Drivers implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly api = inject(DriversApiService);
+  private readonly rbac = inject(RbacApiService);
 
   // --- All Drivers Repository ---
   readonly allDrivers = signal<Driver[]>([]);
+  readonly loading = signal<boolean>(false);
+
+  // --- Driver <-> User account linking (grants/revokes self-service portal access) ---
+  readonly linkPanelDriver = signal<Driver | null>(null);
+  readonly linkUsers = signal<{ id: string; name: string; phone?: string; email?: string }[]>([]);
+  readonly linkSelectedUserId = signal<string>('');
+  readonly linkSaving = signal<boolean>(false);
+  readonly linkError = signal<string | null>(null);
 
   // --- Search, Filter, Sort & Pagination Signals ---
   readonly searchQuery = signal<string>('');
@@ -96,7 +40,7 @@ export class Drivers implements OnInit {
   readonly showAddForm = signal<boolean>(false);
   readonly activeFormTab = signal<number>(0);
   readonly activeSubSection = signal<number>(0);
-  readonly editingDriverId = signal<number | null>(null);
+  readonly editingDriverId = signal<string | null>(null);
 
   // --- Form Validation Signals & Helpers ---
   readonly formSubmitted = signal<boolean>(false);
@@ -274,6 +218,11 @@ export class Drivers implements OnInit {
   readonly policeDocs = signal<Array<{ type: string; regNo: string; file: string }>>([
     { type: 'Select Document Type', regNo: '', file: '' }
   ]);
+
+  // Raw File blobs pending upload, keyed by `${category}-${idx}` — uploaded once the
+  // driver record has a real id (on save), since document rows have no id until then.
+  private readonly pendingFiles = new Map<string, File>();
+
   // --- Personal Detail Master Options ---
   readonly sourceTypes = signal<string[]>(['WalkIn', 'Website', 'Referral']);
   readonly maritalStatuses = signal<string[]>(['Unmarried', 'Married', 'Divorced', 'Widowed']);
@@ -322,7 +271,7 @@ export class Drivers implements OnInit {
 
   protected readonly content = signal({
     title: 'Driver Registry',
-    subtitle: 'Manage and view registered drivers (Loaded dynamically from static JSON data).',
+    subtitle: 'Manage and view registered drivers.',
     cardTitle: 'Add New Driver',
     btnRegister: 'Save Lead',
     errorEmptyFields: 'First Name, Email, and Phone are required.'
@@ -336,15 +285,15 @@ export class Drivers implements OnInit {
     { key: 'email', label: 'Email', sortable: true },
     { key: 'phone', label: 'Phone', sortable: true },
     { key: 'driverType', label: 'Driver Type', sortable: true },
-    { key: 'status', label: 'Status', type: 'status', statusMap: { 
-        'Verified': 'success', 
-        'Partially Verified (P)': 'info', 
-        'Partially Verified (K)': 'info', 
-        'Non-Verified': 'warning', 
-        'Blacklisted': 'error', 
-        'Closed': 'error', 
-        'Not Useful': 'error' 
-      } 
+    { key: 'status', label: 'Status', type: 'status', statusMap: {
+        'Verified': 'success',
+        'Partially Verified (P)': 'info',
+        'Partially Verified (K)': 'info',
+        'Non-Verified': 'warning',
+        'Blacklisted': 'error',
+        'Closed': 'error',
+        'Not Useful': 'error'
+      }
     },
     { key: 'fatherName', label: 'Father Name', sortable: true, hidden: true },
     { key: 'motherName', label: 'Mother Name', sortable: true, hidden: true },
@@ -386,7 +335,8 @@ export class Drivers implements OnInit {
     { key: 'bankName', label: 'Bank Name', sortable: true, hidden: true },
     { key: 'bankAccountNo', label: 'Bank Account No', sortable: false, hidden: true },
     { key: 'ifscCode', label: 'IFSC Code', sortable: false, hidden: true },
-    { key: 'upiIdOrChequeNo', label: 'UPI / Cheque', sortable: false, hidden: true }
+    { key: 'upiIdOrChequeNo', label: 'UPI / Cheque', sortable: false, hidden: true },
+    { key: 'linkedAccountLabel', label: 'Portal Account', sortable: false, hidden: true }
   ]);
 
   readonly tableFilterOptions = JSON.stringify([
@@ -403,101 +353,22 @@ export class Drivers implements OnInit {
   readonly tableActions = JSON.stringify([
     { icon: 'visibility', label: 'View Details', event: '__view_detail__' },
     { icon: 'edit', label: 'Edit', event: 'edit_driver' },
+    { icon: 'link', label: 'Link / Unlink Portal Account', event: 'link_driver' },
     { icon: 'delete', label: 'Delete', event: 'delete_driver', variant: 'danger' }
   ]);
 
   // --- Processed and Filtered Dataset ---
   readonly processedDrivers = computed(() => {
-    let list = this.allDrivers().map(d => {
-      const parts = d.name.split(' ');
-      const firstName = d.firstName || parts[0] || '';
-      const lastName = d.lastName || parts.slice(1).join(' ') || '';
-      const email = d.email || `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s/g, '') || 'driver'}@meradriver.com`;
-      
-      const indianAvatars = [
-        'https://images.unsplash.com/photo-1607990283143-e81e7a2c93ab?auto=format&fit=crop&q=80&w=150&h=150', // Indian man
-        'https://images.unsplash.com/photo-1581391528803-54be77ce23e3?auto=format&fit=crop&q=80&w=150&h=150', // Indian man with turban/beard
-        'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150&h=150', // Smiling man
-        'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=150&h=150', // Clean portrait
-        'https://images.unsplash.com/photo-1619380061814-58f03707f082?auto=format&fit=crop&q=80&w=150&h=150', // Indian woman smiling
-        'https://images.unsplash.com/photo-1624561172888-ac93c696e10c?auto=format&fit=crop&q=80&w=150&h=150', // Professional headshot
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150&h=150', // Smiling man
-        'https://images.unsplash.com/photo-1562572159-4ebcd318f4dd?auto=format&fit=crop&q=80&w=150&h=150'  // Young woman portrait
-      ];
-      const avatarIdx = (d.id || 1) % indianAvatars.length;
-      const avatar = (d.avatar && !d.avatar.includes('pravatar')) 
-        ? d.avatar 
-        : indianAvatars[avatarIdx];
-      
-      const driverType = d.driverType || (d.id && d.id % 4 === 0 ? 'Car Driver' : (d.id && d.id % 3 === 0 ? 'Ambulance Driver' : 'Personal driver'));
-      const status = d.status || (d.id && d.id % 7 === 0 ? 'Blacklisted' : (d.id && d.id % 5 === 0 ? 'Non-Verified' : 'Verified'));
-      const sourceType = d.sourceType || 'Website';
-
-      return {
-        fatherName: d.fatherName || `${firstName} Lal`,
-        motherName: d.motherName || `${firstName} Devi`,
-        emergencyNumber: d.emergencyNumber || '9999988888',
-        dob: d.dob || '1992-06-15',
-        maritalStatus: d.maritalStatus || 'Unmarried',
-        gender: d.gender || 'Male',
-        passportNumber: d.passportNumber || 'P9876543',
-        religion: d.religion || 'Hindu',
-        color: d.color || 'Light Skin',
-        language: d.language || 'Hindi',
-        age: d.age || '32',
-        height: d.height || '5.7',
-        weight: d.weight || '68',
-        country: d.country || 'India',
-        state: d.state || 'Delhi',
-        pincode: d.pincode || '110001',
-        address: d.address || 'Connaught Place, New Delhi',
-        education: d.education || 'No Formal Education',
-        trainingStatus: d.trainingStatus || 'No',
-        trainingCertificate: d.trainingCertificate || 'None',
-        eyeVision: d.eyeVision || 'Normal Vision',
-        healthInsurance: d.healthInsurance || 'No',
-        bloodGroup: d.bloodGroup || 'O+',
-        licenseDetails: d.licenseDetails || 'LMV',
-        vehicleType: d.vehicleType || 'SEDAN',
-        dlNo: d.dlNo || 'DL-987654321',
-        dlIssueDate: d.dlIssueDate || '2018-10-12',
-        dlExpiryDate: d.dlExpiryDate || '2038-10-11',
-        policeVerifiedStatus: d.policeVerifiedStatus || 'Yes',
-        policeVerifiedNo: d.policeVerifiedNo || 'POL-99238',
-        policeVerifiedUpload: d.policeVerifiedUpload || 'Police_Clearance.pdf',
-        jobType: d.jobType || 'Full time',
-        experience: d.experience || '3 Year',
-        currentSalary: d.currentSalary || '15000',
-        expectedSalary: d.expectedSalary || '18000',
-        documentCategory: d.documentCategory || 'Driving License',
-        documentUpload: d.documentUpload || 'Driving_License_Copy.jpg',
-        preferredPaymentMode: d.preferredPaymentMode || 'Online',
-        amount: d.amount || '0',
-        paymentReceiptDate: d.paymentReceiptDate || '2026-08-11',
-        bankName: d.bankName || 'State Bank of India',
-        bankAccountNo: d.bankAccountNo || '332211009988',
-        ifscCode: d.ifscCode || 'SBIN0001234',
-        branchName: d.branchName || 'Connaught Place Branch',
-        upiIdOrChequeNo: d.upiIdOrChequeNo || 'driver@okaxis',
-        ...d,
-        firstName,
-        lastName,
-        email,
-        avatar,
-        driverType,
-        status,
-        sourceType
-      };
-    });
+    let list: Driver[] = this.allDrivers();
 
     // 1. Search Query Filter
     const query = this.searchQuery().toLowerCase().trim();
     if (query) {
       list = list.filter(d =>
-        d.firstName.toLowerCase().includes(query) ||
-        d.lastName.toLowerCase().includes(query) ||
-        d.email.toLowerCase().includes(query) ||
-        d.phone.includes(query) ||
+        (d.firstName || '').toLowerCase().includes(query) ||
+        (d.lastName || '').toLowerCase().includes(query) ||
+        (d.email || '').toLowerCase().includes(query) ||
+        (d.phone || '').includes(query) ||
         (d.driverType && d.driverType.toLowerCase().includes(query)) ||
         (d.state && d.state.toLowerCase().includes(query))
       );
@@ -528,13 +399,23 @@ export class Drivers implements OnInit {
     const list = this.processedDrivers();
     const start = (this.page() - 1) * this.pageSize();
     const paginated = list.slice(start, start + this.pageSize());
-    return JSON.stringify(paginated);
+    // `linkedUser` is a nested object — the shared data table's generic detail drawer just
+    // does `String(value)` per field, which would render `[object Object]`. Swap it for a
+    // flat display label instead; the link/unlink panel reads the real object off
+    // `allDrivers()` directly, not off this serialized row data.
+    return JSON.stringify(
+      paginated.map((d) => ({
+        ...d,
+        linkedUser: undefined,
+        linkedAccountLabel: d.linkedUser ? `${d.linkedUser.name} (${d.linkedUser.phone ?? d.linkedUser.email ?? ''})` : 'Not linked',
+      })),
+    );
   });
 
   readonly totalDrivers = computed(() => this.processedDrivers().length);
 
   ngOnInit(): void {
-    // Load copy strings dynamically
+    // Load copy strings dynamically (static UI copy, not business data)
     this.http.get<any>('data/drivers-registry.json').subscribe({
       next: (data) => {
         if (data) {
@@ -549,13 +430,19 @@ export class Drivers implements OnInit {
       }
     });
 
-    // Load static data from the JSON file inside public/data directory
-    this.http.get<Driver[]>('data/drivers.json').subscribe({
+    this.reload();
+  }
+
+  private reload(): void {
+    this.loading.set(true);
+    this.api.list().subscribe({
       next: (data) => {
-        this.allDrivers.set(data || []);
+        this.allDrivers.set(data);
+        this.loading.set(false);
       },
       error: (err) => {
-        console.error('Failed to load mock drivers JSON', err);
+        console.error('Failed to load drivers', err);
+        this.loading.set(false);
       }
     });
   }
@@ -573,13 +460,13 @@ export class Drivers implements OnInit {
     const phone = this.inputPhone().trim();
     const email = this.inputEmail().trim();
 
-    const newDriver: Driver = {
-      id: Date.now(),
+    const payload: Driver = {
       name: `${firstName} ${lastName}`.trim(),
       firstName,
       lastName,
       phone,
       email,
+      vehicle: this.inputVehicle().trim(),
       fatherName: this.inputFatherName().trim(),
       motherName: this.inputMotherName().trim(),
       emergencyNumber: this.inputEmergencyNumber().trim(),
@@ -600,8 +487,6 @@ export class Drivers implements OnInit {
       driverType: this.inputDriverType(),
       status: this.inputStatus(),
       sourceType: this.inputSourceType(),
-      vehicle: this.inputVehicle().trim(),
-      avatar: `https://i.pravatar.cc/100?img=${Date.now() % 70}`,
       education: this.inputEducation(),
       trainingStatus: this.inputTrainingStatus(),
       trainingCertificate: this.inputTrainingCertificate().trim(),
@@ -616,13 +501,10 @@ export class Drivers implements OnInit {
       dlExpiryDate: this.inputDlExpiryDate(),
       policeVerifiedStatus: this.inputPoliceVerifiedStatus(),
       policeVerifiedNo: this.inputPoliceVerifiedNo().trim(),
-      policeVerifiedUpload: this.inputPoliceVerifiedUpload().trim(),
       jobType: this.inputJobType(),
       experience: this.inputExperience(),
       currentSalary: this.inputCurrentSalary().trim(),
       expectedSalary: this.inputExpectedSalary(),
-      documentCategory: this.inputDocumentCategory(),
-      documentUpload: this.inputDocumentUpload().trim(),
       // --- Payment Details ---
       preferredPaymentMode: this.inputPreferredPaymentMode(),
       amount: this.inputAmount().trim(),
@@ -631,31 +513,41 @@ export class Drivers implements OnInit {
       bankAccountNo: this.inputBankAccountNo().trim(),
       ifscCode: this.inputIfscCode().trim(),
       branchName: this.inputBranchName().trim(),
-      upiIdOrChequeNo: this.inputUpiIdOrChequeNo().trim(),
-      personalDocs: this.personalDocs(),
-      healthDocs: this.healthDocs(),
-      educationDocs: this.educationDocs(),
-      policeDocs: this.policeDocs()
+      upiIdOrChequeNo: this.inputUpiIdOrChequeNo().trim()
     };
 
     const editingId = this.editingDriverId();
-    if (editingId !== null) {
-      // Edit mode: update existing driver while preserving original values like id and avatar
-      const originalDriver = this.allDrivers().find(d => d.id === editingId);
-      const updatedDriver: Driver = {
-        ...newDriver,
-        id: editingId,
-        avatar: originalDriver?.avatar || newDriver.avatar
-      };
-      this.allDrivers.update(list => list.map(d => d.id === editingId ? updatedDriver : d));
-    } else {
-      // Create mode
-      this.allDrivers.update((list) => [newDriver, ...list]);
-    }
+    const request = editingId !== null ? this.api.update(editingId, payload) : this.api.create(payload);
+    request.subscribe({
+      next: (driver) => {
+        this.uploadPendingDocuments(driver.id!);
+        this.reload();
+        this.resetForm();
+        this.showAddForm.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to save driver', err);
+        alert('Failed to save driver. Please try again.');
+      }
+    });
+  }
 
-    // Reset inputs and close form view
-    this.resetForm();
-    this.showAddForm.set(false);
+  private uploadPendingDocuments(driverId: string): void {
+    for (const [key, file] of this.pendingFiles.entries()) {
+      const [category, idxStr] = key.split('-') as ['personal' | 'health' | 'education' | 'police', string];
+      const idx = Number(idxStr);
+      const docs =
+        category === 'personal' ? this.personalDocs() :
+        category === 'health' ? this.healthDocs() :
+        category === 'education' ? this.educationDocs() :
+        this.policeDocs();
+      const doc = docs[idx];
+      if (!doc) continue;
+      this.api.uploadDocument(driverId, category, doc.type, doc.regNo, file).subscribe({
+        error: (err) => console.error(`Failed to upload ${category} document`, err)
+      });
+    }
+    this.pendingFiles.clear();
   }
 
   // --- Document List Actions ---
@@ -704,7 +596,9 @@ export class Drivers implements OnInit {
   onDocFileChange(category: 'personal' | 'health' | 'education' | 'police', idx: number, event: Event): void {
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
-    const val = file ? file.name : '';
+    if (!file) return;
+    this.pendingFiles.set(`${category}-${idx}`, file);
+    const val = file.name;
     if (category === 'personal') {
       this.personalDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: val } : doc));
     } else if (category === 'health') {
@@ -717,6 +611,7 @@ export class Drivers implements OnInit {
   }
 
   clearDocFile(category: 'personal' | 'health' | 'education' | 'police', idx: number): void {
+    this.pendingFiles.delete(`${category}-${idx}`);
     if (category === 'personal') {
       this.personalDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: '' } : doc));
     } else if (category === 'health') {
@@ -732,6 +627,7 @@ export class Drivers implements OnInit {
     this.formSubmitted.set(false);
     this.touchedFields.set({});
     this.editingDriverId.set(null);
+    this.pendingFiles.clear();
     this.inputFirstName.set('');
     this.inputLastName.set('');
     this.inputFatherName.set('');
@@ -817,7 +713,7 @@ export class Drivers implements OnInit {
 
     if (action === 'edit_driver') {
       this.editingDriverId.set(row.id);
-      
+
       // Populate form signals
       this.inputFirstName.set(row.firstName || '');
       this.inputLastName.set(row.lastName || '');
@@ -881,9 +777,69 @@ export class Drivers implements OnInit {
       this.showAddForm.set(true);
     } else if (action === 'delete_driver') {
       if (confirm(`Are you sure you want to delete lead "${row.firstName} ${row.lastName}"?`)) {
-        this.allDrivers.update(list => list.filter(d => d.id !== row.id));
+        this.api.delete(row.id).subscribe({
+          next: () => this.reload(),
+          error: (err) => {
+            console.error('Failed to delete driver', err);
+            alert('Failed to delete driver. Please try again.');
+          }
+        });
       }
+    } else if (action === 'link_driver') {
+      const driver = this.allDrivers().find((d) => d.id === row.id);
+      if (driver) this.openLinkPanel(driver);
     }
+  }
+
+  // --- Driver <-> User account linking ---
+  openLinkPanel(driver: Driver): void {
+    this.linkPanelDriver.set(driver);
+    this.linkSelectedUserId.set('');
+    this.linkError.set(null);
+    if (this.linkUsers().length === 0) {
+      this.rbac.listUsers(1, 200).subscribe({
+        next: (page) => this.linkUsers.set(page.items.map((u) => ({ id: u.id, name: u.name, phone: u.phone, email: u.email }))),
+        error: (err) => console.error('Failed to load users for linking', err),
+      });
+    }
+  }
+
+  closeLinkPanel(): void {
+    this.linkPanelDriver.set(null);
+  }
+
+  confirmLink(): void {
+    const driver = this.linkPanelDriver();
+    const userId = this.linkSelectedUserId();
+    if (!driver?.id || !userId) {
+      this.linkError.set('Please select a user account.');
+      return;
+    }
+    this.linkSaving.set(true);
+    this.linkError.set(null);
+    this.api.linkToUser(driver.id, userId).subscribe({
+      next: (updated) => {
+        this.linkSaving.set(false);
+        this.allDrivers.update((list) => list.map((d) => (d.id === updated.id ? updated : d)));
+        this.closeLinkPanel();
+      },
+      error: (err) => {
+        this.linkSaving.set(false);
+        this.linkError.set(err?.message || 'Failed to link account — the user may already be linked to another driver.');
+      },
+    });
+  }
+
+  unlinkUser(driver: Driver): void {
+    if (!driver.id) return;
+    if (!confirm(`Unlink ${driver.firstName} ${driver.lastName}'s account? They will lose access to the driver portal.`)) return;
+    this.api.unlinkUser(driver.id).subscribe({
+      next: (updated) => this.allDrivers.update((list) => list.map((d) => (d.id === updated.id ? updated : d))),
+      error: (err) => {
+        console.error('Failed to unlink account', err);
+        alert('Failed to unlink account. Please try again.');
+      },
+    });
   }
 
   // --- View Control Events ---
