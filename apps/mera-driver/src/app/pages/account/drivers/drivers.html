@@ -167,11 +167,31 @@
                       }
                     </md-outlined-select>
 
-                    <md-outlined-select label="Language Spoken" [value]="inputLanguage()" (change)="onInputChange('language', $event)">
-                      @for (opt of languages(); track opt) {
-                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                      }
-                    </md-outlined-select>
+                    <div class="relative w-full">
+                      <md-outlined-text-field
+                        id="lang-select-anchor"
+                        label="Languages Spoken"
+                        readonly
+                        class="w-full cursor-pointer"
+                        [value]="selectedLanguagesText()"
+                        (click)="toggleLangDropdown()"
+                      >
+                        <md-icon slot="trailing-icon">arrow_drop_down</md-icon>
+                      </md-outlined-text-field>
+                      <md-menu
+                        anchor="lang-select-anchor"
+                        positioning="popover"
+                        [open]="isLangDropdownOpen()"
+                        (closed)="isLangDropdownOpen.set(false)"
+                      >
+                        @for (opt of languages(); track opt) {
+                          <md-menu-item keep-open (click)="toggleLanguage(opt)">
+                            <md-checkbox slot="start" [checked]="isLanguageSelected(opt)"></md-checkbox>
+                            <div slot="headline">{{ opt }}</div>
+                          </md-menu-item>
+                        }
+                      </md-menu>
+                    </div>
                   </div>
                 </sky-card>
               }
@@ -209,9 +229,7 @@
 
                     <md-outlined-text-field label="Pincode" [value]="inputPincode()" (input)="onInputChange('pincode', $event)" placeholder="Enter pincode"></md-outlined-text-field>
 
-                    <md-outlined-text-field label="Assigned Vehicle Name" [value]="inputVehicle()" (input)="onInputChange('vehicle', $event)" placeholder="Enter vehicle name"></md-outlined-text-field>
-
-                    <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Address" [value]="inputAddress()" (input)="onInputChange('address', $event)" placeholder="Enter full address"></md-outlined-text-field>
+                    <md-outlined-text-field label="Address" [value]="inputAddress()" (input)="onInputChange('address', $event)" placeholder="Enter full address"></md-outlined-text-field>
                   </div>
                 </sky-card>
               }
@@ -247,19 +265,6 @@
               @if (activeSubSection() === 3) {
                 <sky-card class="p-6 block">
                   <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
-                    <md-outlined-text-field
-                      label="Application No."
-                      required
-                      [value]="inputAppNo()"
-                      (input)="onInputChange('appNo', $event)"
-                      (blur)="markTouched('appNo')"
-                      [error]="!!appNoError()"
-                      [errorText]="appNoError()"
-                      placeholder="e.g. APP-10029"
-                    ></md-outlined-text-field>
-
-                    <md-outlined-text-field label="Joining Date" type="date" [value]="inputJoiningDate()" (input)="onInputChange('joiningDate', $event)"></md-outlined-text-field>
-
                     <md-outlined-select label="Source Type" [value]="inputSourceType()" (change)="onInputChange('sourceType', $event)">
                       @for (opt of sourceTypes(); track opt) {
                         <md-select-option [value]="opt">
@@ -269,7 +274,7 @@
                     </md-outlined-select>
 
                     <md-outlined-select
-                      label="Category Status"
+                      label="Driver Status"
                       required
                       [value]="inputStatus()"
                       (change)="onInputChange('status', $event)"
@@ -286,21 +291,46 @@
                       <md-select-option value="Not Useful"><div slot="headline">Not Useful</div></md-select-option>
                     </md-outlined-select>
 
-                    <md-outlined-select
-                      label="Driver Type"
-                      required
-                      [value]="inputDriverType()"
-                      (change)="onInputChange('driverType', $event)"
-                      (blur)="markTouched('driverType')"
-                      [error]="!!driverTypeError()"
-                      [errorText]="driverTypeError()"
-                    >
-                      <md-select-option value="Personal driver"><div slot="headline">Personal driver</div></md-select-option>
-                      <md-select-option value="Car Driver"><div slot="headline">Car Driver</div></md-select-option>
-                      <md-select-option value="Bike Rider"><div slot="headline">Bike Rider</div></md-select-option>
-                      <md-select-option value="Ambulance Driver"><div slot="headline">Ambulance Driver</div></md-select-option>
-                      <md-select-option value="Construction Vehicle Driver"><div slot="headline">Construction Vehicle Driver</div></md-select-option>
+                    <md-outlined-select label="Job Type" [value]="inputJobType()" (change)="onInputChange('jobType', $event)">
+                      @for (opt of jobTypeOptions(); track opt) {
+                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                      }
                     </md-outlined-select>
+
+                    <md-outlined-select label="Experience" [value]="inputExperience()" (change)="onInputChange('experience', $event)">
+                      @for (opt of experienceOptions(); track opt) {
+                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                      }
+                    </md-outlined-select>
+
+                    <div class="relative w-full">
+                      <md-outlined-text-field
+                        id="drivertype-select-anchor"
+                        label="Driver Type"
+                        readonly
+                        required
+                        class="w-full cursor-pointer"
+                        [value]="selectedDriverTypesText()"
+                        (click)="toggleDriverTypeDropdown()"
+                        [error]="!!driverTypeError()"
+                        [errorText]="driverTypeError()"
+                      >
+                        <md-icon slot="trailing-icon">arrow_drop_down</md-icon>
+                      </md-outlined-text-field>
+                      <md-menu
+                        anchor="drivertype-select-anchor"
+                        positioning="popover"
+                        [open]="isDriverTypeDropdownOpen()"
+                        (closed)="isDriverTypeDropdownOpen.set(false)"
+                      >
+                        @for (opt of driverTypeOptions(); track opt) {
+                          <md-menu-item keep-open (click)="toggleDriverType(opt)">
+                            <md-checkbox slot="start" [checked]="isDriverTypeSelected(opt)"></md-checkbox>
+                            <div slot="headline">{{ opt }}</div>
+                          </md-menu-item>
+                        }
+                      </md-menu>
+                    </div>
                   </div>
                 </sky-card>
               }
@@ -319,48 +349,138 @@
 
               <!-- 1. Education & Training Profile -->
               @if (activeSubSection() === 0) {
-                <sky-card class="p-6 block">
-                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
-                    <md-outlined-select label="Education" [value]="inputEducation()" (change)="onInputChange('education', $event)">
-                      @for (opt of educationLevels(); track opt) {
-                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                      }
-                    </md-outlined-select>
+                <div class="flex flex-col gap-y-6 w-full">
+                  <sky-card class="p-6 block">
+                    <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
+                      <md-outlined-select label="Education" [value]="inputEducation()" (change)="onInputChange('education', $event)">
+                        @for (opt of educationLevels(); track opt) {
+                          <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                        }
+                      </md-outlined-select>
 
-                    <md-outlined-select label="Training Status" [value]="inputTrainingStatus()" (change)="onInputChange('trainingStatus', $event)">
-                      @for (opt of trainingStatuses(); track opt) {
-                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                      }
-                    </md-outlined-select>
+                      <md-outlined-select label="Training Status" [value]="inputTrainingStatus()" (change)="onInputChange('trainingStatus', $event)">
+                        @for (opt of trainingStatuses(); track opt) {
+                          <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                        }
+                      </md-outlined-select>
 
-                    <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Training Certificate" [value]="inputTrainingCertificate()" (input)="onInputChange('trainingCertificate', $event)" placeholder="Enter training certificate details"></md-outlined-text-field>
-                  </div>
-                </sky-card>
+                      <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Training Certificate" [value]="inputTrainingCertificate()" (input)="onInputChange('trainingCertificate', $event)" placeholder="Enter training certificate details"></md-outlined-text-field>
+                    </div>
+                  </sky-card>
+
+                  <!-- Education Documents Upload -->
+                  <sky-card class="p-6 block">
+                    <h4 class="text-sm font-semibold text-slate-700 mb-4">Education Documents Upload</h4>
+                    <div class="flex flex-col gap-y-4">
+                      @for (doc of educationDocs(); track $index) {
+                        <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
+                          <md-outlined-select class="col-span-5 max-md:w-full" label="Document Type" [value]="doc.type" (change)="onDocChange('education', $index, 'type', $event)">
+                            <md-select-option value="Select Document Type"><div slot="headline">Select Document Type</div></md-select-option>
+                            @for (opt of educationDocTypes(); track opt) {
+                              <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                            }
+                          </md-outlined-select>
+
+                          <div class="col-span-6 max-md:w-full flex items-center gap-2 relative cursor-pointer">
+                            <input type="file" (change)="onDocFileChange('education', $index, $event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputEducation>
+                            <md-outlined-text-field class="flex-1 cursor-pointer" label="Document File Upload" readonly [value]="doc.file || 'No file chosen'">
+                              <md-icon slot="leading-icon">upload_file</md-icon>
+                            </md-outlined-text-field>
+                            @if (doc.file) {
+                              <md-icon-button type="button" (click)="clearDocFile('education', $index); $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
+                                <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
+                              </md-icon-button>
+                            }
+                          </div>
+
+                          <div class="col-span-1 flex justify-end max-md:w-full">
+                            @if (educationDocs().length > 1) {
+                              <md-icon-button type="button" (click)="deleteEducationDoc($index)" title="Delete Document">
+                                <md-icon class="text-red-500">delete</md-icon>
+                              </md-icon-button>
+                            }
+                          </div>
+                        </div>
+                      }
+                      <div class="flex justify-start mt-2">
+                        <md-filled-tonal-button type="button" (click)="addEducationDoc()">
+                          <md-icon slot="icon">school</md-icon>
+                          Add Education Document
+                        </md-filled-tonal-button>
+                      </div>
+                    </div>
+                  </sky-card>
+                </div>
               }
 
               <!-- 2. Health & Medical Specifications -->
               @if (activeSubSection() === 1) {
-                <sky-card class="p-6 block">
-                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
-                    <md-outlined-select label="Eye Vision" [value]="inputEyeVision()" (change)="onInputChange('eyeVision', $event)">
-                      @for (opt of eyeVisions(); track opt) {
-                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                      }
-                    </md-outlined-select>
+                <div class="flex flex-col gap-y-6 w-full">
+                  <sky-card class="p-6 block">
+                    <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
+                      <md-outlined-select label="Eye Vision" [value]="inputEyeVision()" (change)="onInputChange('eyeVision', $event)">
+                        @for (opt of eyeVisions(); track opt) {
+                          <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                        }
+                      </md-outlined-select>
 
-                    <md-outlined-select label="Health Insurance Status" [value]="inputHealthInsurance()" (change)="onInputChange('healthInsurance', $event)">
-                      @for (opt of healthInsurances(); track opt) {
-                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                      }
-                    </md-outlined-select>
+                      <md-outlined-select label="Health Insurance Status" [value]="inputHealthInsurance()" (change)="onInputChange('healthInsurance', $event)">
+                        @for (opt of healthInsurances(); track opt) {
+                          <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                        }
+                      </md-outlined-select>
 
-                    <md-outlined-select label="Blood Group" [value]="inputBloodGroup()" (change)="onInputChange('bloodGroup', $event)">
-                      @for (opt of bloodGroups(); track opt) {
-                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                      <md-outlined-select label="Blood Group" [value]="inputBloodGroup()" (change)="onInputChange('bloodGroup', $event)">
+                        @for (opt of bloodGroups(); track opt) {
+                          <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                        }
+                      </md-outlined-select>
+                    </div>
+                  </sky-card>
+
+                  <!-- Health Documents Upload -->
+                  <sky-card class="p-6 block">
+                    <h4 class="text-sm font-semibold text-slate-700 mb-4">Health Documents Upload</h4>
+                    <div class="flex flex-col gap-y-4">
+                      @for (doc of healthDocs(); track $index) {
+                        <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
+                          <md-outlined-select class="col-span-5 max-md:w-full" label="Document Type" [value]="doc.type" (change)="onDocChange('health', $index, 'type', $event)">
+                            <md-select-option value="Select Document Type"><div slot="headline">Select Document Type</div></md-select-option>
+                            @for (opt of healthDocTypes(); track opt) {
+                              <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                            }
+                          </md-outlined-select>
+
+                          <div class="col-span-6 max-md:w-full flex items-center gap-2 relative cursor-pointer">
+                            <input type="file" (change)="onDocFileChange('health', $index, $event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputHealth>
+                            <md-outlined-text-field class="flex-1 cursor-pointer" label="Document File Upload" readonly [value]="doc.file || 'No file chosen'">
+                              <md-icon slot="leading-icon">upload_file</md-icon>
+                            </md-outlined-text-field>
+                            @if (doc.file) {
+                              <md-icon-button type="button" (click)="clearDocFile('health', $index); $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
+                                <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
+                              </md-icon-button>
+                            }
+                          </div>
+
+                          <div class="col-span-1 flex justify-end max-md:w-full">
+                            @if (healthDocs().length > 1) {
+                              <md-icon-button type="button" (click)="deleteHealthDoc($index)" title="Delete Document">
+                                <md-icon class="text-red-500">delete</md-icon>
+                              </md-icon-button>
+                            }
+                          </div>
+                        </div>
                       }
-                    </md-outlined-select>
-                  </div>
-                </sky-card>
+                      <div class="flex justify-start mt-2">
+                        <md-filled-tonal-button type="button" (click)="addHealthDoc()">
+                          <md-icon slot="icon">post_add</md-icon>
+                          Add Health Document
+                        </md-filled-tonal-button>
+                      </div>
+                    </div>
+                  </sky-card>
+                </div>
               }
             </div>
           }
@@ -374,9 +494,6 @@
                 <md-filter-chip label="1. Driving License Details" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
                 <md-filter-chip label="2. Police Verification & Employment" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
                 <md-filter-chip label="3. Personal & Category Docs" [selected]="activeSubSection() === 2" (click)="activeSubSection.set(2)"></md-filter-chip>
-                <md-filter-chip label="4. Health Docs" [selected]="activeSubSection() === 3" (click)="activeSubSection.set(3)"></md-filter-chip>
-                <md-filter-chip label="5. Education Docs" [selected]="activeSubSection() === 4" (click)="activeSubSection.set(4)"></md-filter-chip>
-                <md-filter-chip label="6. Police Verification Docs" [selected]="activeSubSection() === 5" (click)="activeSubSection.set(5)"></md-filter-chip>
               </md-chip-set>
 
               <!-- 1. Driving License Details -->
@@ -385,12 +502,6 @@
                   <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
                     <md-outlined-select label="License Details" [value]="inputLicenseDetails()" (change)="onInputChange('licenseDetails', $event)">
                       @for (opt of licenseDetailsOptions(); track opt) {
-                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                      }
-                    </md-outlined-select>
-
-                    <md-outlined-select label="Vehicle Type" [value]="inputVehicleType()" (change)="onInputChange('vehicleType', $event)">
-                      @for (opt of vehicleTypeOptions(); track opt) {
                         <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                       }
                     </md-outlined-select>
@@ -415,37 +526,66 @@
 
               <!-- 2. Police Verification & Employment Details -->
               @if (activeSubSection() === 1) {
-                <sky-card class="p-6 block">
-                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
-                    <md-outlined-select label="Police Verified Status" [value]="inputPoliceVerifiedStatus()" (change)="onInputChange('policeVerifiedStatus', $event)">
-                      @for (opt of policeVerifiedStatuses(); track opt) {
-                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                <div class="flex flex-col gap-y-6 w-full">
+                  <sky-card class="p-6 block">
+                    <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
+                      <md-outlined-select label="Police Verified Status" [value]="inputPoliceVerifiedStatus()" (change)="onInputChange('policeVerifiedStatus', $event)">
+                        @for (opt of policeVerifiedStatuses(); track opt) {
+                          <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                        }
+                      </md-outlined-select>
+
+                      @if (inputPoliceVerifiedStatus() === 'Yes') {
+                        <md-outlined-text-field label="Police Verified No" [value]="inputPoliceVerifiedNo()" (input)="onInputChange('policeVerifiedNo', $event)" placeholder="e.g. PV-883921"></md-outlined-text-field>
                       }
-                    </md-outlined-select>
+                    </div>
+                  </sky-card>
 
-                    <md-outlined-text-field label="Police Verified No" [value]="inputPoliceVerifiedNo()" (input)="onInputChange('policeVerifiedNo', $event)" placeholder="e.g. PV-883921"></md-outlined-text-field>
+                  <!-- Police Verification Documents Upload Section (Visible only when Police Verified Status is Yes) -->
+                  @if (inputPoliceVerifiedStatus() === 'Yes') {
+                    <sky-card class="p-6 block">
+                      <h4 class="text-sm font-semibold text-slate-700 mb-4">Police Verification Documents Upload</h4>
+                      <div class="flex flex-col gap-y-4">
+                        @for (doc of policeDocs(); track $index) {
+                          <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
+                            <md-outlined-select class="col-span-5 max-md:w-full" label="Document Type" [value]="doc.type" (change)="onDocChange('police', $index, 'type', $event)">
+                              <md-select-option value="Select Document Type"><div slot="headline">Select Document Type</div></md-select-option>
+                              @for (opt of policeDocTypes(); track opt) {
+                                <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                              }
+                            </md-outlined-select>
 
-                    <md-outlined-select label="Job Type" [value]="inputJobType()" (change)="onInputChange('jobType', $event)">
-                      @for (opt of jobTypeOptions(); track opt) {
-                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                      }
-                    </md-outlined-select>
+                            <div class="col-span-6 max-md:w-full flex items-center gap-2 relative cursor-pointer">
+                              <input type="file" (change)="onDocFileChange('police', $index, $event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputPolice>
+                              <md-outlined-text-field class="flex-1 cursor-pointer" label="Document File Upload" readonly [value]="doc.file || 'No file chosen'">
+                                <md-icon slot="leading-icon">upload_file</md-icon>
+                              </md-outlined-text-field>
+                              @if (doc.file) {
+                                <md-icon-button type="button" (click)="clearDocFile('police', $index); $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
+                                  <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
+                                </md-icon-button>
+                              }
+                            </div>
 
-                    <md-outlined-select label="Experience" [value]="inputExperience()" (change)="onInputChange('experience', $event)">
-                      @for (opt of experienceOptions(); track opt) {
-                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                      }
-                    </md-outlined-select>
-
-                    <md-outlined-text-field label="Current Salary (₹)" type="number" [value]="inputCurrentSalary()" (input)="onInputChange('currentSalary', $event)" placeholder="e.g. 12000"></md-outlined-text-field>
-
-                    <md-outlined-select label="Expected Salary" [value]="inputExpectedSalary()" (change)="onInputChange('expectedSalary', $event)">
-                      @for (opt of expectedSalaryOptions(); track opt) {
-                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                      }
-                    </md-outlined-select>
-                  </div>
-                </sky-card>
+                            <div class="col-span-1 flex justify-end max-md:w-full">
+                              @if (policeDocs().length > 1) {
+                                <md-icon-button type="button" (click)="deletePoliceDoc($index)" title="Delete Document">
+                                  <md-icon class="text-red-500">delete</md-icon>
+                                </md-icon-button>
+                              }
+                            </div>
+                          </div>
+                        }
+                        <div class="flex justify-start mt-2">
+                          <md-filled-tonal-button type="button" (click)="addPoliceDoc()">
+                            <md-icon slot="icon">verified</md-icon>
+                            Add Verification Document
+                          </md-filled-tonal-button>
+                        </div>
+                      </div>
+                    </sky-card>
+                  }
+                </div>
               }
 
               <!-- 3. Personal & Category Documents -->
@@ -455,17 +595,14 @@
                     @for (doc of personalDocs(); track $index) {
                       <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
                         <!-- Document Category Dropdown -->
-                        <md-outlined-select class="col-span-3 max-md:w-full" label="Document Type" [value]="doc.type" (change)="onDocChange('personal', $index, 'type', $event)">
+                        <md-outlined-select class="col-span-5 max-md:w-full" label="Document Type" [value]="doc.type" (change)="onDocChange('personal', $index, 'type', $event)">
                           @for (opt of documentCategoryOptions(); track opt) {
                             <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                           }
                         </md-outlined-select>
 
-                        <!-- Reg / Ref No -->
-                        <md-outlined-text-field class="col-span-3 max-md:w-full" label="Registration / Reference No." [value]="doc.regNo" (input)="onDocChange('personal', $index, 'regNo', $event)" placeholder="Ref No."></md-outlined-text-field>
-
                         <!-- Document Upload -->
-                        <div class="col-span-5 max-md:w-full flex items-center gap-2 relative cursor-pointer">
+                        <div class="col-span-6 max-md:w-full flex items-center gap-2 relative cursor-pointer">
                           <input type="file" (change)="onDocFileChange('personal', $index, $event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputDocCat>
                           <md-outlined-text-field
                             class="flex-1 cursor-pointer"
@@ -503,169 +640,6 @@
                 </sky-card>
               }
 
-              <!-- 4. Health Documents -->
-              @if (activeSubSection() === 3) {
-                <sky-card class="p-6 block">
-                  <div class="flex flex-col gap-y-4">
-                    @for (doc of healthDocs(); track $index) {
-                      <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
-                        <!-- Dropdown -->
-                        <md-outlined-select class="col-span-3 max-md:w-full" label="Document Type" [value]="doc.type" (change)="onDocChange('health', $index, 'type', $event)">
-                          <md-select-option value="Select Document Type"><div slot="headline">Select Document Type</div></md-select-option>
-                          @for (opt of healthDocTypes(); track opt) {
-                            <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                          }
-                        </md-outlined-select>
-
-                        <!-- Reg No -->
-                        <md-outlined-text-field class="col-span-3 max-md:w-full" label="Registration / Reference No." [value]="doc.regNo" (input)="onDocChange('health', $index, 'regNo', $event)" placeholder="Ref No."></md-outlined-text-field>
-
-                        <!-- File Upload -->
-                        <div class="col-span-5 max-md:w-full flex items-center gap-2 relative cursor-pointer">
-                          <input type="file" (change)="onDocFileChange('health', $index, $event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputHealth>
-                          <md-outlined-text-field
-                            class="flex-1 cursor-pointer"
-                            label="Document File Upload"
-                            readonly
-                            [value]="doc.file || 'No file chosen'"
-                          >
-                            <md-icon slot="leading-icon">upload_file</md-icon>
-                          </md-outlined-text-field>
-                          @if (doc.file) {
-                            <md-icon-button type="button" (click)="clearDocFile('health', $index); $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
-                              <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
-                            </md-icon-button>
-                          }
-                        </div>
-
-                        <!-- Delete Button -->
-                        <div class="col-span-1 flex justify-end max-md:w-full">
-                          @if (healthDocs().length > 1) {
-                            <md-icon-button type="button" (click)="deleteHealthDoc($index)" title="Delete Document">
-                              <md-icon class="text-red-500">delete</md-icon>
-                            </md-icon-button>
-                          }
-                        </div>
-                      </div>
-                    }
-                    
-                    <div class="flex justify-start mt-2">
-                      <md-filled-tonal-button type="button" (click)="addHealthDoc()">
-                        <md-icon slot="icon">post_add</md-icon>
-                        Add Health Document
-                      </md-filled-tonal-button>
-                    </div>
-                  </div>
-                </sky-card>
-              }
-
-              <!-- 5. Education Documents -->
-              @if (activeSubSection() === 4) {
-                <sky-card class="p-6 block">
-                  <div class="flex flex-col gap-y-4">
-                    @for (doc of educationDocs(); track $index) {
-                      <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
-                        <!-- Text Field -->
-                        <md-outlined-text-field class="col-span-3 max-md:w-full" label="Document Type / Name" [value]="doc.type" (input)="onDocChange('education', $index, 'type', $event)" placeholder="e.g. 10th Certificate"></md-outlined-text-field>
-
-                        <!-- Reg No -->
-                        <md-outlined-text-field class="col-span-3 max-md:w-full" label="Registration / Reference No." [value]="doc.regNo" (input)="onDocChange('education', $index, 'regNo', $event)" placeholder="Registration No."></md-outlined-text-field>
-
-                        <!-- File Upload -->
-                        <div class="col-span-5 max-md:w-full flex items-center gap-2 relative cursor-pointer">
-                          <input type="file" (change)="onDocFileChange('education', $index, $event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputEducation>
-                          <md-outlined-text-field
-                            class="flex-1 cursor-pointer"
-                            label="Document File Upload"
-                            readonly
-                            [value]="doc.file || 'No file chosen'"
-                          >
-                            <md-icon slot="leading-icon">upload_file</md-icon>
-                          </md-outlined-text-field>
-                          @if (doc.file) {
-                            <md-icon-button type="button" (click)="clearDocFile('education', $index); $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
-                              <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
-                            </md-icon-button>
-                          }
-                        </div>
-
-                        <!-- Delete Button -->
-                        <div class="col-span-1 flex justify-end max-md:w-full">
-                          @if (educationDocs().length > 1) {
-                            <md-icon-button type="button" (click)="deleteEducationDoc($index)" title="Delete Document">
-                              <md-icon class="text-red-500">delete</md-icon>
-                            </md-icon-button>
-                          }
-                        </div>
-                      </div>
-                    }
-                    
-                    <div class="flex justify-start mt-2">
-                      <md-filled-tonal-button type="button" (click)="addEducationDoc()">
-                        <md-icon slot="icon">school</md-icon>
-                        Add Education Document
-                      </md-filled-tonal-button>
-                    </div>
-                  </div>
-                </sky-card>
-              }
-
-              <!-- 6. Police Verification Documents -->
-              @if (activeSubSection() === 5) {
-                <sky-card class="p-6 block">
-                  <div class="flex flex-col gap-y-4">
-                    @for (doc of policeDocs(); track $index) {
-                      <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
-                        <!-- Dropdown -->
-                        <md-outlined-select class="col-span-3 max-md:w-full" label="Document Type" [value]="doc.type" (change)="onDocChange('police', $index, 'type', $event)">
-                          <md-select-option value="Select Document Type"><div slot="headline">Select Document Type</div></md-select-option>
-                          @for (opt of policeDocTypes(); track opt) {
-                            <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                          }
-                        </md-outlined-select>
-
-                        <!-- Reg No -->
-                        <md-outlined-text-field class="col-span-3 max-md:w-full" label="Registration / Reference No." [value]="doc.regNo" (input)="onDocChange('police', $index, 'regNo', $event)" placeholder="Reference No."></md-outlined-text-field>
-
-                        <!-- File Upload -->
-                        <div class="col-span-5 max-md:w-full flex items-center gap-2 relative cursor-pointer">
-                          <input type="file" (change)="onDocFileChange('police', $index, $event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputPolice>
-                          <md-outlined-text-field
-                            class="flex-1 cursor-pointer"
-                            label="Document File Upload"
-                            readonly
-                            [value]="doc.file || 'No file chosen'"
-                          >
-                            <md-icon slot="leading-icon">upload_file</md-icon>
-                          </md-outlined-text-field>
-                          @if (doc.file) {
-                            <md-icon-button type="button" (click)="clearDocFile('police', $index); $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
-                              <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
-                            </md-icon-button>
-                          }
-                        </div>
-
-                        <!-- Delete Button -->
-                        <div class="col-span-1 flex justify-end max-md:w-full">
-                          @if (policeDocs().length > 1) {
-                            <md-icon-button type="button" (click)="deletePoliceDoc($index)" title="Delete Document">
-                              <md-icon class="text-red-500">delete</md-icon>
-                            </md-icon-button>
-                          }
-                        </div>
-                      </div>
-                    }
-                    
-                    <div class="flex justify-start mt-2">
-                      <md-filled-tonal-button type="button" (click)="addPoliceDoc()">
-                        <md-icon slot="icon">verified</md-icon>
-                        Add Verification Document
-                      </md-filled-tonal-button>
-                    </div>
-                  </div>
-                </sky-card>
-              }
-
             </div>
           }
 
@@ -675,48 +649,33 @@
               
               <!-- Sub-Section Navigation Chips -->
               <md-chip-set class="mb-2">
-                <md-filter-chip label="1. Payment Plan & Settings" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
-                <md-filter-chip label="2. Bank Account Details" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
-                <md-filter-chip label="3. Digital / UPI / Instrument Details" [selected]="activeSubSection() === 2" (click)="activeSubSection.set(2)"></md-filter-chip>
+                <md-filter-chip label="1. Account Details" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
               </md-chip-set>
 
-              <!-- 1. Payment Plan & Settings -->
+              <!-- 1. Account Details -->
               @if (activeSubSection() === 0) {
                 <sky-card class="p-6 block">
-                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
-                    <md-outlined-select label="Preferred Payment Mode" [value]="inputPreferredPaymentMode()" (change)="onInputChange('preferredPaymentMode', $event)">
+                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
+                    <!-- Preferred Payment Mode Dropdown -->
+                    <md-outlined-select label="Payment Method" [value]="inputPreferredPaymentMode()" (change)="onInputChange('preferredPaymentMode', $event)">
                       @for (opt of paymentModes(); track opt) {
                         <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                       }
                     </md-outlined-select>
 
-                    <md-outlined-text-field label="Amount" [value]="inputAmount()" (input)="onInputChange('amount', $event)" placeholder="Enter amount"></md-outlined-text-field>
+                    <!-- CONDITIONAL FIELDS DEPENDING ON PAYMENT METHOD -->
+                    <!-- Bank Account -->
+                    @if (inputPreferredPaymentMode() === 'Bank Account') {
+                      <md-outlined-text-field label="Bank Name" [value]="inputBankName()" (input)="onInputChange('bankName', $event)" placeholder="Enter bank name"></md-outlined-text-field>
+                      <md-outlined-text-field label="Bank Account No" [value]="inputBankAccountNo()" (input)="onInputChange('bankAccountNo', $event)" placeholder="Enter account number"></md-outlined-text-field>
+                      <md-outlined-text-field label="IFSC Code" [value]="inputIfscCode()" (input)="onInputChange('ifscCode', $event)" placeholder="Enter IFSC code"></md-outlined-text-field>
+                      <md-outlined-text-field label="Branch Name" [value]="inputBranchName()" (input)="onInputChange('branchName', $event)" placeholder="Enter branch name"></md-outlined-text-field>
+                    }
 
-                    <md-outlined-text-field type="date" label="Payment Receipt Date" [value]="inputPaymentReceiptDate()" (input)="onInputChange('paymentReceiptDate', $event)"></md-outlined-text-field>
-                  </div>
-                </sky-card>
-              }
-
-              <!-- 2. Bank Account Details -->
-              @if (activeSubSection() === 1) {
-                <sky-card class="p-6 block">
-                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
-                    <md-outlined-text-field label="Bank Name" [value]="inputBankName()" (input)="onInputChange('bankName', $event)" placeholder="Enter bank name"></md-outlined-text-field>
-
-                    <md-outlined-text-field label="Bank Account No" [value]="inputBankAccountNo()" (input)="onInputChange('bankAccountNo', $event)" placeholder="Enter account number"></md-outlined-text-field>
-
-                    <md-outlined-text-field label="IFSC Code" [value]="inputIfscCode()" (input)="onInputChange('ifscCode', $event)" placeholder="Enter IFSC code"></md-outlined-text-field>
-
-                    <md-outlined-text-field label="Branch Name" [value]="inputBranchName()" (input)="onInputChange('branchName', $event)" placeholder="Enter branch name"></md-outlined-text-field>
-                  </div>
-                </sky-card>
-              }
-
-              <!-- 3. Digital / UPI / Instrument Details -->
-              @if (activeSubSection() === 2) {
-                <sky-card class="p-6 block">
-                  <div class="grid grid-cols-1 gap-4 w-full">
-                    <md-outlined-text-field label="UPI ID / Cheque No" [value]="inputUpiIdOrChequeNo()" (input)="onInputChange('upiIdOrChequeNo', $event)" placeholder="Enter UPI ID or Cheque No"></md-outlined-text-field>
+                    <!-- UPI -->
+                    @if (inputPreferredPaymentMode() === 'UPI') {
+                      <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="UPI ID" [value]="inputUpiIdOrChequeNo()" (input)="onInputChange('upiIdOrChequeNo', $event)" placeholder="e.g. username@upi"></md-outlined-text-field>
+                    }
                   </div>
                 </sky-card>
               }
