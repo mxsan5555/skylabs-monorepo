@@ -29,6 +29,9 @@ export const UpdateOwnDriverSchema = CreateDriverSchema.omit({
   expectedSalary: true,
   amount: true,
   paymentReceiptDate: true,
+  // Onboarding-wizard bookkeeping — admin-console-only concept, not part of the driver's
+  // own self-service surface.
+  stepCompleted: true,
 })
   .partial()
   .extend({

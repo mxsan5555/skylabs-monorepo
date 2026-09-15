@@ -68,6 +68,12 @@ export interface Driver {
   policeDocs?: Array<{ type: string; regNo: string; file: string }>;
   /** The User account linked to this driver's self-service portal, if any. */
   linkedUser?: { id: string; name: string; email: string | null; phone: string | null } | null;
+  /** Multi-step onboarding-form progress — set server-side, never trust/derive from the
+   *  frontend beyond the `stepCompleted` number sent on each step save. */
+  onboardingStatus?: 'in_progress' | 'completed';
+  currentStep?: number;
+  completedSteps?: number[];
+  completionPercentage?: number;
 }
 
 interface DriverDocumentDto {
@@ -135,6 +141,10 @@ interface DriverDto {
   upiIdOrChequeNo: string | null;
   documents: DriverDocumentDto[];
   user: { id: string; name: string; email: string | null; phone: string | null } | null;
+  onboardingStatus: string;
+  currentStep: number;
+  completedSteps: number[];
+  completionPercentage: number;
 }
 
 function docsByCategory(docs: DriverDocumentDto[], category: DriverDocumentDto['category']) {
@@ -205,10 +215,14 @@ function fromDto(dto: DriverDto): Driver {
     educationDocs: docsByCategory(dto.documents, 'education'),
     policeDocs: docsByCategory(dto.documents, 'police'),
     linkedUser: dto.user,
+    onboardingStatus: dto.onboardingStatus === 'completed' ? 'completed' : 'in_progress',
+    currentStep: dto.currentStep,
+    completedSteps: dto.completedSteps,
+    completionPercentage: dto.completionPercentage,
   };
 }
 
-function toPayload(input: Driver): Record<string, unknown> {
+function toPayload(input: Driver, stepCompleted?: number): Record<string, unknown> {
   return {
     firstName: input.firstName,
     lastName: input.lastName,
@@ -261,6 +275,7 @@ function toPayload(input: Driver): Record<string, unknown> {
     ifscCode: input.ifscCode,
     branchName: input.branchName,
     upiIdOrChequeNo: input.upiIdOrChequeNo,
+    ...(stepCompleted != null ? { stepCompleted } : {}),
   };
 }
 
@@ -273,13 +288,18 @@ export class DriversApiService {
     return this.http.get<ApiEnvelope<DriverDto[]>>(this.base).pipe(map((res) => unwrap(res).map(fromDto)));
   }
 
-  create(input: Driver): Observable<Driver> {
-    return this.http.post<ApiEnvelope<DriverDto>>(this.base, toPayload(input)).pipe(map((res) => fromDto(unwrap(res))));
+  /** `stepCompleted` (1-4), when passed, marks that onboarding-wizard step done server-side
+   *  (see `driver.service.ts`'s `computeOnboardingUpdate`) — omit it for a plain full-form
+   *  save (e.g. editing an already-completed driver) to leave onboarding progress alone. */
+  create(input: Driver, stepCompleted?: number): Observable<Driver> {
+    return this.http
+      .post<ApiEnvelope<DriverDto>>(this.base, toPayload(input, stepCompleted))
+      .pipe(map((res) => fromDto(unwrap(res))));
   }
 
-  update(id: string, input: Driver): Observable<Driver> {
+  update(id: string, input: Driver, stepCompleted?: number): Observable<Driver> {
     return this.http
-      .patch<ApiEnvelope<DriverDto>>(`${this.base}/${id}`, toPayload(input))
+      .patch<ApiEnvelope<DriverDto>>(`${this.base}/${id}`, toPayload(input, stepCompleted))
       .pipe(map((res) => fromDto(unwrap(res))));
   }
 

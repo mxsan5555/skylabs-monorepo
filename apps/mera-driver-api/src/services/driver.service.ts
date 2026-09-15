@@ -3,6 +3,27 @@ import { HttpError } from '../middleware/errorHandler';
 
 const LINKED_USER_SELECT = { id: true, name: true, email: true, phone: true } as const;
 
+/** The Driver onboarding form has 4 top-level steps (Personal, Education & Health,
+ *  Documents, Payment) — one persistence checkpoint per tab, not per sub-section. */
+const TOTAL_ONBOARDING_STEPS = 4;
+
+/**
+ * Derives the next `onboardingStatus`/`currentStep`/`completedSteps`/`completionPercentage`
+ * after the caller finishes `stepCompleted`. Purely a function of "what step just got
+ * completed" + "what was already completed" — never trusts anything else from the client,
+ * and is the only place these four columns are ever written.
+ */
+function computeOnboardingUpdate(existingCompletedSteps: number[] | undefined, stepCompleted: number) {
+  const completedSteps = Array.from(new Set([...(existingCompletedSteps ?? []), stepCompleted])).sort((a, b) => a - b);
+  const isDone = completedSteps.length >= TOTAL_ONBOARDING_STEPS;
+  return {
+    completedSteps,
+    currentStep: isDone ? TOTAL_ONBOARDING_STEPS : Math.min(stepCompleted + 1, TOTAL_ONBOARDING_STEPS),
+    completionPercentage: Math.round((completedSteps.length / TOTAL_ONBOARDING_STEPS) * 100),
+    onboardingStatus: isDone ? 'completed' : 'in_progress',
+  };
+}
+
 export async function listDrivers() {
   return prisma.driver.findMany({
     orderBy: { createdAt: 'desc' },
@@ -20,14 +41,25 @@ export async function getDriverById(id: string) {
   return driver;
 }
 
+/**
+ * `stepCompleted` (1-4) is stripped off before hitting Prisma — it's not a Driver column,
+ * it's the signal that drives `computeOnboardingUpdate`. Omitting it (the admin's plain
+ * full-form save, or the driver's own `PATCH /drivers/me`) leaves onboarding progress
+ * untouched, so this never regresses a driver's progress when someone edits them outside
+ * the step wizard.
+ */
 export async function createDriver(input: Record<string, unknown>) {
-  const driver = await prisma.driver.create({ data: input as never });
+  const { stepCompleted, ...data } = input as Record<string, unknown> & { stepCompleted?: number };
+  const onboarding = computeOnboardingUpdate([], stepCompleted ?? TOTAL_ONBOARDING_STEPS);
+  const driver = await prisma.driver.create({ data: { ...data, ...onboarding } as never });
   return getDriverById(driver.id);
 }
 
 export async function updateDriver(id: string, input: Record<string, unknown>) {
-  await getDriverById(id);
-  await prisma.driver.update({ where: { id }, data: input as never });
+  const existing = await getDriverById(id);
+  const { stepCompleted, ...data } = input as Record<string, unknown> & { stepCompleted?: number };
+  const onboarding = stepCompleted != null ? computeOnboardingUpdate(existing.completedSteps, stepCompleted) : {};
+  await prisma.driver.update({ where: { id }, data: { ...data, ...onboarding } as never });
   return getDriverById(id);
 }
 

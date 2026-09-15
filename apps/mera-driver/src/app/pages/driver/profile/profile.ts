@@ -1,7 +1,8 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, inject, signal } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, computed, inject, signal } from '@angular/core';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { DriverSelfApiService, type DriverSelf, type DriverSelfUpdate } from '../../../core/drivers/driver-self-api.service';
 import { MasterListApiService, type MasterOption } from '../../../core/masters/master-list-api.service';
+import { calculateProfileCompletion } from '../profile-completion';
 
 type FieldKey = keyof Omit<DriverSelfUpdate, 'languages'>;
 
@@ -66,6 +67,15 @@ export class DriverProfile implements OnInit {
   protected readonly languageOptions = signal<MasterOption[]>([]);
   protected readonly selectedLanguages = signal<string[]>([]);
 
+  /** The full last-fetched record (including `documents`) — kept separately from `draft`
+   *  (the editable-fields-only subset) so profile-completion can see document/language
+   *  state without the self-edit form needing to carry read-only fields around. */
+  private readonly driver = signal<DriverSelf | null>(null);
+  protected readonly completion = computed(() => {
+    const d = this.driver();
+    return d ? calculateProfileCompletion(d) : null;
+  });
+
   ngOnInit(): void {
     this.mastersApi.list('languages').subscribe({
       next: (opts) => this.languageOptions.set(opts.filter((o) => o.status === 'Active')),
@@ -74,6 +84,7 @@ export class DriverProfile implements OnInit {
 
     this.api.get().subscribe({
       next: (d) => {
+        this.driver.set(d);
         this.draft.set(toDraft(d));
         this.selectedLanguages.set(d.languages ?? []);
         this.loading.set(false);
@@ -95,8 +106,14 @@ export class DriverProfile implements OnInit {
   protected save(): void {
     this.saving.set(true);
     this.error.set(null);
-    this.api.update({ ...this.draft(), languages: this.selectedLanguages() }).subscribe({
+    // Omit blank fields rather than sending `""` — several backend validators (e.g. `email`'s
+    // format check, `gender`'s min-length) accept an absent key (untouched) but reject an
+    // empty string, since `.partial()` only makes a field optional, not "empty string is
+    // valid". Sending only the fields the driver actually filled in also means an unfilled
+    // field is never blanked out by force.
+    this.api.update({ ...stripBlank(this.draft()), languages: this.selectedLanguages() }).subscribe({
       next: (d) => {
+        this.driver.set(d);
         this.draft.set(toDraft(d));
         this.selectedLanguages.set(d.languages ?? []);
         this.saving.set(false);
@@ -111,7 +128,33 @@ export class DriverProfile implements OnInit {
   }
 }
 
+/**
+ * Builds the editable draft by picking exactly the known `FIELDS` keys off the fetched
+ * record — NOT a `{...rest}` spread. The real `/drivers/me` response is the full Prisma
+ * row (`createdAt`, `userId`, the linked `user` object, staff-only fields like `driverType`/
+ * `sourceType`/`policeVerifiedStatus`, etc.) since the backend selects the whole model; a
+ * spread would carry every one of those into `draft` and then into the PATCH payload. A
+ * driver's own PATCH must only ever contain the fields they can actually see and edit here.
+ * Missing/`null` DB columns become `''` so text-field bindings never see `null`.
+ */
 function toDraft(d: DriverSelf): DriverSelfUpdate {
-  const { id: _id, status: _status, verificationNotes: _notes, documents: _docs, languages: _langs, ...rest } = d;
-  return rest;
+  const out: DriverSelfUpdate = {};
+  for (const f of FIELDS) {
+    (out as Record<string, unknown>)[f.key] = (d as unknown as Record<string, unknown>)[f.key] ?? '';
+  }
+  return out;
+}
+
+/** Drops blank/absent values before sending — `.partial()` on the backend schema makes a
+ *  key optional (fine to omit), but most fields there are still `z.string()` (not
+ *  `.nullable()`), so an explicit `''`/`null`/`undefined` would fail validation instead of
+ *  being treated as "no change". Omitting the key entirely leaves that column untouched. */
+function stripBlank(draft: DriverSelfUpdate): DriverSelfUpdate {
+  const out: DriverSelfUpdate = {};
+  for (const [key, value] of Object.entries(draft)) {
+    if (value == null) continue;
+    if (typeof value === 'string' && value.trim() === '') continue;
+    (out as Record<string, unknown>)[key] = value;
+  }
+  return out;
 }

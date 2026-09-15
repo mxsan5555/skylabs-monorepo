@@ -258,6 +258,43 @@ router.post('/users', requirePermission('rbac.users', 'create'), validateBody(Cr
   }
 });
 
+// ---------------------------------------------------------------------------
+// Self-service profile — every authenticated user (any role), not just admin-
+// permission holders. Must be registered before `/users/:id` below: Express matches
+// routes in registration order, so a later `/users/me` would be swallowed by the
+// earlier `/users/:id` (with `id` literally "me"). Ownership is resolved from
+// `req.user.sub` (the JWT subject) only — never a route param, query string, or body
+// field — same pattern as `resolveOwnDriver`. Reuses the exact same `UpdateUserSchema`
+// and `userService.getUserById`/`updateUser` the admin routes already use; this is
+// deliberately not a new profile system, just an ownership-gated entry point onto it.
+// ---------------------------------------------------------------------------
+
+router.get('/users/me', async (req, res, next) => {
+  try {
+    const user = await userService.getUserById(req.user!.sub);
+    res.json({ data: user, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/users/me', validateBody(UpdateUserSchema), async (req, res, next) => {
+  try {
+    const user = await userService.updateUser(req.user!.sub, req.body);
+    await auditService.writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'user.self.update',
+      targetType: 'User',
+      targetId: user.id,
+      after: user,
+      ...requestMeta(req),
+    });
+    res.json({ data: user, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.patch('/users/:id', requirePermission('rbac.users', 'edit'), validateBody(UpdateUserSchema), async (req, res, next) => {
   try {
     const user = await userService.updateUser(req.params.id, req.body);

@@ -9,25 +9,40 @@
         <span class="otp-muted" role="status">Saved</span>
       }
     </div>
-    <div class="account-fields">
-      <md-outlined-text-field
-        label="Email"
-        type="email"
-        autocomplete="email"
-        [value]="email"
-        (input)="email = $any($event.target).value"
-      ></md-outlined-text-field>
-      <md-outlined-text-field
-        label="Phone"
-        type="tel"
-        autocomplete="tel"
-        [value]="phone"
-        (input)="phone = $any($event.target).value"
-      ></md-outlined-text-field>
-    </div>
-    <div>
-      <md-filled-button (click)="saveProfile()">Save changes</md-filled-button>
-    </div>
+    @if (account.loading()) {
+      <p class="otp-muted">Loading…</p>
+    } @else {
+      @if (error()) {
+        <p class="otp-muted" role="alert">{{ error() }}</p>
+      }
+      <div class="account-fields">
+        <md-outlined-text-field
+          label="Name"
+          autocomplete="name"
+          [value]="draftProfile().name"
+          (input)="setProfileField('name', $any($event.target).value)"
+        ></md-outlined-text-field>
+        <md-outlined-text-field
+          label="Email"
+          type="email"
+          autocomplete="email"
+          [value]="draftProfile().email"
+          (input)="setProfileField('email', $any($event.target).value)"
+        ></md-outlined-text-field>
+        <md-outlined-text-field
+          label="Phone"
+          type="tel"
+          autocomplete="tel"
+          [value]="draftProfile().phone"
+          (input)="setProfileField('phone', $any($event.target).value)"
+        ></md-outlined-text-field>
+      </div>
+      <div>
+        <md-filled-button [disabled]="saving()" (click)="saveProfile()">
+          {{ saving() ? 'Saving…' : 'Save changes' }}
+        </md-filled-button>
+      </div>
+    }
   </section>
 
   <section class="account-card">

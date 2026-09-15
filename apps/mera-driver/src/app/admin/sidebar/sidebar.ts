@@ -4,6 +4,8 @@ import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
 import type { MenuNode } from '@skylabs-monorepo/shared-types';
 import { accountPath } from '../menu';
 
+const PROFILE_PATH = '/account/profile';
+
 /**
  * Console sidebar: brand, search, and navigation rendered straight from
  * `authService.bootstrap()?.menu` — the server already filtered this tree down to
@@ -44,6 +46,19 @@ export class Sidebar {
   protected readonly user = computed(() => this.auth.bootstrap()?.user);
 
   protected readonly initial = computed(() => (this.user()?.name ?? '?').charAt(0).toUpperCase());
+
+  protected readonly isOnProfile = computed(() => this.currentUrl().split('?')[0] === PROFILE_PATH);
+
+  /** Every authenticated role lands here via this same sidebar — Profile/Logout must be
+   *  reachable regardless of which permissions the signed-in user holds. */
+  protected goToProfile(): void {
+    this.router.navigateByUrl(PROFILE_PATH);
+  }
+
+  protected signOut(): void {
+    this.auth.signOut();
+    this.router.navigateByUrl('/sign-in');
+  }
 
   protected isGroupExpanded(node: MenuNode): boolean {
     // 1. If user manually clicked to expand/collapse this group, honor user preference first

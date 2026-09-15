@@ -402,6 +402,15 @@ model Driver {
 
   documents             DriverDocument[]
 
+  // Multi-step onboarding-form progress — set only by `driver.service.ts`'s
+  // `computeOnboardingUpdate`, never trusted directly from the client beyond the single
+  // `stepCompleted` number the step-save endpoint accepts. Independent of `status` above
+  // (manual staff verification) — a driver can be a fully onboarded, unverified record.
+  onboardingStatus      String    @default("in_progress") // 'in_progress' | 'completed'
+  currentStep           Int       @default(1) // the next pending step (1-4) to resume at
+  completedSteps        Int[]     @default([])
+  completionPercentage  Int       @default(0)
+
   @@index([status])
 }
 
