@@ -352,19 +352,15 @@
                 <div class="flex flex-col gap-y-6 w-full">
                   <sky-card class="p-6 block">
                     <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
-                      <md-outlined-select label="Education" [value]="inputEducation()" (change)="onInputChange('education', $event)">
-                        @for (opt of educationLevels(); track opt) {
-                          <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                        }
-                      </md-outlined-select>
-
                       <md-outlined-select label="Training Status" [value]="inputTrainingStatus()" (change)="onInputChange('trainingStatus', $event)">
                         @for (opt of trainingStatuses(); track opt) {
                           <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                         }
                       </md-outlined-select>
 
-                      <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="Training Certificate" [value]="inputTrainingCertificate()" (input)="onInputChange('trainingCertificate', $event)" placeholder="Enter training certificate details"></md-outlined-text-field>
+                      @if (inputTrainingStatus() === 'Yes') {
+                        <md-outlined-text-field label="Training Certificate" [value]="inputTrainingCertificate()" (input)="onInputChange('trainingCertificate', $event)" placeholder="Enter training certificate details"></md-outlined-text-field>
+                      }
                     </div>
                   </sky-card>
 
