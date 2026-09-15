@@ -295,28 +295,6 @@ export function Header() {
                   </NavLink>
                 </li>
               ))}
-
-              {/* Static Product */}
-              <li>
-                <NavLink
-                  to="/products"
-                  className="nav-drawer__link"
-                  onClick={closeDrawer}
-                >
-                  Products
-                </NavLink>
-              </li>
-
-              {/* Static Therapists */}
-              <li>
-                <NavLink
-                  to="/therapists"
-                  className="nav-drawer__link"
-                  onClick={closeDrawer}
-                >
-                  Therapists
-                </NavLink>
-              </li>
             </ul>
           </ul>
           <Divider />
