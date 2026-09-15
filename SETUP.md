@@ -1,201 +1,288 @@
 # Setup
 
-From-zero bootstrap of the whole monorepo: local development first, then the cloud
-setup for **Option 3** (Vercel + Railway + Neon + Cloudflare R2), including the
-**move from a personal Vercel account to the corporate Vercel Team**.
+Step-by-step deployment runbook for **Option 3**: frontends on **Vercel**, APIs on
+**Railway**, databases on **Neon**, images on **Cloudflare R2**. Follow it top to
+bottom in this order: **GitHub → Vercel → Railway → Cloudflare R2**.
 
-> This is the one-time onboarding runbook. For how deploys work day to day (branch
-> → environment, the security model, the full env-var reference), see
-> **`DEPLOYMENT.md`** — this file links into it rather than repeating it. No secret
-> value appears here: variable *names* only.
+> `DEPLOYMENT.md` is the reference (branch flow, security model, full env-var
+> tables). This file is the "do these steps" guide. No real secret values appear
+> here — variable *names* only.
 
-## 0. What you're standing up
+## Topology (what you're wiring)
 
-| Layer | msd | mera-driver | Host | Cost |
-|-------|-----|-------------|------|------|
-| Frontend (static SPA) | `apps/msd` (React+Vite) | `apps/mera-driver` (Angular) | **Vercel** (2 projects) | free |
-| API (Express) | `apps/msd-api` | `apps/mera-driver-api` | **Railway** (2 services) | ~$5–10/mo |
-| Database | db `msd` | db `mera_driver` | **Neon** (2 DBs) | free |
-| Image bytes | `msd-media` | `mera-driver-media` | **Cloudflare R2** (2 buckets) | free |
+| Layer | msd | mera-driver | Host |
+|-------|-----|-------------|------|
+| Frontend (static SPA) | `apps/msd` (React+Vite) | `apps/mera-driver` (Angular) | **Vercel** (2 projects) |
+| API (Express, always-on) | `apps/msd-api` (`/api/v1`) | `apps/mera-driver-api` (root) | **Railway** (2 services) |
+| Database (Postgres) | db `msd` | db `mera_driver` | **Neon** (2 DBs) — created in each **Vercel** project's Storage tab |
+| Image bytes | bucket `msd-media` | none yet (Phase 2) | **Cloudflare R2** |
+
+- Browser → Vercel (static app) → calls the Railway API (`VITE_API_URL`) → Neon
+  (data) + R2 (images). The browser loads images **directly** from R2's public URL.
+- The **frontend never touches the database** — only the API on Railway does.
+
+## Prerequisites (accounts, one-time)
+
+- **GitHub** repo access.
+- **Vercel** account/team, with the **Vercel GitHub app** installed on the repo.
+- **Railway** account, with the **Railway GitHub app** installed on the repo.
+- **Neon** databases — provisioned via each **Vercel project's Storage** tab
+  (Vercel's Neon integration), one DB per API.
+- **Cloudflare** account (for R2).
+- **Google Cloud** project (OAuth credentials, Maps key) — optional until you need
+  Google sign-in / maps.
+- Enable **2FA** everywhere; restrict who can edit Production env vars.
+
+The steps below are written for **msd**. Repeat the same pattern for **mera-driver**
+with its own values (its own Vercel project, Railway service, and Neon DB; no R2 yet).
 
 ---
 
-## 1. Accounts & access (corporate)
+# Step 1 — GitHub (get code on `main`)
 
-- **Corporate Vercel Team** — join it (a member with deploy rights). Do **not** use
-  a personal account for project work.
-- **GitHub app installs, scoped to this repo only:** install the **Vercel GitHub
-  app** and the **Railway GitHub app** on the **corporate GitHub org** (least
-  privilege — grant only this repo).
-- **Railway** (team), **Neon** (for 2 DBs), **Cloudflare** (for R2), and a **Google
-  Cloud** project (OAuth credentials).
-- **Enable 2FA** on every corporate account. Restrict who can edit **Production**
-  env vars on Vercel and Railway.
+Both Vercel and Railway build the **`main`** branch. Nothing deploys until your code
+is on `main`.
+
+1. Push your work and open PRs through the chain:
+   - `feature/*` → `develop`
+   - `develop` → `release`
+   - `release` → `main`
+   - (A single `feature → main` PR also works if you want to move fast.)
+2. **Skip `nx release` for now.** It only stamps version numbers / changelog / tags;
+   it is not required to deploy. Adopt it later once the pipeline is stable.
+3. Confirm `main` contains the deploy config: `apps/msd/vercel.json`,
+   `apps/msd-api/railway.json`, and the updated `apps/*/project.json`.
+
+> After this, Vercel auto-deploys on every push to `main`. Railway deploys on push
+> to `main` **only if** you enable "Auto deploys" on the service (Step 3); otherwise
+> you trigger it manually.
 
 ---
 
-## 2. Local development (do this first — fastest feedback)
+# Step 2 — Vercel (frontend `apps/msd` + Neon database)
 
-Prereqs: **Node 20**, npm, and local **PostgreSQL** (or a Neon dev branch).
+## 2a. Frontend project
+
+1. **Create the project:** Vercel → **Add New → Project** → import the GitHub repo.
+2. **Root Directory:** set to **`apps/msd`** and enable **"Include files outside the
+   Root Directory in the Build Step."**
+3. **Framework preset:** leave as **Other / None** — `apps/msd/vercel.json` already
+   defines the build:
+   - build: `cd ../.. && npx nx build msd`
+   - output: `../../dist/apps/msd`
+   - ignored build step: `npx nx-ignore msd`
+   - SPA rewrite to `/index.html`
+4. **Production Branch:** `main`.
+5. **Environment Variables** (Settings → Environment Variables, scope **Production +
+   Preview**). These are **public** (baked into the browser bundle) — never put a
+   secret here:
+   - `VITE_API_URL` = `https://<your-msd-api-railway-domain>/api/v1`
+     *(you get the Railway domain in Step 3 — set this now as a placeholder and come
+     back, or set it after Step 3, then redeploy).*
+   - `VITE_MEDIA_BASE_URL` = your R2 public URL *(from Step 4)*.
+   - `VITE_GOOGLE_MAPS_API_KEY` = your Maps JS key *(Google Cloud → Maps JavaScript
+     API → API key, restricted by HTTP referrer)*.
+6. **Deploy.** Note your Vercel domain, e.g. `https://skylabs-msd.vercel.app`.
+
+> ⚠️ **Vite bakes `VITE_*` at build time.** Every time you add or change one of
+> these, you must **Redeploy** (Deployments → ⋮ → Redeploy). Setting a var without
+> redeploying does nothing.
+
+**mera-driver frontend** has **no** Vercel env vars — its API base is compile-time.
+Edit `apps/mera-driver/src/environments/environment.prod.ts` to your mera-driver-api
+Railway domain, commit, and deploy its own Vercel project.
+
+## 2b. Neon database (Storage tab)
+
+The Neon databases are provisioned through **Vercel's Storage integration**, not the
+standalone Neon dashboard.
+
+1. Vercel → your project (e.g. **skylabs-msd**) → **Storage** → the Neon database
+   (e.g. **`msd_db`**). If it doesn't exist yet: **Create Database → Neon** (Free).
+   - **Do not click "Connect."** That wires the DB into the *frontend* project, which
+     never uses a database. You only need the connection string, for Railway.
+2. Open the database (click its name → connection details, or "Open in Neon"). It
+   shows a **pooled** string (host has `-pooler`) and a **direct / unpooled** string.
+   Copy the **direct/unpooled** one for Railway (Step 3) — Prisma migrations fail over
+   the pooled endpoint.
+   - It ends with `?sslmode=require`; shape:
+     `postgresql://<user>:<pass>@ep-xxxx.<region>.aws.neon.tech/<db>?sslmode=require`
+
+Repeat for mera-driver under its own Vercel project's **Storage** tab (its own Neon DB).
+
+---
+
+# Step 3 — Railway (API: `apps/msd-api`)
+
+One Railway **service per API**. Do the whole thing for `msd-api`, then repeat for
+`mera-driver-api` with its own values. You'll paste the Neon **direct** connection
+string from **Step 2b** as `DATABASE_URL`.
+
+## 3a. Create the Railway service
+
+1. Railway → **New Project → Deploy from GitHub repo** → this repo.
+2. **Rename the service** to `msd-api` (so its generated domain is clear).
+3. **Root Directory:** leave **empty** (repo root). Do **not** set it to `apps/msd-api`.
+4. **Settings → Build → Custom Build Command:**
+   ```
+   npm ci && npx nx build msd-api
+   ```
+5. **Settings → Deploy → Custom Start Command:**
+   ```
+   node dist/apps/msd-api/main.js
+   ```
+6. **Settings → Deploy → Pre-deploy Command** (applies DB migrations each deploy):
+   ```
+   node node_modules/prisma/build/index.js migrate deploy --schema=apps/msd-api/prisma/schema.prisma
+   ```
+   *(Alternative to 4–6: Settings → Config-as-code → point at
+   `apps/msd-api/railway.json`, which contains all of the above.)*
+
+## 3b. Variables
+
+Settings → **Variables**. The essentials (full list in `DEPLOYMENT.md` §8.3):
+
+- `DATABASE_URL` = the Neon **direct** string from **Step 2b**.
+- `NODE_ENV` = `production`.
+- `PORT` = `3333` (must match the domain target port in 3c).
+- `JWT_SECRET` = a fresh 64-char hex — generate with `openssl rand -hex 32`.
+- `CORS_ORIGIN` = your **real** Vercel domain, e.g. `https://skylabs-msd.vercel.app`.
+  - **Scheme + host only. No trailing slash, no `/api/v1`, no `<placeholder>` text.**
+    It must exactly equal the browser's `Origin`. Comma-separate multiple domains.
+- `SUPERADMIN_PHONE`, `GOOGLE_*`, `SMTP_*`, `SMS_*`, `RAZORPAY_*`, `R2_*` — add as you
+  enable each feature (see `DEPLOYMENT.md` §8.3). The API boots without the optional
+  ones; those features just won't work until filled.
+
+## 3c. Networking (domain + port)
+
+1. Settings → **Networking → Generate Domain**.
+2. Set the **target port to `3333`** — it must equal the `PORT` variable so the app
+   binds the port Railway routes to. (A 502 means these don't match.)
+3. Your API base is the domain **+ `/api/v1`**, e.g.
+   `https://skylabs-monorepo-production.up.railway.app/api/v1`. Put that in Vercel's
+   `VITE_API_URL` (Step 2) and **redeploy Vercel**.
+
+## 3d. Deploy + first-run database notes
+
+1. Deploy (turn on **Auto deploys when pushed to GitHub** so future `main` pushes
+   redeploy, or trigger manually).
+2. **If the pre-deploy fails with `P3009` (failed migration in the DB):** an earlier
+   attempt left a failed migration recorded. Fix it once, from your machine, against
+   the Neon **direct** URL:
+   - DB is disposable (fresh setup) → reset and re-apply all migrations:
+     ```
+     DATABASE_URL="<neon-direct>" node node_modules/prisma/build/index.js migrate reset --schema=apps/msd-api/prisma/schema.prisma --force --skip-seed
+     ```
+   - DB has data to keep → mark the failed one rolled-back, then redeploy:
+     ```
+     DATABASE_URL="<neon-direct>" node node_modules/prisma/build/index.js migrate resolve --rolled-back <migration_name> --schema=apps/msd-api/prisma/schema.prisma
+     ```
+3. **Seed roles + SuperAdmin once** (set the Neon direct URL, `JWT_SECRET`, and
+   `SUPERADMIN_PHONE` in `apps/msd-api/.env.local`, then):
+   ```
+   npm run msd-api:prisma:seed
+   ```
+
+## 3e. Verify the API
+
+- `https://<railway-domain>/api/v1/health` → `{"data":{"status":"ok","app":"msd-api"}…}`.
+- `https://<railway-domain>/docs` → Swagger lists all routes.
+- Note: hitting the bare `https://<railway-domain>/api/v1` returns a `NOT_FOUND`
+  envelope — that's expected (no route at the base path), not an error.
+
+---
+
+# Step 4 — Cloudflare R2 (images for msd)
+
+Uploads go through the API (server-side); the browser only **reads** images from the
+public URL, so **no bucket CORS config is needed**.
+
+## 4a. Create the bucket
+
+1. Cloudflare → **R2 Object Storage** (enable R2 if first time; 10 GB free, no egress
+   fees).
+2. **Create bucket** → name **`msd-media`** → Create.
+
+## 4b. Enable the public URL
+
+1. Open `msd-media` → **Settings → Public Development URL → Enable**.
+2. Copy the URL, e.g. `https://pub-<hash>.r2.dev` → this is `VITE_MEDIA_BASE_URL`.
+   *(Without this, images 404 in the browser.)*
+
+## 4c. Get the Account ID
+
+- On the R2 overview page, copy your **Account ID** → `R2_ACCOUNT_ID`.
+  *(The API's S3 endpoint is `https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com`.)*
+
+## 4d. Create the API token
+
+1. R2 → **Manage R2 API Tokens → Create Account API token** (Account, not User — it
+   stays valid regardless of individual user membership).
+2. Name `msd-api-r2`; permission **Object Read & Write**; **Apply to specific buckets
+   only → `msd-media`**; create.
+3. Copy (shown once): **Access Key ID** → `R2_ACCESS_KEY_ID`,
+   **Secret Access Key** → `R2_SECRET_ACCESS_KEY`.
+
+## 4e. Add the vars
+
+- **Railway (msd-api → Variables):** `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
+  `R2_SECRET_ACCESS_KEY`, `R2_BUCKET=msd-media` → save (redeploys).
+- **Vercel (msd → Environment Variables):** `VITE_MEDIA_BASE_URL` = the r2.dev URL
+  (no trailing slash) → **redeploy** msd.
+
+## 4f. Verify
+
+1. Sign in to the admin console, **upload a Deal/Product image**.
+2. Cloudflare → `msd-media` → **Objects**: a file appears (e.g. `deals/<id>/<uuid>.jpg`).
+3. The image displays on the site, and **still loads after a Railway redeploy**
+   (proves it's on R2, not the ephemeral container disk).
+
+---
+
+# Final verification (end-to-end)
+
+- API: `/api/v1/health` = ok, `/docs` loads.
+- Frontend `https://skylabs-msd.vercel.app` loads with correct layout and **data**.
+- Browser DevTools (F12) → Network: API calls hit `…railway.app/api/v1/…` and return
+  **200**, with **no CORS errors** in Console.
+- Sign in (OTP / Google), open `/account`, data loads.
+- Image upload appears in R2 and survives a Railway redeploy.
+
+## Common trip-ups (from real setup)
+
+- **No data / CORS errors** → `CORS_ORIGIN` on Railway isn't your exact Vercel domain
+  (no `<placeholder>`, no trailing slash), or `VITE_API_URL` wasn't set **before** the
+  Vercel build (redeploy after setting it).
+- **502 on the API** → `PORT` variable ≠ the domain's target port.
+- **Pre-deploy `P3009`** → a prior failed migration in Neon; reset or resolve (3d).
+- **Pre-deploy can't reach DB** → `DATABASE_URL` is the localhost placeholder or the
+  `-pooler` endpoint; use the Neon **direct** string with `?sslmode=require`.
+- **Images 404** → R2 public URL not enabled (4b), or `VITE_MEDIA_BASE_URL` set but
+  Vercel not redeployed.
+
+---
+
+# Appendix — Local development
+
+Prereqs: **Node 20**, npm, local **PostgreSQL** (or a Neon dev branch).
 
 ```bash
-git clone <repo> && cd skylabs-monorepo
 npm ci
-```
+# copy each template and fill it (git-ignored):
+#   apps/msd/.env.local, apps/msd-api/.env.local, apps/mera-driver-api/.env.local
+#   (mera-driver frontend has no env file — uses environment.ts)
 
-**Env files** — copy each `.env.example` to `.env.local` and fill it (these are
-git-ignored; never commit them):
+# Prisma per API (pinned scripts, never bare `npx prisma`):
+npm run msd-api:prisma:generate && npm run msd-api:prisma:migrate && npm run msd-api:prisma:seed
+npm run mera-driver-api:prisma:generate && npm run mera-driver-api:prisma:migrate && npm run mera-driver-api:prisma:seed
 
-- `apps/msd/.env.local`
-- `apps/msd-api/.env.local`
-- `apps/mera-driver-api/.env.local`
-
-> The **mera-driver frontend** has no env file — its API base is compile-time in
-> `apps/mera-driver/src/environments/environment.ts`.
-
-**Prisma per API** (each API owns its own schema/DB — never shared). Use the pinned
-`npm run` scripts, never bare `npx prisma` (that pulls Prisma 7, which errors on
-this schema):
-
-```bash
-# msd-api (db "msd")
-npm run msd-api:prisma:generate
-npm run msd-api:prisma:migrate
-npm run msd-api:prisma:seed
-
-# mera-driver-api (db "mera_driver")
-npm run mera-driver-api:prisma:generate
-npm run mera-driver-api:prisma:migrate
-npm run mera-driver-api:prisma:seed
-```
-
-> `prisma:generate` also runs automatically as part of `nx build`, so you never
-> ship a stale client. You only run it by hand here to get types before first serve.
-
-**Run all four apps:**
-
-```bash
+# run all four:
 npx nx serve msd                 # http://localhost:4200
 npx nx run mera-driver:serve     # http://localhost:4400
-npx nx serve msd-api             # http://localhost:3333/api/v1  (docs at /docs, health at /api/v1/health)
-npx nx serve mera-driver-api     # http://localhost:3334         (docs at /docs, health at /health)
+npx nx serve msd-api             # http://localhost:3333/api/v1  (docs at /docs)
+npx nx serve mera-driver-api     # http://localhost:3334         (docs at /docs)
 ```
 
-**Verify local:** both frontends load, both `/docs` render, and OTP / Google
-sign-in works against your local DB.
-
-### Variables & secrets: how to get each value
-
-Your `.env.local` files list the variable *names*; here's where each **value**
-comes from. For the full "which variable goes in which service" tables (Vercel /
-Railway msd-api / Railway mera-driver-api / R2), see **`DEPLOYMENT.md` §8**.
-
-| Value | Where to get / how to generate |
-|---|---|
-| **`DATABASE_URL`** | Neon (neon.tech) → your project → Connection Details → copy the **direct** string (the one *without* `-pooler`), e.g. `postgresql://user:pass@ep-xxx.neon.tech/db?sslmode=require`. One Neon project per API (`msd`, `mera_driver`). |
-| **`JWT_SECRET`** | Generate fresh: `openssl rand -hex 32` (or `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`). Use a **different** value per API and per environment. |
-| **`GOOGLE_CLIENT_ID` / `_SECRET`** | Google Cloud Console → APIs & Services → Credentials → Create Credentials → **OAuth client ID** → **Web application**. |
-| **`GOOGLE_CALLBACK_URL`** | Your Railway API domain + the callback path (msd-api: `/api/v1/auth/google/callback`; mera-driver-api: `/auth/google/callback`). Add the *same* URL under the OAuth client's **Authorized redirect URIs**. |
-| **`SMTP_USER` / `SMTP_PASS`** (Gmail) | Enable 2-Step Verification → Google Account → Security → **App passwords** → generate. `SMTP_USER` = the Gmail address, `SMTP_PASS` = the 16-char app password. |
-| **`SMS_API_KEY` / `SMS_SENDER`** | connectexpress.in account → API key from the API section; `SMS_SENDER` = your approved DLT sender ID. |
-| **`RAZORPAY_KEY_ID` / `_SECRET`** | Razorpay Dashboard → Settings → API Keys (Test keys for dev/preview, Live for production). |
-| **`RAZORPAY_WEBHOOK_SECRET`** | Razorpay Dashboard → Settings → Webhooks → add webhook → copy its signing secret. |
-| **`R2_*` + public URL** | Cloudflare R2 (see `DEPLOYMENT.md` §6): Account ID, a bucket-scoped Object Read/Write token (access key + secret), bucket name, and the r2.dev public URL → `VITE_MEDIA_BASE_URL`. |
-| **`VITE_GOOGLE_MAPS_API_KEY`** | Google Cloud Console → enable **Maps JavaScript API** → create an API key → **restrict by HTTP referrer** to your Vercel domain. |
-| **`SUPERADMIN_PHONE`** | A phone number you control; the seed creates the first SuperAdmin with it. |
-| **`VITE_API_URL`** | `https://<msd-api-railway-domain>/api/v1` (after the Railway domain exists). |
-| **`CORS_ORIGIN` / `CORS_ORIGINS`** | Your Vercel frontend domain(s), comma-separated. `CORS_ORIGIN` on msd-api, `CORS_ORIGINS` (plural) on mera-driver-api. |
-
-Fixed (non-secret) values — set them verbatim: `NODE_ENV=production` (cloud),
-`JWT_ACCESS_TTL_MINUTES=15`, `JWT_REFRESH_TTL_DAYS=30`, `OTP_EXPIRY_MINUTES=10`,
-`OTP_MAX_ATTEMPTS=5`, `OTP_REQUEST_RATE_LIMIT_PER_10_MIN=5`, `SMTP_HOST=smtp.gmail.com`,
-`SMTP_PORT=587`, `SMTP_SECURE=false`, `SMS_API_URL=https://connectexpress.in/api/v3/`,
-`R2_BUCKET=msd-media`. On Railway, set **`PORT`** to match the domain's target port
-(`3333` msd-api / `3334` mera-driver-api) so the app binds the port Railway routes to.
-
----
-
-## 3. Cloud setup — do it in this order
-
-Some values reference each other (the Vercel domain ↔ CORS, the Railway domain ↔
-`VITE_API_URL` + Google callback), so follow this sequence. Detailed steps are in
-`DEPLOYMENT.md` §5 (Railway), §6 (R2), §8 (variable tables); the Vercel/connect
-steps are §4–§5 below.
-
-1. **Neon** — create both databases (`msd`, `mera_driver`), copy each **direct**
-   `DATABASE_URL`.
-2. **R2** — create the `msd-media` bucket, enable its public URL, mint a
-   bucket-scoped Object Read/Write token (yields the `R2_*` values + public URL).
-3. **Railway** — deploy both API services from the repo (Root Directory = repo root;
-   each reads its committed `apps/<api>/railway.json`). Set every Variable you have
-   so far; leave `CORS_ORIGIN(S)` and `GOOGLE_CALLBACK_URL` as placeholders. Then
-   **Generate a domain** for each service.
-4. **Google Cloud** — create the OAuth client(s), add the two redirect URIs (now
-   that Railway domains exist), and set `GOOGLE_CALLBACK_URL` on Railway.
-5. **Vercel** — create both projects (§4). On **msd** set `VITE_API_URL`,
-   `VITE_MEDIA_BASE_URL`, `VITE_GOOGLE_MAPS_API_KEY`; for **mera-driver** edit
-   `environment.prod.ts`. Deploy → note the Vercel domains.
-6. **Railway again** — set `CORS_ORIGIN` (msd-api) and `CORS_ORIGINS`
-   (mera-driver-api) to the Vercel domains; redeploy the APIs.
-7. **Redeploy msd on Vercel** so Vite bakes the final `VITE_*` values.
-
----
-
-## 4. Corporate Vercel Team + move off the personal account
-
-Do a **fresh import** into the corporate team (cleaner than transferring the old
-projects).
-
-1. **Corporate Vercel Team → Add New → Project →** import this GitHub repo
-   (authorize the corporate Vercel GitHub app on the org first).
-2. Create **two** projects (don't add api project) following **`DEPLOYMENT.md` §4**:
-   - **msd** — Root Directory `apps/msd`
-   - **mera-driver** — Root Directory `apps/mera-driver`
-
-   The committed `apps/<app>/vercel.json` supplies build/output/ignore. Set
-   **Production Branch = `main`** and enable "Include files outside the Root
-   Directory."
-3. **Env vars per project** (§7 / §8 in DEPLOYMENT.md): `VITE_API_URL`,
-   `VITE_MEDIA_BASE_URL`, and msd's `VITE_GOOGLE_MAPS_API_KEY`, scoped **Production
-   vs Preview**. Deploy a **preview first** to validate the `../..` relative paths.
-
-### Custom-domain cutover (the delicate part)
-
-A domain can be attached to only **one** Vercel project/team at a time, so cut over
-deliberately, in a low-traffic window:
-
-1. Validate the new **corporate** project on its `*.vercel.app` URL.
-2. **Old personal project → Settings → Domains → remove** the domain.
-3. **New corporate project → Domains → add** the domain → Vercel re-verifies.
-   DNS already points at Vercel, so this is usually near-instant; for an apex domain
-   confirm the A/ALIAS/CNAME records Vercel shows at the registrar.
-4. Repeat per app if each app has its own domain.
-
-### Decommission the personal setup
-
-- Once the corporate project serves production **and** the domain, **remove the
-  personal project's Git connection (or delete the project)** — otherwise two Vercel
-  projects watch the same repo and both deploy on every push.
-- **Neon is unaffected by the Vercel move.** In Option 3 the database is read by the
-  **API on Railway** via `DATABASE_URL`, not by Vercel. Any Neon↔personal-Vercel
-  storage link was cosmetic. Optionally transfer the Neon project to a corporate
-  Neon org later — not required for cutover.
-- **Rotate every secret** carried over from the personal setup (fresh `JWT_SECRET`,
-  new provider keys), and confirm all secrets now live in the corporate Vercel Team
-  env store + Railway Variables — never a personal account.
-
----
-
-## 5. Connect, secure, first deploy
-
-- **Connect the three tiers:** `DEPLOYMENT.md` §7 (set `VITE_*`, the CORS allowlist,
-  and the Google OAuth redirect URI).
-- **Security checklist:** `DEPLOYMENT.md` §1 (secrets only in host env + `.env.local`;
-  frontend gets public values only; least-privilege R2 token + strict CORS).
-- **Verify end-to-end:** `DEPLOYMENT.md` §11 (health, docs, sign-in, image upload
-  survives a Railway redeploy, no CORS errors).
-
-## 6. Ongoing work
-
-Branch flow, back-merge discipline, versioning (`nx release`), and the CI gate all
-live in **`DEPLOYMENT.md` §2, §9, §10**. Always branch new work off `develop`.
+**How to get each secret value** (`DATABASE_URL`, `JWT_SECRET`, Google OAuth, Gmail
+app password, ConnectExpress SMS, Razorpay, R2, Maps key): see the table in
+`DEPLOYMENT.md` §8 and the provider notes there.

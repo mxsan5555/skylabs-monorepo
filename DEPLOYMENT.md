@@ -15,7 +15,7 @@ images on **Cloudflare R2**. This is the **source of truth**; `README.md`,
 |-------|-----|-------------|------|------|
 | Frontend (static SPA) | `apps/msd` (React+Vite) | `apps/mera-driver` (Angular) | **Vercel** — 2 projects, global CDN | free |
 | API (Express, always-on) | `apps/msd-api` | `apps/mera-driver-api` | **Railway** — 2 services | ~$5–10/mo total |
-| Database (Postgres) | db `msd` | db `mera_driver` | **Neon** — 2 independent DBs | free tier |
+| Database (Postgres) | db `msd` | db `mera_driver` | **Neon** — 2 independent DBs, provisioned via each Vercel project's **Storage** tab | free tier |
 | Image bytes | bucket `msd-media` | none yet (Phase 2) | **Cloudflare R2** | free (no egress fees) |
 
 **Data flow:** browser → Vercel (static app) → calls the Railway API
@@ -150,21 +150,23 @@ Branch = `main`; leave Build/Install/Output/Ignored-Build-Step blank —
 
 ## 5. APIs → Railway
 
-Each API is its own Railway service, with build/start config committed as
-`apps/<api>/railway.json` (config-as-code, mirroring `vercel.json`):
+Each API is its own Railway service. The build/start config is committed as
+`apps/<api>/railway.json` for reference, but **Railway only auto-reads a config file
+at the repo root** — a per-app `apps/<api>/railway.json` is **not** picked up
+automatically for a monorepo service. If you rely on auto-detection, Railway runs its
+own builder (Railpack), can't find a start command for the Nx workspace, and fails
+with *"No start command detected."* So set the commands one of two ways:
 
-```json
-{
-  "$schema": "https://railway.com/railway.schema.json",
-  "build": { "builder": "NIXPACKS", "buildCommand": "npm ci && npx nx build msd-api" },
-  "deploy": {
-    "startCommand": "node dist/apps/msd-api/main.js",
-    "preDeployCommand": "node node_modules/prisma/build/index.js migrate deploy --schema=apps/msd-api/prisma/schema.prisma",
-    "healthcheckPath": "/api/v1/health",
-    "restartPolicyType": "ON_FAILURE"
-  }
-}
-```
+- **In the Railway UI (reliable):** Settings → Build → Custom Build Command, and
+  Settings → Deploy → Custom Start Command + Pre-deploy Command.
+- **Config-as-code path:** Settings → Config-as-code → point it at
+  `apps/<api>/railway.json`.
+
+The commands (msd-api shown — swap the app name for mera-driver-api):
+
+- **Build Command:** `npm ci && npx nx build msd-api`
+- **Start Command:** `node dist/apps/msd-api/main.js`
+- **Pre-deploy Command:** `node node_modules/prisma/build/index.js migrate deploy --schema=apps/msd-api/prisma/schema.prisma`
 
 Two things make this work — both are already wired in the repo:
 1. **`prisma generate` is part of `nx build`.** The `build` target `dependsOn` a
@@ -185,14 +187,25 @@ Two things make this work — both are already wired in the repo:
 ### Create each Railway service
 
 1. **railway.app → New Project → Deploy from GitHub repo** → this repo (authorize
-   the GitHub app, scoped to this repo only).
-2. **Root Directory = the repo root** (the Nx workspace) — do **not** set it to
-   `apps/<api>`. Railway reads `apps/<api>/railway.json` for build/start/health.
-3. **Variables:** add the values from `apps/<api>/.env.example` as real secrets
-   (section 8). At minimum: `DATABASE_URL` (Neon direct string), `NODE_ENV=production`,
-   `JWT_SECRET` (fresh), the OAuth/OTP/SMTP/SMS/Razorpay keys, the CORS origin(s),
-   and the `R2_*` keys.
-4. **Settings → Networking → Generate Domain.** Railway asks for a **target port**
+   the GitHub app, scoped to this repo only). Rename the service to `msd-api` /
+   `mera-driver-api` so its generated domain is self-explanatory.
+2. **Root Directory: leave empty** (the repo root / Nx workspace) — do **not** set it
+   to `apps/<api>`. The build command runs `nx build` from the root.
+3. **Set the Build / Start / Pre-deploy commands** (Railway UI, or the config-as-code
+   path) as listed above.
+4. **Variables:** add the values from `apps/<api>/.env.example` as real secrets
+   (section 8). At minimum: `DATABASE_URL`, `NODE_ENV=production`, `PORT` (matching the
+   domain port below), `JWT_SECRET` (fresh), the CORS origin(s), and — as you enable
+   each feature — the OAuth/OTP/SMTP/SMS/Razorpay/`R2_*` keys.
+   - **`DATABASE_URL` must be the Neon _direct_ string.** The Neon DBs are
+     provisioned via each **Vercel project's Storage** tab (Vercel's Neon integration,
+     e.g. `msd_db`) — open the DB there to copy its connection string, and use the
+     **direct/unpooled** one (host without `-pooler`, ending `?sslmode=require`) since
+     Prisma `migrate deploy` fails over Neon's pooled endpoint. Don't click Vercel's
+     "Connect" (that wires the DB to the frontend, which doesn't use it).
+   - **`CORS_ORIGIN` must be the exact Vercel origin** — scheme + host only, no
+     trailing slash, no path, and never the literal `<placeholder>` from a template.
+5. **Settings → Networking → Generate Domain.** Railway asks for a **target port**
    and gives a public URL like `https://msd-api-production.up.railway.app`. The
    target port **must equal the port the app listens on**: the app uses
    `process.env.PORT`, falling back to `3333` (msd-api) / `3334` (mera-driver-api).
@@ -204,6 +217,15 @@ Two things make this work — both are already wired in the repo:
    Your **API base** is that domain **+ `/api/v1`** for msd-api (e.g.
    `https://<domain>/api/v1`), or the domain as-is for mera-driver-api. That base is
    what you put in `VITE_API_URL` (msd) / `environment.prod.ts` (mera-driver).
+
+**First-deploy database notes:**
+- If the pre-deploy fails with **`P3009`** (a prior failed migration recorded in the
+  DB), clear it once against the Neon **direct** URL — `migrate reset --force
+  --skip-seed` (disposable DB) or `migrate resolve --rolled-back <name>` (keep data).
+- **Seed the roles + SuperAdmin once** after the first successful migrate:
+  `npm run <api>:prisma:seed` (with the Neon URL + `JWT_SECRET` + `SUPERADMIN_PHONE`
+  in that API's `.env.local`).
+- Step-by-step for both, plus the full first-run sequence, is in **`SETUP.md` §3d**.
 
 ### Per-API specifics
 
@@ -397,6 +419,8 @@ no DB and no `.env.local`. Add it as a required status check in branch protectio
 
 - `https://<railway-domain>/<health path>` returns `{ "data": { "status": "ok" … } }`.
 - `<railway-domain>/docs` loads (Swagger renders).
+- Note: the bare API base (`/api/v1` for msd-api) returns a `NOT_FOUND` envelope —
+  that's **expected** (no route sits at the base path), not a failure.
 - A public route returns real data from Neon.
 - Sign in (OTP / Google), open the account console, confirm data loads and there
   are **no CORS errors** in the browser console.
