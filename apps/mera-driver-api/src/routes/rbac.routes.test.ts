@@ -315,6 +315,95 @@ describe('rbac.routes', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Self-service profile — any authenticated role, no rbac.users permission
+  // needed; ownership is derived from the JWT subject, never a param/body field.
+  // -------------------------------------------------------------------------
+
+  describe('GET /rbac/users/me', () => {
+    it('returns 401 without a token', async () => {
+      const res = await request(app).get('/rbac/users/me');
+      expect(res.status).toBe(401);
+    });
+
+    it("returns the caller's own user row for any role — no rbac.users:view needed", async () => {
+      mockPrisma.user.findFirst.mockResolvedValue({
+        id: 'caller-1',
+        name: 'Ravi Kumar',
+        email: 'ravi@example.com',
+        phone: '9000000001',
+        status: 'active',
+        deletedAt: null,
+        roles: [],
+      });
+
+      const res = await request(app)
+        .get('/rbac/users/me')
+        .set('Authorization', `Bearer ${tokenFor(['support'], 'caller-1')}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.id).toBe('caller-1');
+      expect(mockPrisma.user.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'caller-1', deletedAt: null } }),
+      );
+    });
+  });
+
+  describe('PATCH /rbac/users/me', () => {
+    beforeEach(() => {
+      mockPrisma.user.findFirst.mockResolvedValue({
+        id: 'caller-1',
+        name: 'Ravi Kumar',
+        email: 'ravi@example.com',
+        phone: '9000000001',
+        status: 'active',
+        deletedAt: null,
+        roles: [],
+      });
+      mockPrisma.user.update.mockResolvedValue({});
+    });
+
+    it('updates only the calling user\'s own row, derived from the JWT — never a body/param id', async () => {
+      const res = await request(app)
+        .patch('/rbac/users/me')
+        .set('Authorization', `Bearer ${tokenFor(['data_operator'], 'caller-1')}`)
+        .send({ name: 'Ravi K.', id: 'someone-elses-id', userId: 'someone-elses-id' });
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'caller-1' } }),
+      );
+      // The spoofed id/userId fields aren't Update fields at all — validateBody(UpdateUserSchema)
+      // silently strips them (not `.strict()`), so they can never reach the update call.
+      const updateCall = mockPrisma.user.update.mock.calls[0]?.[0];
+      expect(updateCall.data).not.toHaveProperty('id');
+      expect(updateCall.data).not.toHaveProperty('userId');
+    });
+
+    it('rejects a status/role field — those are not part of UpdateUserSchema at all', async () => {
+      const res = await request(app)
+        .patch('/rbac/users/me')
+        .set('Authorization', `Bearer ${tokenFor(['support'], 'caller-1')}`)
+        .send({ name: 'Ravi K.', status: 'blocked', roleIds: ['admin-role'] });
+
+      expect(res.status).toBe(200);
+      const updateCall = mockPrisma.user.update.mock.calls[0]?.[0];
+      expect(updateCall.data).not.toHaveProperty('status');
+      expect(updateCall.data).not.toHaveProperty('roleIds');
+    });
+
+    it('writes an audit log entry for the self-update', async () => {
+      await request(app)
+        .patch('/rbac/users/me')
+        .set('Authorization', `Bearer ${tokenFor(['company'], 'caller-1')}`)
+        .send({ phone: '9111111111' });
+
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ action: 'user.self.update', targetId: 'caller-1' }) }),
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Bootstrap — authenticated, any role, no extra permission gate.
   // -------------------------------------------------------------------------
 

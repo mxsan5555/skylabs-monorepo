@@ -99,6 +99,11 @@ export const CreateDriverSchema = z
     ifscCode: z.string().optional(),
     branchName: z.string().optional(),
     upiIdOrChequeNo: z.string().optional(),
+    // Not a Driver column — the onboarding-wizard step (1-4) this save completes. Read by
+    // `driver.service.ts`'s `computeOnboardingUpdate` and stripped before hitting Prisma.
+    // Omitted entirely (a plain admin edit, or the driver's own `/drivers/me`) leaves
+    // onboarding progress untouched.
+    stepCompleted: z.number().int().min(1).max(4).optional(),
   })
   .openapi('CreateDriver');
 

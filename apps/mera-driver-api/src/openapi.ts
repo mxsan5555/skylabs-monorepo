@@ -344,6 +344,23 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'get',
+  path: '/rbac/users/me',
+  summary: "Get the caller's own profile (any authenticated user)",
+  security: [{ bearerAuth: [] }],
+  responses: { 200: { description: 'Own user profile', content: { 'application/json': { schema: envelope(z.unknown()) } } } },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: '/rbac/users/me',
+  summary: "Update the caller's own profile (name/email/phone — any authenticated user)",
+  security: [{ bearerAuth: [] }],
+  request: { body: { content: { 'application/json': { schema: UpdateUserSchema } } } },
+  responses: { 200: { description: 'Own user profile updated', content: { 'application/json': { schema: envelope(z.unknown()) } } } },
+});
+
+registry.registerPath({
   method: 'patch',
   path: '/rbac/users/{id}',
   summary: 'Update a user',

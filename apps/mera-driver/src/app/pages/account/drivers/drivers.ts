@@ -1,8 +1,30 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, inject, OnInit, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { DriversApiService, type Driver } from '../../../core/drivers/drivers-api.service';
 import { RbacApiService } from '../../../core/rbac/rbac-api.service';
+import { buildResumeHtml, buildResumeSections, type ResumeSection } from './driver-resume';
+
+/** The 4 tabs are the onboarding wizard's persistence checkpoints — sub-section chip
+ *  navigation within a tab is a pure UI concern and never itself hits the backend. */
+const TOTAL_ONBOARDING_STEPS = 4;
+// Sub-section counts for tabs 0-3, matching the actual number of `@if (activeSubSection() === N)`
+// branches (and chips) rendered per tab in drivers.html — NOT the previous [4,2,6,3], which
+// overcounted tabs 2 and 3 and made "Save & Next" walk through blank, content-less
+// sub-sections before a tab was actually considered finished.
+const MAX_SUBS = [4, 2, 3, 1];
+
+/** Driver List progress display — e.g. "In Progress — Step 2 of 4 (25%)" / "Completed — 100%".
+ *  A driver with no onboarding data at all (shouldn't happen post-migration, but defensively)
+ *  reads as completed rather than a confusing "Step undefined of 4". */
+function onboardingLabel(d: Driver): string {
+  if (d.onboardingStatus === 'in_progress') {
+    const step = Math.min(Math.max(d.currentStep ?? 1, 1), TOTAL_ONBOARDING_STEPS);
+    return `In Progress — Step ${step} of ${TOTAL_ONBOARDING_STEPS} (${d.completionPercentage ?? 0}%)`;
+  }
+  return 'Completed — 100%';
+}
 
 @Component({
   selector: 'md-account-drivers',
@@ -28,6 +50,39 @@ export class Drivers implements OnInit {
   readonly linkSaving = signal<boolean>(false);
   readonly linkError = signal<string | null>(null);
 
+  // --- Read-only Driver Resume/Profile Preview ---
+  readonly previewDriver = signal<Driver | null>(null);
+  readonly previewSections = computed<ResumeSection[]>(() => {
+    const d = this.previewDriver();
+    return d ? buildResumeSections(d) : [];
+  });
+
+  openPreview(driver: Driver): void {
+    this.previewDriver.set(driver);
+  }
+
+  closePreview(): void {
+    this.previewDriver.set(null);
+  }
+
+  /** Browser-native print-to-PDF — no new PDF library. Opens the resume in its own
+   *  window with print-only styling (not the admin console chrome) and invokes print(),
+   *  which every major browser can save as a PDF from its destination picker. */
+  downloadPdf(driver: Driver): void {
+    const html = buildResumeHtml(driver);
+    const win = window.open('', '_blank', 'width=850,height=1100');
+    if (!win) {
+      alert('Please allow pop-ups for this site to download the PDF.');
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.onload = () => {
+      win.focus();
+      win.print();
+    };
+  }
+
   // --- Search, Filter, Sort & Pagination Signals ---
   readonly searchQuery = signal<string>('');
   readonly statusFilter = signal<string>('all');
@@ -41,6 +96,10 @@ export class Drivers implements OnInit {
   readonly activeFormTab = signal<number>(0);
   readonly activeSubSection = signal<number>(0);
   readonly editingDriverId = signal<string | null>(null);
+
+  // --- Step-by-step persistence (onboarding wizard) ---
+  readonly savingStep = signal<boolean>(false);
+  readonly stepError = signal<string | null>(null);
 
   // --- Form Validation Signals & Helpers ---
   readonly formSubmitted = signal<boolean>(false);
@@ -338,6 +397,7 @@ export class Drivers implements OnInit {
         'Not Useful': 'error'
       }
     },
+    { key: 'onboardingLabel', label: 'Onboarding', sortable: false },
     { key: 'fatherName', label: 'Father Name', sortable: true, hidden: true },
     { key: 'motherName', label: 'Mother Name', sortable: true, hidden: true },
     { key: 'emergencyNumber', label: 'Emergency No', sortable: false, hidden: true },
@@ -394,6 +454,8 @@ export class Drivers implements OnInit {
   ]);
 
   readonly tableActions = JSON.stringify([
+    { icon: 'badge', label: 'Preview / View Resume', event: 'preview_driver' },
+    { icon: 'picture_as_pdf', label: 'Download PDF', event: 'download_pdf' },
     { icon: 'visibility', label: 'View Details', event: '__view_detail__' },
     { icon: 'edit', label: 'Edit', event: 'edit_driver' },
     { icon: 'link', label: 'Link / Unlink Portal Account', event: 'link_driver' },
@@ -451,6 +513,7 @@ export class Drivers implements OnInit {
         ...d,
         linkedUser: undefined,
         linkedAccountLabel: d.linkedUser ? `${d.linkedUser.name} (${d.linkedUser.phone ?? d.linkedUser.email ?? ''})` : 'Not linked',
+        onboardingLabel: onboardingLabel(d),
       })),
     );
   });
@@ -490,20 +553,14 @@ export class Drivers implements OnInit {
     });
   }
 
-  // --- Add New Driver Action ---
-  addDriver(): void {
-    this.formSubmitted.set(true);
-    if (this.firstNameError() || this.genderError() || this.phoneError() || this.emailError() || this.statusError() || this.driverTypeError()) {
-      this.activeFormTab.set(0);
-      return;
-    }
-
+  // --- Build the current full-form snapshot (reused by every step save + the final save) ---
+  private buildPayload(): Driver {
     const firstName = this.inputFirstName().trim();
     const lastName = this.inputLastName().trim();
     const phone = this.inputPhone().trim();
     const email = this.inputEmail().trim();
 
-    const payload: Driver = {
+    return {
       name: `${firstName} ${lastName}`.trim(),
       firstName,
       lastName,
@@ -558,21 +615,52 @@ export class Drivers implements OnInit {
       branchName: this.inputBranchName().trim(),
       upiIdOrChequeNo: this.inputUpiIdOrChequeNo().trim()
     };
+  }
 
+  /**
+   * Persists the current full-form snapshot immediately, tagged with the onboarding step
+   * that was just completed. Step 1 (no driver yet) creates the record; every later step
+   * updates the SAME record (`editingDriverId`, set from the step-1 response) — never a
+   * second `POST`. Resolves `true` on success (caller advances the UI), `false` on failure
+   * (caller stays put — the error is already surfaced via `stepError`).
+   */
+  private async persistStep(stepCompleted: number, isFinal: boolean): Promise<boolean> {
+    this.savingStep.set(true);
+    this.stepError.set(null);
+    const payload = this.buildPayload();
     const editingId = this.editingDriverId();
-    const request = editingId !== null ? this.api.update(editingId, payload) : this.api.create(payload);
-    request.subscribe({
-      next: (driver) => {
-        this.uploadPendingDocuments(driver.id!);
-        this.reload();
+
+    try {
+      const driver = editingId !== null
+        ? await firstValueFrom(this.api.update(editingId, payload, stepCompleted))
+        : await firstValueFrom(this.api.create(payload, stepCompleted));
+
+      if (editingId === null) this.editingDriverId.set(driver.id!);
+      this.uploadPendingDocuments(driver.id!);
+      this.reload();
+      this.savingStep.set(false);
+
+      if (isFinal) {
         this.resetForm();
         this.showAddForm.set(false);
-      },
-      error: (err) => {
-        console.error('Failed to save driver', err);
-        alert('Failed to save driver. Please try again.');
       }
-    });
+      return true;
+    } catch (err) {
+      console.error(`Failed to save step ${stepCompleted}`, err);
+      this.savingStep.set(false);
+      this.stepError.set('Failed to save. Please check your connection and try again.');
+      return false;
+    }
+  }
+
+  // --- Final "Save & Register" / "Save Changes" action (last tab's last sub-section) ---
+  async addDriver(): Promise<void> {
+    this.formSubmitted.set(true);
+    if (this.firstNameError() || this.genderError() || this.phoneError() || this.emailError() || this.statusError() || this.driverTypeError()) {
+      this.activeFormTab.set(0);
+      return;
+    }
+    await this.persistStep(TOTAL_ONBOARDING_STEPS, true);
   }
 
   private uploadPendingDocuments(driverId: string): void {
@@ -670,6 +758,8 @@ export class Drivers implements OnInit {
     this.formSubmitted.set(false);
     this.touchedFields.set({});
     this.editingDriverId.set(null);
+    this.stepError.set(null);
+    this.savingStep.set(false);
     this.pendingFiles.clear();
     this.inputFirstName.set('');
     this.inputLastName.set('');
@@ -816,7 +906,17 @@ export class Drivers implements OnInit {
       this.educationDocs.set(row.educationDocs || [{ type: 'Select Document Type', regNo: '', file: '' }]);
       this.policeDocs.set(row.policeDocs || [{ type: 'Select Document Type', regNo: '', file: '' }]);
 
-      this.activeFormTab.set(0);
+      // Resume: an in-progress driver opens on its pending step (from persisted backend
+      // progress, not any frontend memory of where they left off — this component was just
+      // (re)constructed from a fresh `GET /drivers` list). A completed (or legacy, pre-
+      // onboarding-tracking) driver opens on tab 0 as a normal full edit/review, same as before.
+      if (row.onboardingStatus === 'in_progress' && row.currentStep) {
+        const step = Math.min(Math.max(Number(row.currentStep), 1), TOTAL_ONBOARDING_STEPS);
+        this.activeFormTab.set(step - 1);
+      } else {
+        this.activeFormTab.set(0);
+      }
+      this.activeSubSection.set(0);
       this.showAddForm.set(true);
     } else if (action === 'delete_driver') {
       if (confirm(`Are you sure you want to delete lead "${row.firstName} ${row.lastName}"?`)) {
@@ -831,6 +931,14 @@ export class Drivers implements OnInit {
     } else if (action === 'link_driver') {
       const driver = this.allDrivers().find((d) => d.id === row.id);
       if (driver) this.openLinkPanel(driver);
+    } else if (action === 'preview_driver') {
+      // Look up the full record from `allDrivers()` (freshly reloaded after every
+      // mutation), not the serialized table row — the resume must show the latest data.
+      const driver = this.allDrivers().find((d) => d.id === row.id);
+      if (driver) this.openPreview(driver);
+    } else if (action === 'download_pdf') {
+      const driver = this.allDrivers().find((d) => d.id === row.id);
+      if (driver) this.downloadPdf(driver);
     }
   }
 
@@ -895,6 +1003,9 @@ export class Drivers implements OnInit {
   closeAddDriverForm(): void {
     this.showAddForm.set(false);
     this.resetForm();
+    // A step may already have been persisted (driver created/updated mid-wizard) — refresh
+    // so it shows up immediately with its correct in-progress status, not stale/missing.
+    this.reload();
   }
 
   onFormTabChange(event: Event): void {
@@ -905,42 +1016,52 @@ export class Drivers implements OnInit {
 
   // --- Step Navigation Actions ---
   isLastStep(): boolean {
-    return this.activeFormTab() === 3 && this.activeSubSection() === 2;
+    return this.activeFormTab() === 3 && this.activeSubSection() === MAX_SUBS[3] - 1;
   }
 
-  onSaveAndNext(): void {
+  /**
+   * Sub-section chip navigation *within* a tab never touches the backend — only finishing
+   * the last sub-section of a tab (about to cross into the next tab, or finishing the form
+   * entirely) does. That save is awaited before the UI advances, so "Continue" always means
+   * "this step is now in Postgres", never just a local signal update.
+   */
+  async onSaveAndNext(): Promise<void> {
     if (!this.validateCurrentStep()) {
       return;
     }
 
     if (this.isLastStep()) {
-      this.addDriver();
+      await this.addDriver();
       return;
     }
 
     const currentTab = this.activeFormTab();
     const currentSub = this.activeSubSection();
-    const maxSubs = [4, 2, 6, 3]; // Sub-section counts for Tab 0, 1, 2, 3
+    const isLastSubOfTab = currentSub >= MAX_SUBS[currentTab] - 1;
 
-    if (currentSub < maxSubs[currentTab] - 1) {
+    if (!isLastSubOfTab) {
       this.activeSubSection.set(currentSub + 1);
-    } else if (currentTab < 3) {
-      this.activeFormTab.set(currentTab + 1);
-      this.activeSubSection.set(0);
+      return;
     }
+
+    const stepCompleted = currentTab + 1;
+    const ok = await this.persistStep(stepCompleted, false);
+    if (!ok) return; // stay put — stepError is already showing why
+
+    this.activeFormTab.set(currentTab + 1);
+    this.activeSubSection.set(0);
   }
 
   onPrevSubSection(): void {
     const currentTab = this.activeFormTab();
     const currentSub = this.activeSubSection();
-    const maxSubs = [4, 2, 6, 3];
 
     if (currentSub > 0) {
       this.activeSubSection.set(currentSub - 1);
     } else if (currentTab > 0) {
       const prevTab = currentTab - 1;
       this.activeFormTab.set(prevTab);
-      this.activeSubSection.set(maxSubs[prevTab] - 1);
+      this.activeSubSection.set(MAX_SUBS[prevTab] - 1);
     }
   }
 

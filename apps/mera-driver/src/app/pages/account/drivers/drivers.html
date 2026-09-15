@@ -88,6 +88,45 @@
           </div>
         }
       </md-dialog>
+
+      <!-- Read-only Driver Resume / Profile Preview — no edit controls. -->
+      <md-dialog [open]="previewDriver() !== null" (closed)="closePreview()" class="driver-resume-dialog">
+        @if (previewDriver(); as d) {
+          <div slot="headline">{{ d.firstName }} {{ d.lastName }} — Resume</div>
+          <div slot="content" class="flex flex-col gap-4">
+            <div class="account-card__head">
+              <span class="otp-muted">Status</span>
+              <sky-badge
+                [variant]="d.status === 'Verified' ? 'primary' : d.status === 'Blacklisted' || d.status === 'Closed' || d.status === 'Not Useful' ? 'error' : 'secondary'"
+              >
+                {{ d.status || 'Non-Verified' }}
+              </sky-badge>
+            </div>
+            @for (section of previewSections(); track section.title) {
+              <section class="account-card">
+                <div class="account-card__head">
+                  <h2>{{ section.title }}</h2>
+                </div>
+                <dl class="driver-resume-fields">
+                  @for (f of section.fields; track f.label) {
+                    <div>
+                      <dt>{{ f.label }}</dt>
+                      <dd>{{ f.value }}</dd>
+                    </div>
+                  }
+                </dl>
+              </section>
+            }
+          </div>
+          <div slot="actions">
+            <md-text-button (click)="closePreview()">Close</md-text-button>
+            <md-filled-button (click)="downloadPdf(d)">
+              <md-icon slot="icon" aria-hidden="true">picture_as_pdf</md-icon>
+              Download PDF
+            </md-filled-button>
+          </div>
+        }
+      </md-dialog>
     }
 
     <!-- VIEW 2: ADD DRIVER TABS PAGE -->
@@ -103,6 +142,13 @@
             Back to List
           </md-outlined-button>
         </div>
+
+        @if (editingDriverId() !== null) {
+          <p class="text-xs text-slate-500 -mt-2">
+            <md-icon class="align-middle text-sm" aria-hidden="true">cloud_done</md-icon>
+            Saved to database — Step {{ activeFormTab() + 1 }} of 4
+          </p>
+        }
 
         <sky-card variant="outlined" class="w-full p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
           <!-- Material Tabs matching user screenshot -->
@@ -679,28 +725,33 @@
           }
 
           <!-- Form Actions Bar -->
-          <div class="flex justify-between items-center mt-6 pt-2">
-            <md-outlined-button (click)="closeAddDriverForm()">Cancel</md-outlined-button>
+          <div class="flex flex-col gap-2 mt-6 pt-2">
+            @if (stepError()) {
+              <p class="text-sm text-red-600" role="alert">{{ stepError() }}</p>
+            }
+            <div class="flex justify-between items-center">
+              <md-outlined-button [disabled]="savingStep()" (click)="closeAddDriverForm()">Cancel</md-outlined-button>
 
-            <div class="flex items-center gap-3">
-              @if (activeFormTab() > 0 || activeSubSection() > 0) {
-                <md-outlined-button (click)="onPrevSubSection()">
-                  <md-icon slot="icon">arrow_back</md-icon>
-                  Previous
-                </md-outlined-button>
-              }
+              <div class="flex items-center gap-3">
+                @if (activeFormTab() > 0 || activeSubSection() > 0) {
+                  <md-outlined-button [disabled]="savingStep()" (click)="onPrevSubSection()">
+                    <md-icon slot="icon">arrow_back</md-icon>
+                    Previous
+                  </md-outlined-button>
+                }
 
-              @if (isLastStep()) {
-                <md-filled-button (click)="addDriver()">
-                  <md-icon slot="icon">how_to_reg</md-icon>
-                  {{ editingDriverId() !== null ? 'Save Changes' : 'Save & Register Driver' }}
-                </md-filled-button>
-              } @else {
-                <md-filled-button (click)="onSaveAndNext()">
-                  <md-icon slot="icon">arrow_forward</md-icon>
-                  Save & Next
-                </md-filled-button>
-              }
+                @if (isLastStep()) {
+                  <md-filled-button [disabled]="savingStep()" (click)="addDriver()">
+                    <md-icon slot="icon">how_to_reg</md-icon>
+                    {{ savingStep() ? 'Saving…' : (editingDriverId() !== null ? 'Save Changes' : 'Save & Register Driver') }}
+                  </md-filled-button>
+                } @else {
+                  <md-filled-button [disabled]="savingStep()" (click)="onSaveAndNext()">
+                    <md-icon slot="icon">arrow_forward</md-icon>
+                    {{ savingStep() ? 'Saving…' : 'Save & Next' }}
+                  </md-filled-button>
+                }
+              </div>
             </div>
           </div>
         </sky-card>
