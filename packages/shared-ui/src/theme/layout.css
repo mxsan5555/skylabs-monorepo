@@ -235,6 +235,9 @@
 
 /* Sidebar */
 .admin-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -305,9 +308,14 @@
 .admin-sidebar__nav {
   flex: 1;
   overflow-y: auto;
+  scrollbar-width: none;
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.admin-sidebar__nav::-webkit-scrollbar {
+  display: none;
 }
 
 .admin-nav-group__label {
@@ -429,7 +437,9 @@
   border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
 }
 
-.admin-breadcrumb {
+.admin-breadcrumb 
+
+{
   list-style: none;
   margin: 0;
   padding: 0;
