@@ -26,7 +26,7 @@ export const appConfig: ApplicationConfig = {
         scrollPositionRestoration: 'enabled',
       }),
     ),
-    
+    provideHttpClient(withInterceptors([authInterceptor])),
     provideSharedAuth({ appPrefix: 'mera_driver', apiBaseUrl: environment.apiUrl, unauthorizedRedirectPath: '/unauthorized' }),
   ],
 };

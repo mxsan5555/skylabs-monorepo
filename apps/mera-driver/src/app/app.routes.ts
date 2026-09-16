@@ -283,9 +283,9 @@ export const appRoutes: Routes = [
       },
       {
         path: 'masters/statuses',
-        title: 'Category Status · mera-driver',
+        title: 'Driver Status · mera-driver',
         canActivate: [permissionGuard],
-        data: { permission: { menuKey: 'masters.statuses', action: 'view' }, title: 'Category Status', subtitle: 'Driver verification status configuration.' },
+        data: { permission: { menuKey: 'masters.statuses', action: 'view' }, title: 'Driver Status', subtitle: 'Driver verification status configuration.' },
         loadComponent: () =>
           import('./pages/account/masters/statuses/statuses').then((m) => m.StatusesMaster),
       },
