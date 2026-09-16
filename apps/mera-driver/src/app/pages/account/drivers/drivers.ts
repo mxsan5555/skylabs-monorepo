@@ -47,7 +47,6 @@ function subStepKey(tabIndex: number, subIndex: number): number {
 export class Drivers implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly api = inject(DriversApiService);
-  private readonly rbac = inject(RbacApiService);
   private readonly router = inject(Router);
 
   constructor() {

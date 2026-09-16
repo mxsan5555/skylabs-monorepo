@@ -6,7 +6,6 @@ import {
   inject,
   OnInit,
   signal,
-  type OnInit,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
@@ -82,10 +81,6 @@ export class Header implements OnInit {
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
   private readonly host = inject(ElementRef<HTMLElement>);
-
-  protected readonly helplineNumber = signal('1800-123-4567');
-
-  ngOnInit(): void {}
 
   protected readonly services = SERVICES;
   protected readonly staffing = STAFFING;
