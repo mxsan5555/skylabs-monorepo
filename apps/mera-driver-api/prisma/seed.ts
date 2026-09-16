@@ -82,6 +82,9 @@ const RBAC_USERS_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delet
 const RBAC_AUDIT_ACTIONS: PermissionAction[] = ['view'];
 const GROUP_ACTIONS: PermissionAction[] = ['view']; // parent menu groups with no route of their own
 const LEAF_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete'];
+// Adds `status_change` (Active/Inactive account toggle) on top of the leaf default so the
+// Permission row exists to grant via Role Management — see `PATCH /drivers/:id/status`.
+const DRIVERS_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete', 'status_change'];
 
 function actionsForNode(node: MenuNode): PermissionAction[] {
   if (node.children && node.children.length > 0) return GROUP_ACTIONS;
@@ -92,6 +95,8 @@ function actionsForNode(node: MenuNode): PermissionAction[] {
       return RBAC_USERS_ACTIONS;
     case 'rbac.audit-logs':
       return RBAC_AUDIT_ACTIONS;
+    case 'drivers':
+      return DRIVERS_ACTIONS;
     default:
       return LEAF_ACTIONS;
   }
@@ -212,6 +217,10 @@ async function grantNewRolePermissions(roles: Map<string, { id: string }>) {
 
   await grantActionsOf('kyc_verification', ['dashboard'], ['view']);
   await grantActionsOf('kyc_verification', ['drivers'], ['view', 'edit']);
+
+  // Admin needs this out of the box for the Driver List's Activate/Deactivate action — the
+  // baseline grant above only gives `admin` `view` on `drivers`.
+  await grantActionsOf('admin', ['drivers'], ['status_change']);
 }
 
 // ---------------------------------------------------------------------------

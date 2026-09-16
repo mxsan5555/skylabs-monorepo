@@ -35,6 +35,7 @@ import {
   CreateAttendanceSchema,
   UpdateAttendanceSchema,
   LinkDriverToUserSchema,
+  SetDriverStatusSchema,
 } from './schemas/business.schema';
 import { UpdateOwnDriverSchema } from './schemas/driverSelf.schema';
 import {
@@ -591,11 +592,36 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'patch',
+  path: '/drivers/{id}/status',
+  summary: 'Activate or deactivate a Driver account (portal login gate, independent of KYC status)',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }), body: { content: { 'application/json': { schema: SetDriverStatusSchema } } } },
+  responses: {
+    200: { description: 'Driver account status updated', content: { 'application/json': { schema: envelope(z.unknown()) } } },
+    404: { description: 'Driver not found', content: { 'application/json': { schema: envelope(z.null()) } } },
+  },
+});
+
+registry.registerPath({
+  method: 'patch',
   path: '/drivers/{id}/unlink-user',
   summary: 'Unlink a Driver record from its User account',
   security: [{ bearerAuth: [] }],
   request: { params: z.object({ id: z.string().uuid() }) },
   responses: { 200: { description: 'Driver unlinked', content: { 'application/json': { schema: envelope(z.unknown()) } } } },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/drivers/{id}/create-user',
+  summary: 'Create and link a User account for this Driver in one step (auto-assigns the driver role) — the only way a Driver gets portal access',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: {
+    201: { description: 'User created and linked', content: { 'application/json': { schema: envelope(z.unknown()) } } },
+    409: { description: 'Driver already has a linked user account', content: { 'application/json': { schema: envelope(z.null()) } } },
+    422: { description: 'Driver has no phone or email on file', content: { 'application/json': { schema: envelope(z.null()) } } },
+  },
 });
 
 // ---------------------------------------------------------------------------

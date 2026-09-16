@@ -95,6 +95,70 @@ describe('PATCH /drivers/:id/link-user', () => {
   });
 });
 
+describe('PATCH /drivers/:id/status', () => {
+  it('returns 403 without drivers:status_change', async () => {
+    grant('drivers:edit');
+    const res = await request(app)
+      .patch('/drivers/driver-1/status')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ accountStatus: 'Inactive' });
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 422 for an invalid accountStatus value', async () => {
+    grant('drivers:status_change');
+    const res = await request(app)
+      .patch('/drivers/driver-1/status')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ accountStatus: 'Suspended' });
+    expect(res.status).toBe(422);
+  });
+
+  it('returns 404 for a nonexistent driver', async () => {
+    grant('drivers:status_change');
+    mockPrisma.driver.findUnique.mockResolvedValue(null);
+    const res = await request(app)
+      .patch('/drivers/missing/status')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ accountStatus: 'Inactive' });
+    expect(res.status).toBe(404);
+  });
+
+  it('deactivates the driver and audit-logs it', async () => {
+    grant('drivers:status_change');
+    mockPrisma.driver.findUnique.mockResolvedValue({ id: 'driver-1', accountStatus: 'Inactive', documents: [] });
+    mockPrisma.driver.update.mockResolvedValue({});
+    mockPrisma.auditLog.create.mockResolvedValue({});
+
+    const res = await request(app)
+      .patch('/drivers/driver-1/status')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ accountStatus: 'Inactive' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.accountStatus).toBe('Inactive');
+    expect(mockPrisma.driver.update).toHaveBeenCalledWith({ where: { id: 'driver-1' }, data: { accountStatus: 'Inactive' } });
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ action: 'driver.status_change' }) }),
+    );
+  });
+
+  it('reactivates the driver', async () => {
+    grant('drivers:status_change');
+    mockPrisma.driver.findUnique.mockResolvedValue({ id: 'driver-1', accountStatus: 'Active', documents: [] });
+    mockPrisma.driver.update.mockResolvedValue({});
+    mockPrisma.auditLog.create.mockResolvedValue({});
+
+    const res = await request(app)
+      .patch('/drivers/driver-1/status')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ accountStatus: 'Active' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.accountStatus).toBe('Active');
+  });
+});
+
 describe('PATCH /drivers/:id/unlink-user', () => {
   it('clears the link and audit-logs it', async () => {
     grant('drivers:assign');
@@ -108,5 +172,63 @@ describe('PATCH /drivers/:id/unlink-user', () => {
 
     expect(res.status).toBe(200);
     expect(mockPrisma.driver.update).toHaveBeenCalledWith({ where: { id: 'driver-1' }, data: { userId: null } });
+  });
+});
+
+describe('POST /drivers/:id/create-user', () => {
+  it('returns 403 without drivers:assign', async () => {
+    grant('drivers:view');
+    const res = await request(app).post('/drivers/driver-1/create-user').set('Authorization', `Bearer ${adminToken()}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('creates a User, assigns the driver role, links it, and audit-logs it', async () => {
+    grant('drivers:assign');
+    mockPrisma.driver.findUnique.mockResolvedValue({
+      id: 'driver-1',
+      userId: null,
+      firstName: 'Ravi',
+      lastName: 'Kumar',
+      phone: '9000000000',
+      email: null,
+      documents: [],
+    });
+    mockPrisma.role.findUnique.mockResolvedValue({ id: 'role-driver', key: 'driver' });
+    mockPrisma.user.create.mockResolvedValue({ id: USER_2_ID });
+    mockPrisma.userRole.create.mockResolvedValue({});
+    mockPrisma.driver.update.mockResolvedValue({});
+    mockPrisma.auditLog.create.mockResolvedValue({});
+
+    const res = await request(app).post('/drivers/driver-1/create-user').set('Authorization', `Bearer ${adminToken()}`);
+
+    expect(res.status).toBe(201);
+    expect(mockPrisma.user.create).toHaveBeenCalledWith({
+      data: { name: 'Ravi Kumar', email: undefined, phone: '9000000000' },
+    });
+    expect(mockPrisma.userRole.create).toHaveBeenCalledWith({ data: { userId: USER_2_ID, roleId: 'role-driver' } });
+    expect(mockPrisma.driver.update).toHaveBeenCalledWith({ where: { id: 'driver-1' }, data: { userId: USER_2_ID } });
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ action: 'driver.user.create' }) }),
+    );
+  });
+
+  it('returns 409 without creating anything when the driver is already linked', async () => {
+    grant('drivers:assign');
+    mockPrisma.driver.findUnique.mockResolvedValue({ id: 'driver-1', userId: USER_2_ID, documents: [] });
+
+    const res = await request(app).post('/drivers/driver-1/create-user').set('Authorization', `Bearer ${adminToken()}`);
+
+    expect(res.status).toBe(409);
+    expect(mockPrisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 422 when the driver has neither phone nor email', async () => {
+    grant('drivers:assign');
+    mockPrisma.driver.findUnique.mockResolvedValue({ id: 'driver-1', userId: null, phone: null, email: null, documents: [] });
+
+    const res = await request(app).post('/drivers/driver-1/create-user').set('Authorization', `Bearer ${adminToken()}`);
+
+    expect(res.status).toBe(422);
+    expect(mockPrisma.user.create).not.toHaveBeenCalled();
   });
 });

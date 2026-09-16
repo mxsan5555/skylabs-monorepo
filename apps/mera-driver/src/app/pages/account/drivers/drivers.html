@@ -42,11 +42,12 @@
       <md-dialog [open]="linkPanelDriver() !== null" (closed)="closeLinkPanel()">
         @if (linkPanelDriver(); as d) {
           <div slot="headline">
-            {{ d.linkedUser ? 'Manage portal account' : 'Link portal account' }} — {{ d.firstName }} {{ d.lastName }}
+            Driver User Account — {{ d.firstName }} {{ d.lastName }}
           </div>
           <div slot="content" class="flex flex-col gap-4">
             @if (d.linkedUser) {
               <p>
+                <strong>Driver User: Created</strong><br />
                 Linked to <strong>{{ d.linkedUser.name }}</strong>
                 ({{ d.linkedUser.phone || d.linkedUser.email }}). This account can sign in to the
                 driver self-service portal.
@@ -57,32 +58,20 @@
               </md-outlined-button>
             } @else {
               <p>
-                Linking a User account grants that user access to the driver self-service
-                portal (Profile, KYC, Documents) for this driver record. The
-                <code>driver</code> role is assigned automatically.
+                Creating a Driver User automatically creates a portal login for this driver,
+                assigns the <code>driver</code> role, and grants access to the driver
+                self-service portal (Profile, KYC, Documents) — no existing user is selected.
               </p>
               @if (linkError()) {
                 <p class="otp-muted" role="alert">{{ linkError() }}</p>
               }
-              <md-outlined-select
-                label="User account"
-                [value]="linkSelectedUserId()"
-                (change)="linkSelectedUserId.set($any($event.target).value)"
-              >
-                <md-select-option value=""><div slot="headline">Select a user…</div></md-select-option>
-                @for (u of linkUsers(); track u.id) {
-                  <md-select-option [value]="u.id">
-                    <div slot="headline">{{ u.name }} — {{ u.phone || u.email }}</div>
-                  </md-select-option>
-                }
-              </md-outlined-select>
             }
           </div>
           <div slot="actions">
             <md-text-button (click)="closeLinkPanel()">Close</md-text-button>
             @if (!d.linkedUser) {
-              <md-filled-button [disabled]="linkSaving()" (click)="confirmLink()">
-                {{ linkSaving() ? 'Linking…' : 'Link account' }}
+              <md-filled-button [disabled]="linkSaving()" (click)="createDriverUser(d)">
+                {{ linkSaving() ? 'Creating…' : 'Create Driver User' }}
               </md-filled-button>
             }
           </div>
@@ -146,7 +135,8 @@
         @if (editingDriverId() !== null) {
           <p class="text-xs text-slate-500 -mt-2">
             <md-icon class="align-middle text-sm" aria-hidden="true">cloud_done</md-icon>
-            Saved to database — Step {{ activeFormTab() + 1 }} of 4
+            Saved to database — Tab {{ activeFormTab() + 1 }} of 4, sub-step {{ activeSubSection() + 1 }} of {{ maxSubsFor(activeFormTab()) }}
+            ({{ formCompletedSubSteps().length }} of {{ totalSubSteps }} sub-steps completed)
           </p>
         }
 
@@ -165,10 +155,10 @@
               
               <!-- Sub-Section Navigation Chips -->
               <md-chip-set class="mb-2">
-                <md-filter-chip label="1. Personal & Identity Details" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
-                <md-filter-chip label="2. Contact & Address Info" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
-                <md-filter-chip label="3. Physical & Demographics" [selected]="activeSubSection() === 2" (click)="activeSubSection.set(2)"></md-filter-chip>
-                <md-filter-chip label="4. Account & Lead Info" [selected]="activeSubSection() === 3" (click)="activeSubSection.set(3)"></md-filter-chip>
+                <md-filter-chip [label]="'1. Personal & Identity Details' + (isSubStepDone(0, 0) ? ' ✓' : '')" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
+                <md-filter-chip [label]="'2. Contact & Address Info' + (isSubStepDone(0, 1) ? ' ✓' : '')" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
+                <md-filter-chip [label]="'3. Physical & Demographics' + (isSubStepDone(0, 2) ? ' ✓' : '')" [selected]="activeSubSection() === 2" (click)="activeSubSection.set(2)"></md-filter-chip>
+                <md-filter-chip [label]="'4. Account & Lead Info' + (isSubStepDone(0, 3) ? ' ✓' : '')" [selected]="activeSubSection() === 3" (click)="activeSubSection.set(3)"></md-filter-chip>
               </md-chip-set>
 
               <!-- 1. Personal & Identity Details -->
@@ -389,8 +379,8 @@
               
               <!-- Sub-Section Navigation Chips -->
               <md-chip-set class="mb-2">
-                <md-filter-chip label="1. Education & Training Profile" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
-                <md-filter-chip label="2. Health & Medical Specifications" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
+                <md-filter-chip [label]="'1. Education & Training Profile' + (isSubStepDone(1, 0) ? ' ✓' : '')" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
+                <md-filter-chip [label]="'2. Health & Medical Specifications' + (isSubStepDone(1, 1) ? ' ✓' : '')" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
               </md-chip-set>
 
               <!-- 1. Education & Training Profile -->
@@ -533,9 +523,9 @@
               
               <!-- Sub-Section Navigation Chips -->
               <md-chip-set class="mb-2">
-                <md-filter-chip label="1. Driving License Details" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
-                <md-filter-chip label="2. Police Verification & Employment" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
-                <md-filter-chip label="3. Personal & Category Docs" [selected]="activeSubSection() === 2" (click)="activeSubSection.set(2)"></md-filter-chip>
+                <md-filter-chip [label]="'1. Driving License Details' + (isSubStepDone(2, 0) ? ' ✓' : '')" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
+                <md-filter-chip [label]="'2. Police Verification & Employment' + (isSubStepDone(2, 1) ? ' ✓' : '')" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
+                <md-filter-chip [label]="'3. Personal & Category Docs' + (isSubStepDone(2, 2) ? ' ✓' : '')" [selected]="activeSubSection() === 2" (click)="activeSubSection.set(2)"></md-filter-chip>
               </md-chip-set>
 
               <!-- 1. Driving License Details -->
@@ -691,8 +681,8 @@
               
               <!-- Sub-Section Navigation Chips -->
               <md-chip-set class="mb-2">
-                <md-filter-chip label="1. Account Details" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
-                <md-filter-chip label="2. Registration Fees" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
+                <md-filter-chip [label]="'1. Account Details' + (isSubStepDone(3, 0) ? ' ✓' : '')" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
+                <md-filter-chip [label]="'2. Registration Fees' + (isSubStepDone(3, 1) ? ' ✓' : '')" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
               </md-chip-set>
 
               <!-- 1. Account Details -->

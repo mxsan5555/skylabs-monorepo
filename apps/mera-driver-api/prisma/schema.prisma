@@ -367,6 +367,11 @@ model Driver {
   driverType            String?
   status                String    @default("Non-Verified")
   verificationNotes     String?   // staff-set reason for the current status; driver-portal read-only
+  // Portal login gate — independent of `status` above (KYC verification stage). 'Active' |
+  // 'Inactive'. Changed only via `PATCH /drivers/:id/status` (drivers:status_change), never
+  // as a side effect of the KYC `PATCH /drivers/:id`. Enforced at login (`assertDriverAccountActive`)
+  // and on every authenticated `/drivers/me*` call (`resolveOwnDriver`), not just hidden in the UI.
+  accountStatus         String    @default("Active")
   sourceType            String?
   vehicle               String?
   avatar                String?
@@ -403,15 +408,25 @@ model Driver {
   documents             DriverDocument[]
 
   // Multi-step onboarding-form progress — set only by `driver.service.ts`'s
-  // `computeOnboardingUpdate`, never trusted directly from the client beyond the single
-  // `stepCompleted` number the step-save endpoint accepts. Independent of `status` above
-  // (manual staff verification) — a driver can be a fully onboarded, unverified record.
+  // `deriveOnboardingFields`, never trusted directly from the client beyond the single
+  // `stepCompleted`/`subStepCompleted` pair the step-save endpoint accepts. Independent of
+  // `status` above (manual staff verification) — a driver can be a fully onboarded,
+  // unverified record.
+  //
+  // Each top-level tab (1-4) has its own nested sub-steps (see `SUB_COUNTS` in
+  // `driver.service.ts`) — `completedSubSteps` is the definitive source of truth, storing
+  // one entry per finished (tab, sub) pair encoded as `tab*10+sub` (e.g. tab 2 sub 1 -> 21).
+  // `completedSteps`/`currentStep`/`completionPercentage` are all derived FROM it on every
+  // save, never written independently, so the two can never drift out of sync.
   onboardingStatus      String    @default("in_progress") // 'in_progress' | 'completed'
-  currentStep           Int       @default(1) // the next pending step (1-4) to resume at
-  completedSteps        Int[]     @default([])
-  completionPercentage  Int       @default(0)
+  currentStep           Int       @default(1) // the next pending top-level tab (1-4) to resume at
+  currentSubStep        Int       @default(0) // the next pending nested sub-step (0-based) within currentStep
+  completedSteps        Int[]     @default([]) // top-level tabs (1-4) whose every nested sub-step is done
+  completedSubSteps     Int[]     @default([]) // nested (tab, sub) pairs done so far, encoded tab*10+sub
+  completionPercentage  Int       @default(0) // % of all nested sub-steps across all 4 tabs completed
 
   @@index([status])
+  @@index([accountStatus])
 }
 
 model DriverDocument {

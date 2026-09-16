@@ -5,7 +5,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom, filter } from 'rxjs';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { DriversApiService, type Driver } from '../../../core/drivers/drivers-api.service';
-import { RbacApiService } from '../../../core/rbac/rbac-api.service';
 import { buildResumeHtml, buildResumeSections, type ResumeSection } from './driver-resume';
 
 /** The 4 tabs are the onboarding wizard's persistence checkpoints — sub-section chip
@@ -17,15 +16,24 @@ const TOTAL_ONBOARDING_STEPS = 4;
 // sub-sections before a tab was actually considered finished.
 const MAX_SUBS = [4, 2, 3, 2];
 
-/** Driver List progress display — e.g. "In Progress — Step 2 of 4 (25%)" / "Completed — 100%".
- *  A driver with no onboarding data at all (shouldn't happen post-migration, but defensively)
- *  reads as completed rather than a confusing "Step undefined of 4". */
+const TAB_NAMES = ['Personal Details', 'Education & Health Details', 'Documents Details', 'Payment Details'];
+
+/** Driver List progress display — e.g. "In Progress — Personal Details, sub-step 2 of 4 (18%)"
+ *  / "Completed — 100%". A driver with no onboarding data at all (shouldn't happen
+ *  post-migration, but defensively) reads as completed rather than a confusing label. */
 function onboardingLabel(d: Driver): string {
   if (d.onboardingStatus === 'in_progress') {
-    const step = Math.min(Math.max(d.currentStep ?? 1, 1), TOTAL_ONBOARDING_STEPS);
-    return `In Progress — Step ${step} of ${TOTAL_ONBOARDING_STEPS} (${d.completionPercentage ?? 0}%)`;
+    const tab = Math.min(Math.max(d.currentStep ?? 1, 1), TOTAL_ONBOARDING_STEPS);
+    const sub = Math.min(Math.max(d.currentSubStep ?? 0, 0), MAX_SUBS[tab - 1] - 1);
+    return `In Progress — ${TAB_NAMES[tab - 1]}, sub-step ${sub + 1} of ${MAX_SUBS[tab - 1]} (${d.completionPercentage ?? 0}%)`;
   }
   return 'Completed — 100%';
+}
+
+/** Encodes a (0-based tab, 0-based sub) pair to match the backend's `tab*10+sub` storage
+ *  (backend tabs are 1-based) — used to check `completedSubSteps` for chip/tick display. */
+function subStepKey(tabIndex: number, subIndex: number): number {
+  return (tabIndex + 1) * 10 + subIndex;
 }
 
 @Component({
@@ -59,10 +67,9 @@ export class Drivers implements OnInit {
   readonly allDrivers = signal<Driver[]>([]);
   readonly loading = signal<boolean>(false);
 
-  // --- Driver <-> User account linking (grants/revokes self-service portal access) ---
+  // --- Driver User account (self-service portal login) ---
+  // One-click creation only — no existing-user picker. See `createDriverUser()`.
   readonly linkPanelDriver = signal<Driver | null>(null);
-  readonly linkUsers = signal<{ id: string; name: string; phone?: string; email?: string }[]>([]);
-  readonly linkSelectedUserId = signal<string>('');
   readonly linkSaving = signal<boolean>(false);
   readonly linkError = signal<string | null>(null);
 
@@ -116,6 +123,19 @@ export class Drivers implements OnInit {
   // --- Step-by-step persistence (onboarding wizard) ---
   readonly savingStep = signal<boolean>(false);
   readonly stepError = signal<string | null>(null);
+  // Nested (tab, sub) pairs already saved for the driver currently open in the form —
+  // drives the "done" tick on sub-section chips. Encoded via `subStepKey()`.
+  readonly formCompletedSubSteps = signal<number[]>([]);
+
+  isSubStepDone(tabIndex: number, subIndex: number): boolean {
+    return this.formCompletedSubSteps().includes(subStepKey(tabIndex, subIndex));
+  }
+
+  readonly totalSubSteps = MAX_SUBS.reduce((a, b) => a + b, 0);
+
+  maxSubsFor(tabIndex: number): number {
+    return MAX_SUBS[tabIndex];
+  }
 
   // --- Form Validation Signals & Helpers ---
   readonly formSubmitted = signal<boolean>(false);
@@ -427,6 +447,7 @@ export class Drivers implements OnInit {
         'Not Useful': 'error'
       }
     },
+    { key: 'accountStatus', label: 'Account Status', type: 'status', statusMap: { Active: 'success', Inactive: 'error' } },
     { key: 'onboardingLabel', label: 'Onboarding', sortable: false },
     { key: 'fatherName', label: 'Father Name', sortable: true, hidden: true },
     { key: 'motherName', label: 'Mother Name', sortable: true, hidden: true },
@@ -488,7 +509,8 @@ export class Drivers implements OnInit {
     { icon: 'picture_as_pdf', label: 'Download PDF', event: 'download_pdf' },
     { icon: 'visibility', label: 'View Details', event: '__view_detail__' },
     { icon: 'edit', label: 'Edit', event: 'edit_driver' },
-    { icon: 'link', label: 'Link / Unlink Portal Account', event: 'link_driver' },
+    { icon: 'manage_accounts', label: 'Driver User Account', event: 'link_driver' },
+    { icon: 'power_settings_new', label: 'Activate / Deactivate', event: 'toggle_driver_status' },
     { icon: 'delete', label: 'Delete', event: 'delete_driver', variant: 'danger' }
   ]);
 
@@ -648,24 +670,31 @@ export class Drivers implements OnInit {
   }
 
   /**
-   * Persists the current full-form snapshot immediately, tagged with the onboarding step
-   * that was just completed. Step 1 (no driver yet) creates the record; every later step
-   * updates the SAME record (`editingDriverId`, set from the step-1 response) — never a
-   * second `POST`. Resolves `true` on success (caller advances the UI), `false` on failure
-   * (caller stays put — the error is already surfaced via `stepError`).
+   * Persists the current full-form snapshot immediately, tagged with the exact nested
+   * (tab, sub) onboarding sub-step that was just completed. The very first save (no driver
+   * yet) creates the record; every later sub-step updates the SAME record (`editingDriverId`,
+   * set from that first response) — never a second `POST`. Sending the full snapshot on every
+   * sub-step is safe (not a partial-data risk): the component's input signals already hold
+   * every previously-saved field (populated from the backend on `edit_driver`, or entered
+   * earlier in this same session), so nothing gets blanked — only the new sub-step's
+   * `completedSubSteps` entry actually changes. Resolves `true` on success (caller advances
+   * the UI), `false` on failure (caller stays put — the error is already surfaced via
+   * `stepError`).
    */
-  private async persistStep(stepCompleted: number, isFinal: boolean): Promise<boolean> {
+  private async persistStep(tabIndex: number, subIndex: number, isFinal: boolean): Promise<boolean> {
     this.savingStep.set(true);
     this.stepError.set(null);
     const payload = this.buildPayload();
     const editingId = this.editingDriverId();
+    const stepCompleted = tabIndex + 1;
 
     try {
       const driver = editingId !== null
-        ? await firstValueFrom(this.api.update(editingId, payload, stepCompleted))
-        : await firstValueFrom(this.api.create(payload, stepCompleted));
+        ? await firstValueFrom(this.api.update(editingId, payload, stepCompleted, subIndex))
+        : await firstValueFrom(this.api.create(payload, stepCompleted, subIndex));
 
       if (editingId === null) this.editingDriverId.set(driver.id!);
+      this.formCompletedSubSteps.set(driver.completedSubSteps ?? []);
       this.uploadPendingDocuments(driver.id!);
       this.reload();
       this.savingStep.set(false);
@@ -676,7 +705,7 @@ export class Drivers implements OnInit {
       }
       return true;
     } catch (err) {
-      console.error(`Failed to save step ${stepCompleted}`, err);
+      console.error(`Failed to save tab ${stepCompleted} sub-step ${subIndex}`, err);
       this.savingStep.set(false);
       this.stepError.set('Failed to save. Please check your connection and try again.');
       return false;
@@ -690,7 +719,7 @@ export class Drivers implements OnInit {
       this.activeFormTab.set(0);
       return;
     }
-    await this.persistStep(TOTAL_ONBOARDING_STEPS, true);
+    await this.persistStep(TOTAL_ONBOARDING_STEPS - 1, MAX_SUBS[TOTAL_ONBOARDING_STEPS - 1] - 1, true);
   }
 
   private uploadPendingDocuments(driverId: string): void {
@@ -790,6 +819,7 @@ export class Drivers implements OnInit {
     this.editingDriverId.set(null);
     this.stepError.set(null);
     this.savingStep.set(false);
+    this.formCompletedSubSteps.set([]);
     this.pendingFiles.clear();
     this.inputFirstName.set('');
     this.inputLastName.set('');
@@ -937,17 +967,22 @@ export class Drivers implements OnInit {
       this.educationDocs.set(row.educationDocs || [{ type: 'Select Document Type', regNo: '', file: '' }]);
       this.policeDocs.set(row.policeDocs || [{ type: 'Select Document Type', regNo: '', file: '' }]);
 
-      // Resume: an in-progress driver opens on its pending step (from persisted backend
-      // progress, not any frontend memory of where they left off — this component was just
-      // (re)constructed from a fresh `GET /drivers` list). A completed (or legacy, pre-
-      // onboarding-tracking) driver opens on tab 0 as a normal full edit/review, same as before.
+      this.formCompletedSubSteps.set(row.completedSubSteps || []);
+
+      // Resume: an in-progress driver opens on its pending nested sub-step (from persisted
+      // backend progress, not any frontend memory of where they left off — this component
+      // was just (re)constructed from a fresh `GET /drivers` list). A completed (or legacy,
+      // pre-onboarding-tracking) driver opens on tab 0 / sub 0 as a normal full edit/review,
+      // same as before.
       if (row.onboardingStatus === 'in_progress' && row.currentStep) {
-        const step = Math.min(Math.max(Number(row.currentStep), 1), TOTAL_ONBOARDING_STEPS);
-        this.activeFormTab.set(step - 1);
+        const tab = Math.min(Math.max(Number(row.currentStep), 1), TOTAL_ONBOARDING_STEPS);
+        const sub = Math.min(Math.max(Number(row.currentSubStep ?? 0), 0), MAX_SUBS[tab - 1] - 1);
+        this.activeFormTab.set(tab - 1);
+        this.activeSubSection.set(sub);
       } else {
         this.activeFormTab.set(0);
+        this.activeSubSection.set(0);
       }
-      this.activeSubSection.set(0);
       this.showAddForm.set(true);
     } else if (action === 'delete_driver') {
       if (confirm(`Are you sure you want to delete lead "${row.firstName} ${row.lastName}"?`)) {
@@ -962,6 +997,9 @@ export class Drivers implements OnInit {
     } else if (action === 'link_driver') {
       const driver = this.allDrivers().find((d) => d.id === row.id);
       if (driver) this.openLinkPanel(driver);
+    } else if (action === 'toggle_driver_status') {
+      const driver = this.allDrivers().find((d) => d.id === row.id);
+      if (driver) this.toggleDriverStatus(driver);
     } else if (action === 'preview_driver') {
       // Look up the full record from `allDrivers()` (freshly reloaded after every
       // mutation), not the serialized table row — the resume must show the latest data.
@@ -973,41 +1011,51 @@ export class Drivers implements OnInit {
     }
   }
 
-  // --- Driver <-> User account linking ---
+  // --- Driver User account (self-service portal login) ---
   openLinkPanel(driver: Driver): void {
     this.linkPanelDriver.set(driver);
-    this.linkSelectedUserId.set('');
     this.linkError.set(null);
-    if (this.linkUsers().length === 0) {
-      this.rbac.listUsers(1, 200).subscribe({
-        next: (page) => this.linkUsers.set(page.items.map((u) => ({ id: u.id, name: u.name, phone: u.phone, email: u.email }))),
-        error: (err) => console.error('Failed to load users for linking', err),
-      });
-    }
   }
 
   closeLinkPanel(): void {
     this.linkPanelDriver.set(null);
   }
 
-  confirmLink(): void {
-    const driver = this.linkPanelDriver();
-    const userId = this.linkSelectedUserId();
-    if (!driver?.id || !userId) {
-      this.linkError.set('Please select a user account.');
-      return;
-    }
+  /** The only way a driver gets a portal login — creates the User, assigns the `driver`
+   *  role, and links it server-side in one call. No existing-user selection. */
+  createDriverUser(driver: Driver): void {
+    if (!driver.id) return;
     this.linkSaving.set(true);
     this.linkError.set(null);
-    this.api.linkToUser(driver.id, userId).subscribe({
+    this.api.createDriverUser(driver.id).subscribe({
       next: (updated) => {
         this.linkSaving.set(false);
         this.allDrivers.update((list) => list.map((d) => (d.id === updated.id ? updated : d)));
-        this.closeLinkPanel();
+        this.linkPanelDriver.set(updated);
       },
       error: (err) => {
         this.linkSaving.set(false);
-        this.linkError.set(err?.message || 'Failed to link account — the user may already be linked to another driver.');
+        this.linkError.set(err?.message || 'Failed to create the driver user account. Please try again.');
+      },
+    });
+  }
+
+  /** Toggles a driver's Active/Inactive account status from the Driver List row action —
+   *  independent of the KYC `status` column. Confirmed before the call so a mis-click can't
+   *  silently lock out (or restore) a driver's portal login. */
+  toggleDriverStatus(driver: Driver): void {
+    if (!driver.id) return;
+    const next: 'Active' | 'Inactive' = driver.accountStatus === 'Inactive' ? 'Active' : 'Inactive';
+    const question =
+      next === 'Inactive'
+        ? 'Are you sure you want to deactivate this driver?'
+        : 'Are you sure you want to activate this driver?';
+    if (!confirm(question)) return;
+    this.api.setAccountStatus(driver.id, next).subscribe({
+      next: (updated) => this.allDrivers.update((list) => list.map((d) => (d.id === updated.id ? updated : d))),
+      error: (err) => {
+        console.error('Failed to update driver status', err);
+        alert('Failed to update driver status. Please try again.');
       },
     });
   }
@@ -1029,6 +1077,7 @@ export class Drivers implements OnInit {
     this.showAddForm.set(true);
     this.activeFormTab.set(0);
     this.activeSubSection.set(0);
+    this.formCompletedSubSteps.set([]);
   }
 
   closeAddDriverForm(): void {
@@ -1051,36 +1100,31 @@ export class Drivers implements OnInit {
   }
 
   /**
-   * Sub-section chip navigation *within* a tab never touches the backend — only finishing
-   * the last sub-section of a tab (about to cross into the next tab, or finishing the form
-   * entirely) does. That save is awaited before the UI advances, so "Continue" always means
-   * "this step is now in Postgres", never just a local signal update.
+   * Every nested sub-step is its own persistence checkpoint — "Save & Next" always saves the
+   * sub-step just finished to Postgres before moving on, whether or not it's also the last
+   * sub-step of its parent tab. That save is awaited before the UI advances, so "Continue"
+   * always means "this step is now in Postgres", never just a local signal update. The very
+   * last sub-step of the last tab has its own button/handler (`addDriver()`, bound in the
+   * template when `isLastStep()`), so this method is never called for that one.
    */
   async onSaveAndNext(): Promise<void> {
     if (!this.validateCurrentStep()) {
       return;
     }
 
-    if (this.isLastStep()) {
-      await this.addDriver();
-      return;
-    }
-
     const currentTab = this.activeFormTab();
     const currentSub = this.activeSubSection();
-    const isLastSubOfTab = currentSub >= MAX_SUBS[currentTab] - 1;
 
-    if (!isLastSubOfTab) {
-      this.activeSubSection.set(currentSub + 1);
-      return;
-    }
-
-    const stepCompleted = currentTab + 1;
-    const ok = await this.persistStep(stepCompleted, false);
+    const ok = await this.persistStep(currentTab, currentSub, false);
     if (!ok) return; // stay put — stepError is already showing why
 
-    this.activeFormTab.set(currentTab + 1);
-    this.activeSubSection.set(0);
+    const isLastSubOfTab = currentSub >= MAX_SUBS[currentTab] - 1;
+    if (!isLastSubOfTab) {
+      this.activeSubSection.set(currentSub + 1);
+    } else {
+      this.activeFormTab.set(currentTab + 1);
+      this.activeSubSection.set(0);
+    }
   }
 
   onPrevSubSection(): void {
