@@ -681,14 +681,15 @@
               <!-- Sub-Section Navigation Chips -->
               <md-chip-set class="mb-2">
                 <md-filter-chip label="1. Account Details" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
+                <md-filter-chip label="2. Registration Fees" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
               </md-chip-set>
 
               <!-- 1. Account Details -->
               @if (activeSubSection() === 0) {
                 <sky-card class="p-6 block">
                   <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
-                    <!-- Preferred Payment Mode Dropdown -->
-                    <md-outlined-select label="Payment Method" [value]="inputPreferredPaymentMode()" (change)="onInputChange('preferredPaymentMode', $event)">
+                    <!-- Account Payment Method Dropdown -->
+                    <md-outlined-select label="Payment Method" [value]="inputAccountPaymentMethod()" (change)="onInputChange('accountPaymentMethod', $event)">
                       @for (opt of paymentModes(); track opt) {
                         <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                       }
@@ -696,7 +697,7 @@
 
                     <!-- CONDITIONAL FIELDS DEPENDING ON PAYMENT METHOD -->
                     <!-- Bank Account -->
-                    @if (inputPreferredPaymentMode() === 'Bank Account') {
+                    @if (inputAccountPaymentMethod() === 'Bank Account') {
                       <md-outlined-text-field label="Bank Name" [value]="inputBankName()" (input)="onInputChange('bankName', $event)" placeholder="Enter bank name"></md-outlined-text-field>
                       <md-outlined-text-field label="Bank Account No" [value]="inputBankAccountNo()" (input)="onInputChange('bankAccountNo', $event)" placeholder="Enter account number"></md-outlined-text-field>
                       <md-outlined-text-field label="IFSC Code" [value]="inputIfscCode()" (input)="onInputChange('ifscCode', $event)" placeholder="Enter IFSC code"></md-outlined-text-field>
@@ -704,9 +705,40 @@
                     }
 
                     <!-- UPI -->
-                    @if (inputPreferredPaymentMode() === 'UPI') {
+                    @if (inputAccountPaymentMethod() === 'UPI') {
                       <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="UPI ID" [value]="inputUpiIdOrChequeNo()" (input)="onInputChange('upiIdOrChequeNo', $event)" placeholder="e.g. username@upi"></md-outlined-text-field>
                     }
+                  </div>
+                </sky-card>
+              }
+
+              <!-- 2. Registration Fees -->
+              @if (activeSubSection() === 1) {
+                <sky-card class="p-6 block">
+                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
+                    <!-- Preferred Payment Mode Dropdown -->
+                    <md-outlined-select label="Preferred Payment Mode" [value]="inputPreferredPaymentMode()" (change)="onInputChange('preferredPaymentMode', $event)">
+                      @for (opt of registrationPaymentModes(); track opt) {
+                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                      }
+                    </md-outlined-select>
+
+                    <md-outlined-text-field label="Amount (₹)" [value]="inputAmount()" (input)="onInputChange('amount', $event)" placeholder="Enter amount"></md-outlined-text-field>
+
+                    <md-outlined-text-field type="date" label="Payment Receipt Date" [value]="inputPaymentReceiptDate()" (input)="onInputChange('paymentReceiptDate', $event)"></md-outlined-text-field>
+
+                    <!-- Payment Receipt File Upload -->
+                    <div class="flex items-center gap-2 relative cursor-pointer">
+                      <input type="file" (change)="onRegistrationReceiptFileChange($event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputRegistrationReceipt>
+                      <md-outlined-text-field class="flex-1 cursor-pointer" label="Payment Receipt (Optional)" readonly [value]="inputRegistrationReceiptFile() || 'No file chosen'">
+                        <md-icon slot="leading-icon">upload_file</md-icon>
+                      </md-outlined-text-field>
+                      @if (inputRegistrationReceiptFile()) {
+                        <md-icon-button type="button" (click)="clearRegistrationReceiptFile(); $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
+                          <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
+                        </md-icon-button>
+                      }
+                    </div>
                   </div>
                 </sky-card>
               }

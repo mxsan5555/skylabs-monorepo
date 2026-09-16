@@ -12,7 +12,7 @@ const TOTAL_ONBOARDING_STEPS = 4;
 // branches (and chips) rendered per tab in drivers.html — NOT the previous [4,2,6,3], which
 // overcounted tabs 2 and 3 and made "Save & Next" walk through blank, content-less
 // sub-sections before a tab was actually considered finished.
-const MAX_SUBS = [4, 2, 3, 1];
+const MAX_SUBS = [4, 2, 3, 2];
 
 /** Driver List progress display — e.g. "In Progress — Step 2 of 4 (25%)" / "Completed — 100%".
  *  A driver with no onboarding data at all (shouldn't happen post-migration, but defensively)
@@ -285,14 +285,27 @@ export class Drivers implements OnInit {
   readonly inputDocumentUpload = signal<string>('');
 
   // --- Form Input Signals (Tab 4: Payments) ---
-  readonly inputPreferredPaymentMode = signal<string>('Bank Account');
+  readonly inputPreferredPaymentMode = signal<string>('Cash');
+  readonly inputAccountPaymentMethod = signal<string>('Bank Account');
   readonly inputAmount = signal<string>('');
   readonly inputPaymentReceiptDate = signal<string>('');
+  readonly inputRegistrationReceiptFile = signal<string>('');
   readonly inputBankName = signal<string>('');
   readonly inputBankAccountNo = signal<string>('');
   readonly inputIfscCode = signal<string>('');
   readonly inputBranchName = signal<string>('');
   readonly inputUpiIdOrChequeNo = signal<string>('');
+
+  onRegistrationReceiptFileChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      this.inputRegistrationReceiptFile.set(input.files[0].name);
+    }
+  }
+
+  clearRegistrationReceiptFile(): void {
+    this.inputRegistrationReceiptFile.set('');
+  }
 
   // --- Dynamic Document Lists ---
   readonly personalDocs = signal<Array<{ type: string; regNo: string; file: string }>>([
@@ -366,6 +379,7 @@ export class Drivers implements OnInit {
   readonly policeDocTypes = signal<string[]>(['Address Proof', 'Police Clearance Certificate (PCC)', 'Character Verification Form']);
 
   // --- Payment Master Options ---
+  readonly registrationPaymentModes = signal<string[]>(['Cash', 'Cheque', 'NEFT', 'RTGS', 'Online']);
   readonly paymentModes = signal<string[]>(['Bank Account', 'UPI']);
 
   protected readonly content = signal({
@@ -805,9 +819,10 @@ export class Drivers implements OnInit {
     this.inputDocumentCategory.set('Driving License');
     this.inputDocumentUpload.set('');
     // --- Revert Payment Inputs ---
-    this.inputPreferredPaymentMode.set('Bank Account');
+    this.inputPreferredPaymentMode.set('Cash');
     this.inputAmount.set('');
     this.inputPaymentReceiptDate.set('');
+    this.inputRegistrationReceiptFile.set('');
     this.inputBankName.set('');
     this.inputBankAccountNo.set('');
     this.inputIfscCode.set('');
@@ -1104,6 +1119,7 @@ export class Drivers implements OnInit {
       case 'documentUpload': this.inputDocumentUpload.set(val); break;
       // --- Payment details ---
       case 'preferredPaymentMode': this.inputPreferredPaymentMode.set(val); break;
+      case 'accountPaymentMethod': this.inputAccountPaymentMethod.set(val); break;
       case 'amount': this.inputAmount.set(val); break;
       case 'paymentReceiptDate': this.inputPaymentReceiptDate.set(val); break;
       case 'bankName': this.inputBankName.set(val); break;
