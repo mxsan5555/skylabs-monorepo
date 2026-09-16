@@ -1,6 +1,8 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, inject, OnInit, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { Router, NavigationEnd } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { firstValueFrom, filter } from 'rxjs';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { DriversApiService, type Driver } from '../../../core/drivers/drivers-api.service';
 import { RbacApiService } from '../../../core/rbac/rbac-api.service';
@@ -38,6 +40,20 @@ export class Drivers implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly api = inject(DriversApiService);
   private readonly rbac = inject(RbacApiService);
+  private readonly router = inject(Router);
+
+  constructor() {
+    this.router.events
+      .pipe(
+        filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+        takeUntilDestroyed()
+      )
+      .subscribe(() => {
+        if (this.showAddForm()) {
+          this.closeAddDriverForm();
+        }
+      });
+  }
 
   // --- All Drivers Repository ---
   readonly allDrivers = signal<Driver[]>([]);
