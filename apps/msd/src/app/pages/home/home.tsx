@@ -113,56 +113,44 @@ export function Home() {
       cancelled = true;
     };
   }, [coords?.latitude, coords?.longitude]);
-
   // "Featured" = newest real deals — no `isFeatured` flag exists on the real `Deal` model. The
   // batched fetch above already comes back in the backend's default `sort=newest` order, so this
   // just caps the showcase to a sensible carousel length.
   const safeDealsData = dealsData ?? [];
-
   const featuredDeals = useMemo(
     () => safeDealsData.slice(0, 12),
     [safeDealsData],
   );
-
-  const hotDeals = useMemo(
-    () =>
+  const hotDeals = useMemo(() =>
       [...safeDealsData].sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0),),
     [safeDealsData],
   );
-
   // Real `Category.isPopular` rows (admin-toggled — see `masters/categories.tsx`'s Popular
   // switch), sorted by the same `sortOrder` the admin screen exposes. Replaces the old
   // `MOCK_CATEGORY_MATCH` keyword-guessing table entirely — no more brittle name/slug matching.
-  const popularCategories = useMemo(
-    () =>
+  const popularCategories = useMemo( () =>
       [...categories]
         .filter((c) => c.isPopular)
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
     [categories],
   );
-
   // One horizontal carousel per popular category — client-side filtered from the already-
   // batched `dealsData` fetch (a Deal's own `categoryId` is always the top-level category, same
   // filter a server-side `listCatalogDeals({ categoryId })` call would apply).
-  const popularCategoryDeals = useMemo(
-    () =>
+  const popularCategoryDeals = useMemo(() =>
       popularCategories.map((cat) => ({
         category: cat,
         deals: safeDealsData.filter((d) => d.category?.id === cat.id).slice(0, 6),
       })),
     [popularCategories, safeDealsData],
   );
-
   // "Hot Right Now" tabs are now the popular categories themselves (plus "All Deals") instead of
   // the old fixed keyword-bucket list — a service/product deal is filtered by its real
   // `category.id`, never a name/slug guess.
-  const hotTabs = useMemo(
-    () => [
+  const hotTabs = useMemo(() => [
       { label: home.sections.hotRightNow.tabs[0]?.label ?? 'All Deals', value: 'all' },
       ...popularCategories.map((cat) => ({ label: cat.name, value: cat.id })),
-    ],
-    [popularCategories],
-  );
+    ], [popularCategories], );
   useEffect(() => {
     const query = searchQuery.trim();
     if (!query) {
@@ -189,20 +177,17 @@ export function Home() {
       clearTimeout(timer);
     };
   }, [searchQuery, spaFinder.suggestionLimit]);
-
   const filteredHotDeals = useMemo(() => {
     if (selectedTab === 'all') {
       return hotDeals;
     }
     return hotDeals.filter((deal) => deal.category?.id === selectedTab);
   }, [selectedTab, hotDeals]);
-
   // Every Deal is a service offering now (Product is independent — see toDealCardDeal's doc
   // comment).
   function categoryDealCount(categoryId: string) {
     return dealsData.filter((d) => d.category?.id === categoryId).length;
   }
-
   function renderDealCarousel(deals: CatalogDeal[]) {
     return (
       <div className="home-carousel">
@@ -250,7 +235,6 @@ export function Home() {
     }
     toggle(id);
   }
-
   // Loading → Real Data, never Mock → Real Data: the entire page (including the content.json-only
   // sections interleaved below) waits on this one batched fetch, matching `category.tsx`'s
   // existing whole-page loading/error convention.
@@ -260,7 +244,6 @@ export function Home() {
   if (catalogError) {
     return <p className="error-state" role="alert">{catalogError}</p>;
   }
-
   return (
     <div className="home">
       <title>{content.meta.home.title}</title>
@@ -420,7 +403,6 @@ export function Home() {
           </div>
         </div>
       </section>
-
       {/* ── Featured Deals ─────────────────────────────────────────────── */}
       <section className="home-section" aria-labelledby="featured-heading">
         <div className="home-section__container">
@@ -433,7 +415,6 @@ export function Home() {
           {renderDealCarousel(featuredDeals)}
         </div>
       </section>
-
       <section
         className="home-section home-section--alt"
         aria-label={home.ui.accessibility.memberPromotion}
@@ -465,7 +446,6 @@ export function Home() {
           </sky-card>
         </div>
       </section>
-
       {/* ── Hot Right Now ──────────────────────────────────────────────── */}
       <section className="home__heroo" aria-labelledby="hot-heading">
         <div className="home-section__container">
@@ -494,7 +474,6 @@ export function Home() {
           </div>
         </div>
       </section>
-
       {/* ── Gift Cards CTA ─────────────────────────────────────────────── */}
       <section
         className="home-section home-section--alt"
@@ -552,7 +531,6 @@ export function Home() {
 
         </div>
       </section>
-
       {/* ── Per-popular-category horizontal sections ──────────────────── */}
       {popularCategoryDeals[0] && popularCategoryDeals[0].deals.length > 0 && (
         <section className="home-section" aria-labelledby={`popular-category-${popularCategoryDeals[0].category.id}-heading`}>
@@ -624,7 +602,6 @@ export function Home() {
           </section>
         ) : null,
       )}
-
       {/* ── Welcome Offer CTA ──────────────────────────────────────────── */}
       <section
         className="home-section home-section--alt"
@@ -682,7 +659,6 @@ export function Home() {
           </sky-card>
         </div>
       </section>
-
       <section
         className="home-section"
         aria-labelledby="search-destination-heading"
@@ -740,7 +716,6 @@ export function Home() {
 
         </div>
       </section>
-
       <section className="home-section">
         <div className="home-section__container">
           <div className="home__trust-grid">
@@ -799,7 +774,6 @@ export function Home() {
           </div>
         </div>
       </section>
-
       {/* /*FAQS*/}
       <section className="home-section home-section--alt" aria-labelledby="faq-heading">
         <div className="home-section__container">
@@ -826,5 +800,4 @@ export function Home() {
     </div >
   );
 }
-
 export default Home;

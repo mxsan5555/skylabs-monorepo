@@ -1,25 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import {
-  Icon,
-  OutlinedButton,
-  FilledButton,
-  FilledTonalButton,
-  TextButton,
-  OutlinedTextField,
-  Radio,
-  Checkbox,
-} from '@skylabs-monorepo/shared-ui/react';
+import { Icon, OutlinedButton, FilledButton, FilledTonalButton, TextButton, OutlinedTextField, Radio, Checkbox, } from '@skylabs-monorepo/shared-ui/react';
 import type { BlogPost, BlogSort, ReadingBucket } from '../../../types';
-import {
-  queryPosts,
-  categoryName,
-  categoryList,
-  authorList,
-  tagList,
-  formatDate,
-  PAGE_SIZE,
-} from '../../../blog/blog';
+import { queryPosts, categoryName, categoryList, authorList, tagList, formatDate, PAGE_SIZE, } from '../../../blog/blog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import './blog.css';
 
@@ -71,7 +54,6 @@ export function Blog() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   const requestedPage = Math.max(1, Number(params.get('page')) || 1);
 
   useEffect(() => {
@@ -93,12 +75,9 @@ export function Blog() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, requestedPage]);
-
   const categories = categoryList();
   const authors = authorList();
   const tags = tagList();
@@ -134,7 +113,6 @@ export function Blog() {
       </Btn>
     );
   }
-
   return (
     <main className="blog">
       <title>Blog · MSD</title>
@@ -203,9 +181,7 @@ export function Blog() {
                   <label className="facet__opt" key={a}>
                     <Checkbox
                       checked={filters.authors.includes(a)}
-                      onChange={() =>
-                        update({ authors: toggle(filters.authors, a) })
-                      }
+                      onChange={() => update({ authors: toggle(filters.authors, a) })}
                     />
                     <span>{a}</span>
                   </label>
@@ -313,22 +289,14 @@ export function Blog() {
                     {pageNumbers.map((n) => (
                       <li key={n}>
                         {n === page ? (
-                          <FilledButton aria-current="page" aria-label={`Page ${n}`}>
-                            {n}
-                          </FilledButton>
+                          <FilledButton aria-current="page" aria-label={`Page ${n}`}> {n} </FilledButton>
                         ) : (
-                          <TextButton aria-label={`Page ${n}`} onClick={() => goTo(n)}>
-                            {n}
-                          </TextButton>
+                          <TextButton aria-label={`Page ${n}`} onClick={() => goTo(n)}>{n}</TextButton>
                         )}
                       </li>
                     ))}
                   </ul>
-                  <OutlinedButton
-                    disabled={page >= totalPages}
-                    onClick={() => goTo(page + 1)}
-                  >
-                    Next
+                  <OutlinedButton disabled={page >= totalPages} onClick={() => goTo(page + 1)}>Next
                     <Icon slot="icon" aria-hidden="true">chevron_right</Icon>
                   </OutlinedButton>
                 </nav>

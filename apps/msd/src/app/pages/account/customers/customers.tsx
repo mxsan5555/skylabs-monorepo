@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo,  useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, PrimaryTab } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
@@ -37,6 +37,7 @@ export function CustomerManagement() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
   const [activeTab, setActiveTab] = useState(0);
+  const customerDetailsRef = useRef<HTMLElement>(null);
 
   const loadCustomers = useCallback(async () => {
     setLoading(true);
@@ -59,7 +60,9 @@ export function CustomerManagement() {
   useEffect(() => {
     loadCustomers();
   }, [loadCustomers]);
-
+const handleCustomerSelect = useCallback((id: string) => {
+  setSelectedId(id);
+}, []);
   const loadDetail = useCallback(async () => {
     if (!selectedId) {
       setSelectedCustomer(null);
@@ -82,7 +85,18 @@ export function CustomerManagement() {
     setActiveTab(0);
     loadDetail();
   }, [loadDetail]);
+useEffect(() => {
+  if (!selectedId) return;
 
+  const timer = window.setTimeout(() => {
+    customerDetailsRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }, 50);
+
+  return () => window.clearTimeout(timer);
+}, [selectedId]);
   const memoParams = useMemo(() => params, [params]);
 
   return (
@@ -104,13 +118,14 @@ export function CustomerManagement() {
           page={memoParams.page}
           pageSize={memoParams.pageSize}
           loading={loading}
-          onSelect={setSelectedId}
+          // onSelect={setSelectedId}
+          onSelect={handleCustomerSelect}
           onParamsChange={setParams}
         />
       </section>
 
       {selectedId && (
-        <section className="panel vendor-detail" aria-label="Customer details">
+        <section  ref={customerDetailsRef} className="panel vendor-detail" aria-label="Customer details">
           {detailError && <p className="error-state" role="alert">{detailError}</p>}
 
           {detailLoading ? (
