@@ -24,6 +24,7 @@ import {
 } from '../services/auth.service';
 import { issueTokenPair, rotateRefreshToken, revokeRefreshToken, revokeAllSessionsForUser } from '../services/token.service';
 import { findUserWithPasswordByIdentifier, verifyPassword, setPassword, changeOwnPassword } from '../services/password.service';
+import { assertDriverAccountActive } from '../services/driver.service';
 import { writeAuditLog } from '../services/audit.service';
 import { passport } from '../lib/passport';
 
@@ -61,6 +62,7 @@ router.post('/otp/verify', validateBody(OtpVerifySchema), async (req, res, next)
   try {
     await verifyOtp(identifier, purpose, otp);
     const user = await upsertUserByIdentifier(identifier);
+    await assertDriverAccountActive(user.id);
     const roles = await getRoleKeysForUser(user.id);
     const tokens = await issueTokenPair(user.id, roles, requestMeta(req));
 
@@ -99,6 +101,7 @@ router.get(
       }
 
       const user = await upsertUserFromGoogle({ googleId: profile.id, email, name: profile.displayName ?? email });
+      await assertDriverAccountActive(user.id);
       const roles = await getRoleKeysForUser(user.id);
       const tokens = await issueTokenPair(user.id, roles, requestMeta(req));
 
@@ -167,6 +170,13 @@ router.post('/password/login', validateBody(PasswordLoginSchema), async (req, re
     if (!user || user.status !== 'active' || !matches) {
       if (user) await recordLoginHistory(user.id, 'password', false, requestMeta(req)).catch(() => undefined);
       throw new HttpError(401, 'UNAUTHORIZED', 'Invalid identifier or password');
+    }
+
+    try {
+      await assertDriverAccountActive(user.id);
+    } catch (err) {
+      await recordLoginHistory(user.id, 'password', false, requestMeta(req)).catch(() => undefined);
+      throw err;
     }
 
     const roles = await getRoleKeysForUser(user.id);

@@ -36,13 +36,25 @@ export const UpdateCustomerSchema = CreateCustomerSchema.partial().openapi('Upda
 // Drivers
 // ---------------------------------------------------------------------------
 
+/**
+ * The onboarding wizard now persists each nested sub-step the moment it's finished (see
+ * `driver.service.ts`), so a save can legitimately reach the backend with a later
+ * sub-step's field (e.g. `email`, filled on sub-step 2) still blank because the driver
+ * hasn't gotten there yet. Plain `z.string().optional()` already treats `''` as valid, but
+ * `.email()`/`z.enum()` don't — this normalizes `''` to `undefined` first so "not filled in
+ * yet" doesn't 422 a sub-step save that's otherwise perfectly valid.
+ */
+function emptyToUndefined<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((val) => (val === '' ? undefined : val), schema);
+}
+
 export const CreateDriverSchema = z
   .object({
     firstName: z.string().min(1),
     lastName: z.string().optional(),
     fatherName: z.string().optional(),
     motherName: z.string().optional(),
-    email: z.string().email().optional(),
+    email: emptyToUndefined(z.string().email().optional()),
     phone: z.string().optional(),
     emergencyNumber: z.string().optional(),
     dob: z.string().optional(),
@@ -60,17 +72,19 @@ export const CreateDriverSchema = z
     pincode: z.string().optional(),
     address: z.string().optional(),
     driverType: z.string().optional(),
-    status: z
-      .enum([
-        'Verified',
-        'Partially Verified (P)',
-        'Partially Verified (K)',
-        'Non-Verified',
-        'Blacklisted',
-        'Closed',
-        'Not Useful',
-      ])
-      .optional(),
+    status: emptyToUndefined(
+      z
+        .enum([
+          'Verified',
+          'Partially Verified (P)',
+          'Partially Verified (K)',
+          'Non-Verified',
+          'Blacklisted',
+          'Closed',
+          'Not Useful',
+        ])
+        .optional(),
+    ),
     sourceType: z.string().optional(),
     vehicle: z.string().optional(),
     avatar: z.string().optional(),
@@ -99,11 +113,13 @@ export const CreateDriverSchema = z
     ifscCode: z.string().optional(),
     branchName: z.string().optional(),
     upiIdOrChequeNo: z.string().optional(),
-    // Not a Driver column — the onboarding-wizard step (1-4) this save completes. Read by
-    // `driver.service.ts`'s `computeOnboardingUpdate` and stripped before hitting Prisma.
-    // Omitted entirely (a plain admin edit, or the driver's own `/drivers/me`) leaves
-    // onboarding progress untouched.
+    // Not Driver columns — the onboarding-wizard tab (1-4) and, within it, the nested
+    // sub-step (0-based) this save completes. Read by `driver.service.ts`'s
+    // `deriveOnboardingFields` and stripped before hitting Prisma. Omitted entirely (a plain
+    // admin edit, or the driver's own `/drivers/me`) leaves onboarding progress untouched.
+    // `subStepCompleted` without `stepCompleted` is meaningless and ignored server-side.
     stepCompleted: z.number().int().min(1).max(4).optional(),
+    subStepCompleted: z.number().int().min(0).max(3).optional(),
   })
   .openapi('CreateDriver');
 
@@ -179,3 +195,15 @@ export const LinkDriverToUserSchema = z
     userId: z.string().uuid(),
   })
   .openapi('LinkDriverToUser');
+
+// ---------------------------------------------------------------------------
+// Driver account status (Active/Inactive) — portal login gate, independent of the KYC
+// `status` field above. Never part of `CreateDriverSchema`/`UpdateDriverSchema`, same
+// reasoning as User's `SetUserStatusSchema`: changed only via its own dedicated endpoint.
+// ---------------------------------------------------------------------------
+
+export const SetDriverStatusSchema = z
+  .object({
+    accountStatus: z.enum(['Active', 'Inactive']),
+  })
+  .openapi('SetDriverStatus');

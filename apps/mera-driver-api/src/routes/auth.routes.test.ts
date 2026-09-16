@@ -191,6 +191,23 @@ describe('auth.routes', () => {
       expect(mockPrisma.otpChallenge.update).not.toHaveBeenCalled();
     });
 
+    it('returns 403 DRIVER_DEACTIVATED and records a failed login for a deactivated driver, even with the correct code', async () => {
+      await seedOtpChallenge();
+      mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', email: IDENTIFIER, phone: null, name: IDENTIFIER });
+      mockPrisma.driver.findUnique.mockResolvedValue({ accountStatus: 'Inactive' });
+      mockPrisma.loginHistory.create.mockResolvedValue({});
+
+      const res = await request(app)
+        .post('/auth/otp/verify')
+        .send({ identifier: IDENTIFIER, otp: KNOWN_OTP, purpose: 'login' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('DRIVER_DEACTIVATED');
+      expect(mockPrisma.loginHistory.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ userId: 'user-1', success: false }) }),
+      );
+    });
+
     it('records a failed login-history entry for an existing user on a wrong code', async () => {
       await seedOtpChallenge();
       mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', email: IDENTIFIER, phone: null });
@@ -302,6 +319,21 @@ describe('auth.routes', () => {
       const res = await request(app).post('/auth/password/login').send({ identifier: 'nobody@example.com', password: PASSWORD });
 
       expect(res.status).toBe(401);
+    });
+
+    it('returns 403 DRIVER_DEACTIVATED for a correct password on a deactivated driver account', async () => {
+      const passwordHash = await bcrypt.hash(PASSWORD, 10);
+      mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', email: IDENTIFIER, phone: null, name: IDENTIFIER, status: 'active', passwordHash });
+      mockPrisma.driver.findUnique.mockResolvedValue({ accountStatus: 'Inactive' });
+      mockPrisma.loginHistory.create.mockResolvedValue({});
+
+      const res = await request(app).post('/auth/password/login').send({ identifier: IDENTIFIER, password: PASSWORD });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('DRIVER_DEACTIVATED');
+      expect(mockPrisma.loginHistory.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ userId: 'user-1', success: false }) }),
+      );
     });
 
     it('returns 401 for a correct password on an inactive/blocked account', async () => {

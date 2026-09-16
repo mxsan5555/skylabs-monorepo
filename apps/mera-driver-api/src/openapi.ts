@@ -35,6 +35,7 @@ import {
   CreateAttendanceSchema,
   UpdateAttendanceSchema,
   LinkDriverToUserSchema,
+  SetDriverStatusSchema,
 } from './schemas/business.schema';
 import { UpdateOwnDriverSchema } from './schemas/driverSelf.schema';
 import {
@@ -586,6 +587,18 @@ registry.registerPath({
   responses: {
     200: { description: 'Driver linked', content: { 'application/json': { schema: envelope(z.unknown()) } } },
     409: { description: 'That User is already linked to a Driver', content: { 'application/json': { schema: envelope(z.null()) } } },
+  },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: '/drivers/{id}/status',
+  summary: 'Activate or deactivate a Driver account (portal login gate, independent of KYC status)',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }), body: { content: { 'application/json': { schema: SetDriverStatusSchema } } } },
+  responses: {
+    200: { description: 'Driver account status updated', content: { 'application/json': { schema: envelope(z.unknown()) } } },
+    404: { description: 'Driver not found', content: { 'application/json': { schema: envelope(z.null()) } } },
   },
 });
 

@@ -6,7 +6,13 @@ import { validateBody } from '../middleware/validate';
 import { HttpError } from '../middleware/errorHandler';
 import * as auditService from '../services/audit.service';
 import * as driverService from '../services/driver.service';
-import { CreateDriverSchema, UpdateDriverSchema, CreateDriverDocumentSchema, LinkDriverToUserSchema } from '../schemas/business.schema';
+import {
+  CreateDriverSchema,
+  UpdateDriverSchema,
+  CreateDriverDocumentSchema,
+  LinkDriverToUserSchema,
+  SetDriverStatusSchema,
+} from '../schemas/business.schema';
 import { requestMeta } from '../lib/requestMeta';
 import { diskStorageFor } from '../lib/upload';
 
@@ -59,6 +65,31 @@ router.patch('/:id', requirePermission('drivers', 'edit'), validateBody(UpdateDr
     next(err);
   }
 });
+
+// Account status (Active/Inactive) — the portal login gate, independent of the KYC `status`
+// changed by the route above. Enforced server-side at login and on every /drivers/me* call,
+// not just this admin-console toggle — see `assertDriverAccountActive`/`resolveOwnDriver`.
+router.patch(
+  '/:id/status',
+  requirePermission('drivers', 'status_change'),
+  validateBody(SetDriverStatusSchema),
+  async (req, res, next) => {
+    try {
+      const driver = await driverService.setDriverAccountStatus(req.params.id, req.body.accountStatus);
+      await auditService.writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'driver.status_change',
+        targetType: 'Driver',
+        targetId: driver.id,
+        after: { accountStatus: req.body.accountStatus },
+        ...requestMeta(req),
+      });
+      res.json({ data: driver, error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.delete('/:id', requirePermission('drivers', 'delete'), async (req, res, next) => {
   try {

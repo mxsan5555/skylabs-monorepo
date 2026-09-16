@@ -48,6 +48,27 @@ describe('GET /drivers/me', () => {
   });
 });
 
+describe('deactivated driver blocked from the self-service portal', () => {
+  it('returns 403 DRIVER_DEACTIVATED instead of the driver record', async () => {
+    mockPrisma.driver.findUnique.mockResolvedValue({ id: 'driver-1', accountStatus: 'Inactive' });
+
+    const res = await request(app).get('/drivers/me').set('Authorization', `Bearer ${tokenFor('user-1')}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('DRIVER_DEACTIVATED');
+  });
+
+  it('an active driver is unaffected', async () => {
+    mockPrisma.driver.findUnique
+      .mockResolvedValueOnce({ id: 'driver-1', accountStatus: 'Active' })
+      .mockResolvedValueOnce(OWN_DRIVER);
+
+    const res = await request(app).get('/drivers/me').set('Authorization', `Bearer ${tokenFor('user-1')}`);
+
+    expect(res.status).toBe(200);
+  });
+});
+
 describe('PATCH /drivers/me', () => {
   beforeEach(() => {
     mockPrisma.driver.findUnique.mockResolvedValue({ id: 'driver-1' });

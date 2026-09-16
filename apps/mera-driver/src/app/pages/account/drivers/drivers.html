@@ -135,7 +135,8 @@
         @if (editingDriverId() !== null) {
           <p class="text-xs text-slate-500 -mt-2">
             <md-icon class="align-middle text-sm" aria-hidden="true">cloud_done</md-icon>
-            Saved to database — Step {{ activeFormTab() + 1 }} of 4
+            Saved to database — Tab {{ activeFormTab() + 1 }} of 4, sub-step {{ activeSubSection() + 1 }} of {{ maxSubsFor(activeFormTab()) }}
+            ({{ formCompletedSubSteps().length }} of {{ totalSubSteps }} sub-steps completed)
           </p>
         }
 
@@ -154,10 +155,10 @@
               
               <!-- Sub-Section Navigation Chips -->
               <md-chip-set class="mb-2">
-                <md-filter-chip label="1. Personal & Identity Details" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
-                <md-filter-chip label="2. Contact & Address Info" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
-                <md-filter-chip label="3. Physical & Demographics" [selected]="activeSubSection() === 2" (click)="activeSubSection.set(2)"></md-filter-chip>
-                <md-filter-chip label="4. Account & Lead Info" [selected]="activeSubSection() === 3" (click)="activeSubSection.set(3)"></md-filter-chip>
+                <md-filter-chip [label]="'1. Personal & Identity Details' + (isSubStepDone(0, 0) ? ' ✓' : '')" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
+                <md-filter-chip [label]="'2. Contact & Address Info' + (isSubStepDone(0, 1) ? ' ✓' : '')" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
+                <md-filter-chip [label]="'3. Physical & Demographics' + (isSubStepDone(0, 2) ? ' ✓' : '')" [selected]="activeSubSection() === 2" (click)="activeSubSection.set(2)"></md-filter-chip>
+                <md-filter-chip [label]="'4. Account & Lead Info' + (isSubStepDone(0, 3) ? ' ✓' : '')" [selected]="activeSubSection() === 3" (click)="activeSubSection.set(3)"></md-filter-chip>
               </md-chip-set>
 
               <!-- 1. Personal & Identity Details -->
@@ -378,8 +379,8 @@
               
               <!-- Sub-Section Navigation Chips -->
               <md-chip-set class="mb-2">
-                <md-filter-chip label="1. Education & Training Profile" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
-                <md-filter-chip label="2. Health & Medical Specifications" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
+                <md-filter-chip [label]="'1. Education & Training Profile' + (isSubStepDone(1, 0) ? ' ✓' : '')" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
+                <md-filter-chip [label]="'2. Health & Medical Specifications' + (isSubStepDone(1, 1) ? ' ✓' : '')" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
               </md-chip-set>
 
               <!-- 1. Education & Training Profile -->
@@ -522,9 +523,9 @@
               
               <!-- Sub-Section Navigation Chips -->
               <md-chip-set class="mb-2">
-                <md-filter-chip label="1. Driving License Details" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
-                <md-filter-chip label="2. Police Verification & Employment" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
-                <md-filter-chip label="3. Personal & Category Docs" [selected]="activeSubSection() === 2" (click)="activeSubSection.set(2)"></md-filter-chip>
+                <md-filter-chip [label]="'1. Driving License Details' + (isSubStepDone(2, 0) ? ' ✓' : '')" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
+                <md-filter-chip [label]="'2. Police Verification & Employment' + (isSubStepDone(2, 1) ? ' ✓' : '')" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
+                <md-filter-chip [label]="'3. Personal & Category Docs' + (isSubStepDone(2, 2) ? ' ✓' : '')" [selected]="activeSubSection() === 2" (click)="activeSubSection.set(2)"></md-filter-chip>
               </md-chip-set>
 
               <!-- 1. Driving License Details -->
@@ -680,8 +681,8 @@
               
               <!-- Sub-Section Navigation Chips -->
               <md-chip-set class="mb-2">
-                <md-filter-chip label="1. Account Details" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
-                <md-filter-chip label="2. Registration Fees" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
+                <md-filter-chip [label]="'1. Account Details' + (isSubStepDone(3, 0) ? ' ✓' : '')" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
+                <md-filter-chip [label]="'2. Registration Fees' + (isSubStepDone(3, 1) ? ' ✓' : '')" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
               </md-chip-set>
 
               <!-- 1. Account Details -->
