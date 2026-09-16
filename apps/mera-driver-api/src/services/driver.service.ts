@@ -130,3 +130,38 @@ export async function unlinkDriverFromUser(driverId: string) {
   await prisma.driver.update({ where: { id: driverId }, data: { userId: null } });
   return getDriverById(driverId);
 }
+
+/**
+ * The ONLY way a Driver gets a portal login: one action creates the User, assigns the
+ * `driver` role, and links it — all in one transaction, so a partial failure never leaves
+ * an orphaned User or a half-linked Driver. This is the sole entry point into the Driver
+ * User lifecycle; admins never pick an existing User for a driver (that path stays reserved
+ * for the generic `linkDriverToUser` used elsewhere, but the Driver List UI only calls this).
+ * `Driver.userId @unique` also backstops this at the DB level if called twice concurrently.
+ */
+export async function createAndLinkDriverUser(driverId: string) {
+  const driver = await getDriverById(driverId);
+  if (driver.userId) {
+    throw new HttpError(409, 'ALREADY_LINKED', 'This driver already has a linked user account');
+  }
+  if (!driver.phone && !driver.email) {
+    throw new HttpError(422, 'MISSING_CONTACT', 'Driver needs a phone or email on file before a user account can be created');
+  }
+
+  const driverRole = await prisma.role.findUnique({ where: { key: 'driver' } });
+  if (!driverRole) {
+    throw new HttpError(500, 'ROLE_MISSING', 'The driver role is not seeded in this environment');
+  }
+
+  const name = [driver.firstName, driver.lastName].filter(Boolean).join(' ').trim() || 'Driver';
+
+  await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: { name, email: driver.email ?? undefined, phone: driver.phone ?? undefined },
+    });
+    await tx.userRole.create({ data: { userId: user.id, roleId: driverRole.id } });
+    await tx.driver.update({ where: { id: driverId }, data: { userId: user.id } });
+  });
+
+  return getDriverById(driverId);
+}

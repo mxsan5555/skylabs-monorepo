@@ -3,7 +3,6 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { DriversApiService, type Driver } from '../../../core/drivers/drivers-api.service';
-import { RbacApiService } from '../../../core/rbac/rbac-api.service';
 import { buildResumeHtml, buildResumeSections, type ResumeSection } from './driver-resume';
 
 /** The 4 tabs are the onboarding wizard's persistence checkpoints — sub-section chip
@@ -37,16 +36,14 @@ function onboardingLabel(d: Driver): string {
 export class Drivers implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly api = inject(DriversApiService);
-  private readonly rbac = inject(RbacApiService);
 
   // --- All Drivers Repository ---
   readonly allDrivers = signal<Driver[]>([]);
   readonly loading = signal<boolean>(false);
 
-  // --- Driver <-> User account linking (grants/revokes self-service portal access) ---
+  // --- Driver User account (self-service portal login) ---
+  // One-click creation only — no existing-user picker. See `createDriverUser()`.
   readonly linkPanelDriver = signal<Driver | null>(null);
-  readonly linkUsers = signal<{ id: string; name: string; phone?: string; email?: string }[]>([]);
-  readonly linkSelectedUserId = signal<string>('');
   readonly linkSaving = signal<boolean>(false);
   readonly linkError = signal<string | null>(null);
 
@@ -458,7 +455,7 @@ export class Drivers implements OnInit {
     { icon: 'picture_as_pdf', label: 'Download PDF', event: 'download_pdf' },
     { icon: 'visibility', label: 'View Details', event: '__view_detail__' },
     { icon: 'edit', label: 'Edit', event: 'edit_driver' },
-    { icon: 'link', label: 'Link / Unlink Portal Account', event: 'link_driver' },
+    { icon: 'manage_accounts', label: 'Driver User Account', event: 'link_driver' },
     { icon: 'delete', label: 'Delete', event: 'delete_driver', variant: 'danger' }
   ]);
 
@@ -942,41 +939,31 @@ export class Drivers implements OnInit {
     }
   }
 
-  // --- Driver <-> User account linking ---
+  // --- Driver User account (self-service portal login) ---
   openLinkPanel(driver: Driver): void {
     this.linkPanelDriver.set(driver);
-    this.linkSelectedUserId.set('');
     this.linkError.set(null);
-    if (this.linkUsers().length === 0) {
-      this.rbac.listUsers(1, 200).subscribe({
-        next: (page) => this.linkUsers.set(page.items.map((u) => ({ id: u.id, name: u.name, phone: u.phone, email: u.email }))),
-        error: (err) => console.error('Failed to load users for linking', err),
-      });
-    }
   }
 
   closeLinkPanel(): void {
     this.linkPanelDriver.set(null);
   }
 
-  confirmLink(): void {
-    const driver = this.linkPanelDriver();
-    const userId = this.linkSelectedUserId();
-    if (!driver?.id || !userId) {
-      this.linkError.set('Please select a user account.');
-      return;
-    }
+  /** The only way a driver gets a portal login — creates the User, assigns the `driver`
+   *  role, and links it server-side in one call. No existing-user selection. */
+  createDriverUser(driver: Driver): void {
+    if (!driver.id) return;
     this.linkSaving.set(true);
     this.linkError.set(null);
-    this.api.linkToUser(driver.id, userId).subscribe({
+    this.api.createDriverUser(driver.id).subscribe({
       next: (updated) => {
         this.linkSaving.set(false);
         this.allDrivers.update((list) => list.map((d) => (d.id === updated.id ? updated : d)));
-        this.closeLinkPanel();
+        this.linkPanelDriver.set(updated);
       },
       error: (err) => {
         this.linkSaving.set(false);
-        this.linkError.set(err?.message || 'Failed to link account — the user may already be linked to another driver.');
+        this.linkError.set(err?.message || 'Failed to create the driver user account. Please try again.');
       },
     });
   }
