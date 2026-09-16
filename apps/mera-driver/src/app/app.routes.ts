@@ -347,6 +347,14 @@ export const appRoutes: Routes = [
       },
 
       {
+        path: 'kyc-assignments',
+        title: 'KYC Assignments · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'kyc-assignments', action: 'view' }, title: 'KYC Assignments', subtitle: 'Drivers assigned to you for KYC review.' },
+        loadComponent: () =>
+          import('./pages/account/kyc-assignments/kyc-assignments').then((m) => m.KycAssignments),
+      },
+      {
         path: 'settings',
         title: 'Settings · mera-driver',
         canActivate: [permissionGuard],

@@ -35,6 +35,20 @@ export interface Driver {
   /** Portal login gate ('Active' | 'Inactive') — independent of `status` above (KYC stage).
    *  Toggled only via `DriversApiService.setAccountStatus`. */
   accountStatus?: string;
+  /** The staff User currently reviewing this driver's KYC, if any. Set only via
+   *  `DriversApiService.assignVerifier`. */
+  assignedVerifier?: { id: string; name: string; email: string | null; phone: string | null } | null;
+  /** KYC checklist — one status+notes pair per existing document category (personal, health,
+   *  education, police). 'Pending' | 'Verified' | 'Rejected' | 'Correction Requested'.
+   *  Independent of `status` above. Set only via `DriversApiService.setKycChecklistItem`. */
+  personalDocsStatus?: string;
+  personalDocsNotes?: string;
+  healthDocsStatus?: string;
+  healthDocsNotes?: string;
+  educationDocsStatus?: string;
+  educationDocsNotes?: string;
+  policeDocsStatus?: string;
+  policeDocsNotes?: string;
   sourceType?: string;
   avatar?: string;
   education?: string;
@@ -119,6 +133,15 @@ interface DriverDto {
   driverType: string | null;
   status: string;
   accountStatus: string;
+  assignedVerifier: { id: string; name: string; email: string | null; phone: string | null } | null;
+  personalDocsStatus: string;
+  personalDocsNotes: string | null;
+  healthDocsStatus: string;
+  healthDocsNotes: string | null;
+  educationDocsStatus: string;
+  educationDocsNotes: string | null;
+  policeDocsStatus: string;
+  policeDocsNotes: string | null;
   sourceType: string | null;
   vehicle: string | null;
   avatar: string | null;
@@ -194,6 +217,15 @@ function fromDto(dto: DriverDto): Driver {
     driverType: dto.driverType ?? undefined,
     status: dto.status,
     accountStatus: dto.accountStatus,
+    assignedVerifier: dto.assignedVerifier,
+    personalDocsStatus: dto.personalDocsStatus,
+    personalDocsNotes: dto.personalDocsNotes ?? undefined,
+    healthDocsStatus: dto.healthDocsStatus,
+    healthDocsNotes: dto.healthDocsNotes ?? undefined,
+    educationDocsStatus: dto.educationDocsStatus,
+    educationDocsNotes: dto.educationDocsNotes ?? undefined,
+    policeDocsStatus: dto.policeDocsStatus,
+    policeDocsNotes: dto.policeDocsNotes ?? undefined,
     sourceType: dto.sourceType ?? undefined,
     avatar: dto.avatar ?? undefined,
     education: dto.education ?? undefined,
@@ -343,6 +375,43 @@ export class DriversApiService {
   setAccountStatus(driverId: string, accountStatus: 'Active' | 'Inactive'): Observable<Driver> {
     return this.http
       .patch<ApiEnvelope<DriverDto>>(`${this.base}/${driverId}/status`, { accountStatus })
+      .pipe(map((res) => fromDto(unwrap(res))));
+  }
+
+  /** Assigns (or, with `verifierId: null`, clears) the staff User responsible for this
+   *  driver's KYC review. Independent of `linkToUser` — that grants the driver their own
+   *  portal login, this assigns a staff reviewer to check the driver's submitted KYC. */
+  assignVerifier(driverId: string, verifierId: string | null): Observable<Driver> {
+    return this.http
+      .patch<ApiEnvelope<DriverDto>>(`${this.base}/${driverId}/assign-verifier`, { verifierId })
+      .pipe(map((res) => fromDto(unwrap(res))));
+  }
+
+  /** The calling KYC verifier's own assigned-driver queue. */
+  listAssignedToMe(): Observable<Driver[]> {
+    return this.http
+      .get<ApiEnvelope<DriverDto[]>>(`${this.base}/assigned-to-me`)
+      .pipe(map((res) => unwrap(res).map(fromDto)));
+  }
+
+  /** A single driver from the calling verifier's own queue — 404s if not assigned to them. */
+  getAssignedDriver(driverId: string): Observable<Driver> {
+    return this.http
+      .get<ApiEnvelope<DriverDto>>(`${this.base}/assigned-to-me/${driverId}`)
+      .pipe(map((res) => fromDto(unwrap(res))));
+  }
+
+  /** Sets one KYC checklist category's status — ownership-checked server-side (the assigned
+   *  verifier only). Independent of the final `status` verdict, set separately by whoever
+   *  holds `drivers:edit`. */
+  setKycChecklistItem(
+    driverId: string,
+    category: 'personal' | 'health' | 'education' | 'police',
+    status: 'Verified' | 'Rejected' | 'Correction Requested',
+    notes?: string,
+  ): Observable<Driver> {
+    return this.http
+      .patch<ApiEnvelope<DriverDto>>(`${this.base}/${driverId}/kyc-checklist`, { category, status, notes })
       .pipe(map((res) => fromDto(unwrap(res))));
   }
 

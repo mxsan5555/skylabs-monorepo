@@ -57,7 +57,15 @@ export const CreateDriverSchema = z
     email: emptyToUndefined(z.string().email().optional()),
     phone: z.string().optional(),
     emergencyNumber: z.string().optional(),
-    dob: z.string().optional(),
+    // `age` (below) is never trusted from the client — `driver.service.ts` always
+    // (re)derives it from `dob` server-side. Rejecting a future `dob` here is what keeps
+    // that derived age meaningful.
+    dob: emptyToUndefined(
+      z
+        .string()
+        .optional()
+        .refine((val) => !val || new Date(val) <= new Date(), { message: 'Date of birth cannot be in the future' }),
+    ),
     maritalStatus: z.string().optional(),
     gender: z.string().min(1),
     passportNumber: z.string().optional(),
@@ -207,3 +215,22 @@ export const SetDriverStatusSchema = z
     accountStatus: z.enum(['Active', 'Inactive']),
   })
   .openapi('SetDriverStatus');
+
+// ---------------------------------------------------------------------------
+// KYC verifier assignment + per-category checklist — independent of the final `status`
+// above, which stays gated by `drivers:edit` only. See `driver.service.ts`.
+// ---------------------------------------------------------------------------
+
+export const AssignVerifierSchema = z
+  .object({
+    verifierId: z.string().uuid().nullable(),
+  })
+  .openapi('AssignVerifier');
+
+export const KycChecklistSchema = z
+  .object({
+    category: z.enum(['personal', 'health', 'education', 'police']),
+    status: z.enum(['Verified', 'Rejected', 'Correction Requested']),
+    notes: z.string().optional(),
+  })
+  .openapi('KycChecklistItem');

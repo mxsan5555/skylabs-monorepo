@@ -1,10 +1,12 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, inject, OnInit, computed } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, inject, OnInit, computed, effect } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, NavigationEnd } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom, filter } from 'rxjs';
+import { calculateAge } from '@skylabs-monorepo/shared-utils';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { DriversApiService, type Driver } from '../../../core/drivers/drivers-api.service';
+import { RbacApiService } from '../../../core/rbac/rbac-api.service';
 import { buildResumeHtml, buildResumeSections, type ResumeSection } from './driver-resume';
 
 /** The 4 tabs are the onboarding wizard's persistence checkpoints — sub-section chip
@@ -51,6 +53,12 @@ export class Drivers implements OnInit {
   private readonly router = inject(Router);
 
   constructor() {
+    // Age is never manually entered — it's always derived from DOB, backend-authoritative
+    // (see `driver.service.ts`'s `deriveAge`), this is just the immediate on-screen echo.
+    effect(() => {
+      this.inputAge.set(calculateAge(this.inputDob()));
+    });
+
     this.router.events
       .pipe(
         filter((e): e is NavigationEnd => e instanceof NavigationEnd),
@@ -72,6 +80,12 @@ export class Drivers implements OnInit {
   readonly linkPanelDriver = signal<Driver | null>(null);
   readonly linkSaving = signal<boolean>(false);
   readonly linkError = signal<string | null>(null);
+
+  // --- KYC Verifier Assignment ---
+  readonly verifierPanelDriver = signal<Driver | null>(null);
+  readonly verifierOptions = signal<{ id: string; name: string }[]>([]);
+  readonly verifierSaving = signal<boolean>(false);
+  readonly verifierError = signal<string | null>(null);
 
   // --- Read-only Driver Resume/Profile Preview ---
   readonly previewDriver = signal<Driver | null>(null);
@@ -132,6 +146,10 @@ export class Drivers implements OnInit {
   }
 
   readonly totalSubSteps = MAX_SUBS.reduce((a, b) => a + b, 0);
+
+  /** Caps the Date of Birth picker so a future date can't even be selected in the UI —
+   *  the backend rejects it either way (see `business.schema.ts`'s `dob` refine). */
+  readonly today = new Date().toISOString().slice(0, 10);
 
   maxSubsFor(tabIndex: number): number {
     return MAX_SUBS[tabIndex];
@@ -490,7 +508,8 @@ export class Drivers implements OnInit {
     { key: 'bankAccountNo', label: 'Bank Account No', sortable: false, hidden: true },
     { key: 'ifscCode', label: 'IFSC Code', sortable: false, hidden: true },
     { key: 'upiIdOrChequeNo', label: 'UPI / Cheque', sortable: false, hidden: true },
-    { key: 'linkedAccountLabel', label: 'Portal Account', sortable: false, hidden: true }
+    { key: 'linkedAccountLabel', label: 'Portal Account', sortable: false, hidden: true },
+    { key: 'assignedVerifierLabel', label: 'KYC Verifier', sortable: false, hidden: true }
   ]);
 
   readonly tableFilterOptions = JSON.stringify([
@@ -511,6 +530,7 @@ export class Drivers implements OnInit {
     { icon: 'edit', label: 'Edit', event: 'edit_driver' },
     { icon: 'manage_accounts', label: 'Driver User Account', event: 'link_driver' },
     { icon: 'power_settings_new', label: 'Activate / Deactivate', event: 'toggle_driver_status' },
+    { icon: 'assignment_ind', label: 'Assign KYC Verifier', event: 'assign_verifier' },
     { icon: 'delete', label: 'Delete', event: 'delete_driver', variant: 'danger' }
   ]);
 
@@ -565,6 +585,8 @@ export class Drivers implements OnInit {
         ...d,
         linkedUser: undefined,
         linkedAccountLabel: d.linkedUser ? `${d.linkedUser.name} (${d.linkedUser.phone ?? d.linkedUser.email ?? ''})` : 'Not linked',
+        assignedVerifier: undefined,
+        assignedVerifierLabel: d.assignedVerifier ? d.assignedVerifier.name : 'Unassigned',
         onboardingLabel: onboardingLabel(d),
       })),
     );
@@ -1000,6 +1022,9 @@ export class Drivers implements OnInit {
     } else if (action === 'toggle_driver_status') {
       const driver = this.allDrivers().find((d) => d.id === row.id);
       if (driver) this.toggleDriverStatus(driver);
+    } else if (action === 'assign_verifier') {
+      const driver = this.allDrivers().find((d) => d.id === row.id);
+      if (driver) this.openVerifierPanel(driver);
     } else if (action === 'preview_driver') {
       // Look up the full record from `allDrivers()` (freshly reloaded after every
       // mutation), not the serialized table row — the resume must show the latest data.
@@ -1009,6 +1034,58 @@ export class Drivers implements OnInit {
       const driver = this.allDrivers().find((d) => d.id === row.id);
       if (driver) this.downloadPdf(driver);
     }
+  }
+
+  // --- KYC Verifier Assignment ---
+  /** Loads the picker options (every User holding the `kyc_verification` role) the first
+   *  time the panel opens — reuses the existing Administration > Users list endpoint rather
+   *  than adding a new one just for this picker. */
+  openVerifierPanel(driver: Driver): void {
+    this.verifierPanelDriver.set(driver);
+    this.verifierError.set(null);
+    if (this.verifierOptions().length === 0) {
+      this.rbac.listUsers(1, 100).subscribe({
+        next: (page) => {
+          const verifiers = page.items
+            .filter((u) => u.roles.some((r) => r.role.key === 'kyc_verification'))
+            .map((u) => ({ id: u.id, name: u.name }));
+          this.verifierOptions.set(verifiers);
+        },
+        error: (err) => {
+          console.error('Failed to load KYC verifiers', err);
+          this.verifierError.set('Failed to load the list of KYC verifiers.');
+        },
+      });
+    }
+  }
+
+  closeVerifierPanel(): void {
+    this.verifierPanelDriver.set(null);
+  }
+
+  onVerifierChange(event: Event): void {
+    const val = (event.target as any).value || '';
+    this.assignVerifier(val || null);
+  }
+
+  /** Assigns (`verifierId`) or clears (`null`) the driver's KYC reviewer. Independent of the
+   *  self-service portal login link above. */
+  assignVerifier(verifierId: string | null): void {
+    const driver = this.verifierPanelDriver();
+    if (!driver?.id) return;
+    this.verifierSaving.set(true);
+    this.verifierError.set(null);
+    this.api.assignVerifier(driver.id, verifierId).subscribe({
+      next: (updated) => {
+        this.verifierSaving.set(false);
+        this.allDrivers.update((list) => list.map((d) => (d.id === updated.id ? updated : d)));
+        this.verifierPanelDriver.set(updated);
+      },
+      error: (err) => {
+        this.verifierSaving.set(false);
+        this.verifierError.set(err?.message || 'Failed to assign the KYC verifier. Please try again.');
+      },
+    });
   }
 
   // --- Driver User account (self-service portal login) ---

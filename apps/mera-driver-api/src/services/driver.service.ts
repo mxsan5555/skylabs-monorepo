@@ -75,18 +75,41 @@ function resolveNewlyCompletedKeys(stepCompleted: number | undefined, subStepCom
   return allSubStepsUpToTab(TOTAL_ONBOARDING_STEPS);
 }
 
+/** `age` is never trusted from the client — always (re)derived from `dob` here. Whole years
+ *  between `dob` and today; returns undefined if `dob` is absent/unparseable (the Zod schema
+ *  already rejects a future `dob` before this ever runs). */
+function deriveAge(dob: string | null | undefined): string | undefined {
+  if (!dob) return undefined;
+  const birth = new Date(dob);
+  if (Number.isNaN(birth.getTime())) return undefined;
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const hadBirthdayThisYear =
+    now.getMonth() > birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() >= birth.getDate());
+  if (!hadBirthdayThisYear) age -= 1;
+  return String(age);
+}
+
 export async function listDrivers() {
   return prisma.driver.findMany({
     orderBy: { createdAt: 'desc' },
     take: 1000,
-    include: { documents: true, user: { select: LINKED_USER_SELECT } },
+    include: {
+      documents: true,
+      user: { select: LINKED_USER_SELECT },
+      assignedVerifier: { select: LINKED_USER_SELECT },
+    },
   });
 }
 
 export async function getDriverById(id: string) {
   const driver = await prisma.driver.findUnique({
     where: { id },
-    include: { documents: true, user: { select: LINKED_USER_SELECT } },
+    include: {
+      documents: true,
+      user: { select: LINKED_USER_SELECT },
+      assignedVerifier: { select: LINKED_USER_SELECT },
+    },
   });
   if (!driver) throw new HttpError(404, 'NOT_FOUND', 'Driver not found');
   return driver;
@@ -101,26 +124,37 @@ export async function getDriverById(id: string) {
  * treated as fully onboarded (there's no wizard session to resume).
  */
 export async function createDriver(input: Record<string, unknown>) {
-  const { stepCompleted, subStepCompleted, ...data } = input as Record<string, unknown> & {
+  const { stepCompleted, subStepCompleted, age: _clientAge, ...data } = input as Record<string, unknown> & {
     stepCompleted?: number;
     subStepCompleted?: number;
+    age?: unknown;
   };
   const onboarding = deriveOnboardingFields(resolveNewlyCompletedKeys(stepCompleted, subStepCompleted));
-  const driver = await prisma.driver.create({ data: { ...data, ...onboarding } as never });
+  const derivedAge = deriveAge(data.dob as string | undefined);
+  const driver = await prisma.driver.create({
+    data: { ...data, ...onboarding, ...(derivedAge !== undefined ? { age: derivedAge } : {}) } as never,
+  });
   return getDriverById(driver.id);
 }
 
 export async function updateDriver(id: string, input: Record<string, unknown>) {
   const existing = await getDriverById(id);
-  const { stepCompleted, subStepCompleted, ...data } = input as Record<string, unknown> & {
+  const { stepCompleted, subStepCompleted, age: _clientAge, ...data } = input as Record<string, unknown> & {
     stepCompleted?: number;
     subStepCompleted?: number;
+    age?: unknown;
   };
   const onboarding =
     stepCompleted != null
       ? deriveOnboardingFields([...(existing.completedSubSteps ?? []), ...resolveNewlyCompletedKeys(stepCompleted, subStepCompleted)])
       : {};
-  await prisma.driver.update({ where: { id }, data: { ...data, ...onboarding } as never });
+  // Only recompute `age` when this save actually touches `dob` — an unrelated field edit
+  // must never clobber a previously-derived age.
+  const derivedAge = data.dob ? deriveAge(data.dob as string) : undefined;
+  await prisma.driver.update({
+    where: { id },
+    data: { ...data, ...onboarding, ...(derivedAge !== undefined ? { age: derivedAge } : {}) } as never,
+  });
   return getDriverById(id);
 }
 
@@ -249,4 +283,100 @@ export async function createAndLinkDriverUser(driverId: string) {
   });
 
   return getDriverById(driverId);
+}
+
+// ---------------------------------------------------------------------------
+// KYC verifier assignment + per-category checklist
+// ---------------------------------------------------------------------------
+
+/**
+ * Assigns (or clears, if `verifierId` is null) the staff User responsible for this driver's
+ * KYC review. Ownership-scoped `GET /drivers/assigned-to-me*` and `PATCH /drivers/:id/kyc-
+ * checklist` are keyed off this field — see those routes and `getAssignedDriverById` below.
+ */
+export async function assignVerifier(driverId: string, verifierId: string | null) {
+  await getDriverById(driverId);
+  if (verifierId) {
+    const verifier = await prisma.user.findFirst({ where: { id: verifierId, deletedAt: null } });
+    if (!verifier) throw new HttpError(404, 'NOT_FOUND', 'Verifier user not found');
+  }
+  await prisma.driver.update({ where: { id: driverId }, data: { assignedVerifierId: verifierId } });
+  return getDriverById(driverId);
+}
+
+/** The KYC queue for a given verifier — every Driver currently assigned to them. */
+export async function listDriversAssignedTo(verifierUserId: string) {
+  return prisma.driver.findMany({
+    where: { assignedVerifierId: verifierUserId },
+    orderBy: { createdAt: 'desc' },
+    include: { documents: true, user: { select: LINKED_USER_SELECT } },
+  });
+}
+
+/**
+ * The ownership-checked single-driver fetch for a verifier's own queue — mirrors
+ * `resolveOwnDriver`'s posture exactly: 404s whether the driver doesn't exist or simply isn't
+ * assigned to this verifier, so the response never confirms which case it is.
+ */
+export async function getAssignedDriverById(id: string, verifierUserId: string) {
+  const driver = await prisma.driver.findFirst({
+    where: { id, assignedVerifierId: verifierUserId },
+    include: { documents: true, user: { select: LINKED_USER_SELECT } },
+  });
+  if (!driver) throw new HttpError(404, 'NOT_FOUND', 'Driver not found');
+  return driver;
+}
+
+const KYC_CHECKLIST_FIELDS = {
+  personal: { status: 'personalDocsStatus', notes: 'personalDocsNotes' },
+  health: { status: 'healthDocsStatus', notes: 'healthDocsNotes' },
+  education: { status: 'educationDocsStatus', notes: 'educationDocsNotes' },
+  police: { status: 'policeDocsStatus', notes: 'policeDocsNotes' },
+} as const;
+
+export type KycChecklistCategory = keyof typeof KYC_CHECKLIST_FIELDS;
+
+/**
+ * Sets one of the 4 KYC checklist categories for a driver — ownership-checked (only the
+ * assigned verifier may call this), same posture as `getAssignedDriverById`. Independent of
+ * the final `status` verdict, which stays gated by `drivers:edit` only (see `PATCH /:id`).
+ */
+export async function setKycChecklistItem(
+  driverId: string,
+  verifierUserId: string,
+  category: KycChecklistCategory,
+  status: 'Verified' | 'Rejected' | 'Correction Requested',
+  notes: string | undefined,
+) {
+  await getAssignedDriverById(driverId, verifierUserId); // throws 404 if not assigned to this verifier
+  const fields = KYC_CHECKLIST_FIELDS[category];
+  await prisma.driver.update({
+    where: { id: driverId },
+    data: { [fields.status]: status, [fields.notes]: notes ?? null },
+  });
+  return getAssignedDriverById(driverId, verifierUserId);
+}
+
+// ---------------------------------------------------------------------------
+// Customer-facing booking prerequisite — a safe, minimal driver projection for the "choose a
+// driver" step. Deliberately excludes every KYC/contact/financial field (email, phone, bank
+// details, documents) that the admin-facing `listDrivers()`/`getDriverById()` expose.
+// ---------------------------------------------------------------------------
+
+const CUSTOMER_SAFE_DRIVER_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  avatar: true,
+  vehicle: true,
+  driverType: true,
+} as const;
+
+export async function listAvailableDrivers() {
+  return prisma.driver.findMany({
+    where: { status: 'Verified', accountStatus: 'Active' },
+    select: CUSTOMER_SAFE_DRIVER_SELECT,
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+  });
 }

@@ -78,6 +78,46 @@
         }
       </md-dialog>
 
+      <md-dialog [open]="verifierPanelDriver() !== null" (closed)="closeVerifierPanel()">
+        @if (verifierPanelDriver(); as d) {
+          <div slot="headline">
+            Assign KYC Verifier — {{ d.firstName }} {{ d.lastName }}
+          </div>
+          <div slot="content" class="flex flex-col gap-4">
+            <p>
+              Assigns the staff member responsible for reviewing this driver's KYC. The
+              verifier will only see drivers assigned to them under "KYC Assignments" —
+              independent of the driver's own portal login ("Driver User Account").
+            </p>
+            <md-outlined-select
+              label="KYC Verifier"
+              [value]="d.assignedVerifier?.id || ''"
+              (change)="onVerifierChange($event)"
+            >
+              <md-select-option value=""><div slot="headline">Unassigned</div></md-select-option>
+              @for (v of verifierOptions(); track v.id) {
+                <md-select-option [value]="v.id"><div slot="headline">{{ v.name }}</div></md-select-option>
+              }
+            </md-outlined-select>
+            @if (verifierOptions().length === 0) {
+              <p class="otp-muted">
+                No users hold the "KYC Verification" role yet — assign that role to a user
+                first under Administration &gt; User Management.
+              </p>
+            }
+            @if (verifierError()) {
+              <p class="otp-muted" role="alert">{{ verifierError() }}</p>
+            }
+            @if (verifierSaving()) {
+              <p class="otp-muted">Saving…</p>
+            }
+          </div>
+          <div slot="actions">
+            <md-text-button (click)="closeVerifierPanel()">Close</md-text-button>
+          </div>
+        }
+      </md-dialog>
+
       <!-- Read-only Driver Resume / Profile Preview — no edit controls. -->
       <md-dialog [open]="previewDriver() !== null" (closed)="closePreview()" class="driver-resume-dialog">
         @if (previewDriver(); as d) {
@@ -274,9 +314,9 @@
               @if (activeSubSection() === 2) {
                 <sky-card class="p-6 block">
                   <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
-                    <md-outlined-text-field label="Date of Birth" type="date" [value]="inputDob()" (input)="onInputChange('dob', $event)"></md-outlined-text-field>
+                    <md-outlined-text-field label="Date of Birth" type="date" [value]="inputDob()" [max]="today" (input)="onInputChange('dob', $event)"></md-outlined-text-field>
 
-                    <md-outlined-text-field label="Age" [value]="inputAge()" (input)="onInputChange('age', $event)" placeholder="Enter age"></md-outlined-text-field>
+                    <md-outlined-text-field label="Age (auto-calculated)" [value]="inputAge()" disabled placeholder="Set Date of Birth to calculate"></md-outlined-text-field>
 
                     <md-outlined-text-field label="Height" [value]="inputHeight()" (input)="onInputChange('height', $event)" placeholder="Enter height (e.g. 5.7)"></md-outlined-text-field>
 
