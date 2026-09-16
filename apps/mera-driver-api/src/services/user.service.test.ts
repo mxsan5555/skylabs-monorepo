@@ -4,7 +4,7 @@ import { mockPrisma, resetPrismaMock } from '../test-utils/prisma-mock';
 vi.mock('../lib/prisma', () => ({ prisma: mockPrisma }));
 vi.mock('./token.service', () => ({ revokeAllSessionsForUser: vi.fn() }));
 
-import { setUserStatus, softDeleteUser, removeRoleFromUser } from './user.service';
+import { setUserStatus, softDeleteUser, removeRoleFromUser, listUsers, createUser, assignRoleToUser } from './user.service';
 
 beforeEach(() => {
   resetPrismaMock();
@@ -67,5 +67,48 @@ describe('self-lockout protection', () => {
     await removeRoleFromUser('user-1', 'role-2');
     expect(mockPrisma.user.count).not.toHaveBeenCalled();
     expect(mockPrisma.userRole.deleteMany).toHaveBeenCalled();
+  });
+});
+
+describe('driver users are excluded from User Management', () => {
+  it('listUsers() findMany/count both receive a roles.none.role.key=driver filter', async () => {
+    mockPrisma.user.findMany.mockResolvedValue([]);
+    mockPrisma.user.count.mockResolvedValue(0);
+    mockPrisma.$transaction.mockImplementationOnce(async (arg: unknown) =>
+      Array.isArray(arg) ? Promise.all(arg) : arg,
+    );
+
+    await listUsers();
+
+    expect(mockPrisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ roles: { none: { role: { key: 'driver' } } } }) }),
+    );
+  });
+
+  it('createUser() rejects a roleIds list containing the driver role', async () => {
+    mockPrisma.role.findUnique.mockResolvedValue({ id: 'role-driver', key: 'driver' });
+
+    await expect(createUser({ name: 'X', roleIds: ['role-driver'] })).rejects.toMatchObject({
+      code: 'DRIVER_ROLE_NOT_ASSIGNABLE_HERE',
+    });
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('createUser() allows any non-driver role', async () => {
+    mockPrisma.role.findUnique.mockResolvedValue({ id: 'role-admin', key: 'admin' });
+    mockPrisma.user.create.mockResolvedValue({ id: 'user-9' });
+    mockPrisma.userRole.createMany.mockResolvedValue({ count: 1 });
+    mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-9', deletedAt: null });
+
+    await expect(createUser({ name: 'X', roleIds: ['role-admin'] })).resolves.toBeDefined();
+  });
+
+  it('assignRoleToUser() rejects assigning the driver role', async () => {
+    mockPrisma.role.findUnique.mockResolvedValue({ id: 'role-driver', key: 'driver' });
+
+    await expect(assignRoleToUser('user-1', 'role-driver')).rejects.toMatchObject({
+      code: 'DRIVER_ROLE_NOT_ASSIGNABLE_HERE',
+    });
+    expect(mockPrisma.userRole.upsert).not.toHaveBeenCalled();
   });
 });

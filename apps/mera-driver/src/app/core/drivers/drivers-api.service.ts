@@ -322,6 +322,14 @@ export class DriversApiService {
       .pipe(map((res) => fromDto(unwrap(res))));
   }
 
+  /** Creates a portal User for this driver in one step (no existing-user picker) — auto-assigns
+   *  the `driver` role and links it. The backend 409s if this driver already has a linked user. */
+  createDriverUser(driverId: string): Observable<Driver> {
+    return this.http
+      .post<ApiEnvelope<DriverDto>>(`${this.base}/${driverId}/create-user`, {})
+      .pipe(map((res) => fromDto(unwrap(res))));
+  }
+
   /** Uploads one KYC document for a driver (multipart/form-data). Returns the stored filename. */
   uploadDocument(
     driverId: string,

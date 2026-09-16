@@ -42,7 +42,16 @@ export async function listUsers(options: ListUsersOptions = {}) {
   const page = options.page ?? 1;
   const pageSize = options.pageSize ?? 25;
 
-  const where = { deletedAt: null, ...(options.status ? { status: options.status } : {}) };
+  // Driver users have their own dedicated lifecycle — created/linked exclusively via
+  // Driver Management → Driver List → "Create Driver User" (see `driver.service.ts`'s
+  // `createAndLinkDriverUser`), never via this admin User Management screen. Excluding
+  // anyone holding the `driver` role keeps them out of the list AND any search over it,
+  // since this WHERE clause is what every query (including search) is built on.
+  const where = {
+    deletedAt: null,
+    ...(options.status ? { status: options.status } : {}),
+    roles: { none: { role: { key: 'driver' } } },
+  };
 
   const [rows, total] = await prisma.$transaction([
     prisma.user.findMany({
@@ -67,6 +76,24 @@ export async function getUserById(id: string) {
   return user;
 }
 
+/**
+ * Driver-role users are created exclusively via Driver Management → Driver List →
+ * "Create Driver User" (`driverService.createAndLinkDriverUser`), never through this
+ * general-purpose User Management path. Blocking it here — not just filtering the list —
+ * closes the manual-assignment route too (`POST /users` with `roleIds`, and
+ * `POST /users/:id/roles/:roleId`).
+ */
+async function assertNotDriverRole(roleId: string): Promise<void> {
+  const role = await prisma.role.findUnique({ where: { id: roleId } });
+  if (role?.key === 'driver') {
+    throw new HttpError(
+      400,
+      'DRIVER_ROLE_NOT_ASSIGNABLE_HERE',
+      'Driver accounts are created from Driver Management → Driver List → "Create Driver User", not User Management',
+    );
+  }
+}
+
 export interface CreateUserInput {
   name: string;
   email?: string;
@@ -75,6 +102,9 @@ export interface CreateUserInput {
 }
 
 export async function createUser(input: CreateUserInput) {
+  if (input.roleIds?.length) {
+    await Promise.all(input.roleIds.map((roleId) => assertNotDriverRole(roleId)));
+  }
   return prisma.$transaction(async (tx) => {
     const user = await tx.user.create({
       data: { name: input.name, email: input.email, phone: input.phone },
@@ -125,6 +155,7 @@ export async function assignRoleToUser(userId: string, roleId: string) {
   await getUserById(userId);
   const role = await prisma.role.findUnique({ where: { id: roleId } });
   if (!role) throw new HttpError(404, 'NOT_FOUND', 'Role not found');
+  await assertNotDriverRole(roleId);
 
   await prisma.userRole.upsert({
     where: { userId_roleId: { userId, roleId } },

@@ -184,4 +184,24 @@ router.patch('/:id/unlink-user', requirePermission('drivers', 'assign'), async (
   }
 });
 
+// One-click Driver User creation: creates the User, assigns the `driver` role, and links
+// it, all server-side — no existing-user picker. This is the only path that grants a
+// driver a portal login; see `createAndLinkDriverUser`.
+router.post('/:id/create-user', requirePermission('drivers', 'assign'), async (req, res, next) => {
+  try {
+    const driver = await driverService.createAndLinkDriverUser(req.params.id);
+    await auditService.writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'driver.user.create',
+      targetType: 'Driver',
+      targetId: driver.id,
+      after: { userId: driver.userId },
+      ...requestMeta(req),
+    });
+    res.status(201).json({ data: driver, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
