@@ -222,7 +222,10 @@ is Production (bought custom domain); `release`/`develop` use Vercel preview URL
 Versioning is `npx nx release --skip-publish` run on the `release` branch (not
 `main`), tagging only changed apps (`msd@x.y.z`, `mera-driver@x.y.z`; each app has
 a minimal `package.json` with a `version` field so Nx has a manifest to bump). The
-two Express APIs host **off Vercel** (Railway/Fly — long-running servers). CI gate:
+two Express APIs host **off Vercel on Railway** (always-on servers): `msd-api` runs
+`node dist/apps/msd-api/main.js`, reuses the **Neon** Postgres DB via `DATABASE_URL`
+(the same Neon store attached to msd's Vercel project — not a separate DB), and
+stores uploaded media on **Cloudflare R2** (Railway's disk is wiped on redeploy). CI gate:
 `.github/workflows/ci.yml` runs `nx affected -t lint test build` on every PR.
 
 **Developer workflow:** always branch new work off `develop` (never `main`);

@@ -41,9 +41,16 @@ share UI but **not** backends, databases, or business logic.
 - **Tooling**: Nx 22.7.5 (npm) · ESLint · Vitest / Angular unit-test · GitHub Actions.
 - **Deployment**: two frontends → two independent **Vercel** projects, self-selecting
   per push via `nx-ignore`; branch flow `feature→develop→release→main`; `nx release`
-  for version tags. APIs host off Vercel (Railway/Fly). Full detail: `DEPLOYMENT.md`.
+  for version tags. APIs host **off Vercel on Railway** (always-on servers) reusing the
+  **Neon** Postgres DB, with media on **Cloudflare R2**. Full detail (incl. a
+  step-by-step msd-api deploy guide): `DEPLOYMENT.md`.
 
 ## Access control (RBAC)
+
+> **Note:** the role/menu tables below describe the *original* static-role design.
+> The shipped system is **dynamic RBAC** (database-driven roles/permissions/menus,
+> resolved per user via `GET /rbac/bootstrap`) — see `CLAUDE.md` → "Auth & roles
+> (Dynamic RBAC)" and `DEVELOPER_PROCESS.md` for the current source of truth.
 
 One account/admin console (shown after login) serves every persona; **roles**
 decide what each sees and can open.
@@ -136,11 +143,15 @@ Full agent file map: `.claude/agents/` · Full skill file map: `.claude/skills/`
 3. **Account/admin console** — role-based admin layout + My Account (profile + address CRUD) + role gating ✅
 4. **Content pages** — home ✅, then contact, blog, blog-detail, blog-category 🔜
 5. **Account extras** — logout from console, admin/marketing/sales feature pages 🔜
-6. **Backends** — `apps/msd-api`, `apps/mera-driver-api` (Express + Postgres + Prisma + OpenAPI) ⏳ deferred until pages need real data
-7. **Auth integration** — wire OTP/Google + real roles to the backend (replace mock token + demo role switcher) ⏳
-8. **Hardening** — tests, error tracking, CI gate + deployment 🔜
-   - Deployment wired: two Vercel projects (msd, mera-driver), `nx-ignore` per
-     project, `main`=Production, `nx release` on `release`, CI gate on PRs. See
-     `DEPLOYMENT.md`. Remaining: e2e tests, error tracking (Sentry).
+6. **Backends** — `apps/msd-api` (Express + Postgres + Prisma + OpenAPI) **built**:
+   dynamic RBAC + business modules (Customers/Vendors/Orders/Products/Inventory/
+   Reports), auth (OTP/Google/JWT), media uploads, 35+ Prisma migrations. ✅
+   `apps/mera-driver-api` follows the same pattern ⏳
+7. **Auth integration** — OTP/Google + dynamic RBAC wired to msd-api via
+   `GET /rbac/bootstrap` (see `CLAUDE.md` → "Auth & roles" and `DEVELOPER_PROCESS.md`) ✅ (msd)
+8. **Deployment** — frontends live on Vercel; **msd-api deploys to Railway** (Neon DB
+   + Cloudflare R2 media). Step-by-step: `DEPLOYMENT.md → Deploying msd-api`. ⏳ in progress
+9. **Hardening** — e2e tests, error tracking (Sentry) 🔜
 
-Current focus: **frontend pages first** (step 4), backends deferred.
+Current focus: **deploy msd-api** (Railway + Neon + R2) and wire the live Vercel
+frontend to it — see `TASK.md`.

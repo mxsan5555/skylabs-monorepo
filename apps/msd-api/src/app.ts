@@ -3,7 +3,6 @@ import express from 'express';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { env } from './config/env';
-import { getUploadRoot } from './lib/media-storage';
 import { passport, configurePassport } from './lib/passport';
 import { buildOpenApiDocument } from './openapi/registry';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
@@ -35,6 +34,11 @@ import notificationsRoutes from './routes/notifications.routes';
 export function createApp(): express.Express {
   const app = express();
 
+  app.use((req, res, next) => {
+  console.log('🔥 REQUEST RECEIVED:', req.method, req.originalUrl);
+  next();
+});
+
   app.use(cors({ origin: env.corsOrigin, credentials: true }));
   // `verify` captures the exact raw bytes onto req.rawBody — payment.routes.ts's webhook needs
   // these (not a re-serialized JSON.stringify of the parsed body) to match Razorpay's HMAC
@@ -51,11 +55,17 @@ export function createApp(): express.Express {
   app.use(passport.initialize());
 
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(buildOpenApiDocument()));
-  // Uploaded Deal/Product/Therapist media — served by relative storageKey, e.g.
-  // `/media/deals/<dealId>/<uuid>.jpg` (see media-storage.ts's doc comment).
-  app.use('/media', express.static(getUploadRoot()));
+  // Uploaded media (Deal/Product/Therapist/Vendor/Category/CMS images+video) lives in
+  // Cloudflare R2 and is served directly from R2's public URL — the API no longer serves the
+  // bytes. The DB stores the relative `storageKey`; the frontend prefixes `VITE_MEDIA_BASE_URL`
+  // (see media-storage.ts's doc comment and apps/msd/src/api/media.ts's resolveMediaUrl).
 
   const api = express.Router();
+  // Public, unauthenticated liveness probe for the process host (Railway healthcheckPath).
+  // No DB call — it only proves the process is up and serving.
+  api.get('/health', (_req, res) => {
+    res.json({ data: { status: 'ok', app: 'msd-api' }, error: null });
+  });
   api.use('/auth', authRoutes);
   api.use('/rbac', rbacRoutes);
   api.use('/customers', customersRoutes);
