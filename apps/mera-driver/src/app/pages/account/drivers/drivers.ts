@@ -6,7 +6,6 @@ import { firstValueFrom, filter } from 'rxjs';
 import { calculateAge } from '@skylabs-monorepo/shared-utils';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { DriversApiService, type Driver } from '../../../core/drivers/drivers-api.service';
-import { RbacApiService } from '../../../core/rbac/rbac-api.service';
 import { buildResumeHtml, buildResumeSections, type ResumeSection } from './driver-resume';
 
 /** The 4 tabs are the onboarding wizard's persistence checkpoints — sub-section chip
