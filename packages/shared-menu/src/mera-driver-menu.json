@@ -228,7 +228,7 @@
       },
       {
         "id": "masters-statuses",
-        "title": "Category Status",
+        "title": "Driver Status",
         "icon": "rule",
         "route": "/masters/statuses",
         "permissionKey": "masters.statuses",
