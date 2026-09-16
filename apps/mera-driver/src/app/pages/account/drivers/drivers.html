@@ -250,20 +250,45 @@
 
                     <md-outlined-text-field
                       label="Phone"
+                      type="tel"
+                      inputmode="numeric"
+                      maxlength="10"
                       required
                       [value]="inputPhone()"
                       (input)="onInputChange('phone', $event)"
                       (blur)="markTouched('phone')"
                       [error]="!!phoneError()"
                       [errorText]="phoneError()"
-                      placeholder="Enter phone number"
+                      placeholder="Enter 10-digit phone number"
                     ></md-outlined-text-field>
 
-                    <md-outlined-text-field label="Emergency Number" [value]="inputEmergencyNumber()" (input)="onInputChange('emergencyNumber', $event)" placeholder="Enter emergency number"></md-outlined-text-field>
+                    <md-outlined-text-field
+                      label="Emergency Number"
+                      type="tel"
+                      inputmode="numeric"
+                      maxlength="10"
+                      [value]="inputEmergencyNumber()"
+                      (input)="onInputChange('emergencyNumber', $event)"
+                      (blur)="markTouched('emergencyNumber')"
+                      [error]="!!emergencyNumberError()"
+                      [errorText]="emergencyNumberError()"
+                      placeholder="Enter 10-digit emergency number"
+                    ></md-outlined-text-field>
 
                     <md-outlined-text-field label="State" [value]="inputState()" (input)="onInputChange('state', $event)" placeholder="Enter state"></md-outlined-text-field>
 
-                    <md-outlined-text-field label="Pincode" [value]="inputPincode()" (input)="onInputChange('pincode', $event)" placeholder="Enter pincode"></md-outlined-text-field>
+                    <md-outlined-text-field
+                      label="Pincode"
+                      type="tel"
+                      inputmode="numeric"
+                      maxlength="6"
+                      [value]="inputPincode()"
+                      (input)="onInputChange('pincode', $event)"
+                      (blur)="markTouched('pincode')"
+                      [error]="!!pincodeError()"
+                      [errorText]="pincodeError()"
+                      placeholder="Enter 6-digit pincode"
+                    ></md-outlined-text-field>
 
                     <md-outlined-text-field label="Address" [value]="inputAddress()" (input)="onInputChange('address', $event)" placeholder="Enter full address"></md-outlined-text-field>
                   </div>
@@ -276,11 +301,35 @@
                   <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
                     <md-outlined-text-field label="Date of Birth" type="date" [value]="inputDob()" (input)="onInputChange('dob', $event)"></md-outlined-text-field>
 
-                    <md-outlined-text-field label="Age" [value]="inputAge()" (input)="onInputChange('age', $event)" placeholder="Enter age"></md-outlined-text-field>
+                    <md-outlined-text-field
+                      label="Age"
+                      type="tel"
+                      inputmode="numeric"
+                      maxlength="3"
+                      [value]="inputAge()"
+                      (input)="onInputChange('age', $event)"
+                      placeholder="Enter age (e.g. 28)"
+                    ></md-outlined-text-field>
 
-                    <md-outlined-text-field label="Height" [value]="inputHeight()" (input)="onInputChange('height', $event)" placeholder="Enter height (e.g. 5.7)"></md-outlined-text-field>
+                    <md-outlined-text-field
+                      label="Height"
+                      type="text"
+                      inputmode="decimal"
+                      maxlength="5"
+                      [value]="inputHeight()"
+                      (input)="onInputChange('height', $event)"
+                      placeholder="Enter height (e.g. 5.7 or 175)"
+                    ></md-outlined-text-field>
 
-                    <md-outlined-text-field label="Weight" [value]="inputWeight()" (input)="onInputChange('weight', $event)" placeholder="Enter weight (e.g. 68)"></md-outlined-text-field>
+                    <md-outlined-text-field
+                      label="Weight"
+                      type="text"
+                      inputmode="decimal"
+                      maxlength="5"
+                      [value]="inputWeight()"
+                      (input)="onInputChange('weight', $event)"
+                      placeholder="Enter weight (e.g. 68)"
+                    ></md-outlined-text-field>
 
                     <md-outlined-select label="Religion" [value]="inputReligion()" (change)="onInputChange('religion', $event)">
                       @for (opt of religions(); track opt) {
@@ -541,6 +590,7 @@
                     <md-outlined-text-field
                       label="Driving License No"
                       required
+                      maxlength="16"
                       [value]="inputDlNo()"
                       (input)="onInputChange('dlNo', $event)"
                       (blur)="markTouched('dlNo')"
