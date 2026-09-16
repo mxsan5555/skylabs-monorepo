@@ -9,8 +9,6 @@ export const CatalogDealQuerySchema = PaginationQuerySchema.extend({
   subcategoryId: z.string().uuid().optional(),
   vendorId: z.string().uuid().optional(),
   branchId: z.string().uuid().optional(),
-  /** 'service' | 'product' — which half of the catalogue to show; omitted shows both. */
-  type: z.enum(['service', 'product']).optional(),
   search: z.string().max(200).optional(),
   /** Narrows to deals whose branch is in this state/city — merges into the existing active-
    *  branch filter, never overwrites it (see listPublicDeals's own doc comment). */
@@ -29,6 +27,20 @@ export const CatalogDealQuerySchema = PaginationQuerySchema.extend({
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
 }).openapi('CatalogDealQuery');
+
+/** `GET /catalog/products` — mirrors CatalogDealQuerySchema minus the branch/location/duration
+ *  concepts Product doesn't have (no branchId, no packages, no geo distance sort). */
+export const CatalogProductQuerySchema = PaginationQuerySchema.extend({
+  categoryId: z.string().uuid().optional(),
+  subcategoryId: z.string().uuid().optional(),
+  vendorId: z.string().uuid().optional(),
+  search: z.string().max(200).optional(),
+  /** See `CatalogDealQuerySchema`'s identical param doc comment — 'discount' orders by
+   *  Product.discount desc instead of Deal.discountPercent. */
+  sort: z.enum(['newest', 'discount']).optional().default('newest'),
+  minPrice: z.coerce.number().min(0).optional(),
+  maxPrice: z.coerce.number().min(0).optional(),
+}).openapi('CatalogProductQuery');
 
 export const CatalogTherapistQuerySchema = PaginationQuerySchema.extend({
   /** Top-level THERAPY Category id — matches therapists whose `specializationCategoryId` is

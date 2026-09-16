@@ -71,7 +71,8 @@ export interface ServiceVsProductReport {
 }
 
 export interface TopItemRow {
-  dealId: string;
+  /** The underlying Deal id for a top-service row, or Product id for a top-product row. */
+  itemId: string;
   itemName: string;
   vendorName: string;
   quantitySold: number;

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedIconButton, Icon, Divider, Radio, ChipSet, FilterChip, SuggestionChip, Tabs, PrimaryTab, OutlinedTextField, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { getCatalogVendor, listCatalogDeals, type CatalogVendorDetail, type CatalogVendorBranch, type CatalogDeal, type CatalogVendorTherapist, type CatalogOpeningHours, } from '../../../api/catalog';
+import { getCatalogVendor, listCatalogDeals, listCatalogProducts, type CatalogVendorDetail, type CatalogVendorBranch, type CatalogDeal, type CatalogProduct, type CatalogVendorTherapist, type CatalogOpeningHours, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
@@ -13,7 +13,7 @@ import { TherapistPackageSelector } from '../../components/therapist-package-sel
 import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selection';
 import { useTherapistPurchaseSelection } from '../../../hooks/use-therapist-purchase-selection';
 import { formatINR, pluralize, formatTime12h } from '../../../utils/format';
-import { resolveDealMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
+import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import { useToast } from '../../../toast/toast-context';
 import './vendor.css';
 import content from '../../../content.json';
@@ -74,10 +74,6 @@ function getOrCreate<K, V>(map: Map<K, V>, key: K, create: () => V): V {
 function groupServiceDeals(deals: CatalogDeal[]): CategoryGroup[] {
   const categories = new Map<string, Map<string, Map<string, ServiceGroup>>>();
   for (const deal of deals) {
-    // A service deal has no `product` (see Deal's own schema doc comment) — the old Service
-    // master-row model (`deal.service`) is gone entirely, so a service deal is identified purely
-    // by the absence of `product`, never by a truthy `deal.service` (always null now).
-    if (deal.product) continue;
     const categoryName = deal.category?.name ?? 'Other Services';
     const subKey = deal.subcategory?.name ?? '';
     const subMap = getOrCreate(categories, categoryName, () => new Map());
@@ -123,9 +119,10 @@ export function VendorPage() {
   const [branchIndex, setBranchIndex] = useState(0);
 
   const [serviceDeals, setServiceDeals] = useState<CatalogDeal[]>([]);
-  const [productDeals, setProductDeals] = useState<CatalogDeal[]>([]);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [dealsLoading, setDealsLoading] = useState(true);
   const [dealsError, setDealsError] = useState('');
+  const [productsLoading, setProductsLoading] = useState(true);
 
   const [activeCategoryName, setActiveCategoryName] = useState('all');
   // Exactly one of these is ever set — selecting a Deal clears the Therapist selection and vice
@@ -172,23 +169,27 @@ export function VendorPage() {
     resetSelection();
   };
 
-  // ── Fetch services + products for the selected branch ───────────────────
+  // ── Fetch service deals for the selected branch ──────────────────────────
   useEffect(() => {
     if (!vendor || !selectedBranch) return;
     setDealsLoading(true);
     setDealsError('');
-    Promise.all([
-      listCatalogDeals({ vendorId: vendor.id, branchId: selectedBranch.id, type: 'service', pageSize: 100 }),
-      listCatalogDeals({ vendorId: vendor.id, branchId: selectedBranch.id, type: 'product', pageSize: 100 }),
-    ])
-      .then(([services, products]) => {
-        setServiceDeals(services.data);
-        setProductDeals(products.data);
-      })
+    listCatalogDeals({ vendorId: vendor.id, branchId: selectedBranch.id, pageSize: 100 })
+      .then(({ data }) => setServiceDeals(data))
       .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : vendorContent.errors.loadServicesProducts))
       .finally(() => setDealsLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendor, selectedBranch?.id]);
+
+  // ── Fetch products for the vendor — Product has no branchId (see msd-api's Product schema
+  // doc comment), so this is vendor-scoped, not re-fetched on branch switch. ────────────────
+  useEffect(() => {
+    if (!vendor) return;
+    setProductsLoading(true);
+    listCatalogProducts({ vendorId: vendor.id, pageSize: 100 })
+      .then(({ data }) => setProducts(data))
+      .catch(() => setProducts([]))
+      .finally(() => setProductsLoading(false));
+  }, [vendor]);
 
   const categoryGroups = useMemo(() => groupServiceDeals(serviceDeals), [serviceDeals]);
   const categoryNames = useMemo(() => categoryGroups.map((c) => c.name), [categoryGroups]);
@@ -229,15 +230,14 @@ export function VendorPage() {
     void toggleWishlist(deal.id);
   };
 
-  const addProductToCart = async (deal: CatalogDeal) => {
+  const addProductToCart = async (product: CatalogProduct) => {
     if (!requireAuthOrRedirect()) return;
     setProductActionError('');
     setProductActionMessage('');
     try {
-      await addCartItem(token, { dealId: deal.id, quantity: 1 });
-      const name = deal.product?.name ?? deal.title;
-      setProductActionMessage(`Added "${name}" to your cart.`);
-      showToast(`Added to cart\n${name}`);
+      await addCartItem(token, { productId: product.id, quantity: 1 });
+      setProductActionMessage(`Added "${product.name}" to your cart.`);
+      showToast(`Added to cart\n${product.name}`);
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setProductActionError(message);
@@ -535,35 +535,32 @@ export function VendorPage() {
             <h2 className="vendor-page__section-title">Products</h2>
             {productActionMessage && <p className="field-hint" role="status">{productActionMessage}</p>}
             {productActionError && <p className="error-state" role="alert">{productActionError}</p>}
-            {dealsLoading ? (
+            {productsLoading ? (
               <p className="loading-state">{vendorContent.loading.products}</p>
-            ) : productDeals.length === 0 ? (
+            ) : products.length === 0 ? (
               <p className="vendor-page__deal-empty">{vendorContent.empty.noProducts}</p>
             ) : (
               <ul className="vendor-page__product-grid">
-                {productDeals.map((deal) => (
-                  <li key={deal.id}>
+                {products.map((product) => (
+                  <li key={product.id}>
                     <SkyProductCardWC
                       variant="outlined"
                       badge={vendorContent.labels.products}
-                      eyebrow={deal.product?.brand ?? undefined}
-                      heading={deal.product?.name ?? deal.title}
-                      image={primaryImage(resolveDealMedia(deal))}
-                      imageAlt={deal.product?.imageAlt ?? undefined}
-                      price={formatINR(Number(deal.salePrice))}
+                      eyebrow={product.brand ?? undefined}
+                      heading={product.name}
+                      image={primaryImage(resolveProductMedia(product))}
+                      imageAlt={product.imageAlt ?? undefined}
+                      price={formatINR(Number(product.price))}
                       originalPrice={
-                        deal.originalPrice && Number(deal.originalPrice) !== Number(deal.salePrice)
-                          ? formatINR(Number(deal.originalPrice))
+                        product.originalPrice && Number(product.originalPrice) !== Number(product.price)
+                          ? formatINR(Number(product.originalPrice))
                           : undefined
                       }
-                      discount={deal.discountPercent ? `-${deal.discountPercent}%` : undefined}
-                      href={`/products/${deal.id}`}
-                      favorite
-                      favoriteActive={isWishlisted(deal.id)}
-                      onFavorite={() => toggleFavorite(deal)}
+                      discount={product.discount ? `-${product.discount}%` : undefined}
+                      href={`/products/${product.id}`}
                     >
                       <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
-                        <FilledButton onClick={() => addProductToCart(deal)}>
+                        <FilledButton onClick={() => addProductToCart(product)}>
                           <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
                           {vendorContent.actions.addToCart}
                         </FilledButton>
@@ -699,8 +696,8 @@ function DealSelectionPanel({
 
   const addToCart = async () => {
     if (!requireAuthOrRedirect()) return;
-    if (missingSelection) {
-      setActionError(missingSelection);
+    if (missingSelection || !activePackage) {
+      setActionError(missingSelection ?? 'Please select a duration.');
       setActionMessage('');
       return;
     }
@@ -710,10 +707,10 @@ function DealSelectionPanel({
     try {
       await addCartItem(token, {
         dealId: group.deal.id,
+        dealPackageId: activePackage.id,
         quantity: qty,
-        ...(activePackage ? { dealPackageId: activePackage.id } : {}),
       });
-      const durationLabel = activePackage ? ` — ${activePackage.durationMinutes} Minutes` : '';
+      const durationLabel = ` — ${activePackage.durationMinutes} Minutes`;
       setActionMessage(`Added "${group.name}" to your cart.`);
       // Only fires after the API call above has actually resolved — never claims success early.
       showToast(`Added to cart\n${group.name}${durationLabel}`);

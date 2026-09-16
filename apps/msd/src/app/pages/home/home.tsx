@@ -5,7 +5,6 @@ import '@skylabs-monorepo/shared-ui/carousel';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { listCatalogCategories, listCatalogDeals, type CatalogCategoryWithChildren, type CatalogDeal } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { addCartItem } from '../../../api/cart';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
 import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
@@ -24,12 +23,11 @@ const heroImages = home.heroImages as string[];
  * when the caller's coordinates were sent (see `useCurrentLocation`) — both stay `undefined`
  * rather than a fake placeholder when the underlying data isn't there.
  *
- * A Deal is a **product** deal iff it has a linked `product` — the old `Service` master row (and
- * `Deal.service`) no longer exists (see the direct-category-access migration), a **service** deal
- * now carries its own title/description directly on `Deal` with no separate catalog item to join.
+ * Deal is always a service offering now — Product is a fully independent catalog entity (see
+ * msd-api's Product schema doc comment), never wrapped in a Deal.
  */
 function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
-  const title = deal.product?.name ?? deal.title;
+  const title = deal.title;
   const salePrice = Number(deal.salePrice);
   const originalPrice = deal.originalPrice ? Number(deal.originalPrice) : undefined;
   const media = resolveDealMedia(deal);
@@ -37,7 +35,7 @@ function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
     id: deal.id,
     title,
     image: media.images[0] ?? '',
-    imageAlt: deal.product?.imageAlt ?? title,
+    imageAlt: title,
     gallery: media.images.length > 0 ? media.images : undefined,
     video: media.video,
     providerName: deal.vendor?.businessName ?? undefined,
@@ -47,8 +45,7 @@ function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
     originalPrice: originalPrice && originalPrice !== salePrice ? originalPrice : undefined,
     discount: deal.discountPercent ?? undefined,
     priceNote: deal.durationMinutes ? `${deal.durationMinutes} min` : undefined,
-    isProduct: !!deal.product,
-    tag: deal.popularTags?.[0]?.name ?? deal.product?.popularTags?.[0]?.name,
+    tag: deal.popularTags?.[0]?.name,
   };
 }
 
@@ -71,7 +68,7 @@ function SectionHeader({ id, heading, seeAll, seeAllTo, }: {
 export function Home() {
   const vacationSwiperRef = useRef<any>(null);
   const navigate = useNavigate();
-  const { isAuthenticated, token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { toggle, has } = useWishlist();
   const spaFinder = content.home.spaFinderHero;
   const [selectedTab, setSelectedTab] = useState('all');
@@ -82,8 +79,6 @@ export function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<CatalogDeal[]>([]);
-  const [actionMessage, setActionMessage] = useState('');
-  const [actionError, setActionError] = useState('');
   const { location, coords } = useCurrentLocation();
   const shortLocation = location?.split(",")[2]?.trim() ?? location;
 
@@ -92,9 +87,8 @@ export function Home() {
   // nearest-first data without a full reload; every section below (category grid, featured, hot,
   // the per-popular-category carousels, and each category card's deal count) derives from these
   // two already-fetched arrays via client-side grouping/filtering, never a per-section API call.
-  // Includes both services and products (real Cart Add-to-Cart action needs real product deals
-  // to attach to) — `DealCard`'s `href`/`isProduct` correctly routes each to `/deal/:id` or
-  // `/products/:id`.
+  // Every Deal is a service offering (Product is a fully independent catalog entity — see
+  // toDealCardDeal's doc comment) — `DealCard` always routes to `/deal/:id`.
   useEffect(() => {
     let cancelled = false;
     setCatalogLoading(true);
@@ -203,28 +197,10 @@ export function Home() {
     return hotDeals.filter((deal) => deal.category?.id === selectedTab);
   }, [selectedTab, hotDeals]);
 
-  // "Services" count for the category grid — a service deal is any Deal with no linked Product
-  // (the old `Service` master row is gone; see `toDealCardDeal`'s doc comment).
+  // Every Deal is a service offering now (Product is independent — see toDealCardDeal's doc
+  // comment).
   function categoryDealCount(categoryId: string) {
-    return dealsData.filter((d) => d.category?.id === categoryId && !d.product).length;
-  }
-
-  function requireAuthOrRedirect() {
-    if (isAuthenticated) return true;
-    navigate('/sign-in?next=%2F');
-    return false;
-  }
-
-  async function addToCart(deal: CatalogDeal) {
-    if (!requireAuthOrRedirect()) return;
-    setActionError('');
-    setActionMessage('');
-    try {
-      await addCartItem(token, { dealId: deal.id, quantity: 1 });
-      setActionMessage(home.ui.messages.addToCartSuccess.replace('{item}', deal.product?.name ?? deal.title,));
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : home.ui.messages.addToCartError);
-    }
+    return dealsData.filter((d) => d.category?.id === categoryId).length;
   }
 
   function renderDealCarousel(deals: CatalogDeal[]) {
@@ -252,23 +228,12 @@ export function Home() {
                     toggle(deal.id);
                   }}
                   actions={
-                    deal.product ? (
-                      <FilledButton onClick={() => addToCart(deal)}>
-                        <Icon slot="icon" aria-hidden="true">
-                          shopping_bag
-                        </Icon>
-                        Add to Cart
-                      </FilledButton>
-                    ) : (
-                      <FilledButton
-                        onClick={() => navigate(`/deal/${deal.id}`)}
-                      >
-                        <Icon slot="icon" aria-hidden="true">
-                          calendar_month
-                        </Icon>
-                        Book
-                      </FilledButton>
-                    )
+                    <FilledButton onClick={() => navigate(`/deal/${deal.id}`)}>
+                      <Icon slot="icon" aria-hidden="true">
+                        calendar_month
+                      </Icon>
+                      Book
+                    </FilledButton>
                   }
                 />
               </swiper-slide>
@@ -300,8 +265,6 @@ export function Home() {
     <div className="home">
       <title>{content.meta.home.title}</title>
       <meta name="description" content={content.meta.home.description} />
-      {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
-      {actionError && <p className="error-state" role="alert">{actionError}</p>}
       <section className="home__premium-hero">
         <div className="home__premium-content">
           <div className="home__premium-left">
@@ -382,14 +345,14 @@ export function Home() {
                         type="button"
                         className="search-suggestion"
                         onClick={() => {
-                          navigate(deal.product ? `/products/${deal.id}` : `/deal/${deal.id}`);
+                          navigate(`/deal/${deal.id}`);
                           setSearchQuery("");
                           setShowSuggestions(false);
                         }}
                       >
                         <Icon slot="start">  search </Icon>
                         <div>
-                          <strong>{deal.product?.name ?? deal.title}</strong>
+                          <strong>{deal.title}</strong>
                           <small>{deal.vendor?.businessName} • {deal.branch?.city} </small>
                         </div>
                       </ListItem>

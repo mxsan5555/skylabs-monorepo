@@ -22,7 +22,7 @@ const CUSTOMER_ID = 'a0a0a0a0-0000-4000-8000-000000000001';
 const OTHER_CUSTOMER_ID = 'b0b0b0b0-0000-4000-8000-000000000002';
 const CART_ID = 'c0c0c0c0-0000-4000-8000-000000000003';
 const CART_ITEM_ID = 'd0d0d0d0-0000-4000-8000-000000000004';
-const PRODUCT_DEAL_ID = 'e0e0e0e0-0000-4000-8000-000000000005';
+const PRODUCT_ID = 'e0e0e0e0-0000-4000-8000-000000000005';
 const SERVICE_DEAL_ID = 'f0f0f0f0-0000-4000-8000-000000000006';
 const VENDOR_A_ID = 'a1a1a1a1-0000-4000-8000-000000000007';
 const VENDOR_B_ID = 'a2a2a2a2-0000-4000-8000-000000000008';
@@ -40,24 +40,20 @@ const branchAFixture = { id: BRANCH_A_ID, name: 'Gorakhpur Branch', isActive: tr
 const cartWithOneItem = {
   id: CART_ID,
   customerId: CUSTOMER_ID,
-  items: [{ id: CART_ITEM_ID, cartId: CART_ID, dealId: PRODUCT_DEAL_ID, quantity: 2, unitPrice: '150.00' }], // stale unitPrice — live deal price is 199.00
+  items: [{ id: CART_ITEM_ID, cartId: CART_ID, productId: PRODUCT_ID, quantity: 2, unitPrice: '150.00' }], // stale unitPrice — live product price is 199.00
 };
 
-const productDealFixture = {
-  id: PRODUCT_DEAL_ID,
-  productId: 'prod-1',
-  serviceId: null,
+const productFixture = {
+  id: PRODUCT_ID,
+  isActive: true,
   vendorId: VENDOR_A_ID,
-  branchId: BRANCH_A_ID,
-  salePrice: '199.00', // the live, current price — must be what's used, not the stale cart snapshot of 150.00
-  product: { name: 'Face Cream' },
+  name: 'Face Cream',
+  price: '199.00', // the live, current price — must be what's used, not the stale cart snapshot of 150.00
   vendor: vendorAFixture,
-  branch: branchAFixture,
 };
 
 const serviceDealFixture = {
   id: SERVICE_DEAL_ID,
-  productId: null,
   vendorId: VENDOR_A_ID,
   branchId: BRANCH_A_ID,
   title: 'Haircut deal',
@@ -84,20 +80,20 @@ const orderFixture = {
   id: ORDER_ID,
   customerId: CUSTOMER_ID,
   vendorId: VENDOR_A_ID,
-  branchId: BRANCH_A_ID,
+  branchId: null, // Product has no branch — see Product's own schema doc comment.
   type: 'PRODUCT',
   status: 'PENDING_PAYMENT',
   vendorNameSnapshot: 'ABC Salon',
-  branchNameSnapshot: 'Gorakhpur Branch',
+  branchNameSnapshot: null,
   subtotal: '398.00',
   total: '398.00',
   items: [{
     id: 'oi-1',
-    dealId: PRODUCT_DEAL_ID,
+    productId: PRODUCT_ID,
     vendorId: VENDOR_A_ID,
-    branchId: BRANCH_A_ID,
+    branchId: null,
     vendorNameSnapshot: 'ABC Salon',
-    branchNameSnapshot: 'Gorakhpur Branch',
+    branchNameSnapshot: null,
     itemName: 'Face Cream',
     itemType: 'PRODUCT',
     unitPrice: '199.00',
@@ -116,8 +112,7 @@ describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
   it('1. creates a PRODUCT order from the cart', async () => {
     prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);
     prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    prismaMock.deal.findFirst.mockResolvedValue(productDealFixture);
+    prismaMock.product.findFirst.mockResolvedValue(productFixture);
     prismaMock.order.create.mockResolvedValue(orderFixture);
     const res = await request(app)
       .post('/api/v1/orders/checkout')
@@ -126,26 +121,24 @@ describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
     expect(res.body.data.type).toBe('PRODUCT');
   });
 
-  it('8/9. snapshots vendor/branch name at creation time', async () => {
+  it('8/9. snapshots vendor name at creation time; branch stays null — Product has no branch', async () => {
     prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);
     prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    prismaMock.deal.findFirst.mockResolvedValue(productDealFixture);
+    prismaMock.product.findFirst.mockResolvedValue(productFixture);
     prismaMock.order.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: ORDER_ID, ...data }));
     const res = await request(app)
       .post('/api/v1/orders/checkout')
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
     expect(res.status).toBe(201);
     expect(prismaMock.order.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ vendorNameSnapshot: 'ABC Salon', branchNameSnapshot: 'Gorakhpur Branch' }) }),
+      expect.objectContaining({ data: expect.objectContaining({ vendorNameSnapshot: 'ABC Salon', branchId: null, branchNameSnapshot: null }) }),
     );
   });
 
-  it('19. recalculates price server-side from the LIVE deal price, never the stale CartItem.unitPrice', async () => {
+  it('19. recalculates price server-side from the LIVE product price, never the stale CartItem.unitPrice', async () => {
     prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem); // cart item unitPrice snapshot: 150.00 (stale)
     prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    prismaMock.deal.findFirst.mockResolvedValue(productDealFixture); // live price: 199.00
+    prismaMock.product.findFirst.mockResolvedValue(productFixture); // live price: 199.00
     prismaMock.order.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: ORDER_ID, ...data }));
     await request(app).post('/api/v1/orders/checkout').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
     const call = prismaMock.order.create.mock.calls[0][0];
@@ -160,7 +153,7 @@ describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
     // links the cart to its new Order via pendingOrderId, so a repeat checkout call can reuse it
     // (see the next test) and a failed/abandoned payment leaves the cart intact for retry.
     prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);
-    prismaMock.deal.findFirst.mockResolvedValue(productDealFixture);
+    prismaMock.product.findFirst.mockResolvedValue(productFixture);
     prismaMock.order.create.mockResolvedValue(orderFixture);
     await request(app).post('/api/v1/orders/checkout').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
     expect(prismaMock.cartItem.deleteMany).not.toHaveBeenCalled();
@@ -179,7 +172,7 @@ describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
   it('12c. a stale pendingOrderId pointing at a CANCELLED order is cleared and a fresh order is created from the still-intact cart', async () => {
     prismaMock.cart.findUnique.mockResolvedValue({ ...cartWithOneItem, pendingOrderId: ORDER_ID });
     prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, status: 'CANCELLED' });
-    prismaMock.deal.findFirst.mockResolvedValue(productDealFixture);
+    prismaMock.product.findFirst.mockResolvedValue(productFixture);
     prismaMock.order.create.mockResolvedValue(orderFixture);
     const res = await request(app).post('/api/v1/orders/checkout').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
     expect(res.status).toBe(201);
@@ -187,9 +180,9 @@ describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
     expect(prismaMock.order.create).toHaveBeenCalled();
   });
 
-  it('13/20. leaves the cart intact and creates nothing when a deal fails revalidation (transaction rollback)', async () => {
+  it('13/20. leaves the cart intact and creates nothing when a product fails revalidation (transaction rollback)', async () => {
     prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);
-    prismaMock.deal.findFirst.mockResolvedValue(null); // deal went inactive/unapproved since being added to cart
+    prismaMock.product.findFirst.mockResolvedValue(null); // product went inactive/vendor suspended since being added to cart
     const res = await request(app).post('/api/v1/orders/checkout').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
     expect(res.status).toBe(409);
     expect(prismaMock.order.create).not.toHaveBeenCalled();
@@ -206,8 +199,7 @@ describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
   it('stores the checkout "Customer Details" step contact/shipping fields on the order', async () => {
     prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);
     prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
-    prismaMock.deal.findFirst.mockResolvedValue(productDealFixture);
+    prismaMock.product.findFirst.mockResolvedValue(productFixture);
     prismaMock.order.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: ORDER_ID, ...data }));
     const res = await request(app)
       .post('/api/v1/orders/checkout')
@@ -262,15 +254,14 @@ describe('POST /api/v1/orders/checkout — mixed cart (Deal + Product + Therapis
       id: CART_ID,
       customerId: CUSTOMER_ID,
       items: [
-        { id: CART_ITEM_ID, cartId: CART_ID, dealId: PRODUCT_DEAL_ID, dealPackageId: null, therapistId: null, therapistPackageId: null, quantity: 2, unitPrice: '150.00' },
-        { id: SERVICE_CART_ITEM_ID, cartId: CART_ID, dealId: SERVICE_DEAL_ID, dealPackageId: DEAL_PACKAGE_ID, therapistId: null, therapistPackageId: null, quantity: 1, unitPrice: '299.00' },
-        { id: THERAPIST_CART_ITEM_ID, cartId: CART_ID, dealId: null, dealPackageId: null, therapistId: THERAPIST_ID, therapistPackageId: THERAPIST_PACKAGE_ID, quantity: 1, unitPrice: '499.00' },
+        { id: CART_ITEM_ID, cartId: CART_ID, productId: PRODUCT_ID, dealId: null, dealPackageId: null, therapistId: null, therapistPackageId: null, quantity: 2, unitPrice: '150.00' },
+        { id: SERVICE_CART_ITEM_ID, cartId: CART_ID, dealId: SERVICE_DEAL_ID, dealPackageId: DEAL_PACKAGE_ID, therapistId: null, therapistPackageId: null, productId: null, quantity: 1, unitPrice: '299.00' },
+        { id: THERAPIST_CART_ITEM_ID, cartId: CART_ID, dealId: null, dealPackageId: null, therapistId: THERAPIST_ID, therapistPackageId: THERAPIST_PACKAGE_ID, productId: null, quantity: 1, unitPrice: '499.00' },
       ],
     };
     prismaMock.cart.findUnique.mockResolvedValue(mixedCart);
-    prismaMock.deal.findFirst.mockImplementation(({ where }: { where: { id: string } }) =>
-      Promise.resolve(where.id === PRODUCT_DEAL_ID ? productDealFixture : serviceDealFixture),
-    );
+    prismaMock.product.findFirst.mockResolvedValue(productFixture);
+    prismaMock.deal.findFirst.mockResolvedValue(serviceDealFixture);
     prismaMock.dealPackage.findUnique.mockResolvedValue(dealPackageFixture);
     prismaMock.therapist.findFirst.mockResolvedValue(therapistFixture);
     prismaMock.therapistPackage.findUnique.mockResolvedValue(therapistPackageFixture);

@@ -911,3 +911,256 @@ md-ride-confirmed {
     grid-template-columns: repeat(4, 1fr);
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Driver self-service portal (`/driver/*`) — same full-bleed,
+ * mobile-first shell idea as the rider flow above, but with a content
+ * column that scrolls (account-style forms) rather than an immersive
+ * map, plus a top bar. Reuses `.rider-nav`/`.rider-nav__item` for the
+ * bottom nav rather than duplicating it.
+ * ------------------------------------------------------------------ */
+
+.driver-shell {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--md-sys-color-surface, #fafdfb);
+}
+
+.driver-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface, #fafdfb);
+}
+
+.driver-topbar__title {
+  flex: 1;
+  text-align: center;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+.driver-content {
+  flex: 1;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 20px 16px 32px;
+  box-sizing: border-box;
+}
+
+/* Small status/quick-link cards on the driver dashboard. */
+.driver-dash-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.driver-dash-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 16px;
+  border: none;
+  background-color: var(--md-sys-color-surface-container, #eef1f6);
+  font: inherit;
+  text-align: left;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+}
+
+.driver-dash-card[disabled] {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.driver-dash-card__label {
+  font-weight: 600;
+}
+
+.driver-dash-card__hint {
+  font-size: 0.8rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.driver-coming-soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.driver-languages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.driver-lang-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface, #fff);
+  font-size: 0.85rem;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+}
+
+.driver-lang-chip.selected {
+  border-color: var(--md-sys-color-primary, #33618d);
+  background-color: var(--md-sys-color-primary-container, #d0e4ff);
+  font-weight: 600;
+}
+
+.driver-doc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.driver-doc-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  background-color: var(--md-sys-color-surface, #fafdfb);
+}
+
+.driver-doc-card__meta {
+  font-size: 0.8rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.driver-completion__percent {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+.driver-completion__list {
+  margin: 4px 0 0;
+  padding-left: 20px;
+  color: var(--md-sys-color-on-surface);
+}
+
+/* Navigation drawer for the driver portal (all sections + Logout, opened from the topbar). */
+.driver-nav-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 700;
+  background-color: rgb(0 0 0 / 0.32);
+}
+
+.driver-nav-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 701;
+  width: min(300px, 84vw);
+  display: flex;
+  flex-direction: column;
+  background-color: var(--md-sys-color-surface, #fff);
+  box-shadow: 4px 0 24px rgb(0 0 0 / 0.2);
+}
+
+.driver-nav-drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+.driver-nav-drawer__list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.driver-nav-drawer__item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 12px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+}
+
+.driver-nav-drawer__item:hover {
+  background-color: var(--md-sys-color-surface-container-low, #f3f4f9);
+}
+
+.driver-nav-drawer__item.active {
+  background-color: var(--md-sys-color-primary-container, #d0e4ff);
+  font-weight: 600;
+}
+
+.driver-nav-drawer__item--logout {
+  margin-top: auto;
+  color: var(--md-sys-color-error);
+}
+
+/* Profile/Logout affordance in the admin console sidebar's user row (`.admin-sidebar__user`
+ * itself is a shared-ui class — these are app-local additions layered on top, not a change
+ * to shared-ui, so msd is unaffected). Every authenticated role reaches this same sidebar. */
+.sidebar-user-actions {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+
+.sidebar-user-actions md-icon-button.active {
+  color: var(--md-sys-color-primary);
+}
+
+/* Read-only Driver Resume/Profile Preview dialog. */
+.driver-resume-dialog {
+  --md-dialog-container-max-inline-size: 560px;
+}
+
+.driver-resume-fields {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.driver-resume-fields dt {
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.driver-resume-fields dd {
+  margin: 0;
+  color: var(--md-sys-color-on-surface);
+}

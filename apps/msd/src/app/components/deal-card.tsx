@@ -30,13 +30,9 @@ export interface DealCardDeal {
   originalPrice?: number;
   discount?: number;
   priceNote?: string;
-  /** True for a real PRODUCT deal (`deal.product` set) — routes to `/products/:id` and, when
-   *  `onAddToCart` is supplied, shows a real "Add to Cart" action instead of the default
-   *  click-through-only card. A service deal (the default) still routes to `/deal/:id`. */
-  isProduct?: boolean;
-  /** The first active Popular Tag mapped onto this deal (or its linked Product, for a product
-   *  deal) — e.g. "Trending". `sky-product-card`'s `tag` slot is single-value, so only the
-   *  highest-priority (first) active tag is ever shown; omitted entirely when none are mapped. */
+  /** The first active Popular Tag mapped onto this deal — e.g. "Trending". `sky-product-card`'s
+   *  `tag` slot is single-value, so only the highest-priority (first) active tag is ever shown;
+   *  omitted entirely when none are mapped. */
   tag?: string;
 }
 
@@ -48,9 +44,14 @@ interface DealCardProps {
    *  `CatalogDeal.vendor.slug` is always present for a visible deal); mock-data callers omit it
    *  and the vendor name simply renders unlinked, same as before. */
   eyebrowHref?: string;
-  /** Extra action content below the price (e.g. a real "Add to Cart" button for a product deal)
-   *  — wrapped in a stopPropagation/preventDefault div (same pattern as category.tsx's existing
-   *  card action row) so the click never falls through to the card's own stretched link. */
+  /** Where the card's stretched link goes — defaults to `/deal/:id`. `products.tsx` (the only
+   *  other caller of this shared card presentation) passes `/products/:id` instead — Deal and
+   *  Product are independent catalog entities, never distinguished by a field on the card data
+   *  itself. */
+  href?: string;
+  /** Extra action content below the price (e.g. a real "Add to Cart" button) — wrapped in a
+   *  stopPropagation/preventDefault div (same pattern as category.tsx's existing card action row)
+   *  so the click never falls through to the card's own stretched link. */
   actions?: ReactNode;
 }
 
@@ -59,6 +60,7 @@ export function DealCard({
   favoriteActive,
   onFavorite,
   eyebrowHref,
+  href,
   actions,
 }: DealCardProps) {
   const swiperRef = useRef<any>(null);
@@ -89,7 +91,7 @@ export function DealCard({
           : undefined
       }
       priceNote={deal.priceNote}
-      href={deal.isProduct ? `/products/${deal.id}` : `/deal/${deal.id}`}
+      href={href ?? `/deal/${deal.id}`}
     >
 
       <div slot="media" className="deal-card-slider">

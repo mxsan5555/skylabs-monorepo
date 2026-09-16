@@ -8,6 +8,11 @@ declare global {
     // and our own typing merge instead of conflicting.
     // eslint-disable-next-line @typescript-eslint/no-empty-object-type
     interface User extends AccessTokenPayload {}
+
+    interface Request {
+      /** The caller's own linked Driver row — set only by `resolveOwnDriver`, never from a param. */
+      driver?: { id: string };
+    }
   }
 }
 

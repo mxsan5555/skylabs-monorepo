@@ -1,15 +1,6 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, computed, inject, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { AdminPage } from '../../../../admin/admin-page/admin-page';
-
-interface CancellationReason {
-  id?: number | string;
-  code: string;
-  reason_text: string;
-  applies_to: 'Customer' | 'Driver' | 'Both';
-  penalty_applicable: 'Yes' | 'No';
-  status: 'Active' | 'Inactive';
-}
+import { CancellationReasonsApiService, type CancellationReason } from '../../../../core/trips/cancellation-reasons-api.service';
 
 @Component({
   selector: 'md-cancellation-reasons',
@@ -20,10 +11,11 @@ interface CancellationReason {
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class CancellationReasons implements OnInit {
-  private readonly http = inject(HttpClient);
+  private readonly api = inject(CancellationReasonsApiService);
   readonly list = signal<CancellationReason[]>([]);
+  readonly loading = signal(false);
   readonly showAddForm = signal(false);
-  readonly editingId = signal<number | string | 'new' | null>(null);
+  readonly editingId = signal<string | 'new' | null>(null);
 
   // --- Form Input Signals ---
   readonly inputCode = signal('');
@@ -48,9 +40,20 @@ export class CancellationReasons implements OnInit {
   readonly tableRowsString = computed(() => JSON.stringify(this.list()));
 
   ngOnInit(): void {
-    this.http.get<CancellationReason[]>('data/cancellation_reasons.json').subscribe({
-      next: (data) => this.list.set(data || []),
-      error: (err) => console.error('Failed to load cancellation reasons', err),
+    this.reload();
+  }
+
+  private reload(): void {
+    this.loading.set(true);
+    this.api.list().subscribe({
+      next: (data) => {
+        this.list.set(data);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to load cancellation reasons', err);
+        this.loading.set(false);
+      },
     });
   }
 
@@ -86,9 +89,7 @@ export class CancellationReasons implements OnInit {
       alert('Reason description is required.');
       return;
     }
-    const id = this.editingId();
-    const record: CancellationReason = {
-      id: id === 'new' ? Date.now() : id!,
+    const payload: CancellationReason = {
       code: this.inputCode().trim() || 'CR-00',
       reason_text: reason,
       applies_to: this.inputAppliesTo(),
@@ -96,12 +97,18 @@ export class CancellationReasons implements OnInit {
       status: this.inputStatus(),
     };
 
-    if (id === 'new') {
-      this.list.update((l) => [record, ...l]);
-    } else {
-      this.list.update((l) => l.map((x) => (x.id === id ? record : x)));
-    }
-    this.cancelEdit();
+    const id = this.editingId();
+    const request = id === 'new' || id === null ? this.api.create(payload) : this.api.update(id, payload);
+    request.subscribe({
+      next: () => {
+        this.reload();
+        this.cancelEdit();
+      },
+      error: (err) => {
+        console.error('Failed to save cancellation reason', err);
+        alert('Failed to save cancellation reason. Please try again.');
+      },
+    });
   }
 
   cancelEdit(): void {
@@ -110,8 +117,14 @@ export class CancellationReasons implements OnInit {
   }
 
   deleteOption(row: CancellationReason): void {
-    if (confirm(`Delete cancellation reason "${row.reason_text}"?`)) {
-      this.list.update((l) => l.filter((x) => x.id !== row.id));
+    if (confirm(`Delete cancellation reason "${row.reason_text}"?`) && row.id) {
+      this.api.delete(row.id).subscribe({
+        next: () => this.reload(),
+        error: (err) => {
+          console.error('Failed to delete cancellation reason', err);
+          alert('Failed to delete cancellation reason. Please try again.');
+        },
+      });
     }
   }
 }

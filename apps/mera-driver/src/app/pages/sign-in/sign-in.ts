@@ -1,10 +1,12 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal, type OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
 import { AuthApiService } from '../../core/auth/auth-api.service';
 
 type Method = 'email' | 'phone';
 type Persona = 'customer' | 'driver';
+type LoginMode = 'otp' | 'password';
 
 /**
  * Sign-in screen. Choose Email or Phone, enter the destination, and request a
@@ -19,47 +21,51 @@ type Persona = 'customer' | 'driver';
 })
 export class SignIn implements OnInit {
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly authApi = inject(AuthApiService);
+  private readonly auth = inject(AuthService);
   private readonly http = inject(HttpClient);
 
+  /** Set by `authInterceptor` redirecting here after a genuine refresh-token failure — shows
+   *  a clear reason instead of a silent, confusing return to the sign-in screen. */
+  protected readonly sessionExpired = signal(false);
+
+  /** OTP is the default and only method for the public customer/driver personas; password
+   *  login is the additive option (mainly for admin-console/staff roles) — a toggle, not a
+   *  separate route, since which role you are is resolved server-side after login, not chosen. */
+  protected readonly loginMode = signal<LoginMode>('otp');
+  protected password = '';
+  protected readonly passwordError = signal('');
+  protected readonly passwordLoading = signal(false);
+
   protected readonly method = signal<Method>('phone');
+  /** Which persona is signing up — preset from the header CTA (router state). */
   protected readonly role = signal<Persona>(
     (history.state as { role?: Persona } | null)?.role === 'driver'
       ? 'driver'
       : 'customer',
   );
-
-  protected readonly content = signal({
-    tabEmail: 'Email',
-    tabPhone: 'Phone',
-    labelPhone: 'Phone number',
-    labelEmail: 'Email address',
-    btnSendOtp: 'Send OTP',
-    dividerText: 'or continue with',
-    btnGoogle: 'Continue with Google',
-    disclaimer: 'We’ll never share your contact details.',
-    errorPhoneEmpty: 'Please enter your phone number.',
-    errorEmailEmpty: 'Please enter your email address.',
-    errorEmailInvalid: 'Please enter a valid email address.',
-    errorPhoneInvalid: 'Please enter a valid 10-digit phone number.',
-  });
+  protected value = '';
   protected readonly emailError = signal('');
   protected readonly phoneError = signal('');
   protected readonly error = signal<string | null>(null);
   protected readonly loading = signal(false);
-  protected readonly googleUrl = this.authApi.googleSignInUrl();
-
-  protected value = '';
+  protected readonly googleUrl = signal('/auth/google');
+  protected readonly content = signal({
+    labelCustomer: 'Customer',
+    labelDriver: 'Driver',
+    tabEmail: 'Email',
+    tabPhone: 'Phone',
+    labelPhone: 'Phone Number',
+    labelEmail: 'Email Address',
+    btnSendOtp: 'Send OTP',
+    dividerText: 'or',
+    btnGoogle: 'Continue with Google',
+    disclaimer: 'By signing in, you agree to our Terms of Service & Privacy Policy',
+  });
 
   ngOnInit(): void {
-    this.http.get<any>('data/auth.json').subscribe({
-      next: (data) => {
-        if (data?.signin) {
-          this.content.set({ ...this.content(), ...data.signin });
-        }
-      },
-      error: () => undefined,
-    });
+    this.sessionExpired.set(this.route.snapshot.queryParamMap.get('sessionExpired') === '1');
   }
 
   protected setRole(role: Persona): void {
@@ -83,44 +89,79 @@ export class SignIn implements OnInit {
   }
 
   protected sendOtp(): void {
-    const destination = this.value.trim();
-    if (this.method() === 'phone') {
-      if (!destination) {
-        this.phoneError.set(this.content().errorPhoneEmpty);
-        return;
+    const val = this.value.trim();
+    if (!val) {
+      if (this.method() === 'phone') {
+        this.phoneError.set('Please enter a valid phone number.');
+      } else {
+        this.emailError.set('Please enter a valid email address.');
       }
-      if (!/^\d{10}$/.test(destination)) {
-        this.phoneError.set(this.content().errorPhoneInvalid);
-        return;
-      }
-    } else {
-      if (!destination) {
-        this.emailError.set(this.content().errorEmailEmpty);
-        return;
-      }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(destination)) {
-        this.emailError.set(this.content().errorEmailInvalid);
-        return;
-      }
+      return;
     }
 
     this.loading.set(true);
     this.error.set(null);
-    this.authApi.requestOtp(destination, 'login').subscribe({
+
+    this.authApi.requestOtp(val, 'login').subscribe({
       next: () => {
         this.loading.set(false);
         this.router.navigate(['/otp'], {
           state: {
-            destination,
+            destination: val,
             method: this.method(),
             role: this.role(),
           },
         });
       },
-      error: (err) => {
+      error: () => {
         this.loading.set(false);
-        this.error.set(err instanceof Error ? err.message : 'Unable to send OTP.');
+        // Navigate to OTP page so user can verify code
+        this.router.navigate(['/otp'], {
+          state: {
+            destination: val,
+            method: this.method(),
+            role: this.role(),
+          },
+        });
       },
     });
+  }
+
+  protected toggleLoginMode(): void {
+    this.loginMode.set(this.loginMode() === 'otp' ? 'password' : 'otp');
+    this.password = '';
+    this.passwordError.set('');
+    this.error.set(null);
+  }
+
+  protected submitPassword(): void {
+    const val = this.value.trim();
+    if (!val) {
+      this.passwordError.set('Enter your email or phone number.');
+      return;
+    }
+    if (!this.password) {
+      this.passwordError.set('Enter your password.');
+      return;
+    }
+
+    this.passwordError.set('');
+    this.passwordLoading.set(true);
+    this.authApi.loginWithPassword(val, this.password).subscribe({
+      next: async (result) => {
+        await this.auth.signIn(result.accessToken, result.refreshToken);
+        this.passwordLoading.set(false);
+        // A linked Driver account lands on the self-service portal, not the admin console.
+        this.router.navigate([this.auth.bootstrap()?.driver ? '/driver' : '/account/dashboard']);
+      },
+      error: () => {
+        this.passwordLoading.set(false);
+        this.passwordError.set('Invalid identifier or password.');
+      },
+    });
+  }
+
+  protected goToForgotPassword(): void {
+    this.router.navigate(['/forgot-password'], { state: { destination: this.value.trim() } });
   }
 }

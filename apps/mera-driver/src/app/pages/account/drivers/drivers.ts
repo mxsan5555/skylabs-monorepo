@@ -1,73 +1,39 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, inject, OnInit, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Router, NavigationEnd } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { firstValueFrom, filter } from 'rxjs';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
+import { DriversApiService, type Driver } from '../../../core/drivers/drivers-api.service';
+import { buildResumeHtml, buildResumeSections, type ResumeSection } from './driver-resume';
 
-interface Driver {
-  id?: number;
-  name: string;
-  phone: string;
-  vehicle: string;
-  city?: string;
-  // --- Onboarding Leads Fields ---
-  firstName?: string;
-  lastName?: string;
-  fatherName?: string;
-  motherName?: string;
-  email?: string;
-  emergencyNumber?: string;
-  dob?: string;
-  maritalStatus?: string;
-  gender?: string;
-  passportNumber?: string;
-  religion?: string;
-  color?: string;
-  language?: string;
-  age?: string;
-  height?: string;
-  weight?: string;
-  country?: string;
-  state?: string;
-  pincode?: string;
-  address?: string;
-  driverType?: string;
-  status?: string;
-  sourceType?: string;
-  avatar?: string;
-  // --- Education & Health Fields ---
-  education?: string;
-  trainingStatus?: string;
-  trainingCertificate?: string;
-  eyeVision?: string;
-  healthInsurance?: string;
-  bloodGroup?: string;
-  // --- Documents Fields ---
-  licenseDetails?: string;
-  vehicleType?: string;
-  dlNo?: string;
-  dlIssueDate?: string;
-  dlExpiryDate?: string;
-  policeVerifiedStatus?: string;
-  policeVerifiedNo?: string;
-  policeVerifiedUpload?: string;
-  jobType?: string;
-  experience?: string;
-  currentSalary?: string;
-  expectedSalary?: string;
-  documentCategory?: string;
-  documentUpload?: string;
-  // --- Payment Fields ---
-  preferredPaymentMode?: string;
-  amount?: string;
-  paymentReceiptDate?: string;
-  bankName?: string;
-  bankAccountNo?: string;
-  ifscCode?: string;
-  branchName?: string;
-  upiIdOrChequeNo?: string;
-  personalDocs?: Array<{ type: string; regNo: string; file: string }>;
-  healthDocs?: Array<{ type: string; regNo: string; file: string }>;
-  educationDocs?: Array<{ type: string; regNo: string; file: string }>;
-  policeDocs?: Array<{ type: string; regNo: string; file: string }>;
+/** The 4 tabs are the onboarding wizard's persistence checkpoints — sub-section chip
+ *  navigation within a tab is a pure UI concern and never itself hits the backend. */
+const TOTAL_ONBOARDING_STEPS = 4;
+// Sub-section counts for tabs 0-3, matching the actual number of `@if (activeSubSection() === N)`
+// branches (and chips) rendered per tab in drivers.html — NOT the previous [4,2,6,3], which
+// overcounted tabs 2 and 3 and made "Save & Next" walk through blank, content-less
+// sub-sections before a tab was actually considered finished.
+const MAX_SUBS = [4, 2, 3, 2];
+
+const TAB_NAMES = ['Personal Details', 'Education & Health Details', 'Documents Details', 'Payment Details'];
+
+/** Driver List progress display — e.g. "In Progress — Personal Details, sub-step 2 of 4 (18%)"
+ *  / "Completed — 100%". A driver with no onboarding data at all (shouldn't happen
+ *  post-migration, but defensively) reads as completed rather than a confusing label. */
+function onboardingLabel(d: Driver): string {
+  if (d.onboardingStatus === 'in_progress') {
+    const tab = Math.min(Math.max(d.currentStep ?? 1, 1), TOTAL_ONBOARDING_STEPS);
+    const sub = Math.min(Math.max(d.currentSubStep ?? 0, 0), MAX_SUBS[tab - 1] - 1);
+    return `In Progress — ${TAB_NAMES[tab - 1]}, sub-step ${sub + 1} of ${MAX_SUBS[tab - 1]} (${d.completionPercentage ?? 0}%)`;
+  }
+  return 'Completed — 100%';
+}
+
+/** Encodes a (0-based tab, 0-based sub) pair to match the backend's `tab*10+sub` storage
+ *  (backend tabs are 1-based) — used to check `completedSubSteps` for chip/tick display. */
+function subStepKey(tabIndex: number, subIndex: number): number {
+  return (tabIndex + 1) * 10 + subIndex;
 }
 
 @Component({
@@ -80,9 +46,65 @@ interface Driver {
 })
 export class Drivers implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly api = inject(DriversApiService);
+  private readonly rbac = inject(RbacApiService);
+  private readonly router = inject(Router);
+
+  constructor() {
+    this.router.events
+      .pipe(
+        filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+        takeUntilDestroyed()
+      )
+      .subscribe(() => {
+        if (this.showAddForm()) {
+          this.closeAddDriverForm();
+        }
+      });
+  }
 
   // --- All Drivers Repository ---
   readonly allDrivers = signal<Driver[]>([]);
+  readonly loading = signal<boolean>(false);
+
+  // --- Driver User account (self-service portal login) ---
+  // One-click creation only — no existing-user picker. See `createDriverUser()`.
+  readonly linkPanelDriver = signal<Driver | null>(null);
+  readonly linkSaving = signal<boolean>(false);
+  readonly linkError = signal<string | null>(null);
+
+  // --- Read-only Driver Resume/Profile Preview ---
+  readonly previewDriver = signal<Driver | null>(null);
+  readonly previewSections = computed<ResumeSection[]>(() => {
+    const d = this.previewDriver();
+    return d ? buildResumeSections(d) : [];
+  });
+
+  openPreview(driver: Driver): void {
+    this.previewDriver.set(driver);
+  }
+
+  closePreview(): void {
+    this.previewDriver.set(null);
+  }
+
+  /** Browser-native print-to-PDF — no new PDF library. Opens the resume in its own
+   *  window with print-only styling (not the admin console chrome) and invokes print(),
+   *  which every major browser can save as a PDF from its destination picker. */
+  downloadPdf(driver: Driver): void {
+    const html = buildResumeHtml(driver);
+    const win = window.open('', '_blank', 'width=850,height=1100');
+    if (!win) {
+      alert('Please allow pop-ups for this site to download the PDF.');
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.onload = () => {
+      win.focus();
+      win.print();
+    };
+  }
 
   // --- Search, Filter, Sort & Pagination Signals ---
   readonly searchQuery = signal<string>('');
@@ -95,9 +117,120 @@ export class Drivers implements OnInit {
   // --- View Switcher (Page vs Form) & Tab Controls ---
   readonly showAddForm = signal<boolean>(false);
   readonly activeFormTab = signal<number>(0);
-  readonly editingDriverId = signal<number | null>(null);
+  readonly activeSubSection = signal<number>(0);
+  readonly editingDriverId = signal<string | null>(null);
+
+  // --- Step-by-step persistence (onboarding wizard) ---
+  readonly savingStep = signal<boolean>(false);
+  readonly stepError = signal<string | null>(null);
+  // Nested (tab, sub) pairs already saved for the driver currently open in the form —
+  // drives the "done" tick on sub-section chips. Encoded via `subStepKey()`.
+  readonly formCompletedSubSteps = signal<number[]>([]);
+
+  isSubStepDone(tabIndex: number, subIndex: number): boolean {
+    return this.formCompletedSubSteps().includes(subStepKey(tabIndex, subIndex));
+  }
+
+  readonly totalSubSteps = MAX_SUBS.reduce((a, b) => a + b, 0);
+
+  maxSubsFor(tabIndex: number): number {
+    return MAX_SUBS[tabIndex];
+  }
+
+  // --- Form Validation Signals & Helpers ---
+  readonly formSubmitted = signal<boolean>(false);
+  readonly touchedFields = signal<Record<string, boolean>>({});
+
+  markTouched(field: string): void {
+    this.touchedFields.update(prev => ({ ...prev, [field]: true }));
+  }
+
+  isTouched(field: string): boolean {
+    return this.formSubmitted() || !!this.touchedFields()[field];
+  }
+
+  readonly firstNameError = computed(() => {
+    if (!this.isTouched('firstName')) return '';
+    const val = this.inputFirstName().trim();
+    if (!val) return 'First Name is required';
+    return '';
+  });
+
+  readonly genderError = computed(() => {
+    if (!this.isTouched('gender')) return '';
+    const val = this.inputGender().trim();
+    if (!val) return 'Gender is required';
+    return '';
+  });
+
+  readonly emailError = computed(() => {
+    if (!this.isTouched('email')) return '';
+    const val = this.inputEmail().trim();
+    if (!val) return 'Email address is required';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(val)) return 'Enter a valid email address';
+    return '';
+  });
+
+  readonly phoneError = computed(() => {
+    if (!this.isTouched('phone')) return '';
+    const val = this.inputPhone().trim();
+    if (!val) return 'Phone number is required';
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(val)) return 'Enter a valid 10-digit mobile number';
+    return '';
+  });
+
+  readonly statusError = computed(() => {
+    if (!this.isTouched('status')) return '';
+    const val = this.inputStatus().trim();
+    if (!val) return 'Driver status is required';
+    return '';
+  });
+
+  readonly driverTypeError = computed(() => {
+    if (!this.isTouched('driverType')) return '';
+    if (this.inputDriverTypes().length === 0) return 'At least one Driver Type is required';
+    return '';
+  });
+
+  readonly dlNoError = computed(() => {
+    if (!this.isTouched('dlNo')) return '';
+    const val = this.inputDlNo().trim();
+    if (!val) return 'Driving License No. is required';
+    return '';
+  });
+
+  validateCurrentStep(): boolean {
+    const tab = this.activeFormTab();
+    const sub = this.activeSubSection();
+
+    if (tab === 0) {
+      if (sub === 0) {
+        this.markTouched('firstName');
+        this.markTouched('gender');
+        return !this.firstNameError() && !this.genderError();
+      } else if (sub === 1) {
+        this.markTouched('email');
+        this.markTouched('phone');
+        return !this.emailError() && !this.phoneError();
+      } else if (sub === 3) {
+        this.markTouched('status');
+        this.markTouched('driverType');
+        return !this.statusError() && !this.driverTypeError();
+      }
+    } else if (tab === 2) {
+      if (sub === 0) {
+        this.markTouched('dlNo');
+        return !this.dlNoError();
+      }
+    }
+    return true;
+  }
 
   // --- Form Input Signals (Tab 1: Personal) ---
+  readonly inputAppNo = signal<string>('');
+  readonly inputJoiningDate = signal<string>('');
   readonly inputFirstName = signal<string>('');
   readonly inputLastName = signal<string>('');
   readonly inputFatherName = signal<string>('');
@@ -107,19 +240,61 @@ export class Drivers implements OnInit {
   readonly inputEmergencyNumber = signal<string>('');
   readonly inputDob = signal<string>('');
   readonly inputMaritalStatus = signal<string>('Unmarried');
-  readonly inputGender = signal<string>('Male');
+  readonly inputGender = signal<string>('');
   readonly inputPassportNumber = signal<string>('');
   readonly inputReligion = signal<string>('Hindu');
   readonly inputColor = signal<string>('Light Skin');
-  readonly inputLanguage = signal<string>('Hindi');
+  readonly inputLanguages = signal<string[]>(['Hindi']);
   readonly inputCountry = signal<string>('India');
   readonly inputState = signal<string>('');
   readonly inputPincode = signal<string>('');
   readonly inputAddress = signal<string>('');
-  readonly inputDriverType = signal<string>('Personal driver');
-  readonly inputStatus = signal<string>('Non-Verified');
+  readonly inputDriverTypes = signal<string[]>([]);
+  readonly inputStatus = signal<string>('');
   readonly inputSourceType = signal<string>('WalkIn');
   readonly inputVehicle = signal<string>('Personal Sedan');
+
+  // Dropdown Open/Close Signals & Text Computeds
+  readonly isLangDropdownOpen = signal<boolean>(false);
+  readonly isDriverTypeDropdownOpen = signal<boolean>(false);
+
+  toggleLangDropdown(): void {
+    this.isLangDropdownOpen.update((v) => !v);
+  }
+
+  toggleDriverTypeDropdown(): void {
+    this.isDriverTypeDropdownOpen.update((v) => !v);
+  }
+
+  readonly selectedLanguagesText = computed(() => {
+    const list = this.inputLanguages();
+    return list.length > 0 ? list.join(', ') : 'Select Languages...';
+  });
+
+  readonly selectedDriverTypesText = computed(() => {
+    const list = this.inputDriverTypes();
+    return list.length > 0 ? list.join(', ') : 'Select Driver Types...';
+  });
+
+  // Multi-select Checkbox Helpers
+  isLanguageSelected(lang: string): boolean {
+    return this.inputLanguages().includes(lang);
+  }
+  toggleLanguage(lang: string): void {
+    this.inputLanguages.update(list =>
+      list.includes(lang) ? list.filter(l => l !== lang) : [...list, lang]
+    );
+  }
+
+  isDriverTypeSelected(type: string): boolean {
+    return this.inputDriverTypes().includes(type);
+  }
+  toggleDriverType(type: string): void {
+    this.markTouched('driverType');
+    this.inputDriverTypes.update(list =>
+      list.includes(type) ? list.filter(t => t !== type) : [...list, type]
+    );
+  }
 
   // --- Form Input Signals (Tab 2: Education & Health) ---
   readonly inputAge = signal<string>('');
@@ -150,13 +325,26 @@ export class Drivers implements OnInit {
 
   // --- Form Input Signals (Tab 4: Payments) ---
   readonly inputPreferredPaymentMode = signal<string>('Cash');
+  readonly inputAccountPaymentMethod = signal<string>('Bank Account');
   readonly inputAmount = signal<string>('');
   readonly inputPaymentReceiptDate = signal<string>('');
+  readonly inputRegistrationReceiptFile = signal<string>('');
   readonly inputBankName = signal<string>('');
   readonly inputBankAccountNo = signal<string>('');
   readonly inputIfscCode = signal<string>('');
   readonly inputBranchName = signal<string>('');
   readonly inputUpiIdOrChequeNo = signal<string>('');
+
+  onRegistrationReceiptFileChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      this.inputRegistrationReceiptFile.set(input.files[0].name);
+    }
+  }
+
+  clearRegistrationReceiptFile(): void {
+    this.inputRegistrationReceiptFile.set('');
+  }
 
   // --- Dynamic Document Lists ---
   readonly personalDocs = signal<Array<{ type: string; regNo: string; file: string }>>([
@@ -166,11 +354,16 @@ export class Drivers implements OnInit {
     { type: 'Select Document Type', regNo: '', file: '' }
   ]);
   readonly educationDocs = signal<Array<{ type: string; regNo: string; file: string }>>([
-    { type: '', regNo: '', file: '' }
+    { type: 'Select Document Type', regNo: '', file: '' }
   ]);
   readonly policeDocs = signal<Array<{ type: string; regNo: string; file: string }>>([
     { type: 'Select Document Type', regNo: '', file: '' }
   ]);
+
+  // Raw File blobs pending upload, keyed by `${category}-${idx}` — uploaded once the
+  // driver record has a real id (on save), since document rows have no id until then.
+  private readonly pendingFiles = new Map<string, File>();
+
   // --- Personal Detail Master Options ---
   readonly sourceTypes = signal<string[]>(['WalkIn', 'Website', 'Referral']);
   readonly maritalStatuses = signal<string[]>(['Unmarried', 'Married', 'Divorced', 'Widowed']);
@@ -178,10 +371,20 @@ export class Drivers implements OnInit {
   readonly religions = signal<string[]>(['Hindu', 'Muslim', 'Christian', 'Sikh', 'Buddhist', 'Jain', 'Parsi', 'Other']);
   readonly colors = signal<string[]>(['Light Skin', 'Dark Skin']);
   readonly languages = signal<string[]>(['Hindi', 'English', 'Bhojpuri', 'Other']);
+  readonly driverTypeOptions = signal<string[]>(['Personal driver', 'Car Driver', 'Bike Rider', 'Ambulance Driver', 'Construction Vehicle Driver']);
 
   // --- Education Master Options ---
   readonly educationLevels = signal<string[]>(['No Formal Education', 'Primary School (Class 1–5)', 'Secondary School (Class 6–10)', 'Higher Secondary (Class 11–12)', 'Diploma / Certification Course', "Bachelor's Degree", "Master's Degree", 'Doctorate / PhD']);
   readonly trainingStatuses = signal<string[]>(['Yes', 'No']);
+  readonly educationDocTypes = signal<string[]>([
+    '10th Certificate / Marksheet',
+    '12th Certificate / Marksheet',
+    'Diploma / Vocational Certificate',
+    "Bachelor's Degree Certificate",
+    "Master's Degree Certificate",
+    'Training Certificate',
+    'Other Educational Certificate'
+  ]);
 
   // --- Health Master Options ---
   readonly eyeVisions = signal<string[]>(['Normal Vision', 'Wear Glasses', 'Color Blind']);
@@ -215,11 +418,12 @@ export class Drivers implements OnInit {
   readonly policeDocTypes = signal<string[]>(['Address Proof', 'Police Clearance Certificate (PCC)', 'Character Verification Form']);
 
   // --- Payment Master Options ---
-  readonly paymentModes = signal<string[]>(['Cash', 'Cheque', 'NEFT', 'RTGS', 'Online']);
+  readonly registrationPaymentModes = signal<string[]>(['Cash', 'Cheque', 'NEFT', 'RTGS', 'Online']);
+  readonly paymentModes = signal<string[]>(['Bank Account', 'UPI']);
 
   protected readonly content = signal({
     title: 'Driver Registry',
-    subtitle: 'Manage and view registered drivers (Loaded dynamically from static JSON data).',
+    subtitle: 'Manage and view registered drivers.',
     cardTitle: 'Add New Driver',
     btnRegister: 'Save Lead',
     errorEmptyFields: 'First Name, Email, and Phone are required.'
@@ -233,16 +437,18 @@ export class Drivers implements OnInit {
     { key: 'email', label: 'Email', sortable: true },
     { key: 'phone', label: 'Phone', sortable: true },
     { key: 'driverType', label: 'Driver Type', sortable: true },
-    { key: 'status', label: 'Status', type: 'status', statusMap: { 
-        'Verified': 'success', 
-        'Partially Verified (P)': 'info', 
-        'Partially Verified (K)': 'info', 
-        'Non-Verified': 'warning', 
-        'Blacklisted': 'error', 
-        'Closed': 'error', 
-        'Not Useful': 'error' 
-      } 
+    { key: 'status', label: 'Status', type: 'status', statusMap: {
+        'Verified': 'success',
+        'Partially Verified (P)': 'info',
+        'Partially Verified (K)': 'info',
+        'Non-Verified': 'warning',
+        'Blacklisted': 'error',
+        'Closed': 'error',
+        'Not Useful': 'error'
+      }
     },
+    { key: 'accountStatus', label: 'Account Status', type: 'status', statusMap: { Active: 'success', Inactive: 'error' } },
+    { key: 'onboardingLabel', label: 'Onboarding', sortable: false },
     { key: 'fatherName', label: 'Father Name', sortable: true, hidden: true },
     { key: 'motherName', label: 'Mother Name', sortable: true, hidden: true },
     { key: 'emergencyNumber', label: 'Emergency No', sortable: false, hidden: true },
@@ -283,7 +489,8 @@ export class Drivers implements OnInit {
     { key: 'bankName', label: 'Bank Name', sortable: true, hidden: true },
     { key: 'bankAccountNo', label: 'Bank Account No', sortable: false, hidden: true },
     { key: 'ifscCode', label: 'IFSC Code', sortable: false, hidden: true },
-    { key: 'upiIdOrChequeNo', label: 'UPI / Cheque', sortable: false, hidden: true }
+    { key: 'upiIdOrChequeNo', label: 'UPI / Cheque', sortable: false, hidden: true },
+    { key: 'linkedAccountLabel', label: 'Portal Account', sortable: false, hidden: true }
   ]);
 
   readonly tableFilterOptions = JSON.stringify([
@@ -298,103 +505,27 @@ export class Drivers implements OnInit {
   ]);
 
   readonly tableActions = JSON.stringify([
+    { icon: 'badge', label: 'Preview / View Resume', event: 'preview_driver' },
+    { icon: 'picture_as_pdf', label: 'Download PDF', event: 'download_pdf' },
     { icon: 'visibility', label: 'View Details', event: '__view_detail__' },
     { icon: 'edit', label: 'Edit', event: 'edit_driver' },
+    { icon: 'manage_accounts', label: 'Driver User Account', event: 'link_driver' },
+    { icon: 'power_settings_new', label: 'Activate / Deactivate', event: 'toggle_driver_status' },
     { icon: 'delete', label: 'Delete', event: 'delete_driver', variant: 'danger' }
   ]);
 
   // --- Processed and Filtered Dataset ---
   readonly processedDrivers = computed(() => {
-    let list = this.allDrivers().map(d => {
-      const parts = d.name.split(' ');
-      const firstName = d.firstName || parts[0] || '';
-      const lastName = d.lastName || parts.slice(1).join(' ') || '';
-      const email = d.email || `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s/g, '') || 'driver'}@meradriver.com`;
-      
-      const indianAvatars = [
-        'https://images.unsplash.com/photo-1607990283143-e81e7a2c93ab?auto=format&fit=crop&q=80&w=150&h=150', // Indian man
-        'https://images.unsplash.com/photo-1581391528803-54be77ce23e3?auto=format&fit=crop&q=80&w=150&h=150', // Indian man with turban/beard
-        'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150&h=150', // Smiling man
-        'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=150&h=150', // Clean portrait
-        'https://images.unsplash.com/photo-1619380061814-58f03707f082?auto=format&fit=crop&q=80&w=150&h=150', // Indian woman smiling
-        'https://images.unsplash.com/photo-1624561172888-ac93c696e10c?auto=format&fit=crop&q=80&w=150&h=150', // Professional headshot
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150&h=150', // Smiling man
-        'https://images.unsplash.com/photo-1562572159-4ebcd318f4dd?auto=format&fit=crop&q=80&w=150&h=150'  // Young woman portrait
-      ];
-      const avatarIdx = (d.id || 1) % indianAvatars.length;
-      const avatar = (d.avatar && !d.avatar.includes('pravatar')) 
-        ? d.avatar 
-        : indianAvatars[avatarIdx];
-      
-      const driverType = d.driverType || (d.id && d.id % 4 === 0 ? 'Car Driver' : (d.id && d.id % 3 === 0 ? 'Ambulance Driver' : 'Personal driver'));
-      const status = d.status || (d.id && d.id % 7 === 0 ? 'Blacklisted' : (d.id && d.id % 5 === 0 ? 'Non-Verified' : 'Verified'));
-      const sourceType = d.sourceType || 'Website';
-
-      return {
-        fatherName: d.fatherName || `${firstName} Lal`,
-        motherName: d.motherName || `${firstName} Devi`,
-        emergencyNumber: d.emergencyNumber || '9999988888',
-        dob: d.dob || '1992-06-15',
-        maritalStatus: d.maritalStatus || 'Unmarried',
-        gender: d.gender || 'Male',
-        passportNumber: d.passportNumber || 'P9876543',
-        religion: d.religion || 'Hindu',
-        color: d.color || 'Light Skin',
-        language: d.language || 'Hindi',
-        age: d.age || '32',
-        height: d.height || '5.7',
-        weight: d.weight || '68',
-        country: d.country || 'India',
-        state: d.state || 'Delhi',
-        pincode: d.pincode || '110001',
-        address: d.address || 'Connaught Place, New Delhi',
-        education: d.education || 'No Formal Education',
-        trainingStatus: d.trainingStatus || 'No',
-        trainingCertificate: d.trainingCertificate || 'None',
-        eyeVision: d.eyeVision || 'Normal Vision',
-        healthInsurance: d.healthInsurance || 'No',
-        bloodGroup: d.bloodGroup || 'O+',
-        licenseDetails: d.licenseDetails || 'LMV',
-        vehicleType: d.vehicleType || 'SEDAN',
-        dlNo: d.dlNo || 'DL-987654321',
-        dlIssueDate: d.dlIssueDate || '2018-10-12',
-        dlExpiryDate: d.dlExpiryDate || '2038-10-11',
-        policeVerifiedStatus: d.policeVerifiedStatus || 'Yes',
-        policeVerifiedNo: d.policeVerifiedNo || 'POL-99238',
-        policeVerifiedUpload: d.policeVerifiedUpload || 'Police_Clearance.pdf',
-        jobType: d.jobType || 'Full time',
-        experience: d.experience || '3 Year',
-        currentSalary: d.currentSalary || '15000',
-        expectedSalary: d.expectedSalary || '18000',
-        documentCategory: d.documentCategory || 'Driving License',
-        documentUpload: d.documentUpload || 'Driving_License_Copy.jpg',
-        preferredPaymentMode: d.preferredPaymentMode || 'Online',
-        amount: d.amount || '0',
-        paymentReceiptDate: d.paymentReceiptDate || '2026-08-11',
-        bankName: d.bankName || 'State Bank of India',
-        bankAccountNo: d.bankAccountNo || '332211009988',
-        ifscCode: d.ifscCode || 'SBIN0001234',
-        branchName: d.branchName || 'Connaught Place Branch',
-        upiIdOrChequeNo: d.upiIdOrChequeNo || 'driver@okaxis',
-        ...d,
-        firstName,
-        lastName,
-        email,
-        avatar,
-        driverType,
-        status,
-        sourceType
-      };
-    });
+    let list: Driver[] = this.allDrivers();
 
     // 1. Search Query Filter
     const query = this.searchQuery().toLowerCase().trim();
     if (query) {
       list = list.filter(d =>
-        d.firstName.toLowerCase().includes(query) ||
-        d.lastName.toLowerCase().includes(query) ||
-        d.email.toLowerCase().includes(query) ||
-        d.phone.includes(query) ||
+        (d.firstName || '').toLowerCase().includes(query) ||
+        (d.lastName || '').toLowerCase().includes(query) ||
+        (d.email || '').toLowerCase().includes(query) ||
+        (d.phone || '').includes(query) ||
         (d.driverType && d.driverType.toLowerCase().includes(query)) ||
         (d.state && d.state.toLowerCase().includes(query))
       );
@@ -425,13 +556,24 @@ export class Drivers implements OnInit {
     const list = this.processedDrivers();
     const start = (this.page() - 1) * this.pageSize();
     const paginated = list.slice(start, start + this.pageSize());
-    return JSON.stringify(paginated);
+    // `linkedUser` is a nested object — the shared data table's generic detail drawer just
+    // does `String(value)` per field, which would render `[object Object]`. Swap it for a
+    // flat display label instead; the link/unlink panel reads the real object off
+    // `allDrivers()` directly, not off this serialized row data.
+    return JSON.stringify(
+      paginated.map((d) => ({
+        ...d,
+        linkedUser: undefined,
+        linkedAccountLabel: d.linkedUser ? `${d.linkedUser.name} (${d.linkedUser.phone ?? d.linkedUser.email ?? ''})` : 'Not linked',
+        onboardingLabel: onboardingLabel(d),
+      })),
+    );
   });
 
   readonly totalDrivers = computed(() => this.processedDrivers().length);
 
   ngOnInit(): void {
-    // Load copy strings dynamically
+    // Load copy strings dynamically (static UI copy, not business data)
     this.http.get<any>('data/drivers-registry.json').subscribe({
       next: (data) => {
         if (data) {
@@ -446,36 +588,37 @@ export class Drivers implements OnInit {
       }
     });
 
-    // Load static data from the JSON file inside public/data directory
-    this.http.get<Driver[]>('data/drivers.json').subscribe({
+    this.reload();
+  }
+
+  private reload(): void {
+    this.loading.set(true);
+    this.api.list().subscribe({
       next: (data) => {
-        this.allDrivers.set(data || []);
+        this.allDrivers.set(data);
+        this.loading.set(false);
       },
       error: (err) => {
-        console.error('Failed to load mock drivers JSON', err);
+        console.error('Failed to load drivers', err);
+        this.loading.set(false);
       }
     });
   }
 
-  // --- Add New Driver Action ---
-  addDriver(): void {
+  // --- Build the current full-form snapshot (reused by every step save + the final save) ---
+  private buildPayload(): Driver {
     const firstName = this.inputFirstName().trim();
     const lastName = this.inputLastName().trim();
     const phone = this.inputPhone().trim();
     const email = this.inputEmail().trim();
 
-    if (!firstName || !phone || !email) {
-      alert(this.content().errorEmptyFields);
-      return;
-    }
-
-    const newDriver: Driver = {
-      id: Date.now(),
+    return {
       name: `${firstName} ${lastName}`.trim(),
       firstName,
       lastName,
       phone,
       email,
+      vehicle: this.inputVehicle().trim(),
       fatherName: this.inputFatherName().trim(),
       motherName: this.inputMotherName().trim(),
       emergencyNumber: this.inputEmergencyNumber().trim(),
@@ -485,7 +628,7 @@ export class Drivers implements OnInit {
       passportNumber: this.inputPassportNumber().trim(),
       religion: this.inputReligion(),
       color: this.inputColor(),
-      language: this.inputLanguage(),
+      language: this.inputLanguages().join(', '),
       age: this.inputAge().trim(),
       height: this.inputHeight().trim(),
       weight: this.inputWeight().trim(),
@@ -493,11 +636,9 @@ export class Drivers implements OnInit {
       state: this.inputState().trim(),
       pincode: this.inputPincode().trim(),
       address: this.inputAddress().trim(),
-      driverType: this.inputDriverType(),
+      driverType: this.inputDriverTypes().join(', '),
       status: this.inputStatus(),
       sourceType: this.inputSourceType(),
-      vehicle: this.inputVehicle().trim(),
-      avatar: `https://i.pravatar.cc/100?img=${Date.now() % 70}`,
       education: this.inputEducation(),
       trainingStatus: this.inputTrainingStatus(),
       trainingCertificate: this.inputTrainingCertificate().trim(),
@@ -512,13 +653,10 @@ export class Drivers implements OnInit {
       dlExpiryDate: this.inputDlExpiryDate(),
       policeVerifiedStatus: this.inputPoliceVerifiedStatus(),
       policeVerifiedNo: this.inputPoliceVerifiedNo().trim(),
-      policeVerifiedUpload: this.inputPoliceVerifiedUpload().trim(),
       jobType: this.inputJobType(),
       experience: this.inputExperience(),
       currentSalary: this.inputCurrentSalary().trim(),
       expectedSalary: this.inputExpectedSalary(),
-      documentCategory: this.inputDocumentCategory(),
-      documentUpload: this.inputDocumentUpload().trim(),
       // --- Payment Details ---
       preferredPaymentMode: this.inputPreferredPaymentMode(),
       amount: this.inputAmount().trim(),
@@ -527,31 +665,79 @@ export class Drivers implements OnInit {
       bankAccountNo: this.inputBankAccountNo().trim(),
       ifscCode: this.inputIfscCode().trim(),
       branchName: this.inputBranchName().trim(),
-      upiIdOrChequeNo: this.inputUpiIdOrChequeNo().trim(),
-      personalDocs: this.personalDocs(),
-      healthDocs: this.healthDocs(),
-      educationDocs: this.educationDocs(),
-      policeDocs: this.policeDocs()
+      upiIdOrChequeNo: this.inputUpiIdOrChequeNo().trim()
     };
+  }
 
+  /**
+   * Persists the current full-form snapshot immediately, tagged with the exact nested
+   * (tab, sub) onboarding sub-step that was just completed. The very first save (no driver
+   * yet) creates the record; every later sub-step updates the SAME record (`editingDriverId`,
+   * set from that first response) — never a second `POST`. Sending the full snapshot on every
+   * sub-step is safe (not a partial-data risk): the component's input signals already hold
+   * every previously-saved field (populated from the backend on `edit_driver`, or entered
+   * earlier in this same session), so nothing gets blanked — only the new sub-step's
+   * `completedSubSteps` entry actually changes. Resolves `true` on success (caller advances
+   * the UI), `false` on failure (caller stays put — the error is already surfaced via
+   * `stepError`).
+   */
+  private async persistStep(tabIndex: number, subIndex: number, isFinal: boolean): Promise<boolean> {
+    this.savingStep.set(true);
+    this.stepError.set(null);
+    const payload = this.buildPayload();
     const editingId = this.editingDriverId();
-    if (editingId !== null) {
-      // Edit mode: update existing driver while preserving original values like id and avatar
-      const originalDriver = this.allDrivers().find(d => d.id === editingId);
-      const updatedDriver: Driver = {
-        ...newDriver,
-        id: editingId,
-        avatar: originalDriver?.avatar || newDriver.avatar
-      };
-      this.allDrivers.update(list => list.map(d => d.id === editingId ? updatedDriver : d));
-    } else {
-      // Create mode
-      this.allDrivers.update((list) => [newDriver, ...list]);
-    }
+    const stepCompleted = tabIndex + 1;
 
-    // Reset inputs and close form view
-    this.resetForm();
-    this.showAddForm.set(false);
+    try {
+      const driver = editingId !== null
+        ? await firstValueFrom(this.api.update(editingId, payload, stepCompleted, subIndex))
+        : await firstValueFrom(this.api.create(payload, stepCompleted, subIndex));
+
+      if (editingId === null) this.editingDriverId.set(driver.id!);
+      this.formCompletedSubSteps.set(driver.completedSubSteps ?? []);
+      this.uploadPendingDocuments(driver.id!);
+      this.reload();
+      this.savingStep.set(false);
+
+      if (isFinal) {
+        this.resetForm();
+        this.showAddForm.set(false);
+      }
+      return true;
+    } catch (err) {
+      console.error(`Failed to save tab ${stepCompleted} sub-step ${subIndex}`, err);
+      this.savingStep.set(false);
+      this.stepError.set('Failed to save. Please check your connection and try again.');
+      return false;
+    }
+  }
+
+  // --- Final "Save & Register" / "Save Changes" action (last tab's last sub-section) ---
+  async addDriver(): Promise<void> {
+    this.formSubmitted.set(true);
+    if (this.firstNameError() || this.genderError() || this.phoneError() || this.emailError() || this.statusError() || this.driverTypeError()) {
+      this.activeFormTab.set(0);
+      return;
+    }
+    await this.persistStep(TOTAL_ONBOARDING_STEPS - 1, MAX_SUBS[TOTAL_ONBOARDING_STEPS - 1] - 1, true);
+  }
+
+  private uploadPendingDocuments(driverId: string): void {
+    for (const [key, file] of this.pendingFiles.entries()) {
+      const [category, idxStr] = key.split('-') as ['personal' | 'health' | 'education' | 'police', string];
+      const idx = Number(idxStr);
+      const docs =
+        category === 'personal' ? this.personalDocs() :
+        category === 'health' ? this.healthDocs() :
+        category === 'education' ? this.educationDocs() :
+        this.policeDocs();
+      const doc = docs[idx];
+      if (!doc) continue;
+      this.api.uploadDocument(driverId, category, doc.type, doc.regNo, file).subscribe({
+        error: (err) => console.error(`Failed to upload ${category} document`, err)
+      });
+    }
+    this.pendingFiles.clear();
   }
 
   // --- Document List Actions ---
@@ -570,7 +756,7 @@ export class Drivers implements OnInit {
   }
 
   addEducationDoc(): void {
-    this.educationDocs.update(docs => [...docs, { type: '', regNo: '', file: '' }]);
+    this.educationDocs.update(docs => [...docs, { type: 'Select Document Type', regNo: '', file: '' }]);
   }
   deleteEducationDoc(idx: number): void {
     this.educationDocs.update(docs => docs.filter((_, i) => i !== idx));
@@ -600,7 +786,9 @@ export class Drivers implements OnInit {
   onDocFileChange(category: 'personal' | 'health' | 'education' | 'police', idx: number, event: Event): void {
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
-    const val = file ? file.name : '';
+    if (!file) return;
+    this.pendingFiles.set(`${category}-${idx}`, file);
+    const val = file.name;
     if (category === 'personal') {
       this.personalDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: val } : doc));
     } else if (category === 'health') {
@@ -612,8 +800,27 @@ export class Drivers implements OnInit {
     }
   }
 
+  clearDocFile(category: 'personal' | 'health' | 'education' | 'police', idx: number): void {
+    this.pendingFiles.delete(`${category}-${idx}`);
+    if (category === 'personal') {
+      this.personalDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: '' } : doc));
+    } else if (category === 'health') {
+      this.healthDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: '' } : doc));
+    } else if (category === 'education') {
+      this.educationDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: '' } : doc));
+    } else if (category === 'police') {
+      this.policeDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: '' } : doc));
+    }
+  }
+
   resetForm(): void {
+    this.formSubmitted.set(false);
+    this.touchedFields.set({});
     this.editingDriverId.set(null);
+    this.stepError.set(null);
+    this.savingStep.set(false);
+    this.formCompletedSubSteps.set([]);
+    this.pendingFiles.clear();
     this.inputFirstName.set('');
     this.inputLastName.set('');
     this.inputFatherName.set('');
@@ -623,11 +830,11 @@ export class Drivers implements OnInit {
     this.inputEmergencyNumber.set('');
     this.inputDob.set('');
     this.inputMaritalStatus.set('Unmarried');
-    this.inputGender.set('Male');
+    this.inputGender.set('');
     this.inputPassportNumber.set('');
     this.inputReligion.set('Hindu');
     this.inputColor.set('Light Skin');
-    this.inputLanguage.set('Hindi');
+    this.inputLanguages.set(['Hindi']);
     this.inputAge.set('');
     this.inputHeight.set('');
     this.inputWeight.set('');
@@ -635,8 +842,8 @@ export class Drivers implements OnInit {
     this.inputState.set('');
     this.inputPincode.set('');
     this.inputAddress.set('');
-    this.inputDriverType.set('Personal driver');
-    this.inputStatus.set('Non-Verified');
+    this.inputDriverTypes.set([]);
+    this.inputStatus.set('');
     this.inputSourceType.set('WalkIn');
     this.inputVehicle.set('Personal Sedan');
     this.inputEducation.set('No Formal Education');
@@ -664,6 +871,7 @@ export class Drivers implements OnInit {
     this.inputPreferredPaymentMode.set('Cash');
     this.inputAmount.set('');
     this.inputPaymentReceiptDate.set('');
+    this.inputRegistrationReceiptFile.set('');
     this.inputBankName.set('');
     this.inputBankAccountNo.set('');
     this.inputIfscCode.set('');
@@ -671,7 +879,7 @@ export class Drivers implements OnInit {
     this.inputUpiIdOrChequeNo.set('');
     this.personalDocs.set([{ type: 'Aadhaar / National ID', regNo: '', file: '' }]);
     this.healthDocs.set([{ type: 'Select Document Type', regNo: '', file: '' }]);
-    this.educationDocs.set([{ type: '', regNo: '', file: '' }]);
+    this.educationDocs.set([{ type: 'Select Document Type', regNo: '', file: '' }]);
     this.policeDocs.set([{ type: 'Select Document Type', regNo: '', file: '' }]);
     this.activeFormTab.set(0);
   }
@@ -699,7 +907,7 @@ export class Drivers implements OnInit {
 
     if (action === 'edit_driver') {
       this.editingDriverId.set(row.id);
-      
+
       // Populate form signals
       this.inputFirstName.set(row.firstName || '');
       this.inputLastName.set(row.lastName || '');
@@ -714,7 +922,7 @@ export class Drivers implements OnInit {
       this.inputPassportNumber.set(row.passportNumber || '');
       this.inputReligion.set(row.religion || 'Hindu');
       this.inputColor.set(row.color || 'Light Skin');
-      this.inputLanguage.set(row.language || 'Hindi');
+      this.inputLanguages.set(row.language ? row.language.split(', ').map((s: string) => s.trim()) : ['Hindi']);
       this.inputAge.set(row.age || '');
       this.inputHeight.set(row.height || '');
       this.inputWeight.set(row.weight || '');
@@ -722,7 +930,7 @@ export class Drivers implements OnInit {
       this.inputState.set(row.state || '');
       this.inputPincode.set(row.pincode || '');
       this.inputAddress.set(row.address || '');
-      this.inputDriverType.set(row.driverType || 'Personal driver');
+      this.inputDriverTypes.set(row.driverType ? row.driverType.split(', ').map((s: string) => s.trim()) : []);
       this.inputStatus.set(row.status || 'Non-Verified');
       this.inputSourceType.set(row.sourceType || 'WalkIn');
       this.inputVehicle.set(row.vehicle || 'Personal Sedan');
@@ -746,7 +954,7 @@ export class Drivers implements OnInit {
       this.inputExpectedSalary.set(row.expectedSalary || '10000-15000');
       this.inputDocumentCategory.set(row.documentCategory || 'Driving License');
       this.inputDocumentUpload.set(row.documentUpload || '');
-      this.inputPreferredPaymentMode.set(row.preferredPaymentMode || 'Cash');
+      this.inputPreferredPaymentMode.set(row.preferredPaymentMode || 'Bank Account');
       this.inputAmount.set(row.amount || '');
       this.inputPaymentReceiptDate.set(row.paymentReceiptDate || '');
       this.inputBankName.set(row.bankName || '');
@@ -756,38 +964,188 @@ export class Drivers implements OnInit {
       this.inputUpiIdOrChequeNo.set(row.upiIdOrChequeNo || '');
       this.personalDocs.set(row.personalDocs || [{ type: 'Aadhaar / National ID', regNo: '', file: '' }]);
       this.healthDocs.set(row.healthDocs || [{ type: 'Select Document Type', regNo: '', file: '' }]);
-      this.educationDocs.set(row.educationDocs || [{ type: '', regNo: '', file: '' }]);
+      this.educationDocs.set(row.educationDocs || [{ type: 'Select Document Type', regNo: '', file: '' }]);
       this.policeDocs.set(row.policeDocs || [{ type: 'Select Document Type', regNo: '', file: '' }]);
 
-      this.activeFormTab.set(0);
+      this.formCompletedSubSteps.set(row.completedSubSteps || []);
+
+      // Resume: an in-progress driver opens on its pending nested sub-step (from persisted
+      // backend progress, not any frontend memory of where they left off — this component
+      // was just (re)constructed from a fresh `GET /drivers` list). A completed (or legacy,
+      // pre-onboarding-tracking) driver opens on tab 0 / sub 0 as a normal full edit/review,
+      // same as before.
+      if (row.onboardingStatus === 'in_progress' && row.currentStep) {
+        const tab = Math.min(Math.max(Number(row.currentStep), 1), TOTAL_ONBOARDING_STEPS);
+        const sub = Math.min(Math.max(Number(row.currentSubStep ?? 0), 0), MAX_SUBS[tab - 1] - 1);
+        this.activeFormTab.set(tab - 1);
+        this.activeSubSection.set(sub);
+      } else {
+        this.activeFormTab.set(0);
+        this.activeSubSection.set(0);
+      }
       this.showAddForm.set(true);
     } else if (action === 'delete_driver') {
       if (confirm(`Are you sure you want to delete lead "${row.firstName} ${row.lastName}"?`)) {
-        this.allDrivers.update(list => list.filter(d => d.id !== row.id));
+        this.api.delete(row.id).subscribe({
+          next: () => this.reload(),
+          error: (err) => {
+            console.error('Failed to delete driver', err);
+            alert('Failed to delete driver. Please try again.');
+          }
+        });
       }
+    } else if (action === 'link_driver') {
+      const driver = this.allDrivers().find((d) => d.id === row.id);
+      if (driver) this.openLinkPanel(driver);
+    } else if (action === 'toggle_driver_status') {
+      const driver = this.allDrivers().find((d) => d.id === row.id);
+      if (driver) this.toggleDriverStatus(driver);
+    } else if (action === 'preview_driver') {
+      // Look up the full record from `allDrivers()` (freshly reloaded after every
+      // mutation), not the serialized table row — the resume must show the latest data.
+      const driver = this.allDrivers().find((d) => d.id === row.id);
+      if (driver) this.openPreview(driver);
+    } else if (action === 'download_pdf') {
+      const driver = this.allDrivers().find((d) => d.id === row.id);
+      if (driver) this.downloadPdf(driver);
     }
+  }
+
+  // --- Driver User account (self-service portal login) ---
+  openLinkPanel(driver: Driver): void {
+    this.linkPanelDriver.set(driver);
+    this.linkError.set(null);
+  }
+
+  closeLinkPanel(): void {
+    this.linkPanelDriver.set(null);
+  }
+
+  /** The only way a driver gets a portal login — creates the User, assigns the `driver`
+   *  role, and links it server-side in one call. No existing-user selection. */
+  createDriverUser(driver: Driver): void {
+    if (!driver.id) return;
+    this.linkSaving.set(true);
+    this.linkError.set(null);
+    this.api.createDriverUser(driver.id).subscribe({
+      next: (updated) => {
+        this.linkSaving.set(false);
+        this.allDrivers.update((list) => list.map((d) => (d.id === updated.id ? updated : d)));
+        this.linkPanelDriver.set(updated);
+      },
+      error: (err) => {
+        this.linkSaving.set(false);
+        this.linkError.set(err?.message || 'Failed to create the driver user account. Please try again.');
+      },
+    });
+  }
+
+  /** Toggles a driver's Active/Inactive account status from the Driver List row action —
+   *  independent of the KYC `status` column. Confirmed before the call so a mis-click can't
+   *  silently lock out (or restore) a driver's portal login. */
+  toggleDriverStatus(driver: Driver): void {
+    if (!driver.id) return;
+    const next: 'Active' | 'Inactive' = driver.accountStatus === 'Inactive' ? 'Active' : 'Inactive';
+    const question =
+      next === 'Inactive'
+        ? 'Are you sure you want to deactivate this driver?'
+        : 'Are you sure you want to activate this driver?';
+    if (!confirm(question)) return;
+    this.api.setAccountStatus(driver.id, next).subscribe({
+      next: (updated) => this.allDrivers.update((list) => list.map((d) => (d.id === updated.id ? updated : d))),
+      error: (err) => {
+        console.error('Failed to update driver status', err);
+        alert('Failed to update driver status. Please try again.');
+      },
+    });
+  }
+
+  unlinkUser(driver: Driver): void {
+    if (!driver.id) return;
+    if (!confirm(`Unlink ${driver.firstName} ${driver.lastName}'s account? They will lose access to the driver portal.`)) return;
+    this.api.unlinkUser(driver.id).subscribe({
+      next: (updated) => this.allDrivers.update((list) => list.map((d) => (d.id === updated.id ? updated : d))),
+      error: (err) => {
+        console.error('Failed to unlink account', err);
+        alert('Failed to unlink account. Please try again.');
+      },
+    });
   }
 
   // --- View Control Events ---
   openAddDriverForm(): void {
     this.showAddForm.set(true);
     this.activeFormTab.set(0);
+    this.activeSubSection.set(0);
+    this.formCompletedSubSteps.set([]);
   }
 
   closeAddDriverForm(): void {
     this.showAddForm.set(false);
     this.resetForm();
+    // A step may already have been persisted (driver created/updated mid-wizard) — refresh
+    // so it shows up immediately with its correct in-progress status, not stale/missing.
+    this.reload();
   }
 
   onFormTabChange(event: Event): void {
     const index = (event.target as HTMLElement & { activeTabIndex: number }).activeTabIndex;
     this.activeFormTab.set(index);
+    this.activeSubSection.set(0);
+  }
+
+  // --- Step Navigation Actions ---
+  isLastStep(): boolean {
+    return this.activeFormTab() === 3 && this.activeSubSection() === MAX_SUBS[3] - 1;
+  }
+
+  /**
+   * Every nested sub-step is its own persistence checkpoint — "Save & Next" always saves the
+   * sub-step just finished to Postgres before moving on, whether or not it's also the last
+   * sub-step of its parent tab. That save is awaited before the UI advances, so "Continue"
+   * always means "this step is now in Postgres", never just a local signal update. The very
+   * last sub-step of the last tab has its own button/handler (`addDriver()`, bound in the
+   * template when `isLastStep()`), so this method is never called for that one.
+   */
+  async onSaveAndNext(): Promise<void> {
+    if (!this.validateCurrentStep()) {
+      return;
+    }
+
+    const currentTab = this.activeFormTab();
+    const currentSub = this.activeSubSection();
+
+    const ok = await this.persistStep(currentTab, currentSub, false);
+    if (!ok) return; // stay put — stepError is already showing why
+
+    const isLastSubOfTab = currentSub >= MAX_SUBS[currentTab] - 1;
+    if (!isLastSubOfTab) {
+      this.activeSubSection.set(currentSub + 1);
+    } else {
+      this.activeFormTab.set(currentTab + 1);
+      this.activeSubSection.set(0);
+    }
+  }
+
+  onPrevSubSection(): void {
+    const currentTab = this.activeFormTab();
+    const currentSub = this.activeSubSection();
+
+    if (currentSub > 0) {
+      this.activeSubSection.set(currentSub - 1);
+    } else if (currentTab > 0) {
+      const prevTab = currentTab - 1;
+      this.activeFormTab.set(prevTab);
+      this.activeSubSection.set(MAX_SUBS[prevTab] - 1);
+    }
   }
 
   // --- Input Handlers ---
   onInputChange(field: string, event: Event): void {
     const val = (event.target as any).value || '';
     switch(field) {
+      case 'appNo': this.inputAppNo.set(val); break;
+      case 'joiningDate': this.inputJoiningDate.set(val); break;
       case 'firstName': this.inputFirstName.set(val); break;
       case 'lastName': this.inputLastName.set(val); break;
       case 'fatherName': this.inputFatherName.set(val); break;
@@ -801,7 +1159,6 @@ export class Drivers implements OnInit {
       case 'passportNumber': this.inputPassportNumber.set(val); break;
       case 'religion': this.inputReligion.set(val); break;
       case 'color': this.inputColor.set(val); break;
-      case 'language': this.inputLanguage.set(val); break;
       case 'age': this.inputAge.set(val); break;
       case 'height': this.inputHeight.set(val); break;
       case 'weight': this.inputWeight.set(val); break;
@@ -809,7 +1166,6 @@ export class Drivers implements OnInit {
       case 'state': this.inputState.set(val); break;
       case 'pincode': this.inputPincode.set(val); break;
       case 'address': this.inputAddress.set(val); break;
-      case 'driverType': this.inputDriverType.set(val); break;
       case 'status': this.inputStatus.set(val); break;
       case 'sourceType': this.inputSourceType.set(val); break;
       case 'vehicle': this.inputVehicle.set(val); break;
@@ -836,6 +1192,7 @@ export class Drivers implements OnInit {
       case 'documentUpload': this.inputDocumentUpload.set(val); break;
       // --- Payment details ---
       case 'preferredPaymentMode': this.inputPreferredPaymentMode.set(val); break;
+      case 'accountPaymentMethod': this.inputAccountPaymentMethod.set(val); break;
       case 'amount': this.inputAmount.set(val); break;
       case 'paymentReceiptDate': this.inputPaymentReceiptDate.set(val); break;
       case 'bankName': this.inputBankName.set(val); break;

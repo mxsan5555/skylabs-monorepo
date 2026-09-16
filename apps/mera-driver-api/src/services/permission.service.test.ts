@@ -3,7 +3,11 @@ import { mockPrisma, resetPrismaMock } from '../test-utils/prisma-mock';
 
 vi.mock('../lib/prisma', () => ({ prisma: mockPrisma }));
 
-import { resolvePermissionsForRoles, invalidatePermissionCache } from './permission.service';
+import {
+  resolvePermissionsForRoles,
+  invalidatePermissionCache,
+  resolveEffectivePermissionsForUser,
+} from './permission.service';
 
 beforeEach(() => {
   resetPrismaMock();
@@ -41,5 +45,55 @@ describe('resolvePermissionsForRoles', () => {
     const result = await resolvePermissionsForRoles(['super_admin']);
 
     expect(result).toContain('rbac.users:delete');
+  });
+});
+
+describe('resolveEffectivePermissionsForUser', () => {
+  it('returns the role-derived set unchanged when the user has no overrides', async () => {
+    mockPrisma.role.findMany.mockResolvedValue([{ isSuperAdmin: false }]);
+    mockPrisma.rolePermission.findMany.mockResolvedValue([{ permission: { key: 'drivers:view' } }]);
+    mockPrisma.userPermissionOverride.findMany.mockResolvedValue([]);
+
+    const result = await resolveEffectivePermissionsForUser('user-1', ['data_operator']);
+
+    expect(result).toEqual(['drivers:view']);
+  });
+
+  it('adds a grant override the role set does not carry', async () => {
+    mockPrisma.role.findMany.mockResolvedValue([{ isSuperAdmin: false }]);
+    mockPrisma.rolePermission.findMany.mockResolvedValue([{ permission: { key: 'drivers:view' } }]);
+    mockPrisma.userPermissionOverride.findMany.mockResolvedValue([
+      { effect: 'grant', permission: { key: 'drivers:delete' } },
+    ]);
+
+    const result = await resolveEffectivePermissionsForUser('user-1', ['data_operator']);
+
+    expect(result).toEqual(expect.arrayContaining(['drivers:view', 'drivers:delete']));
+  });
+
+  it('removes a revoke override from a permission the role would otherwise grant', async () => {
+    mockPrisma.role.findMany.mockResolvedValue([{ isSuperAdmin: false }]);
+    mockPrisma.rolePermission.findMany.mockResolvedValue([
+      { permission: { key: 'drivers:view' } },
+      { permission: { key: 'drivers:edit' } },
+    ]);
+    mockPrisma.userPermissionOverride.findMany.mockResolvedValue([
+      { effect: 'revoke', permission: { key: 'drivers:edit' } },
+    ]);
+
+    const result = await resolveEffectivePermissionsForUser('user-1', ['kyc_verification']);
+
+    expect(result).toEqual(['drivers:view']);
+  });
+
+  it('never applies overrides to a SuperAdmin-flagged role holder', async () => {
+    mockPrisma.role.findMany.mockResolvedValue([{ isSuperAdmin: true }]);
+    mockPrisma.rolePermission.findMany.mockResolvedValue([]);
+
+    const result = await resolveEffectivePermissionsForUser('user-1', ['super_admin']);
+
+    // Full menu-derived access, and the override table is never even queried.
+    expect(result.length).toBeGreaterThan(1);
+    expect(mockPrisma.userPermissionOverride.findMany).not.toHaveBeenCalled();
   });
 });

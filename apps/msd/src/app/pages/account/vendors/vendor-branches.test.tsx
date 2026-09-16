@@ -6,20 +6,18 @@ import { ApiRequestError } from '../../../../api/rbac/client';
 import { DealDialog, BranchDialog } from './vendor-branches';
 
 /**
- * Feature: DealDialog — Product picker removed, Service-only creation
- * Scenario: the Deal Add/Edit form no longer offers any way to pick or clear a Product — it only
- * ever creates a Service deal now. Category/Subcategory selects work exactly as before for a
- * Service deal; opening the dialog on a pre-existing Product deal (created before this removal)
- * still shows that deal's own read-only category hint and Pricing tab, unchanged, since
- * `offeringType` is still derived from the loaded deal's own stored `productId` — there is simply
- * no control left to set, change, or clear one.
+ * Feature: DealDialog — Deal is a pure service offering (no Product concept at all)
+ * Scenario: `Deal` has no `productId` field any more — Product is a fully independent catalog
+ * entity purchased directly via Cart/Order, never wrapped in a Deal. The Deal Add/Edit form
+ * always shows the Category/Subcategory selects and always requires at least one package; there
+ * is no read-only "pre-existing Product deal" branch left to test, because a Deal can no longer
+ * carry a product reference in any form (current or historical).
  *
  * Given: the vendor's granted SERVICE categories (2- and 3-level branches, including a legacy
  *        Type-tier row from before the "Category Types" master screen was removed)
- * When: DealDialog renders (fresh Add, editing a Service deal, or editing a pre-existing Product
- *       deal)
- * Then: no "Product" select, no "— None (Service deal) —" option, and no "Select a product"/
- *       "Offering type" text ever appear, regardless of which deal (if any) is being edited
+ * When: DealDialog renders (fresh Add or editing an existing Service deal)
+ * Then: Category/Subcategory selects always render, and no Product-related control (select,
+ *       "Offering type" text, read-only category hint) ever appears
  *
  * NOTE: like `categories.test.tsx`'s suite, live select-interaction can't be simulated under this
  * jsdom + `@lit/react` + React 19 combination (documented in `search.test.tsx`), so this suite
@@ -38,7 +36,7 @@ const SUB_CLEANING: Category = { id: 'sub-cleaning', name: 'Cleaning', slug: 'cl
 
 const CATEGORIES: Category[] = [TOP_MASSAGE, SUB_BODY_MASSAGE, LEGACY_TYPE_SWEDISH, TOP_HOME, SUB_CLEANING];
 
-const DEAL_BASE: Omit<Deal, 'categoryId' | 'subcategoryId' | 'productId'> = {
+const DEAL_BASE: Omit<Deal, 'categoryId' | 'subcategoryId'> = {
   id: 'deal-1',
   vendorId: 'vendor-1',
   branchId: 'branch-1',
@@ -64,7 +62,7 @@ function renderDialog(deal?: Deal) {
   );
 }
 
-describe('DealDialog — Product picker removed (Service-only creation)', () => {
+describe('DealDialog — Deal is a pure service offering (no Product concept)', () => {
   it('a fresh Add dialog shows only the Category select — no Product select, no Subcategory yet', () => {
     renderDialog();
     const selects = document.querySelectorAll('md-outlined-select');
@@ -73,33 +71,27 @@ describe('DealDialog — Product picker removed (Service-only creation)', () => 
   });
 
   it('editing a Deal whose subcategoryId is a legacy Type-tier row (Swedish Massage) resolves the correct Subcategory, with no Product/Type select rendered', () => {
-    renderDialog({ ...DEAL_BASE, categoryId: TOP_MASSAGE.id, subcategoryId: LEGACY_TYPE_SWEDISH.id, productId: null });
+    renderDialog({ ...DEAL_BASE, categoryId: TOP_MASSAGE.id, subcategoryId: LEGACY_TYPE_SWEDISH.id });
     const selects = document.querySelectorAll('md-outlined-select');
     expect(selects.length).toBe(2); // Category, Subcategory — never a Product or Type select
     expect(optionLabelsOf(selects[1])).toEqual(['None', 'Body Massage']);
   });
 
   it('editing a Deal whose subcategoryId is a real Subcategory (Body Massage) shows exactly Category/Subcategory', () => {
-    renderDialog({ ...DEAL_BASE, categoryId: TOP_MASSAGE.id, subcategoryId: SUB_BODY_MASSAGE.id, productId: null });
+    renderDialog({ ...DEAL_BASE, categoryId: TOP_MASSAGE.id, subcategoryId: SUB_BODY_MASSAGE.id });
     const selects = document.querySelectorAll('md-outlined-select');
     expect(selects.length).toBe(2);
   });
 
   it('editing a Deal under a 2-level-only branch (Home Services -> Cleaning) shows Category/Subcategory only', () => {
-    renderDialog({ ...DEAL_BASE, categoryId: TOP_HOME.id, subcategoryId: SUB_CLEANING.id, productId: null });
+    renderDialog({ ...DEAL_BASE, categoryId: TOP_HOME.id, subcategoryId: SUB_CLEANING.id });
     const selects = document.querySelectorAll('md-outlined-select');
     expect(selects.length).toBe(2);
   });
 
-  it('editing a pre-existing Product deal shows a read-only category hint and NO selects at all — no way to change or clear the product', () => {
-    renderDialog({ ...DEAL_BASE, categoryId: TOP_MASSAGE.id, subcategoryId: null, productId: 'product-1' });
-    const selects = document.querySelectorAll('md-outlined-select');
-    expect(selects.length).toBe(0);
-    expect(screen.getByText(/Category:/)).toBeTruthy();
-  });
-
-  it('never renders a Product select, "— None (Service deal) —" option, "Select a product" hint, or "Offering type" control, for any deal', () => {
-    renderDialog({ ...DEAL_BASE, categoryId: TOP_MASSAGE.id, subcategoryId: null, productId: 'product-1' });
+  it('never renders a Product select, a read-only "Category:" hint, "— None (Service deal) —" option, "Select a product" hint, or "Offering type" control, for any deal', () => {
+    renderDialog({ ...DEAL_BASE, categoryId: TOP_MASSAGE.id, subcategoryId: SUB_BODY_MASSAGE.id });
+    expect(screen.queryByText(/^Category:/)).toBeNull();
     expect(screen.queryByText('Product (leave as None for a service deal)')).toBeNull();
     expect(screen.queryByText('— None (Service deal) —')).toBeNull();
     expect(screen.queryByText('Offering type')).toBeNull();

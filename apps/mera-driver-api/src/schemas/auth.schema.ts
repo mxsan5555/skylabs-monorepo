@@ -3,7 +3,9 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 
 extendZodWithOpenApi(z);
 
-export const OtpPurposeSchema = z.enum(['login', 'signup', 'change_phone', 'change_email']).openapi('OtpPurpose');
+export const OtpPurposeSchema = z
+  .enum(['login', 'signup', 'change_phone', 'change_email', 'password_reset'])
+  .openapi('OtpPurpose');
 
 export const OtpRequestSchema = z
   .object({
@@ -45,3 +47,35 @@ export const TokenPairResponseSchema = z
     }),
   })
   .openapi('TokenPairResponse');
+
+// ---------------------------------------------------------------------------
+// Password auth — additive alongside OTP/Google, same User model, same JWT/session system.
+// ---------------------------------------------------------------------------
+
+export const PasswordLoginSchema = z
+  .object({
+    identifier: z.string().min(3).openapi({ example: 'admin@example.com' }),
+    password: z.string().min(1),
+  })
+  .openapi('PasswordLogin');
+
+export const ForgotPasswordSchema = z
+  .object({
+    identifier: z.string().min(3),
+  })
+  .openapi('ForgotPassword');
+
+export const ResetPasswordSchema = z
+  .object({
+    identifier: z.string().min(3),
+    otp: z.string().length(6),
+    newPassword: z.string().min(8),
+  })
+  .openapi('ResetPassword');
+
+export const SetPasswordSchema = z
+  .object({
+    currentPassword: z.string().optional(),
+    newPassword: z.string().min(8),
+  })
+  .openapi('SetPassword');

@@ -141,7 +141,6 @@ export async function listVendors(opts: {
       ? {
           OR: [
             { businessName: { contains: opts.search, mode: 'insensitive' as const } },
-            { ownerName: { contains: opts.search, mode: 'insensitive' as const } },
             { businessEmail: { contains: opts.search, mode: 'insensitive' as const } },
           ],
         }
@@ -914,9 +913,9 @@ export async function listMyCustomers(vendorId: string, opts: { page: number; pa
 // — it needs no vendor.service.ts state, and living there lets product.service.ts import it too
 // without a vendor.service.ts <-> product.service.ts circular dependency.
 
-/** Duration is a bookable time slot — required for a service deal, never required for a product deal. */
-function assertDurationRequiredForService(productId: string | null | undefined, durationMinutes: number | null | undefined) {
-  if (!productId && !durationMinutes) {
+/** Duration is a bookable time slot — required for every Deal (a Deal is always a service offering). */
+function assertDurationRequiredForService(durationMinutes: number | null | undefined) {
+  if (!durationMinutes) {
     throw new ApiError('VALIDATION_ERROR', 'durationMinutes is required for a service deal');
   }
 }
@@ -988,7 +987,6 @@ export async function listDeals(vendorId: string, branchId: string) {
     include: {
       category: true,
       subcategory: true,
-      product: true,
       // Root cause of "packages not showing in Deal Edit": this list response (the only source
       // the Edit dialog is ever populated from — there is no single-deal GET) omitted `packages`
       // entirely, unlike `OFFERING_INCLUDE` below (used by create/update). `DealDialog` seeds its
@@ -1030,35 +1028,17 @@ const DEAL_IMAGE_ORDER_BY: Prisma.DealImageOrderByWithRelationInput[] = [
 const OFFERING_INCLUDE = {
   category: { select: { id: true, name: true } },
   subcategory: { select: { id: true, name: true } },
-  product: { select: { id: true, name: true } },
   packages: { orderBy: DEAL_PACKAGE_ORDER_BY },
   mediaImages: { orderBy: DEAL_IMAGE_ORDER_BY },
   mediaVideo: true,
 } as const;
-
-/** The linked Product (when this is a product deal) must belong to the SAME vendor
- *  (`getProductScopedOrThrow` 404s/403s otherwise) and its category/subcategory must match the
- *  Deal's — one definition of "valid catalog linkage" so a Deal can never point at a vendor's
- *  Kettle product while filed under a different category. */
-async function assertProductMatchesDealCategory(
-  vendorId: string,
-  categoryId: string,
-  subcategoryId: string | undefined,
-  productId: string,
-) {
-  const product = await getProductScopedOrThrow(vendorId, productId);
-  if (product.categoryId !== categoryId || (product.subcategoryId ?? undefined) !== subcategoryId) {
-    throw new ApiError('VALIDATION_ERROR', "Deal's categoryId/subcategoryId must match the linked product's category");
-  }
-}
 
 type DealPackageInput = NonNullable<DealCreateInput['packages']>[number];
 
 /** Cheapest active package's price/duration becomes the Deal's own salePrice/originalPrice/
  *  durationMinutes — the "from price"/default-duration display cache every existing
  *  minPrice/maxPrice/sort/badge query already reads (see DealPackage's own schema doc comment).
- *  A no-op when `packages` is empty (a product deal, or a service deal update that didn't touch
- *  packages). */
+ *  A no-op when `packages` is empty (a service deal update that didn't touch packages). */
 async function syncDealPriceFromPackages(tx: Prisma.TransactionClient, dealId: string) {
   const cheapest = await tx.dealPackage.findFirst({
     where: { dealId, isActive: true },
@@ -1083,13 +1063,8 @@ export async function createDeal(
 ) {
   await getBranchScopedOrThrow(vendorId, branchId);
   await assertCategoryChildOf(input.categoryId, input.subcategoryId);
-  if (input.productId) {
-    await assertVendorHasCategoryAccess(vendorId, input.categoryId, 'PRODUCT');
-    await assertProductMatchesDealCategory(vendorId, input.categoryId, input.subcategoryId, input.productId);
-  } else {
-    await assertVendorHasCategoryAccess(vendorId, input.categoryId, 'SERVICE');
-  }
-  assertDurationRequiredForService(input.productId, input.durationMinutes);
+  await assertVendorHasCategoryAccess(vendorId, input.categoryId, 'SERVICE');
+  assertDurationRequiredForService(input.durationMinutes);
   // App-layer pre-check for a clean 409 in the common case — Deal.slug's DB-level @unique is
   // the hard guarantee this can't fully replace under a genuine race (two near-simultaneous
   // double-submits of the same form both reading "slug free" before either commits — see the
@@ -1155,21 +1130,14 @@ export async function updateDeal(vendorId: string, branchId: string, dealId: str
   if (input.categoryId || input.subcategoryId) {
     await assertCategoryChildOf(input.categoryId ?? deal.categoryId, input.subcategoryId ?? deal.subcategoryId ?? undefined);
   }
-  // Any touch that could change the effective productId/category must keep the category-access
-  // + "product's own category matches the deal's" invariants intact.
-  const touchesOffering = 'productId' in input || 'durationMinutes' in input || 'categoryId' in input || 'subcategoryId' in input;
+  // Any touch that could change the effective category must keep the category-access invariant
+  // intact.
+  const touchesOffering = 'durationMinutes' in input || 'categoryId' in input || 'subcategoryId' in input;
   if (touchesOffering) {
-    const effectiveProductId = 'productId' in input ? input.productId : deal.productId ?? undefined;
     const effectiveCategoryId = input.categoryId ?? deal.categoryId;
-    const effectiveSubcategoryId = input.subcategoryId ?? deal.subcategoryId ?? undefined;
-    if (effectiveProductId) {
-      await assertVendorHasCategoryAccess(vendorId, effectiveCategoryId, 'PRODUCT');
-      await assertProductMatchesDealCategory(vendorId, effectiveCategoryId, effectiveSubcategoryId, effectiveProductId);
-    } else {
-      await assertVendorHasCategoryAccess(vendorId, effectiveCategoryId, 'SERVICE');
-    }
+    await assertVendorHasCategoryAccess(vendorId, effectiveCategoryId, 'SERVICE');
     const effectiveDuration = 'durationMinutes' in input ? input.durationMinutes : deal.durationMinutes ?? undefined;
-    assertDurationRequiredForService(effectiveProductId, effectiveDuration);
+    assertDurationRequiredForService(effectiveDuration);
   }
 
   const { packages, ...dealFields } = input;

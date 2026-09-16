@@ -1,82 +1,98 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { Observable, tap } from 'rxjs';
+import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
+import { AccountApiService } from './account-api.service';
 import type { AccountProfile, Address } from '../../models';
 
-interface AccountState {
-  profile: AccountProfile;
-  addresses: Address[];
-}
+const ADDRESSES_STORAGE_KEY = 'mera_account_addresses';
 
-const STORAGE_KEY = 'mera_account';
-
-const SEED: AccountState = {
-  profile: { name: 'John Doe', email: 'john@example.com', phone: '+1 555 0100' },
-  addresses: [
-    {
-      id: 'seed-1',
-      label: 'Home',
-      line1: '12 Ride St',
-      line2: 'Apt 4B',
-      city: 'Austin',
-      state: 'TX',
-      postalCode: '73301',
-      country: 'USA',
-    },
-  ],
-};
+const SEED_ADDRESSES: Address[] = [
+  {
+    id: 'seed-1',
+    label: 'Home',
+    line1: '12 Ride St',
+    line2: 'Apt 4B',
+    city: 'Austin',
+    state: 'TX',
+    postalCode: '73301',
+    country: 'USA',
+  },
+];
 
 /**
- * Account store for mera-driver: the signed-in user's profile + saved addresses,
- * persisted to localStorage. Stands in for the profile API until the backend
- * exists; the profile page and the sidebar both read it via signals.
+ * Account store for mera-driver: the signed-in user's profile (name/email/phone) is
+ * real data from `GET/PATCH /rbac/users/me` — the same `User` row every authenticated
+ * role shares, ownership-resolved server-side from the JWT. Saved addresses have no
+ * backend model (out of scope here — this app's `User`/`Driver` schema has no address
+ * book table), so they remain a local-only convenience, unchanged from before.
  */
 @Injectable({ providedIn: 'root' })
 export class AccountService {
-  private readonly state = signal<AccountState>(load());
+  private readonly api = inject(AccountApiService);
+  private readonly auth = inject(AuthService);
 
-  readonly profile = computed(() => this.state().profile);
-  readonly addresses = computed(() => this.state().addresses);
+  private readonly _profile = signal<AccountProfile>({ name: '', email: '', phone: '' });
+  private readonly _loading = signal<boolean>(true);
+  private readonly _addresses = signal<Address[]>(loadAddresses());
 
-  updateProfile(patch: Partial<AccountProfile>): void {
-    const s = this.state();
-    this.persist({ ...s, profile: { ...s.profile, ...patch } });
+  readonly profile = this._profile.asReadonly();
+  readonly loading = this._loading.asReadonly();
+  readonly addresses = computed(() => this._addresses());
+
+  constructor() {
+    this.refresh();
+  }
+
+  refresh(): void {
+    this._loading.set(true);
+    this.api.get().subscribe({
+      next: (p) => {
+        this._profile.set(p);
+        this._loading.set(false);
+      },
+      error: () => this._loading.set(false),
+    });
+  }
+
+  /** Saves to the backend, updates local state from the server's response (not the raw
+   *  patch — so it reflects exactly what was persisted), and refreshes the shared
+   *  bootstrap so the sidebar's name/email stay in sync immediately. */
+  updateProfile(patch: Partial<AccountProfile>): Observable<AccountProfile> {
+    return this.api.update(patch).pipe(
+      tap((p) => {
+        this._profile.set(p);
+        void this.auth.refreshBootstrap();
+      }),
+    );
   }
 
   addAddress(address: Omit<Address, 'id'>): void {
-    const s = this.state();
-    this.persist({
-      ...s,
-      addresses: [...s.addresses, { ...address, id: newId() }],
-    });
+    this.persistAddresses([...this._addresses(), { ...address, id: newId() }]);
   }
 
   updateAddress(id: string, patch: Omit<Address, 'id'>): void {
-    const s = this.state();
-    this.persist({
-      ...s,
-      addresses: s.addresses.map((a) => (a.id === id ? { ...patch, id } : a)),
-    });
+    this.persistAddresses(this._addresses().map((a) => (a.id === id ? { ...patch, id } : a)));
   }
 
   removeAddress(id: string): void {
-    const s = this.state();
-    this.persist({ ...s, addresses: s.addresses.filter((a) => a.id !== id) });
+    this.persistAddresses(this._addresses().filter((a) => a.id !== id));
   }
 
-  private persist(next: AccountState): void {
-    this.state.set(next);
+  private persistAddresses(next: Address[]): void {
+    this._addresses.set(next);
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      localStorage.setItem(ADDRESSES_STORAGE_KEY, JSON.stringify(next));
     }
   }
 }
 
-function load(): AccountState {
-  if (typeof localStorage === 'undefined') return SEED;
+function loadAddresses(): Address[] {
+  if (typeof localStorage === 'undefined') return SEED_ADDRESSES;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as AccountState) : SEED;
+    const raw = localStorage.getItem(ADDRESSES_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Address[]) : SEED_ADDRESSES;
   } catch {
-    return SEED;
+    return SEED_ADDRESSES;
   }
 }
 

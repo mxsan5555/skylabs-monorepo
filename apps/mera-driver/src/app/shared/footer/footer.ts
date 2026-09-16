@@ -1,5 +1,6 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, inject } from '@angular/core';
+import { RouterLink, Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 
 /** One link in a footer column. Internal links use `to` (+ optional `fragment`); external / mailto links use `href`. */
 interface FooterLink {
@@ -30,6 +31,8 @@ interface FooterColumn {
 })
 export class Footer {
   protected readonly year = new Date().getFullYear();
+
+  ngOnInit(): void {}
 
   protected readonly columns: FooterColumn[] = [
     {
