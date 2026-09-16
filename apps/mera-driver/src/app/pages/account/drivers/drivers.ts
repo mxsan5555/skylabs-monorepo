@@ -197,6 +197,26 @@ export class Drivers implements OnInit {
     return '';
   });
 
+  readonly emergencyNumberError = computed(() => {
+    if (!this.isTouched('emergencyNumber')) return '';
+    const val = this.inputEmergencyNumber().trim();
+    if (val) {
+      const phoneRegex = /^\d{10}$/;
+      if (!phoneRegex.test(val)) return 'Enter a valid 10-digit emergency number';
+    }
+    return '';
+  });
+
+  readonly pincodeError = computed(() => {
+    if (!this.isTouched('pincode')) return '';
+    const val = this.inputPincode().trim();
+    if (val) {
+      const pinRegex = /^[1-9][0-9]{5}$/;
+      if (!pinRegex.test(val)) return 'Enter a valid 6-digit postal pincode';
+    }
+    return '';
+  });
+
   readonly statusError = computed(() => {
     if (!this.isTouched('status')) return '';
     const val = this.inputStatus().trim();
@@ -214,6 +234,10 @@ export class Drivers implements OnInit {
     if (!this.isTouched('dlNo')) return '';
     const val = this.inputDlNo().trim();
     if (!val) return 'Driving License No. is required';
+    const dlRegex = /^[A-Z]{2}[-\s]?[0-9]{2}[-\s]?[0-9]{4}[-\s]?[0-9]{7}$/i;
+    if (val.length < 10 || !dlRegex.test(val)) {
+      return 'Enter a valid Driving License No. (e.g. DL-1420110012345)';
+    }
     return '';
   });
 
@@ -229,7 +253,9 @@ export class Drivers implements OnInit {
       } else if (sub === 1) {
         this.markTouched('email');
         this.markTouched('phone');
-        return !this.emailError() && !this.phoneError();
+        this.markTouched('emergencyNumber');
+        this.markTouched('pincode');
+        return !this.emailError() && !this.phoneError() && !this.emergencyNumberError() && !this.pincodeError();
       } else if (sub === 3) {
         this.markTouched('status');
         this.markTouched('driverType');
@@ -1226,20 +1252,50 @@ export class Drivers implements OnInit {
       case 'fatherName': this.inputFatherName.set(val); break;
       case 'motherName': this.inputMotherName.set(val); break;
       case 'email': this.inputEmail.set(val); break;
-      case 'phone': this.inputPhone.set(val); break;
-      case 'emergencyNumber': this.inputEmergencyNumber.set(val); break;
+      case 'phone': {
+        const cleaned = val.replace(/\D/g, '').slice(0, 10);
+        (event.target as any).value = cleaned;
+        this.inputPhone.set(cleaned);
+        break;
+      }
+      case 'emergencyNumber': {
+        const cleaned = val.replace(/\D/g, '').slice(0, 10);
+        (event.target as any).value = cleaned;
+        this.inputEmergencyNumber.set(cleaned);
+        break;
+      }
       case 'dob': this.inputDob.set(val); break;
       case 'maritalStatus': this.inputMaritalStatus.set(val); break;
       case 'gender': this.inputGender.set(val); break;
       case 'passportNumber': this.inputPassportNumber.set(val); break;
       case 'religion': this.inputReligion.set(val); break;
       case 'color': this.inputColor.set(val); break;
-      case 'age': this.inputAge.set(val); break;
-      case 'height': this.inputHeight.set(val); break;
-      case 'weight': this.inputWeight.set(val); break;
+      case 'age': {
+        const cleaned = val.replace(/\D/g, '').slice(0, 3);
+        (event.target as any).value = cleaned;
+        this.inputAge.set(cleaned);
+        break;
+      }
+      case 'height': {
+        const cleaned = val.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1').slice(0, 5);
+        (event.target as any).value = cleaned;
+        this.inputHeight.set(cleaned);
+        break;
+      }
+      case 'weight': {
+        const cleaned = val.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1').slice(0, 5);
+        (event.target as any).value = cleaned;
+        this.inputWeight.set(cleaned);
+        break;
+      }
       case 'country': this.inputCountry.set(val); break;
       case 'state': this.inputState.set(val); break;
-      case 'pincode': this.inputPincode.set(val); break;
+      case 'pincode': {
+        const cleaned = val.replace(/\D/g, '').slice(0, 6);
+        (event.target as any).value = cleaned;
+        this.inputPincode.set(cleaned);
+        break;
+      }
       case 'address': this.inputAddress.set(val); break;
       case 'status': this.inputStatus.set(val); break;
       case 'sourceType': this.inputSourceType.set(val); break;
@@ -1253,7 +1309,12 @@ export class Drivers implements OnInit {
       // --- Document details ---
       case 'licenseDetails': this.inputLicenseDetails.set(val); break;
       case 'vehicleType': this.inputVehicleType.set(val); break;
-      case 'dlNo': this.inputDlNo.set(val); break;
+      case 'dlNo': {
+        const cleaned = val.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 16);
+        (event.target as any).value = cleaned;
+        this.inputDlNo.set(cleaned);
+        break;
+      }
       case 'dlIssueDate': this.inputDlIssueDate.set(val); break;
       case 'dlExpiryDate': this.inputDlExpiryDate.set(val); break;
       case 'policeVerifiedStatus': this.inputPoliceVerifiedStatus.set(val); break;
