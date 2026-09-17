@@ -341,19 +341,7 @@
                   <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
                     <md-outlined-text-field label="Date of Birth" type="date" [value]="inputDob()" [max]="today" (input)="onInputChange('dob', $event)"></md-outlined-text-field>
 
-<<<<<<< HEAD
                     <md-outlined-text-field label="Age (auto-calculated)" [value]="inputAge()" disabled placeholder="Set Date of Birth to calculate"></md-outlined-text-field>
-=======
-                    <md-outlined-text-field
-                      label="Age"
-                      type="tel"
-                      inputmode="numeric"
-                      maxlength="3"
-                      [value]="inputAge()"
-                      (input)="onInputChange('age', $event)"
-                      placeholder="Enter age (e.g. 28)"
-                    ></md-outlined-text-field>
->>>>>>> cc98ab267307476b690cd03b4e58681815ba974a
 
                     <md-outlined-text-field
                       label="Height"
