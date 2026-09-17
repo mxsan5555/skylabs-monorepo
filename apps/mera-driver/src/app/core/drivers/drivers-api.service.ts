@@ -32,6 +32,23 @@ export interface Driver {
   address?: string;
   driverType?: string;
   status?: string;
+  /** Portal login gate ('Active' | 'Inactive') — independent of `status` above (KYC stage).
+   *  Toggled only via `DriversApiService.setAccountStatus`. */
+  accountStatus?: string;
+  /** The staff User currently reviewing this driver's KYC, if any. Set only via
+   *  `DriversApiService.assignVerifier`. */
+  assignedVerifier?: { id: string; name: string; email: string | null; phone: string | null } | null;
+  /** KYC checklist — one status+notes pair per existing document category (personal, health,
+   *  education, police). 'Pending' | 'Verified' | 'Rejected' | 'Correction Requested'.
+   *  Independent of `status` above. Set only via `DriversApiService.setKycChecklistItem`. */
+  personalDocsStatus?: string;
+  personalDocsNotes?: string;
+  healthDocsStatus?: string;
+  healthDocsNotes?: string;
+  educationDocsStatus?: string;
+  educationDocsNotes?: string;
+  policeDocsStatus?: string;
+  policeDocsNotes?: string;
   sourceType?: string;
   avatar?: string;
   education?: string;
@@ -69,10 +86,14 @@ export interface Driver {
   /** The User account linked to this driver's self-service portal, if any. */
   linkedUser?: { id: string; name: string; email: string | null; phone: string | null } | null;
   /** Multi-step onboarding-form progress — set server-side, never trust/derive from the
-   *  frontend beyond the `stepCompleted` number sent on each step save. */
+   *  frontend beyond the `stepCompleted`/`subStepCompleted` pair sent on each sub-step save.
+   *  `currentStep`/`currentSubStep` are the exact (tab, sub) pair to resume at.
+   *  `completedSubSteps` holds every finished (tab, sub) pair, encoded as `tab*10+sub`. */
   onboardingStatus?: 'in_progress' | 'completed';
   currentStep?: number;
+  currentSubStep?: number;
   completedSteps?: number[];
+  completedSubSteps?: number[];
   completionPercentage?: number;
 }
 
@@ -111,6 +132,16 @@ interface DriverDto {
   address: string | null;
   driverType: string | null;
   status: string;
+  accountStatus: string;
+  assignedVerifier: { id: string; name: string; email: string | null; phone: string | null } | null;
+  personalDocsStatus: string;
+  personalDocsNotes: string | null;
+  healthDocsStatus: string;
+  healthDocsNotes: string | null;
+  educationDocsStatus: string;
+  educationDocsNotes: string | null;
+  policeDocsStatus: string;
+  policeDocsNotes: string | null;
   sourceType: string | null;
   vehicle: string | null;
   avatar: string | null;
@@ -143,7 +174,9 @@ interface DriverDto {
   user: { id: string; name: string; email: string | null; phone: string | null } | null;
   onboardingStatus: string;
   currentStep: number;
+  currentSubStep: number;
   completedSteps: number[];
+  completedSubSteps: number[];
   completionPercentage: number;
 }
 
@@ -183,6 +216,16 @@ function fromDto(dto: DriverDto): Driver {
     address: dto.address ?? undefined,
     driverType: dto.driverType ?? undefined,
     status: dto.status,
+    accountStatus: dto.accountStatus,
+    assignedVerifier: dto.assignedVerifier,
+    personalDocsStatus: dto.personalDocsStatus,
+    personalDocsNotes: dto.personalDocsNotes ?? undefined,
+    healthDocsStatus: dto.healthDocsStatus,
+    healthDocsNotes: dto.healthDocsNotes ?? undefined,
+    educationDocsStatus: dto.educationDocsStatus,
+    educationDocsNotes: dto.educationDocsNotes ?? undefined,
+    policeDocsStatus: dto.policeDocsStatus,
+    policeDocsNotes: dto.policeDocsNotes ?? undefined,
     sourceType: dto.sourceType ?? undefined,
     avatar: dto.avatar ?? undefined,
     education: dto.education ?? undefined,
@@ -217,12 +260,14 @@ function fromDto(dto: DriverDto): Driver {
     linkedUser: dto.user,
     onboardingStatus: dto.onboardingStatus === 'completed' ? 'completed' : 'in_progress',
     currentStep: dto.currentStep,
+    currentSubStep: dto.currentSubStep,
     completedSteps: dto.completedSteps,
+    completedSubSteps: dto.completedSubSteps,
     completionPercentage: dto.completionPercentage,
   };
 }
 
-function toPayload(input: Driver, stepCompleted?: number): Record<string, unknown> {
+function toPayload(input: Driver, stepCompleted?: number, subStepCompleted?: number): Record<string, unknown> {
   return {
     firstName: input.firstName,
     lastName: input.lastName,
@@ -276,6 +321,7 @@ function toPayload(input: Driver, stepCompleted?: number): Record<string, unknow
     branchName: input.branchName,
     upiIdOrChequeNo: input.upiIdOrChequeNo,
     ...(stepCompleted != null ? { stepCompleted } : {}),
+    ...(subStepCompleted != null ? { subStepCompleted } : {}),
   };
 }
 
@@ -288,18 +334,19 @@ export class DriversApiService {
     return this.http.get<ApiEnvelope<DriverDto[]>>(this.base).pipe(map((res) => unwrap(res).map(fromDto)));
   }
 
-  /** `stepCompleted` (1-4), when passed, marks that onboarding-wizard step done server-side
-   *  (see `driver.service.ts`'s `computeOnboardingUpdate`) — omit it for a plain full-form
-   *  save (e.g. editing an already-completed driver) to leave onboarding progress alone. */
-  create(input: Driver, stepCompleted?: number): Observable<Driver> {
+  /** `stepCompleted` (1-4) + `subStepCompleted` (0-based, within that tab), when both passed,
+   *  mark that exact nested onboarding sub-step done server-side (see `driver.service.ts`'s
+   *  `deriveOnboardingFields`) — omit both for a plain full-form save (e.g. editing an
+   *  already-completed driver) to leave onboarding progress alone. */
+  create(input: Driver, stepCompleted?: number, subStepCompleted?: number): Observable<Driver> {
     return this.http
-      .post<ApiEnvelope<DriverDto>>(this.base, toPayload(input, stepCompleted))
+      .post<ApiEnvelope<DriverDto>>(this.base, toPayload(input, stepCompleted, subStepCompleted))
       .pipe(map((res) => fromDto(unwrap(res))));
   }
 
-  update(id: string, input: Driver, stepCompleted?: number): Observable<Driver> {
+  update(id: string, input: Driver, stepCompleted?: number, subStepCompleted?: number): Observable<Driver> {
     return this.http
-      .patch<ApiEnvelope<DriverDto>>(`${this.base}/${id}`, toPayload(input, stepCompleted))
+      .patch<ApiEnvelope<DriverDto>>(`${this.base}/${id}`, toPayload(input, stepCompleted, subStepCompleted))
       .pipe(map((res) => fromDto(unwrap(res))));
   }
 
@@ -319,6 +366,52 @@ export class DriversApiService {
   unlinkUser(driverId: string): Observable<Driver> {
     return this.http
       .patch<ApiEnvelope<DriverDto>>(`${this.base}/${driverId}/unlink-user`, {})
+      .pipe(map((res) => fromDto(unwrap(res))));
+  }
+
+  /** Activates or deactivates a driver's account (portal login gate) — independent of the
+   *  KYC `status` field. A deactivated driver is rejected server-side on their next login
+   *  or authenticated `/drivers/me*` call, not just hidden from this admin console. */
+  setAccountStatus(driverId: string, accountStatus: 'Active' | 'Inactive'): Observable<Driver> {
+    return this.http
+      .patch<ApiEnvelope<DriverDto>>(`${this.base}/${driverId}/status`, { accountStatus })
+      .pipe(map((res) => fromDto(unwrap(res))));
+  }
+
+  /** Assigns (or, with `verifierId: null`, clears) the staff User responsible for this
+   *  driver's KYC review. Independent of `linkToUser` — that grants the driver their own
+   *  portal login, this assigns a staff reviewer to check the driver's submitted KYC. */
+  assignVerifier(driverId: string, verifierId: string | null): Observable<Driver> {
+    return this.http
+      .patch<ApiEnvelope<DriverDto>>(`${this.base}/${driverId}/assign-verifier`, { verifierId })
+      .pipe(map((res) => fromDto(unwrap(res))));
+  }
+
+  /** The calling KYC verifier's own assigned-driver queue. */
+  listAssignedToMe(): Observable<Driver[]> {
+    return this.http
+      .get<ApiEnvelope<DriverDto[]>>(`${this.base}/assigned-to-me`)
+      .pipe(map((res) => unwrap(res).map(fromDto)));
+  }
+
+  /** A single driver from the calling verifier's own queue — 404s if not assigned to them. */
+  getAssignedDriver(driverId: string): Observable<Driver> {
+    return this.http
+      .get<ApiEnvelope<DriverDto>>(`${this.base}/assigned-to-me/${driverId}`)
+      .pipe(map((res) => fromDto(unwrap(res))));
+  }
+
+  /** Sets one KYC checklist category's status — ownership-checked server-side (the assigned
+   *  verifier only). Independent of the final `status` verdict, set separately by whoever
+   *  holds `drivers:edit`. */
+  setKycChecklistItem(
+    driverId: string,
+    category: 'personal' | 'health' | 'education' | 'police',
+    status: 'Verified' | 'Rejected' | 'Correction Requested',
+    notes?: string,
+  ): Observable<Driver> {
+    return this.http
+      .patch<ApiEnvelope<DriverDto>>(`${this.base}/${driverId}/kyc-checklist`, { category, status, notes })
       .pipe(map((res) => fromDto(unwrap(res))));
   }
 

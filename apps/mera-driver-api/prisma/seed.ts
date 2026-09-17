@@ -82,6 +82,14 @@ const RBAC_USERS_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delet
 const RBAC_AUDIT_ACTIONS: PermissionAction[] = ['view'];
 const GROUP_ACTIONS: PermissionAction[] = ['view']; // parent menu groups with no route of their own
 const LEAF_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete'];
+// Adds `status_change` (Active/Inactive account toggle) and `assign` (KYC verifier
+// assignment, plus the pre-existing link-user/unlink-user/create-user actions that were
+// already gated by `drivers:assign` in the routes without ever having a grantable Permission
+// row for a non-superadmin role) on top of the leaf default.
+const DRIVERS_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete', 'status_change', 'assign'];
+// Row-level scoping for this menu is ownership (assignedVerifierId === caller), not
+// permission — `view` here only gates whether the "KYC Assignments" screen appears at all.
+const KYC_ASSIGNMENTS_ACTIONS: PermissionAction[] = ['view'];
 
 function actionsForNode(node: MenuNode): PermissionAction[] {
   if (node.children && node.children.length > 0) return GROUP_ACTIONS;
@@ -92,6 +100,10 @@ function actionsForNode(node: MenuNode): PermissionAction[] {
       return RBAC_USERS_ACTIONS;
     case 'rbac.audit-logs':
       return RBAC_AUDIT_ACTIONS;
+    case 'drivers':
+      return DRIVERS_ACTIONS;
+    case 'kyc-assignments':
+      return KYC_ASSIGNMENTS_ACTIONS;
     default:
       return LEAF_ACTIONS;
   }
@@ -210,8 +222,23 @@ async function grantNewRolePermissions(roles: Map<string, { id: string }>) {
   await grantActionsOf('support', ['dashboard'], ['view']);
   await grantActionsOf('support', ['customers', 'drivers', 'attendance'], ['view']);
 
+  // KYC verifiers no longer get a flat, unscoped `drivers:[view,edit]` — every driver was
+  // visible to every verifier under that grant. They now get only `kyc-assignments:view`
+  // (puts the "KYC Assignments" screen in their sidebar); the underlying `GET
+  // /drivers/assigned-to-me*`/`PATCH /drivers/:id/kyc-checklist` routes are ownership-scoped
+  // to their own `assignedVerifierId`, not permission-scoped — see `drivers.routes.ts`.
   await grantActionsOf('kyc_verification', ['dashboard'], ['view']);
-  await grantActionsOf('kyc_verification', ['drivers'], ['view', 'edit']);
+  await grantActionsOf('kyc_verification', ['kyc-assignments'], ['view']);
+
+  // Admin needs this out of the box for the Driver List's Activate/Deactivate and Assign-
+  // Verifier actions — the baseline grant above only gives `admin` `view` on `drivers`.
+  await grantActionsOf('admin', ['drivers'], ['status_change', 'assign']);
+
+  // Customer needs this for the "want a driver" booking flow's prerequisites (the /ride/*
+  // frontend itself is still a UI prototype — see GET /drivers/available and
+  // bookings.routes.ts — but the permission gap is fixed so a future wiring pass can call
+  // these endpoints without also needing a seed change).
+  await grantActionsOf('customer', ['trips.bookings'], ['view', 'create']);
 }
 
 // ---------------------------------------------------------------------------

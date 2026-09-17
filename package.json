@@ -14,6 +14,7 @@
     "mera-driver-api:prisma:studio": "dotenv -e apps/mera-driver-api/.env.local -- prisma studio --schema=apps/mera-driver-api/prisma/schema.prisma",
     "mera-driver-api:prisma:seed": "dotenv -e apps/mera-driver-api/.env.local -- tsx --tsconfig tsconfig.base.json apps/mera-driver-api/prisma/seed.ts"
   },
+  
   "devDependencies": {
     "@angular-devkit/core": "~21.2.0",
     "@angular-devkit/schematics": "~21.2.0",

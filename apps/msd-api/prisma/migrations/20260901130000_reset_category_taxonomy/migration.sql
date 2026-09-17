@@ -434,51 +434,105 @@ UPDATE "Product" SET "categoryId" = (SELECT id FROM "Category" WHERE slug = 'pro
 
 -- Elite Home Services — was Spas & Retreats (old SERVICE bucket whose real content, Cleaning/Appliance Repair, is Home Services)
 INSERT INTO "VendorCategoryAccess" (id, "vendorId", "categoryId", "createdAt")
-SELECT gen_random_uuid(), '42099d7f-0b12-4ac3-8019-b2a97506f3d4', id, now() FROM "Category" WHERE slug = 'home-services'
+SELECT gen_random_uuid(), v.id, c.id, now()
+FROM "Vendor" v
+CROSS JOIN "Category" c
+WHERE v.id = '42099d7f-0b12-4ac3-8019-b2a97506f3d4'
+  AND c.slug = 'home-services'
 ON CONFLICT ("vendorId", "categoryId") DO NOTHING;
+
 -- Glow Beauty Studio — split from old "Massage"[SERVICE] grant (its Haircut/Hair Spa deals are Hair & Nails)
 INSERT INTO "VendorCategoryAccess" (id, "vendorId", "categoryId", "createdAt")
-SELECT gen_random_uuid(), 'e5339419-87ef-4836-9810-877f096b7255', id, now() FROM "Category" WHERE slug = 'hair-nails'
+SELECT gen_random_uuid(), v.id, c.id, now()
+FROM "Vendor" v
+CROSS JOIN "Category" c
+WHERE v.id = 'e5339419-87ef-4836-9810-877f096b7255'
+  AND c.slug = 'hair-nails'
 ON CONFLICT ("vendorId", "categoryId") DO NOTHING;
+
 -- Glow Beauty Studio — split from old "Massage"[SERVICE] grant (its Facial deal is Skin & Beauty)
 INSERT INTO "VendorCategoryAccess" (id, "vendorId", "categoryId", "createdAt")
-SELECT gen_random_uuid(), 'e5339419-87ef-4836-9810-877f096b7255', id, now() FROM "Category" WHERE slug = 'skin-beauty'
+SELECT gen_random_uuid(), v.id, c.id, now()
+FROM "Vendor" v
+CROSS JOIN "Category" c
+WHERE v.id = 'e5339419-87ef-4836-9810-877f096b7255'
+  AND c.slug = 'skin-beauty'
 ON CONFLICT ("vendorId", "categoryId") DO NOTHING;
 -- Glow Beauty Studio — was Health & Wellnes[SERVICE] (category-level convention: this old bucket’s real content across vendors is Massage; Glow itself has no live deal exercising this specific grant)
 INSERT INTO "VendorCategoryAccess" (id, "vendorId", "categoryId", "createdAt")
-SELECT gen_random_uuid(), 'e5339419-87ef-4836-9810-877f096b7255', id, now() FROM "Category" WHERE slug = 'massage'
+SELECT gen_random_uuid(), v.id, c.id, now()
+FROM "Vendor" v
+CROSS JOIN "Category" c
+WHERE v.id = 'e5339419-87ef-4836-9810-877f096b7255'
+  AND c.slug = 'massage'
 ON CONFLICT ("vendorId", "categoryId") DO NOTHING;
 -- Glow Beauty Studio — was Spas & Retreats[SERVICE] (its Repro/SingleClick/RapidClick/desk test deals live under Cleaning/Appliance Repair)
 INSERT INTO "VendorCategoryAccess" (id, "vendorId", "categoryId", "createdAt")
-SELECT gen_random_uuid(), 'e5339419-87ef-4836-9810-877f096b7255', id, now() FROM "Category" WHERE slug = 'home-services'
+SELECT gen_random_uuid(), v.id, c.id, now()
+FROM "Vendor" v
+CROSS JOIN "Category" c
+WHERE v.id = 'e5339419-87ef-4836-9810-877f096b7255'
+  AND c.slug = 'home-services'
 ON CONFLICT ("vendorId", "categoryId") DO NOTHING;
 -- Glow Beauty Studio — was "Massage"[PRODUCT] (its Hair Shampoo/Hair Serum/Face Wash/Moisturizer product deals)
 INSERT INTO "VendorCategoryAccess" (id, "vendorId", "categoryId", "createdAt")
-SELECT gen_random_uuid(), 'e5339419-87ef-4836-9810-877f096b7255', id, now() FROM "Category" WHERE slug = 'product'
+SELECT gen_random_uuid(), v.id, c.id, now()
+FROM "Vendor" v
+CROSS JOIN "Category" c
+WHERE v.id = 'e5339419-87ef-4836-9810-877f096b7255'
+  AND c.slug = 'product'
 ON CONFLICT ("vendorId", "categoryId") DO NOTHING;
 -- Heuristic Communication Pvt. Ltd — was Health & Wellnes[SERVICE] ("massage"/"finger tissue"/"face tissue" deals)
 INSERT INTO "VendorCategoryAccess" (id, "vendorId", "categoryId", "createdAt")
-SELECT gen_random_uuid(), '87ca0377-3dbc-4999-a925-a49e392dba04', id, now() FROM "Category" WHERE slug = 'massage'
+SELECT gen_random_uuid(), v.id, c.id, now()
+FROM "Vendor" v
+CROSS JOIN "Category" c
+WHERE v.id = '87ca0377-3dbc-4999-a925-a49e392dba04'
+  AND c.slug = 'massage'
 ON CONFLICT ("vendorId", "categoryId") DO NOTHING;
 -- Heuristic Communication Pvt. Ltd — was Health & Wellnes[PRODUCT] + "Massage"[PRODUCT] (deduped: both old PRODUCT-typed grants collapse onto the one new Product top-level; its "Oil body" product deal)
 INSERT INTO "VendorCategoryAccess" (id, "vendorId", "categoryId", "createdAt")
-SELECT gen_random_uuid(), '87ca0377-3dbc-4999-a925-a49e392dba04', id, now() FROM "Category" WHERE slug = 'product'
+SELECT gen_random_uuid(), v.id, c.id, now()
+FROM "Vendor" v
+CROSS JOIN "Category" c
+WHERE v.id = '87ca0377-3dbc-4999-a925-a49e392dba04'
+  AND c.slug = 'product'
 ON CONFLICT ("vendorId", "categoryId") DO NOTHING;
+
 -- xyz — was Health & Wellnes[SERVICE] ("lips massage" deal)
 INSERT INTO "VendorCategoryAccess" (id, "vendorId", "categoryId", "createdAt")
-SELECT gen_random_uuid(), 'b8409d09-98aa-4dad-a2a3-23891a68de61', id, now() FROM "Category" WHERE slug = 'massage'
+SELECT gen_random_uuid(), v.id, c.id, now()
+FROM "Vendor" v
+CROSS JOIN "Category" c
+WHERE v.id = 'b8409d09-98aa-4dad-a2a3-23891a68de61'
+  AND c.slug = 'massage'
 ON CONFLICT ("vendorId", "categoryId") DO NOTHING;
+
 -- Urban Wellness Spa — was Health & Wellnes[SERVICE] (Swedish/Deep Tissue Massage deals)
 INSERT INTO "VendorCategoryAccess" (id, "vendorId", "categoryId", "createdAt")
-SELECT gen_random_uuid(), '1ac20a81-3b05-416a-9d6d-4e9cd0413117', id, now() FROM "Category" WHERE slug = 'massage'
+SELECT gen_random_uuid(), v.id, c.id, now()
+FROM "Vendor" v
+CROSS JOIN "Category" c
+WHERE v.id = '1ac20a81-3b05-416a-9d6d-4e9cd0413117'
+  AND c.slug = 'massage'
 ON CONFLICT ("vendorId", "categoryId") DO NOTHING;
+
 -- Urban Wellness Spa — was Health & Wellnes[PRODUCT] + "Massage"[PRODUCT] (deduped: both old PRODUCT-typed grants collapse onto the one new Product top-level; its Body Scrub/Massage Oil product deals)
 INSERT INTO "VendorCategoryAccess" (id, "vendorId", "categoryId", "createdAt")
-SELECT gen_random_uuid(), '1ac20a81-3b05-416a-9d6d-4e9cd0413117', id, now() FROM "Category" WHERE slug = 'product'
+SELECT gen_random_uuid(), v.id, c.id, now()
+FROM "Vendor" v
+CROSS JOIN "Category" c
+WHERE v.id = '1ac20a81-3b05-416a-9d6d-4e9cd0413117'
+  AND c.slug = 'product'
 ON CONFLICT ("vendorId", "categoryId") DO NOTHING;
+
 -- Urban Wellness Spa — was Therapy[THERAPY] (1:1 carry-over, only one Therapy top-level exists in the new taxonomy too)
 INSERT INTO "VendorCategoryAccess" (id, "vendorId", "categoryId", "createdAt")
-SELECT gen_random_uuid(), '1ac20a81-3b05-416a-9d6d-4e9cd0413117', id, now() FROM "Category" WHERE slug = 'therapy'
+SELECT gen_random_uuid(), v.id, c.id, now()
+FROM "Vendor" v
+CROSS JOIN "Category" c
+WHERE v.id = '1ac20a81-3b05-4163-81f6-4e9cd0413117'
+  AND c.slug = 'therapy'
 ON CONFLICT ("vendorId", "categoryId") DO NOTHING;
 
 DELETE FROM "VendorCategoryAccess" WHERE id IN ('5d94ad5e-a167-49a9-8b45-01f3251c96fe', 'da602af6-ae0a-4353-81f3-5e12a3c21e8d', '9b5e94cb-ac05-4a13-a46f-1a60dd2f44e1', 'ac1f803b-2342-47fd-aea3-eeb78ceecc8c', 'c1e7e119-b0ce-49a7-97f3-477fab9896c6', '064382e7-c1a8-4be1-900b-d277ac122829', '773f85ff-0226-413d-8150-df7e0b16731c', '942c4456-0489-458c-90d6-e8ee0610b848', '616158e2-1e84-4673-9f12-6ae8ab0a0217', '50bfa4b2-8942-4192-a94e-51e915f8757a', '8b5c281c-3cc5-453e-acbd-0da2db04a951', 'd696b5f2-ebd6-4621-8c18-cae8e549fe2e', '56822bb5-973c-462d-9889-f335a13dadfb');

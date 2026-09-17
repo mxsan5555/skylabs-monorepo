@@ -1,8 +1,12 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, inject, OnInit, computed } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, inject, OnInit, computed, effect } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { Router, NavigationEnd } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { firstValueFrom, filter } from 'rxjs';
+import { calculateAge } from '@skylabs-monorepo/shared-utils';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { DriversApiService, type Driver } from '../../../core/drivers/drivers-api.service';
+import { RbacApiService } from '../../../core/rbac/rbac-api.service'; 
 import { buildResumeHtml, buildResumeSections, type ResumeSection } from './driver-resume';
 
 /** The 4 tabs are the onboarding wizard's persistence checkpoints — sub-section chip
@@ -12,17 +16,26 @@ const TOTAL_ONBOARDING_STEPS = 4;
 // branches (and chips) rendered per tab in drivers.html — NOT the previous [4,2,6,3], which
 // overcounted tabs 2 and 3 and made "Save & Next" walk through blank, content-less
 // sub-sections before a tab was actually considered finished.
-const MAX_SUBS = [4, 2, 3, 1];
+const MAX_SUBS = [4, 2, 3, 2];
 
-/** Driver List progress display — e.g. "In Progress — Step 2 of 4 (25%)" / "Completed — 100%".
- *  A driver with no onboarding data at all (shouldn't happen post-migration, but defensively)
- *  reads as completed rather than a confusing "Step undefined of 4". */
+const TAB_NAMES = ['Personal Details', 'Education & Health Details', 'Documents Details', 'Payment Details'];
+
+/** Driver List progress display — e.g. "In Progress — Personal Details, sub-step 2 of 4 (18%)"
+ *  / "Completed — 100%". A driver with no onboarding data at all (shouldn't happen
+ *  post-migration, but defensively) reads as completed rather than a confusing label. */
 function onboardingLabel(d: Driver): string {
   if (d.onboardingStatus === 'in_progress') {
-    const step = Math.min(Math.max(d.currentStep ?? 1, 1), TOTAL_ONBOARDING_STEPS);
-    return `In Progress — Step ${step} of ${TOTAL_ONBOARDING_STEPS} (${d.completionPercentage ?? 0}%)`;
+    const tab = Math.min(Math.max(d.currentStep ?? 1, 1), TOTAL_ONBOARDING_STEPS);
+    const sub = Math.min(Math.max(d.currentSubStep ?? 0, 0), MAX_SUBS[tab - 1] - 1);
+    return `In Progress — ${TAB_NAMES[tab - 1]}, sub-step ${sub + 1} of ${MAX_SUBS[tab - 1]} (${d.completionPercentage ?? 0}%)`;
   }
   return 'Completed — 100%';
+}
+
+/** Encodes a (0-based tab, 0-based sub) pair to match the backend's `tab*10+sub` storage
+ *  (backend tabs are 1-based) — used to check `completedSubSteps` for chip/tick display. */
+function subStepKey(tabIndex: number, subIndex: number): number {
+  return (tabIndex + 1) * 10 + subIndex;
 }
 
 @Component({
@@ -36,6 +49,27 @@ function onboardingLabel(d: Driver): string {
 export class Drivers implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly api = inject(DriversApiService);
+  private readonly rbac = inject(RbacApiService);
+  private readonly router = inject(Router);
+
+  constructor() {
+    // Age is never manually entered — it's always derived from DOB, backend-authoritative
+    // (see `driver.service.ts`'s `deriveAge`), this is just the immediate on-screen echo.
+    effect(() => {
+      this.inputAge.set(calculateAge(this.inputDob()));
+    });
+
+    this.router.events
+      .pipe(
+        filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+        takeUntilDestroyed()
+      )
+      .subscribe(() => {
+        if (this.showAddForm()) {
+          this.closeAddDriverForm();
+        }
+      });
+  }
 
   // --- All Drivers Repository ---
   readonly allDrivers = signal<Driver[]>([]);
@@ -46,6 +80,12 @@ export class Drivers implements OnInit {
   readonly linkPanelDriver = signal<Driver | null>(null);
   readonly linkSaving = signal<boolean>(false);
   readonly linkError = signal<string | null>(null);
+
+  // --- KYC Verifier Assignment ---
+  readonly verifierPanelDriver = signal<Driver | null>(null);
+  readonly verifierOptions = signal<{ id: string; name: string }[]>([]);
+  readonly verifierSaving = signal<boolean>(false);
+  readonly verifierError = signal<string | null>(null);
 
   // --- Read-only Driver Resume/Profile Preview ---
   readonly previewDriver = signal<Driver | null>(null);
@@ -97,6 +137,23 @@ export class Drivers implements OnInit {
   // --- Step-by-step persistence (onboarding wizard) ---
   readonly savingStep = signal<boolean>(false);
   readonly stepError = signal<string | null>(null);
+  // Nested (tab, sub) pairs already saved for the driver currently open in the form —
+  // drives the "done" tick on sub-section chips. Encoded via `subStepKey()`.
+  readonly formCompletedSubSteps = signal<number[]>([]);
+
+  isSubStepDone(tabIndex: number, subIndex: number): boolean {
+    return this.formCompletedSubSteps().includes(subStepKey(tabIndex, subIndex));
+  }
+
+  readonly totalSubSteps = MAX_SUBS.reduce((a, b) => a + b, 0);
+
+  /** Caps the Date of Birth picker so a future date can't even be selected in the UI —
+   *  the backend rejects it either way (see `business.schema.ts`'s `dob` refine). */
+  readonly today = new Date().toISOString().slice(0, 10);
+
+  maxSubsFor(tabIndex: number): number {
+    return MAX_SUBS[tabIndex];
+  }
 
   // --- Form Validation Signals & Helpers ---
   readonly formSubmitted = signal<boolean>(false);
@@ -142,6 +199,24 @@ export class Drivers implements OnInit {
     return '';
   });
 
+  readonly emergencyNumberError = computed(() => {
+    if (!this.isTouched('emergencyNumber')) return '';
+    const val = this.inputEmergencyNumber().trim();
+    if (!val) return 'Emergency number is required';
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(val)) return 'Enter a valid 10-digit emergency number';
+    return '';
+  });
+
+  readonly pincodeError = computed(() => {
+    if (!this.isTouched('pincode')) return '';
+    const val = this.inputPincode().trim();
+    if (!val) return 'Pincode is required';
+    const pincodeRegex = /^\d{6}$/;
+    if (!pincodeRegex.test(val)) return 'Enter a valid 6-digit pincode';
+    return '';
+  });
+
   readonly statusError = computed(() => {
     if (!this.isTouched('status')) return '';
     const val = this.inputStatus().trim();
@@ -174,7 +249,9 @@ export class Drivers implements OnInit {
       } else if (sub === 1) {
         this.markTouched('email');
         this.markTouched('phone');
-        return !this.emailError() && !this.phoneError();
+        this.markTouched('emergencyNumber');
+        this.markTouched('pincode');
+        return !this.emailError() && !this.phoneError() && !this.emergencyNumberError() && !this.pincodeError();
       } else if (sub === 3) {
         this.markTouched('status');
         this.markTouched('driverType');
@@ -285,14 +362,27 @@ export class Drivers implements OnInit {
   readonly inputDocumentUpload = signal<string>('');
 
   // --- Form Input Signals (Tab 4: Payments) ---
-  readonly inputPreferredPaymentMode = signal<string>('Bank Account');
+  readonly inputPreferredPaymentMode = signal<string>('Cash');
+  readonly inputAccountPaymentMethod = signal<string>('Bank Account');
   readonly inputAmount = signal<string>('');
   readonly inputPaymentReceiptDate = signal<string>('');
+  readonly inputRegistrationReceiptFile = signal<string>('');
   readonly inputBankName = signal<string>('');
   readonly inputBankAccountNo = signal<string>('');
   readonly inputIfscCode = signal<string>('');
   readonly inputBranchName = signal<string>('');
   readonly inputUpiIdOrChequeNo = signal<string>('');
+
+  onRegistrationReceiptFileChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      this.inputRegistrationReceiptFile.set(input.files[0].name);
+    }
+  }
+
+  clearRegistrationReceiptFile(): void {
+    this.inputRegistrationReceiptFile.set('');
+  }
 
   // --- Dynamic Document Lists ---
   readonly personalDocs = signal<Array<{ type: string; regNo: string; file: string }>>([
@@ -366,6 +456,7 @@ export class Drivers implements OnInit {
   readonly policeDocTypes = signal<string[]>(['Address Proof', 'Police Clearance Certificate (PCC)', 'Character Verification Form']);
 
   // --- Payment Master Options ---
+  readonly registrationPaymentModes = signal<string[]>(['Cash', 'Cheque', 'NEFT', 'RTGS', 'Online']);
   readonly paymentModes = signal<string[]>(['Bank Account', 'UPI']);
 
   protected readonly content = signal({
@@ -394,6 +485,7 @@ export class Drivers implements OnInit {
         'Not Useful': 'error'
       }
     },
+    { key: 'accountStatus', label: 'Account Status', type: 'status', statusMap: { Active: 'success', Inactive: 'error' } },
     { key: 'onboardingLabel', label: 'Onboarding', sortable: false },
     { key: 'fatherName', label: 'Father Name', sortable: true, hidden: true },
     { key: 'motherName', label: 'Mother Name', sortable: true, hidden: true },
@@ -436,7 +528,8 @@ export class Drivers implements OnInit {
     { key: 'bankAccountNo', label: 'Bank Account No', sortable: false, hidden: true },
     { key: 'ifscCode', label: 'IFSC Code', sortable: false, hidden: true },
     { key: 'upiIdOrChequeNo', label: 'UPI / Cheque', sortable: false, hidden: true },
-    { key: 'linkedAccountLabel', label: 'Portal Account', sortable: false, hidden: true }
+    { key: 'linkedAccountLabel', label: 'Portal Account', sortable: false, hidden: true },
+    { key: 'assignedVerifierLabel', label: 'KYC Verifier', sortable: false, hidden: true }
   ]);
 
   readonly tableFilterOptions = JSON.stringify([
@@ -456,6 +549,8 @@ export class Drivers implements OnInit {
     { icon: 'visibility', label: 'View Details', event: '__view_detail__' },
     { icon: 'edit', label: 'Edit', event: 'edit_driver' },
     { icon: 'manage_accounts', label: 'Driver User Account', event: 'link_driver' },
+    { icon: 'power_settings_new', label: 'Activate / Deactivate', event: 'toggle_driver_status' },
+    { icon: 'assignment_ind', label: 'Assign KYC Verifier', event: 'assign_verifier' },
     { icon: 'delete', label: 'Delete', event: 'delete_driver', variant: 'danger' }
   ]);
 
@@ -510,6 +605,8 @@ export class Drivers implements OnInit {
         ...d,
         linkedUser: undefined,
         linkedAccountLabel: d.linkedUser ? `${d.linkedUser.name} (${d.linkedUser.phone ?? d.linkedUser.email ?? ''})` : 'Not linked',
+        assignedVerifier: undefined,
+        assignedVerifierLabel: d.assignedVerifier ? d.assignedVerifier.name : 'Unassigned',
         onboardingLabel: onboardingLabel(d),
       })),
     );
@@ -615,24 +712,31 @@ export class Drivers implements OnInit {
   }
 
   /**
-   * Persists the current full-form snapshot immediately, tagged with the onboarding step
-   * that was just completed. Step 1 (no driver yet) creates the record; every later step
-   * updates the SAME record (`editingDriverId`, set from the step-1 response) — never a
-   * second `POST`. Resolves `true` on success (caller advances the UI), `false` on failure
-   * (caller stays put — the error is already surfaced via `stepError`).
+   * Persists the current full-form snapshot immediately, tagged with the exact nested
+   * (tab, sub) onboarding sub-step that was just completed. The very first save (no driver
+   * yet) creates the record; every later sub-step updates the SAME record (`editingDriverId`,
+   * set from that first response) — never a second `POST`. Sending the full snapshot on every
+   * sub-step is safe (not a partial-data risk): the component's input signals already hold
+   * every previously-saved field (populated from the backend on `edit_driver`, or entered
+   * earlier in this same session), so nothing gets blanked — only the new sub-step's
+   * `completedSubSteps` entry actually changes. Resolves `true` on success (caller advances
+   * the UI), `false` on failure (caller stays put — the error is already surfaced via
+   * `stepError`).
    */
-  private async persistStep(stepCompleted: number, isFinal: boolean): Promise<boolean> {
+  private async persistStep(tabIndex: number, subIndex: number, isFinal: boolean): Promise<boolean> {
     this.savingStep.set(true);
     this.stepError.set(null);
     const payload = this.buildPayload();
     const editingId = this.editingDriverId();
+    const stepCompleted = tabIndex + 1;
 
     try {
       const driver = editingId !== null
-        ? await firstValueFrom(this.api.update(editingId, payload, stepCompleted))
-        : await firstValueFrom(this.api.create(payload, stepCompleted));
+        ? await firstValueFrom(this.api.update(editingId, payload, stepCompleted, subIndex))
+        : await firstValueFrom(this.api.create(payload, stepCompleted, subIndex));
 
       if (editingId === null) this.editingDriverId.set(driver.id!);
+      this.formCompletedSubSteps.set(driver.completedSubSteps ?? []);
       this.uploadPendingDocuments(driver.id!);
       this.reload();
       this.savingStep.set(false);
@@ -643,7 +747,7 @@ export class Drivers implements OnInit {
       }
       return true;
     } catch (err) {
-      console.error(`Failed to save step ${stepCompleted}`, err);
+      console.error(`Failed to save tab ${stepCompleted} sub-step ${subIndex}`, err);
       this.savingStep.set(false);
       this.stepError.set('Failed to save. Please check your connection and try again.');
       return false;
@@ -657,7 +761,7 @@ export class Drivers implements OnInit {
       this.activeFormTab.set(0);
       return;
     }
-    await this.persistStep(TOTAL_ONBOARDING_STEPS, true);
+    await this.persistStep(TOTAL_ONBOARDING_STEPS - 1, MAX_SUBS[TOTAL_ONBOARDING_STEPS - 1] - 1, true);
   }
 
   private uploadPendingDocuments(driverId: string): void {
@@ -757,6 +861,7 @@ export class Drivers implements OnInit {
     this.editingDriverId.set(null);
     this.stepError.set(null);
     this.savingStep.set(false);
+    this.formCompletedSubSteps.set([]);
     this.pendingFiles.clear();
     this.inputFirstName.set('');
     this.inputLastName.set('');
@@ -805,9 +910,10 @@ export class Drivers implements OnInit {
     this.inputDocumentCategory.set('Driving License');
     this.inputDocumentUpload.set('');
     // --- Revert Payment Inputs ---
-    this.inputPreferredPaymentMode.set('Bank Account');
+    this.inputPreferredPaymentMode.set('Cash');
     this.inputAmount.set('');
     this.inputPaymentReceiptDate.set('');
+    this.inputRegistrationReceiptFile.set('');
     this.inputBankName.set('');
     this.inputBankAccountNo.set('');
     this.inputIfscCode.set('');
@@ -903,17 +1009,22 @@ export class Drivers implements OnInit {
       this.educationDocs.set(row.educationDocs || [{ type: 'Select Document Type', regNo: '', file: '' }]);
       this.policeDocs.set(row.policeDocs || [{ type: 'Select Document Type', regNo: '', file: '' }]);
 
-      // Resume: an in-progress driver opens on its pending step (from persisted backend
-      // progress, not any frontend memory of where they left off — this component was just
-      // (re)constructed from a fresh `GET /drivers` list). A completed (or legacy, pre-
-      // onboarding-tracking) driver opens on tab 0 as a normal full edit/review, same as before.
+      this.formCompletedSubSteps.set(row.completedSubSteps || []);
+
+      // Resume: an in-progress driver opens on its pending nested sub-step (from persisted
+      // backend progress, not any frontend memory of where they left off — this component
+      // was just (re)constructed from a fresh `GET /drivers` list). A completed (or legacy,
+      // pre-onboarding-tracking) driver opens on tab 0 / sub 0 as a normal full edit/review,
+      // same as before.
       if (row.onboardingStatus === 'in_progress' && row.currentStep) {
-        const step = Math.min(Math.max(Number(row.currentStep), 1), TOTAL_ONBOARDING_STEPS);
-        this.activeFormTab.set(step - 1);
+        const tab = Math.min(Math.max(Number(row.currentStep), 1), TOTAL_ONBOARDING_STEPS);
+        const sub = Math.min(Math.max(Number(row.currentSubStep ?? 0), 0), MAX_SUBS[tab - 1] - 1);
+        this.activeFormTab.set(tab - 1);
+        this.activeSubSection.set(sub);
       } else {
         this.activeFormTab.set(0);
+        this.activeSubSection.set(0);
       }
-      this.activeSubSection.set(0);
       this.showAddForm.set(true);
     } else if (action === 'delete_driver') {
       if (confirm(`Are you sure you want to delete lead "${row.firstName} ${row.lastName}"?`)) {
@@ -928,6 +1039,12 @@ export class Drivers implements OnInit {
     } else if (action === 'link_driver') {
       const driver = this.allDrivers().find((d) => d.id === row.id);
       if (driver) this.openLinkPanel(driver);
+    } else if (action === 'toggle_driver_status') {
+      const driver = this.allDrivers().find((d) => d.id === row.id);
+      if (driver) this.toggleDriverStatus(driver);
+    } else if (action === 'assign_verifier') {
+      const driver = this.allDrivers().find((d) => d.id === row.id);
+      if (driver) this.openVerifierPanel(driver);
     } else if (action === 'preview_driver') {
       // Look up the full record from `allDrivers()` (freshly reloaded after every
       // mutation), not the serialized table row — the resume must show the latest data.
@@ -937,6 +1054,58 @@ export class Drivers implements OnInit {
       const driver = this.allDrivers().find((d) => d.id === row.id);
       if (driver) this.downloadPdf(driver);
     }
+  }
+
+  // --- KYC Verifier Assignment ---
+  /** Loads the picker options (every User holding the `kyc_verification` role) the first
+   *  time the panel opens — reuses the existing Administration > Users list endpoint rather
+   *  than adding a new one just for this picker. */
+  openVerifierPanel(driver: Driver): void {
+    this.verifierPanelDriver.set(driver);
+    this.verifierError.set(null);
+    if (this.verifierOptions().length === 0) {
+      this.rbac.listUsers(1, 100).subscribe({
+        next: (page) => {
+          const verifiers = page.items
+            .filter((u) => u.roles.some((r) => r.role.key === 'kyc_verification'))
+            .map((u) => ({ id: u.id, name: u.name }));
+          this.verifierOptions.set(verifiers);
+        },
+        error: (err) => {
+          console.error('Failed to load KYC verifiers', err);
+          this.verifierError.set('Failed to load the list of KYC verifiers.');
+        },
+      });
+    }
+  }
+
+  closeVerifierPanel(): void {
+    this.verifierPanelDriver.set(null);
+  }
+
+  onVerifierChange(event: Event): void {
+    const val = (event.target as any).value || '';
+    this.assignVerifier(val || null);
+  }
+
+  /** Assigns (`verifierId`) or clears (`null`) the driver's KYC reviewer. Independent of the
+   *  self-service portal login link above. */
+  assignVerifier(verifierId: string | null): void {
+    const driver = this.verifierPanelDriver();
+    if (!driver?.id) return;
+    this.verifierSaving.set(true);
+    this.verifierError.set(null);
+    this.api.assignVerifier(driver.id, verifierId).subscribe({
+      next: (updated) => {
+        this.verifierSaving.set(false);
+        this.allDrivers.update((list) => list.map((d) => (d.id === updated.id ? updated : d)));
+        this.verifierPanelDriver.set(updated);
+      },
+      error: (err) => {
+        this.verifierSaving.set(false);
+        this.verifierError.set(err?.message || 'Failed to assign the KYC verifier. Please try again.');
+      },
+    });
   }
 
   // --- Driver User account (self-service portal login) ---
@@ -968,6 +1137,26 @@ export class Drivers implements OnInit {
     });
   }
 
+  /** Toggles a driver's Active/Inactive account status from the Driver List row action —
+   *  independent of the KYC `status` column. Confirmed before the call so a mis-click can't
+   *  silently lock out (or restore) a driver's portal login. */
+  toggleDriverStatus(driver: Driver): void {
+    if (!driver.id) return;
+    const next: 'Active' | 'Inactive' = driver.accountStatus === 'Inactive' ? 'Active' : 'Inactive';
+    const question =
+      next === 'Inactive'
+        ? 'Are you sure you want to deactivate this driver?'
+        : 'Are you sure you want to activate this driver?';
+    if (!confirm(question)) return;
+    this.api.setAccountStatus(driver.id, next).subscribe({
+      next: (updated) => this.allDrivers.update((list) => list.map((d) => (d.id === updated.id ? updated : d))),
+      error: (err) => {
+        console.error('Failed to update driver status', err);
+        alert('Failed to update driver status. Please try again.');
+      },
+    });
+  }
+
   unlinkUser(driver: Driver): void {
     if (!driver.id) return;
     if (!confirm(`Unlink ${driver.firstName} ${driver.lastName}'s account? They will lose access to the driver portal.`)) return;
@@ -985,6 +1174,7 @@ export class Drivers implements OnInit {
     this.showAddForm.set(true);
     this.activeFormTab.set(0);
     this.activeSubSection.set(0);
+    this.formCompletedSubSteps.set([]);
   }
 
   closeAddDriverForm(): void {
@@ -1007,36 +1197,31 @@ export class Drivers implements OnInit {
   }
 
   /**
-   * Sub-section chip navigation *within* a tab never touches the backend — only finishing
-   * the last sub-section of a tab (about to cross into the next tab, or finishing the form
-   * entirely) does. That save is awaited before the UI advances, so "Continue" always means
-   * "this step is now in Postgres", never just a local signal update.
+   * Every nested sub-step is its own persistence checkpoint — "Save & Next" always saves the
+   * sub-step just finished to Postgres before moving on, whether or not it's also the last
+   * sub-step of its parent tab. That save is awaited before the UI advances, so "Continue"
+   * always means "this step is now in Postgres", never just a local signal update. The very
+   * last sub-step of the last tab has its own button/handler (`addDriver()`, bound in the
+   * template when `isLastStep()`), so this method is never called for that one.
    */
   async onSaveAndNext(): Promise<void> {
     if (!this.validateCurrentStep()) {
       return;
     }
 
-    if (this.isLastStep()) {
-      await this.addDriver();
-      return;
-    }
-
     const currentTab = this.activeFormTab();
     const currentSub = this.activeSubSection();
-    const isLastSubOfTab = currentSub >= MAX_SUBS[currentTab] - 1;
 
-    if (!isLastSubOfTab) {
-      this.activeSubSection.set(currentSub + 1);
-      return;
-    }
-
-    const stepCompleted = currentTab + 1;
-    const ok = await this.persistStep(stepCompleted, false);
+    const ok = await this.persistStep(currentTab, currentSub, false);
     if (!ok) return; // stay put — stepError is already showing why
 
-    this.activeFormTab.set(currentTab + 1);
-    this.activeSubSection.set(0);
+    const isLastSubOfTab = currentSub >= MAX_SUBS[currentTab] - 1;
+    if (!isLastSubOfTab) {
+      this.activeSubSection.set(currentSub + 1);
+    } else {
+      this.activeFormTab.set(currentTab + 1);
+      this.activeSubSection.set(0);
+    }
   }
 
   onPrevSubSection(): void {
@@ -1104,6 +1289,7 @@ export class Drivers implements OnInit {
       case 'documentUpload': this.inputDocumentUpload.set(val); break;
       // --- Payment details ---
       case 'preferredPaymentMode': this.inputPreferredPaymentMode.set(val); break;
+      case 'accountPaymentMethod': this.inputAccountPaymentMethod.set(val); break;
       case 'amount': this.inputAmount.set(val); break;
       case 'paymentReceiptDate': this.inputPaymentReceiptDate.set(val); break;
       case 'bankName': this.inputBankName.set(val); break;

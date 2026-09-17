@@ -283,9 +283,9 @@ export const appRoutes: Routes = [
       },
       {
         path: 'masters/statuses',
-        title: 'Category Status · mera-driver',
+        title: 'Driver Status · mera-driver',
         canActivate: [permissionGuard],
-        data: { permission: { menuKey: 'masters.statuses', action: 'view' }, title: 'Category Status', subtitle: 'Driver verification status configuration.' },
+        data: { permission: { menuKey: 'masters.statuses', action: 'view' }, title: 'Driver Status', subtitle: 'Driver verification status configuration.' },
         loadComponent: () =>
           import('./pages/account/masters/statuses/statuses').then((m) => m.StatusesMaster),
       },
@@ -346,6 +346,14 @@ export const appRoutes: Routes = [
           import('./pages/account/masters/languages/languages').then((m) => m.LanguagesMaster),
       },
 
+      {
+        path: 'kyc-assignments',
+        title: 'KYC Assignments · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'kyc-assignments', action: 'view' }, title: 'KYC Assignments', subtitle: 'Drivers assigned to you for KYC review.' },
+        loadComponent: () =>
+          import('./pages/account/kyc-assignments/kyc-assignments').then((m) => m.KycAssignments),
+      },
       {
         path: 'settings',
         title: 'Settings · mera-driver',

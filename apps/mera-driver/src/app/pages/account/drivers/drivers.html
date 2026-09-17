@@ -78,6 +78,46 @@
         }
       </md-dialog>
 
+      <md-dialog [open]="verifierPanelDriver() !== null" (closed)="closeVerifierPanel()">
+        @if (verifierPanelDriver(); as d) {
+          <div slot="headline">
+            Assign KYC Verifier — {{ d.firstName }} {{ d.lastName }}
+          </div>
+          <div slot="content" class="flex flex-col gap-4">
+            <p>
+              Assigns the staff member responsible for reviewing this driver's KYC. The
+              verifier will only see drivers assigned to them under "KYC Assignments" —
+              independent of the driver's own portal login ("Driver User Account").
+            </p>
+            <md-outlined-select
+              label="KYC Verifier"
+              [value]="d.assignedVerifier?.id || ''"
+              (change)="onVerifierChange($event)"
+            >
+              <md-select-option value=""><div slot="headline">Unassigned</div></md-select-option>
+              @for (v of verifierOptions(); track v.id) {
+                <md-select-option [value]="v.id"><div slot="headline">{{ v.name }}</div></md-select-option>
+              }
+            </md-outlined-select>
+            @if (verifierOptions().length === 0) {
+              <p class="otp-muted">
+                No users hold the "KYC Verification" role yet — assign that role to a user
+                first under Administration &gt; User Management.
+              </p>
+            }
+            @if (verifierError()) {
+              <p class="otp-muted" role="alert">{{ verifierError() }}</p>
+            }
+            @if (verifierSaving()) {
+              <p class="otp-muted">Saving…</p>
+            }
+          </div>
+          <div slot="actions">
+            <md-text-button (click)="closeVerifierPanel()">Close</md-text-button>
+          </div>
+        }
+      </md-dialog>
+
       <!-- Read-only Driver Resume / Profile Preview — no edit controls. -->
       <md-dialog [open]="previewDriver() !== null" (closed)="closePreview()" class="driver-resume-dialog">
         @if (previewDriver(); as d) {
@@ -135,7 +175,8 @@
         @if (editingDriverId() !== null) {
           <p class="text-xs text-slate-500 -mt-2">
             <md-icon class="align-middle text-sm" aria-hidden="true">cloud_done</md-icon>
-            Saved to database — Step {{ activeFormTab() + 1 }} of 4
+            Saved to database — Tab {{ activeFormTab() + 1 }} of 4, sub-step {{ activeSubSection() + 1 }} of {{ maxSubsFor(activeFormTab()) }}
+            ({{ formCompletedSubSteps().length }} of {{ totalSubSteps }} sub-steps completed)
           </p>
         }
 
@@ -154,10 +195,10 @@
               
               <!-- Sub-Section Navigation Chips -->
               <md-chip-set class="mb-2">
-                <md-filter-chip label="1. Personal & Identity Details" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
-                <md-filter-chip label="2. Contact & Address Info" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
-                <md-filter-chip label="3. Physical & Demographics" [selected]="activeSubSection() === 2" (click)="activeSubSection.set(2)"></md-filter-chip>
-                <md-filter-chip label="4. Account & Lead Info" [selected]="activeSubSection() === 3" (click)="activeSubSection.set(3)"></md-filter-chip>
+                <md-filter-chip [label]="'1. Personal & Identity Details' + (isSubStepDone(0, 0) ? ' ✓' : '')" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
+                <md-filter-chip [label]="'2. Contact & Address Info' + (isSubStepDone(0, 1) ? ' ✓' : '')" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
+                <md-filter-chip [label]="'3. Physical & Demographics' + (isSubStepDone(0, 2) ? ' ✓' : '')" [selected]="activeSubSection() === 2" (click)="activeSubSection.set(2)"></md-filter-chip>
+                <md-filter-chip [label]="'4. Account & Lead Info' + (isSubStepDone(0, 3) ? ' ✓' : '')" [selected]="activeSubSection() === 3" (click)="activeSubSection.set(3)"></md-filter-chip>
               </md-chip-set>
 
               <!-- 1. Personal & Identity Details -->
@@ -249,20 +290,45 @@
 
                     <md-outlined-text-field
                       label="Phone"
+                      type="tel"
+                      inputmode="numeric"
+                      maxlength="10"
                       required
                       [value]="inputPhone()"
                       (input)="onInputChange('phone', $event)"
                       (blur)="markTouched('phone')"
                       [error]="!!phoneError()"
                       [errorText]="phoneError()"
-                      placeholder="Enter phone number"
+                      placeholder="Enter 10-digit phone number"
                     ></md-outlined-text-field>
 
-                    <md-outlined-text-field label="Emergency Number" [value]="inputEmergencyNumber()" (input)="onInputChange('emergencyNumber', $event)" placeholder="Enter emergency number"></md-outlined-text-field>
+                    <md-outlined-text-field
+                      label="Emergency Number"
+                      type="tel"
+                      inputmode="numeric"
+                      maxlength="10"
+                      [value]="inputEmergencyNumber()"
+                      (input)="onInputChange('emergencyNumber', $event)"
+                      (blur)="markTouched('emergencyNumber')"
+                      [error]="!!emergencyNumberError()"
+                      [errorText]="emergencyNumberError()"
+                      placeholder="Enter 10-digit emergency number"
+                    ></md-outlined-text-field>
 
                     <md-outlined-text-field label="State" [value]="inputState()" (input)="onInputChange('state', $event)" placeholder="Enter state"></md-outlined-text-field>
 
-                    <md-outlined-text-field label="Pincode" [value]="inputPincode()" (input)="onInputChange('pincode', $event)" placeholder="Enter pincode"></md-outlined-text-field>
+                    <md-outlined-text-field
+                      label="Pincode"
+                      type="tel"
+                      inputmode="numeric"
+                      maxlength="6"
+                      [value]="inputPincode()"
+                      (input)="onInputChange('pincode', $event)"
+                      (blur)="markTouched('pincode')"
+                      [error]="!!pincodeError()"
+                      [errorText]="pincodeError()"
+                      placeholder="Enter 6-digit pincode"
+                    ></md-outlined-text-field>
 
                     <md-outlined-text-field label="Address" [value]="inputAddress()" (input)="onInputChange('address', $event)" placeholder="Enter full address"></md-outlined-text-field>
                   </div>
@@ -273,13 +339,29 @@
               @if (activeSubSection() === 2) {
                 <sky-card class="p-6 block">
                   <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
-                    <md-outlined-text-field label="Date of Birth" type="date" [value]="inputDob()" (input)="onInputChange('dob', $event)"></md-outlined-text-field>
+                    <md-outlined-text-field label="Date of Birth" type="date" [value]="inputDob()" [max]="today" (input)="onInputChange('dob', $event)"></md-outlined-text-field>
 
-                    <md-outlined-text-field label="Age" [value]="inputAge()" (input)="onInputChange('age', $event)" placeholder="Enter age"></md-outlined-text-field>
+                    <md-outlined-text-field label="Age (auto-calculated)" [value]="inputAge()" disabled placeholder="Set Date of Birth to calculate"></md-outlined-text-field>
 
-                    <md-outlined-text-field label="Height" [value]="inputHeight()" (input)="onInputChange('height', $event)" placeholder="Enter height (e.g. 5.7)"></md-outlined-text-field>
+                    <md-outlined-text-field
+                      label="Height"
+                      type="text"
+                      inputmode="decimal"
+                      maxlength="5"
+                      [value]="inputHeight()"
+                      (input)="onInputChange('height', $event)"
+                      placeholder="Enter height (e.g. 5.7 or 175)"
+                    ></md-outlined-text-field>
 
-                    <md-outlined-text-field label="Weight" [value]="inputWeight()" (input)="onInputChange('weight', $event)" placeholder="Enter weight (e.g. 68)"></md-outlined-text-field>
+                    <md-outlined-text-field
+                      label="Weight"
+                      type="text"
+                      inputmode="decimal"
+                      maxlength="5"
+                      [value]="inputWeight()"
+                      (input)="onInputChange('weight', $event)"
+                      placeholder="Enter weight (e.g. 68)"
+                    ></md-outlined-text-field>
 
                     <md-outlined-select label="Religion" [value]="inputReligion()" (change)="onInputChange('religion', $event)">
                       @for (opt of religions(); track opt) {
@@ -378,8 +460,8 @@
               
               <!-- Sub-Section Navigation Chips -->
               <md-chip-set class="mb-2">
-                <md-filter-chip label="1. Education & Training Profile" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
-                <md-filter-chip label="2. Health & Medical Specifications" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
+                <md-filter-chip [label]="'1. Education & Training Profile' + (isSubStepDone(1, 0) ? ' ✓' : '')" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
+                <md-filter-chip [label]="'2. Health & Medical Specifications' + (isSubStepDone(1, 1) ? ' ✓' : '')" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
               </md-chip-set>
 
               <!-- 1. Education & Training Profile -->
@@ -522,9 +604,9 @@
               
               <!-- Sub-Section Navigation Chips -->
               <md-chip-set class="mb-2">
-                <md-filter-chip label="1. Driving License Details" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
-                <md-filter-chip label="2. Police Verification & Employment" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
-                <md-filter-chip label="3. Personal & Category Docs" [selected]="activeSubSection() === 2" (click)="activeSubSection.set(2)"></md-filter-chip>
+                <md-filter-chip [label]="'1. Driving License Details' + (isSubStepDone(2, 0) ? ' ✓' : '')" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
+                <md-filter-chip [label]="'2. Police Verification & Employment' + (isSubStepDone(2, 1) ? ' ✓' : '')" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
+                <md-filter-chip [label]="'3. Personal & Category Docs' + (isSubStepDone(2, 2) ? ' ✓' : '')" [selected]="activeSubSection() === 2" (click)="activeSubSection.set(2)"></md-filter-chip>
               </md-chip-set>
 
               <!-- 1. Driving License Details -->
@@ -540,6 +622,7 @@
                     <md-outlined-text-field
                       label="Driving License No"
                       required
+                      maxlength="16"
                       [value]="inputDlNo()"
                       (input)="onInputChange('dlNo', $event)"
                       (blur)="markTouched('dlNo')"
@@ -680,15 +763,16 @@
               
               <!-- Sub-Section Navigation Chips -->
               <md-chip-set class="mb-2">
-                <md-filter-chip label="1. Account Details" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
+                <md-filter-chip [label]="'1. Account Details' + (isSubStepDone(3, 0) ? ' ✓' : '')" [selected]="activeSubSection() === 0" (click)="activeSubSection.set(0)"></md-filter-chip>
+                <md-filter-chip [label]="'2. Registration Fees' + (isSubStepDone(3, 1) ? ' ✓' : '')" [selected]="activeSubSection() === 1" (click)="activeSubSection.set(1)"></md-filter-chip>
               </md-chip-set>
 
               <!-- 1. Account Details -->
               @if (activeSubSection() === 0) {
                 <sky-card class="p-6 block">
                   <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
-                    <!-- Preferred Payment Mode Dropdown -->
-                    <md-outlined-select label="Payment Method" [value]="inputPreferredPaymentMode()" (change)="onInputChange('preferredPaymentMode', $event)">
+                    <!-- Account Payment Method Dropdown -->
+                    <md-outlined-select label="Payment Method" [value]="inputAccountPaymentMethod()" (change)="onInputChange('accountPaymentMethod', $event)">
                       @for (opt of paymentModes(); track opt) {
                         <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                       }
@@ -696,7 +780,7 @@
 
                     <!-- CONDITIONAL FIELDS DEPENDING ON PAYMENT METHOD -->
                     <!-- Bank Account -->
-                    @if (inputPreferredPaymentMode() === 'Bank Account') {
+                    @if (inputAccountPaymentMethod() === 'Bank Account') {
                       <md-outlined-text-field label="Bank Name" [value]="inputBankName()" (input)="onInputChange('bankName', $event)" placeholder="Enter bank name"></md-outlined-text-field>
                       <md-outlined-text-field label="Bank Account No" [value]="inputBankAccountNo()" (input)="onInputChange('bankAccountNo', $event)" placeholder="Enter account number"></md-outlined-text-field>
                       <md-outlined-text-field label="IFSC Code" [value]="inputIfscCode()" (input)="onInputChange('ifscCode', $event)" placeholder="Enter IFSC code"></md-outlined-text-field>
@@ -704,9 +788,40 @@
                     }
 
                     <!-- UPI -->
-                    @if (inputPreferredPaymentMode() === 'UPI') {
+                    @if (inputAccountPaymentMethod() === 'UPI') {
                       <md-outlined-text-field class="col-span-2 max-sm:col-span-1" label="UPI ID" [value]="inputUpiIdOrChequeNo()" (input)="onInputChange('upiIdOrChequeNo', $event)" placeholder="e.g. username@upi"></md-outlined-text-field>
                     }
+                  </div>
+                </sky-card>
+              }
+
+              <!-- 2. Registration Fees -->
+              @if (activeSubSection() === 1) {
+                <sky-card class="p-6 block">
+                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
+                    <!-- Preferred Payment Mode Dropdown -->
+                    <md-outlined-select label="Preferred Payment Mode" [value]="inputPreferredPaymentMode()" (change)="onInputChange('preferredPaymentMode', $event)">
+                      @for (opt of registrationPaymentModes(); track opt) {
+                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                      }
+                    </md-outlined-select>
+
+                    <md-outlined-text-field label="Amount (₹)" [value]="inputAmount()" (input)="onInputChange('amount', $event)" placeholder="Enter amount"></md-outlined-text-field>
+
+                    <md-outlined-text-field type="date" label="Payment Receipt Date" [value]="inputPaymentReceiptDate()" (input)="onInputChange('paymentReceiptDate', $event)"></md-outlined-text-field>
+
+                    <!-- Payment Receipt File Upload -->
+                    <div class="flex items-center gap-2 relative cursor-pointer">
+                      <input type="file" (change)="onRegistrationReceiptFileChange($event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputRegistrationReceipt>
+                      <md-outlined-text-field class="flex-1 cursor-pointer" label="Payment Receipt (Optional)" readonly [value]="inputRegistrationReceiptFile() || 'No file chosen'">
+                        <md-icon slot="leading-icon">upload_file</md-icon>
+                      </md-outlined-text-field>
+                      @if (inputRegistrationReceiptFile()) {
+                        <md-icon-button type="button" (click)="clearRegistrationReceiptFile(); $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
+                          <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
+                        </md-icon-button>
+                      }
+                    </div>
                   </div>
                 </sky-card>
               }

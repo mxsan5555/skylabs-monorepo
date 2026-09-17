@@ -1994,6 +1994,7 @@ router.post(
   requirePermission('vendors', 'edit'),
   imageUpload.single('file'),
   async (req, res, next) => {
+     console.log('🔥 ROUTE MATCHED');
     try {
       if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
       const image = await vendorService.addTherapistImage(req.params.vendorId, req.params.therapistId, {

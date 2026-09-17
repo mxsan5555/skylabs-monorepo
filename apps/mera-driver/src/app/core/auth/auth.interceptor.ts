@@ -31,12 +31,15 @@ function isAuthEndpoint(url: string): boolean {
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const router = inject(Router);
-  const token = auth.token();
-  const authedReq = token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
 
-  return next(authedReq).pipe(
+  if (isAuthEndpoint(req.url)) return next(req);
+
+  return from(auth.ensureValidToken()).pipe(
+    switchMap((token) => {
+      const authedReq = token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
+      return next(authedReq).pipe(
     catchError((err: unknown) => {
-      if (!(err instanceof HttpErrorResponse) || err.status !== 401 || !token || isAuthEndpoint(req.url)) {
+      if (!(err instanceof HttpErrorResponse) || err.status !== 401 || !token) {
         return throwError(() => err);
       }
 
@@ -52,6 +55,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           const retriedReq = req.clone({ setHeaders: { Authorization: `Bearer ${freshToken}` } });
           return next(retriedReq);
         }),
+      );
+    }),
       );
     }),
   );

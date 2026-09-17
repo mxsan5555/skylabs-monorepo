@@ -19,7 +19,10 @@ export async function resolveOwnDriver(req: Request, res: Response, next: NextFu
   }
 
   try {
-    const driver = await prisma.driver.findUnique({ where: { userId: req.user.sub }, select: { id: true } });
+    const driver = await prisma.driver.findUnique({
+      where: { userId: req.user.sub },
+      select: { id: true, accountStatus: true },
+    });
     if (!driver) {
       res.status(404).json({
         data: null,
@@ -27,7 +30,18 @@ export async function resolveOwnDriver(req: Request, res: Response, next: NextFu
       });
       return;
     }
-    req.driver = driver;
+    // Deactivated drivers keep a valid (unexpired) JWT until it naturally expires — this is
+    // the per-request re-check that revokes their portal access immediately rather than
+    // waiting out the token's remaining lifetime. Same restriction enforced at login time
+    // (`assertDriverAccountActive`) for the not-yet-authenticated case.
+    if (driver.accountStatus === 'Inactive') {
+      res.status(403).json({
+        data: null,
+        error: { code: 'DRIVER_DEACTIVATED', message: 'Your driver account has been deactivated. Please contact your administrator.' },
+      });
+      return;
+    }
+    req.driver = { id: driver.id };
     next();
   } catch (err) {
     next(err);

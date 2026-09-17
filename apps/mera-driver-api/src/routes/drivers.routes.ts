@@ -6,7 +6,15 @@ import { validateBody } from '../middleware/validate';
 import { HttpError } from '../middleware/errorHandler';
 import * as auditService from '../services/audit.service';
 import * as driverService from '../services/driver.service';
-import { CreateDriverSchema, UpdateDriverSchema, CreateDriverDocumentSchema, LinkDriverToUserSchema } from '../schemas/business.schema';
+import {
+  CreateDriverSchema,
+  UpdateDriverSchema,
+  CreateDriverDocumentSchema,
+  LinkDriverToUserSchema,
+  SetDriverStatusSchema,
+  AssignVerifierSchema,
+  KycChecklistSchema,
+} from '../schemas/business.schema';
 import { requestMeta } from '../lib/requestMeta';
 import { diskStorageFor } from '../lib/upload';
 
@@ -18,6 +26,17 @@ router.use(authenticate);
 router.get('/', requirePermission('drivers', 'view'), async (_req, res, next) => {
   try {
     const rows = await driverService.listDrivers();
+    res.json({ data: rows, error: null, meta: { total: rows.length } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Customer-facing booking prerequisite — a safe, minimal driver projection (never
+// email/phone/bank/documents). See `driver.service.ts`'s `listAvailableDrivers`.
+router.get('/available', requirePermission('trips.bookings', 'view'), async (_req, res, next) => {
+  try {
+    const rows = await driverService.listAvailableDrivers();
     res.json({ data: rows, error: null, meta: { total: rows.length } });
   } catch (err) {
     next(err);
@@ -59,6 +78,31 @@ router.patch('/:id', requirePermission('drivers', 'edit'), validateBody(UpdateDr
     next(err);
   }
 });
+
+// Account status (Active/Inactive) — the portal login gate, independent of the KYC `status`
+// changed by the route above. Enforced server-side at login and on every /drivers/me* call,
+// not just this admin-console toggle — see `assertDriverAccountActive`/`resolveOwnDriver`.
+router.patch(
+  '/:id/status',
+  requirePermission('drivers', 'status_change'),
+  validateBody(SetDriverStatusSchema),
+  async (req, res, next) => {
+    try {
+      const driver = await driverService.setDriverAccountStatus(req.params.id, req.body.accountStatus);
+      await auditService.writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'driver.status_change',
+        targetType: 'Driver',
+        targetId: driver.id,
+        after: { accountStatus: req.body.accountStatus },
+        ...requestMeta(req),
+      });
+      res.json({ data: driver, error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.delete('/:id', requirePermission('drivers', 'delete'), async (req, res, next) => {
   try {
@@ -199,6 +243,81 @@ router.post('/:id/create-user', requirePermission('drivers', 'assign'), async (r
       ...requestMeta(req),
     });
     res.status(201).json({ data: driver, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// KYC verifier assignment + per-category checklist — independent of the manual-review
+// `status` verdict changed by `PATCH /:id` above, which stays gated by `drivers:edit` only.
+// A KYC verifier never gets `drivers:view`/`drivers:edit` — see `resolveAssignedDriver`-style
+// ownership checks below, exactly mirroring `resolveOwnDriver`'s posture for `/drivers/me`.
+// ---------------------------------------------------------------------------
+
+router.patch(
+  '/:id/assign-verifier',
+  requirePermission('drivers', 'assign'),
+  validateBody(AssignVerifierSchema),
+  async (req, res, next) => {
+    try {
+      const driver = await driverService.assignVerifier(req.params.id, req.body.verifierId);
+      await auditService.writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'driver.kyc.assign',
+        targetType: 'Driver',
+        targetId: driver.id,
+        after: { assignedVerifierId: req.body.verifierId },
+        ...requestMeta(req),
+      });
+      res.json({ data: driver, error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// The KYC queue — gated by `kyc-assignments:view` (puts the screen in the sidebar at all);
+// row-level scoping is ownership, not permission (always the caller's own assigned drivers).
+router.get('/assigned-to-me', requirePermission('kyc-assignments', 'view'), async (req, res, next) => {
+  try {
+    const rows = await driverService.listDriversAssignedTo(req.user!.sub);
+    res.json({ data: rows, error: null, meta: { total: rows.length } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// No requirePermission here on purpose — ownership (assignedVerifierId === caller) IS the
+// authorization, exactly like resolveOwnDriver's /drivers/me. 404s whether the driver doesn't
+// exist or simply isn't assigned to this caller (never distinguishes the two).
+router.get('/assigned-to-me/:id', async (req, res, next) => {
+  try {
+    const driver = await driverService.getAssignedDriverById(req.params.id, req.user!.sub);
+    res.json({ data: driver, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/:id/kyc-checklist', validateBody(KycChecklistSchema), async (req, res, next) => {
+  try {
+    const driver = await driverService.setKycChecklistItem(
+      req.params.id,
+      req.user!.sub,
+      req.body.category,
+      req.body.status,
+      req.body.notes,
+    );
+    await auditService.writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'driver.kyc.checklist_update',
+      targetType: 'Driver',
+      targetId: driver.id,
+      after: { category: req.body.category, status: req.body.status, notes: req.body.notes },
+      ...requestMeta(req),
+    });
+    res.json({ data: driver, error: null });
   } catch (err) {
     next(err);
   }

@@ -32,6 +32,7 @@ export const UpdateOwnDriverSchema = CreateDriverSchema.omit({
   // Onboarding-wizard bookkeeping — admin-console-only concept, not part of the driver's
   // own self-service surface.
   stepCompleted: true,
+  subStepCompleted: true,
 })
   .partial()
   .extend({

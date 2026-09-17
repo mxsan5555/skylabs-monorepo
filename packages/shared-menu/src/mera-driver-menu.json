@@ -228,7 +228,7 @@
       },
       {
         "id": "masters-statuses",
-        "title": "Category Status",
+        "title": "Driver Status",
         "icon": "rule",
         "route": "/masters/statuses",
         "permissionKey": "masters.statuses",
@@ -338,12 +338,21 @@
     ]
   },
   {
+    "id": "kyc-assignments",
+    "title": "KYC Assignments",
+    "icon": "fact_check",
+    "route": "/kyc-assignments",
+    "permissionKey": "kyc-assignments",
+    "parent": null,
+    "order": 14
+  },
+  {
     "id": "settings",
     "title": "Settings",
     "icon": "settings",
     "route": "/settings",
     "permissionKey": "settings",
     "parent": null,
-    "order": 14
+    "order": 15
   }
 ]

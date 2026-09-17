@@ -35,6 +35,9 @@ import {
   CreateAttendanceSchema,
   UpdateAttendanceSchema,
   LinkDriverToUserSchema,
+  SetDriverStatusSchema,
+  AssignVerifierSchema,
+  KycChecklistSchema,
 } from './schemas/business.schema';
 import { UpdateOwnDriverSchema } from './schemas/driverSelf.schema';
 import {
@@ -586,6 +589,74 @@ registry.registerPath({
   responses: {
     200: { description: 'Driver linked', content: { 'application/json': { schema: envelope(z.unknown()) } } },
     409: { description: 'That User is already linked to a Driver', content: { 'application/json': { schema: envelope(z.null()) } } },
+  },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: '/drivers/{id}/status',
+  summary: 'Activate or deactivate a Driver account (portal login gate, independent of KYC status)',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }), body: { content: { 'application/json': { schema: SetDriverStatusSchema } } } },
+  responses: {
+    200: { description: 'Driver account status updated', content: { 'application/json': { schema: envelope(z.unknown()) } } },
+    404: { description: 'Driver not found', content: { 'application/json': { schema: envelope(z.null()) } } },
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/drivers/available',
+  summary: 'Customer-facing safe driver projection for the booking flow (no KYC/contact/financial fields)',
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: { description: 'Available drivers', content: { 'application/json': { schema: envelope(z.array(z.unknown())) } } },
+  },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: '/drivers/{id}/assign-verifier',
+  summary: 'Assign (or clear) the KYC verifier responsible for this driver',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }), body: { content: { 'application/json': { schema: AssignVerifierSchema } } } },
+  responses: {
+    200: { description: 'Verifier assigned', content: { 'application/json': { schema: envelope(z.unknown()) } } },
+    404: { description: 'Driver or verifier not found', content: { 'application/json': { schema: envelope(z.null()) } } },
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/drivers/assigned-to-me',
+  summary: "The calling KYC verifier's own assigned-driver queue",
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: { description: 'Assigned drivers', content: { 'application/json': { schema: envelope(z.array(z.unknown())) } } },
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/drivers/assigned-to-me/{id}',
+  summary: 'A single driver from the calling verifier\'s own queue (ownership-checked, not permission-gated)',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: {
+    200: { description: 'Assigned driver', content: { 'application/json': { schema: envelope(z.unknown()) } } },
+    404: { description: 'Not found, or not assigned to the caller', content: { 'application/json': { schema: envelope(z.null()) } } },
+  },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: '/drivers/{id}/kyc-checklist',
+  summary: "Set one KYC checklist category's status (ownership-checked — the assigned verifier only)",
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }), body: { content: { 'application/json': { schema: KycChecklistSchema } } } },
+  responses: {
+    200: { description: 'Checklist item updated', content: { 'application/json': { schema: envelope(z.unknown()) } } },
+    404: { description: 'Not found, or not assigned to the caller', content: { 'application/json': { schema: envelope(z.null()) } } },
   },
 });
 
