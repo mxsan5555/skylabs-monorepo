@@ -72,7 +72,7 @@ const STAFFING: NavLink[] = [
   styleUrl: './header.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   host: {
-    'class': 'block sticky top-0 z-20'
+    'class': 'block sticky top-0 z-[1000]'
   }
 })
 export class Header implements OnInit {

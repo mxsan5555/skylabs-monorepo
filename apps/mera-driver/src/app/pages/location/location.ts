@@ -227,6 +227,20 @@ export class Location implements OnInit {
     });
   }
 
+  zoomIn(): void {
+    if (this.map) {
+      const cur = this.map.getZoom() || 13;
+      this.map.setZoom(cur + 1);
+    }
+  }
+
+  zoomOut(): void {
+    if (this.map) {
+      const cur = this.map.getZoom() || 13;
+      this.map.setZoom(cur - 1);
+    }
+  }
+
   // --- Initialize Google Map ---
   private initializeMap(): void {
     if (!this.mapContainer) return;
