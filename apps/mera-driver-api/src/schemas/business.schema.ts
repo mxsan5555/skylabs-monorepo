@@ -33,6 +33,17 @@ export const CreateCustomerSchema = z
 export const UpdateCustomerSchema = CreateCustomerSchema.partial().openapi('UpdateCustomer');
 
 // ---------------------------------------------------------------------------
+// Customer <-> User linkage (admin action, self-service portal access) — mirrors
+// LinkDriverToUserSchema exactly.
+// ---------------------------------------------------------------------------
+
+export const LinkCustomerToUserSchema = z
+  .object({
+    userId: z.string().uuid(),
+  })
+  .openapi('LinkCustomerToUser');
+
+// ---------------------------------------------------------------------------
 // Drivers
 // ---------------------------------------------------------------------------
 

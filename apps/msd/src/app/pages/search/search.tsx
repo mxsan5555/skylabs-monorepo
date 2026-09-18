@@ -222,7 +222,8 @@ export function Search() {
 
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
-    navigate(`/sign-in?next=${encodeURIComponent('/explore')}`);
+    const query = params.toString();
+    navigate(`/sign-in?next=${encodeURIComponent(`/explore${query ? `?${query}` : ''}`)}`);
     return false;
   };
 

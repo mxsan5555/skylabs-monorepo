@@ -31,19 +31,24 @@ export function Otp() {
   const otpContent = content.auth.otp;
   const [loading, setLoading] = useState(false);
   const [awaitingBootstrap, setAwaitingBootstrap] = useState(false);
-  const { identifier, method } = (location.state as {
+  const { identifier, method, returnUrl } = (location.state as {
     identifier: string;
     method: 'email' | 'phone';
+    returnUrl?: string | null;
   }) || {};
   const [code, setCode] = useState('');
   const [seconds, setSeconds] = useState(RESEND_SECONDS);
+  // Preserves the intended destination if the user bounces back to /sign-in from here (e.g. to
+  // retry with a different identifier) — same `?next=` convention every storefront page already
+  // reads via `extractReturnUrl`.
+  const signInPath = returnUrl ? `/sign-in?next=${encodeURIComponent(returnUrl)}` : '/sign-in';
   useEffect(() => {
     const timer = setInterval(() => setSeconds((s) => (s > 0 ? s - 1 : 0)), 1000,);
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {
-    if (!identifier) { navigate('/sign-in', { replace: true }); }
-  }, [identifier, navigate]);
+    if (!identifier) { navigate(signInPath, { replace: true }); }
+  }, [identifier, navigate, signInPath]);
 
   // Once `signIn()` has kicked off the bootstrap fetch, wait for it to land in context, then
   // route by role. If it fails (token cleared by `loadBootstrap`'s own error handling), fall
@@ -51,12 +56,14 @@ export function Otp() {
   useEffect(() => {
     if (!awaitingBootstrap) return;
     if (bootstrap) {
-      navigate(resolvePostLoginPath(bootstrap), { replace: true });
+      // Honor the page the user was on before login (Add to Cart, wishlist, a guarded route,
+      // etc.) — the role-based default is only ever a fallback for a plain, direct sign-in.
+      navigate(returnUrl ?? resolvePostLoginPath(bootstrap), { replace: true });
     } else if (!token) {
       setAwaitingBootstrap(false);
       setError(otpContent.validation.invalidOtp);
     }
-  }, [awaitingBootstrap, bootstrap, token, navigate, otpContent.validation.invalidOtp]);
+  }, [awaitingBootstrap, bootstrap, token, navigate, returnUrl, otpContent.validation.invalidOtp]);
 
   const verify = async () => {
     setError('');
@@ -69,7 +76,7 @@ export function Otp() {
       return;
     }
     if (!identifier) {
-      navigate('/sign-in');
+      navigate(signInPath);
       return;
     }
     setLoading(true);
@@ -102,7 +109,7 @@ export function Otp() {
       <IconButton
         className="otp-back"
         aria-label={otpContent.backAriaLabel}
-        onClick={() => navigate('/sign-in')}
+        onClick={() => navigate(signInPath)}
       >
         <Icon aria-hidden="true">{otpContent.icons.back}</Icon>
       </IconButton>

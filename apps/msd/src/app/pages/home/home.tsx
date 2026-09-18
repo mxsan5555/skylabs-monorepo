@@ -3,7 +3,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { ListItem, List, FilledTonalIconButton, FilledButton, TextButton, Icon, Tabs, SecondaryTab, OutlinedTextField, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { listCatalogCategories, listCatalogDeals, type CatalogCategoryWithChildren, type CatalogDeal } from '../../../api/catalog';
+import { listCatalogCategories, listCatalogDeals, listCatalogFaqs, type CatalogCategoryWithChildren, type CatalogDeal, type CatalogFaq } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
 import { resolveDealMedia } from '../../../utils/media';
@@ -79,6 +79,7 @@ export function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<CatalogDeal[]>([]);
+  const [faqs, setFaqs] = useState<CatalogFaq[]>([]);
   const { location, coords } = useCurrentLocation();
   const shortLocation = location?.split(",")[2]?.trim() ?? location;
 
@@ -113,6 +114,15 @@ export function Home() {
       cancelled = true;
     };
   }, [coords?.latitude, coords?.longitude]);
+
+  // FAQ is CMS-managed (msd-api's `Faq` model) — independent of location/coords, fetched once.
+  // A load failure just leaves the section empty rather than surfacing a page-level error, since
+  // it's a below-the-fold, non-critical section.
+  useEffect(() => {
+    listCatalogFaqs()
+      .then(({ data }) => setFaqs(data))
+      .catch(() => setFaqs([]));
+  }, []);
 
   // "Featured" = newest real deals — no `isFeatured` flag exists on the real `Deal` model. The
   // batched fetch above already comes back in the backend's default `sort=newest` order, so this
@@ -834,28 +844,30 @@ export function Home() {
       </section>
 
       {/* /*FAQS*/}
-      <section className="home-section home-section--alt" aria-labelledby="faq-heading">
-        <div className="home-section__container">
-          <div className="home__faq">
-            <h2 id="faq-heading" className="home-section__heading" >
-              {home.faq.heading}
-            </h2>
-            <p className="home__faq-subtitle">
-              {home.faq.subheading}
-            </p>
-            <sky-accordion>
-              {home.faq.items.map((item) => (
-                <sky-accordion-item
-                  key={item.question}
-                  header={item.question}
-                >
-                  {item.answer}
-                </sky-accordion-item>
-              ))}
-            </sky-accordion>
+      {faqs.length > 0 && (
+        <section className="home-section home-section--alt" aria-labelledby="faq-heading">
+          <div className="home-section__container">
+            <div className="home__faq">
+              <h2 id="faq-heading" className="home-section__heading" >
+                {home.faq.heading}
+              </h2>
+              <p className="home__faq-subtitle">
+                {home.faq.subheading}
+              </p>
+              <sky-accordion>
+                {faqs.map((item) => (
+                  <sky-accordion-item
+                    key={item.id}
+                    header={item.question}
+                  >
+                    {item.answer}
+                  </sky-accordion-item>
+                ))}
+              </sky-accordion>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
     </div >
   );
 }

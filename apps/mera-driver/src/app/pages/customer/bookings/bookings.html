@@ -1,0 +1,33 @@
+<md-admin-page title="My Bookings" subtitle="Your upcoming, active, completed, and cancelled trips.">
+  @if (loading()) {
+    <p class="otp-muted">Loading…</p>
+  } @else if (bookings().length === 0) {
+    <section class="account-card">
+      <div class="account-card__head">
+        <h2>No bookings yet</h2>
+      </div>
+      <p class="otp-muted">
+        Once you book a driver through Mera Driver, your trips will show up here.
+      </p>
+    </section>
+  } @else {
+    @for (b of bookings(); track b.id) {
+      <section class="account-card">
+        <div class="account-card__head">
+          <h2>{{ b.bookingCode }}</h2>
+          <sky-badge [variant]="b.status === 'completed' ? 'primary' : b.status === 'cancelled' ? 'error' : 'secondary'">
+            {{ b.status }}
+          </sky-badge>
+        </div>
+        <p class="otp-muted">
+          @if (b.pickupAddress) { {{ b.pickupAddress }} }
+          @if (b.dropAddress) { → {{ b.dropAddress }} }
+        </p>
+        <p class="otp-muted">
+          @if (b.driverName) { Driver: {{ b.driverName }} · }
+          @if (b.scheduledAt) { {{ b.scheduledAt }} }
+        </p>
+      </section>
+    }
+  }
+</md-admin-page>

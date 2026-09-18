@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FilledButton, OutlinedButton, OutlinedTextField, Tabs, PrimaryTab, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import content from '../../../content.json';
 import { googleSignInUrl, requestOtp } from '../../../api/rbac/auth';
 import { ApiRequestError } from '../../../api/rbac/client';
+import { extractReturnUrl } from '../../../auth/role-routing';
 import logo from '../../../assets/logo.jpg';
 import logo2 from '../../../assets/logo2.jpg';
 type Method = 'email' | 'phone';
@@ -25,6 +26,8 @@ const validatePhone = (value: string) =>
   /^[6-9]\d{9}$/.test(value);
 export function SignIn() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnUrl = extractReturnUrl(location);
   const [method, setMethod] = useState<Method>('phone');
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
@@ -56,7 +59,7 @@ export function SignIn() {
     setLoading(true);
     try {
       await requestOtp(input, 'login');
-      navigate('/otp', { state: { identifier: input, method } });
+      navigate('/otp', { state: { identifier: input, method, returnUrl } });
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : auth.validation.somethingWentWrong);
     } finally {

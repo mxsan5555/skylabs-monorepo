@@ -65,6 +65,11 @@
   box-sizing: border-box;
 }
 
+/* Products tab has no "Your selection" aside — main card takes the full width */
+.vendor-page__body--full-width {
+  grid-template-columns: 1fr;
+}
+
 /* ─── Card base ───────────────────────────────────────────────────────────── */
 .vendor-page__main-card,
 .vendor-page__selection-card {
@@ -130,17 +135,17 @@
   --md-icon-size: 16px;
 }
 
-/* ─── Branch selector tabs ────────────────────────────────────────────────── */
-.vendor-page__branch-tabs-wrap {
+/* ─── Deals / Products / Therapies tabs ──────────────────────────────────── */
+.vendor-page__section-tabs-wrap {
   overflow-x: auto;
   scrollbar-width: none;
 }
 
-.vendor-page__branch-tabs-wrap::-webkit-scrollbar {
+.vendor-page__section-tabs-wrap::-webkit-scrollbar {
   display: none;
 }
 
-.vendor-page__branch-tabs {
+.vendor-page__section-tabs {
   display: block;
 }
 

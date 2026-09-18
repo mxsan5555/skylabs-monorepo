@@ -70,8 +70,8 @@ describe('self-lockout protection', () => {
   });
 });
 
-describe('driver users are excluded from User Management', () => {
-  it('listUsers() findMany/count both receive a roles.none.role.key=driver filter', async () => {
+describe('driver and customer users are excluded from User Management', () => {
+  it('listUsers() findMany/count both receive a roles.none.role.key IN (driver, customer) filter', async () => {
     mockPrisma.user.findMany.mockResolvedValue([]);
     mockPrisma.user.count.mockResolvedValue(0);
     mockPrisma.$transaction.mockImplementationOnce(async (arg: unknown) =>
@@ -81,7 +81,12 @@ describe('driver users are excluded from User Management', () => {
     await listUsers();
 
     expect(mockPrisma.user.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ roles: { none: { role: { key: 'driver' } } } }) }),
+      expect.objectContaining({
+        where: expect.objectContaining({ roles: { none: { role: { key: { in: ['driver', 'customer'] } } } } }),
+      }),
+    );
+    expect(mockPrisma.user.count).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ roles: { none: { role: { key: { in: ['driver', 'customer'] } } } } }) }),
     );
   });
 

@@ -158,4 +158,52 @@ router.get('/contact-us', async (_req, res, next) => {
   }
 });
 
+router.get('/faqs', async (_req, res, next) => {
+  try {
+    sendData(res, await catalogService.listPublicFaqs());
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/blog-categories', async (_req, res, next) => {
+  try {
+    sendData(res, await catalogService.listPublicBlogCategories());
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/pages/:slug', validateParams(z.object({ slug: z.string().min(1) })), async (req, res, next) => {
+  try {
+    sendData(res, await catalogService.getPublicWebsitePageBySlug(req.params.slug));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/how-it-works', async (_req, res, next) => {
+  try {
+    sendData(res, await catalogService.getPublicHowItWorks());
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/careers', async (_req, res, next) => {
+  try {
+    sendData(res, await catalogService.getPublicCareers());
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/social-links', async (_req, res, next) => {
+  try {
+    sendData(res, await catalogService.listPublicSocialMediaLinks());
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

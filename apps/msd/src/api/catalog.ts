@@ -150,6 +150,10 @@ export interface CatalogVendorBranch {
   pincode: string | null;
   phone: string | null;
   openingHours: CatalogOpeningHours | null;
+  /** Decimal → string over the wire, nullable — see `CatalogDeal.branch`'s identical field doc
+   *  comment. Used client-side to resolve the customer's nearest branch (never fabricated). */
+  latitude: string | null;
+  longitude: string | null;
   therapists: CatalogVendorTherapist[];
 }
 
@@ -323,4 +327,126 @@ export function getCatalogAboutUs() {
 
 export function getCatalogContactUs() {
   return apiGet<CatalogContactUs>('/catalog/contact-us', null);
+}
+
+/** `GET /catalog/faqs` — always `isActive` only, ordered by `sortOrder` (see msd-api's `Faq`
+ *  schema doc comment). No pagination — the home page's FAQ accordion renders the whole list. */
+export interface CatalogFaq {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export function listCatalogFaqs() {
+  return apiGet<CatalogFaq[]>('/catalog/faqs', null);
+}
+
+// ─── CMS (Blog categories / Website pages / How It Works / Careers / Social links) — same
+// "no auth, one function per public GET" discipline as every other function in this file. ──────
+
+/** `GET /catalog/blog-categories` — always `isActive: true`, ordered (see msd-api's
+ *  `listPublicBlogCategories` doc comment). Drives the Blog index's category filter facet. */
+export interface CatalogBlogCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+}
+
+export function listCatalogBlogCategories() {
+  return apiGet<CatalogBlogCategory[]>('/catalog/blog-categories', null);
+}
+
+/** One of the 4 fixed `WebsitePage` rows (privacy/terms/accessibility/cookies) — always
+ *  `status: 'PUBLISHED'` server-side (see msd-api's `getPublicWebsitePageBySlugOrThrow`).
+ *  `content` is a `BlogBlock[]`, same convention as `CatalogAboutUs.body` above, rendered with
+ *  `blog-detail.tsx`'s shared `renderBlock`. */
+export interface CatalogWebsitePage {
+  id: string;
+  slug: string;
+  title: string;
+  content: BlogBlock[];
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+}
+
+export function getCatalogPage(slug: string) {
+  return apiGet<CatalogWebsitePage>(`/catalog/pages/${encodeURIComponent(slug)}`, null);
+}
+
+/** Singleton row (same convention as `CatalogAboutUs`/`CatalogContactUs`) — the public "How It
+ *  Works" page's hero copy. */
+export interface CatalogHowItWorksContent {
+  heroTitle: string;
+  heroSubtitle: string;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+}
+
+/** One active step in the public "How It Works" flow, ordered by `sortOrder` (see msd-api's
+ *  `getPublicHowItWorks` doc comment). `icon` is a Material Symbols icon name, rendered via
+ *  `<md-icon>`/`Icon` — falsy for a step with no icon chosen yet. */
+export interface CatalogHowItWorksStep {
+  id: string;
+  title: string;
+  description: string;
+  icon?: string | null;
+  sortOrder: number;
+}
+
+export interface CatalogHowItWorks {
+  content: CatalogHowItWorksContent;
+  steps: CatalogHowItWorksStep[];
+}
+
+export function getCatalogHowItWorks() {
+  return apiGet<CatalogHowItWorks>('/catalog/how-it-works', null);
+}
+
+/** Singleton row (same convention as `CatalogHowItWorksContent`) — the public "Careers" page's
+ *  hero copy. */
+export interface CatalogCareersContent {
+  heroTitle: string;
+  heroSubtitle: string;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+}
+
+/** One `PUBLISHED` job listing (see msd-api's `getPublicCareers` doc comment) — `applyUrl` and
+ *  `applyInstructions` are both optional; a listing shows whichever one the admin filled in. */
+export interface CatalogCareersJob {
+  id: string;
+  jobTitle: string;
+  department: string;
+  location: string;
+  employmentType: string;
+  description: string;
+  responsibilities: string;
+  requirements: string;
+  applyUrl?: string | null;
+  applyInstructions?: string | null;
+}
+
+export interface CatalogCareers {
+  content: CatalogCareersContent;
+  jobs: CatalogCareersJob[];
+}
+
+export function getCatalogCareers() {
+  return apiGet<CatalogCareers>('/catalog/careers', null);
+}
+
+/** `GET /catalog/social-links` — always `isActive: true`, ordered (see msd-api's
+ *  `listPublicSocialMediaLinks` doc comment). `platform` is freeform text (facebook/instagram/
+ *  youtube/linkedin/x/whatsapp/...); the frontend maps known keys to icons with a generic
+ *  fallback for anything else (see `footer.tsx`'s `SOCIAL_ICONS`). */
+export interface CatalogSocialMediaLink {
+  id: string;
+  platform: string;
+  displayName: string;
+  url: string;
+}
+
+export function listCatalogSocialLinks() {
+  return apiGet<CatalogSocialMediaLink[]>('/catalog/social-links', null);
 }

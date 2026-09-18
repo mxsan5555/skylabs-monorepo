@@ -27,6 +27,8 @@ const resolveMock = vi.mocked(resolveGrantedPermissionKeys);
 const prismaMock = vi.mocked(prisma, true);
 
 const BLOG_ID = 'f0f0f0f0-0000-4000-8000-000000000010';
+const CATEGORY_ID = 'c0c0c0c0-0000-4000-8000-000000000099';
+const categoryFixture = { id: CATEGORY_ID, name: 'Wellness', slug: 'wellness' };
 
 /** A byte-exact, magic-byte-valid JPEG buffer within the 30KB-80KB window — same helper
  *  convention as categories.routes.test.ts / media.routes.test.ts. */
@@ -43,7 +45,8 @@ const blogPostFixture = {
   title: 'Deep Tissue Massage Benefits',
   slug: 'deep-tissue-massage-benefits',
   excerpt: 'Everything you need to know.',
-  categorySlug: 'wellness',
+  categoryId: CATEGORY_ID,
+  category: categoryFixture,
   body: [{ type: 'paragraph', text: 'Hello world' }],
   author: 'Jane Doe',
   readMinutes: 4,
@@ -59,7 +62,7 @@ const validCreatePayload = {
   title: 'Deep Tissue Massage Benefits',
   slug: 'deep-tissue-massage-benefits',
   excerpt: 'Everything you need to know.',
-  categorySlug: 'wellness',
+  categoryId: CATEGORY_ID,
   body: [{ type: 'paragraph', text: 'Hello world' }],
   author: 'Jane Doe',
   readMinutes: 4,
@@ -118,13 +121,13 @@ describe('GET /api/v1/blog-posts', () => {
     );
   });
 
-  it('filters by categorySlug', async () => {
+  it('filters by categoryId', async () => {
     resolveMock.mockResolvedValue(['cms.blog:view']);
     prismaMock.blogPost.findMany.mockResolvedValue([]);
     prismaMock.blogPost.count.mockResolvedValue(0);
-    await request(app).get('/api/v1/blog-posts?categorySlug=wellness').set('Authorization', authHeader());
+    await request(app).get(`/api/v1/blog-posts?categoryId=${CATEGORY_ID}`).set('Authorization', authHeader());
     expect(prismaMock.blogPost.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ categorySlug: 'wellness' }) }),
+      expect.objectContaining({ where: expect.objectContaining({ categoryId: CATEGORY_ID }) }),
     );
   });
 
@@ -135,6 +138,57 @@ describe('GET /api/v1/blog-posts', () => {
     const res = await request(app).get('/api/v1/blog-posts?status=DRAFT').set('Authorization', authHeader());
     expect(res.status).toBe(200);
     expect(res.body.data[0].status).toBe('DRAFT');
+  });
+});
+
+/**
+ * Feature: categorySlug -> categoryId migration regression check
+ * Scenario: verifying the BlogPost.categorySlug -> BlogPost.categoryId FK migration didn't
+ * orphan any existing post (i.e. every post's categoryId still resolves to a real BlogCategory
+ * row through the `category` relation the admin list/read now always `include`s).
+ *
+ * Given: the admin blog post list is read after the migration
+ * When: the list is fetched
+ * Then: the query always includes the `category` relation, and every returned post carries a
+ * non-null, fully-populated category (never a dangling/orphaned categoryId with no matching row)
+ *
+ * Edge cases:
+ * - a post whose category relation resolves to null (would indicate an orphaned FK) is
+ *   distinguishable from a healthy row — this test asserts the happy path never produces one
+ */
+describe('Regression: BlogPost.categorySlug -> categoryId migration', () => {
+  it('always includes the category relation on the admin list read', async () => {
+    resolveMock.mockResolvedValue(['cms.blog:view']);
+    prismaMock.blogPost.findMany.mockResolvedValue([blogPostFixture]);
+    prismaMock.blogPost.count.mockResolvedValue(1);
+    await request(app).get('/api/v1/blog-posts').set('Authorization', authHeader());
+    expect(prismaMock.blogPost.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ include: expect.objectContaining({ category: true }) }),
+    );
+  });
+
+  it('every post returned by the admin list resolves a real, non-null BlogCategory — no orphaned categoryId', async () => {
+    resolveMock.mockResolvedValue(['cms.blog:view']);
+    prismaMock.blogPost.findMany.mockResolvedValue([blogPostFixture, { ...blogPostFixture, id: 'another-post-id' }]);
+    prismaMock.blogPost.count.mockResolvedValue(2);
+    const res = await request(app).get('/api/v1/blog-posts').set('Authorization', authHeader());
+    expect(res.status).toBe(200);
+    for (const post of res.body.data) {
+      expect(post.categoryId).toBeDefined();
+      expect(post.category).toBeTruthy();
+      expect(post.category.id).toBe(post.categoryId);
+    }
+  });
+
+  it('the single-post read also includes the category relation, never a bare categoryId with no resolved row', async () => {
+    resolveMock.mockResolvedValue(['cms.blog:view']);
+    prismaMock.blogPost.findUnique.mockResolvedValue(blogPostFixture);
+    const res = await request(app).get(`/api/v1/blog-posts/${BLOG_ID}`).set('Authorization', authHeader());
+    expect(res.status).toBe(200);
+    expect(res.body.data.category).toBeTruthy();
+    expect(prismaMock.blogPost.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ include: expect.objectContaining({ category: true }) }),
+    );
   });
 });
 
