@@ -12,7 +12,13 @@ import customersRoutes from './routes/customers.routes';
 import vendorsRoutes from './routes/vendors.routes';
 import categoriesRoutes from './routes/categories.routes';
 import blogPostsRoutes from './routes/blog-posts.routes';
+import blogCategoriesRoutes from './routes/blog-categories.routes';
+import faqsRoutes from './routes/faqs.routes';
 import siteContentRoutes from './routes/site-content.routes';
+import websitePagesRoutes from './routes/website-pages.routes';
+import howItWorksRoutes from './routes/how-it-works.routes';
+import careersRoutes from './routes/careers.routes';
+import socialMediaRoutes from './routes/social-media.routes';
 import popularTagsRoutes from './routes/popular-tags.routes';
 import catalogRoutes from './routes/catalog.routes';
 import cartRoutes from './routes/cart.routes';
@@ -72,10 +78,16 @@ export function createApp(): express.Express {
   api.use('/vendors', vendorsRoutes);
   api.use('/categories', categoriesRoutes);
   api.use('/blog-posts', blogPostsRoutes);
+  api.use('/blog-categories', blogCategoriesRoutes);
+  api.use('/faqs', faqsRoutes);
   // site-content.routes.ts declares its own full paths (`/about-us`, `/contact-us`) rather than
   // living under a shared resource prefix — see that file's own doc comment — so it mounts at
   // the API root, not a sub-path, to avoid double-prefixing (e.g. NOT /site-content/about-us).
   api.use('/', siteContentRoutes);
+  api.use('/website-pages', websitePagesRoutes);
+  api.use('/how-it-works', howItWorksRoutes);
+  api.use('/careers', careersRoutes);
+  api.use('/social-media', socialMediaRoutes);
   api.use('/popular-tags', popularTagsRoutes);
   api.use('/catalog', catalogRoutes);
   api.use('/cart', cartRoutes);

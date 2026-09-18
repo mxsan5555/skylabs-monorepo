@@ -11,6 +11,7 @@ import { makeMasterListRouter } from './lib/masterListRouter';
 import authRoutes from './routes/auth.routes';
 import rbacRoutes from './routes/rbac.routes';
 import customersRoutes from './routes/customers.routes';
+import customerSelfRoutes from './routes/customerSelf.routes';
 import driverSelfRoutes from './routes/driverSelf.routes';
 import driversRoutes from './routes/drivers.routes';
 import vehiclesRoutes from './routes/vehicles.routes';
@@ -54,11 +55,13 @@ export function createApp() {
 
   // Business domain — Phase 1 (real CRUD, Postgres-backed). Each router is gated by
   // `requirePermission('<menuKey>', 'view'|'create'|'edit'|'delete')`.
+  // MUST be registered before `/customers` — otherwise the admin router's `PATCH /:id` would
+  // match `PATCH /customers/me` first (with `id` literally 'me'), swallowing the self-service
+  // route. Customer self-service is ownership-based (`resolveOwnCustomer`), not a permission
+  // grant — a customer has no `customers:*` permission and must never need one for this.
+  app.use('/customers/me', customerSelfRoutes);
   app.use('/customers', customersRoutes);
-  // MUST be registered before `/drivers` — otherwise the admin router's `PATCH /:id` would
-  // match `PATCH /drivers/me` first (with `id` literally 'me'), swallowing the self-service
-  // route. Driver self-service is ownership-based (`resolveOwnDriver`), not a permission
-  // grant — a driver has no `drivers:*` permission and must never need one for this.
+  // Same ordering requirement as above, for the driver self-service router.
   app.use('/drivers/me', driverSelfRoutes);
   app.use('/drivers', driversRoutes);
   app.use('/vehicles', vehiclesRoutes);

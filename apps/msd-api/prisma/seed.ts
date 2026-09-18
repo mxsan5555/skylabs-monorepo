@@ -69,6 +69,15 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   'cms.blog': ['create', 'edit', 'delete'],
   'cms.about-us': ['edit'],
   'cms.contact-us': ['edit'],
+  'cms.faq': ['create', 'edit', 'delete'],
+  // Phase 1 CMS content types (add_cms_content_types migration): Blog Categories/How It
+  // Works/Careers are full CRUD; Website Pages (the 4 fixed legal pages) is edit-only, same
+  // "no create/delete concept for a row that always exists" convention as About Us/Contact Us.
+  'cms.blog-category': ['create', 'edit', 'delete'],
+  'cms.website-pages': ['edit'],
+  'cms.how-it-works': ['create', 'edit', 'delete'],
+  'cms.careers': ['create', 'edit', 'delete'],
+  'cms.social-media': ['create', 'edit', 'delete'],
 };
 
 function flattenMenu(nodes: readonly MenuNode[]): MenuNode[] {
@@ -184,6 +193,7 @@ async function grantStarterPermissions(
     'settings:view', 'settings:edit',
     'cms:view', 'cms.blog:view', 'cms.blog:create', 'cms.blog:edit', 'cms.blog:delete',
     'cms.about-us:view', 'cms.about-us:edit', 'cms.contact-us:view', 'cms.contact-us:edit',
+    'cms.faq:view', 'cms.faq:create', 'cms.faq:edit', 'cms.faq:delete',
   ]);
 
   await grant('marketing', [
@@ -196,6 +206,8 @@ async function grantStarterPermissions(
     // 'masters.categories' above.
     'cms:view', 'cms.blog:view', 'cms.blog:create', 'cms.blog:edit',
     'cms.about-us:view', 'cms.about-us:edit', 'cms.contact-us:view', 'cms.contact-us:edit',
+    // No 'cms.faq:delete' — same create/edit-but-no-delete grant as this role's 'cms.blog' above.
+    'cms.faq:view', 'cms.faq:create', 'cms.faq:edit',
   ]);
 
   await grant('sales', [
@@ -1384,6 +1396,39 @@ async function seedDemoCustomerActivity(
   return customerId;
 }
 
+/** The same 4 Q&A pairs that used to live in the frontend's static `content.json` — seeded once
+ *  (guarded on an empty table, since Faq has no natural unique key to upsert against) so the
+ *  public home page isn't blank the first time this migrates from static content to the CMS. */
+const FAQ_SEEDS: { question: string; answer: string; sortOrder: number }[] = [
+  {
+    question: 'How do I book a spa deal?',
+    answer: 'Select your preferred deal, choose a date and time, then complete the payment to confirm your booking.',
+    sortOrder: 0,
+  },
+  {
+    question: 'Can I cancel or reschedule my booking?',
+    answer: 'Yes. Most bookings can be cancelled or rescheduled before the cancellation deadline mentioned on the deal page.',
+    sortOrder: 1,
+  },
+  {
+    question: 'Are gift cards valid for all spas?',
+    answer: 'Gift cards can be redeemed at participating spas listed on My Spa Deals.',
+    sortOrder: 2,
+  },
+  {
+    question: 'How do I contact customer support?',
+    answer: 'You can contact our support team through the Contact Us page or email us anytime.',
+    sortOrder: 3,
+  },
+];
+
+async function seedFaqs(): Promise<number> {
+  const existing = await prisma.faq.count();
+  if (existing > 0) return 0;
+  await prisma.faq.createMany({ data: FAQ_SEEDS });
+  return FAQ_SEEDS.length;
+}
+
 async function main() {
   const roles = await seedRoles();
   const permissionIdByKey = await seedPermissions();
@@ -1391,7 +1436,9 @@ async function main() {
   await grantStarterPermissions(roles, permissionIdByKey);
   await seedDashboardWidgets(roles);
   await seedSuperAdminUser(roles);
+  const faqsSeeded = await seedFaqs();
   console.log(`Seeded ${roles.size} roles and ${permissionIdByKey.size} permissions.`);
+  console.log(`FAQs: ${faqsSeeded} seeded this run.`);
 
   const categoryIdBySlug = await seedCategoryTaxonomy();
   // Vendors must exist before Products (Product.vendorId is required — see the

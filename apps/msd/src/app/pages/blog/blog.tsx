@@ -2,7 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Icon, OutlinedButton, FilledButton, FilledTonalButton, TextButton, OutlinedTextField, Radio, Checkbox, } from '@skylabs-monorepo/shared-ui/react';
 import type { BlogPost, BlogSort, ReadingBucket } from '../../../types';
-import { queryPosts, categoryName, categoryList, authorList, tagList, formatDate, PAGE_SIZE, } from '../../../blog/blog';
+import {
+  queryPosts,
+  categoryName,
+  authorList,
+  tagList,
+  formatDate,
+  PAGE_SIZE,
+} from '../../../blog/blog';
+import { listCatalogBlogCategories, type CatalogBlogCategory } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import './blog.css';
 
@@ -54,7 +62,23 @@ export function Blog() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [categories, setCategories] = useState<CatalogBlogCategory[]>([]);
+
   const requestedPage = Math.max(1, Number(params.get('page')) || 1);
+
+  useEffect(() => {
+    let cancelled = false;
+    listCatalogBlogCategories()
+      .then(({ data }) => {
+        if (!cancelled) setCategories(data);
+      })
+      .catch(() => {
+        if (!cancelled) setCategories([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,7 +102,6 @@ export function Blog() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, requestedPage]);
-  const categories = categoryList();
   const authors = authorList();
   const tags = tagList();
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));

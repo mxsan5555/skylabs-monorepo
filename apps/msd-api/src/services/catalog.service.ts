@@ -5,6 +5,12 @@ import { listActiveCategories, getActiveCategoryBySlugOrThrow } from './category
 import { getActiveTagNamesFor } from './popular-tag.service';
 import * as blogPostService from './blog-post.service';
 import * as siteContentService from './site-content.service';
+import * as faqService from './faq.service';
+import * as blogCategoryService from './blog-category.service';
+import * as websitePageService from './website-page.service';
+import * as howItWorksService from './how-it-works.service';
+import * as careersService from './careers.service';
+import * as socialMediaService from './social-media.service';
 
 type TagRef = { id: string; name: string; slug: string };
 
@@ -190,6 +196,8 @@ const PUBLIC_VENDOR_DETAIL_SELECT = {
       pincode: true,
       phone: true,
       openingHours: true,
+      latitude: true,
+      longitude: true,
       therapists: {
         where: { isActive: true },
         select: PUBLIC_THERAPIST_SELECT,
@@ -690,4 +698,28 @@ export async function getPublicAboutUs() {
 
 export async function getPublicContactUs() {
   return siteContentService.getPublicContactUs();
+}
+
+export async function listPublicFaqs() {
+  return faqService.listPublicFaqs();
+}
+
+export async function listPublicBlogCategories() {
+  return blogCategoryService.listPublicBlogCategories();
+}
+
+export async function getPublicWebsitePageBySlug(slug: string) {
+  return websitePageService.getPublicWebsitePageBySlugOrThrow(slug);
+}
+
+export async function getPublicHowItWorks() {
+  return howItWorksService.getPublicHowItWorks();
+}
+
+export async function getPublicCareers() {
+  return careersService.getPublicCareers();
+}
+
+export async function listPublicSocialMediaLinks() {
+  return socialMediaService.listPublicSocialMediaLinks();
 }

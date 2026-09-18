@@ -29,8 +29,8 @@ function requestMeta(req: Request) {
 
 router.get('/', requirePermission('cms.blog', 'view'), validateQuery(BlogPostListQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, search, status, categorySlug } = req.validatedQuery as ReturnType<typeof BlogPostListQuerySchema.parse>;
-    const { items, total } = await blogPostService.listBlogPosts({ page, pageSize, search, status, categorySlug });
+    const { page, pageSize, search, status, categoryId } = req.validatedQuery as ReturnType<typeof BlogPostListQuerySchema.parse>;
+    const { items, total } = await blogPostService.listBlogPosts({ page, pageSize, search, status, categoryId });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);

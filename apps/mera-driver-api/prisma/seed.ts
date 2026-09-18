@@ -87,6 +87,10 @@ const LEAF_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete'];
 // already gated by `drivers:assign` in the routes without ever having a grantable Permission
 // row for a non-superadmin role) on top of the leaf default.
 const DRIVERS_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete', 'status_change', 'assign'];
+// Adds `assign` for the Customer <-> User self-service-portal linkage routes
+// (link-user/unlink-user/create-user), same reasoning as `DRIVERS_ACTIONS` above — without
+// this the Permission row wouldn't exist to grant `customers:assign` to any non-superadmin role.
+const CUSTOMERS_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete', 'assign'];
 // Row-level scoping for this menu is ownership (assignedVerifierId === caller), not
 // permission — `view` here only gates whether the "KYC Assignments" screen appears at all.
 const KYC_ASSIGNMENTS_ACTIONS: PermissionAction[] = ['view'];
@@ -102,6 +106,8 @@ function actionsForNode(node: MenuNode): PermissionAction[] {
       return RBAC_AUDIT_ACTIONS;
     case 'drivers':
       return DRIVERS_ACTIONS;
+    case 'customers':
+      return CUSTOMERS_ACTIONS;
     case 'kyc-assignments':
       return KYC_ASSIGNMENTS_ACTIONS;
     default:
@@ -233,6 +239,10 @@ async function grantNewRolePermissions(roles: Map<string, { id: string }>) {
   // Admin needs this out of the box for the Driver List's Activate/Deactivate and Assign-
   // Verifier actions — the baseline grant above only gives `admin` `view` on `drivers`.
   await grantActionsOf('admin', ['drivers'], ['status_change', 'assign']);
+
+  // Admin needs this to link/unlink/create a Customer's self-service portal login from the
+  // Customers admin screen — mirrors the driver-side `assign` grant above.
+  await grantActionsOf('admin', ['customers'], ['assign']);
 
   // Customer needs this for the "want a driver" booking flow's prerequisites (the /ride/*
   // frontend itself is still a UI prototype — see GET /drivers/available and

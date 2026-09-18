@@ -51,6 +51,22 @@ import {
   PublicBlogPostListQuerySchema,
 } from '../schemas/blog-post.schema';
 import { AboutUsUpdateSchema, ContactUsUpdateSchema } from '../schemas/site-content.schema';
+import { FaqCreateSchema, FaqUpdateSchema, FaqStatusUpdateSchema } from '../schemas/faq.schema';
+import { BlogCategoryCreateSchema, BlogCategoryUpdateSchema } from '../schemas/blog-category.schema';
+import { WebsitePageUpdateSchema } from '../schemas/website-page.schema';
+import {
+  HowItWorksContentUpdateSchema,
+  HowItWorksStepCreateSchema,
+  HowItWorksStepUpdateSchema,
+  HowItWorksStepReorderSchema,
+} from '../schemas/how-it-works.schema';
+import {
+  CareersPageContentUpdateSchema,
+  CareersJobListingCreateSchema,
+  CareersJobListingUpdateSchema,
+  CareersJobListingStatusUpdateSchema,
+} from '../schemas/careers.schema';
+import { SocialMediaLinkCreateSchema, SocialMediaLinkUpdateSchema } from '../schemas/social-media.schema';
 import {
   PopularTagCreateSchema,
   PopularTagUpdateSchema,
@@ -1496,6 +1512,55 @@ export function buildOpenApiDocument() {
     responses: { 200: { description: 'Contact Us content' } },
   });
 
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/faqs',
+    summary: 'Public FAQ list — always isActive only, ordered by sortOrder',
+    tags: ['Catalogue (public)'],
+    responses: { 200: { description: 'FAQs' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/blog-categories',
+    summary: 'Public blog category list — always isActive only, ordered by sortOrder',
+    tags: ['Catalogue (public)'],
+    responses: { 200: { description: 'Blog categories' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/pages/{slug}',
+    summary: 'A single public website page (Privacy Policy/Terms of Service/Accessibility/Cookie Policy) — 404s if not found or not PUBLISHED',
+    tags: ['Catalogue (public)'],
+    request: { params: z.object({ slug: z.string() }) },
+    responses: { 200: { description: 'Website page' }, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/how-it-works',
+    summary: 'Public How It Works content — { content, steps } with active steps only, ordered by sortOrder',
+    tags: ['Catalogue (public)'],
+    responses: { 200: { description: 'How It Works content' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/careers',
+    summary: 'Public Careers content — { content, jobs } with PUBLISHED jobs only, ordered by sortOrder',
+    tags: ['Catalogue (public)'],
+    responses: { 200: { description: 'Careers content' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/social-links',
+    summary: 'Public social media link list — always isActive only, ordered by sortOrder',
+    tags: ['Catalogue (public)'],
+    responses: { 200: { description: 'Social media links' } },
+  });
+
   // ─── Cart (customer self-service — service deals, products, and therapists) ──
 
   registry.registerPath({
@@ -1916,6 +1981,73 @@ export function buildOpenApiDocument() {
     responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse },
   });
 
+  // ─── FAQ (admin CRUD, mirrors Blog Posts' registration style, minus the media sub-paths) ────
+
+  registry.registerPath({
+    method: 'get',
+    path: '/faqs',
+    summary: 'List FAQs (?search=)',
+    tags: ['FAQ'],
+    security: bearer,
+    responses: { 200: { description: 'FAQs' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/faqs',
+    summary: 'Create an FAQ',
+    tags: ['FAQ'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: FaqCreateSchema } } } },
+    responses: { 201: { description: 'Created' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/faqs/{id}',
+    summary: 'Get an FAQ by id',
+    tags: ['FAQ'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'FAQ' }, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/faqs/{id}',
+    summary: 'Update an FAQ',
+    tags: ['FAQ'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: FaqUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' } },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/faqs/{id}/status',
+    summary: 'Activate/deactivate an FAQ',
+    tags: ['FAQ'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: FaqStatusUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' } },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/faqs/{id}',
+    summary: 'Delete an FAQ',
+    tags: ['FAQ'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Deleted' } },
+  });
+
   // ─── About Us / Contact Us (admin — both singleton rows, no :id in any path) ────────────────
 
   registry.registerPath({
@@ -1994,6 +2126,307 @@ export function buildOpenApiDocument() {
     security: bearer,
     request: { body: { content: { 'application/json': { schema: ContactUsUpdateSchema } } } },
     responses: { 200: { description: 'Updated' } },
+  });
+
+  // ─── Blog Categories (admin CRUD, mirrors FAQ's registration style, minus media/status) ─────
+
+  registry.registerPath({
+    method: 'get',
+    path: '/blog-categories',
+    summary: 'List blog categories (?search=)',
+    tags: ['Blog Categories'],
+    security: bearer,
+    responses: { 200: { description: 'Blog categories' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/blog-categories',
+    summary: 'Create a blog category',
+    tags: ['Blog Categories'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: BlogCategoryCreateSchema } } } },
+    responses: { 201: { description: 'Created' }, 409: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/blog-categories/{id}',
+    summary: 'Get a blog category by id',
+    tags: ['Blog Categories'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Blog category' }, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/blog-categories/{id}',
+    summary: 'Update a blog category (isActive is a plain field here — no separate /status route)',
+    tags: ['Blog Categories'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: BlogCategoryUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' } },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/blog-categories/{id}',
+    summary: 'Delete a blog category (must have no referencing blog posts)',
+    tags: ['Blog Categories'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Deleted' }, 409: errorResponse },
+  });
+
+  // ─── Website Pages (admin — the 4 fixed legal pages; no create/delete route) ────────────────
+
+  registry.registerPath({
+    method: 'get',
+    path: '/website-pages',
+    summary: 'List website pages (?search=) — always the 4 fixed legal pages',
+    tags: ['Website Pages'],
+    security: bearer,
+    responses: { 200: { description: 'Website pages' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/website-pages/{id}',
+    summary: 'Get a website page by id',
+    tags: ['Website Pages'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Website page' }, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/website-pages/{id}',
+    summary: 'Update a website page (title/content/status/meta — slug is fixed, not editable)',
+    tags: ['Website Pages'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: WebsitePageUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' } },
+  });
+
+  // ─── How It Works (admin — singleton hero content + a reorderable list of steps) ────────────
+
+  registry.registerPath({
+    method: 'get',
+    path: '/how-it-works',
+    summary: 'Get the How It Works hero content (singleton — auto-created with defaults on first read)',
+    tags: ['How It Works'],
+    security: bearer,
+    responses: { 200: { description: 'How It Works content' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/how-it-works',
+    summary: 'Update the How It Works hero content (upserts the singleton row)',
+    tags: ['How It Works'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: HowItWorksContentUpdateSchema } } } },
+    responses: { 200: { description: 'Updated' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/how-it-works/steps',
+    summary: 'List How It Works steps',
+    tags: ['How It Works'],
+    security: bearer,
+    responses: { 200: { description: 'Steps' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/how-it-works/steps',
+    summary: 'Create a How It Works step',
+    tags: ['How It Works'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: HowItWorksStepCreateSchema } } } },
+    responses: { 201: { description: 'Created' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/how-it-works/steps/reorder',
+    summary: "Reorder the How It Works steps (must supply every current step's id)",
+    tags: ['How It Works'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: HowItWorksStepReorderSchema } } } },
+    responses: { 200: { description: 'Reordered' }, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/how-it-works/steps/{id}',
+    summary: 'Update a How It Works step',
+    tags: ['How It Works'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: HowItWorksStepUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' } },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/how-it-works/steps/{id}',
+    summary: 'Delete a How It Works step',
+    tags: ['How It Works'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Deleted' } },
+  });
+
+  // ─── Careers (admin — singleton hero content + full CRUD job listings) ──────────────────────
+
+  registry.registerPath({
+    method: 'get',
+    path: '/careers',
+    summary: 'Get the Careers hero content (singleton — auto-created with defaults on first read)',
+    tags: ['Careers'],
+    security: bearer,
+    responses: { 200: { description: 'Careers content' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/careers',
+    summary: 'Update the Careers hero content (upserts the singleton row)',
+    tags: ['Careers'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: CareersPageContentUpdateSchema } } } },
+    responses: { 200: { description: 'Updated' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/careers/jobs',
+    summary: 'List job listings (?search=, ?status=DRAFT|PUBLISHED)',
+    tags: ['Careers'],
+    security: bearer,
+    responses: { 200: { description: 'Job listings' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/careers/jobs',
+    summary: 'Create a job listing',
+    tags: ['Careers'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: CareersJobListingCreateSchema } } } },
+    responses: { 201: { description: 'Created' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/careers/jobs/{id}',
+    summary: 'Get a job listing by id',
+    tags: ['Careers'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Job listing' }, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/careers/jobs/{id}',
+    summary: 'Update a job listing',
+    tags: ['Careers'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: CareersJobListingUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' } },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/careers/jobs/{id}/status',
+    summary: 'Publish/unpublish a job listing',
+    tags: ['Careers'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: CareersJobListingStatusUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' } },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/careers/jobs/{id}',
+    summary: 'Delete a job listing',
+    tags: ['Careers'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Deleted' } },
+  });
+
+  // ─── Social Media Links (admin CRUD, mirrors FAQ's registration style, minus media/status) ──
+
+  registry.registerPath({
+    method: 'get',
+    path: '/social-media',
+    summary: 'List social media links (?search=)',
+    tags: ['Social Media'],
+    security: bearer,
+    responses: { 200: { description: 'Social media links' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/social-media',
+    summary: 'Create a social media link',
+    tags: ['Social Media'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: SocialMediaLinkCreateSchema } } } },
+    responses: { 201: { description: 'Created' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/social-media/{id}',
+    summary: 'Get a social media link by id',
+    tags: ['Social Media'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Social media link' }, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/social-media/{id}',
+    summary: 'Update a social media link (isActive is a plain field here — no separate /status route)',
+    tags: ['Social Media'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: SocialMediaLinkUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' } },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/social-media/{id}',
+    summary: 'Delete a social media link',
+    tags: ['Social Media'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Deleted' } },
   });
 
   // ─── Business module stubs ───────────────────────────────────────────────────

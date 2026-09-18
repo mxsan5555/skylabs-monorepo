@@ -4,6 +4,7 @@ import { FilledButton, OutlinedButton, OutlinedTextField, Tabs, PrimaryTab, Icon
 import content from '../../../content.json';
 import { googleSignInUrl, requestOtp } from '../../../api/rbac/auth';
 import { ApiRequestError } from '../../../api/rbac/client';
+import { extractReturnUrl } from '../../../auth/role-routing';
 import logo from '../../../assets/logo.jpg';
 import logo2 from '../../../assets/logo2.jpg';
 type Method = 'email' | 'phone';

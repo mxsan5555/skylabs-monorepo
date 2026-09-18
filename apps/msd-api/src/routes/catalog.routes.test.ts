@@ -577,7 +577,7 @@ const publishedPostFixture = {
   title: 'Deep Tissue Massage Benefits',
   slug: 'deep-tissue-massage-benefits',
   excerpt: 'Everything you need to know.',
-  categorySlug: 'wellness',
+  category: { slug: 'wellness' },
   body: [{ type: 'paragraph', text: 'Hello world' }],
   author: 'Jane Doe',
   readMinutes: 4,
@@ -623,7 +623,10 @@ describe('GET /api/v1/catalog/blog-posts', () => {
     await request(app).get('/api/v1/catalog/blog-posts?categorySlug=wellness&search=tissue');
     expect(prismaMock.blogPost.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ categorySlug: 'wellness', title: { contains: 'tissue', mode: 'insensitive' } }),
+        where: expect.objectContaining({
+          category: { is: { slug: 'wellness' } },
+          title: { contains: 'tissue', mode: 'insensitive' },
+        }),
       }),
     );
   });
@@ -727,5 +730,198 @@ describe('GET /api/v1/catalog/contact-us', () => {
     const res = await request(app).get('/api/v1/catalog/contact-us');
     expect(res.status).toBe(200);
     expect(res.body.data.email).toBe('');
+  });
+});
+
+describe('GET /api/v1/catalog/faqs', () => {
+  it('returns only isActive FAQs, with no Authorization header at all', async () => {
+    prismaMock.faq.findMany.mockResolvedValue([
+      { id: 'faq-1', question: 'How do I book?', answer: 'Select a deal and pay.' },
+    ]);
+    const res = await request(app).get('/api/v1/catalog/faqs');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(prismaMock.faq.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { isActive: true } }),
+    );
+  });
+
+  it('never exposes isActive/sortOrder/timestamps — only question/answer', async () => {
+    prismaMock.faq.findMany.mockResolvedValue([
+      { id: 'faq-1', question: 'How do I book?', answer: 'Select a deal and pay.' },
+    ]);
+    const res = await request(app).get('/api/v1/catalog/faqs');
+    expect(prismaMock.faq.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ select: { id: true, question: true, answer: true } }),
+    );
+    expect(res.body.data[0]).not.toHaveProperty('sortOrder');
+  });
+
+  it('returns an empty array when there are no active FAQs — not an error', async () => {
+    prismaMock.faq.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/v1/catalog/faqs');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
+});
+
+/**
+ * Feature: public CMS reads for the new content types (Blog Categories / Legal Pages /
+ * How It Works / Careers / Social Media links).
+ * Scenario: anonymous storefront visitors reading each of these with no auth.
+ *
+ * Given: an anonymous visitor with no Authorization header at all
+ * When: they read blog categories / a legal page by slug / how-it-works / careers / social links
+ * Then: only active/published content is ever visible, and every route works with zero auth
+ *
+ * Edge cases:
+ * - an unknown or DRAFT website-page slug 404s, same as never leaking a hidden page
+ * - an empty result set still returns 200 with an empty array, not an error
+ */
+describe('GET /api/v1/catalog/blog-categories', () => {
+  it('returns only isActive blog categories, with no Authorization header at all', async () => {
+    prismaMock.blogCategory.findMany.mockResolvedValue([
+      { id: 'cat-1', name: 'Wellness', slug: 'wellness', description: null },
+    ]);
+    const res = await request(app).get('/api/v1/catalog/blog-categories');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(prismaMock.blogCategory.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { isActive: true } }),
+    );
+  });
+
+  it('returns an empty array when there are no active categories — not an error', async () => {
+    prismaMock.blogCategory.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/v1/catalog/blog-categories');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
+});
+
+describe('GET /api/v1/catalog/pages/:slug', () => {
+  it('returns the published page by slug with no auth required', async () => {
+    prismaMock.websitePage.findFirst.mockResolvedValue({
+      id: 'page-1',
+      slug: 'privacy-policy',
+      title: 'Privacy Policy',
+      content: [{ type: 'paragraph', text: 'We respect your privacy.' }],
+      status: 'PUBLISHED',
+      metaTitle: null,
+      metaDescription: null,
+    });
+    const res = await request(app).get('/api/v1/catalog/pages/privacy-policy');
+    expect(res.status).toBe(200);
+    expect(res.body.data.slug).toBe('privacy-policy');
+    expect(prismaMock.websitePage.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { slug: 'privacy-policy', status: 'PUBLISHED' } }),
+    );
+  });
+
+  it('404s for a DRAFT page slug — never leaks an unpublished page', async () => {
+    // getPublicWebsitePageBySlugOrThrow's `where` already folds status: 'PUBLISHED' into the
+    // query, so the mock returning null here IS the correct simulation of "this slug exists but
+    // is still a draft".
+    prismaMock.websitePage.findFirst.mockResolvedValue(null);
+    const res = await request(app).get('/api/v1/catalog/pages/still-a-draft');
+    expect(res.status).toBe(404);
+  });
+
+  it('404s for an unknown slug', async () => {
+    prismaMock.websitePage.findFirst.mockResolvedValue(null);
+    const res = await request(app).get('/api/v1/catalog/pages/does-not-exist');
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/v1/catalog/how-it-works', () => {
+  it('returns the hero content plus only active steps, with no Authorization header at all', async () => {
+    prismaMock.howItWorksContent.findUnique.mockResolvedValue({
+      id: 'singleton',
+      heroTitle: 'How It Works',
+      heroSubtitle: 'Book in three easy steps',
+      metaTitle: null,
+      metaDescription: null,
+    });
+    prismaMock.howItWorksStep.findMany.mockResolvedValue([
+      { id: 'step-1', title: 'Choose a Deal', description: 'Browse and pick.', icon: 'search', sortOrder: 0, isActive: true },
+    ]);
+    const res = await request(app).get('/api/v1/catalog/how-it-works');
+    expect(res.status).toBe(200);
+    expect(res.body.data.steps).toHaveLength(1);
+    expect(res.body.data.content.heroTitle).toBe('How It Works');
+    expect(prismaMock.howItWorksStep.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { isActive: true } }),
+    );
+  });
+
+  it('returns an empty steps array when there are no active steps yet — not an error', async () => {
+    prismaMock.howItWorksContent.findUnique.mockResolvedValue({
+      id: 'singleton',
+      heroTitle: null,
+      heroSubtitle: null,
+      metaTitle: null,
+      metaDescription: null,
+    });
+    prismaMock.howItWorksStep.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/v1/catalog/how-it-works');
+    expect(res.status).toBe(200);
+    expect(res.body.data.steps).toEqual([]);
+  });
+});
+
+describe('GET /api/v1/catalog/careers', () => {
+  it('returns the hero content plus only PUBLISHED job listings, with no Authorization header at all', async () => {
+    prismaMock.careersPageContent.findUnique.mockResolvedValue({
+      id: 'singleton',
+      heroTitle: 'Careers',
+      heroSubtitle: 'Join our team',
+      metaTitle: null,
+      metaDescription: null,
+    });
+    prismaMock.careersJobListing.findMany.mockResolvedValue([
+      { id: 'job-1', jobTitle: 'Massage Therapist', status: 'PUBLISHED' },
+    ]);
+    const res = await request(app).get('/api/v1/catalog/careers');
+    expect(res.status).toBe(200);
+    expect(res.body.data.jobs).toHaveLength(1);
+    expect(prismaMock.careersJobListing.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: 'PUBLISHED' } }),
+    );
+  });
+
+  it('never accepts a caller-supplied status override — unpublished DRAFT jobs are excluded server-side', async () => {
+    prismaMock.careersPageContent.findUnique.mockResolvedValue({
+      id: 'singleton',
+      heroTitle: null,
+      heroSubtitle: null,
+      metaTitle: null,
+      metaDescription: null,
+    });
+    prismaMock.careersJobListing.findMany.mockResolvedValue([]);
+    await request(app).get('/api/v1/catalog/careers?status=DRAFT');
+    const call = prismaMock.careersJobListing.findMany.mock.calls[0][0];
+    expect(call.where.status).toBe('PUBLISHED');
+  });
+});
+
+describe('GET /api/v1/catalog/social-links', () => {
+  it('returns only isActive social links, with no Authorization header at all', async () => {
+    prismaMock.socialMediaLink.findMany.mockResolvedValue([
+      { id: 'link-1', platform: 'instagram', displayName: 'Instagram', url: 'https://instagram.com/skylabs' },
+    ]);
+    const res = await request(app).get('/api/v1/catalog/social-links');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(prismaMock.socialMediaLink.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { isActive: true }, select: { id: true, platform: true, displayName: true, url: true } }),
+    );
+  });
+
+  it('returns an empty array when there are no active social links — not an error', async () => {
+    prismaMock.socialMediaLink.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/v1/catalog/social-links');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
   });
 });

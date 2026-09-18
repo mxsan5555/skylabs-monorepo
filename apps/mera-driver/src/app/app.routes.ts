@@ -4,8 +4,11 @@ import { AuthLayout } from './layouts/auth-layout/auth-layout';
 import { AdminLayout } from './layouts/admin-layout/admin-layout';
 import { RiderLayout } from './layouts/rider-layout/rider-layout';
 import { DriverLayout } from './layouts/driver-layout/driver-layout';
+import { CustomerLayout } from './layouts/customer-layout/customer-layout';
 import { authGuard, permissionGuard } from '@skylabs-monorepo/shared-auth/angular';
 import { driverPortalGuard } from './core/auth/driver-portal.guard';
+import { customerPortalGuard } from './core/auth/customer-portal.guard';
+import { adminAreaGuard } from './core/auth/admin-area.guard';
 
 /**
  * Route table.
@@ -79,7 +82,9 @@ export const appRoutes: Routes = [
   {
     path: 'account',
     component: AdminLayout,
-    canActivate: [authGuard],
+    // `adminAreaGuard` redirects a Customer straight to `/customer` before any child route
+    // (or its individual permission grants) is ever evaluated — see that guard's own comment.
+    canActivate: [authGuard, adminAreaGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {
@@ -499,6 +504,47 @@ export const appRoutes: Routes = [
         title: 'Support · Driver Portal',
         loadComponent: () =>
           import('./pages/driver/support/support').then((m) => m.DriverSupport),
+      },
+    ],
+  },
+  {
+    path: 'customer',
+    component: CustomerLayout,
+    canActivate: [authGuard, customerPortalGuard],
+    children: [
+      {
+        path: '',
+        title: 'Dashboard · Customer Portal',
+        loadComponent: () =>
+          import('./pages/customer/dashboard/dashboard').then((m) => m.CustomerDashboard),
+      },
+      {
+        path: 'profile',
+        title: 'My Profile · Customer Portal',
+        loadComponent: () =>
+          import('./pages/customer/profile/profile').then((m) => m.CustomerProfile),
+      },
+      {
+        path: 'bookings',
+        title: 'My Bookings · Customer Portal',
+        loadComponent: () =>
+          import('./pages/customer/bookings/bookings').then((m) => m.CustomerBookings),
+      },
+      {
+        path: 'notifications',
+        title: 'Notifications · Customer Portal',
+        data: { title: 'Notifications', description: 'Notifications are on the way.' },
+        // Reuses the Driver portal's generic placeholder component directly — it's already
+        // fully generic (driven by route `data.title`/`data.description`), no new component
+        // needed just to say "not built yet".
+        loadComponent: () =>
+          import('./pages/driver/coming-soon/coming-soon').then((m) => m.DriverComingSoon),
+      },
+      {
+        path: 'support',
+        title: 'Support · Customer Portal',
+        loadComponent: () =>
+          import('./pages/customer/support/support').then((m) => m.CustomerSupport),
       },
     ],
   },

@@ -52,7 +52,7 @@ export function Otp() {
   useEffect(() => {
     if (!awaitingBootstrap) return;
     if (bootstrap) {
-      navigate(next || resolvePostLoginPath(bootstrap), { replace: true });
+      navigate(resolvePostLoginPath(bootstrap), { replace: true });
     } else if (!token) {
       setAwaitingBootstrap(false);
       setError(otpContent.validation.invalidOtp);

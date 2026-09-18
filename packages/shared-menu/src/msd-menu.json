@@ -181,6 +181,15 @@
         "order": 1
       },
       {
+        "id": "cms-blog-categories",
+        "title": "Blog Categories",
+        "icon": "category",
+        "route": "/account/cms/blog-categories",
+        "permissionKey": "cms.blog-category",
+        "parent": "cms",
+        "order": 1.5
+      },
+      {
         "id": "cms-about-us",
         "title": "About Us",
         "icon": "info",
@@ -197,6 +206,51 @@
         "permissionKey": "cms.contact-us",
         "parent": "cms",
         "order": 3
+      },
+      {
+        "id": "cms-faq",
+        "title": "FAQ",
+        "icon": "quiz",
+        "route": "/account/cms/faq",
+        "permissionKey": "cms.faq",
+        "parent": "cms",
+        "order": 4
+      },
+      {
+        "id": "cms-how-it-works",
+        "title": "How It Works",
+        "icon": "list_alt",
+        "route": "/account/cms/how-it-works",
+        "permissionKey": "cms.how-it-works",
+        "parent": "cms",
+        "order": 5
+      },
+      {
+        "id": "cms-careers",
+        "title": "Careers",
+        "icon": "work",
+        "route": "/account/cms/careers",
+        "permissionKey": "cms.careers",
+        "parent": "cms",
+        "order": 6
+      },
+      {
+        "id": "cms-legal-pages",
+        "title": "Legal Pages",
+        "icon": "policy",
+        "route": "/account/cms/legal-pages",
+        "permissionKey": "cms.website-pages",
+        "parent": "cms",
+        "order": 7
+      },
+      {
+        "id": "cms-social-media",
+        "title": "Social Media",
+        "icon": "share",
+        "route": "/account/cms/social-media",
+        "permissionKey": "cms.social-media",
+        "parent": "cms",
+        "order": 8
       }
     ]
   },

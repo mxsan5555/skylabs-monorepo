@@ -571,6 +571,24 @@ model CategoryImage {
   @@index([categoryId])
 }
 
+/// A blog post's category — a flat list (no tree, unlike Category), same "Active/Inactive +
+/// manual sortOrder" convention as Faq/PopularTag. Introduced to replace BlogPost's original
+/// free-text `categorySlug` column with a real FK (see the `add_cms_content_types` migration's
+/// own comment for the backfill this required).
+model BlogCategory {
+  id          String     @id @default(uuid())
+  name        String
+  slug        String     @unique
+  description String     @default("")
+  isActive    Boolean    @default(true)
+  sortOrder   Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  posts       BlogPost[]
+
+  @@index([isActive, sortOrder])
+}
+
 /// A CMS article — `body` is a `BlogBlock[]` (paragraph/heading/list/quote), matching
 /// apps/msd/src/types/index.ts's `BlogBlock` union exactly (kept in sync by hand, same
 /// discipline as PermissionAction's own "keep in sync" doc comment above). `status` gates public
@@ -578,13 +596,16 @@ model CategoryImage {
 /// trusting a caller-supplied status (see catalog.service.ts's VISIBLE_DEAL_WHERE for the
 /// identical convention). `publishedAt` is set once, the first time a post transitions
 /// DRAFT -> PUBLISHED, and never overwritten by a later status flip (blog-post.service.ts's
-/// setBlogPostStatus).
+/// setBlogPostStatus). `categoryId` is a real FK to BlogCategory (was a free-text `categorySlug`
+/// column) — the public read contract (`GET /catalog/blog-posts?categorySlug=`) still speaks in
+/// terms of the category's slug, resolved through the `category` relation.
 model BlogPost {
   id              String          @id @default(uuid())
   title           String
   slug            String          @unique
   excerpt         String
-  categorySlug    String
+  categoryId      String
+  category        BlogCategory    @relation(fields: [categoryId], references: [id])
   author          String
   readMinutes     Int             @default(1)
   publishedAt     DateTime?
@@ -603,6 +624,7 @@ model BlogPost {
   mediaImages     BlogPostImage[]
 
   @@index([status, publishedAt])
+  @@index([categoryId])
 }
 
 /// One uploaded image for a BlogPost — part of the shared Deal/Product/Therapist/Category/
@@ -676,6 +698,120 @@ model ContactUsContent {
   metaTitle       String?
   metaDescription String?
   updatedAt       DateTime @updatedAt
+}
+
+/// The public "Frequently Asked Questions" list (rendered as an accordion on the home page) —
+/// a flat list, no category concept (see Category's own tree for that pattern elsewhere; FAQ
+/// doesn't need it). `isActive`/`sortOrder` mirror Category's own identical fields exactly —
+/// same "Active/Inactive" + manual display-order convention, not a Draft/Published workflow.
+model Faq {
+  id        String   @id @default(uuid())
+  question  String
+  answer    String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+/// A generic reusable content page — introduced for the 4 fixed legal pages (Privacy Policy,
+/// Terms of Service, Accessibility, Cookie Policy). Unlike BlogPost there is no admin create/
+/// delete route for this model (see website-pages.routes.ts's own doc comment) — the 4 rows are
+/// seeded once by the `add_cms_content_types` migration and only ever edited in place.
+/// `content` is a `BlogBlock[]`, same shape as BlogPost.body/AboutUsContent.body.
+model WebsitePage {
+  id              String         @id @default(uuid())
+  slug            String         @unique
+  title           String
+  content         Json
+  status          BlogPostStatus @default(DRAFT)
+  metaTitle       String?
+  metaDescription String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([status])
+}
+
+/// Singleton row (same "id is always 'singleton'" convention as AboutUsContent/ContactUsContent
+/// above) — the public "How It Works" page's hero copy; the actual numbered steps live in
+/// HowItWorksStep below.
+model HowItWorksContent {
+  id              String   @id @default("singleton")
+  heroTitle       String   @default("")
+  heroSubtitle    String   @default("")
+  metaTitle       String?
+  metaDescription String?
+  updatedAt       DateTime @updatedAt
+}
+
+/// One step in the public "How It Works" page's numbered flow — a flat list, same
+/// "Active/Inactive" + manual `sortOrder` convention as Faq above (plus a drag-and-drop
+/// `PATCH /how-it-works/steps/reorder`, mirroring media.service.ts's `reorderImages`).
+model HowItWorksStep {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  /// A Material Symbols icon name (e.g. "search"), rendered client-side via `<md-icon>`.
+  icon        String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+/// Singleton row (same convention as HowItWorksContent above) — the public "Careers" page's
+/// hero copy; the actual job listings live in CareersJobListing below.
+model CareersPageContent {
+  id              String   @id @default("singleton")
+  heroTitle       String   @default("")
+  heroSubtitle    String   @default("")
+  metaTitle       String?
+  metaDescription String?
+  updatedAt       DateTime @updatedAt
+}
+
+/// One open role on the public "Careers" page — `status` reuses BlogPostStatus's DRAFT/PUBLISHED
+/// (same "not visible until explicitly published" discipline as BlogPost/WebsitePage).
+/// `employmentType` is a free string (Full-time/Part-time/Contract/Internship/Freelance enforced
+/// client-side only, not a DB enum) so HR can add a new employment type without a schema change.
+model CareersJobListing {
+  id                String         @id @default(uuid())
+  jobTitle          String
+  department        String
+  location          String
+  employmentType    String
+  description       String
+  responsibilities  String
+  requirements      String
+  applyUrl          String?
+  applyInstructions String?
+  status            BlogPostStatus @default(DRAFT)
+  sortOrder         Int            @default(0)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([status, sortOrder])
+}
+
+/// One footer/social link — `platform` is free text (facebook/instagram/youtube/linkedin/x/
+/// whatsapp/...), the frontend maps known keys to icons with a generic fallback for anything
+/// else, same "no DB enum, client maps it" convention as CareersJobListing.employmentType above.
+model SocialMediaLink {
+  id          String   @id @default(uuid())
+  platform    String
+  displayName String
+  url         String
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
 }
 
 /// A vendor's direct grant of access to one TOP-LEVEL Category (checkbox-style, per business

@@ -12,6 +12,8 @@ declare global {
     interface Request {
       /** The caller's own linked Driver row — set only by `resolveOwnDriver`, never from a param. */
       driver?: { id: string };
+      /** The caller's own linked Customer row — set only by `resolveOwnCustomer`, never from a param. */
+      customer?: { id: string };
     }
   }
 }

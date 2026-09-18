@@ -38,8 +38,10 @@ import {
   SetDriverStatusSchema,
   AssignVerifierSchema,
   KycChecklistSchema,
+  LinkCustomerToUserSchema,
 } from './schemas/business.schema';
 import { UpdateOwnDriverSchema } from './schemas/driverSelf.schema';
+import { UpdateOwnCustomerSchema } from './schemas/customerSelf.schema';
 import {
   CreateTripTypeSchema,
   UpdateTripTypeSchema,
@@ -594,6 +596,39 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'patch',
+  path: '/customers/{id}/link-user',
+  summary: 'Link a Customer record to a User account, granting self-service portal access (auto-assigns the customer role)',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }), body: { content: { 'application/json': { schema: LinkCustomerToUserSchema } } } },
+  responses: {
+    200: { description: 'Customer linked', content: { 'application/json': { schema: envelope(z.unknown()) } } },
+    409: { description: 'That User is already linked to a Customer', content: { 'application/json': { schema: envelope(z.null()) } } },
+  },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: '/customers/{id}/unlink-user',
+  summary: 'Unlink a Customer record from its User account',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: { 200: { description: 'Customer unlinked', content: { 'application/json': { schema: envelope(z.unknown()) } } } },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/customers/{id}/create-user',
+  summary: 'One-click creation of a portal-login User for this Customer (auto-assigns the customer role and links it)',
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: {
+    201: { description: 'User created and linked', content: { 'application/json': { schema: envelope(z.unknown()) } } },
+    409: { description: 'Customer already has a linked user', content: { 'application/json': { schema: envelope(z.null()) } } },
+  },
+});
+
+registry.registerPath({
+  method: 'patch',
   path: '/drivers/{id}/status',
   summary: 'Activate or deactivate a Driver account (portal login gate, independent of KYC status)',
   security: [{ bearerAuth: [] }],
@@ -680,6 +715,38 @@ registry.registerPath({
     409: { description: 'Driver already has a linked user account', content: { 'application/json': { schema: envelope(z.null()) } } },
     422: { description: 'Driver has no phone or email on file', content: { 'application/json': { schema: envelope(z.null()) } } },
   },
+});
+
+// ---------------------------------------------------------------------------
+// Customer self-service (/customers/me) — ownership-based, not permission-gated.
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: 'get',
+  path: '/customers/me',
+  summary: "The caller's own Customer record",
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: { description: 'Own customer record', content: { 'application/json': { schema: envelope(z.unknown()) } } },
+    404: { description: 'Caller has no linked Customer record (code CUSTOMER_NOT_LINKED)', content: { 'application/json': { schema: envelope(z.null()) } } },
+  },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: '/customers/me',
+  summary: "Update the caller's own Customer record (restricted field set — never verificationStatus/accountStatus)",
+  security: [{ bearerAuth: [] }],
+  request: { body: { content: { 'application/json': { schema: UpdateOwnCustomerSchema } } } },
+  responses: { 200: { description: 'Updated', content: { 'application/json': { schema: envelope(z.unknown()) } } } },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/customers/me/bookings',
+  summary: "The caller's own booking history",
+  security: [{ bearerAuth: [] }],
+  responses: { 200: { description: 'Booking list', content: { 'application/json': { schema: envelope(z.array(z.unknown())) } } } },
 });
 
 // ---------------------------------------------------------------------------

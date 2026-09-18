@@ -18,7 +18,12 @@ export interface BlogPost {
   title: string;
   slug: string;
   excerpt: string;
-  categorySlug: string;
+  /** A real FK to BlogCategory.id (was a free-text `categorySlug` column — see msd-api's
+   *  `BlogPost.categoryId` schema doc comment). */
+  categoryId: string;
+  /** Populated by the admin list/get endpoints (`include: { category: true }` — see
+   *  blog-post.service.ts#listBlogPosts) — used for display only, never sent back on write. */
+  category?: { id: string; name: string; slug: string };
   body: BlogBlock[];
   author: string;
   readMinutes: number;
@@ -38,7 +43,7 @@ export interface BlogPostInput {
   title: string;
   slug: string;
   excerpt: string;
-  categorySlug: string;
+  categoryId: string;
   body: BlogBlock[];
   author: string;
   readMinutes: number;
@@ -63,7 +68,7 @@ export function listBlogPosts(
     pageSize?: number;
     search?: string;
     status?: BlogPostStatus;
-    categorySlug?: string;
+    categoryId?: string;
   } = {},
 ) {
   return apiGet<BlogPost[]>(`/blog-posts${toQuery(opts)}`, token);

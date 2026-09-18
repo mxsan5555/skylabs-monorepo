@@ -4,7 +4,7 @@ export type BlogPostFieldKey =
   | 'title'
   | 'slug'
   | 'excerpt'
-  | 'categorySlug'
+  | 'categoryId'
   | 'body'
   | 'author'
   | 'readMinutes'
@@ -40,4 +40,50 @@ export function extractBlogPostFieldErrors(err: unknown): Partial<Record<BlogPos
  *  `extractSiteContentFieldErrors<keyof ContactUsInput>(err)`. */
 export function extractSiteContentFieldErrors<T extends string>(err: unknown): Partial<Record<T, string>> | null {
   return extractFieldErrors<T>(err);
+}
+
+export type FaqFieldKey = 'question' | 'answer' | 'sortOrder';
+
+export function extractFaqFieldErrors(err: unknown): Partial<Record<FaqFieldKey, string>> | null {
+  return extractFieldErrors<FaqFieldKey>(err);
+}
+
+export type BlogCategoryFieldKey = 'name' | 'slug' | 'description' | 'sortOrder' | 'isActive';
+
+export function extractBlogCategoryFieldErrors(err: unknown): Partial<Record<BlogCategoryFieldKey, string>> | null {
+  return extractFieldErrors<BlogCategoryFieldKey>(err);
+}
+
+export type HowItWorksStepFieldKey = 'title' | 'description' | 'icon' | 'sortOrder' | 'isActive';
+
+export function extractHowItWorksStepFieldErrors(err: unknown): Partial<Record<HowItWorksStepFieldKey, string>> | null {
+  return extractFieldErrors<HowItWorksStepFieldKey>(err);
+}
+
+export type CareersJobFieldKey =
+  | 'jobTitle'
+  | 'department'
+  | 'location'
+  | 'employmentType'
+  | 'description'
+  | 'responsibilities'
+  | 'requirements'
+  | 'applyUrl'
+  | 'applyInstructions'
+  | 'sortOrder';
+
+export function extractCareersJobFieldErrors(err: unknown): Partial<Record<CareersJobFieldKey, string>> | null {
+  return extractFieldErrors<CareersJobFieldKey>(err);
+}
+
+export type SocialMediaLinkFieldKey = 'platform' | 'displayName' | 'url' | 'sortOrder' | 'isActive';
+
+export function extractSocialMediaLinkFieldErrors(err: unknown): Partial<Record<SocialMediaLinkFieldKey, string>> | null {
+  return extractFieldErrors<SocialMediaLinkFieldKey>(err);
+}
+
+export type WebsitePageFieldKey = 'title' | 'content' | 'status' | 'metaTitle' | 'metaDescription';
+
+export function extractWebsitePageFieldErrors(err: unknown): Partial<Record<WebsitePageFieldKey, string>> | null {
+  return extractFieldErrors<WebsitePageFieldKey>(err);
 }
