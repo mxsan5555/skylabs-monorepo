@@ -41,6 +41,8 @@ export const CATEGORY_TAXONOMY: TaxonomyTop[] = [
         name: 'Body Massage',
         slug: 'body-massage',
         children: [
+          { name: 'Full Body Massage', slug: 'full-body-massage' },
+          { name: 'Ayurvedic Massage', slug: 'ayurvedic-massage' },
           { name: 'Swedish Massage', slug: 'swedish-massage' },
           { name: 'Deep Tissue Massage', slug: 'deep-tissue-massage' },
           { name: 'Aromatherapy Massage', slug: 'aromatherapy-massage' },
@@ -148,6 +150,11 @@ export const CATEGORY_TAXONOMY: TaxonomyTop[] = [
         name: 'Skin Treatment',
         slug: 'skin-treatment',
         children: [
+          { name: 'De-Tan Treatment', slug: 'de-tan' },
+          { name: 'Bleaching', slug: 'bleaching' },
+          { name: 'Chemical Peel', slug: 'chemical-peel' },
+          { name: 'Anti-Ageing Treatment', slug: 'anti-ageing' },
+          { name: 'Body Contouring & Slimming', slug: 'body-contouring' },
           { name: 'Acne Treatment', slug: 'acne-treatment' },
           { name: 'Pigmentation Treatment', slug: 'pigmentation-treatment' },
           { name: 'Skin Rejuvenation', slug: 'skin-rejuvenation' },
@@ -263,21 +270,128 @@ export const CATEGORY_TAXONOMY: TaxonomyTop[] = [
     ],
   },
   {
+    name: 'Spa & Wellness',
+    slug: 'spa-wellness',
+    type: 'SERVICE',
+    children: [
+      {
+        name: 'Body Treatments',
+        slug: 'spa-body-treatments',
+        children: [
+          { name: 'Body Scrub', slug: 'spa-body-scrub' },
+          { name: 'Body Polish', slug: 'body-polish' },
+          { name: 'Body Wrap', slug: 'body-wrap' },
+          { name: 'Detox Treatment', slug: 'detox-treatment' },
+        ],
+      },
+      {
+        name: 'Steam & Sauna',
+        slug: 'spa-steam-sauna',
+        children: [
+          { name: 'Steam Bath', slug: 'spa-steam-bath' },
+          { name: 'Sauna', slug: 'spa-sauna' },
+          { name: 'Steam & Sauna Combo', slug: 'steam-sauna' },
+        ],
+      },
+      {
+        name: 'Aromatherapy',
+        slug: 'aromatherapy-spa',
+        children: [
+          { name: 'Aromatherapy Session', slug: 'aromatherapy-session' },
+          { name: 'Essential Oil Therapy', slug: 'essential-oil-therapy' },
+        ],
+      },
+      {
+        name: 'Bridal & Special Packages',
+        slug: 'spa-bridal',
+        children: [
+          { name: 'Bridal Spa Package', slug: 'bridal-spa' },
+          { name: 'Couple Spa Package', slug: 'couple-spa-package' },
+          { name: 'Luxury Spa Package', slug: 'luxury-spa-package' },
+        ],
+      },
+    ],
+  },
+  {
+    name: 'Hair',
+    slug: 'hair',
+    type: 'SERVICE',
+    children: [
+      {
+        name: 'Haircut & Styling',
+        slug: 'hair-haircut-styling',
+        children: [
+          { name: "Women's Haircut", slug: 'womens-haircut' },
+          { name: "Men's Haircut", slug: 'mens-haircut' },
+          { name: 'Hair Styling', slug: 'hair-styling-service' },
+          { name: 'Blow Dry', slug: 'blow-dry-service' },
+        ],
+      },
+      {
+        name: 'Hair Treatments',
+        slug: 'hair-treatments',
+        children: [
+          { name: 'Hair Spa', slug: 'hair-spa' },
+          { name: 'Keratin Treatment', slug: 'keratin-treatment' },
+          { name: 'Hair Smoothening', slug: 'hair-smoothening' },
+          { name: 'Hair Straightening', slug: 'hair-straightening' },
+          { name: 'Scalp Treatment', slug: 'scalp-treatment' },
+        ],
+      },
+      {
+        name: 'Hair Coloring',
+        slug: 'hair-coloring-services',
+        children: [
+          { name: 'Global Color', slug: 'global-color' },
+          { name: 'Highlights', slug: 'highlights' },
+          { name: 'Balayage', slug: 'balayage' },
+          { name: 'Hair Coloring', slug: 'hair-coloring' },
+        ],
+      },
+      {
+        name: 'Bridal & Extensions',
+        slug: 'hair-bridal',
+        children: [
+          { name: 'Bridal Hair', slug: 'bridal-hair' },
+          { name: 'Hair Extensions', slug: 'hair-extensions' },
+          { name: 'Hair Updo', slug: 'hair-updo' },
+        ],
+      },
+    ],
+  },
+  {
+    name: 'Nails & Lashes',
+    slug: 'nails-lashes',
+    type: 'SERVICE',
+    children: [
+      {
+        name: 'Nail Services',
+        slug: 'nail-services',
+        children: [
+          { name: 'Manicure', slug: 'manicure' },
+          { name: 'Pedicure', slug: 'pedicure' },
+          { name: 'Nail Art', slug: 'nail-art' },
+          { name: 'Gel Nails', slug: 'gel-nails' },
+          { name: 'Acrylic Nails', slug: 'acrylic-nails' },
+          { name: 'Nail Extensions', slug: 'nail-extension' },
+        ],
+      },
+      {
+        name: 'Lash Services',
+        slug: 'lash-services',
+        children: [
+          { name: 'Eyelash Extensions', slug: 'eyelash-extensions' },
+          { name: 'Lash Lift', slug: 'lash-lift' },
+          { name: 'Lash Lamination', slug: 'lash-lamination' },
+        ],
+      },
+    ],
+  },
+  {
     name: 'Therapy',
     slug: 'therapy',
     type: 'THERAPY',
     children: [
-      {
-        name: 'Mental Wellness',
-        slug: 'mental-wellness',
-        children: [
-          { name: 'Counseling', slug: 'counseling' },
-          { name: 'Psychotherapy', slug: 'psychotherapy' },
-          { name: 'Stress Therapy', slug: 'stress-therapy' },
-          { name: 'Anxiety Support', slug: 'anxiety-support' },
-          { name: 'Relationship Counseling', slug: 'relationship-counseling' },
-        ],
-      },
       {
         name: 'Physical Therapy',
         slug: 'physical-therapy',
@@ -285,24 +399,26 @@ export const CATEGORY_TAXONOMY: TaxonomyTop[] = [
           { name: 'Physiotherapy', slug: 'physiotherapy' },
           { name: 'Sports Physiotherapy', slug: 'sports-physiotherapy' },
           { name: 'Rehabilitation Therapy', slug: 'rehabilitation-therapy' },
+          { name: 'Chiropractic Care', slug: 'chiropractic-care' },
         ],
       },
       {
-        name: 'Specialized Therapy',
-        slug: 'specialized-therapy',
+        name: 'Alternative Therapy',
+        slug: 'alternative-therapy',
         children: [
-          { name: 'Occupational Therapy', slug: 'occupational-therapy' },
-          { name: 'Speech Therapy', slug: 'speech-therapy' },
-          { name: 'Behavioral Therapy', slug: 'behavioral-therapy' },
+          { name: 'Acupuncture', slug: 'acupuncture' },
+          { name: 'Naturopathy', slug: 'naturopathy' },
+          { name: 'Acupressure', slug: 'acupressure' },
+          { name: 'Ayurveda', slug: 'ayurveda' },
         ],
       },
       {
-        name: 'Couple & Family',
-        slug: 'couple-family',
+        name: 'Mind & Body',
+        slug: 'mind-body',
         children: [
-          { name: 'Couple Therapy', slug: 'couple-therapy' },
-          { name: 'Family Counseling', slug: 'family-counseling' },
-          { name: 'Relationship Therapy', slug: 'relationship-therapy' },
+          { name: 'Yoga', slug: 'yoga' },
+          { name: 'Meditation', slug: 'meditation' },
+          { name: 'Stress Management', slug: 'stress-management' },
         ],
       },
     ],

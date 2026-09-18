@@ -1,6 +1,6 @@
 ﻿import { useNavigate, NavLink } from 'react-router-dom';
-import { useState, useMemo, useEffect } from 'react';
-import { ListItem, List, FilledButton, TextButton, Icon, Tabs, SecondaryTab, OutlinedTextField, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { ListItem, List, FilledTonalIconButton, FilledButton, OutlinedButton, TextButton, Icon, Tabs, SecondaryTab, OutlinedTextField, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { formatINR } from '../../../utils/format';
 import { useWishlist } from '../../../wishlist/wishlist-context';
@@ -129,6 +129,9 @@ function SectionHeader({ id, heading, seeAll, seeAllTo, }: {
   );
 }
 export function Home() {
+  const vacationSwiperRef = useRef<any>(null);
+  const heroV2Ref = useRef<HTMLElement>(null);
+  const [heroV2Active, setHeroV2Active] = useState(0);
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { toggle, has } = useWishlist();
@@ -265,6 +268,37 @@ export function Home() {
   function categoryDealCount(categoryId: string) {
     return dealsData.filter((d) => d.category?.id === categoryId).length;
   }
+
+  function requireAuthOrRedirect() {
+    if (isAuthenticated) return true;
+    navigate('/sign-in?next=%2F');
+    return false;
+  }
+
+  async function addToCart(deal: CatalogDeal) {
+    if (!requireAuthOrRedirect()) return;
+    setActionError('');
+    setActionMessage('');
+    try {
+      await addCartItem(token, { dealId: deal.id, quantity: 1 });
+      setActionMessage(home.ui.messages.addToCartSuccess.replace('{item}', deal.product?.name ?? deal.title,));
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : home.ui.messages.addToCartError);
+    }
+  }
+
+  // Track active slide for Hero V2 pagination dots.
+  useEffect(() => {
+    const el = heroV2Ref.current;
+    if (!el) return;
+    const handler = (e: Event) => {
+      const sw = (e as CustomEvent).detail?.[0];
+      if (sw) setHeroV2Active(sw.realIndex ?? 0);
+    };
+    el.addEventListener('swiperslidechange', handler);
+    return () => el.removeEventListener('swiperslidechange', handler);
+  }, []);
+
   function renderDealCarousel(deals: CatalogDeal[]) {
     return (
       <div className="home-carousel">
@@ -408,127 +442,246 @@ export function Home() {
     <div className="home">
       <title>{content.meta.home.title}</title>
       <meta name="description" content={content.meta.home.description} />
-      <section className="home__premium-hero">
-        <div className="home__premium-content">
-          <div className="home__premium-left">
-            <h1 className="home__premium-title"> {premiumHero.heading} </h1>
-            <p className="home__premium-subtitle"> {premiumHero.subheading}</p>
-            <div
-              className="home__premium-tabs"
-              role="navigation"
-              aria-label={home.ui.accessibility.browseWellnessCategories}
-            >
-              {categories.map((category) => (
-                <NavLink
-                  key={category.id}
-                  to={`/category/${category.slug}`}
-                  className="premium-category-link"
-                  aria-label={home.ui.accessibility.exploreCategory.replace(
-                    '{category}',
-                    category.name,
-                  )}
-                >
-                  <AssistChip className="premium-category-chip">
-                    <Icon slot="icon">category</Icon>
-                    <span>{category.name}</span>
-                    <Icon slot="trailing-icon"> arrow_forward </Icon>
-                  </AssistChip>
-                </NavLink>
-              ))}
+      {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
+      {actionError && <p className="error-state" role="alert">{actionError}</p>}
+      {/* ── OLD premium hero — hidden for comparison ── */}
+      {false && (
+        <section className="home__premium-hero">
+          <div className="home__premium-content">
+            <div className="home__premium-left">
+              <h1 className="home__premium-title">{premiumHero.heading}</h1>
             </div>
-            <sky-card variant="filled" className="home__premium-search-card">
-              <form
-                className="home__premium-search"
-                role="search"
-                aria-label={content.search.ariaLabel}
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (searchQuery.trim()) { navigate(`/explore?q=${encodeURIComponent(searchQuery.trim())}`); }
-                  else { navigate("/explore"); }
-                  setShowSuggestions(false);
-                }}
-              >
-                <TextButton type="button" className="home__premium-location" >
-                  <span className="home__premium-location-content">
-                    <Icon>location_on</Icon>
-                    <span>{shortLocation ?? premiumHero.search.locationPlaceholder}</span>
-                  </span>
-                </TextButton>
-                <OutlinedTextField
-                  name="q"
-                  label={premiumHero.search.servicePlaceholder}
-                  className="premium-field premium-field--grow "
-                  value={searchQuery}
-                  onInput={(e) => {
-                    const target = e.currentTarget as HTMLInputElement;
-                    setSearchQuery(target.value);
-                    setShowSuggestions(true);
-                  }}
-                >
-                  <Icon slot="leading-icon">search</Icon>
-                  {searchQuery && (
-                    <Icon
-                      slot="trailing-icon"
-                      onClick={() => setSearchQuery("")}
-                      style={{ cursor: "pointer" }}
-                    > close </Icon>
-                  )}
-                </OutlinedTextField>
-                <FilledButton type="submit">
-                  {premiumHero.search.button}
-                  <Icon slot="trailing-icon">arrow_forward</Icon>
-                </FilledButton>
-              </form>
-              {showSuggestions && (
-                <List className="search-suggestions">
-                  {suggestions.length > 0 ? (
-                    suggestions.map((deal) => (
-                      <ListItem
-                        key={deal.id}
-                        type="button"
-                        className="search-suggestion"
-                        onClick={() => {
-                          navigate(`/deal/${deal.id}`);
-                          setSearchQuery("");
-                          setShowSuggestions(false);
-                        }}
-                      >
-                        <Icon slot="start">  search </Icon>
-                        <div>
-                          <strong>{deal.title}</strong>
-                          <small>{deal.vendor?.businessName} • {deal.branch?.city} </small>
-                        </div>
-                      </ListItem>
-                    ))
-                  ) : (
-                    <ListItem disabled> {content.search.emptySuggestion} </ListItem>
-                  )}
-                </List>
-              )}
-            </sky-card>
-            <div className="home__premium-popular">
-              {/* <span className="popular-label"> {home.ui.labels.popular}</span> */}
+          </div>
+        </section>
+      )}
 
-              {premiumHero.popular.map((item) => (
-                <AssistChip
-                  key={item}
-                  className="premium-popular-chip"
-                  onClick={() => {
-                    navigate(`/explore?q=${encodeURIComponent(item)}`);
-                  }}
-                >
-                  {item}
-                </AssistChip>
-              ))}
+      {/* ────────────────────────────────────────────────────────────────────
+          HERO OPTION 1 — Full-width deal slider
+          Two-column: left = content, right = image. Slides through top deals.
+      ──────────────────────────────────────────────────────────────────── */}
+      {featuredDeals.length > 0 && (
+        <section className="home__hero-v1" aria-label="Featured spa and wellness deals">
+          <div className="hero-v1__bg" aria-hidden="true" />
+          <swiper-container
+            class="hero-v1__swiper"
+            autoplay-delay="5000"
+            autoplay-disable-on-interaction="false"
+            loop="true"
+            pagination="true"
+            grab-cursor="true"
+            a11y="true"
+          >
+            {featuredDeals.slice(0, 6).map((deal, i) => {
+              const d = toDealCardDeal(deal);
+              const fmtPrice = `₹${Math.round(d.price ?? 0).toLocaleString('en-IN')}`;
+              const fmtOriginal = d.originalPrice
+                ? `₹${Math.round(d.originalPrice).toLocaleString('en-IN')}`
+                : null;
+              const dealPath = deal.product ? `/products/${deal.id}` : `/deal/${deal.id}`;
+              return (
+                <swiper-slide key={deal.id}>
+                  <article className="hero-v1__slide">
+                    {/* Left: deal copy */}
+                    <div className="hero-v1__left">
+                      {deal.category?.name && (
+                        <span className="hero-v1__badge" aria-label={`Category: ${deal.category.name}`}>
+                          {deal.category.name}
+                        </span>
+                      )}
+                      <h1 className={`hero-v1__title${i === 0 ? '' : ' hero-v1__title--slide'}`}>
+                        {d.title}
+                      </h1>
+                      {(d.providerName || d.location) && (
+                        <p className="hero-v1__meta">
+                          {d.providerName && (
+                            <span className="hero-v1__meta-vendor">{d.providerName}</span>
+                          )}
+                          {d.providerName && d.location && (
+                            <span className="hero-v1__meta-sep" aria-hidden="true" />
+                          )}
+                          {d.location && (
+                            <span className="hero-v1__meta-city">{d.location}</span>
+                          )}
+                        </p>
+                      )}
+                      <FilledButton
+                        onClick={() => navigate(dealPath)}
+                        aria-label={`Book ${d.title}`}
+                      >
+                        Book Now
+                        <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
+                      </FilledButton>
+                      <div className="hero-v1__price-card">
+                        {d.discount && d.originalPrice && (
+                          <span className="hero-v1__save-chip" aria-label={`Save ₹${Math.round(d.originalPrice - (d.price ?? 0)).toLocaleString('en-IN')}`}>
+                            Save ₹{Math.round(d.originalPrice - (d.price ?? 0)).toLocaleString('en-IN')}
+                          </span>
+                        )}
+                        <span className="hero-v1__price-label">Starting from</span>
+                        <div className="hero-v1__price-row">
+                          <strong className="hero-v1__price">{fmtPrice}</strong>
+                          {fmtOriginal && (
+                            <s className="hero-v1__price-original" aria-label={`Original price ${fmtOriginal}`}>
+                              {fmtOriginal}
+                            </s>
+                          )}
+                        </div>
+                        {d.priceNote && (
+                          <span className="hero-v1__price-note">{d.priceNote}</span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Right: deal image */}
+                    <div className="hero-v1__right">
+                      {d.image ? (
+                        <img
+                          src={d.image}
+                          alt={d.imageAlt ?? d.title}
+                          className="hero-v1__img"
+                          loading={i === 0 ? 'eager' : 'lazy'}
+                          width={600}
+                          height={440}
+                        />
+                      ) : (
+                        <div className="hero-v1__img-placeholder" aria-hidden="true" />
+                      )}
+                    </div>
+                  </article>
+                </swiper-slide>
+              );
+            })}
+          </swiper-container>
+        </section>
+      )}
+
+      {/* ────────────────────────────────────────────────────────────────────
+          HERO OPTION 2 — Static left copy + deal card slider on right
+          Left: bold headline + desc + CTAs + pagination dots
+          Right: horizontally scrolling staggered deal cards
+      ──────────────────────────────────────────────────────────────────── */}
+      {featuredDeals.length > 0 && (
+        <section className="home__hero-v2" aria-labelledby="hero-v2-heading">
+          <div className="hero-v2__inner">
+            {/* Left — static copy */}
+            <div className="hero-v2__left">
+              <span className="hero-v2__left-accent" aria-hidden="true" />
+              <h2 id="hero-v2-heading" className="hero-v2__title">
+                Book Top Spa &amp; Wellness Deals Near You
+              </h2>
+              <p className="hero-v2__desc">
+                Discover curated massages, facials, and beauty treatments at the best prices from verified spas near you.
+              </p>
+              <div className="hero-v2__actions" role="group" aria-label="Browse or book deals">
+                <OutlinedButton onClick={() => navigate('/explore')}>
+                  Browse All
+                  <Icon slot="trailing-icon" aria-hidden="true">arrow_outward</Icon>
+                </OutlinedButton>
+                <FilledButton onClick={() => navigate('/explore')}>
+                  Book Now
+                  <Icon slot="trailing-icon" aria-hidden="true">arrow_outward</Icon>
+                </FilledButton>
+              </div>
+              {/* Pagination dots — synced to right Swiper */}
+              <nav className="hero-v2__pagination" aria-label="Deal slides navigation">
+                {featuredDeals.slice(0, 8).map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    aria-label={`Go to slide ${i + 1}`}
+                    aria-current={i === heroV2Active ? 'true' : undefined}
+                    className={`hero-v2__dot${i === heroV2Active ? ' hero-v2__dot--active' : ''}`}
+                    onClick={() => {
+                      const el = heroV2Ref.current as any;
+                      el?.swiper?.slideToLoop(i);
+                    }}
+                  />
+                ))}
+              </nav>
+            </div>
+
+            {/* Right — scrolling card slider */}
+            <div className="hero-v2__right">
+              <swiper-container
+                ref={heroV2Ref}
+                class="hero-v2__swiper"
+                slides-per-view="auto"
+                space-between="16"
+                loop="true"
+                grab-cursor="true"
+                a11y="true"
+              >
+                {featuredDeals.slice(0, 8).map((deal, i) => {
+                  const d = toDealCardDeal(deal);
+                  const fmtPrice = `₹${Math.round(d.price ?? 0).toLocaleString('en-IN')}`;
+                  const dealPath = deal.product ? `/products/${deal.id}` : `/deal/${deal.id}`;
+                  return (
+                    <swiper-slide key={deal.id} style={{ width: '240px', height: 'auto' }}>
+                      <article className={`hero-v2__card${i % 2 !== 0 ? ' hero-v2__card--offset' : ''}`}>
+                        <NavLink
+                          to={dealPath}
+                          className="hero-v2__card-link"
+                          aria-label={`${d.title}, ${fmtPrice}`}
+                        >
+                          <div className="hero-v2__card-img-wrap">
+                            <img
+                              src={d.image}
+                              alt={d.imageAlt ?? d.title}
+                              className="hero-v2__card-img"
+                              loading="lazy"
+                              width={240}
+                              height={320}
+                            />
+                          </div>
+                          <div className="hero-v2__card-body">
+                            {d.providerName && (
+                              <span className="hero-v2__card-vendor">{d.providerName}</span>
+                            )}
+                            <h3 className="hero-v2__card-title">{d.title}</h3>
+                            <span className="hero-v2__card-price">{fmtPrice}</span>
+                          </div>
+                        </NavLink>
+                      </article>
+                    </swiper-slide>
+                  );
+                })}
+              </swiper-container>
             </div>
           </div>
-          <div className="home__premium-right">
-            <div className="home__premium-image-card">
-              <img src={premiumHero.image} alt={premiumHero.imageAlt} />
-            </div>
+        </section>
+      )}
+      {/* ── Hero / Search ──────────────────────────────────────────────── */}
+      {false && (
+        <section className="home__hero" aria-labelledby="hero-heading">
+          <div className="home__hero-slider">
+            {heroImages.map((image, index) => (
+              <div key={index} className="home__hero-slide"
+                style={{ backgroundImage: `url(${image})`, animationDelay: `${index * 6}s`, }}
+              />
+            ))}
           </div>
-        </div>
-      </section>
+          <div className="home__hero-overlay"></div>
+          <div className="home__hero-content">
+            <h1 id="hero-heading" className="home__hero-heading"> {home.hero.heading}</h1>
+            <p className="home__hero-sub">{home.hero.subheading}</p>
+            <form
+              className="home__hero-search"
+              role="search"
+              aria-label="Search deals"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = (e.currentTarget.elements.namedItem('q') as HTMLInputElement)?.value;
+                if (q?.trim()) navigate(`/explore?q=${encodeURIComponent(q.trim())}`);
+                else navigate('/explore');
+              }}
+            >
+              <OutlinedTextField name="q" label={home.hero.searchPlaceholder} className="home__hero-search-field">
+                <Icon slot="leading-icon" aria-hidden="true">search</Icon>
+              </OutlinedTextField>
+              <FilledButton type="submit">{home.hero.ctaLabel}</FilledButton>
+            </form>
+          </div>
+        </section>
+      )}
       {/* ── Browse by Category ─────────────────────────────────────────── */}
       <section className="home-section home-section--alt" aria-labelledby="category-heading">
         <div className="home-section__container">

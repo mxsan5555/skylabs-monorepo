@@ -15,8 +15,8 @@ images on **Cloudflare R2**. This is the **source of truth**; `README.md`,
 |-------|-----|-------------|------|------|
 | Frontend (static SPA) | `apps/msd` (React+Vite) | `apps/mera-driver` (Angular) | **Vercel** — 2 projects, global CDN | free |
 | API (Express, always-on) | `apps/msd-api` | `apps/mera-driver-api` | **Railway** — 2 services | ~$5–10/mo total |
-| Database (Postgres) | db `msd` | db `mera_driver` | **Neon** — 2 independent DBs | free tier |
-| Image bytes | bucket `msd-media` | bucket `mera-driver-media` | **Cloudflare R2** — 2 buckets | free (no egress fees) |
+| Database (Postgres) | db `msd` | db `mera_driver` | **Neon** — 2 independent DBs, provisioned via each Vercel project's **Storage** tab | free tier |
+| Image bytes | bucket `msd-media` | none yet (Phase 2) | **Cloudflare R2** | free (no egress fees) |
 
 **Data flow:** browser → Vercel (static app) → calls the Railway API
 (`VITE_API_URL`) → Neon (structured data) + R2 (image uploads). The browser loads
@@ -150,21 +150,23 @@ Branch = `main`; leave Build/Install/Output/Ignored-Build-Step blank —
 
 ## 5. APIs → Railway
 
-Each API is its own Railway service, with build/start config committed as
-`apps/<api>/railway.json` (config-as-code, mirroring `vercel.json`):
+Each API is its own Railway service. The build/start config is committed as
+`apps/<api>/railway.json` for reference, but **Railway only auto-reads a config file
+at the repo root** — a per-app `apps/<api>/railway.json` is **not** picked up
+automatically for a monorepo service. If you rely on auto-detection, Railway runs its
+own builder (Railpack), can't find a start command for the Nx workspace, and fails
+with *"No start command detected."* So set the commands one of two ways:
 
-```json
-{
-  "$schema": "https://railway.com/railway.schema.json",
-  "build": { "builder": "NIXPACKS", "buildCommand": "npm ci && npx nx build msd-api" },
-  "deploy": {
-    "startCommand": "node dist/apps/msd-api/main.js",
-    "preDeployCommand": "node node_modules/prisma/build/index.js migrate deploy --schema=apps/msd-api/prisma/schema.prisma",
-    "healthcheckPath": "/api/v1/health",
-    "restartPolicyType": "ON_FAILURE"
-  }
-}
-```
+- **In the Railway UI (reliable):** Settings → Build → Custom Build Command, and
+  Settings → Deploy → Custom Start Command + Pre-deploy Command.
+- **Config-as-code path:** Settings → Config-as-code → point it at
+  `apps/<api>/railway.json`.
+
+The commands (msd-api shown — swap the app name for mera-driver-api):
+
+- **Build Command:** `npm ci && npx nx build msd-api`
+- **Start Command:** `node dist/apps/msd-api/main.js`
+- **Pre-deploy Command:** `node node_modules/prisma/build/index.js migrate deploy --schema=apps/msd-api/prisma/schema.prisma`
 
 Two things make this work — both are already wired in the repo:
 1. **`prisma generate` is part of `nx build`.** The `build` target `dependsOn` a
@@ -185,15 +187,45 @@ Two things make this work — both are already wired in the repo:
 ### Create each Railway service
 
 1. **railway.app → New Project → Deploy from GitHub repo** → this repo (authorize
-   the GitHub app, scoped to this repo only).
-2. **Root Directory = the repo root** (the Nx workspace) — do **not** set it to
-   `apps/<api>`. Railway reads `apps/<api>/railway.json` for build/start/health.
-3. **Variables:** add the values from `apps/<api>/.env.example` as real secrets
-   (section 8). At minimum: `DATABASE_URL` (Neon direct string), `NODE_ENV=production`,
-   `JWT_SECRET` (fresh), the OAuth/OTP/SMTP/SMS/Razorpay keys, the CORS origin(s),
-   and the `R2_*` keys.
-4. **Settings → Networking → Generate Domain.** Railway gives a public URL like
-   `https://msd-api-production.up.railway.app`.
+   the GitHub app, scoped to this repo only). Rename the service to `msd-api` /
+   `mera-driver-api` so its generated domain is self-explanatory.
+2. **Root Directory: leave empty** (the repo root / Nx workspace) — do **not** set it
+   to `apps/<api>`. The build command runs `nx build` from the root.
+3. **Set the Build / Start / Pre-deploy commands** (Railway UI, or the config-as-code
+   path) as listed above.
+4. **Variables:** add the values from `apps/<api>/.env.example` as real secrets
+   (section 8). At minimum: `DATABASE_URL`, `NODE_ENV=production`, `PORT` (matching the
+   domain port below), `JWT_SECRET` (fresh), the CORS origin(s), and — as you enable
+   each feature — the OAuth/OTP/SMTP/SMS/Razorpay/`R2_*` keys.
+   - **`DATABASE_URL` must be the Neon _direct_ string.** The Neon DBs are
+     provisioned via each **Vercel project's Storage** tab (Vercel's Neon integration,
+     e.g. `msd_db`) — open the DB there to copy its connection string, and use the
+     **direct/unpooled** one (host without `-pooler`, ending `?sslmode=require`) since
+     Prisma `migrate deploy` fails over Neon's pooled endpoint. Don't click Vercel's
+     "Connect" (that wires the DB to the frontend, which doesn't use it).
+   - **`CORS_ORIGIN` must be the exact Vercel origin** — scheme + host only, no
+     trailing slash, no path, and never the literal `<placeholder>` from a template.
+5. **Settings → Networking → Generate Domain.** Railway asks for a **target port**
+   and gives a public URL like `https://msd-api-production.up.railway.app`. The
+   target port **must equal the port the app listens on**: the app uses
+   `process.env.PORT`, falling back to `3333` (msd-api) / `3334` (mera-driver-api).
+   Simplest deterministic setup — set the target port to `3333`/`3334` **and** add a
+   matching `PORT` variable (`PORT=3333` / `PORT=3334`) so the app can't bind a
+   different port. Then confirm the health path responds (§11); a 502 means the
+   listen port and the domain's target port don't match.
+
+   Your **API base** is that domain **+ `/api/v1`** for msd-api (e.g.
+   `https://<domain>/api/v1`), or the domain as-is for mera-driver-api. That base is
+   what you put in `VITE_API_URL` (msd) / `environment.prod.ts` (mera-driver).
+
+**First-deploy database notes:**
+- If the pre-deploy fails with **`P3009`** (a prior failed migration recorded in the
+  DB), clear it once against the Neon **direct** URL — `migrate reset --force
+  --skip-seed` (disposable DB) or `migrate resolve --rolled-back <name>` (keep data).
+- **Seed the roles + SuperAdmin once** after the first successful migrate:
+  `npm run <api>:prisma:seed` (with the Neon URL + `JWT_SECRET` + `SUPERADMIN_PHONE`
+  in that API's `.env.local`).
+- Step-by-step for both, plus the full first-run sequence, is in **`SETUP.md` §3d**.
 
 ### Per-API specifics
 
@@ -209,13 +241,17 @@ Two things make this work — both are already wired in the repo:
 
 ---
 
-## 6. Image storage → Cloudflare R2 (one bucket per API)
+## 6. Image storage → Cloudflare R2 (`msd-media` only, for now)
 
 Railway's disk is wiped on every redeploy, so uploads live in R2 (S3-compatible,
 10 GB free, no egress fees). The DB stores only the relative `storageKey` (the R2
 object key); the browser loads bytes directly from R2's public URL.
 
-1. **cloudflare.com → R2 → Create bucket** (`msd-media`, then `mera-driver-media`).
+> Only **msd** uses R2 today (msd-api has the four `R2_*` vars + upload code).
+> `mera-driver-api` has no media variables yet, so create a `mera-driver-media`
+> bucket only when it adds uploads (Phase 2).
+
+1. **cloudflare.com → R2 → Create bucket** (`msd-media`).
 2. **Settings → Public access →** enable the **r2.dev** public URL (or attach a
    custom domain). Copy it, e.g. `https://pub-<hash>.r2.dev` → this is the
    frontend's `VITE_MEDIA_BASE_URL`.
@@ -253,21 +289,99 @@ Do this once the API has a Railway domain and the bucket has a public URL.
 
 ---
 
-## 8. Environment-variable reference — where each var lives
+## 8. Environment variables — full reference per service
+
+> **How to obtain/generate each value** (Neon string, JWT secret, Google OAuth,
+> Gmail app password, ConnectExpress SMS, Razorpay, R2 keys, Maps key) is in
+> **`SETUP.md` → "Variables & secrets: how to get each value"**. This section is the
+> authoritative list of *which variable goes where and its value*.
+
+**Only the `msd` Vercel project has variables.** The `mera-driver` frontend
+(Angular) reads its API base at compile time from
+`apps/mera-driver/src/environments/environment.prod.ts` — it has **no Vercel env
+vars**. On Railway, set **`PORT`** to the same value as the domain's target port
+(`3333` msd-api / `3334` mera-driver-api) so the app binds the port Railway routes
+to — see §5. 🔒 = secret (Railway Variables / local `.env.local` only, never a
+`VITE_*` var, never git).
+
+### 8.1 Quick overview — where each var lives
 
 | Variable | Local `.env.local` | Vercel | Railway | Notes |
 |----------|:------------------:|:------:|:-------:|-------|
-| `VITE_API_URL` (msd) | ✅ dev value | ✅ msd project | ❌ | baked into the browser bundle at build |
-| `VITE_MEDIA_BASE_URL` (msd) | ✅ | ✅ msd project | ❌ | R2 public URL; **public** |
-| `VITE_GOOGLE_MAPS_API_KEY` (msd) | ✅ | ✅ msd project | ❌ | **public** — restrict by HTTP referrer |
+| `VITE_*` (msd) | ✅ dev value | ✅ msd project | ❌ | **public**, baked into the browser bundle |
 | mera-driver API base | ❌ (in `environment.ts`) | ❌ | ❌ | compile-time in `environment.prod.ts` |
-| `DATABASE_URL` | ✅ API `.env.local` | ❌ | ✅ | Neon **direct** string; secret |
-| `JWT_SECRET` | ✅ | ❌ | ✅ | fresh per environment |
-| `GOOGLE_CLIENT_ID` / `_SECRET` / `_CALLBACK_URL` | ✅ | ❌ | ✅ | OAuth app + Railway domain |
+| `DATABASE_URL`, `JWT_SECRET`, OAuth secret, `SMTP_*`, `SMS_*`, `RAZORPAY_*`, `R2_*` | ✅ API `.env.local` | ❌ | ✅ 🔒 | API secrets, Railway only |
 | `CORS_ORIGIN` (msd-api) / `CORS_ORIGINS` (mera-driver-api) | ✅ | ❌ | ✅ | comma-separated Vercel domains; no `*` |
-| `SMTP_*`, `EMAIL_FROM`, `SMS_*` | ✅ | ❌ | ✅ | OTP delivery |
-| `RAZORPAY_*` (msd-api) | ✅ | ❌ | ✅ | client is lazy — API boots without them |
-| `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | ✅ | ❌ | ✅ | upload credentials; secret |
+
+### 8.2 Vercel — `msd` project (all public)
+
+| Variable | Value |
+|---|---|
+| `VITE_API_URL` | `https://<msd-api-railway-domain>/api/v1` |
+| `VITE_MEDIA_BASE_URL` | `https://pub-<hash>.r2.dev` (R2 bucket public URL) |
+| `VITE_GOOGLE_MAPS_API_KEY` | your Maps JS API key (restrict by HTTP referrer) |
+
+`mera-driver` project: no variables — set the API base in
+`apps/mera-driver/src/environments/environment.prod.ts` to
+`https://<mera-driver-api-railway-domain>` and commit.
+
+### 8.3 Railway — `msd-api` service
+
+| Variable | Value | 🔒 |
+|---|---|:--:|
+| `DATABASE_URL` | Neon direct string for db `msd` | 🔒 |
+| `NODE_ENV` | `production` | |
+| `PORT` | `3333` (match the domain's target port) | |
+| `JWT_SECRET` | fresh 64-char hex (`openssl rand -hex 32`) | 🔒 |
+| `JWT_ACCESS_TTL_MINUTES` / `JWT_REFRESH_TTL_DAYS` | `15` / `30` | |
+| `OTP_EXPIRY_MINUTES` / `OTP_MAX_ATTEMPTS` / `OTP_REQUEST_RATE_LIMIT_PER_10_MIN` | `10` / `5` / `5` | |
+| `SUPERADMIN_PHONE` | phone for the seeded SuperAdmin | |
+| `GOOGLE_CLIENT_ID` | OAuth client ID | |
+| `GOOGLE_CLIENT_SECRET` | OAuth secret | 🔒 |
+| `GOOGLE_CALLBACK_URL` | `https://<msd-api-railway-domain>/api/v1/auth/google/callback` | |
+| `CORS_ORIGIN` | `https://<msd-vercel-domain>` (comma-separate prod + preview) | |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | `smtp.gmail.com` / `587` / `false` | |
+| `SMTP_USER` | your Gmail address | |
+| `SMTP_PASS` | Gmail app password | 🔒 |
+| `EMAIL_FROM` | `Massage Deals <no-reply@yourdomain>` | |
+| `SMS_API_URL` | `https://connectexpress.in/api/v3/` | |
+| `SMS_API_KEY` | ConnectExpress API key | 🔒 |
+| `SMS_SENDER` | approved DLT sender ID | |
+| `RAZORPAY_KEY_ID` | Razorpay key id | |
+| `RAZORPAY_KEY_SECRET` | Razorpay secret | 🔒 |
+| `RAZORPAY_WEBHOOK_SECRET` | Razorpay webhook signing secret | 🔒 |
+| `R2_ACCOUNT_ID` | Cloudflare account ID | |
+| `R2_ACCESS_KEY_ID` | R2 token access key | 🔒 |
+| `R2_SECRET_ACCESS_KEY` | R2 token secret | 🔒 |
+| `R2_BUCKET` | `msd-media` | |
+
+SMTP/SMS/Razorpay/R2 are validated on first use, so the service still boots if a
+group is blank — but that feature (email/SMS OTP, payments, upload) won't work
+until its group is filled.
+
+### 8.4 Railway — `mera-driver-api` service
+
+Smaller set (no SMS/SMTP/Razorpay/R2 in this API's template yet).
+
+| Variable | Value | 🔒 |
+|---|---|:--:|
+| `DATABASE_URL` | Neon direct string for db `mera_driver` (**separate** Neon project) | 🔒 |
+| `NODE_ENV` | `production` | |
+| `PORT` | `3334` (match the domain's target port) | |
+| `JWT_SECRET` | fresh 64-char hex (**different** from msd-api's) | 🔒 |
+| `JWT_ACCESS_TTL_MINUTES` / `JWT_REFRESH_TTL_DAYS` | `15` / `30` | |
+| `OTP_EXPIRY_MINUTES` / `OTP_MAX_ATTEMPTS` | `10` / `5` | |
+| `GOOGLE_CLIENT_ID` | OAuth client ID (may be blank if Google sign-in unused) | |
+| `GOOGLE_CLIENT_SECRET` | OAuth secret | 🔒 |
+| `GOOGLE_CALLBACK_URL` | `https://<mera-driver-api-railway-domain>/auth/google/callback` (**no** `/api/v1`) | |
+| `CORS_ORIGINS` | `https://<mera-driver-vercel-domain>` (**plural** var name) | |
+
+### 8.5 Cloudflare R2 → the values it produces
+
+One bucket (`msd-media`) yields: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID` 🔒,
+`R2_SECRET_ACCESS_KEY` 🔒 for **Railway (msd-api)**, plus `R2_BUCKET=msd-media`, and
+the public URL → `VITE_MEDIA_BASE_URL` on **Vercel (msd)**. See §6 for the create
+steps. `mera-driver` needs **no bucket yet** (mera-driver-api has no media vars).
 
 **GitHub Actions needs none of these** — CI runs `nx affected -t lint test build`,
 which compiles with all of them unset (relevant only at deploy). Add a secret only
@@ -305,6 +419,8 @@ no DB and no `.env.local`. Add it as a required status check in branch protectio
 
 - `https://<railway-domain>/<health path>` returns `{ "data": { "status": "ok" … } }`.
 - `<railway-domain>/docs` loads (Swagger renders).
+- Note: the bare API base (`/api/v1` for msd-api) returns a `NOT_FOUND` envelope —
+  that's **expected** (no route sits at the base path), not a failure.
 - A public route returns real data from Neon.
 - Sign in (OTP / Google), open the account console, confirm data loads and there
   are **no CORS errors** in the browser console.
