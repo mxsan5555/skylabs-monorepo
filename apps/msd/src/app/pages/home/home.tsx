@@ -1,16 +1,31 @@
 ﻿import { useNavigate, NavLink } from 'react-router-dom';
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { ListItem, List, FilledTonalIconButton, FilledButton, TextButton, Icon, Tabs, SecondaryTab, OutlinedTextField, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
+import { useState, useMemo, useEffect } from 'react';
+import { ListItem, List, FilledButton, TextButton, Icon, Tabs, SecondaryTab, OutlinedTextField, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
+import { formatINR } from '../../../utils/format';
 import { useWishlist } from '../../../wishlist/wishlist-context';
-import { listCatalogCategories, listCatalogDeals, type CatalogCategoryWithChildren, type CatalogDeal } from '../../../api/catalog';
+import {
+  listCatalogCategories,
+  listCatalogDeals,
+  listCatalogProducts,
+  listCatalogTherapists,
+  type CatalogProduct,
+  type CatalogCategoryWithChildren,
+  type CatalogDeal,
+  type CatalogTherapist,
+} from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
-import { resolveDealMedia } from '../../../utils/media';
+import {
+  resolveDealMedia,
+  resolveTherapistMedia,
+  primaryImage,
+} from '../../../utils/media';
 import content from '../../../content.json';
 import './home.css';
 import { useCurrentLocation } from "../../../hooks/useCurrentLocation";
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 const { home } = content;
 const premiumHero = home.premiumHero;
 const heroImages = home.heroImages as string[];
@@ -48,7 +63,54 @@ function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
     tag: deal.popularTags?.[0]?.name,
   };
 }
+function toProductCardDeal(product: CatalogProduct): DealCardDeal {
+  const price = Number(product.price);
 
+  const originalPrice =
+    product.originalPrice != null
+      ? Number(product.originalPrice)
+      : undefined;
+
+  return {
+    id: product.id,
+    title: product.name,
+    image: product.image ?? '',
+    imageAlt: product.imageAlt ?? product.name,
+    providerName: product.vendor?.businessName ?? undefined,
+    location: product.vendor?.city ?? undefined,
+    price,
+    originalPrice:
+      originalPrice != null && originalPrice !== price
+        ? originalPrice
+        : undefined,
+    discount: product.discount ?? undefined,
+    priceNote: 'Product',
+    tag: product.popularTags?.[0]?.name,
+  };
+}
+function toTherapistCardData(therapist: CatalogTherapist) {
+  const price =
+    therapist.packages.length > 0
+      ? Math.min(
+        ...therapist.packages.map((pkg) => Number(pkg.sellingPrice)),
+      )
+      : null;
+
+  const media = resolveTherapistMedia(therapist);
+
+  return {
+    price,
+    image: primaryImage(media),
+    eyebrow: therapist.personName,
+    heading: therapist.therapistType,
+    location: therapist.branch?.city ?? undefined,
+    distance:
+      therapist.distanceKm != null
+        ? `${Math.round(therapist.distanceKm * 10) / 10} km`
+        : undefined,
+    tag: therapist.popularTags?.[0]?.name,
+  };
+}
 function SectionHeader({ id, heading, seeAll, seeAllTo, }: {
   id: string;
   heading: string;
@@ -66,7 +128,6 @@ function SectionHeader({ id, heading, seeAll, seeAllTo, }: {
   );
 }
 export function Home() {
-  const vacationSwiperRef = useRef<any>(null);
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { toggle, has } = useWishlist();
@@ -74,6 +135,8 @@ export function Home() {
   const [selectedTab, setSelectedTab] = useState('all');
   const [categories, setCategories] = useState<CatalogCategoryWithChildren[]>([]);
   const [dealsData, setDealsData] = useState<CatalogDeal[]>([]);
+  const [featuredProducts, setFeaturedProducts] = useState<CatalogProduct[]>([]);
+  const [therapists, setTherapists] = useState<CatalogTherapist[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,11 +159,15 @@ export function Home() {
     Promise.all([
       listCatalogCategories(),
       listCatalogDeals({ pageSize: 100, latitude: coords?.latitude, longitude: coords?.longitude }),
+      listCatalogProducts({ pageSize: 12, sort: 'newest', }),
+      listCatalogTherapists({ pageSize: 12, latitude: coords?.latitude, longitude: coords?.longitude, }),
     ])
-      .then(([categoriesRes, dealsRes]) => {
+      .then(([categoriesRes, dealsRes, productsRes, therapistsRes]) => {
         if (cancelled) return;
         setCategories(categoriesRes.data ?? []);
         setDealsData(dealsRes.data ?? []);
+        setFeaturedProducts(productsRes.data ?? []);
+        setTherapists(therapistsRes.data ?? []);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -122,35 +189,35 @@ export function Home() {
     [safeDealsData],
   );
   const hotDeals = useMemo(() =>
-      [...safeDealsData].sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0),),
+    [...safeDealsData].sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0),),
     [safeDealsData],
   );
   // Real `Category.isPopular` rows (admin-toggled — see `masters/categories.tsx`'s Popular
   // switch), sorted by the same `sortOrder` the admin screen exposes. Replaces the old
   // `MOCK_CATEGORY_MATCH` keyword-guessing table entirely — no more brittle name/slug matching.
-  const popularCategories = useMemo( () =>
-      [...categories]
-        .filter((c) => c.isPopular)
-        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+  const popularCategories = useMemo(() =>
+    [...categories]
+      .filter((c) => c.isPopular)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
     [categories],
   );
   // One horizontal carousel per popular category — client-side filtered from the already-
   // batched `dealsData` fetch (a Deal's own `categoryId` is always the top-level category, same
   // filter a server-side `listCatalogDeals({ categoryId })` call would apply).
   const popularCategoryDeals = useMemo(() =>
-      popularCategories.map((cat) => ({
-        category: cat,
-        deals: safeDealsData.filter((d) => d.category?.id === cat.id).slice(0, 6),
-      })),
+    popularCategories.map((cat) => ({
+      category: cat,
+      deals: safeDealsData.filter((d) => d.category?.id === cat.id).slice(0, 6),
+    })),
     [popularCategories, safeDealsData],
   );
   // "Hot Right Now" tabs are now the popular categories themselves (plus "All Deals") instead of
   // the old fixed keyword-bucket list — a service/product deal is filtered by its real
   // `category.id`, never a name/slug guess.
   const hotTabs = useMemo(() => [
-      { label: home.sections.hotRightNow.tabs[0]?.label ?? 'All Deals', value: 'all' },
-      ...popularCategories.map((cat) => ({ label: cat.name, value: cat.id })),
-    ], [popularCategories], );
+    { label: home.sections.hotRightNow.tabs[0]?.label ?? 'All Deals', value: 'all' },
+    ...popularCategories.map((cat) => ({ label: cat.name, value: cat.id })),
+  ], [popularCategories],);
   useEffect(() => {
     const query = searchQuery.trim();
     if (!query) {
@@ -183,8 +250,6 @@ export function Home() {
     }
     return hotDeals.filter((deal) => deal.category?.id === selectedTab);
   }, [selectedTab, hotDeals]);
-  // Every Deal is a service offering now (Product is independent — see toDealCardDeal's doc
-  // comment).
   function categoryDealCount(categoryId: string) {
     return dealsData.filter((d) => d.category?.id === categoryId).length;
   }
@@ -220,6 +285,89 @@ export function Home() {
                       Book
                     </FilledButton>
                   }
+                />
+              </swiper-slide>
+            );
+          })}
+        </swiper-container>
+      </div>
+    );
+  }
+  function renderProductCarousel(products: CatalogProduct[]) {
+    return (
+      <div className="home-carousel">
+        <swiper-container
+          navigation="true"
+          slides-per-view="auto"
+          space-between={16}
+          free-mode="true"
+          grab-cursor="true"
+        >
+          {products.map((product) => (
+            <swiper-slide
+              key={product.id}
+              style={{ width: '260px', height: 'auto' }}
+            >
+              <DealCard
+                deal={toProductCardDeal(product)}
+                href={`/products/${product.id}`}
+                favoriteActive={isAuthenticated && has(product.id)}
+                onFavorite={() => handleFavorite(product.id)}
+                actions={
+                  <FilledButton
+                    onClick={() => navigate(`/products/${product.id}`)}
+                  >
+                    <Icon slot="icon" aria-hidden="true">
+                      shopping_bag
+                    </Icon>
+                    View Product
+                  </FilledButton>
+                }
+              />
+            </swiper-slide>
+          ))}
+        </swiper-container>
+      </div>
+    );
+  }
+  function renderTherapistCarousel(therapists: CatalogTherapist[]) {
+    return (
+      <div className="home-carousel">
+        <swiper-container
+          navigation="true"
+          slides-per-view="auto"
+          space-between={16}
+          free-mode="true"
+          grab-cursor="true"
+        >
+          {therapists.map((therapist) => {
+            const card = toTherapistCardData(therapist);
+
+            return (
+              <swiper-slide
+                key={therapist.id}
+                style={{ width: '260px', height: 'auto' }}
+              >
+                <SkyProductCardWC
+                  image={card.image}
+                  imageAlt={therapist.personName}
+                  eyebrow={card.eyebrow}
+                  eyebrowHref={
+                    therapist.vendor?.slug
+                      ? `/vendor/${therapist.vendor.slug}`
+                      : undefined
+                  }
+                  heading={card.heading}
+                  location={card.location}
+                  distance={card.distance}
+                  tag={card.tag}
+                  pricePrefix={card.price != null ? 'From' : undefined}
+                  price={
+                    card.price != null
+                      ? formatINR(card.price)
+                      : undefined
+                  }
+                  href={`/therapist/${therapist.id}`}
                 />
               </swiper-slide>
             );
@@ -474,6 +622,29 @@ export function Home() {
           </div>
         </div>
       </section>
+      {therapists.length > 0 && (
+        <section
+          className="home-section"
+          aria-labelledby="therapists-heading"
+        >
+          <div className="home-section__container">
+            <div className="home-section__header">
+              <h2 id="therapists-heading" className="home-section__heading">
+                Our Therapists
+              </h2>
+
+              <TextButton onClick={() => navigate('/therapists')}>
+                View All
+                <Icon slot="trailing-icon" aria-hidden="true">
+                  chevron_right
+                </Icon>
+              </TextButton>
+            </div>
+
+            {renderTherapistCarousel(therapists)}
+          </div>
+        </section>
+      )}
       {/* ── Gift Cards CTA ─────────────────────────────────────────────── */}
       <section
         className="home-section home-section--alt"
@@ -545,42 +716,19 @@ export function Home() {
           </div>
         </section>
       )}
-      <section className="home-section">
+      <section
+        className="home-section"
+        aria-labelledby="featured-products-heading"
+      >
         <div className="home-section__container">
+          <SectionHeader
+            id="featured-products-heading"
+            heading="Featured Products"
+            seeAll="See all"
+            seeAllTo="/products"
+          />
 
-          <div className="home-section__header">
-            <h2 className="home-section__heading">
-              {home.vacationStays.title}
-            </h2>
-          </div>
-
-          <div className="vacation-slider">
-
-            <swiper-container
-              ref={vacationSwiperRef}
-              navigation="true"
-              pagination="false"
-              slides-per-view="auto"
-              space-between="20"
-              grab-cursor="true"
-            >
-              {home.vacationStays.items.map((item) => (
-                <swiper-slide
-                  key={item.label}
-                  className="home-stays-slide"
-                >
-                  <sky-image-card
-                    image={item.image}
-                    imageAlt={item.imageAlt}
-                    label={item.label}
-                    href={item.href}
-                  />
-                </swiper-slide>
-              ))}
-            </swiper-container>
-
-          </div>
-
+          {renderProductCarousel(featuredProducts)}
         </div>
       </section>
       {popularCategoryDeals.slice(1).map(({ category, deals }, index) =>
@@ -659,6 +807,7 @@ export function Home() {
           </sky-card>
         </div>
       </section>
+
       <section
         className="home-section"
         aria-labelledby="search-destination-heading"
@@ -714,64 +863,6 @@ export function Home() {
 
           </div>
 
-        </div>
-      </section>
-      <section className="home-section">
-        <div className="home-section__container">
-          <div className="home__trust-grid">
-            {home.trustSection.cards.map((card, index) => (
-              <sky-card
-                key={index}
-                variant="outlined"
-                className="home__trust-card"
-              >
-                <div className="home__trust-top">
-
-                  {card.type === 'logos' && card.logos && (
-                    <div className="home__trust-icons">
-                      {card.logos.map((logo) => (
-                        <div key={logo} className="home__trust-circle">
-                          <img
-                            src={logo}
-                            alt=""
-                            className="home__trust-logo"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {card.type === "avatars" && card.avatars && (
-                    <div className="home__trust-avatars">
-                      {card.avatars.map((avatar) => (
-                        <div key={avatar} className="home__trust-circle">
-                          <img
-                            src={avatar}
-                            alt=""
-                            className="home__trust-avatar"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {card.type === 'stars' && card.stars && (
-                    <div className="home__trust-stars">
-                      {Array.from({ length: card.stars }).map((_, i) => (
-                        <Icon key={i}>
-                          star
-                        </Icon>
-                      ))}
-                    </div>
-                  )}
-
-                </div>
-
-                <h3>{card.title}</h3>
-                <p>{card.subtitle}</p>
-              </sky-card>
-            ))}
-          </div>
         </div>
       </section>
       {/* /*FAQS*/}

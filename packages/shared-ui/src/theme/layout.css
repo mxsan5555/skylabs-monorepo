@@ -208,16 +208,28 @@
 }
 
 .otp-resend {
-  margin: 4px 0 0;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  min-height: 40px;
   color: var(--md-sys-color-on-surface);
   font-size: 0.875rem;
+  line-height: 1.25rem;
 }
 
 .otp-muted {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.25rem;
   color: var(--md-sys-color-on-surface-variant);
 }
 
+.otp-resend__button {
+  display: inline-flex;
+  align-items: center;
+}
 /* ------------------------------------------------------------------ *
  * Admin / account console: sidebar + centered content. Reused for every
  * role (user/admin/marketing/sales). Themed by --md-sys-color-* tokens.
