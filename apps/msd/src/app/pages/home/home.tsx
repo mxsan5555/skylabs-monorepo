@@ -85,7 +85,7 @@ function toProductCardDeal(product: CatalogProduct): DealCardDeal {
         ? originalPrice
         : undefined,
     discount: product.discount ?? undefined,
-    priceNote: 'Product',
+    priceNote: home.ui.labels.product,
     tag: product.popularTags?.[0]?.name,
   };
 }
@@ -294,7 +294,7 @@ export function Home() {
                       <Icon slot="icon" aria-hidden="true">
                         calendar_month
                       </Icon>
-                      Book
+                      {home.ui.labels.book}
                     </FilledButton>
                   }
                 />
@@ -332,7 +332,7 @@ export function Home() {
                     <Icon slot="icon" aria-hidden="true">
                       shopping_bag
                     </Icon>
-                    View Product
+                    {home.ui.labels.viewProduct}
                   </FilledButton>
                 }
               />
@@ -373,7 +373,7 @@ export function Home() {
                   location={card.location}
                   distance={card.distance}
                   tag={card.tag}
-                  pricePrefix={card.price != null ? 'From' : undefined}
+                  pricePrefix={card.price != null ? home.ui.labels.from : undefined}
                   price={
                     card.price != null
                       ? formatINR(card.price)
@@ -642,11 +642,13 @@ export function Home() {
           <div className="home-section__container">
             <div className="home-section__header">
               <h2 id="therapists-heading" className="home-section__heading">
-                Our Therapists
+                {home.sections.therapists.heading}
               </h2>
 
-              <TextButton onClick={() => navigate('/therapists')}>
-                View All
+              <TextButton
+                onClick={() => navigate('/therapists')}
+              >
+                {home.sections.therapists.seeAll}
                 <Icon slot="trailing-icon" aria-hidden="true">
                   chevron_right
                 </Icon>
@@ -721,7 +723,7 @@ export function Home() {
             <SectionHeader
               id={`popular-category-${popularCategoryDeals[0].category.id}-heading`}
               heading={popularCategoryDeals[0].category.name}
-              seeAll="See all"
+              seeAll={home.ui.labels.seeAll}
               seeAllTo={`/category/${popularCategoryDeals[0].category.slug}`}
             />
             {renderDealCarousel(popularCategoryDeals[0].deals)}
@@ -735,9 +737,9 @@ export function Home() {
         <div className="home-section__container">
           <SectionHeader
             id="featured-products-heading"
-            heading="Featured Products"
-            seeAll="See all"
-            seeAllTo="/products"
+            heading={home.sections.featuredProducts.heading}
+            seeAll={home.sections.featuredProducts.seeAll}
+            seeAllTo={home.sections.featuredProducts.seeAllTo}
           />
 
           {renderProductCarousel(featuredProducts)}
@@ -754,7 +756,7 @@ export function Home() {
               <SectionHeader
                 id={`popular-category-${category.id}-heading`}
                 heading={category.name}
-                seeAll="See all"
+                seeAll={home.ui.labels.seeAll}
                 seeAllTo={`/category/${category.slug}`}
               />
               {renderDealCarousel(deals)}

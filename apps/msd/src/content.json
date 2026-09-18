@@ -333,6 +333,16 @@
         "seeAll": "See all",
         "seeAllTo": "/explore"
       },
+      "featuredProducts": {
+        "heading": "Featured Products",
+        "seeAll": "See all",
+        "seeAllTo": "/products"
+      },
+      "therapists": {
+        "heading": "Our Therapists",
+        "seeAll": "View All",
+        "seeAllTo": "/therapists"
+      },
       "hotRightNow": {
         "heading": "Hot Right Now",
         "seeAll": "See more deals",
@@ -601,7 +611,16 @@
       },
       "labels": {
         "services": "Deals",
-        "popular": "Popular:"
+        "popular": "Popular:",
+        "seeAll": "See all",
+        "ourTherapists": "Our Therapists",
+        "viewAll": "View All",
+        "featuredProducts": "Featured Products",
+        "from": "From",
+        "book": "Book",
+        "viewProduct": "View Product",
+        "product": "Product",
+        "searchResultSeparator": " • "
       },
       "messages": {
         "loading": "Loading…",
@@ -929,24 +948,24 @@
       "removeItem": "Could not remove item."
     }
   },
-"wishlist": {
-  "title": "Saved Deals",
-  "emptyHeading": "No saved deals yet",
-  "emptySubheading": "Tap the heart on any deal to save it here for later.",
-  "emptyCtaLabel": "Browse Deals",
-  "addToCartLabel": "Add to Cart",
-  "loading": "Loading your wishlist…",
-  "savedDealsLabel": "Saved deals",
-  "serviceLabel": "Deal",
-  "productLabel": "Product",
-  "bookLabel": "Book",
-  "addingLabel": "Adding…",
-  "addToCartError": "Could not add to cart.",
-  "dealSingular": "deal",
-  "dealPlural": "deals",
-  "removeFromWishlist": "Remove from wishlist",
-  "saveToWishlist": "Save to wishlist"
-},
+  "wishlist": {
+    "title": "Saved Deals",
+    "emptyHeading": "No saved deals yet",
+    "emptySubheading": "Tap the heart on any deal to save it here for later.",
+    "emptyCtaLabel": "Browse Deals",
+    "addToCartLabel": "Add to Cart",
+    "loading": "Loading your wishlist…",
+    "savedDealsLabel": "Saved deals",
+    "serviceLabel": "Deal",
+    "productLabel": "Product",
+    "bookLabel": "Book",
+    "addingLabel": "Adding…",
+    "addToCartError": "Could not add to cart.",
+    "dealSingular": "deal",
+    "dealPlural": "deals",
+    "removeFromWishlist": "Remove from wishlist",
+    "saveToWishlist": "Save to wishlist"
+  },
   "checkout": {
     "title": "Checkout",
     "steps": [
