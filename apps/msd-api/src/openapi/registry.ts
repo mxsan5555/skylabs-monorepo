@@ -42,6 +42,7 @@ import {
   TherapistPackageCreateSchema,
   TherapistPackageUpdateSchema,
   VendorModulesAndCategoryAccessSchema,
+  BranchCategoryAccessInputSchema,
 } from '../schemas/vendor.schema';
 import { CategoryCreateSchema, CategoryUpdateSchema, CategoryStatusUpdateSchema } from '../schemas/category.schema';
 import {
@@ -518,6 +519,25 @@ export function buildOpenApiDocument() {
     security: bearer,
     request: { query: z.object({ q: z.string().optional(), page: z.coerce.number().optional(), pageSize: z.coerce.number().optional() }) },
     responses: { 200: { description: 'Users' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/vendors/users/lookup',
+    summary: 'Owner-identity preview for "Add Vendor" (admin, gated on vendors:create) — UX only',
+    tags: ['Vendors - Admin'],
+    security: bearer,
+    request: { query: z.object({ email: z.string().optional(), mobile: z.string().optional() }) },
+    responses: { 200: { description: 'Match preview' }, 403: errorResponse, 409: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/vendors/public/register',
+    summary: 'Public "Become a Vendor" registration — unauthenticated, always creates PENDING_VERIFICATION',
+    tags: ['Vendors - Public'],
+    request: { body: { content: { 'application/json': { schema: VendorSelfCreateSchema } } } },
+    responses: { 201: { description: 'Vendor application created' }, 409: errorResponse, 422: errorResponse, 429: errorResponse },
   });
 
   registry.registerPath({
@@ -1361,6 +1381,16 @@ export function buildOpenApiDocument() {
 
   registry.registerPath({
     method: 'get',
+    path: '/vendors/me/branches/{branchId}/category-access',
+    summary: "A branch's own category/subcategory access map, for the caller's own vendor (read-only)",
+    tags: ['Vendors - Self-service'],
+    security: bearer,
+    request: { params: z.object({ branchId: z.string().uuid() }) },
+    responses: { 200: { description: 'Branch category access' }, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
     path: '/vendors/{vendorId}/category-access',
     summary: "A vendor's granted top-level categories (admin)",
     tags: ['Vendors - Admin'],
@@ -1378,6 +1408,29 @@ export function buildOpenApiDocument() {
     request: {
       params: z.object({ vendorId: z.string().uuid() }),
       body: { content: { 'application/json': { schema: VendorModulesAndCategoryAccessSchema } } },
+    },
+    responses: { 200: { description: 'Updated' }, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/vendors/{vendorId}/branches/{branchId}/category-access',
+    summary: "A branch's own category/subcategory access map (narrows the vendor's grants)",
+    tags: ['Vendors - Admin'],
+    security: bearer,
+    request: { params: z.object({ vendorId: z.string().uuid(), branchId: z.string().uuid() }) },
+    responses: { 200: { description: 'Grants' } },
+  });
+
+  registry.registerPath({
+    method: 'put',
+    path: '/vendors/{vendorId}/branches/{branchId}/category-access',
+    summary: "Replace a branch's category/subcategory access map",
+    tags: ['Vendors - Admin'],
+    security: bearer,
+    request: {
+      params: z.object({ vendorId: z.string().uuid(), branchId: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: BranchCategoryAccessInputSchema } } },
     },
     responses: { 200: { description: 'Updated' }, 422: errorResponse },
   });

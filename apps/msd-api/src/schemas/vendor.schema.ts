@@ -176,11 +176,24 @@ const VendorFieldsSchema = z.object({
 });
 
 export const VendorCreateSchema = VendorFieldsSchema.extend({
-  /** Admin-only: link an existing User (with the `vendor` role) as this business's owner. */
+  /** NOT read by `createVendor` (see that function's own doc comment — a Vendor's owner is
+   *  always a brand-new User, never an existing one). Declared here only because
+   *  `VendorUpdateSchema` below is `VendorCreateSchema.partial()` and `updateVendor` still has
+   *  its own separate, pre-existing re-link-on-edit capability that reads this field. */
   ownerUserId: z.string().uuid().optional(),
 }).openapi('VendorCreate');
 
 export const VendorUpdateSchema = VendorCreateSchema.partial().openapi('VendorUpdate');
+
+/** Query for the "Add Vendor" owner-identity AVAILABILITY preview — UX-only (see
+ *  `vendorService.checkVendorOwnerAvailability`'s own doc comment); at least one of
+ *  email/mobile must be given. */
+export const VendorOwnerLookupQuerySchema = z
+  .object({
+    email: z.string().email().optional(),
+    mobile: vendorPhoneSchema,
+  })
+  .refine((v) => Boolean(v.email) || Boolean(v.mobile), { message: 'Provide an email or mobile number' });
 
 // Self-registration has no "Step 1 only" concept (unlike the admin pipeline) — re-require
 // businessName here even though the base VendorFieldsSchema relaxed it to optional.
@@ -235,6 +248,14 @@ export const VendorModulesAndCategoryAccessSchema = z
 
 // ─── Branch ──────────────────────────────────────────────────────────────────
 
+/** Route param for the admin-scoped `/:vendorId/branches/:branchId/...` sub-resources — same
+ *  "every param must be declared" discipline as `VendorImageIdParamSchema`/`VendorProductIdParamSchema`
+ *  above (bare `VendorIdParamSchema` would silently strip `branchId`). */
+export const VendorBranchIdParamSchema = z.object({
+  vendorId: z.string().uuid(),
+  branchId: z.string().uuid(),
+});
+
 /** Same 6-digit-only rule as Vendor's own PINCODE_REGEX above — Branch previously had no format
  *  check at all here (`z.string().max(20)`), unlike Vendor. */
 const branchPincodeSchema = z
@@ -286,6 +307,27 @@ const BranchFieldsSchema = z.object({
 export const BranchCreateSchema = BranchFieldsSchema.openapi('BranchCreate');
 export const BranchUpdateSchema = BranchFieldsSchema.partial().openapi('BranchUpdate');
 export const BranchStatusUpdateSchema = z.object({ isActive: z.boolean() }).openapi('BranchStatusUpdate');
+
+/**
+ * A branch's own category/subcategory access map — replace-the-full-set semantics (same shape as
+ * `VendorModulesAndCategoryAccessSchema` above). Each `categoryId` must be a top-level category
+ * the VENDOR already holds via `VendorCategoryAccess` (a branch can only narrow the vendor's
+ * grants, never exceed them); each `subcategoryIds` entry must be a real child of that
+ * `categoryId` (validated server-side in vendor.service.ts#setBranchCategoryAccess). An empty
+ * `subcategoryIds` array means the branch offers the category's top level with none of its
+ * subcategories explicitly enabled yet — see BranchSubcategoryAccess's own schema doc comment for
+ * why subcategory access is always explicit, never implied.
+ */
+export const BranchCategoryAccessInputSchema = z
+  .object({
+    mappings: z.array(
+      z.object({
+        categoryId: z.string().uuid(),
+        subcategoryIds: z.array(z.string().uuid()).default([]),
+      }),
+    ),
+  })
+  .openapi('BranchCategoryAccessInput');
 
 // ─── Therapist ───────────────────────────────────────────────────────────────
 

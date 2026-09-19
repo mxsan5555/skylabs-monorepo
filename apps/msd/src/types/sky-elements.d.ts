@@ -100,6 +100,15 @@ declare module 'react' {
         level?: number;
       }>;
 
+      // ── sky-search-bar ─────────────────────────────────────────────────────
+      'sky-search-bar': SkyEl<{
+        placeholder?: string;
+        value?: string;
+        label?: string;
+        /** Attribute: button-label */
+        'button-label'?: string;
+      }>;
+
       // ── sky-data-table ─────────────────────────────────────────────────────
       'sky-data-table': SkyEl<{
         caption?: string;

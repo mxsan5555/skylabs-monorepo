@@ -1,9 +1,9 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from './client';
 import type { MediaImage } from '../media';
 
-/** `type`/`isPopular` only ever apply to a top-level row (`parentId: null`) — a subcategory
- *  inherits its parent's type by join and never carries its own (see msd-api's
- *  `category.schema.ts` doc comment). Both are `undefined`/absent on a subcategory row. */
+/** `type` only ever applies to a top-level row (`parentId: null`) — a subcategory inherits its
+ *  parent's type by join and never carries its own (see msd-api's `category.schema.ts` doc
+ *  comment). `undefined`/absent on a subcategory row. */
 export type CategoryType = 'SERVICE' | 'PRODUCT' | 'THERAPY';
 
 export interface Category {
@@ -14,7 +14,6 @@ export interface Category {
   parentId: string | null;
   sortOrder: number;
   type?: CategoryType | null;
-  isPopular?: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -35,7 +34,6 @@ export interface CategoryInput {
   /** Required by the backend when `parentId` is omitted (top-level category); ignored/omitted
    *  for a subcategory. */
   type?: CategoryType;
-  isPopular?: boolean;
 }
 
 function toQuery(params: Record<string, string | number | undefined>): string {

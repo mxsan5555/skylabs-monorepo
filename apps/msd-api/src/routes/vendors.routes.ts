@@ -19,10 +19,13 @@ import {
   VendorKycReviewSchema,
   VendorListQuerySchema,
   VendorUserSearchQuerySchema,
+  VendorOwnerLookupQuerySchema,
   CrossVendorListQuerySchema,
   BranchCreateSchema,
   BranchUpdateSchema,
   BranchStatusUpdateSchema,
+  BranchCategoryAccessInputSchema,
+  VendorBranchIdParamSchema,
   DealCreateSchema,
   DealUpdateSchema,
   DealStatusUpdateSchema,
@@ -123,6 +126,28 @@ router.get('/users/search', requireAnyPermission('vendors', ['create', 'edit']),
     next(err);
   }
 });
+
+/**
+ * "Add Vendor" owner-identity AVAILABILITY preview — UX only, same gate as `/users/search`
+ * above. Vendor creation always creates a brand-new owner User (see `vendorService.
+ * createVendorOwner`'s own doc comment) — this just lets the frontend show "this email/phone is
+ * already taken" BEFORE the admin fills in the rest of the form; the actual `POST /` below
+ * re-checks independently regardless of what this returned (backend is always the source of
+ * truth, never trusts this preview).
+ */
+router.get(
+  '/users/lookup',
+  requireAnyPermission('vendors', ['create', 'edit']),
+  validateQuery(VendorOwnerLookupQuerySchema),
+  async (req, res, next) => {
+    try {
+      const { email, mobile } = req.validatedQuery as ReturnType<typeof VendorOwnerLookupQuerySchema.parse>;
+      sendData(res, await vendorService.checkVendorOwnerAvailability(email, mobile));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 /**
  * Cross-vendor listings for the sidebar's standalone "Branches"/"Deals" admin pages — gated on
@@ -448,6 +473,24 @@ router.put(
     }
   },
 );
+
+/**
+ * Self-service read mirror of `/:vendorId/branches/:branchId/category-access` (see that route's
+ * doc comment further down) — needed because `DealDialog`'s Category/Subcategory pickers are
+ * branch-scoped now and that component is shared between the admin wizard and this self-service
+ * surface. Read-only: a vendor owner views but never edits their own branch's category mapping
+ * (that stays an admin/Data-Entry action via Step 2 of the onboarding wizard) — no `PUT` mirror.
+ * `getBranchCategoryAccess` already calls `getBranchScopedOrThrow`, so a vendor can't reach
+ * another vendor's branch here even by guessing a `branchId`.
+ */
+router.get('/me/branches/:branchId/category-access', requirePermission('vendors', 'custom'), async (req, res, next) => {
+  try {
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    sendData(res, await vendorService.getBranchCategoryAccess(vendor.id, req.params.branchId));
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * Distinct customers who have ordered from the caller's own vendor — for the vendor-facing
@@ -1625,6 +1668,47 @@ router.put(
         action: 'vendor.category_access.update',
         targetType: 'Vendor',
         targetId: req.params.vendorId,
+        after: req.body,
+        ...requestMeta(req),
+      });
+      sendData(res, result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * A branch's own category/subcategory access map — narrows the vendor-level grants above (see
+ * BranchCategoryAccess's own schema doc comment). Same `vendors:view`/`vendors:edit` gate as
+ * every other branch-scoped route in this file; no new permission key.
+ */
+router.get(
+  '/:vendorId/branches/:branchId/category-access',
+  requirePermission('vendors', 'view'),
+  validateParams(VendorBranchIdParamSchema),
+  async (req, res, next) => {
+    try {
+      sendData(res, await vendorService.getBranchCategoryAccess(req.params.vendorId, req.params.branchId));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.put(
+  '/:vendorId/branches/:branchId/category-access',
+  requirePermission('vendors', 'edit'),
+  validateParams(VendorBranchIdParamSchema),
+  validateBody(BranchCategoryAccessInputSchema),
+  async (req, res, next) => {
+    try {
+      const result = await vendorService.setBranchCategoryAccess(req.params.vendorId, req.params.branchId, req.body);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'branch_category_access.update',
+        targetType: 'Branch',
+        targetId: req.params.branchId,
         after: req.body,
         ...requestMeta(req),
       });

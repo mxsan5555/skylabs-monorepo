@@ -87,3 +87,23 @@ export type WebsitePageFieldKey = 'title' | 'content' | 'status' | 'metaTitle' |
 export function extractWebsitePageFieldErrors(err: unknown): Partial<Record<WebsitePageFieldKey, string>> | null {
   return extractFieldErrors<WebsitePageFieldKey>(err);
 }
+
+/** The public "Become a Vendor" application's own field set — a subset of msd-api's
+ *  `VendorFieldsSchema` (see `VendorSelfCreateSchema`), just the identity/business/address
+ *  fields that page actually collects. */
+export type BecomeVendorFieldKey =
+  | 'businessName'
+  | 'businessEmail'
+  | 'businessPhone'
+  | 'ownerFirstName'
+  | 'ownerLastName'
+  | 'ownerEmail'
+  | 'ownerMobile'
+  | 'address'
+  | 'city'
+  | 'state'
+  | 'pincode';
+
+export function extractBecomeVendorFieldErrors(err: unknown): Partial<Record<BecomeVendorFieldKey, string>> | null {
+  return extractFieldErrors<BecomeVendorFieldKey>(err);
+}

@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.routes';
 import rbacRoutes from './routes/rbac.routes';
 import customersRoutes from './routes/customers.routes';
 import vendorsRoutes from './routes/vendors.routes';
+import vendorPublicRoutes from './routes/vendor-public.routes';
 import categoriesRoutes from './routes/categories.routes';
 import blogPostsRoutes from './routes/blog-posts.routes';
 import blogCategoriesRoutes from './routes/blog-categories.routes';
@@ -75,6 +76,10 @@ export function createApp(): express.Express {
   api.use('/auth', authRoutes);
   api.use('/rbac', rbacRoutes);
   api.use('/customers', customersRoutes);
+  // Mounted BEFORE the authenticated `/vendors` router so `POST /vendors/public/register`
+  // (no `authenticate`) is matched first — same "public-first" ordering discipline as
+  // `catalogRoutes` below, just sharing the `/vendors` prefix instead of its own.
+  api.use('/vendors/public', vendorPublicRoutes);
   api.use('/vendors', vendorsRoutes);
   api.use('/categories', categoriesRoutes);
   api.use('/blog-posts', blogPostsRoutes);

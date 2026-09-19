@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedButton, OutlinedTextField, Tabs, PrimaryTab, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import content from '../../../content.json';
 import { googleSignInUrl, requestOtp } from '../../../api/rbac/auth';
@@ -27,7 +27,6 @@ const validatePhone = (value: string) =>
 export function SignIn() {
   const navigate = useNavigate();
   const location = useLocation();
-  const returnUrl = extractReturnUrl(location);
   const [method, setMethod] = useState<Method>('phone');
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
@@ -59,7 +58,10 @@ export function SignIn() {
     setLoading(true);
     try {
       await requestOtp(input, 'login');
-      navigate('/otp', { state: { identifier: input, method, returnUrl } });
+      const next = new URLSearchParams(location.search).get('next');
+      navigate('/otp', {
+        state: { identifier: input, method, next, },
+      });
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : auth.validation.somethingWentWrong);
     } finally {
@@ -130,6 +132,12 @@ export function SignIn() {
               setValue(target.value.trim());
             }
             if (error) setError('');
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !loading) {
+              event.preventDefault();
+              sendOtp();
+            }
           }}
         >
           <Icon slot="leading-icon" aria-hidden="true">

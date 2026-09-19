@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Category } from '../../../../api/rbac/categories';
 
@@ -38,7 +38,6 @@ const TOP_CATEGORY: Category = {
   parentId: null,
   sortOrder: 1,
   type: 'SERVICE',
-  isPopular: true,
   isActive: true,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
@@ -76,26 +75,23 @@ async function waitForTableLoaded(expectedTotal: number): Promise<void> {
 }
 
 /**
- * Feature: Category master — Type selector + Popular toggle
+ * Feature: Category master — Type selector
  * Scenario: a top-level category requires a Type (Service/Product/Therapy); a subcategory
- * inherits its parent's type and never shows the Type/Popular controls at all.
+ * inherits its parent's type and never shows the Type control at all.
  *
  * Given: the admin Categories screen (`scope="top"`) or Sub Categories screen (`scope="sub"`)
  * When: the create/edit form renders
- * Then: `scope="top"` shows a required Type select + a Popular checkbox; `scope="sub"` shows
- *       neither, only an inherited-type message
+ * Then: `scope="top"` shows a required Type select; `scope="sub"` shows neither, only an
+ *       inherited-type message
  *
  * Edge cases:
  * - submitting a top-level category with no type selected is rejected client-side
- * - isPopular persists through an edit round-trip (checked state reflects the existing row)
  */
 describe('CategoryManagement — Type selector (top-level only)', () => {
-  it('renders a Type select and a Popular checkbox for scope="top"', async () => {
+  it('renders a Type select for scope="top"', async () => {
     render(<CategoryManagement scope="top" />);
     await waitForTableLoaded(1);
     expect(typeSelect()).toBeTruthy();
-    // Renders once per open-able dialog (Add + Edit, both mounted regardless of open state).
-    expect(screen.getAllByText('Popular (shown in homepage carousels)').length).toBeGreaterThan(0);
   });
 
   it('shows an "inherited from parent" message instead of a Type select for scope="sub"', async () => {
@@ -107,38 +103,14 @@ describe('CategoryManagement — Type selector (top-level only)', () => {
       ['Service', 'Product', 'Therapy'].every((label) => select.textContent?.includes(label)),
     );
     expect(anyTypeOptionRendered).toBe(false);
-    expect(screen.queryByText('Popular (shown in homepage carousels)')).toBeNull();
     expect(screen.getAllByText('Type is inherited from the parent category.').length).toBeGreaterThan(0);
   });
 
-  it('defaults a new top-level category form to Type=SERVICE and Popular=false', async () => {
+  it('defaults a new top-level category form to Type=SERVICE', async () => {
     render(<CategoryManagement scope="top" />);
     await waitForTableLoaded(1);
     const optionLabels = Array.from(typeSelect().querySelectorAll('md-select-option')).map((o) => o.textContent?.trim());
     expect(optionLabels).toEqual(['Service', 'Product', 'Therapy']);
-    // The Add dialog's Popular checkbox (first of the two mounted — Add, then Edit-empty).
-    const popularCheckbox = screen.getAllByRole('checkbox', { name: 'Popular (shown in homepage carousels)' })[0] as HTMLInputElement;
-    expect(popularCheckbox.checked).toBe(false);
-  });
-
-  // isPopular persists through an edit round-trip
-  it('pre-checks Popular for an existing category that already has isPopular=true, and submits it back unchanged', async () => {
-    listCategoriesMock.mockResolvedValue({ data: [TOP_CATEGORY], meta: { total: 1 } });
-    updateCategoryMock.mockResolvedValue({ data: { ...TOP_CATEGORY } });
-    render(<CategoryManagement scope="top" />);
-    await waitForTableLoaded(1);
-
-    // Drive the row-action event the sky-data-table would normally dispatch on "Edit" click —
-    // this is the same custom-event contract categories.tsx already listens for. `fireEvent`
-    // (rather than a raw `dispatchEvent`) wraps this in `act()` so the resulting state update
-    // is flushed synchronously.
-    const table = document.querySelector('sky-data-table')!;
-    fireEvent(table, new CustomEvent('sky-dt-row-action', { detail: { action: 'edit', row: {}, rowIndex: 0 } }));
-
-    await waitFor(() => {
-      const checkboxes = screen.getAllByRole('checkbox', { name: 'Popular (shown in homepage carousels)' }) as HTMLInputElement[];
-      expect(checkboxes.some((c) => c.checked)).toBe(true);
-    });
   });
 
   // Edge case: a brand-new top-level category is never submittable with an empty Type — the
@@ -157,17 +129,6 @@ describe('CategoryManagement — Type selector (top-level only)', () => {
     const optionLabels = Array.from(typeSelect().querySelectorAll('md-select-option')).map((o) => o.textContent?.trim());
     expect(optionLabels).toEqual(['Service', 'Product', 'Therapy']);
     expect(optionLabels).not.toContain('');
-  });
-
-  // Toggling Popular is a real native `<input type="checkbox">`, so it's driven the same way as
-  // any other native form control in this suite (unlike the Type `<md-outlined-select>`).
-  it('toggling the Popular checkbox updates its own checked state', async () => {
-    render(<CategoryManagement scope="top" />);
-    await waitForTableLoaded(1);
-    const popularCheckbox = screen.getAllByRole('checkbox', { name: 'Popular (shown in homepage carousels)' })[0] as HTMLInputElement;
-    expect(popularCheckbox.checked).toBe(false);
-    fireEvent.click(popularCheckbox);
-    expect(popularCheckbox.checked).toBe(true);
   });
 
   // Regression check: scope="sub" still renders exactly its original single flat "Parent

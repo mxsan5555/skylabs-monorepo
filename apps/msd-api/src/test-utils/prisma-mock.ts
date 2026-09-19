@@ -9,12 +9,23 @@ import { vi } from 'vitest';
  * Every leaf is a bare `vi.fn()` with no default resolution — each test arranges the exact
  * calls it needs via `mockResolvedValue`/`mockResolvedValueOnce`. Call `resetPrismaMock()`
  * between tests (see afterEach in each spec) to clear call history and implementations.
+ *
+ * ONE deliberate exception: `user.findUnique` defaults to resolving an active, non-deleted
+ * user. This is the one Prisma call `middleware/authenticate.ts`'s shared status re-check makes
+ * on every authenticated request (see that file's own doc comment) — every existing test that
+ * hits ANY authenticated route via `bearerFor()` now goes through it too, and `findUnique`
+ * (this exact method, not `findFirst`) has no other caller in this codebase, so this default
+ * can't collide with any existing test's own business-logic assertions. A test exercising the
+ * blocked/suspended-account path overrides it per-test with `mockResolvedValueOnce`/
+ * `mockResolvedValue`, same as any other mock call. `vi.clearAllMocks()` (used in every spec's
+ * `beforeEach`) clears call history/counts only, never implementations, so this default survives
+ * across every test in a file without needing to be re-armed.
  */
 export function createPrismaMock() {
   const mock = {
     user: {
       findFirst: vi.fn(),
-      findUnique: vi.fn(),
+      findUnique: vi.fn().mockResolvedValue({ status: 'active', deletedAt: null }),
       findMany: vi.fn(),
       findUniqueOrThrow: vi.fn(),
       create: vi.fn(),
@@ -214,6 +225,22 @@ export function createPrismaMock() {
       count: vi.fn(),
     },
     vendorCategoryAccess: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      createMany: vi.fn(),
+      deleteMany: vi.fn(),
+      count: vi.fn(),
+    },
+    branchCategoryAccess: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      createMany: vi.fn(),
+      deleteMany: vi.fn(),
+      count: vi.fn(),
+    },
+    branchSubcategoryAccess: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),

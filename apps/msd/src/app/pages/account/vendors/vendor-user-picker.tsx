@@ -1,116 +1,143 @@
 import { useEffect, useState } from 'react';
-import { OutlinedTextField, OutlinedButton, Icon } from '@skylabs-monorepo/shared-ui/react';
+import { OutlinedTextField } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { searchUsersForVendor, type UserSummary } from '../../../../api/rbac/vendors';
+import { getVendorOwnerAvailability, type VendorOwnerAvailability } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 
+/** What Step 1 of "Add Vendor" submits — a brand-new owner identity only. A Vendor's owner is
+ *  ALWAYS a new User; there is no "pick/reuse an existing account" path anywhere in this flow
+ *  (see msd-api's `vendorService.createVendorOwner` doc comment) — `vendor-pipeline.tsx#saveUser`
+ *  sends these fields straight through to `createVendor`/`registerPublicVendor`, which reject
+ *  outright if the email/mobile already belongs to anyone. */
+export interface PendingVendorOwner {
+  ownerFirstName?: string;
+  ownerLastName?: string;
+  ownerEmail?: string;
+  ownerMobile?: string;
+}
+
 interface VendorUserPickerProps {
-  selectedUser: UserSummary | null;
-  onSelect: (user: UserSummary | null) => void;
+  value: PendingVendorOwner | null;
+  onChange: (value: PendingVendorOwner | null) => void;
   disabled?: boolean;
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const INDIA_MOBILE_REGEX = /^[6-9]\d{9}$/;
+
 /**
- * "Add Vendor → Select Existing User" — search-and-pick UI so it's unambiguous which
- * existing login a new vendor profile is linked to. Vendor.ownerUserId is set from the
- * selected user's id; no new user/auth record is ever created here.
+ * "Add Vendor → Vendor User" — Step 1 of the onboarding pipeline. Type the new owner's name/
+ * email/mobile directly; a debounced availability check (`GET /vendors/users/lookup`) shows a
+ * blocking "this email/phone is already taken" message if either identifier already belongs to
+ * any existing account — there is no way to proceed with a taken identifier, and no "use this
+ * existing account anyway" option, by design. The actual `POST /vendors`/public-register call
+ * independently re-checks regardless of what this preview showed — this component is UX
+ * assistance only, never a "trust me" shortcut.
  */
-export function VendorUserPicker({ selectedUser, onSelect, disabled }: VendorUserPickerProps) {
+export function VendorUserPicker({ value, onChange, disabled }: VendorUserPickerProps) {
   const { token } = useAuth();
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<UserSummary[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
+  const [firstName, setFirstName] = useState(value?.ownerFirstName ?? '');
+  const [lastName, setLastName] = useState(value?.ownerLastName ?? '');
+  const [email, setEmail] = useState(value?.ownerEmail ?? '');
+  const [mobile, setMobile] = useState(value?.ownerMobile ?? '');
+  const [checking, setChecking] = useState(false);
+  const [checkError, setCheckError] = useState('');
+  const [availability, setAvailability] = useState<VendorOwnerAvailability | null>(null);
+
+  const emailValid = !email.trim() || EMAIL_REGEX.test(email.trim());
+  const mobileValid = !mobile.trim() || INDIA_MOBILE_REGEX.test(mobile.trim());
+
+  // Debounced availability check (mirrors the original search box's own 300ms debounce) —
+  // re-runs, and clears any prior result, on every email/mobile edit.
   useEffect(() => {
-    if (selectedUser || !query.trim()) {
-      setResults([]);
-      return;
-    }
+    setAvailability(null);
+    setCheckError('');
+    const emailArg = emailValid && email.trim() ? email.trim() : undefined;
+    const mobileArg = mobileValid && mobile.trim() ? mobile.trim() : undefined;
+    if (!emailArg && !mobileArg) return;
     const handle = setTimeout(() => {
-      setLoading(true);
-      setError('');
-      searchUsersForVendor(token, query.trim())
-        .then(({ data }) => setResults(data))
-        .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not search users.'))
-        .finally(() => setLoading(false));
-    }, 300);
+      setChecking(true);
+      getVendorOwnerAvailability(token, { email: emailArg, mobile: mobileArg })
+        .then(({ data }) => setAvailability(data))
+        .catch((err) => setCheckError(err instanceof ApiRequestError ? err.message : 'Could not verify this email/mobile.'))
+        .finally(() => setChecking(false));
+    }, 400);
     return () => clearTimeout(handle);
-  }, [token, query, selectedUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, email, mobile, emailValid, mobileValid]);
 
-  if (selectedUser) {
-    return (
-      <fieldset>
-        <legend>Vendor Account</legend>
-        <dl className="form-grid">
-          <div>
-            <dt className="field-hint">User</dt>
-            <dd>{selectedUser.name}</dd>
-          </div>
-          <div>
-            <dt className="field-hint">Email</dt>
-            <dd>{selectedUser.email ?? '—'}</dd>
-          </div>
-          <div>
-            <dt className="field-hint">Mobile</dt>
-            <dd>{selectedUser.phone ?? '—'}</dd>
-          </div>
-          <div>
-            <dt className="field-hint">Status</dt>
-            <dd className={`status-pill ${selectedUser.status === 'active' ? 'status-pill--active' : 'status-pill--inactive'}`}>
-              {selectedUser.status}
-            </dd>
-          </div>
-          <div>
-            <dt className="field-hint">Role</dt>
-            <dd>{selectedUser.roles.map((r) => r.name).join(', ') || '—'}</dd>
-          </div>
-          <div>
-            <dt className="field-hint">User ID</dt>
-            <dd>{selectedUser.id}</dd>
-          </div>
-        </dl>
-        {!disabled && (
-          <OutlinedButton onClick={() => onSelect(null)}>
-            <Icon slot="icon" aria-hidden="true">close</Icon>
-            Change user
-          </OutlinedButton>
-        )}
-      </fieldset>
-    );
-  }
+  const blocked = Boolean(checkError) || (availability !== null && !availability.available);
+
+  // Reports the identity payload up only once it's actually submittable: valid formats, no
+  // taken identifier, no check still in flight.
+  useEffect(() => {
+    const trimmedEmail = email.trim();
+    const trimmedMobile = mobile.trim();
+    if (!trimmedEmail && !trimmedMobile) return onChange(null);
+    if (!emailValid || !mobileValid) return onChange(null);
+    if (checking || blocked) return onChange(null);
+    onChange({
+      ownerFirstName: firstName.trim() || undefined,
+      ownerLastName: lastName.trim() || undefined,
+      ownerEmail: trimmedEmail || undefined,
+      ownerMobile: trimmedMobile || undefined,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstName, lastName, email, mobile, emailValid, mobileValid, checking, blocked]);
 
   return (
     <fieldset>
       <legend>Vendor User</legend>
-      <OutlinedTextField
-        label="Search existing user by name / email / mobile"
-        value={query}
-        // disabled={disabled}
-        onInput={(e: Event) => setQuery((e.target as HTMLInputElement).value)}
-      />
-      {loading && <p className="loading-state">Searching…</p>}
-      {error && <p className="error-state" role="alert">{error}</p>}
-      {results.length > 0 && (
-        <ul className="entity-list">
-          {results.map((user) => (
-            <li key={user.id}>
-              <button type="button" className="entity-list__item" onClick={() => onSelect(user)}>
-                <span className="role-list__name">
-                  {user.name}
-                  <span className="field-hint">
-                    {' '}
-                    · {user.email ?? user.phone ?? user.id} · {user.roles.map((r) => r.name).join(', ') || 'no roles'}
-                  </span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {!loading && query.trim() && results.length === 0 && !error && (
-        <p className="empty-state">No matching users found.</p>
-      )}
+      <div className="form-grid">
+        <OutlinedTextField
+          label="First name"
+          value={firstName}
+          disabled={disabled}
+          onInput={(e: Event) => setFirstName((e.target as HTMLInputElement).value)}
+        />
+        <OutlinedTextField
+          label="Last name"
+          value={lastName}
+          disabled={disabled}
+          onInput={(e: Event) => setLastName((e.target as HTMLInputElement).value)}
+        />
+        <OutlinedTextField
+          label="Email"
+          type="email"
+          value={email}
+          disabled={disabled}
+          onInput={(e: Event) => setEmail((e.target as HTMLInputElement).value)}
+          error={!emailValid}
+        />
+        {!emailValid && <p className="error-state" role="alert">Enter a valid email address.</p>}
+        <OutlinedTextField
+          label="Mobile"
+          type="tel"
+          inputMode="numeric"
+          maxLength={10}
+          value={mobile}
+          disabled={disabled}
+          onInput={(e: Event) => setMobile((e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 10))}
+          error={!mobileValid}
+        />
+        {!mobileValid && <p className="error-state" role="alert">Enter a valid 10-digit mobile number.</p>}
+        <p className="field-hint">
+          Provide at least an email or a mobile number for the new Vendor owner's login. A fresh account is always
+          created — if either already belongs to an existing user, choose different details.
+        </p>
+
+        {checking && <p className="loading-state">Checking availability…</p>}
+        {checkError && <p className="error-state" role="alert">{checkError}</p>}
+        {availability && !availability.available && (
+          <p className="error-state" role="alert">
+            A user with this {availability.conflicts.join(' and ')} already exists. Please use a different
+            email/phone to create this Vendor.
+          </p>
+        )}
+      </div>
     </fieldset>
   );
 }
+
+export default VendorUserPicker;
