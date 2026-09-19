@@ -46,7 +46,7 @@ const ROLES: RoleSeed[] = [
 const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   customers: ['create', 'edit', 'delete', 'export'],
   // 'custom' gates the vendor's own `/vendors/me*` self-service surface — granted only to the
-  // `vendor` role (never `view`, which would leak the admin "list every vendor" endpoint).
+  // `vendor` role (never 'view', which would leak the admin "list every vendor" endpoint).
   vendors: ['create', 'edit', 'delete', 'export', 'approve', 'reject', 'status_change', 'custom'],
   orders: ['create', 'edit', 'delete', 'export', 'status_change'],
   products: ['create', 'edit', 'delete', 'export'],
@@ -69,15 +69,6 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   'cms.blog': ['create', 'edit', 'delete'],
   'cms.about-us': ['edit'],
   'cms.contact-us': ['edit'],
-  'cms.faq': ['create', 'edit', 'delete'],
-  // Phase 1 CMS content types (add_cms_content_types migration): Blog Categories/How It
-  // Works/Careers are full CRUD; Website Pages (the 4 fixed legal pages) is edit-only, same
-  // "no create/delete concept for a row that always exists" convention as About Us/Contact Us.
-  'cms.blog-category': ['create', 'edit', 'delete'],
-  'cms.website-pages': ['edit'],
-  'cms.how-it-works': ['create', 'edit', 'delete'],
-  'cms.careers': ['create', 'edit', 'delete'],
-  'cms.social-media': ['create', 'edit', 'delete'],
 };
 
 function flattenMenu(nodes: readonly MenuNode[]): MenuNode[] {
@@ -193,7 +184,6 @@ async function grantStarterPermissions(
     'settings:view', 'settings:edit',
     'cms:view', 'cms.blog:view', 'cms.blog:create', 'cms.blog:edit', 'cms.blog:delete',
     'cms.about-us:view', 'cms.about-us:edit', 'cms.contact-us:view', 'cms.contact-us:edit',
-    'cms.faq:view', 'cms.faq:create', 'cms.faq:edit', 'cms.faq:delete',
   ]);
 
   await grant('marketing', [
@@ -206,8 +196,6 @@ async function grantStarterPermissions(
     // 'masters.categories' above.
     'cms:view', 'cms.blog:view', 'cms.blog:create', 'cms.blog:edit',
     'cms.about-us:view', 'cms.about-us:edit', 'cms.contact-us:view', 'cms.contact-us:edit',
-    // No 'cms.faq:delete' — same create/edit-but-no-delete grant as this role's 'cms.blog' above.
-    'cms.faq:view', 'cms.faq:create', 'cms.faq:edit',
   ]);
 
   await grant('sales', [
@@ -342,9 +330,9 @@ async function seedSuperAdminUser(roles: Map<string, { id: string; isSuperAdmin:
 }
 
 /**
- * The canonical 8-category taxonomy (Category → Subcategory → Type — see
+ * The canonical 6-category taxonomy (Category → Subcategory → Type — see
  * `prisma/category-taxonomy.ts`'s own doc comment for the naming/depth rules) — find-or-create
- * by slug at every one of the 152 rows (8 top + 30 sub + 114 type), same discipline as every
+ * by slug at every one of the rows (6 top + sub + type), same discipline as every
  * other seed function in this file: `name`/`description` are admin-editable via `masters.
  * categories` CRUD, so a rerun must never revert an admin's rename. Returns a Map of EVERY
  * node's slug -> id (top-level, Subcategory, and Type alike) so downstream seed data can look up
@@ -453,7 +441,7 @@ interface ProductSeed {
   categorySlug: string;
   subcategorySlug: string;
   /** Which seeded vendor (see VENDOR_SEEDS' own `key`) owns this Product — Product is now
-   *  vendor-scoped (see the `direct_category_access` migration), never a shared global master. */
+   *  vendor-scoped (see Product's schema doc comment), never a shared global master. */
   vendorKey: string;
   brand: string;
   description: string;
@@ -468,24 +456,77 @@ interface ProductSeed {
  *  "shampoo" under Product > Hair Care), matching the "categoryId is always top-level,
  *  subcategoryId is whichever deeper tier was actually chosen" rule the rest of the reset
  *  taxonomy follows (see `prisma/category-taxonomy.ts`). */
+const PRODUCT_IMAGE_QUERY_BY_SLUG: Record<string, string> = {
+  'hair-shampoo': 'hair,shampoo',
+  'hair-conditioner': 'hair,conditioner',
+  'hair-serum': 'hair,serum',
+  'face-wash': 'face,wash,skincare',
+  moisturizer: 'moisturizer,skincare',
+  'body-scrub': 'body,scrub,spa',
+  'massage-oil': 'massage,oil',
+  'spa-kit': 'spa,kit',
+  'essential-oil-blend': 'essential,oils,aromatherapy',
+  'daily-sunscreen': 'sunscreen,skincare',
+  'personal-care-kit': 'personal,care,kit',
+};
+
+const DEAL_IMAGE_QUERY_BY_SLUG: Record<string, string> = {
+  'haircut-glow-golghar': 'haircut,salon',
+  'hair-spa-glow-taramandal': 'hair,spa,salon',
+  'facial-glow-golghar': 'facial,skincare,salon',
+  'swedish-massage-urban-civillines': 'swedish,massage,spa',
+  'deep-tissue-massage-urban-medicalroad': 'deep,tissue,massage,spa',
+  'full-body-spa-serenity-betiahata': 'full,body,spa',
+  'couple-spa-serenity-betiahata': 'couple,spa,wellness',
+  'personal-training-vitality-paadribazar': 'personal,training,fitness',
+  'yoga-session-vitality-paadribazar': 'yoga,fitness,wellness',
+};
+
+function stableImageLock(key: string): number {
+  let hash = 0;
+  for (const char of key) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return (hash % 9000) + 1;
+}
+
+function contextualImageUrl(query: string, key: string): string {
+  return `https://loremflickr.com/600/400/${query}?lock=${stableImageLock(key)}`;
+}
+
+function therapistImageQuery(specialization: string): string {
+  const value = specialization.toLowerCase();
+  if (value.includes('hair')) return 'hair,stylist,salon';
+  if (value.includes('skin') || value.includes('facial')) return 'facial,skincare,therapist';
+  if (value.includes('makeup')) return 'makeup,beauty,artist';
+  if (value.includes('massage') || value.includes('aromatherapy') || value.includes('spa')) return 'massage,therapist,spa';
+  if (value.includes('yoga')) return 'yoga,instructor,wellness';
+  if (value.includes('training')) return 'personal,trainer,fitness';
+  if (value.includes('cleaning') || value.includes('sanitization')) return 'cleaning,technician';
+  if (value.includes('repair') || value.includes('ac')) return 'technician,repair';
+  if (value.includes('wellness')) return 'wellness,therapist';
+  return 'professional,therapist,wellness';
+}
+
 const PRODUCT_SEEDS: ProductSeed[] = [
-  { name: 'Hair Shampoo', slug: 'hair-shampoo', categorySlug: 'product', subcategorySlug: 'shampoo', vendorKey: 'glow', brand: 'GlowCare', description: 'Sulphate-free shampoo for everyday use.', price: 499, originalPrice: 599 },
-  { name: 'Hair Conditioner', slug: 'hair-conditioner', categorySlug: 'product', subcategorySlug: 'conditioner', vendorKey: 'glow', brand: 'GlowCare', description: 'Deep-conditioning formula for smooth, frizz-free hair.', price: 449, originalPrice: 549 },
-  { name: 'Hair Serum', slug: 'hair-serum', categorySlug: 'product', subcategorySlug: 'hair-serum', vendorKey: 'glow', brand: 'GlowCare', description: 'Lightweight serum for shine and split-end control.', price: 699, originalPrice: 799 },
-  { name: 'Face Wash', slug: 'face-wash', categorySlug: 'product', subcategorySlug: 'face-wash', vendorKey: 'glow', brand: 'PureSkin', description: 'Gentle daily face wash for all skin types.', price: 299, originalPrice: 349 },
-  { name: 'Moisturizer', slug: 'moisturizer', categorySlug: 'product', subcategorySlug: 'moisturizer', vendorKey: 'glow', brand: 'PureSkin', description: 'Hydrating moisturizer for soft, supple skin.', price: 599, originalPrice: 699 },
-  { name: 'Body Scrub', slug: 'body-scrub', categorySlug: 'product', subcategorySlug: 'body-scrub-product', vendorKey: 'urban', brand: 'UrbanSpa', description: 'Exfoliating body scrub for smoother skin.', price: 399, originalPrice: 499 },
-  { name: 'Massage Oil', slug: 'massage-oil', categorySlug: 'product', subcategorySlug: 'massage-oil', vendorKey: 'urban', brand: 'UrbanSpa', description: 'Aromatic massage oil for relaxation.', price: 349, originalPrice: 429 },
-  { name: 'Spa Kit', slug: 'spa-kit', categorySlug: 'product', subcategorySlug: 'spa-kit', vendorKey: 'serenity', brand: 'SerenityHome', description: 'At-home spa essentials kit for a relaxing retreat.', price: 799, originalPrice: 999 },
-  { name: 'Essential Oil Blend', slug: 'essential-oil-blend', categorySlug: 'product', subcategorySlug: 'essential-oils', vendorKey: 'serenity', brand: 'SerenityHome', description: 'Calming essential oil blend for aromatherapy.', price: 599, originalPrice: 749 },
-  { name: 'Daily Sunscreen', slug: 'daily-sunscreen', categorySlug: 'product', subcategorySlug: 'sunscreen', vendorKey: 'vitality', brand: 'VitalityCare', description: 'Broad-spectrum daily sunscreen, SPF 50.', price: 399, originalPrice: 499 },
-  { name: 'Personal Care Kit', slug: 'personal-care-kit', categorySlug: 'product', subcategorySlug: 'personal-care', vendorKey: 'vitality', brand: 'VitalityCare', description: 'Everyday personal care essentials kit.', price: 899, originalPrice: 1099 },
+  { name: 'Hair Shampoo', slug: 'hair-shampoo', categorySlug: 'product', subcategorySlug: 'hair-care', vendorKey: 'glow', brand: 'GlowCare', description: 'Sulphate-free shampoo for everyday use.', price: 499, originalPrice: 599 },
+  { name: 'Hair Conditioner', slug: 'hair-conditioner', categorySlug: 'product', subcategorySlug: 'hair-care', vendorKey: 'glow', brand: 'GlowCare', description: 'Deep-conditioning formula for smooth, frizz-free hair.', price: 449, originalPrice: 549 },
+  { name: 'Hair Serum', slug: 'hair-serum', categorySlug: 'product', subcategorySlug: 'hair-care', vendorKey: 'glow', brand: 'GlowCare', description: 'Lightweight serum for shine and split-end control.', price: 699, originalPrice: 799 },
+  { name: 'Face Wash', slug: 'face-wash', categorySlug: 'product', subcategorySlug: 'skincare', vendorKey: 'glow', brand: 'PureSkin', description: 'Gentle daily face wash for all skin types.', price: 299, originalPrice: 349 },
+  { name: 'Moisturizer', slug: 'moisturizer', categorySlug: 'product', subcategorySlug: 'skincare', vendorKey: 'glow', brand: 'PureSkin', description: 'Hydrating moisturizer for soft, supple skin.', price: 599, originalPrice: 699 },
+  { name: 'Body Scrub', slug: 'body-scrub', categorySlug: 'product', subcategorySlug: 'massage-spa-products', vendorKey: 'urban', brand: 'UrbanSpa', description: 'Exfoliating body scrub for smoother skin.', price: 399, originalPrice: 499 },
+  { name: 'Massage Oil', slug: 'massage-oil', categorySlug: 'product', subcategorySlug: 'massage-spa-products', vendorKey: 'urban', brand: 'UrbanSpa', description: 'Aromatic massage oil for relaxation.', price: 349, originalPrice: 429 },
+  { name: 'Spa Kit', slug: 'spa-kit', categorySlug: 'product', subcategorySlug: 'massage-spa-products', vendorKey: 'serenity', brand: 'SerenityHome', description: 'At-home spa essentials kit for a relaxing retreat.', price: 799, originalPrice: 999 },
+  { name: 'Essential Oil Blend', slug: 'essential-oil-blend', categorySlug: 'product', subcategorySlug: 'wellness-products', vendorKey: 'serenity', brand: 'SerenityHome', description: 'Calming essential oil blend for aromatherapy.', price: 599, originalPrice: 749 },
+  { name: 'Daily Sunscreen', slug: 'daily-sunscreen', categorySlug: 'product', subcategorySlug: 'skincare', vendorKey: 'vitality', brand: 'VitalityCare', description: 'Broad-spectrum daily sunscreen, SPF 50.', price: 399, originalPrice: 499 },
+  { name: 'Personal Care Kit', slug: 'personal-care-kit', categorySlug: 'product', subcategorySlug: 'beauty', vendorKey: 'vitality', brand: 'VitalityCare', description: 'Everyday personal care essentials kit.', price: 899, originalPrice: 1099 },
 ];
 
 async function seedProducts(categoryIdBySlug: Map<string, string>, vendorIdByKey: Map<string, string>): Promise<Map<string, string>> {
   const productIdBySlug = new Map<string, string>();
   for (const prod of PRODUCT_SEEDS) {
     const discount = Math.round(((prod.originalPrice - prod.price) / prod.originalPrice) * 100);
+    const imageQuery = PRODUCT_IMAGE_QUERY_BY_SLUG[prod.slug] ?? 'beauty,wellness,product';
+    const image = contextualImageUrl(imageQuery, `product-${prod.slug}`);
+    const gallery = [contextualImageUrl(imageQuery, `product-${prod.slug}-gallery`)] as Prisma.InputJsonValue;
     const data = {
       vendorId: vendorIdByKey.get(prod.vendorKey)!,
       name: prod.name,
@@ -494,25 +535,24 @@ async function seedProducts(categoryIdBySlug: Map<string, string>, vendorIdByKey
       subcategoryId: categoryIdBySlug.get(prod.subcategorySlug)!,
       description: prod.description,
       summary: prod.description,
-      // Was keyed off `categorySlug` (which distinguished "beauty-products" vs "wellness-products"
-      // pre-reset) — every PRODUCT_SEEDS entry now shares the single new "product" top-level, so
-      // this keys off `subcategorySlug` (the Type-tier row) instead, which still carries the
-      // same relaxation-vs-skin/hair distinction.
-      benefits: [`Improves ${['massage-oil', 'body-scrub-product'].includes(prod.subcategorySlug) ? 'relaxation' : 'skin/hair health'}`] as Prisma.InputJsonValue,
+      benefits: [`Improves ${['massage-spa-products', 'wellness-products'].includes(prod.subcategorySlug) ? 'relaxation' : 'skin/hair health'}`] as Prisma.InputJsonValue,
       howToUse: ['Apply as directed', 'Use regularly for best results'] as Prisma.InputJsonValue,
       ingredients: 'See packaging for full ingredient list.',
       returnPolicy: '7-day return if unopened.',
-      image: `https://picsum.photos/seed/product-${prod.slug}/600/400`,
-      gallery: [`https://picsum.photos/seed/product-${prod.slug}-2/600/400`] as Prisma.InputJsonValue,
+      image,
+      gallery,
       imageAlt: prod.name,
       price: prod.price,
       originalPrice: prod.originalPrice,
       discount,
       isActive: true,
     };
-    // Find-or-create: Product name/description/price/etc. are admin-editable — never overwrite.
-    const row = (await prisma.product.findUnique({ where: { slug: prod.slug } }))
-      ?? (await prisma.product.create({ data: { ...data, slug: prod.slug } }));
+    // Find-or-create: product business fields remain admin-editable, but the demo image/media
+    // is intentionally refreshed on every seed run to match the product name.
+    const existing = await prisma.product.findUnique({ where: { slug: prod.slug } });
+    const row = existing
+      ? await prisma.product.update({ where: { id: existing.id }, data: { categoryId: data.categoryId, subcategoryId: data.subcategoryId, image: data.image, gallery: data.gallery, imageAlt: data.imageAlt } })
+      : await prisma.product.create({ data: { ...data, slug: prod.slug } });
     productIdBySlug.set(prod.slug, row.id);
   }
   return productIdBySlug;
@@ -648,7 +688,7 @@ async function seedVendorsAndBranches(
       gstNumber: `DEMOGST${v.key.toUpperCase()}0001`,
       panNumber: `DEMOPAN${v.key.toUpperCase()}`,
       businessRegistrationNumber: `DEMOREG${v.key.toUpperCase()}2024`,
-      logoUrl: `https://picsum.photos/seed/vendor-${v.key}/200/200`,
+      logoUrl: `https://picsum.photos/seed/vendor-${v.key}/600/400`,
       kycStatus: 'VERIFIED' as const,
       status: 'ACTIVE' as const,
     };
@@ -707,17 +747,15 @@ interface ServiceDealSeed {
 /** Bookable service offerings — no master Service row at all (see Deal's own schema doc
  *  comment); the Deal's own title/description/duration/packages ARE the offering. */
 const SERVICE_DEAL_SEEDS: ServiceDealSeed[] = [
-  { slug: 'haircut-glow-golghar', title: 'Haircut at Glow Beauty Studio — Golghar', categorySlug: 'hair-nails', subcategorySlug: 'haircut', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 299, originalPrice: 399, durationMinutes: 30 },
-  { slug: 'hair-spa-glow-taramandal', title: 'Hair Spa at Glow Beauty Studio — Taramandal', categorySlug: 'hair-nails', subcategorySlug: 'hair-spa', vendorKey: 'glow', branchKey: 'glow-taramandal', salePrice: 799, originalPrice: 999, durationMinutes: 60 },
-  { slug: 'facial-glow-golghar', title: 'Facial at Glow Beauty Studio — Golghar', categorySlug: 'skin-beauty', subcategorySlug: 'classic-facial', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 999, originalPrice: 1299, durationMinutes: 60 },
-  { slug: 'swedish-massage-urban-civillines', title: 'Swedish Massage at Urban Wellness Spa — Civil Lines', categorySlug: 'massage', subcategorySlug: 'swedish-massage', vendorKey: 'urban', branchKey: 'urban-civillines', salePrice: 1499, originalPrice: 1899, durationMinutes: 60 },
-  { slug: 'deep-tissue-massage-urban-medicalroad', title: 'Deep Tissue Massage at Urban Wellness Spa — Medical College Road', categorySlug: 'massage', subcategorySlug: 'deep-tissue-massage', vendorKey: 'urban', branchKey: 'urban-medicalroad', salePrice: 1799, originalPrice: 2199, durationMinutes: 75 },
-  { slug: 'home-deep-cleaning-elite-rustampur', title: 'Home Deep Cleaning by Elite Home Services — Rustampur', categorySlug: 'home-services', subcategorySlug: 'cleaning', vendorKey: 'elite', branchKey: 'elite-rustampur', salePrice: 1299, originalPrice: 1599, durationMinutes: 120 },
-  { slug: 'ac-repair-elite-mohaddipur', title: 'AC Repair by Elite Home Services — Mohaddipur', categorySlug: 'home-services', subcategorySlug: 'appliance-repair', vendorKey: 'elite', branchKey: 'elite-mohaddipur', salePrice: 899, originalPrice: 1099, durationMinutes: 60 },
-  { slug: 'full-body-spa-serenity-betiahata', title: 'Full Body Spa at Serenity Spa & Retreat — Betiahata', categorySlug: 'spa-retreats', subcategorySlug: 'full-body-spa', vendorKey: 'serenity', branchKey: 'serenity-betiahata', salePrice: 1899, originalPrice: 2399, durationMinutes: 90 },
-  { slug: 'couple-spa-serenity-betiahata', title: 'Couple Spa at Serenity Spa & Retreat — Betiahata', categorySlug: 'spa-retreats', subcategorySlug: 'couple-spa', vendorKey: 'serenity', branchKey: 'serenity-betiahata', salePrice: 3499, originalPrice: 4299, durationMinutes: 120 },
-  { slug: 'personal-training-vitality-paadribazar', title: 'Personal Training at Vitality Fitness & Wellness — Paadri Bazar', categorySlug: 'health-wellness', subcategorySlug: 'personal-training', vendorKey: 'vitality', branchKey: 'vitality-paadribazar', salePrice: 999, originalPrice: 1299, durationMinutes: 60 },
-  { slug: 'yoga-session-vitality-paadribazar', title: 'Yoga Session at Vitality Fitness & Wellness — Paadri Bazar', categorySlug: 'health-wellness', subcategorySlug: 'yoga', vendorKey: 'vitality', branchKey: 'vitality-paadribazar', salePrice: 499, originalPrice: 649, durationMinutes: 60 },
+  { slug: 'haircut-glow-golghar', title: 'Haircut at Glow Beauty Studio — Golghar', categorySlug: 'hair', subcategorySlug: 'haircut-styling', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 299, originalPrice: 399, durationMinutes: 30 },
+  { slug: 'hair-spa-glow-taramandal', title: 'Hair Spa at Glow Beauty Studio — Taramandal', categorySlug: 'hair', subcategorySlug: 'hair-treatments', vendorKey: 'glow', branchKey: 'glow-taramandal', salePrice: 799, originalPrice: 999, durationMinutes: 60 },
+  { slug: 'facial-glow-golghar', title: 'Facial at Glow Beauty Studio — Golghar', categorySlug: 'skin-beauty', subcategorySlug: 'facial', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 999, originalPrice: 1299, durationMinutes: 60 },
+  { slug: 'swedish-massage-urban-civillines', title: 'Swedish Massage at Urban Wellness Spa — Civil Lines', categorySlug: 'massage', subcategorySlug: 'body-massage', vendorKey: 'urban', branchKey: 'urban-civillines', salePrice: 1499, originalPrice: 1899, durationMinutes: 60 },
+  { slug: 'deep-tissue-massage-urban-medicalroad', title: 'Deep Tissue Massage at Urban Wellness Spa — Medical College Road', categorySlug: 'massage', subcategorySlug: 'body-massage', vendorKey: 'urban', branchKey: 'urban-medicalroad', salePrice: 1799, originalPrice: 2199, durationMinutes: 75 },
+  { slug: 'full-body-spa-serenity-betiahata', title: 'Full Body Spa at Serenity Spa & Retreat — Betiahata', categorySlug: 'spa-wellness', subcategorySlug: 'spa-treatments', vendorKey: 'serenity', branchKey: 'serenity-betiahata', salePrice: 1899, originalPrice: 2399, durationMinutes: 90 },
+  { slug: 'couple-spa-serenity-betiahata', title: 'Couple Spa at Serenity Spa & Retreat — Betiahata', categorySlug: 'spa-wellness', subcategorySlug: 'spa-treatments', vendorKey: 'serenity', branchKey: 'serenity-betiahata', salePrice: 3499, originalPrice: 4299, durationMinutes: 120 },
+  { slug: 'personal-training-vitality-paadribazar', title: 'Personal Training at Vitality Fitness & Wellness — Paadri Bazar', categorySlug: 'spa-wellness', subcategorySlug: 'wellness', vendorKey: 'vitality', branchKey: 'vitality-paadribazar', salePrice: 999, originalPrice: 1299, durationMinutes: 60 },
+  { slug: 'yoga-session-vitality-paadribazar', title: 'Yoga Session at Vitality Fitness & Wellness — Paadri Bazar', categorySlug: 'spa-wellness', subcategorySlug: 'wellness', vendorKey: 'vitality', branchKey: 'vitality-paadribazar', salePrice: 499, originalPrice: 649, durationMinutes: 60 },
 ];
 
 async function seedDeals(
@@ -741,15 +779,18 @@ async function seedDeals(
       salePrice: d.salePrice,
       discountPercent,
       durationMinutes: d.durationMinutes,
-      images: [`https://picsum.photos/seed/deal-${d.slug}/800/500`] as Prisma.InputJsonValue,
+      images: [contextualImageUrl(DEAL_IMAGE_QUERY_BY_SLUG[d.slug] ?? 'spa,wellness,service', `deal-${d.slug}`)] as Prisma.InputJsonValue,
       maxBookings: 100,
       availableBookings: 100,
       status: 'ACTIVE' as const,
       approvalStatus: 'APPROVED' as const,
     };
-    // Find-or-create: title/price/description/status are admin/vendor-editable — never overwrite.
-    const row = (await prisma.deal.findUnique({ where: { slug: d.slug } }))
-      ?? (await prisma.deal.create({ data: { ...data, slug: d.slug } as unknown as Prisma.DealUncheckedCreateInput }));
+    // Find-or-create: title/price/description/status remain admin/vendor-editable, but the
+    // demo image is intentionally refreshed on every seed run to match the service name.
+    const existing = await prisma.deal.findUnique({ where: { slug: d.slug } });
+    const row = existing
+      ? await prisma.deal.update({ where: { id: existing.id }, data: { categoryId: data.categoryId, subcategoryId: data.subcategoryId, images: data.images } })
+      : await prisma.deal.create({ data: { ...data, slug: d.slug } as unknown as Prisma.DealUncheckedCreateInput });
     dealIdBySlug.set(d.slug, row.id);
   }
 
@@ -790,24 +831,20 @@ async function seedVendorModulesAndCategoryAccess(
     }
   };
 
-  // Glow Beauty Studio: sells Hair & Nails services (Haircut/Hair Spa), Skin & Beauty services
-  // (Facial), AND Product-typed items (Hair Shampoo/Face Wash/Moisturizer/Hair Serum) — three
-  // separate top-level grants, since VendorCategoryAccess is always top-level-only and the new
-  // taxonomy has exactly one PRODUCT-typed top-level ("product") regardless of what's sold.
-  await grant('glow', { offersService: true, offersProduct: true }, ['hair-nails', 'skin-beauty', 'product']);
-  // Urban Wellness Spa: sells Massage services, Product-typed items (Body Scrub/Massage Oil),
-  // plus demo Therapy access — the new taxonomy collapses the old per-specialization THERAPY
-  // top-levels (physiotherapy/sports-therapy/deep-tissue/stress-relief) into subcategory/Type
-  // rows under the single new "Therapy" top-level, so this is now one grant, not four.
+  // Glow Beauty Studio: sells Hair, Skin & Beauty services, AND Product-typed items.
+  await grant('glow', { offersService: true, offersProduct: true }, ['hair', 'skin-beauty', 'product']);
+
+  // Urban Wellness Spa: sells Massage services, Product-typed items, plus demo Therapy access.
   await grant('urban', { offersService: true, offersProduct: true, offersTherapy: true }, ['massage', 'product', 'therapy']);
-  // Elite Home Services: services only, no product/therapy catalog. Slug unchanged by the reset.
-  await grant('elite', { offersService: true }, ['home-services']);
-  // Serenity Spa & Retreat: Spa & Retreats services, Product-typed items, plus Therapy access
-  // for its spa therapists.
-  await grant('serenity', { offersService: true, offersProduct: true, offersTherapy: true }, ['spa-retreats', 'product', 'therapy']);
-  // Vitality Fitness & Wellness: Health & Wellness services, Product-typed items, plus Therapy
-  // access for its personal trainers/instructors.
-  await grant('vitality', { offersService: true, offersProduct: true, offersTherapy: true }, ['health-wellness', 'product', 'therapy']);
+
+  // Elite Home Services remains as a seeded vendor record, but Home Services is no longer an
+  // active marketplace category, so it receives no category-access grant from this seed.
+
+  // Serenity Spa & Retreat: Spa & Wellness services, Product-typed items, plus Therapy access.
+  await grant('serenity', { offersService: true, offersProduct: true, offersTherapy: true }, ['spa-wellness', 'product', 'therapy']);
+
+  // Vitality Fitness & Wellness: now mapped to Spa & Wellness > Wellness services.
+  await grant('vitality', { offersService: true, offersProduct: true, offersTherapy: true }, ['spa-wellness', 'product', 'therapy']);
 }
 
 interface TherapistSeed {
@@ -866,6 +903,7 @@ async function seedTherapists(
     const branchId = branchIdByKey.get(t.branchKey)!;
     const vendorId = vendorIdByKey.get(vendorKeyByBranchKey.get(t.branchKey)!)!;
 
+    const photoUrl = contextualImageUrl(therapistImageQuery(t.specialization), `therapist-${slugify(t.name)}`);
     const existing = await prisma.therapist.findFirst({ where: { branchId, personName: t.name } });
     if (!existing) {
       await prisma.therapist.create({
@@ -877,11 +915,14 @@ async function seedTherapists(
           specializationCategoryId: t.specializationCategorySlug ? categoryIdBySlug.get(t.specializationCategorySlug) : undefined,
           bio: t.bio,
           experienceYears: t.experienceYears,
-          photoUrl: `https://picsum.photos/seed/therapist-${slugify(t.name)}/300/300`,
+          photoUrl,
           isActive: true,
         },
       });
       created++;
+    } else {
+      // Refresh only the demo photo so existing therapist profile data stays untouched.
+      await prisma.therapist.update({ where: { id: existing.id }, data: { photoUrl } });
     }
   }
   return created;
@@ -1225,13 +1266,12 @@ async function seedPayment(orderId: string, status: 'CREATED' | 'PAID', amount: 
  * disambiguate by, see `seedProductOrder`'s doc comment) combo — see `seedOrder`'s doc comment.
  */
 async function seedDemoCustomerActivity(
-  roles: Map<string, { id: string; isSuperAdmin: boolean }>,
+  customerId: string,
   dealIdBySlug: Map<string, string>,
   productIdBySlug: Map<string, string>,
   vendorIdByKey: Map<string, string>,
   branchIdByKey: Map<string, string>,
-): Promise<string> {
-  const customerId = await seedDemoCustomer(roles);
+): Promise<void> {
   await seedCart(customerId, dealIdBySlug, productIdBySlug);
   await seedWishlist(customerId, dealIdBySlug);
 
@@ -1392,41 +1432,29 @@ async function seedDemoCustomerActivity(
     [{ productId: productIdBySlug.get('hair-shampoo')!, itemName: 'Hair Shampoo', unitPrice: 499, quantity: 1 }],
     'Customer changed their mind before payment.',
   );
-
-  return customerId;
 }
 
-/** The same 4 Q&A pairs that used to live in the frontend's static `content.json` — seeded once
- *  (guarded on an empty table, since Faq has no natural unique key to upsert against) so the
- *  public home page isn't blank the first time this migrates from static content to the CMS. */
-const FAQ_SEEDS: { question: string; answer: string; sortOrder: number }[] = [
-  {
-    question: 'How do I book a spa deal?',
-    answer: 'Select your preferred deal, choose a date and time, then complete the payment to confirm your booking.',
-    sortOrder: 0,
-  },
-  {
-    question: 'Can I cancel or reschedule my booking?',
-    answer: 'Yes. Most bookings can be cancelled or rescheduled before the cancellation deadline mentioned on the deal page.',
-    sortOrder: 1,
-  },
-  {
-    question: 'Are gift cards valid for all spas?',
-    answer: 'Gift cards can be redeemed at participating spas listed on My Spa Deals.',
-    sortOrder: 2,
-  },
-  {
-    question: 'How do I contact customer support?',
-    answer: 'You can contact our support team through the Contact Us page or email us anytime.',
-    sortOrder: 3,
-  },
-];
-
-async function seedFaqs(): Promise<number> {
-  const existing = await prisma.faq.count();
-  if (existing > 0) return 0;
-  await prisma.faq.createMany({ data: FAQ_SEEDS });
-  return FAQ_SEEDS.length;
+/** Marks the retired taxonomy rows inactive when they already exist in an older
+ * database. The new CATEGORY_TAXONOMY no longer contains these rows, but seedCategoryTaxonomy()
+ * intentionally never deletes admin-created/stale rows, so this explicit backfill prevents the
+ * retired category from remaining visible after a rerun. */
+async function deactivateRemovedTaxonomyRows(): Promise<number> {
+  const result = await prisma.category.updateMany({
+    where: {
+      slug: {
+        in: [
+          'home-services',
+          'cleaning',
+          'appliance-repair',
+          'health-wellness',
+          'spa-retreats',
+          'hair-nails',
+        ],
+      },
+    },
+    data: { isActive: false },
+  });
+  return result.count;
 }
 
 async function main() {
@@ -1436,11 +1464,10 @@ async function main() {
   await grantStarterPermissions(roles, permissionIdByKey);
   await seedDashboardWidgets(roles);
   await seedSuperAdminUser(roles);
-  const faqsSeeded = await seedFaqs();
   console.log(`Seeded ${roles.size} roles and ${permissionIdByKey.size} permissions.`);
-  console.log(`FAQs: ${faqsSeeded} seeded this run.`);
 
   const categoryIdBySlug = await seedCategoryTaxonomy();
+  const retiredTaxonomyRows = await deactivateRemovedTaxonomyRows();
   // Vendors must exist before Products (Product.vendorId is required — see the
   // direct_category_access migration), unlike the old shared-master-row model's ordering.
   const { vendorIdByKey, branchIdByKey } = await seedVendorsAndBranches(roles);
@@ -1455,7 +1482,8 @@ async function main() {
   // customer's cart/orders below (or the unified Add-to-Cart flow) can select one.
   const dealPackagesCreated = await seedDealPackages();
   const therapistPackagesCreated = await seedTherapistPackages();
-  const demoCustomerId = await seedDemoCustomerActivity(roles, dealIdBySlug, productIdBySlug, vendorIdByKey, branchIdByKey);
+  const demoCustomerId = await seedDemoCustomer(roles);
+  await seedDemoCustomerActivity(demoCustomerId, dealIdBySlug, productIdBySlug, vendorIdByKey, branchIdByKey);
 
   const [
     categoryCount,
@@ -1487,6 +1515,7 @@ async function main() {
 
   console.log('\n── Demo marketplace dataset ──────────────────────────────');
   console.log(`Categories:      ${categoryCount} (${subcategoryCount} sub-categories)`);
+  console.log(`Retired taxonomy rows deactivated: ${retiredTaxonomyRows}`);
   console.log(`Products:        ${productCount}`);
   console.log(`Vendor category grants: ${vendorCategoryAccessCount}`);
   console.log(`Vendors:         ${vendorCount} (${VENDOR_SEEDS.length} vendor owner users, ${backfilledSlugs} slug(s) backfilled)`);

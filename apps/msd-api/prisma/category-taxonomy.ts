@@ -1,5 +1,5 @@
 /**
- * The canonical 8-category taxonomy (Category → Subcategory → Type) — the single source of
+ * The canonical 7-category taxonomy (Category → Subcategory → Type) — the single source of
  * truth consumed by BOTH `prisma/seed.ts` (idempotent find-or-create on every `npx prisma db
  * seed` run) and the one-off live-data-reset backfill script
  * (`.scratch-backup/reset-category-taxonomy.ts`), so the two can never drift apart.
@@ -81,8 +81,8 @@ export const CATEGORY_TAXONOMY: TaxonomyTop[] = [
     ],
   },
   {
-    name: 'Spa & Retreats',
-    slug: 'spa-retreats',
+    name: 'Spa & Wellness',
+    slug: 'spa-wellness',
     type: 'SERVICE',
     children: [
       {
@@ -124,6 +124,63 @@ export const CATEGORY_TAXONOMY: TaxonomyTop[] = [
           { name: 'Body Wrap', slug: 'body-wrap' },
         ],
       },
+      {
+        name: 'Wellness',
+        slug: 'wellness',
+        children: [
+          { name: 'Stress Management', slug: 'stress-management' },
+          { name: 'Sleep Wellness', slug: 'sleep-wellness' },
+          { name: 'Lifestyle Coaching', slug: 'lifestyle-coaching' },
+        ],
+      },
+    ],
+  },
+  {
+    name: 'Hair',
+    slug: 'hair',
+    type: 'SERVICE',
+    children: [
+      {
+        name: 'Haircut & Styling',
+        slug: 'haircut-styling',
+        children: [
+          { name: 'Haircut', slug: 'haircut' },
+          { name: 'Hair Styling', slug: 'hair-styling' },
+          { name: 'Blow Dry', slug: 'blow-dry' },
+          { name: 'Hair Wash', slug: 'hair-wash' },
+        ],
+      },
+      {
+        name: 'Hair Treatments',
+        slug: 'hair-treatments',
+        children: [
+          { name: 'Hair Spa', slug: 'hair-spa' },
+          { name: 'Keratin Treatment', slug: 'keratin-treatment' },
+          { name: 'Hair Smoothening', slug: 'hair-smoothening' },
+          { name: 'Hair Straightening', slug: 'hair-straightening' },
+          { name: 'Hair Coloring', slug: 'hair-coloring' },
+          { name: 'Scalp Treatment', slug: 'scalp-treatment' },
+        ],
+      },
+      {
+        name: 'Hair Coloring',
+        slug: 'hair-coloring-cat',
+        children: [
+          { name: 'Hair Coloring', slug: 'hair-coloring-service' },
+          { name: 'Highlights', slug: 'highlights' },
+          { name: 'Balayage', slug: 'balayage' },
+          { name: 'Root Touch-Up', slug: 'root-touch-up' },
+        ],
+      },
+      {
+        name: 'Hair Care',
+        slug: 'hair-care-services',
+        children: [
+          { name: 'Hair Wash & Condition', slug: 'hair-wash-condition' },
+          { name: 'Scalp Care', slug: 'scalp-care' },
+          { name: 'Hair Repair Treatment', slug: 'hair-repair-treatment' },
+        ],
+      },
     ],
   },
   {
@@ -145,8 +202,8 @@ export const CATEGORY_TAXONOMY: TaxonomyTop[] = [
         ],
       },
       {
-        name: 'Skin Treatment',
-        slug: 'skin-treatment',
+        name: 'Skin Treatments',
+        slug: 'skin-treatments',
         children: [
           { name: 'Acne Treatment', slug: 'acne-treatment' },
           { name: 'Pigmentation Treatment', slug: 'pigmentation-treatment' },
@@ -165,99 +222,81 @@ export const CATEGORY_TAXONOMY: TaxonomyTop[] = [
         ],
       },
       {
-        name: 'Beauty Services',
-        slug: 'beauty-services',
+        name: 'Makeup & Beauty Services',
+        slug: 'makeup-beauty-services',
         children: [
           { name: 'Makeup', slug: 'makeup' },
           { name: 'Bridal Makeup', slug: 'bridal-makeup' },
           { name: 'Party Makeup', slug: 'party-makeup' },
-          { name: 'Eyebrow', slug: 'eyebrow' },
-          { name: 'Eyelash', slug: 'eyelash' },
+          { name: 'Eyebrow Shaping', slug: 'eyebrow-shaping' },
+          { name: 'Eyelash Tinting', slug: 'eyelash-tinting' },
+          { name: 'Eyelash Extensions', slug: 'eyelash-extensions' },
         ],
       },
     ],
   },
   {
-    name: 'Hair & Nails',
-    slug: 'hair-nails',
+    name: 'Nails & Lashes',
+    slug: 'nails-lashes',
     type: 'SERVICE',
     children: [
       {
-        name: 'Haircut & Styling',
-        slug: 'haircut-styling',
+        name: 'Manicure',
+        slug: 'manicure',
         children: [
-          { name: 'Haircut', slug: 'haircut' },
-          { name: 'Hair Styling', slug: 'hair-styling' },
-          { name: 'Blow Dry', slug: 'blow-dry' },
-          { name: 'Hair Wash', slug: 'hair-wash' },
+          { name: 'Classic Manicure', slug: 'classic-manicure' },
+          { name: 'Gel Manicure', slug: 'gel-manicure' },
+          { name: 'Acrylic Manicure', slug: 'acrylic-manicure' },
+          { name: 'French Manicure', slug: 'french-manicure' },
         ],
       },
       {
-        name: 'Hair Treatment',
-        slug: 'hair-treatment',
+        name: 'Pedicure',
+        slug: 'pedicure',
         children: [
-          { name: 'Hair Spa', slug: 'hair-spa' },
-          { name: 'Keratin Treatment', slug: 'keratin-treatment' },
-          { name: 'Hair Smoothening', slug: 'hair-smoothening' },
-          { name: 'Hair Straightening', slug: 'hair-straightening' },
-          { name: 'Hair Coloring', slug: 'hair-coloring' },
-          { name: 'Scalp Treatment', slug: 'scalp-treatment' },
+          { name: 'Classic Pedicure', slug: 'classic-pedicure' },
+          { name: 'Gel Pedicure', slug: 'gel-pedicure' },
+          { name: 'Spa Pedicure', slug: 'spa-pedicure' },
+          { name: 'French Pedicure', slug: 'french-pedicure' },
         ],
       },
       {
-        name: 'Nails',
-        slug: 'nails',
+        name: 'Nail Extensions',
+        slug: 'nail-extensions',
         children: [
-          { name: 'Manicure', slug: 'manicure' },
-          { name: 'Pedicure', slug: 'pedicure' },
-          { name: 'Gel Nails', slug: 'gel-nails' },
-          { name: 'Nail Extension', slug: 'nail-extension' },
-          { name: 'Nail Art', slug: 'nail-art' },
-        ],
-      },
-    ],
-  },
-  {
-    name: 'Health & Wellness',
-    slug: 'health-wellness',
-    type: 'SERVICE',
-    children: [
-      {
-        name: 'Fitness',
-        slug: 'fitness',
-        children: [
-          { name: 'Personal Training', slug: 'personal-training' },
-          { name: 'Yoga', slug: 'yoga' },
-          { name: 'Pilates', slug: 'pilates' },
-          { name: 'Meditation', slug: 'meditation' },
+          { name: 'Acrylic Extensions', slug: 'acrylic-extensions' },
+          { name: 'Gel Extensions', slug: 'gel-extensions' },
+          { name: 'Fiberglass Extensions', slug: 'fiberglass-extensions' },
         ],
       },
       {
-        name: 'Nutrition',
-        slug: 'nutrition',
+        name: 'Nail Art',
+        slug: 'nail-art',
         children: [
-          { name: 'Diet Consultation', slug: 'diet-consultation' },
-          { name: 'Nutrition Consultation', slug: 'nutrition-consultation' },
-          { name: 'Weight Management', slug: 'weight-management' },
+          { name: 'Hand-Painted Nail Art', slug: 'hand-painted-nail-art' },
+          { name: '3D Nail Art', slug: '3d-nail-art' },
+          { name: 'Nail Stickers & Decals', slug: 'nail-stickers-decals' },
+          { name: 'Glitter & Foil Nails', slug: 'glitter-foil-nails' },
         ],
       },
       {
-        name: 'Wellness',
-        slug: 'wellness',
+        name: 'Eyelash Services',
+        slug: 'eyelash-services',
         children: [
-          { name: 'Stress Management', slug: 'stress-management' },
-          { name: 'Sleep Wellness', slug: 'sleep-wellness' },
-          { name: 'Lifestyle Coaching', slug: 'lifestyle-coaching' },
+          { name: 'Eyelash Extensions', slug: 'eyelash-extensions-service' },
+          { name: 'Eyelash Tinting', slug: 'eyelash-tinting-service' },
+          { name: 'Eyelash Lift', slug: 'eyelash-lift' },
+          { name: 'Lash Fill', slug: 'lash-fill' },
         ],
       },
       {
-        name: 'Alternative Wellness',
-        slug: 'alternative-wellness',
+        name: 'Eyebrow Services',
+        slug: 'eyebrow-services',
         children: [
-          { name: 'Ayurveda', slug: 'ayurveda' },
-          { name: 'Naturopathy', slug: 'naturopathy' },
-          { name: 'Acupressure', slug: 'acupressure' },
-          { name: 'Acupuncture', slug: 'acupuncture' },
+          { name: 'Eyebrow Shaping', slug: 'eyebrow-shaping-service' },
+          { name: 'Eyebrow Tinting', slug: 'eyebrow-tinting' },
+          { name: 'Eyebrow Threading', slug: 'eyebrow-threading' },
+          { name: 'Eyebrow Waxing', slug: 'eyebrow-waxing' },
         ],
       },
     ],
@@ -297,8 +336,8 @@ export const CATEGORY_TAXONOMY: TaxonomyTop[] = [
         ],
       },
       {
-        name: 'Couple & Family',
-        slug: 'couple-family',
+        name: 'Couple & Family Therapy',
+        slug: 'couple-family-therapy',
         children: [
           { name: 'Couple Therapy', slug: 'couple-therapy' },
           { name: 'Family Counseling', slug: 'family-counseling' },
@@ -337,7 +376,7 @@ export const CATEGORY_TAXONOMY: TaxonomyTop[] = [
       },
       {
         name: 'Wellness',
-        // Disambiguated slug — collides with Health & Wellness > Wellness otherwise.
+        // Disambiguated slug — collides with Spa & Wellness > Wellness otherwise.
         slug: 'wellness-products',
         children: [
           { name: 'Essential Oils', slug: 'essential-oils' },
@@ -350,7 +389,7 @@ export const CATEGORY_TAXONOMY: TaxonomyTop[] = [
         name: 'Beauty',
         slug: 'beauty',
         children: [
-          // Disambiguated slug — collides with Skin & Beauty > Beauty Services > Makeup
+          // Disambiguated slug — collides with Skin & Beauty > Makeup & Beauty Services > Makeup
           // otherwise.
           { name: 'Makeup', slug: 'makeup-product' },
           { name: 'Beauty Tools', slug: 'beauty-tools' },
@@ -363,25 +402,13 @@ export const CATEGORY_TAXONOMY: TaxonomyTop[] = [
         slug: 'massage-spa-products',
         children: [
           { name: 'Massage Oil', slug: 'massage-oil' },
-          // Disambiguated slug — collides with Spa & Retreats > Body Treatments > Body Scrub
+          // Disambiguated slug — collides with Spa & Wellness > Body Treatments > Body Scrub
           // otherwise.
           { name: 'Body Scrub', slug: 'body-scrub-product' },
           { name: 'Body Lotion', slug: 'body-lotion' },
           { name: 'Spa Kit', slug: 'spa-kit' },
         ],
       },
-    ],
-  },
-  {
-    // Added beyond the user's original 7 requested categories — approved after research found
-    // live vendor "Elite Home Services" has real Deals here with no other home in the taxonomy.
-    // Two-level only (no Type tier), matching what already existed pre-reset.
-    name: 'Home Services',
-    slug: 'home-services',
-    type: 'SERVICE',
-    children: [
-      { name: 'Cleaning', slug: 'cleaning', children: [] },
-      { name: 'Appliance Repair', slug: 'appliance-repair', children: [] },
     ],
   },
 ];
