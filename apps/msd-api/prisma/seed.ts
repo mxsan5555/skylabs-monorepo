@@ -44,7 +44,11 @@ const ROLES: RoleSeed[] = [
 
 /** Per-menuKey action subset. Every node gets 'view' at minimum (added below); this map adds the rest. */
 const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
-  customers: ['create', 'edit', 'delete', 'export'],
+  // 'status_change' is deliberately its OWN action here, distinct from `rbac.users:status_change`
+  // (the Users Management screen's own status control) — a role can hold one without the other,
+  // so Customer status management is never accidentally reachable via/confused with staff User
+  // management, and vice versa (see customer.service.ts#setCustomerStatus's own doc comment).
+  customers: ['create', 'edit', 'delete', 'export', 'status_change'],
   // 'custom' gates the vendor's own `/vendors/me*` self-service surface — granted only to the
   // `vendor` role (never `view`, which would leak the admin "list every vendor" endpoint).
   vendors: ['create', 'edit', 'delete', 'export', 'approve', 'reject', 'status_change', 'custom'],
@@ -179,7 +183,7 @@ async function grantStarterPermissions(
 
   await grant('admin', [
     'dashboard:view',
-    'customers:view', 'customers:create', 'customers:edit', 'customers:delete',
+    'customers:view', 'customers:create', 'customers:edit', 'customers:delete', 'customers:status_change',
     'vendors:view', 'vendors:create', 'vendors:edit', 'vendors:delete',
     'vendors:approve', 'vendors:reject', 'vendors:status_change',
     'orders:view', 'orders:edit', 'orders:status_change',

@@ -634,3 +634,15 @@ input[type='checkbox'] {
   gap: 8px;
   min-height: 44px;
 }
+
+/* Branch-level Category → Subcategory tree (branch-category-access-dialog.tsx) — subcategories
+   nest under their parent category's checkbox, indented rather than in their own grid group. */
+.category-grant-grid__subgroup {
+  display: flex;
+  flex-direction: column;
+  margin-left: 24px;
+}
+
+.category-grant-grid__option--indented {
+  min-height: 40px;
+}

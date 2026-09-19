@@ -70,6 +70,8 @@ describe('GET /api/v1/categories', () => {
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
+    // isPopular is fully gone — migrated to the PopularTag system (see home.tsx).
+    expect(res.body.data[0]).not.toHaveProperty('isPopular');
   });
 });
 
@@ -183,6 +185,29 @@ describe('POST /api/v1/categories', () => {
     expect(res.status).toBe(422);
     expect(prismaMock.category.create).not.toHaveBeenCalled();
   });
+
+  // Category.isPopular was removed in favor of the PopularTag system (see the
+  // 20260918140000_drop_category_is_popular migration + home.tsx's popularTags-based carousels).
+  // CategoryCreateSchema is a plain z.object() (never .strict()), so Zod's default behavior is to
+  // silently strip any unknown key rather than reject the request — verified here rather than
+  // assumed, since a `.strict()` schema would instead 422 on this same payload.
+  it('a request body that still sends isPopular is accepted — the field is silently stripped, never persisted, never causes a 422', async () => {
+    resolveMock.mockResolvedValue(['masters.categories:create']);
+    prismaMock.category.findUnique.mockResolvedValue(null); // slug free
+    prismaMock.category.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: PARENT_ID, ...data }),
+    );
+    const res = await request(app)
+      .post('/api/v1/categories')
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ name: 'Spa & Wellness', slug: 'spa-wellness', type: 'SERVICE', isPopular: true });
+    expect(res.status).toBe(201);
+    // The create call actually reaching Prisma must never carry isPopular through.
+    expect(prismaMock.category.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.not.objectContaining({ isPopular: expect.anything() }) }),
+    );
+    expect(res.body.data).not.toHaveProperty('isPopular');
+  });
 });
 
 describe('POST /api/v1/categories/:id/images', () => {
@@ -261,6 +286,25 @@ describe('PATCH /api/v1/categories/:id', () => {
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
       .send({ parentId: CHILD_ID });
     expect(res.status).toBe(422);
+  });
+
+  // Same isPopular-removal contract as the POST test above — an update request that still sends
+  // isPopular (e.g. a stale admin-console tab) is accepted, silently stripped, never persisted.
+  it('a request body that still sends isPopular is accepted on update too — silently stripped, never persisted', async () => {
+    resolveMock.mockResolvedValue(['masters.categories:edit']);
+    prismaMock.category.findUnique.mockResolvedValue(parentFixture);
+    prismaMock.category.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ ...parentFixture, ...data }),
+    );
+    const res = await request(app)
+      .patch(`/api/v1/categories/${PARENT_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ name: 'Spa & Wellness Renamed', isPopular: false });
+    expect(res.status).toBe(200);
+    expect(prismaMock.category.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.not.objectContaining({ isPopular: expect.anything() }) }),
+    );
+    expect(res.body.data).not.toHaveProperty('isPopular');
   });
 });
 

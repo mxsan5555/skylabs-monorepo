@@ -29,7 +29,6 @@ export interface CatalogPopularTag {
  *  `undefined` for a subcategory entry (which never appears at the top of the tree anyway). */
 export interface CatalogCategoryWithChildren extends CatalogCategory {
   type?: 'SERVICE' | 'PRODUCT' | 'THERAPY' | null;
-  isPopular?: boolean;
   sortOrder?: number;
   popularTags?: CatalogPopularTag[];
   children: CatalogCategory[];

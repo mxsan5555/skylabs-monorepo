@@ -76,7 +76,7 @@ function toOrderRow(order: Order): Record<string, string | number> {
     'Order ID': order.id,
     Customer: order.customer.name,
     Vendor: singleVendorItem?.vendorNameSnapshot ?? order.vendorNameSnapshot,
-    Branch: singleVendorItem?.branchNameSnapshot ?? order.branchNameSnapshot,
+    Branch: singleVendorItem?.branchNameSnapshot ?? order.branchNameSnapshot ?? '—',
     Composition: describeOrderComposition(order),
     Type: order.type,
     Item: order.items.map((i) => i.itemName).join(', ') || '—',
@@ -86,7 +86,9 @@ function toOrderRow(order: Order): Record<string, string | number> {
     'Created At': new Date(order.createdAt).toLocaleString(),
     'Customer Phone': order.customer.phone ?? '—',
     'Customer Email': order.customer.email ?? '—',
-    'Branch Address': [order.branch.address, order.branch.city].filter(Boolean).join(', ') || '—',
+    // order.branch is null for a Product-only order (Product is vendor-level, not branch-level —
+    // see Order.branchId's schema doc comment in msd-api) — never read .address off it unguarded.
+    'Branch Address': order.branch ? [order.branch.address, order.branch.city].filter(Boolean).join(', ') || '—' : '—',
     Subtotal: `₹${order.subtotal}`,
     Quantity: order.items.reduce((n, i) => n + i.quantity, 0),
     'Payment Provider': latestPayment?.provider ?? '—',

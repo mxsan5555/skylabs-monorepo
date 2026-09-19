@@ -36,8 +36,6 @@ const CategoryFieldsSchema = z.object({
    *  parent's type by join, never carries its own (see Category's schema doc comment and
    *  the `Category_type_required_for_top_level` DB check constraint). */
   type: z.enum(['SERVICE', 'PRODUCT', 'THERAPY']).optional(),
-  /** Drives the storefront's "Popular Category"/"Popular Therapy" carousels. */
-  isPopular: z.boolean().optional(),
 });
 
 export const CategoryCreateSchema = CategoryFieldsSchema

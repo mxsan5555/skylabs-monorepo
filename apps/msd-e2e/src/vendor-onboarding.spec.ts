@@ -376,7 +376,7 @@ test.describe('Vendor onboarding wizard — direct category access, happy path',
 test.describe('Public storefront — location filter and category pages still render', () => {
   test('/explore renders with a location filter and narrows to /category/:slug', async ({ page }) => {
     await page.route(`${API_BASE}/catalog/categories`, (route: Route) =>
-      route.fulfill({ json: envelope([{ ...SERVICE_CATEGORY, description: null, children: [], isPopular: true, sortOrder: 1 }]) }),
+      route.fulfill({ json: envelope([{ ...SERVICE_CATEGORY, description: null, children: [], sortOrder: 1 }]) }),
     );
     await page.route(`${API_BASE}/catalog/categories/massage`, (route: Route) =>
       route.fulfill({ json: envelope({ ...SERVICE_CATEGORY, description: null, children: [] }) }),

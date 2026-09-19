@@ -336,12 +336,11 @@ export async function getPublicCategoryTree() {
     name: parent.name,
     slug: parent.slug,
     description: parent.description,
-    // `type`/`isPopular` only ever live on a top-level row (see Category's schema doc comment)
-    // — exposed here so the public storefront can drive the "Popular Category" homepage
-    // carousels without a second admin-only fetch. Already ordered by sortOrder via
-    // listActiveCategories, so no extra sort needed here.
+    // `type` only ever lives on a top-level row (see Category's schema doc comment). The
+    // "Popular Category"/"Popular Therapy" homepage carousels are driven entirely by
+    // `popularTags` below (PopularTag/PopularTagCategory), not by a flag on Category itself.
+    // Already ordered by sortOrder via listActiveCategories, so no extra sort needed here.
     type: parent.type,
-    isPopular: parent.isPopular,
     sortOrder: parent.sortOrder,
     popularTags: parent.popularTags,
     children: buildPublicChildren(categories, parent.id),
@@ -359,11 +358,10 @@ export async function getPublicCategoryBySlug(slug: string) {
     name: category.name,
     slug: category.slug,
     description: category.description,
-    // `type`/`isPopular`/`sortOrder` only ever live on a top-level row (same as
-    // getPublicCategoryTree above) — this is the field the storefront's category page reads to
-    // automatically pick Deal vs Product vs Therapist listing, so it must round-trip here too.
+    // `type`/`sortOrder` only ever live on a top-level row (same as getPublicCategoryTree
+    // above) — `type` is the field the storefront's category page reads to automatically pick
+    // Deal vs Product vs Therapist listing, so it must round-trip here too.
     type: category.type,
-    isPopular: category.isPopular,
     sortOrder: category.sortOrder,
     popularTags: withTags.popularTags,
     children: category.children.map((child) => ({

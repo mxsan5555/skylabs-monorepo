@@ -395,6 +395,7 @@ model Branch {
   orders         Order[]
   orderItems     OrderItem[]
   therapists     Therapist[]
+  categoryAccess BranchCategoryAccess[]
 
   @@index([vendorId])
 }
@@ -530,10 +531,6 @@ model Category {
   /// migration's own comment). Only ever meaningful/set on a top-level row (`parentId: null`);
   /// a subcategory inherits its parent's type by join — never duplicated here.
   type                     CategoryType?
-  /// Drives the storefront's "Popular Category"/"Popular Therapy" carousels (Category rows with
-  /// `type: THERAPY` double as flat specialization rows — see Therapist.specializationCategoryId).
-  /// Combined with the existing `sortOrder` for display ordering; no separate table needed.
-  isPopular                Boolean                @default(false)
   parent                   Category?              @relation("CategoryParent", fields: [parentId], references: [id])
   children                 Category[]             @relation("CategoryParent")
   mediaImages              CategoryImage[]
@@ -544,6 +541,8 @@ model Category {
   subcategoryProducts      Product[]              @relation("ProductSubcategory")
   therapistSpecializations Therapist[]            @relation("TherapistSpecialization")
   vendorAccess             VendorCategoryAccess[]
+  branchAccess             BranchCategoryAccess[]
+  branchSubcategoryAccess  BranchSubcategoryAccess[]
 
   @@index([parentId])
 }
@@ -830,6 +829,40 @@ model VendorCategoryAccess {
   @@unique([vendorId, categoryId])
   @@index([vendorId])
   @@index([categoryId])
+}
+
+/// A branch's direct grant of access to one top-level Category already granted to the vendor
+/// (VendorCategoryAccess) — narrows which of the vendor's granted categories THIS branch
+/// actually offers. Unlike VendorCategoryAccess, subcategory access is explicit (see
+/// BranchSubcategoryAccess below), not implied — a branch may offer a category's top level
+/// without every subcategory.
+model BranchCategoryAccess {
+  id            String                    @id @default(uuid())
+  branchId      String
+  categoryId    String
+  createdAt     DateTime                  @default(now())
+  branch        Branch                    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  category      Category                  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  subcategories BranchSubcategoryAccess[]
+
+  @@unique([branchId, categoryId])
+  @@index([branchId])
+  @@index([categoryId])
+}
+
+/// One Subcategory explicitly enabled under a BranchCategoryAccess row — deleting the parent
+/// BranchCategoryAccess (removing the whole category from a branch) cascades to remove these.
+model BranchSubcategoryAccess {
+  id                     String               @id @default(uuid())
+  branchCategoryAccessId String
+  subcategoryId          String
+  createdAt              DateTime             @default(now())
+  branchCategoryAccess   BranchCategoryAccess @relation(fields: [branchCategoryAccessId], references: [id], onDelete: Cascade)
+  subcategory            Category             @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([branchCategoryAccessId, subcategoryId])
+  @@index([branchCategoryAccessId])
+  @@index([subcategoryId])
 }
 
 /// A Superadmin-managed marketing label ("Trending", "Best Seller", ...) mappable onto any mix

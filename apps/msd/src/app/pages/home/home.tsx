@@ -140,13 +140,14 @@ export function Home() {
     [safeDealsData],
   );
 
-  // Real `Category.isPopular` rows (admin-toggled — see `masters/categories.tsx`'s Popular
-  // switch), sorted by the same `sortOrder` the admin screen exposes. Replaces the old
-  // `MOCK_CATEGORY_MATCH` keyword-guessing table entirely — no more brittle name/slug matching.
+  // A category counts as "popular" when it has at least one PopularTag assigned to it (via the
+  // Popular Tags admin screen — `masters/popular-tags.tsx`), sorted by the same `sortOrder` the
+  // admin screen exposes. Replaces the old `Category.isPopular` checkbox entirely — no more
+  // dedicated boolean on Category.
   const popularCategories = useMemo(
     () =>
       [...categories]
-        .filter((c) => c.isPopular)
+        .filter((c) => (c.popularTags?.length ?? 0) > 0)
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
     [categories],
   );
