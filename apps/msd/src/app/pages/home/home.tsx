@@ -149,6 +149,8 @@ export function Home() {
   const [faqs, setFaqs] = useState<CatalogFaq[]>([]);
   const { location, coords } = useCurrentLocation();
   const shortLocation = location?.split(",")[2]?.trim() ?? location;
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState('');
 
   // Single batched fetch — re-runs the moment real coordinates arrive (permission granted after
   // the first render, or denied/unavailable and staying null forever) so the page refreshes to
