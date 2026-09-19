@@ -41,10 +41,10 @@ import notificationsRoutes from './routes/notifications.routes';
 export function createApp(): express.Express {
   const app = express();
 
-  app.use((req, res, next) => {
-  console.log('🔥 REQUEST RECEIVED:', req.method, req.originalUrl);
-  next();
-});
+//   app.use((req, res, next) => {
+//   console.log('🔥 REQUEST RECEIVED:', req.method, req.originalUrl);
+//   next();
+// });
 
   app.use(cors({ origin: env.corsOrigin, credentials: true }));
   // `verify` captures the exact raw bytes onto req.rawBody — payment.routes.ts's webhook needs

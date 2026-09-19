@@ -519,12 +519,13 @@
   --md-icon-size: 40px;
   color: var(--md-sys-color-outline);
 }
+/* ─── Opening Hours ─────────────────────────────────────────────────────── */
+/* ─── Working Hours ────────────────────────────────────────────────────── */
 
-/* ─── Opening hours ───────────────────────────────────────────────────────── */
 .vendor-page__hours-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .vendor-page__hours-title {
@@ -538,33 +539,54 @@
 
 .vendor-page__hours-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 6px 16px;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 10px 16px;
 }
 
 .vendor-page__hours-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  border-radius: 8px;
+  gap: 14px;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 10px;
   background: var(--md-sys-color-surface-container-low);
-  gap: 8px;
+  box-sizing: border-box;
 }
 
 .vendor-page__hours-day {
+  flex: 0 0 72px;
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--md-sys-color-on-surface);
-  min-width: 32px;
+  white-space: nowrap;
 }
 
 .vendor-page__hours-time {
+  flex: 1;
+  min-width: 0;
   font-size: 0.8rem;
   color: var(--md-sys-color-on-surface-variant);
   white-space: nowrap;
 }
 
+.vendor-page__hours-empty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+@media (max-width: 900px) {
+  .vendor-page__hours-grid {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .vendor-page__hours-grid {
+    grid-template-columns: 1fr;
+  }
+}
 /* ─── Right panel extras ──────────────────────────────────────────────────── */
 .vendor-page__service-tagline {
   margin: 0;
@@ -604,26 +626,42 @@
 
 /* Mobile */
 @media (max-width: 599px) {
-  .vendor-page__hero {
-    height: 200px;
-  }
-
   .vendor-page__body {
-    margin-top: -40px;
-    padding: 0 12px 32px;
+    grid-template-columns: 1fr;
+    margin-top: -36px;
+    padding: 0 12px 28px;
   }
 
-  .vendor-page__main-card {
-    padding: 20px 16px;
-    gap: 20px;
-  }
-
-  .vendor-page__company-img {
-    width: 88px;
-    height: 60px;
+  .vendor-page__main-card,
+  .vendor-page__selection-card {
+    width: 100%;
+    min-width: 0;
+    padding: 16px;
   }
 
   .vendor-page__selection-card {
-    padding: 20px 16px;
+    position: static;
+    order: -1;
+  }
+
+  .vendor-page__hours-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .vendor-page__hours-row {
+    grid-template-columns: max-content 1fr;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .vendor-page__hours-time {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vendor-page__product-grid,
+  .vendor-page__therapist-grid {
+    grid-template-columns: 1fr;
   }
 }

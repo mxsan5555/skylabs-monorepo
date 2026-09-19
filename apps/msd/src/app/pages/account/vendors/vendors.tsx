@@ -150,9 +150,24 @@ function AdminVendorManagement({
   // The selected vendor's granted SERVICE categories — a service Deal picks directly from these
   // (see vendor-branches.tsx's DealDialog); scoped per-vendor since access is vendor-specific.
   const [categories, setCategories] = useState<Category[]>([]);
-
+  const vendorDetailsRef = useRef<HTMLElement>(null);
   const selectedVendor = useMemo(() => vendors.find((v) => v.id === selectedId) ?? null, [vendors, selectedId]);
+ const handleVendorSelect = useCallback((id: string) => {
+  setSelectedId(id);
+}, []);
 
+useEffect(() => {
+  if (!selectedVendor) return;
+
+  const timer = window.setTimeout(() => {
+    vendorDetailsRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }, 50);
+
+  return () => window.clearTimeout(timer);
+}, [selectedVendor]);
   useEffect(() => {
     if (!selectedVendor) {
       setCategories([]);
@@ -344,7 +359,8 @@ function AdminVendorManagement({
         <VendorList
           vendors={vendors}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          // onSelect={setSelectedId}
+          onSelect={handleVendorSelect}
           total={total}
           page={params.page}
           pageSize={params.pageSize}
@@ -354,7 +370,7 @@ function AdminVendorManagement({
       </section>
 
       {selectedVendor && (
-        <section className="panel vendor-detail" aria-label="Vendor details">
+        <section  ref={vendorDetailsRef} className="panel vendor-detail" aria-label="Vendor details">
           {message && <p className="field-hint" role="status">{message}</p>}
           {error && <p className="error-state" role="alert">{error}</p>}
 

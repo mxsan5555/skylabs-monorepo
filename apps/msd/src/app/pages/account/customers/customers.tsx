@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo,  useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, PrimaryTab } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
@@ -57,6 +57,7 @@ export function CustomerManagement() {
   const [detailError, setDetailError] = useState('');
   const [statusError, setStatusError] = useState('');
   const [activeTab, setActiveTab] = useState(0);
+  const customerDetailsRef = useRef<HTMLElement>(null);
 
   const loadCustomers = useCallback(async () => {
     setLoading(true);
@@ -79,7 +80,9 @@ export function CustomerManagement() {
   useEffect(() => {
     loadCustomers();
   }, [loadCustomers]);
-
+const handleCustomerSelect = useCallback((id: string) => {
+  setSelectedId(id);
+}, []);
   const loadDetail = useCallback(async () => {
     if (!selectedId) {
       setSelectedCustomer(null);
@@ -102,6 +105,8 @@ export function CustomerManagement() {
     setActiveTab(0);
     loadDetail();
   }, [loadDetail]);
+useEffect(() => {
+  if (!selectedId) return;
 
   /** Fired from the customer-list actions column (`customer-list.tsx`'s row-action handler
    *  already resolved the clicked action to a target status and guarded the no-op case). Only
@@ -146,7 +151,8 @@ export function CustomerManagement() {
           page={memoParams.page}
           pageSize={memoParams.pageSize}
           loading={loading}
-          onSelect={setSelectedId}
+          // onSelect={setSelectedId}
+          onSelect={handleCustomerSelect}
           onParamsChange={setParams}
           canChangeStatus={canChangeStatus}
           onStatusChange={doStatusChange}
@@ -154,7 +160,7 @@ export function CustomerManagement() {
       </section>
 
       {selectedId && (
-        <section className="panel vendor-detail" aria-label="Customer details">
+        <section  ref={customerDetailsRef} className="panel vendor-detail" aria-label="Customer details">
           {detailError && <p className="error-state" role="alert">{detailError}</p>}
           {statusError && <p className="error-state" role="alert">{statusError}</p>}
 
@@ -181,14 +187,10 @@ export function CustomerManagement() {
 
               {activeTab === 0 && (
                 <div className="admin-tab-panel" aria-label="Overview">
-                  <div className="widget-grid">
+                  <div className="widget-grids">
                     <div className="stat-card">
                       <p className="stat-card__title">Mobile</p>
-                      <p className="stat-card__value">{selectedCustomer.phone ?? '—'}</p>
-                    </div>
-                    <div className="stat-card">
-                      <p className="stat-card__title">Email</p>
-                      <p className="stat-card__value">{selectedCustomer.email ?? '—'}</p>
+                      <p className="stat-card__values">{selectedCustomer.phone ?? '—'}</p>
                     </div>
                     <div className="stat-card">
                       <p className="stat-card__title">Status</p>
@@ -196,11 +198,11 @@ export function CustomerManagement() {
                     </div>
                     <div className="stat-card">
                       <p className="stat-card__title">Total Orders</p>
-                      <p className="stat-card__value">{selectedCustomer._count.orders}</p>
+                      <p className="stat-card__values">{selectedCustomer._count.orders}</p>
                     </div>
                     <div className="stat-card">
                       <p className="stat-card__title">Customer Since</p>
-                      <p className="stat-card__value">{new Date(selectedCustomer.createdAt).toLocaleDateString()}</p>
+                      <p className="stat-card__values">{new Date(selectedCustomer.createdAt).toLocaleDateString()}</p>
                     </div>
                   </div>
                 </div>

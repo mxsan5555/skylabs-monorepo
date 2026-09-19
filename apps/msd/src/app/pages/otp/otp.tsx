@@ -31,24 +31,20 @@ export function Otp() {
   const otpContent = content.auth.otp;
   const [loading, setLoading] = useState(false);
   const [awaitingBootstrap, setAwaitingBootstrap] = useState(false);
-  const { identifier, method, returnUrl } = (location.state as {
+  const { identifier, method, next } = (location.state as {
     identifier: string;
     method: 'email' | 'phone';
-    returnUrl?: string | null;
+    next?: string | null;
   }) || {};
   const [code, setCode] = useState('');
   const [seconds, setSeconds] = useState(RESEND_SECONDS);
-  // Preserves the intended destination if the user bounces back to /sign-in from here (e.g. to
-  // retry with a different identifier) — same `?next=` convention every storefront page already
-  // reads via `extractReturnUrl`.
-  const signInPath = returnUrl ? `/sign-in?next=${encodeURIComponent(returnUrl)}` : '/sign-in';
   useEffect(() => {
     const timer = setInterval(() => setSeconds((s) => (s > 0 ? s - 1 : 0)), 1000,);
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {
-    if (!identifier) { navigate(signInPath, { replace: true }); }
-  }, [identifier, navigate, signInPath]);
+    if (!identifier) { navigate('/sign-in', { replace: true }); }
+  }, [identifier, navigate]);
 
   // Once `signIn()` has kicked off the bootstrap fetch, wait for it to land in context, then
   // route by role. If it fails (token cleared by `loadBootstrap`'s own error handling), fall
@@ -56,14 +52,12 @@ export function Otp() {
   useEffect(() => {
     if (!awaitingBootstrap) return;
     if (bootstrap) {
-      // Honor the page the user was on before login (Add to Cart, wishlist, a guarded route,
-      // etc.) — the role-based default is only ever a fallback for a plain, direct sign-in.
-      navigate(returnUrl ?? resolvePostLoginPath(bootstrap), { replace: true });
+      navigate(resolvePostLoginPath(bootstrap), { replace: true });
     } else if (!token) {
       setAwaitingBootstrap(false);
       setError(otpContent.validation.invalidOtp);
     }
-  }, [awaitingBootstrap, bootstrap, token, navigate, returnUrl, otpContent.validation.invalidOtp]);
+  }, [awaitingBootstrap, bootstrap, token, navigate, otpContent.validation.invalidOtp]);
 
   const verify = async () => {
     setError('');
@@ -76,7 +70,7 @@ export function Otp() {
       return;
     }
     if (!identifier) {
-      navigate(signInPath);
+      navigate('/sign-in');
       return;
     }
     setLoading(true);
@@ -109,7 +103,7 @@ export function Otp() {
       <IconButton
         className="otp-back"
         aria-label={otpContent.backAriaLabel}
-        onClick={() => navigate(signInPath)}
+        onClick={() => navigate('/sign-in')}
       >
         <Icon aria-hidden="true">{otpContent.icons.back}</Icon>
       </IconButton>
@@ -145,6 +139,14 @@ export function Otp() {
             setCode(otp);
             if (error) setError('');
           }}
+          onKeyDown={(event) => {
+            if (
+              event.key === 'Enter' && code.length === 6 && !loading && !awaitingBootstrap
+            ) {
+              event.preventDefault();
+              verify();
+            }
+          }}
         />
         {error && <p className="auth-error">{error}</p>}
         <FilledButton className="auth-submit" onClick={verify} disabled={loading || awaitingBootstrap || code.length !== 6}>
@@ -153,13 +155,18 @@ export function Otp() {
       </div>
 
       <p className="otp-resend">
-        {otpContent.resend.question}{' '}
+        <span>{otpContent.resend.question}</span>
+
         {seconds > 0 ? (
-          <span className="otp-muted">{otpContent.resend.countdown} {seconds}s</span>
+          <span className="otp-muted">
+            {otpContent.resend.countdown} {seconds}s
+          </span>
         ) : (
-          <TextButton onClick={resend}>
-            {otpContent.resend.button}
-          </TextButton>
+          <span className="otp-resend__button">
+            <TextButton onClick={resend}>
+              {otpContent.resend.button}
+            </TextButton>
+          </span>
         )}
       </p>
     </div>

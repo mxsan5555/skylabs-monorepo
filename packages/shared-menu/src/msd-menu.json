@@ -9,103 +9,124 @@
     "order": 1
   },
   {
-    "id": "customers",
-    "title": "Customers",
-    "icon": "group",
-    "route": "/account/customers",
-    "permissionKey": "customers",
+    "id": "admin",
+    "title": "Admin",
+    "icon": "admin_panel_settings",
+    "permissionKey": "administration",
     "parent": null,
-    "order": 2
+    "order": 2,
+    "children": [
+      {
+        "id": "admin-manage",
+        "title": "Manage",
+        "icon": "manage_accounts",
+        "permissionKey": "administration",
+        "parent": "admin",
+        "order": 1,
+        "children": [
+          {
+            "id": "admin-roles",
+            "title": "Role",
+            "route": "/account/administration/roles",
+            "permissionKey": "rbac.roles",
+            "parent": "admin-manage",
+            "order": 1
+          },
+          {
+            "id": "admin-users",
+            "title": "User",
+            "route": "/account/administration/users",
+            "permissionKey": "rbac.users",
+            "parent": "admin-manage",
+            "order": 2
+          },
+          {
+            "id": "admin-audit-logs",
+            "title": "Logs",
+            "route": "/account/administration/audit-logs",
+            "permissionKey": "rbac.audit-logs",
+            "parent": "admin-manage",
+            "order": 3
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "vendors",
-    "title": "Vendors",
+    "title": "Vendor",
     "icon": "storefront",
-    "route": "/account/vendors",
     "permissionKey": "vendors",
     "parent": null,
-    "order": 3
+    "order": 3,
+    "children": [
+      {
+        "id": "vendor-list",
+        "title": "Vendor List",
+        "route": "/account/vendors",
+        "permissionKey": "vendors",
+        "parent": "vendors",
+        "order": 1
+      },
+      {
+        "id": "vendor-branches",
+        "title": "Branch",
+        "route": "/account/branches",
+        "permissionKey": "vendors",
+        "parent": "vendors",
+        "order": 2
+      },
+      {
+        "id": "vendor-deals",
+        "title": "Deal",
+        "route": "/account/deals",
+        "permissionKey": "vendors",
+        "parent": "vendors",
+        "order": 3
+      },
+      {
+        "id": "vendor-products",
+        "title": "Product",
+        "route": "/account/products",
+        "permissionKey": "vendors",
+        "parent": "vendors",
+        "order": 4
+      },
+      {
+        "id": "vendor-therapists",
+        "title": "Therapist",
+        "route": "/account/therapists",
+        "permissionKey": "vendors",
+        "parent": "vendors",
+        "order": 5
+      }
+    ]
   },
   {
-    "id": "branches",
-    "title": "Branches",
-    "icon": "store",
-    "route": "/account/branches",
-    "permissionKey": "vendors",
-    "parent": null,
-    "order": 3.1
-  },
-  {
-    "id": "deals",
-    "title": "Deals",
-    "icon": "local_offer",
-    "route": "/account/deals",
-    "permissionKey": "vendors",
-    "parent": null,
-    "order": 3.2
-  },
-  {
-    "id": "therapists",
-    "title": "Therapists",
-    "icon": "badge",
-    "route": "/account/therapists",
-    "permissionKey": "vendors",
-    "parent": null,
-    "order": 3.25
-  },
-  {
-    "id": "vendor-business-profile",
-    "title": "Business Profile",
-    "icon": "business_center",
-    "route": "/account/vendor-profile",
-    "permissionKey": "vendor-portal",
-    "parent": null,
-    "order": 3.3
-  },
-  {
-    "id": "vendor-branches-deals",
-    "title": "Branches",
-    "icon": "store",
-    "route": "/account/vendor-branches-deals",
-    "permissionKey": "vendor-portal",
-    "parent": null,
-    "order": 3.31
-  },
-  {
-    "id": "vendor-deals",
-    "title": "Deals / Packages",
-    "icon": "sell",
-    "route": "/account/vendor-deals",
-    "permissionKey": "vendor-portal",
-    "parent": null,
-    "order": 3.315
-  },
-  {
-    "id": "vendor-customers",
+    "id": "customers",
     "title": "Customers",
     "icon": "group",
-    "route": "/account/vendor-customers",
-    "permissionKey": "vendor-portal",
+    "permissionKey": "customers",
     "parent": null,
-    "order": 3.32
-  },
-  {
-    "id": "vendor-therapists",
-    "title": "Therapists",
-    "icon": "badge",
-    "route": "/account/vendor-therapists",
-    "permissionKey": "vendor-portal",
-    "parent": null,
-    "order": 3.33
-  },
-  {
-    "id": "orders",
-    "title": "Orders",
-    "icon": "shopping_cart",
-    "route": "/account/orders",
-    "permissionKey": "orders",
-    "parent": null,
-    "order": 4
+    "order": 4,
+    "children": [
+      {
+        "id": "customer-list",
+        "title": "Customer List",
+        "route": "/account/customers",
+        "permissionKey": "customers",
+        "parent": "customers",
+        "order": 1
+      },
+      {
+        "id": "customer-order-history",
+        "title": "Order History",
+        "route": "/account/orders",
+        "permissionKey": "orders",
+        "parent": "customers",
+        "order": 2
+      }
+    ]
   },
   {
     "id": "products",
@@ -114,17 +135,136 @@
     "route": "/account/products",
     "permissionKey": "products",
     "parent": null,
-    "order": 5
+    "order": 4
   },
-
   {
-    "id": "reports",
-    "title": "Reports",
-    "icon": "insights",
-    "route": "/account/reports",
+    "id": "cms",
+    "title": "CMS",
+    "icon": "article",
+    "permissionKey": "cms",
+    "parent": null,
+    "order": 6,
+    "children": [
+      {
+        "id": "cms-blog",
+        "title": "Blog",
+        "icon": "info",
+        "permissionKey": "cms.blog",
+        "parent": "cms",
+        "order": 1,
+        "children": [
+          {
+            "id": "cms-blog-pages",
+            "title": "Pages",
+            "route": "/account/cms/blog",
+            "permissionKey": "cms.blog",
+            "parent": "cms-blog",
+            "order": 1
+          },
+          {
+            "id": "cms-blog-category",
+            "title": "Category",
+            "route": "/account/cms/blog-categories",
+            "permissionKey": "cms.blog-category",
+            "parent": "cms-blog",
+            "order": 2
+          },
+          {
+            "id": "cms-blog-articles",
+            "title": "Articles",
+            "route": "/account/cms/blog/articles",
+            "permissionKey": "cms.blog",
+            "parent": "cms-blog",
+            "order": 3
+          }
+        ]
+      },
+      {
+        "id": "cms-static-pages",
+        "title": "Static",
+        "icon": "web",
+        "permissionKey": "cms",
+        "parent": "cms",
+        "order": 2,
+        "children": [
+          {
+            "id": "cms-about-us",
+            "title": "About Us",
+            "route": "/account/cms/about-us",
+            "permissionKey": "cms.about-us",
+            "parent": "cms-static-pages",
+            "order": 1
+          },
+          {
+            "id": "cms-contact-us",
+            "title": "Contact Us",
+            "route": "/account/cms/contact-us",
+            "permissionKey": "cms.contact-us",
+            "parent": "cms-static-pages",
+            "order": 2
+          },
+          {
+            "id": "cms-faq",
+            "title": "FAQ",
+            "route": "/account/cms/faq",
+            "permissionKey": "cms.faq",
+            "parent": "cms-static-pages",
+            "order": 3
+          },
+          {
+            "id": "cms-how-it-works",
+            "title": "How It Works",
+            "route": "/account/cms/how-it-works",
+            "permissionKey": "cms.how-it-works",
+            "parent": "cms-static-pages",
+            "order": 4
+          },
+          {
+            "id": "cms-careers",
+            "title": "Careers",
+            "route": "/account/cms/careers",
+            "permissionKey": "cms.careers",
+            "parent": "cms-static-pages",
+            "order": 5
+          },
+          {
+            "id": "cms-terms",
+            "title": "Terms & Conditions",
+            "route": "/account/cms/legal-pages",
+            "permissionKey": "cms.website-pages",
+            "parent": "cms-static-pages",
+            "order": 7
+          }
+        ]
+      },
+      {
+        "id": "cms-social-media",
+        "title": "Social Media",
+        "icon": "share",
+        "route": "/account/cms/social-media",
+        "permissionKey": "cms.social-media",
+        "parent": "cms",
+        "order": 3
+      }
+    ]
+  },
+  {
+    "id": "analytics",
+    "title": "Analytics",
+    "icon": "analytics",
     "permissionKey": "reports",
     "parent": null,
-    "order": 7
+    "order": 7,
+    "children": [
+      {
+        "id": "analytics-reports",
+        "title": "Reports",
+        "route": "/account/reports",
+        "permissionKey": "reports",
+        "parent": "analytics",
+        "order": 1
+      }
+    ]
   },
   {
     "id": "masters",
@@ -137,7 +277,6 @@
       {
         "id": "masters-categories",
         "title": "Categories",
-        "icon": "category",
         "route": "/account/masters/categories",
         "permissionKey": "masters.categories",
         "parent": "masters",
@@ -146,7 +285,6 @@
       {
         "id": "masters-sub-categories",
         "title": "Sub Categories",
-        "icon": "category",
         "route": "/account/masters/sub-categories",
         "permissionKey": "masters.sub-categories",
         "parent": "masters",
@@ -155,7 +293,6 @@
       {
         "id": "masters-tags",
         "title": "Marketing Tags",
-        "icon": "sell",
         "route": "/account/masters/tags",
         "permissionKey": "masters.tags",
         "parent": "masters",
@@ -164,140 +301,28 @@
     ]
   },
   {
-    "id": "cms",
-    "title": "CMS",
-    "icon": "article",
-    "permissionKey": "cms",
-    "parent": null,
-    "order": 8.5,
-    "children": [
-      {
-        "id": "cms-blog",
-        "title": "Blog",
-        "icon": "article",
-        "route": "/account/cms/blog",
-        "permissionKey": "cms.blog",
-        "parent": "cms",
-        "order": 1
-      },
-      {
-        "id": "cms-blog-categories",
-        "title": "Blog Categories",
-        "icon": "category",
-        "route": "/account/cms/blog-categories",
-        "permissionKey": "cms.blog-category",
-        "parent": "cms",
-        "order": 1.5
-      },
-      {
-        "id": "cms-about-us",
-        "title": "About Us",
-        "icon": "info",
-        "route": "/account/cms/about-us",
-        "permissionKey": "cms.about-us",
-        "parent": "cms",
-        "order": 2
-      },
-      {
-        "id": "cms-contact-us",
-        "title": "Contact Us",
-        "icon": "call",
-        "route": "/account/cms/contact-us",
-        "permissionKey": "cms.contact-us",
-        "parent": "cms",
-        "order": 3
-      },
-      {
-        "id": "cms-faq",
-        "title": "FAQ",
-        "icon": "quiz",
-        "route": "/account/cms/faq",
-        "permissionKey": "cms.faq",
-        "parent": "cms",
-        "order": 4
-      },
-      {
-        "id": "cms-how-it-works",
-        "title": "How It Works",
-        "icon": "list_alt",
-        "route": "/account/cms/how-it-works",
-        "permissionKey": "cms.how-it-works",
-        "parent": "cms",
-        "order": 5
-      },
-      {
-        "id": "cms-careers",
-        "title": "Careers",
-        "icon": "work",
-        "route": "/account/cms/careers",
-        "permissionKey": "cms.careers",
-        "parent": "cms",
-        "order": 6
-      },
-      {
-        "id": "cms-legal-pages",
-        "title": "Legal Pages",
-        "icon": "policy",
-        "route": "/account/cms/legal-pages",
-        "permissionKey": "cms.website-pages",
-        "parent": "cms",
-        "order": 7
-      },
-      {
-        "id": "cms-social-media",
-        "title": "Social Media",
-        "icon": "share",
-        "route": "/account/cms/social-media",
-        "permissionKey": "cms.social-media",
-        "parent": "cms",
-        "order": 8
-      }
-    ]
-  },
-  {
-    "id": "administration",
-    "title": "Administration",
-    "icon": "admin_panel_settings",
-    "permissionKey": "administration",
-    "parent": null,
-    "order": 9,
-    "children": [
-      {
-        "id": "admin-roles",
-        "title": "Role Management",
-        "icon": "shield_person",
-        "route": "/account/administration/roles", 
-        "permissionKey": "rbac.roles",
-        "parent": "administration",
-        "order": 1
-      },
-      {
-        "id": "admin-users",
-        "title": "User Management",
-        "icon": "manage_accounts",
-        "route": "/account/administration/users",
-        "permissionKey": "rbac.users",
-        "parent": "administration",
-        "order": 2
-      },
-      {
-        "id": "admin-audit-logs",
-        "title": "Audit Logs",
-        "icon": "history",
-        "route": "/account/administration/audit-logs",
-        "permissionKey": "rbac.audit-logs",
-        "parent": "administration",
-        "order": 3
-      }
-    ]
-  },
-  {
     "id": "settings",
     "title": "Settings",
     "icon": "settings",
-    "route": "/account/settings",
     "permissionKey": "settings",
     "parent": null,
-    "order": 10
+    "order": 10,
+    "children": [
+      {
+        "id": "settings-profile",
+        "title": "Profile",
+        "route": "/account/settings",
+        "permissionKey": "settings",
+        "parent": "settings",
+        "order": 1
+      },
+      {
+        "id": "settings-logout",
+        "title": "Logout",
+        "permissionKey": "settings",
+        "parent": "settings",
+        "order": 2
+      }
+    ]
   }
 ]

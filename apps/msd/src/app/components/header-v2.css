@@ -1,0 +1,1015 @@
+/* ============================================================
+   MSD Header V2 — clean, minimal, 60/30/10 professional design
+   60% surface (white), 30% on-surface-variant (labels/text),
+   10% primary (#007C2B green — CTAs, active states, hover)
+   ============================================================ */
+
+:root {
+  --hv2-height: 68px;
+}
+
+/* Skip link */
+.hv2-skip-link {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  z-index: 10000;
+  padding: 8px 16px;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  text-decoration: none;
+  font-weight: 600;
+  border-radius: 0 0 8px 0;
+  transition: top 0.2s;
+}
+
+.hv2-skip-link:focus {
+  top: 0;
+}
+
+/* Header shell */
+.hv2-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  width: 100%;
+  height: var(--hv2-height);
+  background: var(--md-sys-color-surface);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 6%);
+}
+
+/* Offset page content */
+main {
+  padding-top: var(--hv2-height);
+}
+
+/* Inner layout */
+.hv2-header__inner {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 100%;
+  padding: 0 32px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+/* Hamburger — hidden on desktop */
+.hv2-header__hamburger {
+  display: none;
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+
+/* Logo */
+.hv2-header__brand {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  text-decoration: none;
+  margin-right: 32px;
+}
+
+.hv2-header__logo {
+  height: 48px;
+  width: auto;
+  object-fit: contain;
+  /* Remove the white background from a jpg logo */
+  mix-blend-mode: multiply;
+  filter: contrast(1.05);
+}
+
+/* Core nav */
+.hv2-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.hv2-nav__item {
+  position: relative;
+}
+
+.hv2-nav__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+  white-space: nowrap;
+}
+
+.hv2-nav__trigger:hover,
+.hv2-nav__trigger--active {
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+}
+
+/* Promotional menu labels (Therapists, Products) */
+.hv2-nav__trigger--promo {
+  color: var(--md-sys-color-primary);
+}
+
+.hv2-nav__trigger--promo:hover,
+.hv2-nav__trigger--promo.hv2-nav__trigger--active {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+/* Chevron */
+.hv2-nav__chevron {
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.hv2-nav__chevron--open {
+  transform: rotate(180deg);
+}
+
+/* Dropdown panel */
+.hv2-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  min-width: 240px;
+  max-width: 320px;
+  padding: 8px;
+  background: var(--md-sys-color-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  animation: hv2-dropdown-in 0.15s ease;
+}
+
+@keyframes hv2-dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hv2-dropdown__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background 0.12s ease;
+}
+
+.hv2-dropdown__item:hover {
+  background: var(--md-sys-color-surface-container);
+}
+
+.hv2-dropdown__item:hover .hv2-dropdown__item-title {
+  color: var(--md-sys-color-primary);
+}
+
+.hv2-dropdown__item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  transition: color 0.12s ease;
+}
+
+.hv2-dropdown__item-subtitle {
+  font-size: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Search */
+.hv2-search {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  width: clamp(180px, 22vw, 320px);
+  margin: 0 20px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 24px;
+  background: var(--md-sys-color-surface-container-low);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hv2-search:focus-within {
+  border-color: var(--md-sys-color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-sys-color-primary) 15%, transparent);
+}
+
+.hv2-search__input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 14px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--md-sys-color-on-surface);
+  outline: none;
+}
+
+.hv2-search__input::placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* hide native search clear button */
+.hv2-search__input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.hv2-search__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  margin-right: 4px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.hv2-search__btn:hover {
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-primary);
+}
+
+/* Right actions */
+.hv2-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.hv2-header__member-link {
+  padding: 8px 14px;
+  border-radius: 8px;
+  color: var(--md-sys-color-on-surface-variant);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.hv2-header__member-link:hover {
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-primary);
+}
+
+.hv2-header__icon-btn {
+  position: relative;
+}
+
+/* Badge */
+.hv2-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 50%;
+  background: var(--md-sys-color-error);
+  color: var(--md-sys-color-on-error);
+  font-size: 0.65rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+/* Profile menu anchor */
+.hv2-profile {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.hv2-profile md-menu {
+  --md-menu-container-min-width: 170px;
+  z-index: 999;
+}
+
+/* ============================================================
+   Mobile drawer backdrop
+   ============================================================ */
+.hv2-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgb(0 0 0 / 40%);
+}
+
+/* ============================================================
+   Mobile drawer
+   ============================================================ */
+.hv2-drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 10001;
+  display: flex;
+  flex-direction: column;
+  width: min(320px, 85vw);
+  height: 100vh;
+  background: var(--md-sys-color-surface);
+  overflow-y: auto;
+  transform: translateX(-100%);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hv2-drawer--open {
+  transform: translateX(0);
+}
+
+.hv2-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.hv2-drawer__brand {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.hv2-drawer__logo {
+  height: 44px;
+  width: auto;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+}
+
+.hv2-drawer__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding-bottom: 16px;
+}
+
+.hv2-drawer__member-link {
+  display: block;
+  padding: 14px 20px;
+  color: var(--md-sys-color-primary);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.hv2-drawer__member-link:hover {
+  background: var(--md-sys-color-primary-container);
+}
+
+.hv2-drawer__search {
+  margin: 12px 16px;
+}
+
+/* Accordion nav */
+.hv2-drawer__nav {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hv2-drawer__nav-group {
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.hv2-drawer__nav-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 20px;
+  border: none;
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+
+.hv2-drawer__nav-trigger--promo {
+  color: var(--md-sys-color-primary);
+}
+
+.hv2-drawer__nav-trigger:hover {
+  background: var(--md-sys-color-surface-container);
+}
+
+.hv2-drawer__subnav {
+  margin: 0;
+  padding: 4px 0 8px;
+  list-style: none;
+  background: var(--md-sys-color-surface-container-low);
+}
+
+.hv2-drawer__sublink {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 10px 28px;
+  text-decoration: none;
+}
+
+.hv2-drawer__sublink:hover {
+  background: var(--md-sys-color-surface-container);
+}
+
+.hv2-drawer__sublink-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+}
+
+.hv2-drawer__sublink-subtitle {
+  font-size: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.hv2-drawer__links {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hv2-drawer__link {
+  display: block;
+  padding: 14px 20px;
+  color: var(--md-sys-color-on-surface);
+  font-size: 15px;
+  text-decoration: none;
+}
+
+.hv2-drawer__link:hover {
+  background: var(--md-sys-color-secondary-container);
+}
+
+.hv2-drawer__auth {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+/* ============================================================
+   Responsive breakpoints
+   ============================================================ */
+
+/* Tablet — hide search + member link, show hamburger */
+@media (max-width: 1199px) {
+  .hv2-header__hamburger {
+    display: flex;
+  }
+
+  .hv2-nav {
+    display: none;
+  }
+
+  .hv2-search {
+    display: none;
+  }
+
+  .hv2-header__member-link {
+    display: none;
+  }
+
+  .hv2-header__brand {
+    margin-right: 0;
+  }
+
+  .hv2-header__inner {
+    gap: 12px;
+    padding: 0 20px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+  .hv2-header__inner {
+    padding: 0 14px;
+    gap: 8px;
+  }
+
+  .hv2-header__logo {
+    height: 40px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hv2-header__actions {
+    gap: 4px;
+  }
+}
+
+/* ============================================================
+   HeaderV3 — Polished two-row layout
+   Row 1 (hv3-top): Logo · Search · Actions   72px
+   Row 2 (hv3-cat): Category strip            48px
+   Total fixed height: 120px
+   60% white | 30% on-surface-variant | 10% primary #007C2B
+   ============================================================ */
+
+:root {
+  --hv3-top-height: 72px;
+  --hv3-cat-height: 48px;
+  --hv3-height: 120px;
+  /* Explicit white — never tinted by surface token */
+  --hv3-bg: #ffffff;
+}
+
+/* Skip link */
+.hv3-skip {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  z-index: 10000;
+  padding: 8px 16px;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  text-decoration: none;
+  font-weight: 600;
+  border-radius: 0 0 8px 0;
+  transition: top 0.2s;
+}
+
+.hv3-skip:focus { top: 0; }
+
+/* Header shell */
+.hv3-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  width: 100%;
+  background: var(--hv3-bg);
+  box-shadow: 0 1px 6px rgb(0 0 0 / 8%);
+}
+
+/* Page offset — sibling <main> or any immediate child that wraps <main> */
+.hv3-header ~ main,
+.hv3-header + * > main,
+.hv3-header + main {
+  padding-top: var(--hv3-height);
+}
+
+/* ── Row 1 ── */
+.hv3-top {
+  height: var(--hv3-top-height);
+  background: var(--hv3-bg);
+  border-bottom: 1px solid #ebebeb;
+}
+
+.hv3-top__inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* Hamburger — hidden on desktop */
+.hv3-hamburger {
+  display: none;
+  flex-shrink: 0;
+}
+
+/* Logo — no blend mode, larger, breathing room */
+.hv3-brand {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  text-decoration: none;
+  margin-right: 8px;
+}
+
+.hv3-logo {
+  height: 56px;
+  width: auto;
+  object-fit: contain;
+  /* No mix-blend-mode — renders cleanly on white */
+}
+
+/* Search — host wrapper only; sky-search-bar owns all internal styles */
+.hv3-search {
+  flex: 1;
+  max-width: 560px;
+}
+
+/* Right actions */
+.hv3-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* "Become a Member" — OutlinedButton wrapper, hidden < 1024px */
+.hv3-actions__member-wrap {
+  display: contents;
+}
+
+.hv3-actions__divider {
+  display: block;
+  width: 1px;
+  height: 24px;
+  background: #e0e0e0;
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+/* Icon button wrapper — provides badge positioning context */
+.hv3-actions__icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Notification badge */
+.hv3-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 50%;
+  background: var(--md-sys-color-error);
+  color: var(--md-sys-color-on-error);
+  font-size: 0.62rem;
+  font-weight: 700;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Profile dropdown anchor */
+.hv3-profile {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.hv3-profile md-menu {
+  --md-menu-container-min-width: 170px;
+  z-index: 999;
+}
+
+/* ── Row 2: Category strip ── */
+.hv3-cat {
+  height: var(--hv3-cat-height);
+  background: var(--hv3-bg);
+  border-top: 1px solid #ebebeb;
+  border-bottom: 1px solid #ebebeb;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.hv3-cat::-webkit-scrollbar { display: none; }
+
+.hv3-cat__inner {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 24px;
+  gap: 0;
+}
+
+/* Each category item — equal width across the full strip */
+.hv3-cat__item {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+}
+
+/* Category trigger button — fills its equal-width parent, label centered */
+.hv3-cat__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  gap: 5px;
+  padding: 0 8px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #444444;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.hv3-cat__trigger:hover {
+  color: var(--md-sys-color-primary);
+  border-bottom-color: var(--md-sys-color-primary);
+}
+
+.hv3-cat__trigger:focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: -3px;
+}
+
+.hv3-cat__trigger--open {
+  color: var(--md-sys-color-primary);
+  border-bottom: 2px solid var(--md-sys-color-primary);
+  font-weight: 600;
+}
+
+/* Chevron */
+.hv3-cat__chevron {
+  transition: transform 0.2s ease;
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+
+.hv3-cat__chevron--open {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
+/* Dropdown panel */
+.hv3-cat__dropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  min-width: 248px;
+  max-width: 320px;
+  padding: 6px;
+  background: #ffffff;
+  border: 1px solid #ebebeb;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 10%);
+  animation: hv3-drop-in 0.14s ease;
+}
+
+@keyframes hv3-drop-in {
+  from { opacity: 0; transform: translateY(-5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Dropdown item */
+.hv3-cat__dropdown-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  text-decoration: none;
+  transition: background 0.12s ease;
+}
+
+.hv3-cat__dropdown-item:hover {
+  background: #f5f5f5;
+}
+
+.hv3-cat__dropdown-item:focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: -2px;
+}
+
+.hv3-cat__dropdown-item:hover .hv3-cat__dropdown-title {
+  color: var(--md-sys-color-primary);
+}
+
+.hv3-cat__dropdown-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  transition: color 0.12s ease;
+}
+
+.hv3-cat__dropdown-sub {
+  font-size: 12px;
+  color: #888888;
+}
+
+/* ── Mobile drawer backdrop ── */
+.hv3-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgb(0 0 0 / 40%);
+}
+
+/* ── Mobile drawer ── */
+.hv3-drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 10001;
+  display: flex;
+  flex-direction: column;
+  width: min(320px, 85vw);
+  height: 100vh;
+  background: #ffffff;
+  overflow-y: auto;
+  transform: translateX(-100%);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hv3-drawer--open { transform: translateX(0); }
+
+.hv3-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.hv3-drawer__brand {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.hv3-drawer__logo {
+  height: 44px;
+  width: auto;
+  object-fit: contain;
+  /* No mix-blend-mode */
+}
+
+.hv3-drawer__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding-bottom: 16px;
+}
+
+/* "Become a Member" link in drawer */
+.hv3-drawer__member {
+  display: block;
+  padding: 14px 20px;
+  color: var(--md-sys-color-primary);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.hv3-drawer__member:hover {
+  background: #f0faf4;
+}
+
+/* Drawer search form */
+.hv3-drawer__search {
+  display: block;
+  margin: 12px 16px;
+}
+
+/* Drawer accordion nav */
+.hv3-drawer__nav {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hv3-drawer__group {
+  border-bottom: 1px solid #ebebeb;
+}
+
+.hv3-drawer__nav-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 20px;
+  border: none;
+  background: transparent;
+  color: #1a1a1a;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+
+.hv3-drawer__nav-trigger:hover {
+  background: #f5f5f5;
+}
+
+.hv3-drawer__subnav {
+  margin: 0;
+  padding: 4px 0 8px;
+  list-style: none;
+  background: #fafafa;
+}
+
+.hv3-drawer__sublink {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 28px;
+  text-decoration: none;
+}
+
+.hv3-drawer__sublink:hover {
+  background: #f0faf4;
+}
+
+.hv3-drawer__sublink-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.hv3-drawer__sublink-sub {
+  font-size: 12px;
+  color: #888888;
+}
+
+.hv3-drawer__links {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hv3-drawer__link {
+  display: block;
+  padding: 14px 20px;
+  color: #1a1a1a;
+  font-size: 15px;
+  text-decoration: none;
+}
+
+.hv3-drawer__link:hover {
+  background: #f5f5f5;
+}
+
+.hv3-drawer__auth {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+/* ── Responsive breakpoints ── */
+
+/* Tablet 768–1199px: hamburger visible, category strip hidden, member CTA hidden */
+@media (max-width: 1199px) {
+  .hv3-hamburger { display: flex; }
+  .hv3-cat { display: none; }
+  .hv3-header { box-shadow: 0 1px 4px rgb(0 0 0 / 7%); }
+  /* Height shrinks to just the top bar */
+  .hv3-header ~ main,
+  .hv3-header + * > main,
+  .hv3-header + main { padding-top: var(--hv3-top-height); }
+  .hv3-actions__member-wrap { display: none; }
+  .hv3-actions__divider { display: none; }
+  .hv3-top__inner { gap: 10px; padding: 0 16px; }
+}
+
+/* Mobile < 768px: search visible but smaller, tighter padding */
+@media (max-width: 767px) {
+  .hv3-top__inner { padding: 0 12px; gap: 8px; }
+  .hv3-logo { height: 44px; }
+  .hv3-search { max-width: none; }
+}
+
+/* Compact < 480px: hide search entirely (lives in drawer), just icons */
+@media (max-width: 479px) {
+  .hv3-search { display: none; }
+  .hv3-actions { gap: 2px; }
+}
