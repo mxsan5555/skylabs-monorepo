@@ -18,7 +18,7 @@ dotenv.config({ path: path.join(__dirname, '../.env.local') });
 import { PrismaClient, Prisma } from '../src/generated/prisma-client';
 import type { PermissionAction, MenuNode } from '@skylabs-monorepo/shared-types';
 import { permissionKeyFor } from '@skylabs-monorepo/shared-permissions';
-import { ensureUniqueSlug, slugify } from '../src/lib/slug';
+import { ensureUniqueSlug } from '../src/lib/slug';
 import { getMenuForApp } from '@skylabs-monorepo/shared-menu';
 import { normalizeIdentifier } from '../src/lib/normalizeIdentifier';
 import { CATEGORY_TAXONOMY } from './category-taxonomy';
@@ -368,7 +368,7 @@ async function seedCategoryTaxonomy(): Promise<Map<string, string>> {
       });
       categoryIdBySlug.set(sub.slug, subRow.id);
 
-      for (const [leafIdx, leaf] of sub.children.entries()) {
+      for (const [leafIdx, leaf] of (sub.children ?? []).entries()) {
         const leafRow = await prisma.category.upsert({
           where: { slug: leaf.slug },
           update: { isActive: true },
@@ -440,216 +440,154 @@ async function backfillBranchOpeningHours(): Promise<number> {
 // layers demo rows on top of whatever's already there.
 
 interface ProductSeed {
-  name: string;
-  slug: string;
-  categorySlug: string;
-  subcategorySlug: string;
-  /** Which seeded vendor (see VENDOR_SEEDS' own `key`) owns this Product — Product is now
-   *  vendor-scoped (see Product's schema doc comment), never a shared global master. */
-  vendorKey: string;
-  brand: string;
-  description: string;
-  price: number;
-  originalPrice: number;
+  name: string; slug: string; categorySlug: string; subcategorySlug: string;
+  vendorKey: string; branchKey: string; brand: string; description: string;
+  price: number; originalPrice: number;
 }
 
-/** Vendor-owned retail catalog (see Product's schema doc comment) — the storefront charges this
- *  Product's own `price` directly (Product is a fully independent, directly-purchasable catalog
- *  entity, never a Deal). Every entry's `categorySlug` is the single new PRODUCT-typed top-level
- *  ("product") — `subcategorySlug` goes all the way to the specific Type-tier row under it (e.g.
- *  "shampoo" under Product > Hair Care), matching the "categoryId is always top-level,
- *  subcategoryId is whichever deeper tier was actually chosen" rule the rest of the reset
- *  taxonomy follows (see `prisma/category-taxonomy.ts`). */
-const PRODUCT_IMAGE_QUERY_BY_SLUG: Record<string, string> = {
-  'hair-shampoo': 'hair,shampoo',
-  'hair-conditioner': 'hair,conditioner',
-  'hair-serum': 'hair,serum',
-  'face-wash': 'face,wash,skincare',
-  moisturizer: 'moisturizer,skincare',
-  'body-scrub': 'body,scrub,spa',
-  'massage-oil': 'massage,oil',
-  'spa-kit': 'spa,kit',
-  'essential-oil-blend': 'essential,oils,aromatherapy',
-  'daily-sunscreen': 'sunscreen,skincare',
-  'personal-care-kit': 'personal,care,kit',
+/**
+ * Static, title/category-matched images. These URLs are deliberately NOT random-image
+ * endpoints (no loremflickr/source.unsplash/randomuser/picsum). The same seed always
+ * produces the same visual for a given subcategory, so the storefront does not change
+ * images between page loads or seed runs.
+ */
+const STATIC_CATEGORY_IMAGES: Record<string,string> = {
+  'body-massage':'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=900&q=85',
+  'head-neck-massage':'https://images.unsplash.com/photo-1600334089648-b0d9d3028eb2?auto=format&fit=crop&w=900&q=85',
+  'foot-massage':'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=900&q=85',
+  'prenatal-massage':'https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&w=900&q=85',
+  'spa-treatments':'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=900&q=85',
+  'steam-sauna':'https://images.unsplash.com/photo-1556760544-74068565f05c?auto=format&fit=crop&w=900&q=85',
+  'retreats':'https://images.unsplash.com/photo-1540541338287-41700207dee6?auto=format&fit=crop&w=900&q=85',
+  'body-treatments':'https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&w=900&q=85',
+  'wellness':'https://images.unsplash.com/photo-1545389336-cf090694435e?auto=format&fit=crop&w=900&q=85',
+  'haircut-styling':'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=900&q=85',
+  'hair-treatments':'https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&w=900&q=85',
+  'hair-coloring':'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=900&q=85',
+  'hair-care':'https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=900&q=85',
+  'facial':'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=900&q=85',
+  'skin-treatments':'https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?auto=format&fit=crop&w=900&q=85',
+  'hair-removal':'https://images.unsplash.com/photo-1619451334792-150fd785ee74?auto=format&fit=crop&w=900&q=85',
+  'makeup-beauty-services':'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=900&q=85',
+  'manicure':'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=900&q=85',
+  'pedicure':'https://images.unsplash.com/photo-1519014816548-bf5fe059798b?auto=format&fit=crop&w=900&q=85',
+  'nail-extensions':'https://images.unsplash.com/photo-1610992015732-2449b76344bc?auto=format&fit=crop&w=900&q=85',
+  'nail-art':'https://images.unsplash.com/photo-1610992015762-45fca7f3e3b9?auto=format&fit=crop&w=900&q=85',
+  'eyelash-services':'https://images.unsplash.com/photo-1583001931096-959e9a1a6223?auto=format&fit=crop&w=900&q=85',
+  'eyebrow-services':'https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?auto=format&fit=crop&w=900&q=85',
+  'mental-wellness':'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=900&q=85',
+  'physical-therapy':'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=900&q=85',
+  'specialized-therapy':'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=900&q=85',
+  'couple-family-therapy':'https://images.unsplash.com/photo-1516307365426-bea591f05011?auto=format&fit=crop&w=900&q=85',
 };
 
-const DEAL_IMAGE_QUERY_BY_SLUG: Record<string, string> = {
-  'haircut-glow-golghar': 'haircut,salon',
-  'hair-spa-glow-taramandal': 'hair,spa,salon',
-  'facial-glow-golghar': 'facial,skincare,salon',
-  'swedish-massage-urban-civillines': 'swedish,massage,spa',
-  'deep-tissue-massage-urban-medicalroad': 'deep,tissue,massage,spa',
-  'full-body-spa-serenity-betiahata': 'full,body,spa',
-  'couple-spa-serenity-betiahata': 'couple,spa,wellness',
-  'personal-training-vitality-paadribazar': 'personal,training,fitness',
-  'yoga-session-vitality-paadribazar': 'yoga,fitness,wellness',
-};
-
-function stableImageLock(key: string): number {
-  let hash = 0;
-  for (const char of key) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return (hash % 9000) + 1;
-}
-
-function contextualImageUrl(query: string, key: string): string {
-  return `https://loremflickr.com/600/400/${query}?lock=${stableImageLock(key)}`;
-}
-
-function therapistImageQuery(specialization: string): string {
-  const value = specialization.toLowerCase();
-  if (value.includes('hair')) return 'hair,stylist,salon';
-  if (value.includes('skin') || value.includes('facial')) return 'facial,skincare,therapist';
-  if (value.includes('makeup')) return 'makeup,beauty,artist';
-  if (value.includes('massage') || value.includes('aromatherapy') || value.includes('spa')) return 'massage,therapist,spa';
-  if (value.includes('yoga')) return 'yoga,instructor,wellness';
-  if (value.includes('training')) return 'personal,trainer,fitness';
-  if (value.includes('cleaning') || value.includes('sanitization')) return 'cleaning,technician';
-  if (value.includes('repair') || value.includes('ac')) return 'technician,repair';
-  if (value.includes('wellness')) return 'wellness,therapist';
-  return 'professional,therapist,wellness';
+function staticCategoryImage(subcategorySlug:string):string {
+  return STATIC_CATEGORY_IMAGES[subcategorySlug] ?? 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=900&q=85';
 }
 
 const PRODUCT_SEEDS: ProductSeed[] = [
-  { name: 'Hair Shampoo', slug: 'hair-shampoo', categorySlug: 'product', subcategorySlug: 'hair-care', vendorKey: 'glow', brand: 'GlowCare', description: 'Sulphate-free shampoo for everyday use.', price: 499, originalPrice: 599 },
-  { name: 'Hair Conditioner', slug: 'hair-conditioner', categorySlug: 'product', subcategorySlug: 'hair-care', vendorKey: 'glow', brand: 'GlowCare', description: 'Deep-conditioning formula for smooth, frizz-free hair.', price: 449, originalPrice: 549 },
-  { name: 'Hair Serum', slug: 'hair-serum', categorySlug: 'product', subcategorySlug: 'hair-care', vendorKey: 'glow', brand: 'GlowCare', description: 'Lightweight serum for shine and split-end control.', price: 699, originalPrice: 799 },
-  { name: 'Face Wash', slug: 'face-wash', categorySlug: 'product', subcategorySlug: 'skincare', vendorKey: 'glow', brand: 'PureSkin', description: 'Gentle daily face wash for all skin types.', price: 299, originalPrice: 349 },
-  { name: 'Moisturizer', slug: 'moisturizer', categorySlug: 'product', subcategorySlug: 'skincare', vendorKey: 'glow', brand: 'PureSkin', description: 'Hydrating moisturizer for soft, supple skin.', price: 599, originalPrice: 699 },
-  { name: 'Body Scrub', slug: 'body-scrub', categorySlug: 'product', subcategorySlug: 'massage-spa-products', vendorKey: 'urban', brand: 'UrbanSpa', description: 'Exfoliating body scrub for smoother skin.', price: 399, originalPrice: 499 },
-  { name: 'Massage Oil', slug: 'massage-oil', categorySlug: 'product', subcategorySlug: 'massage-spa-products', vendorKey: 'urban', brand: 'UrbanSpa', description: 'Aromatic massage oil for relaxation.', price: 349, originalPrice: 429 },
-  { name: 'Spa Kit', slug: 'spa-kit', categorySlug: 'product', subcategorySlug: 'massage-spa-products', vendorKey: 'serenity', brand: 'SerenityHome', description: 'At-home spa essentials kit for a relaxing retreat.', price: 799, originalPrice: 999 },
-  { name: 'Essential Oil Blend', slug: 'essential-oil-blend', categorySlug: 'product', subcategorySlug: 'wellness-products', vendorKey: 'serenity', brand: 'SerenityHome', description: 'Calming essential oil blend for aromatherapy.', price: 599, originalPrice: 749 },
-  { name: 'Daily Sunscreen', slug: 'daily-sunscreen', categorySlug: 'product', subcategorySlug: 'skincare', vendorKey: 'vitality', brand: 'VitalityCare', description: 'Broad-spectrum daily sunscreen, SPF 50.', price: 399, originalPrice: 499 },
-  { name: 'Personal Care Kit', slug: 'personal-care-kit', categorySlug: 'product', subcategorySlug: 'beauty', vendorKey: 'vitality', brand: 'VitalityCare', description: 'Everyday personal care essentials kit.', price: 899, originalPrice: 1099 },
+  { name:'Hydrating Hair Shampoo', slug:'hydrating-hair-shampoo-elite-delhi-cp', categorySlug:'hair', subcategorySlug:'hair-care', vendorKey:'elite', branchKey:'elite-delhi-cp', brand:'GlowRoot', description:'Hydrating Hair Shampoo for professional and regular personal-care routines.', price:499, originalPrice:649 },
+  { name:'Vitamin C Glow Serum', slug:'vitamin-c-glow-serum-elite-delhi-cp', categorySlug:'skin-beauty', subcategorySlug:'skin-treatments', vendorKey:'elite', branchKey:'elite-delhi-cp', brand:'PureDerma', description:'Vitamin C Glow Serum for professional and regular personal-care routines.', price:899, originalPrice:1099 },
+  { name:'Professional Hair Repair Mask', slug:'professional-hair-repair-mask-elite-delhi-saket', categorySlug:'hair', subcategorySlug:'hair-treatments', vendorKey:'elite', branchKey:'elite-delhi-saket', brand:'GlowRoot', description:'Professional Hair Repair Mask for professional and regular personal-care routines.', price:699, originalPrice:849 },
+  { name:'Daily Facial Cleanser', slug:'daily-facial-cleanser-elite-delhi-saket', categorySlug:'skin-beauty', subcategorySlug:'facial', vendorKey:'elite', branchKey:'elite-delhi-saket', brand:'PureDerma', description:'Daily Facial Cleanser for professional and regular personal-care routines.', price:399, originalPrice:499 },
+  { name:'Body Polish Scrub', slug:'body-polish-scrub-elite-delhi-rohini', categorySlug:'spa-wellness', subcategorySlug:'body-treatments', vendorKey:'elite', branchKey:'elite-delhi-rohini', brand:'UrbanSpa', description:'Body Polish Scrub for professional and regular personal-care routines.', price:449, originalPrice:549 },
+  { name:'Professional Manicure Care Kit', slug:'professional-manicure-care-kit-elite-delhi-rohini', categorySlug:'nails-lashes', subcategorySlug:'manicure', vendorKey:'elite', branchKey:'elite-delhi-rohini', brand:'NailPro', description:'Professional Manicure Care Kit for professional and regular personal-care routines.', price:599, originalPrice:749 },
+  { name:'Salon Color Care Kit', slug:'salon-color-care-kit-elite-delhi-dwarka', categorySlug:'hair', subcategorySlug:'hair-coloring', vendorKey:'elite', branchKey:'elite-delhi-dwarka', brand:'ColorCare', description:'Salon Color Care Kit for professional and regular personal-care routines.', price:899, originalPrice:1099 },
+  { name:'Lash Conditioning Serum', slug:'lash-conditioning-serum-elite-delhi-dwarka', categorySlug:'nails-lashes', subcategorySlug:'eyelash-services', vendorKey:'elite', branchKey:'elite-delhi-dwarka', brand:'LashLuxe', description:'Lash Conditioning Serum for professional and regular personal-care routines.', price:799, originalPrice:999 },
+  { name:'Spa Recovery Kit', slug:'spa-recovery-kit-serenity-delhi', categorySlug:'spa-wellness', subcategorySlug:'spa-treatments', vendorKey:'serenity', branchKey:'serenity-delhi', brand:'SerenityHome', description:'Spa Recovery Kit for professional and regular personal-care routines.', price:999, originalPrice:1299 },
+  { name:'Aromatherapy Massage Oil', slug:'aromatherapy-massage-oil-serenity-delhi', categorySlug:'massage', subcategorySlug:'body-massage', vendorKey:'serenity', branchKey:'serenity-delhi', brand:'SerenityHome', description:'Aromatherapy Massage Oil for professional and regular personal-care routines.', price:599, originalPrice:749 },
+  { name:'Calming Wellness Essential Oil', slug:'calming-wellness-essential-oil-serenity-mumbai', categorySlug:'spa-wellness', subcategorySlug:'wellness', vendorKey:'serenity', branchKey:'serenity-mumbai', brand:'SerenityHome', description:'Calming Wellness Essential Oil for professional and regular personal-care routines.', price:649, originalPrice:799 },
+  { name:'Color Protection Hair Serum', slug:'color-protection-hair-serum-serenity-mumbai', categorySlug:'hair', subcategorySlug:'hair-care', vendorKey:'serenity', branchKey:'serenity-mumbai', brand:'ColorCare', description:'Color Protection Hair Serum for professional and regular personal-care routines.', price:749, originalPrice:899 },
+  { name:'Hydrating Hair Shampoo', slug:'hydrating-hair-shampoo-serenity-bangalore', categorySlug:'hair', subcategorySlug:'hair-care', vendorKey:'serenity', branchKey:'serenity-bangalore', brand:'SerenityCare', description:'Hydrating Hair Shampoo for professional and regular personal-care routines.', price:549, originalPrice:699 },
+  { name:'Vitamin C Skin Treatment Serum', slug:'vitamin-c-skin-treatment-serenity-bangalore', categorySlug:'skin-beauty', subcategorySlug:'skin-treatments', vendorKey:'serenity', branchKey:'serenity-bangalore', brand:'SerenityCare', description:'Vitamin C Skin Treatment Serum for professional and regular personal-care routines.', price:949, originalPrice:1199 },
+  { name:'Repair Hair Serum', slug:'repair-hair-serum-vitality-delhi-1', categorySlug:'hair', subcategorySlug:'hair-care', vendorKey:'vitality', branchKey:'vitality-delhi-1', brand:'VitalityCare', description:'Repair Hair Serum for professional and regular personal-care routines.', price:599, originalPrice:799 },
+  { name:'Daily Facial Cleanser', slug:'daily-facial-cleanser-vitality-delhi-1', categorySlug:'skin-beauty', subcategorySlug:'facial', vendorKey:'vitality', branchKey:'vitality-delhi-1', brand:'VitalityCare', description:'Daily Facial Cleanser for professional and regular personal-care routines.', price:699, originalPrice:899 },
+  { name:'Hair Treatment Repair Serum', slug:'hair-treatment-repair-serum-vitality-delhi-2', categorySlug:'hair', subcategorySlug:'hair-treatments', vendorKey:'vitality', branchKey:'vitality-delhi-2', brand:'VitalityCare', description:'Hair Treatment Repair Serum for professional and regular personal-care routines.', price:599, originalPrice:799 },
+  { name:'Skin Renewal Serum', slug:'skin-renewal-serum-vitality-delhi-2', categorySlug:'skin-beauty', subcategorySlug:'skin-treatments', vendorKey:'vitality', branchKey:'vitality-delhi-2', brand:'VitalityCare', description:'Skin Renewal Serum for professional and regular personal-care routines.', price:599, originalPrice:799 },
+  { name:'Hair Color Protection Kit', slug:'hair-color-protection-kit-vitality-delhi-3', categorySlug:'hair', subcategorySlug:'hair-coloring', vendorKey:'vitality', branchKey:'vitality-delhi-3', brand:'VitalityCare', description:'Hair Color Protection Kit for professional and regular personal-care routines.', price:699, originalPrice:899 },
+  { name:'Manicure Essentials Kit', slug:'manicure-essentials-kit-vitality-delhi-3', categorySlug:'nails-lashes', subcategorySlug:'manicure', vendorKey:'vitality', branchKey:'vitality-delhi-3', brand:'VitalityCare', description:'Manicure Essentials Kit for professional and regular personal-care routines.', price:699, originalPrice:899 },
+  { name:'Hair Removal Aftercare Lotion', slug:'hair-removal-aftercare-lotion-vitality-delhi-4', categorySlug:'skin-beauty', subcategorySlug:'hair-removal', vendorKey:'vitality', branchKey:'vitality-delhi-4', brand:'VitalityCare', description:'Hair Removal Aftercare Lotion for professional and regular personal-care routines.', price:699, originalPrice:899 },
+  { name:'Eyebrow Care Serum', slug:'eyebrow-care-serum-vitality-delhi-4', categorySlug:'nails-lashes', subcategorySlug:'eyebrow-services', vendorKey:'vitality', branchKey:'vitality-delhi-4', brand:'VitalityCare', description:'Eyebrow Care Serum for professional and regular personal-care routines.', price:599, originalPrice:799 },
+  { name:'Bridal Makeup Prep Kit', slug:'bridal-makeup-prep-kit-vitality-mumbai-1', categorySlug:'skin-beauty', subcategorySlug:'makeup-beauty-services', vendorKey:'vitality', branchKey:'vitality-mumbai-1', brand:'VitalityCare', description:'Bridal Makeup Prep Kit for professional and regular personal-care routines.', price:699, originalPrice:899 },
+  { name:'Spa Pedicure Care Kit', slug:'spa-pedicure-care-kit-vitality-mumbai-1', categorySlug:'nails-lashes', subcategorySlug:'pedicure', vendorKey:'vitality', branchKey:'vitality-mumbai-1', brand:'VitalityCare', description:'Spa Pedicure Care Kit for professional and regular personal-care routines.', price:699, originalPrice:899 },
+  { name:'Steam Sauna Wellness Kit', slug:'steam-sauna-wellness-kit-vitality-mumbai-2', categorySlug:'spa-wellness', subcategorySlug:'steam-sauna', vendorKey:'vitality', branchKey:'vitality-mumbai-2', brand:'VitalityCare', description:'Steam Sauna Wellness Kit for professional and regular personal-care routines.', price:699, originalPrice:899 },
+  { name:'Nail Extension Care Kit', slug:'nail-extension-care-kit-vitality-mumbai-2', categorySlug:'nails-lashes', subcategorySlug:'nail-extensions', vendorKey:'vitality', branchKey:'vitality-mumbai-2', brand:'VitalityCare', description:'Nail Extension Care Kit for professional and regular personal-care routines.', price:699, originalPrice:899 },
+  { name:'Weekend Wellness Retreat Kit', slug:'weekend-wellness-retreat-kit-vitality-mumbai-3', categorySlug:'spa-wellness', subcategorySlug:'retreats', vendorKey:'vitality', branchKey:'vitality-mumbai-3', brand:'VitalityCare', description:'Weekend Wellness Retreat Kit for professional and regular personal-care routines.', price:699, originalPrice:899 },
+  { name:'Body Treatment Exfoliating Butter', slug:'body-treatment-exfoliating-butter-vitality-mumbai-3', categorySlug:'spa-wellness', subcategorySlug:'body-treatments', vendorKey:'vitality', branchKey:'vitality-mumbai-3', brand:'VitalityCare', description:'Body Treatment Exfoliating Butter for professional and regular personal-care routines.', price:699, originalPrice:899 },
+  { name:'Eyelash Conditioning Serum', slug:'eyelash-conditioning-serum-vitality-mumbai-4', categorySlug:'nails-lashes', subcategorySlug:'eyelash-services', vendorKey:'vitality', branchKey:'vitality-mumbai-4', brand:'VitalityCare', description:'Eyelash Conditioning Serum for professional and regular personal-care routines.', price:599, originalPrice:799 },
+  { name:'Nail Art Precision Kit', slug:'nail-art-precision-kit-vitality-mumbai-4', categorySlug:'nails-lashes', subcategorySlug:'nail-art', vendorKey:'vitality', branchKey:'vitality-mumbai-4', brand:'VitalityCare', description:'Nail Art Precision Kit for professional and regular personal-care routines.', price:699, originalPrice:899 },
+  { name:'Wellness Aromatherapy Roll-On', slug:'wellness-aromatherapy-roll-on-vitality-mumbai-5', categorySlug:'spa-wellness', subcategorySlug:'wellness', vendorKey:'vitality', branchKey:'vitality-mumbai-5', brand:'VitalityCare', description:'Wellness Aromatherapy Roll-On for professional and regular personal-care routines.', price:699, originalPrice:899 },
+  { name:'Daily Hair Care Shampoo', slug:'daily-hair-care-shampoo-vitality-mumbai-5', categorySlug:'hair', subcategorySlug:'hair-care', vendorKey:'vitality', branchKey:'vitality-mumbai-5', brand:'VitalityCare', description:'Daily Hair Care Shampoo for professional and regular personal-care routines.', price:699, originalPrice:899 }
 ];
 
-async function seedProducts(categoryIdBySlug: Map<string, string>, vendorIdByKey: Map<string, string>): Promise<Map<string, string>> {
-  const productIdBySlug = new Map<string, string>();
+async function seedProducts(
+  categoryIdBySlug: Map<string,string>, vendorIdByKey: Map<string,string>,
+): Promise<Map<string,string>> {
+  const productIdBySlug = new Map<string,string>();
   for (const prod of PRODUCT_SEEDS) {
-    const discount = Math.round(((prod.originalPrice - prod.price) / prod.originalPrice) * 100);
-    const imageQuery = PRODUCT_IMAGE_QUERY_BY_SLUG[prod.slug] ?? 'beauty,wellness,product';
-    const image = contextualImageUrl(imageQuery, `product-${prod.slug}`);
-    const gallery = [contextualImageUrl(imageQuery, `product-${prod.slug}-gallery`)] as Prisma.InputJsonValue;
+    const discount = Math.round(((prod.originalPrice-prod.price)/prod.originalPrice)*100);
+    const image = staticCategoryImage(prod.subcategorySlug);
+    const gallery = [
+      staticCategoryImage(prod.subcategorySlug),
+      staticCategoryImage(prod.subcategorySlug),
+    ] as Prisma.InputJsonValue;
     const data = {
       vendorId: vendorIdByKey.get(prod.vendorKey)!,
-      name: prod.name,
-      brand: prod.brand,
+      name: prod.name, brand: prod.brand,
       categoryId: categoryIdBySlug.get(prod.categorySlug)!,
       subcategoryId: categoryIdBySlug.get(prod.subcategorySlug)!,
-      description: prod.description,
-      summary: prod.description,
-      benefits: [`Improves ${['massage-spa-products', 'wellness-products'].includes(prod.subcategorySlug) ? 'relaxation' : 'skin/hair health'}`] as Prisma.InputJsonValue,
-      howToUse: ['Apply as directed', 'Use regularly for best results'] as Prisma.InputJsonValue,
-      ingredients: 'See packaging for full ingredient list.',
-      returnPolicy: '7-day return if unopened.',
-      image,
-      gallery,
-      imageAlt: prod.name,
-      price: prod.price,
-      originalPrice: prod.originalPrice,
-      discount,
-      isActive: true,
+      description: prod.description, summary: prod.description,
+      benefits: ['Professional-quality care','Suitable for regular personal-care routines'] as Prisma.InputJsonValue,
+      howToUse: ['Use as directed on the product packaging','Store in a cool, dry place'] as Prisma.InputJsonValue,
+      ingredients: 'See product packaging for the complete ingredient list.',
+      returnPolicy: 'Return accepted within 7 days if unopened and unused.',
+      image, gallery, imageAlt: prod.name, price: prod.price, originalPrice: prod.originalPrice,
+      discount, isActive: true,
     };
-    // Find-or-create: product business fields remain admin-editable, but the demo image/media
-    // is intentionally refreshed on every seed run to match the product name.
-    const existing = await prisma.product.findUnique({ where: { slug: prod.slug } });
+    const existing = await prisma.product.findUnique({where:{slug:prod.slug}});
     const row = existing
-      ? await prisma.product.update({ where: { id: existing.id }, data: { categoryId: data.categoryId, subcategoryId: data.subcategoryId, image: data.image, gallery: data.gallery, imageAlt: data.imageAlt } })
-      : await prisma.product.create({ data: { ...data, slug: prod.slug } });
-    productIdBySlug.set(prod.slug, row.id);
+      ? await prisma.product.update({where:{id:existing.id},data:{vendorId:data.vendorId,categoryId:data.categoryId,subcategoryId:data.subcategoryId,image:data.image,gallery:data.gallery,imageAlt:data.imageAlt}})
+      : await prisma.product.create({data:{...data,slug:prod.slug}});
+    productIdBySlug.set(prod.slug,row.id);
   }
   return productIdBySlug;
 }
 
 interface VendorSeed {
-  key: string;
-  ownerName: string;
-  ownerPhone: string;
-  ownerEmail: string;
-  businessName: string;
-  businessType: string;
-  city: string;
-  state: string;
-  branches: { key: string; name: string; address: string; pincode: string; phone: string; email: string; latitude: number; longitude: number }[];
+  key:string; ownerName:string; ownerPhone:string; ownerEmail:string;
+  businessName:string; businessType:string; city:string; state:string;
+  branches:{key:string;name:string;address:string;city:string;state:string;pincode:string;phone:string;email:string;latitude:number;longitude:number}[];
 }
 
-/** Exactly 5 approved, active vendors (the maximum this dev dataset seeds) so the public
- *  catalogue has real sellers to browse across every top-level category —
- *  `status: 'ACTIVE'` + `kycStatus: 'VERIFIED'` are required for a vendor's deals to ever be
- *  publicly visible (see `VISIBLE_DEAL_WHERE` in catalog.service.ts). Each branch's
- *  `latitude`/`longitude` are real-world approximate coordinates for its actual named locality
- *  in Gorakhpur (Golghar, Taramandal, Civil Lines, etc.) — demo data, not random/fake points —
- *  so the Explore map view has real coordinates to plot. */
 const VENDOR_SEEDS: VendorSeed[] = [
-  {
-    key: 'glow',
-    ownerName: 'Priya Sharma',
-    ownerPhone: '+919810000001',
-    ownerEmail: 'priya.glowbeauty@seed.msd.local',
-    businessName: 'Glow Beauty Studio',
-    businessType: 'Beauty Salon',
-    city: 'Gorakhpur',
-    state: 'Uttar Pradesh',
-    branches: [
-      { key: 'glow-golghar', name: 'Golghar Branch', address: 'Golghar Main Road', pincode: '273001', phone: '+919810000011', email: 'golghar@glowbeauty.seed.msd.local', latitude: 26.7550, longitude: 83.3706 },
-      { key: 'glow-taramandal', name: 'Taramandal Branch', address: 'Taramandal Chowk', pincode: '273001', phone: '+919810000012', email: 'taramandal@glowbeauty.seed.msd.local', latitude: 26.7476, longitude: 83.3855 },
-    ],
-  },
-  {
-    key: 'urban',
-    ownerName: 'Rahul Verma',
-    ownerPhone: '+919810000002',
-    ownerEmail: 'rahul.urbanwellness@seed.msd.local',
-    businessName: 'Urban Wellness Spa',
-    businessType: 'Spa & Wellness',
-    city: 'Gorakhpur',
-    state: 'Uttar Pradesh',
-    branches: [
-      { key: 'urban-civillines', name: 'Civil Lines Branch', address: 'Civil Lines', pincode: '273001', phone: '+919810000021', email: 'civillines@urbanwellness.seed.msd.local', latitude: 26.7598, longitude: 83.3646 },
-      { key: 'urban-medicalroad', name: 'Medical College Road Branch', address: 'Medical College Road', pincode: '273013', phone: '+919810000022', email: 'medicalroad@urbanwellness.seed.msd.local', latitude: 26.7364, longitude: 83.3745 },
-    ],
-  },
-  {
-    key: 'elite',
-    ownerName: 'Ankit Singh',
-    ownerPhone: '+919810000003',
-    ownerEmail: 'ankit.elitehome@seed.msd.local',
-    businessName: 'Elite Home Services',
-    businessType: 'Home Services',
-    city: 'Gorakhpur',
-    state: 'Uttar Pradesh',
-    branches: [
-      { key: 'elite-rustampur', name: 'Rustampur Branch', address: 'Rustampur', pincode: '273001', phone: '+919810000031', email: 'rustampur@elitehome.seed.msd.local', latitude: 26.7429, longitude: 83.3947 },
-      { key: 'elite-mohaddipur', name: 'Mohaddipur Branch', address: 'Mohaddipur', pincode: '273010', phone: '+919810000032', email: 'mohaddipur@elitehome.seed.msd.local', latitude: 26.7213, longitude: 83.3961 },
-    ],
-  },
-  {
-    key: 'serenity',
-    ownerName: 'Kavita Nair',
-    ownerPhone: '+919810000004',
-    ownerEmail: 'kavita.serenityspa@seed.msd.local',
-    businessName: 'Serenity Spa & Retreat',
-    businessType: 'Spa & Retreats',
-    city: 'Gorakhpur',
-    state: 'Uttar Pradesh',
-    branches: [
-      { key: 'serenity-betiahata', name: 'Betiahata Branch', address: 'Betiahata', pincode: '273001', phone: '+919810000041', email: 'betiahata@serenityspa.seed.msd.local', latitude: 26.7508, longitude: 83.3897 },
-    ],
-  },
-  {
-    key: 'vitality',
-    ownerName: 'Arjun Malhotra',
-    ownerPhone: '+919810000005',
-    ownerEmail: 'arjun.vitalityfitness@seed.msd.local',
-    businessName: 'Vitality Fitness & Wellness',
-    businessType: 'Health & Wellness',
-    city: 'Gorakhpur',
-    state: 'Uttar Pradesh',
-    branches: [
-      { key: 'vitality-paadribazar', name: 'Paadri Bazar Branch', address: 'Paadri Bazar', pincode: '273001', phone: '+919810000051', email: 'paadribazar@vitalityfitness.seed.msd.local', latitude: 26.7554, longitude: 83.3781 },
-    ],
-  },
+  { key:'glow', ownerName:'Aarav Mehta', ownerPhone:'+919876501101', ownerEmail:'aarav.glownest@seed.msd.local', businessName:'GlowNest Wellness Studio', businessType:'Beauty & Wellness Studio', city:'New Delhi', state:'Delhi', branches:[
+    {key:'glow-delhi',name:'Connaught Place Branch',address:'Connaught Place, New Delhi',city:'New Delhi',state:'Delhi',pincode:'110001',phone:'+9198765010001',email:'glow-delhi@seed.msd.local',latitude:28.6315,longitude:77.2167},
+  ]},
+  { key:'urban', ownerName:'Ishita Kapoor', ownerPhone:'+919876501102', ownerEmail:'ishita.sereneaura@seed.msd.local', businessName:'SereneAura Spa & Wellness', businessType:'Spa & Wellness', city:'New Delhi', state:'Delhi', branches:[
+    {key:'urban-delhi',name:'Saket Branch',address:'Saket, New Delhi',city:'New Delhi',state:'Delhi',pincode:'110017',phone:'+9198765020001',email:'urban-delhi@seed.msd.local',latitude:28.5245,longitude:77.2066},
+  ]},
+  { key:'elite', ownerName:'Rohan Bhatia', ownerPhone:'+919876501103', ownerEmail:'rohan.urbanglow@seed.msd.local', businessName:'UrbanGlow Beauty & Care', businessType:'Beauty & Personal Care', city:'New Delhi', state:'Delhi', branches:[
+    {key:'elite-delhi-cp',name:'Connaught Place Branch',address:'Connaught Place, New Delhi',city:'New Delhi',state:'Delhi',pincode:'110001',phone:'+9198765030001',email:'elite-delhi-cp@seed.msd.local',latitude:28.6315,longitude:77.2167},
+    {key:'elite-delhi-saket',name:'Saket Branch',address:'Saket, New Delhi',city:'New Delhi',state:'Delhi',pincode:'110017',phone:'+9198765030002',email:'elite-delhi-saket@seed.msd.local',latitude:28.5245,longitude:77.2066},
+    {key:'elite-delhi-rohini',name:'Rohini Branch',address:'Rohini, New Delhi',city:'New Delhi',state:'Delhi',pincode:'110085',phone:'+9198765030003',email:'elite-delhi-rohini@seed.msd.local',latitude:28.7495,longitude:77.0565},
+    {key:'elite-delhi-dwarka',name:'Dwarka Branch',address:'Dwarka, New Delhi',city:'New Delhi',state:'Delhi',pincode:'110075',phone:'+9198765030004',email:'elite-delhi-dwarka@seed.msd.local',latitude:28.5921,longitude:77.046},
+  ]},
+  { key:'serenity', ownerName:'Kavya Nair', ownerPhone:'+919876501104', ownerEmail:'kavya.serenity@seed.msd.local', businessName:'Serenity Spa & Wellness', businessType:'Spa & Wellness', city:'New Delhi', state:'Delhi', branches:[
+    {key:'serenity-delhi',name:'Delhi Branch',address:'Vasant Kunj, New Delhi',city:'New Delhi',state:'Delhi',pincode:'110070',phone:'+9198765040001',email:'serenity-delhi@seed.msd.local',latitude:28.5421,longitude:77.155},
+    {key:'serenity-mumbai',name:'Mumbai Branch',address:'Bandra West, Mumbai',city:'Mumbai',state:'Maharashtra',pincode:'400050',phone:'+9198765040002',email:'serenity-mumbai@seed.msd.local',latitude:19.0607,longitude:72.8362},
+    {key:'serenity-bangalore',name:'Bangalore Branch',address:'Indiranagar, Bengaluru',city:'Bengaluru',state:'Karnataka',pincode:'560038',phone:'+9198765040003',email:'serenity-bangalore@seed.msd.local',latitude:12.9784,longitude:77.6408},
+  ]},
+  { key:'vitality', ownerName:'Arjun Malhotra', ownerPhone:'+919876501105', ownerEmail:'arjun.vitality@seed.msd.local', businessName:'Vitality Wellness & Beauty', businessType:'Wellness & Beauty Studio', city:'New Delhi', state:'Delhi', branches:[
+    {key:'vitality-delhi-1',name:'Lajpat Nagar Branch',address:'Lajpat Nagar, New Delhi',city:'New Delhi',state:'Delhi',pincode:'110024',phone:'+9198765050001',email:'vitality-delhi-1@seed.msd.local',latitude:28.5677,longitude:77.2433},
+    {key:'vitality-delhi-2',name:'Karol Bagh Branch',address:'Karol Bagh, New Delhi',city:'New Delhi',state:'Delhi',pincode:'110005',phone:'+9198765050002',email:'vitality-delhi-2@seed.msd.local',latitude:28.6514,longitude:77.1907},
+    {key:'vitality-delhi-3',name:'Greater Kailash Branch',address:'Greater Kailash, New Delhi',city:'New Delhi',state:'Delhi',pincode:'110048',phone:'+9198765050003',email:'vitality-delhi-3@seed.msd.local',latitude:28.5494,longitude:77.242},
+    {key:'vitality-delhi-4',name:'Janakpuri Branch',address:'Janakpuri, New Delhi',city:'New Delhi',state:'Delhi',pincode:'110058',phone:'+9198765050004',email:'vitality-delhi-4@seed.msd.local',latitude:28.6219,longitude:77.0878},
+    {key:'vitality-mumbai-1',name:'Andheri West Branch',address:'Andheri West, Mumbai',city:'Mumbai',state:'Maharashtra',pincode:'400058',phone:'+9198765050005',email:'vitality-mumbai-1@seed.msd.local',latitude:19.1364,longitude:72.8296},
+    {key:'vitality-mumbai-2',name:'Powai Branch',address:'Powai, Mumbai',city:'Mumbai',state:'Maharashtra',pincode:'400076',phone:'+9198765050006',email:'vitality-mumbai-2@seed.msd.local',latitude:19.1176,longitude:72.906},
+    {key:'vitality-mumbai-3',name:'Thane Branch',address:'Thane West, Mumbai',city:'Mumbai',state:'Maharashtra',pincode:'400601',phone:'+9198765050007',email:'vitality-mumbai-3@seed.msd.local',latitude:19.2183,longitude:72.9781},
+    {key:'vitality-mumbai-4',name:'Colaba Branch',address:'Colaba, Mumbai',city:'Mumbai',state:'Maharashtra',pincode:'400005',phone:'+9198765050008',email:'vitality-mumbai-4@seed.msd.local',latitude:18.9067,longitude:72.8147},
+    {key:'vitality-mumbai-5',name:'Lower Parel Branch',address:'Lower Parel, Mumbai',city:'Mumbai',state:'Maharashtra',pincode:'400013',phone:'+9198765050009',email:'vitality-mumbai-5@seed.msd.local',latitude:18.9988,longitude:72.8258},
+  ]},
 ];
 
 async function seedVendorsAndBranches(
@@ -692,7 +630,7 @@ async function seedVendorsAndBranches(
       gstNumber: `DEMOGST${v.key.toUpperCase()}0001`,
       panNumber: `DEMOPAN${v.key.toUpperCase()}`,
       businessRegistrationNumber: `DEMOREG${v.key.toUpperCase()}2024`,
-      logoUrl: `https://picsum.photos/seed/vendor-${v.key}/600/400`,
+      logoUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(v.businessName)}&size=600&background=0D8ABC&color=fff&bold=true`,
       kycStatus: 'VERIFIED' as const,
       status: 'ACTIVE' as const,
     };
@@ -711,8 +649,8 @@ async function seedVendorsAndBranches(
             vendorId: vendor.id,
             name: b.name,
             address: b.address,
-            city: v.city,
-            state: v.state,
+            city: b.city,
+            state: b.state,
             country: 'India',
             pincode: b.pincode,
             phone: b.phone,
@@ -736,30 +674,47 @@ async function seedVendorsAndBranches(
   return { vendorIdByKey, branchIdByKey };
 }
 
-interface ServiceDealSeed {
-  slug: string;
-  title: string;
-  categorySlug: string;
-  subcategorySlug: string;
-  vendorKey: string;
-  branchKey: string;
-  salePrice: number;
-  originalPrice: number;
-  durationMinutes: number;
-}
+interface ServiceDealSeed { slug:string; title:string; categorySlug:string; subcategorySlug:string; vendorKey:string; branchKey:string; salePrice:number; originalPrice:number; durationMinutes:number; }
 
-/** Bookable service offerings — no master Service row at all (see Deal's own schema doc
- *  comment); the Deal's own title/description/duration/packages ARE the offering. */
 const SERVICE_DEAL_SEEDS: ServiceDealSeed[] = [
-  { slug: 'haircut-glow-golghar', title: 'Haircut at Glow Beauty Studio — Golghar', categorySlug: 'hair', subcategorySlug: 'haircut-styling', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 299, originalPrice: 399, durationMinutes: 30 },
-  { slug: 'hair-spa-glow-taramandal', title: 'Hair Spa at Glow Beauty Studio — Taramandal', categorySlug: 'hair', subcategorySlug: 'hair-treatments', vendorKey: 'glow', branchKey: 'glow-taramandal', salePrice: 799, originalPrice: 999, durationMinutes: 60 },
-  { slug: 'facial-glow-golghar', title: 'Facial at Glow Beauty Studio — Golghar', categorySlug: 'skin-beauty', subcategorySlug: 'facial', vendorKey: 'glow', branchKey: 'glow-golghar', salePrice: 999, originalPrice: 1299, durationMinutes: 60 },
-  { slug: 'swedish-massage-urban-civillines', title: 'Swedish Massage at Urban Wellness Spa — Civil Lines', categorySlug: 'massage', subcategorySlug: 'body-massage', vendorKey: 'urban', branchKey: 'urban-civillines', salePrice: 1499, originalPrice: 1899, durationMinutes: 60 },
-  { slug: 'deep-tissue-massage-urban-medicalroad', title: 'Deep Tissue Massage at Urban Wellness Spa — Medical College Road', categorySlug: 'massage', subcategorySlug: 'body-massage', vendorKey: 'urban', branchKey: 'urban-medicalroad', salePrice: 1799, originalPrice: 2199, durationMinutes: 75 },
-  { slug: 'full-body-spa-serenity-betiahata', title: 'Full Body Spa at Serenity Spa & Retreat — Betiahata', categorySlug: 'spa-wellness', subcategorySlug: 'spa-treatments', vendorKey: 'serenity', branchKey: 'serenity-betiahata', salePrice: 1899, originalPrice: 2399, durationMinutes: 90 },
-  { slug: 'couple-spa-serenity-betiahata', title: 'Couple Spa at Serenity Spa & Retreat — Betiahata', categorySlug: 'spa-wellness', subcategorySlug: 'spa-treatments', vendorKey: 'serenity', branchKey: 'serenity-betiahata', salePrice: 3499, originalPrice: 4299, durationMinutes: 120 },
-  { slug: 'personal-training-vitality-paadribazar', title: 'Personal Training at Vitality Fitness & Wellness — Paadri Bazar', categorySlug: 'spa-wellness', subcategorySlug: 'wellness', vendorKey: 'vitality', branchKey: 'vitality-paadribazar', salePrice: 999, originalPrice: 1299, durationMinutes: 60 },
-  { slug: 'yoga-session-vitality-paadribazar', title: 'Yoga Session at Vitality Fitness & Wellness — Paadri Bazar', categorySlug: 'spa-wellness', subcategorySlug: 'wellness', vendorKey: 'vitality', branchKey: 'vitality-paadribazar', salePrice: 499, originalPrice: 649, durationMinutes: 60 },
+  {slug:'relaxation-body-massage-glow-delhi',title:'Relaxation Body Massage',categorySlug:'massage',subcategorySlug:'body-massage',vendorKey:'glow',branchKey:'glow-delhi',salePrice:1499,originalPrice:1999,durationMinutes:60},
+  {slug:'head-neck-relaxation-glow-delhi',title:'Head & Neck Relaxation Massage',categorySlug:'massage',subcategorySlug:'head-neck-massage',vendorKey:'glow',branchKey:'glow-delhi',salePrice:999,originalPrice:1299,durationMinutes:45},
+  {slug:'premium-glow-facial-glow-delhi',title:'Premium Glow Facial',categorySlug:'skin-beauty',subcategorySlug:'facial',vendorKey:'glow',branchKey:'glow-delhi',salePrice:1199,originalPrice:1599,durationMinutes:60},
+  {slug:'deep-tissue-recovery-urban-delhi',title:'Deep Tissue Recovery Massage',categorySlug:'massage',subcategorySlug:'body-massage',vendorKey:'urban',branchKey:'urban-delhi',salePrice:1799,originalPrice:2299,durationMinutes:75},
+  {slug:'foot-recovery-massage-urban-delhi',title:'Foot Recovery Massage',categorySlug:'massage',subcategorySlug:'foot-massage',vendorKey:'urban',branchKey:'urban-delhi',salePrice:999,originalPrice:1299,durationMinutes:45},
+  {slug:'prenatal-relaxation-massage-urban-delhi',title:'Prenatal Relaxation Massage',categorySlug:'massage',subcategorySlug:'prenatal-massage',vendorKey:'urban',branchKey:'urban-delhi',salePrice:1699,originalPrice:2199,durationMinutes:60},
+  {slug:'steam-sauna-wellness-elite-cp',title:'Steam & Sauna Session',categorySlug:'spa-wellness',subcategorySlug:'steam-sauna',vendorKey:'elite',branchKey:'elite-delhi-cp',salePrice:1299,originalPrice:1699,durationMinutes:60},
+  {slug:'wellness-retreat-planning-elite-cp',title:'Wellness Retreat Experience',categorySlug:'spa-wellness',subcategorySlug:'retreats',vendorKey:'elite',branchKey:'elite-delhi-cp',salePrice:2499,originalPrice:2999,durationMinutes:120},
+  {slug:'body-treatment-polish-elite-saket',title:'Body Treatment & Polish',categorySlug:'spa-wellness',subcategorySlug:'body-treatments',vendorKey:'elite',branchKey:'elite-delhi-saket',salePrice:1599,originalPrice:2099,durationMinutes:75},
+  {slug:'mindful-wellness-session-elite-saket',title:'Mindful Wellness Session',categorySlug:'spa-wellness',subcategorySlug:'wellness',vendorKey:'elite',branchKey:'elite-delhi-saket',salePrice:1199,originalPrice:1499,durationMinutes:60},
+  {slug:'signature-hair-styling-elite-rohini',title:'Signature Hair Styling',categorySlug:'hair',subcategorySlug:'haircut-styling',vendorKey:'elite',branchKey:'elite-delhi-rohini',salePrice:799,originalPrice:999,durationMinutes:45},
+  {slug:'repair-hair-treatment-elite-rohini',title:'Repair Hair Treatment',categorySlug:'hair',subcategorySlug:'hair-treatments',vendorKey:'elite',branchKey:'elite-delhi-rohini',salePrice:1399,originalPrice:1799,durationMinutes:75},
+  {slug:'premium-hair-color-elite-dwarka',title:'Premium Hair Coloring',categorySlug:'hair',subcategorySlug:'hair-coloring',vendorKey:'elite',branchKey:'elite-delhi-dwarka',salePrice:1899,originalPrice:2399,durationMinutes:90},
+  {slug:'scalp-hair-care-elite-dwarka',title:'Scalp & Hair Care Ritual',categorySlug:'hair',subcategorySlug:'hair-care',vendorKey:'elite',branchKey:'elite-delhi-dwarka',salePrice:1199,originalPrice:1499,durationMinutes:60},
+  {slug:'skin-renewal-serenity-delhi',title:'Skin Renewal Treatment',categorySlug:'skin-beauty',subcategorySlug:'skin-treatments',vendorKey:'serenity',branchKey:'serenity-delhi',salePrice:1499,originalPrice:1999,durationMinutes:60},
+  {slug:'gentle-hair-removal-serenity-delhi',title:'Gentle Hair Removal Service',categorySlug:'skin-beauty',subcategorySlug:'hair-removal',vendorKey:'serenity',branchKey:'serenity-delhi',salePrice:899,originalPrice:1199,durationMinutes:45},
+  {slug:'bridal-makeup-serenity-mumbai',title:'Bridal Makeup & Beauty Service',categorySlug:'skin-beauty',subcategorySlug:'makeup-beauty-services',vendorKey:'serenity',branchKey:'serenity-mumbai',salePrice:3999,originalPrice:4999,durationMinutes:150},
+  {slug:'classic-manicure-serenity-mumbai',title:'Classic Manicure',categorySlug:'nails-lashes',subcategorySlug:'manicure',vendorKey:'serenity',branchKey:'serenity-mumbai',salePrice:699,originalPrice:899,durationMinutes:45},
+  {slug:'spa-pedicure-serenity-bangalore',title:'Spa Pedicure',categorySlug:'nails-lashes',subcategorySlug:'pedicure',vendorKey:'serenity',branchKey:'serenity-bangalore',salePrice:799,originalPrice:999,durationMinutes:50},
+  {slug:'premium-nail-extension-serenity-bangalore',title:'Premium Nail Extensions',categorySlug:'nails-lashes',subcategorySlug:'nail-extensions',vendorKey:'serenity',branchKey:'serenity-bangalore',salePrice:1599,originalPrice:1999,durationMinutes:90},
+  {slug:'creative-nail-art-vitality-delhi-1',title:'Creative Nail Art',categorySlug:'nails-lashes',subcategorySlug:'nail-art',vendorKey:'vitality',branchKey:'vitality-delhi-1',salePrice:999,originalPrice:1299,durationMinutes:60},
+  {slug:'luxury-eyelash-service-vitality-delhi-1',title:'Luxury Eyelash Service',categorySlug:'nails-lashes',subcategorySlug:'eyelash-services',vendorKey:'vitality',branchKey:'vitality-delhi-1',salePrice:1299,originalPrice:1699,durationMinutes:60},
+  {slug:'precision-eyebrow-service-vitality-delhi-2',title:'Precision Eyebrow Service',categorySlug:'nails-lashes',subcategorySlug:'eyebrow-services',vendorKey:'vitality',branchKey:'vitality-delhi-2',salePrice:499,originalPrice:699,durationMinutes:30},
+  {slug:'mental-wellness-consultation-vitality-delhi-2',title:'Mental Wellness Consultation',categorySlug:'therapy',subcategorySlug:'mental-wellness',vendorKey:'vitality',branchKey:'vitality-delhi-2',salePrice:1499,originalPrice:1999,durationMinutes:60},
+  {slug:'physical-recovery-therapy-vitality-delhi-3',title:'Physical Recovery Therapy',categorySlug:'therapy',subcategorySlug:'physical-therapy',vendorKey:'vitality',branchKey:'vitality-delhi-3',salePrice:1799,originalPrice:2299,durationMinutes:60},
+  {slug:'specialized-wellness-therapy-vitality-delhi-3',title:'Specialized Wellness Therapy',categorySlug:'therapy',subcategorySlug:'specialized-therapy',vendorKey:'vitality',branchKey:'vitality-delhi-3',salePrice:1999,originalPrice:2499,durationMinutes:75},
+  {slug:'couple-family-counseling-vitality-delhi-4',title:'Couple & Family Counseling',categorySlug:'therapy',subcategorySlug:'couple-family-therapy',vendorKey:'vitality',branchKey:'vitality-delhi-4',salePrice:2199,originalPrice:2799,durationMinutes:75},
+  {slug:'classic-body-massage-vitality-delhi-4',title:'Classic Body Massage',categorySlug:'massage',subcategorySlug:'body-massage',vendorKey:'vitality',branchKey:'vitality-delhi-4',salePrice:1299,originalPrice:1699,durationMinutes:60},
+  {slug:'aromatherapy-spa-treatment-vitality-mumbai-1',title:'Aromatherapy Spa Treatment',categorySlug:'spa-wellness',subcategorySlug:'spa-treatments',vendorKey:'vitality',branchKey:'vitality-mumbai-1',salePrice:1899,originalPrice:2499,durationMinutes:90},
+  {slug:'skin-glow-facial-vitality-mumbai-1',title:'Skin Glow Facial',categorySlug:'skin-beauty',subcategorySlug:'facial',vendorKey:'vitality',branchKey:'vitality-mumbai-1',salePrice:1099,originalPrice:1499,durationMinutes:60},
+  {slug:'steam-sauna-recovery-vitality-mumbai-2',title:'Steam & Sauna Recovery',categorySlug:'spa-wellness',subcategorySlug:'steam-sauna',vendorKey:'vitality',branchKey:'vitality-mumbai-2',salePrice:1299,originalPrice:1699,durationMinutes:60},
+  {slug:'hair-repair-treatment-vitality-mumbai-2',title:'Professional Hair Repair Treatment',categorySlug:'hair',subcategorySlug:'hair-treatments',vendorKey:'vitality',branchKey:'vitality-mumbai-2',salePrice:1399,originalPrice:1799,durationMinutes:75},
+  {slug:'hair-removal-beauty-session-vitality-mumbai-3',title:'Hair Removal Beauty Session',categorySlug:'skin-beauty',subcategorySlug:'hair-removal',vendorKey:'vitality',branchKey:'vitality-mumbai-3',salePrice:899,originalPrice:1199,durationMinutes:45},
+  {slug:'professional-makeup-vitality-mumbai-3',title:'Professional Makeup Service',categorySlug:'skin-beauty',subcategorySlug:'makeup-beauty-services',vendorKey:'vitality',branchKey:'vitality-mumbai-3',salePrice:2499,originalPrice:3199,durationMinutes:90},
+  {slug:'premium-manicure-vitality-mumbai-4',title:'Premium Manicure',categorySlug:'nails-lashes',subcategorySlug:'manicure',vendorKey:'vitality',branchKey:'vitality-mumbai-4',salePrice:799,originalPrice:999,durationMinutes:45},
+  {slug:'relaxing-pedicure-vitality-mumbai-4',title:'Relaxing Pedicure',categorySlug:'nails-lashes',subcategorySlug:'pedicure',vendorKey:'vitality',branchKey:'vitality-mumbai-4',salePrice:899,originalPrice:1099,durationMinutes:50},
+  {slug:'advanced-nail-extension-vitality-mumbai-5',title:'Advanced Nail Extensions',categorySlug:'nails-lashes',subcategorySlug:'nail-extensions',vendorKey:'vitality',branchKey:'vitality-mumbai-5',salePrice:1699,originalPrice:2199,durationMinutes:90},
+  {slug:'designer-nail-art-vitality-mumbai-5',title:'Designer Nail Art',categorySlug:'nails-lashes',subcategorySlug:'nail-art',vendorKey:'vitality',branchKey:'vitality-mumbai-5',salePrice:1099,originalPrice:1399,durationMinutes:60}
 ];
 
 async function seedDeals(
@@ -783,7 +738,7 @@ async function seedDeals(
       salePrice: d.salePrice,
       discountPercent,
       durationMinutes: d.durationMinutes,
-      images: [contextualImageUrl(DEAL_IMAGE_QUERY_BY_SLUG[d.slug] ?? 'spa,wellness,service', `deal-${d.slug}`)] as Prisma.InputJsonValue,
+      images: [staticCategoryImage(d.subcategorySlug)] as Prisma.InputJsonValue,
       maxBookings: 100,
       availableBookings: 100,
       status: 'ACTIVE' as const,
@@ -810,88 +765,60 @@ async function seedDeals(
  * demo of the Therapist.specializationCategoryId flow.
  */
 async function seedVendorModulesAndCategoryAccess(
-  vendorIdByKey: Map<string, string>,
-  categoryIdBySlug: Map<string, string>,
-): Promise<void> {
-  const grant = async (vendorKey: string, opts: { offersService?: boolean; offersProduct?: boolean; offersTherapy?: boolean }, categorySlugs: string[]) => {
-    const vendorId = vendorIdByKey.get(vendorKey);
-    if (!vendorId) return;
-    await prisma.vendor.update({
-      where: { id: vendorId },
-      data: {
-        offersService: opts.offersService ?? false,
-        offersProduct: opts.offersProduct ?? false,
-        offersTherapy: opts.offersTherapy ?? false,
-      },
-    });
-    for (const slug of categorySlugs) {
-      const categoryId = categoryIdBySlug.get(slug);
-      if (!categoryId) continue;
-      await prisma.vendorCategoryAccess.upsert({
-        where: { vendorId_categoryId: { vendorId, categoryId } },
-        update: {},
-        create: { vendorId, categoryId },
-      });
-    }
+  vendorIdByKey:Map<string,string>, categoryIdBySlug:Map<string,string>,
+):Promise<void>{
+  const grant=async(vendorKey:string,opts:{offersService?:boolean;offersProduct?:boolean;offersTherapy?:boolean},categorySlugs:string[])=>{
+    const vendorId=vendorIdByKey.get(vendorKey); if(!vendorId)return;
+    await prisma.vendor.update({where:{id:vendorId},data:{offersService:opts.offersService??false,offersProduct:opts.offersProduct??false,offersTherapy:opts.offersTherapy??false}});
+    for(const slug of categorySlugs){const categoryId=categoryIdBySlug.get(slug); if(!categoryId)continue; await prisma.vendorCategoryAccess.upsert({where:{vendorId_categoryId:{vendorId,categoryId}},update:{},create:{vendorId,categoryId}});}
   };
-
-  // Glow Beauty Studio: sells Hair, Skin & Beauty services, AND Product-typed items.
-  await grant('glow', { offersService: true, offersProduct: true }, ['hair', 'skin-beauty', 'product']);
-
-  // Urban Wellness Spa: sells Massage services, Product-typed items, plus demo Therapy access.
-  await grant('urban', { offersService: true, offersProduct: true, offersTherapy: true }, ['massage', 'product', 'therapy']);
-
-  // Elite Home Services remains as a seeded vendor record, but Home Services is no longer an
-  // active marketplace category, so it receives no category-access grant from this seed.
-
-  // Serenity Spa & Retreat: Spa & Wellness services, Product-typed items, plus Therapy access.
-  await grant('serenity', { offersService: true, offersProduct: true, offersTherapy: true }, ['spa-wellness', 'product', 'therapy']);
-
-  // Vitality Fitness & Wellness: now mapped to Spa & Wellness > Wellness services.
-  await grant('vitality', { offersService: true, offersProduct: true, offersTherapy: true }, ['spa-wellness', 'product', 'therapy']);
+  await grant('glow',{offersService:true},['massage','skin-beauty']);
+  await grant('urban',{offersService:true,offersTherapy:true},['massage','therapy']);
+  await grant('elite',{offersService:true,offersProduct:true,offersTherapy:true},['spa-wellness','hair','skin-beauty','nails-lashes','therapy']);
+  await grant('serenity',{offersService:true,offersProduct:true,offersTherapy:true},['skin-beauty','nails-lashes','spa-wellness','massage','hair','therapy']);
+  await grant('vitality',{offersService:true,offersProduct:true,offersTherapy:true},['massage','spa-wellness','hair','skin-beauty','nails-lashes','therapy']);
 }
 
 interface TherapistSeed {
-  branchKey: string;
-  name: string;
-  specialization: string;
-  /** Restricted-choice counterpart to the free-text `specialization` above — only set for the
-   *  handful of therapists whose specialization is genuinely a THERAPY-category concept (massage/
-   *  bodywork); every beauty-domain therapist (hairstylist, makeup artist, cleaning technician)
-   *  legitimately has none, per Therapist.specializationCategoryId's own schema doc comment. */
-  specializationCategorySlug?: string;
-  bio: string;
-  experienceYears: number;
+  branchKey:string; name:string; specialization:string; specializationCategorySlug?:string; bio:string; experienceYears:number;
 }
-
-/** 2 demo therapists per existing seeded branch. */
 const THERAPIST_SEEDS: TherapistSeed[] = [
-  { branchKey: 'glow-golghar', name: 'Anjali Mehta', specialization: 'Hair Styling', bio: 'Specialist in modern haircuts and styling, 6 years of salon experience.', experienceYears: 6 },
-  { branchKey: 'glow-golghar', name: 'Simran Kaur', specialization: 'Skincare & Facials', bio: 'Certified skincare therapist focused on facials and rejuvenation treatments.', experienceYears: 4 },
-  { branchKey: 'glow-taramandal', name: 'Neha Gupta', specialization: 'Hair Spa & Coloring', bio: 'Expert in hair spa treatments and coloring techniques.', experienceYears: 5 },
-  { branchKey: 'glow-taramandal', name: 'Pooja Yadav', specialization: 'Bridal Makeup', bio: 'Bridal and party makeup specialist with an eye for detail.', experienceYears: 7 },
-  // specializationCategorySlug values updated to the reset taxonomy's Therapy tree (see
-  // prisma/category-taxonomy.ts) — the old per-specialization THERAPY top-levels
-  // (stress-relief/deep-tissue/physiotherapy) no longer exist; 'physiotherapy' happens to survive
-  // unchanged as a Type-tier slug under Therapy > Physical Therapy, the others are remapped to
-  // the closest new Therapy-tree equivalent.
-  { branchKey: 'urban-civillines', name: 'Ramesh Kumar', specialization: 'Swedish Massage', bio: 'Trained massage therapist specializing in relaxation therapies.', experienceYears: 8, specializationCategorySlug: 'stress-therapy' },
-  { branchKey: 'urban-civillines', name: 'Suresh Chandra', specialization: 'Deep Tissue Massage', bio: 'Focuses on therapeutic deep-tissue massage for muscle tension relief.', experienceYears: 6, specializationCategorySlug: 'rehabilitation-therapy' },
-  { branchKey: 'urban-medicalroad', name: 'Vikram Singh', specialization: 'Aromatherapy', bio: 'Aromatherapy and full-body massage specialist.', experienceYears: 5, specializationCategorySlug: 'stress-therapy' },
-  { branchKey: 'urban-medicalroad', name: 'Deepak Joshi', specialization: 'Head & Shoulder Massage', bio: 'Specializes in head, neck, and shoulder massage therapy.', experienceYears: 3, specializationCategorySlug: 'physiotherapy' },
-  { branchKey: 'elite-rustampur', name: 'Manoj Tiwari', specialization: 'Home Deep Cleaning', bio: 'Experienced home cleaning technician with a strong attention to detail.', experienceYears: 4 },
-  { branchKey: 'elite-rustampur', name: 'Sanjay Pandey', specialization: 'Sanitization', bio: 'Focused on deep sanitization and hygiene-first cleaning.', experienceYears: 3 },
-  { branchKey: 'elite-mohaddipur', name: 'Ajay Rai', specialization: 'AC Repair', bio: 'Certified appliance technician specializing in AC repair and servicing.', experienceYears: 9 },
-  { branchKey: 'elite-mohaddipur', name: 'Vinod Shukla', specialization: 'Electrical Appliance Repair', bio: 'Skilled in diagnosing and repairing home electrical appliances.', experienceYears: 6 },
-  { branchKey: 'serenity-betiahata', name: 'Meera Joshi', specialization: 'Spa Therapy', bio: 'Spa therapist specializing in full-body relaxation treatments.', experienceYears: 7, specializationCategorySlug: 'stress-therapy' },
-  { branchKey: 'serenity-betiahata', name: 'Ritu Agarwal', specialization: 'Wellness Retreats', bio: 'Curates and delivers wellness retreat experiences for couples and groups.', experienceYears: 5, specializationCategorySlug: 'stress-therapy' },
-  { branchKey: 'vitality-paadribazar', name: 'Rohan Kapoor', specialization: 'Personal Training', bio: 'Certified personal trainer focused on strength and conditioning.', experienceYears: 6 },
-  { branchKey: 'vitality-paadribazar', name: 'Sneha Kapoor', specialization: 'Yoga Instruction', bio: 'Registered yoga instructor specializing in Hatha and Vinyasa styles.', experienceYears: 8 },
+  {branchKey:'urban-delhi',name:'Aditya Verma',specialization:'Physical Therapy Specialist',bio:'Aditya Verma is an experienced professional specializing in physical therapy specialist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:7,specializationCategorySlug:'physical-therapy'},
+  {branchKey:'urban-delhi',name:'Ananya Singh',specialization:'Mental Wellness Counselor',bio:'Ananya Singh is an experienced professional specializing in mental wellness counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:6,specializationCategorySlug:'mental-wellness'},
+  {branchKey:'elite-delhi-cp',name:'Meera Kapoor',specialization:'Specialized Wellness Therapist',bio:'Meera Kapoor is an experienced professional specializing in specialized wellness therapist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:8,specializationCategorySlug:'specialized-therapy'},
+  {branchKey:'elite-delhi-cp',name:'Arjun Rao',specialization:'Couple & Family Counselor',bio:'Arjun Rao is an experienced professional specializing in couple & family counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:7,specializationCategorySlug:'couple-family-therapy'},
+  {branchKey:'elite-delhi-saket',name:'Priya Gupta',specialization:'Physical Therapy Specialist',bio:'Priya Gupta is an experienced professional specializing in physical therapy specialist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:6,specializationCategorySlug:'physical-therapy'},
+  {branchKey:'elite-delhi-saket',name:'Rahul Nair',specialization:'Mental Wellness Counselor',bio:'Rahul Nair is an experienced professional specializing in mental wellness counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:5,specializationCategorySlug:'mental-wellness'},
+  {branchKey:'elite-delhi-rohini',name:'Nisha Malik',specialization:'Specialized Wellness Therapist',bio:'Nisha Malik is an experienced professional specializing in specialized wellness therapist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:7,specializationCategorySlug:'specialized-therapy'},
+  {branchKey:'elite-delhi-rohini',name:'Karan Verma',specialization:'Couple & Family Counselor',bio:'Karan Verma is an experienced professional specializing in couple & family counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:6,specializationCategorySlug:'couple-family-therapy'},
+  {branchKey:'elite-delhi-dwarka',name:'Meera Kapoor 2',specialization:'Physical Therapy Specialist',bio:'Meera Kapoor 2 is an experienced professional specializing in physical therapy specialist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:8,specializationCategorySlug:'physical-therapy'},
+  {branchKey:'elite-delhi-dwarka',name:'Arjun Rao 2',specialization:'Specialized Wellness Therapist',bio:'Arjun Rao 2 is an experienced professional specializing in specialized wellness therapist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:7,specializationCategorySlug:'specialized-therapy'},
+  {branchKey:'serenity-delhi',name:'Priya Gupta 2',specialization:'Mental Wellness Counselor',bio:'Priya Gupta 2 is an experienced professional specializing in mental wellness counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:6,specializationCategorySlug:'mental-wellness'},
+  {branchKey:'serenity-delhi',name:'Rahul Nair 2',specialization:'Physical Therapy Specialist',bio:'Rahul Nair 2 is an experienced professional specializing in physical therapy specialist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:8,specializationCategorySlug:'physical-therapy'},
+  {branchKey:'serenity-mumbai',name:'Nisha Malik 2',specialization:'Couple & Family Counselor',bio:'Nisha Malik 2 is an experienced professional specializing in couple & family counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:7,specializationCategorySlug:'couple-family-therapy'},
+  {branchKey:'serenity-mumbai',name:'Karan Verma 2',specialization:'Specialized Wellness Therapist',bio:'Karan Verma 2 is an experienced professional specializing in specialized wellness therapist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:6,specializationCategorySlug:'specialized-therapy'},
+  {branchKey:'serenity-bangalore',name:'Meera Kapoor 3',specialization:'Mental Wellness Counselor',bio:'Meera Kapoor 3 is an experienced professional specializing in mental wellness counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:7,specializationCategorySlug:'mental-wellness'},
+  {branchKey:'serenity-bangalore',name:'Arjun Rao 3',specialization:'Physical Therapy Specialist',bio:'Arjun Rao 3 is an experienced professional specializing in physical therapy specialist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:8,specializationCategorySlug:'physical-therapy'},
+  {branchKey:'vitality-delhi-1',name:'Priya Gupta 11',specialization:'Mental Wellness Counselor',bio:'Priya Gupta 11 is an experienced professional specializing in mental wellness counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:5,specializationCategorySlug:'mental-wellness'},
+  {branchKey:'vitality-delhi-1',name:'Rahul Nair 12',specialization:'Physical Therapy Specialist',bio:'Rahul Nair 12 is an experienced professional specializing in physical therapy specialist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:6,specializationCategorySlug:'physical-therapy'},
+  {branchKey:'vitality-delhi-2',name:'Nisha Malik 21',specialization:'Specialized Wellness Therapist',bio:'Nisha Malik 21 is an experienced professional specializing in specialized wellness therapist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:7,specializationCategorySlug:'specialized-therapy'},
+  {branchKey:'vitality-delhi-2',name:'Karan Verma 22',specialization:'Couple & Family Counselor',bio:'Karan Verma 22 is an experienced professional specializing in couple & family counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:8,specializationCategorySlug:'couple-family-therapy'},
+  {branchKey:'vitality-delhi-3',name:'Meera Kapoor 31',specialization:'Mental Wellness Counselor',bio:'Meera Kapoor 31 is an experienced professional specializing in mental wellness counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:9,specializationCategorySlug:'mental-wellness'},
+  {branchKey:'vitality-delhi-3',name:'Arjun Rao 32',specialization:'Physical Therapy Specialist',bio:'Arjun Rao 32 is an experienced professional specializing in physical therapy specialist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:5,specializationCategorySlug:'physical-therapy'},
+  {branchKey:'vitality-delhi-4',name:'Priya Gupta 41',specialization:'Specialized Wellness Therapist',bio:'Priya Gupta 41 is an experienced professional specializing in specialized wellness therapist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:6,specializationCategorySlug:'specialized-therapy'},
+  {branchKey:'vitality-delhi-4',name:'Rahul Nair 42',specialization:'Couple & Family Counselor',bio:'Rahul Nair 42 is an experienced professional specializing in couple & family counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:7,specializationCategorySlug:'couple-family-therapy'},
+  {branchKey:'vitality-mumbai-1',name:'Nisha Malik 51',specialization:'Mental Wellness Counselor',bio:'Nisha Malik 51 is an experienced professional specializing in mental wellness counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:8,specializationCategorySlug:'mental-wellness'},
+  {branchKey:'vitality-mumbai-1',name:'Karan Verma 52',specialization:'Physical Therapy Specialist',bio:'Karan Verma 52 is an experienced professional specializing in physical therapy specialist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:9,specializationCategorySlug:'physical-therapy'},
+  {branchKey:'vitality-mumbai-2',name:'Meera Kapoor 61',specialization:'Specialized Wellness Therapist',bio:'Meera Kapoor 61 is an experienced professional specializing in specialized wellness therapist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:5,specializationCategorySlug:'specialized-therapy'},
+  {branchKey:'vitality-mumbai-2',name:'Arjun Rao 62',specialization:'Couple & Family Counselor',bio:'Arjun Rao 62 is an experienced professional specializing in couple & family counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:6,specializationCategorySlug:'couple-family-therapy'},
+  {branchKey:'vitality-mumbai-3',name:'Priya Gupta 71',specialization:'Mental Wellness Counselor',bio:'Priya Gupta 71 is an experienced professional specializing in mental wellness counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:7,specializationCategorySlug:'mental-wellness'},
+  {branchKey:'vitality-mumbai-3',name:'Rahul Nair 72',specialization:'Physical Therapy Specialist',bio:'Rahul Nair 72 is an experienced professional specializing in physical therapy specialist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:8,specializationCategorySlug:'physical-therapy'},
+  {branchKey:'vitality-mumbai-4',name:'Nisha Malik 81',specialization:'Specialized Wellness Therapist',bio:'Nisha Malik 81 is an experienced professional specializing in specialized wellness therapist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:9,specializationCategorySlug:'specialized-therapy'},
+  {branchKey:'vitality-mumbai-4',name:'Karan Verma 82',specialization:'Couple & Family Counselor',bio:'Karan Verma 82 is an experienced professional specializing in couple & family counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:5,specializationCategorySlug:'couple-family-therapy'},
+  {branchKey:'vitality-mumbai-5',name:'Meera Kapoor 91',specialization:'Mental Wellness Counselor',bio:'Meera Kapoor 91 is an experienced professional specializing in mental wellness counselor, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:6,specializationCategorySlug:'mental-wellness'},
+  {branchKey:'vitality-mumbai-5',name:'Arjun Rao 92',specialization:'Physical Therapy Specialist',bio:'Arjun Rao 92 is an experienced professional specializing in physical therapy specialist, with a focus on customer comfort, hygiene, and personalized care.',experienceYears:7,specializationCategorySlug:'physical-therapy'}
 ];
 
-/** Therapist has no natural unique key besides `id` — idempotent via the same
- *  findFirst-then-create-if-missing guard already used for Branch/Order in this file, keyed on
- *  (branchId, personName). */
 async function seedTherapists(
   vendorIdByKey: Map<string, string>,
   branchIdByKey: Map<string, string>,
@@ -907,7 +834,7 @@ async function seedTherapists(
     const branchId = branchIdByKey.get(t.branchKey)!;
     const vendorId = vendorIdByKey.get(vendorKeyByBranchKey.get(t.branchKey)!)!;
 
-    const photoUrl = contextualImageUrl(therapistImageQuery(t.specialization), `therapist-${slugify(t.name)}`);
+    const photoUrl = staticCategoryImage(t.specializationCategorySlug ?? 'wellness');
     const existing = await prisma.therapist.findFirst({ where: { branchId, personName: t.name } });
     if (!existing) {
       await prisma.therapist.create({
@@ -1015,71 +942,35 @@ async function seedTherapistPackages(): Promise<number> {
  *  an explicit `findFirst` match on the exact line shape, same discipline as
  *  cart.service.ts#addItem (the compound unique index can't serve as an upsert key here since
  *  Postgres treats NULLs as pairwise-distinct). */
-async function seedCart(
-  customerId: string,
-  dealIdBySlug: Map<string, string>,
-  productIdBySlug: Map<string, string>,
-): Promise<void> {
-  const cart = await prisma.cart.upsert({
-    where: { customerId },
-    update: {},
-    create: { customerId },
-  });
-
-  const upsertLine = async (line: { dealId?: string; dealPackageId?: string; therapistId?: string; therapistPackageId?: string; productId?: string; quantity: number; unitPrice: number }) => {
-    const where = {
-      cartId: cart.id,
-      dealId: line.dealId ?? null,
-      dealPackageId: line.dealPackageId ?? null,
-      therapistId: line.therapistId ?? null,
-      therapistPackageId: line.therapistPackageId ?? null,
-      productId: line.productId ?? null,
-    };
-    const existing = await prisma.cartItem.findFirst({ where });
-    if (existing) {
-      await prisma.cartItem.update({ where: { id: existing.id }, data: { quantity: line.quantity, unitPrice: line.unitPrice } });
-    } else {
-      await prisma.cartItem.create({ data: { ...where, quantity: line.quantity, unitPrice: line.unitPrice } });
-    }
+async function seedCart(customerId:string,dealIdBySlug:Map<string,string>,productIdBySlug:Map<string,string>):Promise<void>{
+  const cart=await prisma.cart.upsert({where:{customerId},update:{},create:{customerId}});
+  const upsertLine=async(line:{dealId?:string;dealPackageId?:string;therapistId?:string;therapistPackageId?:string;productId?:string;quantity:number;unitPrice:number})=>{
+    const where={cartId:cart.id,dealId:line.dealId??null,dealPackageId:line.dealPackageId??null,therapistId:line.therapistId??null,therapistPackageId:line.therapistPackageId??null,productId:line.productId??null};
+    const existing=await prisma.cartItem.findFirst({where});
+    if(existing) await prisma.cartItem.update({where:{id:existing.id},data:{quantity:line.quantity,unitPrice:line.unitPrice}});
+    else await prisma.cartItem.create({data:{...where,quantity:line.quantity,unitPrice:line.unitPrice}});
   };
-
-  // Product lines — Product is a fully independent, directly-purchasable catalog entity (see
-  // its own schema doc comment), never a Deal wrapper.
-  const productLineSeeds = [
-    { productSlug: 'hair-shampoo', quantity: 2 },
-    { productSlug: 'face-wash', quantity: 1 },
-    { productSlug: 'massage-oil', quantity: 1 },
-  ];
-  for (const item of productLineSeeds) {
-    const productId = productIdBySlug.get(item.productSlug)!;
-    const product = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
-    await upsertLine({ productId, quantity: item.quantity, unitPrice: product.price.toNumber() });
+  for(const item of [
+    {productSlug:'hydrating-hair-shampoo-elite-delhi-cp',quantity:2},
+    {productSlug:'vitamin-c-glow-serum-elite-delhi-cp',quantity:1},
+    {productSlug:'spa-recovery-kit-serenity-delhi',quantity:1},
+  ]){
+    const productId=productIdBySlug.get(item.productSlug)!;
+    const product=await prisma.product.findUniqueOrThrow({where:{id:productId}});
+    await upsertLine({productId,quantity:item.quantity,unitPrice:product.price.toNumber()});
   }
-
-  // Service-Deal line — Swedish Massage, 60-minute package.
-  const massageDealId = dealIdBySlug.get('swedish-massage-urban-civillines')!;
-  const massagePackage = await prisma.dealPackage.findFirstOrThrow({ where: { dealId: massageDealId, durationMinutes: 60 } });
-  await upsertLine({ dealId: massageDealId, dealPackageId: massagePackage.id, quantity: 1, unitPrice: massagePackage.sellingPrice.toNumber() });
-
-  // Therapist line — Ramesh Kumar, 30-minute package.
-  const ramesh = await prisma.therapist.findFirstOrThrow({ where: { personName: 'Ramesh Kumar' } });
-  const rameshPackage = await prisma.therapistPackage.findFirstOrThrow({ where: { therapistId: ramesh.id, durationMinutes: 30 } });
-  await upsertLine({ therapistId: ramesh.id, therapistPackageId: rameshPackage.id, quantity: 1, unitPrice: rameshPackage.sellingPrice.toNumber() });
+  const massageDealId=dealIdBySlug.get('deep-tissue-recovery-urban-delhi')!;
+  const massagePackage=await prisma.dealPackage.findFirstOrThrow({where:{dealId:massageDealId,durationMinutes:60}});
+  await upsertLine({dealId:massageDealId,dealPackageId:massagePackage.id,quantity:1,unitPrice:massagePackage.sellingPrice.toNumber()});
+  const therapist=await prisma.therapist.findFirstOrThrow({where:{personName:'Aditya Verma'}});
+  const therapistPackage=await prisma.therapistPackage.findFirstOrThrow({where:{therapistId:therapist.id,durationMinutes:30}});
+  await upsertLine({therapistId:therapist.id,therapistPackageId:therapistPackage.id,quantity:1,unitPrice:therapistPackage.sellingPrice.toNumber()});
 }
 
-/** 2 demo wishlist items — service deals only (WishlistItem only supports a Deal, see its own
- *  schema doc comment; Product cannot be wishlisted). Idempotent via WishlistItem's real
- *  `@@unique([customerId, dealId])` constraint (upsert-by-compound-key, same pattern as
- *  `seedCart`'s CartItem upsert). */
-async function seedWishlist(customerId: string, dealIdBySlug: Map<string, string>): Promise<void> {
-  const wishlistSlugs = ['facial-glow-golghar', 'hair-spa-glow-taramandal'];
-  for (const slug of wishlistSlugs) {
-    const dealId = dealIdBySlug.get(slug)!;
-    await prisma.wishlistItem.upsert({
-      where: { customerId_dealId: { customerId, dealId } },
-      update: {},
-      create: { customerId, dealId },
-    });
+async function seedWishlist(customerId:string,dealIdBySlug:Map<string,string>):Promise<void>{
+  for(const slug of ['premium-glow-facial-glow-delhi','head-neck-relaxation-urban-delhi']){
+    const dealId=dealIdBySlug.get(slug)!;
+    await prisma.wishlistItem.upsert({where:{customerId_dealId:{customerId,dealId}},update:{},create:{customerId,dealId}});
   }
 }
 
@@ -1270,198 +1161,91 @@ async function seedPayment(orderId: string, status: 'CREATED' | 'PAID', amount: 
  * disambiguate by, see `seedProductOrder`'s doc comment) combo — see `seedOrder`'s doc comment.
  */
 async function seedDemoCustomerActivity(
-  customerId: string,
-  dealIdBySlug: Map<string, string>,
-  productIdBySlug: Map<string, string>,
-  vendorIdByKey: Map<string, string>,
-  branchIdByKey: Map<string, string>,
-): Promise<void> {
-  await seedCart(customerId, dealIdBySlug, productIdBySlug);
-  await seedWishlist(customerId, dealIdBySlug);
+  customerId:string,dealIdBySlug:Map<string,string>,productIdBySlug:Map<string,string>,
+  vendorIdByKey:Map<string,string>,branchIdByKey:Map<string,string>,
+):Promise<void>{
+  await seedCart(customerId,dealIdBySlug,productIdBySlug);
+  await seedWishlist(customerId,dealIdBySlug);
 
-  const glowGolgharId = vendorIdByKey.get('glow')!;
-  const glowGolgharBranchId = branchIdByKey.get('glow-golghar')!;
+  const urbanId=vendorIdByKey.get('urban')!;
+  const urbanBranchId=branchIdByKey.get('urban-delhi')!;
+  const aditya=await prisma.therapist.findFirstOrThrow({where:{personName:'Aditya Verma'}});
+  const adityaPackage=await prisma.therapistPackage.findFirstOrThrow({where:{therapistId:aditya.id,durationMinutes:60}});
+  const massageDealId=dealIdBySlug.get('deep-tissue-recovery-urban-delhi')!;
+  const massagePackage=await prisma.dealPackage.findFirstOrThrow({where:{dealId:massageDealId,durationMinutes:90}});
+  const productId=productIdBySlug.get('hydrating-hair-shampoo-elite-delhi-cp')!;
+  const product=await prisma.product.findUniqueOrThrow({where:{id:productId}});
 
-  // 1) MIXED order — COMPLETED (Glow Beauty Studio, Golghar Branch): Deal + Product + Therapist.
-  const haircutDealId = dealIdBySlug.get('haircut-glow-golghar')!;
-  const haircutPackage = await prisma.dealPackage.findFirstOrThrow({ where: { dealId: haircutDealId, durationMinutes: 30 } });
-  const shampooProductId = productIdBySlug.get('hair-shampoo')!;
-  const shampooProduct = await prisma.product.findUniqueOrThrow({ where: { id: shampooProductId } });
-  const anjali = await prisma.therapist.findFirstOrThrow({ where: { personName: 'Anjali Mehta' } });
-  const anjaliPackage = await prisma.therapistPackage.findFirstOrThrow({ where: { therapistId: anjali.id, durationMinutes: 60 } });
-  const mixedOrderId = await seedOrder(
-    customerId,
-    glowGolgharId,
-    glowGolgharBranchId,
-    'Glow Beauty Studio',
-    'Golghar Branch',
-    'COMPLETED',
-    [
-      {
-        dealId: haircutDealId,
-        dealPackageId: haircutPackage.id,
-        itemName: 'Haircut at Glow Beauty Studio — Golghar',
-        itemType: 'SERVICE',
-        unitPrice: haircutPackage.sellingPrice.toNumber(),
-        quantity: 1,
-        durationMinutes: haircutPackage.durationMinutes,
-        vendorId: glowGolgharId,
-        branchId: glowGolgharBranchId,
-        vendorNameSnapshot: 'Glow Beauty Studio',
-        branchNameSnapshot: 'Golghar Branch',
-      },
-      {
-        productId: shampooProductId,
-        itemName: 'Hair Shampoo',
-        itemType: 'PRODUCT',
-        unitPrice: shampooProduct.price.toNumber(),
-        quantity: 1,
-        vendorId: glowGolgharId,
-        vendorNameSnapshot: 'Glow Beauty Studio',
-      },
-      {
-        therapistId: anjali.id,
-        therapistPackageId: anjaliPackage.id,
-        itemName: `${anjali.therapistType} — ${anjali.personName}`,
-        itemType: 'SERVICE',
-        unitPrice: anjaliPackage.sellingPrice.toNumber(),
-        quantity: 1,
-        durationMinutes: anjaliPackage.durationMinutes,
-        vendorId: glowGolgharId,
-        branchId: glowGolgharBranchId,
-        vendorNameSnapshot: 'Glow Beauty Studio',
-        branchNameSnapshot: 'Golghar Branch',
-      },
-    ],
-  );
-  const mixedOrder = await prisma.order.findUniqueOrThrow({ where: { id: mixedOrderId } });
-  await seedPayment(mixedOrder.id, 'PAID', mixedOrder.total.toNumber());
+  const mixedOrderId=await seedOrder(customerId,urbanId,urbanBranchId,'SereneAura Spa & Wellness','Saket Branch','COMPLETED',[
+    {dealId:massageDealId,dealPackageId:massagePackage.id,itemName:'Deep Tissue Recovery Massage',itemType:'SERVICE',unitPrice:massagePackage.sellingPrice.toNumber(),quantity:1,durationMinutes:massagePackage.durationMinutes,vendorId:urbanId,branchId:urbanBranchId,vendorNameSnapshot:'SereneAura Spa & Wellness',branchNameSnapshot:'Saket Branch'},
+    {therapistId:aditya.id,therapistPackageId:adityaPackage.id,itemName:`${aditya.specialization} — ${aditya.personName}`,itemType:'SERVICE',unitPrice:adityaPackage.sellingPrice.toNumber(),quantity:1,durationMinutes:adityaPackage.durationMinutes,vendorId:urbanId,branchId:urbanBranchId,vendorNameSnapshot:'SereneAura Spa & Wellness',branchNameSnapshot:'Saket Branch'},
+    {productId,itemName:product.name,itemType:'PRODUCT',unitPrice:product.price.toNumber(),quantity:1,vendorId:vendorIdByKey.get('elite')!,vendorNameSnapshot:'UrbanGlow Beauty & Care'},
+  ]);
+  const mixedOrder=await prisma.order.findUniqueOrThrow({where:{id:mixedOrderId}});
+  await seedPayment(mixedOrder.id,'PAID',mixedOrder.total.toNumber());
 
-  // 2) THERAPIST order — CONFIRMED (Urban Wellness Spa, Civil Lines Branch): Ramesh Kumar.
-  const urbanCivilLinesId = vendorIdByKey.get('urban')!;
-  const urbanCivilLinesBranchId = branchIdByKey.get('urban-civillines')!;
-  const ramesh = await prisma.therapist.findFirstOrThrow({ where: { personName: 'Ramesh Kumar' } });
-  const rameshPackage = await prisma.therapistPackage.findFirstOrThrow({ where: { therapistId: ramesh.id, durationMinutes: 60 } });
-  const therapistOrderId = await seedOrder(
-    customerId,
-    urbanCivilLinesId,
-    urbanCivilLinesBranchId,
-    'Urban Wellness Spa',
-    'Civil Lines Branch',
-    'CONFIRMED',
-    [
-      {
-        therapistId: ramesh.id,
-        therapistPackageId: rameshPackage.id,
-        itemName: `${ramesh.therapistType} — ${ramesh.personName}`,
-        itemType: 'SERVICE',
-        unitPrice: rameshPackage.sellingPrice.toNumber(),
-        quantity: 1,
-        durationMinutes: rameshPackage.durationMinutes,
-        vendorId: urbanCivilLinesId,
-        branchId: urbanCivilLinesBranchId,
-        vendorNameSnapshot: 'Urban Wellness Spa',
-        branchNameSnapshot: 'Civil Lines Branch',
-      },
-    ],
-  );
-  const therapistOrder = await prisma.order.findUniqueOrThrow({ where: { id: therapistOrderId } });
-  await seedPayment(therapistOrder.id, 'PAID', therapistOrder.total.toNumber());
+  const therapistOrderId=await seedOrder(customerId,urbanId,urbanBranchId,'SereneAura Spa & Wellness','Saket Branch','CONFIRMED',[
+    {therapistId:aditya.id,therapistPackageId:adityaPackage.id,itemName:`${aditya.specialization} — ${aditya.personName}`,itemType:'SERVICE',unitPrice:adityaPackage.sellingPrice.toNumber(),quantity:1,durationMinutes:adityaPackage.durationMinutes,vendorId:urbanId,branchId:urbanBranchId,vendorNameSnapshot:'SereneAura Spa & Wellness',branchNameSnapshot:'Saket Branch'},
+  ]);
+  const therapistOrder=await prisma.order.findUniqueOrThrow({where:{id:therapistOrderId}});
+  await seedPayment(therapistOrder.id,'PAID',therapistOrder.total.toNumber());
 
-  // 3) DEAL order — CONFIRMED (Urban Wellness Spa, Medical College Road Branch): Deep Tissue Massage.
-  const urbanMedicalRoadId = vendorIdByKey.get('urban')!;
-  const urbanMedicalRoadBranchId = branchIdByKey.get('urban-medicalroad')!;
-  const massageDealId = dealIdBySlug.get('deep-tissue-massage-urban-medicalroad')!;
-  const massagePackage = await prisma.dealPackage.findFirstOrThrow({ where: { dealId: massageDealId, durationMinutes: 90 } });
-  const dealOrderId = await seedOrder(
-    customerId,
-    urbanMedicalRoadId,
-    urbanMedicalRoadBranchId,
-    'Urban Wellness Spa',
-    'Medical College Road Branch',
-    'CONFIRMED',
-    [
-      {
-        dealId: massageDealId,
-        dealPackageId: massagePackage.id,
-        itemName: 'Deep Tissue Massage at Urban Wellness Spa — Medical College Road',
-        itemType: 'SERVICE',
-        unitPrice: massagePackage.sellingPrice.toNumber(),
-        quantity: 1,
-        durationMinutes: massagePackage.durationMinutes,
-        vendorId: urbanMedicalRoadId,
-        branchId: urbanMedicalRoadBranchId,
-        vendorNameSnapshot: 'Urban Wellness Spa',
-        branchNameSnapshot: 'Medical College Road Branch',
-      },
-    ],
-  );
-  const dealOrder = await prisma.order.findUniqueOrThrow({ where: { id: dealOrderId } });
-  await seedPayment(dealOrder.id, 'PAID', dealOrder.total.toNumber());
+  const dealOrderId=await seedOrder(customerId,urbanId,urbanBranchId,'SereneAura Spa & Wellness','Saket Branch','PENDING_PAYMENT',[
+    {dealId:massageDealId,dealPackageId:massagePackage.id,itemName:'Deep Tissue Recovery Massage',itemType:'SERVICE',unitPrice:massagePackage.sellingPrice.toNumber(),quantity:1,durationMinutes:massagePackage.durationMinutes,vendorId:urbanId,branchId:urbanBranchId,vendorNameSnapshot:'SereneAura Spa & Wellness',branchNameSnapshot:'Saket Branch'},
+  ]);
+  const dealOrder=await prisma.order.findUniqueOrThrow({where:{id:dealOrderId}});
+  await seedPayment(dealOrder.id,'CREATED',dealOrder.total.toNumber());
 
-  // 4) PRODUCT order — CONFIRMED (Glow Beauty Studio), PAID.
-  const confirmedOrderId = await seedProductOrder(
-    customerId,
-    vendorIdByKey.get('glow')!,
-    'Glow Beauty Studio',
-    'CONFIRMED',
-    [
-      { productId: productIdBySlug.get('moisturizer')!, itemName: 'Moisturizer', unitPrice: 599, quantity: 1 },
-      { productId: productIdBySlug.get('hair-serum')!, itemName: 'Hair Serum', unitPrice: 699, quantity: 1 },
-    ],
-  );
-  const confirmedOrder = await prisma.order.findUniqueOrThrow({ where: { id: confirmedOrderId } });
-  await seedPayment(confirmedOrder.id, 'PAID', confirmedOrder.total.toNumber());
-
-  // 5) PRODUCT order — PENDING_PAYMENT (Urban Wellness Spa), unpaid.
-  const pendingOrderId = await seedProductOrder(
-    customerId,
-    vendorIdByKey.get('urban')!,
-    'Urban Wellness Spa',
-    'PENDING_PAYMENT',
-    [
-      { productId: productIdBySlug.get('massage-oil')!, itemName: 'Massage Oil', unitPrice: 349, quantity: 1 },
-      { productId: productIdBySlug.get('body-scrub')!, itemName: 'Body Scrub', unitPrice: 399, quantity: 1 },
-    ],
-  );
-  const pendingOrder = await prisma.order.findUniqueOrThrow({ where: { id: pendingOrderId } });
-  await seedPayment(pendingOrder.id, 'CREATED', pendingOrder.total.toNumber());
-
-  // 6) PRODUCT order — CANCELLED (Glow Beauty Studio), no payment.
-  await seedProductOrder(
-    customerId,
-    vendorIdByKey.get('glow')!,
-    'Glow Beauty Studio',
-    'CANCELLED',
-    [{ productId: productIdBySlug.get('hair-shampoo')!, itemName: 'Hair Shampoo', unitPrice: 499, quantity: 1 }],
-    'Customer changed their mind before payment.',
-  );
+  const productVendorId=vendorIdByKey.get('elite')!;
+  const confirmedProductId=await seedProductOrder(customerId,productVendorId,'UrbanGlow Beauty & Care','CONFIRMED',[
+    {productId,itemName:product.name,unitPrice:product.price.toNumber(),quantity:1},
+    {productId:productIdBySlug.get('vitamin-c-glow-serum-elite-delhi-cp')!,itemName:'Vitamin C Glow Serum - Connaught Place',unitPrice:899,quantity:1},
+  ]);
+  const confirmedProduct=await prisma.order.findUniqueOrThrow({where:{id:confirmedProductId}});
+  await seedPayment(confirmedProduct.id,'PAID',confirmedProduct.total.toNumber());
 }
 
 /** Marks the retired taxonomy rows inactive when they already exist in an older
  * database. The new CATEGORY_TAXONOMY no longer contains these rows, but seedCategoryTaxonomy()
  * intentionally never deletes admin-created/stale rows, so this explicit backfill prevents the
  * retired category from remaining visible after a rerun. */
-async function deactivateRemovedTaxonomyRows(): Promise<number> {
-  const result = await prisma.category.updateMany({
-    where: {
-      slug: {
-        in: [
-          'home-services',
-          'cleaning',
-          'appliance-repair',
-          'health-wellness',
-          'spa-retreats',
-          'hair-nails',
-        ],
-      },
-    },
-    data: { isActive: false },
-  });
+async function deactivateRemovedTaxonomyRows():Promise<number>{
+  const activeSlugs=new Set<string>();
+  for(const top of CATEGORY_TAXONOMY){activeSlugs.add(top.slug); for(const sub of top.children)activeSlugs.add(sub.slug);}
+  const existing=await prisma.category.findMany({select:{id:true,slug:true}});
+  const retiredIds=existing.filter((row)=>!activeSlugs.has(row.slug)).map((row)=>row.id);
+  if(!retiredIds.length)return 0;
+  const result=await prisma.category.updateMany({where:{id:{in:retiredIds}},data:{isActive:false}});
   return result.count;
 }
 
+function validateDemoSeedDataset():void{
+  if(VENDOR_SEEDS.length!==5)throw new Error('Seed validation failed: exactly 5 vendors are required.');
+  const branchCount=VENDOR_SEEDS.reduce((n,v)=>n+v.branches.length,0);
+  if(branchCount!==18)throw new Error(`Seed validation failed: expected 18 branches, got ${branchCount}.`);
+  if(SERVICE_DEAL_SEEDS.length!==38)throw new Error('Seed validation failed: exactly 38 deals are required.');
+  if(PRODUCT_SEEDS.length!==32)throw new Error('Seed validation failed: exactly 32 products are required.');
+  if(THERAPIST_SEEDS.length!==34)throw new Error('Seed validation failed: exactly 34 therapists are required.');
+  const taxonomySubcategories=CATEGORY_TAXONOMY.flatMap((top)=>top.children.map((sub)=>sub.slug));
+  const seeded=new Set<string>();
+  for(const x of SERVICE_DEAL_SEEDS)seeded.add(x.subcategorySlug);
+  for(const x of PRODUCT_SEEDS)seeded.add(x.subcategorySlug);
+  for(const x of THERAPIST_SEEDS)if(x.specializationCategorySlug)seeded.add(x.specializationCategorySlug);
+  const missing=taxonomySubcategories.filter((slug)=>!seeded.has(slug));
+  if(missing.length)throw new Error(`Seed validation failed: subcategories without data: ${missing.join(', ')}`);
+  const branchKeys=new Set(VENDOR_SEEDS.flatMap((v)=>v.branches.map((b)=>b.key)));
+  const count=(rows:any[])=>rows.reduce((m,row)=>(m.set(row.branchKey,(m.get(row.branchKey)??0)+1),m),new Map<string,number>());
+  const dc=count(SERVICE_DEAL_SEEDS),pc=count(PRODUCT_SEEDS),tc=count(THERAPIST_SEEDS);
+  for(const row of [...SERVICE_DEAL_SEEDS,...PRODUCT_SEEDS,...THERAPIST_SEEDS])if(!branchKeys.has(row.branchKey))throw new Error(`Seed validation failed: unknown branch ${row.branchKey}.`);
+  for(const v of VENDOR_SEEDS)for(const b of v.branches){const d=dc.get(b.key)??0,p=pc.get(b.key)??0,t=tc.get(b.key)??0;
+    if(v.key==='glow'&&d!==3)throw new Error('Vendor 1 must have exactly 3 deals.');
+    if(v.key==='urban'&&(d!==3||t!==2))throw new Error('Vendor 2 must have exactly 3 deals and 2 therapists.');
+    if(['elite','serenity','vitality'].includes(v.key)&&(d<2||p<2||t<2))throw new Error(`${v.key}/${b.key} must have at least 2 deals, 2 products and 2 therapists.`);
+  }
+}
+
 async function main() {
+  validateDemoSeedDataset();
   const roles = await seedRoles();
   const permissionIdByKey = await seedPermissions();
   await grantAllPermissionsToSuperAdmins(roles, permissionIdByKey);
