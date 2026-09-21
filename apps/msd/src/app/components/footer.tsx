@@ -4,7 +4,7 @@ import { OutlinedTextField, FilledButton, Icon, Divider, } from '@skylabs-monore
 import { inputValue } from '../../utils/format';
 import content from '../../content.json';
 import './footer.css';
-import logo from "../../assets/logo5.jpeg";
+import logo from "../../assets/MSDlogo.jpeg";
 import logo2 from "../../assets/logo2.jpg";
 import { listCatalogCategories, listCatalogSocialLinks, type CatalogCategoryWithChildren, type CatalogSocialMediaLink, } from '../../api/catalog';
 import { ApiRequestError } from '../../api/rbac/client';

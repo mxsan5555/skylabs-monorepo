@@ -658,7 +658,7 @@
 
 .admin-nav-group__children {
   margin-left: 20px;
-  padding-left: 0;
+  padding-left: 10px;
   border-left: 1px solid var(--md-sys-color-outline-variant);
 }
 
