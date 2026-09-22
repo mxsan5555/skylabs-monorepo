@@ -247,7 +247,7 @@ This project ships with a set of project-scoped agents, skills, and commands und
 | `skylabs-ravi` | Any React 19 or Angular 21 UI task — pages, components, routing, guards |
 | `skylabs-neha` | Design spec before building any new screen or component (60/30/10, M3 tokens, accessibility) |
 | `skylabs-dev` | Test cases (before coding), Vitest unit tests, Angular unit tests, Playwright e2e |
-| `skylabs-vivek` | SEO meta + JSON-LD + GA4 events before any public page ships; social media copy |
+| `skylabs-udaya` | SEO meta + JSON-LD + GA4 events before any public page ships; social media copy |
 | `skylabs-reena` | Any copywriting, `content.json` updates, blog articles, marketing text |
 
 ### Commands (invoke as slash commands)

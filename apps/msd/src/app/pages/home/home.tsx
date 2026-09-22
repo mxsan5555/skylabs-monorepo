@@ -128,6 +128,16 @@ function SectionHeader({ id, heading, seeAll, seeAllTo, }: {
     </div>
   );
 }
+const CATEGORY_ICONS: Record<string, string> = {
+  'massage':        'self_improvement',
+  'spa-retreats':   'hot_tub',
+  'skin-beauty':    'face_retouching_natural',
+  'hair-nails':     'content_cut',
+  'health-wellness':'favorite',
+  'therapy':        'healing',
+  'product':        'shopping_bag',
+};
+
 export function Home() {
   const vacationSwiperRef = useRef<any>(null);
   const navigate = useNavigate();
@@ -595,19 +605,16 @@ export function Home() {
                 key={cat.id}
                 to={`/category/${cat.slug}`}
                 className="category-card"
+                aria-label={`${cat.name} — ${categoryDealCount(cat.id)} services`}
               >
                 <div className="category-card__icon-wrap">
                   <Icon className="category-card__icon" aria-hidden="true">
-                    category
+                    {CATEGORY_ICONS[cat.slug] ?? 'spa'}
                   </Icon>
                 </div>
-
                 <div className="category-card__content">
                   <h3>{cat.name}</h3>
                   <p>{categoryDealCount(cat.id)} {home.ui.labels.services}</p>
-                </div>
-                <div className="category-card__arrow">
-                  <Icon>arrow_forward</Icon>
                 </div>
               </NavLink>
             ))}

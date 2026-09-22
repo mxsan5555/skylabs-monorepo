@@ -230,7 +230,7 @@ Project-scoped agents, skills, and commands live here. Claude Code loads them au
 │   ├── skylabs-ravi.md          ← Frontend (React 19 + Angular 21)
 │   ├── skylabs-neha.md          ← UI/UX design (60/30/10 + M3)
 │   ├── skylabs-dev.md           ← QA (Vitest + Playwright + Angular tests)
-│   ├── skylabs-vivek.md         ← SEO + GA4 + social media
+│   ├── skylabs-udaya.md         ← SEO + GA4 + social media
 │   └── skylabs-reena.md         ← Content management
 ├── skills/                      ← Reference docs agents load on demand
 │   ├── msd-stack.md             ← React 19 + Vite patterns, auth, routing

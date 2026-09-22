@@ -595,9 +595,9 @@ main {
   align-items: center;
   gap: 16px;
   height: 100%;
-  max-width: 1440px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 0 32px;
+  padding: 0 20px;
 }
 
 /* Hamburger — hidden on desktop */
@@ -696,19 +696,15 @@ main {
   background: var(--hv3-bg);
   border-top: 1px solid #ebebeb;
   border-bottom: 1px solid #ebebeb;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
-
-.hv3-cat::-webkit-scrollbar { display: none; }
 
 .hv3-cat__inner {
   display: flex;
   align-items: stretch;
   height: 100%;
-  max-width: 1440px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 20px;
   gap: 0;
 }
 

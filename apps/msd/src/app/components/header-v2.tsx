@@ -103,6 +103,16 @@ const NAV_MENUS: NavMenu[] = [
       { title: 'Yoga & Meditation', subtitle: 'Mind-body balance', href: '/category/therapy?sub=yoga' },
     ],
   },
+  {
+    label: 'Products',
+    items: [
+      { title: 'Skincare', subtitle: 'Face wash, serums, moisturisers', href: '/category/product?sub=skincare' },
+      { title: 'Hair Care', subtitle: 'Shampoo, oils & treatments', href: '/category/product?sub=hair-care' },
+      { title: 'Massage & Spa Products', subtitle: 'Oils, scrubs & spa kits', href: '/category/product?sub=massage-spa-products' },
+      { title: 'Wellness Products', subtitle: 'Essential oils & self-care kits', href: '/category/product?sub=wellness-products' },
+      { title: 'Beauty', subtitle: 'Makeup & beauty tools', href: '/category/product?sub=beauty' },
+    ],
+  },
 ];
 
 function DropdownMenu({ menu, onClose }: { menu: NavMenu; onClose: () => void }) {
