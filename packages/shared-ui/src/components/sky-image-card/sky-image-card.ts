@@ -1,5 +1,5 @@
 import { LitElement, html, css, nothing } from 'lit';
-import { hostBase, stretchLink } from '../shared-styles.js';
+import { alignment, coverImage, hostBase, stretchLink, typescale } from '../shared-styles.js';
 
 /**
  * <sky-image-card> — full-bleed image with a bottom overlay label.
@@ -40,61 +40,44 @@ export class SkyImageCard extends LitElement {
 
   static override styles = css`
     ${hostBase}
+    ${alignment}
+    ${typescale}
+    ${coverImage}
+    ${stretchLink}
     .card {
-      position: relative;
-      margin: 0;
-      display: block;
-      overflow: hidden;
-      border-radius: var(--md-sys-shape-corner-large, 16px);
-      aspect-ratio: var(--_ratio, 3 / 4);
-      background-color: var(--md-sys-color-surface-variant);
+      border-radius: var(--md-sys-shape-corner-large);
+      aspect-ratio: var(--_ratio);
     }
-    .card img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
+    /* Scrim keeps the label readable on any photo, in light and dark themes. */
     .card::after {
       content: '';
       position: absolute;
       inset: 0;
       background: linear-gradient(
         to top,
-        color-mix(in srgb, var(--md-sys-color-scrim) 55%, transparent) 0%,
-        transparent 45%
+        color-mix(in srgb, var(--md-sys-color-scrim) 70%, transparent) 0%,
+        transparent 55%
       );
     }
     .label {
       position: absolute;
-      left: 14px;
-      right: 14px;
-      bottom: 12px;
+      inset-inline: 14px;
+      inset-block-end: 12px;
       z-index: 1;
-      color: var(--md-sys-color-surface);
-      font-size: 1.15rem;
-      font-weight: 700;
-      text-shadow: 0 1px 3px color-mix(in srgb, var(--md-sys-color-scrim) 40%, transparent);
+      color: var(--sky-color-on-scrim);
+      text-shadow: 0 1px 3px var(--md-sys-color-scrim);
     }
-    :host([align='center']) .label {
-      text-align: center;
-    }
-    :host([align='right']) .label {
-      text-align: right;
-    }
-    /* Stretched link: covers the figure, carries the accessible name. */
-    ${stretchLink}
   `;
 
   protected override render() {
     const style = `--_ratio:${this.ratio}`;
     return html`
-      <figure class="card" style=${style}>
+      <figure class="card media" style=${style}>
         ${this.image
-          ? html`<img src=${this.image} alt=${this.imageAlt ?? ''} />`
+          ? html`<img src=${this.image} alt=${this.imageAlt ?? ''} loading="lazy" decoding="async" />`
           : nothing}
         ${this.label
-          ? html`<figcaption class="label">${this.label}</figcaption>`
+          ? html`<figcaption class="label title-large">${this.label}</figcaption>`
           : nothing}
         ${this.href
           ? html`<a

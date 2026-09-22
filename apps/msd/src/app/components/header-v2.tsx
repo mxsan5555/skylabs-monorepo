@@ -610,8 +610,6 @@ export function HeaderV3() {
   const [expandedDrawerMenu, setExpandedDrawerMenu] = useState<string | null>(null);
 
   const profileRef = useRef<HTMLDivElement>(null);
-  const searchBarRef = useRef<HTMLElement>(null);
-  const drawerSearchBarRef = useRef<HTMLElement>(null);
   const wishlistCount = wishlistIds ? wishlistIds.size : 0;
 
   const closeDrawer = () => { setDrawerOpen(false); setExpandedDrawerMenu(null); };
@@ -652,28 +650,12 @@ export function HeaderV3() {
 
   const handleSignOut = () => { signOut(); setProfileMenuOpen(false); closeDrawer(); setTotalItems(0); };
 
-  useEffect(() => {
-    const el = searchBarRef.current;
-    if (!el) return;
-    const handler = (e: Event) => {
-      const { query } = (e as CustomEvent<{ query: string }>).detail;
-      navigate(`/search?q=${encodeURIComponent(query)}`);
-    };
-    el.addEventListener('sky-search', handler);
-    return () => el.removeEventListener('sky-search', handler);
-  }, [navigate]);
-
-  useEffect(() => {
-    const el = drawerSearchBarRef.current;
-    if (!el) return;
-    const handler = (e: Event) => {
-      const { query } = (e as CustomEvent<{ query: string }>).detail;
-      navigate(`/search?q=${encodeURIComponent(query)}`);
-      closeDrawer();
-    };
-    el.addEventListener('sky-search', handler);
-    return () => el.removeEventListener('sky-search', handler);
-  }, [navigate]);
+  // Header + drawer search fields share one handler: `/explore` is the search results route.
+  const handleSearch = (e: CustomEvent<{ value: string }>) => {
+    if (!e.detail.value) return;
+    navigate(`/explore?q=${encodeURIComponent(e.detail.value)}`);
+    closeDrawer();
+  };
 
   return (
     <>
@@ -698,11 +680,17 @@ export function HeaderV3() {
             </NavLink>
 
             {/* Search */}
-            <sky-search-bar
-              ref={searchBarRef}
+            <sky-action-field
               className="hv3-search"
-              placeholder="Search spas, massages, treatments..."
-              label="Search massage services"
+              role="search"
+              dense
+              type="search"
+              enterkeyhint="search"
+              icon="search"
+              label={content.header.searchLabel}
+              placeholder={content.header.searchPlaceholder}
+              actionLabel={content.header.searchAction}
+              onsky-submit={handleSearch}
             />
 
             {/* Right actions */}
@@ -820,11 +808,17 @@ export function HeaderV3() {
 
           <Divider />
 
-          <sky-search-bar
-            ref={drawerSearchBarRef}
+          <sky-action-field
             className="hv3-drawer__search"
-            placeholder="Search spas, massages, treatments..."
-            label="Search massage services"
+            role="search"
+            dense
+            type="search"
+            enterkeyhint="search"
+            icon="search"
+            label={content.header.searchLabel}
+            placeholder={content.header.searchPlaceholder}
+            actionLabel={content.header.searchAction}
+            onsky-submit={handleSearch}
           />
 
           <Divider />

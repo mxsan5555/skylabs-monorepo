@@ -622,7 +622,7 @@ main {
   /* No mix-blend-mode — renders cleanly on white */
 }
 
-/* Search — host wrapper only; sky-search-bar owns all internal styles */
+/* Search — host wrapper only; sky-action-field owns all internal styles */
 .hv3-search {
   flex: 1;
   max-width: 560px;

@@ -31,6 +31,8 @@ vi.mock('../../../wishlist/wishlist-context', () => ({
 vi.mock('../../../api/catalog', () => ({
   listCatalogCategories: vi.fn(),
   listCatalogDeals: vi.fn(),
+  listCatalogProducts: vi.fn().mockResolvedValue({ data: [] }),
+  listCatalogTherapists: vi.fn().mockResolvedValue({ data: [] }),
   listCatalogFaqs: vi.fn().mockResolvedValue({ data: [] }),
 }));
 

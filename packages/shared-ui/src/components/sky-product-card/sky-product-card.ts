@@ -2,7 +2,7 @@ import { LitElement, html, css, nothing } from 'lit';
 // Register the M3 elements this card composes (works even without the full barrel).
 import '@material/web/icon/icon.js';
 import '@material/web/iconbutton/icon-button.js';
-import { hostBase } from '../shared-styles.js';
+import { alignment, coverImage, focusRing, hostBase, nextId, pill, typescale } from '../shared-styles.js';
 
 /**
  * <sky-product-card> — rich listing card (deal / hotel / product).
@@ -82,8 +82,8 @@ export class SkyProductCard extends LitElement {
   /** Content alignment: 'left' (default) | 'center' | 'right'. */
   declare align: 'left' | 'center' | 'right';
 
-  /** Per-instance ID used to wire aria-labelledby from article → heading. */
-  private readonly _uid = Math.random().toString(36).slice(2, 8);
+  /** Per-instance id wiring aria-labelledby from the article to its heading. */
+  private readonly _headingId = nextId('sky-product-heading');
 
   constructor() {
     super();
@@ -95,6 +95,10 @@ export class SkyProductCard extends LitElement {
 
   static override styles = css`
     ${hostBase}
+    ${alignment}
+    ${typescale}
+    ${coverImage}
+    ${pill}
     :host {
       display: flex;
       flex-direction: column;
@@ -105,80 +109,34 @@ export class SkyProductCard extends LitElement {
       flex-direction: column;
       flex: 1;
       overflow: hidden;
-      border-radius: var(--md-sys-shape-corner-large, 16px);
+      border-radius: var(--md-sys-shape-corner-large);
       background-color: var(--md-sys-color-surface);
-      transition: box-shadow 150ms ease;
+      transition: box-shadow var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
     }
     :host([variant='outlined']) .card {
       border: 1px solid var(--md-sys-color-outline-variant);
     }
     .card:hover {
-      box-shadow:
-        0 1px 2px color-mix(in srgb, var(--md-sys-color-shadow) 30%, transparent),
-        0 2px 6px 2px color-mix(in srgb, var(--md-sys-color-shadow) 15%, transparent);
+      box-shadow: var(--sky-elevation-2);
+    }
+    /* The heading link carries focus; the ring outlines the whole card it stretches over. */
+    .card:has(.heading a:focus-visible) {
+      ${focusRing}
+    }
+    .heading a:focus-visible {
+      outline: none;
     }
     .media {
-      position: relative;
-      margin: 0; /* reset <figure> UA default margin */
       aspect-ratio: 3 / 2;
-      background-color: var(--md-sys-color-surface-variant);
-    }
-    .media img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-    .media swiper-container {
-      width: 100%;
-      height: 100%;
-      --swiper-theme-color: var(--md-sys-color-primary);
-      --swiper-navigation-color: var(--md-sys-color-primary);
-    }
-
-    .media swiper-slide {
-      display: flex;
-    }
-
-    .media swiper-slide img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .media::part(button-prev),
-    .media::part(button-next) {
-      color: var(--md-sys-color-on-primary-container);
-      width: 32px;
-      height: 32px;
-    }
-
-    .media::part(pagination) {
-      bottom: 8px;
-    }
-    .badge {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 2;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background-color: var(--md-sys-color-primary);
-      color: var(--md-sys-color-on-primary);
-      font-size: 0.75rem;
-      font-weight: 600;
     }
     .favorite {
       position: absolute;
-      top: 6px;
-      right: 6px;
+      inset-block-start: 6px;
+      inset-inline-end: 6px;
       z-index: 2;
       --md-icon-button-icon-color: var(--md-sys-color-on-surface);
       background-color: var(--md-sys-color-surface);
-      border-radius: 999px;
+      border-radius: var(--md-sys-shape-corner-full);
     }
     :host([favorite-active]) .favorite {
       --md-icon-button-icon-color: var(--md-sys-color-error);
@@ -189,97 +147,83 @@ export class SkyProductCard extends LitElement {
     .body {
       display: flex;
       flex-direction: column;
+      align-items: var(--_align);
       flex: 1;
       gap: 6px;
       padding: 12px 14px 14px;
-      background: var(--md-sys-color-surface-container);
+      background-color: var(--md-sys-color-surface-container);
     }
-    /* Own stacking context above the heading's stretched link (z-index: 1) — same technique as
-       .favorite/a.eyebrow above. Without this, slotted action content (e.g. an "Add to Cart"
-       button) sits in the normal, non-positioned paint layer, which the stretched link's
-       absolutely-positioned ::after (inset: 0 over the whole card) paints over — so a click
-       lands on the invisible link instead of the button, incorrectly navigating instead of
-       firing the button's own click handler. */
+    /* Slotted actions (e.g. "Add to Cart") get their own stacking context above the
+       heading's stretched link (::after, z-index 1), or the link would swallow their clicks. */
     slot {
       display: block;
       margin-top: auto;
       position: relative;
       z-index: 2;
     }
-    .tag {
-      display: inline-flex;
+    .tag,
+    .meta,
+    .rating,
+    .score,
+    .price {
+      display: flex;
       align-items: center;
-      gap: 4px;
-      font-size: 0.75rem;
-      font-weight: 600;
+      justify-content: var(--_align);
+      flex-wrap: wrap;
+      gap: 6px;
       color: var(--md-sys-color-on-surface-variant);
     }
-    .tag md-icon {
+    .tag md-icon,
+    .meta md-icon {
       --md-icon-size: 16px;
+    }
+    .tag md-icon {
       color: var(--md-sys-color-primary);
     }
-    .eyebrow {
-      font-size: 0.8125rem;
+    .eyebrow,
+    .price__current,
+    .price__discount,
+    .price__note {
       color: var(--md-sys-color-primary);
     }
-    /* Own stacking context above the heading's stretched link (z-index: 1),
-       same technique as .favorite: an independently-clickable sibling that
-       resolves its own href instead of falling through to the card link. */
+    /* Independently clickable link above the stretched card link. */
     a.eyebrow {
       position: relative;
       z-index: 2;
-      display: inline-block;
       text-decoration: none;
     }
     a.eyebrow:hover,
     a.eyebrow:focus-visible {
       text-decoration: underline;
     }
-    .heading {
-      margin: 0;
-      font-size: 0.95rem;
-      font-weight: 600;
-      line-height: 1.3;
+    a.eyebrow:focus-visible {
+      ${focusRing}
     }
     .heading a {
       color: inherit;
       text-decoration: none;
     }
-    /* Stretched link: makes the whole card clickable while keeping the favorite
-       button (a sibling with higher z-index) independently interactive. */
+    /* Stretched link: the whole card is clickable, the favorite button stays separate. */
     .heading a::after {
       content: '';
       position: absolute;
       inset: 0;
       z-index: 1;
     }
-    .card:focus-within {
-      outline: 2px solid var(--md-sys-color-primary);
-      outline-offset: 2px;
-    }
     .meta {
-      display: flex;
-      align-items: center;
+      flex-wrap: nowrap;
       justify-content: space-between;
-      gap: 8px;
-      font-size: 0.8125rem;
-      color: var(--md-sys-color-on-surface-variant);
+      inline-size: 100%;
+    }
+    :host([align='center']) .meta,
+    :host([align='right']) .meta {
+      justify-content: var(--_align);
     }
     .meta .distance {
       display: inline-flex;
       align-items: center;
       gap: 2px;
       white-space: nowrap;
-    }
-    .meta md-icon {
-      --md-icon-size: 16px;
-    }
-    .rating {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.8125rem;
-      color: var(--md-sys-color-on-surface-variant);
     }
     .stars {
       display: inline-flex;
@@ -293,84 +237,33 @@ export class SkyProductCard extends LitElement {
       font-variation-settings: 'FILL' 0;
       color: var(--md-sys-color-outline);
     }
-    .rating strong {
-      color: var(--md-sys-color-on-surface);
-    }
-    .score {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.8125rem;
-      color: var(--md-sys-color-on-surface-variant);
-    }
-    .score__badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 2rem;
-      padding: 3px 6px;
-      border-radius: 8px 8px 8px 0;
-      background-color: var(--md-sys-color-primary);
-      color: var(--md-sys-color-on-primary);
-      font-weight: 700;
-    }
+    .rating strong,
     .score__label {
       color: var(--md-sys-color-on-surface);
       font-weight: 600;
     }
+    .score__badge {
+      min-inline-size: 2rem;
+      padding: 3px 6px;
+      text-align: center;
+      border-radius: var(--md-sys-shape-corner-small) var(--md-sys-shape-corner-small)
+        var(--md-sys-shape-corner-small) 0;
+      background-color: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      font-weight: 700;
+    }
     .price {
-      display: flex;
       align-items: baseline;
-      flex-wrap: wrap;
-      gap: 6px;
       margin-top: 2px;
     }
-    .price__prefix {
-      font-size: 0.8125rem;
-      color: var(--md-sys-color-on-surface-variant);
-    }
     .price__original {
-      font-size: 0.875rem;
       text-decoration: line-through;
-      color: var(--md-sys-color-on-surface-variant);
     }
     .price__current {
-      font-size: 1.15rem;
       font-weight: 700;
-      color: var(--md-sys-color-primary);
     }
     .price__discount {
-      font-size: 0.8125rem;
       font-weight: 600;
-      color: var(--md-sys-color-primary);
-    }
-    .price__note {
-      font-size: 0.8125rem;
-      color: var(--md-sys-color-primary);
-    }
-
-    /* Content alignment (default left). */
-    :host([align='center']) .body {
-      align-items: center;
-      text-align: center;
-    }
-    :host([align='center']) .meta,
-    :host([align='center']) .price,
-    :host([align='center']) .rating,
-    :host([align='center']) .score,
-    :host([align='center']) .tag {
-      justify-content: center;
-    }
-    :host([align='right']) .body {
-      align-items: flex-end;
-      text-align: right;
-    }
-    :host([align='right']) .meta,
-    :host([align='right']) .price,
-    :host([align='right']) .rating,
-    :host([align='right']) .score,
-    :host([align='right']) .tag {
-      justify-content: flex-end;
     }
   `;
 
@@ -408,11 +301,13 @@ export class SkyProductCard extends LitElement {
       ]
         .filter(Boolean)
         .join(', ');
+      // role="img" makes the aria-label announce; aria-label on a plain <div> is ignored.
       return html`<div
-        class="score"
+        class="score body-medium"
+        role="img"
         aria-label=${`Score ${this.score} out of 10${label ? `, ${label}` : ''}`}
       >
-        <span class="score__badge">${this.score}</span>
+        <span class="score__badge label-large">${this.score}</span>
         ${this.scoreLabel
           ? html`<span class="score__label">${this.scoreLabel}</span>`
           : nothing}
@@ -423,9 +318,10 @@ export class SkyProductCard extends LitElement {
     }
     if (this.rating != null) {
       return html`<div
-        class="rating"
+        class="rating body-medium"
+        role="img"
         aria-label=${`Rated ${this.rating} out of 5${
-          this.reviews != null ? `, ${this.reviews} reviews` : ''
+          this.reviews != null ? `, ${this.reviews.toLocaleString()} reviews` : ''
         }`}
       >
         ${this._renderStars()}
@@ -441,34 +337,34 @@ export class SkyProductCard extends LitElement {
       ${this.price
         ? html`<div class="price">
             ${this.pricePrefix
-              ? html`<span class="price__prefix">${this.pricePrefix}</span>`
+              ? html`<span class="price__prefix body-medium">${this.pricePrefix}</span>`
               : nothing}
             ${this.originalPrice
-            ? html`<span class="price__original">${this.originalPrice}</span>`
+            ? html`<span class="price__original body-medium">${this.originalPrice}</span>`
             : nothing}
-            <data class="price__current" value=${this.price ?? ''}>${this.price}</data>
+            <data class="price__current title-medium" value=${this.price ?? ''}>${this.price}</data>
             ${this.discount
-              ? html`<span class="price__discount">${this.discount}</span>`
+              ? html`<span class="price__discount body-medium">${this.discount}</span>`
               : nothing}
           </div>`
         : nothing}
       ${this.priceNote
-        ? html`<div class="price__note">${this.priceNote}</div>`
+        ? html`<div class="price__note body-medium">${this.priceNote}</div>`
         : nothing}
     `;
   }
 
   protected override render() {
     return html`
-      <article class="card" aria-labelledby=${this.heading ? `${this._uid}-heading` : nothing}>
+      <article class="card" aria-labelledby=${this.heading ? this._headingId : nothing}>
         <figure class="media">
           <slot name="media">
             ${this.image
-              ? html`<img src=${this.image} alt=${this.imageAlt ?? ''} />`
+              ? html`<img src=${this.image} alt=${this.imageAlt ?? ''} loading="lazy" decoding="async" />`
               : nothing}
           </slot>
           ${this.badge
-            ? html`<span class="badge">${this.badge}</span>`
+            ? html`<span class="badge pill">${this.badge}</span>`
             : nothing}
           ${this.favorite
             ? html`<md-icon-button
@@ -485,7 +381,7 @@ export class SkyProductCard extends LitElement {
         </figure>
         <div class="body">
           ${this.tag
-            ? html`<span class="tag"
+            ? html`<span class="tag label-medium"
                 >${this.tagIcon
                   ? html`<md-icon aria-hidden="true">${this.tagIcon}</md-icon>`
                   : nothing}${this.tag}</span
@@ -494,22 +390,22 @@ export class SkyProductCard extends LitElement {
           ${this.eyebrow
         ? this.eyebrowHref
           ? html`<a
-                class="eyebrow"
+                class="eyebrow body-medium"
                 href=${this.eyebrowHref}
                 @click=${(e: Event) => e.stopPropagation()}
                 >${this.eyebrow}</a
               >`
-          : html`<span class="eyebrow">${this.eyebrow}</span>`
+          : html`<span class="eyebrow body-medium">${this.eyebrow}</span>`
         : nothing}
           ${this.heading
-        ? html`<h3 id=${`${this._uid}-heading`} class="heading">
+        ? html`<h3 id=${this._headingId} class="heading title-medium">
                 ${this.href
                   ? html`<a href=${this.href}>${this.heading}</a>`
                   : this.heading}
               </h3>`
             : nothing}
           ${this.location || this.distance
-            ? html`<div class="meta">
+            ? html`<div class="meta body-medium">
                 <span>${this.location}</span>
                 ${this.distance
                   ? html`<span class="distance"

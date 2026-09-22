@@ -46,25 +46,33 @@ export function applyTheme(
   return next;
 }
 
+const matches = (query: string): boolean =>
+  typeof window !== 'undefined' && window.matchMedia?.(query).matches === true;
+
 /** Resolve the mode the OS currently prefers. */
 export function prefersDark(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    window.matchMedia?.('(prefers-color-scheme: dark)').matches === true
-  );
+  return matches('(prefers-color-scheme: dark)');
+}
+
+/** Resolve the contrast the OS currently asks for (`high` maps to the AAA theme variants). */
+export function prefersContrast(): ThemeContrast {
+  return matches('(prefers-contrast: more)') ? 'high' : 'standard';
 }
 
 /**
- * Convenience: apply the OS-preferred mode now and keep it in sync when the OS
- * setting changes. Returns a cleanup function that stops listening.
+ * Apply the OS-preferred mode (and contrast, unless one is passed) now, and keep
+ * both in sync when the OS settings change. Returns a cleanup function.
  */
 export function applySystemTheme(
-  contrast: ThemeContrast = 'standard',
+  contrast?: ThemeContrast,
   target: HTMLElement = document.documentElement,
 ): () => void {
-  const set = () => applyTheme(prefersDark() ? 'dark' : 'light', contrast, target);
+  const set = () =>
+    applyTheme(prefersDark() ? 'dark' : 'light', contrast ?? prefersContrast(), target);
   set();
-  const mq = window.matchMedia('(prefers-color-scheme: dark)');
-  mq.addEventListener('change', set);
-  return () => mq.removeEventListener('change', set);
+  const queries = ['(prefers-color-scheme: dark)', '(prefers-contrast: more)'].map((q) =>
+    window.matchMedia(q),
+  );
+  queries.forEach((mq) => mq.addEventListener('change', set));
+  return () => queries.forEach((mq) => mq.removeEventListener('change', set));
 }
