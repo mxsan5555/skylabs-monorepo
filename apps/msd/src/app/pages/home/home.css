@@ -2487,7 +2487,7 @@ swiper-container::part(button-next) {
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(ellipse 70% 80% at 0% 50%, color-mix(in srgb, var(--md-sys-color-primary) 6%, transparent) 0%, transparent 70%),
+        radial-gradient(ellipse 70% 80% at 0% 50%, color-mix(in srgb, var(--md-sys-color-primary) 4%, transparent) 0%, transparent 70%),
         linear-gradient(135deg, var(--md-sys-color-surface-container-lowest) 0%, var(--md-sys-color-surface) 60%);
     pointer-events: none;
     z-index: 0;
@@ -2498,32 +2498,32 @@ swiper-container::part(button-next) {
     --swiper-pagination-bullet-inactive-color: var(--md-sys-color-outline-variant);
     --swiper-pagination-bullet-inactive-opacity: 1;
     --swiper-pagination-bullet-size: 8px;
-    --swiper-pagination-bullet-horizontal-gap: 5px;
-    --swiper-pagination-bottom: 18px;
+    --swiper-pagination-bullet-horizontal-gap: 4px;
+    --swiper-pagination-bottom: 20px;
     width: 100%;
     position: relative;
     z-index: 1;
 }
 
 .hero-v1__swiper::part(pagination) {
-    bottom: 18px;
+    bottom: 20px;
 }
 
 .hero-v1__swiper::part(bullet-active) {
-    width: 24px;
+    width: 20px;
     border-radius: 4px;
     transition: width 0.25s ease;
 }
 
 .hero-v1__slide {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    min-height: 560px;
+    grid-template-columns: 55fr 45fr;
+    /* min-height: 560px; */
     max-width: 1440px;
     margin: 0 auto;
-    padding: 64px 80px 96px;
+    padding: 64px 80px 80px;
     align-items: center;
-    gap: 56px;
+    gap: 48px;
 }
 
 /* ── Left column ── */
@@ -2546,13 +2546,13 @@ swiper-container::part(button-next) {
     background: var(--md-sys-color-primary);
     padding: 4px 12px;
     border-radius: 100px;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
     line-height: 1.5;
 }
 
 .hero-v1__title {
-    margin: 0 0 12px;
-    font-size: clamp(2.5rem, 4vw, 3.5rem);
+    margin: 0 0 8px;
+    font-size: clamp(1.875rem, 4vw, 3.25rem);
     font-weight: 900;
     line-height: 1.05;
     letter-spacing: -0.025em;
@@ -2563,7 +2563,7 @@ swiper-container::part(button-next) {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin: 0 0 28px;
+    margin: 0 0 20px;
     font-size: 0.9375rem;
     line-height: 1.5;
 }
@@ -2599,23 +2599,14 @@ swiper-container::part(button-next) {
     box-shadow: 0 6px 20px color-mix(in srgb, var(--md-sys-color-primary) 30%, transparent);
 }
 
-/* Elevated floating price card */
-.hero-v1__price-card {
+.hero-v1__price-block {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    margin-top: 32px;
-    padding: 20px 24px 22px;
-    background: var(--md-sys-color-surface);
-    border-radius: 20px;
-    box-shadow:
-        0 2px 8px rgb(0 0 0 / 6%),
-        0 8px 32px rgb(0 0 0 / 10%);
-    max-width: 300px;
-    position: relative;
+    margin-bottom: 24px;
 }
 
-/* Green "Save ₹X" chip inside the card */
+/* Teal "Save ₹X" chip — uses tertiary-container so it reads distinct from the primary badge */
 .hero-v1__save-chip {
     display: inline-flex;
     align-items: center;
@@ -2623,8 +2614,8 @@ swiper-container::part(button-next) {
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: var(--md-sys-color-on-primary);
-    background: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-tertiary-container);
+    background: var(--md-sys-color-tertiary-container);
     padding: 3px 10px;
     border-radius: 100px;
     margin-bottom: 10px;
@@ -2675,6 +2666,7 @@ swiper-container::part(button-next) {
     overflow: hidden;
     align-self: stretch;
     min-height: 400px;
+    aspect-ratio: 4 / 3;
     box-shadow:
         0 4px 16px rgb(0 0 0 / 8%),
         0 16px 48px rgb(0 0 0 / 12%);
@@ -2700,7 +2692,7 @@ swiper-container::part(button-next) {
 /* ── Responsive ── */
 @media (max-width: 1024px) {
     .hero-v1__slide {
-        padding: 52px 48px 88px;
+        padding: 48px 48px 72px;
         gap: 40px;
     }
 }
@@ -2708,13 +2700,14 @@ swiper-container::part(button-next) {
 @media (max-width: 900px) {
     .hero-v1__slide {
         grid-template-columns: 1fr;
-        padding: 40px 24px 72px;
+        padding: 36px 24px 64px;
         min-height: auto;
-        gap: 32px;
+        gap: 24px;
     }
 
     .hero-v1__right {
-        min-height: 280px;
+        min-height: 260px;
+        aspect-ratio: 16 / 9;
         order: -1;
         border-radius: 16px;
     }
@@ -2722,15 +2715,12 @@ swiper-container::part(button-next) {
     .hero-v1__img {
         height: 280px;
     }
-
-    .hero-v1__price-card {
-        max-width: 100%;
-    }
 }
 
 @media (max-width: 480px) {
     .hero-v1__slide {
-        padding: 32px 20px 64px;
+        padding: 28px 16px 56px;
+        gap: 20px;
     }
 
     .hero-v1__title {
@@ -2745,283 +2735,5 @@ swiper-container::part(button-next) {
 @media (max-width: 375px) {
     .hero-v1__title {
         font-size: 1.875rem;
-    }
-}
-
-
-/* ============================================================
-   HERO OPTION 2 — Static left copy + staggered card slider
-   ============================================================ */
-
-.home__hero-v2 {
-    width: 100%;
-    overflow: hidden;
-    background: var(--md-sys-color-surface-container-low);
-    border-bottom: 1px solid var(--md-sys-color-outline-variant);
-}
-
-.hero-v2__inner {
-    display: grid;
-    grid-template-columns: 2fr 3fr;
-    min-height: 560px;
-    max-width: 1440px;
-    margin: 0 auto;
-    align-items: center;
-}
-
-/* ── Left copy ── */
-.hero-v2__left {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-    padding: 72px 48px 72px 72px;
-    position: relative;
-}
-
-/* Vertical primary accent line */
-.hero-v2__left-accent {
-    position: absolute;
-    left: 0;
-    top: 72px;
-    bottom: 72px;
-    width: 4px;
-    border-radius: 0 4px 4px 0;
-    background: var(--md-sys-color-primary);
-    pointer-events: none;
-}
-
-.hero-v2__title {
-    margin: 0;
-    font-size: clamp(2rem, 3vw, 3rem);
-    font-weight: 900;
-    line-height: 1.08;
-    color: var(--md-sys-color-on-surface);
-    letter-spacing: -0.025em;
-}
-
-.hero-v2__desc {
-    margin: 0;
-    font-size: 1rem;
-    color: var(--md-sys-color-on-surface-variant);
-    max-width: 36ch;
-    line-height: 1.7;
-}
-
-.hero-v2__actions {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    align-items: center;
-    margin-top: 4px;
-}
-
-/* Pagination dots — 12×12 circles, active pill */
-.hero-v2__pagination {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-top: 8px;
-}
-
-.hero-v2__dot {
-    width: 12px;
-    height: 12px;
-    border: none;
-    border-radius: 50%;
-    background: var(--md-sys-color-outline-variant);
-    cursor: pointer;
-    padding: 0;
-    transition:
-        background 0.25s ease,
-        width 0.25s ease,
-        border-radius 0.25s ease;
-    flex-shrink: 0;
-}
-
-.hero-v2__dot--active {
-    background: var(--md-sys-color-primary);
-    width: 32px;
-    border-radius: 6px;
-}
-
-.hero-v2__dot:focus-visible {
-    outline: 3px solid var(--md-sys-color-primary);
-    outline-offset: 2px;
-}
-
-.hero-v2__dot:hover:not(.hero-v2__dot--active) {
-    background: var(--md-sys-color-outline);
-}
-
-/* ── Right slider ── */
-.hero-v2__right {
-    overflow: hidden;
-    align-self: stretch;
-    display: flex;
-    align-items: center;
-    padding: 52px 32px 52px 0;
-}
-
-.hero-v2__swiper {
-    width: 100%;
-    padding-left: 16px;
-    overflow: visible;
-}
-
-/* ── Deal cards ── */
-.hero-v2__card {
-    width: 240px;
-    border-radius: 20px;
-    overflow: hidden;
-    background: var(--md-sys-color-surface);
-    box-shadow:
-        0 2px 8px rgb(0 0 0 / 6%),
-        0 4px 24px rgb(0 0 0 / 14%);
-    transition: transform 0.22s ease, box-shadow 0.22s ease;
-}
-
-.hero-v2__card--offset {
-    margin-top: 40px;
-}
-
-.hero-v2__card:hover {
-    transform: translateY(-8px);
-    box-shadow:
-        0 4px 12px rgb(0 0 0 / 8%),
-        0 12px 36px rgb(0 0 0 / 18%);
-}
-
-.hero-v2__card-link {
-    display: flex;
-    flex-direction: column;
-    text-decoration: none;
-    color: inherit;
-    height: 100%;
-}
-
-.hero-v2__card-img-wrap {
-    overflow: hidden;
-    flex-shrink: 0;
-}
-
-.hero-v2__card-img {
-    width: 100%;
-    height: 320px;
-    object-fit: cover;
-    display: block;
-    transition: transform 0.35s ease;
-}
-
-.hero-v2__card:hover .hero-v2__card-img {
-    transform: scale(1.05);
-}
-
-.hero-v2__card-body {
-    padding: 14px 18px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    flex: 1;
-}
-
-/* Muted vendor — clearly subordinate to title */
-.hero-v2__card-vendor {
-    font-size: 0.6875rem;
-    font-weight: 500;
-    color: var(--md-sys-color-on-surface-variant);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-
-.hero-v2__card-title {
-    margin: 0;
-    font-size: 0.9375rem;
-    font-weight: 700;
-    color: var(--md-sys-color-on-surface);
-    line-height: 1.35;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-/* Price: primary green, clearly the action signal */
-.hero-v2__card-price {
-    font-size: 1.0625rem;
-    font-weight: 800;
-    color: var(--md-sys-color-primary);
-    margin-top: 6px;
-    letter-spacing: -0.01em;
-}
-
-/* ── Responsive ── */
-@media (max-width: 1200px) {
-    .hero-v2__left {
-        padding: 64px 40px 64px 56px;
-    }
-
-    .hero-v2__left-accent {
-        top: 64px;
-        bottom: 64px;
-    }
-}
-
-@media (max-width: 1000px) {
-    .hero-v2__inner {
-        grid-template-columns: 1fr;
-    }
-
-    .hero-v2__left {
-        padding: 48px 24px 32px 32px;
-    }
-
-    .hero-v2__left-accent {
-        top: 48px;
-        bottom: 32px;
-    }
-
-    .hero-v2__right {
-        padding: 0 0 52px 16px;
-    }
-
-    .hero-v2__card--offset {
-        margin-top: 0;
-    }
-}
-
-@media (max-width: 768px) {
-    .hero-v2__left {
-        padding: 40px 20px 28px 28px;
-    }
-
-    .hero-v2__left-accent {
-        top: 40px;
-        bottom: 28px;
-    }
-}
-
-@media (max-width: 480px) {
-    .hero-v2__title {
-        font-size: clamp(1.875rem, 7vw, 2.25rem);
-    }
-
-    .hero-v2__left {
-        padding: 36px 20px 24px 24px;
-    }
-
-    .hero-v2__left-accent {
-        top: 36px;
-        bottom: 24px;
-    }
-
-    .hero-v2__card-img {
-        height: 260px;
-    }
-}
-
-@media (max-width: 375px) {
-    .hero-v2__title {
-        font-size: 1.75rem;
     }
 }

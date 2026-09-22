@@ -690,7 +690,7 @@ export function HeaderV3() {
             {/* Search */}
             <sky-search-bar
               ref={searchBarRef}
-              class="hv3-search"
+              className="hv3-search"
               placeholder="Search spas, massages, treatments..."
               label="Search massage services"
             />
@@ -812,7 +812,7 @@ export function HeaderV3() {
 
           <sky-search-bar
             ref={drawerSearchBarRef}
-            class="hv3-drawer__search"
+            className="hv3-drawer__search"
             placeholder="Search spas, massages, treatments..."
             label="Search massage services"
           />

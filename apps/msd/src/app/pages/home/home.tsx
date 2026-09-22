@@ -1,6 +1,6 @@
 ﻿import { useNavigate, NavLink } from 'react-router-dom';
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ListItem, List, FilledTonalIconButton, FilledButton, OutlinedButton, TextButton, Icon, Tabs, SecondaryTab, OutlinedTextField, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
+import { ListItem, List, FilledTonalIconButton, FilledButton, TextButton, Icon, Tabs, SecondaryTab, OutlinedTextField, AssistChip, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { formatINR } from '../../../utils/format';
 import { useWishlist } from '../../../wishlist/wishlist-context';
@@ -130,8 +130,6 @@ function SectionHeader({ id, heading, seeAll, seeAllTo, }: {
 }
 export function Home() {
   const vacationSwiperRef = useRef<any>(null);
-  const heroV2Ref = useRef<HTMLElement>(null);
-  const [heroV2Active, setHeroV2Active] = useState(0);
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { toggle, has } = useWishlist();
@@ -291,18 +289,6 @@ export function Home() {
       setActionError(err instanceof ApiRequestError ? err.message : home.ui.messages.addToCartError);
     }
   }
-
-  // Track active slide for Hero V2 pagination dots.
-  useEffect(() => {
-    const el = heroV2Ref.current;
-    if (!el) return;
-    const handler = (e: Event) => {
-      const sw = (e as CustomEvent).detail?.[0];
-      if (sw) setHeroV2Active(sw.realIndex ?? 0);
-    };
-    el.addEventListener('swiperslidechange', handler);
-    return () => el.removeEventListener('swiperslidechange', handler);
-  }, []);
 
   function renderDealCarousel(deals: CatalogDeal[]) {
     return (
@@ -465,13 +451,13 @@ export function Home() {
           Two-column: left = content, right = image. Slides through top deals.
       ──────────────────────────────────────────────────────────────────── */}
       {featuredDeals.length > 0 && (
-        <section className="home__hero-v1" aria-label="Featured spa and wellness deals">
+        <section className="home__hero-v1" aria-label="Featured spa and wellness deals" aria-live="polite" aria-atomic="false">
           <div className="hero-v1__bg" aria-hidden="true" />
           <swiper-container
-            class="hero-v1__swiper"
-            autoplay-delay="5000"
+            className="hero-v1__swiper"
+            autoplay-delay="100000"
             autoplay-disable-on-interaction="false"
-            loop="true"
+            loop="false"
             pagination="true"
             grab-cursor="true"
             a11y="true"
@@ -493,9 +479,11 @@ export function Home() {
                           {deal.category.name}
                         </span>
                       )}
-                      <h1 className={`hero-v1__title${i === 0 ? '' : ' hero-v1__title--slide'}`}>
-                        {d.title}
-                      </h1>
+                      {i === 0 ? (
+                        <h1 className="hero-v1__title">{d.title}</h1>
+                      ) : (
+                        <h2 className="hero-v1__title">{d.title}</h2>
+                      )}
                       {(d.providerName || d.location) && (
                         <p className="hero-v1__meta">
                           {d.providerName && (
@@ -509,14 +497,7 @@ export function Home() {
                           )}
                         </p>
                       )}
-                      <FilledButton
-                        onClick={() => navigate(dealPath)}
-                        aria-label={`Book ${d.title}`}
-                      >
-                        Book Now
-                        <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
-                      </FilledButton>
-                      <div className="hero-v1__price-card">
+                      <div className="hero-v1__price-block">
                         {d.discount && d.originalPrice && (
                           <span className="hero-v1__save-chip" aria-label={`Save ₹${Math.round(d.originalPrice - (d.price ?? 0)).toLocaleString('en-IN')}`}>
                             Save ₹{Math.round(d.originalPrice - (d.price ?? 0)).toLocaleString('en-IN')}
@@ -535,6 +516,13 @@ export function Home() {
                           <span className="hero-v1__price-note">{d.priceNote}</span>
                         )}
                       </div>
+                      <FilledButton
+                        onClick={() => navigate(dealPath)}
+                        aria-label={`Book ${d.title}`}
+                      >
+                        Book Now
+                        <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
+                      </FilledButton>
                     </div>
                     {/* Right: deal image */}
                     <div className="hero-v1__right">
@@ -559,101 +547,6 @@ export function Home() {
         </section>
       )}
 
-      {/* ────────────────────────────────────────────────────────────────────
-          HERO OPTION 2 — Static left copy + deal card slider on right
-          Left: bold headline + desc + CTAs + pagination dots
-          Right: horizontally scrolling staggered deal cards
-      ──────────────────────────────────────────────────────────────────── */}
-      {featuredDeals.length > 0 && (
-        <section className="home__hero-v2" aria-labelledby="hero-v2-heading">
-          <div className="hero-v2__inner">
-            {/* Left — static copy */}
-            <div className="hero-v2__left">
-              <span className="hero-v2__left-accent" aria-hidden="true" />
-              <h2 id="hero-v2-heading" className="hero-v2__title">
-                Book Top Spa &amp; Wellness Deals Near You
-              </h2>
-              <p className="hero-v2__desc">
-                Discover curated massages, facials, and beauty treatments at the best prices from verified spas near you.
-              </p>
-              <div className="hero-v2__actions" role="group" aria-label="Browse or book deals">
-                <OutlinedButton onClick={() => navigate('/explore')}>
-                  Browse All
-                  <Icon slot="trailing-icon" aria-hidden="true">arrow_outward</Icon>
-                </OutlinedButton>
-                <FilledButton onClick={() => navigate('/explore')}>
-                  Book Now
-                  <Icon slot="trailing-icon" aria-hidden="true">arrow_outward</Icon>
-                </FilledButton>
-              </div>
-              {/* Pagination dots — synced to right Swiper */}
-              <nav className="hero-v2__pagination" aria-label="Deal slides navigation">
-                {featuredDeals.slice(0, 8).map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    aria-label={`Go to slide ${i + 1}`}
-                    aria-current={i === heroV2Active ? 'true' : undefined}
-                    className={`hero-v2__dot${i === heroV2Active ? ' hero-v2__dot--active' : ''}`}
-                    onClick={() => {
-                      const el = heroV2Ref.current as any;
-                      el?.swiper?.slideToLoop(i);
-                    }}
-                  />
-                ))}
-              </nav>
-            </div>
-
-            {/* Right — scrolling card slider */}
-            <div className="hero-v2__right">
-              <swiper-container
-                ref={heroV2Ref}
-                class="hero-v2__swiper"
-                slides-per-view="auto"
-                space-between="16"
-                loop="true"
-                grab-cursor="true"
-                a11y="true"
-              >
-                {featuredDeals.slice(0, 8).map((deal, i) => {
-                  const d = toDealCardDeal(deal);
-                  const fmtPrice = `₹${Math.round(d.price ?? 0).toLocaleString('en-IN')}`;
-                  const dealPath = deal.product ? `/products/${deal.id}` : `/deal/${deal.id}`;
-                  return (
-                    <swiper-slide key={deal.id} style={{ width: '240px', height: 'auto' }}>
-                      <article className={`hero-v2__card${i % 2 !== 0 ? ' hero-v2__card--offset' : ''}`}>
-                        <NavLink
-                          to={dealPath}
-                          className="hero-v2__card-link"
-                          aria-label={`${d.title}, ${fmtPrice}`}
-                        >
-                          <div className="hero-v2__card-img-wrap">
-                            <img
-                              src={d.image}
-                              alt={d.imageAlt ?? d.title}
-                              className="hero-v2__card-img"
-                              loading="lazy"
-                              width={240}
-                              height={320}
-                            />
-                          </div>
-                          <div className="hero-v2__card-body">
-                            {d.providerName && (
-                              <span className="hero-v2__card-vendor">{d.providerName}</span>
-                            )}
-                            <h3 className="hero-v2__card-title">{d.title}</h3>
-                            <span className="hero-v2__card-price">{fmtPrice}</span>
-                          </div>
-                        </NavLink>
-                      </article>
-                    </swiper-slide>
-                  );
-                })}
-              </swiper-container>
-            </div>
-          </div>
-        </section>
-      )}
       {/* ── Hero / Search ──────────────────────────────────────────────── */}
       {false && (
         <section className="home__hero" aria-labelledby="hero-heading">
