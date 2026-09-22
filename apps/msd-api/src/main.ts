@@ -13,7 +13,7 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-console.log("🔥 MS D API PROCESS STARTED");
+console.log(" MSD API PROCESS STARTED");
 const server = app.listen(env.port, () => {
   console.log(`msd-api listening at http://localhost:${env.port}/api/v1 (docs at /docs)`);
 });
