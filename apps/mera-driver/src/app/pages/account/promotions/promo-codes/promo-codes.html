@@ -36,9 +36,9 @@
           <div class="flex flex-col gap-y-6 w-full">
             <!-- 1. Code & Discount Rules -->
             <sky-card class="p-6 block">
-              <div class="section-heading-box">
-                <h3>1. Code & Discount Rules</h3>
-              </div>
+              <sky-card variant="filled" class="p-3 block bg-blue-50 border-l-4 border-[#2563eb] mb-5 rounded-r-md">
+                  <h3 class="text-sm font-bold text-slate-800 m-0">1. Code & Discount Rules</h3>
+                </sky-card>
               <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
                 <md-outlined-text-field label="Promo Code" required [value]="inputCode()" (input)="inputCode.set($any($event.target).value)" placeholder="e.g. FIRST50"></md-outlined-text-field>
 
@@ -60,9 +60,9 @@
 
             <!-- 2. Usage Limits, Validity & Active Status -->
             <sky-card class="p-6 block">
-              <div class="section-heading-box">
-                <h3>2. Usage Limits & Validity Period</h3>
-              </div>
+              <sky-card variant="filled" class="p-3 block bg-blue-50 border-l-4 border-[#2563eb] mb-5 rounded-r-md">
+                  <h3 class="text-sm font-bold text-slate-800 m-0">2. Usage Limits & Validity Period</h3>
+                </sky-card>
               <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full">
                 <md-outlined-text-field label="Usage Limit Per User" type="number" [value]="inputUsageLimitPerUser()" (input)="inputUsageLimitPerUser.set($any($event.target).value)" placeholder="e.g. 1"></md-outlined-text-field>
 

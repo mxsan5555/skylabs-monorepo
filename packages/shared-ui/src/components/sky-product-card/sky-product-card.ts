@@ -194,9 +194,17 @@ export class SkyProductCard extends LitElement {
       padding: 12px 14px 14px;
       background: var(--md-sys-color-surface-container);
     }
+    /* Own stacking context above the heading's stretched link (z-index: 1) — same technique as
+       .favorite/a.eyebrow above. Without this, slotted action content (e.g. an "Add to Cart"
+       button) sits in the normal, non-positioned paint layer, which the stretched link's
+       absolutely-positioned ::after (inset: 0 over the whole card) paints over — so a click
+       lands on the invisible link instead of the button, incorrectly navigating instead of
+       firing the button's own click handler. */
     slot {
       display: block;
       margin-top: auto;
+      position: relative;
+      z-index: 2;
     }
     .tag {
       display: inline-flex;

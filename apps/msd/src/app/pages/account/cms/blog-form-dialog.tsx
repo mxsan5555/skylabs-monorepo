@@ -1,9 +1,10 @@
 import { useRef, useState, type RefObject } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
 import type { MdFilledButton } from '@material/web/button/filled-button.js';
-import { Dialog, FilledButton, OutlinedTextField, TextButton } from '@skylabs-monorepo/shared-ui/react';
+import { Dialog, FilledButton, OutlinedSelect, OutlinedTextField, SelectOption, TextButton } from '@skylabs-monorepo/shared-ui/react';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import type { BlogPost, BlogPostInput } from '../../../../api/rbac/blog-posts';
+import type { BlogCategory } from '../../../../api/rbac/blog-categories';
 import { MediaUploader } from '../../../components/media-uploader';
 import { useToast } from '../../../../toast/toast-context';
 import { BlogBlockEditor, sanitizeBlogBlocks } from './blog-block-editor';
@@ -19,12 +20,18 @@ export function BlogFormDialog({
   dialogRef,
   post,
   token,
+  categories,
+  categoriesLoading,
   onSave,
   onClose,
 }: {
   dialogRef: RefObject<MdDialog>;
   post?: BlogPost;
   token: string | null;
+  /** Populated once by `blog-list.tsx` (fetch-once-on-list-mount, shared by both the add and
+   *  edit dialog instances) — a blog post's `categoryId` is a real FK now, not a free-text slug. */
+  categories: BlogCategory[];
+  categoriesLoading: boolean;
   onSave: (input: BlogPostInput) => Promise<BlogPost | void>;
   onClose?: () => void;
 }) {
@@ -33,7 +40,7 @@ export function BlogFormDialog({
     title: post?.title ?? '',
     slug: post?.slug ?? '',
     excerpt: post?.excerpt ?? '',
-    categorySlug: post?.categorySlug ?? '',
+    categoryId: post?.categoryId ?? '',
     body: post?.body ?? [],
     author: post?.author ?? '',
     readMinutes: post?.readMinutes ?? 1,
@@ -57,7 +64,7 @@ export function BlogFormDialog({
     if (submittingRef.current) return;
     setError('');
     setFieldErrors(null);
-    if (!form.title.trim() || !form.slug.trim() || !form.excerpt.trim() || !form.categorySlug.trim() || !form.author.trim()) {
+    if (!form.title.trim() || !form.slug.trim() || !form.excerpt.trim() || !form.categoryId.trim() || !form.author.trim()) {
       setError('Title, slug, excerpt, category, and author are required.');
       return;
     }
@@ -133,13 +140,22 @@ export function BlogFormDialog({
         />
         {fieldErrors?.excerpt && <p className="error-state" role="alert">{fieldErrors.excerpt}</p>}
 
-        <OutlinedTextField
-          label="Category slug"
-          value={form.categorySlug}
-          onInput={(e: Event) => setForm((f) => ({ ...f, categorySlug: (e.target as HTMLInputElement).value }))}
-        />
-        <p className="field-hint">e.g. wellness, massage-tips, self-care — matches the public blog's category filter.</p>
-        {fieldErrors?.categorySlug && <p className="error-state" role="alert">{fieldErrors.categorySlug}</p>}
+        {categoriesLoading && <p className="loading-state">Loading categories…</p>}
+        {!categoriesLoading && categories.length === 0 && <p className="empty-state">No blog categories yet — add one first.</p>}
+        {!categoriesLoading && categories.length > 0 && (
+          <OutlinedSelect
+            label="Category"
+            value={form.categoryId}
+            onChange={(e: Event) => setForm((f) => ({ ...f, categoryId: (e.target as HTMLSelectElement).value }))}
+          >
+            {categories.map((c) => (
+              <SelectOption key={c.id} value={c.id}>
+                <div slot="headline">{c.name}</div>
+              </SelectOption>
+            ))}
+          </OutlinedSelect>
+        )}
+        {fieldErrors?.categoryId && <p className="error-state" role="alert">{fieldErrors.categoryId}</p>}
 
         <OutlinedTextField
           label="Author"

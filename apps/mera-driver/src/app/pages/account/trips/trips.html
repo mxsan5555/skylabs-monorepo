@@ -64,9 +64,9 @@
             
             <!-- 1. Primary Trip Information -->
             <sky-card class="p-6 block">
-              <div class="section-heading-box">
-                <h3>1. Primary Trip Information</h3>
-              </div>
+              <sky-card variant="filled" class="p-3 block bg-blue-50 border-l-4 border-[#2563eb] mb-5 rounded-r-md">
+                  <h3 class="text-sm font-bold text-slate-800 m-0">1. Primary Trip Information</h3>
+                </sky-card>
               <div class="grid grid-cols-3 gap-4 max-md:grid-cols-2 max-sm:grid-cols-1 w-full">
                 <md-outlined-text-field label="Trip UID *" required [value]="inputTripUid()" (input)="onInputChange('trip_uid', $event)" placeholder="e.g. TRIP-201"></md-outlined-text-field>
 
@@ -97,9 +97,9 @@
 
             <!-- 2. Schedule & Time Tracking -->
             <sky-card class="p-6 block">
-              <div class="section-heading-box">
-                <h3>2. Schedule & Time Tracking</h3>
-              </div>
+              <sky-card variant="filled" class="p-3 block bg-blue-50 border-l-4 border-[#2563eb] mb-5 rounded-r-md">
+                  <h3 class="text-sm font-bold text-slate-800 m-0">2. Schedule & Time Tracking</h3>
+                </sky-card>
               <div class="grid grid-cols-4 gap-4 max-md:grid-cols-2 max-sm:grid-cols-1 w-full">
                 <md-outlined-text-field type="date" label="Scheduled Date *" required [value]="inputScheduledDate()" (input)="onInputChange('scheduled_date', $event)"></md-outlined-text-field>
 
@@ -121,9 +121,9 @@
 
             <!-- 3. Route & Geolocation -->
             <sky-card class="p-6 block">
-              <div class="section-heading-box">
-                <h3>3. Route & Geolocation</h3>
-              </div>
+              <sky-card variant="filled" class="p-3 block bg-blue-50 border-l-4 border-[#2563eb] mb-5 rounded-r-md">
+                  <h3 class="text-sm font-bold text-slate-800 m-0">3. Route & Geolocation</h3>
+                </sky-card>
               <div class="grid grid-cols-3 gap-4 max-md:grid-cols-2 max-sm:grid-cols-1 w-full">
                 <md-outlined-text-field class="col-span-3 max-md:col-span-2 max-sm:col-span-1" label="Pickup Address *" [value]="inputPickupAddress()" (input)="onInputChange('pickup_address', $event)" placeholder="Enter pickup address details"></md-outlined-text-field>
 
@@ -143,9 +143,9 @@
 
             <!-- 4. Fare Details & Feedback -->
             <sky-card class="p-6 block">
-              <div class="section-heading-box">
-                <h3>4. Fare Details & Feedback</h3>
-              </div>
+              <sky-card variant="filled" class="p-3 block bg-blue-50 border-l-4 border-[#2563eb] mb-5 rounded-r-md">
+                  <h3 class="text-sm font-bold text-slate-800 m-0">4. Fare Details & Feedback</h3>
+                </sky-card>
               <div class="grid grid-cols-4 gap-4 max-md:grid-cols-2 max-sm:grid-cols-1 w-full">
                 <md-outlined-text-field label="Base Fare (₹)" type="number" step="0.01" [value]="inputBaseFare()" (input)="onInputChange('base_fare', $event)" placeholder="e.g. 500.00"></md-outlined-text-field>
 

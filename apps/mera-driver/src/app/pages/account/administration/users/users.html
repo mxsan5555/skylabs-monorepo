@@ -148,6 +148,67 @@
           </section>
         </div>
       </sky-card>
+
+      <sky-card *appHasPermission="{ menuKey: 'rbac.users', action: 'assign' }">
+        <h2 class="m-0 mb-1 text-base font-semibold">Permission overrides — {{ user.name }}</h2>
+        <p class="m-0 mb-3 text-xs text-[var(--md-sys-color-on-surface-variant)]">
+          Overrides layer on top of this user's role-derived permissions. "Always allow" grants access their roles
+          don't; "Always deny" removes access their roles would otherwise give. Has no effect on a Super Admin.
+        </p>
+
+        @if (overridesLoading()) {
+          <p role="status">Loading current overrides…</p>
+        } @else {
+          <div class="flex flex-col gap-3">
+            @for (group of overrideCatalogGroups(); track group.menuKey) {
+              <fieldset class="rounded-lg border border-[var(--md-sys-color-outline-variant,#c4c7c5)] p-3">
+                <legend class="px-1 text-sm font-medium">{{ group.title }}</legend>
+                <div class="flex flex-col gap-2">
+                  @for (entry of group.entries; track entry.key) {
+                    <label class="flex min-h-11 items-center justify-between gap-3 text-sm">
+                      <span>{{ entry.action }}</span>
+                      <md-outlined-select
+                        [value]="overrideStateFor(entry.key)"
+                        (change)="setOverrideState(entry.key, $any($event.target).value)"
+                      >
+                        <md-select-option value="inherit"><div slot="headline">Inherit (role default)</div></md-select-option>
+                        <md-select-option value="grant"><div slot="headline">Always allow</div></md-select-option>
+                        <md-select-option value="revoke"><div slot="headline">Always deny</div></md-select-option>
+                      </md-outlined-select>
+                    </label>
+                  }
+                </div>
+              </fieldset>
+            }
+          </div>
+
+          @if (overridesError()) {
+            <p role="alert" class="auth-error mt-3">{{ overridesError() }}</p>
+          }
+          @if (overridesSuccess()) {
+            <p role="status" class="mt-3 text-[var(--md-sys-color-primary)]">Overrides saved.</p>
+          }
+
+          <md-filled-button class="mt-3" [disabled]="savingOverrides()" (click)="saveOverrides()">
+            {{ savingOverrides() ? 'Saving…' : 'Save overrides' }}
+          </md-filled-button>
+        }
+
+        <div class="mt-4 border-t border-[var(--md-sys-color-outline-variant,#c4c7c5)] pt-3">
+          <md-text-button (click)="loadEffectivePermissions()">View effective permissions</md-text-button>
+          @if (effectivePermissions(); as permissions) {
+            @if (permissions.length === 0) {
+              <p class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]">This user has no permissions.</p>
+            } @else {
+              <ul class="m-0 mt-2 flex list-none flex-wrap gap-1 p-0 text-xs">
+                @for (key of permissions; track key) {
+                  <li class="rounded bg-[var(--md-sys-color-surface-variant)] px-2 py-1">{{ key }}</li>
+                }
+              </ul>
+            }
+          }
+        </div>
+      </sky-card>
     }
   </div>
 </md-admin-page>

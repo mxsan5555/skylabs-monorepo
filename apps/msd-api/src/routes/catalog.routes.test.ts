@@ -27,17 +27,27 @@ const serviceDealFixture = {
   durationMinutes: 30,
   category: { id: CATEGORY_ID, name: 'Salon & Grooming', slug: 'salon-grooming' },
   subcategory: null,
-  product: null,
   vendor: { id: 'vendor-1', businessName: 'ABC Salon', city: 'Gorakhpur' },
   branch: { id: 'branch-1', name: 'Gorakhpur Branch', city: 'Gorakhpur' },
 };
 
-const productDealFixture = {
-  ...serviceDealFixture,
-  id: 'd1d1d1d1-0000-4000-8000-000000000004',
-  title: 'Face cream deal',
-  durationMinutes: null,
-  product: { id: 'prod-1', name: 'Face Cream', slug: 'face-cream' },
+const PRODUCT_ID = 'd1d1d1d1-0000-4000-8000-000000000004';
+
+const productFixture = {
+  id: PRODUCT_ID,
+  name: 'Face Cream',
+  slug: 'face-cream',
+  brand: 'GlowCare',
+  description: null,
+  summary: null,
+  image: null,
+  imageAlt: null,
+  price: '499.00',
+  originalPrice: '599.00',
+  discount: 17,
+  category: { id: CATEGORY_ID, name: 'Salon & Grooming', slug: 'salon-grooming' },
+  subcategory: null,
+  vendor: { id: 'vendor-1', businessName: 'ABC Salon', city: 'Gorakhpur' },
 };
 
 beforeEach(() => {
@@ -98,18 +108,7 @@ describe('GET /api/v1/catalog/deals', () => {
     const res = await request(app).get('/api/v1/catalog/deals');
     expect(res.status).toBe(200);
     expect(res.body.data[0].title).toBe('Haircut deal');
-    expect(res.body.data[0].product).toBeNull();
-  });
-
-  it('4. shows a product deal', async () => {
-    prismaMock.deal.findMany.mockResolvedValue([productDealFixture]);
-    prismaMock.deal.count.mockResolvedValue(1);
-    const res = await request(app).get('/api/v1/catalog/deals?type=product');
-    expect(res.status).toBe(200);
-    expect(res.body.data[0].product.name).toBe('Face Cream');
-    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ productId: { not: null } }) }),
-    );
+    expect(res.body.data[0].product).toBeUndefined();
   });
 
   it('5/6/7/8/9. always filters to ACTIVE + APPROVED + active vendor + active branch (inactive/rejected/unapproved/inactive-vendor/inactive-branch all excluded by construction)', async () => {
@@ -128,12 +127,13 @@ describe('GET /api/v1/catalog/deals', () => {
     );
   });
 
-  it('also excludes a product deal whose linked product has itself gone inactive', async () => {
+  it('never filters by productId — Deal has no Product concept (fully independent catalog entities)', async () => {
     prismaMock.deal.findMany.mockResolvedValue([]);
     prismaMock.deal.count.mockResolvedValue(0);
     await request(app).get('/api/v1/catalog/deals');
     const call = prismaMock.deal.findMany.mock.calls[0][0];
-    expect(call.where.AND).toContainEqual({ OR: [{ productId: null }, { product: { is: { isActive: true } } }] });
+    expect(call.where).not.toHaveProperty('productId');
+    expect(call.where.AND).toBeUndefined();
   });
 
   it('10. a service deal carries durationMinutes', async () => {
@@ -141,13 +141,6 @@ describe('GET /api/v1/catalog/deals', () => {
     prismaMock.deal.count.mockResolvedValue(1);
     const res = await request(app).get('/api/v1/catalog/deals');
     expect(res.body.data[0].durationMinutes).toBe(30);
-  });
-
-  it('11. a product deal has no durationMinutes', async () => {
-    prismaMock.deal.findMany.mockResolvedValue([productDealFixture]);
-    prismaMock.deal.count.mockResolvedValue(1);
-    const res = await request(app).get('/api/v1/catalog/deals?type=product');
-    expect(res.body.data[0].durationMinutes).toBeNull();
   });
 
   it('12. shows vendor and branch correctly', async () => {
@@ -247,7 +240,7 @@ describe('GET /api/v1/catalog/deals', () => {
     // see the Gorakhpur-branch deal first with a small distanceKm, the Delhi one after it with a
     // much larger one, regardless of `findMany`'s own array order (never a fabricated ordering).
     const nearDeal = { ...serviceDealFixture, id: 'near-deal', branch: { ...serviceDealFixture.branch, latitude: '26.7606', longitude: '83.3732' } };
-    const farDeal = { ...productDealFixture, id: 'far-deal', branch: { ...productDealFixture.branch, latitude: '28.6139', longitude: '77.2090' } };
+    const farDeal = { ...serviceDealFixture, id: 'far-deal', branch: { ...serviceDealFixture.branch, latitude: '28.6139', longitude: '77.2090' } };
     prismaMock.deal.findMany.mockResolvedValue([farDeal, nearDeal]);
     prismaMock.deal.count.mockResolvedValue(2);
     const res = await request(app).get('/api/v1/catalog/deals?latitude=26.7606&longitude=83.3732');
@@ -294,6 +287,77 @@ describe('GET /api/v1/catalog/deals', () => {
     await request(app).get('/api/v1/catalog/deals');
     const call = prismaMock.deal.findMany.mock.calls[0][0];
     expect(call.where.salePrice).toBeUndefined();
+  });
+});
+
+describe('GET /api/v1/catalog/products', () => {
+  it('lists active products with an active vendor, no branch/approval concepts (Product is fully independent of Deal)', async () => {
+    prismaMock.product.findMany.mockResolvedValue([productFixture]);
+    prismaMock.product.count.mockResolvedValue(1);
+    const res = await request(app).get('/api/v1/catalog/products');
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].name).toBe('Face Cream');
+    expect(res.body.data[0].price).toBe('499.00');
+    expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ isActive: true, vendor: { status: 'ACTIVE' } }) }),
+    );
+  });
+
+  it('never requests private vendor fields from Prisma (KYC, bank, owner, audit)', async () => {
+    prismaMock.product.findMany.mockResolvedValue([]);
+    prismaMock.product.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/products');
+    const call = prismaMock.product.findMany.mock.calls[0][0];
+    const vendorFields = Object.keys(call.select.vendor.select);
+    for (const forbidden of ['kycDocuments', 'kycStatus', 'ownerUserId', 'bankAccountNumber', 'bankIfsc', 'gstNumber', 'panNumber', 'businessEmail', 'businessPhone']) {
+      expect(vendorFields).not.toContain(forbidden);
+    }
+  });
+
+  it('filters by categoryId/subcategoryId/vendorId when given', async () => {
+    prismaMock.product.findMany.mockResolvedValue([]);
+    prismaMock.product.count.mockResolvedValue(0);
+    const vendorId = 'e5e5e5e5-0000-4000-8000-000000000009';
+    await request(app).get(`/api/v1/catalog/products?categoryId=${CATEGORY_ID}&subcategoryId=${SUBCATEGORY_ID}&vendorId=${vendorId}`);
+    expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ categoryId: CATEGORY_ID, subcategoryId: SUBCATEGORY_ID, vendorId }) }),
+    );
+  });
+
+  it('sort=discount orders by discount desc, nulls last', async () => {
+    prismaMock.product.findMany.mockResolvedValue([]);
+    prismaMock.product.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/products?sort=discount');
+    expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: [{ discount: { sort: 'desc', nulls: 'last' } }] }),
+    );
+  });
+
+  it('minPrice/maxPrice bound results via a price where-filter', async () => {
+    prismaMock.product.findMany.mockResolvedValue([]);
+    prismaMock.product.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/products?minPrice=300&maxPrice=800');
+    expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ price: { gte: 300, lte: 800 } }) }),
+    );
+  });
+});
+
+describe('GET /api/v1/catalog/products/:id', () => {
+  it('returns 404 for a product that fails the visibility filter (inactive product or inactive vendor)', async () => {
+    prismaMock.product.findFirst.mockResolvedValue(null);
+    const res = await request(app).get(`/api/v1/catalog/products/${PRODUCT_ID}`);
+    expect(res.status).toBe(404);
+  });
+
+  it('returns a visible product by id', async () => {
+    prismaMock.product.findFirst.mockResolvedValue(productFixture);
+    const res = await request(app).get(`/api/v1/catalog/products/${PRODUCT_ID}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.name).toBe('Face Cream');
+    expect(prismaMock.product.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: PRODUCT_ID, isActive: true, vendor: { status: 'ACTIVE' } }) }),
+    );
   });
 });
 
@@ -513,7 +577,7 @@ const publishedPostFixture = {
   title: 'Deep Tissue Massage Benefits',
   slug: 'deep-tissue-massage-benefits',
   excerpt: 'Everything you need to know.',
-  categorySlug: 'wellness',
+  category: { slug: 'wellness' },
   body: [{ type: 'paragraph', text: 'Hello world' }],
   author: 'Jane Doe',
   readMinutes: 4,
@@ -559,7 +623,10 @@ describe('GET /api/v1/catalog/blog-posts', () => {
     await request(app).get('/api/v1/catalog/blog-posts?categorySlug=wellness&search=tissue');
     expect(prismaMock.blogPost.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ categorySlug: 'wellness', title: { contains: 'tissue', mode: 'insensitive' } }),
+        where: expect.objectContaining({
+          category: { is: { slug: 'wellness' } },
+          title: { contains: 'tissue', mode: 'insensitive' },
+        }),
       }),
     );
   });
@@ -663,5 +730,198 @@ describe('GET /api/v1/catalog/contact-us', () => {
     const res = await request(app).get('/api/v1/catalog/contact-us');
     expect(res.status).toBe(200);
     expect(res.body.data.email).toBe('');
+  });
+});
+
+describe('GET /api/v1/catalog/faqs', () => {
+  it('returns only isActive FAQs, with no Authorization header at all', async () => {
+    prismaMock.faq.findMany.mockResolvedValue([
+      { id: 'faq-1', question: 'How do I book?', answer: 'Select a deal and pay.' },
+    ]);
+    const res = await request(app).get('/api/v1/catalog/faqs');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(prismaMock.faq.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { isActive: true } }),
+    );
+  });
+
+  it('never exposes isActive/sortOrder/timestamps — only question/answer', async () => {
+    prismaMock.faq.findMany.mockResolvedValue([
+      { id: 'faq-1', question: 'How do I book?', answer: 'Select a deal and pay.' },
+    ]);
+    const res = await request(app).get('/api/v1/catalog/faqs');
+    expect(prismaMock.faq.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ select: { id: true, question: true, answer: true } }),
+    );
+    expect(res.body.data[0]).not.toHaveProperty('sortOrder');
+  });
+
+  it('returns an empty array when there are no active FAQs — not an error', async () => {
+    prismaMock.faq.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/v1/catalog/faqs');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
+});
+
+/**
+ * Feature: public CMS reads for the new content types (Blog Categories / Legal Pages /
+ * How It Works / Careers / Social Media links).
+ * Scenario: anonymous storefront visitors reading each of these with no auth.
+ *
+ * Given: an anonymous visitor with no Authorization header at all
+ * When: they read blog categories / a legal page by slug / how-it-works / careers / social links
+ * Then: only active/published content is ever visible, and every route works with zero auth
+ *
+ * Edge cases:
+ * - an unknown or DRAFT website-page slug 404s, same as never leaking a hidden page
+ * - an empty result set still returns 200 with an empty array, not an error
+ */
+describe('GET /api/v1/catalog/blog-categories', () => {
+  it('returns only isActive blog categories, with no Authorization header at all', async () => {
+    prismaMock.blogCategory.findMany.mockResolvedValue([
+      { id: 'cat-1', name: 'Wellness', slug: 'wellness', description: null },
+    ]);
+    const res = await request(app).get('/api/v1/catalog/blog-categories');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(prismaMock.blogCategory.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { isActive: true } }),
+    );
+  });
+
+  it('returns an empty array when there are no active categories — not an error', async () => {
+    prismaMock.blogCategory.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/v1/catalog/blog-categories');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
+});
+
+describe('GET /api/v1/catalog/pages/:slug', () => {
+  it('returns the published page by slug with no auth required', async () => {
+    prismaMock.websitePage.findFirst.mockResolvedValue({
+      id: 'page-1',
+      slug: 'privacy-policy',
+      title: 'Privacy Policy',
+      content: [{ type: 'paragraph', text: 'We respect your privacy.' }],
+      status: 'PUBLISHED',
+      metaTitle: null,
+      metaDescription: null,
+    });
+    const res = await request(app).get('/api/v1/catalog/pages/privacy-policy');
+    expect(res.status).toBe(200);
+    expect(res.body.data.slug).toBe('privacy-policy');
+    expect(prismaMock.websitePage.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { slug: 'privacy-policy', status: 'PUBLISHED' } }),
+    );
+  });
+
+  it('404s for a DRAFT page slug — never leaks an unpublished page', async () => {
+    // getPublicWebsitePageBySlugOrThrow's `where` already folds status: 'PUBLISHED' into the
+    // query, so the mock returning null here IS the correct simulation of "this slug exists but
+    // is still a draft".
+    prismaMock.websitePage.findFirst.mockResolvedValue(null);
+    const res = await request(app).get('/api/v1/catalog/pages/still-a-draft');
+    expect(res.status).toBe(404);
+  });
+
+  it('404s for an unknown slug', async () => {
+    prismaMock.websitePage.findFirst.mockResolvedValue(null);
+    const res = await request(app).get('/api/v1/catalog/pages/does-not-exist');
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/v1/catalog/how-it-works', () => {
+  it('returns the hero content plus only active steps, with no Authorization header at all', async () => {
+    prismaMock.howItWorksContent.findUnique.mockResolvedValue({
+      id: 'singleton',
+      heroTitle: 'How It Works',
+      heroSubtitle: 'Book in three easy steps',
+      metaTitle: null,
+      metaDescription: null,
+    });
+    prismaMock.howItWorksStep.findMany.mockResolvedValue([
+      { id: 'step-1', title: 'Choose a Deal', description: 'Browse and pick.', icon: 'search', sortOrder: 0, isActive: true },
+    ]);
+    const res = await request(app).get('/api/v1/catalog/how-it-works');
+    expect(res.status).toBe(200);
+    expect(res.body.data.steps).toHaveLength(1);
+    expect(res.body.data.content.heroTitle).toBe('How It Works');
+    expect(prismaMock.howItWorksStep.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { isActive: true } }),
+    );
+  });
+
+  it('returns an empty steps array when there are no active steps yet — not an error', async () => {
+    prismaMock.howItWorksContent.findUnique.mockResolvedValue({
+      id: 'singleton',
+      heroTitle: null,
+      heroSubtitle: null,
+      metaTitle: null,
+      metaDescription: null,
+    });
+    prismaMock.howItWorksStep.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/v1/catalog/how-it-works');
+    expect(res.status).toBe(200);
+    expect(res.body.data.steps).toEqual([]);
+  });
+});
+
+describe('GET /api/v1/catalog/careers', () => {
+  it('returns the hero content plus only PUBLISHED job listings, with no Authorization header at all', async () => {
+    prismaMock.careersPageContent.findUnique.mockResolvedValue({
+      id: 'singleton',
+      heroTitle: 'Careers',
+      heroSubtitle: 'Join our team',
+      metaTitle: null,
+      metaDescription: null,
+    });
+    prismaMock.careersJobListing.findMany.mockResolvedValue([
+      { id: 'job-1', jobTitle: 'Massage Therapist', status: 'PUBLISHED' },
+    ]);
+    const res = await request(app).get('/api/v1/catalog/careers');
+    expect(res.status).toBe(200);
+    expect(res.body.data.jobs).toHaveLength(1);
+    expect(prismaMock.careersJobListing.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: 'PUBLISHED' } }),
+    );
+  });
+
+  it('never accepts a caller-supplied status override — unpublished DRAFT jobs are excluded server-side', async () => {
+    prismaMock.careersPageContent.findUnique.mockResolvedValue({
+      id: 'singleton',
+      heroTitle: null,
+      heroSubtitle: null,
+      metaTitle: null,
+      metaDescription: null,
+    });
+    prismaMock.careersJobListing.findMany.mockResolvedValue([]);
+    await request(app).get('/api/v1/catalog/careers?status=DRAFT');
+    const call = prismaMock.careersJobListing.findMany.mock.calls[0][0];
+    expect(call.where.status).toBe('PUBLISHED');
+  });
+});
+
+describe('GET /api/v1/catalog/social-links', () => {
+  it('returns only isActive social links, with no Authorization header at all', async () => {
+    prismaMock.socialMediaLink.findMany.mockResolvedValue([
+      { id: 'link-1', platform: 'instagram', displayName: 'Instagram', url: 'https://instagram.com/skylabs' },
+    ]);
+    const res = await request(app).get('/api/v1/catalog/social-links');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(prismaMock.socialMediaLink.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { isActive: true }, select: { id: true, platform: true, displayName: true, url: true } }),
+    );
+  });
+
+  it('returns an empty array when there are no active social links — not an error', async () => {
+    prismaMock.socialMediaLink.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/v1/catalog/social-links');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
   });
 });

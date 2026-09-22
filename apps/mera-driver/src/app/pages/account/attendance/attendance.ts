@@ -1,25 +1,6 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, inject, OnInit, computed } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
-
-interface AttendanceRecord {
-  id?: number;
-  driver_id: number;
-  driver_name?: string;
-  attendance_date: string;
-  check_in_time?: string;
-  check_out_time?: string;
-  check_in_latitude?: number;
-  check_in_longitude?: number;
-  check_out_latitude?: number;
-  check_out_longitude?: number;
-  status: string;
-  total_hours?: number;
-  assigned_trip_id?: number;
-  leave_type?: string;
-  leave_reason?: string;
-  remarks?: string;
-}
+import { AttendanceApiService, type AttendanceRecord } from '../../../core/attendance/attendance-api.service';
 
 @Component({
   selector: 'md-account-attendance',
@@ -30,10 +11,11 @@ interface AttendanceRecord {
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class Attendance implements OnInit {
-  private readonly http = inject(HttpClient);
+  private readonly api = inject(AttendanceApiService);
 
   // --- All Attendance Repository ---
   readonly allAttendance = signal<AttendanceRecord[]>([]);
+  readonly loading = signal<boolean>(false);
 
   // --- Search, Filter, Sort & Pagination Signals ---
   readonly searchQuery = signal<string>('');
@@ -45,7 +27,7 @@ export class Attendance implements OnInit {
 
   // --- View Switcher (Page vs Form) ---
   readonly showAddForm = signal<boolean>(false);
-  readonly editingRecordId = signal<number | null>(null);
+  readonly editingRecordId = signal<string | null>(null);
 
   // --- Form Input Signals ---
   readonly inputDriverId = signal<string>('');
@@ -79,12 +61,12 @@ export class Attendance implements OnInit {
     { key: 'check_in_time', label: 'Check In', sortable: true },
     { key: 'check_out_time', label: 'Check Out', sortable: true },
     { key: 'total_hours', label: 'Hours Worked', sortable: true },
-    { key: 'status', label: 'Status', type: 'status', statusMap: { 
-        'Present': 'success', 
-        'Half Day': 'info', 
-        'Leave': 'warning', 
+    { key: 'status', label: 'Status', type: 'status', statusMap: {
+        'Present': 'success',
+        'Half Day': 'info',
+        'Leave': 'warning',
         'Absent': 'error'
-      } 
+      }
     },
     { key: 'check_in_latitude', label: 'In Lat', sortable: false, hidden: true },
     { key: 'check_in_longitude', label: 'In Lng', sortable: false, hidden: true },
@@ -167,12 +149,19 @@ export class Attendance implements OnInit {
   readonly totalAttendance = computed(() => this.processedAttendance().length);
 
   ngOnInit(): void {
-    this.http.get<AttendanceRecord[]>('data/attendance.json').subscribe({
+    this.reload();
+  }
+
+  private reload(): void {
+    this.loading.set(true);
+    this.api.list().subscribe({
       next: (data) => {
-        this.allAttendance.set(data || []);
+        this.allAttendance.set(data);
+        this.loading.set(false);
       },
       error: (err) => {
-        console.error('Failed to load mock attendance JSON', err);
+        console.error('Failed to load attendance', err);
+        this.loading.set(false);
       }
     });
   }
@@ -188,8 +177,7 @@ export class Attendance implements OnInit {
       return;
     }
 
-    const newRecord: AttendanceRecord = {
-      id: this.editingRecordId() || Date.now(),
+    const payload: AttendanceRecord = {
       driver_id,
       attendance_date,
       status,
@@ -207,14 +195,18 @@ export class Attendance implements OnInit {
     };
 
     const editingId = this.editingRecordId();
-    if (editingId !== null) {
-      this.allAttendance.update(list => list.map(r => r.id === editingId ? newRecord : r));
-    } else {
-      this.allAttendance.update(list => [newRecord, ...list]);
-    }
-
-    this.resetForm();
-    this.showAddForm.set(false);
+    const request = editingId !== null ? this.api.update(editingId, payload) : this.api.create(payload);
+    request.subscribe({
+      next: () => {
+        this.reload();
+        this.resetForm();
+        this.showAddForm.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to save attendance record', err);
+        alert('Failed to save attendance record. Please try again.');
+      }
+    });
   }
 
   resetForm(): void {
@@ -275,7 +267,13 @@ export class Attendance implements OnInit {
       this.showAddForm.set(true);
     } else if (action === 'delete_attendance') {
       if (confirm(`Are you sure you want to delete attendance record?`)) {
-        this.allAttendance.update(list => list.filter(r => r.id !== row.id));
+        this.api.delete(row.id).subscribe({
+          next: () => this.reload(),
+          error: (err) => {
+            console.error('Failed to delete attendance record', err);
+            alert('Failed to delete attendance record. Please try again.');
+          }
+        });
       }
     }
   }

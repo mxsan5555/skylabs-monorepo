@@ -15,9 +15,9 @@ type CartAddItemInput = z.infer<typeof CartAddItemSchema>;
 const DEAL_IMAGE_ORDER_BY: Prisma.DealImageOrderByWithRelationInput[] = [{ isPrimary: 'desc' }, { sortOrder: 'asc' }];
 const PRODUCT_IMAGE_ORDER_BY: Prisma.ProductImageOrderByWithRelationInput[] = [{ isPrimary: 'desc' }, { sortOrder: 'asc' }];
 
-/** One CART_INCLUDE covers all three CartItem shapes (Product, Service-Deal, Therapist — see
- *  CartItem's own schema doc comment) — `dealPackage`/`therapist`/`therapistPackage` are simply
- *  null on whichever lines they don't apply to. */
+/** One CART_INCLUDE covers all three CartItem shapes (Service-Deal, Product, Therapist — see
+ *  CartItem's own schema doc comment) — `dealPackage`/`therapist`/`therapistPackage`/`product`
+ *  are simply null on whichever lines they don't apply to. */
 const CART_INCLUDE = {
   items: {
     include: {
@@ -34,15 +34,6 @@ const CART_INCLUDE = {
           branchId: true,
           vendor: { select: { id: true, businessName: true } },
           branch: { select: { id: true, name: true } },
-          product: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
-              imageAlt: true,
-              mediaImages: { orderBy: PRODUCT_IMAGE_ORDER_BY },
-            },
-          },
           mediaImages: { orderBy: DEAL_IMAGE_ORDER_BY },
         },
       },
@@ -60,6 +51,19 @@ const CART_INCLUDE = {
         },
       },
       therapistPackage: { select: { id: true, durationMinutes: true, sellingPrice: true } },
+      product: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
+          imageAlt: true,
+          price: true,
+          originalPrice: true,
+          vendorId: true,
+          vendor: { select: { id: true, businessName: true } },
+          mediaImages: { orderBy: PRODUCT_IMAGE_ORDER_BY },
+        },
+      },
     },
     orderBy: { createdAt: 'asc' as const },
   },
@@ -76,11 +80,16 @@ export async function getOrCreateCart(customerId: string) {
   });
 }
 
-async function assertProductDeal(dealId: string) {
-  const deal = await prisma.deal.findUnique({ where: { id: dealId } });
-  if (!deal) throw new ApiError('NOT_FOUND', 'Deal not found');
-  if (!deal.productId) throw new ApiError('VALIDATION_ERROR', 'Only product deals can be added to a cart this way');
-  return { unitPrice: deal.salePrice };
+/** Product line — `productId` alone, entirely independent of any Deal (Product is a fully
+ *  independent, directly-purchasable catalog entity — see Product's own schema doc comment).
+ *  Mirrors `catalog.service.ts`'s `VISIBLE_PRODUCT_WHERE` bar: active product, active vendor. */
+async function assertProduct(productId: string) {
+  const product = await prisma.product.findUnique({ where: { id: productId }, include: { vendor: { select: { status: true } } } });
+  if (!product) throw new ApiError('NOT_FOUND', 'Product not found');
+  if (!product.isActive || product.vendor.status !== 'ACTIVE') {
+    throw new ApiError('VALIDATION_ERROR', 'Selected product is not currently available');
+  }
+  return { unitPrice: product.price };
 }
 
 /** Service-Deal line — `dealId` + `dealPackageId`. Never trusts a client-supplied price: the
@@ -89,7 +98,6 @@ async function assertProductDeal(dealId: string) {
 async function assertServiceDeal(dealId: string, dealPackageId: string) {
   const deal = await prisma.deal.findUnique({ where: { id: dealId } });
   if (!deal) throw new ApiError('NOT_FOUND', 'Deal not found');
-  if (deal.productId) throw new ApiError('VALIDATION_ERROR', 'A product deal has no packages to select');
   const pkg = await prisma.dealPackage.findUnique({ where: { id: dealPackageId } });
   if (!pkg || pkg.dealId !== deal.id) throw new ApiError('NOT_FOUND', 'Deal package not found');
   if (!pkg.isActive) throw new ApiError('VALIDATION_ERROR', 'Selected package is not currently available');
@@ -118,40 +126,42 @@ async function getOwnedCartItemOrThrow(customerId: string, itemId: string) {
 }
 
 /**
- * Adds one of the three CartItem shapes (see CartItem's own schema doc comment): a Product line
- * (`dealId` alone), a Service-Deal line (`dealId` + `dealPackageId`), or a Therapist line
+ * Adds one of the three CartItem shapes (see CartItem's own schema doc comment): a Service-Deal
+ * line (`dealId` + `dealPackageId`), a Product line (`productId` alone), or a Therapist line
  * (`therapistId` + `therapistPackageId`) — `cart.schema.ts#CartAddItemSchema`'s refinement already
  * guarantees the request matches exactly one of these shapes.
  *
  * The compound unique index on CartItem (`cartId, dealId, dealPackageId, therapistId,
- * therapistPackageId`) treats NULLs as pairwise-distinct (Postgres unique-index semantics — see
- * that index's own schema doc comment), so it can never behave as an upsert key by itself when
- * some fields are null. This does an explicit `findFirst` match on the exact shape submitted as
- * an application-level dedupe/increment, the same defense-in-depth discipline the schema comment
- * calls for.
+ * therapistPackageId, productId`) treats NULLs as pairwise-distinct (Postgres unique-index
+ * semantics — see that index's own schema doc comment), so it can never behave as an upsert key
+ * by itself when some fields are null. This does an explicit `findFirst` match on the exact shape
+ * submitted as an application-level dedupe/increment, the same defense-in-depth discipline the
+ * schema comment calls for.
  *
  * Multi-vendor: a cart may hold lines from any number of different vendors/branches — each
- * line's own deal/therapist relation is authoritative, so there is no vendor/branch conflict
- * check here. Checkout groups items by vendor when creating the Order — see
+ * line's own deal/therapist/product relation is authoritative, so there is no vendor/branch
+ * conflict check here. Checkout groups items by vendor when creating the Order — see
  * order.service.ts#createOrderFromCart.
  */
 export async function addItem(customerId: string, input: CartAddItemInput) {
   const isTherapistLine = !!input.therapistId;
+  const isProductLine = !isTherapistLine && !!input.productId;
 
   const { unitPrice } = isTherapistLine
     ? await assertTherapist(input.therapistId!, input.therapistPackageId!)
-    : input.dealPackageId
-      ? await assertServiceDeal(input.dealId!, input.dealPackageId)
-      : await assertProductDeal(input.dealId!);
+    : isProductLine
+      ? await assertProduct(input.productId!)
+      : await assertServiceDeal(input.dealId!, input.dealPackageId!);
 
   const cart = await prisma.cart.upsert({ where: { customerId }, update: {}, create: { customerId } });
 
   const matchWhere = {
     cartId: cart.id,
-    dealId: isTherapistLine ? null : input.dealId!,
-    dealPackageId: isTherapistLine ? null : (input.dealPackageId ?? null),
+    dealId: isTherapistLine || isProductLine ? null : input.dealId!,
+    dealPackageId: isTherapistLine || isProductLine ? null : input.dealPackageId!,
     therapistId: isTherapistLine ? input.therapistId! : null,
     therapistPackageId: isTherapistLine ? input.therapistPackageId! : null,
+    productId: isProductLine ? input.productId! : null,
   };
   const existingItem = await prisma.cartItem.findFirst({ where: matchWhere });
 

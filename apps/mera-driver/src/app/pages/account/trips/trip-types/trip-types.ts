@@ -1,13 +1,6 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, computed, inject, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { AdminPage } from '../../../../admin/admin-page/admin-page';
-
-interface TripType {
-  id?: string;
-  name: string;
-  description: string;
-  is_active: boolean;
-}
+import { TripTypesApiService, type TripType } from '../../../../core/trips/trip-types-api.service';
 
 @Component({
   selector: 'md-trip-types',
@@ -18,8 +11,9 @@ interface TripType {
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class TripTypes implements OnInit {
-  private readonly http = inject(HttpClient);
+  private readonly api = inject(TripTypesApiService);
   readonly list = signal<TripType[]>([]);
+  readonly loading = signal(false);
   readonly showAddForm = signal(false);
   readonly editingId = signal<string | 'new' | null>(null);
   readonly inputName = signal('');
@@ -40,9 +34,20 @@ export class TripTypes implements OnInit {
   );
 
   ngOnInit(): void {
-    this.http.get<TripType[]>('data/trip_types.json').subscribe({
-      next: (data) => this.list.set(data || []),
-      error: (err) => console.error('Failed to load trip types', err),
+    this.reload();
+  }
+
+  private reload(): void {
+    this.loading.set(true);
+    this.api.list().subscribe({
+      next: (data) => {
+        this.list.set(data);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to load trip types', err);
+        this.loading.set(false);
+      },
     });
   }
 
@@ -73,16 +78,23 @@ export class TripTypes implements OnInit {
       alert('Name is required.');
       return;
     }
-    const id = this.editingId();
-    const record: TripType = {
-      id: id === 'new' ? 'tt-' + Date.now() : id!,
+    const payload: TripType = {
       name: this.inputName().trim(),
       description: this.inputDescription().trim(),
       is_active: this.inputIsActive(),
     };
-    if (id === 'new') this.list.update((l) => [...l, record]);
-    else this.list.update((l) => l.map((x) => (x.id === id ? record : x)));
-    this.cancelEdit();
+    const id = this.editingId();
+    const request = id === 'new' || id === null ? this.api.create(payload) : this.api.update(id, payload);
+    request.subscribe({
+      next: () => {
+        this.reload();
+        this.cancelEdit();
+      },
+      error: (err) => {
+        console.error('Failed to save trip type', err);
+        alert('Failed to save trip type. Please try again.');
+      },
+    });
   }
 
   cancelEdit(): void {
@@ -91,8 +103,14 @@ export class TripTypes implements OnInit {
   }
 
   deleteOption(row: TripType): void {
-    if (confirm(`Delete trip type "${row.name}"?`)) {
-      this.list.update((l) => l.filter((x) => x.id !== row.id));
+    if (confirm(`Delete trip type "${row.name}"?`) && row.id) {
+      this.api.delete(row.id).subscribe({
+        next: () => this.reload(),
+        error: (err) => {
+          console.error('Failed to delete trip type', err);
+          alert('Failed to delete trip type. Please try again.');
+        },
+      });
     }
   }
 }

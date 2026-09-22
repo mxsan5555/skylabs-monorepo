@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedIconButton, Icon, Divider, Radio, ChipSet, FilterChip, SuggestionChip, Tabs, PrimaryTab, OutlinedTextField, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { getCatalogVendor, listCatalogDeals, type CatalogVendorDetail, type CatalogVendorBranch, type CatalogDeal, type CatalogVendorTherapist, type CatalogOpeningHours, } from '../../../api/catalog';
+import { getCatalogVendor, listCatalogDeals, listCatalogProducts, type CatalogVendorDetail, type CatalogVendorBranch, type CatalogDeal, type CatalogProduct, type CatalogVendorTherapist, type CatalogOpeningHours, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
+import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { DurationPackageSelector } from '../../components/duration-package-selector';
@@ -13,7 +14,7 @@ import { TherapistPackageSelector } from '../../components/therapist-package-sel
 import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selection';
 import { useTherapistPurchaseSelection } from '../../../hooks/use-therapist-purchase-selection';
 import { formatINR, pluralize, formatTime12h } from '../../../utils/format';
-import { resolveDealMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
+import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import { useToast } from '../../../toast/toast-context';
 import './vendor.css';
 import content from '../../../content.json';
@@ -74,10 +75,6 @@ function getOrCreate<K, V>(map: Map<K, V>, key: K, create: () => V): V {
 function groupServiceDeals(deals: CatalogDeal[]): CategoryGroup[] {
   const categories = new Map<string, Map<string, Map<string, ServiceGroup>>>();
   for (const deal of deals) {
-    // A service deal has no `product` (see Deal's own schema doc comment) — the old Service
-    // master-row model (`deal.service`) is gone entirely, so a service deal is identified purely
-    // by the absence of `product`, never by a truthy `deal.service` (always null now).
-    if (deal.product) continue;
     const categoryName = deal.category?.name ?? 'Other Services';
     const subKey = deal.subcategory?.name ?? '';
     const subMap = getOrCreate(categories, categoryName, () => new Map());
@@ -107,6 +104,41 @@ function therapistFromPrice(therapist: CatalogVendorTherapist): number | null {
   return Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)));
 }
 
+type VendorSection = 'deals' | 'products' | 'therapies';
+
+/** Great-circle distance in kilometers — mirrors msd-api's own `haversineKm` (catalog.service.ts).
+ *  Kept as an independent client-side copy rather than a shared package, per this app's "app-local
+ *  logic, never shared between frontend and backend" convention. */
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return earthRadiusKm * 2 * Math.asin(Math.sqrt(a));
+}
+
+/** The customer's "serviceable branch" — always the nearest branch to their browser-geolocation
+ *  coordinates (no radius cutoff), falling back to the vendor's first active branch when
+ *  coordinates are unavailable (denied/unsupported) or no branch has coordinates set yet. The
+ *  customer never picks a branch manually — see this page's removed branch-tabs selector. */
+function resolveBranch(branches: CatalogVendorBranch[], coords: { latitude: number; longitude: number } | null): CatalogVendorBranch | null {
+  if (branches.length === 0) return null;
+  if (!coords) return branches[0];
+  let nearest: CatalogVendorBranch | null = null;
+  let nearestDistance = Infinity;
+  for (const branch of branches) {
+    if (branch.latitude == null || branch.longitude == null) continue;
+    const distance = haversineKm(coords.latitude, coords.longitude, Number(branch.latitude), Number(branch.longitude));
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearest = branch;
+    }
+  }
+  return nearest ?? branches[0];
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function VendorPage() {
@@ -116,16 +148,19 @@ export function VendorPage() {
   const { has: isWishlisted, toggle: toggleWishlist, isPending: wishlistPending } = useWishlist();
   const { showToast } = useToast();
 
+  const { coords } = useCurrentLocation();
+
   const [vendor, setVendor] = useState<CatalogVendorDetail | null>(null);
   const [vendorLoading, setVendorLoading] = useState(true);
   const [vendorError, setVendorError] = useState('');
 
-  const [branchIndex, setBranchIndex] = useState(0);
+  const [activeSection, setActiveSection] = useState<VendorSection>('deals');
 
   const [serviceDeals, setServiceDeals] = useState<CatalogDeal[]>([]);
-  const [productDeals, setProductDeals] = useState<CatalogDeal[]>([]);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [dealsLoading, setDealsLoading] = useState(true);
   const [dealsError, setDealsError] = useState('');
+  const [productsLoading, setProductsLoading] = useState(true);
 
   const [activeCategoryName, setActiveCategoryName] = useState('all');
   // Exactly one of these is ever set — selecting a Deal clears the Therapist selection and vice
@@ -143,7 +178,7 @@ export function VendorPage() {
     setVendorLoading(true);
     setVendorError('');
     setVendor(null);
-    setBranchIndex(0);
+    setActiveSection('deals');
     getCatalogVendor(slug)
       .then(({ data }) => setVendor(data))
       .catch((err) => {
@@ -157,7 +192,10 @@ export function VendorPage() {
       .finally(() => setVendorLoading(false));
   }, [slug]);
 
-  const selectedBranch: CatalogVendorBranch | null = vendor?.branches[branchIndex] ?? vendor?.branches[0] ?? null;
+  const selectedBranch = useMemo(
+    () => resolveBranch(vendor?.branches ?? [], coords),
+    [vendor, coords],
+  );
 
   const resetSelection = () => {
     setActiveCategoryName('all');
@@ -167,28 +205,39 @@ export function VendorPage() {
     setProductActionMessage('');
   };
 
-  const handleBranchSelect = (index: number) => {
-    setBranchIndex(index);
+  const handleSectionSelect = (section: VendorSection) => {
+    setActiveSection(section);
     resetSelection();
   };
 
-  // ── Fetch services + products for the selected branch ───────────────────
+  // ── Fetch service deals for the selected branch ──────────────────────────
   useEffect(() => {
-    if (!vendor || !selectedBranch) return;
+    if (!vendor) return;
+    if (!selectedBranch) {
+      // No active branch at all (e.g. vendor has none) — nothing to fetch, show the empty state
+      // immediately rather than spinning forever.
+      setServiceDeals([]);
+      setDealsLoading(false);
+      return;
+    }
     setDealsLoading(true);
     setDealsError('');
-    Promise.all([
-      listCatalogDeals({ vendorId: vendor.id, branchId: selectedBranch.id, type: 'service', pageSize: 100 }),
-      listCatalogDeals({ vendorId: vendor.id, branchId: selectedBranch.id, type: 'product', pageSize: 100 }),
-    ])
-      .then(([services, products]) => {
-        setServiceDeals(services.data);
-        setProductDeals(products.data);
-      })
+    listCatalogDeals({ vendorId: vendor.id, branchId: selectedBranch.id, pageSize: 100 })
+      .then(({ data }) => setServiceDeals(data))
       .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : vendorContent.errors.loadServicesProducts))
       .finally(() => setDealsLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendor, selectedBranch?.id]);
+
+  // ── Fetch products for the vendor — Product has no branchId (see msd-api's Product schema
+  // doc comment), so this is vendor-scoped, not re-fetched on branch switch. ────────────────
+  useEffect(() => {
+    if (!vendor) return;
+    setProductsLoading(true);
+    listCatalogProducts({ vendorId: vendor.id, pageSize: 100 })
+      .then(({ data }) => setProducts(data))
+      .catch(() => setProducts([]))
+      .finally(() => setProductsLoading(false));
+  }, [vendor]);
 
   const categoryGroups = useMemo(() => groupServiceDeals(serviceDeals), [serviceDeals]);
   const categoryNames = useMemo(() => categoryGroups.map((c) => c.name), [categoryGroups]);
@@ -229,15 +278,14 @@ export function VendorPage() {
     void toggleWishlist(deal.id);
   };
 
-  const addProductToCart = async (deal: CatalogDeal) => {
+  const addProductToCart = async (product: CatalogProduct) => {
     if (!requireAuthOrRedirect()) return;
     setProductActionError('');
     setProductActionMessage('');
     try {
-      await addCartItem(token, { dealId: deal.id, quantity: 1 });
-      const name = deal.product?.name ?? deal.title;
-      setProductActionMessage(`Added "${name}" to your cart.`);
-      showToast(`Added to cart\n${name}`);
+      await addCartItem(token, { productId: product.id, quantity: 1 });
+      setProductActionMessage(`Added "${product.name}" to your cart.`);
+      showToast(`Added to cart\n${product.name}`);
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setProductActionError(message);
@@ -265,7 +313,7 @@ export function VendorPage() {
 
   const canonicalUrl = `${SITE_URL}/vendor/${vendor.slug}`;
   const metaDescription = vendor.businessDescription
-    ?? `Book services at ${vendor.businessName}${vendor.city ? `, ${vendor.city}` : ''}.`;
+    ?? `Book deals at ${vendor.businessName}${vendor.city ? `, ${vendor.city}` : ''}.`;
 
   return (
     <div id="main-content" className="vendor-page">
@@ -334,8 +382,8 @@ export function VendorPage() {
         {vendor.logoUrl && <img src={vendor.logoUrl} alt="" />}
       </div>
 
-      {/* Two-panel body overlapping the hero */}
-      <div className="vendor-page__body">
+      {/* Two-panel body overlapping the hero — full-width when the Products tab has no aside */}
+      <div className={`vendor-page__body${activeSection === 'products' ? ' vendor-page__body--full-width' : ''}`}>
 
         {/* ── Left: main content card ──────────────────────────────────────── */}
         <div className="vendor-page__main-card">
@@ -368,25 +416,11 @@ export function VendorPage() {
             )}
           </div>
 
-          {/* Branch selector — only when there's a real choice to make */}
-          {vendor.branches.length > 1 && (
-            <div className="vendor-page__branch-tabs-wrap">
-              <Tabs
-                className="vendor-page__branch-tabs"
-                onChange={(e) => handleBranchSelect((e.target as unknown as { activeTabIndex: number }).activeTabIndex)}
-              >
-                {vendor.branches.map((b, i) => (
-                  <PrimaryTab key={b.id} active={i === branchIndex}>{b.name}</PrimaryTab>
-                ))}
-              </Tabs>
-            </div>
-          )}
-
           {/* Opening hours — always rendered (never silently omitted) so a branch with no
               schedule set yet still tells the customer that, instead of just vanishing. Reads
-              this SELECTED branch's own `openingHours` object fresh on every render (never a
-              hardcoded day/time literal), so switching branch tabs always shows that branch's
-              own real schedule, never a stale/different branch's. */}
+              the customer's auto-resolved nearest branch's own `openingHours` object fresh on
+              every render (never a hardcoded day/time literal) — the customer never picks a
+              branch manually. */}
           <div className="vendor-page__hours-section">
             <h2 className="vendor-page__hours-title">{vendorContent.labels.workingHours}</h2>
             {selectedBranch?.openingHours && Object.keys(selectedBranch.openingHours).length > 0 ? (
@@ -411,7 +445,24 @@ export function VendorPage() {
 
           <Divider />
 
+          {/* Deals / Products / Therapies — the customer's branch is auto-resolved from their
+              location above, never picked manually, so this is the only tab switcher on the
+              page. */}
+          <div className="vendor-page__section-tabs-wrap">
+            <Tabs
+              className="vendor-page__section-tabs"
+              onChange={(e) => handleSectionSelect(
+                (['deals', 'products', 'therapies'] as const)[(e.target as unknown as { activeTabIndex: number }).activeTabIndex],
+              )}
+            >
+              <PrimaryTab active={activeSection === 'deals'}>{vendorContent.tabs.deals}</PrimaryTab>
+              <PrimaryTab active={activeSection === 'products'}>{vendorContent.tabs.products}</PrimaryTab>
+              <PrimaryTab active={activeSection === 'therapies'}>{vendorContent.tabs.therapies}</PrimaryTab>
+            </Tabs>
+          </div>
+
           {/* Select Service */}
+          {activeSection === 'deals' && (
           <section className="vendor-page__section" aria-label={vendorContent.accessibility.services}>
             <h2 className="vendor-page__section-title"> {vendorContent.labels.selectService}</h2>
 
@@ -527,43 +578,40 @@ export function VendorPage() {
               </div>
             )}
           </section>
-
-          <Divider />
+          )}
 
           {/* Products */}
+          {activeSection === 'products' && (
           <section className="vendor-page__section" aria-label={vendorContent.accessibility.products}>
             <h2 className="vendor-page__section-title">Products</h2>
             {productActionMessage && <p className="field-hint" role="status">{productActionMessage}</p>}
             {productActionError && <p className="error-state" role="alert">{productActionError}</p>}
-            {dealsLoading ? (
+            {productsLoading ? (
               <p className="loading-state">{vendorContent.loading.products}</p>
-            ) : productDeals.length === 0 ? (
+            ) : products.length === 0 ? (
               <p className="vendor-page__deal-empty">{vendorContent.empty.noProducts}</p>
             ) : (
               <ul className="vendor-page__product-grid">
-                {productDeals.map((deal) => (
-                  <li key={deal.id}>
+                {products.map((product) => (
+                  <li key={product.id}>
                     <SkyProductCardWC
                       variant="outlined"
                       badge={vendorContent.labels.products}
-                      eyebrow={deal.product?.brand ?? undefined}
-                      heading={deal.product?.name ?? deal.title}
-                      image={primaryImage(resolveDealMedia(deal))}
-                      imageAlt={deal.product?.imageAlt ?? undefined}
-                      price={formatINR(Number(deal.salePrice))}
+                      eyebrow={product.brand ?? undefined}
+                      heading={product.name}
+                      image={primaryImage(resolveProductMedia(product))}
+                      imageAlt={product.imageAlt ?? undefined}
+                      price={formatINR(Number(product.price))}
                       originalPrice={
-                        deal.originalPrice && Number(deal.originalPrice) !== Number(deal.salePrice)
-                          ? formatINR(Number(deal.originalPrice))
+                        product.originalPrice && Number(product.originalPrice) !== Number(product.price)
+                          ? formatINR(Number(product.originalPrice))
                           : undefined
                       }
-                      discount={deal.discountPercent ? `-${deal.discountPercent}%` : undefined}
-                      href={`/products/${deal.id}`}
-                      favorite
-                      favoriteActive={isWishlisted(deal.id)}
-                      onFavorite={() => toggleFavorite(deal)}
+                      discount={product.discount ? `-${product.discount}%` : undefined}
+                      href={`/products/${product.id}`}
                     >
                       <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
-                        <FilledButton onClick={() => addProductToCart(deal)}>
+                        <FilledButton onClick={() => addProductToCart(product)}>
                           <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
                           {vendorContent.actions.addToCart}
                         </FilledButton>
@@ -574,10 +622,10 @@ export function VendorPage() {
               </ul>
             )}
           </section>
-
-          <Divider />
+          )}
 
           {/* Therapists */}
+          {activeSection === 'therapies' && (
           <section className="vendor-page__section" aria-label={vendorContent.accessibility.therapists}>
             <h2 className="vendor-page__section-title">Meet Our Therapists</h2>
             {selectedBranch && selectedBranch.therapists.length > 0 ? (
@@ -638,9 +686,12 @@ export function VendorPage() {
               <p className="vendor-page__deal-empty">{vendorContent.empty.noTherapists}</p>
             )}
           </section>
+          )}
         </div>
 
-        {/* ── Right: Your selection card ───────────────────────────────────── */}
+        {/* ── Right: Your selection card — Deals/Therapies only, Products uses its own inline
+            Add to Cart per card ─────────────────────────────────────────────── */}
+        {activeSection !== 'products' && (
         <aside className="vendor-page__selection-card" aria-label={vendorContent.accessibility.yourSelection}>
           <h2 className="vendor-page__selection-title"> {vendorContent.labels.yourSelection}</h2>
 
@@ -659,10 +710,11 @@ export function VendorPage() {
           ) : (
             <div className="vendor-page__selection-empty">
               <Icon aria-hidden="true" className="vendor-page__empty-icon">spa</Icon>
-              <p>Select a service or therapist to see packages and pricing.</p>
+              <p>Select a deal or therapist to see packages and pricing.</p>
             </div>
           )}
         </aside>
+        )}
 
       </div>
     </div>
@@ -699,8 +751,8 @@ function DealSelectionPanel({
 
   const addToCart = async () => {
     if (!requireAuthOrRedirect()) return;
-    if (missingSelection) {
-      setActionError(missingSelection);
+    if (missingSelection || !activePackage) {
+      setActionError(missingSelection ?? 'Please select a duration.');
       setActionMessage('');
       return;
     }
@@ -710,10 +762,10 @@ function DealSelectionPanel({
     try {
       await addCartItem(token, {
         dealId: group.deal.id,
+        dealPackageId: activePackage.id,
         quantity: qty,
-        ...(activePackage ? { dealPackageId: activePackage.id } : {}),
       });
-      const durationLabel = activePackage ? ` — ${activePackage.durationMinutes} Minutes` : '';
+      const durationLabel = ` — ${activePackage.durationMinutes} Minutes`;
       setActionMessage(`Added "${group.name}" to your cart.`);
       // Only fires after the API call above has actually resolved — never claims success early.
       showToast(`Added to cart\n${group.name}${durationLabel}`);

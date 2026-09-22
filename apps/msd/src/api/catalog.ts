@@ -29,7 +29,6 @@ export interface CatalogPopularTag {
  *  `undefined` for a subcategory entry (which never appears at the top of the tree anyway). */
 export interface CatalogCategoryWithChildren extends CatalogCategory {
   type?: 'SERVICE' | 'PRODUCT' | 'THERAPY' | null;
-  isPopular?: boolean;
   sortOrder?: number;
   popularTags?: CatalogPopularTag[];
   children: CatalogCategory[];
@@ -42,25 +41,9 @@ export interface CatalogLocation {
   city: string;
 }
 
-export interface CatalogDealSummary {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string | null;
-  image?: string | null;
-  imageAlt?: string | null;
-}
-
-export interface CatalogProductSummary extends CatalogDealSummary {
-  brand?: string | null;
-  mediaImages?: MediaImage[];
-  mediaVideo?: MediaVideo | null;
-  popularTags?: CatalogPopularTag[];
-}
-
 /** A service Deal's own duration/price menu entry — a real child row (DealPackage), never a
- *  sibling Deal row. Only active packages are ever included here. Empty for a product deal (no
- *  duration/package concept applies) or a not-yet-migrated legacy service deal. */
+ *  sibling Deal row. Only active packages are ever included here. Empty for a not-yet-migrated
+ *  legacy service deal with no packages configured yet. */
 export interface CatalogDealPackage {
   id: string;
   durationMinutes: number;
@@ -88,10 +71,6 @@ export interface CatalogDeal {
   images: string[] | null;
   category: CatalogCategory | null;
   subcategory: CatalogCategory | null;
-  /** No `service` field — the old Service master-row model is gone entirely (see msd-api's Deal
-   *  schema doc comment). A service deal is identified purely by `product` being `null`, never by
-   *  a separate truthy/falsy discriminator field. */
-  product: CatalogProductSummary | null;
   vendor: { id: string; slug: string | null; businessName: string | null; city: string | null; logoUrl: string | null } | null;
   /** `latitude`/`longitude` are Decimal → string over the wire (same convention as
    *  originalPrice/salePrice below), and nullable — most branches don't have coordinates set
@@ -170,6 +149,10 @@ export interface CatalogVendorBranch {
   pincode: string | null;
   phone: string | null;
   openingHours: CatalogOpeningHours | null;
+  /** Decimal → string over the wire, nullable — see `CatalogDeal.branch`'s identical field doc
+   *  comment. Used client-side to resolve the customer's nearest branch (never fabricated). */
+  latitude: string | null;
+  longitude: string | null;
   therapists: CatalogVendorTherapist[];
 }
 
@@ -209,7 +192,6 @@ export function listCatalogDeals(opts: {
   subcategoryId?: string;
   vendorId?: string;
   branchId?: string;
-  type?: 'service' | 'product';
   search?: string;
   state?: string;
   city?: string;
@@ -226,6 +208,47 @@ export function listCatalogDeals(opts: {
 
 export function getCatalogDeal(id: string) {
   return apiGet<CatalogDeal>(`/catalog/deals/${id}`, null);
+}
+
+/** Product is a fully independent, directly-purchasable catalog entity (see msd-api's Product
+ *  schema doc comment) — never nested under or fetched through a Deal. No branch/location
+ *  fields (Product has no branchId) and no `packages` (no duration/tier concept applies). */
+export interface CatalogProduct {
+  id: string;
+  name: string;
+  slug: string;
+  brand: string | null;
+  description: string | null;
+  summary: string | null;
+  image: string | null;
+  imageAlt: string | null;
+  price: string;
+  originalPrice: string | null;
+  discount: number | null;
+  category: CatalogCategory | null;
+  subcategory: CatalogCategory | null;
+  vendor: { id: string; slug: string | null; businessName: string | null; city: string | null; logoUrl: string | null } | null;
+  mediaImages?: MediaImage[];
+  mediaVideo?: MediaVideo | null;
+  popularTags?: CatalogPopularTag[];
+}
+
+export function listCatalogProducts(opts: {
+  page?: number;
+  pageSize?: number;
+  categoryId?: string;
+  subcategoryId?: string;
+  vendorId?: string;
+  search?: string;
+  sort?: 'newest' | 'discount';
+  minPrice?: number;
+  maxPrice?: number;
+} = {}) {
+  return apiGet<CatalogProduct[]>(`/catalog/products${toQuery(opts)}`, null);
+}
+
+export function getCatalogProduct(id: string) {
+  return apiGet<CatalogProduct>(`/catalog/products/${id}`, null);
 }
 
 /** Distinct `{state, city}` pairs from active branches — drives the public State/City picker
@@ -303,4 +326,126 @@ export function getCatalogAboutUs() {
 
 export function getCatalogContactUs() {
   return apiGet<CatalogContactUs>('/catalog/contact-us', null);
+}
+
+/** `GET /catalog/faqs` — always `isActive` only, ordered by `sortOrder` (see msd-api's `Faq`
+ *  schema doc comment). No pagination — the home page's FAQ accordion renders the whole list. */
+export interface CatalogFaq {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export function listCatalogFaqs() {
+  return apiGet<CatalogFaq[]>('/catalog/faqs', null);
+}
+
+// ─── CMS (Blog categories / Website pages / How It Works / Careers / Social links) — same
+// "no auth, one function per public GET" discipline as every other function in this file. ──────
+
+/** `GET /catalog/blog-categories` — always `isActive: true`, ordered (see msd-api's
+ *  `listPublicBlogCategories` doc comment). Drives the Blog index's category filter facet. */
+export interface CatalogBlogCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+}
+
+export function listCatalogBlogCategories() {
+  return apiGet<CatalogBlogCategory[]>('/catalog/blog-categories', null);
+}
+
+/** One of the 4 fixed `WebsitePage` rows (privacy/terms/accessibility/cookies) — always
+ *  `status: 'PUBLISHED'` server-side (see msd-api's `getPublicWebsitePageBySlugOrThrow`).
+ *  `content` is a `BlogBlock[]`, same convention as `CatalogAboutUs.body` above, rendered with
+ *  `blog-detail.tsx`'s shared `renderBlock`. */
+export interface CatalogWebsitePage {
+  id: string;
+  slug: string;
+  title: string;
+  content: BlogBlock[];
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+}
+
+export function getCatalogPage(slug: string) {
+  return apiGet<CatalogWebsitePage>(`/catalog/pages/${encodeURIComponent(slug)}`, null);
+}
+
+/** Singleton row (same convention as `CatalogAboutUs`/`CatalogContactUs`) — the public "How It
+ *  Works" page's hero copy. */
+export interface CatalogHowItWorksContent {
+  heroTitle: string;
+  heroSubtitle: string;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+}
+
+/** One active step in the public "How It Works" flow, ordered by `sortOrder` (see msd-api's
+ *  `getPublicHowItWorks` doc comment). `icon` is a Material Symbols icon name, rendered via
+ *  `<md-icon>`/`Icon` — falsy for a step with no icon chosen yet. */
+export interface CatalogHowItWorksStep {
+  id: string;
+  title: string;
+  description: string;
+  icon?: string | null;
+  sortOrder: number;
+}
+
+export interface CatalogHowItWorks {
+  content: CatalogHowItWorksContent;
+  steps: CatalogHowItWorksStep[];
+}
+
+export function getCatalogHowItWorks() {
+  return apiGet<CatalogHowItWorks>('/catalog/how-it-works', null);
+}
+
+/** Singleton row (same convention as `CatalogHowItWorksContent`) — the public "Careers" page's
+ *  hero copy. */
+export interface CatalogCareersContent {
+  heroTitle: string;
+  heroSubtitle: string;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+}
+
+/** One `PUBLISHED` job listing (see msd-api's `getPublicCareers` doc comment) — `applyUrl` and
+ *  `applyInstructions` are both optional; a listing shows whichever one the admin filled in. */
+export interface CatalogCareersJob {
+  id: string;
+  jobTitle: string;
+  department: string;
+  location: string;
+  employmentType: string;
+  description: string;
+  responsibilities: string;
+  requirements: string;
+  applyUrl?: string | null;
+  applyInstructions?: string | null;
+}
+
+export interface CatalogCareers {
+  content: CatalogCareersContent;
+  jobs: CatalogCareersJob[];
+}
+
+export function getCatalogCareers() {
+  return apiGet<CatalogCareers>('/catalog/careers', null);
+}
+
+/** `GET /catalog/social-links` — always `isActive: true`, ordered (see msd-api's
+ *  `listPublicSocialMediaLinks` doc comment). `platform` is freeform text (facebook/instagram/
+ *  youtube/linkedin/x/whatsapp/...); the frontend maps known keys to icons with a generic
+ *  fallback for anything else (see `footer.tsx`'s `SOCIAL_ICONS`). */
+export interface CatalogSocialMediaLink {
+  id: string;
+  platform: string;
+  displayName: string;
+  url: string;
+}
+
+export function listCatalogSocialLinks() {
+  return apiGet<CatalogSocialMediaLink[]>('/catalog/social-links', null);
 }

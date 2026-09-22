@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { Prisma } from '../generated/prisma-client';
 
 export class HttpError extends Error {
   constructor(
@@ -21,6 +22,18 @@ export function notFoundHandler(req: Request, res: Response): void {
 export function errorHandler(err: unknown, req: Request, res: Response, next: NextFunction): void {
   if (err instanceof HttpError) {
     res.status(err.status).json({ data: null, error: { code: err.code, message: err.message, details: err.details } });
+    return;
+  }
+
+  // Prisma unique-constraint violation — every `@unique`/`@@unique` field across the
+  // schema (customer mobile numbers, vehicle numbers, master item names, ...) hits this,
+  // not just one module, so it's translated here rather than per-service.
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+    const fields = (err.meta?.target as string[] | undefined)?.join(', ') ?? 'value';
+    res.status(409).json({
+      data: null,
+      error: { code: 'CONFLICT', message: `A record with this ${fields} already exists.` },
+    });
     return;
   }
 

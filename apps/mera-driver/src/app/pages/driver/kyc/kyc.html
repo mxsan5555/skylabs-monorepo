@@ -1,0 +1,46 @@
+<md-admin-page title="KYC Status" subtitle="Your verification status is set by our staff after reviewing your documents.">
+  @if (loading()) {
+    <p class="otp-muted">Loading…</p>
+  } @else if (driver(); as d) {
+    <section class="account-card">
+      <div class="account-card__head">
+        <h2>Current status</h2>
+        <sky-badge [variant]="statusVariant(d.status)">{{ d.status }}</sky-badge>
+      </div>
+
+      @if (d.status === 'Non-Verified') {
+        <p class="otp-muted">
+          Your account hasn't been verified yet. Please make sure all required documents are
+          uploaded, and our team will review them shortly.
+        </p>
+      } @else if (d.status.startsWith('Partially Verified')) {
+        <p class="otp-muted">
+          Some of your documents have been verified. Please check the Documents tab and
+          upload anything still missing.
+        </p>
+      } @else if (d.status === 'Verified') {
+        <p class="otp-muted">You're fully verified. No action needed.</p>
+      } @else {
+        <p class="otp-muted">
+          Contact support if you believe this status is incorrect.
+        </p>
+      }
+
+      @if (d.verificationNotes) {
+        <div class="account-card">
+          <div class="account-card__head">
+            <h2>Note from our team</h2>
+          </div>
+          <p>{{ d.verificationNotes }}</p>
+        </div>
+      }
+
+      <div>
+        <md-outlined-button (click)="goToDocuments()">
+          <md-icon slot="icon" aria-hidden="true">folder</md-icon>
+          Manage documents
+        </md-outlined-button>
+      </div>
+    </section>
+  }
+</md-admin-page>

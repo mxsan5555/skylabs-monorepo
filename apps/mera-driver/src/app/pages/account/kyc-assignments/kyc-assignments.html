@@ -1,0 +1,86 @@
+<md-admin-page
+  [title]="selectedDriver() ? 'Review KYC — ' + selectedDriver()!.firstName + ' ' + selectedDriver()!.lastName : 'KYC Assignments'"
+  [subtitle]="selectedDriver() ? 'Verify, reject, or request correction for each document category.' : 'Drivers currently assigned to you for KYC review.'"
+>
+  <div class="relative w-full">
+    @if (!selectedDriver()) {
+      <div class="w-full mt-4">
+        <sky-card class="p-6 block">
+          <sky-data-table
+            caption="Assigned KYC Queue"
+            [columns]="tableColumns"
+            [rows]="tableRowsString()"
+            [total]="totalDrivers()"
+            [loading]="loading()"
+            [actions]="tableActions"
+            (sky-dt-row-action)="onRowAction($event)"
+          ></sky-data-table>
+        </sky-card>
+      </div>
+    } @else {
+      <div class="flex flex-col gap-6 w-full mt-2">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+          <div class="flex items-center gap-x-2">
+            <md-icon-button (click)="closeDetail()">
+              <md-icon>arrow_back</md-icon>
+            </md-icon-button>
+            <span class="form-header-title">Back to Assigned KYC Queue</span>
+          </div>
+        </div>
+
+        @if (actionError()) {
+          <p class="otp-muted" role="alert">{{ actionError() }}</p>
+        }
+
+        @for (cat of checklistCategories(); track cat.key) {
+          <sky-card class="p-6 block">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-bold text-slate-800 m-0">{{ cat.label }}</h3>
+              <sky-badge [variant]="checklistVariant(cat.status)">{{ cat.status }}</sky-badge>
+            </div>
+
+            @if (cat.docs.length) {
+              <ul class="mb-3">
+                @for (doc of cat.docs; track doc.type) {
+                  <li>{{ doc.type }} — {{ doc.file || 'No file uploaded' }}</li>
+                }
+              </ul>
+            } @else {
+              <p class="otp-muted mb-3">No documents uploaded yet.</p>
+            }
+
+            @if (cat.notes) {
+              <p class="mb-3"><strong>Previous note:</strong> {{ cat.notes }}</p>
+            }
+
+            <md-outlined-text-field
+              class="w-full mb-3"
+              label="Notes (shown to admin/driver)"
+              [value]="noteDrafts()[cat.key]"
+              (input)="onNoteChange(cat.key, $event)"
+            ></md-outlined-text-field>
+
+            <div class="flex flex-wrap gap-2">
+              <md-filled-button
+                [disabled]="savingCategory() === cat.key"
+                (click)="setCategory(cat.key, 'Verified')"
+                style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;"
+              >
+                <md-icon slot="icon">check_circle</md-icon>
+                Verify
+              </md-filled-button>
+              <md-outlined-button [disabled]="savingCategory() === cat.key" (click)="setCategory(cat.key, 'Correction Requested')">
+                <md-icon slot="icon">edit_note</md-icon>
+                Request Correction
+              </md-outlined-button>
+              <md-outlined-button [disabled]="savingCategory() === cat.key" (click)="setCategory(cat.key, 'Rejected')">
+                <md-icon slot="icon">cancel</md-icon>
+                Reject
+              </md-outlined-button>
+            </div>
+          </sky-card>
+        }
+      </div>
+    }
+  </div>
+</md-admin-page>

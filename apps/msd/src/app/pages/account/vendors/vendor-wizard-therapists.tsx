@@ -13,11 +13,13 @@ import {
 } from '@skylabs-monorepo/shared-ui/react';
 import {
   createVendorTherapist,
+  getBranchCategoryAccess,
   listVendorTherapistsForAdmin,
   setVendorTherapistStatus,
   updateVendorTherapist,
   type AdminTherapist,
   type Branch,
+  type BranchCategoryAccessRow,
   type Category,
   type Therapist,
   type TherapistInput,
@@ -236,7 +238,6 @@ function WizardTherapistFormDialog({
           personName: therapist.personName,
           gender: therapist.gender ?? undefined,
           specialization: therapist.specialization ?? undefined,
-          specializationCategoryId: therapist.specializationCategoryId ?? undefined,
           bio: therapist.bio ?? undefined,
           experienceYears: therapist.experienceYears ?? undefined,
         }
@@ -245,6 +246,100 @@ function WizardTherapistFormDialog({
   const [branchId, setBranchId] = useState(therapist?.branchId ?? branches[0]?.id ?? '');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Two-tier Category → Subcategory UI state, mirroring DealDialog's cascade — the backend still
+  // only stores one `specializationCategoryId` field (see `TherapistInput`), so this is UI-only
+  // state; `specSubcategoryId || specCategoryId` is computed into that single field at submit
+  // time (see `submit()` below).
+  const [specCategoryId, setSpecCategoryId] = useState('');
+  const [specSubcategoryId, setSpecSubcategoryId] = useState<string | undefined>(undefined);
+  // The therapist's pre-existing single id, resolved into the two-tier UI state once this
+  // branch's mapping has loaded (see the resolution effect below) — captured once so a later
+  // `branchCategoryAccess` refetch (there shouldn't be one in edit mode, branch is fixed) never
+  // re-triggers the resolution and stomps on an in-progress edit.
+  const initialSpecializationCategoryId = useRef(therapist?.specializationCategoryId ?? undefined).current;
+  const hasResolvedInitialSpecialization = useRef(false);
+
+  const [branchCategoryAccess, setBranchCategoryAccess] = useState<BranchCategoryAccessRow[]>([]);
+  // Starts `true` for the same reason as DealDialog's own flag — avoids a one-frame "stale"
+  // flash for an edit's existing specialization before the fetch below has run.
+  const [branchCategoryAccessLoading, setBranchCategoryAccessLoading] = useState(true);
+  const [branchCategoryAccessError, setBranchCategoryAccessError] = useState('');
+
+  useEffect(() => {
+    if (!branchId) {
+      setBranchCategoryAccess([]);
+      setBranchCategoryAccessError('');
+      setBranchCategoryAccessLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setBranchCategoryAccessLoading(true);
+    setBranchCategoryAccessError('');
+    getBranchCategoryAccess(token, vendorId, branchId)
+      .then(({ data }) => {
+        if (cancelled) return;
+        setBranchCategoryAccess(data);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setBranchCategoryAccess([]);
+        setBranchCategoryAccessError(err instanceof ApiRequestError ? err.message : "Could not load this branch's category access.");
+      })
+      .finally(() => {
+        if (!cancelled) setBranchCategoryAccessLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, vendorId, branchId]);
+
+  // Resolves the therapist's existing single `specializationCategoryId` back into the two-tier
+  // UI state once the branch's mapping has loaded: a match among the mapped top-level categories
+  // sets just `specCategoryId`; a match among one of those categories' subcategories sets both;
+  // no match at all (branch remapped since this therapist was staffed) leaves it to be picked up
+  // as a stale top-level value below, same "don't silently overwrite" contract as DealDialog.
+  useEffect(() => {
+    if (hasResolvedInitialSpecialization.current || branchCategoryAccessLoading) return;
+    if (!initialSpecializationCategoryId) {
+      hasResolvedInitialSpecialization.current = true;
+      return;
+    }
+    const asCategory = branchCategoryAccess.find((row) => row.categoryId === initialSpecializationCategoryId);
+    if (asCategory) {
+      setSpecCategoryId(initialSpecializationCategoryId);
+      setSpecSubcategoryId(undefined);
+      hasResolvedInitialSpecialization.current = true;
+      return;
+    }
+    const parentRow = branchCategoryAccess.find((row) =>
+      row.subcategories.some((s) => s.subcategoryId === initialSpecializationCategoryId),
+    );
+    if (parentRow) {
+      setSpecCategoryId(parentRow.categoryId);
+      setSpecSubcategoryId(initialSpecializationCategoryId);
+    } else {
+      // Not found under this branch's current mapping at all, at either tier — surface it as a
+      // stale top-level pick (its original tier is unrecoverable) via `specCategoryStale` below.
+      setSpecCategoryId(initialSpecializationCategoryId);
+      setSpecSubcategoryId(undefined);
+    }
+    hasResolvedInitialSpecialization.current = true;
+  }, [branchCategoryAccessLoading, branchCategoryAccess, initialSpecializationCategoryId]);
+
+  const matchedSpecRow = branchCategoryAccess.find((row) => row.categoryId === specCategoryId);
+  const specSubcategoryOptions = matchedSpecRow?.subcategories.map((s) => s.subcategory) ?? [];
+  const branchCategoryAccessReady = !branchCategoryAccessLoading && !branchCategoryAccessError;
+  const specCategoryStale = branchCategoryAccessReady && Boolean(specCategoryId) && !matchedSpecRow;
+  const specSubcategoryStale =
+    branchCategoryAccessReady &&
+    !specCategoryStale &&
+    Boolean(specSubcategoryId) &&
+    !specSubcategoryOptions.some((c) => c.id === specSubcategoryId);
+  // `specializationCategories` (the vendor-wide grant list) is the only place left with a name
+  // for a stale id — `getBranchCategoryAccess`'s rows obviously don't include it any more.
+  const staleSpecCategoryName = specializationCategories.find((c) => c.id === specCategoryId)?.name ?? 'Unknown specialization';
+  const staleSpecSubcategoryName = specializationCategories.find((c) => c.id === specSubcategoryId)?.name ?? 'Unknown specialization';
   // Tracks the entity MediaUploader should upload against — see ProductFormDialog's identical
   // `savedProduct` state for the full staged-upload-after-create rationale.
   const [savedTherapist, setSavedTherapist] = useState<Therapist | undefined>(therapist);
@@ -257,12 +352,6 @@ function WizardTherapistFormDialog({
   // in the same tick as the click, rather than waiting on React's `disabled={submitting}`
   // re-render to commit.
   const saveButtonRef = useRef<MdFilledButton>(null);
-
-  // `specializationCategories` here comes from the pipeline's vendorId-scoped `listCategories`
-  // call, which is flat (top-level rows + their active children, per that function's own doc
-  // comment) — the self-service form's equivalent list only ever contains top-level rows (a
-  // `VendorCategoryAccess` grant is always on a top-level category), so filter down to match.
-  const topLevelSpecializationCategories = specializationCategories.filter((c) => !c.parentId);
 
   const set = <K extends keyof TherapistInput>(key: K, value: TherapistInput[K]) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -277,7 +366,11 @@ function WizardTherapistFormDialog({
     setSubmitting(true);
     setError('');
     try {
-      const result = await onSave(form, branchId);
+      // Only one field is actually submitted (`specializationCategoryId`) — the two-tier
+      // Category/Subcategory UI is purely local; whichever tier the admin picked last wins,
+      // subcategory taking precedence when both are set.
+      const payload: TherapistInput = { ...form, specializationCategoryId: specSubcategoryId || specCategoryId || undefined };
+      const result = await onSave(payload, branchId);
       if (!therapist && result) {
         // A fresh create — keep the dialog open so MediaUploader can flush any staged photos/
         // video against the new id; an edit's dialog closes immediately as before, since
@@ -318,7 +411,19 @@ function WizardTherapistFormDialog({
         {therapist ? (
           <p className="field-hint">Branch: {therapist.branch.name} (cannot be changed)</p>
         ) : (
-          <OutlinedSelect label="Branch" value={branchId} onChange={(e: Event) => setBranchId((e.target as HTMLSelectElement).value)}>
+          <OutlinedSelect
+            label="Branch"
+            value={branchId}
+            onChange={(e: Event) => {
+              const value = (e.target as HTMLSelectElement).value;
+              // Same reset-in-same-update idiom as DealDialog's Branch select and BranchDialog's
+              // State→City cascade — a specialization picked for the previous branch isn't
+              // necessarily even offered under a newly-picked branch's own mapping.
+              setBranchId(value);
+              setSpecCategoryId('');
+              setSpecSubcategoryId(undefined);
+            }}
+          >
             {branches.map((b) => (
               <SelectOption key={b.id} value={b.id}>
                 <div slot="headline">{b.name}</div>
@@ -327,24 +432,71 @@ function WizardTherapistFormDialog({
           </OutlinedSelect>
         )}
 
-        {topLevelSpecializationCategories.length > 0 ? (
-          <OutlinedSelect
-            label="Specialization"
-            value={form.specializationCategoryId ?? ''}
-            onChange={(e: Event) => set('specializationCategoryId', (e.target as HTMLSelectElement).value || undefined)}
-          >
-            <SelectOption value="">
-              <div slot="headline">None</div>
-            </SelectOption>
-            {topLevelSpecializationCategories.map((c) => (
-              <SelectOption key={c.id} value={c.id}>
-                <div slot="headline">{c.name}</div>
+        {branchCategoryAccess.length > 0 || specCategoryStale || branchCategoryAccessLoading ? (
+          <>
+            <OutlinedSelect
+              label="Specialization Category"
+              value={specCategoryId}
+              disabled={branchCategoryAccessLoading}
+              onChange={(e: Event) => {
+                const value = (e.target as HTMLSelectElement).value;
+                setSpecCategoryId(value);
+                setSpecSubcategoryId(undefined);
+              }}
+            >
+              <SelectOption value="">
+                <div slot="headline">{branchCategoryAccessLoading ? 'Loading…' : 'None'}</div>
               </SelectOption>
-            ))}
-          </OutlinedSelect>
+              {specCategoryStale && (
+                <SelectOption value={specCategoryId}>
+                  <div slot="headline">{staleSpecCategoryName}</div>
+                </SelectOption>
+              )}
+              {branchCategoryAccess.map((row) => (
+                <SelectOption key={row.categoryId} value={row.categoryId}>
+                  <div slot="headline">{row.category.name}</div>
+                </SelectOption>
+              ))}
+            </OutlinedSelect>
+
+            {(specSubcategoryOptions.length > 0 || specSubcategoryStale) && (
+              <OutlinedSelect
+                label="Specialization Subcategory (optional)"
+                value={specSubcategoryId ?? ''}
+                disabled={branchCategoryAccessLoading}
+                onChange={(e: Event) => setSpecSubcategoryId((e.target as HTMLSelectElement).value || undefined)}
+              >
+                <SelectOption value="">
+                  <div slot="headline">None</div>
+                </SelectOption>
+                {specSubcategoryStale && (
+                  <SelectOption value={specSubcategoryId ?? ''}>
+                    <div slot="headline">{staleSpecSubcategoryName}</div>
+                  </SelectOption>
+                )}
+                {specSubcategoryOptions.map((c) => (
+                  <SelectOption key={c.id} value={c.id}>
+                    <div slot="headline">{c.name}</div>
+                  </SelectOption>
+                ))}
+              </OutlinedSelect>
+            )}
+
+            {specCategoryStale && (
+              <p className="error-state" role="alert">
+                This specialization is no longer mapped to this branch. Saving without changing it keeps the existing value — or pick a currently mapped option.
+              </p>
+            )}
+            {specSubcategoryStale && (
+              <p className="error-state" role="alert">
+                This specialization subcategory is no longer mapped to this branch/category. Saving without changing it keeps the existing value — or pick a currently mapped option.
+              </p>
+            )}
+            {branchCategoryAccessError && <p className="error-state" role="alert">{branchCategoryAccessError}</p>}
+          </>
         ) : (
           <p className="empty-state">
-            No Therapy categories have been granted to this business yet — grant one in Step 2 before adding therapists.
+            No Therapy categories are mapped to this branch yet — map one under Business Modules &amp; Category Access first.
           </p>
         )}
         {therapist?.specialization && (

@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createPrismaMock } from '../test-utils/prisma-mock';
 
 // requirePermission's only real dependency is the permission resolver (which itself hits
 // Prisma) — mocking it directly keeps this a middleware-level test (auth boundary + gate
@@ -8,6 +9,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../services/permission-resolver.service', () => ({
   resolveGrantedPermissionKeys: vi.fn(),
 }));
+
+// `authenticate` (shared by every route, including this stub) now re-checks `User.status` via
+// `prisma.user.findUnique` — this file previously never needed a Prisma mock at all (nothing
+// downstream of `resolveGrantedPermissionKeys`, itself mocked above, touched the DB). The
+// shared `createPrismaMock()` factory's own default (active, non-deleted) covers this
+// automatically — see that file's doc comment.
+vi.mock('../lib/prisma', () => ({ prisma: createPrismaMock() }));
 
 import app from '../app';
 import { bearerFor } from '../test-utils/auth-test-utils';

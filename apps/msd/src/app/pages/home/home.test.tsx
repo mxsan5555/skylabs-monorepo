@@ -77,10 +77,12 @@ beforeEach(() => {
 
 /**
  * Feature: Home page — "popular category" carousels
- * Scenario: sections are driven by real `Category.isPopular` data, not the old hardcoded
- * keyword-matching table (`MOCK_CATEGORY_MATCH`), which has been deleted entirely.
+ * Scenario: sections are driven by real `PopularTag` assignments (a category counts as
+ * "popular" once it has at least one `popularTags` entry), not the old `Category.isPopular`
+ * boolean, and not the older hardcoded keyword-matching table (`MOCK_CATEGORY_MATCH`), both of
+ * which have been deleted entirely.
  *
- * Given: the catalog returns categories, some flagged `isPopular: true`
+ * Given: the catalog returns categories, some with a non-empty `popularTags` array
  * When: the home page loads
  * Then: one carousel section renders per popular category (sorted by sortOrder), each showing
  *       only deals whose `category.id` matches that category — non-popular categories get no
@@ -93,9 +95,9 @@ beforeEach(() => {
 describe('Home — popular-category-driven sections', () => {
   it('renders a section per popular category, ordered by sortOrder, using real category data', async () => {
     const categories = [
-      cat({ id: 'cat-massage', name: 'Massage', slug: 'massage', isPopular: true, sortOrder: 2 }),
-      cat({ id: 'cat-spa', name: 'Spa Days', slug: 'spa-days', isPopular: true, sortOrder: 1 }),
-      cat({ id: 'cat-facial', name: 'Facials', slug: 'facials', isPopular: false, sortOrder: 3 }),
+      cat({ id: 'cat-massage', name: 'Massage', slug: 'massage', popularTags: [{ id: 'tag-massage', name: 'Trending', slug: 'trending' }], sortOrder: 2 }),
+      cat({ id: 'cat-spa', name: 'Spa Days', slug: 'spa-days', popularTags: [{ id: 'tag-spa', name: 'Trending', slug: 'trending' }], sortOrder: 1 }),
+      cat({ id: 'cat-facial', name: 'Facials', slug: 'facials', popularTags: [], sortOrder: 3 }),
     ];
     const deals = [
       deal({ id: 'd1', title: 'Full Body Massage', category: { id: 'cat-massage', name: 'Massage', slug: 'massage', description: null } }),
@@ -126,8 +128,8 @@ describe('Home — popular-category-driven sections', () => {
 
   it('shows the Massage deal card only inside the Massage carousel, not the Spa one (category-filtered)', async () => {
     const categories = [
-      cat({ id: 'cat-massage', name: 'Massage', slug: 'massage', isPopular: true, sortOrder: 1 }),
-      cat({ id: 'cat-spa', name: 'Spa Days', slug: 'spa-days', isPopular: true, sortOrder: 2 }),
+      cat({ id: 'cat-massage', name: 'Massage', slug: 'massage', popularTags: [{ id: 'tag-massage', name: 'Trending', slug: 'trending' }], sortOrder: 1 }),
+      cat({ id: 'cat-spa', name: 'Spa Days', slug: 'spa-days', popularTags: [{ id: 'tag-spa', name: 'Trending', slug: 'trending' }], sortOrder: 2 }),
     ];
     const deals = [
       deal({ id: 'd1', title: 'Full Body Massage', category: { id: 'cat-massage', name: 'Massage', slug: 'massage', description: null } }),
@@ -153,7 +155,7 @@ describe('Home — popular-category-driven sections', () => {
 
   // Edge case: a popular category with zero matching deals gets no section
   it('renders no section for a popular category that has zero matching deals', async () => {
-    const categories = [cat({ id: 'cat-empty', name: 'Empty Popular', slug: 'empty-popular', isPopular: true, sortOrder: 1 })];
+    const categories = [cat({ id: 'cat-empty', name: 'Empty Popular', slug: 'empty-popular', popularTags: [{ id: 'tag-empty', name: 'Trending', slug: 'trending' }], sortOrder: 1 })];
     listCatalogCategoriesMock.mockResolvedValue({ data: categories });
     listCatalogDealsMock.mockResolvedValue({ data: [] });
 
@@ -174,7 +176,7 @@ describe('Home — popular-category-driven sections', () => {
   // Confirms the old hardcoded keyword-matching table is genuinely gone — "Hot Right Now" tabs
   // are built purely from the real popular categories fetched above, never a fixed bucket list.
   it('builds "Hot Right Now" tabs from real popular categories, not a fixed keyword bucket list', async () => {
-    const categories = [cat({ id: 'cat-massage', name: 'Massage', slug: 'massage', isPopular: true, sortOrder: 1 })];
+    const categories = [cat({ id: 'cat-massage', name: 'Massage', slug: 'massage', popularTags: [{ id: 'tag-massage', name: 'Trending', slug: 'trending' }], sortOrder: 1 })];
     listCatalogCategoriesMock.mockResolvedValue({ data: categories });
     listCatalogDealsMock.mockResolvedValue({ data: [] });
 

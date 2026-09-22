@@ -493,7 +493,7 @@ function TopItemsSection({ data }: { data: AllReportData }) {
             </thead>
             <tbody>
               {data.topProducts.map((row) => (
-                <tr key={row.dealId}>
+                <tr key={row.itemId}>
                   <td>{row.itemName}</td>
                   <td>{row.vendorName}</td>
                   <td>{row.quantitySold}</td>
@@ -521,7 +521,7 @@ function TopItemsSection({ data }: { data: AllReportData }) {
             </thead>
             <tbody>
               {data.topServices.map((row) => (
-                <tr key={row.dealId}>
+                <tr key={row.itemId}>
                   <td>{row.itemName}</td>
                   <td>{row.vendorName}</td>
                   <td>{row.quantitySold}</td>

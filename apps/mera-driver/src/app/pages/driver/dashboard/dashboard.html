@@ -1,0 +1,46 @@
+<md-admin-page title="Welcome" subtitle="Your driver account at a glance.">
+  @if (loading()) {
+    <p class="otp-muted">Loading…</p>
+  } @else if (driver(); as d) {
+    <section class="account-card">
+      <div class="account-card__head">
+        <h2>{{ d.firstName }} {{ d.lastName }}</h2>
+        <sky-badge [variant]="statusVariant(d.status)">{{ d.status }}</sky-badge>
+      </div>
+      <p class="otp-muted">{{ d.phone }} @if (d.email) { · {{ d.email }} }</p>
+    </section>
+
+    <div class="driver-dash-grid">
+      <button type="button" class="driver-dash-card" (click)="go('/driver/profile')">
+        <md-icon aria-hidden="true">person</md-icon>
+        <span class="driver-dash-card__label">My Profile</span>
+        <span class="driver-dash-card__hint">Edit your details</span>
+      </button>
+      <button type="button" class="driver-dash-card" (click)="go('/driver/kyc')">
+        <md-icon aria-hidden="true">verified_user</md-icon>
+        <span class="driver-dash-card__label">KYC Status</span>
+        <span class="driver-dash-card__hint">{{ d.status }}</span>
+      </button>
+      <button type="button" class="driver-dash-card" (click)="go('/driver/documents')">
+        <md-icon aria-hidden="true">folder</md-icon>
+        <span class="driver-dash-card__label">Documents</span>
+        <span class="driver-dash-card__hint">Upload &amp; manage</span>
+      </button>
+      <button type="button" class="driver-dash-card" (click)="go('/driver/vehicle')">
+        <md-icon aria-hidden="true">directions_car</md-icon>
+        <span class="driver-dash-card__label">My Vehicle</span>
+        <span class="driver-dash-card__hint">Coming soon</span>
+      </button>
+      <button type="button" class="driver-dash-card" (click)="go('/driver/trips')">
+        <md-icon aria-hidden="true">route</md-icon>
+        <span class="driver-dash-card__label">My Trips</span>
+        <span class="driver-dash-card__hint">Coming soon</span>
+      </button>
+      <button type="button" class="driver-dash-card" (click)="go('/driver/notifications')">
+        <md-icon aria-hidden="true">notifications</md-icon>
+        <span class="driver-dash-card__label">Notifications</span>
+        <span class="driver-dash-card__hint">Coming soon</span>
+      </button>
+    </div>
+  }
+</md-admin-page>

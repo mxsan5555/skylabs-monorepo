@@ -12,7 +12,9 @@
     "mera-driver-api:prisma:validate": "prisma validate --schema=apps/mera-driver-api/prisma/schema.prisma",
     "mera-driver-api:prisma:migrate": "dotenv -e apps/mera-driver-api/.env.local -- prisma migrate dev --schema=apps/mera-driver-api/prisma/schema.prisma",
     "mera-driver-api:prisma:studio": "dotenv -e apps/mera-driver-api/.env.local -- prisma studio --schema=apps/mera-driver-api/prisma/schema.prisma",
-    "mera-driver-api:prisma:seed": "dotenv -e apps/mera-driver-api/.env.local -- tsx --tsconfig tsconfig.base.json apps/mera-driver-api/prisma/seed.ts"
+    "mera-driver-api:prisma:seed": "dotenv -e apps/mera-driver-api/.env.local -- tsx --tsconfig tsconfig.base.json apps/mera-driver-api/prisma/seed.ts",
+    "dev": "tsx watch src/main.ts",
+    "build": "webpack-cli build --node-env=production"
   },
   "devDependencies": {
     "@angular-devkit/core": "~21.2.0",
@@ -50,6 +52,7 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "16.3.0",
     "@types/bcrypt": "^6.0.0",
+    "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.10",
@@ -87,7 +90,7 @@
     "supertest": "^7.2.2",
     "tailwindcss": "^3.0.2",
     "tslib": "^2.3.0",
-    "tsx": "^4.23.8",
+    "tsx": "^4.23.13",
     "typescript": "~5.9.2",
     "vite": "^8.0.0",
     "vite-plugin-dts": "^4.5.4",
@@ -111,6 +114,7 @@
     "@types/qrcode": "^1.5.6",
     "axios": "^1.20.0",
     "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.3",
     "leaflet": "^1.9.4",

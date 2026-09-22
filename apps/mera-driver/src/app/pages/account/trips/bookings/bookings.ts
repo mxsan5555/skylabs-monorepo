@@ -1,35 +1,6 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, computed, inject, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { AdminPage } from '../../../../admin/admin-page/admin-page';
-
-interface Booking {
-  id?: string;
-  booking_code: string;
-  customer_name: string;
-  driver_name: string;
-  vehicle_name: string;
-  vehicle_category: string;
-  trip_type_name: string;
-  pickup_address: string;
-  pickup_lat: number;
-  pickup_lng: number;
-  drop_address: string;
-  drop_lat: number;
-  drop_lng: number;
-  scheduled_at: string;
-  estimated_distance_km: number;
-  estimated_duration_min: number;
-  estimated_fare: number;
-  final_fare: number;
-  status: string;
-  payment_status: string;
-  payment_mode: string;
-  otp: string;
-  requested_at: string;
-  accepted_at: string;
-  started_at: string;
-  completed_at: string;
-}
+import { BookingsApiService, type Booking } from '../../../../core/trips/bookings-api.service';
 
 @Component({
   selector: 'md-bookings',
@@ -40,8 +11,9 @@ interface Booking {
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class Bookings implements OnInit {
-  private readonly http = inject(HttpClient);
+  private readonly api = inject(BookingsApiService);
   readonly list = signal<Booking[]>([]);
+  readonly loading = signal(false);
   readonly showAddForm = signal(false);
   readonly editingId = signal<string | 'new' | null>(null);
 
@@ -97,41 +69,20 @@ export class Bookings implements OnInit {
   readonly tableRowsString = computed(() => JSON.stringify(this.list()));
 
   ngOnInit(): void {
-    this.http.get<Booking[]>('data/bookings.json').subscribe({
+    this.reload();
+  }
+
+  private reload(): void {
+    this.loading.set(true);
+    this.api.list().subscribe({
       next: (data) => {
-        if (data) {
-          const mapped = data.map((item: any) => ({
-            id: String(item.id || 'bk-' + Math.random()),
-            booking_code: item.booking_code || 'BK-100' + item.id,
-            customer_name: item.customer_name || 'Rohan Sharma',
-            driver_name: item.driver_name || 'Rahul Verma',
-            vehicle_name: item.vehicle_name || 'Hyundai Accent',
-            vehicle_category: item.vehicle_category || 'Sedan',
-            trip_type_name: item.trip_type || item.trip_type_name || 'One Way',
-            pickup_address: item.pickup_address || 'Connaught Place, New Delhi',
-            pickup_lat: item.pickup_lat || 28.6304,
-            pickup_lng: item.pickup_lng || 77.2177,
-            drop_address: item.drop_address || 'Sector 18, Noida',
-            drop_lat: item.drop_lat || 28.5708,
-            drop_lng: item.drop_lng || 77.3258,
-            scheduled_at: item.scheduled_at || '2026-08-19 10:00',
-            estimated_distance_km: item.estimated_distance_km || 15.5,
-            estimated_duration_min: item.estimated_duration_min || 35,
-            estimated_fare: item.estimated_fare || item.fare || 500,
-            final_fare: item.final_fare || item.fare || 500,
-            status: item.status ? String(item.status).toLowerCase() : 'requested',
-            payment_status: item.payment_status ? String(item.payment_status).toLowerCase() : 'pending',
-            payment_mode: item.payment_mode || 'cash',
-            otp: item.otp || '4321',
-            requested_at: item.requested_at || item.created_at || '2026-08-19 09:30',
-            accepted_at: item.accepted_at || '',
-            started_at: item.started_at || '',
-            completed_at: item.completed_at || '',
-          }));
-          this.list.set(mapped);
-        }
+        this.list.set(data);
+        this.loading.set(false);
       },
-      error: (err) => console.error('Failed to load bookings', err),
+      error: (err) => {
+        console.error('Failed to load bookings', err);
+        this.loading.set(false);
+      },
     });
   }
 
@@ -206,9 +157,7 @@ export class Bookings implements OnInit {
       alert('Booking code is required.');
       return;
     }
-    const id = this.editingId();
-    const record: Booking = {
-      id: id === 'new' ? 'bk-' + Date.now() : id!,
+    const payload: Booking = {
       booking_code: this.inputCode().trim(),
       customer_name: this.inputCustomer().trim() || 'Guest Customer',
       driver_name: this.inputDriver().trim() || 'Unassigned',
@@ -235,9 +184,18 @@ export class Bookings implements OnInit {
       started_at: this.inputStartedAt(),
       completed_at: this.inputCompletedAt(),
     };
-    if (id === 'new') this.list.update((l) => [...l, record]);
-    else this.list.update((l) => l.map((x) => (x.id === id ? record : x)));
-    this.cancelEdit();
+    const id = this.editingId();
+    const request = id === 'new' || id === null ? this.api.create(payload) : this.api.update(id, payload);
+    request.subscribe({
+      next: () => {
+        this.reload();
+        this.cancelEdit();
+      },
+      error: (err) => {
+        console.error('Failed to save booking', err);
+        alert('Failed to save booking. Please try again.');
+      },
+    });
   }
 
   cancelEdit(): void {
@@ -246,8 +204,14 @@ export class Bookings implements OnInit {
   }
 
   deleteOption(row: Booking): void {
-    if (confirm(`Delete booking "${row.booking_code}"?`)) {
-      this.list.update((l) => l.filter((x) => x.id !== row.id));
+    if (confirm(`Delete booking "${row.booking_code}"?`) && row.id) {
+      this.api.delete(row.id).subscribe({
+        next: () => this.reload(),
+        error: (err) => {
+          console.error('Failed to delete booking', err);
+          alert('Failed to delete booking. Please try again.');
+        },
+      });
     }
   }
 }

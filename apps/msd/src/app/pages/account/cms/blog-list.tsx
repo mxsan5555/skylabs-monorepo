@@ -13,6 +13,7 @@ import {
   type BlogPost,
   type BlogPostInput,
 } from '../../../../api/rbac/blog-posts';
+import { listBlogCategories, type BlogCategory } from '../../../../api/rbac/blog-categories';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useToast } from '../../../../toast/toast-context';
 import { formatDate } from '../../../../blog/blog';
@@ -55,6 +56,20 @@ export function BlogList() {
   const [loading, setLoading] = useState(true);
   const [params, setParams] = useState<TableParams>(DEFAULT_PARAMS);
   const [error, setError] = useState('');
+
+  // Loaded once for the category picker in the add/edit dialogs (and this list's own Category
+  // column display) — a blog post's `categoryId` is now a real FK, not a free-text slug (see
+  // `api/rbac/blog-posts.ts`'s own doc comment).
+  const [categories, setCategories] = useState<BlogCategory[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+
+  useEffect(() => {
+    setCategoriesLoading(true);
+    listBlogCategories(token, { pageSize: 100 })
+      .then(({ data }) => setCategories(data))
+      .catch(() => setCategories([]))
+      .finally(() => setCategoriesLoading(false));
+  }, [token]);
 
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const addDialogRef = useRef<MdDialog>(null);
@@ -130,7 +145,7 @@ export function BlogList() {
         posts.map((post) => ({
           Title: post.title,
           Slug: post.slug,
-          Category: post.categorySlug,
+          Category: post.category?.name ?? '—',
           Author: post.author,
           Status: post.status === 'PUBLISHED' ? 'Published' : 'Draft',
           Published: post.publishedAt ? formatDate(post.publishedAt) : '—',
@@ -218,7 +233,15 @@ export function BlogList() {
         actions={actions}
       />
 
-      {canCreate && <BlogFormDialog dialogRef={addDialogRef} token={token} onSave={(input) => save(input)} />}
+      {canCreate && (
+        <BlogFormDialog
+          dialogRef={addDialogRef}
+          token={token}
+          categories={categories}
+          categoriesLoading={categoriesLoading}
+          onSave={(input) => save(input)}
+        />
+      )}
 
       {canEdit && (
         <BlogFormDialog
@@ -226,6 +249,8 @@ export function BlogList() {
           dialogRef={editDialogRef}
           post={editingPost ?? undefined}
           token={token}
+          categories={categories}
+          categoriesLoading={categoriesLoading}
           onSave={(input) => save(input, editingPost ?? undefined)}
           onClose={() => setEditingPost(null)}
         />

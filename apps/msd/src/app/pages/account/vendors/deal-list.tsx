@@ -7,7 +7,6 @@ import { ApiRequestError } from '../../../../api/rbac/client';
 
 const DEAL_COLUMNS = JSON.stringify([
   { key: 'Deal Name', label: 'Deal Name' },
-  { key: 'Service', label: 'Service/Product' },
   { key: 'Vendor', label: 'Vendor' },
   { key: 'Branch', label: 'Branch' },
   { key: 'Category', label: 'Category' },
@@ -32,15 +31,14 @@ const DEAL_COLUMNS = JSON.stringify([
  *  reused there), so the row action here just deep-links to that vendor. */
 const DEAL_ACTIONS = JSON.stringify([{ icon: 'open_in_new', label: 'View vendor', event: 'view-vendor' }]);
 
-/** "From ₹X" for a service deal with 2+ active packages, the single package's price for exactly
- *  one, or a plain dash for a product deal (packages are service-only — see DealPackage's schema
- *  doc comment in msd-api) or a service deal with none yet. Mirrors what the customer-facing
- *  storefront already shows for a multi-package deal — never a separate row per package, since
- *  packages are children of one logical Deal, not separate deals (per this request's own "do not
- *  create multiple confusing cards for the same logical Deal" instruction). */
+/** "From ₹X" for a deal with 2+ active packages, the single package's price for exactly one, or
+ *  a plain dash for a deal with none yet. Mirrors what the customer-facing storefront already
+ *  shows for a multi-package deal — never a separate row per package, since packages are
+ *  children of one logical Deal, not separate deals (per this request's own "do not create
+ *  multiple confusing cards for the same logical Deal" instruction). */
 function packagesSummary(deal: Deal): string {
   const active = (deal.packages ?? []).filter((p) => p.isActive);
-  if (active.length === 0) return deal.product ? 'N/A' : '—';
+  if (active.length === 0) return '—';
   const cheapest = active.reduce((min, p) => (Number(p.sellingPrice) < Number(min.sellingPrice) ? p : min), active[0]);
   const label = active.length > 1 ? `${active.length} packages` : `${cheapest.durationMinutes} min`;
   return `${label} · From ₹${cheapest.sellingPrice}`;
@@ -60,7 +58,6 @@ function startingPrice(deal: Deal): string {
 function toDealRow(deal: Deal): Record<string, string | number> {
   return {
     'Deal Name': deal.title,
-    Service: deal.product?.name ?? 'Service',
     Vendor: deal.vendor?.businessName ?? '—',
     Branch: deal.branch?.name ?? '—',
     Category: deal.category?.name ?? '—',

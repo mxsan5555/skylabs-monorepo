@@ -163,6 +163,11 @@
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 
+.site-footer__social-loading {
+  font-size: 0.8rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
 .site-footer__social-link:hover {
   border-color: var(--md-sys-color-primary);
   color: var(--md-sys-color-primary);

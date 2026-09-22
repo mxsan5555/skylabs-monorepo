@@ -42,6 +42,28 @@ export class AuthApiService {
   googleSignInUrl(): string {
     return `${this.base}/google`;
   }
+
+  // -------------------------------------------------------------------------
+  // Password auth — additive alongside OTP/Google, same token/user response shape.
+  // -------------------------------------------------------------------------
+
+  loginWithPassword(identifier: string, password: string): Observable<OtpVerifyResult> {
+    return this.http
+      .post<ApiEnvelope<OtpVerifyResult>>(`${this.base}/password/login`, { identifier, password })
+      .pipe(map(unwrap));
+  }
+
+  forgotPassword(identifier: string): Observable<{ message: string }> {
+    return this.http
+      .post<ApiEnvelope<{ message: string }>>(`${this.base}/password/forgot`, { identifier })
+      .pipe(map(unwrap));
+  }
+
+  resetPassword(identifier: string, otp: string, newPassword: string): Observable<{ message: string }> {
+    return this.http
+      .post<ApiEnvelope<{ message: string }>>(`${this.base}/password/reset`, { identifier, otp, newPassword })
+      .pipe(map(unwrap));
+  }
 }
 
 function unwrap<T>(res: ApiEnvelope<T>): T {
