@@ -105,8 +105,6 @@ const handleCustomerSelect = useCallback((id: string) => {
     setActiveTab(0);
     loadDetail();
   }, [loadDetail]);
-useEffect(() => {
-  if (!selectedId) return;
 
   /** Fired from the customer-list actions column (`customer-list.tsx`'s row-action handler
    *  already resolved the clicked action to a target status and guarded the no-op case). Only

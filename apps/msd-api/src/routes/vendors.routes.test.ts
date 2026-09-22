@@ -1366,7 +1366,7 @@ describe('Admin vendor image routes — imageId param regression', () => {
  */
 describe('Admin product routes — productId param regression', () => {
   it('PATCH /:vendorId/products/:productId reaches the service with the real productId, not undefined', async () => {
-    resolveMock.mockResolvedValue(['products:edit']);
+    resolveMock.mockResolvedValue(['vendors:edit']);
     prismaMock.product.findUnique.mockResolvedValue(productFixture);
     prismaMock.product.update.mockResolvedValue({ ...productFixture, name: 'Updated Name' });
     const res = await request(app)
@@ -1380,7 +1380,7 @@ describe('Admin product routes — productId param regression', () => {
   });
 
   it('DELETE /:vendorId/products/:productId reaches the service with the real productId, not undefined', async () => {
-    resolveMock.mockResolvedValue(['products:delete']);
+    resolveMock.mockResolvedValue(['vendors:delete']);
     prismaMock.product.findUnique.mockResolvedValue(productFixture);
     prismaMock.product.delete.mockResolvedValue(productFixture);
     const res = await request(app)
@@ -1391,7 +1391,7 @@ describe('Admin product routes — productId param regression', () => {
   });
 
   it('422s (not a 500) for a malformed productId instead of silently stripping it', async () => {
-    resolveMock.mockResolvedValue(['products:edit']);
+    resolveMock.mockResolvedValue(['vendors:edit']);
     const res = await request(app)
       .patch(`/api/v1/vendors/${VENDOR_A_ID}/products/not-a-uuid`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
@@ -1409,7 +1409,7 @@ describe('Admin product routes — productId param regression', () => {
  */
 describe('Admin-on-behalf product media routes (previously missing entirely)', () => {
   it('POST /:vendorId/products/:productId/images uploads successfully', async () => {
-    resolveMock.mockResolvedValue(['products:edit']);
+    resolveMock.mockResolvedValue(['vendors:edit']);
     prismaMock.product.findUnique.mockResolvedValue(productFixture);
     prismaMock.productImage.create.mockResolvedValue({ id: 'img-1', productId: PRODUCT_ID, storageKey: 'products/x/a.jpg' });
     prismaMock.productImage.count.mockResolvedValue(0);
@@ -1421,7 +1421,7 @@ describe('Admin-on-behalf product media routes (previously missing entirely)', (
   });
 
   it('DELETE /:vendorId/products/:productId/images/:imageId deletes successfully', async () => {
-    resolveMock.mockResolvedValue(['products:edit']);
+    resolveMock.mockResolvedValue(['vendors:edit']);
     prismaMock.product.findUnique.mockResolvedValue(productFixture);
     prismaMock.productImage.findUnique.mockResolvedValue({ id: 'img-1', productId: PRODUCT_ID, isPrimary: false, storageKey: 'products/x/a.jpg' });
     prismaMock.productImage.delete.mockResolvedValue({ id: 'img-1' });
@@ -1432,7 +1432,7 @@ describe('Admin-on-behalf product media routes (previously missing entirely)', (
   });
 
   it('404s (not a raw 500) creating media for a product that does not belong to the URL vendor', async () => {
-    resolveMock.mockResolvedValue(['products:edit']);
+    resolveMock.mockResolvedValue(['vendors:edit']);
     prismaMock.product.findUnique.mockResolvedValue(null);
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/products/${PRODUCT_ID}/images`)
@@ -2567,6 +2567,41 @@ describe('Product (vendor-scoped self-service + admin-on-behalf)', () => {
     expect(prismaMock.product.update).not.toHaveBeenCalled();
   });
 
+  /**
+   * Regression for the cross-vendor Product write hole: the admin-on-behalf `/:vendorId/products*`
+   * routes used to gate on plain `products:edit/create/delete` — the SAME permission key a vendor
+   * needs for its own self-service `/vendors/me/products*` — instead of `vendors:edit/create/
+   * delete` like Branch/Deal/Therapist's admin-on-behalf routes already do. A vendor holding only
+   * `products:*` (never `vendors:*`) could therefore call `/vendors/{OTHER_VENDOR_ID}/products/...`
+   * directly and write another vendor's catalog. Now gated on `vendors:*`, which the `vendor` role
+   * never holds (see seed.ts) — only `vendors:custom` for its own scoped self-service routes.
+   */
+  it("a vendor holding only 'products:edit' (no 'vendors:edit') cannot reach the admin-on-behalf route to hijack another vendor's product", async () => {
+    resolveMock.mockResolvedValue(['products:edit', 'products:create', 'products:delete', 'vendors:custom']);
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_B_ID}/products/${PRODUCT_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+      .send({ name: 'Hijacked' });
+    expect(res.status).toBe(403);
+    expect(prismaMock.product.update).not.toHaveBeenCalled();
+  });
+
+  it("...and is likewise blocked from creating or deleting another vendor's product via the admin-on-behalf route", async () => {
+    resolveMock.mockResolvedValue(['products:edit', 'products:create', 'products:delete', 'vendors:custom']);
+    const createRes = await request(app)
+      .post(`/api/v1/vendors/${VENDOR_B_ID}/products`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+      .send(productBody);
+    expect(createRes.status).toBe(403);
+    expect(prismaMock.product.create).not.toHaveBeenCalled();
+
+    const deleteRes = await request(app)
+      .delete(`/api/v1/vendors/${VENDOR_B_ID}/products/${PRODUCT_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
+    expect(deleteRes.status).toBe(403);
+    expect(prismaMock.product.delete).not.toHaveBeenCalled();
+  });
+
   it('returns a clean 409 (not a raw 500) when a double-submit races past the app-layer slug check and hits the DB unique constraint', async () => {
     resolveMock.mockResolvedValue(['products:create', 'vendors:custom']);
     prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
@@ -2583,7 +2618,7 @@ describe('Product (vendor-scoped self-service + admin-on-behalf)', () => {
   });
 
   it('admin can create a product on behalf of a vendor via /vendors/:vendorId/products', async () => {
-    resolveMock.mockResolvedValue(['products:create']);
+    resolveMock.mockResolvedValue(['vendors:create']);
     prismaMock.product.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: PRODUCT_ID, ...data }),
     );

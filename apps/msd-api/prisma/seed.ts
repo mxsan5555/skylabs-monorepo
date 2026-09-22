@@ -181,6 +181,27 @@ async function grantStarterPermissions(
     });
   };
 
+  /**
+   * Authoritative (delete-then-recreate) variant of `grant` above — used only for `vendor`.
+   * `grant`'s additive `createMany`/`skipDuplicates` can only ever ADD permissions on a re-run;
+   * it can never retract a grant that was added by an older seed revision or hand-edited via the
+   * Role Permission Matrix UI. That matters specifically for `vendor`: it must never hold
+   * `vendors:view`/`customers:view`/`products:view`/`orders:view` etc. (those would leak the
+   * admin-wide Vendor List/Customers/Products/Orders sidebar nodes and their backing endpoints to
+   * every vendor owner — see CLAUDE.md's vendor-isolation rules), so its RolePermission set is
+   * reset to exactly this list on every seed run rather than only ever growing.
+   */
+  const resetGrant = async (roleKey: string, keys: string[]) => {
+    const role = roles.get(roleKey);
+    if (!role) return;
+    const ids = keys.map((k) => permissionIdByKey.get(k)).filter((v): v is string => Boolean(v));
+    await prisma.rolePermission.deleteMany({ where: { roleId: role.id } });
+    await prisma.rolePermission.createMany({
+      data: ids.map((permissionId) => ({ roleId: role.id, permissionId })),
+      skipDuplicates: true,
+    });
+  };
+
   await grant('admin', [
     'dashboard:view',
     'customers:view', 'customers:create', 'customers:edit', 'customers:delete', 'customers:status_change',
@@ -222,15 +243,17 @@ async function grantStarterPermissions(
   ]);
 
   await grant('customer', ['dashboard:view']);
-  // Deliberately NOT 'vendors:view' — that would also unlock the admin "list every vendor"
-  // endpoint (requirePermission only checks the boolean grant, not who's asking). 'custom'
-  // gates only the ownership-scoped `/vendors/me*` self-service surface. 'vendor-portal:view'
-  // is a separate, narrower menu key that only surfaces the "My Business" sidebar item —
-  // never granted to admin/customer/etc., so it can't leak the admin Vendors/Branches/Deals nav.
-  // 'orders:status_change' lets a vendor confirm/complete/cancel its OWN orders —
-  // order.service.ts still enforces vendor-ownership scoping and a narrower transition set
-  // server-side; the permission alone only gates whether the action UI/route is reachable at all.
-  await grant('vendor', ['dashboard:view', 'orders:view', 'orders:status_change', 'products:view', 'services:view', 'vendors:custom', 'vendor-portal:view']);
+  // Deliberately NOT 'vendors:view'/'customers:view'/'products:*'/'orders:*' — any of those would
+  // also unlock the matching admin-wide sidebar node AND its backing endpoint (requirePermission
+  // only checks the boolean grant, not who's asking): 'vendors:custom' is the one gate every
+  // vendor self-service route (`/vendors/me/*`, including its own Order/Product access via the
+  // `orders`/`vendors` OR-checks in orders.routes.ts and vendors.routes.ts) already runs on, and
+  // 'vendor-portal:view' is the separate, narrower menu key that only surfaces the "Business"
+  // sidebar group — never granted to admin/customer/etc., so it can't leak the admin Vendor List/
+  // Customers/Products/Orders nav or their endpoints to a vendor owner. Uses `resetGrant` (not
+  // `grant`) so a re-seed always converges back to exactly this set, even if an older seed
+  // revision or a hand-edit via the Role Permission Matrix UI had granted this role more.
+  await resetGrant('vendor', ['dashboard:view', 'vendors:custom', 'vendor-portal:view']);
 }
 
 async function seedDashboardWidgets(roles: Map<string, { id: string; isSuperAdmin: boolean }>) {

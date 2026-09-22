@@ -1065,7 +1065,7 @@ router.delete(
 
 // ─── Product (self-service — vendor-owned catalog, mirrors Branch/Therapist's exact split) ──
 
-router.get('/me/products', requirePermission('products', 'view'), validateQuery(ProductListQuerySchema), async (req, res, next) => {
+router.get('/me/products', requirePermission('vendors', 'custom'), validateQuery(ProductListQuerySchema), async (req, res, next) => {
   try {
     const { page, pageSize, search, categoryId, subcategoryId, status } = req.validatedQuery as ReturnType<typeof ProductListQuerySchema.parse>;
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
@@ -1078,7 +1078,7 @@ router.get('/me/products', requirePermission('products', 'view'), validateQuery(
 
 router.post(
   '/me/products',
-  requirePermission('products', 'create'),
+  requirePermission('vendors', 'custom'),
   validateBody(ProductCreateSchema),
   async (req, res, next) => {
     try {
@@ -1101,7 +1101,7 @@ router.post(
 
 router.patch(
   '/me/products/:productId',
-  requirePermission('products', 'edit'),
+  requirePermission('vendors', 'custom'),
   validateBody(ProductUpdateSchema),
   async (req, res, next) => {
     try {
@@ -1124,7 +1124,7 @@ router.patch(
 
 router.patch(
   '/me/products/:productId/status',
-  requirePermission('products', 'edit'),
+  requirePermission('vendors', 'custom'),
   validateBody(ProductStatusUpdateSchema),
   async (req, res, next) => {
     try {
@@ -1145,7 +1145,7 @@ router.patch(
   },
 );
 
-router.delete('/me/products/:productId', requirePermission('products', 'delete'), async (req, res, next) => {
+router.delete('/me/products/:productId', requirePermission('vendors', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     const before = await productService.getProductScopedOrThrow(vendor.id, req.params.productId);
@@ -1168,7 +1168,7 @@ router.delete('/me/products/:productId', requirePermission('products', 'delete')
 
 router.post(
   '/me/products/:productId/images',
-  requirePermission('products', 'edit'),
+  requirePermission('vendors', 'custom'),
   imageUpload.single('file'),
   async (req, res, next) => {
     try {
@@ -1193,7 +1193,7 @@ router.post(
   },
 );
 
-router.delete('/me/products/:productId/images/:imageId', requirePermission('products', 'edit'), async (req, res, next) => {
+router.delete('/me/products/:productId/images/:imageId', requirePermission('vendors', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     await productService.getProductScopedOrThrow(vendor.id, req.params.productId);
@@ -1213,7 +1213,7 @@ router.delete('/me/products/:productId/images/:imageId', requirePermission('prod
 
 router.patch(
   '/me/products/:productId/images/reorder',
-  requirePermission('products', 'edit'),
+  requirePermission('vendors', 'custom'),
   validateBody(MediaReorderSchema),
   async (req, res, next) => {
     try {
@@ -1227,7 +1227,7 @@ router.patch(
   },
 );
 
-router.patch('/me/products/:productId/images/:imageId/primary', requirePermission('products', 'edit'), async (req, res, next) => {
+router.patch('/me/products/:productId/images/:imageId/primary', requirePermission('vendors', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     await productService.getProductScopedOrThrow(vendor.id, req.params.productId);
@@ -1240,7 +1240,7 @@ router.patch('/me/products/:productId/images/:imageId/primary', requirePermissio
 
 router.post(
   '/me/products/:productId/video',
-  requirePermission('products', 'edit'),
+  requirePermission('vendors', 'custom'),
   videoUpload.single('file'),
   async (req, res, next) => {
     try {
@@ -1265,7 +1265,7 @@ router.post(
   },
 );
 
-router.delete('/me/products/:productId/video', requirePermission('products', 'edit'), async (req, res, next) => {
+router.delete('/me/products/:productId/video', requirePermission('vendors', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     await productService.getProductScopedOrThrow(vendor.id, req.params.productId);
@@ -2193,7 +2193,7 @@ router.delete(
 
 // ─── Product (admin-on-behalf — mirrors Branch/Deal's exact admin split) ─────────────────────
 
-router.get('/:vendorId/products', requirePermission('products', 'view'), validateParams(VendorIdParamSchema), validateQuery(ProductListQuerySchema), async (req, res, next) => {
+router.get('/:vendorId/products', requirePermission('vendors', 'view'), validateParams(VendorIdParamSchema), validateQuery(ProductListQuerySchema), async (req, res, next) => {
   try {
     const { page, pageSize, search, categoryId, subcategoryId, status } = req.validatedQuery as ReturnType<typeof ProductListQuerySchema.parse>;
     const { items, total } = await productService.listProducts({ page, pageSize, search, categoryId, subcategoryId, status, vendorId: req.params.vendorId });
@@ -2205,7 +2205,7 @@ router.get('/:vendorId/products', requirePermission('products', 'view'), validat
 
 router.post(
   '/:vendorId/products',
-  requirePermission('products', 'create'),
+  requirePermission('vendors', 'create'),
   validateParams(VendorIdParamSchema),
   validateBody(ProductCreateSchema),
   async (req, res, next) => {
@@ -2228,7 +2228,7 @@ router.post(
 
 router.patch(
   '/:vendorId/products/:productId',
-  requirePermission('products', 'edit'),
+  requirePermission('vendors', 'edit'),
   validateParams(VendorProductIdParamSchema),
   validateBody(ProductUpdateSchema),
   async (req, res, next) => {
@@ -2251,7 +2251,7 @@ router.patch(
 
 router.patch(
   '/:vendorId/products/:productId/status',
-  requirePermission('products', 'edit'),
+  requirePermission('vendors', 'edit'),
   validateParams(VendorProductIdParamSchema),
   validateBody(ProductStatusUpdateSchema),
   async (req, res, next) => {
@@ -2274,7 +2274,7 @@ router.patch(
 
 router.delete(
   '/:vendorId/products/:productId',
-  requirePermission('products', 'delete'),
+  requirePermission('vendors', 'delete'),
   validateParams(VendorProductIdParamSchema),
   async (req, res, next) => {
     try {
@@ -2303,7 +2303,7 @@ router.delete(
 
 router.post(
   '/:vendorId/products/:productId/images',
-  requirePermission('products', 'edit'),
+  requirePermission('vendors', 'edit'),
   validateParams(VendorProductIdParamSchema),
   imageUpload.single('file'),
   async (req, res, next) => {
@@ -2330,7 +2330,7 @@ router.post(
 
 router.delete(
   '/:vendorId/products/:productId/images/:imageId',
-  requirePermission('products', 'edit'),
+  requirePermission('vendors', 'edit'),
   validateParams(VendorProductIdParamSchema),
   async (req, res, next) => {
     try {
@@ -2352,7 +2352,7 @@ router.delete(
 
 router.patch(
   '/:vendorId/products/:productId/images/reorder',
-  requirePermission('products', 'edit'),
+  requirePermission('vendors', 'edit'),
   validateParams(VendorProductIdParamSchema),
   validateBody(MediaReorderSchema),
   async (req, res, next) => {
@@ -2368,7 +2368,7 @@ router.patch(
 
 router.patch(
   '/:vendorId/products/:productId/images/:imageId/primary',
-  requirePermission('products', 'edit'),
+  requirePermission('vendors', 'edit'),
   validateParams(VendorProductIdParamSchema),
   async (req, res, next) => {
     try {
@@ -2383,7 +2383,7 @@ router.patch(
 
 router.post(
   '/:vendorId/products/:productId/video',
-  requirePermission('products', 'edit'),
+  requirePermission('vendors', 'edit'),
   validateParams(VendorProductIdParamSchema),
   videoUpload.single('file'),
   async (req, res, next) => {
@@ -2410,7 +2410,7 @@ router.post(
 
 router.delete(
   '/:vendorId/products/:productId/video',
-  requirePermission('products', 'edit'),
+  requirePermission('vendors', 'edit'),
   validateParams(VendorProductIdParamSchema),
   async (req, res, next) => {
     try {

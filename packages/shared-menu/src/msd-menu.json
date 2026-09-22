@@ -103,6 +103,72 @@
     ]
   },
   {
+    "id": "business",
+    "title": "Business",
+    "icon": "storefront",
+    "permissionKey": "vendor-portal",
+    "parent": null,
+    "order": 3,
+    "children": [
+      {
+        "id": "business-profile",
+        "title": "Business Profile",
+        "route": "/account/vendor-profile",
+        "permissionKey": "vendor-portal",
+        "parent": "business",
+        "order": 1
+      },
+      {
+        "id": "business-branch",
+        "title": "Branch",
+        "route": "/account/vendor-branches-deals",
+        "permissionKey": "vendor-portal",
+        "parent": "business",
+        "order": 2
+      },
+      {
+        "id": "business-deal",
+        "title": "Deal",
+        "route": "/account/vendor-deals",
+        "permissionKey": "vendor-portal",
+        "parent": "business",
+        "order": 3
+      },
+      {
+        "id": "business-product",
+        "title": "Product",
+        "route": "/account/vendor-products",
+        "permissionKey": "vendor-portal",
+        "parent": "business",
+        "order": 4
+      },
+      {
+        "id": "business-therapist",
+        "title": "Therapist",
+        "route": "/account/vendor-therapists",
+        "permissionKey": "vendor-portal",
+        "parent": "business",
+        "order": 5
+      },
+      {
+        "id": "business-customer",
+        "title": "Customer",
+        "route": "/account/vendor-customers",
+        "permissionKey": "vendor-portal",
+        "parent": "business",
+        "order": 6
+      },
+      {
+        "id": "business-order",
+        "title": "Order",
+        "route": "/account/vendor-orders",
+        "permissionKey": "vendor-portal",
+        "parent": "business",
+        "order": 7
+      }
+    ]
+  },
+  {
     "id": "customers",
     "title": "Customers",
     "icon": "group",
@@ -117,16 +183,17 @@
         "permissionKey": "customers",
         "parent": "customers",
         "order": 1
-      },
-      {
-        "id": "customer-order-history",
-        "title": "Order History",
-        "route": "/account/orders",
-        "permissionKey": "orders",
-        "parent": "customers",
-        "order": 2
       }
     ]
+  },
+  {
+    "id": "orders",
+    "title": "Orders",
+    "icon": "receipt_long",
+    "route": "/account/orders",
+    "permissionKey": "orders",
+    "parent": null,
+    "order": 4
   },
   {
     "id": "products",

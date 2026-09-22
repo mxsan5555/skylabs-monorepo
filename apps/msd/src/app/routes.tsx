@@ -30,6 +30,7 @@ import { VendorBranchesDeals } from './pages/account/vendors/vendor-branches-dea
 import { VendorCustomers } from './pages/account/vendors/vendor-customers';
 import { VendorTherapists } from './pages/account/vendors/vendor-therapists';
 import { VendorDeals } from './pages/account/vendors/vendor-deals';
+import { VendorProducts } from './pages/account/vendors/vendor-products';
 import { CategoryManagement } from './pages/account/masters/categories';
 import { PopularTagManagement } from './pages/account/masters/popular-tags';
 import { BlogList } from './pages/account/cms/blog-list';
@@ -331,6 +332,32 @@ export function AppRoutes() {
           element={
             <RequirePermission menuKey="vendor-portal">
               <VendorTherapists />
+            </RequirePermission>
+          }
+        />
+        {/* Vendor-facing "Product" — same self-service /vendors/me/products* routes
+            (`vendors:custom`) the onboarding wizard's admin-on-behalf Products step already
+            uses, just the ongoing-management surface. Never the read-only admin oversight
+            `/account/products` page below. */}
+        <Route
+          path="/account/vendor-products"
+          element={
+            <RequirePermission menuKey="vendor-portal">
+              <VendorProducts />
+            </RequirePermission>
+          }
+        />
+        {/* Vendor-facing "Order" — reuses the exact same <OrderManagement/> component as the
+            admin `/account/orders` route below (its GET/PATCH calls already force-scope a vendor
+            caller to its own vendorId server-side, see order.service.ts#listOrders) — just a
+            second route/nav entry gated `vendor-portal` instead of `orders`, so a vendor never
+            needs the admin-wide `orders:view` permission that would otherwise leak the top-level
+            "Orders" sidebar node (see msd-menu.json). */}
+        <Route
+          path="/account/vendor-orders"
+          element={
+            <RequirePermission menuKey="vendor-portal">
+              <OrderManagement />
             </RequirePermission>
           }
         />

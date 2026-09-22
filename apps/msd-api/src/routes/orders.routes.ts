@@ -1,6 +1,9 @@
 import { Router } from 'express';
+import type { Request, Response, NextFunction } from 'express';
+import type { PermissionAction } from '@skylabs-monorepo/shared-types';
+import { can } from '@skylabs-monorepo/shared-permissions';
 import { authenticate } from '../middleware/authenticate';
-import { requirePermission } from '../middleware/requirePermission';
+import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema } from '../schemas/common.schema';
 import {
@@ -13,18 +16,43 @@ import { VerifyPaymentSchema, OrderBatchSchema, VerifyBatchPaymentSchema } from 
 import * as orderService from '../services/order.service';
 import * as paymentService from '../services/payment.service';
 import { writeAuditLog } from '../services/audit.service';
-import { sendData } from '../lib/http';
+import { sendData, sendError } from '../lib/http';
 
 /**
  * Orders — the Cart convergence point: every purchase (Deal, Product, Therapist alike) becomes
  * one Order via `/orders/checkout`, never a separate Booking flow. Two access surfaces on one
  * router: `/orders/checkout`, `/orders/me*` are customer self-service (`authenticate` only, no
- * RBAC — mirrors `cart.routes.ts` exactly). `/orders` (list/get) and `/orders/:id/status` reuse
- * the EXISTING `orders` permission key — `orders:view` (already granted to admin/vendor/sales)
- * and `orders:status_change` (admin only) — no new permission was needed or added.
+ * RBAC — mirrors `cart.routes.ts` exactly). `/orders` (list/get) and `/orders/:id/status` are
+ * gated on the existing `orders` permission key (admin/sales) OR `vendors:custom` (the same
+ * vendor self-service gate every other `/vendors/me/*` route already uses) — never `orders:view`
+ * alone, which would also grant the `vendor` role the admin-wide top-level "Orders" sidebar node
+ * (see msd-menu.json) even though `orderService.listOrders`/`getOrderOrThrow`/`setOrderStatus`
+ * already force-scope a vendor caller to its own vendorId regardless of which gate let it in.
  */
 const router = Router();
 router.use(authenticate);
+
+/** Passes if the caller holds `orders:{action}` (admin/sales) OR `vendors:custom` (vendor
+ *  self-service — see this file's own doc comment for why `orders:view`/`status_change` are
+ *  deliberately never granted to the `vendor` role directly). */
+function requireOrdersOrVendorSelf(action: PermissionAction) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (!req.user) {
+      sendError(res, 'UNAUTHORIZED', 'Authentication required');
+      return;
+    }
+    try {
+      const granted = await resolveGrantedPermissionKeys(req.user.roles);
+      if (!can(granted, 'orders', action) && !can(granted, 'vendors', 'custom')) {
+        sendError(res, 'FORBIDDEN', `Missing permission orders:${action}`);
+        return;
+      }
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+}
 
 function requestMeta(req: import('express').Request) {
   return { ip: req.ip, userAgent: req.headers['user-agent'] };
@@ -192,7 +220,7 @@ router.post('/pay-batch/verify', validateBody(VerifyBatchPaymentSchema), async (
 
 // ─── Admin / vendor-scoped (existing `orders` permission) ────────────────────
 
-router.get('/', requirePermission('orders', 'view'), validateQuery(OrderListQuerySchema), async (req, res, next) => {
+router.get('/', requireOrdersOrVendorSelf('view'), validateQuery(OrderListQuerySchema), async (req, res, next) => {
   try {
     const { page, pageSize, status, vendorId, branchId, customerId, paymentStatus, createdFrom, createdTo, search } = req.validatedQuery as ReturnType<typeof OrderListQuerySchema.parse>;
     const { items, total } = await orderService.listOrders(req.user!.sub, {
@@ -213,7 +241,7 @@ router.get('/', requirePermission('orders', 'view'), validateQuery(OrderListQuer
   }
 });
 
-router.get('/:id', requirePermission('orders', 'view'), validateParams(UuidParamSchema), async (req, res, next) => {
+router.get('/:id', requireOrdersOrVendorSelf('view'), validateParams(UuidParamSchema), async (req, res, next) => {
   try {
     sendData(res, await orderService.getOrderOrThrow(req.user!.sub, req.params.id));
   } catch (err) {
@@ -223,7 +251,7 @@ router.get('/:id', requirePermission('orders', 'view'), validateParams(UuidParam
 
 router.patch(
   '/:id/status',
-  requirePermission('orders', 'status_change'),
+  requireOrdersOrVendorSelf('status_change'),
   validateParams(UuidParamSchema),
   validateBody(OrderStatusUpdateSchema),
   async (req, res, next) => {
