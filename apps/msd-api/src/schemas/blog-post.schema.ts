@@ -18,13 +18,13 @@ export const blogBlockSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('quote'), text: z.string().min(1) }),
 ]);
 
-/** `search` matches title (see blog-post.service.ts's listBlogPosts); `status`/`categorySlug`
+/** `search` matches title (see blog-post.service.ts's listBlogPosts); `status`/`categoryId`
  *  narrow the admin listing — unlike the public catalog read, an admin caller MAY filter by any
  *  status (including DRAFT), since this endpoint is permission-gated on 'cms.blog:view'. */
 export const BlogPostListQuerySchema = PaginationQuerySchema.extend({
   search: z.string().max(200).optional(),
   status: z.enum(['DRAFT', 'PUBLISHED']).optional(),
-  categorySlug: z.string().max(160).optional(),
+  categoryId: z.string().uuid().optional(),
 });
 
 const BlogPostFieldsSchema = z.object({
@@ -35,7 +35,10 @@ const BlogPostFieldsSchema = z.object({
     .max(160)
     .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'slug must be lower-kebab-case'),
   excerpt: z.string().min(1).max(500),
-  categorySlug: z.string().min(1).max(160),
+  /** A real FK to BlogCategory.id (was a free-text `categorySlug` column — see schema.prisma's
+   *  own doc comment on BlogPost.categoryId for why). The public read contract is unaffected —
+   *  see PublicBlogPostListQuerySchema below, which still speaks in terms of the category slug. */
+  categoryId: z.string().uuid(),
   body: z.array(blogBlockSchema).min(1),
   author: z.string().min(1).max(150),
   readMinutes: z.number().int().min(1),

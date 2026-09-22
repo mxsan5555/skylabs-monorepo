@@ -51,12 +51,14 @@ enum OtpPurpose {
   signup
   change_phone
   change_email
+  password_reset
 }
 
 enum LoginMethod {
   otp_email
   otp_phone
   google
+  password
 }
 
 // ---------------------------------------------------------------------------
@@ -73,6 +75,7 @@ model User {
   phone       String?    @unique
   name        String
   googleId    String?    @unique
+  passwordHash String?   // nullable — OTP/Google-only users never set one; password login is additive
   status      UserStatus @default(active)
   lastLoginAt DateTime?
 
@@ -82,6 +85,12 @@ model User {
   auditLogsAsActor            AuditLog[]             @relation("AuditLogActor")
   impersonationsAsSuperAdmin  ImpersonationSession[]  @relation("ImpersonationSuperAdmin")
   impersonationsAsTarget      ImpersonationSession[]  @relation("ImpersonationTarget")
+  permissionOverrides         UserPermissionOverride[]
+  driver                      Driver?
+  customer                    Customer?
+  // Drivers currently assigned to this User for KYC review — set only via
+  // `PATCH /drivers/:id/assign-verifier`. See `Driver.assignedVerifierId`.
+  assignedKycDrivers          Driver[]               @relation("DriverAssignedVerifier")
 
   @@index([status])
 }
@@ -120,9 +129,29 @@ model Permission {
   label     String
 
   roles     RolePermission[]
+  userOverrides UserPermissionOverride[]
 
   @@index([menuKey])
   @@index([action])
+}
+
+// Per-user permission override, layered on top of the role-derived grant set at resolution
+// time (see `permission.service.ts#resolveEffectivePermissionsForUser`). 'grant' adds a
+// permission the user's roles don't carry; 'revoke' removes one they otherwise would have.
+// Never applied to a SuperAdmin-flagged role holder — that access is a hard guarantee.
+model UserPermissionOverride {
+  id           String   @id @default(uuid())
+  createdAt    DateTime @default(now())
+
+  userId       String
+  permissionId String
+  effect       String // 'grant' | 'revoke'
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permissionId])
+  @@index([userId])
 }
 
 model RolePermission {
@@ -205,7 +234,6 @@ model RefreshSession {
 
   userId      String
   hashedToken String    @unique
-  deviceInfo  String?
   ip          String?
   userAgent   String?
   expiresAt   DateTime
@@ -265,7 +293,6 @@ model ImpersonationSession {
   superAdminUserId String
   targetUserId     String
   startedAt        DateTime  @default(now())
-  endedAt          DateTime?
   previewTokenJti  String    @unique
 
   superAdmin       User @relation("ImpersonationSuperAdmin", fields: [superAdminUserId], references: [id], onDelete: Cascade)
@@ -273,4 +300,393 @@ model ImpersonationSession {
 
   @@index([superAdminUserId])
   @@index([targetUserId])
+}
+
+// ---------------------------------------------------------------------------
+// Business domain — Phase 1 (Drivers, Vehicles, Customers, Attendance, Trips group)
+// Status/category fields are plain String, not enums: their vocabularies are
+// meant to become Masters-table-driven later and are validated at the Zod layer
+// for now, not the DB layer.
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id                  String    @id @default(uuid())
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Self-service linkage — nullable (existing rows start unlinked) and unique (one User can
+  // claim at most one Customer record). Set/cleared only via the admin link/unlink actions,
+  // never a side effect of anything else. See `resolveOwnCustomer` — the ONLY place a
+  // caller's own customerId is ever resolved (from `req.user.sub`, never a client-supplied
+  // id). Mirrors `Driver.userId` exactly.
+  userId              String?   @unique
+  user                User?     @relation(fields: [userId], references: [id])
+
+  firstName           String
+  lastName            String?
+  profileImage        String?
+  mobileNumber        String    @unique
+  email               String?
+  dateOfBirth         String?
+  gender              String?
+  addressLine1        String?
+  addressLine2        String?
+  stateId             Int?
+  cityId              Int?
+  pincode             String?
+  alternatePhone      String?
+  customerType        String?
+  registrationSource  String?
+  verificationStatus  String    @default("Pending")
+  accountStatus       String    @default("Active")
+  lastLoginAt         DateTime?
+  notes               String?
+
+  bookings            Booking[]
+
+  @@index([verificationStatus])
+  @@index([accountStatus])
+}
+
+model Driver {
+  id                    String    @id @default(uuid())
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Self-service linkage — nullable (existing rows start unlinked) and unique (one User can
+  // claim at most one Driver record). Set/cleared only via the admin link/unlink actions,
+  // never a side effect of anything else. See `resolveOwnDriver` — the ONLY place a caller's
+  // own driverId is ever resolved (from `req.user.sub`, never a client-supplied id).
+  userId                String?   @unique
+  user                  User?     @relation(fields: [userId], references: [id])
+
+  firstName             String
+  lastName              String?
+  fatherName            String?
+  motherName            String?
+  email                 String?
+  phone                 String?
+  emergencyNumber       String?
+  dob                   String?
+  maritalStatus         String?
+  gender                String?
+  passportNumber        String?
+  religion              String?
+  color                 String?
+  language              String?
+  age                   String?
+  height                String?
+  weight                String?
+  country               String?
+  state                 String?
+  pincode               String?
+  address               String?
+  driverType            String?
+  status                String    @default("Non-Verified")
+  verificationNotes     String?   // staff-set reason for the current status; driver-portal read-only
+  // Portal login gate — independent of `status` above (KYC verification stage). 'Active' |
+  // 'Inactive'. Changed only via `PATCH /drivers/:id/status` (drivers:status_change), never
+  // as a side effect of the KYC `PATCH /drivers/:id`. Enforced at login (`assertDriverAccountActive`)
+  // and on every authenticated `/drivers/me*` call (`resolveOwnDriver`), not just hidden in the UI.
+  accountStatus         String    @default("Active")
+
+  // KYC review assignment — which staff User is currently reviewing this driver's KYC.
+  // Set/cleared only via `PATCH /drivers/:id/assign-verifier` (drivers:assign). A verifier's
+  // `GET /drivers/assigned-to-me*` routes are ownership-scoped off this field, mirroring the
+  // `userId`/`resolveOwnDriver` pattern above but for staff instead of the driver themselves.
+  assignedVerifierId    String?
+  assignedVerifier      User?     @relation("DriverAssignedVerifier", fields: [assignedVerifierId], references: [id])
+
+  // KYC checklist — one status+notes pair per existing `DriverDocument` category (personal,
+  // health, education, police), set only via `PATCH /drivers/:id/kyc-checklist` by the
+  // assigned verifier. 'Pending' | 'Verified' | 'Rejected' | 'Correction Requested'.
+  // Independent of the final `status` above, which stays gated by `drivers:edit`.
+  personalDocsStatus    String    @default("Pending")
+  personalDocsNotes     String?
+  healthDocsStatus      String    @default("Pending")
+  healthDocsNotes       String?
+  educationDocsStatus   String    @default("Pending")
+  educationDocsNotes    String?
+  policeDocsStatus      String    @default("Pending")
+  policeDocsNotes       String?
+
+  sourceType            String?
+  vehicle               String?
+  avatar                String?
+  languages             String[] @default([]) // multi-select, master-data-driven (masters.languages) — additive alongside the legacy singular `language` field above
+
+  education             String?
+  trainingStatus        String?
+  trainingCertificate   String?
+  eyeVision             String?
+  healthInsurance       String?
+  bloodGroup            String?
+
+  licenseDetails        String?
+  vehicleType           String?
+  dlNo                  String?
+  dlIssueDate           String?
+  dlExpiryDate          String?
+  policeVerifiedStatus  String?
+  policeVerifiedNo      String?
+  jobType               String?
+  experience            String?
+  currentSalary         String?
+  expectedSalary        String?
+
+  preferredPaymentMode  String?
+  amount                String?
+  paymentReceiptDate    String?
+  bankName              String?
+  bankAccountNo         String?
+  ifscCode              String?
+  branchName            String?
+  upiIdOrChequeNo       String?
+
+  documents             DriverDocument[]
+
+  // Multi-step onboarding-form progress — set only by `driver.service.ts`'s
+  // `deriveOnboardingFields`, never trusted directly from the client beyond the single
+  // `stepCompleted`/`subStepCompleted` pair the step-save endpoint accepts. Independent of
+  // `status` above (manual staff verification) — a driver can be a fully onboarded,
+  // unverified record.
+  //
+  // Each top-level tab (1-4) has its own nested sub-steps (see `SUB_COUNTS` in
+  // `driver.service.ts`) — `completedSubSteps` is the definitive source of truth, storing
+  // one entry per finished (tab, sub) pair encoded as `tab*10+sub` (e.g. tab 2 sub 1 -> 21).
+  // `completedSteps`/`currentStep`/`completionPercentage` are all derived FROM it on every
+  // save, never written independently, so the two can never drift out of sync.
+  onboardingStatus      String    @default("in_progress") // 'in_progress' | 'completed'
+  currentStep           Int       @default(1) // the next pending top-level tab (1-4) to resume at
+  currentSubStep        Int       @default(0) // the next pending nested sub-step (0-based) within currentStep
+  completedSteps        Int[]     @default([]) // top-level tabs (1-4) whose every nested sub-step is done
+  completedSubSteps     Int[]     @default([]) // nested (tab, sub) pairs done so far, encoded tab*10+sub
+  completionPercentage  Int       @default(0) // % of all nested sub-steps across all 4 tabs completed
+
+  @@index([status])
+  @@index([accountStatus])
+  @@index([assignedVerifierId])
+}
+
+model DriverDocument {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now())
+
+  driverId   String
+  category   String // 'personal' | 'health' | 'education' | 'police'
+  type       String // doc-type dropdown value, e.g. "Aadhaar / National ID"
+  regNo      String?
+  fileName   String?
+  filePath   String?
+  mimeType   String?
+  sizeBytes  Int?
+
+  driver     Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([category])
+}
+
+model Vehicle {
+  id                    String    @id @default(uuid())
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  vehicleUid            String    @unique
+  customerId            Int?
+  vehicleNumber         String    @unique
+  vehicleTypeId         Int
+  make                  String?
+  model                 String?
+  variant               String?
+  manufacturingYear     String?
+  fuelType              String?
+  transmission          String?
+  color                 String?
+  rcNumber              String?
+  rcExpiryDate          String?
+  insuranceNumber       String?
+  insuranceExpiryDate   String?
+  status                String    @default("Active")
+  notes                 String?
+
+  @@index([status])
+}
+
+model AttendanceRecord {
+  id                   String    @id @default(uuid())
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  driverId             String
+  attendanceDate       String
+  checkInTime          String?
+  checkOutTime         String?
+  checkInLatitude      Float?
+  checkInLongitude     Float?
+  checkOutLatitude     Float?
+  checkOutLongitude    Float?
+  status               String    @default("Present")
+  totalHours           Float?
+  assignedTripId       String?
+  leaveType            String?
+  leaveReason          String?
+  remarks              String?
+
+  @@index([driverId])
+  @@index([status])
+}
+
+model TripType {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+}
+
+model Booking {
+  id                     String    @id @default(uuid())
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  bookingCode            String    @unique
+  customerName           String
+  // Real ownership link for the Customer self-service portal (`GET /customers/me/bookings`)
+  // — additive alongside the pre-existing `customerName` string, which the admin booking
+  // screen still writes and displays; nothing about that existing flow changes. Nullable
+  // because nothing currently populates it automatically (the public /ride/* booking flow
+  // is still a UI prototype — see its own code comments) until a customer picker is added
+  // to the admin booking form or that flow is wired to a real backend.
+  customerId             String?
+  customer               Customer? @relation(fields: [customerId], references: [id])
+  driverName             String?
+  vehicleName            String?
+  vehicleCategory        String?
+  tripTypeName           String?
+  pickupAddress          String?
+  pickupLat              Float?
+  pickupLng              Float?
+  dropAddress            String?
+  dropLat                Float?
+  dropLng                Float?
+  scheduledAt            String?
+  estimatedDistanceKm    Float?
+  estimatedDurationMin   Float?
+  estimatedFare          Float?
+  finalFare              Float?
+  status                 String    @default("requested")
+  paymentStatus          String    @default("pending")
+  paymentMode            String    @default("cash")
+  otp                    String?
+  requestedAt            String?
+  acceptedAt             String?
+  startedAt              String?
+  completedAt            String?
+
+  @@index([status])
+  @@index([customerId])
+}
+
+model DriverLocation {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  driverName  String
+  phone       String?
+  vehicle     String?
+  city        String?
+  latitude    Float
+  longitude   Float
+  status      String   @default("Online")
+  recordedAt  String?
+}
+
+model CancellationReason {
+  id                  String   @id @default(uuid())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  code                String   @unique
+  reasonText          String
+  appliesTo           String   @default("Customer") // 'Customer' | 'Driver' | 'Both'
+  penaltyApplicable   String   @default("No") // 'Yes' | 'No'
+  status              String   @default("Active")
+}
+
+model FareRule {
+  id                     String   @id @default(uuid())
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  vehicleCategoryName    String
+  tripTypeName           String
+  zoneName               String
+  baseFare               Float
+  perKmRate              Float
+  perMinRate             Float
+  waitingChargePerMin    Float
+  minFare                Float
+  driverAllowance        Float
+  tollIncluded           Boolean  @default(false)
+  surgeMultiplier        Float    @default(1.0)
+  effectiveFrom          String
+  isActive               Boolean  @default(true)
+}
+
+// ---------------------------------------------------------------------------
+// Master data — simple admin-managed lookup lists behind the "Driver Masters"
+// menu group. No FK relations point at these yet (Driver/Vehicle store plain
+// strings), so deletes here are hard deletes.
+// ---------------------------------------------------------------------------
+
+// Backs the 8 structurally-identical lookup screens (driver-types, education,
+// eye-visions, health-docs, personal-docs, police-docs, source-types, statuses),
+// one row per (category, name). `category` values are the frontend's menu-route
+// segments, e.g. 'driver-types', 'education'.
+model MasterListItem {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category  String
+  name      String
+  status    String   @default("Active") // 'Active' | 'Inactive'
+
+  @@unique([category, name])
+  @@index([category])
+}
+
+model VehicleType {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  name        String
+  code        String   @unique
+  description String?
+  status      String   @default("Active")
+}
+
+model ServiceZone {
+  id           String   @id @default(uuid())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  zoneName     String
+  zoneCode     String   @unique
+  stateId      Int?
+  cityId       Int?
+  areaName     String?
+  pincode      String?
+  zoneType     String   @default("City") // 'City' | 'Area' | 'Pincode' | 'Custom'
+  latitude     Float?
+  longitude    Float?
+  radiusKm     Float?
+  boundaryData String?
+  status       String   @default("Active")
+  notes        String?
 }

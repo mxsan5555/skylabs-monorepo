@@ -8,9 +8,14 @@ import { Prisma, type UserStatus } from '../generated/prisma-client';
  * scalar role column on `User` itself to filter on directly). Superadmin-flagged users are
  * excluded from every call here by default — a Superadmin manages their own profile via the
  * separate `/rbac/users/me` self-service surface (see Phase 7), not as a row an admin can edit/
- * delete/reassign in this general staff/vendor/customer list. Checked via `Role.isSuperAdmin`,
- * never a role-key string compare (same discipline as `notifySuperAdmins`/
- * `permission-resolver.service.ts`).
+ * delete/reassign in this general staff/customer list. Checked via `Role.isSuperAdmin`, never a
+ * role-key string compare (same discipline as `notifySuperAdmins`/`permission-resolver.service.ts`).
+ *
+ * Vendor-owner accounts are ALSO excluded (`vendorProfile: null`, via the existing back-relation)
+ * — a Vendor's owner User is managed exclusively through Vendor List/Management
+ * (`vendors.routes.ts`), never through this general User Management screen, so it never appears
+ * here at all (not hidden client-side — excluded at the query). The User row itself is untouched
+ * either way; this only narrows what this one listing surfaces.
  */
 export async function listUsers(page: number, pageSize: number, opts: { search?: string; roleKey?: string } = {}) {
   const { search, roleKey } = opts;
@@ -18,6 +23,7 @@ export async function listUsers(page: number, pageSize: number, opts: { search?:
     deletedAt: null,
     AND: [
       { roles: { none: { role: { isSuperAdmin: true } } } },
+      { vendorProfile: null },
       ...(roleKey ? [{ roles: { some: { role: { key: roleKey } } } } as Prisma.UserWhereInput] : []),
       ...(search
         ? [

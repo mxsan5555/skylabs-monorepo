@@ -3,14 +3,13 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Divider, FilledButton, Icon, OutlinedIconButton, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { getCatalogDeal, listCatalogDeals, type CatalogDeal, } from '../../../api/catalog';
+import { getCatalogProduct, listCatalogProducts, type CatalogProduct, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
-import { useWishlist } from '../../../wishlist/wishlist-context';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { formatINR } from '../../../utils/format';
-import { resolveDealMedia, primaryImage } from '../../../utils/media';
+import { resolveProductMedia, primaryImage } from '../../../utils/media';
 import content from '../../../content.json';
 import './product-detail.css';
 
@@ -18,28 +17,19 @@ const { products } = content;
 const SITE_URL = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
 
 /**
- * A single product-deal — GET /catalog/deals/:id.
- *
- * CatalogDeal unifies Service and Product as one Deal entity
- * (.product populated here).
- *
- * The backend does not expose the old flat Product shape, so this
- * page renders the fields available from Deal/Product:
- * title, description, images and price.
+ * A single Product — GET /catalog/products/:id. Product is a fully independent,
+ * directly-purchasable catalog entity now (see msd-api's Product schema doc comment), never a
+ * Deal. Cannot be wishlisted — `WishlistItem` only supports a Deal (see its own schema doc
+ * comment), matching today's status quo for a bare Product.
  */
 export function ProductDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { token, isAuthenticated } = useAuth();
-  const {
-    has: isWishlisted,
-    toggle: toggleWishlist,
-    isPending: wishlistPending,
-  } = useWishlist();
-  const [deal, setDeal] = useState<CatalogDeal | null>(null);
+  const [product, setProduct] = useState<CatalogProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [related, setRelated] = useState<CatalogDeal[]>([]);
+  const [related, setRelated] = useState<CatalogProduct[]>([]);
   const [activeImg, setActiveImg] = useState(0);
   const [qty, setQty] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
@@ -48,7 +38,7 @@ export function ProductDetail() {
 
   useEffect(() => {
     if (!id) {
-      setDeal(null);
+      setProduct(null);
       setError(products.detail.errors.invalidProduct);
       setLoading(false);
       return;
@@ -58,13 +48,13 @@ export function ProductDetail() {
     setError('');
     setActiveImg(0);
 
-    getCatalogDeal(id)
+    getCatalogProduct(id)
       .then(({ data }) => {
-        setDeal(data);
+        setProduct(data);
       })
       .catch((err: unknown) => {
         if (err instanceof ApiRequestError && err.status === 404) {
-          setDeal(null);
+          setProduct(null);
           return;
         }
 
@@ -80,27 +70,26 @@ export function ProductDetail() {
   }, [id]);
 
   useEffect(() => {
-    if (!deal?.category?.id) {
+    if (!product?.category?.id) {
       setRelated([]);
       return;
     }
 
-    listCatalogDeals({
-      type: 'product',
-      categoryId: deal.category.id,
+    listCatalogProducts({
+      categoryId: product.category.id,
       pageSize: 7,
     })
       .then(({ data }) => {
         setRelated(
           data
-            .filter((item) => item.id !== deal.id)
+            .filter((item) => item.id !== product.id)
             .slice(0, 6),
         );
       })
       .catch(() => {
         setRelated([]);
       });
-  }, [deal]);
+  }, [product]);
 
   if (loading) {
     return (
@@ -108,7 +97,7 @@ export function ProductDetail() {
     );
   }
 
-  if (error || !deal || !deal.product) {
+  if (error || !product) {
     return (
       <div className="product-detail product-detail--empty">
         <title>{products.detail.notFound.metaTitle}</title>
@@ -140,24 +129,21 @@ export function ProductDetail() {
     return false;
   };
 
-  const name = deal.product?.name ?? deal.title;
+  const name = product.name;
 
-  const dealMedia = resolveDealMedia(deal);
-  const gallery = dealMedia.images;
-  const video = dealMedia.video;
+  const productMedia = resolveProductMedia(product);
+  const gallery = productMedia.images;
+  const video = productMedia.video;
 
-  const description =
-    deal.description ??
-    deal.shortDescription ??
-    '';
+  const description = product.description ?? product.summary ?? '';
 
-  const salePrice = Number(deal.salePrice);
+  const salePrice = Number(product.price);
 
-  const originalPrice = deal.originalPrice
-    ? Number(deal.originalPrice)
+  const originalPrice = product.originalPrice
+    ? Number(product.originalPrice)
     : undefined;
 
-  const dealId = deal.id;
+  const productId = product.id;
 
   async function handleAddToCart() {
     if (!requireAuthOrRedirect()) {
@@ -167,7 +153,7 @@ export function ProductDetail() {
     setAddError('');
 
     try {
-      await addCartItem(token, { dealId, quantity: qty });
+      await addCartItem(token, { productId, quantity: qty });
 
       setAddedToCart(true);
 
@@ -199,14 +185,6 @@ export function ProductDetail() {
     }
   }
 
-  function toggleFavorite() {
-    if (!requireAuthOrRedirect()) {
-      return;
-    }
-
-    void toggleWishlist(dealId);
-  }
-
   const seoName =
     name.length > 50
       ? `${name.slice(0, 47)}…`
@@ -217,7 +195,7 @@ export function ProductDetail() {
     : `Shop ${name} at MSD.`;
 
   const canonicalUrl =
-    `${SITE_URL}/products/${deal.id}`;
+    `${SITE_URL}/products/${product.id}`;
 
   return (
     <div className="product-detail">
@@ -291,13 +269,13 @@ export function ProductDetail() {
             name,
             description,
             image: gallery,
-            brand: deal.product?.brand
+            brand: product.brand
               ? {
                 '@type': 'Brand',
-                name: deal.product.brand,
+                name: product.brand,
               }
               : undefined,
-            sku: deal.id,
+            sku: product.id,
             offers: {
               '@type': 'Offer',
               price: salePrice,
@@ -308,7 +286,7 @@ export function ProductDetail() {
               seller: {
                 '@type': 'Organization',
                 name:
-                  deal.vendor?.businessName ??
+                  product.vendor?.businessName ??
                   'MySpaDeal',
               },
             },
@@ -373,7 +351,7 @@ export function ProductDetail() {
                 className="product-detail__main-img"
                 src={gallery[activeImg]}
                 alt={
-                  deal.product?.imageAlt ??
+                  product.imageAlt ??
                   name
                 }
                 width={600}
@@ -381,13 +359,13 @@ export function ProductDetail() {
               />
             )}
 
-            {deal.discountPercent && (
+            {product.discount && (
               <sky-badge
                 className="product-detail__badge"
                 variant="primary"
-                aria-label={`${deal.discountPercent}% ${products.detail.offSuffix}`}
+                aria-label={`${product.discount}% ${products.detail.offSuffix}`}
               >
-                {deal.discountPercent}% {products.detail.offSuffix}
+                {product.discount}% {products.detail.offSuffix}
               </sky-badge>
             )}
           </div>
@@ -434,26 +412,26 @@ export function ProductDetail() {
         <div className="product-detail__info">
           {/* Badges */}
           <div className="product-detail__meta-row">
-            {deal.product?.brand && (
+            {product.brand && (
               <sky-badge
                 variant="secondary"
                 size="small"
               >
-                {deal.product.brand}
+                {product.brand}
               </sky-badge>
             )}
 
-            {deal.vendor?.businessName &&
-              (deal.vendor.slug ? (
+            {product.vendor?.businessName &&
+              (product.vendor.slug ? (
                 <Link
-                  to={`/vendor/${deal.vendor.slug}`}
+                  to={`/vendor/${product.vendor.slug}`}
                   className="product-detail__vendor-link"
                 >
                   <sky-badge
                     variant="primary"
                     size="small"
                   >
-                    {deal.vendor.businessName}
+                    {product.vendor.businessName}
                   </sky-badge>
                 </Link>
               ) : (
@@ -461,7 +439,7 @@ export function ProductDetail() {
                   variant="primary"
                   size="small"
                 >
-                  {deal.vendor.businessName}
+                  {product.vendor.businessName}
                 </sky-badge>
               ))}
           </div>
@@ -488,12 +466,12 @@ export function ProductDetail() {
                 </s>
               )}
 
-            {deal.discountPercent && (
+            {product.discount && (
               <sky-badge
                 variant="error"
                 size="small"
               >
-                {deal.discountPercent}% OFF
+                {product.discount}% OFF
               </sky-badge>
             )}
           </div>
@@ -559,24 +537,6 @@ export function ProductDetail() {
                   ? products.detail.addedToCart
                   : products.detail.addToCart}
               </FilledButton>
-
-              <OutlinedIconButton
-                className="product-detail__action-icon"
-                aria-label={
-                  isWishlisted(dealId)
-                    ? products.detail.removeFromWishlist
-                    : products.detail.saveToWishlist
-                }
-                aria-pressed={isWishlisted(dealId)}
-                disabled={wishlistPending(dealId)}
-                onClick={toggleFavorite}
-              >
-                <Icon aria-hidden="true">
-                  {isWishlisted(dealId)
-                    ? 'favorite'
-                    : 'favorite_border'}
-                </Icon>
-              </OutlinedIconButton>
 
               <OutlinedIconButton
                 className="product-detail__action-icon"
@@ -669,33 +629,27 @@ export function ProductDetail() {
                   >
                     <SkyProductCardWC
                       variant="outlined"
-                      heading={
-                        item.product?.name ??
-                        item.title
-                      }
+                      heading={item.name}
                       eyebrow={
-                        item.product?.brand ??
+                        item.brand ??
                         item.vendor?.businessName ??
                         undefined
                       }
                       eyebrowHref={
-                        !item.product?.brand &&
+                        !item.brand &&
                           item.vendor?.slug
                           ? `/vendor/${item.vendor.slug}`
                           : undefined
                       }
-                      image={primaryImage(resolveDealMedia(item))}
-                      imageAlt={
-                        item.product?.imageAlt ??
-                        undefined
-                      }
+                      image={primaryImage(resolveProductMedia(item))}
+                      imageAlt={item.imageAlt ?? undefined}
                       price={formatINR(
-                        Number(item.salePrice),
+                        Number(item.price),
                       )}
                       originalPrice={
                         item.originalPrice &&
                           Number(item.originalPrice) !==
-                          Number(item.salePrice)
+                          Number(item.price)
                           ? formatINR(
                             Number(
                               item.originalPrice,
@@ -704,26 +658,11 @@ export function ProductDetail() {
                           : undefined
                       }
                       discount={
-                        item.discountPercent
-                          ? `${item.discountPercent}% OFF`
+                        item.discount
+                          ? `${item.discount}% OFF`
                           : undefined
                       }
                       href={`/products/${item.id}`}
-                      favorite
-                      favoriteActive={isWishlisted(
-                        item.id,
-                      )}
-                      onFavorite={() => {
-                        if (
-                          !requireAuthOrRedirect()
-                        ) {
-                          return;
-                        }
-
-                        void toggleWishlist(
-                          item.id,
-                        );
-                      }}
                     />
                   </swiper-slide>
                 ))}

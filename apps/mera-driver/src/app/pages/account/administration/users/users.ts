@@ -4,7 +4,15 @@ import { AuthService, HasPermissionDirective } from '@skylabs-monorepo/shared-au
 import type { DeviceSession, LoginHistoryEntry, Role, User, UserStatus } from '@skylabs-monorepo/shared-types';
 import type { SkyDataTableAction, SkyDataTableColumn, SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { AdminPage } from '../../../../admin/admin-page/admin-page';
-import { RbacApiService } from '../../../../core/rbac/rbac-api.service';
+import { RbacApiService, type PermissionCatalogAction, type PermissionCatalogNode } from '../../../../core/rbac/rbac-api.service';
+
+type OverrideState = 'inherit' | 'grant' | 'revoke';
+
+interface OverrideCatalogGroup {
+  menuKey: string;
+  title: string;
+  entries: PermissionCatalogAction[];
+}
 
 type RbacUser = User & { roles: { role: Role }[] };
 
@@ -129,6 +137,27 @@ export class AdministrationUsers {
   protected readonly loginHistory = signal<LoginHistoryEntry[] | null>(null);
   protected readonly sessions = signal<DeviceSession[] | null>(null);
 
+  // Permission overrides -------------------------------------------------
+  protected readonly catalog = signal<PermissionCatalogNode[]>([]);
+  private readonly catalogActionsByKey = computed(() => {
+    const map = new Map<string, PermissionCatalogAction>();
+    for (const node of this.catalog()) {
+      for (const action of node.actions) map.set(action.key, action);
+    }
+    return map;
+  });
+  protected readonly overrideCatalogGroups = computed<OverrideCatalogGroup[]>(() =>
+    this.catalog()
+      .map((node) => ({ menuKey: node.menuKey, title: node.title, entries: node.actions.filter((a) => a.permissionId !== null) }))
+      .filter((group) => group.entries.length > 0),
+  );
+  protected readonly overrideStates = signal<Map<string, OverrideState>>(new Map());
+  protected readonly overridesLoading = signal(false);
+  protected readonly savingOverrides = signal(false);
+  protected readonly overridesError = signal<string | null>(null);
+  protected readonly overridesSuccess = signal(false);
+  protected readonly effectivePermissions = signal<string[] | null>(null);
+
   // Create user ----------------------------------------------------------
   protected newUserName = '';
   protected newUserEmail = '';
@@ -139,6 +168,7 @@ export class AdministrationUsers {
   constructor() {
     this.loadUsers();
     this.rbac.listRoles().subscribe({ next: (roles) => this.roles.set(roles) });
+    this.rbac.permissionsCatalog().subscribe({ next: (catalog) => this.catalog.set(catalog) });
   }
 
   private loadUsers(): void {
@@ -177,10 +207,90 @@ export class AdministrationUsers {
     this.detailMessage.set(null);
     this.loginHistory.set(null);
     this.sessions.set(null);
+    this.overrideStates.set(new Map());
+    this.overridesError.set(null);
+    this.overridesSuccess.set(false);
+    this.effectivePermissions.set(null);
+    this.loadOverrides(id);
   }
 
   protected closeDetail(): void {
     this.selectedUserId.set(null);
+  }
+
+  private loadOverrides(userId: string): void {
+    this.overridesLoading.set(true);
+    this.rbac.userPermissionOverrides(userId).subscribe({
+      next: ({ grants, revokes }) => {
+        const byKey = this.catalogActionsByKey();
+        const idToKey = new Map<string, string>();
+        for (const action of byKey.values()) {
+          if (action.permissionId) idToKey.set(action.permissionId, action.key);
+        }
+        const states = new Map<string, OverrideState>();
+        for (const id of grants) {
+          const key = idToKey.get(id);
+          if (key) states.set(key, 'grant');
+        }
+        for (const id of revokes) {
+          const key = idToKey.get(id);
+          if (key) states.set(key, 'revoke');
+        }
+        this.overrideStates.set(states);
+        this.overridesLoading.set(false);
+      },
+      error: () => {
+        this.overridesLoading.set(false);
+        this.overridesError.set('Could not load permission overrides.');
+      },
+    });
+  }
+
+  protected overrideStateFor(key: string): OverrideState {
+    return this.overrideStates().get(key) ?? 'inherit';
+  }
+
+  protected setOverrideState(key: string, state: OverrideState): void {
+    const next = new Map(this.overrideStates());
+    if (state === 'inherit') next.delete(key);
+    else next.set(key, state);
+    this.overrideStates.set(next);
+  }
+
+  protected saveOverrides(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+
+    const byKey = this.catalogActionsByKey();
+    const grants: string[] = [];
+    const revokes: string[] = [];
+    for (const [key, state] of this.overrideStates()) {
+      const permissionId = byKey.get(key)?.permissionId;
+      if (!permissionId) continue;
+      if (state === 'grant') grants.push(permissionId);
+      else if (state === 'revoke') revokes.push(permissionId);
+    }
+
+    this.savingOverrides.set(true);
+    this.overridesError.set(null);
+    this.overridesSuccess.set(false);
+    this.rbac.setUserPermissionOverrides(user.id, grants, revokes).subscribe({
+      next: () => {
+        this.savingOverrides.set(false);
+        this.overridesSuccess.set(true);
+        this.effectivePermissions.set(null);
+      },
+      error: (err: Error) => {
+        this.savingOverrides.set(false);
+        this.overridesError.set(err.message || 'Failed to save permission overrides.');
+      },
+    });
+  }
+
+  protected loadEffectivePermissions(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.rbac.effectivePermissions(user.id).subscribe({ next: (permissions) => this.effectivePermissions.set(permissions) });
   }
 
   private refreshUser(updated: RbacUser): void {

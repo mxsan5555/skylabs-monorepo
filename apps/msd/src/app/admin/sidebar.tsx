@@ -1,6 +1,7 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import type { MenuNode } from '@skylabs-monorepo/shared-types';
-import { Icon, TextButton } from '@skylabs-monorepo/shared-ui/react';
+import { Icon, IconButton, TextButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { isDualRoleUser, setExperienceMode } from '../../auth/role-routing';
 import logo from '../../assets/logo.jpg';
@@ -20,6 +21,11 @@ export function Sidebar() {
   const { bootstrap, isPreviewing, signOut } = useAuth();
   const navigate = useNavigate();
   const menu = bootstrap?.menu ?? [];
+   console.log('SIDEBAR MENU:', menu);
+   console.log(
+  'CUSTOMER MENU:',
+  menu.find((node) => node.id === 'customers')
+);
   const visibleMenu = isPreviewing ? menu.filter((node) => node.id !== 'administration') : menu;
   const initial = (bootstrap?.user.name ?? '?').charAt(0).toUpperCase();
   const dualRole = bootstrap ? isDualRoleUser(bootstrap) : false;
@@ -35,23 +41,23 @@ export function Sidebar() {
 
   return (
     <aside className="admin-sidebar">
-   <div className="admin-sidebar__brand">
-  <span className="admin-sidebar__logo">
-    <img
-      src={logo}
-      alt="MySpaDeal"
-      className="admin-sidebar__logo-image admin-sidebar__logo-image--desktop"
-    />
-    <img
-      src={logo2}
-      alt="MySpaDeal"
-      className="admin-sidebar__logo-image admin-sidebar__logo-image--mobile"
-    />
-  </span>
-</div>
+      <div className="admin-sidebar__brand">
+        <span className="admin-sidebar__logo">
+          <img
+            src={logo}
+            alt="MySpaDeal"
+            className="admin-sidebar__logo-image admin-sidebar__logo-image--desktop"
+          />
+          <img
+            src={logo2}
+            alt="MySpaDeal"
+            className="admin-sidebar__logo-image admin-sidebar__logo-image--mobile"
+          />
+        </span>
+      </div>
 
       <nav className="admin-sidebar__nav" aria-label="Console">
-        {visibleMenu.map((node) => <MenuNodeItem key={node.id} node={node} />)}
+        {visibleMenu.map((node) => <MenuNodeItem key={node.id} node={node}  onLogout={doSignOut}/>)}
         {dualRole && (
           <NavLink to="/" onClick={switchToCustomer} className="admin-nav-item">
             <Icon aria-hidden="true">storefront</Icon>
@@ -74,26 +80,96 @@ export function Sidebar() {
     </aside>
   );
 }
+function MenuNodeItem({
+  node,
+  onLogout,
+  isChild = false,
+}: {
+  node: MenuNode;
+  onLogout: () => void;
+  isChild?: boolean;
+}) {
+  const location = useLocation();
+  const hasChildren = Boolean(node.children?.length);
 
-function MenuNodeItem({ node }: { node: MenuNode }) {
-  if (node.children && node.children.length > 0) {
+  const childIsActive =
+    hasChildren &&
+    node.children?.some((child) =>
+      child.route ? location.pathname.startsWith(child.route) : false
+    );
+
+  const [open, setOpen] = useState(Boolean(childIsActive));
+
+  useEffect(() => {
+    if (childIsActive) {
+      setOpen(true);
+    }
+  }, [childIsActive]);
+
+  if (hasChildren) {
     return (
-      <div className="admin-nav-group">
-        <p className="admin-nav-group__label">{node.title}</p>
-        {node.children.map((child) => <MenuNodeItem key={child.id} node={child} />)}
+      <div className={`admin-nav-group${open ? ' open' : ''}`}>
+        <div className="admin-nav-group__header">
+          <div className="admin-nav-group__title">
+            <Icon aria-hidden="true">{node.icon}</Icon>
+            <span>{node.title}</span>
+          </div>
+
+          <IconButton
+            className="admin-nav-group__toggle"
+            aria-label={`${open ? 'Collapse' : 'Expand'} ${node.title}`}
+            onClick={() => setOpen((current) => !current)}
+          >
+            <Icon aria-hidden="true">
+              {open ? 'keyboard_arrow_up' : 'keyboard_arrow_down'}
+            </Icon>
+          </IconButton>
+        </div>
+
+        {open && (
+          <div className="admin-nav-group__children">
+            {node.children!.map((child) => (
+              <MenuNodeItem
+                key={child.id}
+                node={child}
+                onLogout={onLogout}
+                isChild
+              />
+            ))}
+          </div>
+        )}
       </div>
+    );
+  }
+
+  if (node.id === 'settings-logout') {
+    return (
+      <button
+        type="button"
+        className="admin-nav-item"
+        onClick={onLogout}
+      >
+        {!isChild && node.icon && (
+          <Icon aria-hidden="true">{node.icon}</Icon>
+        )}
+        <span>{node.title}</span>
+      </button>
     );
   }
 
   if (!node.route) return null;
 
-  return (
-    <NavLink
-      to={node.route}
-      className={({ isActive }) => `admin-nav-item${isActive ? ' active' : ''}`}
-    >
+return (
+  <NavLink
+    to={node.route}
+    className={({ isActive }) =>
+      `admin-nav-item${isActive ? ' active' : ''}`
+    }
+  >
+    {node.icon && (
       <Icon aria-hidden="true">{node.icon}</Icon>
-      {node.title}
-    </NavLink>
-  );
+    )}
+    <span>{node.title}</span>
+  </NavLink>
+);
 }

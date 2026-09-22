@@ -70,7 +70,6 @@ interface CategoryRecord {
   parentId: string | null;
   sortOrder: number;
   type: 'SERVICE' | 'PRODUCT' | 'THERAPY' | null;
-  isPopular: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -97,7 +96,6 @@ class CategoryBackend {
       parentId: input.parentId ?? null,
       sortOrder: input.sortOrder ?? 0,
       type: input.parentId ? null : (input.type ?? 'SERVICE'),
-      isPopular: input.isPopular ?? false,
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

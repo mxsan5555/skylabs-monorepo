@@ -1,0 +1,72 @@
+<md-admin-page title="Documents" subtitle="Upload and manage your KYC documents.">
+  <section class="account-card">
+    <div class="account-card__head">
+      <h2>Upload a document</h2>
+    </div>
+    @if (error()) {
+      <p class="otp-muted" role="alert">{{ error() }}</p>
+    }
+    <div class="address-form">
+      <md-outlined-select
+        label="Category"
+        [value]="category()"
+        (change)="category.set($any($event.target).value)"
+      >
+        @for (c of categories; track c.value) {
+          <md-select-option [value]="c.value"><div slot="headline">{{ c.label }}</div></md-select-option>
+        }
+      </md-outlined-select>
+      <md-outlined-text-field
+        label="Document type"
+        placeholder="e.g. Aadhaar Card"
+        [value]="docType()"
+        (input)="docType.set($any($event.target).value)"
+      ></md-outlined-text-field>
+      <md-outlined-text-field
+        label="Registration / ID number (optional)"
+        [value]="regNo()"
+        (input)="regNo.set($any($event.target).value)"
+      ></md-outlined-text-field>
+      <input type="file" (change)="onFileSelected($event)" aria-label="Choose file" />
+      <div class="address-form__actions">
+        <md-filled-button [disabled]="uploading()" (click)="upload()">
+          {{ uploading() ? 'Uploading…' : 'Upload' }}
+        </md-filled-button>
+      </div>
+    </div>
+  </section>
+
+  @if (loading()) {
+    <p class="otp-muted">Loading…</p>
+  } @else {
+    @for (c of categories; track c.value) {
+      <section class="account-card">
+        <div class="account-card__head">
+          <h2>{{ c.label }}</h2>
+        </div>
+        @if (docsFor(c.value).length === 0) {
+          <p class="address-empty">No {{ c.label.toLowerCase() }} documents yet.</p>
+        } @else {
+          <ul class="driver-doc-list">
+            @for (doc of docsFor(c.value); track doc.id) {
+              <li class="driver-doc-card">
+                <div>
+                  <div>{{ doc.type }}</div>
+                  <div class="driver-doc-card__meta">
+                    @if (doc.regNo) {
+                      {{ doc.regNo }} ·
+                    }
+                    {{ doc.fileName ?? 'No file' }}
+                  </div>
+                </div>
+                <md-icon-button [attr.aria-label]="'Delete ' + doc.type" (click)="remove(doc)">
+                  <md-icon aria-hidden="true">delete</md-icon>
+                </md-icon-button>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    }
+  }
+</md-admin-page>

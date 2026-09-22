@@ -1,6 +1,7 @@
 import { getMenuForApp } from '@skylabs-monorepo/shared-menu';
 import { allPermissionKeysForMenu } from '@skylabs-monorepo/shared-permissions';
 import { prisma } from '../lib/prisma';
+import { HttpError } from '../middleware/errorHandler';
 
 /**
  * Resolves the flat set of `${menuKey}:${action}` permission keys granted across a set of
@@ -75,4 +76,89 @@ export async function resolvePermissionsForRoles(roleKeys: readonly string[]): P
 /** Test/dev helper — clears the in-memory permission cache immediately after a role/permission mutation. */
 export function invalidatePermissionCache(): void {
   cache.clear();
+}
+
+/**
+ * Layers a user's `UserPermissionOverride` rows on top of their role-derived permission set:
+ * every 'revoke' removes a permission the roles would otherwise grant, every 'grant' adds one
+ * they wouldn't otherwise have. Never applied to a SuperAdmin-flagged role holder — that access
+ * is a hard guarantee that a per-user override row could otherwise accidentally (or maliciously)
+ * weaken, so overrides are skipped entirely once `resolvePermissionsForRoles` reports SuperAdmin.
+ *
+ * This is the function `requirePermission` and `buildBootstrapResponse` call — role-only
+ * resolution above is unchanged and still independently cached/tested.
+ */
+export async function resolveEffectivePermissionsForUser(userId: string, roleKeys: readonly string[]): Promise<string[]> {
+  const basePermissions = await resolvePermissionsForRoles(roleKeys);
+  if (roleKeys.length === 0) return basePermissions;
+
+  const roles = (await prisma.role.findMany({
+    where: { key: { in: [...roleKeys] }, isActive: true },
+    select: { isSuperAdmin: true },
+  })) ?? [];
+  if (roles.some((r) => r.isSuperAdmin)) return basePermissions;
+
+  const overrides = (await prisma.userPermissionOverride.findMany({
+    where: { userId },
+    include: { permission: { select: { key: true } } },
+  })) ?? [];
+  if (overrides.length === 0) return basePermissions;
+
+  const revokes = new Set(overrides.filter((o) => o.effect === 'revoke').map((o) => o.permission.key));
+  const grants = new Set(overrides.filter((o) => o.effect === 'grant').map((o) => o.permission.key));
+
+  const effective = new Set(basePermissions.filter((p) => !revokes.has(p)));
+  for (const g of grants) effective.add(g);
+  return [...effective];
+}
+
+/** Resolves a user's roles, then their effective (role + override) permission set. */
+export async function getEffectivePermissionsForUserId(userId: string): Promise<string[]> {
+  const userRoles = await prisma.userRole.findMany({ where: { userId }, select: { role: { select: { key: true } } } });
+  const roleKeys = userRoles.map((ur) => ur.role.key);
+  return resolveEffectivePermissionsForUser(userId, roleKeys);
+}
+
+/** The user's current override rows, split into grant/revoke `Permission.id` lists —
+ *  used to pre-check the override editor UI before the caller edits and re-saves. */
+export async function getUserPermissionOverrides(userId: string): Promise<{ grants: string[]; revokes: string[] }> {
+  const overrides = await prisma.userPermissionOverride.findMany({ where: { userId } });
+  return {
+    grants: overrides.filter((o) => o.effect === 'grant').map((o) => o.permissionId),
+    revokes: overrides.filter((o) => o.effect === 'revoke').map((o) => o.permissionId),
+  };
+}
+
+/** Replaces a user's full override set. A permissionId in both lists is rejected — that's
+ *  a contradictory request, not something to silently resolve one way or the other. */
+export async function setUserPermissionOverrides(
+  userId: string,
+  grants: string[],
+  revokes: string[],
+): Promise<{ grants: string[]; revokes: string[] }> {
+  const overlap = grants.filter((id) => revokes.includes(id));
+  if (overlap.length > 0) {
+    throw new HttpError(422, 'VALIDATION_ERROR', 'A permission cannot be both granted and revoked for the same user');
+  }
+
+  const permissionIds = [...grants, ...revokes];
+  if (permissionIds.length > 0) {
+    const validCount = await prisma.permission.count({ where: { id: { in: permissionIds } } });
+    if (validCount !== new Set(permissionIds).size) {
+      throw new HttpError(422, 'VALIDATION_ERROR', 'One or more permissionIds do not exist');
+    }
+  }
+
+  await prisma.$transaction([
+    prisma.userPermissionOverride.deleteMany({ where: { userId } }),
+    prisma.userPermissionOverride.createMany({
+      data: [
+        ...grants.map((permissionId) => ({ userId, permissionId, effect: 'grant' })),
+        ...revokes.map((permissionId) => ({ userId, permissionId, effect: 'revoke' })),
+      ],
+    }),
+  ]);
+
+  invalidatePermissionCache();
+  return getUserPermissionOverrides(userId);
 }

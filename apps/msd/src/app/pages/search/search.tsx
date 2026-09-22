@@ -21,7 +21,6 @@ import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { addCartItem } from '../../../api/cart';
 import {
   listCatalogCategories,
   listCatalogDeals,
@@ -62,7 +61,7 @@ type ActiveDialog = 'price' | 'category' | 'location' | null;
  */
 export function Search() {
   const navigate = useNavigate();
-  const { token, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [params, setParams] = useSearchParams();
   const [view, setView] = useState<View>('list');
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null);
@@ -223,20 +222,9 @@ export function Search() {
 
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
-    navigate(`/sign-in?next=${encodeURIComponent('/explore')}`);
+    const query = params.toString();
+    navigate(`/sign-in?next=${encodeURIComponent(`/explore${query ? `?${query}` : ''}`)}`);
     return false;
-  };
-
-  const addToCart = async (deal: CatalogDeal) => {
-    if (!requireAuthOrRedirect()) return;
-    setActionError('');
-    setActionMessage('');
-    try {
-      await addCartItem(token, { dealId: deal.id, quantity: 1 });
-      setActionMessage(`Added "${deal.product?.name ?? deal.title}" to your cart.`);
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : 'Could not add to cart.');
-    }
   };
 
   // ── Map view — only deals whose branch has real, non-fabricated coordinates ──
@@ -390,9 +378,9 @@ export function Search() {
               <section aria-label={searchContent.results.listAriaLabel}>
                 <ul className="search-results-list">
                   {deals.map((deal) => {
-                    const heading = deal.product?.name ?? deal.title;
+                    const heading = deal.title;
                     const image = primaryImage(resolveDealMedia(deal));
-                    const imageAlt = deal.product?.imageAlt ?? heading;
+                    const imageAlt = heading;
                     return (
                       <li key={deal.id} className="search-results-list__item">
                         <article className="search-result-card">
@@ -439,25 +427,19 @@ export function Search() {
                               </span>
                             </div>
                             <div className="search-result-card__actions">
-                              {!deal.product ? (
-                                <DealAddToCartDialog
-                                  deal={deal}
-                                  onAdded={(label) => setActionMessage(`Added "${label}" to your cart.`)}
-                                  renderTrigger={(open) => (
-                                    <FilledTonalButton
-                                      onClick={() => {
-                                        if (requireAuthOrRedirect()) open();
-                                      }}
-                                    >
-                                      Add to Cart
-                                    </FilledTonalButton>
-                                  )}
-                                />
-                              ) : (
-                                <FilledTonalButton onClick={() => addToCart(deal)}>
-                                  Add to Cart
-                                </FilledTonalButton>
-                              )}
+                              <DealAddToCartDialog
+                                deal={deal}
+                                onAdded={(label) => setActionMessage(`Added "${label}" to your cart.`)}
+                                renderTrigger={(open) => (
+                                  <FilledTonalButton
+                                    onClick={() => {
+                                      if (requireAuthOrRedirect()) open();
+                                    }}
+                                  >
+                                    Add to Cart
+                                  </FilledTonalButton>
+                                )}
+                              />
                               <IconButton
                                 aria-label={
                                   wishlistHas(deal.id)
@@ -488,13 +470,10 @@ export function Search() {
                     <li key={deal.id}>
                       <SkyProductCardWC
                         image={primaryImage(resolveDealMedia(deal))}
-                        imageAlt={deal.product?.imageAlt ?? undefined}
-                        badge={deal.product
-                          ? searchContent.labels.product
-                          : searchContent.labels.service
-                        }
-                        tag={deal.popularTags?.[0]?.name ?? deal.product?.popularTags?.[0]?.name}
-                        heading={deal.product?.name ?? deal.title}
+                        imageAlt={deal.title}
+                        badge={searchContent.labels.service}
+                        tag={deal.popularTags?.[0]?.name}
+                        heading={deal.title}
                         eyebrow={[deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · ')}
                         eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
                         location={deal.branch?.city ?? undefined}
@@ -508,7 +487,7 @@ export function Search() {
                         }
                         favorite={true}
                         favoriteActive={wishlistHas(deal.id)}
-                        href={deal.product ? `/products/${deal.id}` : `/deal/${deal.id}`}
+                        href={`/deal/${deal.id}`}
                         onFavorite={() => wishlistToggle(deal.id)}
                       />
                     </li>
@@ -533,9 +512,9 @@ export function Search() {
                         {dealsWithCoords
                           .slice(0, 5)
                           .map((deal) => {
-                            const heading = deal.product?.name ?? deal.title;
+                            const heading = deal.title;
                             const image = primaryImage(resolveDealMedia(deal));
-                            const imageAlt = deal.product?.imageAlt ?? heading;
+                            const imageAlt = heading;
                             return (
                               <li key={deal.id} className="search-map__list-item">
                                 <Link to={`/deal/${deal.id}`} className="search-map__list-link">

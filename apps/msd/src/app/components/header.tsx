@@ -8,7 +8,7 @@ import { listCatalogCategories, type CatalogCategoryWithChildren, } from '../../
 import { isCustomerUser, isStaffUser, } from '../../auth/role-routing';
 import content from '../../content.json';
 import './header.css';
-import logo from "../../assets/logo.jpg";
+import logo from "../../assets/logo.png";
 import logo2 from "../../assets/logo2.jpg";
 export function Header() {
   const {
@@ -295,28 +295,6 @@ export function Header() {
                   </NavLink>
                 </li>
               ))}
-
-              {/* Static Product */}
-              <li>
-                <NavLink
-                  to="/products"
-                  className="nav-drawer__link"
-                  onClick={closeDrawer}
-                >
-                  Products
-                </NavLink>
-              </li>
-
-              {/* Static Therapists */}
-              <li>
-                <NavLink
-                  to="/therapists"
-                  className="nav-drawer__link"
-                  onClick={closeDrawer}
-                >
-                  Therapists
-                </NavLink>
-              </li>
             </ul>
           </ul>
           <Divider />

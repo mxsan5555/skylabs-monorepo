@@ -3,8 +3,12 @@ import { PublicLayout } from './layouts/public-layout/public-layout';
 import { AuthLayout } from './layouts/auth-layout/auth-layout';
 import { AdminLayout } from './layouts/admin-layout/admin-layout';
 import { RiderLayout } from './layouts/rider-layout/rider-layout';
-import { authGuard } from './core/auth/auth.guard';
-import { roleGuard } from './core/auth/role.guard';
+import { DriverLayout } from './layouts/driver-layout/driver-layout';
+import { CustomerLayout } from './layouts/customer-layout/customer-layout';
+import { authGuard, permissionGuard } from '@skylabs-monorepo/shared-auth/angular';
+import { driverPortalGuard } from './core/auth/driver-portal.guard';
+import { customerPortalGuard } from './core/auth/customer-portal.guard';
+import { adminAreaGuard } from './core/auth/admin-area.guard';
 
 /**
  * Route table.
@@ -13,7 +17,9 @@ import { roleGuard } from './core/auth/role.guard';
  * here PublicLayout (the marketing landing '/', blog, showcase, and the 404
  * catch-all, all with the site header/footer). Every other layout gets an
  * explicit non-empty parent path: AuthLayout (sign-in, otp), AdminLayout
- * (account), and the full-bleed RiderLayout (the booking flow under '/ride/*').
+ * (account), the full-bleed RiderLayout (the booking flow under '/ride/*'),
+ * and the full-bleed DriverLayout (the driver self-service portal under
+ * '/driver/*', gated by `driverPortalGuard` — ownership-based, not RBAC).
  * Protected pages use `canActivate: [authGuard]`. Lazy-loaded via loadComponent.
  */
 export const appRoutes: Routes = [
@@ -47,9 +53,38 @@ export const appRoutes: Routes = [
     ],
   },
   {
+    path: 'forgot-password',
+    component: AuthLayout,
+    children: [
+      {
+        path: '',
+        title: 'Forgot password · mera-driver',
+        loadComponent: () => import('./pages/forgot-password/forgot-password').then((m) => m.ForgotPassword),
+      },
+    ],
+  },
+  {
+    path: 'reset-password',
+    component: AuthLayout,
+    children: [
+      {
+        path: '',
+        title: 'Reset password · mera-driver',
+        loadComponent: () => import('./pages/reset-password/reset-password').then((m) => m.ResetPassword),
+      },
+    ],
+  },
+  {
+    path: 'unauthorized',
+    title: 'Unauthorized · mera-driver',
+    loadComponent: () => import('./pages/unauthorized/unauthorized').then((m) => m.Unauthorized),
+  },
+  {
     path: 'account',
     component: AdminLayout,
-    canActivate: [authGuard],
+    // `adminAreaGuard` redirects a Customer straight to `/customer` before any child route
+    // (or its individual permission grants) is ever evaluated — see that guard's own comment.
+    canActivate: [authGuard, adminAreaGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {
@@ -153,9 +188,14 @@ export const appRoutes: Routes = [
       // Payments Section
       {
         path: 'payments',
+        pathMatch: 'full',
+        redirectTo: 'payments/payments',
+      },
+      {
+        path: 'payments/payments',
         title: 'Payments · mera-driver',
         canActivate: [permissionGuard],
-        data: { permission: { menuKey: 'payments.overview', action: 'view' }, title: 'Payments', subtitle: 'Fares, payouts, and reconciliation.' },
+        data: { permission: { menuKey: 'payments.overview', action: 'view' }, title: 'Payments', subtitle: 'Fares, receipts, and payment transactions.' },
         loadComponent: () =>
           import('./pages/account/payments/payments').then((m) => m.Payments),
       },
@@ -248,9 +288,9 @@ export const appRoutes: Routes = [
       },
       {
         path: 'masters/statuses',
-        title: 'Category Status · mera-driver',
+        title: 'Driver Status · mera-driver',
         canActivate: [permissionGuard],
-        data: { permission: { menuKey: 'masters.statuses', action: 'view' }, title: 'Category Status', subtitle: 'Driver verification status configuration.' },
+        data: { permission: { menuKey: 'masters.statuses', action: 'view' }, title: 'Driver Status', subtitle: 'Driver verification status configuration.' },
         loadComponent: () =>
           import('./pages/account/masters/statuses/statuses').then((m) => m.StatusesMaster),
       },
@@ -302,7 +342,23 @@ export const appRoutes: Routes = [
         loadComponent: () =>
           import('./pages/account/masters/police-docs/police-docs').then((m) => m.PoliceDocsMaster),
       },
+      {
+        path: 'masters/languages',
+        title: 'Languages · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'masters.languages', action: 'view' }, title: 'Languages', subtitle: 'Language list drivers can select in their self-service profile.' },
+        loadComponent: () =>
+          import('./pages/account/masters/languages/languages').then((m) => m.LanguagesMaster),
+      },
 
+      {
+        path: 'kyc-assignments',
+        title: 'KYC Assignments · mera-driver',
+        canActivate: [permissionGuard],
+        data: { permission: { menuKey: 'kyc-assignments', action: 'view' }, title: 'KYC Assignments', subtitle: 'Drivers assigned to you for KYC review.' },
+        loadComponent: () =>
+          import('./pages/account/kyc-assignments/kyc-assignments').then((m) => m.KycAssignments),
+      },
       {
         path: 'settings',
         title: 'Settings · mera-driver',
@@ -390,6 +446,105 @@ export const appRoutes: Routes = [
           import('./pages/ride/confirmed/confirmed').then(
             (m) => m.RideConfirmed,
           ),
+      },
+    ],
+  },
+  {
+    path: 'driver',
+    component: DriverLayout,
+    canActivate: [authGuard, driverPortalGuard],
+    children: [
+      {
+        path: '',
+        title: 'Dashboard · Driver Portal',
+        loadComponent: () =>
+          import('./pages/driver/dashboard/dashboard').then((m) => m.DriverDashboard),
+      },
+      {
+        path: 'profile',
+        title: 'My Profile · Driver Portal',
+        loadComponent: () =>
+          import('./pages/driver/profile/profile').then((m) => m.DriverProfile),
+      },
+      {
+        path: 'kyc',
+        title: 'KYC Status · Driver Portal',
+        loadComponent: () =>
+          import('./pages/driver/kyc/kyc').then((m) => m.DriverKyc),
+      },
+      {
+        path: 'documents',
+        title: 'Documents · Driver Portal',
+        loadComponent: () =>
+          import('./pages/driver/documents/documents').then((m) => m.DriverDocuments),
+      },
+      {
+        path: 'vehicle',
+        title: 'My Vehicle · Driver Portal',
+        data: { title: 'My Vehicle', description: "Vehicle assignment isn't linked to driver accounts yet." },
+        loadComponent: () =>
+          import('./pages/driver/coming-soon/coming-soon').then((m) => m.DriverComingSoon),
+      },
+      {
+        path: 'trips',
+        title: 'My Trips · Driver Portal',
+        data: { title: 'My Trips', description: "Trip history isn't linked to driver accounts yet." },
+        loadComponent: () =>
+          import('./pages/driver/coming-soon/coming-soon').then((m) => m.DriverComingSoon),
+      },
+      {
+        path: 'notifications',
+        title: 'Notifications · Driver Portal',
+        data: { title: 'Notifications', description: 'Notifications are on the way.' },
+        loadComponent: () =>
+          import('./pages/driver/coming-soon/coming-soon').then((m) => m.DriverComingSoon),
+      },
+      {
+        path: 'support',
+        title: 'Support · Driver Portal',
+        loadComponent: () =>
+          import('./pages/driver/support/support').then((m) => m.DriverSupport),
+      },
+    ],
+  },
+  {
+    path: 'customer',
+    component: CustomerLayout,
+    canActivate: [authGuard, customerPortalGuard],
+    children: [
+      {
+        path: '',
+        title: 'Dashboard · Customer Portal',
+        loadComponent: () =>
+          import('./pages/customer/dashboard/dashboard').then((m) => m.CustomerDashboard),
+      },
+      {
+        path: 'profile',
+        title: 'My Profile · Customer Portal',
+        loadComponent: () =>
+          import('./pages/customer/profile/profile').then((m) => m.CustomerProfile),
+      },
+      {
+        path: 'bookings',
+        title: 'My Bookings · Customer Portal',
+        loadComponent: () =>
+          import('./pages/customer/bookings/bookings').then((m) => m.CustomerBookings),
+      },
+      {
+        path: 'notifications',
+        title: 'Notifications · Customer Portal',
+        data: { title: 'Notifications', description: 'Notifications are on the way.' },
+        // Reuses the Driver portal's generic placeholder component directly — it's already
+        // fully generic (driven by route `data.title`/`data.description`), no new component
+        // needed just to say "not built yet".
+        loadComponent: () =>
+          import('./pages/driver/coming-soon/coming-soon').then((m) => m.DriverComingSoon),
+      },
+      {
+        path: 'support',
+        title: 'Support · Customer Portal',
+        loadComponent: () =>
+          import('./pages/customer/support/support').then((m) => m.CustomerSupport),
       },
     ],
   },

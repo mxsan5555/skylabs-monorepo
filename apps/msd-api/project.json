@@ -43,11 +43,10 @@
     },
     "serve": {
       "continuous": true,
-      "executor": "@nx/js:node",
-      "dependsOn": ["build"],
+      "executor": "nx:run-commands",
       "options": {
-        "buildTarget": "msd-api:build",
-        "runBuildTargetDependencies": false
+        "command": "tsx watch src/main.ts",
+           "cwd": "apps/msd-api"
       }
     }
   },

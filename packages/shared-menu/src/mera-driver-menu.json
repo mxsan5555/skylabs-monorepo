@@ -111,7 +111,7 @@
         "id": "payments-overview",
         "title": "Payments",
         "icon": "receipt_long",
-        "route": "/payments",
+        "route": "/payments/payments",
         "permissionKey": "payments.overview",
         "parent": "payments-group",
         "order": 1
@@ -228,7 +228,7 @@
       },
       {
         "id": "masters-statuses",
-        "title": "Category Status",
+        "title": "Driver Status",
         "icon": "rule",
         "route": "/masters/statuses",
         "permissionKey": "masters.statuses",
@@ -288,6 +288,15 @@
         "permissionKey": "masters.police-docs",
         "parent": "masters",
         "order": 10
+      },
+      {
+        "id": "masters-languages",
+        "title": "Languages",
+        "icon": "translate",
+        "route": "/masters/languages",
+        "permissionKey": "masters.languages",
+        "parent": "masters",
+        "order": 11
       }
     ]
   },
@@ -329,12 +338,21 @@
     ]
   },
   {
+    "id": "kyc-assignments",
+    "title": "KYC Assignments",
+    "icon": "fact_check",
+    "route": "/kyc-assignments",
+    "permissionKey": "kyc-assignments",
+    "parent": null,
+    "order": 14
+  },
+  {
     "id": "settings",
     "title": "Settings",
     "icon": "settings",
     "route": "/settings",
     "permissionKey": "settings",
     "parent": null,
-    "order": 14
+    "order": 15
   }
 ]

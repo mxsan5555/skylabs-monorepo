@@ -23,8 +23,6 @@ import { DealDialog } from './vendor-branches';
 
 const DEAL_COLUMNS = JSON.stringify([
   { key: 'Deal', label: 'Deal / Package' },
-  { key: 'Type', label: 'Type' },
-  { key: 'Item', label: 'Service / Product' },
   { key: 'Branch', label: 'Branch' },
   { key: 'Price', label: 'Price' },
   { key: 'Duration', label: 'Duration' },
@@ -50,8 +48,6 @@ interface DealWithBranch extends Deal {
 function toRow(d: DealWithBranch): Record<string, string | number> {
   return {
     Deal: d.title,
-    Type: d.productId ? 'Product' : 'Service',
-    Item: d.product?.name ?? '—',
     Branch: d.branchName,
     Price: `₹${d.salePrice}`,
     Duration: d.durationMinutes ? `${d.durationMinutes} min` : '—',
@@ -78,6 +74,7 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 20 };
  */
 export function VendorDeals() {
   const { token } = useAuth();
+  const [vendorId, setVendorId] = useState('');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [deals, setDeals] = useState<DealWithBranch[]>([]);
   const [products, setProducts] = useState<VendorProduct[]>([]);
@@ -96,7 +93,10 @@ export function VendorDeals() {
     // pageSize is capped at 100 server-side (PaginationQuerySchema) — 200 here 500s.
     listMyProducts(token, { status: 'active', pageSize: 100 }).then(({ data }) => setProducts(data)).catch(() => setProducts([]));
     getMyVendor(token)
-      .then(({ data }) => listCategories(token, { type: 'SERVICE', vendorId: data.id }))
+      .then(({ data: vendor }) => {
+        setVendorId(vendor.id);
+        return listCategories(token, { type: 'SERVICE', vendorId: vendor.id });
+      })
       .then(({ data }) => setCategories(data))
       .catch(() => setCategories([]));
   }, [token]);
@@ -230,6 +230,8 @@ export function VendorDeals() {
           products={products}
           branches={branches}
           token={token}
+          vendorId={vendorId}
+          isSelf
           dialogRef={addDialogRef}
           hideTrigger
           onSave={(input, branchId) => save(input, branchId ?? branches[0]?.id ?? '')}
@@ -244,6 +246,8 @@ export function VendorDeals() {
           products={products}
           branches={branches}
           token={token}
+          vendorId={vendorId}
+          isSelf
           dialogRef={editDialogRef}
           hideTrigger
           onSave={(input) => save(input, editingDeal.branchId, editingDeal)}

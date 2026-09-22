@@ -1,23 +1,6 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, computed, inject, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { AdminPage } from '../../../../admin/admin-page/admin-page';
-
-interface FareRule {
-  id?: string;
-  vehicle_category_name: string;
-  trip_type_name: string;
-  zone_name: string;
-  base_fare: number;
-  per_km_rate: number;
-  per_min_rate: number;
-  waiting_charge_per_min: number;
-  min_fare: number;
-  driver_allowance: number;
-  toll_included: boolean;
-  surge_multiplier: number;
-  effective_from: string;
-  is_active: boolean;
-}
+import { PricingApiService, type FareRule } from '../../../../core/trips/pricing-api.service';
 
 @Component({
   selector: 'md-pricing',
@@ -28,8 +11,9 @@ interface FareRule {
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class Pricing implements OnInit {
-  private readonly http = inject(HttpClient);
+  private readonly api = inject(PricingApiService);
   readonly list = signal<FareRule[]>([]);
+  readonly loading = signal(false);
   readonly showAddForm = signal(false);
   readonly editingId = signal<string | 'new' | null>(null);
 
@@ -82,29 +66,20 @@ export class Pricing implements OnInit {
   );
 
   ngOnInit(): void {
-    this.http.get<FareRule[]>('data/fare_rules.json').subscribe({
+    this.reload();
+  }
+
+  private reload(): void {
+    this.loading.set(true);
+    this.api.list().subscribe({
       next: (data) => {
-        if (data) {
-          const mapped = data.map((item: any) => ({
-            id: String(item.id || 'fr-' + Math.random()),
-            vehicle_category_name: item.vehicle_category_name || item.vehicle_category || 'Sedan',
-            trip_type_name: item.trip_type_name || item.trip_type || 'One Way',
-            zone_name: item.zone_name || item.zone || 'Delhi NCR',
-            base_fare: Number(item.base_fare || 50),
-            per_km_rate: Number(item.per_km_rate || 12),
-            per_min_rate: Number(item.per_min_rate || 1.5),
-            waiting_charge_per_min: Number(item.waiting_charge_per_min || 2),
-            min_fare: Number(item.min_fare || 100),
-            driver_allowance: Number(item.driver_allowance || 0),
-            toll_included: Boolean(item.toll_included),
-            surge_multiplier: Number(item.surge_multiplier || 1.0),
-            effective_from: item.effective_from || '2026-08-01',
-            is_active: item.is_active !== undefined ? Boolean(item.is_active) : item.status === 'Active',
-          }));
-          this.list.set(mapped);
-        }
+        this.list.set(data);
+        this.loading.set(false);
       },
-      error: (err) => console.error('Failed to load fare rules', err),
+      error: (err) => {
+        console.error('Failed to load fare rules', err);
+        this.loading.set(false);
+      },
     });
   }
 
@@ -151,9 +126,7 @@ export class Pricing implements OnInit {
   }
 
   saveOption(): void {
-    const id = this.editingId();
-    const record: FareRule = {
-      id: id === 'new' ? 'fr-' + Date.now() : id!,
+    const payload: FareRule = {
       vehicle_category_name: this.inputVehicle(),
       trip_type_name: this.inputTripType(),
       zone_name: this.inputZone(),
@@ -168,9 +141,18 @@ export class Pricing implements OnInit {
       effective_from: this.inputEffectiveFrom(),
       is_active: Boolean(this.inputIsActive()),
     };
-    if (id === 'new') this.list.update((l) => [...l, record]);
-    else this.list.update((l) => l.map((x) => (x.id === id ? record : x)));
-    this.cancelEdit();
+    const id = this.editingId();
+    const request = id === 'new' || id === null ? this.api.create(payload) : this.api.update(id, payload);
+    request.subscribe({
+      next: () => {
+        this.reload();
+        this.cancelEdit();
+      },
+      error: (err) => {
+        console.error('Failed to save fare rule', err);
+        alert('Failed to save fare rule. Please try again.');
+      },
+    });
   }
 
   cancelEdit(): void {
@@ -179,8 +161,14 @@ export class Pricing implements OnInit {
   }
 
   deleteOption(row: FareRule): void {
-    if (confirm(`Delete fare rule for "${row.vehicle_category_name} (${row.trip_type_name})"?`)) {
-      this.list.update((l) => l.filter((x) => x.id !== row.id));
+    if (confirm(`Delete fare rule for "${row.vehicle_category_name} (${row.trip_type_name})"?`) && row.id) {
+      this.api.delete(row.id).subscribe({
+        next: () => this.reload(),
+        error: (err) => {
+          console.error('Failed to delete fare rule', err);
+          alert('Failed to delete fare rule. Please try again.');
+        },
+      });
     }
   }
 }

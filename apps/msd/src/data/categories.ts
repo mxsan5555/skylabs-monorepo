@@ -55,22 +55,7 @@ export const CATEGORIES: Category[] = [
       { id: 'sc-3-4', slug: 'hydrafacial', name: 'HydraFacial' },
     ],
   },
-  {
-    id: 'cat-4',
-    slug: 'hair-nails',
-    name: 'Hair & Nails',
-    icon: 'content_cut',
-    serviceCount:getServiceCount('hair-nails'),
-    description: 'Manicures, pedicures, nail art, and hair treatments at top salons.',
-    image: catImg('nails'),
-    imageAlt: 'Nail care and manicure',
-    subcategories: [
-      { id: 'sc-4-1', slug: 'manicure', name: 'Manicure' },
-      { id: 'sc-4-2', slug: 'pedicure', name: 'Pedicure' },
-      { id: 'sc-4-3', slug: 'nail-art', name: 'Nail Art' },
-      { id: 'sc-4-4', slug: 'hair-spa', name: 'Hair Spa' },
-    ],
-  },
+  
   {
     id: 'cat-5',
     slug: 'health-wellness',

@@ -1,5 +1,6 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, inject } from '@angular/core';
+import { RouterLink, Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 
 /** One link in a footer column. Internal links use `to` (+ optional `fragment`); external / mailto links use `href`. */
 interface FooterLink {
@@ -28,10 +29,10 @@ interface FooterColumn {
   styleUrl: './footer.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
-export class Footer implements OnInit {
-  private readonly http = inject(HttpClient);
-  private readonly router = inject(Router);
+export class Footer {
   protected readonly year = new Date().getFullYear();
+
+  ngOnInit(): void {}
 
   protected readonly columns: FooterColumn[] = [
     {
