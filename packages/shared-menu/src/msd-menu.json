@@ -102,17 +102,11 @@
       }
     ]
   },
-  {
-    "id": "business",
-    "title": "Business",
-    "icon": "storefront",
-    "permissionKey": "vendor-portal",
-    "parent": null,
-    "order": 3,
-    "children": [
+
       {
         "id": "business-profile",
         "title": "Business Profile",
+         "icon": "storefront",
         "route": "/account/vendor-profile",
         "permissionKey": "vendor-portal",
         "parent": "business",
@@ -121,6 +115,7 @@
       {
         "id": "business-branch",
         "title": "Branch",
+         "icon": "storefront",
         "route": "/account/vendor-branches-deals",
         "permissionKey": "vendor-portal",
         "parent": "business",
@@ -129,6 +124,7 @@
       {
         "id": "business-deal",
         "title": "Deal",
+         "icon": "storefront",
         "route": "/account/vendor-deals",
         "permissionKey": "vendor-portal",
         "parent": "business",
@@ -137,6 +133,7 @@
       {
         "id": "business-product",
         "title": "Product",
+         "icon": "storefront",
         "route": "/account/vendor-products",
         "permissionKey": "vendor-portal",
         "parent": "business",
@@ -145,6 +142,7 @@
       {
         "id": "business-therapist",
         "title": "Therapist",
+         "icon": "storefront",
         "route": "/account/vendor-therapists",
         "permissionKey": "vendor-portal",
         "parent": "business",
@@ -153,6 +151,7 @@
       {
         "id": "business-customer",
         "title": "Customer",
+         "icon": "storefront",
         "route": "/account/vendor-customers",
         "permissionKey": "vendor-portal",
         "parent": "business",
@@ -161,13 +160,13 @@
       {
         "id": "business-order",
         "title": "Order",
+         "icon": "shopping_cart",
         "route": "/account/vendor-orders",
         "permissionKey": "vendor-portal",
         "parent": "business",
         "order": 7
-      }
-    ]
-  },
+      },
+
   {
     "id": "customers",
     "title": "Customers",
@@ -382,14 +381,8 @@
         "permissionKey": "settings",
         "parent": "settings",
         "order": 1
-      },
-      {
-        "id": "settings-logout",
-        "title": "Logout",
-        "permissionKey": "settings",
-        "parent": "settings",
-        "order": 2
       }
+     
     ]
   }
 ]
