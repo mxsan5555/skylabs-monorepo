@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import { Prisma, type OrderStatus, type OrderType } from '../generated/prisma-client';
 import { getVendorByOwnerUserId } from './vendor.service';
-import { VISIBLE_DEAL_WHERE, VISIBLE_THERAPIST_WHERE } from './catalog.service';
+import { VISIBLE_DEAL_WHERE, VISIBLE_PRODUCT_WHERE, VISIBLE_THERAPIST_WHERE } from './catalog.service';
 import type { OrderContactDetailsSchema } from '../schemas/order.schema';
 
 type OrderContactDetails = z.infer<typeof OrderContactDetailsSchema>;
@@ -79,7 +79,10 @@ export async function createOrderFromCart(customerId: string, contactDetails: Or
 
     let subtotal = new Prisma.Decimal(0);
     const itemsData: Prisma.OrderItemCreateWithoutOrderInput[] = [];
-    // First item's vendor/branch — see doc comment above.
+    // First item's vendor becomes Order.vendorId; first item that HAS a branch (a Product line
+    // has none — see Product's own schema doc comment) becomes Order.branchId. Tracked
+    // independently so a Product-first cart still picks up a real branch from a later Deal/
+    // Therapist line, rather than getting stuck on "no branch" forever.
     let primaryVendor: { id: string; businessName: string | null } | null = null;
     let primaryBranch: { id: string; name: string } | null = null;
 
@@ -100,10 +103,8 @@ export async function createOrderFromCart(customerId: string, contactDetails: Or
         const unitPrice = new Prisma.Decimal(pkg.sellingPrice);
         const lineTotal = unitPrice.mul(item.quantity);
         subtotal = subtotal.add(lineTotal);
-        if (!primaryVendor) {
-          primaryVendor = therapist.vendor;
-          primaryBranch = therapist.branch;
-        }
+        if (!primaryVendor) primaryVendor = therapist.vendor;
+        if (!primaryBranch) primaryBranch = therapist.branch;
         itemsData.push({
           therapist: { connect: { id: therapist.id } },
           therapistPackage: { connect: { id: pkg.id } },
@@ -121,70 +122,72 @@ export async function createOrderFromCart(customerId: string, contactDetails: Or
         continue;
       }
 
-      // Deal line — either a Product deal (no dealPackageId) or a Service-Deal (dealPackageId
-      // set). Re-validated against the SAME visibility rule the public catalogue uses — a deal
-      // that's gone inactive/unapproved/vendor-suspended since it was added can't be checked out.
+      if (item.productId) {
+        // Product line — entirely independent of any Deal (Product is a fully independent,
+        // directly-purchasable catalog entity, see Product's own schema doc comment). Re-
+        // validated against the SAME visibility rule the public catalogue/cart use. No branch —
+        // Product has no branchId.
+        const product = await tx.product.findFirst({
+          where: { id: item.productId, ...VISIBLE_PRODUCT_WHERE },
+          include: { vendor: true },
+        });
+        if (!product) {
+          throw new ApiError('CONFLICT', 'One or more items in your cart are no longer available — please review your cart');
+        }
+        const unitPrice = new Prisma.Decimal(product.price);
+        const lineTotal = unitPrice.mul(item.quantity);
+        subtotal = subtotal.add(lineTotal);
+        if (!primaryVendor) primaryVendor = product.vendor;
+        itemsData.push({
+          product: { connect: { id: product.id } },
+          vendor: { connect: { id: product.vendorId } },
+          itemName: product.name,
+          itemType: 'PRODUCT',
+          vendorNameSnapshot: product.vendor.businessName ?? 'Vendor',
+          unitPrice,
+          quantity: item.quantity,
+          lineTotal,
+        });
+        continue;
+      }
+
+      // Deal line — always a Service-Deal now (Deal has no Product concept — see Deal's own
+      // schema doc comment). Re-validated against the SAME visibility rule the public catalogue
+      // uses — a deal that's gone inactive/unapproved/vendor-suspended since it was added can't
+      // be checked out.
       const deal = await tx.deal.findFirst({
         where: { id: item.dealId!, ...VISIBLE_DEAL_WHERE },
-        include: { product: { select: { name: true } }, vendor: true, branch: true },
+        include: { vendor: true, branch: true },
       });
       if (!deal) {
         throw new ApiError('CONFLICT', 'One or more items in your cart are no longer available — please review your cart');
       }
 
-      if (!primaryVendor) {
-        primaryVendor = deal.vendor;
-        primaryBranch = deal.branch;
-      }
+      if (!primaryVendor) primaryVendor = deal.vendor;
+      if (!primaryBranch) primaryBranch = deal.branch;
 
-      if (item.dealPackageId) {
-        // Service-Deal line. Never trusts CartItem.unitPrice — the package's own live
-        // sellingPrice is authoritative.
-        if (deal.productId) {
-          throw new ApiError('CONFLICT', 'One or more items in your cart are no longer available — please review your cart');
-        }
-        const pkg = await tx.dealPackage.findUnique({ where: { id: item.dealPackageId } });
-        if (!pkg || pkg.dealId !== deal.id || !pkg.isActive) {
-          throw new ApiError('CONFLICT', 'One or more items in your cart are no longer available — please review your cart');
-        }
-        const unitPrice = new Prisma.Decimal(pkg.sellingPrice);
-        const lineTotal = unitPrice.mul(item.quantity);
-        subtotal = subtotal.add(lineTotal);
-        itemsData.push({
-          deal: { connect: { id: deal.id } },
-          dealPackage: { connect: { id: pkg.id } },
-          vendor: { connect: { id: deal.vendorId } },
-          branch: { connect: { id: deal.branchId } },
-          itemName: deal.title,
-          itemType: 'SERVICE',
-          vendorNameSnapshot: deal.vendor.businessName ?? 'Vendor',
-          branchNameSnapshot: deal.branch.name,
-          unitPrice,
-          quantity: item.quantity,
-          lineTotal,
-          durationMinutes: pkg.durationMinutes,
-        });
-      } else {
-        // Product line.
-        if (!deal.productId || !deal.product) {
-          throw new ApiError('CONFLICT', 'One or more items in your cart are no longer available — please review your cart');
-        }
-        const unitPrice = new Prisma.Decimal(deal.salePrice);
-        const lineTotal = unitPrice.mul(item.quantity);
-        subtotal = subtotal.add(lineTotal);
-        itemsData.push({
-          deal: { connect: { id: deal.id } },
-          vendor: { connect: { id: deal.vendorId } },
-          branch: { connect: { id: deal.branchId } },
-          itemName: deal.product.name,
-          itemType: 'PRODUCT',
-          vendorNameSnapshot: deal.vendor.businessName ?? 'Vendor',
-          branchNameSnapshot: deal.branch.name,
-          unitPrice,
-          quantity: item.quantity,
-          lineTotal,
-        });
+      // Never trusts CartItem.unitPrice — the package's own live sellingPrice is authoritative.
+      const pkg = await tx.dealPackage.findUnique({ where: { id: item.dealPackageId! } });
+      if (!pkg || pkg.dealId !== deal.id || !pkg.isActive) {
+        throw new ApiError('CONFLICT', 'One or more items in your cart are no longer available — please review your cart');
       }
+      const unitPrice = new Prisma.Decimal(pkg.sellingPrice);
+      const lineTotal = unitPrice.mul(item.quantity);
+      subtotal = subtotal.add(lineTotal);
+      itemsData.push({
+        deal: { connect: { id: deal.id } },
+        dealPackage: { connect: { id: pkg.id } },
+        vendor: { connect: { id: deal.vendorId } },
+        branch: { connect: { id: deal.branchId } },
+        itemName: deal.title,
+        itemType: 'SERVICE',
+        vendorNameSnapshot: deal.vendor.businessName ?? 'Vendor',
+        branchNameSnapshot: deal.branch.name,
+        unitPrice,
+        quantity: item.quantity,
+        lineTotal,
+        durationMinutes: pkg.durationMinutes,
+      });
     }
 
     // Order.type stays the existing broad PRODUCT|SERVICE split (unchanged shape) — an order
@@ -196,10 +199,10 @@ export async function createOrderFromCart(customerId: string, contactDetails: Or
       data: {
         customerId,
         vendorId: primaryVendor!.id,
-        branchId: primaryBranch!.id,
+        branchId: primaryBranch?.id ?? null,
         type,
         vendorNameSnapshot: primaryVendor!.businessName ?? 'Vendor',
-        branchNameSnapshot: primaryBranch!.name,
+        branchNameSnapshot: primaryBranch?.name ?? null,
         subtotal,
         total: subtotal,
         items: { create: itemsData },

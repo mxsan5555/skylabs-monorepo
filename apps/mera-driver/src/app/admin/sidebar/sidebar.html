@@ -48,6 +48,7 @@
                 class="admin-nav-item pl-8"
                 [routerLink]="accountPath(child)"
                 routerLinkActive="active"
+                [routerLinkActiveOptions]="{ exact: true }"
               >
                 <md-icon aria-hidden="true">{{ child.icon }}</md-icon>
                 {{ child.title }}
@@ -74,5 +75,18 @@
       <div class="admin-sidebar__user-name">{{ user()?.name ?? 'Loading…' }}</div>
       <div class="admin-sidebar__user-mail">{{ user()?.email ?? user()?.phone ?? '' }}</div>
     </span>
+    <div class="sidebar-user-actions">
+      <md-icon-button
+        aria-label="My Profile"
+        title="My Profile"
+        [class.active]="isOnProfile()"
+        (click)="goToProfile()"
+      >
+        <md-icon aria-hidden="true">person</md-icon>
+      </md-icon-button>
+      <md-icon-button aria-label="Log out" title="Log out" (click)="signOut()">
+        <md-icon aria-hidden="true">logout</md-icon>
+      </md-icon-button>
+    </div>
   </div>
 </aside>

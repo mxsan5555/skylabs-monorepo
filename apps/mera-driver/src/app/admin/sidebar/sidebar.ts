@@ -4,6 +4,8 @@ import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
 import type { MenuNode } from '@skylabs-monorepo/shared-types';
 import { accountPath } from '../menu';
 
+const PROFILE_PATH = '/account/profile';
+
 /**
  * Console sidebar: brand, search, and navigation rendered straight from
  * `authService.bootstrap()?.menu` — the server already filtered this tree down to
@@ -45,26 +47,35 @@ export class Sidebar {
 
   protected readonly initial = computed(() => (this.user()?.name ?? '?').charAt(0).toUpperCase());
 
-  protected isGroupExpanded(node: MenuNode): boolean {
-    // 1. If any child route is currently active, ALWAYS keep group expanded so active item is visible
-    if (node.children) {
-      const current = this.currentUrl();
-      const hasActiveChild = node.children.some((child) => {
-        const path = accountPath(child);
-        return path ? (current === path || current.startsWith(path + '/') || current.startsWith(path + '?')) : false;
-      });
-      if (hasActiveChild) {
-        return true;
-      }
-    }
+  protected readonly isOnProfile = computed(() => this.currentUrl().split('?')[0] === PROFILE_PATH);
 
-    // 2. If user manually toggled this group, honor user preference
+  /** Every authenticated role lands here via this same sidebar — Profile/Logout must be
+   *  reachable regardless of which permissions the signed-in user holds. */
+  protected goToProfile(): void {
+    this.router.navigateByUrl(PROFILE_PATH);
+  }
+
+  protected signOut(): void {
+    this.auth.signOut();
+    this.router.navigateByUrl('/sign-in');
+  }
+
+  protected isGroupExpanded(node: MenuNode): boolean {
+    // 1. If user manually clicked to expand/collapse this group, honor user preference first
     const toggled = this.userToggled();
     if (toggled[node.id] !== undefined) {
       return toggled[node.id];
     }
 
-    // 3. Default: Non-active groups remain collapsed to keep sidebar clean & organized
+    // 2. Default initial state: Auto-expand if current URL matches any child route in this group
+    if (node.children) {
+      const current = this.currentUrl();
+      return node.children.some((child) => {
+        const path = accountPath(child);
+        return path ? (current === path || current.startsWith(path + '/') || current.startsWith(path + '?')) : false;
+      });
+    }
+
     return false;
   }
 

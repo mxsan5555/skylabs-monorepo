@@ -1,42 +1,21 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, inject, OnInit, computed } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
-
-interface Vehicle {
-  id?: number;
-  vehicle_uid: string;
-  customer_id: number;
-  vehicle_number: string;
-  vehicle_type_id: number;
-  vehicle_type_name?: string;
-  make?: string;
-  model?: string;
-  variant?: string;
-  manufacturing_year?: string;
-  fuel_type?: string;
-  transmission?: string;
-  color?: string;
-  rc_number?: string;
-  rc_expiry_date?: string;
-  insurance_number?: string;
-  insurance_expiry_date?: string;
-  status: string;
-  notes?: string;
-}
+import { VehiclesApiService, type Vehicle } from '../../../core/vehicles/vehicles-api.service';
 
 @Component({
   selector: 'md-account-vehicles',
   standalone: true,
   imports: [AdminPage],
   templateUrl: './vehicles.html',
-  styleUrl: './vehicles.css',
+  styleUrl: '../masters/masters.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class Vehicles implements OnInit {
-  private readonly http = inject(HttpClient);
+  private readonly api = inject(VehiclesApiService);
 
   // --- All Vehicles Repository ---
   readonly allVehicles = signal<Vehicle[]>([]);
+  readonly loading = signal<boolean>(false);
 
   // --- Search, Filter, Sort & Pagination Signals ---
   readonly searchQuery = signal<string>('');
@@ -48,7 +27,7 @@ export class Vehicles implements OnInit {
 
   // --- View Switcher (Page vs Form) ---
   readonly showAddForm = signal<boolean>(false);
-  readonly editingVehicleId = signal<number | null>(null);
+  readonly editingVehicleId = signal<string | null>(null);
 
   // --- Form Input Signals ---
   readonly inputVehicleUid = signal<string>('');
@@ -85,11 +64,11 @@ export class Vehicles implements OnInit {
     { key: 'make', label: 'Make', sortable: true },
     { key: 'model', label: 'Model', sortable: true },
     { key: 'vehicle_type_name', label: 'Type', sortable: true },
-    { key: 'status', label: 'Status', type: 'status', statusMap: { 
-        'Active': 'success', 
-        'Inactive': 'warning', 
+    { key: 'status', label: 'Status', type: 'status', statusMap: {
+        'Active': 'success',
+        'Inactive': 'warning',
         'Maintenance': 'error'
-      } 
+      }
     },
     { key: 'variant', label: 'Variant', sortable: true, hidden: true },
     { key: 'manufacturing_year', label: 'Mfg Year', sortable: true, hidden: true },
@@ -174,13 +153,19 @@ export class Vehicles implements OnInit {
   readonly totalVehicles = computed(() => this.processedVehicles().length);
 
   ngOnInit(): void {
-    // Load static data from the JSON file inside public/data directory
-    this.http.get<Vehicle[]>('data/vehicles.json').subscribe({
+    this.reload();
+  }
+
+  private reload(): void {
+    this.loading.set(true);
+    this.api.list().subscribe({
       next: (data) => {
-        this.allVehicles.set(data || []);
+        this.allVehicles.set(data);
+        this.loading.set(false);
       },
       error: (err) => {
-        console.error('Failed to load mock vehicles JSON', err);
+        console.error('Failed to load vehicles', err);
+        this.loading.set(false);
       }
     });
   }
@@ -197,8 +182,7 @@ export class Vehicles implements OnInit {
       return;
     }
 
-    const newVehicle: Vehicle = {
-      id: this.editingVehicleId() || Date.now(),
+    const payload: Vehicle = {
       vehicle_uid,
       customer_id,
       vehicle_number,
@@ -219,14 +203,18 @@ export class Vehicles implements OnInit {
     };
 
     const editingId = this.editingVehicleId();
-    if (editingId !== null) {
-      this.allVehicles.update(list => list.map(v => v.id === editingId ? newVehicle : v));
-    } else {
-      this.allVehicles.update(list => [newVehicle, ...list]);
-    }
-
-    this.resetForm();
-    this.showAddForm.set(false);
+    const request = editingId !== null ? this.api.update(editingId, payload) : this.api.create(payload);
+    request.subscribe({
+      next: () => {
+        this.reload();
+        this.resetForm();
+        this.showAddForm.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to save vehicle', err);
+        alert('Failed to save vehicle. Please try again.');
+      }
+    });
   }
 
   resetForm(): void {
@@ -273,7 +261,7 @@ export class Vehicles implements OnInit {
 
     if (action === 'edit_vehicle') {
       this.editingVehicleId.set(row.id);
-      
+
       this.inputVehicleUid.set(row.vehicle_uid || '');
       this.inputCustomerId.set(String(row.customer_id || ''));
       this.inputVehicleNumber.set(row.vehicle_number || '');
@@ -295,7 +283,13 @@ export class Vehicles implements OnInit {
       this.showAddForm.set(true);
     } else if (action === 'delete_vehicle') {
       if (confirm(`Are you sure you want to delete vehicle "${row.vehicle_number}"?`)) {
-        this.allVehicles.update(list => list.filter(v => v.id !== row.id));
+        this.api.delete(row.id).subscribe({
+          next: () => this.reload(),
+          error: (err) => {
+            console.error('Failed to delete vehicle', err);
+            alert('Failed to delete vehicle. Please try again.');
+          }
+        });
       }
     }
   }

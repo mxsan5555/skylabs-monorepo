@@ -39,35 +39,36 @@
         "label": "Massage",
         "icon": "self_improvement",
         "to": "/category/massage",
-        "count": 12
+        "count": 0
       },
       {
-        "label": "Spas & Retreats",
+        "label": "Spa & Wellness",
         "icon": "spa",
-        "to": "/category/spas-retreats",
-        "count": 11
+        "to": "/category/spa-wellness",
+        "count": 0
+      },
+      {
+        "label": "Hair",
+        "icon": "content_cut",
+        "to": "/category/hair",
+        "count": 0
       },
       {
         "label": "Skin & Beauty",
         "icon": "face",
         "to": "/category/skin-beauty",
-        "count": 14
+        "count": 0
       },
       {
-        "label": "Hair & Nails",
-        "icon": "content_cut",
-        "to": "/category/hair-nails",
-        "count": 7
+        "label": "Nails & Lashes",
+        "icon": "back_hand",
+        "to": "/category/nails-lashes",
+        "count": 0
       },
       {
-        "label": "Health & Wellness",
-        "icon": "heart_smile",
-        "to": "/category/health-wellness",
-        "count": 13
-      },
-      {
-        "label": "Products",
-        "to": "/products",
+        "label": "Therapy",
+        "icon": "healing",
+        "to": "/category/therapy",
         "count": 0
       }
     ],
@@ -75,31 +76,32 @@
       {
         "label": "Massage",
         "to": "/category/massage",
-        "count": 12
+        "count": 0
       },
       {
-        "label": "Spas & Retreats",
-        "to": "/category/spas-retreats",
-        "count": 11
+        "label": "Spa & Wellness",
+        "to": "/category/spa-wellness",
+        "count": 0
+      },
+      {
+        "label": "Hair",
+        "to": "/category/hair",
+        "count": 0
       },
       {
         "label": "Skin & Beauty",
         "to": "/category/skin-beauty",
-        "count": 14
+        "count": 0
       },
       {
-        "label": "Hair & Nails",
-        "to": "/category/hair-nails",
-        "count": 7
+        "label": "Nails & Lashes",
+        "to": "/category/nails-lashes",
+        "count": 0
       },
       {
-        "label": "Health & Wellness",
-        "to": "/category/health-wellness",
-        "count": 13
-      },
-      {
-        "label": "Product",
-        "to": "/products"
+        "label": "Therapy",
+        "to": "/category/therapy",
+        "count": 0
       }
     ],
     "footer": {
@@ -131,24 +133,24 @@
           "to": "/category/massage"
         },
         {
-          "label": "Spas & Retreats",
-          "to": "/category/spas-retreats"
+          "label": "Spa & Wellness",
+          "to": "/category/spa-wellness"
+        },
+        {
+          "label": "Hair",
+          "to": "/category/hair"
         },
         {
           "label": "Skin & Beauty",
           "to": "/category/skin-beauty"
         },
         {
-          "label": "Hair & Nails",
-          "to": "/category/hair-nails"
+          "label": "Nails & Lashes",
+          "to": "/category/nails-lashes"
         },
         {
-          "label": "Health & Wellness",
-          "to": "/category/health-wellness"
-        },
-        {
-          "label": "Products",
-          "to": "/products"
+          "label": "Therapy",
+          "to": "/category/therapy"
         },
         {
           "label": "Therapists",
@@ -166,7 +168,7 @@
         },
         {
           "label": "Partner With Us",
-          "to": "/partner"
+          "to": "/become-vendor"
         },
         {
           "label": "Wishlist",
@@ -207,28 +209,6 @@
         "submitLabel": "Subscribe",
         "successMessage": "You're subscribed! Check your inbox."
       },
-      "social": [
-        {
-          "label": "Follow us on Facebook",
-          "key": "facebook",
-          "url": "https://facebook.com"
-        },
-        {
-          "label": "Follow us on X",
-          "key": "x",
-          "url": "https://x.com"
-        },
-        {
-          "label": "Watch us on YouTube",
-          "key": "youtube",
-          "url": "https://youtube.com"
-        },
-        {
-          "label": "Follow us on Instagram",
-          "key": "instagram",
-          "url": "https://instagram.com"
-        }
-      ],
       "copyright": "MySpaDeal Pvt. Ltd. All rights reserved."
     }
   },
@@ -277,7 +257,7 @@
       ],
       "search": {
         "locationPlaceholder": "Current Location",
-        "servicePlaceholder": "Search services",
+        "servicePlaceholder": "Search deals",
         "button": "Search"
       },
       "popularHeading": "Popular",
@@ -327,7 +307,7 @@
       ],
       "search": {
         "locationPlaceholder": "Current Location",
-        "servicePlaceholder": "Search services",
+        "servicePlaceholder": "Search deals",
         "button": "Search"
       },
       "popular": [
@@ -354,6 +334,16 @@
         "heading": "Browse by Category",
         "seeAll": "See all",
         "seeAllTo": "/explore"
+      },
+      "featuredProducts": {
+        "heading": "Featured Products",
+        "seeAll": "See all",
+        "seeAllTo": "/products"
+      },
+      "therapists": {
+        "heading": "Our Therapists",
+        "seeAll": "View All",
+        "seeAllTo": "/therapists"
       },
       "hotRightNow": {
         "heading": "Hot Right Now",
@@ -567,7 +557,7 @@
             ]
           },
           {
-            "title": "More Services",
+            "title": "More Deals",
             "items": [
               "Steam Bath",
               "Sauna",
@@ -579,25 +569,7 @@
     },
     "faq": {
       "heading": "Frequently Asked Questions",
-      "subheading": "Find answers to the most common questions about bookings, payments, cancellations, and gift cards.",
-      "items": [
-        {
-          "question": "How do I book a spa deal?",
-          "answer": "Select your preferred deal, choose a date and time, then complete the payment to confirm your booking."
-        },
-        {
-          "question": "Can I cancel or reschedule my booking?",
-          "answer": "Yes. Most bookings can be cancelled or rescheduled before the cancellation deadline mentioned on the deal page."
-        },
-        {
-          "question": "Are gift cards valid for all spas?",
-          "answer": "Gift cards can be redeemed at participating spas listed on My Spa Deals."
-        },
-        {
-          "question": "How do I contact customer support?",
-          "answer": "You can contact our support team through the Contact Us page or email us anytime."
-        }
-      ]
+      "subheading": "Find answers to the most common questions about bookings, payments, cancellations, and gift cards."
     },
     "trustSection": {
       "cards": [
@@ -640,8 +612,17 @@
         "welcomeOfferPromotion": "Welcome offer promotion"
       },
       "labels": {
-        "services": "Services",
-        "popular": "Popular:"
+        "services": "Deals",
+        "popular": "Popular:",
+        "seeAll": "See all",
+        "ourTherapists": "Our Therapists",
+        "viewAll": "View All",
+        "featuredProducts": "Featured Products",
+        "from": "From",
+        "book": "Book",
+        "viewProduct": "View Product",
+        "product": "Product",
+        "searchResultSeparator": " • "
       },
       "messages": {
         "loading": "Loading…",
@@ -722,7 +703,7 @@
     },
     "labels": {
       "addToCart": "Add to Cart",
-      "service": "Service",
+      "service": "Deal",
       "product": "Product",
       "durationSuffix": "min",
       "book": "Book",
@@ -773,7 +754,7 @@
       "6:00 PM"
     ],
     "metaTitleSuffix": " Deals | MSD",
-    "metaDescriptionTemplate": "Browse {category} services and products near you.",
+    "metaDescriptionTemplate": "Browse {category} deals and products near you.",
     "breadcrumb": {
       "home": "Home",
       "categories": "Categories"
@@ -784,7 +765,7 @@
     "filter": {
       "ariaLabel": "Filter by offering type",
       "all": "All",
-      "services": "Services",
+      "services": "Deals",
       "products": "Products"
     },
     "searchLabel": "Search",
@@ -797,7 +778,7 @@
     "loadingDeals": "Loading deals…",
     "durationSuffix": "min",
     "offeringLabels": {
-      "service": "Service",
+      "service": "Deal",
       "product": "Product"
     },
     "actions": {
@@ -832,7 +813,7 @@
       "cancel": "Cancel",
       "submitting": "Booking…",
       "confirm": "Confirm booking",
-      "error": "Could not book this service."
+      "error": "Could not book this deal."
     }
   },
   "dealDetail": {
@@ -848,7 +829,7 @@
       "invalidDeal": "Invalid deal.",
       "loadDeal": "Could not load this deal.",
       "addToCart": "Could not add to cart.",
-      "bookService": "Could not book this service."
+      "bookService": "Could not book this deal."
     },
     "notFound": {
       "metaTitle": "Deal Not Found | MSD",
@@ -873,7 +854,7 @@
       "off": "OFF",
       "originalPrice": "Original price",
       "location": "Location",
-      "service": "Service",
+      "service": "Deal",
       "product": "Product",
       "durationSuffix": "min"
     },
@@ -896,7 +877,7 @@
       "confirm": "Confirm booking"
     },
     "serviceType": {
-      "service": "Service",
+      "service": "Deal",
       "product": "Product"
     },
     "timeSlots": [
@@ -969,24 +950,24 @@
       "removeItem": "Could not remove item."
     }
   },
-"wishlist": {
-  "title": "Saved Deals",
-  "emptyHeading": "No saved deals yet",
-  "emptySubheading": "Tap the heart on any deal to save it here for later.",
-  "emptyCtaLabel": "Browse Deals",
-  "addToCartLabel": "Add to Cart",
-  "loading": "Loading your wishlist…",
-  "savedDealsLabel": "Saved deals",
-  "serviceLabel": "Service",
-  "productLabel": "Product",
-  "bookLabel": "Book",
-  "addingLabel": "Adding…",
-  "addToCartError": "Could not add to cart.",
-  "dealSingular": "deal",
-  "dealPlural": "deals",
-  "removeFromWishlist": "Remove from wishlist",
-  "saveToWishlist": "Save to wishlist"
-},
+  "wishlist": {
+    "title": "Saved Deals",
+    "emptyHeading": "No saved deals yet",
+    "emptySubheading": "Tap the heart on any deal to save it here for later.",
+    "emptyCtaLabel": "Browse Deals",
+    "addToCartLabel": "Add to Cart",
+    "loading": "Loading your wishlist…",
+    "savedDealsLabel": "Saved deals",
+    "serviceLabel": "Deal",
+    "productLabel": "Product",
+    "bookLabel": "Book",
+    "addingLabel": "Adding…",
+    "addToCartError": "Could not add to cart.",
+    "dealSingular": "deal",
+    "dealPlural": "deals",
+    "removeFromWishlist": "Remove from wishlist",
+    "saveToWishlist": "Save to wishlist"
+  },
   "checkout": {
     "title": "Checkout",
     "steps": [
@@ -1100,7 +1081,7 @@
       "bookingIdLabel": "Booking ID",
       "dateLabel": "Date",
       "timeLabel": "Time",
-      "servicesTitle": "Booked Services",
+      "servicesTitle": "Booked Deals",
       "quantityLabel": "Quantity",
       "totalLabel": "Total Amount",
       "statusIconLabel": "Booking confirmed"
@@ -1109,7 +1090,7 @@
   "orders": {
     "metaTitle": "My Orders | MSD",
     "title": "My Orders",
-    "subtitle": "Your product and service orders.",
+    "subtitle": "Your product and deal orders.",
     "loading": "Loading orders…",
     "empty": {
       "title": "No orders yet",
@@ -1406,13 +1387,13 @@
   },
   "categories": {
     "metaTitle": "Browse Categories | MSD",
-    "metaDescription": "Browse services and products by category — compare vendors, branches, and prices.",
+    "metaDescription": "Browse deals and products by category — compare vendors, branches, and prices.",
     "breadcrumb": {
       "home": "Home",
       "categories": "Categories"
     },
     "title": "Categories",
-    "subtitle": "Browse services and products by category from vendors near you.",
+    "subtitle": "Browse deals and products by category from vendors near you.",
     "ariaLabel": "Categories",
     "loading": "Loading categories…",
     "error": {
@@ -1461,7 +1442,7 @@
   "vendor": {
     "meta": {
       "titleSuffix": " | MSD",
-      "defaultDescription": "Book services at {vendor}{location}.",
+      "defaultDescription": "Book deals at {vendor}{location}.",
       "notFoundTitle": "Vendor Not Found | MSD",
       "vendorTitleSuffix": " | MSD"
     },
@@ -1471,8 +1452,8 @@
     },
     "labels": {
       "workingHours": "Working Hours",
-      "selectService": "Select Service",
-      "services": "Services",
+      "selectService": "Deals",
+      "services": "Deals",
       "products": "Products",
       "therapists": "Meet Our Therapists",
       "yourSelection": "Your selection",
@@ -1492,7 +1473,7 @@
       "timingsNotAvailable": "Timings not available"
     },
     "actions": {
-      "browseServices": "Browse Services",
+      "browseServices": "Browse Deals",
       "bookNow": "Book Now",
       "cancel": "Cancel",
       "addToCart": "Add to Cart",
@@ -1500,31 +1481,31 @@
     },
     "filters": {
       "all": "All",
-      "filterByServiceCategory": "Filter by service category"
+      "filterByServiceCategory": "Filter by deal category"
     },
     "empty": {
-      "noServices": "No services available at this branch.",
-      "noProducts": "No products available at this branch.",
-      "noTherapists": "No therapist profiles listed for this branch yet.",
-      "selectService": "Select a service to see packages and pricing."
+      "noServices": "No deals available in your area.",
+      "noProducts": "No products available.",
+      "noTherapists": "No therapies available in your area yet.",
+      "selectService": "Select a deal to see packages and pricing."
     },
     "loading": {
       "vendor": "Loading vendor…",
-      "services": "Loading services…",
+      "services": "Loading deals…",
       "products": "Loading products…"
     },
     "errors": {
       "loadVendor": "Could not load this vendor.",
-      "loadServicesProducts": "Could not load services and products.",
+      "loadServicesProducts": "Could not load deals and products.",
       "addToCart": "Could not add to cart.",
-      "bookService": "Could not book this service.",
+      "bookService": "Could not book this deal.",
       "selectDateTime": "Select a date and time slot."
     },
     "notFound": {
       "metaTitle": "Vendor Not Found | MSD",
       "heading": "Vendor not found",
       "subheading": "This vendor may no longer be available.",
-      "cta": "Browse Services"
+      "cta": "Browse Deals"
     },
     "booking": {
       "bookedPrefix": "Booked",
@@ -1534,8 +1515,13 @@
       "bookNow": "Book Now",
       "ariaLabel": "Book {service} — {amount}"
     },
+    "tabs": {
+      "deals": "Deals",
+      "products": "Products",
+      "therapies": "Therapies"
+    },
     "accessibility": {
-      "services": "Services",
+      "services": "Deals",
       "products": "Products",
       "therapists": "Therapists",
       "yourSelection": "Your selection",

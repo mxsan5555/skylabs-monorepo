@@ -137,7 +137,7 @@ export function VendorDealsStep({ token, vendorId, canEdit, canApprove, branches
                   {deal.title}
                   <span className="field-hint">
                     {' '}
-                    · {deal.branchName} · {deal.product ? `Product: ${deal.product.name}` : 'Service'} · ₹{deal.salePrice}
+                    · {deal.branchName} · ₹{deal.salePrice}
                   </span>
                 </span>
                 <span className={`status-pill ${deal.status === 'ACTIVE' ? 'status-pill--active' : 'status-pill--inactive'}`}>
@@ -180,6 +180,7 @@ export function VendorDealsStep({ token, vendorId, canEdit, canApprove, branches
           products={products}
           branches={branches}
           token={token}
+          vendorId={vendorId}
           dialogRef={addDialogRef}
           hideTrigger
           onSave={(input, branchId) => save(input, branchId)}
@@ -194,6 +195,7 @@ export function VendorDealsStep({ token, vendorId, canEdit, canApprove, branches
           products={products}
           branches={branches}
           token={token}
+          vendorId={vendorId}
           dialogRef={editDialogRef}
           hideTrigger
           onSave={(input) => save(input, undefined, editingDeal)}

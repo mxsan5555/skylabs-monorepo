@@ -1,12 +1,16 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ToastProvider } from '../../../../toast/toast-context';
-import type { Branch, Category } from '../../../../api/rbac/vendors';
+import type { Branch, BranchCategoryAccessRow, Category } from '../../../../api/rbac/vendors';
 
 const listVendorTherapistsForAdminMock = vi.fn();
 const createVendorTherapistMock = vi.fn();
 const updateVendorTherapistMock = vi.fn();
 const setVendorTherapistStatusMock = vi.fn();
+// The Specialization picker is now branch-scoped (`getBranchCategoryAccess`), not sourced
+// directly from the `specializationCategories`/`categories` prop any more (that prop now only
+// backs the "stale value" name lookup) — see `WizardTherapistFormDialog`'s own doc comments.
+const getBranchCategoryAccessMock = vi.fn();
 
 vi.mock('../../../../api/rbac/vendors', async () => {
   const actual = await vi.importActual<typeof import('../../../../api/rbac/vendors')>('../../../../api/rbac/vendors');
@@ -16,6 +20,7 @@ vi.mock('../../../../api/rbac/vendors', async () => {
     createVendorTherapist: (...args: unknown[]) => createVendorTherapistMock(...args),
     updateVendorTherapist: (...args: unknown[]) => updateVendorTherapistMock(...args),
     setVendorTherapistStatus: (...args: unknown[]) => setVendorTherapistStatusMock(...args),
+    getBranchCategoryAccess: (...args: unknown[]) => getBranchCategoryAccessMock(...args),
   };
 });
 
@@ -34,6 +39,18 @@ const THERAPY_CATEGORIES: Category[] = [
   { id: 'ther-1', name: 'Physiotherapy', slug: 'physiotherapy', parentId: null, isActive: true, type: 'THERAPY' },
   { id: 'ther-2', name: 'Sports Therapy', slug: 'sports-therapy', parentId: null, isActive: true, type: 'THERAPY' },
 ];
+
+// This branch's own mapping — the Specialization picker is scoped to THIS (not the vendor-wide
+// `categories`/`specializationCategories` prop, which now only backs the "stale value" name
+// lookup — see `WizardTherapistFormDialog`'s own doc comments in vendor-wizard-therapists.tsx).
+const THERAPY_BRANCH_ACCESS: BranchCategoryAccessRow[] = THERAPY_CATEGORIES.map((c) => ({
+  id: `bca-${c.id}`,
+  branchId: BRANCH.id,
+  categoryId: c.id,
+  createdAt: '2026-01-01T00:00:00Z',
+  category: c,
+  subcategories: [],
+}));
 
 // A SERVICE category should never leak into the Specialization picker even if accidentally
 // passed in — the wizard only ever hands this step the vendor's granted THERAPY categories, but
@@ -81,6 +98,7 @@ function renderStep(overrides: Partial<React.ComponentProps<typeof VendorTherapi
 beforeEach(() => {
   vi.clearAllMocks();
   listVendorTherapistsForAdminMock.mockResolvedValue({ data: [] });
+  getBranchCategoryAccessMock.mockResolvedValue({ data: THERAPY_BRANCH_ACCESS });
 });
 
 /**
@@ -126,60 +144,104 @@ describe('VendorTherapistsStep — module gating', () => {
 
 /**
  * Feature: Vendor onboarding Step 4 — Therapy
- * Scenario: Specialization picker is scoped to the vendor's granted THERAPY categories
+ * Scenario: Specialization picker is scoped to the ACTIVE BRANCH's own `BranchCategoryAccess`
+ * mapping (`getBranchCategoryAccess`), not the vendor-wide `specializationCategories`/`categories`
+ * prop any more — that prop is now only a name-lookup fallback for a stale value that's fallen out
+ * of the branch's current mapping (see `WizardTherapistFormDialog`'s doc comments).
  *
- * Given: a vendor granted a specific set of THERAPY categories
+ * Given: the active branch's own granted THERAPY category mapping
  * When: the Add Therapist form renders
- * Then: only those granted categories appear as Specialization options
+ * Then: only the branch-mapped categories appear as Specialization options
  *
  * Edge cases:
- * - zero granted Therapy categories -> no select at all, just a "grant one first" hint
- * - a non-THERAPY category passed in by mistake is still excluded from top-level filtering only
- *   if it has a parentId; this component trusts its `categories` prop for type-scoping (done by
- *   the caller/backend), so this suite documents the parentId-based top-level filter it does own
+ * - zero branch-mapped Therapy categories -> no select at all, just a "map one first" hint
+ * - a subcategory-tier row is never offered in the top-level Specialization Category select
  */
 describe('VendorTherapistsStep — category-access-scoped Specialization picker', () => {
-  it('lists exactly the vendor-granted Therapy categories in the Specialization select', async () => {
+  it('lists exactly the branch-mapped Therapy categories in the Specialization select', async () => {
     renderStep();
-    await waitFor(() => expect(listVendorTherapistsForAdminMock).toHaveBeenCalled());
-    const select = findSpecializationSelect();
-    expect(select).toBeTruthy();
-    const optionLabels = Array.from(select!.querySelectorAll('md-select-option')).map((o) => o.textContent?.trim());
+    await waitFor(() => expect(getBranchCategoryAccessMock).toHaveBeenCalledWith('tok', 'vendor-1', BRANCH.id));
+    const select = await waitFor(() => {
+      const found = findSpecializationSelect();
+      expect(found).toBeTruthy();
+      return found!;
+    });
+    const optionLabels = Array.from(select.querySelectorAll('md-select-option')).map((o) => o.textContent?.trim());
     expect(optionLabels).toContain('Physiotherapy');
     expect(optionLabels).toContain('Sports Therapy');
-    // Exactly the granted set plus the "None" option — nothing extra.
+    // Exactly the branch-mapped set plus the "None" option — nothing extra.
     expect(optionLabels.filter(Boolean).length).toBe(THERAPY_CATEGORIES.length + 1);
   });
 
-  it('filters out a subcategory (non-top-level) row from the Specialization select', async () => {
-    const withSubcategory: Category[] = [
-      ...THERAPY_CATEGORIES,
-      { id: 'ther-1-sub', name: 'Deep Tissue', slug: 'deep-tissue', parentId: 'ther-1', isActive: true, type: 'THERAPY' },
-    ];
-    renderStep({ categories: withSubcategory });
-    await waitFor(() => expect(listVendorTherapistsForAdminMock).toHaveBeenCalled());
+  it('never offers a subcategory-tier row in the top-level Specialization Category select', async () => {
+    const deepTissue: Category = { id: 'ther-1-sub', name: 'Deep Tissue', slug: 'deep-tissue', parentId: 'ther-1', isActive: true, type: 'THERAPY' };
+    getBranchCategoryAccessMock.mockResolvedValue({
+      data: [
+        { ...THERAPY_BRANCH_ACCESS[0], subcategories: [{ id: 'bsa-1', subcategoryId: deepTissue.id, subcategory: deepTissue }] },
+        THERAPY_BRANCH_ACCESS[1],
+      ],
+    });
+    renderStep();
+    await waitFor(() => expect(getBranchCategoryAccessMock).toHaveBeenCalled());
+    await waitFor(() => expect(findSpecializationSelect()).toBeTruthy());
     const select = findSpecializationSelect();
     expect(select?.textContent).not.toContain('Deep Tissue');
   });
 
-  // Edge case: no granted categories yet
-  it('shows a "grant a Therapy category first" hint instead of an empty select when none are granted', async () => {
-    renderStep({ categories: [] });
-    await waitFor(() => expect(listVendorTherapistsForAdminMock).toHaveBeenCalled());
+  // Edge case: no branch-mapped categories yet
+  it('shows a "map a Therapy category first" hint instead of an empty select when none are branch-mapped', async () => {
+    getBranchCategoryAccessMock.mockResolvedValue({ data: [] });
+    renderStep();
+    await waitFor(() => expect(getBranchCategoryAccessMock).toHaveBeenCalled());
     expect(
-      await screen.findByText(/No Therapy categories have been granted to this business yet/),
+      await screen.findByText('No Therapy categories are mapped to this branch yet — map one under Business Modules & Category Access first.'),
     ).toBeTruthy();
     expect(findSpecializationSelect()).toBeUndefined();
   });
 
-  it('never shows an unrelated SERVICE category even if passed in the categories array', async () => {
+  // Edge case: a stale specializationCategoryId (branch remapped since this therapist was
+  // staffed) is preserved (never silently cleared) and surfaced with a warning, rather than
+  // dropped from the form — same "don't silently overwrite" contract as DealDialog.
+  it('editing a therapist whose specializationCategoryId has fallen out of the branch mapping preserves it and shows a warning', async () => {
+    const STALE_ID = 'ther-stale';
+    const therapist = {
+      id: 'therapist-1',
+      vendorId: 'vendor-1',
+      branchId: BRANCH.id,
+      branch: { id: BRANCH.id, name: BRANCH.name },
+      therapistType: 'Legs Therapist',
+      personName: 'Ramesh Kumar',
+      isActive: true,
+      specializationCategoryId: STALE_ID,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    listVendorTherapistsForAdminMock.mockResolvedValue({ data: [therapist] });
+    renderStep({
+      categories: [
+        ...THERAPY_CATEGORIES,
+        { id: STALE_ID, name: 'Discontinued Therapy', slug: 'discontinued-therapy', parentId: null, isActive: false, type: 'THERAPY' },
+      ],
+    });
+    await screen.findByText('Ramesh Kumar');
+    fireEvent.click(screen.getByText('Edit'));
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          'This specialization is no longer mapped to this branch. Saving without changing it keeps the existing value — or pick a currently mapped option.',
+        ),
+      ).toBeTruthy(),
+    );
+  });
+
+  it('a mis-scoped SERVICE category passed via the categories prop never leaks into the Specialization select — the picker is driven entirely by the branch mapping fetch, not this prop', async () => {
     renderStep({ categories: [...THERAPY_CATEGORIES, SERVICE_CATEGORY_LOOKALIKE] });
-    await waitFor(() => expect(listVendorTherapistsForAdminMock).toHaveBeenCalled());
-    const select = findSpecializationSelect();
-    // This component doesn't itself filter by `type` (it trusts the caller already scoped
-    // `categories` to THERAPY) — documenting that a mis-scoped SERVICE row WOULD show up,
-    // since the real gate is the caller passing the right list (see vendor-pipeline.tsx's
-    // `therapyCategories` state, sourced from `listCategories({ type: 'THERAPY', vendorId })`).
-    expect(select?.textContent).toContain('Massage');
+    await waitFor(() => expect(getBranchCategoryAccessMock).toHaveBeenCalled());
+    const select = await waitFor(() => {
+      const found = findSpecializationSelect();
+      expect(found).toBeTruthy();
+      return found!;
+    });
+    expect(select.textContent).not.toContain('Massage');
   });
 });

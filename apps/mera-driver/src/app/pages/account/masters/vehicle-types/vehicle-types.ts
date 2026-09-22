@@ -1,13 +1,6 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, computed } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, computed, inject, OnInit } from '@angular/core';
 import { AdminPage } from '../../../../admin/admin-page/admin-page';
-
-interface VehicleType {
-  vehicle_type_uid: string;
-  name: string;
-  code: string;
-  description: string;
-  status: 'Active' | 'Inactive';
-}
+import { VehicleTypesApiService, type VehicleType } from '../../../../core/masters/vehicle-types-api.service';
 
 @Component({
   selector: 'md-vehicle-types-master',
@@ -17,44 +10,11 @@ interface VehicleType {
   styleUrl: '../masters.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
-export class VehicleTypesMaster {
-  readonly options = signal<VehicleType[]>([
-    {
-      vehicle_type_uid: 'vt-1',
-      name: 'Sedan',
-      code: 'SEDAN',
-      description: 'Standard 4-door sedan, comfortable and economical.',
-      status: 'Active'
-    },
-    {
-      vehicle_type_uid: 'vt-2',
-      name: 'SUV',
-      code: 'SUV',
-      description: 'Spacious Sports Utility Vehicle, perfect for family trips.',
-      status: 'Active'
-    },
-    {
-      vehicle_type_uid: 'vt-3',
-      name: 'MUV',
-      code: 'MUV',
-      description: 'Multi Utility Vehicle for large groups and luggage.',
-      status: 'Active'
-    },
-    {
-      vehicle_type_uid: 'vt-4',
-      name: 'HUV',
-      code: 'HUV',
-      description: 'Heavy Utility Vehicle for special transportation needs.',
-      status: 'Active'
-    },
-    {
-      vehicle_type_uid: 'vt-5',
-      name: 'Hatchback',
-      code: 'HATCHBACK',
-      description: 'Compact city hatchback, easy to park and navigate.',
-      status: 'Active'
-    }
-  ]);
+export class VehicleTypesMaster implements OnInit {
+  private readonly api = inject(VehicleTypesApiService);
+
+  readonly options = signal<VehicleType[]>([]);
+  readonly loading = signal<boolean>(false);
 
   readonly showAddForm = signal<boolean>(false);
   readonly editingId = signal<string | 'new' | null>(null);
@@ -79,6 +39,24 @@ export class VehicleTypesMaster {
   ]);
 
   readonly tableRowsString = computed(() => JSON.stringify(this.options()));
+
+  ngOnInit(): void {
+    this.reload();
+  }
+
+  private reload(): void {
+    this.loading.set(true);
+    this.api.list().subscribe({
+      next: (data) => {
+        this.options.set(data);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to load vehicle types', err);
+        this.loading.set(false);
+      }
+    });
+  }
 
   onRowAction(event: any): void {
     const detail = event.detail || event;
@@ -122,27 +100,25 @@ export class VehicleTypesMaster {
       return;
     }
 
-    const id = this.editingId();
-    if (id === 'new') {
-      const newOption: VehicleType = {
-        vehicle_type_uid: 'vt-' + Date.now(),
-        name,
-        code,
-        description: this.inputDescription(),
-        status: this.inputStatus()
-      };
-      this.options.update(list => [...list, newOption]);
-    } else if (id) {
-      this.options.update(list => list.map(opt => opt.vehicle_type_uid === id ? {
-        ...opt,
-        name,
-        code,
-        description: this.inputDescription(),
-        status: this.inputStatus()
-      } : opt));
-    }
+    const payload = {
+      name,
+      code,
+      description: this.inputDescription(),
+      status: this.inputStatus()
+    };
 
-    this.cancelEdit();
+    const id = this.editingId();
+    const request = id === 'new' || id === null ? this.api.create(payload) : this.api.update(id, payload);
+    request.subscribe({
+      next: () => {
+        this.reload();
+        this.cancelEdit();
+      },
+      error: (err) => {
+        console.error('Failed to save vehicle type', err);
+        alert('Failed to save vehicle type. Please try again.');
+      }
+    });
   }
 
   cancelEdit(): void {
@@ -156,7 +132,13 @@ export class VehicleTypesMaster {
 
   deleteOption(option: VehicleType): void {
     if (confirm(`Are you sure you want to delete "${option.name}"?`)) {
-      this.options.update(list => list.filter(opt => opt.vehicle_type_uid !== option.vehicle_type_uid));
+      this.api.delete(option.vehicle_type_uid).subscribe({
+        next: () => this.reload(),
+        error: (err) => {
+          console.error('Failed to delete vehicle type', err);
+          alert('Failed to delete vehicle type. Please try again.');
+        }
+      });
     }
   }
 }

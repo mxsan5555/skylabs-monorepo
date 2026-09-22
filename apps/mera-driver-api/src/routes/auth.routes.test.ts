@@ -191,6 +191,41 @@ describe('auth.routes', () => {
       expect(mockPrisma.otpChallenge.update).not.toHaveBeenCalled();
     });
 
+    it('returns 403 DRIVER_DEACTIVATED and records a failed login for a deactivated driver, even with the correct code', async () => {
+      await seedOtpChallenge();
+      mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', email: IDENTIFIER, phone: null, name: IDENTIFIER });
+      mockPrisma.driver.findUnique.mockResolvedValue({ accountStatus: 'Inactive' });
+      mockPrisma.loginHistory.create.mockResolvedValue({});
+
+      const res = await request(app)
+        .post('/auth/otp/verify')
+        .send({ identifier: IDENTIFIER, otp: KNOWN_OTP, purpose: 'login' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('DRIVER_DEACTIVATED');
+      expect(mockPrisma.loginHistory.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ userId: 'user-1', success: false }) }),
+      );
+    });
+
+    it('returns 403 CUSTOMER_DEACTIVATED and records a failed login for a deactivated customer, even with the correct code', async () => {
+      await seedOtpChallenge();
+      mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', email: IDENTIFIER, phone: null, name: IDENTIFIER });
+      mockPrisma.driver.findUnique.mockResolvedValue(null);
+      mockPrisma.customer.findUnique.mockResolvedValue({ accountStatus: 'Inactive' });
+      mockPrisma.loginHistory.create.mockResolvedValue({});
+
+      const res = await request(app)
+        .post('/auth/otp/verify')
+        .send({ identifier: IDENTIFIER, otp: KNOWN_OTP, purpose: 'login' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('CUSTOMER_DEACTIVATED');
+      expect(mockPrisma.loginHistory.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ userId: 'user-1', success: false }) }),
+      );
+    });
+
     it('records a failed login-history entry for an existing user on a wrong code', async () => {
       await seedOtpChallenge();
       mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', email: IDENTIFIER, phone: null });
@@ -241,6 +276,178 @@ describe('auth.routes', () => {
       expect(mockPrisma.refreshSession.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: expect.objectContaining({ userId: 'user-1' }) }),
       );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Password auth — additive alongside OTP/Google
+  // -------------------------------------------------------------------------
+
+  describe('POST /auth/password/login', () => {
+    const PASSWORD = 'correct horse battery staple';
+
+    it('returns 422 when the body is missing password', async () => {
+      const res = await request(app).post('/auth/password/login').send({ identifier: IDENTIFIER });
+      expect(res.status).toBe(422);
+    });
+
+    it('issues a token pair for a correct password', async () => {
+      const passwordHash = await bcrypt.hash(PASSWORD, 10);
+      mockPrisma.user.findFirst.mockResolvedValue({
+        id: 'user-1',
+        email: IDENTIFIER,
+        phone: null,
+        name: IDENTIFIER,
+        status: 'active',
+        passwordHash,
+      });
+      mockPrisma.userRole.findMany.mockResolvedValue([{ role: { key: 'admin' } }]);
+      mockPrisma.refreshSession.create.mockResolvedValue({ id: 'session-1' });
+      mockPrisma.user.update.mockResolvedValue({});
+      mockPrisma.loginHistory.create.mockResolvedValue({});
+
+      const res = await request(app).post('/auth/password/login').send({ identifier: IDENTIFIER, password: PASSWORD });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.accessToken).toEqual(expect.any(String));
+      expect(res.body.data.user).toEqual(expect.objectContaining({ id: 'user-1', roles: ['admin'] }));
+    });
+
+    it('returns 401 for a wrong password', async () => {
+      const passwordHash = await bcrypt.hash(PASSWORD, 10);
+      mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', email: IDENTIFIER, phone: null, name: IDENTIFIER, status: 'active', passwordHash });
+      mockPrisma.loginHistory.create.mockResolvedValue({});
+
+      const res = await request(app).post('/auth/password/login').send({ identifier: IDENTIFIER, password: 'wrong password' });
+
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 401 for an identifier with no password set (OTP/Google-only user)', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', email: IDENTIFIER, phone: null, name: IDENTIFIER, status: 'active', passwordHash: null });
+
+      const res = await request(app).post('/auth/password/login').send({ identifier: IDENTIFIER, password: PASSWORD });
+
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 401 for a nonexistent identifier (same status as a wrong password — no enumeration)', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue(null);
+
+      const res = await request(app).post('/auth/password/login').send({ identifier: 'nobody@example.com', password: PASSWORD });
+
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 403 DRIVER_DEACTIVATED for a correct password on a deactivated driver account', async () => {
+      const passwordHash = await bcrypt.hash(PASSWORD, 10);
+      mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', email: IDENTIFIER, phone: null, name: IDENTIFIER, status: 'active', passwordHash });
+      mockPrisma.driver.findUnique.mockResolvedValue({ accountStatus: 'Inactive' });
+      mockPrisma.loginHistory.create.mockResolvedValue({});
+
+      const res = await request(app).post('/auth/password/login').send({ identifier: IDENTIFIER, password: PASSWORD });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('DRIVER_DEACTIVATED');
+      expect(mockPrisma.loginHistory.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ userId: 'user-1', success: false }) }),
+      );
+    });
+
+    it('returns 403 CUSTOMER_DEACTIVATED for a correct password on a deactivated customer account', async () => {
+      const passwordHash = await bcrypt.hash(PASSWORD, 10);
+      mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', email: IDENTIFIER, phone: null, name: IDENTIFIER, status: 'active', passwordHash });
+      mockPrisma.driver.findUnique.mockResolvedValue(null);
+      mockPrisma.customer.findUnique.mockResolvedValue({ accountStatus: 'Inactive' });
+      mockPrisma.loginHistory.create.mockResolvedValue({});
+
+      const res = await request(app).post('/auth/password/login').send({ identifier: IDENTIFIER, password: PASSWORD });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('CUSTOMER_DEACTIVATED');
+      expect(mockPrisma.loginHistory.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ userId: 'user-1', success: false }) }),
+      );
+    });
+
+    it('returns 401 for a correct password on an inactive/blocked account', async () => {
+      const passwordHash = await bcrypt.hash(PASSWORD, 10);
+      mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', email: IDENTIFIER, phone: null, name: IDENTIFIER, status: 'blocked', passwordHash });
+      mockPrisma.loginHistory.create.mockResolvedValue({});
+
+      const res = await request(app).post('/auth/password/login').send({ identifier: IDENTIFIER, password: PASSWORD });
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('POST /auth/password/forgot', () => {
+    it('returns 200 with a generic message regardless of whether the identifier exists', async () => {
+      const res = await request(app).post('/auth/password/forgot').send({ identifier: IDENTIFIER });
+      expect(res.status).toBe(200);
+      expect(mockPrisma.otpChallenge.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ identifier: IDENTIFIER, purpose: 'password_reset' }) }),
+      );
+    });
+  });
+
+  describe('POST /auth/password/reset', () => {
+    it('returns 422 for an invalid/expired code', async () => {
+      mockPrisma.otpChallenge.findFirst.mockResolvedValue(null);
+      const res = await request(app)
+        .post('/auth/password/reset')
+        .send({ identifier: IDENTIFIER, otp: KNOWN_OTP, newPassword: 'a-new-password' });
+      expect(res.status).toBe(422);
+    });
+
+    it('sets the new password hash after a correct code', async () => {
+      await seedOtpChallenge({ purpose: 'password_reset' });
+      mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', email: IDENTIFIER, phone: null, name: IDENTIFIER });
+      mockPrisma.user.update.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const res = await request(app)
+        .post('/auth/password/reset')
+        .send({ identifier: IDENTIFIER, otp: KNOWN_OTP, newPassword: 'a-new-password' });
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'user-1' }, data: expect.objectContaining({ passwordHash: expect.any(String) }) }),
+      );
+    });
+  });
+
+  describe('POST /auth/password/set', () => {
+    it('returns 401 without a token', async () => {
+      const res = await request(app).post('/auth/password/set').send({ newPassword: 'a-new-password' });
+      expect(res.status).toBe(401);
+    });
+
+    it("rejects an incorrect currentPassword when one is already set", async () => {
+      const passwordHash = await bcrypt.hash('old-password', 10);
+      mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', passwordHash });
+      const token = signAccessToken({ sub: 'user-1', roles: ['admin'], app: 'mera-driver' });
+
+      const res = await request(app)
+        .post('/auth/password/set')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ currentPassword: 'wrong', newPassword: 'a-new-password' });
+
+      expect(res.status).toBe(422);
+    });
+
+    it('allows setting an initial password with no currentPassword required', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue({ id: 'user-1', passwordHash: null });
+      mockPrisma.user.update.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+      const token = signAccessToken({ sub: 'user-1', roles: ['admin'], app: 'mera-driver' });
+
+      const res = await request(app)
+        .post('/auth/password/set')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ newPassword: 'a-new-password' });
+
+      expect(res.status).toBe(200);
     });
   });
 });

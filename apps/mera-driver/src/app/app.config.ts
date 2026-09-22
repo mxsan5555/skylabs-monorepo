@@ -5,6 +5,7 @@ import {
 import {
   provideRouter,
   withInMemoryScrolling,
+  withRouterConfig,
 } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideSharedAuth } from '@skylabs-monorepo/shared-auth/angular';
@@ -17,6 +18,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideRouter(
       appRoutes,
+      withRouterConfig({ onSameUrlNavigation: 'reload' }),
       // Enable `[fragment]` anchor scrolling (e.g. the header "Safety & Trust"
       // link → landing `#safety`) and restore scroll position on navigation.
       withInMemoryScrolling({
@@ -25,6 +27,6 @@ export const appConfig: ApplicationConfig = {
       }),
     ),
     provideHttpClient(withInterceptors([authInterceptor])),
-    provideSharedAuth({ appPrefix: 'mera_driver', apiBaseUrl: environment.apiUrl }),
+    provideSharedAuth({ appPrefix: 'mera_driver', apiBaseUrl: environment.apiUrl, unauthorizedRedirectPath: '/unauthorized' }),
   ],
 };

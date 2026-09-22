@@ -1,18 +1,6 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, computed, inject, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { AdminPage } from '../../../../admin/admin-page/admin-page';
-
-interface DriverLocation {
-  id?: number | string;
-  driver_name: string;
-  phone: string;
-  vehicle: string;
-  city: string;
-  latitude: number;
-  longitude: number;
-  status: string;
-  recorded_at: string;
-}
+import { DriverLocationsApiService, type DriverLocation } from '../../../../core/trips/driver-locations-api.service';
 
 @Component({
   selector: 'md-driver-locations',
@@ -23,10 +11,11 @@ interface DriverLocation {
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class DriverLocations implements OnInit {
-  private readonly http = inject(HttpClient);
+  private readonly api = inject(DriverLocationsApiService);
   readonly list = signal<DriverLocation[]>([]);
+  readonly loading = signal(false);
   readonly showAddForm = signal(false);
-  readonly editingId = signal<number | string | 'new' | null>(null);
+  readonly editingId = signal<string | 'new' | null>(null);
 
   // --- Form Input Signals ---
   readonly inputDriver = signal('');
@@ -57,9 +46,20 @@ export class DriverLocations implements OnInit {
   readonly tableRowsString = computed(() => JSON.stringify(this.list()));
 
   ngOnInit(): void {
-    this.http.get<DriverLocation[]>('data/driver_locations.json').subscribe({
-      next: (data) => this.list.set(data || []),
-      error: (err) => console.error('Failed to load driver locations', err),
+    this.reload();
+  }
+
+  private reload(): void {
+    this.loading.set(true);
+    this.api.list().subscribe({
+      next: (data) => {
+        this.list.set(data);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to load driver locations', err);
+        this.loading.set(false);
+      },
     });
   }
 
@@ -101,9 +101,7 @@ export class DriverLocations implements OnInit {
       alert('Driver name is required.');
       return;
     }
-    const id = this.editingId();
-    const record: DriverLocation = {
-      id: id === 'new' ? Date.now() : id!,
+    const payload: DriverLocation = {
       driver_name: driver,
       phone: this.inputPhone().trim() || '—',
       vehicle: this.inputVehicle().trim() || '—',
@@ -114,12 +112,18 @@ export class DriverLocations implements OnInit {
       recorded_at: this.inputRecordedAt() || 'Just now',
     };
 
-    if (id === 'new') {
-      this.list.update((l) => [record, ...l]);
-    } else {
-      this.list.update((l) => l.map((x) => (x.id === id ? record : x)));
-    }
-    this.cancelEdit();
+    const id = this.editingId();
+    const request = id === 'new' || id === null ? this.api.create(payload) : this.api.update(id, payload);
+    request.subscribe({
+      next: () => {
+        this.reload();
+        this.cancelEdit();
+      },
+      error: (err) => {
+        console.error('Failed to save driver location', err);
+        alert('Failed to save driver location. Please try again.');
+      },
+    });
   }
 
   cancelEdit(): void {
@@ -128,8 +132,14 @@ export class DriverLocations implements OnInit {
   }
 
   deleteOption(row: DriverLocation): void {
-    if (confirm(`Delete location tracking for "${row.driver_name}"?`)) {
-      this.list.update((l) => l.filter((x) => x.id !== row.id));
+    if (confirm(`Delete location tracking for "${row.driver_name}"?`) && row.id) {
+      this.api.delete(row.id).subscribe({
+        next: () => this.reload(),
+        error: (err) => {
+          console.error('Failed to delete driver location', err);
+          alert('Failed to delete driver location. Please try again.');
+        },
+      });
     }
   }
 }

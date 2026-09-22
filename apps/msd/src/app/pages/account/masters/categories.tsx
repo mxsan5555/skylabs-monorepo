@@ -40,7 +40,6 @@ const TOP_COLUMNS = JSON.stringify([
   { key: 'Name', label: 'Name' },
   { key: 'Slug', label: 'Slug' },
   { key: 'Type', label: 'Type' },
-  { key: 'Popular', label: 'Popular' },
   { key: 'Sort Order', label: 'Sort Order' },
   { key: 'Sub-categories', label: 'Sub-categories' },
   STATUS_COLUMN,
@@ -204,7 +203,6 @@ export function CategoryManagement({ scope }: CategoryManagementProps) {
           Name: category.name,
           Slug: category.slug,
           Type: category.type ?? '—',
-          Popular: category.parentId ? '—' : category.isPopular ? 'Yes' : 'No',
           'Sort Order': category.sortOrder,
           'Sub-categories': category._count?.children ?? 0,
           'Parent Category': category.parent?.name ?? '—',
@@ -355,7 +353,6 @@ function CategoryFormDialog({
     parentId: category?.parentId ?? (scope === 'sub' ? parentOptions[0]?.id : undefined),
     sortOrder: category?.sortOrder ?? 0,
     type: category?.type ?? 'SERVICE',
-    isPopular: category?.isPopular ?? false,
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -403,10 +400,10 @@ function CategoryFormDialog({
     if (saveButtonRef.current) saveButtonRef.current.disabled = true;
     setSubmitting(true);
     setError('');
-    // `type`/`isPopular` only ever apply to a top-level row — a subcategory row inherits its
-    // top-level ancestor's type by join and never carries its own (see msd-api's
-    // category.schema.ts doc comment), so both are omitted from a non-top payload.
-    const payload: CategoryInput = scope === 'top' ? form : { ...form, type: undefined, isPopular: undefined };
+    // `type` only ever applies to a top-level row — a subcategory row inherits its top-level
+    // ancestor's type by join and never carries its own (see msd-api's category.schema.ts doc
+    // comment), so it's omitted from a non-top payload.
+    const payload: CategoryInput = scope === 'top' ? form : { ...form, type: undefined };
     try {
       const result = await onSave(payload);
       if (!category && result) {
@@ -477,15 +474,6 @@ function CategoryFormDialog({
                 </SelectOption>
               ))}
             </OutlinedSelect>
-
-            <label className="widget-assign-row__label">
-              <input
-                type="checkbox"
-                checked={form.isPopular ?? false}
-                onChange={(e) => setForm((f) => ({ ...f, isPopular: e.target.checked }))}
-              />
-              Popular (shown in homepage carousels)
-            </label>
           </>
         ) : (
           <p className="field-hint">Type is inherited from the parent category.</p>

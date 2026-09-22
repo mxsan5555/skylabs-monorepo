@@ -1,0 +1,81 @@
+<md-admin-page title="My Profile" subtitle="Keep your details up to date. Verification status can only be changed by staff.">
+  @if (loading()) {
+    <p class="otp-muted">Loading…</p>
+  } @else {
+    @if (completion(); as c) {
+      <section class="account-card">
+        <div class="account-card__head">
+          <h2>Profile Completion</h2>
+          <sky-badge [variant]="c.status === 'complete' ? 'primary' : c.status === 'almost-complete' ? 'tertiary' : 'secondary'">
+            {{ c.status === 'complete' ? 'Profile Complete' : c.status === 'almost-complete' ? 'Almost Complete' : 'Incomplete' }}
+          </sky-badge>
+        </div>
+        <div class="driver-completion__percent">{{ c.percentage }}%</div>
+        <md-linear-progress [value]="c.percentage / 100" [attr.aria-label]="'Profile ' + c.percentage + '% complete'"></md-linear-progress>
+        <p class="otp-muted">{{ c.completedCount }} of {{ c.totalCount }} sections complete</p>
+        @if (c.incompleteSections.length > 0) {
+          <div>
+            <p class="otp-muted">Complete these sections:</p>
+            <ul class="driver-completion__list">
+              @for (s of c.incompleteSections; track s.key) {
+                <li>{{ s.label }}</li>
+              }
+            </ul>
+          </div>
+        }
+      </section>
+    }
+
+    <section class="account-card">
+      <div class="account-card__head">
+        <h2>Personal details</h2>
+        @if (saved()) {
+          <span class="otp-muted" role="status">Saved</span>
+        }
+      </div>
+      @if (error()) {
+        <p class="otp-muted" role="alert">{{ error() }}</p>
+      }
+      <div class="address-form">
+        @for (f of fields; track f.key) {
+          <md-outlined-text-field
+            [class.span-2]="f.span2"
+            [label]="f.label"
+            [type]="f.type ?? 'text'"
+            [value]="draft()[f.key] ?? ''"
+            (input)="setField(f.key, $any($event.target).value)"
+          ></md-outlined-text-field>
+        }
+      </div>
+    </section>
+
+    <section class="account-card">
+      <div class="account-card__head">
+        <h2>Languages</h2>
+      </div>
+      @if (languageOptions().length === 0) {
+        <p class="otp-muted">No languages configured yet.</p>
+      } @else {
+        <div class="driver-languages">
+          @for (opt of languageOptions(); track opt.id) {
+            <button
+              type="button"
+              class="driver-lang-chip"
+              [class.selected]="selectedLanguages().includes(opt.name)"
+              [attr.aria-pressed]="selectedLanguages().includes(opt.name)"
+              (click)="toggleLanguage(opt.name)"
+            >
+              {{ opt.name }}
+            </button>
+          }
+        </div>
+      }
+    </section>
+
+    <div>
+      <md-filled-button [disabled]="saving()" (click)="save()">
+        {{ saving() ? 'Saving…' : 'Save changes' }}
+      </md-filled-button>
+    </div>
+  }
+</md-admin-page>

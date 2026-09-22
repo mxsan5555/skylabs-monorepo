@@ -34,8 +34,14 @@ import { CategoryManagement } from './pages/account/masters/categories';
 import { PopularTagManagement } from './pages/account/masters/popular-tags';
 import { BlogList } from './pages/account/cms/blog-list';
 import { BlogDetailAdmin } from './pages/account/cms/blog-detail-admin';
+import { BlogCategoriesList } from './pages/account/cms/blog-categories-list';
 import { AboutUsPage } from './pages/account/cms/about-us';
 import { ContactUsPage } from './pages/account/cms/contact-us';
+import { FaqList } from './pages/account/cms/faq-list';
+import { HowItWorksPage } from './pages/account/cms/how-it-works';
+import { CareersPage } from './pages/account/cms/careers';
+import { LegalPagesList } from './pages/account/cms/legal-pages-list';
+import { SocialMediaList } from './pages/account/cms/social-media-list';
 import { ProductManagement } from './pages/account/products/products';
 import { OrderManagement } from './pages/account/orders/orders';
 import { Reports } from './pages/account/reports/reports';
@@ -45,6 +51,10 @@ import Category from './pages/category/category';
 import { CategoriesIndex } from './pages/categories/categories';
 import About from './pages/about/about';
 import Contact from './pages/contact/contact';
+import Careers from './pages/careers/careers';
+import { BecomeVendor } from './pages/become-vendor/become-vendor';
+import HowItWorks from './pages/how-it-works/how-it-works';
+import WebsitePage from './pages/website-page/website-page';
 import { Orders } from './pages/orders/orders';
 import { OrderDetail } from './pages/orders/order-detail';
 import { Invoice } from './pages/invoice/invoice';
@@ -180,6 +190,18 @@ export function AppRoutes() {
         <Route path="/blog/:slug" element={<BlogDetail />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/careers" element={<Careers />} />
+        {/* Public, unauthenticated Vendor self-registration ("Become a Vendor") — the storefront
+            counterpart of the admin "Add Vendor" wizard, see become-vendor.tsx's own doc
+            comment. Linked from the footer's "Partner With Us" entry (content.json). */}
+        <Route path="/become-vendor" element={<BecomeVendor />} />
+        <Route path="/how-it-works" element={<HowItWorks />} />
+        {/* WebsitePage is one reusable component parameterized by `slug` — wired to all 4 fixed
+            `WebsitePage` rows (see website-page.tsx's own doc comment), not 4 separate files. */}
+        <Route path="/privacy" element={<WebsitePage slug="privacy" />} />
+        <Route path="/terms" element={<WebsitePage slug="terms" />} />
+        <Route path="/accessibility" element={<WebsitePage slug="accessibility" />} />
+        <Route path="/cookies" element={<WebsitePage slug="cookies" />} />
         <Route path="/products/:slug" element={<ProductDetail />} />
         <Route path="/showcase" element={<Showcase />} />
         {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}
@@ -436,6 +458,54 @@ export function AppRoutes() {
           element={
             <RequirePermission menuKey="cms.contact-us">
               <ContactUsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/faq"
+          element={
+            <RequirePermission menuKey="cms.faq">
+              <FaqList />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/blog-categories"
+          element={
+            <RequirePermission menuKey="cms.blog-category">
+              <BlogCategoriesList />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/how-it-works"
+          element={
+            <RequirePermission menuKey="cms.how-it-works">
+              <HowItWorksPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/careers"
+          element={
+            <RequirePermission menuKey="cms.careers">
+              <CareersPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/legal-pages"
+          element={
+            <RequirePermission menuKey="cms.website-pages">
+              <LegalPagesList />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/social-media"
+          element={
+            <RequirePermission menuKey="cms.social-media">
+              <SocialMediaList />
             </RequirePermission>
           }
         />

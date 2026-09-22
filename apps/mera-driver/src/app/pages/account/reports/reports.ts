@@ -23,7 +23,7 @@ interface ReportRecord {
   standalone: true,
   imports: [AdminPage],
   templateUrl: './reports.html',
-  styleUrl: './reports.css',
+  styleUrl: '../masters/masters.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class Reports implements OnInit {

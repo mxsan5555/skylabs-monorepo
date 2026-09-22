@@ -82,7 +82,7 @@ export function Invoice() {
             <h1 className="invoice__vendor">
               {isMultiVendor ? `${vendorGroups.length} Vendors` : order.vendorNameSnapshot}
             </h1>
-            {!isMultiVendor && <p className="invoice__branch">{order.branchNameSnapshot}</p>}
+            {!isMultiVendor && order.branchNameSnapshot && <p className="invoice__branch">{order.branchNameSnapshot}</p>}
           </div>
           <div className="invoice__meta">
             <h2 className="invoice__title">{invoice.title}</h2>
@@ -127,7 +127,7 @@ export function Invoice() {
               <Fragment key={group.vendorId}>
                 {isMultiVendor && (
                   <tr className="invoice__items-vendor-row">
-                    <td colSpan={4}>{group.vendorName} · {group.branchName}</td>
+                    <td colSpan={4}>{group.vendorName}{group.branchName ? ` · ${group.branchName}` : ''}</td>
                   </tr>
                 )}
                 {group.items.map((item) => (

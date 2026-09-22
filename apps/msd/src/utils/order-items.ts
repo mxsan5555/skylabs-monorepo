@@ -3,7 +3,9 @@ import type { OrderItem } from '../api/orders';
 export interface OrderVendorGroup {
   vendorId: string;
   vendorName: string;
-  branchName: string;
+  /** Null when the group's first item is a Product line — Product has no branch (see msd-api's
+   *  Product schema doc comment). */
+  branchName: string | null;
   items: OrderItem[];
   subtotal: number;
 }

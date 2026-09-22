@@ -6,6 +6,11 @@ import { HttpError } from '../middleware/errorHandler';
 import * as roleService from '../services/role.service';
 import * as userService from '../services/user.service';
 import * as auditService from '../services/audit.service';
+import {
+  getUserPermissionOverrides,
+  setUserPermissionOverrides,
+  getEffectivePermissionsForUserId,
+} from '../services/permission.service';
 import { impersonateUser } from '../services/impersonation.service';
 import { buildBootstrapResponse } from '../services/bootstrap.service';
 import { resetOtpForUser } from '../services/user.service';
@@ -21,6 +26,7 @@ import {
   UpdateUserSchema,
   SetUserStatusSchema,
   ImpersonateSchema,
+  SetUserPermissionOverridesSchema,
 } from '../schemas/rbac.schema';
 
 const router = Router();
@@ -252,6 +258,43 @@ router.post('/users', requirePermission('rbac.users', 'create'), validateBody(Cr
   }
 });
 
+// ---------------------------------------------------------------------------
+// Self-service profile — every authenticated user (any role), not just admin-
+// permission holders. Must be registered before `/users/:id` below: Express matches
+// routes in registration order, so a later `/users/me` would be swallowed by the
+// earlier `/users/:id` (with `id` literally "me"). Ownership is resolved from
+// `req.user.sub` (the JWT subject) only — never a route param, query string, or body
+// field — same pattern as `resolveOwnDriver`. Reuses the exact same `UpdateUserSchema`
+// and `userService.getUserById`/`updateUser` the admin routes already use; this is
+// deliberately not a new profile system, just an ownership-gated entry point onto it.
+// ---------------------------------------------------------------------------
+
+router.get('/users/me', async (req, res, next) => {
+  try {
+    const user = await userService.getUserById(req.user!.sub);
+    res.json({ data: user, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/users/me', validateBody(UpdateUserSchema), async (req, res, next) => {
+  try {
+    const user = await userService.updateUser(req.user!.sub, req.body);
+    await auditService.writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'user.self.update',
+      targetType: 'User',
+      targetId: user.id,
+      after: user,
+      ...requestMeta(req),
+    });
+    res.json({ data: user, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.patch('/users/:id', requirePermission('rbac.users', 'edit'), validateBody(UpdateUserSchema), async (req, res, next) => {
   try {
     const user = await userService.updateUser(req.params.id, req.body);
@@ -390,6 +433,51 @@ router.get('/users/:id/sessions', requirePermission('rbac.users', 'view'), async
     next(err);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Per-user permission overrides — layered on top of role-derived grants at
+// resolution time (see `permission.service.ts#resolveEffectivePermissionsForUser`).
+// ---------------------------------------------------------------------------
+
+router.get('/users/:id/permissions/effective', requirePermission('rbac.users', 'view'), async (req, res, next) => {
+  try {
+    const permissions = await getEffectivePermissionsForUserId(req.params.id);
+    res.json({ data: { permissions }, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/users/:id/permission-overrides', requirePermission('rbac.users', 'view'), async (req, res, next) => {
+  try {
+    const overrides = await getUserPermissionOverrides(req.params.id);
+    res.json({ data: overrides, error: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put(
+  '/users/:id/permission-overrides',
+  requirePermission('rbac.users', 'assign'),
+  validateBody(SetUserPermissionOverridesSchema),
+  async (req, res, next) => {
+    try {
+      const overrides = await setUserPermissionOverrides(req.params.id, req.body.grants, req.body.revokes);
+      await auditService.writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'user.permissionOverrides.set',
+        targetType: 'User',
+        targetId: req.params.id,
+        after: overrides,
+        ...requestMeta(req),
+      });
+      res.json({ data: overrides, error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Audit logs

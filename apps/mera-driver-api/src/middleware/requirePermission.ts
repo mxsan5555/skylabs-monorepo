@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { PermissionAction } from '@skylabs-monorepo/shared-types';
 import { can } from '@skylabs-monorepo/shared-permissions';
-import { resolvePermissionsForRoles } from '../services/permission.service';
+import { resolveEffectivePermissionsForUser } from '../services/permission.service';
 
 /**
  * The ONLY gate protected routes use. It never compares a role name — it resolves the
@@ -19,7 +19,7 @@ export function requirePermission(menuKey: string, action: PermissionAction = 'v
     }
 
     try {
-      const granted = await resolvePermissionsForRoles(req.user.roles);
+      const granted = await resolveEffectivePermissionsForUser(req.user.sub, req.user.roles);
       if (!can(granted, menuKey, action)) {
         res.status(403).json({
           data: null,
