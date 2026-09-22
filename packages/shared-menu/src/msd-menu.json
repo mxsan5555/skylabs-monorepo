@@ -62,7 +62,7 @@
     "children": [
       {
         "id": "vendor-list",
-        "title": "Vendor List",
+        "title": "All Vendor",
         "route": "/account/vendors",
         "permissionKey": "vendors",
         "parent": "vendors",
@@ -112,7 +112,7 @@
     "children": [
       {
         "id": "customer-list",
-        "title": "Customer List",
+        "title": "All Customer",
         "route": "/account/customers",
         "permissionKey": "customers",
         "parent": "customers",
@@ -315,13 +315,6 @@
         "permissionKey": "settings",
         "parent": "settings",
         "order": 1
-      },
-      {
-        "id": "settings-logout",
-        "title": "Logout",
-        "permissionKey": "settings",
-        "parent": "settings",
-        "order": 2
       }
     ]
   }

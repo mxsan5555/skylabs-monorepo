@@ -1,4 +1,3 @@
-import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import type { DashboardStats } from '../../../api/rbac/dashboard';
 import { formatINR } from '../../../utils/format';
 
@@ -10,7 +9,7 @@ interface DashboardMarketplaceOverviewProps {
 
 interface MarketplaceMetric {
   label: string;
-  value: string;
+  stat: keyof DashboardStats;
   icon: string;
 }
 
@@ -19,80 +18,58 @@ export function DashboardProcessFlow({
   loading,
   error,
 }: DashboardMarketplaceOverviewProps) {
-  const catalogMetrics: MarketplaceMetric[] = [
+  const dashboardMetrics: MarketplaceMetric[] = [
     {
       label: 'Categories',
-      value: stats ? stats.categories.toLocaleString('en-IN') : '—',
+      stat: 'categories',
       icon: 'category',
     },
     {
       label: 'Sub Categories',
-      value: stats ? stats.subCategories.toLocaleString('en-IN') : '—',
+      stat: 'subCategories',
       icon: 'account_tree',
     },
     {
       label: 'Products',
-      value: stats ? stats.products.toLocaleString('en-IN') : '—',
+      stat: 'products',
       icon: 'inventory_2',
     },
     {
       label: 'Deals',
-      value: stats ? stats.deals.toLocaleString('en-IN') : '—',
+      stat: 'deals',
       icon: 'local_offer',
     },
-  ];
-
-  const supplyMetrics: MarketplaceMetric[] = [
     {
       label: 'Vendors',
-      value: stats ? stats.vendors.toLocaleString('en-IN') : '—',
+      stat: 'vendors',
       icon: 'storefront',
     },
     {
       label: 'Branches',
-      value: stats ? stats.branches.toLocaleString('en-IN') : '—',
+      stat: 'branches',
       icon: 'location_on',
     },
-  ];
-
-  const activityMetrics: MarketplaceMetric[] = [
     {
       label: 'Orders',
-      value: stats ? stats.orders.toLocaleString('en-IN') : '—',
+      stat: 'orders',
       icon: 'shopping_bag',
     },
     {
       label: 'Revenue',
-      value: stats ? formatINR(Number(stats.revenue)) : '—',
+      stat: 'revenue',
       icon: 'payments',
     },
   ];
 
-  const groups = [
-    {
-      key: 'catalog',
-      title: 'CATALOG',
-      icon: 'inventory_2',
-      metrics: catalogMetrics,
-    },
-    {
-      key: 'supply',
-      title: 'SUPPLY',
-      icon: 'storefront',
-      metrics: supplyMetrics,
-    },
-    {
-      key: 'activity',
-      title: 'ACTIVITY',
-      icon: 'monitoring',
-      metrics: activityMetrics,
-    },
-  ];
-
   return (
-    <section className="dashboard-marketplace" aria-label="Marketplace overview">
+    <section
+      className="dashboard-stats"
+      aria-label="Marketplace statistics"
+    >
       {loading && (
-        <p className="loading-state">Loading marketplace overview…</p>
+        <p className="loading-state">
+          Loading marketplace overview…
+        </p>
       )}
 
       {!loading && error && (
@@ -101,37 +78,26 @@ export function DashboardProcessFlow({
         </p>
       )}
 
-      {!loading && !error && (
-        <div className="dashboard-marketplace__grid">
-          {groups.map((group) => (
-            <article
-              key={group.key}
-              className="dashboard-marketplace__group"
-            >
-              <div className="dashboard-marketplace__group-header">
-                <Icon aria-hidden="true">{group.icon}</Icon>
-                <h3>{group.title}</h3>
-              </div>
+      {!loading &&
+        !error &&
+        dashboardMetrics.map((metric) => {
+          const rawValue = stats?.[metric.stat];
 
-              <div className="dashboard-marketplace__metrics">
-                {group.metrics.map((metric) => (
-                  <div
-                    key={metric.label}
-                    className="dashboard-marketplace__metric"
-                  >
-                    <div className="dashboard-marketplace__metric-label">
-                      <Icon aria-hidden="true">{metric.icon}</Icon>
-                      <span>{metric.label}</span>
-                    </div>
+          const value =
+            metric.stat === 'revenue'
+              ? formatINR(Number(rawValue ?? 0))
+              : Number(rawValue ?? 0).toLocaleString('en-IN');
 
-                    <strong>{metric.value}</strong>
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
+          return (
+            <sky-info-card
+              key={metric.stat}
+              align="center"
+              icon={metric.icon}
+              heading={metric.label}
+              subheading={value}
+            />
+          );
+        })}
     </section>
   );
 }
