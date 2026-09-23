@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   listCatalogDeals,
   listCatalogFaqs,
@@ -93,11 +93,17 @@ export function useHomeCatalog(coords: Coordinates | null | undefined): HomeCata
   const resolved = coords !== undefined;
   const latitude = coords?.latitude;
   const longitude = coords?.longitude;
+  // Only the very first load shows the full skeleton. A refetch triggered by coords changing
+  // after data has already loaded keeps `status: 'ready'` and the current arrays on screen
+  // until the new data arrives, instead of flashing back to the loading state.
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     if (!resolved) return;
     let cancelled = false;
-    setState((s) => ({ ...s, status: 'loading', error: '' }));
+    if (!hasLoadedRef.current) {
+      setState((s) => ({ ...s, status: 'loading', error: '' }));
+    }
     Promise.all([
       listCatalogDeals({ pageSize: HOME_DEALS_PAGE_SIZE, latitude, longitude }),
       listCatalogProducts({ pageSize: HOME_RAIL_SIZE, sort: 'newest' }),
@@ -105,6 +111,7 @@ export function useHomeCatalog(coords: Coordinates | null | undefined): HomeCata
     ])
       .then(([deals, products, therapists]) => {
         if (cancelled) return;
+        hasLoadedRef.current = true;
         setState({ status: 'ready', error: '', deals: deals.data ?? [], products: products.data ?? [], therapists: therapists.data ?? [] });
       })
       .catch((err) => {
@@ -120,10 +127,20 @@ export function useHomeCatalog(coords: Coordinates | null | undefined): HomeCata
     };
   }, [resolved, latitude, longitude]);
 
+  // FAQs are CMS-managed and non-critical: a failure just leaves them empty. `cancelled` guards
+  // against setting state from a fetch that resolves after this hook's component has unmounted.
   useEffect(() => {
+    let cancelled = false;
     listCatalogFaqs()
-      .then(({ data }) => setFaqs(data ?? []))
-      .catch(() => setFaqs([]));
+      .then(({ data }) => {
+        if (!cancelled) setFaqs(data ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setFaqs([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return { ...state, faqs };

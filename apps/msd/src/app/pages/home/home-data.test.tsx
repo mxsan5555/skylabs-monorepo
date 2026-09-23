@@ -61,3 +61,42 @@ describe('useHomeCatalog', () => {
     expect(result.current.faqs).toEqual([]);
   });
 });
+
+describe('useHomeCatalog — unmount and refetch behavior', () => {
+  it('does not error when FAQs resolve after the component has unmounted', async () => {
+    let resolveFaqs!: (v: { data: { id: string; question: string; answer: string }[] }) => void;
+    m.faqs.mockImplementation(() => new Promise((resolve) => { resolveFaqs = resolve; }));
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const { unmount } = renderHook(() => useHomeCatalog(null));
+    unmount();
+    resolveFaqs({ data: [{ id: 'f1', question: 'Q', answer: 'A' }] });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it('keeps status "ready" and the previous arrays during a refetch, instead of flashing "loading"', async () => {
+    const { result, rerender } = renderHook(
+      ({ coords }: { coords: { latitude: number; longitude: number } | null }) => useHomeCatalog(coords),
+      { initialProps: { coords: { latitude: 1, longitude: 2 } } },
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.deals).toHaveLength(1);
+
+    let resolveDeals!: (v: { data: { id: string }[] }) => void;
+    m.deals.mockImplementation(() => new Promise((resolve) => { resolveDeals = resolve; }));
+
+    rerender({ coords: { latitude: 3, longitude: 4 } });
+
+    // The refetch is in flight (deals hasn't resolved yet): no skeleton flash, old data stays.
+    expect(result.current.status).toBe('ready');
+    expect(result.current.deals).toHaveLength(1);
+
+    resolveDeals({ data: [{ id: 'd2' }, { id: 'd3' }] });
+    await waitFor(() => expect(result.current.deals).toHaveLength(2));
+    expect(result.current.status).toBe('ready');
+  });
+});
