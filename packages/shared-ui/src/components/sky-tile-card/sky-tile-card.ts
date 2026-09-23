@@ -28,6 +28,9 @@ import {
  *   icon-shape  none | small | medium | large | full
  *   align       start | center
  *
+ * Use the `headline` slot to supply light-DOM heading markup (e.g. `<h3 slot="headline"><a href>…</a></h3>`)
+ * when crawlers must see the link; omit `href` then, the slotted link is the tile's link.
+ *
  * @example
  * <sky-tile-card icon="healing" headline="Therapy" text="12 deals" href="/category/therapy"
  *   variant="outlined"></sky-tile-card>
@@ -98,7 +101,7 @@ export class SkyTileCard extends LitElement {
     return html`
       <article class="surface">
         ${this.icon ? html`<span class="icon"><md-icon aria-hidden="true">${this.icon}</md-icon></span>` : nothing}
-        ${this.headline ? html`<h3 id="headline" class="title-medium">${this.headline}</h3>` : nothing}
+        <slot name="headline">${this.headline ? html`<h3 id="headline" class="title-medium">${this.headline}</h3>` : nothing}</slot>
         ${this.text ? html`<p id="text" class="body-medium">${this.text}</p>` : nothing}
         <slot></slot>
         ${this.href

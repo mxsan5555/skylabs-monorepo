@@ -54,4 +54,21 @@ describe('sky-tile-card', () => {
     expect(el.getAttribute('icon-style')).toBe('tonal');
     expect(el.getAttribute('align')).toBe('center');
   });
+
+  it('renders slotted headline content in place of the headline prop', async () => {
+    const el = await create();
+    const h3 = document.createElement('h3');
+    h3.slot = 'headline';
+    h3.textContent = 'Massage';
+    el.appendChild(h3);
+    await el.updateComplete;
+    const slot = el.shadowRoot?.querySelector('slot[name="headline"]') as HTMLSlotElement;
+    expect(slot).toBeTruthy();
+    expect(slot.assignedElements()[0]).toBe(h3);
+  });
+
+  it('still renders the headline prop as the slot fallback', async () => {
+    const el = await create({ headline: 'Spa' });
+    expect(el.shadowRoot?.querySelector('slot[name="headline"] h3')?.textContent).toBe('Spa');
+  });
 });
