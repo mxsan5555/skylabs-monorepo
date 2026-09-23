@@ -57,6 +57,13 @@ function writeSaved(value: CatalogLocation | null) {
   }
 }
 
+/** True iff `ip` is a usable `GeoResult` — has a non-empty `city` string. `/api/geo` can resolve
+ *  to `{}` (or, in local dev, to something that isn't a `GeoResult` at all), which must be
+ *  treated the same as "no data" rather than surfaced as a city named `undefined`. */
+function isUsableGeoResult(ip: unknown): ip is GeoResult {
+  return typeof ip === 'object' && ip !== null && typeof (ip as { city?: unknown }).city === 'string' && (ip as GeoResult).city.length > 0;
+}
+
 async function geolocationGranted(): Promise<boolean> {
   try {
     const status = await navigator.permissions?.query({ name: 'geolocation' });
@@ -72,7 +79,7 @@ function readBrowserCoords(): Promise<Coordinates | null> {
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => resolve({ latitude: coords.latitude, longitude: coords.longitude }),
       () => resolve(null),
-      { maximumAge: 600_000, timeout: 10_000 },
+      { maximumAge: 600_000, timeout: 5_000 },
     );
   });
 }
@@ -91,36 +98,50 @@ async function fetchIpLocation(): Promise<GeoResult | null> {
 /**
  * One location lookup per visit, in order: saved choice, browser coordinates (only when
  * permission is already granted; never prompts on load), Vercel IP headers, none.
- * Browser coordinates map to a city name via the nearest active city from `/catalog/locations`.
+ * Browser coordinates map to a city name via the nearest active city from `/catalog/locations`
+ * (within `nearestCity`'s distance cap — a visitor far from every active city keeps their raw
+ * coordinates for distance sorting but gets no city guess).
+ *
+ * Two independent guards decide whether an async lookup's result is still allowed to land:
+ *  - `choiceGen` is bumped only by `setCity`, the one action that must always win. The mount
+ *    effect and `requestBrowser` each capture its value before starting and skip committing if
+ *    it has since changed, so a city the visitor explicitly picks can never be clobbered by a
+ *    slower lookup that was already in flight.
+ *  - `browserRequestId` is bumped by every `requestBrowser` call, so an older, still-pending
+ *    geolocation lookup discards its own result instead of clobbering a newer one. It never
+ *    touches the mount effect's own IP lookup: that runs and commits independently, so a
+ *    `requestBrowser` failure only restores the state that existed before it started and never
+ *    cancels a same-time mount lookup still resolving in the background.
  */
 export function LocationProvider({ children }: { children: ReactNode }) {
   const { locations } = useCatalogShell();
   const [resolved, setResolved] = useState<Resolved>({ ...NONE, status: 'locating' });
-  // Bumped by every user-driven choice (setCity, requestBrowser) so a slower, superseded
-  // lookup can detect it is stale and discard its result instead of clobbering a newer one.
-  const requestId = useRef(0);
+  const choiceGen = useRef(0);
+  const browserRequestId = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
-    const myId = ++requestId.current;
+    const myChoiceGen = choiceGen.current;
     (async () => {
       const saved = readSaved();
       if (saved) {
-        if (cancelled || requestId.current !== myId) return;
+        if (cancelled || choiceGen.current !== myChoiceGen) return;
         setResolved({ status: 'ready', source: 'saved', city: saved.city, coords: coordsOf(saved) });
         return;
       }
-      if (await geolocationGranted()) {
+      const granted = await geolocationGranted();
+      if (cancelled || choiceGen.current !== myChoiceGen) return;
+      if (granted) {
         const coords = await readBrowserCoords();
-        if (cancelled || requestId.current !== myId) return;
+        if (cancelled || choiceGen.current !== myChoiceGen) return;
         if (coords) {
           setResolved({ status: 'ready', source: 'browser', city: null, coords });
           return;
         }
       }
       const ip = await fetchIpLocation();
-      if (cancelled || requestId.current !== myId) return;
-      setResolved(ip ? { status: 'ready', source: 'ip', city: ip.city, coords: coordsOf(ip) } : NONE);
+      if (cancelled || choiceGen.current !== myChoiceGen) return;
+      setResolved(isUsableGeoResult(ip) ? { status: 'ready', source: 'ip', city: ip.city, coords: coordsOf(ip) } : NONE);
     })();
     return () => {
       cancelled = true;
@@ -128,17 +149,20 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setCity = useCallback((location: CatalogLocation) => {
-    requestId.current += 1;
+    choiceGen.current += 1;
     writeSaved(location);
     setResolved({ status: 'ready', source: 'saved', city: location.city, coords: coordsOf(location) });
   }, []);
 
   const requestBrowser = useCallback(() => {
-    const myId = ++requestId.current;
+    const myBrowserId = ++browserRequestId.current;
+    const myChoiceGen = choiceGen.current;
     setResolved((r) => ({ ...r, status: 'locating' }));
     void (async () => {
       const coords = await readBrowserCoords();
-      if (requestId.current !== myId) return; // a newer setCity/requestBrowser won since this started
+      // A newer requestBrowser() call superseded this one, or the visitor picked a city while
+      // this lookup was in flight — either way, this result is stale and must not be applied.
+      if (browserRequestId.current !== myBrowserId || choiceGen.current !== myChoiceGen) return;
       if (coords) {
         writeSaved(null);
         setResolved({ status: 'ready', source: 'browser', city: null, coords });
@@ -157,9 +181,9 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- * `useLocation` shares a name with React Router's hook; consumers that also use the router's
- * hook should import it as `useLocation as useVisitorLocation`.
+ * Note: this hook is named `useVisitorLocation` (rather than `useLocation`) specifically to
+ * avoid a name clash with React Router's `useLocation`.
  */
-export function useLocation(): LocationValue {
+export function useVisitorLocation(): LocationValue {
   return useContext(LocationContext);
 }

@@ -58,4 +58,20 @@ describe('nearestCity', () => {
   it('returns null when no city has coordinates', () => {
     expect(nearestCity({ latitude: 18.6, longitude: 73.8 }, [cities[2]])).toBeNull();
   });
+
+  it('returns the nearest city when it is within the default 75km cap', () => {
+    // ~13km from Pune.
+    expect(nearestCity({ latitude: 18.6, longitude: 73.8 }, cities)?.city).toBe('Pune');
+  });
+
+  it('returns null when the nearest city is farther than the default 75km cap', () => {
+    // Delhi is roughly 1150km from both Pune and Mumbai.
+    const farPoint = { latitude: 28.6139, longitude: 77.209 };
+    expect(nearestCity(farPoint, cities)).toBeNull();
+  });
+
+  it('respects a custom maxKm', () => {
+    // ~13km from Pune, inside the default cap but outside a tighter 5km cap.
+    expect(nearestCity({ latitude: 18.6, longitude: 73.8 }, cities, 5)).toBeNull();
+  });
 });

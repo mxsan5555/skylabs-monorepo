@@ -1,18 +1,23 @@
+import { StrictMode } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+
+let mockLocations: Array<{ state: string; city: string; latitude?: number | null; longitude?: number | null }> = [
+  { state: 'Maharashtra', city: 'Pune', latitude: 18.52, longitude: 73.85 },
+];
 
 vi.mock('../catalog/catalog-shell', () => ({
   useCatalogShell: () => ({
     status: 'ready',
     categories: [],
-    locations: [{ state: 'Maharashtra', city: 'Pune', latitude: 18.52, longitude: 73.85 }],
+    locations: mockLocations,
   }),
 }));
 
-import { LocationProvider, useLocation } from './location-context';
+import { LocationProvider, useVisitorLocation } from './location-context';
 
 function Probe() {
-  const { status, source, city, setCity } = useLocation();
+  const { status, source, city, setCity } = useVisitorLocation();
   return (
     <>
       <p data-testid="out">{`${status}|${source}|${city ?? '-'}`}</p>
@@ -22,7 +27,7 @@ function Probe() {
 }
 
 function RequestProbe() {
-  const { status, source, city, setCity, requestBrowser } = useLocation();
+  const { status, source, city, setCity, requestBrowser } = useVisitorLocation();
   return (
     <>
       <p data-testid="out">{`${status}|${source}|${city ?? '-'}`}</p>
@@ -39,6 +44,7 @@ beforeEach(() => {
   localStorage.clear();
   getCurrentPosition.mockReset();
   permissionState = 'prompt';
+  mockLocations = [{ state: 'Maharashtra', city: 'Pune', latitude: 18.52, longitude: 73.85 }];
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => null }));
   Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { getCurrentPosition } });
   Object.defineProperty(navigator, 'permissions', {
@@ -94,6 +100,12 @@ describe('LocationProvider', () => {
     await waitFor(() => expect(out()).toBe('none|none|-'));
   });
 
+  it('treats a shapeless /api/geo response (no usable city) as no data', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response);
+    render(<LocationProvider><Probe /></LocationProvider>);
+    await waitFor(() => expect(out()).toBe('none|none|-'));
+  });
+
   it('setCity saves the choice', async () => {
     render(<LocationProvider><Probe /></LocationProvider>);
     await waitFor(() => expect(out()).toBe('none|none|-'));
@@ -102,7 +114,7 @@ describe('LocationProvider', () => {
     expect(JSON.parse(localStorage.getItem('msd.location') ?? '{}').city).toBe('Delhi');
   });
 
-  it('useLocation outside a provider returns a safe "none" value', () => {
+  it('useVisitorLocation outside a provider returns a safe "none" value', () => {
     render(<Probe />);
     expect(out()).toBe('none|none|-');
   });
@@ -129,5 +141,87 @@ describe('LocationProvider', () => {
     });
 
     expect(out()).toBe('ready|saved|Delhi');
+  });
+
+  it('requestBrowser success switches to a browser-sourced city and clears any saved choice', async () => {
+    localStorage.setItem('msd.location', JSON.stringify({ state: 'Maharashtra', city: 'Pune', latitude: 18.52, longitude: 73.85 }));
+    getCurrentPosition.mockImplementation((ok: PositionCallback) =>
+      ok({ coords: { latitude: 18.6, longitude: 73.8 } } as GeolocationPosition),
+    );
+    render(<LocationProvider><RequestProbe /></LocationProvider>);
+    await waitFor(() => expect(out()).toBe('ready|saved|Pune'));
+
+    act(() => {
+      screen.getByText('locate').click();
+    });
+
+    await waitFor(() => expect(out()).toBe('ready|browser|Pune'));
+    expect(localStorage.getItem('msd.location')).toBeNull();
+  });
+
+  it('requestBrowser failure after a resolved IP city restores the IP result', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ city: 'Nagpur', region: 'MH', latitude: 21.1, longitude: 79.1 }) } as Response);
+    render(<LocationProvider><RequestProbe /></LocationProvider>);
+    await waitFor(() => expect(out()).toBe('ready|ip|Nagpur'));
+
+    getCurrentPosition.mockImplementation((_ok: PositionCallback, err?: PositionErrorCallback) => err?.({} as GeolocationPositionError));
+    act(() => {
+      screen.getByText('locate').click();
+    });
+
+    await waitFor(() => expect(out()).toBe('ready|ip|Nagpur'));
+  });
+
+  it('does not lose a still-pending mount IP lookup when requestBrowser fails meanwhile', async () => {
+    let resolveFetch!: (value: Response) => void;
+    vi.mocked(fetch).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve as (value: Response) => void;
+        }),
+    );
+    getCurrentPosition.mockImplementation((_ok: PositionCallback, err?: PositionErrorCallback) => err?.({} as GeolocationPositionError));
+
+    render(<LocationProvider><RequestProbe /></LocationProvider>);
+
+    act(() => {
+      screen.getByText('locate').click();
+    });
+    await waitFor(() => expect(out()).toBe('none|none|-'));
+
+    await act(async () => {
+      resolveFetch({ ok: true, json: async () => ({ city: 'Nagpur', region: 'MH', latitude: 21.1, longitude: 79.1 }) } as Response);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(out()).toBe('ready|ip|Nagpur'));
+  });
+
+  it('resolves once under StrictMode, applying the IP result exactly once', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ city: 'Nagpur', region: 'MH', latitude: 21.1, longitude: 79.1 }) } as Response);
+    render(
+      <StrictMode>
+        <LocationProvider>
+          <Probe />
+        </LocationProvider>
+      </StrictMode>,
+    );
+    await waitFor(() => expect(out()).toBe('ready|ip|Nagpur'));
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('fills in the city once the catalog locations arrive after coordinates are already resolved', async () => {
+    mockLocations = [];
+    permissionState = 'granted';
+    getCurrentPosition.mockImplementation((ok: PositionCallback) =>
+      ok({ coords: { latitude: 18.6, longitude: 73.8 } } as GeolocationPosition),
+    );
+    const { rerender } = render(<LocationProvider><Probe /></LocationProvider>);
+    await waitFor(() => expect(out()).toBe('ready|browser|-'));
+
+    mockLocations = [{ state: 'Maharashtra', city: 'Pune', latitude: 18.52, longitude: 73.85 }];
+    rerender(<LocationProvider><Probe /></LocationProvider>);
+
+    await waitFor(() => expect(out()).toBe('ready|browser|Pune'));
   });
 });

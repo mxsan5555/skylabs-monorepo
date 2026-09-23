@@ -8,6 +8,7 @@ import {
 import content from '../content.json';
 
 export interface CatalogShellValue {
+  /** Reflects the categories fetch only; locations fail silently to an empty array below. */
   status: 'loading' | 'ready' | 'error';
   categories: CatalogCategoryWithChildren[];
   locations: CatalogLocation[];

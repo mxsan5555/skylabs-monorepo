@@ -56,7 +56,10 @@ export interface CityPoint {
   longitude?: number | null;
 }
 
-export function nearestCity<T extends CityPoint>(point: Coordinates, cities: T[]): T | null {
+/** Closest city with coordinates, or `null` if none has coordinates or the closest one is
+ *  farther than `maxKm` (default 75km) — a visitor far from every active city gets no city
+ *  guess, though their raw coordinates are still available for distance sorting). */
+export function nearestCity<T extends CityPoint>(point: Coordinates, cities: T[], maxKm = 75): T | null {
   let best: T | null = null;
   let bestKm = Infinity;
   for (const c of cities) {
@@ -67,5 +70,5 @@ export function nearestCity<T extends CityPoint>(point: Coordinates, cities: T[]
       bestKm = km;
     }
   }
-  return best;
+  return best != null && bestKm <= maxKm ? best : null;
 }
