@@ -5,8 +5,9 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { SiteFooter } from './site-footer';
 
-const { wide, savedTheme, setThemePreferenceMock } = vi.hoisted(() => ({
+const { wide, savedTheme, setThemePreferenceMock, social } = vi.hoisted(() => ({
   wide: { value: true },
+  social: { links: [] as { id: string; platform: string; displayName: string; url: string }[] },
   savedTheme: { value: 'light' },
   setThemePreferenceMock: vi.fn(),
 }));
@@ -28,10 +29,7 @@ vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
       { state: 'Delhi', city: 'Delhi' },
       { state: 'Maharashtra', city: 'Pune' },
     ],
-    socialLinks: [
-      { id: 's1', platform: 'instagram', displayName: 'Instagram', url: 'https://instagram.com/x' },
-      { id: 's2', platform: 'tiktok', displayName: 'TikTok', url: 'https://tiktok.com/@x' },
-    ],
+    socialLinks: social.links,
   }),
   useCategoryLinks: () => [{ id: 'c1', label: 'Massage', to: '/category/massage' }],
 }));
@@ -40,6 +38,10 @@ const renderFooter = () => render(<MemoryRouter><SiteFooter /></MemoryRouter>);
 
 beforeEach(() => {
   wide.value = true;
+  social.links = [
+    { id: 's1', platform: 'instagram', displayName: 'Instagram', url: 'https://instagram.com/x' },
+    { id: 's2', platform: 'tiktok', displayName: 'TikTok', url: 'https://tiktok.com/@x' },
+  ];
   savedTheme.value = 'light';
   setThemePreferenceMock.mockClear();
 });
@@ -114,6 +116,20 @@ describe('SiteFooter', () => {
     errors.mockRestore();
     act(() => root?.unmount());
     container.remove();
+  });
+
+  it('renders one anchor per social link, with a platform icon distinct from the fallback', () => {
+    renderFooter();
+    const list = screen.getByRole('list', { name: 'MySpaDeal on social media' });
+    const anchors = within(list).getAllByRole('link');
+    expect(anchors.map((a) => a.getAttribute('href'))).toEqual(['https://instagram.com/x', 'https://tiktok.com/@x']);
+    expect(anchors[0].innerHTML).not.toBe(anchors[1].innerHTML);
+  });
+
+  it('omits the social list when there are no links', () => {
+    social.links = [];
+    renderFooter();
+    expect(screen.queryByRole('list', { name: 'MySpaDeal on social media' })).toBeNull();
   });
 
   it('switches theme through radio buttons', () => {
