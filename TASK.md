@@ -79,6 +79,13 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] msd: shared --sky-content-max token for 1280px/16px containers (header, footer, home)
 - [ ] msd: migrate remaining useCurrentLocation callers (category, search, therapists, vendor) to useVisitorLocation
 
+#### Plan 4 prerender prerequisites
+- [ ] msd: `sky-action-field` `onsky-submit` listeners aren't attached on hydrate: attach via ref + addEventListener (hero, header, footer newsletter)
+- [ ] msd: camelCase props on raw custom elements serialize as lowercase attributes and are lost in server HTML: switch to kebab-case attributes (`cta-label`, `icon-style`, `icon-shape`, `cta-href`, `cta-icon`, `image-alt`, `eyebrow-href`, `original-price`, `price-note`, `price-prefix`, `favorite-active`) in `sky-cta-banner`/`sky-feature-card` usages and `SkyProductCardWC`
+- [ ] msd: @lit/react wrappers drop prototype props in server HTML (e.g. `FilledButton href`): render SEO-relevant links as light-DOM anchors
+- [ ] msd: `useHomeCatalog`/`CatalogShellProvider` need `initialData` from the prerender payload and a seeded `hasLoadedRef`
+- [ ] msd: gift/member `sky-feature-card` copy is shadow-DOM only: decide on light-DOM slots
+
 ### Account & admin — both apps (remaining)
 - [ ] Logout from inside the console (currently in the public header)
 - [ ] Admin/marketing/sales feature pages (real content, not stubs)
