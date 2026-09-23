@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useWishlist } from '../../../wishlist/wishlist-context';
@@ -55,10 +55,10 @@ export function MobileTabBar() {
   const cartCount = useCartCount();
   const { accountPath } = useAccountLinks();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const sheetId = useId();
   const categoriesButtonRef = useRef<HTMLButtonElement>(null);
 
-  // The sheet unmounts on close, so md-dialog cannot restore focus itself; return it to the button.
+  // The sheet unmounts immediately on close (skipping md-dialog's own close animation), so
+  // md-dialog can't restore focus itself — return it to the button manually.
   const closeSheet = () => {
     setSheetOpen(false);
     categoriesButtonRef.current?.focus();
@@ -75,8 +75,6 @@ export function MobileTabBar() {
               type="button"
               className="tab-bar__item"
               aria-haspopup="dialog"
-              aria-expanded={sheetOpen}
-              aria-controls={sheetOpen ? sheetId : undefined}
               onClick={() => setSheetOpen(true)}
             >
               <TabIcon icon="grid_view" />
@@ -88,7 +86,7 @@ export function MobileTabBar() {
           <TabLink to={accountPath} icon="person" label={t.account} />
         </ul>
       </nav>
-      <CategorySheet id={sheetId} open={sheetOpen} onClose={closeSheet} />
+      <CategorySheet open={sheetOpen} onClose={closeSheet} />
     </>
   );
 }

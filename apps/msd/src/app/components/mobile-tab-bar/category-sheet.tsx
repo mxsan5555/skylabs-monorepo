@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Dialog, IconButton, Icon } from '@skylabs-monorepo/shared-ui/react';
-import { useCatalogShell } from '../../../catalog/catalog-shell';
+import { useCatalogShell, useCategoryLinks } from '../../../catalog/catalog-shell';
 import content from '../../../content.json';
 
 /**
@@ -8,55 +8,63 @@ import content from '../../../content.json';
  * Unmounts on close (`open` gates the render) so `md-dialog` cannot restore focus itself —
  * the caller (`MobileTabBar`) is responsible for returning focus to the trigger.
  */
-export function CategorySheet({
-  id,
-  open,
-  onClose,
-}: {
-  id: string;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { categories } = useCatalogShell();
+export function CategorySheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { status, categories } = useCatalogShell();
+  // Same static `content.nav.categories` fallback `useCategoryLinks` uses elsewhere in the
+  // shell, so the sheet always has something to show (loading, error, or a genuinely empty
+  // catalog) instead of rendering an empty accordion.
+  const categoryLinks = useCategoryLinks();
   if (!open) return null;
 
   return (
-    <Dialog id={id} open className="category-sheet" onClose={onClose}>
+    <Dialog open className="category-sheet" onClose={onClose}>
       <span slot="headline" className="category-sheet__headline">
         {content.tabBar.sheetTitle}
         <IconButton aria-label={content.header.closeNavigation} onClick={onClose}>
           <Icon aria-hidden="true">close</Icon>
         </IconButton>
       </span>
-      <div slot="content">
-        <sky-accordion single>
-          {categories.map((cat) => (
-            <sky-accordion-item key={cat.id} header={cat.name}>
-              <ul className="category-sheet__list">
-                <li>
-                  <Link
-                    to={`/category/${cat.slug}`}
-                    className="category-sheet__link title-small"
-                    onClick={onClose}
-                  >
-                    {content.tabBar.viewAll.replace('{category}', cat.name)}
-                  </Link>
-                </li>
-                {cat.children.map((sub) => (
-                  <li key={sub.id}>
+      <div slot="content" aria-busy={status === 'loading' ? true : undefined}>
+        {categories.length > 0 ? (
+          <sky-accordion single>
+            {categories.map((cat) => (
+              <sky-accordion-item key={cat.id} header={cat.name}>
+                <ul className="category-sheet__list">
+                  <li>
                     <Link
-                      to={`/category/${cat.slug}?sub=${sub.slug}`}
-                      className="category-sheet__link body-large"
+                      to={`/category/${cat.slug}`}
+                      className="category-sheet__link title-small"
                       onClick={onClose}
                     >
-                      {sub.name}
+                      {content.tabBar.viewAll.replace('{category}', cat.name)}
                     </Link>
                   </li>
-                ))}
-              </ul>
-            </sky-accordion-item>
-          ))}
-        </sky-accordion>
+                  {cat.children.map((sub) => (
+                    <li key={sub.id}>
+                      <Link
+                        to={`/category/${cat.slug}?sub=${sub.slug}`}
+                        className="category-sheet__link body-large"
+                        onClick={onClose}
+                      >
+                        {sub.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </sky-accordion-item>
+            ))}
+          </sky-accordion>
+        ) : (
+          <ul className="category-sheet__list">
+            {categoryLinks.map((link) => (
+              <li key={link.id}>
+                <Link to={link.to} className="category-sheet__link title-small" onClick={onClose}>
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </Dialog>
   );

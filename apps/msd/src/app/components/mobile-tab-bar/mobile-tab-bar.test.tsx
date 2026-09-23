@@ -1,19 +1,32 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { MobileTabBar } from './mobile-tab-bar';
+import content from '../../../content.json';
+
+type MockSubcategory = { id: string; name: string; slug: string; description: string | null };
+type MockCategory = MockSubcategory & { children: MockSubcategory[] };
+
+const state = vi.hoisted(() => ({
+  status: 'ready' as 'loading' | 'ready' | 'error',
+  categories: [] as MockCategory[],
+}));
 
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   useAuth: () => ({ isAuthenticated: false, token: null, bootstrap: null }),
 }));
 vi.mock('../../../wishlist/wishlist-context', () => ({ useWishlist: () => ({ ids: new Set(['a']) }) }));
 vi.mock('../../../hooks/use-cart-count', () => ({ useCartCount: () => 0 }));
+// `useCategoryLinks` (same module) calls `useCatalogShell` internally, so mocking only
+// `useCatalogShell` and importing the real `useCategoryLinks` would read the real (unmocked)
+// context instead of this test's `state` — mock both, mirroring `useCategoryLinks`'s own
+// categories-present/fallback-to-`content.nav.categories` logic against the same `state`.
 vi.mock('../../../catalog/catalog-shell', () => ({
-  useCatalogShell: () => ({
-    status: 'ready',
-    locations: [],
-    categories: [{ id: 'c1', name: 'Massage', slug: 'massage', description: null, children: [] }],
-  }),
+  useCatalogShell: () => ({ status: state.status, categories: state.categories, locations: [] }),
+  useCategoryLinks: () =>
+    state.categories.length > 0
+      ? state.categories.map((c) => ({ id: c.id, label: c.name, to: `/category/${c.slug}` }))
+      : content.nav.categories.map((c) => ({ id: c.to, label: c.label, to: c.to })),
 }));
 
 const renderAt = (path: string) =>
@@ -22,6 +35,11 @@ const renderAt = (path: string) =>
       <MobileTabBar />
     </MemoryRouter>,
   );
+
+beforeEach(() => {
+  state.status = 'ready';
+  state.categories = [{ id: 'c1', name: 'Massage', slug: 'massage', description: null, children: [] }];
+});
 
 describe('MobileTabBar', () => {
   it('is a labelled nav with Home, Categories, Wishlist, Cart, Account', () => {
@@ -43,9 +61,8 @@ describe('MobileTabBar', () => {
   it('opens the category sheet from the Categories button', () => {
     renderAt('/');
     const button = screen.getByRole('button', { name: 'Categories' });
-    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(button.getAttribute('aria-haspopup')).toBe('dialog');
     fireEvent.click(button);
-    expect(button.getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByRole('link', { name: 'All Massage' }).getAttribute('href')).toBe('/category/massage');
   });
 
@@ -59,7 +76,23 @@ describe('MobileTabBar', () => {
     const closeButton = document.querySelector('md-icon-button[aria-label="Close navigation"]');
     if (!closeButton) throw new Error('Close navigation button not found');
     fireEvent.click(closeButton);
-    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(document.querySelector('md-dialog')).toBeNull();
     expect(document.activeElement).toBe(button);
+  });
+
+  it('shows the flat fallback list when categories are still loading', () => {
+    state.status = 'loading';
+    state.categories = [];
+    renderAt('/');
+    fireEvent.click(screen.getByRole('button', { name: 'Categories' }));
+    expect(screen.getByRole('link', { name: 'Massage' }).getAttribute('href')).toBe('/category/massage');
+  });
+
+  it('shows the flat fallback list when the categories fetch errors', () => {
+    state.status = 'error';
+    state.categories = [];
+    renderAt('/');
+    fireEvent.click(screen.getByRole('button', { name: 'Categories' }));
+    expect(screen.getByRole('link', { name: 'Massage' }).getAttribute('href')).toBe('/category/massage');
   });
 });
