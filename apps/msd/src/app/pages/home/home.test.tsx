@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import type { CatalogCategoryWithChildren, CatalogDeal, CatalogProduct, CatalogTherapist } from '../../../api/catalog';
 import content from '../../../content.json';
@@ -13,6 +13,7 @@ const m = vi.hoisted(() => ({
   categories: [] as unknown[],
   location: { status: 'ready', coords: null as null | { latitude: number; longitude: number } },
   auth: { isAuthenticated: false, token: null as string | null },
+  toggle: vi.fn(),
 }));
 
 vi.mock('../../../api/catalog', async (importOriginal) => ({
@@ -28,7 +29,7 @@ vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
 }));
 vi.mock('../../../location/location-context', () => ({ useVisitorLocation: () => m.location }));
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({ useAuth: () => m.auth }));
-vi.mock('../../../wishlist/wishlist-context', () => ({ useWishlist: () => ({ toggle: vi.fn(), has: () => false }) }));
+vi.mock('../../../wishlist/wishlist-context', () => ({ useWishlist: () => ({ toggle: m.toggle, has: () => false }) }));
 vi.mock('../../seo/site-url', () => ({
   SITE_URL: 'https://example.test',
   absoluteUrl: (p: string) => new URL(p, 'https://example.test/').toString(),
@@ -92,12 +93,18 @@ const PRODUCT = {
   vendor: null,
 } as unknown as CatalogProduct;
 
+function LocationProbe() {
+  const { pathname, search } = useLocation();
+  return <p data-testid="location">{pathname + search}</p>;
+}
+
 function HomeRoutes() {
   return (
     <MemoryRouter>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/sign-in" element={<p>Sign-in page</p>} />
+        <Route path="/explore" element={<LocationProbe />} />
       </Routes>
     </MemoryRouter>
   );
@@ -124,7 +131,7 @@ beforeEach(() => {
   ];
   m.deals.mockResolvedValue({
     data: [
-      deal({ id: 'd1', title: 'Full Body Massage', category: MASSAGE }),
+      deal({ id: 'd1', title: 'Full Body Massage', category: MASSAGE, images: ['https://cdn.test/d1.jpg'] }),
       deal({ id: 'd2', title: 'Foot Massage', category: MASSAGE }),
       deal({ id: 'd3', title: 'Weekend Spa', category: SPA }),
     ],
@@ -264,6 +271,65 @@ describe('Home', () => {
     expect(hero.getAttribute('sizes')).toBe('(min-width: 840px) 52vw, 100vw');
   });
 
+  it('hero search navigates to /explore with the trimmed query, or to /explore when empty', async () => {
+    const field = () => document.querySelector('.home-hero sky-action-field') as Element;
+    const { unmount } = renderHome();
+    fireEvent(field(), new CustomEvent('sky-submit', { detail: { value: 'hot stone' } }));
+    expect((await screen.findByTestId('location')).textContent).toBe('/explore?q=hot%20stone');
+    unmount();
+
+    renderHome();
+    fireEvent(field(), new CustomEvent('sky-submit', { detail: { value: '' } }));
+    expect((await screen.findByTestId('location')).textContent).toBe('/explore');
+  });
+
+  it('links the welcome offer CTA to /explore', () => {
+    renderHome();
+    const cta = document.querySelector('.home-offer--welcome md-filled-button') as Element & { href?: string };
+    expect(cta.getAttribute('href') ?? cta.href).toBe('/explore');
+  });
+
+  it('toggles the wishlist when a signed-in visitor favourites a deal', async () => {
+    m.auth = { isAuthenticated: true, token: 't' };
+    renderHome();
+    await waitFor(() => {
+      const card = dealsSection()?.querySelector('sky-product-card');
+      if (card) fireEvent(card, new CustomEvent('favorite'));
+      expect(m.toggle).toHaveBeenCalledWith('d1');
+    });
+  });
+
+  it('links popular treatments to an /explore search', () => {
+    renderHome();
+    const [group] = content.home.searchByDestination.columns.flat();
+    const link = screen.getByRole('link', { name: group.items[0] });
+    expect(link.getAttribute('href')).toBe(`/explore?q=${encodeURIComponent(group.items[0])}`);
+  });
+
+  it('renders no tabs or tabpanel when the deals share no category', async () => {
+    m.deals.mockResolvedValue({ data: [deal({ id: 'x1' }), deal({ id: 'x2' })] });
+    renderHome();
+    await waitFor(() => expect(dealsSection().querySelectorAll('sky-product-card')).toHaveLength(2));
+    expect(dealsSection().querySelector('md-secondary-tab')).toBeNull();
+    expect(within(dealsSection()).queryByRole('tabpanel')).toBeNull();
+  });
+
+  it('falls back to the All tab when the active category disappears after a refetch', async () => {
+    const { rerender } = renderHome();
+    await waitFor(() => expect(dealsSection().querySelectorAll('md-secondary-tab')).toHaveLength(3));
+    fireEvent.click(dealsSection().querySelectorAll('md-secondary-tab')[2]);
+    await waitFor(() => expect(dealsSection().querySelectorAll('sky-product-card')).toHaveLength(1));
+
+    m.deals.mockResolvedValue({
+      data: [deal({ id: 'd1', title: 'Full Body Massage', category: MASSAGE }), deal({ id: 'd2', title: 'Foot Massage', category: MASSAGE })],
+    });
+    m.location = { status: 'ready', coords: { latitude: 1, longitude: 2 } };
+    rerender(<HomeRoutes />);
+    await waitFor(() => expect(dealsSection().querySelectorAll('md-secondary-tab')).toHaveLength(2));
+    expect(within(dealsSection()).getByRole('tabpanel').getAttribute('aria-labelledby')).toBe('deals-tab-all');
+    expect(dealsSection().querySelectorAll('sky-product-card')).toHaveLength(2);
+  });
+
   it('lists the three "How it works" steps', async () => {
     renderHome();
     const heading = await screen.findByRole('heading', { level: 2, name: content.home.howItWorks.heading });
@@ -284,6 +350,8 @@ describe('Home', () => {
     const list = blocks.find((b) => b['@type'] === 'ItemList');
     expect(list.itemListElement).toHaveLength(3);
     for (const entry of list.itemListElement) expect(entry.item.url.startsWith('https://example.test/deal/')).toBe(true);
+    expect(list.itemListElement[0].item.image).toBe('https://cdn.test/d1.jpg');
+    expect(list.itemListElement[1].item.image).toBeUndefined();
     const faq = blocks.find((b) => b['@type'] === 'FAQPage');
     expect(faq.mainEntity[0].name).toBe(FAQ.question);
   });

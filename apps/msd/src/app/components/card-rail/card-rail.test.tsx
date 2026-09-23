@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { CardRail } from './card-rail';
 
 const renderRail = () =>
@@ -53,5 +53,15 @@ describe('CardRail', () => {
   it('renders no tabpanel without a panel', () => {
     renderRail();
     expect(screen.queryByRole('tabpanel')).toBeNull();
+  });
+
+  it('moves the carousel with the previous/next buttons', () => {
+    renderRail();
+    const swiper = { slidePrev: vi.fn(), slideNext: vi.fn() };
+    Object.assign(document.querySelector('swiper-container') as HTMLElement, { swiper });
+    fireEvent.click(document.querySelector('[aria-label="Previous: Deals near you"]') as Element);
+    fireEvent.click(document.querySelector('[aria-label="Next: Deals near you"]') as Element);
+    expect(swiper.slidePrev).toHaveBeenCalledTimes(1);
+    expect(swiper.slideNext).toHaveBeenCalledTimes(1);
   });
 });

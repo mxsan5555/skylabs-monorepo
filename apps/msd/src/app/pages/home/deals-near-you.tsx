@@ -43,7 +43,10 @@ export function DealsNearYou({
   );
 
   if (status === 'ready' && deals.length === 0) return null;
-  const shown = active === ALL ? deals : deals.filter((d) => d.category?.id === active);
+  // A refetch can drop the active category; fall back to All instead of an empty rail.
+  const current = tabs.some((tab) => tab.id === active) ? active : ALL;
+  const hasTabs = tabs.length > 1;
+  const shown = current === ALL ? deals : deals.filter((d) => d.category?.id === current);
 
   return (
     <section className="home-band home-band--tint" aria-labelledby="deals-heading">
@@ -54,13 +57,13 @@ export function DealsNearYou({
             heading={t.heading}
             seeAll={t.seeAll}
             seeAllTo={t.seeAllTo}
-            railKey={active}
-            panel={{ id: PANEL_ID, labelledBy: tabs.length > 1 ? tabId(active) : undefined }}
+            railKey={current}
+            panel={hasTabs ? { id: PANEL_ID, labelledBy: tabId(current) } : undefined}
             above={
-              tabs.length > 1 ? (
+              hasTabs ? (
                 <Tabs className="home-tabs" aria-label={t.tabsLabel}>
                   {tabs.map((tab) => (
-                    <DealsTab key={tab.id} id={tab.id} active={active === tab.id} onSelect={() => setActive(tab.id)}>
+                    <DealsTab key={tab.id} id={tab.id} active={current === tab.id} onSelect={() => setActive(tab.id)}>
                       {tab.label}
                     </DealsTab>
                   ))}

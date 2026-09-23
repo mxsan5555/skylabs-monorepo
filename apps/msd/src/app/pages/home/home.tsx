@@ -6,7 +6,7 @@ import { useCatalogShell } from '../../../catalog/catalog-shell';
 import { useVisitorLocation } from '../../../location/location-context';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { formatINR } from '../../../utils/format';
-import { primaryImage, resolveTherapistMedia } from '../../../utils/media';
+import { primaryImage, resolveDealMedia, resolveTherapistMedia } from '../../../utils/media';
 import { CardRail } from '../../components/card-rail/card-rail';
 import { DealCard } from '../../components/deal-card';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
@@ -43,12 +43,18 @@ export function Home() {
   const jsonLd = useMemo(() => {
     const blocks: JsonLdObject[] = [];
     if (SITE_URL && catalog.deals.length > 0) {
+      // The list covers the first HOME_RAIL_SIZE deals (what the Deals near you rail leads with).
       blocks.push(
         itemListJsonLd(
           SITE_URL,
           catalog.deals
             .slice(0, HOME_RAIL_SIZE)
-            .map((d) => ({ name: d.title, path: `/deal/${d.id}`, price: Number(d.salePrice) })),
+            .map((d) => ({
+              name: d.title,
+              path: `/deal/${d.id}`,
+              price: Number(d.salePrice),
+              image: primaryImage(resolveDealMedia(d)) || undefined,
+            })),
         ),
       );
     }

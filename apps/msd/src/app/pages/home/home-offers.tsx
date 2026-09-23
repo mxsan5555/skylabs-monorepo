@@ -1,4 +1,4 @@
-import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
+import { createElement } from 'react';
 import content from '../../../content.json';
 
 const { home } = content;
@@ -15,7 +15,8 @@ export function HomeOffers({ isAuthenticated }: { isAuthenticated: boolean }) {
             <h2 id="offers-heading" className="home-offer__title">{home.welcomeOffer.title}</h2>
             <p className="home-offer__subtitle">{home.welcomeOffer.subtitle}</p>
             <p className="home-offer__text">{home.welcomeOffer.description}</p>
-            <FilledButton href="/explore">{home.welcomeOffer.cta}</FilledButton>
+            {/* Raw tag so `href` is set outside the browser build too (the @lit/react wrapper drops it). */}
+            {createElement('md-filled-button', { href: '/explore' }, home.welcomeOffer.cta)}
           </div>
         </article>
 

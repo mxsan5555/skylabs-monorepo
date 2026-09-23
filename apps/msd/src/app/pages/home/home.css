@@ -21,8 +21,10 @@
 .home-band--flush {
   padding-block: 16px 32px;
 }
-/* Tile links draw their ring on the tile (below), so skip them here to avoid a double ring. */
-.home :is(a):not(.home-cats__link):focus-visible {
+/* Focus rings for the page's own links. SectionHead links style theirs in section-head.css;
+   tile links draw theirs on the tile (below). */
+.home-spotlight:focus-visible,
+.home-directory__links a:focus-visible {
   outline: 3px solid var(--md-sys-color-primary);
   outline-offset: 2px;
 }
