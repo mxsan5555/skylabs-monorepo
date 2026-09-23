@@ -37,11 +37,12 @@ Scope: `apps/msd` (plus one additive `apps/msd-api` field). First of a page-by-p
 
 | Unit | Path | Responsibility | Depends on |
 |---|---|---|---|
-| `LocationProvider`, `useLocation()` | `apps/msd/src/location/` | Resolve and share `{ status, city, coords, source, setCity, requestBrowser }` once per visit. Replaces `hooks/useCurrentLocation.ts`. | `/api/geo`, `CatalogShellProvider` (cities with coordinates), `localStorage` key `msd.location` |
+| `LocationProvider`, `useVisitorLocation()` | `apps/msd/src/location/` | Resolve and share `{ status, city, state, coords, source, setCity, requestBrowser }` once per visit. Replaces `hooks/useCurrentLocation.ts`. Named `useVisitorLocation()` (not `useLocation()`) so it never clashes with React Router's `useLocation()`. | `/api/geo`, `CatalogShellProvider` (cities with coordinates), `localStorage` key `msd.location` |
 | `geo` function | `apps/msd/api/geo.ts` | Vercel function returning `{ city, region, latitude, longitude }` from `x-vercel-ip-city`, `x-vercel-ip-country-region`, `x-vercel-ip-latitude`, `x-vercel-ip-longitude`; `null` when headers are absent. | Vercel runtime |
-| `CatalogShellProvider`, `useCatalogShell()` | `apps/msd/src/catalog/` | Fetch categories and locations once; share with header, tab bar sheet, footer, and home. Seeds from prerendered data. | `api/catalog.ts` |
+| `CatalogShellProvider`, `useCatalogShell()`, `categoryHref()` | `apps/msd/src/catalog/` | Fetch categories and locations once; share with header, tab bar sheet, footer, and home. Seeds from prerendered data. `categoryHref(slug, subSlug?)` builds every category URL (`/category/<slug>`, `?sub=<subSlug>` for a subcategory). | `api/catalog.ts` |
 | `SiteHeader` | `apps/msd/src/app/components/site-header/` | Desktop two-row header, phone header, mega panel, city chip dialog. | providers, shared-ui |
 | `MobileTabBar` | `apps/msd/src/app/components/mobile-tab-bar/` | Phone bottom navigation and the category sheet. | providers, shared-ui |
+| `CartCountProvider`, `useCartCount()` | `apps/msd/src/hooks/use-cart-count.ts` | One shared cart count for the header and tab bar badges (one fetch, not one per badge). | `api/cart.ts`, auth |
 | `SiteFooter` | `apps/msd/src/app/components/site-footer/` | Trust strip, newsletter band, columns, popular searches, legal bar, theme switch. | providers, shared-ui |
 | `Seo`, `jsonld.ts` | `apps/msd/src/app/seo/` | Title, description, canonical, Open Graph/Twitter, JSON-LD builders. | `VITE_SITE_URL`, `content.json` |
 | Prerender | `apps/msd/prerender/` | Render public routes to HTML, embed page data, write `sitemap.xml`, `robots.txt`, `llms.txt`. | `entry-server.tsx`, `PRERENDER_API_URL` |
@@ -49,15 +50,16 @@ Scope: `apps/msd` (plus one additive `apps/msd-api` field). First of a page-by-p
 | Home page | `apps/msd/src/app/pages/home/` | Section 7. Exports `prerenderData()`. | providers, `Seo`, shared-ui |
 | `/catalog/locations` | `apps/msd-api` | Add average `latitude`/`longitude` per city (additive, no migration). | `Branch.latitude/longitude` |
 
-Removed: `header-v2.tsx`, `header-v2.css`, `header.tsx`, `header.css`, `footer.tsx`, `footer.css`, `hooks/useCurrentLocation.ts` (after all callers move to `useLocation()`), hardcoded `NAV_MENUS`, the Google Maps geocode call.
+Removed: `header-v2.tsx`, `header-v2.css`, `header.tsx`, `header.css`, `footer.tsx`, `footer.css`, `hooks/useCurrentLocation.ts` (after all callers move to `useVisitorLocation()`), hardcoded `NAV_MENUS`, the Google Maps geocode call.
 
 ## 5. Shell
 
 ### 5.1 Header, desktop (>= 840px)
 
-- Row 1 (64px): logo link (one `<img>` with `width`/`height`), `sky-action-field` search (`role="search"`, `type="search"`, submits to `/explore?q=`), city chip, wishlist and cart icon buttons with `sky-badge` counts (accessible names like "Cart, 2 items"), account (Sign in button, or M3 menu when signed in: Profile, Orders for customers, Sign out). "Become a Member" is a text link.
-- Row 2 (44px): top categories as plain `<a>` links from `useCatalogShell()`, then "All categories" disclosure button (`aria-expanded`, `aria-controls`) opening a mega panel of every category and subcategory as plain links. Esc closes and returns focus to the button. Not an ARIA menu.
-- Sticky; row 2 hides on scroll down and returns on scroll up, using motion tokens (zero under reduced motion).
+- Row 1 (64px), in this order: logo link (one `<img>` with `width`/`height`), city chip, `sky-action-field` search (`role="search"`, `type="search"`, submits to `/explore?q=`), then actions: wishlist and cart icon buttons with `sky-badge` counts (accessible names like "Cart, 2 items"), account (Sign in button, or M3 menu when signed in: Profile, Orders for customers, Sign out). "Become a Member" is a text link.
+- Row 2 (`--site-header-strip-size`, 56px): top categories as plain `<a>` links from `useCatalogShell()`, then "All categories" disclosure button (`aria-expanded`, `aria-controls`) opening a mega panel of every category and subcategory as plain links built with `categoryHref()` (while categories load or fail, the panel lists the `nav.categories` fallback links). Esc closes and returns focus to the button. Not an ARIA menu.
+- Sticky; row 2 hides on scroll down and returns on scroll up by a transform (no layout shift), using motion tokens (zero under reduced motion).
+- Category links open the category page; `?sub=<subSlug>` selects that subcategory tab, and switching tabs rewrites `?sub=` (removed for "All").
 - Skip link targets `<main id="main-content" tabindex="-1">` in `PublicLayout`.
 
 ### 5.2 Phone (< 840px)
@@ -89,7 +91,7 @@ Removed: `header-v2.tsx`, `header-v2.css`, `header.tsx`, `header.css`, `footer.t
 3. `GET /api/geo` → `source: 'ip'`.
 4. Otherwise `status: 'none'`.
 
-Browser coordinates map to a city name by nearest city centre from `/catalog/locations` (Haversine). No third-party geocoding.
+Browser and IP coordinates map to a city name by nearest city centre from `/catalog/locations` (Haversine), capped at 75 km: farther than that, the visitor keeps coordinates for distance sorting but gets no city. An IP result without coordinates keeps its city name only when it exactly (case-insensitive) matches a catalog city, using the catalog's spelling and state. No third-party geocoding.
 
 ### 6.2 Consumers
 
