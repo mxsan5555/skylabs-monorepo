@@ -200,7 +200,9 @@ export function Category() {
     cityLocation?.state,
   ]);
 
-  if (categoryLoading) {
+  // Hold the page (and its canonical) until the city resolves, so a city URL never briefly
+  // announces itself as the plain category page.
+  if (categoryLoading || cityPending) {
     return <p className="loading-state"> {content.category.loading}</p>;
   }
   if (categoryError || !category || cityMissing) {

@@ -172,17 +172,18 @@ describe('Category page /:city', () => {
     expect(listCatalogDealsMock).not.toHaveBeenCalled();
   });
 
-  it('waits for cities before fetching city deals', async () => {
+  it('waits for cities before fetching city deals, showing the loading state without Seo', async () => {
     // Categories are ready; only the locations fetch is outstanding.
     shellState.value = { ...shellState.value, locationsStatus: 'loading', locations: [] };
-    getCatalogCategoryMock.mockResolvedValue({ data: CATEGORY });
-    listCatalogDealsMock.mockResolvedValue({ data: [] });
     renderAt('/category/massage/pune');
-    await screen.findByRole('heading', { level: 1, name: 'Massage' });
-    // Let the deals effect run before asserting it stayed idle.
+    await waitFor(() => expect(getCatalogCategoryMock).toHaveBeenCalled());
+    // Let the category resolve and the deals effect run before asserting.
     await act(async () => {
       await Promise.resolve();
     });
+    expect(await screen.findByText(content.category.loading)).toBeTruthy();
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+    expect(canonical()).toBeUndefined();
     expect(listCatalogDealsMock).not.toHaveBeenCalled();
   });
 
