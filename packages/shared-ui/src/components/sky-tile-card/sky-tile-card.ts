@@ -36,6 +36,10 @@ import {
  * containing block) and loses the `md-ripple`/`md-focus-ring` state layer that `href` gets.
  * Prefer `href` when crawlability of the link itself isn't a requirement.
  *
+ * With `href` and a slotted headline, the stretched link's `aria-labelledby` points at the
+ * `<slot>`; Chromium resolves the slot's assigned nodes for the accessible name, other engines
+ * vary. So when you use `href`, prefer the `headline` prop over the slot.
+ *
  * @example
  * <sky-tile-card icon="healing" headline="Therapy" text="12 deals" href="/category/therapy"
  *   variant="outlined"></sky-tile-card>
