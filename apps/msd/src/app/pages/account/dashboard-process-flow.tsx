@@ -9,7 +9,7 @@ interface DashboardMarketplaceOverviewProps {
 
 interface MarketplaceMetric {
   label: string;
-  stat: keyof DashboardStats;
+  value: string;
   icon: string;
 }
 
@@ -18,53 +18,48 @@ export function DashboardProcessFlow({
   loading,
   error,
 }: DashboardMarketplaceOverviewProps) {
-  const dashboardMetrics: MarketplaceMetric[] = [
+  const marketplaceMetrics: MarketplaceMetric[] = [
     {
-      label: 'Categories',
-      stat: 'categories',
+      label: 'Total Categories',
+      value: stats
+        ? stats.categories.toLocaleString('en-IN')
+        : '—',
       icon: 'category',
     },
     {
-      label: 'Sub Categories',
-      stat: 'subCategories',
+      label: 'Total Sub-Categories',
+      value: stats
+        ? stats.subCategories.toLocaleString('en-IN')
+        : '—',
       icon: 'account_tree',
     },
     {
-      label: 'Products',
-      stat: 'products',
-      icon: 'inventory_2',
-    },
-    {
-      label: 'Deals',
-      stat: 'deals',
+      label: 'Total Deals',
+      value: stats
+        ? stats.deals.toLocaleString('en-IN')
+        : '—',
       icon: 'local_offer',
     },
     {
-      label: 'Vendors',
-      stat: 'vendors',
-      icon: 'storefront',
-    },
-    {
-      label: 'Branches',
-      stat: 'branches',
+      label: 'Total Branches',
+      value: stats
+        ? stats.branches.toLocaleString('en-IN')
+        : '—',
       icon: 'location_on',
     },
     {
-      label: 'Orders',
-      stat: 'orders',
-      icon: 'shopping_bag',
-    },
-    {
-      label: 'Revenue',
-      stat: 'revenue',
+      label: 'Total Revenue',
+      value: stats
+        ? formatINR(Number(stats.revenue))
+        : '—',
       icon: 'payments',
     },
   ];
 
   return (
     <section
-      className="dashboard-stats"
-      aria-label="Marketplace statistics"
+      className="dashboard-marketplace"
+      aria-label="Marketplace overview"
     >
       {loading && (
         <p className="loading-state">
@@ -78,26 +73,23 @@ export function DashboardProcessFlow({
         </p>
       )}
 
-      {!loading &&
-        !error &&
-        dashboardMetrics.map((metric) => {
-          const rawValue = stats?.[metric.stat];
-
-          const value =
-            metric.stat === 'revenue'
-              ? formatINR(Number(rawValue ?? 0))
-              : Number(rawValue ?? 0).toLocaleString('en-IN');
-
-          return (
-            <sky-info-card
-              key={metric.stat}
-              align="center"
-              icon={metric.icon}
-              heading={metric.label}
-              subheading={value}
-            />
-          );
-        })}
+      {!loading && !error && (
+        <div className="dashboard-marketplace__metrics">
+          {marketplaceMetrics.map((metric) => (
+            <div
+              key={metric.label}
+              className="dashboard-marketplace__metric"
+            >
+              <sky-info-card
+                align="center"
+                icon={metric.icon}
+                heading={metric.value}
+                subheading={metric.label}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

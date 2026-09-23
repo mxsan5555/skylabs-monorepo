@@ -62,7 +62,7 @@
     "children": [
       {
         "id": "vendor-list",
-        "title": "All Members",
+        "title": "All Member",
         "route": "/account/vendors",
         "permissionKey": "vendors",
         "parent": "vendors",
@@ -181,17 +181,16 @@
         "permissionKey": "customers",
         "parent": "customers",
         "order": 1
+      },
+      {
+        "id": "customer-orders",
+        "title": "Order Hitory",
+        "route": "/account/orders",
+        "permissionKey": "orders",
+        "parent": "customers",
+        "order": 2
       }
     ]
-  },
-  {
-    "id": "orders",
-    "title": "Orders",
-    "icon": "receipt_long",
-    "route": "/account/orders",
-    "permissionKey": "orders",
-    "parent": null,
-    "order": 4
   },
   {
     "id": "products",
