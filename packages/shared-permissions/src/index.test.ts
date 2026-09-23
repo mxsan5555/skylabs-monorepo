@@ -175,6 +175,90 @@ describe('filterMenuByPermissions', () => {
     expect(result.map((n) => n.id)).toEqual(['dashboard', 'customers', 'administration', 'masters']);
   });
 
+  /**
+   * Mirrors the real shape of `packages/shared-menu/src/msd-menu.json`'s Vendor-isolation nodes
+   * (Vendor/Business/Customers/Orders/Products) — regression coverage for the "vendor gets
+   * near-Superadmin sidebar" bug: a `vendor` role must see only the "Business" group, never
+   * "Vendor" (admin vendor list), the full "Customers" directory, or the top-level "Orders"/
+   * "Products" oversight nodes.
+   */
+  const msdVendorIsolationMenu: MenuNode[] = [
+    {
+      id: 'vendors',
+      title: 'Vendor',
+      icon: 'storefront',
+      permissionKey: 'vendors',
+      parent: null,
+      order: 3,
+      children: [
+        { id: 'vendor-list', title: 'Vendor List', route: '/account/vendors', permissionKey: 'vendors', parent: 'vendors', order: 1 },
+      ],
+    },
+    {
+      id: 'business',
+      title: 'Business',
+      icon: 'storefront',
+      permissionKey: 'vendor-portal',
+      parent: null,
+      order: 3,
+      children: [
+        { id: 'business-profile', title: 'Business Profile', route: '/account/vendor-profile', permissionKey: 'vendor-portal', parent: 'business', order: 1 },
+        { id: 'business-branch', title: 'Branch', route: '/account/vendor-branches-deals', permissionKey: 'vendor-portal', parent: 'business', order: 2 },
+        { id: 'business-deal', title: 'Deal', route: '/account/vendor-deals', permissionKey: 'vendor-portal', parent: 'business', order: 3 },
+        { id: 'business-product', title: 'Product', route: '/account/vendor-products', permissionKey: 'vendor-portal', parent: 'business', order: 4 },
+        { id: 'business-therapist', title: 'Therapist', route: '/account/vendor-therapists', permissionKey: 'vendor-portal', parent: 'business', order: 5 },
+        { id: 'business-customer', title: 'Customer', route: '/account/vendor-customers', permissionKey: 'vendor-portal', parent: 'business', order: 6 },
+        { id: 'business-order', title: 'Order', route: '/account/vendor-orders', permissionKey: 'vendor-portal', parent: 'business', order: 7 },
+      ],
+    },
+    {
+      id: 'customers',
+      title: 'Customers',
+      icon: 'group',
+      permissionKey: 'customers',
+      parent: null,
+      order: 4,
+      children: [
+        { id: 'customer-list', title: 'Customer List', route: '/account/customers', permissionKey: 'customers', parent: 'customers', order: 1 },
+      ],
+    },
+    { id: 'orders', title: 'Orders', route: '/account/orders', permissionKey: 'orders', parent: null, order: 4 },
+    { id: 'products', title: 'Products', route: '/account/products', permissionKey: 'products', parent: null, order: 4 },
+    { id: 'rbac.users', title: 'User', route: '/account/administration/users', permissionKey: 'rbac.users', parent: null, order: 2 },
+  ];
+
+  it("a vendor's granted set (dashboard:view, vendors:custom, vendor-portal:view) sees ONLY the Business group with all 7 self-service items", () => {
+    const granted = ['dashboard:view', 'vendors:custom', 'vendor-portal:view'];
+    const result = filterMenuByPermissions(msdVendorIsolationMenu, granted);
+    expect(result.map((n) => n.id)).toEqual(['business']);
+    expect(result[0].children?.map((c) => c.id)).toEqual([
+      'business-profile',
+      'business-branch',
+      'business-deal',
+      'business-product',
+      'business-therapist',
+      'business-customer',
+      'business-order',
+    ]);
+  });
+
+  it("a vendor never sees Vendor List, the Customers directory, User Management, or the admin Orders/Products nodes", () => {
+    const granted = ['dashboard:view', 'vendors:custom', 'vendor-portal:view'];
+    const result = filterMenuByPermissions(msdVendorIsolationMenu, granted);
+    expect(result.find((n) => n.id === 'vendors')).toBeUndefined();
+    expect(result.find((n) => n.id === 'customers')).toBeUndefined();
+    expect(result.find((n) => n.id === 'orders')).toBeUndefined();
+    expect(result.find((n) => n.id === 'products')).toBeUndefined();
+    expect(result.find((n) => n.id === 'rbac.users')).toBeUndefined();
+  });
+
+  it("an admin's granted set sees Vendor/Customers/Orders/Products/User Management but never the vendor-only Business group", () => {
+    const granted = ['vendors:view', 'customers:view', 'orders:view', 'products:view', 'rbac.users:view'];
+    const result = filterMenuByPermissions(msdVendorIsolationMenu, granted);
+    expect(result.map((n) => n.id).sort()).toEqual(['customers', 'orders', 'products', 'rbac.users', 'vendors']);
+    expect(result.find((n) => n.id === 'business')).toBeUndefined();
+  });
+
   it('keeps a parent that is itself granted view even when it has no children array', () => {
     const flatMenu: MenuNode[] = [
       {

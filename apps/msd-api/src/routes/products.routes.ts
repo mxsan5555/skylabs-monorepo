@@ -9,15 +9,15 @@ import * as vendorService from '../services/vendor.service';
 import { sendData } from '../lib/http';
 
 /**
- * Cross-vendor oversight surface — but unlike Branches/Deals/Therapists' equivalent
- * (`GET /vendors/branches|deals|therapists`, gated on the admin-only `vendors:view`, which the
- * `vendor` role never holds — see seed.ts), this router is gated on plain `products:view`, which
- * the `vendor` role DOES hold (it needs that same permission key for its own self-service
- * `/vendors/me/products`). So a client-supplied `?vendorId=` here can't be trusted the way it can
- * be for an admin-only route — a Vendor caller must always be force-scoped to their own vendor,
- * exactly like `order.service.ts#listOrders`/`getOrderOrThrow` already force-scope Orders via
- * `getVendorByOwnerUserId`. Create/update/delete/media stay vendor-scoped only, split self-service
- * (`/vendors/me/products`) vs admin-on-behalf (`/vendors/:id/products`) in vendors.routes.ts.
+ * Cross-vendor oversight surface, gated on plain `products:view` — currently only admin/staff
+ * roles hold that key (the `vendor` role's own self-service reads/writes go through
+ * `/vendors/me/products*`, gated `vendors:custom` instead — see vendors.routes.ts). Still,
+ * a caller who happens to own a Vendor profile is force-scoped to it regardless of any
+ * `?vendorId=` supplied, exactly like `order.service.ts#listOrders`/`getOrderOrThrow` force-scope
+ * Orders via `getVendorByOwnerUserId` — belt-and-suspenders in case `products:view` is ever
+ * granted more broadly later. Create/update/delete/media stay vendor-scoped only, split
+ * self-service (`/vendors/me/products`, `vendors:custom`) vs admin-on-behalf
+ * (`/vendors/:id/products`, `vendors:*`) in vendors.routes.ts.
  */
 const router = Router();
 router.use(authenticate);

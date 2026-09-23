@@ -69,7 +69,7 @@ export function VendorManagement() {
     return <SelfVendorManagement token={token} />;
   }
 
-  return <p className="empty-state">You do not have access to Vendor Management.</p>;
+  return <p className="empty-state">You do not have access to Member Management.</p>;
 }
 
 interface VendorTableParams {
@@ -337,11 +337,11 @@ useEffect(() => {
 
   return (
     <div className="admin-page admin-page--wide">
-      <title>Vendor Management · MSD</title>
+      <title>Member Management · MSD</title>
       <header className="page-head">
         <div>
-          <h1>Vendor Management</h1>
-          <p>Onboard vendors, review KYC, and manage their branches and deals.</p>
+          <h1>Member Management</h1>
+          <p>Onboard members, review KYC, and manage their branches and deals.</p>
         </div>
         <div className="page-head__actions">
           {canCreate && (
@@ -354,7 +354,7 @@ useEffect(() => {
       </header>
 
       <section className="panel" aria-label="Vendors">
-        <h2>Vendors ({total})</h2>
+        <h2>Member ({total})</h2>
         {listError && <p className="error-state" role="alert">{listError}</p>}
         <VendorList
           vendors={vendors}
@@ -473,7 +473,7 @@ useEffect(() => {
         </section>
       )}
 
-      {!selectedVendor && <p className="empty-state">Select a vendor, or add a new one.</p>}
+      {!selectedVendor && <p className="empty-state">Select a member, or add a new one.</p>}
     </div>
   );
 }

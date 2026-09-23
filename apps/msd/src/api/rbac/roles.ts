@@ -25,6 +25,10 @@ export interface PermissionCatalogAction {
 }
 
 export interface PermissionCatalogRow {
+  /** The menu node's own unique id — distinct from `menuKey`, which two nodes may deliberately
+   *  share (e.g. CMS "Pages"/"Articles" both grant `cms.blog`). Always use `id` as a React list
+   *  key, never `menuKey`, or two same-`menuKey` rows collide. */
+  id: string;
   menuKey: string;
   title: string;
   actions: PermissionCatalogAction[];

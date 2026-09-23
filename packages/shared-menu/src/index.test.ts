@@ -57,3 +57,57 @@ describe('findMenuNodeByRoute', () => {
     expect(findMenuNodeByRoute(meraMenu, '/customers')).toBeUndefined();
   });
 });
+
+describe('msd menu permissionKey independence (regression for the Role Permission Matrix bug)', () => {
+  // A shared `permissionKey` across distinct menu nodes means they resolve to the SAME
+  // `Permission.id` (Permission.key === `${menuKey}:${action}`), so checking one node's box in
+  // the Role Permission Matrix silently checks every node sharing that key too. The admin
+  // "Vendor" group and the vendor's own "Business" group both used to collapse their five/seven
+  // children onto one shared key ("vendors" / "vendor-portal") — this pins each child to its own
+  // distinct key so that regression can't silently come back.
+  const msdMenu = getMenuForApp('msd');
+
+  it('gives each child of the admin "Vendor" group its own distinct permissionKey', () => {
+    const vendors = msdMenu.find((n) => n.id === 'vendors');
+    const keys = vendors?.children?.map((c) => c.permissionKey) ?? [];
+    expect(keys).toEqual(['vendors', 'vendors.branches', 'vendors.deals', 'vendors.products', 'vendors.therapists']);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('gives each child of the vendor-portal "Business" group its own distinct permissionKey', () => {
+    const business = msdMenu.find((n) => n.id === 'business');
+    const keys = business?.children?.map((c) => c.permissionKey) ?? [];
+    expect(keys).toEqual([
+      'vendor-portal.profile',
+      'vendor-portal.branches',
+      'vendor-portal.deals',
+      'vendor-portal.products',
+      'vendor-portal.therapists',
+      'vendor-portal.customers',
+      'vendor-portal.orders',
+    ]);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  // General regression guard, not just the two groups above — a decorative parent group header
+  // (e.g. "Admin", "Manage", "Vendor", "Business", "Customers", "Static", "Analytics",
+  // "Settings") must never reuse a real child's permissionKey, or the group's own Role
+  // Permission Matrix row becomes the same checkbox as that child's row. The one documented
+  // exception: `cms-blog-pages`/`cms-blog-articles` deliberately share `cms.blog` (two views of
+  // the same underlying blog content, an intentional pre-existing design — see msd-menu.json).
+  it('every node in the msd menu has a unique permissionKey, except the documented cms.blog Pages/Articles pairing', () => {
+    function flatten(nodes: readonly import('@skylabs-monorepo/shared-types').MenuNode[], out: { id: string; permissionKey: string }[] = []) {
+      for (const n of nodes) {
+        out.push({ id: n.id, permissionKey: n.permissionKey });
+        if (n.children) flatten(n.children, out);
+      }
+      return out;
+    }
+    const byKey = new Map<string, string[]>();
+    for (const { id, permissionKey } of flatten(msdMenu)) {
+      byKey.set(permissionKey, [...(byKey.get(permissionKey) ?? []), id]);
+    }
+    const duplicates = [...byKey.entries()].filter(([, ids]) => ids.length > 1);
+    expect(duplicates).toEqual([['cms.blog', ['cms-blog-pages', 'cms-blog-articles']]]);
+  });
+});
