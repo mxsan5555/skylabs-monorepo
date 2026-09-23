@@ -28,4 +28,39 @@ describe('useMediaQuery', () => {
     act(() => listeners.forEach((l) => l()));
     expect(result.current).toBe(true);
   });
+
+  it('removes the listener on unmount', () => {
+    const removeEventListener = vi.fn();
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener,
+    }));
+    const { unmount } = renderHook(() => useMediaQuery('(min-width: 840px)'));
+    unmount();
+    expect(removeEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+  });
+
+  it('re-subscribes when the query changes', () => {
+    const queriesSeen: string[] = [];
+    const removeEventListener = vi.fn();
+    vi.stubGlobal('matchMedia', (query: string) => {
+      queriesSeen.push(query);
+      return {
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener,
+      };
+    });
+    const { rerender } = renderHook(({ query }) => useMediaQuery(query), {
+      initialProps: { query: '(min-width: 840px)' },
+    });
+    expect(queriesSeen).toContain('(min-width: 840px)');
+    removeEventListener.mockClear();
+
+    rerender({ query: '(min-width: 600px)' });
+
+    expect(queriesSeen).toContain('(min-width: 600px)');
+    expect(removeEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+  });
 });
