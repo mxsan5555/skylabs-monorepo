@@ -66,30 +66,43 @@ export function CategoryStrip() {
         </ul>
       </div>
       <div id={panelId} className="mega-panel" hidden={!open}>
-        <div className="mega-panel__grid">
-          {categories.map((cat) => (
-            <div key={cat.id} className="mega-panel__group">
-              <Link to={categoryHref(cat.slug)} className="mega-panel__heading title-small" onClick={close}>
-                {cat.name}
-              </Link>
-              {cat.children.length > 0 && (
-                <ul className="mega-panel__list">
-                  {cat.children.map((sub) => (
-                    <li key={sub.id}>
-                      <Link
-                        to={categoryHref(cat.slug, sub.slug)}
-                        className="mega-panel__link body-medium"
-                        onClick={close}
-                      >
-                        {sub.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
+        {categories.length === 0 ? (
+          // Categories still loading or failed: offer the same fallback links as the strip.
+          <ul className="mega-panel__list">
+            {links.map((link) => (
+              <li key={link.id}>
+                <Link to={link.to} className="mega-panel__link body-medium" onClick={close}>
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="mega-panel__grid">
+            {categories.map((cat) => (
+              <div key={cat.id} className="mega-panel__group">
+                <Link to={categoryHref(cat.slug)} className="mega-panel__heading title-small" onClick={close}>
+                  {cat.name}
+                </Link>
+                {cat.children.length > 0 && (
+                  <ul className="mega-panel__list">
+                    {cat.children.map((sub) => (
+                      <li key={sub.id}>
+                        <Link
+                          to={categoryHref(cat.slug, sub.slug)}
+                          className="mega-panel__link body-medium"
+                          onClick={close}
+                        >
+                          {sub.name}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </nav>
   );

@@ -5,7 +5,11 @@ import { SiteHeader } from './site-header';
 
 const { setCity, shell } = vi.hoisted(() => ({
   setCity: vi.fn(),
-  shell: { locations: [] as Array<{ state: string; city: string }> },
+  shell: {
+    locations: [] as Array<{ state: string; city: string }>,
+    categories: [] as Array<{ id: string; name: string; slug: string; description: null; children: Array<{ id: string; name: string; slug: string; description: null }> }>,
+    links: [] as Array<{ id: string; label: string; to: string }>,
+  },
 }));
 
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
@@ -18,17 +22,9 @@ vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
   useCatalogShell: () => ({
     status: 'ready',
     locations: shell.locations,
-    categories: [
-      {
-        id: 'c1',
-        name: 'Massage',
-        slug: 'massage',
-        description: null,
-        children: [{ id: 's1', name: 'Swedish', slug: 'swedish', description: null }],
-      },
-    ],
+    categories: shell.categories,
   }),
-  useCategoryLinks: () => [{ id: 'c1', label: 'Massage', to: '/category/massage' }],
+  useCategoryLinks: () => shell.links,
 }));
 vi.mock('../../../location/location-context', () => ({
   useVisitorLocation: () => ({
@@ -61,6 +57,16 @@ const openPanel = () => {
 
 beforeEach(() => {
   shell.locations = [{ state: 'Maharashtra', city: 'Pune' }];
+  shell.categories = [
+    {
+      id: 'c1',
+      name: 'Massage',
+      slug: 'massage',
+      description: null,
+      children: [{ id: 's1', name: 'Swedish', slug: 'swedish', description: null }],
+    },
+  ];
+  shell.links = [{ id: 'c1', label: 'Massage', to: '/category/massage' }];
   setCity.mockClear();
 });
 
@@ -92,6 +98,21 @@ describe('SiteHeader', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(button.getAttribute('aria-expanded')).toBe('false');
     expect(document.activeElement).toBe(button);
+  });
+
+  it('lists the fallback category links in the mega panel while categories are unavailable', () => {
+    shell.categories = [];
+    shell.links = [
+      { id: '/category/massage', label: 'Massage', to: '/category/massage' },
+      { id: '/category/spa', label: 'Spa', to: '/category/spa' },
+    ];
+    renderHeader();
+    const { panel } = openPanel();
+    const links = within(panel).getAllByRole('link');
+    expect(links.map((l) => [l.textContent, l.getAttribute('href')])).toEqual([
+      ['Massage', '/category/massage'],
+      ['Spa', '/category/spa'],
+    ]);
   });
 
   it('closes the mega panel when focus leaves the nav, without moving focus', () => {
