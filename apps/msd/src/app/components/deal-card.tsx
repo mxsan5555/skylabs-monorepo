@@ -8,8 +8,7 @@ import '@skylabs-monorepo/shared-ui';
 
 /**
  * What `DealCard` actually needs to render — a relaxed superset of the mock `Deal` type (still
- * satisfied by it structurally, so existing mock-data callers like `home-deal-card.tsx` keep
- * compiling unchanged) that also accepts a real `CatalogDeal` adapted to this shape. Real deals
+ * satisfied by it structurally) that also accepts a real `CatalogDeal` adapted to this shape. Real deals
  * have no rating/reviews/distance/location/badge fields (none exist on the real `Deal` model),
  * so those stay optional here and are simply omitted rather than fabricated when absent.
  */
