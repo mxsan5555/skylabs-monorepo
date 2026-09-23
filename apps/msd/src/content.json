@@ -30,7 +30,10 @@
       "wishlist": "Wishlist",
       "signOut": "Sign Out"
     },
-    "drawerLabel": "Navigation drawer"
+    "drawerLabel": "Navigation drawer",
+    "searchLabel": "Search spas, massages and treatments",
+    "searchPlaceholder": "Search spas, massages, treatments",
+    "searchAction": "Search"
   },
   "nav": {
     "drawerCategoryHeader": "Browse Categories",
@@ -214,10 +217,15 @@
   },
   "home": {
     "hero": {
-      "heading": "Your wellness, your way sddfsafd asfd asf asf asfsfa",
-      "subheading": "Book top-rated spas, massage studios, and beauty centres near you — exclusive deals, instant confirmation.",
-      "searchPlaceholder": "Search spas, treatments, locations…",
-      "ctaLabel": "Explore All Deals"
+      "heading": "Spa, massage and beauty deals near you",
+      "subheading": "Book verified spas and therapists in your city. Pay less and get instant confirmation.",
+      "searchPlaceholder": "Search spas, treatments, locations",
+      "ctaLabel": "Search",
+      "image": "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=1400&q=80",
+      "imageAlt": "Therapist giving a relaxing back massage in a calm spa room",
+      "spotlightLabel": "Top deal right now",
+      "spotlightCta": "View deal",
+      "searchLabel": "Search spas, treatments and locations"
     },
     "spaFinderHero": {
       "title": " Nearby Wellness",
@@ -331,7 +339,7 @@
         "seeAllTo": "/explore?sort=featured"
       },
       "browseByCategory": {
-        "heading": "Browse by Category",
+        "heading": "Shop by category",
         "seeAll": "See all",
         "seeAllTo": "/explore"
       },
@@ -341,14 +349,14 @@
         "seeAllTo": "/products"
       },
       "therapists": {
-        "heading": "Our Therapists",
-        "seeAll": "View All",
+        "heading": "Book a therapist",
+        "seeAll": "See all",
         "seeAllTo": "/therapists"
       },
       "hotRightNow": {
-        "heading": "Hot Right Now",
+        "heading": "Biggest savings",
         "seeAll": "See more deals",
-        "seeAllTo": "/explore?sort=hot",
+        "seeAllTo": "/explore?sort=discount",
         "tabs": [
           {
             "label": "All Deals",
@@ -405,7 +413,7 @@
     "giftCard": {
       "chip": "Gift Cards",
       "heading": "Give the Gift of Wellness",
-      "body": "Treat someone special with a relaxing spa experience. Gift Cards are accepted at 200+ premium partner spas across India.",
+      "body": "Gift a spa day. Redeemable at 200+ partner spas across India.",
       "cta": "Buy Gift Card",
       "image": "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&w=900&q=80",
       "features": [
@@ -424,12 +432,12 @@
       ]
     },
     "welcomeOffer": {
-      "badge": "✨ New Member Offer",
+      "badge": "New member offer",
       "title": "Flat 40% OFF",
       "subtitle": "On Your First Spa Booking",
-      "description": "Experience premium wellness with exclusive introductory pricing. Relax, Refresh & Rejuvenate at India's finest spas.",
-      "cta": "Book Now",
-      "image": "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=1200&q=80",
+      "description": "Get introductory pricing at partner spas across India on your first booking.",
+      "cta": "Browse deals",
+      "image": "https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&w=1400&q=80",
       "offerCard": {
         "discount": "40% OFF",
         "label": "First Booking Only"
@@ -478,13 +486,14 @@
     },
     "memberBanner": {
       "icon": "payments",
-      "heading": "Want access to exclusive spa deals & member pricing?",
+      "heading": "Unlock member-only pricing",
       "button": "Sign In",
-      "buttonLink": "/sign-in"
+      "buttonLink": "/sign-in",
+      "body": "Sign in to save deals, track bookings and see exclusive rates."
     },
     "searchByDestination": {
-      "heading": "Search Spa Deals by Category",
-      "subheading": "Find massage, beauty, wellness and spa offers near you.",
+      "heading": "Popular treatments",
+      "subheading": "Jump straight to the treatment you want.",
       "columns": [
         [
           {
@@ -568,8 +577,8 @@
       ]
     },
     "faq": {
-      "heading": "Frequently Asked Questions",
-      "subheading": "Find answers to the most common questions about bookings, payments, cancellations, and gift cards."
+      "heading": "Questions, answered",
+      "subheading": "Bookings, payments, cancellations and gift cards."
     },
     "trustSection": {
       "cards": [
@@ -631,6 +640,13 @@
         "addToCartSuccess": "Added \"{item}\" to your cart.",
         "addToCartError": "Could not add to cart."
       }
+    },
+    "partnerBanner": {
+      "icon": "storefront",
+      "heading": "Own a spa or salon?",
+      "body": "List your services and reach customers near you.",
+      "cta": "Partner with us",
+      "href": "/become-vendor"
     }
   },
   "search": {

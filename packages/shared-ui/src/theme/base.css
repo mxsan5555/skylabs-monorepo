@@ -1,33 +1,146 @@
 /**
- * Shared base styles for Material 3 web components.
+ * Shared design tokens + page baseline for every app.
  *
- * Color tokens (--md-sys-color-*) are intentionally NOT defined here — each app
- * loads its own brand theme CSS. This file only sets cross-app defaults:
- * the icon font, fonts, the M3 type scale family, and a page baseline that
- * uses the active theme's surface/on-surface tokens.
+ * Token sources (one owner per token family):
+ *   --md-sys-color-*       each app's Material Theme Builder export
+ *                          (apps/<app>/src/assets/theme/css/{light,dark}[-mc|-hc].css),
+ *                          switched by applyTheme(). NOT defined here, so msd stays
+ *                          green and mera-driver stays blue.
+ *   --md-sys-shape-*       this file (M3 corner scale)
+ *   --md-sys-typescale-*   this file (M3 type scale; Material Web reads these too)
+ *   --md-sys-state-*       this file (M3 state-layer opacities)
+ *   --md-sys-motion-*      this file (M3 durations/easing; zeroed for reduced motion)
+ *   --sky-elevation-*      this file (M3 elevation levels built from --md-sys-color-shadow)
+ *   --sky-color-on-scrim   this file (text on an image scrim; the scrim is black in every theme)
+ *
+ * Custom properties inherit through shadow roots, so every <sky-*> component reads
+ * these without its own fallbacks.
  */
 
-/* Self-hosted Material Symbols Outlined — the M3 icon set used by <md-icon>.
-   Installed locally (no runtime CDN request); the font file is bundled by
-   each app's build. */
+/* Self-hosted Material Symbols Outlined, the M3 icon set used by <md-icon>. */
 @import 'material-symbols/outlined.css';
 
 :root {
-  /* M3 reference fonts. Apps load the actual Roboto webfont via <link>. */
+  /* Type */
   --md-ref-typeface-brand: 'Roboto', system-ui, sans-serif;
   --md-ref-typeface-plain: 'Roboto', system-ui, sans-serif;
 
-  --md-sys-typescale-body-medium-font: 'Roboto', system-ui, sans-serif;
-  --md-sys-typescale-label-large-font: 'Roboto', system-ui, sans-serif;
+  --md-sys-typescale-headline-large-font: var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-large-size: 2rem;
+  --md-sys-typescale-headline-large-line-height: 2.5rem;
+  --md-sys-typescale-headline-large-weight: 400;
+
+  --md-sys-typescale-headline-medium-font: var(--md-ref-typeface-brand);
+  --md-sys-typescale-headline-medium-size: 1.75rem;
+  --md-sys-typescale-headline-medium-line-height: 2.25rem;
+  --md-sys-typescale-headline-medium-weight: 400;
+
+  --md-sys-typescale-title-large-font: var(--md-ref-typeface-brand);
+  --md-sys-typescale-title-large-size: 1.375rem;
+  --md-sys-typescale-title-large-line-height: 1.75rem;
+  --md-sys-typescale-title-large-weight: 500;
+  --md-sys-typescale-title-large-tracking: 0;
+
+  --md-sys-typescale-title-medium-font: var(--md-ref-typeface-plain);
+  --md-sys-typescale-title-medium-size: 1rem;
+  --md-sys-typescale-title-medium-line-height: 1.5rem;
+  --md-sys-typescale-title-medium-weight: 500;
+  --md-sys-typescale-title-medium-tracking: 0.009375rem;
+
+  --md-sys-typescale-title-small-font: var(--md-ref-typeface-plain);
+  --md-sys-typescale-title-small-size: 0.875rem;
+  --md-sys-typescale-title-small-line-height: 1.25rem;
+  --md-sys-typescale-title-small-weight: 500;
+  --md-sys-typescale-title-small-tracking: 0.00625rem;
+
+  --md-sys-typescale-body-large-font: var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-large-size: 1rem;
+  --md-sys-typescale-body-large-line-height: 1.5rem;
+  --md-sys-typescale-body-large-weight: 400;
+  --md-sys-typescale-body-large-tracking: 0.03125rem;
+
+  --md-sys-typescale-body-medium-font: var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-medium-size: 0.875rem;
+  --md-sys-typescale-body-medium-line-height: 1.25rem;
+  --md-sys-typescale-body-medium-weight: 400;
+  --md-sys-typescale-body-medium-tracking: 0.015625rem;
+
+  --md-sys-typescale-body-small-font: var(--md-ref-typeface-plain);
+  --md-sys-typescale-body-small-size: 0.75rem;
+  --md-sys-typescale-body-small-line-height: 1rem;
+  --md-sys-typescale-body-small-weight: 400;
+  --md-sys-typescale-body-small-tracking: 0.025rem;
+
+  --md-sys-typescale-label-large-font: var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-large-size: 0.875rem;
+  --md-sys-typescale-label-large-line-height: 1.25rem;
+  --md-sys-typescale-label-large-weight: 500;
+  --md-sys-typescale-label-large-tracking: 0.00625rem;
+
+  --md-sys-typescale-label-medium-font: var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-medium-size: 0.75rem;
+  --md-sys-typescale-label-medium-line-height: 1rem;
+  --md-sys-typescale-label-medium-weight: 500;
+  --md-sys-typescale-label-medium-tracking: 0.03125rem;
+
+  --md-sys-typescale-label-small-font: var(--md-ref-typeface-plain);
+  --md-sys-typescale-label-small-size: 0.6875rem;
+  --md-sys-typescale-label-small-line-height: 1rem;
+  --md-sys-typescale-label-small-weight: 500;
+  --md-sys-typescale-label-small-tracking: 0.03125rem;
+
+  /* Shape (M3 corner scale) */
+  --md-sys-shape-corner-none: 0px;
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-large-increased: 20px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
+
+  /* State layers */
+  --md-sys-state-hover-state-layer-opacity: 0.08;
+  --md-sys-state-focus-state-layer-opacity: 0.1;
+  --md-sys-state-pressed-state-layer-opacity: 0.1;
+  --md-sys-state-disabled-opacity: 0.38;
+
+  /* Motion */
+  --md-sys-motion-duration-short2: 100ms;
+  --md-sys-motion-duration-short4: 200ms;
+  --md-sys-motion-duration-medium1: 250ms;
+  --md-sys-motion-duration-extra-long2: 1500ms;
+  --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+
+  /* Elevation (M3 levels 1-3; tinted by each theme's shadow color) */
+  --sky-elevation-1:
+    0 1px 2px 0 color-mix(in srgb, var(--md-sys-color-shadow) 30%, transparent),
+    0 1px 3px 1px color-mix(in srgb, var(--md-sys-color-shadow) 15%, transparent);
+  --sky-elevation-2:
+    0 1px 2px 0 color-mix(in srgb, var(--md-sys-color-shadow) 30%, transparent),
+    0 2px 6px 2px color-mix(in srgb, var(--md-sys-color-shadow) 15%, transparent);
+  --sky-elevation-3:
+    0 4px 8px 3px color-mix(in srgb, var(--md-sys-color-shadow) 15%, transparent),
+    0 1px 3px 0 color-mix(in srgb, var(--md-sys-color-shadow) 30%, transparent);
+
+  /* Text on a --md-sys-color-scrim overlay (black in all six theme variants). */
+  --sky-color-on-scrim: rgb(255 255 255);
 }
 
-/* Carousel (Swiper Element) brand color. Swiper injects
-   `:host { --swiper-theme-color: #007aff }` into its own shadow root, which beats
-   an inherited :root value — so we override it on the host element itself with
-   !important. Then pagination bullets, the scrollbar drag, and navigation arrows
-   inherit each app's brand (msd green / mera-driver blue) automatically. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --md-sys-motion-duration-short2: 0ms;
+    --md-sys-motion-duration-short4: 0ms;
+    --md-sys-motion-duration-medium1: 0ms;
+    --md-sys-motion-duration-extra-long2: 0ms;
+  }
+}
+
+/* Swiper injects `:host { --swiper-theme-color: #007aff }` into its shadow root,
+   which beats an inherited value, so override it on the host with !important. */
 swiper-container {
-  --swiper-theme-color: var(--md-sys-color-primary, #3a693c) !important;
+  --swiper-theme-color: var(--md-sys-color-primary) !important;
 }
 
 html,
@@ -37,16 +150,7 @@ body {
 }
 
 body {
-  font-family: 'Roboto', system-ui, sans-serif;
-  background-color: var(--md-sys-color-background, #fff);
-  color: var(--md-sys-color-on-background, #1a1c19);
-}
-
-/* Material Symbols baseline so <md-icon> renders ligature names. */
-.material-symbols-outlined {
-  font-variation-settings:
-    'FILL' 0,
-    'wght' 400,
-    'GRAD' 0,
-    'opsz' 24;
+  font-family: var(--md-sys-typescale-body-large-font);
+  background-color: var(--md-sys-color-background);
+  color: var(--md-sys-color-on-background);
 }

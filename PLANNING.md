@@ -105,14 +105,14 @@ The project ships with 6 project-scoped AI agents, 8 skill reference docs, and 5
 | `skylabs-ravi` | React 19 (msd) + Angular 21 (mera-driver) frontend |
 | `skylabs-neha` | UI/UX design — 60/30/10 rule, M3 tokens, accessibility specs |
 | `skylabs-dev` | QA — Vitest, Angular unit tests, Playwright e2e |
-| `skylabs-vivek` | SEO/GEO/AEO, GA4/GTM, social media copy |
+| `skylabs-udaya` | SEO/GEO/AEO, GA4/GTM, social media copy |
 | `skylabs-reena` | Content — `content.json`, blog posts, marketing copy |
 
 ### Commands
 
 | Command | Triggers |
 |---------|---------|
-| `/msd-feature` | Full pipeline: neha → abhi → ravi → dev → vivek → reena |
+| `/msd-feature` | Full pipeline: neha → abhi → ravi → dev → udaya → reena |
 | `/mera-driver-feature` | Same pipeline scoped to mera-driver |
 | `/new-endpoint` | abhi builds endpoint + dev writes integration tests |
 | `/new-shared-component` | neha spec → ravi LIT + React wrapper → dev unit test |
@@ -131,7 +131,7 @@ Full agent file map: `.claude/agents/` · Full skill file map: `.claude/skills/`
   option works.
 - Use the AI agent team (above) for all new features — never build outside the
   defined pipeline or bypass a step (e.g. shipping without skylabs-dev tests or
-  skylabs-vivek SEO on public pages).
+  skylabs-udaya SEO on public pages).
 - Branch flow `feature/* → develop → release → main`: branch new work off
   `develop` (never `main`), and **back-merge `main` into `develop` after every
   release** so `develop` never trails production. Full detail: `DEPLOYMENT.md`.

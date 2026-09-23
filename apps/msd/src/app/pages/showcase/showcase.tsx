@@ -1,5 +1,6 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './showcase.css';
+import logo from '../../../assets/logo.jpg';
 // Opt-in: registers <swiper-container> / <swiper-slide> for the carousel demos.
 import '@skylabs-monorepo/shared-ui/carousel';
 import {
@@ -330,6 +331,52 @@ const PAGINATION_FRACTION = {
 };
 
 /**
+ * Quick-jump side nav (M3 navigation-drawer style). Built from the page's own
+ * `.showcase__card[id]` sections, so a new demo section appears here automatically.
+ * The section currently in view gets `aria-current` (scroll-spy via IntersectionObserver).
+ */
+function ShowcaseNav() {
+  const [items, setItems] = useState<{ id: string; label: string }[]>([]);
+  const [active, setActive] = useState('');
+
+  useEffect(() => {
+    const sections = Array.from(document.querySelectorAll<HTMLElement>('.showcase__card[id]'));
+    setItems(sections.map((s) => ({ id: s.id, label: s.querySelector('h2')?.textContent ?? s.id })));
+    const observer = new IntersectionObserver(
+      (entries) => entries.forEach((e) => e.isIntersecting && setActive(e.target.id)),
+      { rootMargin: '-20% 0px -70% 0px' },
+    );
+    sections.forEach((s) => observer.observe(s));
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <nav className="showcase-nav" aria-label="Components">
+      <ul>
+        {items.map((item) => (
+          <li key={item.id}>
+            <a
+              className="showcase-nav__link"
+              href={`/showcase#${item.id}`}
+              aria-current={active === item.id ? 'location' : undefined}
+              onClick={(e) => {
+                // In-page jump: <base href="/"> would otherwise resolve a bare #hash against "/".
+                e.preventDefault();
+                const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                document.getElementById(item.id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
+                window.history.replaceState(null, '', `${window.location.pathname}#${item.id}`);
+              }}
+            >
+              {item.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+/**
  * Demo page for msd. Every control here is a Material 3 web component coming
  * from @skylabs-monorepo/shared-ui, themed by msd's own (green) palette. The
  * toggle calls applyTheme() to switch the <html> theme class live.
@@ -416,6 +463,8 @@ export function Showcase() {
     ));
 
   return (
+    <div className="showcase-shell">
+    <ShowcaseNav />
     <main className="showcase">
       <title>Component showcase · MSD</title>
       <header className="showcase__bar">
@@ -429,7 +478,7 @@ export function Showcase() {
         </label>
       </header>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="buttons">
         <h2>Buttons</h2>
         <div className="showcase__row">
           <FilledButton>Filled</FilledButton>
@@ -443,7 +492,7 @@ export function Showcase() {
         </div>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="chips">
         <h2>Chips</h2>
         <ChipSet>
           <AssistChip label="Assist">
@@ -456,7 +505,7 @@ export function Showcase() {
         </ChipSet>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="icon-buttons">
         <h2>Icon buttons</h2>
         <div className="showcase__row">
           <IconButton aria-label="Settings">
@@ -478,7 +527,7 @@ export function Showcase() {
         </div>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="fab-and-extended-fab">
         <h2>FAB &amp; extended FAB</h2>
         <div className="showcase__row">
           <Fab size="small" aria-label="Add">
@@ -499,7 +548,7 @@ export function Showcase() {
         </div>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="selection">
         <h2>Selection</h2>
         <div className="showcase__row">
           <label className="showcase__inline">
@@ -536,7 +585,7 @@ export function Showcase() {
         </div>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="text-fields">
         <h2>Text fields</h2>
         <div className="fields-grid">
           <FilledTextField label="Filled" value="Hello" />
@@ -568,7 +617,7 @@ export function Showcase() {
         </div>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="select">
         <h2>Select</h2>
         <div className="showcase__row">
           <FilledSelect label="Filled" value="apple">
@@ -596,7 +645,7 @@ export function Showcase() {
         </div>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="slider">
         <h2>Slider</h2>
         <p className="demo-label">Continuous</p>
         <Slider value={50} aria-label="Continuous value" />
@@ -606,7 +655,7 @@ export function Showcase() {
         <Slider range valueStart={20} valueEnd={70} aria-label="Range value" />
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="menu">
         <h2>Menu</h2>
         <span className="menu-anchor-wrap">
           <FilledButton
@@ -650,7 +699,7 @@ export function Showcase() {
         </span>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="tabs">
         <h2>Tabs</h2>
         <p className="demo-label">Primary</p>
         <Tabs>
@@ -675,7 +724,7 @@ export function Showcase() {
         </Tabs>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="progress">
         <h2>Progress</h2>
         <p className="demo-label">Linear</p>
         <div className="progress-stack">
@@ -690,7 +739,7 @@ export function Showcase() {
         </div>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="ripple">
         <h2>Ripple</h2>
         <button type="button" className="ripple-surface">
           <Ripple />
@@ -698,7 +747,7 @@ export function Showcase() {
         </button>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="dialog">
         <h2>Dialog</h2>
         <FilledButton onClick={() => dialogRef.current?.show()}>
           Open dialog
@@ -717,7 +766,7 @@ export function Showcase() {
         </Dialog>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="list">
         <h2>List</h2>
         <List>
           <ListItem>
@@ -747,7 +796,7 @@ export function Showcase() {
         </List>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="cards">
         <h2>Cards</h2>
         <div className="cards-grid">
           <sky-product-card
@@ -804,7 +853,87 @@ export function Showcase() {
         </div>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="action-field">
+        <h2>Action field</h2>
+        <p className="demo-label">Text input + action button: search, newsletter, coupon, pincode</p>
+        <div className="demo-stack">
+          <sky-action-field role="search" type="search" enterkeyhint="search" icon="search" label="Search spas and treatments" placeholder="Search spas, treatments, locations" actionLabel="Search" />
+          <sky-action-field type="email" autocomplete="email" icon="mail" variant="outlined" label="Email address" placeholder="Your email address" actionLabel="Subscribe" required />
+          <sky-action-field dense icon="sell" label="Coupon code" placeholder="Enter coupon code" actionLabel="Apply" shape="small" />
+          <sky-action-field dense icon="location_on" label="Check availability by pincode" placeholder="Pincode" actionIcon="arrow_forward" variant="outlined" />
+          <sky-action-field label="Disabled field" placeholder="Disabled" actionLabel="Send" actionIcon="send" disabled />
+        </div>
+      </section>
+
+      <section className="showcase__card" id="image">
+        <h2>Image</h2>
+        <p className="demo-label">Logo (contain, outlined, linked), photo, round, placeholder, broken source</p>
+        <div className="demo-grid demo-grid--images">
+          <sky-image src={logo} alt="My Spa Deal" label="My Spa Deal home" href="/showcase#image" fit="contain" ratio="3 / 2" variant="outlined" color="surface-high" />
+          <sky-image src="https://picsum.photos/seed/sky-spa-room/600/400" alt="Candle-lit spa treatment room" href="/showcase#image" ratio="3 / 2" shape="extra-large" />
+          <sky-image src="https://picsum.photos/seed/sky-therapist/400/400" alt="Therapist portrait" shape="full" />
+          <sky-image alt="Photo coming soon" ratio="3 / 2" />
+          <sky-image src="/broken-image.jpg" alt="Broken source falls back" ratio="3 / 2" variant="outlined" color="none" placeholderIcon="broken_image" />
+        </div>
+      </section>
+
+      <section className="showcase__card" id="tile-card">
+        <h2>Tile card</h2>
+        <p className="demo-label">Variants and colors (linked tiles show the M3 state layer)</p>
+        <div className="demo-grid">
+          <sky-tile-card icon="healing" headline="Therapy" text="12 deals" href="/showcase#tile-card" />
+          <sky-tile-card icon="self_improvement" headline="Massage" text="48 deals" variant="filled" color="surface-high" href="/showcase#tile-card" />
+          <sky-tile-card icon="hot_tub" headline="Spa & retreats" text="9 deals" variant="elevated" href="/showcase#tile-card" />
+          <sky-tile-card icon="spa" headline="Wellness" text="21 deals" variant="filled" color="primary" iconStyle="surface" href="/showcase#tile-card" />
+          <sky-tile-card icon="content_cut" headline="Hair & nails" text="17 deals" variant="filled" color="secondary" iconStyle="surface" iconShape="full" />
+          <sky-tile-card icon="face_retouching_natural" headline="Skin & beauty" text="30 deals" variant="filled" color="tertiary" iconStyle="surface" />
+        </div>
+        <p className="demo-label">Icon styles, icon shapes, shapes, alignment, no icon</p>
+        <div className="demo-grid">
+          <sky-tile-card icon="favorite" headline="Tonal icon" text="icon-style tonal" iconStyle="tonal" />
+          <sky-tile-card icon="favorite" headline="Plain icon" text="icon-style plain" iconStyle="plain" />
+          <sky-tile-card icon="favorite" headline="Round icon" text="icon-shape full" iconShape="full" />
+          <sky-tile-card icon="favorite" headline="Square corners" text="shape small" shape="small" iconShape="small" />
+          <sky-tile-card icon="favorite" headline="Centered" text="align center" align="center" />
+          <sky-tile-card headline="No icon" text="Text only, no background" color="none" />
+          <sky-tile-card icon="nightlight" headline="Inverse" text="color inverse" variant="filled" color="inverse" iconStyle="tonal" />
+        </div>
+      </section>
+
+      <section className="showcase__card" id="feature-card">
+        <h2>Feature card</h2>
+        <p className="demo-label">Container colors with a CTA</p>
+        <div className="demo-grid demo-grid--wide">
+          <sky-feature-card color="primary" icon="card_giftcard" iconStyle="surface" headline="Give the gift of wellness" text="Gift a spa day. Redeemable at 200+ partner spas across India." ctaLabel="Buy gift card" ctaHref="/showcase#feature-card" />
+          <sky-feature-card color="surface-high" icon="payments" iconStyle="surface" headline="Unlock member-only pricing" text="Sign in to save deals, track bookings and see exclusive rates." ctaLabel="Sign in" ctaHref="/showcase#feature-card" />
+          <sky-feature-card color="secondary" icon="event_available" iconStyle="surface" headline="Book in 30 seconds" text="Pick a slot, pay online and get instant confirmation." ctaLabel="Browse deals" ctaHref="/showcase#feature-card" ctaIcon="arrow_forward" />
+          <sky-feature-card color="tertiary" icon="verified" iconStyle="surface" headline="Verified partners" text="Every spa is checked for hygiene, licensing and reviews." />
+          <sky-feature-card color="inverse" icon="support_agent" iconStyle="tonal" iconShape="full" headline="Talk to a wellness expert" text="Not sure what to book? We will help you choose." ctaLabel="Chat with us" ctaHref="/showcase#feature-card" />
+        </div>
+        <p className="demo-label">No background, outlined, elevated, no icon, custom actions slot</p>
+        <div className="demo-grid demo-grid--wide">
+          <sky-feature-card color="none" variant="outlined" icon="spa" iconStyle="tonal" headline="Outlined, no fill" text="variant outlined, color none" ctaLabel="Learn more" ctaHref="/showcase#feature-card" />
+          <sky-feature-card variant="elevated" icon="spa" iconStyle="plain" headline="Elevated, plain icon" text="variant elevated, icon-style plain" />
+          <sky-feature-card shape="medium" headline="No icon" text="Headline and text only, medium shape.">
+            <div slot="actions">
+              <FilledButton>Primary</FilledButton>
+              <TextButton>Secondary</TextButton>
+            </div>
+          </sky-feature-card>
+        </div>
+      </section>
+
+      <section className="showcase__card" id="cta-banner">
+        <h2>CTA banner</h2>
+        <div className="demo-stack">
+          <sky-cta-banner color="inverse" icon="card_giftcard" iconStyle="tonal" iconShape="full" headline="Give the gift of wellness" text="Gift cards work at 200+ partner spas across India." ctaLabel="Buy gift card" ctaHref="/showcase#cta-banner" />
+          <sky-cta-banner color="primary" icon="percent" iconStyle="surface" headline="Flat 40% off your first booking" text="New members only. Applied at checkout." ctaLabel="Browse deals" ctaHref="/showcase#cta-banner" ctaIcon="arrow_forward" />
+          <sky-cta-banner color="none" variant="outlined" icon="storefront" iconStyle="tonal" headline="Own a spa?" text="List your services and reach customers near you." ctaLabel="Partner with us" ctaHref="/showcase#cta-banner" />
+          <sky-cta-banner color="tertiary" headline="No icon, tertiary container" text="Every option from the feature card works here." ctaLabel="See options" ctaHref="/showcase#feature-card" />
+        </div>
+      </section>
+
+      <section className="showcase__card" id="accordion">
         <h2>Accordion</h2>
         <sky-accordion>
           <sky-accordion-item header="Accordion 1" open>
@@ -819,7 +948,7 @@ export function Showcase() {
         </sky-accordion>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="carousel-swiper-element">
         <h2>Carousel (Swiper Element)</h2>
 
         <h3 className="demo-carousel__label">1. Default</h3>
@@ -911,7 +1040,7 @@ export function Showcase() {
         </swiper-container>
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="data-table">
         <h2>Data Table</h2>
         <p className="demo-label">
           100 records · lazy loading · search · filter · sort · PDF export ·
@@ -937,7 +1066,7 @@ export function Showcase() {
         />
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="data-table-filter-by-status-no-pdf-export">
         <h2>Data Table — Filter by Status (no PDF export)</h2>
         <p className="demo-label">
           60 bookings · search · filter by status (Active / Completed / Cancelled) · sort · view details — no PDF export button
@@ -958,7 +1087,7 @@ export function Showcase() {
         />
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="data-table-pdf-export-no-filter-dropdown">
         <h2>Data Table — PDF Export (no filter dropdown)</h2>
         <p className="demo-label">
           36 records · search · sort · exportable PDF — filter dropdown omitted entirely
@@ -977,7 +1106,7 @@ export function Showcase() {
         />
       </section>
 
-      <section className="showcase__card">
+      <section className="showcase__card" id="data-table-minimal-sort-only">
         <h2>Data Table — Minimal (sort only)</h2>
         <p className="demo-label">
           5 records · sort only — no search, no filter, no export, no row selection, no actions
@@ -992,6 +1121,7 @@ export function Showcase() {
         />
       </section>
     </main>
+    </div>
   );
 }
 

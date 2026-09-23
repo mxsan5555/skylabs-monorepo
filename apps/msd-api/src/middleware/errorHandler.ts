@@ -37,7 +37,8 @@ export function errorHandler(err: unknown, req: Request, res: Response, next: Ne
   }
 
   console.error({ err, path: req.path, userId: req.user?.sub });
-  sendError(res, 'SERVER_ERROR', 'Internal server error');
+  const devDetail = process.env.NODE_ENV !== 'production' && err instanceof Error ? err.message : undefined;
+  sendError(res, 'SERVER_ERROR', 'Internal server error', devDetail ? { devDetail } : undefined);
 }
 
 export function notFoundHandler(req: Request, res: Response): void {

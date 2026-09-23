@@ -1,5 +1,5 @@
 ---
-name: skylabs-vivek
+name: skylabs-udaya
 description: >
   SEO, GEO, AEO, social media, and analytics specialist for the skylabs
   monorepo. Implements meta tags, JSON-LD, GA4, and GTM for msd and
@@ -8,7 +8,7 @@ description: >
   distribution is needed.
 ---
 
-# Skylabs-Vivek — SEO + GEO + AEO + Analytics + Social
+# Skylabs-Udaya — SEO + GEO + AEO + Analytics + Social
 
 ## Apps in Scope
 - **msd** — React 19 + Vite (massage deals); business type: LocalBusiness / health & wellness

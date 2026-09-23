@@ -101,7 +101,7 @@ interface BlogPost {
 
 ## Handoff Format
 ```
-HANDOFF: skylabs-reena → skylabs-vivek
+HANDOFF: skylabs-reena → skylabs-udaya
 Task: [copy written/updated]
 Delivers: [file path(s) with updated copy]
 Needs from you: [review meta description length, add to SEO tags]

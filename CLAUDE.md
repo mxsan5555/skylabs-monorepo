@@ -75,6 +75,13 @@ If pages render unstyled or an import 500s in dev, it's almost always a **stale
   - `sky-category-card` — rounded image + `heading`/`subheading` (+ optional `href`).
   - `sky-info-card` — surface card with an illustration (`media` slot) or `icon` + `heading`/`subheading`.
   - React: `SkyProductCardReact`, `SkyImageCardReact`, `SkyCategoryCardReact`, `SkyInfoCardReact`. Angular: raw `<sky-*-card>` tags.
+- **M3 surface components** (`sky-image`, `sky-tile-card`, `sky-feature-card`, `sky-cta-banner`) share one option vocabulary from `components/m3-surface.ts`, every value mapped to an M3 token (no brand values in the components): `color` = `none|surface|surface-high|primary|secondary|tertiary|inverse` (container + on-container + accent roles), `variant` = `filled|outlined|elevated`, `shape` = M3 corner scale `none…extra-large|full`, `icon` + `icon-style` (`filled|tonal|surface|plain`) + `icon-shape`. Linked surfaces use `md-ripple` + `md-focus-ring` (M3 state layer).
+  - `sky-image` — framed image/logo (`fit="contain"`, `ratio`) with a placeholder icon when `src` is missing or fails; `href` makes it one link.
+  - `sky-tile-card` — icon + headline + text tile (category grids); `href` = whole-tile link.
+  - `sky-feature-card` — icon + headline + text + CTA (`cta-label`/`cta-href`/`cta-icon`, accent-tinted `md-filled-button`) or an `actions` slot; `layout="horizontal"` for a strip.
+  - `sky-cta-banner` — `sky-feature-card` preset to horizontal (stacks under 600px of its own width).
+  - All four are raw tags in both apps (typed in `apps/msd/src/types/sky-elements.d.ts`). msd's `useShadowLinkNavigation` (in `AppRoutes`) routes same-origin shadow-DOM `href` clicks through React Router, so these links don't reload the page.
+- **Action field** (`sky-action-field`): M3 text field with an attached action button, for any "type, then act" UI (site search, newsletter, coupon, pincode). Options: `icon` (leading), `action-label` → `md-filled-button` / `action-icon` alone → `md-filled-icon-button`, `variant="filled|outlined"`, `shape` (default `full`), `dense` (48dp), plus native `type`/`name`/`autocomplete`/`enterkeyhint`/`required`/`disabled`. Fires `sky-submit` `{ value }` (trimmed); in React 19 bind it with the `onsky-submit` prop. Put `role="search"` on the host for a search landmark. Used by the msd header and home hero.
 - **Accordion** (`sky-accordion` + `sky-accordion-item`): expandable card panels with a rotating `md-icon` chevron. Each header is one accessible trigger (`aria-expanded`/`aria-controls`); collapsed bodies are `hidden`. `sky-accordion single` keeps only one item open. React: `SkyAccordionReact`/`SkyAccordionItemReact`; Angular: raw `<sky-accordion>`/`<sky-accordion-item>`.
   - All cards are **fluid** (fill their container — wrap them in a responsive grid/flex), support **`align="left|center|right"`**, and are **semantic + accessible by default**: `figure`/`figcaption` (image & category), `article` + `h3`/`p`, `<img alt>`, `href` renders one labelled stretched link, and `aria` on the rating and favorite button.
 - Icons: self-hosted Material Symbols Outlined (the `material-symbols` package, imported in `theme/base.css`). Use `<md-icon>name</md-icon>` and `aria-hidden="true"` when decorative.
@@ -247,7 +254,7 @@ This project ships with a set of project-scoped agents, skills, and commands und
 | `skylabs-ravi` | Any React 19 or Angular 21 UI task — pages, components, routing, guards |
 | `skylabs-neha` | Design spec before building any new screen or component (60/30/10, M3 tokens, accessibility) |
 | `skylabs-dev` | Test cases (before coding), Vitest unit tests, Angular unit tests, Playwright e2e |
-| `skylabs-vivek` | SEO meta + JSON-LD + GA4 events before any public page ships; social media copy |
+| `skylabs-udaya` | SEO meta + JSON-LD + GA4 events before any public page ships; social media copy |
 | `skylabs-reena` | Any copywriting, `content.json` updates, blog articles, marketing text |
 
 ### Commands (invoke as slash commands)
