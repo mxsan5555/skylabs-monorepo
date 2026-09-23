@@ -66,6 +66,7 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] msd: 10 public pages render their own `<main>` inside PublicLayout's `<main>` (about, become-vendor, blog, blog-detail, careers, checkout, contact, how-it-works, showcase, website-page): change page roots to div/article
 - [ ] msd: tell the user when 'Use my current location' fails or is >75 km from any partner city
 - [ ] msd: header/tab bar tests for search submit, signed-in account menu, useAccountLinks role branches
+- [ ] msd: pages without their own `<title>`/`Seo` (dashboard-process-flow.tsx, profile-form.tsx, account/profile.tsx, my-account/my-account-layout.tsx, my-account/profile.tsx) show no title since index.html no longer carries a static one; add Seo per page spec
 
 ### Account & admin — both apps (remaining)
 - [ ] Logout from inside the console (currently in the public header)
