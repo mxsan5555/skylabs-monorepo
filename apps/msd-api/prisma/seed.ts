@@ -42,7 +42,17 @@ const ROLES: RoleSeed[] = [
   { key: 'sales', name: 'Sales', description: 'Vendor accounts and reporting.', isSystem: true, isSuperAdmin: false },
 ];
 
-/** Per-menuKey action subset. Every node gets 'view' at minimum (added below); this map adds the rest. */
+/**
+ * Per-menuKey EXTRA actions, beyond the universal View/Create/Edit/Delete baseline every
+ * menuKey now gets automatically (see `actionsForMenuKey`) — the Role Permission Matrix always
+ * renders all 4 baseline columns for every row, never a "—" for one of those 4, even for a
+ * navigation-only group header or a read-only screen with no real create/edit/delete endpoint.
+ * Granting one of these baseline actions where the backend has no matching route is inert (no
+ * `requirePermission` call ever checks it) — the checkbox exists for UI/RBAC-editing
+ * completeness only, per the "menu grants a checkbox, ownership/route-existence grants access"
+ * split documented in `requirePermission.ts`. This map is now only for genuinely EXTRA actions
+ * (export/approve/reject/status_change/custom/assign/etc.) that a real route actually checks.
+ */
 const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   // 'status_change' is deliberately its OWN action here, distinct from `rbac.users:status_change`
   // (the Users Management screen's own status control) — a role can hold one without the other,
@@ -51,7 +61,23 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   customers: ['create', 'edit', 'delete', 'export', 'status_change'],
   // 'custom' gates the vendor's own `/vendors/me*` self-service surface — granted only to the
   // `vendor` role (never `view`, which would leak the admin "list every vendor" endpoint).
+  // Scoped to the Vendor entity itself (profile/KYC/approve/reject/status/delete) — Branch/Deal/
+  // Product/Therapist sub-resources moved to their own `vendors.*` keys below so each admin
+  // sidebar item (and its Role Permission Matrix row) is independently grantable, matching
+  // `vendors.routes.ts`'s per-resource `requirePermission` calls.
   vendors: ['create', 'edit', 'delete', 'export', 'approve', 'reject', 'status_change', 'custom'],
+  // Admin-on-behalf Branch CRUD — no delete endpoint exists (Branch is only ever soft-disabled
+  // via `status_change`, see Branch's own schema doc comment), so no `delete` action is seeded;
+  // the Role Permission Matrix shows a disabled dash for that cell, same as any other
+  // not-yet-grantable action (see permission-matrix.tsx's own doc comment).
+  'vendors.branches': ['create', 'edit', 'status_change'],
+  // Admin-on-behalf Deal CRUD, including the admin-only approve/reject moderation actions.
+  'vendors.deals': ['create', 'edit', 'delete', 'status_change', 'approve', 'reject'],
+  // Admin-on-behalf Therapist CRUD — no delete-via-status distinction beyond status_change/delete
+  // both existing as real endpoints.
+  'vendors.therapists': ['create', 'edit', 'delete', 'status_change'],
+  // Admin-on-behalf Product CRUD (status changes go through the same `edit` action as the route).
+  'vendors.products': ['create', 'edit', 'delete'],
   orders: ['create', 'edit', 'delete', 'export', 'status_change'],
   products: ['create', 'edit', 'delete', 'export'],
   services: ['create', 'edit', 'delete', 'export'],
@@ -82,6 +108,20 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   'cms.how-it-works': ['create', 'edit', 'delete'],
   'cms.careers': ['create', 'edit', 'delete'],
   'cms.social-media': ['create', 'edit', 'delete'],
+  // The vendor's own self-service "Business" surface — one key per sidebar node (see
+  // msd-menu.json's `business` group) so each is independently grantable, mirroring the
+  // `vendors.*` split above. Action sets mirror what `vendors.routes.ts`'s `/me/*` routes
+  // actually support: Business Profile is edit-only (singleton, no create/delete concept, same
+  // convention as `settings`); Branch/Therapist have no self-service delete endpoint (soft-
+  // disable via status_change only); Deal's self-service surface has no delete endpoint either
+  // (only the admin-on-behalf path does); Product has full CRUD; Customer/Order are read-only.
+  'vendor-portal.profile': ['edit'],
+  'vendor-portal.branches': ['create', 'edit', 'status_change'],
+  'vendor-portal.deals': ['create', 'edit', 'status_change'],
+  'vendor-portal.products': ['create', 'edit', 'delete'],
+  'vendor-portal.therapists': ['create', 'edit', 'status_change'],
+  'vendor-portal.customers': [],
+  'vendor-portal.orders': [],
 };
 
 function flattenMenu(nodes: readonly MenuNode[]): MenuNode[] {
@@ -93,9 +133,13 @@ function flattenMenu(nodes: readonly MenuNode[]): MenuNode[] {
   return out;
 }
 
+/** The 4 actions the Role Permission Matrix UI always renders a column for — every menuKey gets
+ *  a real Permission row for all 4, regardless of whether any route actually checks them. */
+const BASELINE_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete'];
+
 function actionsForMenuKey(menuKey: string): PermissionAction[] {
   const extra = EXTRA_ACTIONS_BY_MENU_KEY[menuKey] ?? [];
-  return ['view' as PermissionAction, ...extra.filter((a) => a !== 'view')];
+  return [...new Set([...BASELINE_ACTIONS, ...extra])];
 }
 
 async function seedRoles() {
@@ -154,7 +198,7 @@ async function grantAllPermissionsToSuperAdmins(
   permissionIdByKey: Map<string, string>,
 ) {
   const allPermissionIds = [...permissionIdByKey.entries()]
-    .filter(([key]) => !key.startsWith('vendor-portal:'))
+    .filter(([key]) => !key.startsWith('vendor-portal.'))
     .map(([, id]) => id);
   for (const role of roles.values()) {
     if (!role.isSuperAdmin) continue;
@@ -248,12 +292,23 @@ async function grantStarterPermissions(
   // only checks the boolean grant, not who's asking): 'vendors:custom' is the one gate every
   // vendor self-service route (`/vendors/me/*`, including its own Order/Product access via the
   // `orders`/`vendors` OR-checks in orders.routes.ts and vendors.routes.ts) already runs on, and
-  // 'vendor-portal:view' is the separate, narrower menu key that only surfaces the "Business"
-  // sidebar group — never granted to admin/customer/etc., so it can't leak the admin Vendor List/
-  // Customers/Products/Orders nav or their endpoints to a vendor owner. Uses `resetGrant` (not
-  // `grant`) so a re-seed always converges back to exactly this set, even if an older seed
-  // revision or a hand-edit via the Role Permission Matrix UI had granted this role more.
-  await resetGrant('vendor', ['dashboard:view', 'vendors:custom', 'vendor-portal:view']);
+  // the `vendor-portal.*` keys below are the separate, narrower per-node menu keys that only
+  // surface the "Business" sidebar group's own children — never granted to admin/customer/etc.,
+  // so they can't leak the admin Vendor List/Customers/Products/Orders nav or their endpoints to
+  // a vendor owner. Uses `resetGrant` (not `grant`) so a re-seed always converges back to exactly
+  // this set, even if an older seed revision or a hand-edit via the Role Permission Matrix UI had
+  // granted this role more.
+  await resetGrant('vendor', [
+    'dashboard:view',
+    'vendors:custom',
+    'vendor-portal.profile:view', 'vendor-portal.profile:edit',
+    'vendor-portal.branches:view', 'vendor-portal.branches:create', 'vendor-portal.branches:edit', 'vendor-portal.branches:status_change',
+    'vendor-portal.deals:view', 'vendor-portal.deals:create', 'vendor-portal.deals:edit', 'vendor-portal.deals:status_change',
+    'vendor-portal.products:view', 'vendor-portal.products:create', 'vendor-portal.products:edit', 'vendor-portal.products:delete',
+    'vendor-portal.therapists:view', 'vendor-portal.therapists:create', 'vendor-portal.therapists:edit', 'vendor-portal.therapists:status_change',
+    'vendor-portal.customers:view',
+    'vendor-portal.orders:view',
+  ]);
 }
 
 async function seedDashboardWidgets(roles: Map<string, { id: string; isSuperAdmin: boolean }>) {

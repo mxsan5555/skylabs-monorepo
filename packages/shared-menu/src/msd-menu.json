@@ -20,7 +20,7 @@
         "id": "admin-manage",
         "title": "Manage",
         "icon": "manage_accounts",
-        "permissionKey": "administration",
+        "permissionKey": "administration.manage",
         "parent": "admin",
         "order": 1,
         "children": [
@@ -54,15 +54,15 @@
   },
   {
     "id": "vendors",
-    "title": "Vendor",
+    "title": "Members",
     "icon": "storefront",
-    "permissionKey": "vendors",
+    "permissionKey": "vendors.group",
     "parent": null,
     "order": 3,
     "children": [
       {
         "id": "vendor-list",
-        "title": "Vendor List",
+        "title": "All Members",
         "route": "/account/vendors",
         "permissionKey": "vendors",
         "parent": "vendors",
@@ -72,7 +72,7 @@
         "id": "vendor-branches",
         "title": "Branch",
         "route": "/account/branches",
-        "permissionKey": "vendors",
+        "permissionKey": "vendors.branches",
         "parent": "vendors",
         "order": 2
       },
@@ -80,7 +80,7 @@
         "id": "vendor-deals",
         "title": "Deal",
         "route": "/account/deals",
-        "permissionKey": "vendors",
+        "permissionKey": "vendors.deals",
         "parent": "vendors",
         "order": 3
       },
@@ -88,7 +88,7 @@
         "id": "vendor-products",
         "title": "Product",
         "route": "/account/products",
-        "permissionKey": "vendors",
+        "permissionKey": "vendors.products",
         "parent": "vendors",
         "order": 4
       },
@@ -96,7 +96,7 @@
         "id": "vendor-therapists",
         "title": "Therapist",
         "route": "/account/therapists",
-        "permissionKey": "vendors",
+        "permissionKey": "vendors.therapists",
         "parent": "vendors",
         "order": 5
       }
@@ -108,7 +108,7 @@
         "title": "Business Profile",
          "icon": "storefront",
         "route": "/account/vendor-profile",
-        "permissionKey": "vendor-portal",
+        "permissionKey": "vendor-portal.profile",
         "parent": "business",
         "order": 1
       },
@@ -117,7 +117,7 @@
         "title": "Branch",
          "icon": "storefront",
         "route": "/account/vendor-branches-deals",
-        "permissionKey": "vendor-portal",
+        "permissionKey": "vendor-portal.branches",
         "parent": "business",
         "order": 2
       },
@@ -126,7 +126,7 @@
         "title": "Deal",
          "icon": "storefront",
         "route": "/account/vendor-deals",
-        "permissionKey": "vendor-portal",
+        "permissionKey": "vendor-portal.deals",
         "parent": "business",
         "order": 3
       },
@@ -135,7 +135,7 @@
         "title": "Product",
          "icon": "storefront",
         "route": "/account/vendor-products",
-        "permissionKey": "vendor-portal",
+        "permissionKey": "vendor-portal.products",
         "parent": "business",
         "order": 4
       },
@@ -144,7 +144,7 @@
         "title": "Therapist",
          "icon": "storefront",
         "route": "/account/vendor-therapists",
-        "permissionKey": "vendor-portal",
+        "permissionKey": "vendor-portal.therapists",
         "parent": "business",
         "order": 5
       },
@@ -153,7 +153,7 @@
         "title": "Customer",
          "icon": "storefront",
         "route": "/account/vendor-customers",
-        "permissionKey": "vendor-portal",
+        "permissionKey": "vendor-portal.customers",
         "parent": "business",
         "order": 6
       },
@@ -162,16 +162,15 @@
         "title": "Order",
          "icon": "shopping_cart",
         "route": "/account/vendor-orders",
-        "permissionKey": "vendor-portal",
+        "permissionKey": "vendor-portal.orders",
         "parent": "business",
         "order": 7
       },
-
   {
     "id": "customers",
     "title": "Customers",
     "icon": "group",
-    "permissionKey": "customers",
+    "permissionKey": "customers.group",
     "parent": null,
     "order": 4,
     "children": [
@@ -215,7 +214,7 @@
         "id": "cms-blog",
         "title": "Blog",
         "icon": "info",
-        "permissionKey": "cms.blog",
+        "permissionKey": "cms.blog.group",
         "parent": "cms",
         "order": 1,
         "children": [
@@ -249,7 +248,7 @@
         "id": "cms-static-pages",
         "title": "Static",
         "icon": "web",
-        "permissionKey": "cms",
+        "permissionKey": "cms.static",
         "parent": "cms",
         "order": 2,
         "children": [
@@ -318,7 +317,7 @@
     "id": "analytics",
     "title": "Analytics",
     "icon": "analytics",
-    "permissionKey": "reports",
+    "permissionKey": "reports.group",
     "parent": null,
     "order": 7,
     "children": [
@@ -370,7 +369,7 @@
     "id": "settings",
     "title": "Settings",
     "icon": "settings",
-    "permissionKey": "settings",
+    "permissionKey": "settings.group",
     "parent": null,
     "order": 10,
     "children": [

@@ -154,7 +154,7 @@ router.get(
  * the existing `vendors:view` (the same permission the "Vendors" sidebar item already uses, so
  * no new permission key or seed grant is needed; the `vendor` role still never holds this).
  */
-router.get('/branches', requirePermission('vendors', 'view'), validateQuery(CrossVendorListQuerySchema), async (req, res, next) => {
+router.get('/branches', requirePermission('vendors.branches', 'view'), validateQuery(CrossVendorListQuerySchema), async (req, res, next) => {
   try {
     const { page, pageSize, search } = req.validatedQuery as ReturnType<typeof CrossVendorListQuerySchema.parse>;
     const { items, total } = await vendorService.listAllBranches({ page, pageSize, search });
@@ -164,7 +164,7 @@ router.get('/branches', requirePermission('vendors', 'view'), validateQuery(Cros
   }
 });
 
-router.get('/deals', requirePermission('vendors', 'view'), validateQuery(CrossVendorListQuerySchema), async (req, res, next) => {
+router.get('/deals', requirePermission('vendors.deals', 'view'), validateQuery(CrossVendorListQuerySchema), async (req, res, next) => {
   try {
     const { page, pageSize, search } = req.validatedQuery as ReturnType<typeof CrossVendorListQuerySchema.parse>;
     const { items, total } = await vendorService.listAllDeals({ page, pageSize, search });
@@ -174,7 +174,7 @@ router.get('/deals', requirePermission('vendors', 'view'), validateQuery(CrossVe
   }
 });
 
-router.get('/therapists', requirePermission('vendors', 'view'), validateQuery(CrossVendorListQuerySchema), async (req, res, next) => {
+router.get('/therapists', requirePermission('vendors.therapists', 'view'), validateQuery(CrossVendorListQuerySchema), async (req, res, next) => {
   try {
     const { page, pageSize, search } = req.validatedQuery as ReturnType<typeof CrossVendorListQuerySchema.parse>;
     const { items, total } = await vendorService.listAllTherapists({ page, pageSize, search });
@@ -1634,7 +1634,7 @@ router.patch(
   },
 );
 
-router.get('/:vendorId/branches', requirePermission('vendors', 'view'), async (req, res, next) => {
+router.get('/:vendorId/branches', requirePermission('vendors.branches', 'view'), async (req, res, next) => {
   try {
     sendData(res, await vendorService.listBranches(req.params.vendorId));
   } catch (err) {
@@ -1680,12 +1680,12 @@ router.put(
 
 /**
  * A branch's own category/subcategory access map — narrows the vendor-level grants above (see
- * BranchCategoryAccess's own schema doc comment). Same `vendors:view`/`vendors:edit` gate as
- * every other branch-scoped route in this file; no new permission key.
+ * BranchCategoryAccess's own schema doc comment). Gated on `vendors.branches`, same as every
+ * other branch-scoped route in this file.
  */
 router.get(
   '/:vendorId/branches/:branchId/category-access',
-  requirePermission('vendors', 'view'),
+  requirePermission('vendors.branches', 'view'),
   validateParams(VendorBranchIdParamSchema),
   async (req, res, next) => {
     try {
@@ -1698,7 +1698,7 @@ router.get(
 
 router.put(
   '/:vendorId/branches/:branchId/category-access',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.branches', 'edit'),
   validateParams(VendorBranchIdParamSchema),
   validateBody(BranchCategoryAccessInputSchema),
   async (req, res, next) => {
@@ -1725,12 +1725,11 @@ router.put(
  * further down (`/:vendorId/branches/:branchId/therapists`, `/:vendorId/therapists/:therapistId
  * [/status]`), right after Branch/Deal's own admin-on-behalf routes, since a non-owner admin
  * can't reach the `/me/*` self-service paths (those resolve the vendor from the caller's own
- * `ownerUserId`). Gated on the same `vendors:view` every other purely-admin vendor read in this
- * file already uses — no new permission key needed.
+ * `ownerUserId`). Gated on `vendors.therapists`, same as the cross-vendor listing above.
  */
 router.get(
   '/:vendorId/therapists',
-  requirePermission('vendors', 'view'),
+  requirePermission('vendors.therapists', 'view'),
   validateParams(VendorIdParamSchema),
   async (req, res, next) => {
     try {
@@ -1767,7 +1766,7 @@ router.get(
 
 router.post(
   '/:vendorId/branches',
-  requirePermission('vendors', 'create'),
+  requirePermission('vendors.branches', 'create'),
   validateBody(BranchCreateSchema),
   async (req, res, next) => {
     try {
@@ -1789,7 +1788,7 @@ router.post(
 
 router.patch(
   '/:vendorId/branches/:branchId',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.branches', 'edit'),
   validateBody(BranchUpdateSchema),
   async (req, res, next) => {
     try {
@@ -1811,7 +1810,7 @@ router.patch(
 
 router.patch(
   '/:vendorId/branches/:branchId/status',
-  requirePermission('vendors', 'status_change'),
+  requirePermission('vendors.branches', 'status_change'),
   validateBody(BranchStatusUpdateSchema),
   async (req, res, next) => {
     try {
@@ -1831,7 +1830,7 @@ router.patch(
   },
 );
 
-router.get('/:vendorId/branches/:branchId/deals', requirePermission('vendors', 'view'), async (req, res, next) => {
+router.get('/:vendorId/branches/:branchId/deals', requirePermission('vendors.deals', 'view'), async (req, res, next) => {
   try {
     sendData(res, await vendorService.listDeals(req.params.vendorId, req.params.branchId));
   } catch (err) {
@@ -1841,7 +1840,7 @@ router.get('/:vendorId/branches/:branchId/deals', requirePermission('vendors', '
 
 router.post(
   '/:vendorId/branches/:branchId/deals',
-  requirePermission('vendors', 'create'),
+  requirePermission('vendors.deals', 'create'),
   validateBody(DealCreateSchema),
   async (req, res, next) => {
     try {
@@ -1863,7 +1862,7 @@ router.post(
 
 router.patch(
   '/:vendorId/branches/:branchId/deals/:dealId',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.deals', 'edit'),
   validateBody(DealUpdateSchema),
   async (req, res, next) => {
     try {
@@ -1885,7 +1884,7 @@ router.patch(
 
 router.patch(
   '/:vendorId/branches/:branchId/deals/:dealId/status',
-  requirePermission('vendors', 'status_change'),
+  requirePermission('vendors.deals', 'status_change'),
   validateBody(DealStatusUpdateSchema),
   async (req, res, next) => {
     try {
@@ -1913,7 +1912,7 @@ router.patch(
 
 router.patch(
   '/:vendorId/branches/:branchId/deals/:dealId/approve',
-  requirePermission('vendors', 'approve'),
+  requirePermission('vendors.deals', 'approve'),
   async (req, res, next) => {
     try {
       const deal = await vendorService.approveDeal(req.params.vendorId, req.params.branchId, req.params.dealId);
@@ -1934,7 +1933,7 @@ router.patch(
 
 router.patch(
   '/:vendorId/branches/:branchId/deals/:dealId/reject',
-  requirePermission('vendors', 'reject'),
+  requirePermission('vendors.deals', 'reject'),
   validateBody(DealRejectSchema),
   async (req, res, next) => {
     try {
@@ -1956,7 +1955,7 @@ router.patch(
 
 router.delete(
   '/:vendorId/branches/:branchId/deals/:dealId',
-  requirePermission('vendors', 'delete'),
+  requirePermission('vendors.deals', 'delete'),
   async (req, res, next) => {
     try {
       const before = await vendorService.getDealScopedOrThrow(req.params.vendorId, req.params.branchId, req.params.dealId);
@@ -1986,7 +1985,7 @@ router.delete(
 
 router.post(
   '/:vendorId/branches/:branchId/therapists',
-  requirePermission('vendors', 'create'),
+  requirePermission('vendors.therapists', 'create'),
   validateBody(TherapistCreateSchema),
   async (req, res, next) => {
     try {
@@ -2008,7 +2007,7 @@ router.post(
 
 router.patch(
   '/:vendorId/therapists/:therapistId',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.therapists', 'edit'),
   validateBody(TherapistUpdateSchema),
   async (req, res, next) => {
     try {
@@ -2030,7 +2029,7 @@ router.patch(
 
 router.patch(
   '/:vendorId/therapists/:therapistId/status',
-  requirePermission('vendors', 'status_change'),
+  requirePermission('vendors.therapists', 'status_change'),
   validateBody(TherapistStatusUpdateSchema),
   async (req, res, next) => {
     try {
@@ -2050,7 +2049,7 @@ router.patch(
   },
 );
 
-router.delete('/:vendorId/therapists/:therapistId', requirePermission('vendors', 'delete'), async (req, res, next) => {
+router.delete('/:vendorId/therapists/:therapistId', requirePermission('vendors.therapists', 'delete'), async (req, res, next) => {
   try {
     const before = await vendorService.getTherapistScopedOrThrow(req.params.vendorId, req.params.therapistId);
     await vendorService.deleteTherapist(req.params.vendorId, req.params.therapistId);
@@ -2075,10 +2074,9 @@ router.delete('/:vendorId/therapists/:therapistId', requirePermission('vendors',
 
 router.post(
   '/:vendorId/therapists/:therapistId/images',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.therapists', 'edit'),
   imageUpload.single('file'),
   async (req, res, next) => {
-     console.log('🔥 ROUTE MATCHED');
     try {
       if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
       const image = await vendorService.addTherapistImage(req.params.vendorId, req.params.therapistId, {
@@ -2101,7 +2099,7 @@ router.post(
 
 router.delete(
   '/:vendorId/therapists/:therapistId/images/:imageId',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.therapists', 'edit'),
   async (req, res, next) => {
     try {
       await vendorService.deleteTherapistImage(req.params.vendorId, req.params.therapistId, req.params.imageId);
@@ -2121,7 +2119,7 @@ router.delete(
 
 router.patch(
   '/:vendorId/therapists/:therapistId/images/reorder',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.therapists', 'edit'),
   validateBody(MediaReorderSchema),
   async (req, res, next) => {
     try {
@@ -2135,7 +2133,7 @@ router.patch(
 
 router.patch(
   '/:vendorId/therapists/:therapistId/images/:imageId/primary',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.therapists', 'edit'),
   async (req, res, next) => {
     try {
       await vendorService.setTherapistPrimaryImage(req.params.vendorId, req.params.therapistId, req.params.imageId);
@@ -2148,7 +2146,7 @@ router.patch(
 
 router.post(
   '/:vendorId/therapists/:therapistId/video',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.therapists', 'edit'),
   videoUpload.single('file'),
   async (req, res, next) => {
     try {
@@ -2173,7 +2171,7 @@ router.post(
 
 router.delete(
   '/:vendorId/therapists/:therapistId/video',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.therapists', 'edit'),
   async (req, res, next) => {
     try {
       await vendorService.deleteTherapistVideo(req.params.vendorId, req.params.therapistId);
@@ -2193,7 +2191,7 @@ router.delete(
 
 // ─── Product (admin-on-behalf — mirrors Branch/Deal's exact admin split) ─────────────────────
 
-router.get('/:vendorId/products', requirePermission('vendors', 'view'), validateParams(VendorIdParamSchema), validateQuery(ProductListQuerySchema), async (req, res, next) => {
+router.get('/:vendorId/products', requirePermission('vendors.products', 'view'), validateParams(VendorIdParamSchema), validateQuery(ProductListQuerySchema), async (req, res, next) => {
   try {
     const { page, pageSize, search, categoryId, subcategoryId, status } = req.validatedQuery as ReturnType<typeof ProductListQuerySchema.parse>;
     const { items, total } = await productService.listProducts({ page, pageSize, search, categoryId, subcategoryId, status, vendorId: req.params.vendorId });
@@ -2205,7 +2203,7 @@ router.get('/:vendorId/products', requirePermission('vendors', 'view'), validate
 
 router.post(
   '/:vendorId/products',
-  requirePermission('vendors', 'create'),
+  requirePermission('vendors.products', 'create'),
   validateParams(VendorIdParamSchema),
   validateBody(ProductCreateSchema),
   async (req, res, next) => {
@@ -2228,7 +2226,7 @@ router.post(
 
 router.patch(
   '/:vendorId/products/:productId',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.products', 'edit'),
   validateParams(VendorProductIdParamSchema),
   validateBody(ProductUpdateSchema),
   async (req, res, next) => {
@@ -2251,7 +2249,7 @@ router.patch(
 
 router.patch(
   '/:vendorId/products/:productId/status',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.products', 'edit'),
   validateParams(VendorProductIdParamSchema),
   validateBody(ProductStatusUpdateSchema),
   async (req, res, next) => {
@@ -2274,7 +2272,7 @@ router.patch(
 
 router.delete(
   '/:vendorId/products/:productId',
-  requirePermission('vendors', 'delete'),
+  requirePermission('vendors.products', 'delete'),
   validateParams(VendorProductIdParamSchema),
   async (req, res, next) => {
     try {
@@ -2303,7 +2301,7 @@ router.delete(
 
 router.post(
   '/:vendorId/products/:productId/images',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.products', 'edit'),
   validateParams(VendorProductIdParamSchema),
   imageUpload.single('file'),
   async (req, res, next) => {
@@ -2330,7 +2328,7 @@ router.post(
 
 router.delete(
   '/:vendorId/products/:productId/images/:imageId',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.products', 'edit'),
   validateParams(VendorProductIdParamSchema),
   async (req, res, next) => {
     try {
@@ -2352,7 +2350,7 @@ router.delete(
 
 router.patch(
   '/:vendorId/products/:productId/images/reorder',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.products', 'edit'),
   validateParams(VendorProductIdParamSchema),
   validateBody(MediaReorderSchema),
   async (req, res, next) => {
@@ -2368,7 +2366,7 @@ router.patch(
 
 router.patch(
   '/:vendorId/products/:productId/images/:imageId/primary',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.products', 'edit'),
   validateParams(VendorProductIdParamSchema),
   async (req, res, next) => {
     try {
@@ -2383,7 +2381,7 @@ router.patch(
 
 router.post(
   '/:vendorId/products/:productId/video',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.products', 'edit'),
   validateParams(VendorProductIdParamSchema),
   videoUpload.single('file'),
   async (req, res, next) => {
@@ -2410,7 +2408,7 @@ router.post(
 
 router.delete(
   '/:vendorId/products/:productId/video',
-  requirePermission('vendors', 'edit'),
+  requirePermission('vendors.products', 'edit'),
   validateParams(VendorProductIdParamSchema),
   async (req, res, next) => {
     try {

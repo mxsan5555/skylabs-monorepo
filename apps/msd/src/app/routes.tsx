@@ -84,7 +84,7 @@ import { MyAccountPayments } from './pages/my-account/payments';
 
 function VendorsRouteGuard({ children }: { children: ReactNode }) {
   const { can } = useAuth();
-  if (!can('vendors', 'view') && !can('vendors', 'custom') && !can('vendor-portal', 'view')) {
+  if (!can('vendors', 'view') && !can('vendors', 'custom') && !can('vendor-portal.profile', 'view')) {
     return <Navigate to="/account/profile" replace />;
   }
   return <>{children}</>;
@@ -290,7 +290,7 @@ export function AppRoutes() {
         <Route
           path="/account/vendor-profile"
           element={
-            <RequirePermission menuKey="vendor-portal">
+            <RequirePermission menuKey="vendor-portal.profile">
               <VendorBusinessProfile />
             </RequirePermission>
           }
@@ -298,7 +298,7 @@ export function AppRoutes() {
         <Route
           path="/account/vendor-branches-deals"
           element={
-            <RequirePermission menuKey="vendor-portal">
+            <RequirePermission menuKey="vendor-portal.branches">
               <VendorBranchesDeals />
             </RequirePermission>
           }
@@ -309,7 +309,7 @@ export function AppRoutes() {
         <Route
           path="/account/vendor-deals"
           element={
-            <RequirePermission menuKey="vendor-portal">
+            <RequirePermission menuKey="vendor-portal.deals">
               <VendorDeals />
             </RequirePermission>
           }
@@ -320,7 +320,7 @@ export function AppRoutes() {
         <Route
           path="/account/vendor-customers"
           element={
-            <RequirePermission menuKey="vendor-portal">
+            <RequirePermission menuKey="vendor-portal.customers">
               <VendorCustomers />
             </RequirePermission>
           }
@@ -330,7 +330,7 @@ export function AppRoutes() {
         <Route
           path="/account/vendor-therapists"
           element={
-            <RequirePermission menuKey="vendor-portal">
+            <RequirePermission menuKey="vendor-portal.therapists">
               <VendorTherapists />
             </RequirePermission>
           }
@@ -342,7 +342,7 @@ export function AppRoutes() {
         <Route
           path="/account/vendor-products"
           element={
-            <RequirePermission menuKey="vendor-portal">
+            <RequirePermission menuKey="vendor-portal.products">
               <VendorProducts />
             </RequirePermission>
           }
@@ -356,7 +356,7 @@ export function AppRoutes() {
         <Route
           path="/account/vendor-orders"
           element={
-            <RequirePermission menuKey="vendor-portal">
+            <RequirePermission menuKey="vendor-portal.orders">
               <OrderManagement />
             </RequirePermission>
           }
@@ -364,7 +364,7 @@ export function AppRoutes() {
         <Route
           path="/account/branches"
           element={
-            <RequirePermission menuKey="vendors">
+            <RequirePermission menuKey="vendors.branches">
               <BranchList />
             </RequirePermission>
           }
@@ -372,7 +372,7 @@ export function AppRoutes() {
         <Route
           path="/account/deals"
           element={
-            <RequirePermission menuKey="vendors">
+            <RequirePermission menuKey="vendors.deals">
               <DealList />
             </RequirePermission>
           }
@@ -380,7 +380,7 @@ export function AppRoutes() {
         <Route
           path="/account/therapists"
           element={
-            <RequirePermission menuKey="vendors">
+            <RequirePermission menuKey="vendors.therapists">
               <TherapistList />
             </RequirePermission>
           }
