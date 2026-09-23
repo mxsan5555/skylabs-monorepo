@@ -71,4 +71,28 @@ describe('sky-tile-card', () => {
     const el = await create({ headline: 'Spa' });
     expect(el.shadowRoot?.querySelector('slot[name="headline"] h3')?.textContent).toBe('Spa');
   });
+
+  it('labels the stretched link via the slot itself when the headline is slotted', async () => {
+    const el = await create({ href: '/category/massage' });
+    const h3 = document.createElement('h3');
+    h3.slot = 'headline';
+    h3.textContent = 'Massage';
+    el.appendChild(h3);
+    await el.updateComplete;
+    el.shadowRoot?.querySelector('slot[name="headline"]')?.dispatchEvent(new Event('slotchange'));
+    await el.updateComplete;
+    const link = el.shadowRoot?.querySelector('a.stretch');
+    const ids = link?.getAttribute('aria-labelledby')?.split(' ') ?? [];
+    expect(ids).toContain('headline');
+    const labelEl = el.shadowRoot?.getElementById('headline') as HTMLSlotElement;
+    expect(labelEl).toBeTruthy();
+    expect(labelEl.assignedElements()[0]).toBe(h3);
+    expect(labelEl.assignedElements()[0]?.textContent).toBe('Massage');
+  });
+
+  it('omits aria-labelledby (no dangling ids) when href is set but headline/text are not', async () => {
+    const el = await create({ href: '/category/massage' });
+    const link = el.shadowRoot?.querySelector('a.stretch');
+    expect(link?.hasAttribute('aria-labelledby')).toBe(false);
+  });
 });
