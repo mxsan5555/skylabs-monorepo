@@ -107,6 +107,8 @@ export function DealCard({
               <img
                 src={img}
                 alt={deal.imageAlt}
+                loading="lazy"
+                decoding="async"
               />
             </swiper-slide>
           ))}
