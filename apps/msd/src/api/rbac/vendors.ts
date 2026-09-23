@@ -113,7 +113,7 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
   offersService: boolean;
   offersProduct: boolean;
   offersTherapy: boolean;
-  _count?: { branches: number };
+  _count?: { branches: number; deals: number; products: number;};
   /** Only present on `GET /vendors/me` — the self-service "complete your profile" checklist. */
   profileCompletion?: { percent: number; sections: { key: string; label: string; complete: boolean }[] };
   /** The existing User account this vendor is linked to — null if an admin created the

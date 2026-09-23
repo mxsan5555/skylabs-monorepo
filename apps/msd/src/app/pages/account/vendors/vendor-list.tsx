@@ -54,8 +54,10 @@ const VENDOR_COLUMNS = JSON.stringify([
   { key: 'Contact', label: 'Contact' },
   { key: 'Status', label: 'Status', type: 'status', statusMap: VENDOR_STATUS_MAP },
   { key: 'KYC Status', label: 'KYC Status', type: 'status', statusMap: KYC_STATUS_MAP },
-  { key: 'Source', label: 'Source', type: 'status', statusMap: SOURCE_STATUS_MAP },
-  { key: 'Branch Count', label: 'Branch Count' },
+  // { key: 'Source', label: 'Source', type: 'status', statusMap: SOURCE_STATUS_MAP },
+  { key: 'Branch Count', label: 'Branch' },
+  { key: 'Deal Count', label: 'Deal' },
+  { key: 'Product Count', label: 'Product' },
 ]);
 
 /** Not '__view_detail__' — the real "detail view" for a vendor is the existing right-hand
@@ -74,6 +76,8 @@ function toVendorRow(vendor: Vendor): Record<string, string | number> {
     'KYC Status': vendor.kycStatus,
     Source: vendor.createdByUserId ? 'ADMIN' : 'WEBSITE',
     'Branch Count': vendor._count?.branches ?? 0,
+    'Deal Count': vendor._count?.deals ?? 0,
+    'Product Count': vendor._count?.products ?? 0,
   };
 }
 

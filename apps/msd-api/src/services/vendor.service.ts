@@ -110,7 +110,7 @@ const VENDOR_IMAGE_ORDER_BY: Prisma.VendorImageOrderByWithRelationInput[] = [
 const VENDOR_MEDIA_INCLUDE = { mediaImages: { orderBy: VENDOR_IMAGE_ORDER_BY }, mediaVideo: true, documents: true } as const;
 
 /** Standard `include` for any Vendor read/write that should carry its linked-owner summary + branch count. */
-const OWNER_INCLUDE = { _count: { select: { branches: true } }, owner: OWNER_SUMMARY_SELECT, ...VENDOR_MEDIA_INCLUDE } as const;
+const OWNER_INCLUDE = { _count: { select: { branches: true,  deals: true, products: true, } }, owner: OWNER_SUMMARY_SELECT, ...VENDOR_MEDIA_INCLUDE } as const;
 
 function heuristicInitialStatus(input: { gstNumber?: string; panNumber?: string }): VendorStatus {
   return input.gstNumber && input.panNumber ? 'PENDING_VERIFICATION' : 'PROFILE_INCOMPLETE';
