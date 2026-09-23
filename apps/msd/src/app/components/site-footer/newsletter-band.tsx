@@ -33,6 +33,7 @@ export function NewsletterBand() {
             icon="mail"
             variant="outlined"
             label={t.newsletter.emailLabel}
+            placeholder={t.newsletter.emailLabel}
             action-label={t.newsletter.submitLabel}
             onsky-submit={(e) => {
               if (!e.detail.value) return;

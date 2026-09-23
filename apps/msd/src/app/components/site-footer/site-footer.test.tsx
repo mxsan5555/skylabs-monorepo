@@ -75,8 +75,11 @@ describe('SiteFooter', () => {
     renderFooter();
     const status = screen.getByRole('status');
     expect(status.textContent).toBe('');
-    const field = document.querySelector('sky-action-field') as HTMLElement;
+    const field = document.querySelector('sky-action-field') as HTMLElement & { placeholder: string };
     expect(field.getAttribute('type')).toBe('email');
+    // Visible hint for sighted users (WCAG 3.3.2). The element is not registered in this test, so
+    // React 19 writes an attribute; in the app (registered) it sets the `placeholder` property.
+    expect(field.getAttribute('placeholder') ?? field.placeholder).toBe('Your email address');
     fireEvent(field, new CustomEvent('sky-submit', { detail: { value: 'a@b.in' } }));
     expect(status.textContent).toBe('Thanks for your interest! Newsletter sign-up is launching soon.');
     expect(document.activeElement).toBe(status);

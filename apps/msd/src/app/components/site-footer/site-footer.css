@@ -61,6 +61,7 @@
 }
 .site-footer__brand {
   display: grid;
+  align-content: start;
   gap: 8px;
   padding-block-end: 16px;
 }
