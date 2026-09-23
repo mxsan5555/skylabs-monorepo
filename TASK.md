@@ -67,7 +67,10 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] msd: 10 public pages render their own `<main>` inside PublicLayout's `<main>` (about, become-vendor, blog, blog-detail, careers, checkout, contact, how-it-works, showcase, website-page): change page roots to div/article
 - [ ] msd: tell the user when 'Use my current location' fails or is >75 km from any partner city
 - [ ] msd: header/tab bar tests for search submit, signed-in account menu, useAccountLinks role branches
-- [ ] msd: pages without their own `<title>`/`Seo` (dashboard-process-flow.tsx, profile-form.tsx, account/profile.tsx, my-account/my-account-layout.tsx, my-account/profile.tsx) show no title since index.html no longer carries a static one; add Seo per page spec
+- [x] msd: pages without their own `<title>`/`Seo`: checked, none missing. account/profile.tsx and my-account/profile.tsx get their titles from `AdminPage`; dashboard-process-flow.tsx, profile-form.tsx and my-account/my-account-layout.tsx are components, not routes
+- [ ] msd: /help and /gifting footer links have no routes (404)
+- [ ] msd: other public pages without a meta description (cart, sign-in, otp, orders, invoice, choose-experience) should move to Seo
+- [ ] msd: footer brand block contact details (phone/email) pending from owner
 - [ ] msd: set VITE_SITE_URL in Vercel (Production + Preview) so canonical/OG/JSON-LD emit absolute URLs
 - [ ] msd: audit app-level CSS in dark theme now that the footer theme switch exposes it
 - [ ] msd: city filter for products/therapists APIs so Product/Therapy city pages and popular searches can include them
