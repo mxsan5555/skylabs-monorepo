@@ -41,6 +41,37 @@ export function breadcrumbJsonLd(siteUrl: string, items: { name: string; path: s
   };
 }
 
+/** Carousel deals as a list of INR offers. No ratings: real reviews don't exist yet. */
+export function itemListJsonLd(siteUrl: string, items: { name: string; path: string; price: number }[]): JsonLdObject {
+  return {
+    '@context': CONTEXT,
+    '@type': 'ItemList',
+    itemListElement: items.map((item, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      item: {
+        '@type': 'Offer',
+        name: item.name,
+        url: new URL(item.path, `${siteUrl}/`).toString(),
+        price: item.price,
+        priceCurrency: 'INR',
+      },
+    })),
+  };
+}
+
+export function faqPageJsonLd(faqs: { question: string; answer: string }[]): JsonLdObject {
+  return {
+    '@context': CONTEXT,
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((f) => ({
+      '@type': 'Question',
+      name: f.question,
+      acceptedAnswer: { '@type': 'Answer', text: f.answer },
+    })),
+  };
+}
+
 /** JSON for an inline <script>: escapes `<` so data can never close the script element. */
 export function serializeJsonLd(data: JsonLdObject | JsonLdObject[]): string {
   return JSON.stringify(data).replace(/</g, '\\u003c');

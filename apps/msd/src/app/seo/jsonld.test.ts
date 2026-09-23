@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { breadcrumbJsonLd, organizationJsonLd, serializeJsonLd, websiteJsonLd } from './jsonld';
+import { breadcrumbJsonLd, faqPageJsonLd, itemListJsonLd, organizationJsonLd, serializeJsonLd, websiteJsonLd } from './jsonld';
 
 describe('jsonld builders', () => {
   it('builds Organization with optional logo and sameAs', () => {
@@ -38,5 +38,28 @@ describe('jsonld builders', () => {
 
   it('serializes safely for an inline script', () => {
     expect(serializeJsonLd({ name: '</script><b>' })).not.toContain('</script>');
+  });
+});
+
+describe('home builders', () => {
+  it('builds an ItemList of INR offers with absolute URLs', () => {
+    const list = itemListJsonLd('https://x.in', [
+      { name: 'Swedish Massage', path: '/deal/d1', price: 1499 },
+      { name: 'Hair Spa', path: '/deal/d2', price: 799 },
+    ]);
+    expect(list['@type']).toBe('ItemList');
+    expect(list.itemListElement).toEqual([
+      { '@type': 'ListItem', position: 1, item: { '@type': 'Offer', name: 'Swedish Massage', url: 'https://x.in/deal/d1', price: 1499, priceCurrency: 'INR' } },
+      { '@type': 'ListItem', position: 2, item: { '@type': 'Offer', name: 'Hair Spa', url: 'https://x.in/deal/d2', price: 799, priceCurrency: 'INR' } },
+    ]);
+    expect(JSON.stringify(list)).not.toContain('aggregateRating');
+  });
+
+  it('builds a FAQPage', () => {
+    expect(faqPageJsonLd([{ question: 'Can I cancel?', answer: 'Yes, 24 hours before.' }])).toEqual({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: [{ '@type': 'Question', name: 'Can I cancel?', acceptedAnswer: { '@type': 'Answer', text: 'Yes, 24 hours before.' } }],
+    });
   });
 });
