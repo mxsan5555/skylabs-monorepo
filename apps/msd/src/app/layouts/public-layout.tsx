@@ -11,7 +11,7 @@ export function PublicLayout() {
   return (
     <div className="app-shell">
       <Header />
-      <main className="app-main">
+      <main id="main-content" className="app-main" tabIndex={-1}>
         <Outlet />
       </main>
       <Footer />
