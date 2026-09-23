@@ -24,60 +24,15 @@ import {
   type CatalogTherapist,
 } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { DealCard, type DealCardDeal } from '../../components/deal-card';
+import { DealCard } from '../../components/deal-card';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
-import { primaryImage, resolveDealMedia, resolveTherapistMedia } from '../../../utils/media';
+import { primaryImage, resolveTherapistMedia } from '../../../utils/media';
 import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
+import { toDealCardDeal, toProductCardDeal } from './home-data';
 import content from '../../../content.json';
 import './home.css';
 
 const { home } = content;
-
-/**
- * Adapts a real `CatalogDeal` into the shape `DealCard` renders. Real deals carry no
- * rating/reviews (no such fields exist on the real `Deal` model), so those stay `undefined`
- * rather than fabricated. `distance` is the real Haversine `distanceKm` computed server-side only
- * when the caller's coordinates were sent (see `useCurrentLocation`).
- */
-function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
-  const salePrice = Number(deal.salePrice);
-  const originalPrice = deal.originalPrice ? Number(deal.originalPrice) : undefined;
-  const media = resolveDealMedia(deal);
-  return {
-    id: deal.id,
-    title: deal.title,
-    image: media.images[0] ?? '',
-    imageAlt: deal.title,
-    gallery: media.images.length > 0 ? media.images : undefined,
-    video: media.video,
-    providerName: deal.vendor?.businessName ?? undefined,
-    location: deal.branch?.city ?? undefined,
-    distance: deal.distanceKm != null ? Math.round(deal.distanceKm * 10) / 10 : undefined,
-    price: salePrice,
-    originalPrice: originalPrice && originalPrice !== salePrice ? originalPrice : undefined,
-    discount: deal.discountPercent ?? undefined,
-    priceNote: deal.durationMinutes ? `${deal.durationMinutes} min` : undefined,
-    tag: deal.popularTags?.[0]?.name,
-  };
-}
-
-function toProductCardDeal(product: CatalogProduct): DealCardDeal {
-  const price = Number(product.price);
-  const originalPrice = product.originalPrice != null ? Number(product.originalPrice) : undefined;
-  return {
-    id: product.id,
-    title: product.name,
-    image: product.image ?? '',
-    imageAlt: product.imageAlt ?? product.name,
-    providerName: product.vendor?.businessName ?? undefined,
-    location: product.vendor?.city ?? undefined,
-    price,
-    originalPrice: originalPrice != null && originalPrice !== price ? originalPrice : undefined,
-    discount: product.discount ?? undefined,
-    priceNote: home.ui.labels.product,
-    tag: product.popularTags?.[0]?.name,
-  };
-}
 
 const CATEGORY_ICONS: Record<string, string> = {
   massage: 'self_improvement',
