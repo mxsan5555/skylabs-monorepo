@@ -3,9 +3,11 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { LocationProvider, useVisitorLocation } from './location-context';
 
-let mockLocations: Array<{ state: string; city: string; latitude?: number | null; longitude?: number | null }> = [
+const DEFAULT_LOCATIONS = [
   { state: 'Maharashtra', city: 'Pune', latitude: 18.52, longitude: 73.85 },
+  { state: 'Maharashtra', city: 'Nagpur', latitude: 21.15, longitude: 79.09 },
 ];
+let mockLocations: Array<{ state: string; city: string; latitude?: number | null; longitude?: number | null }> = DEFAULT_LOCATIONS;
 
 vi.mock('../catalog/catalog-shell', () => ({
   useCatalogShell: () => ({
@@ -43,7 +45,7 @@ beforeEach(() => {
   localStorage.clear();
   getCurrentPosition.mockReset();
   permissionState = 'prompt';
-  mockLocations = [{ state: 'Maharashtra', city: 'Pune', latitude: 18.52, longitude: 73.85 }];
+  mockLocations = DEFAULT_LOCATIONS;
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => null }));
   Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { getCurrentPosition } });
   Object.defineProperty(navigator, 'permissions', {
@@ -92,6 +94,29 @@ describe('LocationProvider', () => {
     await waitFor(() => expect(out()).toBe('ready|ip|Nagpur'));
     expect(getCurrentPosition).not.toHaveBeenCalled();
     expect(fetch).toHaveBeenCalledWith('/api/geo');
+  });
+
+  it('resolves IP coordinates through the catalog to the nearest city', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ city: 'Pimpri', region: 'MH', latitude: 18.62, longitude: 73.8 }) } as Response);
+    render(<LocationProvider><Probe /></LocationProvider>);
+    await waitFor(() => expect(out()).toBe('ready|ip|Pune'));
+  });
+
+  it('shows no city for IP coordinates farther than 75 km from every catalog city', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ city: 'Bengaluru', region: 'KA', latitude: 12.97, longitude: 77.59 }) } as Response);
+    render(<LocationProvider><Probe /></LocationProvider>);
+    await waitFor(() => expect(out()).toBe('ready|ip|-'));
+  });
+
+  it('keeps an IP city without coordinates only when it names a catalog city (catalog spelling)', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ city: 'pune', region: 'MH', latitude: null, longitude: null }) } as Response);
+    const { unmount } = render(<LocationProvider><Probe /></LocationProvider>);
+    await waitFor(() => expect(out()).toBe('ready|ip|Pune'));
+    unmount();
+
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ city: 'Bengaluru', region: 'KA', latitude: null, longitude: null }) } as Response);
+    render(<LocationProvider><Probe /></LocationProvider>);
+    await waitFor(() => expect(out()).toBe('ready|ip|-'));
   });
 
   it('ends in "none" when the IP lookup has nothing', async () => {

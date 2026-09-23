@@ -23,6 +23,10 @@ interface Resolved {
   city: string | null;
   state: string | null;
   coords: Coordinates | null;
+  /** Raw IP city name, used only when the IP lookup had no coordinates. It is shown only if it
+   *  exactly (case-insensitively) names a catalog city; resolved against the catalog at render
+   *  time so late-arriving locations still apply. */
+  ipCity?: string | null;
 }
 
 const STORAGE_KEY = 'msd.location';
@@ -144,7 +148,14 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       }
       const ip = await fetchIpLocation();
       if (cancelled || choiceGen.current !== myChoiceGen) return;
-      setResolved(isUsableGeoResult(ip) ? { status: 'ready', source: 'ip', city: ip.city, state: null, coords: coordsOf(ip) } : NONE);
+      if (!isUsableGeoResult(ip)) {
+        setResolved(NONE);
+        return;
+      }
+      // Coordinates resolve through the catalog via nearestCity (75 km cap) like browser ones;
+      // the raw IP city name is only a fallback when there are no coordinates.
+      const coords = coordsOf(ip);
+      setResolved({ status: 'ready', source: 'ip', city: null, state: null, coords, ipCity: coords ? null : ip.city });
     })();
     return () => {
       cancelled = true;
@@ -170,18 +181,21 @@ export function LocationProvider({ children }: { children: ReactNode }) {
         writeSaved(null);
         setResolved({ status: 'ready', source: 'browser', city: null, state: null, coords });
       } else {
-        setResolved((r) => ({ ...r, status: r.city || r.coords ? 'ready' : 'none' }));
+        setResolved((r) => ({ ...r, status: r.city || r.coords || r.ipCity ? 'ready' : 'none' }));
       }
     })();
   }, []);
 
   const value = useMemo<LocationValue>(() => {
-    const nearest = !resolved.city && resolved.coords ? nearestCity(resolved.coords, locations) : null;
-    const city = resolved.city ?? nearest?.city ?? null;
-    // An IP city carries no catalog state; take it from the catalog only when the name is unique.
-    const namesakes = city ? locations.filter((l) => l.city === city) : [];
-    const state = resolved.state ?? nearest?.state ?? (namesakes.length === 1 ? namesakes[0].state : null);
-    return { ...resolved, city, state, setCity, requestBrowser };
+    const { ipCity, ...rest } = resolved;
+    const nearest = !rest.city && rest.coords ? nearestCity(rest.coords, locations) : null;
+    // An IP city without coordinates counts only when it names a catalog city; the catalog's
+    // spelling wins, and its state is taken only when the name is unique.
+    const ipName = ipCity?.toLowerCase();
+    const namesakes = ipName ? locations.filter((l) => l.city.toLowerCase() === ipName) : [];
+    const city = rest.city ?? nearest?.city ?? namesakes[0]?.city ?? null;
+    const state = rest.state ?? nearest?.state ?? (namesakes.length === 1 ? namesakes[0].state : null);
+    return { ...rest, city, state, setCity, requestBrowser };
   }, [resolved, locations, setCity, requestBrowser]);
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;
