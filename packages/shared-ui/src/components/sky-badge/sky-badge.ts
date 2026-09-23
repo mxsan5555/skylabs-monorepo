@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit';
+import { srOnly } from '../shared-styles.js';
 
 /**
  * <sky-badge> — example custom Material 3 web component built with LIT.
@@ -8,8 +9,6 @@ import { LitElement, html, css } from 'lit';
  * (mera-driver) with no experimental-decorator coupling. It is themed by the
  * same `--md-sys-color-*` tokens as Material Web, so it inherits each app's
  * brand palette automatically.
- *
- * Use it as the pattern for the team's own M3 components.
  *
  * @example
  * <sky-badge>New</sky-badge>
@@ -40,24 +39,26 @@ export class SkyBadge extends LitElement {
   }
 
   static override styles = css`
+    ${srOnly}
     :host {
       --_bg: var(--md-sys-color-primary);
       --_fg: var(--md-sys-color-on-primary);
+      --_size: 1.5rem;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       box-sizing: border-box;
-      min-width: 1.5rem;
-      padding: 0 0.5rem;
-      height: 1.5rem;
-      border-radius: 999px;
+      min-inline-size: var(--_size);
+      block-size: var(--_size);
+      padding-inline: 0.5rem;
+      border-radius: var(--md-sys-shape-corner-full);
       background-color: var(--_bg);
       color: var(--_fg);
-      font-family: var(--md-sys-typescale-label-large-font, 'Roboto', sans-serif);
-      font-size: 0.6875rem;
+      font-family: var(--md-sys-typescale-label-small-font);
+      font-size: var(--md-sys-typescale-label-small-size);
       font-weight: 600;
       line-height: 1;
-      letter-spacing: 0.03em;
+      letter-spacing: var(--md-sys-typescale-label-small-tracking);
       user-select: none;
     }
     :host([variant='secondary']) {
@@ -73,25 +74,22 @@ export class SkyBadge extends LitElement {
       --_fg: var(--md-sys-color-on-error);
     }
     :host([size='small']) {
-      height: 1.125rem;
-      min-width: 1.125rem;
-      font-size: 0.625rem;
-      padding: 0 0.375rem;
+      --_size: 1.125rem;
+      padding-inline: 0.375rem;
     }
     :host([size='large']) {
-      height: 2rem;
-      min-width: 2rem;
-      font-size: 0.8125rem;
-      padding: 0 0.75rem;
+      --_size: 2rem;
+      padding-inline: 0.75rem;
+      font-size: var(--md-sys-typescale-label-large-size);
     }
   `;
 
   protected override render() {
-    // When a label is supplied the span surfaces it to AT; slotted text is
-    // still visible but the label gives the full context (e.g. "12 unread").
+    // aria-label is ignored on a generic <span>, so a supplied label is announced
+    // as hidden text and the visible (often numeric) content is hidden from AT.
     return this.label
-      ? html`<span aria-label=${this.label}><slot></slot></span>`
-      : html`<span><slot></slot></span>`;
+      ? html`<span class="sr-only">${this.label}</span><span aria-hidden="true"><slot></slot></span>`
+      : html`<slot></slot>`;
   }
 }
 

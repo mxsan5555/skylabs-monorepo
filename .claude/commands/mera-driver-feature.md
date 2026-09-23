@@ -30,7 +30,7 @@ Builds a new feature end-to-end in the mera-driver app (Angular 21 + Tailwind, d
    - Playwright e2e test: `e2e/mera-driver/<feature>.spec.ts`
    - Verify: happy path + empty state + error state + auth/role guard redirect
 
-5. **skylabs-vivek** — SEO (public pages only — skip for account pages)
+5. **skylabs-udaya** — SEO (public pages only — skip for account pages)
    - Route `title` field in `app.routes.ts`
    - `Meta` service for description and robots tags
    - Open Graph tags in component

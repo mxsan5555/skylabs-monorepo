@@ -12,6 +12,9 @@ vi.mock('../../../api/catalog', async () => {
     ...actual,
     listCatalogCategories: (...args: unknown[]) => listCatalogCategoriesMock(...args),
     listCatalogDeals: (...args: unknown[]) => listCatalogDealsMock(...args),
+    listCatalogProducts: () => Promise.resolve({ data: [] }),
+    listCatalogTherapists: () => Promise.resolve({ data: [] }),
+    listCatalogFaqs: () => Promise.resolve({ data: [] }),
   };
 });
 
