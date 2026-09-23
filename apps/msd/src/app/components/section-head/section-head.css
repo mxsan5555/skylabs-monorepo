@@ -1,0 +1,50 @@
+/* Section header row shared by carousels and static sections. */
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-block-end: 16px;
+}
+.section-head__text {
+  display: grid;
+  gap: 8px;
+  min-inline-size: 0;
+}
+.section-head__title {
+  margin: 0;
+  color: var(--md-sys-color-on-surface);
+}
+.section-head__sub {
+  margin: 0;
+  max-inline-size: 60ch;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.section-head__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-head__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-block-size: 48px;
+  padding-inline: 12px;
+  border-radius: var(--md-sys-shape-corner-full);
+  color: var(--md-sys-color-primary);
+  text-decoration: none;
+  --md-icon-size: 20px;
+}
+.section-head__link:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--md-sys-color-primary) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+    transparent
+  );
+}
+.section-head__link:focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}

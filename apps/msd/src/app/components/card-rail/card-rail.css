@@ -1,43 +1,4 @@
-/* Carousel section. 840px = M3 expanded window class. */
-.card-rail__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
-  margin-block-end: 16px;
-}
-.card-rail__title {
-  margin: 0;
-  color: var(--md-sys-color-on-surface);
-}
-.card-rail__actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.card-rail__link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-block-size: 48px;
-  padding-inline: 12px;
-  border-radius: var(--md-sys-shape-corner-full);
-  color: var(--md-sys-color-primary);
-  text-decoration: none;
-  --md-icon-size: 20px;
-}
-.card-rail__link:hover {
-  background-color: color-mix(
-    in srgb,
-    var(--md-sys-color-primary) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
-    transparent
-  );
-}
-.card-rail__link:focus-visible {
-  outline: 3px solid var(--md-sys-color-primary);
-  outline-offset: 2px;
-}
+/* Carousel track + nav. Header row styles live in section-head.css. 840px = M3 expanded window class. */
 .card-rail__nav {
   display: none;
 }

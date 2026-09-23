@@ -35,4 +35,23 @@ describe('CardRail', () => {
     // (unlike hyphenated ones such as `grab-cursor`, which have no matching property name).
     expect(track?.a11y === 'true' || track?.getAttribute('a11y') === 'true').toBe(true);
   });
+
+  it('wraps the track in a tabpanel when given a panel', () => {
+    render(
+      <MemoryRouter>
+        <CardRail id="rail-heading" heading="Deals" seeAll="See all" seeAllTo="/explore" panel={{ id: 'deals-panel', labelledBy: 'deals-tab-all' }}>
+          <swiper-slide>one</swiper-slide>
+        </CardRail>
+      </MemoryRouter>,
+    );
+    const panel = screen.getByRole('tabpanel');
+    expect(panel.id).toBe('deals-panel');
+    expect(panel.getAttribute('aria-labelledby')).toBe('deals-tab-all');
+    expect(panel.querySelector('swiper-container')).toBeTruthy();
+  });
+
+  it('renders no tabpanel without a panel', () => {
+    renderRail();
+    expect(screen.queryByRole('tabpanel')).toBeNull();
+  });
 });
