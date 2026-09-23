@@ -42,17 +42,45 @@ describe('jsonld builders', () => {
 });
 
 describe('home builders', () => {
-  it('builds an ItemList of INR offers with absolute URLs', () => {
+  it('builds an ItemList of Products, each with a nested INR Offer, with absolute URLs', () => {
     const list = itemListJsonLd('https://x.in', [
       { name: 'Swedish Massage', path: '/deal/d1', price: 1499 },
       { name: 'Hair Spa', path: '/deal/d2', price: 799 },
     ]);
     expect(list['@type']).toBe('ItemList');
     expect(list.itemListElement).toEqual([
-      { '@type': 'ListItem', position: 1, item: { '@type': 'Offer', name: 'Swedish Massage', url: 'https://x.in/deal/d1', price: 1499, priceCurrency: 'INR' } },
-      { '@type': 'ListItem', position: 2, item: { '@type': 'Offer', name: 'Hair Spa', url: 'https://x.in/deal/d2', price: 799, priceCurrency: 'INR' } },
+      {
+        '@type': 'ListItem',
+        position: 1,
+        item: {
+          '@type': 'Product',
+          name: 'Swedish Massage',
+          url: 'https://x.in/deal/d1',
+          offers: { '@type': 'Offer', price: 1499, priceCurrency: 'INR', url: 'https://x.in/deal/d1' },
+        },
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        item: {
+          '@type': 'Product',
+          name: 'Hair Spa',
+          url: 'https://x.in/deal/d2',
+          offers: { '@type': 'Offer', price: 799, priceCurrency: 'INR', url: 'https://x.in/deal/d2' },
+        },
+      },
     ]);
     expect(JSON.stringify(list)).not.toContain('aggregateRating');
+  });
+
+  it('includes image on the Product only when provided', () => {
+    const list = itemListJsonLd('https://x.in', [
+      { name: 'Swedish Massage', path: '/deal/d1', price: 1499, image: 'https://x.in/d1.jpg' },
+      { name: 'Hair Spa', path: '/deal/d2', price: 799 },
+    ]);
+    const items = list.itemListElement as { item: Record<string, unknown> }[];
+    expect(items[0].item.image).toBe('https://x.in/d1.jpg');
+    expect(items[1].item).not.toHaveProperty('image');
   });
 
   it('builds a FAQPage', () => {

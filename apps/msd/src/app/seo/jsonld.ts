@@ -41,22 +41,34 @@ export function breadcrumbJsonLd(siteUrl: string, items: { name: string; path: s
   };
 }
 
-/** Carousel deals as a list of INR offers. No ratings: real reviews don't exist yet. */
-export function itemListJsonLd(siteUrl: string, items: { name: string; path: string; price: number }[]): JsonLdObject {
+/** Carousel deals as a list of Products, each with a nested INR Offer. No ratings: real reviews
+ *  don't exist yet. */
+export function itemListJsonLd(
+  siteUrl: string,
+  items: { name: string; path: string; price: number; image?: string }[],
+): JsonLdObject {
   return {
     '@context': CONTEXT,
     '@type': 'ItemList',
-    itemListElement: items.map((item, i) => ({
-      '@type': 'ListItem',
-      position: i + 1,
-      item: {
-        '@type': 'Offer',
-        name: item.name,
-        url: new URL(item.path, `${siteUrl}/`).toString(),
-        price: item.price,
-        priceCurrency: 'INR',
-      },
-    })),
+    itemListElement: items.map((item, i) => {
+      const url = new URL(item.path, `${siteUrl}/`).toString();
+      return {
+        '@type': 'ListItem',
+        position: i + 1,
+        item: {
+          '@type': 'Product',
+          name: item.name,
+          url,
+          ...(item.image ? { image: item.image } : {}),
+          offers: {
+            '@type': 'Offer',
+            price: item.price,
+            priceCurrency: 'INR',
+            url,
+          },
+        },
+      };
+    }),
   };
 }
 
