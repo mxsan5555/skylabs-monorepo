@@ -2,16 +2,20 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import {
   listCatalogCategories,
   listCatalogLocations,
+  listCatalogSocialLinks,
   type CatalogCategoryWithChildren,
   type CatalogLocation,
+  type CatalogSocialMediaLink,
 } from '../api/catalog';
 import content from '../content.json';
 
 export interface CatalogShellValue {
-  /** Reflects the categories fetch only; locations fail silently to an empty array below. */
+  /** Reflects the categories fetch only; locations and social links fail silently to an empty
+   *  array below. */
   status: 'loading' | 'ready' | 'error';
   categories: CatalogCategoryWithChildren[];
   locations: CatalogLocation[];
+  socialLinks: CatalogSocialMediaLink[];
 }
 
 export interface CategoryLink {
@@ -20,24 +24,27 @@ export interface CategoryLink {
   to: string;
 }
 
-const EMPTY: CatalogShellValue = { status: 'loading', categories: [], locations: [] };
+const EMPTY: CatalogShellValue = { status: 'loading', categories: [], locations: [], socialLinks: [] };
 const CatalogShellContext = createContext<CatalogShellValue>(EMPTY);
 
-/** One fetch of categories + cities for the whole shell (header, tab bar, footer, home).
- *  The two requests settle independently so one failing never hides the other. */
+/** One fetch of categories + cities + social links for the whole shell (header, tab bar, footer,
+ *  home). The requests settle independently so one failing never hides the others. */
 export function CatalogShellProvider({ children }: { children: ReactNode }) {
   const [value, setValue] = useState<CatalogShellValue>(EMPTY);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([listCatalogCategories(), listCatalogLocations()]).then(([cats, locs]) => {
-      if (cancelled) return;
-      setValue({
-        status: cats.status === 'fulfilled' ? 'ready' : 'error',
-        categories: cats.status === 'fulfilled' ? (cats.value.data ?? []) : [],
-        locations: locs.status === 'fulfilled' ? (locs.value.data ?? []) : [],
-      });
-    });
+    Promise.allSettled([listCatalogCategories(), listCatalogLocations(), listCatalogSocialLinks()]).then(
+      ([cats, locs, social]) => {
+        if (cancelled) return;
+        setValue({
+          status: cats.status === 'fulfilled' ? 'ready' : 'error',
+          categories: cats.status === 'fulfilled' ? (cats.value.data ?? []) : [],
+          locations: locs.status === 'fulfilled' ? (locs.value.data ?? []) : [],
+          socialLinks: social.status === 'fulfilled' ? (social.value.data ?? []) : [],
+        });
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -55,6 +62,21 @@ export function useCatalogShell(): CatalogShellValue {
 export function categoryHref(categorySlug: string, subSlug?: string): string {
   const base = `/category/${encodeURIComponent(categorySlug)}`;
   return subSlug ? `${base}?sub=${encodeURIComponent(subSlug)}` : base;
+}
+
+/** URL-safe city segment: "Navi Mumbai" -> "navi-mumbai". */
+export function citySlug(city: string): string {
+  return city
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** City landing page for a category: `/category/<slug>/<city-slug>`. */
+export function cityHref(categorySlug: string, city: string): string {
+  return `${categoryHref(categorySlug)}/${citySlug(city)}`;
 }
 
 /** Top-level category links from the API, or the static `nav.categories` list when the API

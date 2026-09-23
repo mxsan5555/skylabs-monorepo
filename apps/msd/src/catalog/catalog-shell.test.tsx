@@ -1,10 +1,18 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CatalogShellProvider, categoryHref, useCatalogShell, useCategoryLinks } from './catalog-shell';
+import {
+  CatalogShellProvider,
+  categoryHref,
+  cityHref,
+  citySlug,
+  useCatalogShell,
+  useCategoryLinks,
+} from './catalog-shell';
 
-const { listCatalogCategoriesMock, listCatalogLocationsMock } = vi.hoisted(() => ({
+const { listCatalogCategoriesMock, listCatalogLocationsMock, listCatalogSocialLinksMock } = vi.hoisted(() => ({
   listCatalogCategoriesMock: vi.fn(),
   listCatalogLocationsMock: vi.fn(),
+  listCatalogSocialLinksMock: vi.fn(),
 }));
 
 vi.mock('../api/catalog', async () => {
@@ -13,6 +21,7 @@ vi.mock('../api/catalog', async () => {
     ...actual,
     listCatalogCategories: (...a: unknown[]) => listCatalogCategoriesMock(...a),
     listCatalogLocations: (...a: unknown[]) => listCatalogLocationsMock(...a),
+    listCatalogSocialLinks: (...a: unknown[]) => listCatalogSocialLinksMock(...a),
   };
 });
 
@@ -26,7 +35,10 @@ function Probe() {
   );
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  listCatalogSocialLinksMock.mockResolvedValue({ data: [] });
+});
 
 describe('CatalogShellProvider', () => {
   it('fetches categories and locations once and exposes category links', async () => {
@@ -58,5 +70,33 @@ describe('categoryHref', () => {
     expect(categoryHref('massage')).toBe('/category/massage');
     expect(categoryHref('massage', 'deep-tissue')).toBe('/category/massage?sub=deep-tissue');
     expect(categoryHref('spa & more', 'a/b')).toBe('/category/spa%20%26%20more?sub=a%2Fb');
+  });
+});
+
+describe('social links', () => {
+  it('exposes social links and tolerates their failure', async () => {
+    listCatalogCategoriesMock.mockResolvedValue({ data: [] });
+    listCatalogLocationsMock.mockResolvedValue({ data: [] });
+    listCatalogSocialLinksMock.mockResolvedValue({
+      data: [{ id: 's1', platform: 'instagram', displayName: 'Instagram', url: 'https://instagram.com/x' }],
+    });
+    function SocialProbe() {
+      const { socialLinks } = useCatalogShell();
+      return <p>{socialLinks.map((s) => s.displayName).join(',') || '-'}</p>;
+    }
+    render(<CatalogShellProvider><SocialProbe /></CatalogShellProvider>);
+    await waitFor(() => expect(screen.getByText('Instagram')).toBeTruthy());
+    expect(listCatalogSocialLinksMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('citySlug / cityHref', () => {
+  it('slugifies city names', () => {
+    expect(citySlug('Navi Mumbai')).toBe('navi-mumbai');
+    expect(citySlug('  Pune ')).toBe('pune');
+    expect(citySlug('Thiruvananthapuram (Trivandrum)')).toBe('thiruvananthapuram-trivandrum');
+  });
+  it('builds /category/<slug>/<city-slug>', () => {
+    expect(cityHref('massage', 'Navi Mumbai')).toBe('/category/massage/navi-mumbai');
   });
 });
