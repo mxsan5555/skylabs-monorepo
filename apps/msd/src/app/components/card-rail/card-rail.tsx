@@ -47,7 +47,17 @@ export function CardRail({ id, heading, seeAll, seeAllTo, railKey, above, childr
       </div>
       {above}
       <div className="card-rail__track">
-        <swiper-container key={railKey} ref={swiperRef} slides-per-view="auto" space-between={16} grab-cursor="true">
+        {/* a11y: Swiper's A11y module adds slide roles/labels and, by keeping its default
+            scrollOnFocus:true, slides a card into view when Tab moves focus onto something
+            inside it — so keyboard users never focus an off-screen slide. */}
+        <swiper-container
+          key={railKey}
+          ref={swiperRef}
+          slides-per-view="auto"
+          space-between={16}
+          grab-cursor="true"
+          a11y="true"
+        >
           {children}
         </swiper-container>
       </div>

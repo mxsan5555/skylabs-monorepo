@@ -26,4 +26,13 @@ describe('CardRail', () => {
     expect(document.querySelector('[aria-label="Previous: Deals near you"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Next: Deals near you"]')).toBeTruthy();
   });
+
+  it('enables Swiper A11y on the track so keyboard focus scrolls the slide into view', () => {
+    renderRail();
+    const track = document.querySelector('swiper-container') as (HTMLElement & { a11y?: unknown }) | null;
+    // React 19 assigns single-word custom-element props (matching a property on the element's
+    // prototype, e.g. Swiper's `a11y`) as a JS property rather than reflecting an HTML attribute
+    // (unlike hyphenated ones such as `grab-cursor`, which have no matching property name).
+    expect(track?.a11y === 'true' || track?.getAttribute('a11y') === 'true').toBe(true);
+  });
 });
