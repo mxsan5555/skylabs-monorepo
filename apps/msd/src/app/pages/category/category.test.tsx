@@ -3,13 +3,25 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { CatalogCategoryWithChildren } from '../../../api/catalog';
+import type { CatalogShellValue } from '../../../catalog/catalog-shell';
+import content from '../../../content.json';
 import { Category } from './category';
 
-const { getCatalogCategoryMock, listCatalogDealsMock, tabsStub } = vi.hoisted(() => ({
-  getCatalogCategoryMock: vi.fn(),
-  listCatalogDealsMock: vi.fn(),
-  tabsStub: { onChange: undefined as undefined | ((e: { target: { activeTabIndex: number } }) => void) },
-}));
+const { getCatalogCategoryMock, listCatalogDealsMock, tabsStub, shellState, defaultShell } = vi.hoisted(() => {
+  const defaultShell: CatalogShellValue = {
+    status: 'ready',
+    categories: [],
+    socialLinks: [],
+    locations: [{ state: 'Maharashtra', city: 'Pune' }],
+  };
+  return {
+    defaultShell,
+    shellState: { value: defaultShell },
+    getCatalogCategoryMock: vi.fn(),
+    listCatalogDealsMock: vi.fn(),
+    tabsStub: { onChange: undefined as undefined | ((e: { target: { activeTabIndex: number } }) => void) },
+  };
+});
 
 vi.mock('@skylabs-monorepo/shared-ui/react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@skylabs-monorepo/shared-ui/react')>()),
@@ -32,6 +44,10 @@ vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
 }));
 vi.mock('../../../wishlist/wishlist-context', () => ({
   useWishlist: () => ({ toggle: vi.fn(), has: () => false }),
+}));
+vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../catalog/catalog-shell')>()),
+  useCatalogShell: () => shellState.value,
 }));
 vi.mock('../../../hooks/useCurrentLocation', () => ({
   useCurrentLocation: () => ({ location: null, coords: null }),
@@ -58,6 +74,7 @@ const renderAt = (path: string) =>
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/category/:slug" element={<><Category /><LocationBar /></>} />
+        <Route path="/category/:slug/:city" element={<><Category /><LocationBar /></>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -77,6 +94,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   getCatalogCategoryMock.mockResolvedValue({ data: CATEGORY });
   listCatalogDealsMock.mockResolvedValue({ data: [] });
+  shellState.value = defaultShell;
 });
 
 describe('Category page ?sub=', () => {
@@ -102,5 +120,44 @@ describe('Category page ?sub=', () => {
     pickTab(0);
     await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage'));
     await waitFor(() => expect(lastSubcategoryId()).toBeUndefined());
+  });
+});
+
+describe('Category page /:city', () => {
+  it('city route titles the page "{category} in {city}" and filters deals by that city', async () => {
+    getCatalogCategoryMock.mockResolvedValue({ data: CATEGORY });
+    listCatalogDealsMock.mockResolvedValue({ data: [] });
+    renderAt('/category/massage/pune');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Massage in Pune' })).toBeTruthy();
+    await waitFor(() =>
+      expect(listCatalogDealsMock).toHaveBeenCalledWith(expect.objectContaining({ city: 'Pune', state: 'Maharashtra' })),
+    );
+  });
+
+  it('unknown city slug renders not found', async () => {
+    getCatalogCategoryMock.mockResolvedValue({ data: CATEGORY });
+    listCatalogDealsMock.mockResolvedValue({ data: [] });
+    renderAt('/category/massage/atlantis');
+    // The heading renders inside sky-info-card's shadow DOM; React 19 sets it as a property on
+    // the registered element, so read it off the host.
+    await waitFor(() =>
+      expect((document.querySelector('sky-info-card') as { heading?: string } | null)?.heading).toBe(
+        content.category.notFound.heading,
+      ),
+    );
+    expect(listCatalogDealsMock).not.toHaveBeenCalled();
+  });
+
+  it('waits for cities before fetching city deals', async () => {
+    shellState.value = { ...shellState.value, status: 'loading', locations: [] };
+    getCatalogCategoryMock.mockResolvedValue({ data: CATEGORY });
+    listCatalogDealsMock.mockResolvedValue({ data: [] });
+    renderAt('/category/massage/pune');
+    await screen.findByRole('heading', { level: 1, name: 'Massage' });
+    // Let the deals effect run before asserting it stayed idle.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(listCatalogDealsMock).not.toHaveBeenCalled();
   });
 });

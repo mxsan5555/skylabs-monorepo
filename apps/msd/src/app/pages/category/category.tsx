@@ -29,6 +29,10 @@ import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { formatINR } from '../../../utils/format';
 import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
+import { citySlug, cityHref, categoryHref, useCatalogShell } from '../../../catalog/catalog-shell';
+import { Seo } from '../../seo/seo';
+import { breadcrumbJsonLd } from '../../seo/jsonld';
+import { SITE_URL } from '../../seo/site-url';
 import './category.css';
 import content from '../../../content.json';
 
@@ -56,7 +60,7 @@ function therapistFromPrice(therapist: CatalogTherapist): number | null {
  * subcategory only.
  */
 export function Category() {
-  const { slug = '' } = useParams<{ slug: string }>();
+  const { slug = '', city: citySlugParam } = useParams<{ slug: string; city?: string }>();
   const navigate = useNavigate();
   const { token, isAuthenticated } = useAuth();
   const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
@@ -73,6 +77,11 @@ export function Category() {
   const [therapists, setTherapists] = useState<CatalogTherapist[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const { coords } = useCurrentLocation();
+  const { status: shellStatus, locations } = useCatalogShell();
+  const cityLocation = citySlugParam ? locations.find((l) => citySlug(l.city) === citySlugParam) : undefined;
+  // Locations arrive with the catalog shell; until then a city URL can't be resolved.
+  const cityPending = !!citySlugParam && !cityLocation && shellStatus === 'loading';
+  const cityMissing = !!citySlugParam && !cityLocation && !cityPending;
 
   useEffect(() => {
     setCategoryLoading(true);
@@ -162,8 +171,11 @@ export function Category() {
         .finally(() => setDealsLoading(false));
       return;
     }
+    if (cityPending) return;
     listCatalogDeals({
       categoryId: category.id,
+      city: cityLocation?.city,
+      state: cityLocation?.state,
       subcategoryId: activeSubcategory?.id,
       search: search || undefined,
       pageSize: 60,
@@ -174,30 +186,62 @@ export function Category() {
       .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : content.category.errors.loadDeals))
       .finally(() => setDealsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, activeSubcategory?.id, search, coords?.latitude, coords?.longitude]);
+  }, [
+    category,
+    activeSubcategory?.id,
+    search,
+    coords?.latitude,
+    coords?.longitude,
+    cityPending,
+    cityLocation?.city,
+    cityLocation?.state,
+  ]);
 
   if (categoryLoading) {
     return <p className="loading-state"> {content.category.loading}</p>;
   }
-  if (categoryError || !category) {
+  if (categoryError || !category || cityMissing) {
     return (
       <div className="category-page category-page--empty">
-        <title>{content.category.notFound.metaTitle}</title>
+        <Seo
+          title={content.category.notFound.metaTitle}
+          description={content.category.notFound.subheading}
+          path={categoryHref(slug)}
+          noindex
+        />
         <sky-info-card icon="search_off" heading={content.category.notFound.heading} subheading={categoryError || content.category.notFound.subheading} />
         <FilledButton onClick={() => navigate('/categories')}>{content.category.notFound.cta}</FilledButton>
       </div>
     );
   }
+  const displayName = cityLocation
+    ? content.category.cityTitleTemplate.replace('{category}', category.name).replace('{city}', cityLocation.city)
+    : category.name;
+  const description = cityLocation
+    ? content.category.cityMetaDescriptionTemplate.replace('{category}', category.name).replace('{city}', cityLocation.city)
+    : (category.description ?? content.category.metaDescriptionTemplate.replace('{category}', category.name));
+  const path = cityLocation ? cityHref(category.slug, cityLocation.city) : categoryHref(category.slug);
+  const crumbs = [
+    { name: content.category.breadcrumb.home, path: '/' },
+    { name: content.category.breadcrumb.categories, path: '/categories' },
+    { name: category.name, path: categoryHref(category.slug) },
+    ...(cityLocation ? [{ name: cityLocation.city, path }] : []),
+  ];
   return (
     <div className="category-page">
-      <title>{`${category.name}${content.category.metaTitleSuffix}`}</title>
-      <meta name="description" content={category.description ?? content.category.metaDescriptionTemplate.replace('{category}', category.name)} />
+      <Seo
+        title={`${displayName}${content.category.metaTitleSuffix}`}
+        description={description}
+        path={path}
+        jsonLd={SITE_URL ? breadcrumbJsonLd(SITE_URL, crumbs) : undefined}
+      />
       <Breadcrumb
         className="category-page__breadcrumb"
         items={[
           { label: content.category.breadcrumb.home, to: '/' },
           { label: content.category.breadcrumb.categories, to: '/categories' },
-          { label: category.name }
+          cityLocation ? { label: category.name, to: categoryHref(category.slug) } : { label: category.name },
+          ...(cityLocation ? [{ label: cityLocation.city }] : []),
         ]} />
       <header className="category-page__hero">
         <div className="category-page__hero-inner">
@@ -205,7 +249,7 @@ export function Category() {
             <Icon>category</Icon>
           </div>
           <div>
-            <h1 className="category-page__title">{category.name}</h1>
+            <h1 className="category-page__title">{displayName}</h1>
             {category.description && <p className="category-page__subtitle">{category.description}</p>}
           </div>
         </div>
