@@ -10,6 +10,8 @@ export interface LocationValue {
   status: LocationStatus;
   source: LocationSource;
   city: string | null;
+  /** State of the current catalog city; null when unknown or when the city name is ambiguous. */
+  state: string | null;
   coords: Coordinates | null;
   setCity: (location: CatalogLocation) => void;
   requestBrowser: () => void;
@@ -19,11 +21,12 @@ interface Resolved {
   status: LocationStatus;
   source: LocationSource;
   city: string | null;
+  state: string | null;
   coords: Coordinates | null;
 }
 
 const STORAGE_KEY = 'msd.location';
-const NONE: Resolved = { status: 'none', source: 'none', city: null, coords: null };
+const NONE: Resolved = { status: 'none', source: 'none', city: null, state: null, coords: null };
 const noop = () => undefined;
 
 const LocationContext = createContext<LocationValue>({ ...NONE, setCity: noop, requestBrowser: noop });
@@ -126,7 +129,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       const saved = readSaved();
       if (saved) {
         if (cancelled || choiceGen.current !== myChoiceGen) return;
-        setResolved({ status: 'ready', source: 'saved', city: saved.city, coords: coordsOf(saved) });
+        setResolved({ status: 'ready', source: 'saved', city: saved.city, state: saved.state ?? null, coords: coordsOf(saved) });
         return;
       }
       const granted = await geolocationGranted();
@@ -135,13 +138,13 @@ export function LocationProvider({ children }: { children: ReactNode }) {
         const coords = await readBrowserCoords();
         if (cancelled || choiceGen.current !== myChoiceGen) return;
         if (coords) {
-          setResolved({ status: 'ready', source: 'browser', city: null, coords });
+          setResolved({ status: 'ready', source: 'browser', city: null, state: null, coords });
           return;
         }
       }
       const ip = await fetchIpLocation();
       if (cancelled || choiceGen.current !== myChoiceGen) return;
-      setResolved(isUsableGeoResult(ip) ? { status: 'ready', source: 'ip', city: ip.city, coords: coordsOf(ip) } : NONE);
+      setResolved(isUsableGeoResult(ip) ? { status: 'ready', source: 'ip', city: ip.city, state: null, coords: coordsOf(ip) } : NONE);
     })();
     return () => {
       cancelled = true;
@@ -151,7 +154,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   const setCity = useCallback((location: CatalogLocation) => {
     choiceGen.current += 1;
     writeSaved(location);
-    setResolved({ status: 'ready', source: 'saved', city: location.city, coords: coordsOf(location) });
+    setResolved({ status: 'ready', source: 'saved', city: location.city, state: location.state, coords: coordsOf(location) });
   }, []);
 
   const requestBrowser = useCallback(() => {
@@ -165,7 +168,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       if (browserRequestId.current !== myBrowserId || choiceGen.current !== myChoiceGen) return;
       if (coords) {
         writeSaved(null);
-        setResolved({ status: 'ready', source: 'browser', city: null, coords });
+        setResolved({ status: 'ready', source: 'browser', city: null, state: null, coords });
       } else {
         setResolved((r) => ({ ...r, status: r.city || r.coords ? 'ready' : 'none' }));
       }
@@ -173,8 +176,12 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<LocationValue>(() => {
-    const city = resolved.city ?? (resolved.coords ? (nearestCity(resolved.coords, locations)?.city ?? null) : null);
-    return { ...resolved, city, setCity, requestBrowser };
+    const nearest = !resolved.city && resolved.coords ? nearestCity(resolved.coords, locations) : null;
+    const city = resolved.city ?? nearest?.city ?? null;
+    // An IP city carries no catalog state; take it from the catalog only when the name is unique.
+    const namesakes = city ? locations.filter((l) => l.city === city) : [];
+    const state = resolved.state ?? nearest?.state ?? (namesakes.length === 1 ? namesakes[0].state : null);
+    return { ...resolved, city, state, setCity, requestBrowser };
   }, [resolved, locations, setCity, requestBrowser]);
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;

@@ -41,7 +41,7 @@ export function SiteHeader() {
             icon="search"
             label={content.header.searchLabel}
             placeholder={content.header.searchPlaceholder}
-            actionLabel={content.header.searchAction}
+            action-label={content.header.searchAction}
             onsky-submit={onSearch}
           />
           <HeaderActions />

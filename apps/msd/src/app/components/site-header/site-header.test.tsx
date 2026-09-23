@@ -1,9 +1,12 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { describe, it, expect, vi } from 'vitest';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { Link, MemoryRouter } from 'react-router-dom';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { SiteHeader } from './site-header';
 
-const { setCity } = vi.hoisted(() => ({ setCity: vi.fn() }));
+const { setCity, shell } = vi.hoisted(() => ({
+  setCity: vi.fn(),
+  shell: { locations: [] as Array<{ state: string; city: string }> },
+}));
 
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   useAuth: () => ({ isAuthenticated: false, token: null, bootstrap: null, signOut: vi.fn() }),
@@ -13,7 +16,7 @@ vi.mock('../../../hooks/use-cart-count', () => ({ useCartCount: () => 1 }));
 vi.mock('../../../catalog/catalog-shell', () => ({
   useCatalogShell: () => ({
     status: 'ready',
-    locations: [{ state: 'Maharashtra', city: 'Pune' }],
+    locations: shell.locations,
     categories: [
       {
         id: 'c1',
@@ -31,6 +34,7 @@ vi.mock('../../../location/location-context', () => ({
     status: 'ready',
     source: 'ip',
     city: 'Pune',
+    state: 'Maharashtra',
     coords: null,
     setCity,
     requestBrowser: vi.fn(),
@@ -41,8 +45,23 @@ const renderHeader = () =>
   render(
     <MemoryRouter>
       <SiteHeader />
+      <Link to="/elsewhere">Elsewhere</Link>
+      <button type="button">Outside</button>
     </MemoryRouter>,
   );
+
+const openPanel = () => {
+  const button = screen.getByRole('button', { name: /All categories/ });
+  fireEvent.click(button);
+  const panel = document.getElementById(button.getAttribute('aria-controls') ?? '') as HTMLElement;
+  expect(panel.hidden).toBe(false);
+  return { button, panel };
+};
+
+beforeEach(() => {
+  shell.locations = [{ state: 'Maharashtra', city: 'Pune' }];
+  setCity.mockClear();
+});
 
 describe('SiteHeader', () => {
   it('has a skip link to #main-content and a banner landmark', () => {
@@ -74,6 +93,46 @@ describe('SiteHeader', () => {
     expect(document.activeElement).toBe(button);
   });
 
+  it('closes the mega panel when focus leaves the nav, without moving focus', () => {
+    renderHeader();
+    const { button, panel } = openPanel();
+    const link = within(panel).getByRole('link', { name: 'Swedish' });
+    act(() => link.focus());
+    const outside = screen.getByRole('button', { name: 'Outside' });
+    act(() => outside.focus());
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(panel.hidden).toBe(true);
+    expect(document.activeElement).toBe(outside);
+  });
+
+  it('keeps the mega panel open while focus moves within the nav', () => {
+    renderHeader();
+    const { button, panel } = openPanel();
+    act(() => button.focus());
+    act(() => within(panel).getByRole('link', { name: 'Swedish' }).focus());
+    expect(panel.hidden).toBe(false);
+  });
+
+  it('closes the mega panel on an outside pointerdown without moving focus', () => {
+    renderHeader();
+    const { button, panel } = openPanel();
+    const focusedBefore = document.activeElement;
+    fireEvent.pointerDown(document.body);
+    expect(panel.hidden).toBe(true);
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(focusedBefore);
+    expect(document.activeElement).not.toBe(button);
+  });
+
+  it('closes the mega panel on route change', () => {
+    renderHeader();
+    const { panel } = openPanel();
+    fireEvent.click(screen.getByRole('link', { name: 'Elsewhere' }));
+    expect(panel.hidden).toBe(true);
+  });
+
+  // Material icon buttons keep their button/link role inside shadow DOM, so testing-library's
+  // role queries cannot see them; query the host's aria-label instead.
   it('names counted actions for screen readers', () => {
     renderHeader();
     expect(document.querySelector('[aria-label="Wishlist, 2 items"]')).toBeTruthy();
@@ -94,5 +153,16 @@ describe('SiteHeader', () => {
     expect(setCity).toHaveBeenCalledWith({ state: 'Maharashtra', city: 'Pune' });
     expect(document.querySelector('md-dialog')).toBeNull();
     expect(document.activeElement).toBe(chip);
+  });
+
+  it('marks only the current state and city as current in the city dialog', () => {
+    shell.locations = [
+      { state: 'Maharashtra', city: 'Pune' },
+      { state: 'Other', city: 'Pune' },
+    ];
+    renderHeader();
+    fireEvent.click(screen.getByRole('button', { name: 'Change city: Pune' }));
+    const options = within(screen.getByRole('list', { name: 'Cities with partner spas' })).getAllByRole('button');
+    expect(options.map((o) => o.getAttribute('aria-current'))).toEqual(['true', null]);
   });
 });

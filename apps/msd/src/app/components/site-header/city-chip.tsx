@@ -8,7 +8,7 @@ const t = content.header.city;
 
 /** Shows the visitor's city; opens a dialog to pick a city or use the browser location. */
 export function CityChip() {
-  const { status, city, setCity, requestBrowser } = useVisitorLocation();
+  const { status, city, state, setCity, requestBrowser } = useVisitorLocation();
   const { locations } = useCatalogShell();
   const [open, setOpen] = useState(false);
   const chipRef = useRef<HTMLButtonElement>(null);
@@ -54,7 +54,7 @@ export function CityChip() {
                   <button
                     type="button"
                     className="city-dialog__option body-large"
-                    aria-current={loc.city === city ? 'true' : undefined}
+                    aria-current={loc.city === city && loc.state === state ? 'true' : undefined}
                     onClick={() => {
                       setCity(loc);
                       close();

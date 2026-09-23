@@ -223,4 +223,48 @@ describe('LocationProvider', () => {
 
     await waitFor(() => expect(out()).toBe('ready|browser|Pune'));
   });
+
+  describe('state of the current city', () => {
+    function StateProbe() {
+      const { city, state, setCity } = useVisitorLocation();
+      return (
+        <>
+          <p data-testid="out">{`${state ?? '-'}|${city ?? '-'}`}</p>
+          <button onClick={() => setCity({ state: 'Delhi', city: 'Delhi' })}>pick</button>
+        </>
+      );
+    }
+
+    it('comes from the chosen location', async () => {
+      render(<LocationProvider><StateProbe /></LocationProvider>);
+      await waitFor(() => expect(out()).toBe('-|-'));
+      act(() => screen.getByText('pick').click());
+      expect(out()).toBe('Delhi|Delhi');
+    });
+
+    it('comes from the nearest catalog city for browser coordinates', async () => {
+      permissionState = 'granted';
+      getCurrentPosition.mockImplementation((ok: PositionCallback) =>
+        ok({ coords: { latitude: 18.6, longitude: 73.8 } } as GeolocationPosition),
+      );
+      render(<LocationProvider><StateProbe /></LocationProvider>);
+      await waitFor(() => expect(out()).toBe('Maharashtra|Pune'));
+    });
+
+    it('is looked up for an IP city only when exactly one catalog city has that name', async () => {
+      mockLocations = [
+        { state: 'Maharashtra', city: 'Pune' },
+        { state: 'Goa', city: 'Aurangabad' },
+        { state: 'Maharashtra', city: 'Aurangabad' },
+      ];
+      vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ city: 'Pune', region: 'MH', latitude: null, longitude: null }) } as Response);
+      const { unmount } = render(<LocationProvider><StateProbe /></LocationProvider>);
+      await waitFor(() => expect(out()).toBe('Maharashtra|Pune'));
+      unmount();
+
+      vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ city: 'Aurangabad', region: 'MH', latitude: null, longitude: null }) } as Response);
+      render(<LocationProvider><StateProbe /></LocationProvider>);
+      await waitFor(() => expect(out()).toBe('-|Aurangabad'));
+    });
+  });
 });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FilledButton, FilledTonalIconButton, Icon, Menu, MenuItem } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
@@ -8,7 +8,6 @@ import { countLabel, useAccountLinks } from '../shell/shell-labels';
 import content from '../../../content.json';
 
 const t = content.header;
-const ACCOUNT_BUTTON_ID = 'site-header-account';
 
 function CountedAction({ href, icon, label, count }: { href: string; icon: string; label: string; count: number }) {
   return (
@@ -33,6 +32,7 @@ export function HeaderActions() {
   const cartCount = useCartCount();
   const { isAuthenticated, isCustomer, accountPath } = useAccountLinks();
   const [menuOpen, setMenuOpen] = useState(false);
+  const accountButtonId = useId();
 
   const go = (path: string) => {
     setMenuOpen(false);
@@ -49,7 +49,7 @@ export function HeaderActions() {
       {isAuthenticated ? (
         <span className="header-actions__account">
           <FilledTonalIconButton
-            id={ACCOUNT_BUTTON_ID}
+            id={accountButtonId}
             aria-label={t.accountMenuLabel}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
@@ -59,7 +59,7 @@ export function HeaderActions() {
           </FilledTonalIconButton>
           <Menu
             open={menuOpen}
-            anchor={ACCOUNT_BUTTON_ID}
+            anchor={accountButtonId}
             positioning="popover"
             onClosed={() => setMenuOpen(false)}
           >

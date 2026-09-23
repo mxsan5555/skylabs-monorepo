@@ -1,5 +1,5 @@
-import { useCallback, useId, useRef, useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { useCallback, useEffect, useId, useRef, useState, type FocusEvent } from 'react';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useCatalogShell, useCategoryLinks } from '../../../catalog/catalog-shell';
 import { useDismiss } from '../../../hooks/use-dismiss';
@@ -8,7 +8,9 @@ import content from '../../../content.json';
 const MAX_STRIP_LINKS = 8;
 
 /** Row 2: plain category links plus an "All categories" disclosure panel. The panel links stay
- *  in the DOM (hidden) so prerendered HTML carries every category URL for crawlers. */
+ *  in the DOM (hidden) so prerendered HTML carries every category URL for crawlers. The panel
+ *  closes on Escape (focus returns to the toggle), an outside pointer press, focus leaving the
+ *  nav, and any route change. */
 export function CategoryStrip() {
   const links = useCategoryLinks();
   const { categories } = useCatalogShell();
@@ -24,8 +26,20 @@ export function CategoryStrip() {
   }, []);
   useDismiss(open, rootRef, dismiss);
 
+  const { pathname, search } = useLocation();
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname, search]);
+
+  // Only a real focus target outside the nav closes the panel; a null target (window blur,
+  // click on a non-focusable spot) leaves it to the pointer and Escape handlers.
+  const onBlur = (e: FocusEvent<HTMLElement>) => {
+    const next = e.relatedTarget as Node | null;
+    if (next && !e.currentTarget.contains(next)) setOpen(false);
+  };
+
   return (
-    <nav ref={rootRef} className="category-strip" aria-label={content.header.categoriesNavLabel}>
+    <nav ref={rootRef} className="category-strip" aria-label={content.header.categoriesNavLabel} onBlur={onBlur}>
       <div className="category-strip__inner">
         <button
           ref={buttonRef}

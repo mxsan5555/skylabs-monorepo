@@ -132,6 +132,8 @@ declare module 'react' {
         enterkeyhint?: 'enter' | 'done' | 'go' | 'next' | 'previous' | 'search' | 'send';
         icon?: string;
         actionLabel?: string;
+        /** Attribute form of `actionLabel`; survives server rendering / prerendering. */
+        'action-label'?: string;
         actionIcon?: string;
         variant?: 'filled' | 'outlined';
         shape?: 'none' | 'extra-small' | 'small' | 'medium' | 'large' | 'extra-large' | 'full';
