@@ -10,6 +10,7 @@ import { Category } from './category';
 const { getCatalogCategoryMock, listCatalogDealsMock, tabsStub, shellState, defaultShell } = vi.hoisted(() => {
   const defaultShell: CatalogShellValue = {
     status: 'ready',
+    locationsStatus: 'ready',
     categories: [],
     socialLinks: [],
     locations: [{ state: 'Maharashtra', city: 'Pune' }],
@@ -49,6 +50,10 @@ vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../catalog/catalog-shell')>()),
   useCatalogShell: () => shellState.value,
 }));
+vi.mock('../../seo/site-url', () => ({
+  SITE_URL: 'https://example.test',
+  absoluteUrl: (path: string) => `https://example.test${path}`,
+}));
 vi.mock('../../../hooks/useCurrentLocation', () => ({
   useCurrentLocation: () => ({ location: null, coords: null }),
 }));
@@ -78,6 +83,9 @@ const renderAt = (path: string) =>
       </Routes>
     </MemoryRouter>,
   );
+
+const canonical = () => document.head.querySelector('link[rel="canonical"]')?.getAttribute('href');
+const robots = () => document.head.querySelector('meta[name="robots"]')?.getAttribute('content');
 
 const lastSubcategoryId = () => listCatalogDealsMock.mock.calls.at(-1)?.[0]?.subcategoryId;
 
@@ -132,6 +140,8 @@ describe('Category page /:city', () => {
     await waitFor(() =>
       expect(listCatalogDealsMock).toHaveBeenCalledWith(expect.objectContaining({ city: 'Pune', state: 'Maharashtra' })),
     );
+    expect(canonical()).toBe('https://example.test/category/massage/pune');
+    expect(robots()).toBeUndefined();
   });
 
   it('unknown city slug renders not found', async () => {
@@ -149,7 +159,8 @@ describe('Category page /:city', () => {
   });
 
   it('waits for cities before fetching city deals', async () => {
-    shellState.value = { ...shellState.value, status: 'loading', locations: [] };
+    // Categories are ready; only the locations fetch is outstanding.
+    shellState.value = { ...shellState.value, locationsStatus: 'loading', locations: [] };
     getCatalogCategoryMock.mockResolvedValue({ data: CATEGORY });
     listCatalogDealsMock.mockResolvedValue({ data: [] });
     renderAt('/category/massage/pune');
@@ -159,5 +170,15 @@ describe('Category page /:city', () => {
       await Promise.resolve();
     });
     expect(listCatalogDealsMock).not.toHaveBeenCalled();
+  });
+
+  it('a locations failure renders the plain category page, noindexed, instead of not found', async () => {
+    shellState.value = { ...shellState.value, locationsStatus: 'error', locations: [] };
+    renderAt('/category/massage/pune');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Massage' })).toBeTruthy();
+    await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
+    expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.city).toBeUndefined();
+    expect(canonical()).toBe('https://example.test/category/massage');
+    expect(robots()).toBe('noindex, nofollow');
   });
 });

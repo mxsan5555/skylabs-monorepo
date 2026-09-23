@@ -77,11 +77,14 @@ export function Category() {
   const [therapists, setTherapists] = useState<CatalogTherapist[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const { coords } = useCurrentLocation();
-  const { status: shellStatus, locations } = useCatalogShell();
+  const { locationsStatus, locations } = useCatalogShell();
   const cityLocation = citySlugParam ? locations.find((l) => citySlug(l.city) === citySlugParam) : undefined;
+  const cityUnresolved = !!citySlugParam && !cityLocation;
   // Locations arrive with the catalog shell; until then a city URL can't be resolved.
-  const cityPending = !!citySlugParam && !cityLocation && shellStatus === 'loading';
-  const cityMissing = !!citySlugParam && !cityLocation && !cityPending;
+  const cityPending = cityUnresolved && locationsStatus === 'loading';
+  // Only a successful locations fetch can prove a city doesn't exist. If it failed, the page
+  // falls back to the plain (noindexed) category page rather than 404ing a real city.
+  const cityMissing = cityUnresolved && locationsStatus === 'ready';
 
   useEffect(() => {
     setCategoryLoading(true);
@@ -233,6 +236,7 @@ export function Category() {
         title={`${displayName}${content.category.metaTitleSuffix}`}
         description={description}
         path={path}
+        noindex={!!citySlugParam && !cityLocation}
         jsonLd={SITE_URL ? breadcrumbJsonLd(SITE_URL, crumbs) : undefined}
       />
       <Breadcrumb

@@ -13,6 +13,9 @@ export interface CatalogShellValue {
   /** Reflects the categories fetch only; locations and social links fail silently to an empty
    *  array below. */
   status: 'loading' | 'ready' | 'error';
+  /** The locations fetch on its own, so a city URL can tell "still loading" and "fetch failed"
+   *  apart from "no such city". */
+  locationsStatus: 'loading' | 'ready' | 'error';
   categories: CatalogCategoryWithChildren[];
   locations: CatalogLocation[];
   socialLinks: CatalogSocialMediaLink[];
@@ -24,7 +27,7 @@ export interface CategoryLink {
   to: string;
 }
 
-const EMPTY: CatalogShellValue = { status: 'loading', categories: [], locations: [], socialLinks: [] };
+const EMPTY: CatalogShellValue = { status: 'loading', locationsStatus: 'loading', categories: [], locations: [], socialLinks: [] };
 const CatalogShellContext = createContext<CatalogShellValue>(EMPTY);
 
 /** One fetch of categories + cities + social links for the whole shell (header, tab bar, footer,
@@ -39,6 +42,7 @@ export function CatalogShellProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         setValue({
           status: cats.status === 'fulfilled' ? 'ready' : 'error',
+          locationsStatus: locs.status === 'fulfilled' ? 'ready' : 'error',
           categories: cats.status === 'fulfilled' ? (cats.value.data ?? []) : [],
           locations: locs.status === 'fulfilled' ? (locs.value.data ?? []) : [],
           socialLinks: social.status === 'fulfilled' ? (social.value.data ?? []) : [],

@@ -65,6 +65,28 @@ describe('CatalogShellProvider', () => {
   });
 });
 
+describe('locationsStatus', () => {
+  function LocationsProbe() {
+    const { status, locationsStatus } = useCatalogShell();
+    return <p>{`${status}/${locationsStatus}`}</p>;
+  }
+
+  it('starts loading and becomes ready when locations load', async () => {
+    listCatalogCategoriesMock.mockResolvedValue({ data: [] });
+    listCatalogLocationsMock.mockResolvedValue({ data: [{ state: 'Maharashtra', city: 'Pune' }] });
+    render(<CatalogShellProvider><LocationsProbe /></CatalogShellProvider>);
+    expect(screen.getByText('loading/loading')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('ready/ready')).toBeTruthy());
+  });
+
+  it('reports a locations failure separately from categories', async () => {
+    listCatalogCategoriesMock.mockResolvedValue({ data: [] });
+    listCatalogLocationsMock.mockRejectedValue(new Error('down'));
+    render(<CatalogShellProvider><LocationsProbe /></CatalogShellProvider>);
+    await waitFor(() => expect(screen.getByText('ready/error')).toBeTruthy());
+  });
+});
+
 describe('categoryHref', () => {
   it('builds a category URL, with an optional encoded ?sub=', () => {
     expect(categoryHref('massage')).toBe('/category/massage');
