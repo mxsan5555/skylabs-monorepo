@@ -115,7 +115,8 @@ export function useHomeCatalog(coords: Coordinates | null | undefined): HomeCata
         setState({ status: 'ready', error: '', deals: deals.data ?? [], products: products.data ?? [], therapists: therapists.data ?? [] });
       })
       .catch((err) => {
-        if (cancelled) return;
+        // Stale-while-revalidate: once data has loaded, a failed refetch keeps it on screen.
+        if (cancelled || hasLoadedRef.current) return;
         setState((s) => ({
           ...s,
           status: 'error',

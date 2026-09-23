@@ -99,6 +99,24 @@ describe('useHomeCatalog — unmount and refetch behavior', () => {
     await waitFor(() => expect(result.current.deals).toHaveLength(2));
     expect(result.current.status).toBe('ready');
   });
+
+  it('keeps status "ready" and the previous arrays when a refetch fails (stale-while-revalidate)', async () => {
+    const { result, rerender } = renderHook(
+      ({ coords }: { coords: { latitude: number; longitude: number } | null }) => useHomeCatalog(coords),
+      { initialProps: { coords: { latitude: 1, longitude: 2 } } },
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    m.deals.mockRejectedValue(new Error('down'));
+    rerender({ coords: { latitude: 3, longitude: 4 } });
+    await waitFor(() => expect(m.deals).toHaveBeenCalledTimes(2));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(result.current.status).toBe('ready');
+    expect(result.current.error).toBe('');
+    expect(result.current.deals).toHaveLength(1);
+  });
 });
 
 describe('imageSrcSet', () => {
