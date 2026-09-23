@@ -51,10 +51,18 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] New type definitions: Deal, Category, Subcategory, CartItem, WishlistItem, SearchFilter, SearchView, PriceLevel, CheckoutStep, DealSort — 2026-07-12
 - [x] Routes: added /explore, /category/:slug, /deal/:id, /cart, /wishlist (RequireAuth), /checkout (RequireAuth) to PublicLayout — 2026-07-12
 - [x] Wired CartProvider + WishlistProvider in main.tsx — 2026-07-12
+- [x] msd shell plan 1: location provider (saved/browser/IP), shared catalog shell, SiteHeader, MobileTabBar — 2026-09-22
 
 ### Content pages — both apps (`pages/` + route)
 - [ ] Contact page~
 - [ ] Blog category (filtered list)
+
+### msd shell — follow-ups
+- [ ] msd: create `/member` page (header "Become a Member" links to it)
+- [ ] msd: newsletter backend (msd-api table + endpoint) for footer signup
+- [ ] msd: transparent/dark-mode logo asset (`logo.jpg` has a white background)
+- [ ] msd: fix pre-existing lint (~43 errors) and tsc (~28 errors) so CI `nx affected -t lint` passes
+- [ ] msd: staff/admin "Account" on phones lands in admin console without bottom nav (decide UX)
 
 ### Account & admin — both apps (remaining)
 - [ ] Logout from inside the console (currently in the public header)
