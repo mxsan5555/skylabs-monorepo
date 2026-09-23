@@ -154,3 +154,17 @@ body {
   background-color: var(--md-sys-color-background);
   color: var(--md-sys-color-on-background);
 }
+
+/* M3 type roles as light-DOM utility classes (the same roles components use in shadow DOM). */
+:where(.title-large, .title-medium, .title-small, .body-large, .body-medium, .body-small, .label-large, .label-medium, .label-small) {
+  margin: 0;
+}
+.title-large { font: var(--md-sys-typescale-title-large-weight) var(--md-sys-typescale-title-large-size) / var(--md-sys-typescale-title-large-line-height) var(--md-sys-typescale-title-large-font); letter-spacing: var(--md-sys-typescale-title-large-tracking); }
+.title-medium { font: var(--md-sys-typescale-title-medium-weight) var(--md-sys-typescale-title-medium-size) / var(--md-sys-typescale-title-medium-line-height) var(--md-sys-typescale-title-medium-font); letter-spacing: var(--md-sys-typescale-title-medium-tracking); }
+.title-small { font: var(--md-sys-typescale-title-small-weight) var(--md-sys-typescale-title-small-size) / var(--md-sys-typescale-title-small-line-height) var(--md-sys-typescale-title-small-font); letter-spacing: var(--md-sys-typescale-title-small-tracking); }
+.body-large { font: var(--md-sys-typescale-body-large-weight) var(--md-sys-typescale-body-large-size) / var(--md-sys-typescale-body-large-line-height) var(--md-sys-typescale-body-large-font); letter-spacing: var(--md-sys-typescale-body-large-tracking); }
+.body-medium { font: var(--md-sys-typescale-body-medium-weight) var(--md-sys-typescale-body-medium-size) / var(--md-sys-typescale-body-medium-line-height) var(--md-sys-typescale-body-medium-font); letter-spacing: var(--md-sys-typescale-body-medium-tracking); }
+.body-small { font: var(--md-sys-typescale-body-small-weight) var(--md-sys-typescale-body-small-size) / var(--md-sys-typescale-body-small-line-height) var(--md-sys-typescale-body-small-font); letter-spacing: var(--md-sys-typescale-body-small-tracking); }
+.label-large { font: var(--md-sys-typescale-label-large-weight) var(--md-sys-typescale-label-large-size) / var(--md-sys-typescale-label-large-line-height) var(--md-sys-typescale-label-large-font); letter-spacing: var(--md-sys-typescale-label-large-tracking); }
+.label-medium { font: var(--md-sys-typescale-label-medium-weight) var(--md-sys-typescale-label-medium-size) / var(--md-sys-typescale-label-medium-line-height) var(--md-sys-typescale-label-medium-font); letter-spacing: var(--md-sys-typescale-label-medium-tracking); }
+.label-small { font: var(--md-sys-typescale-label-small-weight) var(--md-sys-typescale-label-small-size) / var(--md-sys-typescale-label-small-line-height) var(--md-sys-typescale-label-small-font); letter-spacing: var(--md-sys-typescale-label-small-tracking); }
