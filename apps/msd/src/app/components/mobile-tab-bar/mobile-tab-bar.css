@@ -1,4 +1,9 @@
 /* Phone bottom navigation; hidden from 840px (M3 expanded window class). */
+:root {
+  /* One source for the bar's height: the items' min size, the public layout's bottom padding
+     and the toast offset (toast.css) all read it. */
+  --tab-bar-size: 64px;
+}
 .tab-bar {
   position: fixed;
   inset-inline: 0;
@@ -23,7 +28,7 @@
   justify-content: center;
   gap: 4px;
   inline-size: 100%;
-  min-block-size: 64px;
+  min-block-size: var(--tab-bar-size);
   padding: 8px 4px;
   border: 0;
   background: transparent;
@@ -64,9 +69,12 @@
   inset-inline-end: 12px;
 }
 
-/* Keep page content clear of the fixed bar. */
-.app-shell {
-  padding-block-end: calc(64px + env(safe-area-inset-bottom));
+/* Keep public page content clear of the fixed bar. */
+@media (max-width: 839.98px) {
+  .public-layout {
+    box-sizing: border-box;
+    padding-block-end: calc(var(--tab-bar-size) + env(safe-area-inset-bottom));
+  }
 }
 
 .category-sheet {
@@ -102,8 +110,5 @@
 @media (min-width: 840px) {
   .tab-bar {
     display: none;
-  }
-  .app-shell {
-    padding-block-end: 0;
   }
 }

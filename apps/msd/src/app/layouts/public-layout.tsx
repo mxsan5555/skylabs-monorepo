@@ -9,7 +9,7 @@ import { Footer } from '../components/footer';
  */
 export function PublicLayout() {
   return (
-    <div className="app-shell">
+    <div className="app-shell public-layout">
       <SiteHeader />
       <main id="main-content" className="app-main" tabIndex={-1}>
         <Outlet />
