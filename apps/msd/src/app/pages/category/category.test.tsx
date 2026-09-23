@@ -7,7 +7,15 @@ import type { CatalogShellValue } from '../../../catalog/catalog-shell';
 import content from '../../../content.json';
 import { Category } from './category';
 
-const { getCatalogCategoryMock, listCatalogDealsMock, tabsStub, shellState, defaultShell } = vi.hoisted(() => {
+const {
+  getCatalogCategoryMock,
+  listCatalogDealsMock,
+  listCatalogProductsMock,
+  listCatalogTherapistsMock,
+  tabsStub,
+  shellState,
+  defaultShell,
+} = vi.hoisted(() => {
   const defaultShell: CatalogShellValue = {
     status: 'ready',
     locationsStatus: 'ready',
@@ -20,6 +28,8 @@ const { getCatalogCategoryMock, listCatalogDealsMock, tabsStub, shellState, defa
     shellState: { value: defaultShell },
     getCatalogCategoryMock: vi.fn(),
     listCatalogDealsMock: vi.fn(),
+    listCatalogProductsMock: vi.fn(),
+    listCatalogTherapistsMock: vi.fn(),
     tabsStub: { onChange: undefined as undefined | ((e: { target: { activeTabIndex: number } }) => void) },
   };
 });
@@ -38,6 +48,8 @@ vi.mock('../../../api/catalog', async () => {
     ...actual,
     getCatalogCategory: (...args: unknown[]) => getCatalogCategoryMock(...args),
     listCatalogDeals: (...args: unknown[]) => listCatalogDealsMock(...args),
+    listCatalogProducts: (...args: unknown[]) => listCatalogProductsMock(...args),
+    listCatalogTherapists: (...args: unknown[]) => listCatalogTherapistsMock(...args),
   };
 });
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
@@ -102,6 +114,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   getCatalogCategoryMock.mockResolvedValue({ data: CATEGORY });
   listCatalogDealsMock.mockResolvedValue({ data: [] });
+  listCatalogProductsMock.mockResolvedValue({ data: [] });
+  listCatalogTherapistsMock.mockResolvedValue({ data: [] });
   shellState.value = defaultShell;
 });
 
@@ -178,6 +192,20 @@ describe('Category page /:city', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Massage' })).toBeTruthy();
     await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
     expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.city).toBeUndefined();
+    expect(canonical()).toBe('https://example.test/category/massage');
+    expect(robots()).toBe('noindex, nofollow');
+  });
+
+  it.each([
+    ['PRODUCT', listCatalogProductsMock],
+    ['THERAPY', listCatalogTherapistsMock],
+  ] as const)('a %s category ignores the city: plain page, category canonical, noindex', async (type, listMock) => {
+    getCatalogCategoryMock.mockResolvedValue({ data: { ...CATEGORY, type } });
+    renderAt('/category/massage/pune');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Massage' })).toBeTruthy();
+    await waitFor(() => expect(listMock).toHaveBeenCalled());
+    expect(screen.queryByText('Pune')).toBeNull();
+    expect(document.title).not.toContain('Pune');
     expect(canonical()).toBe('https://example.test/category/massage');
     expect(robots()).toBe('noindex, nofollow');
   });

@@ -217,18 +217,22 @@ export function Category() {
       </div>
     );
   }
-  const displayName = cityLocation
-    ? content.category.cityTitleTemplate.replace('{category}', category.name).replace('{city}', cityLocation.city)
+  // Product and therapist listings can't be filtered by city, so a city URL on those categories
+  // shows the plain category page (noindexed) rather than a thin "X in City" duplicate.
+  const cityFilterable = category.type !== 'PRODUCT' && category.type !== 'THERAPY';
+  const activeCity = cityFilterable ? cityLocation : undefined;
+  const displayName = activeCity
+    ? content.category.cityTitleTemplate.replace('{category}', category.name).replace('{city}', activeCity.city)
     : category.name;
-  const description = cityLocation
-    ? content.category.cityMetaDescriptionTemplate.replace('{category}', category.name).replace('{city}', cityLocation.city)
+  const description = activeCity
+    ? content.category.cityMetaDescriptionTemplate.replace('{category}', category.name).replace('{city}', activeCity.city)
     : (category.description ?? content.category.metaDescriptionTemplate.replace('{category}', category.name));
-  const path = cityLocation ? cityHref(category.slug, cityLocation.city) : categoryHref(category.slug);
+  const path = activeCity ? cityHref(category.slug, activeCity.city) : categoryHref(category.slug);
   const crumbs = [
     { name: content.category.breadcrumb.home, path: '/' },
     { name: content.category.breadcrumb.categories, path: '/categories' },
     { name: category.name, path: categoryHref(category.slug) },
-    ...(cityLocation ? [{ name: cityLocation.city, path }] : []),
+    ...(activeCity ? [{ name: activeCity.city, path }] : []),
   ];
   return (
     <div className="category-page">
@@ -236,7 +240,7 @@ export function Category() {
         title={`${displayName}${content.category.metaTitleSuffix}`}
         description={description}
         path={path}
-        noindex={!!citySlugParam && !cityLocation}
+        noindex={!!citySlugParam && !activeCity}
         jsonLd={SITE_URL ? breadcrumbJsonLd(SITE_URL, crumbs) : undefined}
       />
       <Breadcrumb
@@ -244,8 +248,8 @@ export function Category() {
         items={[
           { label: content.category.breadcrumb.home, to: '/' },
           { label: content.category.breadcrumb.categories, to: '/categories' },
-          cityLocation ? { label: category.name, to: categoryHref(category.slug) } : { label: category.name },
-          ...(cityLocation ? [{ label: cityLocation.city }] : []),
+          activeCity ? { label: category.name, to: categoryHref(category.slug) } : { label: category.name },
+          ...(activeCity ? [{ label: activeCity.city }] : []),
         ]} />
       <header className="category-page__hero">
         <div className="category-page__hero-inner">
