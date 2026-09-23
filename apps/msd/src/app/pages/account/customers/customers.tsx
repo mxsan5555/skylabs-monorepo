@@ -80,9 +80,11 @@ export function CustomerManagement() {
   useEffect(() => {
     loadCustomers();
   }, [loadCustomers]);
-const handleCustomerSelect = useCallback((id: string) => {
-  setSelectedId(id);
-}, []);
+
+  const handleCustomerSelect = useCallback((id: string) => {
+    setSelectedId(id);
+  }, []);
+
   const loadDetail = useCallback(async () => {
     if (!selectedId) {
       setSelectedCustomer(null);

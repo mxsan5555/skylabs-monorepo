@@ -46,7 +46,7 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "tsx watch src/main.ts",
-        "cwd": "apps/msd-api"
+           "cwd": "apps/msd-api"
       }
     }
   },
