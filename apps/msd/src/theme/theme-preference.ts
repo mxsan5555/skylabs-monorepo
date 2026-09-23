@@ -4,7 +4,7 @@ export type ThemePreference = 'light' | 'dark' | 'system';
 
 const STORAGE_KEY = 'msd.theme';
 const PREFERENCES: readonly ThemePreference[] = ['light', 'dark', 'system'];
-let stopSystemSync: (() => void) | null = null;
+let stopSync: (() => void) | null = null;
 
 export function readThemePreference(): ThemePreference {
   try {
@@ -15,11 +15,18 @@ export function readThemePreference(): ThemePreference {
   }
 }
 
+/** Apply an explicit mode, re-applying whenever the OS contrast setting changes. */
+function applyExplicitTheme(mode: 'light' | 'dark'): () => void {
+  const set = () => applyTheme(mode, prefersContrast());
+  set();
+  const mq = window.matchMedia('(prefers-contrast: more)');
+  mq.addEventListener('change', set);
+  return () => mq.removeEventListener('change', set);
+}
+
 function apply(preference: ThemePreference) {
-  stopSystemSync?.();
-  stopSystemSync = null;
-  if (preference === 'system') stopSystemSync = applySystemTheme();
-  else applyTheme(preference, prefersContrast());
+  stopSync?.();
+  stopSync = preference === 'system' ? applySystemTheme() : applyExplicitTheme(preference);
 }
 
 /** Apply and remember the visitor's choice. */
