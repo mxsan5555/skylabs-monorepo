@@ -201,117 +201,7 @@
       "spotlightCta": "View deal",
       "searchLabel": "Search spas, treatments and locations"
     },
-    "spaFinderHero": {
-      "title": " Nearby Wellness",
-      "heading": "Find your perfect spa",
-      "subheading": "Discover spas near you",
-      "defaultTab": "Massage",
-      "mapDealsLimit": 8,
-      "suggestionLimit": 6,
-      "limits": {
-        "massage": 6,
-        "skinBeauty": 6,
-        "hairNails": 6,
-        "spaRetreats": 6,
-        "healthWellness": 6
-      },
-      "tabs": [
-        {
-          "label": "Massage",
-          "icon": "self_improvement"
-        },
-        {
-          "label": "Spa",
-          "icon": "spa"
-        },
-        {
-          "label": "Beauty",
-          "icon": "face"
-        },
-        {
-          "label": "Hair",
-          "icon": "content_cut"
-        },
-        {
-          "label": "Wellness",
-          "icon": "favorite"
-        }
-      ],
-      "search": {
-        "locationPlaceholder": "Current Location",
-        "servicePlaceholder": "Search deals",
-        "button": "Search"
-      },
-      "popularHeading": "Popular",
-      "popular": [
-        "Couple Spa",
-        "Hair Spa",
-        "Deep Tissue",
-        "Facial"
-      ]
-    },
-    "premiumHero": {
-      "heading": "Relax. Refresh. Rejuvenate.",
-      "subheading": "Discover premium spas, salons and wellness experiences near you.",
-      "image": "https://images.unsplash.com/photo-1540555700478-4be289fbecef",
-      "imageAlt": "Luxury spa experience",
-      "tabs": [
-        {
-          "label": "Massage",
-          "icon": "self_improvement",
-          "to": "/category/massage"
-        },
-        {
-          "label": "Spa & Retreats",
-          "icon": "spa",
-          "to": "/category/spas-retreats"
-        },
-        {
-          "label": "Skin & Beauty",
-          "icon": "face",
-          "to": "/category/skin-beauty"
-        },
-        {
-          "label": "Hair & Nails",
-          "icon": "content_cut",
-          "to": "/category/hair-nails"
-        },
-        {
-          "label": "Health & Wellness",
-          "icon": "favorite",
-          "to": "/category/health-wellness"
-        },
-        {
-          "label": "Products",
-          "icon": "digital_wellbeing",
-          "to": "/products"
-        }
-      ],
-      "search": {
-        "locationPlaceholder": "Current Location",
-        "servicePlaceholder": "Search deals",
-        "button": "Search"
-      },
-      "popular": [
-        "Couple Spa",
-        "Hair Spa",
-        "Deep Tissue",
-        "Facial",
-        "Ayurvedic Spa"
-      ]
-    },
-    "heroImages": [
-      "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=1920&q=80",
-      "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&w=1920&q=80",
-      "https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&w=1920&q=80",
-      "https://images.unsplash.com/photo-1507652313519-d4e9174996dd?auto=format&fit=crop&w=1920&q=80"
-    ],
     "sections": {
-      "featuredDeals": {
-        "heading": "Featured Deals",
-        "seeAll": "See all",
-        "seeAllTo": "/explore?sort=featured"
-      },
       "browseByCategory": {
         "heading": "Shop by category",
         "seeAll": "See all",
@@ -334,62 +224,6 @@
         "heading": "Book a therapist",
         "seeAll": "See all",
         "seeAllTo": "/therapists"
-      },
-      "hotRightNow": {
-        "heading": "Biggest savings",
-        "seeAll": "See more deals",
-        "seeAllTo": "/explore?sort=discount",
-        "tabs": [
-          {
-            "label": "All Deals",
-            "value": "all"
-          },
-          {
-            "label": "Massage",
-            "value": "massage"
-          },
-          {
-            "label": "Spas & Retreats",
-            "value": "spas-retreats"
-          },
-          {
-            "label": "Skin & Beauty",
-            "value": "skin-beauty"
-          },
-          {
-            "label": "Hair & Nails",
-            "value": "hair-nails"
-          },
-          {
-            "label": "Health & Wellness",
-            "value": "health-wellness"
-          }
-        ]
-      },
-      "massageTherapy": {
-        "heading": "Massage",
-        "seeAll": "See all",
-        "seeAllTo": "/category/massage"
-      },
-      "facialSkin": {
-        "heading": "Skin & Beauty",
-        "seeAll": "See all",
-        "seeAllTo": "/category/skin-beauty"
-      },
-      "nailCare": {
-        "heading": "Hair & Nails",
-        "seeAll": "See all",
-        "seeAllTo": "/category/hair-nails"
-      },
-      "spasRetreats": {
-        "heading": "Spas & Retreats",
-        "seeAll": "See all",
-        "seeAllTo": "/category/spas-retreats"
-      },
-      "healthWellness": {
-        "heading": "Health & Wellness",
-        "seeAll": "See all",
-        "seeAllTo": "/category/health-wellness"
       }
     },
     "howItWorks": {
@@ -413,25 +247,9 @@
     },
     "categoryTileText": "{count} treatments",
     "giftCard": {
-      "chip": "Gift Cards",
       "heading": "Give the Gift of Wellness",
       "body": "Gift a spa day. Redeemable at 200+ partner spas across India.",
-      "cta": "Buy Gift Card",
-      "image": "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?auto=format&fit=crop&w=900&q=80",
-      "features": [
-        {
-          "icon": "verified",
-          "title": "Never Expires"
-        },
-        {
-          "icon": "redeem",
-          "title": "Instant Delivery"
-        },
-        {
-          "icon": "spa",
-          "title": "200+ Partner Spas"
-        }
-      ]
+      "cta": "Buy Gift Card"
     },
     "welcomeOffer": {
       "badge": "New member offer",
@@ -439,52 +257,7 @@
       "subtitle": "On Your First Spa Booking",
       "description": "Get introductory pricing at partner spas across India on your first booking.",
       "cta": "Browse deals",
-      "image": "https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&w=1400&q=80",
-      "offerCard": {
-        "discount": "40% OFF",
-        "label": "First Booking Only"
-      }
-    },
-    "vacationStays": {
-      "title": "Vacation rentals for your kind of stay",
-      "items": [
-        {
-          "label": "Private vacation homes",
-          "image": "https://picsum.photos/seed/private/600/800",
-          "imageAlt": "Private vacation homes",
-          "href": "#private"
-        },
-        {
-          "label": "Apartments & Condos",
-          "image": "https://picsum.photos/seed/apartment/600/800",
-          "imageAlt": "Apartments & Condos",
-          "href": "#apartments"
-        },
-        {
-          "label": "Cabins",
-          "image": "https://picsum.photos/seed/cabins/600/800",
-          "imageAlt": "Cabins",
-          "href": "#cabins"
-        },
-        {
-          "label": "Cottages",
-          "image": "https://picsum.photos/seed/cottages/600/800",
-          "imageAlt": "Cottages",
-          "href": "#cottages"
-        },
-        {
-          "label": "Villas",
-          "image": "https://picsum.photos/seed/villas/600/800",
-          "imageAlt": "Villas",
-          "href": "#villas"
-        },
-        {
-          "label": "Huts",
-          "image": "https://picsum.photos/seed/huts/600/800",
-          "imageAlt": "huts",
-          "href": "#huts"
-        }
-      ]
+      "image": "https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&w=1400&q=80"
     },
     "memberBanner": {
       "icon": "payments",
@@ -582,58 +355,10 @@
       "heading": "Questions, answered",
       "subheading": "Bookings, payments, cancellations and gift cards."
     },
-    "trustSection": {
-      "cards": [
-        {
-          "type": "logos",
-          "logos": [
-            "https://picsum.photos/seed/logo1/60/60",
-            "https://picsum.photos/seed/logo2/60/60",
-            "https://picsum.photos/seed/logo3/60/60",
-            "https://picsum.photos/seed/logo4/60/60"
-          ],
-          "title": "Save when you compare",
-          "subtitle": "More deals, More sites, One search"
-        },
-        {
-          "type": "avatars",
-          "avatars": [
-            "https://picsum.photos/seed/user1/80/80",
-            "https://picsum.photos/seed/user2/80/80",
-            "https://picsum.photos/seed/user3/80/80",
-            "https://picsum.photos/seed/user4/80/80"
-          ],
-          "title": "10,000+",
-          "subtitle": "searches for massage this week"
-        },
-        {
-          "type": "stars",
-          "stars": 5,
-          "title": "You will definitly love it",
-          "subtitle": "1M+ ratings on our app"
-        }
-      ]
-    },
     "ui": {
-      "accessibility": {
-        "browseWellnessCategories": "Browse wellness categories",
-        "exploreCategory": "Explore {category}",
-        "memberPromotion": "Member promotion",
-        "giftCardsPromotion": "Gift cards promotion",
-        "welcomeOfferPromotion": "Welcome offer promotion"
-      },
       "labels": {
-        "services": "Deals",
-        "popular": "Popular:",
-        "seeAll": "See all",
-        "ourTherapists": "Our Therapists",
-        "viewAll": "View All",
-        "featuredProducts": "Featured Products",
         "from": "From",
-        "book": "Book",
-        "viewProduct": "View Product",
-        "product": "Product",
-        "searchResultSeparator": " • "
+        "product": "Product"
       },
       "messages": {
         "loading": "Loading…",
@@ -1187,45 +912,6 @@
       "title": "Checkout | MSD – MySpaDeal",
       "description": "Complete your booking at MySpaDeal."
     }
-  },
-  "dealOfTheDay": {
-    "badge": "🔥 Deal of the Day",
-    "title": "Luxury Aroma Therapy",
-    "subtitle": "Relax. Rejuvenate. Refresh.",
-    "discount": "75% OFF",
-    "price": "₹999",
-    "originalPrice": "₹3999",
-    "duration": "90 mins",
-    "location": "Noida Sector 18",
-    "rating": {
-      "value": "4.9",
-      "reviews": 1248
-    },
-    "coupon": {
-      "label": "Use Coupon",
-      "code": "SPA75",
-      "description": "Extra 10% OFF"
-    },
-    "features": [
-      {
-        "icon": "spa",
-        "label": "Complimentary Steam"
-      },
-      {
-        "icon": "emoji_food_beverage",
-        "label": "Herbal Tea"
-      },
-      {
-        "icon": "verified",
-        "label": "Verified Partner"
-      },
-      {
-        "icon": "event_available",
-        "label": "Free Cancellation"
-      }
-    ],
-    "buttonText": "Book Now",
-    "image": "https://images.unsplash.com/photo-1507652313519-d4e9174996dd?auto=format&fit=crop&w=1920&q=80"
   },
   "auth": {
     "signIn": {

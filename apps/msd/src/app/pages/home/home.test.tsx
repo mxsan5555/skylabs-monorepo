@@ -1,36 +1,37 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import type { CatalogCategoryWithChildren, CatalogDeal } from '../../../api/catalog';
-
-const listCatalogCategoriesMock = vi.fn();
-const listCatalogDealsMock = vi.fn();
-
-vi.mock('../../../api/catalog', async () => {
-  const actual = await vi.importActual<typeof import('../../../api/catalog')>('../../../api/catalog');
-  return {
-    ...actual,
-    listCatalogCategories: (...args: unknown[]) => listCatalogCategoriesMock(...args),
-    listCatalogDeals: (...args: unknown[]) => listCatalogDealsMock(...args),
-    listCatalogProducts: () => Promise.resolve({ data: [] }),
-    listCatalogTherapists: () => Promise.resolve({ data: [] }),
-    listCatalogFaqs: () => Promise.resolve({ data: [] }),
-  };
-});
-
-vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
-  useAuth: () => ({ isAuthenticated: false, token: null }),
-}));
-
-vi.mock('../../../wishlist/wishlist-context', () => ({
-  useWishlist: () => ({ toggle: vi.fn(), has: () => false }),
-}));
-
-vi.mock('../../../hooks/useCurrentLocation', () => ({
-  useCurrentLocation: () => ({ location: null }),
-}));
-
+import content from '../../../content.json';
 import { Home } from './home';
+
+const m = vi.hoisted(() => ({
+  deals: vi.fn(),
+  products: vi.fn(),
+  therapists: vi.fn(),
+  faqs: vi.fn(),
+  categories: [] as unknown[],
+  location: { status: 'ready', coords: null as null | { latitude: number; longitude: number } },
+}));
+
+vi.mock('../../../api/catalog', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/catalog')>()),
+  listCatalogDeals: (...a: unknown[]) => m.deals(...a),
+  listCatalogProducts: (...a: unknown[]) => m.products(...a),
+  listCatalogTherapists: (...a: unknown[]) => m.therapists(...a),
+  listCatalogFaqs: (...a: unknown[]) => m.faqs(...a),
+}));
+vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../catalog/catalog-shell')>()),
+  useCatalogShell: () => ({ status: 'ready', locationsStatus: 'ready', categories: m.categories, locations: [], socialLinks: [] }),
+}));
+vi.mock('../../../location/location-context', () => ({ useVisitorLocation: () => m.location }));
+vi.mock('@skylabs-monorepo/shared-auth/react', () => ({ useAuth: () => ({ isAuthenticated: false, token: null }) }));
+vi.mock('../../../wishlist/wishlist-context', () => ({ useWishlist: () => ({ toggle: vi.fn(), has: () => false }) }));
+vi.mock('../../seo/site-url', () => ({
+  SITE_URL: 'https://example.test',
+  absoluteUrl: (p: string) => new URL(p, 'https://example.test/').toString(),
+}));
 
 function cat(overrides: Partial<CatalogCategoryWithChildren>): CatalogCategoryWithChildren {
   return {
@@ -66,6 +67,10 @@ function deal(overrides: Partial<CatalogDeal>): CatalogDeal {
   } as CatalogDeal;
 }
 
+const MASSAGE = { id: 'c-m', name: 'Massage', slug: 'massage', description: null };
+const SPA = { id: 'c-s', name: 'Spa', slug: 'spa-retreats', description: null };
+const FAQ = { id: 'f1', question: 'Can I cancel a booking?', answer: 'Yes, up to 24 hours before.' };
+
 function renderHome() {
   return render(
     <MemoryRouter>
@@ -74,119 +79,131 @@ function renderHome() {
   );
 }
 
+const dealsSection = () => document.querySelector('section[aria-labelledby="deals-heading"]') as HTMLElement;
+
 beforeEach(() => {
   vi.clearAllMocks();
+  // md-tabs animates its indicator on selection; jsdom (and the shared-ui polyfills) lack getAnimations.
+  if (!Element.prototype.getAnimations) Element.prototype.getAnimations = () => [];
+  m.categories = [
+    cat({
+      ...MASSAGE,
+      children: [
+        { id: 'c-m-1', name: 'Swedish', slug: 'swedish', description: null },
+        { id: 'c-m-2', name: 'Thai', slug: 'thai', description: null },
+      ],
+    }),
+    cat({ ...SPA }),
+    cat({ id: 'c-h', name: 'Hair', slug: 'hair-nails' }),
+  ];
+  m.deals.mockResolvedValue({
+    data: [
+      deal({ id: 'd1', title: 'Full Body Massage', category: MASSAGE }),
+      deal({ id: 'd2', title: 'Foot Massage', category: MASSAGE }),
+      deal({ id: 'd3', title: 'Weekend Spa', category: SPA }),
+    ],
+  });
+  m.products.mockResolvedValue({ data: [] });
+  m.therapists.mockResolvedValue({ data: [] });
+  m.faqs.mockResolvedValue({ data: [FAQ] });
+  m.location = { status: 'ready', coords: null };
 });
 
-/**
- * Feature: Home page — "popular category" carousels
- * Scenario: sections are driven by real `PopularTag` assignments (a category counts as
- * "popular" once it has at least one `popularTags` entry), not the old `Category.isPopular`
- * boolean, and not the older hardcoded keyword-matching table (`MOCK_CATEGORY_MATCH`), both of
- * which have been deleted entirely.
- *
- * Given: the catalog returns categories, some with a non-empty `popularTags` array
- * When: the home page loads
- * Then: one carousel section renders per popular category (sorted by sortOrder), each showing
- *       only deals whose `category.id` matches that category — non-popular categories get no
- *       dedicated carousel
- *
- * Edge cases:
- * - a popular category with zero matching deals renders no section for it (no empty carousel)
- * - the catalog fetch fails -> a page-level error state, not a crash
- */
-describe('Home — popular-category-driven sections', () => {
-  it('renders a section per popular category, ordered by sortOrder, using real category data', async () => {
-    const categories = [
-      cat({ id: 'cat-massage', name: 'Massage', slug: 'massage', popularTags: [{ id: 'tag-massage', name: 'Trending', slug: 'trending' }], sortOrder: 2 }),
-      cat({ id: 'cat-spa', name: 'Spa Days', slug: 'spa-days', popularTags: [{ id: 'tag-spa', name: 'Trending', slug: 'trending' }], sortOrder: 1 }),
-      cat({ id: 'cat-facial', name: 'Facials', slug: 'facials', popularTags: [], sortOrder: 3 }),
-    ];
-    const deals = [
-      deal({ id: 'd1', title: 'Full Body Massage', category: { id: 'cat-massage', name: 'Massage', slug: 'massage', description: null } }),
-      deal({ id: 'd2', title: 'Weekend Spa', category: { id: 'cat-spa', name: 'Spa Days', slug: 'spa-days', description: null } }),
-      deal({ id: 'd3', title: 'Deep Cleanse Facial', category: { id: 'cat-facial', name: 'Facials', slug: 'facials', description: null } }),
-    ];
-    listCatalogCategoriesMock.mockResolvedValue({ data: categories });
-    listCatalogDealsMock.mockResolvedValue({ data: deals });
-
+describe('Home', () => {
+  it('shows a busy status while the catalog loads', () => {
+    m.deals.mockReturnValue(new Promise(() => undefined));
     renderHome();
-
-    // Each popular category gets its own dedicated section, addressable by a stable
-    // `popular-category-<id>-heading` id — this is unambiguous even though the plain "Browse by
-    // Category" grid elsewhere on the page also renders an <h3> with the same category name.
-    await waitFor(() => expect(document.getElementById('popular-category-cat-spa-heading')).toBeTruthy());
-    const spaHeading = document.getElementById('popular-category-cat-spa-heading')!;
-    const massageHeading = document.getElementById('popular-category-cat-massage-heading')!;
-    expect(spaHeading.textContent).toBe('Spa Days');
-    expect(massageHeading.textContent).toBe('Massage');
-    // "Spa Days" (sortOrder 1) renders before "Massage" (sortOrder 2).
-    expect(
-      spaHeading.compareDocumentPosition(massageHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-
-    // "Facials" isn't popular, so it never gets its own dedicated carousel section.
-    expect(document.getElementById('popular-category-cat-facial-heading')).toBeNull();
+    const status = screen.getByRole('status');
+    expect(status.getAttribute('aria-busy')).toBe('true');
   });
 
-  it('shows the Massage deal card only inside the Massage carousel, not the Spa one (category-filtered)', async () => {
-    const categories = [
-      cat({ id: 'cat-massage', name: 'Massage', slug: 'massage', popularTags: [{ id: 'tag-massage', name: 'Trending', slug: 'trending' }], sortOrder: 1 }),
-      cat({ id: 'cat-spa', name: 'Spa Days', slug: 'spa-days', popularTags: [{ id: 'tag-spa', name: 'Trending', slug: 'trending' }], sortOrder: 2 }),
-    ];
-    const deals = [
-      deal({ id: 'd1', title: 'Full Body Massage', category: { id: 'cat-massage', name: 'Massage', slug: 'massage', description: null } }),
-      deal({ id: 'd2', title: 'Weekend Spa', category: { id: 'cat-spa', name: 'Spa Days', slug: 'spa-days', description: null } }),
-    ];
-    listCatalogCategoriesMock.mockResolvedValue({ data: categories });
-    listCatalogDealsMock.mockResolvedValue({ data: deals });
-
+  it('shows an alert when the catalog fails to load', async () => {
+    m.deals.mockRejectedValue(new Error('network down'));
     renderHome();
-    await waitFor(() => expect(document.getElementById('popular-category-cat-massage-heading')).toBeTruthy());
-
-    // `<sky-product-card heading="...">`'s `heading` is a plain (non-attribute-reflecting) LIT
-    // reactive property — React sets it as a JS property, not an HTML attribute, and it renders
-    // inside the card's shadow root, so it's reachable only by reading the property directly, not
-    // via `.textContent` (light-DOM only) or a `[heading=...]` attribute selector.
-    const massageSection = document.getElementById('popular-category-cat-massage-heading')!.closest('section')!;
-    const spaSection = document.getElementById('popular-category-cat-spa-heading')!.closest('section')!;
-    const headingsIn = (section: Element) =>
-      Array.from(section.querySelectorAll('sky-product-card')).map((el) => (el as unknown as { heading?: string }).heading);
-    expect(headingsIn(massageSection)).toEqual(['Full Body Massage']);
-    expect(headingsIn(spaSection)).toEqual(['Weekend Spa']);
+    expect((await screen.findByRole('alert')).textContent).toBe(content.home.ui.messages.loadError);
   });
 
-  // Edge case: a popular category with zero matching deals gets no section
-  it('renders no section for a popular category that has zero matching deals', async () => {
-    const categories = [cat({ id: 'cat-empty', name: 'Empty Popular', slug: 'empty-popular', popularTags: [{ id: 'tag-empty', name: 'Trending', slug: 'trending' }], sortOrder: 1 })];
-    listCatalogCategoriesMock.mockResolvedValue({ data: categories });
-    listCatalogDealsMock.mockResolvedValue({ data: [] });
+  it('waits for the visitor location before fetching deals, then sends its coordinates', async () => {
+    m.location = { status: 'locating', coords: null };
+    const { rerender } = renderHome();
+    await Promise.resolve();
+    expect(m.deals).not.toHaveBeenCalled();
 
-    renderHome();
-    await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
-    expect(document.getElementById('popular-category-cat-empty-heading')).toBeNull();
+    m.location = { status: 'ready', coords: { latitude: 26.7, longitude: 83.4 } };
+    rerender(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(m.deals).toHaveBeenCalledWith(expect.objectContaining({ latitude: 26.7, longitude: 83.4 })));
   });
 
-  // Edge case: catalog fetch failure
-  it('shows a page-level error state when the catalog fetch fails, instead of crashing', async () => {
-    listCatalogCategoriesMock.mockRejectedValue(new Error('network down'));
-    listCatalogDealsMock.mockResolvedValue({ data: [] });
-
+  it('renders one h1 and the sections in the approved order', async () => {
     renderHome();
-    expect(await screen.findByRole('alert')).toBeTruthy();
+    await screen.findByRole('heading', { level: 2, name: content.home.sections.dealsNearYou.heading });
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    const h2s = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    const order = [
+      content.home.sections.browseByCategory.heading,
+      content.home.sections.dealsNearYou.heading,
+      content.home.howItWorks.heading,
+      content.home.searchByDestination.heading,
+      content.home.faq.heading,
+    ].map((text) => h2s.indexOf(text));
+    order.forEach((index, i) => {
+      expect(index).toBeGreaterThan(-1);
+      if (i > 0) expect(index).toBeGreaterThan(order[i - 1]);
+    });
   });
 
-  // Confirms the old hardcoded keyword-matching table is genuinely gone — "Hot Right Now" tabs
-  // are built purely from the real popular categories fetched above, never a fixed bucket list.
-  it('builds "Hot Right Now" tabs from real popular categories, not a fixed keyword bucket list', async () => {
-    const categories = [cat({ id: 'cat-massage', name: 'Massage', slug: 'massage', popularTags: [{ id: 'tag-massage', name: 'Trending', slug: 'trending' }], sortOrder: 1 })];
-    listCatalogCategoriesMock.mockResolvedValue({ data: categories });
-    listCatalogDealsMock.mockResolvedValue({ data: [] });
-
+  it('renders category tiles as real light-DOM links', async () => {
     renderHome();
-    await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
-    // The "Massage" tab exists because it's a real popular category, not a hardcoded bucket name
-    // like the deleted MOCK_CATEGORY_MATCH table used (e.g. "Deep Tissue", "Facial Glow", ...).
-    expect(screen.getAllByText('Massage').length).toBeGreaterThan(0);
+    const heading = await screen.findByRole('heading', { level: 2, name: content.home.sections.browseByCategory.heading });
+    const list = within(heading.closest('section') as HTMLElement).getByRole('list');
+    expect(within(list).getByRole('link', { name: 'Massage' }).getAttribute('href')).toBe('/category/massage');
+    expect(within(list).queryByRole('link', { name: 'Skin' })).toBeNull();
+    expect(within(list).getByRole('heading', { level: 3, name: 'Massage' })).toBeTruthy();
+  });
+
+  it('filters the deals carousel with category tabs, skipping categories without deals', async () => {
+    renderHome();
+    await screen.findByRole('heading', { level: 2, name: content.home.sections.dealsNearYou.heading });
+    const tabs = Array.from(dealsSection().querySelectorAll('md-secondary-tab'));
+    expect(tabs.map((tab) => tab.textContent)).toEqual([content.home.sections.dealsNearYou.allTab, 'Massage', 'Spa']);
+    expect(dealsSection().querySelectorAll('sky-product-card')).toHaveLength(3);
+
+    fireEvent.click(tabs[2]);
+    await waitFor(() => expect(dealsSection().querySelectorAll('sky-product-card')).toHaveLength(1));
+  });
+
+  it('lists the three "How it works" steps', async () => {
+    renderHome();
+    const heading = await screen.findByRole('heading', { level: 2, name: content.home.howItWorks.heading });
+    const items = (heading.closest('section') as HTMLElement).querySelectorAll('ol > li');
+    expect(items).toHaveLength(3);
+    content.home.howItWorks.steps.forEach((step, i) => {
+      expect(within(items[i] as HTMLElement).getByRole('heading', { level: 3 }).textContent).toBe(step.title);
+    });
+  });
+
+  it('emits ItemList and FAQPage JSON-LD', async () => {
+    renderHome();
+    await screen.findByRole('heading', { level: 2, name: content.home.faq.heading });
+    const blocks = Array.from(document.querySelectorAll('script[type="application/ld+json"]')).flatMap((s) => {
+      const data = JSON.parse(s.textContent ?? 'null');
+      return Array.isArray(data) ? data : [data];
+    });
+    const list = blocks.find((b) => b['@type'] === 'ItemList');
+    expect(list.itemListElement).toHaveLength(3);
+    for (const entry of list.itemListElement) expect(entry.item.url.startsWith('https://example.test/deal/')).toBe(true);
+    const faq = blocks.find((b) => b['@type'] === 'FAQPage');
+    expect(faq.mainEntity[0].name).toBe(FAQ.question);
+  });
+
+  it('sets the page title and canonical URL', async () => {
+    renderHome();
+    await screen.findByRole('heading', { level: 1 });
+    await waitFor(() => expect(document.title).toBe(content.meta.home.title));
+    expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe('https://example.test/');
   });
 });
