@@ -7,6 +7,8 @@ describe('DealCard', () => {
     render(
       <DealCard
         deal={{ id: 'd1', title: 'Hot Stone', image: 'a.jpg', imageAlt: 'Hot Stone', gallery: ['a.jpg', 'b.jpg'], price: 999 }}
+        favoriteActive={false}
+        onFavorite={() => undefined}
       />,
     );
     const imgs = Array.from(document.querySelectorAll('img'));
