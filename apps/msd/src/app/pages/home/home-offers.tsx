@@ -9,7 +9,7 @@ export function HomeOffers({ isAuthenticated }: { isAuthenticated: boolean }) {
     <section className="home-band" aria-labelledby="offers-heading">
       <div className={`home-container home-offers${isAuthenticated ? ' home-offers--member' : ''}`}>
         <article className="home-offer home-offer--welcome">
-          <img className="home-offer__bg" src={home.welcomeOffer.image} alt="" loading="lazy" />
+          <img className="home-offer__bg" src={home.welcomeOffer.image} alt="" loading="lazy" decoding="async" />
           <div className="home-offer__content">
             <p className="home-offer__badge">{home.welcomeOffer.badge}</p>
             <h2 id="offers-heading" className="home-offer__title">{home.welcomeOffer.title}</h2>

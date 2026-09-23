@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { SectionHead } from '../../components/section-head/section-head';
 import content from '../../../content.json';
 
 const t = content.home.searchByDestination;
@@ -8,10 +9,7 @@ export function TreatmentDirectory() {
   return (
     <section className="home-band" aria-labelledby="treatments-heading">
       <div className="home-container">
-        <div className="home-head home-head--stack">
-          <h2 id="treatments-heading" className="headline-small">{t.heading}</h2>
-          <p className="home-head__sub body-large">{t.subheading}</p>
-        </div>
+        <SectionHead id="treatments-heading" heading={t.heading} subheading={t.subheading} />
         <div className="home-directory">
           {t.columns.flat().map((group) => (
             <div key={group.title} className="home-directory__group">

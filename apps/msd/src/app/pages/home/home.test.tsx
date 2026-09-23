@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import type { CatalogCategoryWithChildren, CatalogDeal } from '../../../api/catalog';
+import type { CatalogCategoryWithChildren, CatalogDeal, CatalogProduct, CatalogTherapist } from '../../../api/catalog';
 import content from '../../../content.json';
 import { Home } from './home';
 
@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   faqs: vi.fn(),
   categories: [] as unknown[],
   location: { status: 'ready', coords: null as null | { latitude: number; longitude: number } },
+  auth: { isAuthenticated: false, token: null as string | null },
 }));
 
 vi.mock('../../../api/catalog', async (importOriginal) => ({
@@ -26,7 +27,7 @@ vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
   useCatalogShell: () => ({ status: 'ready', locationsStatus: 'ready', categories: m.categories, locations: [], socialLinks: [] }),
 }));
 vi.mock('../../../location/location-context', () => ({ useVisitorLocation: () => m.location }));
-vi.mock('@skylabs-monorepo/shared-auth/react', () => ({ useAuth: () => ({ isAuthenticated: false, token: null }) }));
+vi.mock('@skylabs-monorepo/shared-auth/react', () => ({ useAuth: () => m.auth }));
 vi.mock('../../../wishlist/wishlist-context', () => ({ useWishlist: () => ({ toggle: vi.fn(), has: () => false }) }));
 vi.mock('../../seo/site-url', () => ({
   SITE_URL: 'https://example.test',
@@ -71,20 +72,45 @@ const MASSAGE = { id: 'c-m', name: 'Massage', slug: 'massage', description: null
 const SPA = { id: 'c-s', name: 'Spa', slug: 'spa-retreats', description: null };
 const FAQ = { id: 'f1', question: 'Can I cancel a booking?', answer: 'Yes, up to 24 hours before.' };
 
-function renderHome() {
-  return render(
+const THERAPIST = {
+  id: 't1',
+  personName: 'Asha',
+  therapistType: 'Physiotherapist',
+  packages: [],
+  vendor: null,
+  branch: null,
+} as unknown as CatalogTherapist;
+const PRODUCT = {
+  id: 'p1',
+  name: 'Massage Oil',
+  slug: 'massage-oil',
+  image: null,
+  imageAlt: null,
+  price: '499',
+  originalPrice: null,
+  discount: null,
+  vendor: null,
+} as unknown as CatalogProduct;
+
+function HomeRoutes() {
+  return (
     <MemoryRouter>
-      <Home />
-    </MemoryRouter>,
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/sign-in" element={<p>Sign-in page</p>} />
+      </Routes>
+    </MemoryRouter>
   );
+}
+
+function renderHome() {
+  return render(<HomeRoutes />);
 }
 
 const dealsSection = () => document.querySelector('section[aria-labelledby="deals-heading"]') as HTMLElement;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // md-tabs animates its indicator on selection; jsdom (and the shared-ui polyfills) lack getAnimations.
-  if (!Element.prototype.getAnimations) Element.prototype.getAnimations = () => [];
   m.categories = [
     cat({
       ...MASSAGE,
@@ -94,7 +120,7 @@ beforeEach(() => {
       ],
     }),
     cat({ ...SPA }),
-    cat({ id: 'c-h', name: 'Hair', slug: 'hair-nails' }),
+    cat({ id: 'c-h', name: 'Hair', slug: 'hair-nails', children: [{ id: 'c-h-1', name: 'Cut', slug: 'cut', description: null }] }),
   ];
   m.deals.mockResolvedValue({
     data: [
@@ -107,20 +133,30 @@ beforeEach(() => {
   m.therapists.mockResolvedValue({ data: [] });
   m.faqs.mockResolvedValue({ data: [FAQ] });
   m.location = { status: 'ready', coords: null };
+  m.auth = { isAuthenticated: false, token: null };
 });
 
 describe('Home', () => {
-  it('shows a busy status while the catalog loads', () => {
+  it('renders the static sections at once and a busy deals placeholder while the catalog loads', () => {
     m.deals.mockReturnValue(new Promise(() => undefined));
     renderHome();
-    const status = screen.getByRole('status');
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'Massage' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: content.home.howItWorks.heading })).toBeTruthy();
+    const status = within(dealsSection()).getByRole('status');
     expect(status.getAttribute('aria-busy')).toBe('true');
+    expect(screen.queryByRole('heading', { level: 2, name: content.home.faq.heading })).toBeNull();
   });
 
-  it('shows an alert when the catalog fails to load', async () => {
+  it('shows the load error inside the deals section and keeps the static sections', async () => {
     m.deals.mockRejectedValue(new Error('network down'));
     renderHome();
-    expect((await screen.findByRole('alert')).textContent).toBe(content.home.ui.messages.loadError);
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe(content.home.ui.messages.loadError);
+    expect(dealsSection().contains(alert)).toBe(true);
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'Massage' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: content.home.partnerBanner.heading })).toBeTruthy();
   });
 
   it('waits for the visitor location before fetching deals, then sends its coordinates', async () => {
@@ -130,15 +166,13 @@ describe('Home', () => {
     expect(m.deals).not.toHaveBeenCalled();
 
     m.location = { status: 'ready', coords: { latitude: 26.7, longitude: 83.4 } };
-    rerender(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
-    );
+    rerender(<HomeRoutes />);
     await waitFor(() => expect(m.deals).toHaveBeenCalledWith(expect.objectContaining({ latitude: 26.7, longitude: 83.4 })));
   });
 
   it('renders one h1 and the sections in the approved order', async () => {
+    m.therapists.mockResolvedValue({ data: [THERAPIST] });
+    m.products.mockResolvedValue({ data: [PRODUCT] });
     renderHome();
     await screen.findByRole('heading', { level: 2, name: content.home.sections.dealsNearYou.heading });
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
@@ -147,8 +181,11 @@ describe('Home', () => {
       content.home.sections.browseByCategory.heading,
       content.home.sections.dealsNearYou.heading,
       content.home.howItWorks.heading,
+      content.home.sections.therapists.heading,
+      content.home.sections.featuredProducts.heading,
       content.home.searchByDestination.heading,
       content.home.faq.heading,
+      content.home.partnerBanner.heading,
     ].map((text) => h2s.indexOf(text));
     order.forEach((index, i) => {
       expect(index).toBeGreaterThan(-1);
@@ -163,6 +200,12 @@ describe('Home', () => {
     expect(within(list).getByRole('link', { name: 'Massage' }).getAttribute('href')).toBe('/category/massage');
     expect(within(list).queryByRole('link', { name: 'Skin' })).toBeNull();
     expect(within(list).getByRole('heading', { level: 3, name: 'Massage' })).toBeTruthy();
+    const texts = Array.from(list.querySelectorAll('sky-tile-card')).map((el) => (el as unknown as { text?: string }).text);
+    expect(texts).toEqual([
+      content.home.categoryTileText.replace('{count}', '2'),
+      undefined,
+      content.home.categoryTileTextOne,
+    ]);
   });
 
   it('filters the deals carousel with category tabs, skipping categories without deals', async () => {
@@ -172,8 +215,53 @@ describe('Home', () => {
     expect(tabs.map((tab) => tab.textContent)).toEqual([content.home.sections.dealsNearYou.allTab, 'Massage', 'Spa']);
     expect(dealsSection().querySelectorAll('sky-product-card')).toHaveLength(3);
 
+    expect(tabs.map((tab) => tab.id)).toEqual(['deals-tab-all', 'deals-tab-c-m', 'deals-tab-c-s']);
+    for (const tab of tabs) expect(tab.getAttribute('aria-controls')).toBe('deals-panel');
+    const panel = within(dealsSection()).getByRole('tabpanel');
+    expect(panel.id).toBe('deals-panel');
+    expect(panel.getAttribute('aria-labelledby')).toBe('deals-tab-all');
+
     fireEvent.click(tabs[2]);
     await waitFor(() => expect(dealsSection().querySelectorAll('sky-product-card')).toHaveLength(1));
+    expect(within(dealsSection()).getByRole('tabpanel').getAttribute('aria-labelledby')).toBe('deals-tab-c-s');
+  });
+
+  it('hides the member banner when signed in', async () => {
+    const headlines = () =>
+      Array.from(document.querySelectorAll('sky-feature-card')).map((el) => (el as unknown as { headline?: string }).headline);
+    const { unmount } = renderHome();
+    await screen.findByRole('heading', { level: 2, name: content.home.sections.dealsNearYou.heading });
+    expect(headlines()).toContain(content.home.memberBanner.heading);
+    unmount();
+
+    m.auth = { isAuthenticated: true, token: 't' };
+    renderHome();
+    await screen.findByRole('heading', { level: 2, name: content.home.sections.dealsNearYou.heading });
+    expect(headlines()).not.toContain(content.home.memberBanner.heading);
+  });
+
+  it('sends a signed-out visitor to sign in when they favourite a deal', async () => {
+    renderHome();
+    // The card attaches its `favorite` listener in an effect, so re-dispatch until it is wired up.
+    await waitFor(() => {
+      const card = dealsSection()?.querySelector('sky-product-card');
+      if (card) fireEvent(card, new CustomEvent('favorite'));
+      expect(screen.getByText('Sign-in page')).toBeTruthy();
+    });
+  });
+
+  it('describes the spotlight price for screen readers and serves a responsive hero image', async () => {
+    renderHome();
+    const spotlight = await waitFor(() => {
+      const el = document.querySelector('.home-spotlight');
+      if (!el) throw new Error('no spotlight yet');
+      return el;
+    });
+    expect(spotlight.textContent).toContain(content.home.hero.spotlightWas);
+    expect(spotlight.textContent).toContain(content.home.hero.spotlightOff);
+    const hero = screen.getByRole('img', { name: content.home.hero.imageAlt });
+    expect(hero.getAttribute('srcset')).toContain('640w');
+    expect(hero.getAttribute('sizes')).toBe('(min-width: 840px) 52vw, 100vw');
   });
 
   it('lists the three "How it works" steps', async () => {

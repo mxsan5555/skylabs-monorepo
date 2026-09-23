@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import { useHomeCatalog } from './home-data';
+import { imageSrcSet, useHomeCatalog } from './home-data';
 
 const m = vi.hoisted(() => ({
   deals: vi.fn(),
@@ -98,5 +98,21 @@ describe('useHomeCatalog — unmount and refetch behavior', () => {
     resolveDeals({ data: [{ id: 'd2' }, { id: 'd3' }] });
     await waitFor(() => expect(result.current.deals).toHaveLength(2));
     expect(result.current.status).toBe('ready');
+  });
+});
+
+describe('imageSrcSet', () => {
+  const url = 'https://images.unsplash.com/photo-1?auto=format&fit=crop&w=1400&q=80';
+
+  it('builds one candidate per width by replacing the w= query param', () => {
+    expect(imageSrcSet(url, [640, 1400])).toBe(
+      'https://images.unsplash.com/photo-1?auto=format&fit=crop&w=640&q=80 640w, ' +
+        'https://images.unsplash.com/photo-1?auto=format&fit=crop&w=1400&q=80 1400w',
+    );
+  });
+
+  it('returns undefined when the URL has no w= param or is not absolute', () => {
+    expect(imageSrcSet('https://example.test/a.jpg', [640])).toBeUndefined();
+    expect(imageSrcSet('/local.jpg?w=1400', [640])).toBeUndefined();
   });
 });

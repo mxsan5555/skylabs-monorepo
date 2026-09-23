@@ -26,25 +26,6 @@ import './home.css';
 
 const { home } = content;
 
-function HomeSkeleton() {
-  return (
-    <div className="home" role="status" aria-busy="true">
-      <span className="sr-only">{home.ui.messages.loading}</span>
-      <div className="home-container home-skeleton">
-        <div className="home-skeleton__hero">
-          <div className="home-skeleton__block home-skeleton__block--copy" />
-          <div className="home-skeleton__block home-skeleton__block--media" />
-        </div>
-        <div className="home-skeleton__row">
-          {Array.from({ length: 4 }, (_, i) => (
-            <div key={i} className="home-skeleton__block home-skeleton__block--card" />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function Home() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
@@ -52,6 +33,7 @@ export function Home() {
   const { categories } = useCatalogShell();
   const { status: locationStatus, coords } = useVisitorLocation();
   const catalog = useHomeCatalog(locationStatus === 'locating' ? undefined : coords);
+  const ready = catalog.status === 'ready';
 
   const spotlight = useMemo(
     () => [...catalog.deals].sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0))[0],
@@ -93,37 +75,20 @@ export function Home() {
     </swiper-slide>
   );
 
-  const seo = (
-    <Seo title={content.meta.home.title} description={content.meta.home.description} path="/" jsonLd={jsonLd} />
-  );
-
-  if (catalog.status === 'loading') {
-    return (
-      <>
-        {seo}
-        <HomeSkeleton />
-      </>
-    );
-  }
-  if (catalog.status === 'error') {
-    return (
-      <>
-        {seo}
-        <p className="error-state" role="alert">{catalog.error}</p>
-      </>
-    );
-  }
-
   return (
     <div className="home">
-      {seo}
-      <HomeHero spotlight={spotlight} />
+      <Seo title={content.meta.home.title} description={content.meta.home.description} path="/" jsonLd={jsonLd} />
+      <HomeHero spotlight={ready ? spotlight : undefined} />
       <CategoryTiles categories={categories} />
-      {catalog.deals.length > 0 && (
-        <DealsNearYou deals={catalog.deals} categories={categories} renderDeal={renderDeal} />
-      )}
+      <DealsNearYou
+        status={catalog.status}
+        error={catalog.error}
+        deals={catalog.deals}
+        categories={categories}
+        renderDeal={renderDeal}
+      />
       <HowItWorks />
-      {catalog.therapists.length > 0 && (
+      {ready && catalog.therapists.length > 0 && (
         <section className="home-band" aria-labelledby="therapists-heading">
           <div className="home-container">
             <CardRail
@@ -161,7 +126,7 @@ export function Home() {
         </section>
       )}
       <HomeOffers isAuthenticated={isAuthenticated} />
-      {catalog.products.length > 0 && (
+      {ready && catalog.products.length > 0 && (
         <section className="home-band home-band--tint" aria-labelledby="products-heading">
           <div className="home-container">
             <CardRail
@@ -185,20 +150,22 @@ export function Home() {
         </section>
       )}
       <TreatmentDirectory />
-      <HomeFaq faqs={catalog.faqs} />
-      <section className="home-band home-band--flush" aria-label={home.partnerBanner.heading}>
+      {ready && <HomeFaq faqs={catalog.faqs} />}
+      <section className="home-band home-band--flush" aria-labelledby="partner-heading">
         <div className="home-container">
+          {/* Heading and body are slotted light DOM so the section has a real h2. */}
           <sky-cta-banner
             color="inverse"
             icon={home.partnerBanner.icon}
             iconStyle="tonal"
             iconShape="full"
-            headline={home.partnerBanner.heading}
-            text={home.partnerBanner.body}
             ctaLabel={home.partnerBanner.cta}
             ctaHref={home.partnerBanner.href}
             ctaIcon="arrow_forward"
-          />
+          >
+            <h2 id="partner-heading" className="home-partner__title title-large">{home.partnerBanner.heading}</h2>
+            <p className="home-partner__text body-large">{home.partnerBanner.body}</p>
+          </sky-cta-banner>
         </div>
       </section>
     </div>

@@ -1,4 +1,5 @@
 import type { CatalogFaq } from '../../../api/catalog';
+import { SectionHead } from '../../components/section-head/section-head';
 import content from '../../../content.json';
 
 const t = content.home.faq;
@@ -9,10 +10,7 @@ export function HomeFaq({ faqs }: { faqs: CatalogFaq[] }) {
   return (
     <section className="home-band home-band--tint" aria-labelledby="faq-heading">
       <div className="home-container home-faq">
-        <div className="home-faq__intro">
-          <h2 id="faq-heading" className="headline-small">{t.heading}</h2>
-          <p className="home-head__sub body-large">{t.subheading}</p>
-        </div>
+        <SectionHead id="faq-heading" heading={t.heading} subheading={t.subheading} />
         <sky-accordion single>
           {faqs.map((item) => (
             <sky-accordion-item key={item.id} header={item.question}>

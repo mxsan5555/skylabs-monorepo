@@ -21,48 +21,10 @@
 .home-band--flush {
   padding-block: 16px 32px;
 }
-.home :is(a):focus-visible {
+/* Tile links draw their ring on the tile (below), so skip them here to avoid a double ring. */
+.home :is(a):not(.home-cats__link):focus-visible {
   outline: 3px solid var(--md-sys-color-primary);
   outline-offset: 2px;
-}
-
-.home-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
-  margin-block-end: 16px;
-}
-.home-head--stack {
-  flex-direction: column;
-  align-items: flex-start;
-}
-.home-head h2,
-.home-faq__intro h2 {
-  margin: 0;
-  color: var(--md-sys-color-on-surface);
-}
-.home-head__sub {
-  margin: 0;
-  max-inline-size: 60ch;
-  color: var(--md-sys-color-on-surface-variant);
-}
-.home-head__link {
-  display: inline-flex;
-  align-items: center;
-  min-block-size: 48px;
-  padding-inline: 12px;
-  border-radius: var(--md-sys-shape-corner-full);
-  color: var(--md-sys-color-primary);
-  text-decoration: none;
-}
-.home-head__link:hover {
-  background-color: color-mix(
-    in srgb,
-    var(--md-sys-color-primary) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
-    transparent
-  );
 }
 
 /* Hero */
@@ -221,12 +183,6 @@
   background-color: transparent;
   --md-secondary-tab-container-color: transparent;
 }
-.home-empty {
-  margin: 0;
-  padding-block: 16px;
-  color: var(--md-sys-color-on-surface-variant);
-}
-
 /* How it works */
 .home-steps {
   display: grid;
@@ -289,10 +245,6 @@
   inline-size: 100%;
   block-size: 100%;
   object-fit: cover;
-  transition: transform var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
-}
-.home-offer--welcome:hover .home-offer__bg {
-  transform: scale(1.03);
 }
 /* Scrim keeps overlay copy at AA contrast on any photo. */
 .home-offer--welcome::after {
@@ -373,33 +325,26 @@
 .home-faq {
   display: grid;
   gap: 24px;
-}
-.home-faq__intro {
-  display: grid;
-  gap: 8px;
-  align-content: start;
+  align-items: start;
 }
 
-/* Skeleton */
-.home-skeleton {
-  display: grid;
-  gap: 24px;
-  padding-block: 32px;
+/* Partner banner: heading + body slotted into sky-cta-banner's copy column. */
+.home-partner__title,
+.home-partner__text {
+  margin: 0;
 }
-.home-skeleton__hero,
+
+/* Deals placeholder: card-sized blocks laid out like the rail. */
 .home-skeleton__row {
   display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: min(272px, 80vw);
   gap: 16px;
+  overflow: hidden;
 }
 .home-skeleton__block {
   border-radius: var(--md-sys-shape-corner-large);
   background-color: var(--md-sys-color-surface-container);
-}
-.home-skeleton__block--copy {
-  min-block-size: 200px;
-}
-.home-skeleton__block--media {
-  aspect-ratio: 4 / 3;
 }
 .home-skeleton__block--card {
   aspect-ratio: 3 / 4;
@@ -425,9 +370,6 @@
   .home-offers--member .home-offer--gift {
     grid-column: 1 / -1;
   }
-  .home-skeleton__row {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 @media (min-width: 840px) {
   .home-band {
@@ -436,8 +378,7 @@
   .home-hero {
     padding-block: 48px;
   }
-  .home-hero__inner,
-  .home-skeleton__hero {
+  .home-hero__inner {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
     gap: 48px;
   }
@@ -455,12 +396,14 @@
     grid-column: auto;
     grid-row: span 2;
   }
+  /* The copy column is at most 32px padding + 420px wide, so the scrim stays at 70% or more
+     up to 460px (or 80% of a narrower card) and only fades beyond the text. */
   .home-offer--welcome::after {
     background: linear-gradient(
-      100deg,
-      color-mix(in srgb, var(--md-sys-color-scrim) 85%, transparent) 0%,
-      color-mix(in srgb, var(--md-sys-color-scrim) 70%, transparent) 55%,
-      color-mix(in srgb, var(--md-sys-color-scrim) 10%, transparent) 90%
+      to right,
+      color-mix(in srgb, var(--md-sys-color-scrim) 80%, transparent) 0,
+      color-mix(in srgb, var(--md-sys-color-scrim) 70%, transparent) min(460px, 80%),
+      color-mix(in srgb, var(--md-sys-color-scrim) 15%, transparent) 100%
     );
   }
   .home-steps {
@@ -469,8 +412,5 @@
   .home-faq {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr);
     gap: 48px;
-  }
-  .home-skeleton__row {
-    grid-template-columns: repeat(4, 1fr);
   }
 }

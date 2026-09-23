@@ -145,3 +145,21 @@ export function useHomeCatalog(coords: Coordinates | null | undefined): HomeCata
 
   return { ...state, faqs };
 }
+
+/** `srcset` for a CDN image whose width is a `w=` query param (e.g. Unsplash): one candidate per
+ *  width. Undefined when the URL is not absolute or carries no `w=` param. */
+export function imageSrcSet(url: string, widths: number[]): string | undefined {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return undefined;
+  }
+  if (!parsed.searchParams.has('w')) return undefined;
+  return widths
+    .map((w) => {
+      parsed.searchParams.set('w', String(w));
+      return `${parsed.toString()} ${w}w`;
+    })
+    .join(', ');
+}

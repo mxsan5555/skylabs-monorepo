@@ -2,10 +2,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import type { CatalogDeal } from '../../../api/catalog';
 import { formatINR } from '../../../utils/format';
-import { toDealCardDeal } from './home-data';
+import { imageSrcSet, toDealCardDeal } from './home-data';
 import content from '../../../content.json';
 
 const { home } = content;
+const heroSrcSet = imageSrcSet(home.hero.image, [640, 960, 1400]);
 
 /** Hero: the page's only h1, site search, and a live "top deal" spotlight over the photo. */
 export function HomeHero({ spotlight }: { spotlight?: CatalogDeal }) {
@@ -38,6 +39,8 @@ export function HomeHero({ spotlight }: { spotlight?: CatalogDeal }) {
           <img
             className="home-hero__img"
             src={home.hero.image}
+            srcSet={heroSrcSet}
+            sizes="(min-width: 840px) 52vw, 100vw"
             alt={home.hero.imageAlt}
             width={1400}
             height={1050}
@@ -46,16 +49,23 @@ export function HomeHero({ spotlight }: { spotlight?: CatalogDeal }) {
           {spotlight && spotlightCard && (
             <Link to={`/deal/${spotlight.id}`} className="home-spotlight">
               {spotlightCard.image && (
-                <img className="home-spotlight__thumb" src={spotlightCard.image} alt="" width={72} height={72} />
+                <img className="home-spotlight__thumb" src={spotlightCard.image} alt="" width={64} height={64} />
               )}
               <span className="home-spotlight__body">
                 <span className="home-spotlight__label">{home.hero.spotlightLabel}</span>
                 <span className="home-spotlight__title">{spotlightCard.title}</span>
                 <span className="home-spotlight__price">
                   <strong>{formatINR(spotlightCard.price)}</strong>
-                  {spotlightCard.originalPrice && <s>{formatINR(spotlightCard.originalPrice)}</s>}
+                  {spotlightCard.originalPrice && (
+                    <>
+                      <span className="sr-only">{home.hero.spotlightWas}</span>
+                      <s>{formatINR(spotlightCard.originalPrice)}</s>
+                    </>
+                  )}
                   {spotlightCard.discount ? (
-                    <span className="home-spotlight__off">-{spotlightCard.discount}%</span>
+                    <span className="home-spotlight__off">
+                      -{spotlightCard.discount}%<span className="sr-only"> {home.hero.spotlightOff}</span>
+                    </span>
                   ) : null}
                 </span>
               </span>

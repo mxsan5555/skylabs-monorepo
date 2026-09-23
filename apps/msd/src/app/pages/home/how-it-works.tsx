@@ -1,4 +1,5 @@
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
+import { SectionHead } from '../../components/section-head/section-head';
 import content from '../../../content.json';
 
 const t = content.home.howItWorks;
@@ -8,10 +9,7 @@ export function HowItWorks() {
   return (
     <section className="home-band" aria-labelledby="how-heading">
       <div className="home-container">
-        <div className="home-head home-head--stack">
-          <h2 id="how-heading" className="headline-small">{t.heading}</h2>
-          <p className="home-head__sub body-large">{t.subheading}</p>
-        </div>
+        <SectionHead id="how-heading" heading={t.heading} subheading={t.subheading} />
         <ol className="home-steps">
           {t.steps.map((step) => (
             <li key={step.title} className="home-steps__item">
