@@ -118,7 +118,7 @@ export function VendorList({ vendors, onSelect, total, page, pageSize, loading, 
   return (
     <sky-data-table
       ref={tableRef as RefObject<HTMLElement>}
-      caption="Vendors"
+      caption="Member"
       columns={VENDOR_COLUMNS}
       rows={rows}
       total={total}

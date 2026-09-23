@@ -148,6 +148,11 @@ export async function getPermissionCatalog() {
   const existingByKey = new Map(existing.map((p) => [p.key, p]));
 
   return menu.map((node) => ({
+    // The menu node's own unique id — distinct from `menuKey`, which two different nodes may
+    // deliberately share (e.g. CMS "Pages"/"Articles" both grant `cms.blog`, two views of the
+    // same content by design). The frontend keys table rows on `id`, never `menuKey`, so two
+    // rows sharing a `menuKey` never collide as React list keys.
+    id: node.id,
     menuKey: node.permissionKey,
     title: node.title,
     actions: PERMISSION_ACTIONS.map((action: PermissionAction) => {
