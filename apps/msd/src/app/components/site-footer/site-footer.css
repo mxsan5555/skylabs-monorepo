@@ -43,8 +43,13 @@
 }
 .newsletter-band__inner {
   display: grid;
+  /* minmax(0, …) lets the column shrink below the email field's min-content at 320-360px. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   padding-block: 24px;
+}
+.newsletter-band__form {
+  min-inline-size: 0;
 }
 .newsletter-band__status {
   margin: 0;
