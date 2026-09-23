@@ -7,6 +7,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!-- title, description and robots are per-page tags from <Seo> (apps/msd/src/app/seo/seo.tsx);
          React 19 hoists them into <head> but never removes a static tag, so none live here. -->
+    <!-- Applies the saved theme before first paint (avoids a flash of the wrong theme).
+         Mirrors apps/msd/src/theme/theme-preference.ts + shared-ui themeClassName; keep in sync. -->
+    <script>
+      (function () {
+        var pref = 'light';
+        try {
+          var stored = localStorage.getItem('msd.theme');
+          if (stored === 'light' || stored === 'dark' || stored === 'system') pref = stored;
+        } catch (e) {}
+        var dark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        var mode = dark ? 'dark' : 'light';
+        var high = matchMedia('(prefers-contrast: more)').matches;
+        document.documentElement.className = high ? mode + '-high-contrast' : mode;
+        document.documentElement.style.colorScheme = mode;
+      })();
+    </script>
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
