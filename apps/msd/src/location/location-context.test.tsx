@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import { LocationProvider, useVisitorLocation } from './location-context';
 
 let mockLocations: Array<{ state: string; city: string; latitude?: number | null; longitude?: number | null }> = [
   { state: 'Maharashtra', city: 'Pune', latitude: 18.52, longitude: 73.85 },
@@ -13,8 +14,6 @@ vi.mock('../catalog/catalog-shell', () => ({
     locations: mockLocations,
   }),
 }));
-
-import { LocationProvider, useVisitorLocation } from './location-context';
 
 function Probe() {
   const { status, source, city, setCity } = useVisitorLocation();

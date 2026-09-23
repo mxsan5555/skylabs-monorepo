@@ -1,8 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { CatalogShellProvider, useCatalogShell, useCategoryLinks } from './catalog-shell';
 
-const listCatalogCategoriesMock = vi.fn();
-const listCatalogLocationsMock = vi.fn();
+const { listCatalogCategoriesMock, listCatalogLocationsMock } = vi.hoisted(() => ({
+  listCatalogCategoriesMock: vi.fn(),
+  listCatalogLocationsMock: vi.fn(),
+}));
 
 vi.mock('../api/catalog', async () => {
   const actual = await vi.importActual<typeof import('../api/catalog')>('../api/catalog');
@@ -12,8 +15,6 @@ vi.mock('../api/catalog', async () => {
     listCatalogLocations: (...a: unknown[]) => listCatalogLocationsMock(...a),
   };
 });
-
-import { CatalogShellProvider, useCatalogShell, useCategoryLinks } from './catalog-shell';
 
 function Probe() {
   const { status, locations } = useCatalogShell();
