@@ -5,5 +5,5 @@
   "outputDirectory": "../../dist/apps/msd",
   "ignoreCommand": "cd ../.. && npx nx-ignore msd",
   "framework": null,
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
 }
