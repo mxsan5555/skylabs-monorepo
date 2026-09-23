@@ -34,11 +34,13 @@ export interface CatalogCategoryWithChildren extends CatalogCategory {
   children: CatalogCategory[];
 }
 
-/** `GET /catalog/locations` — distinct `{state, city}` pairs from active branches, used to
- *  populate the public location picker without a full branch fetch. */
+/** `GET /catalog/locations`: distinct `{state, city}` pairs from active branches, plus the
+ *  average branch coordinates for that city (null when no branch has coordinates). */
 export interface CatalogLocation {
   state: string;
   city: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 /** A service Deal's own duration/price menu entry — a real child row (DealPackage), never a

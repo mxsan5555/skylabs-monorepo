@@ -465,19 +465,23 @@ export async function listPublicDeals(opts: {
   return { items, total };
 }
 
-/**
- * Distinct {state, city} pairs from active branches — drives the public location picker's
- * dropdown without a full branch fetch. Never includes an inactive branch's location (matches
- * every other public read's "active gating" convention in this file).
- */
+/** Distinct active {state, city} pairs plus the average of that city's branch coordinates, so
+ *  the storefront can map browser coordinates to the nearest city without a geocoding API.
+ *  `latitude`/`longitude` are null when no branch in the city has coordinates. */
 export async function listPublicLocations() {
-  const rows = await prisma.branch.findMany({
+  const rows = await prisma.branch.groupBy({
+    by: ['state', 'city'],
     where: { isActive: true, state: { not: null }, city: { not: null } },
-    select: { state: true, city: true },
-    distinct: ['state', 'city'],
+    _avg: { latitude: true, longitude: true },
     orderBy: [{ state: 'asc' }, { city: 'asc' }],
   });
-  return rows as { state: string; city: string }[];
+  const toNumber = (v: unknown) => (v == null ? null : Number(v));
+  return rows.map((r) => ({
+    state: r.state as string,
+    city: r.city as string,
+    latitude: toNumber(r._avg.latitude),
+    longitude: toNumber(r._avg.longitude),
+  }));
 }
 
 export async function getPublicDealOrThrow(id: string) {
