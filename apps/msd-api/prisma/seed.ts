@@ -21,6 +21,7 @@ import { permissionKeyFor } from '@skylabs-monorepo/shared-permissions';
 import { ensureUniqueSlug } from '../src/lib/slug';
 import { getMenuForApp } from '@skylabs-monorepo/shared-menu';
 import { normalizeIdentifier } from '../src/lib/normalizeIdentifier';
+import { migrateSharedKeySplitGrants } from '../src/services/permission-migration.service';
 import { CATEGORY_TAXONOMY } from './category-taxonomy';
 
 const prisma = new PrismaClient();
@@ -94,9 +95,15 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   'rbac.users': ['create', 'edit', 'delete', 'assign', 'status_change', 'custom'],
   'rbac.audit-logs': [],
   settings: ['edit'],
-  // CMS: Blog is full CRUD; About Us/Contact Us are singleton content rows — edit-only, mirrors
-  // 'settings' above exactly (no create/delete concept for a row that always exists).
-  'cms.blog': ['create', 'edit', 'delete'],
+  // CMS Blog was previously ONE key ('cms.blog') shared by the "Pages" and "Articles" sidebar
+  // rows — split into two distinct keys so their Role Permission Matrix checkboxes toggle
+  // independently (see msd-menu.json). `cms.blog.pages` is the real, currently-implemented
+  // route (blog-posts.routes.ts); `cms.blog.articles` has no frontend route or backend gate of
+  // its own yet — its checkbox exists for matrix completeness/future wiring, same "grantable but
+  // currently inert" pattern as any navigation-only row. `migrateSharedKeySplitGrants` below
+  // (not this map) is what preserves every role's existing 'cms.blog:*' grant onto both new keys.
+  'cms.blog.pages': ['create', 'edit', 'delete'],
+  'cms.blog.articles': ['create', 'edit', 'delete'],
   'cms.about-us': ['edit'],
   'cms.contact-us': ['edit'],
   'cms.faq': ['create', 'edit', 'delete'],
@@ -260,7 +267,9 @@ async function grantStarterPermissions(
     'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit', 'masters.sub-categories:delete',
     'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
     'settings:view', 'settings:edit',
-    'cms:view', 'cms.blog:view', 'cms.blog:create', 'cms.blog:edit', 'cms.blog:delete',
+    'cms:view',
+    'cms.blog.pages:view', 'cms.blog.pages:create', 'cms.blog.pages:edit', 'cms.blog.pages:delete',
+    'cms.blog.articles:view', 'cms.blog.articles:create', 'cms.blog.articles:edit', 'cms.blog.articles:delete',
     'cms.about-us:view', 'cms.about-us:edit', 'cms.contact-us:view', 'cms.contact-us:edit',
   ]);
 
@@ -270,10 +279,14 @@ async function grantStarterPermissions(
     'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit',
     'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
     'reports:view',
-    // No 'cms.blog:delete' — mirrors this same role's create/edit-but-no-delete grant on
-    // 'masters.categories' above.
-    'cms:view', 'cms.blog:view', 'cms.blog:create', 'cms.blog:edit',
+    // No 'cms.blog.pages:delete'/'cms.blog.articles:delete' — mirrors this same role's
+    // create/edit-but-no-delete grant on 'masters.categories' above.
+    'cms:view',
+    'cms.blog.pages:view', 'cms.blog.pages:create', 'cms.blog.pages:edit',
+    'cms.blog.articles:view', 'cms.blog.articles:create', 'cms.blog.articles:edit',
     'cms.about-us:view', 'cms.about-us:edit', 'cms.contact-us:view', 'cms.contact-us:edit',
+    // No 'cms.faq:delete' — same create/edit-but-no-delete grant as this role's blog grants above.
+    'cms.faq:view', 'cms.faq:create', 'cms.faq:edit',
   ]);
 
   await grant('sales', [
@@ -1335,6 +1348,14 @@ async function main() {
   validateDemoSeedDataset();
   const roles = await seedRoles();
   const permissionIdByKey = await seedPermissions();
+  // Every menuKey that used to be shared by multiple menu nodes and has since been split into
+  // distinct per-node keys — add a new `{ oldMenuKey, newMenuKeys }` entry here whenever another
+  // such split happens, so every role's (including custom roles') existing access is preserved.
+  await migrateSharedKeySplitGrants(
+    prisma,
+    [{ oldMenuKey: 'cms.blog', newMenuKeys: ['cms.blog.pages', 'cms.blog.articles'] }],
+    permissionIdByKey,
+  );
   await grantAllPermissionsToSuperAdmins(roles, permissionIdByKey);
   await grantStarterPermissions(roles, permissionIdByKey);
   await seedDashboardWidgets(roles);

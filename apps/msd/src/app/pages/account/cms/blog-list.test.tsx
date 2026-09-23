@@ -133,7 +133,7 @@ async function dispatchRowActionUntil(action: string, assert: () => void, rowInd
 
 beforeEach(() => {
   vi.clearAllMocks();
-  grantedPermissions = new Set(['cms.blog:create', 'cms.blog:edit', 'cms.blog:delete']);
+  grantedPermissions = new Set(['cms.blog.pages:create', 'cms.blog.pages:edit', 'cms.blog.pages:delete']);
   listBlogPostsMock.mockResolvedValue({ data: [POST], meta: { total: 1 } });
   listBlogCategoriesMock.mockResolvedValue({ data: [{ id: 'cat-1', name: 'Wellness', slug: 'wellness', description: '', isActive: true, sortOrder: 0, createdAt: '', updatedAt: '' }] });
 });

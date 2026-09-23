@@ -222,7 +222,7 @@
             "id": "cms-blog-pages",
             "title": "Pages",
             "route": "/account/cms/blog",
-            "permissionKey": "cms.blog",
+            "permissionKey": "cms.blog.pages",
             "parent": "cms-blog",
             "order": 1
           },
@@ -238,7 +238,7 @@
             "id": "cms-blog-articles",
             "title": "Articles",
             "route": "/account/cms/blog/articles",
-            "permissionKey": "cms.blog",
+            "permissionKey": "cms.blog.articles",
             "parent": "cms-blog",
             "order": 3
           }
