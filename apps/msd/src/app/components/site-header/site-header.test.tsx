@@ -13,7 +13,8 @@ vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
 }));
 vi.mock('../../../wishlist/wishlist-context', () => ({ useWishlist: () => ({ ids: new Set(['a', 'b']) }) }));
 vi.mock('../../../hooks/use-cart-count', () => ({ useCartCount: () => 1 }));
-vi.mock('../../../catalog/catalog-shell', () => ({
+vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../catalog/catalog-shell')>()),
   useCatalogShell: () => ({
     status: 'ready',
     locations: shell.locations,

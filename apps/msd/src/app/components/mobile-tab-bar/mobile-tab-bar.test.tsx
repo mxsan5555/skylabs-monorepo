@@ -21,7 +21,8 @@ vi.mock('../../../hooks/use-cart-count', () => ({ useCartCount: () => 0 }));
 // `useCatalogShell` and importing the real `useCategoryLinks` would read the real (unmocked)
 // context instead of this test's `state` — mock both, mirroring `useCategoryLinks`'s own
 // categories-present/fallback-to-`content.nav.categories` logic against the same `state`.
-vi.mock('../../../catalog/catalog-shell', () => ({
+vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../catalog/catalog-shell')>()),
   useCatalogShell: () => ({ status: state.status, categories: state.categories, locations: [] }),
   useCategoryLinks: () =>
     state.categories.length > 0

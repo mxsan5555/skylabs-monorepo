@@ -50,6 +50,13 @@ export function useCatalogShell(): CatalogShellValue {
   return useContext(CatalogShellContext);
 }
 
+/** The one place category URLs are built: `/category/<slug>`, plus `?sub=<subSlug>` to open the
+ *  category page on that subcategory tab. */
+export function categoryHref(categorySlug: string, subSlug?: string): string {
+  const base = `/category/${encodeURIComponent(categorySlug)}`;
+  return subSlug ? `${base}?sub=${encodeURIComponent(subSlug)}` : base;
+}
+
 /** Top-level category links from the API, or the static `nav.categories` list when the API
  *  has nothing (loading, error, empty) so navigation never disappears. */
 export function useCategoryLinks(): CategoryLink[] {
@@ -57,7 +64,7 @@ export function useCategoryLinks(): CategoryLink[] {
   return useMemo(
     () =>
       categories.length > 0
-        ? categories.map((c) => ({ id: c.id, label: c.name, to: `/category/${c.slug}` }))
+        ? categories.map((c) => ({ id: c.id, label: c.name, to: categoryHref(c.slug) }))
         : content.nav.categories.map((c) => ({ id: c.to, label: c.label, to: c.to })),
     [categories],
   );

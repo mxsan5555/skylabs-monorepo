@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type FocusEvent } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
-import { useCatalogShell, useCategoryLinks } from '../../../catalog/catalog-shell';
+import { categoryHref, useCatalogShell, useCategoryLinks } from '../../../catalog/catalog-shell';
 import { useDismiss } from '../../../hooks/use-dismiss';
 import content from '../../../content.json';
 
@@ -69,7 +69,7 @@ export function CategoryStrip() {
         <div className="mega-panel__grid">
           {categories.map((cat) => (
             <div key={cat.id} className="mega-panel__group">
-              <Link to={`/category/${cat.slug}`} className="mega-panel__heading title-small" onClick={close}>
+              <Link to={categoryHref(cat.slug)} className="mega-panel__heading title-small" onClick={close}>
                 {cat.name}
               </Link>
               {cat.children.length > 0 && (
@@ -77,7 +77,7 @@ export function CategoryStrip() {
                   {cat.children.map((sub) => (
                     <li key={sub.id}>
                       <Link
-                        to={`/category/${cat.slug}?sub=${sub.slug}`}
+                        to={categoryHref(cat.slug, sub.slug)}
                         className="mega-panel__link body-medium"
                         onClick={close}
                       >

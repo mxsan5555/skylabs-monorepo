@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CatalogShellProvider, useCatalogShell, useCategoryLinks } from './catalog-shell';
+import { CatalogShellProvider, categoryHref, useCatalogShell, useCategoryLinks } from './catalog-shell';
 
 const { listCatalogCategoriesMock, listCatalogLocationsMock } = vi.hoisted(() => ({
   listCatalogCategoriesMock: vi.fn(),
@@ -50,5 +50,13 @@ describe('CatalogShellProvider', () => {
     listCatalogLocationsMock.mockResolvedValue({ data: [{ state: 'Maharashtra', city: 'Pune' }] });
     render(<CatalogShellProvider><Probe /></CatalogShellProvider>);
     await waitFor(() => expect(screen.getByText(/^error\|.*\|Pune$/)).toBeTruthy());
+  });
+});
+
+describe('categoryHref', () => {
+  it('builds a category URL, with an optional encoded ?sub=', () => {
+    expect(categoryHref('massage')).toBe('/category/massage');
+    expect(categoryHref('massage', 'deep-tissue')).toBe('/category/massage?sub=deep-tissue');
+    expect(categoryHref('spa & more', 'a/b')).toBe('/category/spa%20%26%20more?sub=a%2Fb');
   });
 });

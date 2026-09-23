@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Dialog, IconButton, Icon } from '@skylabs-monorepo/shared-ui/react';
-import { useCatalogShell, useCategoryLinks } from '../../../catalog/catalog-shell';
+import { categoryHref, useCatalogShell, useCategoryLinks } from '../../../catalog/catalog-shell';
 import content from '../../../content.json';
 
 /**
@@ -32,7 +32,7 @@ export function CategorySheet({ open, onClose }: { open: boolean; onClose: () =>
                 <ul className="category-sheet__list">
                   <li>
                     <Link
-                      to={`/category/${cat.slug}`}
+                      to={categoryHref(cat.slug)}
                       className="category-sheet__link title-small"
                       onClick={onClose}
                     >
@@ -42,7 +42,7 @@ export function CategorySheet({ open, onClose }: { open: boolean; onClose: () =>
                   {cat.children.map((sub) => (
                     <li key={sub.id}>
                       <Link
-                        to={`/category/${cat.slug}?sub=${sub.slug}`}
+                        to={categoryHref(cat.slug, sub.slug)}
                         className="category-sheet__link body-large"
                         onClick={onClose}
                       >
