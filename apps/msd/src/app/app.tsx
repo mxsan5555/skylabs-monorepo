@@ -2,6 +2,7 @@ import { AuthProvider } from '@skylabs-monorepo/shared-auth/react';
 import { CatalogShellProvider } from '../catalog/catalog-shell';
 import { LocationProvider } from '../location/location-context';
 import { WishlistProvider } from '../wishlist/wishlist-context';
+import { CartCountProvider } from '../hooks/use-cart-count';
 import { ToastProvider } from '../toast/toast-context';
 import { ErrorBoundary } from './components/error-boundary';
 import { AppRoutes } from './routes';
@@ -20,7 +21,8 @@ import { AppRoutes } from './routes';
  * deliberately no `CartProvider` here at all — the cart is real, backend-driven state
  * (`api/cart.ts`, read directly via `getCart` wherever needed, with a lightweight pub/sub so the
  * header badge refetches on every mutation — see `subscribeCartUpdated`), never a second
- * client-side store.
+ * client-side store. `CartCountProvider` (also inside `AuthProvider`) holds only the item total
+ * for the header and mobile tab bar badges, so both share one `getCart` call.
  * `ToastProvider` doesn't need auth, but sits innermost anyway so its fixed-position stack
  * always mounts closest to the route tree that calls `useToast()`. `ErrorBoundary` wraps only
  * `<AppRoutes />`, inside every provider, so a render-phase crash anywhere in the route tree
@@ -33,11 +35,13 @@ export function App() {
       <CatalogShellProvider>
         <LocationProvider>
           <WishlistProvider>
-            <ToastProvider>
-              <ErrorBoundary>
-                <AppRoutes />
-              </ErrorBoundary>
-            </ToastProvider>
+            <CartCountProvider>
+              <ToastProvider>
+                <ErrorBoundary>
+                  <AppRoutes />
+                </ErrorBoundary>
+              </ToastProvider>
+            </CartCountProvider>
           </WishlistProvider>
         </LocationProvider>
       </CatalogShellProvider>

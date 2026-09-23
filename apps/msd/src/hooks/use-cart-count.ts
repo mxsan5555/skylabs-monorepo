@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react';
+import { createContext, createElement, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCart, subscribeCartUpdated } from '../api/cart';
 
-/** Total item quantity in the signed-in customer's cart; refetches on every cart mutation. */
-export function useCartCount(): number {
+const CartCountContext = createContext(0);
+
+/** Holds the signed-in customer's cart item total, fetched once and refetched on every cart
+ *  mutation, so the header and the mobile tab bar share one `getCart` call. Mount inside
+ *  `AuthProvider`. */
+export function CartCountProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, token } = useAuth();
   const [count, setCount] = useState(0);
 
@@ -30,5 +34,10 @@ export function useCartCount(): number {
     };
   }, [isAuthenticated, token]);
 
-  return count;
+  return createElement(CartCountContext.Provider, { value: count }, children);
+}
+
+/** Total item quantity in the signed-in customer's cart (0 outside `CartCountProvider`). */
+export function useCartCount(): number {
+  return useContext(CartCountContext);
 }
