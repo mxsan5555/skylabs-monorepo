@@ -11,6 +11,11 @@
     "tagline": "India's wellness marketplace",
     "description": "Discover trusted spa, beauty, and wellness experiences with exclusive offers and effortless booking."
   },
+  "cardRail": {
+    "previous": "Previous: {heading}",
+    "next": "Next: {heading}",
+    "seeAllLabel": "{seeAll}: {heading}"
+  },
   "header": {
     "skipToContent": "Skip to main content",
     "closeNavigation": "Close navigation",
@@ -312,6 +317,14 @@
         "seeAll": "See all",
         "seeAllTo": "/explore"
       },
+      "dealsNearYou": {
+        "heading": "Deals near you",
+        "seeAll": "See all deals",
+        "seeAllTo": "/explore",
+        "allTab": "All",
+        "tabsLabel": "Filter deals by category",
+        "empty": "No deals in this category yet."
+      },
       "featuredProducts": {
         "heading": "Featured Products",
         "seeAll": "See all",
@@ -379,6 +392,26 @@
         "seeAllTo": "/category/health-wellness"
       }
     },
+    "howItWorks": {
+      "heading": "How it works",
+      "subheading": "Book a spa, massage or beauty treatment in three steps.",
+      "steps": [
+        { "icon": "search", "title": "Find", "text": "Search or browse verified spas and therapists near you." },
+        { "icon": "event_available", "title": "Book", "text": "Pick a deal and a time, then pay securely with Razorpay." },
+        { "icon": "spa", "title": "Relax", "text": "Get instant confirmation and enjoy your treatment." }
+      ]
+    },
+    "categoryIcons": {
+      "massage": "self_improvement",
+      "spa-retreats": "hot_tub",
+      "skin-beauty": "face_retouching_natural",
+      "hair-nails": "content_cut",
+      "health-wellness": "favorite",
+      "therapy": "healing",
+      "product": "shopping_bag",
+      "default": "spa"
+    },
+    "categoryTileText": "{count} treatments",
     "giftCard": {
       "chip": "Gift Cards",
       "heading": "Give the Gift of Wellness",
