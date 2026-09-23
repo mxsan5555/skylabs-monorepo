@@ -28,12 +28,40 @@
       "profile": "My Profile",
       "bookings": "My Bookings",
       "wishlist": "Wishlist",
+      "orders": "Orders",
       "signOut": "Sign Out"
     },
     "drawerLabel": "Navigation drawer",
     "searchLabel": "Search spas, massages and treatments",
     "searchPlaceholder": "Search spas, massages, treatments",
-    "searchAction": "Search"
+    "searchAction": "Search",
+    "orders": "Orders",
+    "countLabel": "{label}, {count} items",
+    "countLabelOne": "{label}, 1 item",
+    "becomeMember": "Become a Member",
+    "becomeMemberTo": "/member",
+    "allCategories": "All categories",
+    "categoriesNavLabel": "Categories",
+    "accountMenuLabel": "Account menu",
+    "city": {
+      "locating": "Locating…",
+      "setLocation": "Set location",
+      "changeLabel": "Change city",
+      "dialogTitle": "Choose your city",
+      "useCurrent": "Use my current location",
+      "listLabel": "Cities with partner spas",
+      "close": "Close"
+    }
+  },
+  "tabBar": {
+    "label": "Primary",
+    "home": "Home",
+    "categories": "Categories",
+    "wishlist": "Wishlist",
+    "cart": "Cart",
+    "account": "Account",
+    "sheetTitle": "All categories",
+    "viewAll": "All {category}"
   },
   "nav": {
     "drawerCategoryHeader": "Browse Categories",
