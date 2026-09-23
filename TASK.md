@@ -53,6 +53,7 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] Wired CartProvider + WishlistProvider in main.tsx — 2026-07-12
 - [x] msd shell plan 1: location provider (saved/browser/IP), shared catalog shell, SiteHeader, MobileTabBar — 2026-09-22
 - [x] msd shell plan 2: SiteFooter, Seo component, JSON-LD, city landing pages — 2026-09-23
+- [x] msd shell plan 3: home page (10 fixed sections, CardRail, SectionHead, Seo + ItemList/FAQPage JSON-LD, location-aware catalog fetch) — 2026-09-23
 
 ### Content pages — both apps (`pages/` + route)
 - [ ] Contact page~
@@ -75,6 +76,8 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] msd: audit app-level CSS in dark theme now that the footer theme switch exposes it
 - [ ] msd: city filter for products/therapists APIs so Product/Therapy city pages and popular searches can include them
 - [ ] msd: popular searches are only in the client render until plan 4 seeds the catalog into the prerender
+- [ ] msd: shared --sky-content-max token for 1280px/16px containers (header, footer, home)
+- [ ] msd: migrate remaining useCurrentLocation callers (category, search, therapists, vendor) to useVisitorLocation
 
 ### Account & admin — both apps (remaining)
 - [ ] Logout from inside the console (currently in the public header)

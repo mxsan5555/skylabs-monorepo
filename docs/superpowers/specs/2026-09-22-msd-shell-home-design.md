@@ -118,6 +118,8 @@ Order (every section is a `<section aria-labelledby>` with an `<h2>`, except the
 9. FAQ (`sky-accordion`, answers slotted in light DOM) with FAQPage JSON-LD.
 10. Partner banner (`sky-cta-banner`).
 
+Static sections (hero with `<h1>` and search, category tiles, How it works, treatment directory, offers, partner banner) render at once; only the spotlight, Deals near you, therapists, products and FAQ wait for catalog data. While it loads, the Deals near you section shows card placeholders (`role="status"`, `aria-busy`); on error its alert sits in that section and the rest of the page stays. Category tiles read "1 treatment" / "{n} treatments" (child subcategory count) and omit the line at 0. The welcome offer CTA is a real link (`md-filled-button href`), not a click handler.
+
 Carousel prev/next buttons stay in the section header row with accessible names. Images below the hero use `loading="lazy"` and `decoding="async"`. `home.css` is rewritten against tokens; unused `content.json` keys for removed sections (`spaFinderHero`, `premiumHero`, `heroImages`, `vacationStays`, `trustSection`, removed `sections.*` entries) are deleted after a repo-wide grep confirms no other caller.
 
 `prerenderData()` returns categories, locations, deals (first 24), therapists (12), products (12), and FAQs.
