@@ -29,9 +29,10 @@ const safeDecode = (value: string): string => {
 export function parseGeoHeaders(headers: Headers): GeoResult | null {
   const rawCity = headers.get('x-vercel-ip-city');
   if (!rawCity) return null;
+  const rawRegion = headers.get('x-vercel-ip-country-region');
   return {
     city: safeDecode(rawCity),
-    region: headers.get('x-vercel-ip-country-region'),
+    region: rawRegion == null ? null : safeDecode(rawRegion),
     latitude: toNumber(headers.get('x-vercel-ip-latitude')),
     longitude: toNumber(headers.get('x-vercel-ip-longitude')),
   };

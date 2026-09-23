@@ -25,6 +25,15 @@ describe('parseGeoHeaders', () => {
     const headers = new Headers({ 'x-vercel-ip-city': 'Pune%' });
     expect(parseGeoHeaders(headers)).toEqual({ city: 'Pune%', region: null, latitude: null, longitude: null });
   });
+
+  it('keeps zero and negative coordinates instead of dropping them as falsy', () => {
+    const headers = new Headers({
+      'x-vercel-ip-city': 'Accra',
+      'x-vercel-ip-latitude': '0',
+      'x-vercel-ip-longitude': '-0.1276',
+    });
+    expect(parseGeoHeaders(headers)).toEqual({ city: 'Accra', region: null, latitude: 0, longitude: -0.1276 });
+  });
 });
 
 describe('haversineKm', () => {
