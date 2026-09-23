@@ -63,6 +63,9 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] msd: transparent/dark-mode logo asset (`logo.jpg` has a white background)
 - [ ] msd: fix pre-existing lint (~43 errors) and tsc (~28 errors) so CI `nx affected -t lint` passes
 - [ ] msd: staff/admin "Account" on phones lands in admin console without bottom nav (decide UX)
+- [ ] msd: 10 public pages render their own `<main>` inside PublicLayout's `<main>` (about, become-vendor, blog, blog-detail, careers, checkout, contact, how-it-works, showcase, website-page): change page roots to div/article
+- [ ] msd: tell the user when 'Use my current location' fails or is >75 km from any partner city
+- [ ] msd: header/tab bar tests for search submit, signed-in account menu, useAccountLinks role branches
 
 ### Account & admin — both apps (remaining)
 - [ ] Logout from inside the console (currently in the public header)
