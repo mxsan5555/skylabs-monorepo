@@ -34,6 +34,17 @@ describe('buildPopularSearches', () => {
     expect(out.map((s) => s.label)).toEqual(['Massage in Aurangabad']);
   });
 
+  it('skips Product and Therapy categories (their city pages cannot filter by city)', () => {
+    const typed = [
+      { id: 's', name: 'Spa', slug: 'spa', description: null, children: [], type: 'SERVICE' as const },
+      { id: 'p', name: 'Serums', slug: 'serums', description: null, children: [], type: 'PRODUCT' as const },
+      { id: 't', name: 'Therapy', slug: 'therapy', description: null, children: [], type: 'THERAPY' as const },
+      { id: 'n', name: 'Nails', slug: 'nails', description: null, children: [], type: null },
+    ];
+    const out = buildPopularSearches(typed, [cities[0]], null);
+    expect(out.map((s) => s.label)).toEqual(['Spa in Delhi', 'Nails in Delhi']);
+  });
+
   it('caps the list', () => {
     expect(buildPopularSearches(cats, cities, null, 3)).toHaveLength(3);
   });

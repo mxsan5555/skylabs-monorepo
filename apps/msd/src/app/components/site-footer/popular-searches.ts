@@ -10,6 +10,10 @@ export interface PopularSearch {
 
 export const POPULAR_SEARCH_LIMIT = 40;
 
+/** Only deal (service) categories: the city page narrows deals by city, but the product and
+ *  therapist catalog APIs have no city filter yet, so those city pages would not differ. */
+const filtersByCity = (cat: CatalogCategoryWithChildren) => cat.type !== 'PRODUCT' && cat.type !== 'THERAPY';
+
 /** "{Category} in {City}" links for every city with partners; the visitor's city first. */
 export function buildPopularSearches(
   categories: CatalogCategoryWithChildren[],
@@ -28,9 +32,10 @@ export function buildPopularSearches(
   const visitorSlug = visitorCity ? citySlug(visitorCity) : null;
   const isVisitor = (loc: CatalogLocation) => Number(citySlug(loc.city) === visitorSlug);
   const cities = unique.sort((a, b) => isVisitor(b) - isVisitor(a));
+  const dealCategories = categories.filter(filtersByCity);
   const out: PopularSearch[] = [];
   for (const loc of cities) {
-    for (const cat of categories) {
+    for (const cat of dealCategories) {
       if (out.length >= limit) return out;
       out.push({
         id: `${cat.id}|${loc.state}|${loc.city}`,
