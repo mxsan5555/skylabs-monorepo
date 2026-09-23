@@ -99,4 +99,9 @@ describe('citySlug / cityHref', () => {
   it('builds /category/<slug>/<city-slug>', () => {
     expect(cityHref('massage', 'Navi Mumbai')).toBe('/category/massage/navi-mumbai');
   });
+  it('falls back to the category page when the city slugifies to empty', () => {
+    expect(citySlug('!!!')).toBe('');
+    expect(cityHref('massage', '!!!')).toBe('/category/massage');
+    expect(cityHref('massage', '')).toBe('/category/massage');
+  });
 });

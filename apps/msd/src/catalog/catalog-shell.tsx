@@ -74,9 +74,11 @@ export function citySlug(city: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-/** City landing page for a category: `/category/<slug>/<city-slug>`. */
+/** City landing page for a category: `/category/<slug>/<city-slug>`. Falls back to the plain
+ *  category page when the city name has no URL-safe characters (empty or symbols only). */
 export function cityHref(categorySlug: string, city: string): string {
-  return `${categoryHref(categorySlug)}/${citySlug(city)}`;
+  const slug = citySlug(city);
+  return slug ? `${categoryHref(categorySlug)}/${slug}` : categoryHref(categorySlug);
 }
 
 /** Top-level category links from the API, or the static `nav.categories` list when the API
