@@ -79,8 +79,10 @@ Removed: `header-v2.tsx`, `header-v2.css`, `header.tsx`, `header.css`, `footer.t
 2. Newsletter band: `sky-action-field` with `type="email"`, `autocomplete="email"`, `required`. UI-only: on valid submit it clears the field and shows the success message from `content.json` in an `aria-live="polite"` region. No request is sent; the `TASK.md` backlog item "Newsletter backend (msd-api table + endpoint)" tracks the real integration.
 3. Columns: brand block (name, tagline, contact, social links with "opens in new tab" in the accessible name), Discover (categories from `useCatalogShell()`), Company, Help, Partners. Each column is a `<nav>` with an `<h2>`.
 4. Popular searches: "{Category} in {City}" links to `/category/{slug}/{city-slug}`. Prerendered HTML lists all pairs (capped at 40 links); on the client the visitor's city moves first.
-5. Legal bar: copyright with the current year, legal links, theme switch (light, dark, system) calling `applyTheme` / `applySystemTheme`.
-- Phone: blocks 3 and 4 collapse into `sky-accordion`; links stay in the DOM.
+5. Legal bar: copyright with the current year, legal links, theme switch (light, dark, system) calling `applyTheme` / `applySystemTheme`. The theme choice persists as `msd.theme` (default light) and still honours OS high contrast.
+- Phone: link columns collapse into native disclosure buttons (one list per column, links stay in the DOM); `sky-accordion` is not used here to avoid rendering links twice.
+- Popular searches exclude Product and Therapy categories until the products/therapists catalog APIs filter by city (the city page can only narrow deals).
+- While the newsletter is UI-only, its success copy is honest ("launching soon") and does not claim a subscription.
 
 ## 6. Location and shared data
 

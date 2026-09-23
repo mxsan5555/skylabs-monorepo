@@ -52,6 +52,7 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] Routes: added /explore, /category/:slug, /deal/:id, /cart, /wishlist (RequireAuth), /checkout (RequireAuth) to PublicLayout — 2026-07-12
 - [x] Wired CartProvider + WishlistProvider in main.tsx — 2026-07-12
 - [x] msd shell plan 1: location provider (saved/browser/IP), shared catalog shell, SiteHeader, MobileTabBar — 2026-09-22
+- [x] msd shell plan 2: SiteFooter, Seo component, JSON-LD, city landing pages — 2026-09-23
 
 ### Content pages — both apps (`pages/` + route)
 - [ ] Contact page~
@@ -67,6 +68,10 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] msd: tell the user when 'Use my current location' fails or is >75 km from any partner city
 - [ ] msd: header/tab bar tests for search submit, signed-in account menu, useAccountLinks role branches
 - [ ] msd: pages without their own `<title>`/`Seo` (dashboard-process-flow.tsx, profile-form.tsx, account/profile.tsx, my-account/my-account-layout.tsx, my-account/profile.tsx) show no title since index.html no longer carries a static one; add Seo per page spec
+- [ ] msd: set VITE_SITE_URL in Vercel (Production + Preview) so canonical/OG/JSON-LD emit absolute URLs
+- [ ] msd: audit app-level CSS in dark theme now that the footer theme switch exposes it
+- [ ] msd: city filter for products/therapists APIs so Product/Therapy city pages and popular searches can include them
+- [ ] msd: popular searches are only in the client render until plan 4 seeds the catalog into the prerender
 
 ### Account & admin — both apps (remaining)
 - [ ] Logout from inside the console (currently in the public header)
