@@ -111,11 +111,13 @@ describe('PermissionMatrix', () => {
     }
   });
 
-  // Regression: two catalog rows can legitimately share a `menuKey` (e.g. CMS "Pages"/"Articles"
-  // both grant `cms.blog` by design), but each still comes from a distinct menu node with its
-  // own `id`. Before rows were keyed on `row.id` (previously `row.menuKey`), two such rows
-  // collided as React list keys — caught via a live "two children with the same key" console
-  // error during manual verification — and one silently failed to render.
+  // Regression: two catalog rows sharing a `menuKey` is no longer real msd-menu data (CMS
+  // "Pages"/"Articles" used to both grant `cms.blog` — since split into distinct keys, see
+  // seed.ts's migrateSharedKeySplitGrants), but the PermissionMatrix component must still handle
+  // it safely as a general contract. Before rows were keyed on `row.id` (previously
+  // `row.menuKey`), two same-`menuKey` rows collided as React list keys — caught via a live "two
+  // children with the same key" console error during manual verification of the (then still
+  // shared) cms.blog rows — and one silently failed to render.
   it('renders two distinct rows even when they share a menuKey, keyed by the unique row id', () => {
     const sharedKeyCatalog: PermissionCatalogRow[] = [
       {

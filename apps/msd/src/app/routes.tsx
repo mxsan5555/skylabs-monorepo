@@ -459,7 +459,7 @@ export function AppRoutes() {
         <Route
           path="/account/cms/blog"
           element={
-            <RequirePermission menuKey="cms.blog">
+            <RequirePermission menuKey="cms.blog.pages">
               <BlogList />
             </RequirePermission>
           }
@@ -467,7 +467,7 @@ export function AppRoutes() {
         <Route
           path="/account/cms/blog/:id"
           element={
-            <RequirePermission menuKey="cms.blog">
+            <RequirePermission menuKey="cms.blog.pages">
               <BlogDetailAdmin />
             </RequirePermission>
           }
