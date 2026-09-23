@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { readThemePreference, setThemePreference, type ThemePreference } from '../../../theme/theme-preference';
 import content from '../../../content.json';
 
@@ -8,7 +8,9 @@ const OPTIONS: ThemePreference[] = ['light', 'dark', 'system'];
 /** Light / dark / system as a native radio group (keyboard arrows work for free). */
 export function ThemeSwitch() {
   const name = useId();
-  const [value, setValue] = useState<ThemePreference>(() => readThemePreference());
+  // Start from the server's value ('light') so hydration matches, then show the saved choice.
+  const [value, setValue] = useState<ThemePreference>('light');
+  useEffect(() => setValue(readThemePreference()), []);
   return (
     <fieldset className="theme-switch">
       <legend className="label-large">{t.legend}</legend>

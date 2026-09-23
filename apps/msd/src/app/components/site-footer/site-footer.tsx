@@ -25,7 +25,8 @@ export function SiteFooter() {
 
   return (
     <footer className="site-footer">
-      <ul className="trust-strip" aria-label={t.trustLabel}>
+      {/* eslint-disable-next-line jsx-a11y/no-redundant-roles -- Safari/VoiceOver drops list semantics when list-style is none */}
+      <ul className="trust-strip" role="list" aria-label={t.trustLabel}>
         {t.trust.map((item) => (
           <li key={item.text} className="trust-strip__item label-large">
             <Icon aria-hidden="true">{item.icon}</Icon>
@@ -44,7 +45,8 @@ export function SiteFooter() {
           <p className="title-small">{content.site.tagline}</p>
           <p className="body-medium site-footer__desc">{content.site.description}</p>
           {socialLinks.length > 0 && (
-            <ul className="site-footer__social" aria-label={t.socialLabel}>
+            // eslint-disable-next-line jsx-a11y/no-redundant-roles -- Safari/VoiceOver drops list semantics when list-style is none
+            <ul className="site-footer__social" role="list" aria-label={t.socialLabel}>
               {socialLinks.map((s) => (
                 <li key={s.id}>
                   <a
@@ -76,7 +78,8 @@ export function SiteFooter() {
       <div className="site-footer__legal">
         <p className="body-small">© {year} {t.copyright}</p>
         <nav aria-label={t.legalLabel}>
-          <ul className="site-footer__legal-links">
+          {/* eslint-disable-next-line jsx-a11y/no-redundant-roles -- Safari/VoiceOver drops list semantics when list-style is none */}
+          <ul className="site-footer__legal-links" role="list">
             {t.legal.map((item) => (
               <li key={item.to}>
                 <Link to={item.to} className="body-small">{item.label}</Link>

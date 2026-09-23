@@ -1,4 +1,4 @@
-import { cityHref } from '../../../catalog/catalog-shell';
+import { citySlug, cityHref } from '../../../catalog/catalog-shell';
 import type { CatalogCategoryWithChildren, CatalogLocation } from '../../../api/catalog';
 import content from '../../../content.json';
 
@@ -17,7 +17,17 @@ export function buildPopularSearches(
   visitorCity: string | null,
   limit = POPULAR_SEARCH_LIMIT,
 ): PopularSearch[] {
-  const cities = [...locations].sort((a, b) => Number(b.city === visitorCity) - Number(a.city === visitorCity));
+  // One entry per city slug (a name can exist in two states); keep the first.
+  const seen = new Set<string>();
+  const unique = locations.filter((loc) => {
+    const slug = citySlug(loc.city);
+    if (seen.has(slug)) return false;
+    seen.add(slug);
+    return true;
+  });
+  const visitorSlug = visitorCity ? citySlug(visitorCity) : null;
+  const isVisitor = (loc: CatalogLocation) => Number(citySlug(loc.city) === visitorSlug);
+  const cities = unique.sort((a, b) => isVisitor(b) - isVisitor(a));
   const out: PopularSearch[] = [];
   for (const loc of cities) {
     for (const cat of categories) {

@@ -21,6 +21,19 @@ describe('buildPopularSearches', () => {
     expect(buildPopularSearches(cats, cities, 'Pune')[0].label).toBe('Massage in Pune');
   });
 
+  it('matches the visitor city case-insensitively', () => {
+    expect(buildPopularSearches(cats, cities, 'pune')[0].label).toBe('Massage in Pune');
+  });
+
+  it('drops duplicate city names across states', () => {
+    const dupes = [
+      { state: 'Maharashtra', city: 'Aurangabad' },
+      { state: 'Bihar', city: 'Aurangabad' },
+    ];
+    const out = buildPopularSearches([cats[0]], dupes, null);
+    expect(out.map((s) => s.label)).toEqual(['Massage in Aurangabad']);
+  });
+
   it('caps the list', () => {
     expect(buildPopularSearches(cats, cities, null, 3)).toHaveLength(3);
   });

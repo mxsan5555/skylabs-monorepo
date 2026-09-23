@@ -32,7 +32,8 @@ export function FooterColumn({ id, title, links, inline = false }: { id: string;
           </button>
         )}
       </h2>
-      <ul id={listId} className="footer-col__list" data-collapsed={collapsed ? 'true' : undefined}>
+      {/* eslint-disable-next-line jsx-a11y/no-redundant-roles -- Safari/VoiceOver drops list semantics when list-style is none */}
+      <ul id={listId} className="footer-col__list" role="list" data-collapsed={collapsed ? 'true' : undefined}>
         {links.map((link) => (
           <li key={link.id}>
             <Link to={link.to} className="footer-col__link body-medium">
