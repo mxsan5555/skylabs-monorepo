@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Icon,
   Tabs,
@@ -65,7 +65,7 @@ export function Category() {
   const [category, setCategory] = useState<CatalogCategoryWithChildren | null>(null);
   const [categoryLoading, setCategoryLoading] = useState(true);
   const [categoryError, setCategoryError] = useState('');
-  const [subcategoryIdx, setSubcategoryIdx] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [deals, setDeals] = useState<CatalogDeal[]>([]);
   const [dealsLoading, setDealsLoading] = useState(true);
@@ -77,7 +77,6 @@ export function Category() {
   useEffect(() => {
     setCategoryLoading(true);
     setCategoryError('');
-    setSubcategoryIdx(0);
     getCatalogCategory(slug)
       .then(({ data }) => setCategory(data))
       .catch((err) => {
@@ -90,7 +89,23 @@ export function Category() {
       })
       .finally(() => setCategoryLoading(false));
   }, [slug]);
+  // The subcategory tab lives in `?sub=<slug>` so header/sheet links can open a tab directly;
+  // an unknown slug falls back to "All" (index 0).
+  const subSlug = searchParams.get('sub');
+  const subcategoryIdx = (category?.children.findIndex((c) => c.slug === subSlug) ?? -1) + 1;
   const activeSubcategory = subcategoryIdx === 0 ? undefined : category?.children[subcategoryIdx - 1];
+  const setSubcategoryIdx = (idx: number) => {
+    const sub = idx === 0 ? undefined : category?.children[idx - 1];
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (sub) next.set('sub', sub.slug);
+        else next.delete('sub');
+        return next;
+      },
+      { replace: true },
+    );
+  };
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
     navigate(`/sign-in?next=${encodeURIComponent(`/category/${slug}`)}`);
