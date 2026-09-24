@@ -1,9 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd ../.. && npx nx build msd",
+  "buildCommand": "cd ../.. && npx nx run msd:prerender",
   "installCommand": "cd ../.. && npm ci",
   "outputDirectory": "../../dist/apps/msd",
   "ignoreCommand": "cd ../.. && npx nx-ignore msd",
   "framework": null,
-  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
+  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/spa.html" }]
 }
