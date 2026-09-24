@@ -6,6 +6,8 @@ import type { CatalogCategoryWithChildren } from '../../../api/catalog';
 import type { CatalogShellValue } from '../../../catalog/catalog-shell';
 import content from '../../../content.json';
 import { Category } from './category';
+import { PrerenderDataProvider, categoryDataKey, type PrerenderPayload } from '../../../prerender-data/prerender-data';
+import { ToastProvider } from '../../../toast/toast-context';
 
 const {
   getCatalogCategoryMock,
@@ -209,5 +211,80 @@ describe('Category page /:city', () => {
     expect(document.title).not.toContain('Pune');
     expect(canonical()).toBe('https://example.test/category/massage');
     expect(robots()).toBe('noindex, nofollow');
+  });
+});
+
+describe('Category page with prerendered data', () => {
+  const DEAL = {
+    id: 'd1',
+    title: 'Swedish 60',
+    slug: 'swedish-60',
+    originalPrice: '1000',
+    salePrice: '800',
+    discountPercent: 20,
+    durationMinutes: 60,
+    images: [],
+    packages: [],
+    vendor: null,
+    branch: null,
+    category: null,
+    subcategory: null,
+  };
+  const renderWith = (path: string, payload: PrerenderPayload) =>
+    render(
+      <PrerenderDataProvider payload={payload}>
+        <ToastProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <Routes>
+              <Route path="/category/:slug" element={<Category />} />
+              <Route path="/category/:slug/:city" element={<Category />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      </PrerenderDataProvider>,
+    );
+  const countText = () => document.querySelector('.category-page__count')?.textContent;
+
+  it('renders the prerendered category and deals on the first render without fetching', async () => {
+    renderWith('/category/massage', { [categoryDataKey('massage')]: { category: CATEGORY, deals: [DEAL] } });
+    expect(screen.getByRole('heading', { level: 1, name: 'Massage' })).toBeTruthy();
+    expect(countText()).toBe(`1 ${content.category.dealCount.singular}`);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(getCatalogCategoryMock).not.toHaveBeenCalled();
+    expect(listCatalogDealsMock).not.toHaveBeenCalled();
+  });
+
+  it('keys a city page by the resolved city name', async () => {
+    renderWith('/category/massage/pune', { [categoryDataKey('massage', 'Pune')]: { category: CATEGORY, deals: [] } });
+    expect(screen.getByRole('heading', { level: 1, name: 'Massage in Pune' })).toBeTruthy();
+    expect(countText()).toBe(`0 ${content.category.dealCount.plural}`);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(getCatalogCategoryMock).not.toHaveBeenCalled();
+    expect(listCatalogDealsMock).not.toHaveBeenCalled();
+  });
+
+  it('still fetches when the payload is for another slug or city', async () => {
+    renderWith('/category/massage/pune', { [categoryDataKey('massage')]: { category: CATEGORY, deals: [] } });
+    await waitFor(() => expect(getCatalogCategoryMock).toHaveBeenCalledWith('massage'));
+    await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalledWith(expect.objectContaining({ city: 'Pune' })));
+  });
+
+  it('still fetches the subcategory list when ?sub= is set', async () => {
+    renderWith('/category/massage?sub=swedish', { [categoryDataKey('massage')]: { category: CATEGORY, deals: [] } });
+    await waitFor(() => expect(lastSubcategoryId()).toBe('s1'));
+    expect(getCatalogCategoryMock).not.toHaveBeenCalled();
+  });
+
+  it('a prerendered 404 renders not found without fetching', async () => {
+    renderWith('/category/nope', { [categoryDataKey('nope')]: { category: null, deals: [] } });
+    expect(document.querySelector('sky-info-card')).toBeTruthy();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(getCatalogCategoryMock).not.toHaveBeenCalled();
   });
 });

@@ -8,6 +8,8 @@ import {
   type CatalogSocialMediaLink,
 } from '../api/catalog';
 import content from '../content.json';
+import { usePrerenderedData } from '../prerender-data/prerender-data';
+import type { ShellData } from '../prerender-data/loaders';
 
 export interface CatalogShellValue {
   /** Reflects the categories fetch only; locations and social links fail silently to an empty
@@ -33,9 +35,15 @@ const CatalogShellContext = createContext<CatalogShellValue>(EMPTY);
 /** One fetch of categories + cities + social links for the whole shell (header, tab bar, footer,
  *  home). The requests settle independently so one failing never hides the others. */
 export function CatalogShellProvider({ children }: { children: ReactNode }) {
-  const [value, setValue] = useState<CatalogShellValue>(EMPTY);
+  // A prerendered page embeds the shell data, so it starts ready and skips the fetch.
+  const initial = usePrerenderedData<ShellData>('shell');
+  const [value, setValue] = useState<CatalogShellValue>(() =>
+    initial ? { status: 'ready', locationsStatus: 'ready', ...initial } : EMPTY,
+  );
+  const prerendered = !!initial;
 
   useEffect(() => {
+    if (prerendered) return;
     let cancelled = false;
     Promise.allSettled([listCatalogCategories(), listCatalogLocations(), listCatalogSocialLinks()]).then(
       ([cats, locs, social]) => {
@@ -52,7 +60,7 @@ export function CatalogShellProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [prerendered]);
 
   return <CatalogShellContext.Provider value={value}>{children}</CatalogShellContext.Provider>;
 }

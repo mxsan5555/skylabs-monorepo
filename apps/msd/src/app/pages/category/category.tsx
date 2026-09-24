@@ -31,6 +31,8 @@ import { formatINR } from '../../../utils/format';
 import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import { citySlug, cityHref, categoryHref, useCatalogShell } from '../../../catalog/catalog-shell';
+import { categoryDataKey, usePrerenderedData } from '../../../prerender-data/prerender-data';
+import type { CategoryData } from '../../../prerender-data/loaders';
 import { Seo } from '../../seo/seo';
 import { breadcrumbJsonLd } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
@@ -40,6 +42,11 @@ import content from '../../../content.json';
 /** Lowest active package price for a therapist listing card — mirrors `therapists.tsx`'s own
  *  `fromPrice` exactly (kept as a small local copy rather than a shared export, same as that
  *  file already does for its own single use). */
+/** SERVICE (or untyped, legacy) categories list deals; PRODUCT/THERAPY list their own entities. */
+function isDealCategory(category: CatalogCategoryWithChildren): boolean {
+  return category.type !== 'PRODUCT' && category.type !== 'THERAPY';
+}
+
 function therapistFromPrice(therapist: CatalogTherapist): number | null {
   if (therapist.packages.length === 0) return null;
   return Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)));
@@ -69,19 +76,23 @@ export function Category() {
   const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
-  const [category, setCategory] = useState<CatalogCategoryWithChildren | null>(null);
-  const [categoryLoading, setCategoryLoading] = useState(true);
-  const [categoryError, setCategoryError] = useState('');
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [search, setSearch] = useState('');
-  const [deals, setDeals] = useState<CatalogDeal[]>([]);
-  const [dealsLoading, setDealsLoading] = useState(true);
-  const [dealsError, setDealsError] = useState('');
-  const [therapists, setTherapists] = useState<CatalogTherapist[]>([]);
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
   const { coords } = useCurrentLocation();
   const { locationsStatus, locations } = useCatalogShell();
   const cityLocation = citySlugParam ? locations.find((l) => citySlug(l.city) === citySlugParam) : undefined;
+  // A prerendered page embeds this slug's (and resolved city's) category + "All" deals. The key
+  // includes both, so `initial` only exists when it describes exactly this route.
+  const initial = usePrerenderedData<CategoryData>(categoryDataKey(slug, cityLocation?.city));
+  const initialHasDeals = !!initial?.category && isDealCategory(initial.category);
+  const [category, setCategory] = useState<CatalogCategoryWithChildren | null>(initial?.category ?? null);
+  const [categoryLoading, setCategoryLoading] = useState(!initial);
+  const [categoryError, setCategoryError] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [search, setSearch] = useState('');
+  const [deals, setDeals] = useState<CatalogDeal[]>(initialHasDeals ? initial.deals : []);
+  const [dealsLoading, setDealsLoading] = useState(!initialHasDeals);
+  const [dealsError, setDealsError] = useState('');
+  const [therapists, setTherapists] = useState<CatalogTherapist[]>([]);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
   const cityUnresolved = !!citySlugParam && !cityLocation;
   // Locations arrive with the catalog shell; until then a city URL can't be resolved.
   const cityPending = cityUnresolved && locationsStatus === 'loading';
@@ -90,6 +101,8 @@ export function Category() {
   const cityMissing = cityUnresolved && locationsStatus === 'ready';
 
   useEffect(() => {
+    // Still showing the prerendered category for this slug: nothing to fetch.
+    if (initial && category === initial.category) return;
     setCategoryLoading(true);
     setCategoryError('');
     getCatalogCategory(slug)
@@ -103,6 +116,7 @@ export function Category() {
         }
       })
       .finally(() => setCategoryLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
   // The subcategory tab lives in `?sub=<slug>` so header/sheet links can open a tab directly;
   // an unknown slug falls back to "All" (index 0).
@@ -147,6 +161,18 @@ export function Category() {
 
   useEffect(() => {
     if (!category) return;
+    // The prerendered "All" list for this route, before any filter or location applies.
+    if (
+      initialHasDeals &&
+      category === initial.category &&
+      deals === initial.deals &&
+      !activeSubcategory &&
+      !search &&
+      coords?.latitude == null &&
+      coords?.longitude == null
+    ) {
+      return;
+    }
     setDealsLoading(true);
     setDealsError('');
     if (category.type === 'THERAPY') {

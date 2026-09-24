@@ -14,6 +14,8 @@ import type { Coordinates } from '../../../location/geo';
 import { type DealCardDeal } from '../../components/deal-card';
 import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
+import { usePrerenderedData } from '../../../prerender-data/prerender-data';
+import type { HomeData } from '../../../prerender-data/loaders';
 
 const { home } = content;
 
@@ -82,24 +84,27 @@ export interface HomeCatalog {
  * FAQs are CMS-managed and non-critical: a failure just leaves them empty.
  */
 export function useHomeCatalog(coords: Coordinates | null | undefined): HomeCatalog {
-  const [state, setState] = useState<Omit<HomeCatalog, 'faqs'>>({
-    status: 'loading',
-    error: '',
-    deals: [],
-    products: [],
-    therapists: [],
-  });
-  const [faqs, setFaqs] = useState<CatalogFaq[]>([]);
+  // A prerendered home embeds its lists (fetched without coordinates): start ready from them.
+  const initial = usePrerenderedData<HomeData>('home');
+  const prerendered = !!initial;
+  const [state, setState] = useState<Omit<HomeCatalog, 'faqs'>>(() =>
+    initial
+      ? { status: 'ready', error: '', deals: initial.deals, products: initial.products, therapists: initial.therapists }
+      : { status: 'loading', error: '', deals: [], products: [], therapists: [] },
+  );
+  const [faqs, setFaqs] = useState<CatalogFaq[]>(() => initial?.faqs ?? []);
   const resolved = coords !== undefined;
   const latitude = coords?.latitude;
   const longitude = coords?.longitude;
   // Only the very first load shows the full skeleton. A refetch triggered by coords changing
   // after data has already loaded keeps `status: 'ready'` and the current arrays on screen
   // until the new data arrives, instead of flashing back to the loading state.
-  const hasLoadedRef = useRef(false);
+  const hasLoadedRef = useRef(prerendered);
 
   useEffect(() => {
     if (!resolved) return;
+    // No coordinates is the exact query the prerender already ran.
+    if (prerendered && latitude === undefined && longitude === undefined) return;
     let cancelled = false;
     if (!hasLoadedRef.current) {
       setState((s) => ({ ...s, status: 'loading', error: '' }));
@@ -126,11 +131,12 @@ export function useHomeCatalog(coords: Coordinates | null | undefined): HomeCata
     return () => {
       cancelled = true;
     };
-  }, [resolved, latitude, longitude]);
+  }, [resolved, latitude, longitude, prerendered]);
 
   // FAQs are CMS-managed and non-critical: a failure just leaves them empty. `cancelled` guards
   // against setting state from a fetch that resolves after this hook's component has unmounted.
   useEffect(() => {
+    if (prerendered) return;
     let cancelled = false;
     listCatalogFaqs()
       .then(({ data }) => {
@@ -142,7 +148,7 @@ export function useHomeCatalog(coords: Coordinates | null | undefined): HomeCata
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [prerendered]);
 
   return { ...state, faqs };
 }

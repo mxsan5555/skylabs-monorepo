@@ -1,6 +1,8 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
+import type { ReactNode } from 'react';
 import { imageSrcSet, useHomeCatalog } from './home-data';
+import { PrerenderDataProvider } from '../../../prerender-data/prerender-data';
 
 const m = vi.hoisted(() => ({
   deals: vi.fn(),
@@ -132,5 +134,40 @@ describe('imageSrcSet', () => {
   it('returns undefined when the URL has no w= param or is not absolute', () => {
     expect(imageSrcSet('https://example.test/a.jpg', [640])).toBeUndefined();
     expect(imageSrcSet('/local.jpg?w=1400', [640])).toBeUndefined();
+  });
+});
+
+describe('useHomeCatalog with prerendered data', () => {
+  const home = { deals: [{ id: 'p1' }], products: [], therapists: [], faqs: [{ id: 'f9', question: 'Q', answer: 'A' }] };
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <PrerenderDataProvider payload={{ home }}>{children}</PrerenderDataProvider>
+  );
+
+  it('starts ready with the prerendered lists and does not fetch', async () => {
+    const { result } = renderHook(() => useHomeCatalog(undefined), { wrapper });
+    expect(result.current.status).toBe('ready');
+    expect(result.current.deals).toEqual([{ id: 'p1' }]);
+    expect(result.current.faqs).toEqual(home.faqs);
+    await Promise.resolve();
+    expect(m.deals).not.toHaveBeenCalled();
+    expect(m.faqs).not.toHaveBeenCalled();
+  });
+
+  it('does not refetch when the location resolves to none (same query as the prerender)', async () => {
+    const { result } = renderHook(() => useHomeCatalog(null), { wrapper });
+    await Promise.resolve();
+    expect(m.deals).not.toHaveBeenCalled();
+    expect(result.current.deals).toEqual([{ id: 'p1' }]);
+  });
+
+  it('refetches nearest-first when coordinates arrive, keeping the prerendered data on screen', async () => {
+    let resolveDeals!: (v: { data: { id: string }[] }) => void;
+    m.deals.mockImplementation(() => new Promise((resolve) => { resolveDeals = resolve; }));
+    const { result } = renderHook(() => useHomeCatalog({ latitude: 1, longitude: 2 }), { wrapper });
+    expect(m.deals).toHaveBeenCalledWith(expect.objectContaining({ latitude: 1, longitude: 2 }));
+    expect(result.current.status).toBe('ready');
+    expect(result.current.deals).toEqual([{ id: 'p1' }]);
+    resolveDeals({ data: [{ id: 'n1' }] });
+    await waitFor(() => expect(result.current.deals).toEqual([{ id: 'n1' }]));
   });
 });

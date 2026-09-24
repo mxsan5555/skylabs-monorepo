@@ -8,6 +8,7 @@ import {
   useCatalogShell,
   useCategoryLinks,
 } from './catalog-shell';
+import { PrerenderDataProvider } from '../prerender-data/prerender-data';
 
 const { listCatalogCategoriesMock, listCatalogLocationsMock, listCatalogSocialLinksMock } = vi.hoisted(() => ({
   listCatalogCategoriesMock: vi.fn(),
@@ -125,5 +126,24 @@ describe('citySlug / cityHref', () => {
     expect(citySlug('!!!')).toBe('');
     expect(cityHref('massage', '!!!')).toBe('/category/massage');
     expect(cityHref('massage', '')).toBe('/category/massage');
+  });
+});
+
+describe('CatalogShellProvider with prerendered data', () => {
+  it('renders the prerendered shell on the first render without fetching', () => {
+    const shell = {
+      categories: [{ id: 'c1', name: 'Massage', slug: 'massage', description: null, children: [] }],
+      locations: [{ state: 'Maharashtra', city: 'Pune' }],
+      socialLinks: [],
+    };
+    render(
+      <PrerenderDataProvider payload={{ shell }}>
+        <CatalogShellProvider><Probe /></CatalogShellProvider>
+      </PrerenderDataProvider>,
+    );
+    expect(screen.getByText('ready|Massage>/category/massage|Pune')).toBeTruthy();
+    expect(listCatalogCategoriesMock).not.toHaveBeenCalled();
+    expect(listCatalogLocationsMock).not.toHaveBeenCalled();
+    expect(listCatalogSocialLinksMock).not.toHaveBeenCalled();
   });
 });
