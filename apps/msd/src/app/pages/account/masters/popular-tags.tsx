@@ -28,7 +28,11 @@ import {
 } from '../../../../api/rbac/popular-tags';
 import { listCategories, type Category } from '../../../../api/rbac/categories';
 import { listAllDeals, listAllTherapists, type Deal, type CrossVendorTherapist } from '../../../../api/rbac/vendors';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
+import { extractFieldErrors } from '../../../../utils/field-errors';
 import { listProducts, type Product } from '../../../../api/rbac/products';
+
+type TagFieldKey = 'name' | 'slug';
 import { ApiRequestError } from '../../../../api/rbac/client';
 
 const COLUMNS = JSON.stringify([
@@ -66,6 +70,7 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
  */
 export function PopularTagManagement() {
   const { token, can } = useAuth();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const canCreate = can('masters.tags', 'create');
   const canEdit = can('masters.tags', 'edit');
   const canDelete = can('masters.tags', 'delete');
@@ -131,7 +136,7 @@ export function PopularTagManagement() {
   };
 
   const remove = async (tag: PopularTag) => {
-    if (!window.confirm(`Delete "${tag.name}"? This cannot be undone.`)) return;
+    if (!(await confirm(`Delete "${tag.name}"? This cannot be undone.`))) return;
     setError('');
     try {
       await deletePopularTag(token, tag.id);
@@ -230,7 +235,6 @@ export function PopularTagManagement() {
 
       {canEdit && (
         <TagFormDialog
-          key={editingTag?.id ?? 'edit-empty'}
           dialogRef={editDialogRef}
           tag={editingTag ?? undefined}
           onSave={(input) => save(input, editingTag ?? undefined)}
@@ -248,6 +252,7 @@ export function PopularTagManagement() {
           onClose={() => setMappingTag(null)}
         />
       )}
+      {ConfirmDialog}
     </div>
   );
 }
@@ -265,8 +270,20 @@ function TagFormDialog({
 }) {
   const [form, setForm] = useState<PopularTagInput>({ name: tag?.name ?? '', slug: tag?.slug ?? '' });
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<TagFieldKey, string>> | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
+
+  // Dialog is a single long-lived instance (never remounted via `key`) so imperative
+  // `dialogRef.current?.show()` calls always act on the same, already-open node instead of
+  // racing a key-triggered remount that would replace it with a fresh closed one right after
+  // `show()` fires. Re-sync the form here whenever a different row is opened for editing.
+  useEffect(() => {
+    setForm({ name: tag?.name ?? '', slug: tag?.slug ?? '' });
+    setError('');
+    setFieldErrors(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tag?.id]);
 
   const submit = async () => {
     if (submittingRef.current) return;
@@ -277,11 +294,18 @@ function TagFormDialog({
     submittingRef.current = true;
     setSubmitting(true);
     setError('');
+    setFieldErrors(null);
     try {
       await onSave(form);
       dialogRef.current?.close();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not save.');
+      const fields = extractFieldErrors<TagFieldKey>(err);
+      if (fields) {
+        setFieldErrors(fields);
+        setError('Fix the highlighted fields and try again.');
+      } else {
+        setError(err instanceof ApiRequestError ? err.message : 'Could not save.');
+      }
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
@@ -292,8 +316,22 @@ function TagFormDialog({
     <Dialog ref={dialogRef} onClose={onClose}>
       <div slot="headline">{tag ? 'Edit tag' : 'Add tag'}</div>
       <div slot="content" className="form-grid">
-        <OutlinedTextField label="Name" value={form.name} onInput={(e: Event) => setForm((f) => ({ ...f, name: (e.target as HTMLInputElement).value }))} />
-        <OutlinedTextField label="Slug" value={form.slug} onInput={(e: Event) => setForm((f) => ({ ...f, slug: (e.target as HTMLInputElement).value }))} />
+        <OutlinedTextField
+          label="Name"
+          required
+          value={form.name}
+          onInput={(e: Event) => setForm((f) => ({ ...f, name: (e.target as HTMLInputElement).value }))}
+          error={Boolean(fieldErrors?.name)}
+        />
+        {fieldErrors?.name && <p className="error-state" role="alert">{fieldErrors.name}</p>}
+        <OutlinedTextField
+          label="Slug"
+          required
+          value={form.slug}
+          onInput={(e: Event) => setForm((f) => ({ ...f, slug: (e.target as HTMLInputElement).value }))}
+          error={Boolean(fieldErrors?.slug)}
+        />
+        {fieldErrors?.slug && <p className="error-state" role="alert">{fieldErrors.slug}</p>}
         {error && <p className="error-state" role="alert">{error}</p>}
       </div>
       <div slot="actions">

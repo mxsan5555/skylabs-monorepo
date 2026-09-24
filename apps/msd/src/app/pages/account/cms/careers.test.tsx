@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ToastProvider } from '../../../../toast/toast-context';
 import { ApiRequestError } from '../../../../api/rbac/client';
@@ -235,27 +235,30 @@ describe('CareersPage', () => {
     expect(await screen.findByText('Job listing published.')).toBeTruthy();
   });
 
-  it('delete confirms via window.confirm, then calls deleteCareersJob only when confirmed', async () => {
+  it('delete confirms via the themed dialog, then calls deleteCareersJob only when confirmed', async () => {
     deleteCareersJobMock.mockResolvedValue({ data: null });
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderPage();
     await waitForTableLoaded(1);
 
     await dispatchRowActionUntil('delete', () => {
-      expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining(JOB.jobTitle));
+      expect(screen.getByText(`Delete "${JOB.jobTitle}"? This cannot be undone.`)).toBeTruthy();
     });
+    const confirmDialog = screen.getByText(`Delete "${JOB.jobTitle}"? This cannot be undone.`).closest('md-dialog')!;
+    fireEvent.click(within(confirmDialog).getByText('Confirm'));
+
     await waitFor(() => expect(deleteCareersJobMock).toHaveBeenCalledWith('test-token', JOB.id));
     expect(await screen.findByText('Job listing deleted.')).toBeTruthy();
   });
 
-  it('delete does NOT call deleteCareersJob when window.confirm is cancelled', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('delete does NOT call deleteCareersJob when the confirm dialog is cancelled', async () => {
     renderPage();
     await waitForTableLoaded(1);
 
     await dispatchRowActionUntil('delete', () => {
-      expect(confirmSpy).toHaveBeenCalled();
+      expect(screen.getByText(`Delete "${JOB.jobTitle}"? This cannot be undone.`)).toBeTruthy();
     });
+    const confirmDialog = screen.getByText(`Delete "${JOB.jobTitle}"? This cannot be undone.`).closest('md-dialog')!;
+    fireEvent.click(within(confirmDialog).getByText('Cancel'));
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(deleteCareersJobMock).not.toHaveBeenCalled();
   });

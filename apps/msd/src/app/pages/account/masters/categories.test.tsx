@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Category } from '../../../../api/rbac/categories';
+import { ApiRequestError } from '../../../../api/rbac/client';
 
 let grantedPermissions: Set<string>;
 
@@ -134,17 +135,64 @@ describe('CategoryManagement — Type selector (top-level only)', () => {
   // Regression check: scope="sub" still renders exactly its original single flat "Parent
   // category" picker per dialog — the new scope="leaf" 2-step cascade must not have leaked an
   // extra select into this unrelated scope. (Add + Edit-empty dialogs both mount regardless of
-  // open state — see this suite's own established convention — so 2 total is correct, not 1.)
+  // open state — see this suite's own established convention — so 2 total is correct, not 1. A
+  // third always-mounted `md-dialog` is the page's themed delete-confirm dialog — see
+  // `confirm-dialog.tsx` — which never holds a select, so it's excluded from the per-dialog loop.)
   it('scope="sub" still renders exactly one md-outlined-select per dialog (the flat Parent category picker), not a 2-step cascade', async () => {
     listCategoriesMock.mockResolvedValue({ data: [TOP_CATEGORY], meta: { total: 1 } });
     render(<CategoryManagement scope="sub" />);
     await waitForTableLoaded(1);
     await waitFor(() => expect(listCategoriesMock).toHaveBeenCalledTimes(2)); // main list + top-level parent options only
     await waitFor(() => expect(document.querySelectorAll('md-outlined-select').length).toBeGreaterThan(0));
-    const dialogs = Array.from(document.querySelectorAll('md-dialog'));
+    const dialogs = Array.from(document.querySelectorAll('md-dialog')).filter(
+      (d) => d.querySelectorAll('md-outlined-select').length > 0,
+    );
     expect(dialogs.length).toBe(2); // Add + Edit-empty
     for (const dialog of dialogs) {
       expect(dialog.querySelectorAll('md-outlined-select').length).toBe(1);
     }
+  });
+});
+
+/**
+ * Feature: Category Add/Edit dialog — backend field-error mapping
+ * Scenario: a 422 VALIDATION_ERROR with Zod-flattened `details.fieldErrors` must surface each
+ * message under its own field (with that field's own `error` visual state), not just as a
+ * generic top-of-dialog banner — matches the same pattern already established in
+ * `vendor-profile-form.tsx`/the CMS form dialogs.
+ */
+describe('CategoryFormDialog — backend field-error mapping', () => {
+  it('shows a slug-taken 422 under the Slug field specifically, with that field flagged as an error', async () => {
+    grantedPermissions = new Set(['masters.categories:create', 'masters.categories:edit', 'masters.categories:delete']);
+    updateCategoryMock.mockRejectedValue(
+      new ApiRequestError('VALIDATION_ERROR', 'Validation failed', 422, {
+        fieldErrors: { slug: ['A category with this slug already exists.'] },
+      }),
+    );
+    render(<CategoryManagement scope="top" />);
+    await waitForTableLoaded(1);
+
+    // Same self-healing retry as `dispatchRowActionUntil` elsewhere in this test family — opens
+    // the Edit dialog pre-filled from TOP_CATEGORY (avoids the documented `fireEvent.input`
+    // unreliability on `@lit/react`-wrapped text fields under jsdom; see settings.test.tsx's own
+    // doc comment), so Save can be clicked directly without simulating typing.
+    const table = document.querySelector('sky-data-table')!;
+    await waitFor(() => {
+      fireEvent(table, new CustomEvent('sky-dt-row-action', { detail: { action: 'edit', row: {}, rowIndex: 0 } }));
+      expect(screen.getByText('Edit')).toBeTruthy();
+    });
+
+    const editDialogHeadline = screen.getByText('Edit');
+    const editDialogBeforeSave = editDialogHeadline.closest('md-dialog')!;
+    fireEvent.click(within(editDialogBeforeSave).getByText('Save'));
+
+    const message = await screen.findByText('A category with this slug already exists.');
+    expect(message).toBeTruthy();
+    // Scoped to the Slug field specifically, not Name and not only a dialog-wide banner —
+    // `extractFieldErrors` mapped the 422's `details.fieldErrors.slug` to `fieldErrors.slug`,
+    // which is what both this message and the field's own `error={Boolean(fieldErrors?.slug)}`
+    // prop (see categories.tsx) are driven by.
+    expect(screen.queryByText('Fix the highlighted fields and try again.')).toBeTruthy();
+    expect(screen.queryByText(/name.*required/i)).toBeNull();
   });
 });

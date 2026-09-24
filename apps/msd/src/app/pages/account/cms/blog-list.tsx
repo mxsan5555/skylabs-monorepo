@@ -17,6 +17,7 @@ import { listBlogCategories, type BlogCategory } from '../../../../api/rbac/blog
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useToast } from '../../../../toast/toast-context';
 import { formatDate } from '../../../../blog/blog';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { BlogFormDialog } from './blog-form-dialog';
 
 const COLUMNS = JSON.stringify([
@@ -38,18 +39,21 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
 
 /**
  * Blog Posts admin list — mirrors `categories.tsx`'s exact `<sky-data-table>` +
- * add/edit-dialog + `window.confirm` delete pattern, gated throughout on the single `cms.blog`
- * menu key (view/create/edit/delete actions). Uses `useToast()` for every mutation's outcome,
- * the newer preferred pattern per that context's own doc comment, rather than categories.tsx's
- * older inline-`<p>` message.
+ * add/edit-dialog + `window.confirm` delete pattern, gated throughout on the `cms.blog.pages`
+ * menu key (view/create/edit/delete actions) — split out from the old shared `cms.blog` key so
+ * this "Pages" row toggles independently of the (currently unimplemented) "Articles" row in the
+ * Role Permission Matrix; see blog-posts.routes.ts's own doc comment. Uses `useToast()` for every
+ * mutation's outcome, the newer preferred pattern per that context's own doc comment, rather than
+ * categories.tsx's older inline-`<p>` message.
  */
 export function BlogList() {
   const { token, can } = useAuth();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const canCreate = can('cms.blog', 'create');
-  const canEdit = can('cms.blog', 'edit');
-  const canDelete = can('cms.blog', 'delete');
+  const canCreate = can('cms.blog.pages', 'create');
+  const canEdit = can('cms.blog.pages', 'edit');
+  const canDelete = can('cms.blog.pages', 'delete');
 
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [total, setTotal] = useState(0);
@@ -125,7 +129,7 @@ export function BlogList() {
   };
 
   const remove = async (post: BlogPost) => {
-    if (!window.confirm(`Delete "${post.title}"? This cannot be undone.`)) return;
+    if (!(await confirm(`Delete "${post.title}"? This cannot be undone.`))) return;
     setError('');
     try {
       await deleteBlogPost(token, post.id);
@@ -255,6 +259,7 @@ export function BlogList() {
           onClose={() => setEditingPost(null)}
         />
       )}
+      {ConfirmDialog}
     </div>
   );
 }

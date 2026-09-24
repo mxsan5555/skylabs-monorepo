@@ -21,6 +21,7 @@ import { permissionKeyFor } from '@skylabs-monorepo/shared-permissions';
 import { ensureUniqueSlug } from '../src/lib/slug';
 import { getMenuForApp } from '@skylabs-monorepo/shared-menu';
 import { normalizeIdentifier } from '../src/lib/normalizeIdentifier';
+import { migrateSharedKeySplitGrants } from '../src/services/permission-migration.service';
 import { CATEGORY_TAXONOMY } from './category-taxonomy';
 
 const prisma = new PrismaClient();
@@ -90,13 +91,20 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   'masters.categories': ['create', 'edit', 'delete'],
   'masters.sub-categories': ['create', 'edit', 'delete'],
   'masters.tags': ['create', 'edit', 'delete'],
+  'masters.popular-treatments': ['create', 'edit', 'delete'],
   'rbac.roles': ['create', 'edit', 'delete', 'status_change'],
   'rbac.users': ['create', 'edit', 'delete', 'assign', 'status_change', 'custom'],
   'rbac.audit-logs': [],
   settings: ['edit'],
-  // CMS: Blog is full CRUD; About Us/Contact Us are singleton content rows — edit-only, mirrors
-  // 'settings' above exactly (no create/delete concept for a row that always exists).
-  'cms.blog': ['create', 'edit', 'delete'],
+  // CMS Blog was previously ONE key ('cms.blog') shared by the "Pages" and "Articles" sidebar
+  // rows — split into two distinct keys so their Role Permission Matrix checkboxes toggle
+  // independently (see msd-menu.json). `cms.blog.pages` is the real, currently-implemented
+  // route (blog-posts.routes.ts); `cms.blog.articles` has no frontend route or backend gate of
+  // its own yet — its checkbox exists for matrix completeness/future wiring, same "grantable but
+  // currently inert" pattern as any navigation-only row. `migrateSharedKeySplitGrants` below
+  // (not this map) is what preserves every role's existing 'cms.blog:*' grant onto both new keys.
+  'cms.blog.pages': ['create', 'edit', 'delete'],
+  'cms.blog.articles': ['create', 'edit', 'delete'],
   'cms.about-us': ['edit'],
   'cms.contact-us': ['edit'],
   'cms.faq': ['create', 'edit', 'delete'],
@@ -259,8 +267,11 @@ async function grantStarterPermissions(
     'masters:view', 'masters.categories:view', 'masters.categories:create', 'masters.categories:edit', 'masters.categories:delete',
     'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit', 'masters.sub-categories:delete',
     'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
+    'masters.popular-treatments:view', 'masters.popular-treatments:create', 'masters.popular-treatments:edit', 'masters.popular-treatments:delete',
     'settings:view', 'settings:edit',
-    'cms:view', 'cms.blog:view', 'cms.blog:create', 'cms.blog:edit', 'cms.blog:delete',
+    'cms:view',
+    'cms.blog.pages:view', 'cms.blog.pages:create', 'cms.blog.pages:edit', 'cms.blog.pages:delete',
+    'cms.blog.articles:view', 'cms.blog.articles:create', 'cms.blog.articles:edit', 'cms.blog.articles:delete',
     'cms.about-us:view', 'cms.about-us:edit', 'cms.contact-us:view', 'cms.contact-us:edit',
   ]);
 
@@ -269,11 +280,16 @@ async function grantStarterPermissions(
     'masters:view', 'masters.categories:view', 'masters.categories:create', 'masters.categories:edit',
     'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit',
     'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
+    'masters.popular-treatments:view', 'masters.popular-treatments:create', 'masters.popular-treatments:edit', 'masters.popular-treatments:delete',
     'reports:view',
-    // No 'cms.blog:delete' — mirrors this same role's create/edit-but-no-delete grant on
-    // 'masters.categories' above.
-    'cms:view', 'cms.blog:view', 'cms.blog:create', 'cms.blog:edit',
+    // No 'cms.blog.pages:delete'/'cms.blog.articles:delete' — mirrors this same role's
+    // create/edit-but-no-delete grant on 'masters.categories' above.
+    'cms:view',
+    'cms.blog.pages:view', 'cms.blog.pages:create', 'cms.blog.pages:edit',
+    'cms.blog.articles:view', 'cms.blog.articles:create', 'cms.blog.articles:edit',
     'cms.about-us:view', 'cms.about-us:edit', 'cms.contact-us:view', 'cms.contact-us:edit',
+    // No 'cms.faq:delete' — same create/edit-but-no-delete grant as this role's blog grants above.
+    'cms.faq:view', 'cms.faq:create', 'cms.faq:edit',
   ]);
 
   await grant('sales', [
@@ -337,10 +353,18 @@ async function seedDashboardWidgets(roles: Map<string, { id: string; isSuperAdmi
     widgetIdByKey.set(widget.key, row.id);
   }
 
+  // Find-or-create-only, same discipline as every other admin-editable seed in this file (see
+  // `seedPopularTreatments`'s own doc comment): a role's widget assignment is only ever applied
+  // ONCE, the first time this role has zero `RoleDashboardWidget` rows. Once any row exists —
+  // whether from this very seed or from an admin's own edit via the Role Management UI's Save
+  // widgets — a reseed must never touch it again. The old `deleteMany` + `createMany` on every
+  // run unconditionally reset every system role's widgets back to these hardcoded defaults,
+  // silently discarding any admin customization each time the seed reran.
   const assign = async (roleKey: string, keysInOrder: string[]) => {
     const role = roles.get(roleKey);
     if (!role) return;
-    await prisma.roleDashboardWidget.deleteMany({ where: { roleId: role.id } });
+    const existingCount = await prisma.roleDashboardWidget.count({ where: { roleId: role.id } });
+    if (existingCount > 0) return;
     await prisma.roleDashboardWidget.createMany({
       data: keysInOrder.map((key, order) => ({
         roleId: role.id,
@@ -436,6 +460,87 @@ async function seedSuperAdminUser(roles: Map<string, { id: string; isSuperAdmin:
  *  (e.g. a vendor-reset side effect) is unconditionally restored, rather than silently staying
  *  hidden until someone notices and hand-fixes the DB row again. Never touches `name`/`slug`/
  *  `type` on the update path — only the activeness guarantee. */
+/** Starter "Popular Treatments" directory (groups + chips) migrated from the old hardcoded
+ *  `content.json#home.searchByDestination` data — this is the ONE-TIME initial data only.
+ *  Find-or-create-only (never `upsert`'s `update` branch): once a group/treatment row exists (by
+ *  slug), this function never touches its `name`/`sortOrder`/`isActive` again on a later re-run,
+ *  so an admin's edit or Active/Inactive toggle via the Master screen is never reverted by
+ *  reseeding — the opposite discipline from `seedCategoryTaxonomy`'s own forced-active taxonomy
+ *  rows just below (see that function's doc comment for why THAT one differs). `categoryId` is
+ *  deliberately left unset here — it's an optional refinement hint the admin can add later via
+ *  the Master screen, not something this starter data guesses at. */
+const POPULAR_TREATMENT_SEED: { name: string; slug: string; treatments: { name: string; slug: string }[] }[] = [
+  { name: 'Massage', slug: 'massage', treatments: [
+    { name: 'Swedish Massage', slug: 'swedish-massage' },
+    { name: 'Deep Tissue Massage', slug: 'deep-tissue-massage' },
+    { name: 'Thai Massage', slug: 'thai-massage' },
+    { name: 'Hot Stone Massage', slug: 'hot-stone-massage' },
+  ] },
+  { name: 'Facials', slug: 'facials', treatments: [
+    { name: 'Hydra Facial', slug: 'hydra-facial' },
+    { name: 'Gold Facial', slug: 'gold-facial' },
+    { name: 'Anti Aging Facial', slug: 'anti-aging-facial' },
+  ] },
+  { name: 'Hair Spa', slug: 'hair-spa', treatments: [
+    { name: 'Hair Spa', slug: 'hair-spa-treatment' },
+    { name: 'Hair Smoothening', slug: 'hair-smoothening' },
+    { name: 'Keratin Treatment', slug: 'keratin-treatment' },
+  ] },
+  { name: 'Spa Packages', slug: 'spa-packages', treatments: [
+    { name: 'Couple Spa', slug: 'couple-spa' },
+    { name: 'Luxury Spa', slug: 'luxury-spa' },
+    { name: 'Weekend Spa', slug: 'weekend-spa' },
+  ] },
+  { name: 'Wellness', slug: 'wellness', treatments: [
+    { name: 'Yoga', slug: 'yoga' },
+    { name: 'Meditation', slug: 'meditation' },
+    { name: 'Detox Therapy', slug: 'detox-therapy' },
+  ] },
+  { name: 'Beauty', slug: 'beauty', treatments: [
+    { name: 'Waxing', slug: 'waxing' },
+    { name: 'Threading', slug: 'threading' },
+    { name: 'Makeup', slug: 'makeup' },
+  ] },
+  { name: 'Nails', slug: 'nails', treatments: [
+    { name: 'Manicure', slug: 'manicure' },
+    { name: 'Pedicure', slug: 'pedicure' },
+    { name: 'Nail Art', slug: 'nail-art' },
+  ] },
+  { name: 'Body Care', slug: 'body-care', treatments: [
+    { name: 'Body Polish', slug: 'body-polish' },
+    { name: 'Body Scrub', slug: 'body-scrub' },
+    { name: 'Body Wrap', slug: 'body-wrap' },
+  ] },
+  { name: 'More Deals', slug: 'more-deals', treatments: [
+    { name: 'Steam Bath', slug: 'steam-bath' },
+    { name: 'Sauna', slug: 'sauna' },
+    { name: 'Aromatherapy', slug: 'aromatherapy' },
+  ] },
+];
+
+async function seedPopularTreatments(): Promise<{ groupsCreated: number; treatmentsCreated: number }> {
+  let groupsCreated = 0;
+  let treatmentsCreated = 0;
+  for (const [groupIdx, group] of POPULAR_TREATMENT_SEED.entries()) {
+    let groupRow = await prisma.popularTreatmentGroup.findUnique({ where: { slug: group.slug } });
+    if (!groupRow) {
+      groupRow = await prisma.popularTreatmentGroup.create({
+        data: { name: group.name, slug: group.slug, sortOrder: groupIdx },
+      });
+      groupsCreated++;
+    }
+    for (const [treatmentIdx, treatment] of group.treatments.entries()) {
+      const existing = await prisma.popularTreatment.findUnique({ where: { slug: treatment.slug } });
+      if (existing) continue;
+      await prisma.popularTreatment.create({
+        data: { name: treatment.name, slug: treatment.slug, groupId: groupRow.id, sortOrder: treatmentIdx },
+      });
+      treatmentsCreated++;
+    }
+  }
+  return { groupsCreated, treatmentsCreated };
+}
+
 async function seedCategoryTaxonomy(): Promise<Map<string, string>> {
   const categoryIdBySlug = new Map<string, string>();
 
@@ -1335,6 +1440,14 @@ async function main() {
   validateDemoSeedDataset();
   const roles = await seedRoles();
   const permissionIdByKey = await seedPermissions();
+  // Every menuKey that used to be shared by multiple menu nodes and has since been split into
+  // distinct per-node keys — add a new `{ oldMenuKey, newMenuKeys }` entry here whenever another
+  // such split happens, so every role's (including custom roles') existing access is preserved.
+  await migrateSharedKeySplitGrants(
+    prisma,
+    [{ oldMenuKey: 'cms.blog', newMenuKeys: ['cms.blog.pages', 'cms.blog.articles'] }],
+    permissionIdByKey,
+  );
   await grantAllPermissionsToSuperAdmins(roles, permissionIdByKey);
   await grantStarterPermissions(roles, permissionIdByKey);
   await seedDashboardWidgets(roles);
@@ -1343,6 +1456,10 @@ async function main() {
 
   const categoryIdBySlug = await seedCategoryTaxonomy();
   const retiredTaxonomyRows = await deactivateRemovedTaxonomyRows();
+  const { groupsCreated, treatmentsCreated } = await seedPopularTreatments();
+  if (groupsCreated > 0 || treatmentsCreated > 0) {
+    console.log(`Seeded ${groupsCreated} new popular treatment group(s) and ${treatmentsCreated} new treatment(s).`);
+  }
   // Vendors must exist before Products (Product.vendorId is required — see the
   // direct_category_access migration), unlike the old shared-master-row model's ordering.
   const { vendorIdByKey, branchIdByKey } = await seedVendorsAndBranches(roles);

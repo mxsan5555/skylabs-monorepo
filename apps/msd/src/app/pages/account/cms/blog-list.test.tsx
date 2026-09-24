@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ToastProvider } from '../../../../toast/toast-context';
@@ -133,7 +133,7 @@ async function dispatchRowActionUntil(action: string, assert: () => void, rowInd
 
 beforeEach(() => {
   vi.clearAllMocks();
-  grantedPermissions = new Set(['cms.blog:create', 'cms.blog:edit', 'cms.blog:delete']);
+  grantedPermissions = new Set(['cms.blog.pages:create', 'cms.blog.pages:edit', 'cms.blog.pages:delete']);
   listBlogPostsMock.mockResolvedValue({ data: [POST], meta: { total: 1 } });
   listBlogCategoriesMock.mockResolvedValue({ data: [{ id: 'cat-1', name: 'Wellness', slug: 'wellness', description: '', isActive: true, sortOrder: 0, createdAt: '', updatedAt: '' }] });
 });
@@ -218,21 +218,24 @@ describe('BlogList', () => {
     expect(await screen.findByText('Post published.')).toBeTruthy();
   });
 
-  it('delete confirms via window.confirm, then calls deleteBlogPost only when confirmed', async () => {
+  it('delete confirms via the themed dialog, then calls deleteBlogPost only when confirmed', async () => {
     deleteBlogPostMock.mockResolvedValue({ data: null });
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderList();
     await waitForTableLoaded(1);
 
     await dispatchRowActionUntil('delete', () => {
-      expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining(POST.title));
+      expect(screen.getByText(`Delete "${POST.title}"? This cannot be undone.`)).toBeTruthy();
     });
+    // Scoped to the confirm dialog itself — the always-mounted Add/Edit BlogFormDialogs each
+    // have their own "Cancel" button, so an unscoped query would match more than one element.
+    const confirmDialog = screen.getByText(`Delete "${POST.title}"? This cannot be undone.`).closest('md-dialog')!;
+    fireEvent.click(within(confirmDialog).getByText('Confirm'));
+
     await waitFor(() => expect(deleteBlogPostMock).toHaveBeenCalledWith('test-token', POST.id));
     expect(await screen.findByText('Blog post deleted.')).toBeTruthy();
   });
 
-  it('delete does NOT call deleteBlogPost when window.confirm is cancelled', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('delete does NOT call deleteBlogPost when the confirm dialog is cancelled', async () => {
     renderList();
     await waitForTableLoaded(1);
 
@@ -240,8 +243,10 @@ describe('BlogList', () => {
     // have never been called, which would trivially — and misleadingly — pass even if the
     // dispatch never reached a listener at all).
     await dispatchRowActionUntil('delete', () => {
-      expect(confirmSpy).toHaveBeenCalled();
+      expect(screen.getByText(`Delete "${POST.title}"? This cannot be undone.`)).toBeTruthy();
     });
+    const confirmDialog = screen.getByText(`Delete "${POST.title}"? This cannot be undone.`).closest('md-dialog')!;
+    fireEvent.click(within(confirmDialog).getByText('Cancel'));
 
     // Give any (incorrect) async delete call a chance to fire before asserting it never did.
     await new Promise((resolve) => setTimeout(resolve, 0));

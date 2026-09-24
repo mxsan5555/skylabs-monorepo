@@ -221,7 +221,7 @@
             "id": "cms-blog-pages",
             "title": "Pages",
             "route": "/account/cms/blog",
-            "permissionKey": "cms.blog",
+            "permissionKey": "cms.blog.pages",
             "parent": "cms-blog",
             "order": 1
           },
@@ -237,7 +237,7 @@
             "id": "cms-blog-articles",
             "title": "Articles",
             "route": "/account/cms/blog/articles",
-            "permissionKey": "cms.blog",
+            "permissionKey": "cms.blog.articles",
             "parent": "cms-blog",
             "order": 3
           }
@@ -361,6 +361,14 @@
         "permissionKey": "masters.tags",
         "parent": "masters",
         "order": 2
+      },
+      {
+        "id": "masters-popular-treatments",
+        "title": "Popular Treatments",
+        "route": "/account/masters/popular-treatments",
+        "permissionKey": "masters.popular-treatments",
+        "parent": "masters",
+        "order": 3
       }
     ]
   },

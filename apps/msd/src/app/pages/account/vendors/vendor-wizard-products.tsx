@@ -22,7 +22,24 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { MediaUploader } from '../../../components/media-uploader';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { resolveCategoryTiers } from '../../../../utils/category-tree';
+import { extractFieldErrors } from '../../../../utils/field-errors';
+
+type ProductFieldKey =
+  | 'categoryId'
+  | 'subcategoryId'
+  | 'name'
+  | 'slug'
+  | 'brand'
+  | 'price'
+  | 'originalPrice'
+  | 'discount'
+  | 'badge'
+  | 'summary'
+  | 'description'
+  | 'ingredients'
+  | 'returnPolicy';
 
 interface VendorProductsStepProps {
   token: string | null;
@@ -43,6 +60,7 @@ interface VendorProductsStepProps {
  * PRODUCT categories only).
  */
 export function VendorProductsStep({ token, vendorId, canEdit, offersProduct, categories, onProductsChange }: VendorProductsStepProps) {
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [products, setProducts] = useState<VendorProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -88,7 +106,7 @@ export function VendorProductsStep({ token, vendorId, canEdit, offersProduct, ca
   };
 
   const remove = async (product: VendorProduct) => {
-    if (!window.confirm(`Delete "${product.name}"? This cannot be undone.`)) return;
+    if (!(await confirm(`Delete "${product.name}"? This cannot be undone.`))) return;
     setError('');
     try {
       await deleteVendorProduct(token, vendorId, product.id);
@@ -98,7 +116,13 @@ export function VendorProductsStep({ token, vendorId, canEdit, offersProduct, ca
     }
   };
 
-  if (!offersProduct) {
+  // `vendor.offersProduct` is a denormalized convenience flag, not the ground truth — the
+  // vendor's real `VendorCategoryAccess` grants are (`categories` above is already scoped to
+  // exactly those). It can be `false` while the vendor already genuinely holds granted PRODUCT
+  // categories (e.g. data mapped outside the normal grant-flips-the-flag save path), which used
+  // to hard-block this whole step with a misleading "not enabled" message despite valid access
+  // existing — mirrors the identical Therapy-step bug/fix in `vendor-wizard-therapists.tsx`.
+  if (!offersProduct && categories.length === 0) {
     return <p className="empty-state">This vendor has not enabled the Product business module in Step 2.</p>;
   }
 
@@ -178,6 +202,7 @@ export function VendorProductsStep({ token, vendorId, canEdit, offersProduct, ca
           onClose={() => setEditingProduct(null)}
         />
       )}
+      {ConfirmDialog}
     </section>
   );
 }
@@ -225,6 +250,7 @@ function ProductFormDialog({
       : { ...EMPTY_INPUT, categoryId: categories.find((c) => !c.parentId)?.id ?? categories[0]?.id ?? '' },
   );
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<ProductFieldKey, string>> | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
   // Tracks the entity MediaUploader should upload against — see DealDialog's identical
@@ -251,6 +277,7 @@ function ProductFormDialog({
     submittingRef.current = true;
     setSubmitting(true);
     setError('');
+    setFieldErrors(null);
     try {
       const result = await onSave(form);
       if (!product && result) {
@@ -259,7 +286,13 @@ function ProductFormDialog({
         dialogRef.current?.close();
       }
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not save product.');
+      const fields = extractFieldErrors<ProductFieldKey>(err);
+      if (fields) {
+        setFieldErrors(fields);
+        setError('Fix the highlighted fields and try again.');
+      } else {
+        setError(err instanceof ApiRequestError ? err.message : 'Could not save product.');
+      }
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
@@ -277,6 +310,7 @@ function ProductFormDialog({
             set('categoryId', (e.target as HTMLSelectElement).value);
             set('subcategoryId', undefined);
           }}
+          error={Boolean(fieldErrors?.categoryId)}
         >
           {parentCategories.map((c) => (
             <SelectOption key={c.id} value={c.id}>
@@ -284,12 +318,14 @@ function ProductFormDialog({
             </SelectOption>
           ))}
         </OutlinedSelect>
+        {fieldErrors?.categoryId && <p className="error-state" role="alert">{fieldErrors.categoryId}</p>}
 
         {subcategoryOptions.length > 0 && (
           <OutlinedSelect
             label="Subcategory (optional)"
             value={subcategoryTierId ?? ''}
             onChange={(e: Event) => set('subcategoryId', (e.target as HTMLSelectElement).value || undefined)}
+            error={Boolean(fieldErrors?.subcategoryId)}
           >
             <SelectOption value="">
               <div slot="headline">None</div>
@@ -301,6 +337,7 @@ function ProductFormDialog({
             ))}
           </OutlinedSelect>
         )}
+        {fieldErrors?.subcategoryId && <p className="error-state" role="alert">{fieldErrors.subcategoryId}</p>}
 
         {/* 3rd, Type tier (e.g. "Swedish Massage" under "Body Massage") — optional, only shown
             once the chosen Subcategory actually has children; one with none (e.g. "Cleaning")
@@ -323,24 +360,36 @@ function ProductFormDialog({
           </OutlinedSelect>
         )}
 
-        <OutlinedTextField label="Name" value={form.name} onInput={(e: Event) => set('name', (e.target as HTMLInputElement).value)} />
-        <OutlinedTextField label="Slug" value={form.slug} onInput={(e: Event) => set('slug', (e.target as HTMLInputElement).value)} />
-        <OutlinedTextField label="Brand" value={form.brand ?? ''} onInput={(e: Event) => set('brand', (e.target as HTMLInputElement).value)} />
+        <OutlinedTextField label="Name" required value={form.name} onInput={(e: Event) => set('name', (e.target as HTMLInputElement).value)} error={Boolean(fieldErrors?.name)} />
+        {fieldErrors?.name && <p className="error-state" role="alert">{fieldErrors.name}</p>}
+        <OutlinedTextField label="Slug" required value={form.slug} onInput={(e: Event) => set('slug', (e.target as HTMLInputElement).value)} error={Boolean(fieldErrors?.slug)} />
+        {fieldErrors?.slug && <p className="error-state" role="alert">{fieldErrors.slug}</p>}
+        <OutlinedTextField label="Brand" value={form.brand ?? ''} onInput={(e: Event) => set('brand', (e.target as HTMLInputElement).value)} error={Boolean(fieldErrors?.brand)} />
+        {fieldErrors?.brand && <p className="error-state" role="alert">{fieldErrors.brand}</p>}
 
-        <OutlinedTextField label="Price" value={form.price} onInput={(e: Event) => set('price', (e.target as HTMLInputElement).value)} />
-        <OutlinedTextField label="Original price" value={form.originalPrice ?? ''} onInput={(e: Event) => set('originalPrice', (e.target as HTMLInputElement).value)} />
+        <OutlinedTextField label="Price" required value={form.price} onInput={(e: Event) => set('price', (e.target as HTMLInputElement).value)} error={Boolean(fieldErrors?.price)} />
+        {fieldErrors?.price && <p className="error-state" role="alert">{fieldErrors.price}</p>}
+        <OutlinedTextField label="Original price" value={form.originalPrice ?? ''} onInput={(e: Event) => set('originalPrice', (e.target as HTMLInputElement).value)} error={Boolean(fieldErrors?.originalPrice)} />
+        {fieldErrors?.originalPrice && <p className="error-state" role="alert">{fieldErrors.originalPrice}</p>}
         <OutlinedTextField
           label="Discount %"
           type="number"
           value={form.discount !== undefined ? String(form.discount) : ''}
           onInput={(e: Event) => set('discount', Number((e.target as HTMLInputElement).value) || undefined)}
+          error={Boolean(fieldErrors?.discount)}
         />
-        <OutlinedTextField label="Badge" value={form.badge ?? ''} onInput={(e: Event) => set('badge', (e.target as HTMLInputElement).value)} />
+        {fieldErrors?.discount && <p className="error-state" role="alert">{fieldErrors.discount}</p>}
+        <OutlinedTextField label="Badge" value={form.badge ?? ''} onInput={(e: Event) => set('badge', (e.target as HTMLInputElement).value)} error={Boolean(fieldErrors?.badge)} />
+        {fieldErrors?.badge && <p className="error-state" role="alert">{fieldErrors.badge}</p>}
 
-        <OutlinedTextField label="Summary" value={form.summary ?? ''} onInput={(e: Event) => set('summary', (e.target as HTMLInputElement).value)} />
-        <OutlinedTextField label="Description" value={form.description ?? ''} onInput={(e: Event) => set('description', (e.target as HTMLInputElement).value)} />
-        <OutlinedTextField label="Ingredients" value={form.ingredients ?? ''} onInput={(e: Event) => set('ingredients', (e.target as HTMLInputElement).value)} />
-        <OutlinedTextField label="Return policy" value={form.returnPolicy ?? ''} onInput={(e: Event) => set('returnPolicy', (e.target as HTMLInputElement).value)} />
+        <OutlinedTextField label="Summary" value={form.summary ?? ''} onInput={(e: Event) => set('summary', (e.target as HTMLInputElement).value)} error={Boolean(fieldErrors?.summary)} />
+        {fieldErrors?.summary && <p className="error-state" role="alert">{fieldErrors.summary}</p>}
+        <OutlinedTextField label="Description" value={form.description ?? ''} onInput={(e: Event) => set('description', (e.target as HTMLInputElement).value)} error={Boolean(fieldErrors?.description)} />
+        {fieldErrors?.description && <p className="error-state" role="alert">{fieldErrors.description}</p>}
+        <OutlinedTextField label="Ingredients" value={form.ingredients ?? ''} onInput={(e: Event) => set('ingredients', (e.target as HTMLInputElement).value)} error={Boolean(fieldErrors?.ingredients)} />
+        {fieldErrors?.ingredients && <p className="error-state" role="alert">{fieldErrors.ingredients}</p>}
+        <OutlinedTextField label="Return policy" value={form.returnPolicy ?? ''} onInput={(e: Event) => set('returnPolicy', (e.target as HTMLInputElement).value)} error={Boolean(fieldErrors?.returnPolicy)} />
+        {fieldErrors?.returnPolicy && <p className="error-state" role="alert">{fieldErrors.returnPolicy}</p>}
 
         <MediaUploader
           entityType="product"

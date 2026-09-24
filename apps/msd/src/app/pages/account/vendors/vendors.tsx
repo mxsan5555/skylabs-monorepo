@@ -8,6 +8,7 @@ import {
   deleteVendor,
   deleteVendorTherapist,
   getMyVendor,
+  getVendor,
   listCategories,
   listVendors,
   listVendorTherapistsForAdmin,
@@ -23,6 +24,7 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useToast } from '../../../../toast/toast-context';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { VendorList } from './vendor-list';
 import { VendorProfileForm, extractVendorFieldErrors, type VendorFieldErrors } from './vendor-profile-form';
 import { VendorBranches } from './vendor-branches';
@@ -136,6 +138,7 @@ function AdminVendorManagement({
   // now the only place to reach a vendor's own dashboard on their behalf).
   const canAccessDashboard = can('rbac.users', 'custom');
   const { showToast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [searchParams] = useSearchParams();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [total, setTotal] = useState(0);
@@ -234,7 +237,7 @@ useEffect(() => {
 
   const doDeleteTherapist = async (therapist: AdminTherapist) => {
     if (!selectedVendor) return;
-    if (!window.confirm(`Delete "${therapist.personName}"? This cannot be undone.`)) return;
+    if (!(await confirm(`Delete "${therapist.personName}"? This cannot be undone.`))) return;
     try {
       await deleteVendorTherapist(token, selectedVendor.id, therapist.id);
       loadTherapists();
@@ -322,9 +325,29 @@ useEffect(() => {
     }
   };
 
+  // Wired to `VendorBranches`' `onVendorRefresh` (the "Branches and Deals" tab, one level below
+  // this component) — see `BranchDialog`'s own `onCategoryAccessSaved` doc comment in
+  // vendor-branches.tsx for exactly why this exists: a branch's category-access save on THIS tab
+  // can flip `offersService`/`offersTherapy` server-side, but this tab is a completely separate
+  // component tree from the Overview tab's `VendorPipeline` (which owns its own, independently
+  // stale `vendor` state) — without this, switching to Overview afterward would still render the
+  // pre-grant flags and wrongly show "module not enabled" on Step 4/5 until a full page reload.
+  // Reuses `handlePipelineChange`'s exact update shape so both refresh paths keep `vendors`/
+  // `selectedId` in sync the same way.
+  const refreshSelectedVendorAfterBranchAccessChange = async () => {
+    if (!selectedVendor) return;
+    try {
+      const { data } = await getVendor(token, selectedVendor.id);
+      handlePipelineChange(data);
+    } catch {
+      // Non-fatal — the branch/category save itself already succeeded and its own toast fired;
+      // worst case the admin sees a stale flag until they switch tabs again or reload.
+    }
+  };
+
   const doDelete = async () => {
     if (!selectedVendor) return;
-    if (!window.confirm(`Delete "${selectedVendor.businessName || 'this vendor'}"? This cannot be undone.`)) return;
+    if (!(await confirm(`Delete "${selectedVendor.businessName || 'this vendor'}"? This cannot be undone.`))) return;
     try {
       await deleteVendor(token, selectedVendor.id);
       setVendors((prev) => prev.filter((v) => v.id !== selectedVendor.id));
@@ -437,6 +460,7 @@ useEffect(() => {
                 canApproveDeal={canApprove}
                 canDeleteDeal={canDelete}
                 categories={categories}
+                onVendorRefresh={refreshSelectedVendorAfterBranchAccessChange}
               />
             </div>
           )}
@@ -474,6 +498,7 @@ useEffect(() => {
       )}
 
       {!selectedVendor && <p className="empty-state">Select a member, or add a new one.</p>}
+      {ConfirmDialog}
     </div>
   );
 }

@@ -18,7 +18,9 @@ import { imageUpload } from '../lib/media-upload.middleware';
 
 /**
  * Blog Posts admin CRUD — mirrors categories.routes.ts's structure exactly (one router, gated on
- * the single 'cms.blog' menu key for every action).
+ * the single 'cms.blog.pages' menu key for every action — the "Articles" sidebar node has no
+ * frontend route or backend surface of its own yet, so it holds its own distinct 'cms.blog.articles'
+ * key in the Role Permission Matrix but nothing currently checks it).
  */
 const router = Router();
 router.use(authenticate);
@@ -27,7 +29,7 @@ function requestMeta(req: Request) {
   return { ip: req.ip, userAgent: req.headers['user-agent'] };
 }
 
-router.get('/', requirePermission('cms.blog', 'view'), validateQuery(BlogPostListQuerySchema), async (req, res, next) => {
+router.get('/', requirePermission('cms.blog.pages', 'view'), validateQuery(BlogPostListQuerySchema), async (req, res, next) => {
   try {
     const { page, pageSize, search, status, categoryId } = req.validatedQuery as ReturnType<typeof BlogPostListQuerySchema.parse>;
     const { items, total } = await blogPostService.listBlogPosts({ page, pageSize, search, status, categoryId });
@@ -39,7 +41,7 @@ router.get('/', requirePermission('cms.blog', 'view'), validateQuery(BlogPostLis
 
 router.post(
   '/',
-  requirePermission('cms.blog', 'create'),
+  requirePermission('cms.blog.pages', 'create'),
   validateBody(BlogPostCreateSchema),
   async (req, res, next) => {
     try {
@@ -59,7 +61,7 @@ router.post(
   },
 );
 
-router.get('/:id', requirePermission('cms.blog', 'view'), validateParams(UuidParamSchema), async (req, res, next) => {
+router.get('/:id', requirePermission('cms.blog.pages', 'view'), validateParams(UuidParamSchema), async (req, res, next) => {
   try {
     sendData(res, await blogPostService.getBlogPostOrThrow(req.params.id));
   } catch (err) {
@@ -69,7 +71,7 @@ router.get('/:id', requirePermission('cms.blog', 'view'), validateParams(UuidPar
 
 router.patch(
   '/:id',
-  requirePermission('cms.blog', 'edit'),
+  requirePermission('cms.blog.pages', 'edit'),
   validateParams(UuidParamSchema),
   validateBody(BlogPostUpdateSchema),
   async (req, res, next) => {
@@ -92,7 +94,7 @@ router.patch(
 
 router.patch(
   '/:id/status',
-  requirePermission('cms.blog', 'edit'),
+  requirePermission('cms.blog.pages', 'edit'),
   validateParams(UuidParamSchema),
   validateBody(BlogPostStatusUpdateSchema),
   async (req, res, next) => {
@@ -115,7 +117,7 @@ router.patch(
 
 router.delete(
   '/:id',
-  requirePermission('cms.blog', 'delete'),
+  requirePermission('cms.blog.pages', 'delete'),
   validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {
@@ -137,11 +139,11 @@ router.delete(
 );
 
 // ─── Blog Post media (shared upload system — see media.service.ts's doc comment). Gated on the
-// same 'cms.blog' permission as the rest of this router. ────────────────────────────────────────
+// same 'cms.blog.pages' permission as the rest of this router. ──────────────────────────────────
 
 router.post(
   '/:id/images',
-  requirePermission('cms.blog', 'edit'),
+  requirePermission('cms.blog.pages', 'edit'),
   validateParams(UuidParamSchema),
   imageUpload.single('file'),
   async (req, res, next) => {
@@ -167,7 +169,7 @@ router.post(
 
 router.delete(
   '/:id/images/:imageId',
-  requirePermission('cms.blog', 'edit'),
+  requirePermission('cms.blog.pages', 'edit'),
   validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {
@@ -188,7 +190,7 @@ router.delete(
 
 router.patch(
   '/:id/images/reorder',
-  requirePermission('cms.blog', 'edit'),
+  requirePermission('cms.blog.pages', 'edit'),
   validateParams(UuidParamSchema),
   validateBody(MediaReorderSchema),
   async (req, res, next) => {
@@ -203,7 +205,7 @@ router.patch(
 
 router.patch(
   '/:id/images/:imageId/primary',
-  requirePermission('cms.blog', 'edit'),
+  requirePermission('cms.blog.pages', 'edit'),
   validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {

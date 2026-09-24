@@ -11,37 +11,9 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getMyProfile, updateMyProfile } from '../../../../api/rbac/me';
 import type { UserRecord } from '../../../../api/rbac/users';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useAccount } from '../../../../account/account-context';
-import type { Address } from '../../../../types';
+import { extractFieldErrors } from '../../../../utils/field-errors';
 
-type Draft = Omit<Address, 'id'>;
-
-const EMPTY: Draft = {
-  label: '',
-  line1: '',
-  line2: '',
-  city: '',
-  state: '',
-  postalCode: '',
-  country: '',
-};
-
-/** One source of truth for the address form — add a field by extending this. */
-const ADDRESS_FIELDS: {
-  key: keyof Draft;
-  label: string;
-  span2?: boolean;
-}[] = [
-  { key: 'label', label: 'Label (e.g. Home, Work)', span2: true },
-  { key: 'line1', label: 'Address line 1', span2: true },
-  { key: 'line2', label: 'Address line 2', span2: true },
-  { key: 'city', label: 'City' },
-  { key: 'state', label: 'State' },
-  { key: 'postalCode', label: 'Postal code' },
-  { key: 'country', label: 'Country' },
-];
-
-const value = (e: Event) => (e.target as HTMLInputElement).value;
+type ProfileFieldKey = 'name' | 'email' | 'phone';
 
 export function MyProfileSettings() {
   const { token } = useAuth();
@@ -59,6 +31,7 @@ export function MyProfileSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<ProfileFieldKey, string>> | null>(null);
   const [message, setMessage] = useState('');
 
   /*
@@ -110,6 +83,7 @@ export function MyProfileSettings() {
   const saveProfile = async () => {
     setSaving(true);
     setError('');
+    setFieldErrors(null);
     setMessage('');
 
     try {
@@ -133,11 +107,13 @@ export function MyProfileSettings() {
         setMessage('');
       }, 2000);
     } catch (err) {
-      setError(
-        err instanceof ApiRequestError
-          ? err.message
-          : 'Could not save your profile.',
-      );
+      const fields = extractFieldErrors<ProfileFieldKey>(err);
+      if (fields) {
+        setFieldErrors(fields);
+        setError('Fix the highlighted fields and try again.');
+      } else {
+        setError(err instanceof ApiRequestError ? err.message : 'Could not save your profile.');
+      }
     } finally {
       setSaving(false);
     }
@@ -200,13 +176,33 @@ export function MyProfileSettings() {
             </p>
           )}
 
-          {/* ================================
-              CONTACT DETAILS
-              Backend driven
-             ================================= */}
-          <section className="account-card">
-            <div className="account-card__head">
-              <h2>Contact details</h2>
+          <div className="form-grid">
+            <OutlinedTextField
+              label="Name"
+              required
+              value={form.name}
+              onInput={(e: Event) => setForm((f) => ({ ...f, name: (e.target as HTMLInputElement).value }))}
+              error={Boolean(fieldErrors?.name)}
+            />
+            {fieldErrors?.name && <p className="error-state" role="alert">{fieldErrors.name}</p>}
+            <OutlinedTextField
+              label="Email"
+              type="email"
+              value={form.email}
+              onInput={(e: Event) => setForm((f) => ({ ...f, email: (e.target as HTMLInputElement).value }))}
+              error={Boolean(fieldErrors?.email)}
+            />
+            {fieldErrors?.email && <p className="error-state" role="alert">{fieldErrors.email}</p>}
+            <OutlinedTextField
+              label="Phone"
+              type="tel"
+              value={form.phone}
+              onInput={(e: Event) => setForm((f) => ({ ...f, phone: (e.target as HTMLInputElement).value }))}
+              error={Boolean(fieldErrors?.phone)}
+            />
+            {fieldErrors?.phone && <p className="error-state" role="alert">{fieldErrors.phone}</p>}
+            {/* Read-only by design — never an editable field. See this component's own doc comment. */}
+            <OutlinedTextField label="Role" value={user?.roles.map((r) => r.name).join(', ') || '—'} disabled />
 
               {message && (
                 <span className="otp-muted" role="status">

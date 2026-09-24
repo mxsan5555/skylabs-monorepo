@@ -83,6 +83,12 @@
 }
 
 /* ─── List view ──────────────────────────────────────────────────────────── */
+.search-results-list__subheading {
+  font: var(--md-sys-typescale-title-medium-font);
+  color: var(--md-sys-color-on-surface);
+  margin: 20px 0 12px;
+}
+
 .search-results-list {
   list-style: none;
   margin: 0;

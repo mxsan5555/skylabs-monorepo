@@ -46,6 +46,7 @@ export function createPrismaMock() {
       findMany: vi.fn(),
       findUnique: vi.fn(),
       count: vi.fn(),
+      deleteMany: vi.fn(),
     },
     rolePermission: {
       findMany: vi.fn(),
@@ -234,6 +235,7 @@ export function createPrismaMock() {
     },
     branchCategoryAccess: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       createMany: vi.fn(),
@@ -275,6 +277,22 @@ export function createPrismaMock() {
       findMany: vi.fn(),
       upsert: vi.fn(),
       deleteMany: vi.fn(),
+    },
+    popularTreatmentGroup: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn(),
+    },
+    popularTreatment: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn(),
     },
     cart: {
       findUnique: vi.fn(),

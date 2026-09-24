@@ -84,14 +84,14 @@ describe('GET /api/v1/blog-posts', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 403 without cms.blog:view', async () => {
+  it('returns 403 without cms.blog.pages:view', async () => {
     resolveMock.mockResolvedValue([]);
     const res = await request(app).get('/api/v1/blog-posts').set('Authorization', authHeader());
     expect(res.status).toBe(403);
   });
 
   it('returns 200 with the paginated list', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:view']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:view']);
     prismaMock.blogPost.findMany.mockResolvedValue([blogPostFixture]);
     prismaMock.blogPost.count.mockResolvedValue(1);
     const res = await request(app).get('/api/v1/blog-posts?page=2&pageSize=10').set('Authorization', authHeader());
@@ -102,7 +102,7 @@ describe('GET /api/v1/blog-posts', () => {
   });
 
   it('filters by search (title contains, case-insensitive)', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:view']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:view']);
     prismaMock.blogPost.findMany.mockResolvedValue([]);
     prismaMock.blogPost.count.mockResolvedValue(0);
     await request(app).get('/api/v1/blog-posts?search=tissue').set('Authorization', authHeader());
@@ -112,7 +112,7 @@ describe('GET /api/v1/blog-posts', () => {
   });
 
   it('filters by status', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:view']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:view']);
     prismaMock.blogPost.findMany.mockResolvedValue([]);
     prismaMock.blogPost.count.mockResolvedValue(0);
     await request(app).get('/api/v1/blog-posts?status=PUBLISHED').set('Authorization', authHeader());
@@ -122,7 +122,7 @@ describe('GET /api/v1/blog-posts', () => {
   });
 
   it('filters by categoryId', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:view']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:view']);
     prismaMock.blogPost.findMany.mockResolvedValue([]);
     prismaMock.blogPost.count.mockResolvedValue(0);
     await request(app).get(`/api/v1/blog-posts?categoryId=${CATEGORY_ID}`).set('Authorization', authHeader());
@@ -132,7 +132,7 @@ describe('GET /api/v1/blog-posts', () => {
   });
 
   it('an admin caller may filter by DRAFT status (unlike the public catalog read)', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:view']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:view']);
     prismaMock.blogPost.findMany.mockResolvedValue([{ ...blogPostFixture, status: 'DRAFT' }]);
     prismaMock.blogPost.count.mockResolvedValue(1);
     const res = await request(app).get('/api/v1/blog-posts?status=DRAFT').set('Authorization', authHeader());
@@ -158,7 +158,7 @@ describe('GET /api/v1/blog-posts', () => {
  */
 describe('Regression: BlogPost.categorySlug -> categoryId migration', () => {
   it('always includes the category relation on the admin list read', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:view']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:view']);
     prismaMock.blogPost.findMany.mockResolvedValue([blogPostFixture]);
     prismaMock.blogPost.count.mockResolvedValue(1);
     await request(app).get('/api/v1/blog-posts').set('Authorization', authHeader());
@@ -168,7 +168,7 @@ describe('Regression: BlogPost.categorySlug -> categoryId migration', () => {
   });
 
   it('every post returned by the admin list resolves a real, non-null BlogCategory — no orphaned categoryId', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:view']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:view']);
     prismaMock.blogPost.findMany.mockResolvedValue([blogPostFixture, { ...blogPostFixture, id: 'another-post-id' }]);
     prismaMock.blogPost.count.mockResolvedValue(2);
     const res = await request(app).get('/api/v1/blog-posts').set('Authorization', authHeader());
@@ -181,7 +181,7 @@ describe('Regression: BlogPost.categorySlug -> categoryId migration', () => {
   });
 
   it('the single-post read also includes the category relation, never a bare categoryId with no resolved row', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:view']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:view']);
     prismaMock.blogPost.findUnique.mockResolvedValue(blogPostFixture);
     const res = await request(app).get(`/api/v1/blog-posts/${BLOG_ID}`).set('Authorization', authHeader());
     expect(res.status).toBe(200);
@@ -193,14 +193,14 @@ describe('Regression: BlogPost.categorySlug -> categoryId migration', () => {
 });
 
 describe('POST /api/v1/blog-posts', () => {
-  it('returns 403 without cms.blog:create', async () => {
+  it('returns 403 without cms.blog.pages:create', async () => {
     resolveMock.mockResolvedValue([]);
     const res = await request(app).post('/api/v1/blog-posts').set('Authorization', authHeader()).send(validCreatePayload);
     expect(res.status).toBe(403);
   });
 
   it('creates a blog post and writes an audit log entry', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:create']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:create']);
     prismaMock.blogPost.findUnique.mockResolvedValue(null); // slug free
     prismaMock.blogPost.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: BLOG_ID, status: 'DRAFT', publishedAt: null, ...data }),
@@ -212,7 +212,7 @@ describe('POST /api/v1/blog-posts', () => {
   });
 
   it('returns 422 with fieldErrors when title is missing', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:create']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:create']);
     const { title, ...withoutTitle } = validCreatePayload;
     void title;
     const res = await request(app).post('/api/v1/blog-posts').set('Authorization', authHeader()).send(withoutTitle);
@@ -222,7 +222,7 @@ describe('POST /api/v1/blog-posts', () => {
   });
 
   it('returns 422 with fieldErrors when body is an empty array', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:create']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:create']);
     const res = await request(app)
       .post('/api/v1/blog-posts')
       .set('Authorization', authHeader())
@@ -233,7 +233,7 @@ describe('POST /api/v1/blog-posts', () => {
   });
 
   it('returns 422 for a malformed block inside body (missing text on a paragraph)', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:create']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:create']);
     const res = await request(app)
       .post('/api/v1/blog-posts')
       .set('Authorization', authHeader())
@@ -243,7 +243,7 @@ describe('POST /api/v1/blog-posts', () => {
   });
 
   it('returns 409 when the slug already exists', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:create']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:create']);
     prismaMock.blogPost.findUnique.mockResolvedValue(blogPostFixture);
     const res = await request(app).post('/api/v1/blog-posts').set('Authorization', authHeader()).send(validCreatePayload);
     expect(res.status).toBe(409);
@@ -251,7 +251,7 @@ describe('POST /api/v1/blog-posts', () => {
   });
 
   it('returns a clean 409 (not a raw 500) when a double-submit races past the app-layer slug check and hits the DB unique constraint', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:create']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:create']);
     prismaMock.blogPost.findUnique.mockResolvedValue(null);
     const { Prisma } = await import('../generated/prisma-client');
     prismaMock.blogPost.create.mockRejectedValue(
@@ -264,7 +264,7 @@ describe('POST /api/v1/blog-posts', () => {
 });
 
 describe('PATCH /api/v1/blog-posts/:id', () => {
-  it('returns 403 without cms.blog:edit', async () => {
+  it('returns 403 without cms.blog.pages:edit', async () => {
     resolveMock.mockResolvedValue([]);
     const res = await request(app)
       .patch(`/api/v1/blog-posts/${BLOG_ID}`)
@@ -274,7 +274,7 @@ describe('PATCH /api/v1/blog-posts/:id', () => {
   });
 
   it('updates the post', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:edit']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:edit']);
     prismaMock.blogPost.findUnique.mockResolvedValue(blogPostFixture);
     prismaMock.blogPost.update.mockResolvedValue({ ...blogPostFixture, title: 'New Title' });
     const res = await request(app)
@@ -287,7 +287,7 @@ describe('PATCH /api/v1/blog-posts/:id', () => {
   });
 
   it('returns 409 when editing to a slug already used by another post', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:edit']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:edit']);
     prismaMock.blogPost.findUnique
       .mockResolvedValueOnce(blogPostFixture) // getBlogPostOrThrow
       .mockResolvedValueOnce({ ...blogPostFixture, id: 'another-post-id' }); // assertSlugAvailable finds a different post
@@ -300,7 +300,7 @@ describe('PATCH /api/v1/blog-posts/:id', () => {
   });
 
   it('allows keeping its own slug unchanged (excludeId matches)', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:edit']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:edit']);
     prismaMock.blogPost.findUnique
       .mockResolvedValueOnce(blogPostFixture)
       .mockResolvedValueOnce(blogPostFixture); // same id -> not a conflict
@@ -314,7 +314,7 @@ describe('PATCH /api/v1/blog-posts/:id', () => {
 });
 
 describe('PATCH /api/v1/blog-posts/:id/status', () => {
-  it('returns 403 without cms.blog:edit', async () => {
+  it('returns 403 without cms.blog.pages:edit', async () => {
     resolveMock.mockResolvedValue([]);
     const res = await request(app)
       .patch(`/api/v1/blog-posts/${BLOG_ID}/status`)
@@ -324,7 +324,7 @@ describe('PATCH /api/v1/blog-posts/:id/status', () => {
   });
 
   it('draft -> published sets publishedAt for the first time', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:edit']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:edit']);
     prismaMock.blogPost.findUnique.mockResolvedValue({ ...blogPostFixture, status: 'DRAFT', publishedAt: null });
     prismaMock.blogPost.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ ...blogPostFixture, ...data }),
@@ -340,7 +340,7 @@ describe('PATCH /api/v1/blog-posts/:id/status', () => {
   });
 
   it('a later published -> draft -> published round trip never overwrites the original publishedAt', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:edit']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:edit']);
     const originalPublishedAt = new Date('2025-01-01T00:00:00.000Z');
     prismaMock.blogPost.findUnique.mockResolvedValue({ ...blogPostFixture, status: 'DRAFT', publishedAt: originalPublishedAt });
     prismaMock.blogPost.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
@@ -356,7 +356,7 @@ describe('PATCH /api/v1/blog-posts/:id/status', () => {
   });
 
   it('published -> draft leaves publishedAt untouched', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:edit']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:edit']);
     const originalPublishedAt = new Date('2025-01-01T00:00:00.000Z');
     prismaMock.blogPost.findUnique.mockResolvedValue({ ...blogPostFixture, status: 'PUBLISHED', publishedAt: originalPublishedAt });
     prismaMock.blogPost.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
@@ -373,14 +373,14 @@ describe('PATCH /api/v1/blog-posts/:id/status', () => {
 });
 
 describe('DELETE /api/v1/blog-posts/:id', () => {
-  it('returns 403 without cms.blog:delete', async () => {
+  it('returns 403 without cms.blog.pages:delete', async () => {
     resolveMock.mockResolvedValue([]);
     const res = await request(app).delete(`/api/v1/blog-posts/${BLOG_ID}`).set('Authorization', authHeader());
     expect(res.status).toBe(403);
   });
 
   it('deletes the post and writes an audit log entry', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:delete']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:delete']);
     prismaMock.blogPost.findUnique.mockResolvedValue(blogPostFixture);
     prismaMock.blogPost.delete.mockResolvedValue(blogPostFixture);
     const res = await request(app).delete(`/api/v1/blog-posts/${BLOG_ID}`).set('Authorization', authHeader());
@@ -389,7 +389,7 @@ describe('DELETE /api/v1/blog-posts/:id', () => {
   });
 
   it('returns 404 when the post does not exist', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:delete']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:delete']);
     prismaMock.blogPost.findUnique.mockResolvedValue(null);
     const res = await request(app).delete(`/api/v1/blog-posts/${BLOG_ID}`).set('Authorization', authHeader());
     expect(res.status).toBe(404);
@@ -398,7 +398,7 @@ describe('DELETE /api/v1/blog-posts/:id', () => {
 });
 
 describe('POST /api/v1/blog-posts/:id/images', () => {
-  it('returns 403 without cms.blog:edit', async () => {
+  it('returns 403 without cms.blog.pages:edit', async () => {
     resolveMock.mockResolvedValue([]);
     const res = await request(app)
       .post(`/api/v1/blog-posts/${BLOG_ID}/images`)
@@ -408,7 +408,7 @@ describe('POST /api/v1/blog-posts/:id/images', () => {
   });
 
   it('uploads an image and writes an audit log entry', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:edit']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:edit']);
     prismaMock.blogPost.findUnique.mockResolvedValue(blogPostFixture);
     prismaMock.blogPostImage.count.mockResolvedValue(0);
     prismaMock.blogPostImage.create.mockResolvedValue({ id: 'img-1' });
@@ -421,7 +421,7 @@ describe('POST /api/v1/blog-posts/:id/images', () => {
   });
 
   it('404s when the blog post does not exist', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:edit']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:edit']);
     prismaMock.blogPost.findUnique.mockResolvedValue(null);
     const res = await request(app)
       .post(`/api/v1/blog-posts/${BLOG_ID}/images`)
@@ -432,7 +432,7 @@ describe('POST /api/v1/blog-posts/:id/images', () => {
 });
 
 describe('DELETE /api/v1/blog-posts/:id/images/:imageId', () => {
-  it('returns 403 without cms.blog:edit', async () => {
+  it('returns 403 without cms.blog.pages:edit', async () => {
     resolveMock.mockResolvedValue([]);
     const res = await request(app)
       .delete(`/api/v1/blog-posts/${BLOG_ID}/images/img-1`)
@@ -441,7 +441,7 @@ describe('DELETE /api/v1/blog-posts/:id/images/:imageId', () => {
   });
 
   it('deletes the image and writes an audit log entry', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:edit']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:edit']);
     prismaMock.blogPost.findUnique.mockResolvedValue(blogPostFixture);
     prismaMock.blogPostImage.findUnique.mockResolvedValue({ id: 'img-1', blogPostId: BLOG_ID, isPrimary: false, storageKey: 'blog-posts/x/img-1.jpg' });
     prismaMock.blogPostImage.delete.mockResolvedValue({ storageKey: 'blog-posts/x/img-1.jpg' });
@@ -454,7 +454,7 @@ describe('DELETE /api/v1/blog-posts/:id/images/:imageId', () => {
 });
 
 describe('PATCH /api/v1/blog-posts/:id/images/:imageId/primary', () => {
-  it('returns 403 without cms.blog:edit', async () => {
+  it('returns 403 without cms.blog.pages:edit', async () => {
     resolveMock.mockResolvedValue([]);
     const res = await request(app)
       .patch(`/api/v1/blog-posts/${BLOG_ID}/images/img-1/primary`)
@@ -463,7 +463,7 @@ describe('PATCH /api/v1/blog-posts/:id/images/:imageId/primary', () => {
   });
 
   it('sets the primary image', async () => {
-    resolveMock.mockResolvedValue(['cms.blog:edit']);
+    resolveMock.mockResolvedValue(['cms.blog.pages:edit']);
     prismaMock.blogPost.findUnique.mockResolvedValue(blogPostFixture);
     prismaMock.blogPostImage.findUnique.mockResolvedValue({ id: 'img-2', blogPostId: BLOG_ID, isPrimary: false, storageKey: 'y' });
     prismaMock.blogPostImage.updateMany.mockResolvedValue({});

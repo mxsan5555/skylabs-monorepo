@@ -34,6 +34,7 @@ import { VendorDeals } from './pages/account/vendors/vendor-deals';
 import { VendorProducts } from './pages/account/vendors/vendor-products';
 import { CategoryManagement } from './pages/account/masters/categories';
 import { PopularTagManagement } from './pages/account/masters/popular-tags';
+import { PopularTreatmentManagement } from './pages/account/masters/popular-treatments';
 import { BlogList } from './pages/account/cms/blog-list';
 import { BlogDetailAdmin } from './pages/account/cms/blog-detail-admin';
 import { BlogCategoriesList } from './pages/account/cms/blog-categories-list';
@@ -459,9 +460,17 @@ export function AppRoutes() {
           }
         />
         <Route
+          path="/account/masters/popular-treatments"
+          element={
+            <RequirePermission menuKey="masters.popular-treatments">
+              <PopularTreatmentManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
           path="/account/cms/blog"
           element={
-            <RequirePermission menuKey="cms.blog">
+            <RequirePermission menuKey="cms.blog.pages">
               <BlogList />
             </RequirePermission>
           }
@@ -469,7 +478,7 @@ export function AppRoutes() {
         <Route
           path="/account/cms/blog/:id"
           element={
-            <RequirePermission menuKey="cms.blog">
+            <RequirePermission menuKey="cms.blog.pages">
               <BlogDetailAdmin />
             </RequirePermission>
           }

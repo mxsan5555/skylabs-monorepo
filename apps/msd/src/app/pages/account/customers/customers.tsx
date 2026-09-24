@@ -5,11 +5,12 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listCustomers, getCustomer, setCustomerStatus, type Customer, type CustomerStatus } from '../../../../api/rbac/customers';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useToast } from '../../../../toast/toast-context';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { CustomerList, customerStatusLabel } from './customer-list';
 import { CustomerDetailOrders } from './customer-detail-orders';
 
 /** Confirm-dialog + success-toast copy per status-change target — mirrors `blog-list.tsx`'s
- *  `toggleStatus`/`remove` pattern (window.confirm, then showToast on resolve). */
+ *  `toggleStatus`/`remove` pattern (themed confirm dialog, then showToast on resolve). */
 const STATUS_CONFIRM_COPY: Record<CustomerStatus, string> = {
   active: 'Are you sure you want to activate this customer?',
   inactive: 'Are you sure you want to deactivate this customer?',
@@ -45,6 +46,7 @@ export function CustomerManagement() {
   const { token, can } = useAuth();
   const canChangeStatus = can('customers', 'status_change');
   const { showToast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [searchParams] = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [total, setTotal] = useState(0);
@@ -113,7 +115,7 @@ export function CustomerManagement() {
    *  request can never leave the table showing a status that was never actually saved. */
   const doStatusChange = useCallback(
     async (id: string, status: CustomerStatus) => {
-      if (!window.confirm(STATUS_CONFIRM_COPY[status])) return;
+      if (!(await confirm(STATUS_CONFIRM_COPY[status]))) return;
       setStatusError('');
       try {
         const { data } = await setCustomerStatus(token, id, status);
@@ -126,7 +128,7 @@ export function CustomerManagement() {
         showToast(msg, 'error');
       }
     },
-    [token, showToast],
+    [token, showToast, confirm],
   );
 
   const memoParams = useMemo(() => params, [params]);
@@ -218,6 +220,7 @@ export function CustomerManagement() {
       )}
 
       {!selectedId && <p className="empty-state">Select a customer to view their details.</p>}
+      {ConfirmDialog}
     </div>
   );
 }

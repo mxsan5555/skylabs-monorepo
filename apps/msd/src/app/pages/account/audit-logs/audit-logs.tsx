@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import { OutlinedButton, OutlinedTextField } from '@skylabs-monorepo/shared-ui/react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { OutlinedTextField } from '@skylabs-monorepo/shared-ui/react';
+import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import type { AuditLogEntry } from '@skylabs-monorepo/shared-types';
 import { listAuditLogs } from '../../../../api/rbac/audit-logs';
@@ -7,15 +8,29 @@ import { ApiRequestError } from '../../../../api/rbac/client';
 
 const PAGE_SIZE = 25;
 
-/** Read-only audit trail for every RBAC mutation (role/user changes, impersonation starts). Filterable by target user id. */
+const COLUMNS = JSON.stringify([
+  { key: 'When', label: 'When' },
+  { key: 'Actor', label: 'Actor' },
+  { key: 'Action', label: 'Action' },
+  { key: 'Target', label: 'Target' },
+  { key: 'IP', label: 'IP' },
+]);
+
+/** Read-only audit trail for every RBAC mutation (role/user changes, impersonation starts).
+ *  Filterable by target user id (a specific-id lookup, kept as its own labelled field rather
+ *  than `<sky-data-table>`'s built-in full-text `searchable` box) with page/page-size handled by
+ *  the table's own built-in pagination (`sky-dt-params-change`) instead of hand-rolled
+ *  Previous/Next buttons. */
 export function AuditLogs() {
   const { token } = useAuth();
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [targetUserId, setTargetUserId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const tableRef = useRef<HTMLElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -24,7 +39,7 @@ export function AuditLogs() {
       const { data, meta } = await listAuditLogs(token, {
         targetUserId: targetUserId || undefined,
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
       });
       setEntries(data);
       setTotal(meta?.total ?? data.length);
@@ -33,13 +48,37 @@ export function AuditLogs() {
     } finally {
       setLoading(false);
     }
-  }, [token, targetUserId, page]);
+  }, [token, targetUserId, page, pageSize]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const rows = useMemo(
+    () =>
+      JSON.stringify(
+        entries.map((entry) => ({
+          When: new Date(entry.createdAt).toLocaleString(),
+          Actor: entry.actorUserId,
+          Action: entry.action,
+          Target: `${entry.targetType} · ${entry.targetId}`,
+          IP: entry.ip ?? '—',
+        })),
+      ),
+    [entries],
+  );
+
+  useEffect(() => {
+    const el = tableRef.current;
+    if (!el) return;
+    const onParamsChange = (e: Event) => {
+      const detail = (e as CustomEvent<SkyDataTableParamsDetail>).detail;
+      setPage(detail.page);
+      setPageSize(detail.pageSize);
+    };
+    el.addEventListener('sky-dt-params-change', onParamsChange);
+    return () => el.removeEventListener('sky-dt-params-change', onParamsChange);
+  }, []);
 
   return (
     <div className="admin-page admin-page--wide">
@@ -63,53 +102,18 @@ export function AuditLogs() {
           />
         </div>
 
-        {loading ? (
-          <p className="loading-state">Loading audit logs…</p>
-        ) : error ? (
-          <p className="error-state">{error}</p>
-        ) : entries.length === 0 ? (
-          <p className="empty-state">No audit log entries match.</p>
-        ) : (
-          <>
-            <div className="data-table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th scope="col">When</th>
-                    <th scope="col">Actor</th>
-                    <th scope="col">Action</th>
-                    <th scope="col">Target</th>
-                    <th scope="col">IP</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map((entry) => (
-                    <tr key={entry.id}>
-                      <td>{new Date(entry.createdAt).toLocaleString()}</td>
-                      <td>{entry.actorUserId}</td>
-                      <td>{entry.action}</td>
-                      <td>
-                        {entry.targetType} · {entry.targetId}
-                      </td>
-                      <td>{entry.ip ?? '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="form-actions">
-              <OutlinedButton disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                Previous
-              </OutlinedButton>
-              <span className="field-hint">
-                Page {page} of {totalPages}
-              </span>
-              <OutlinedButton disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
-                Next
-              </OutlinedButton>
-            </div>
-          </>
-        )}
+        {error && <p className="error-state">{error}</p>}
+
+        <sky-data-table
+          ref={tableRef as RefObject<HTMLElement>}
+          caption="Audit Logs"
+          columns={COLUMNS}
+          rows={rows}
+          total={total}
+          page={page}
+          page-size={pageSize}
+          loading={loading}
+        />
       </div>
     </div>
   );
