@@ -34,6 +34,7 @@ vi.mock('../../../api/catalog', () => ({
   listCatalogProducts: vi.fn().mockResolvedValue({ data: [] }),
   listCatalogTherapists: vi.fn().mockResolvedValue({ data: [] }),
   listCatalogFaqs: vi.fn().mockResolvedValue({ data: [] }),
+  listCatalogPopularTreatments: vi.fn().mockResolvedValue({ data: [] }),
 }));
 
 const mockCategory = {

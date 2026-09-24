@@ -362,6 +362,14 @@
         "permissionKey": "masters.tags",
         "parent": "masters",
         "order": 2
+      },
+      {
+        "id": "masters-popular-treatments",
+        "title": "Popular Treatments",
+        "route": "/account/masters/popular-treatments",
+        "permissionKey": "masters.popular-treatments",
+        "parent": "masters",
+        "order": 3
       }
     ]
   },

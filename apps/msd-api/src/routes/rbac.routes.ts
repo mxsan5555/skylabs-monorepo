@@ -217,6 +217,20 @@ router.put(
   },
 );
 
+router.get(
+  '/roles/:id/widgets',
+  requirePermission('rbac.roles', 'view'),
+  validateParams(UuidParamSchema),
+  async (req, res, next) => {
+    try {
+      const widgets = await roleService.getRoleWidgets(req.params.id);
+      sendData(res, widgets);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 router.put(
   '/roles/:id/widgets',
   requirePermission('rbac.roles', 'edit'),

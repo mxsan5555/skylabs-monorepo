@@ -17,11 +17,13 @@ import {
   listCatalogFaqs,
   listCatalogProducts,
   listCatalogTherapists,
+  listCatalogPopularTreatments,
   type CatalogCategoryWithChildren,
   type CatalogDeal,
   type CatalogFaq,
   type CatalogProduct,
   type CatalogTherapist,
+  type CatalogPopularTreatmentGroup,
 } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
@@ -219,6 +221,17 @@ export function Home() {
     listCatalogFaqs()
       .then(({ data }) => setFaqs(data ?? []))
       .catch(() => setFaqs([]));
+  }, []);
+
+  // Popular Treatments — Master-managed (see account/masters/popular-treatments.tsx); the
+  // endpoint already returns only active groups holding only their own active treatments, so no
+  // client-side filtering is needed here. Non-critical, same "failure just hides the section"
+  // discipline as FAQ above.
+  const [treatmentGroups, setTreatmentGroups] = useState<CatalogPopularTreatmentGroup[]>([]);
+  useEffect(() => {
+    listCatalogPopularTreatments()
+      .then(({ data }) => setTreatmentGroups(data ?? []))
+      .catch(() => setTreatmentGroups([]));
   }, []);
 
   // "Featured" = newest real deals (backend default sort); no `isFeatured` flag exists.
@@ -567,29 +580,35 @@ export function Home() {
         </div>
       </section>
 
-      {/* ── Treatment directory ────────────────────────────────────────── */}
-      <section className="home-band" aria-labelledby="treatments-heading">
-        <div className="home-container">
-          <div className="home-head home-head--stack">
-            <h2 id="treatments-heading" className="home-head__title">{home.searchByDestination.heading}</h2>
-            <p className="home-head__sub">{home.searchByDestination.subheading}</p>
+      {/* ── Treatment directory (Master-managed — see account/masters/popular-treatments.tsx) ── */}
+      {treatmentGroups.length > 0 && (
+        <section className="home-band" aria-labelledby="treatments-heading">
+          <div className="home-container">
+            <div className="home-head home-head--stack">
+              <h2 id="treatments-heading" className="home-head__title">{home.searchByDestination.heading}</h2>
+              <p className="home-head__sub">{home.searchByDestination.subheading}</p>
+            </div>
+            <div className="home-directory">
+              {treatmentGroups.map((group) => (
+                <div key={group.id} className="home-directory__group">
+                  <h3 className="home-directory__title">{group.name}</h3>
+                  <ul className="home-directory__links">
+                    {group.treatments.map((treatment) => {
+                      const params = new URLSearchParams({ q: treatment.name });
+                      if (treatment.categorySlug) params.set('category', treatment.categorySlug);
+                      return (
+                        <li key={treatment.id}>
+                          <Link to={`/explore?${params.toString()}`}>{treatment.name}</Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="home-directory">
-            {home.searchByDestination.columns.flat().map((group) => (
-              <div key={group.title} className="home-directory__group">
-                <h3 className="home-directory__title">{group.title}</h3>
-                <ul className="home-directory__links">
-                  {group.items.map((item) => (
-                    <li key={item}>
-                      <Link to={`/explore?q=${encodeURIComponent(item)}`}>{item}</Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ── FAQ ────────────────────────────────────────────────────────── */}
       {faqs.length > 0 && (

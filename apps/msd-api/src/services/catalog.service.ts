@@ -3,6 +3,7 @@ import { ApiError } from '../lib/http';
 import type { Prisma } from '../generated/prisma-client';
 import { listActiveCategories, getActiveCategoryBySlugOrThrow } from './category.service';
 import { getActiveTagNamesFor } from './popular-tag.service';
+import { getPublicTreatmentDirectory } from './popular-treatment.service';
 import * as blogPostService from './blog-post.service';
 import * as siteContentService from './site-content.service';
 import * as faqService from './faq.service';
@@ -325,6 +326,13 @@ function buildPublicChildren<T extends { id: string; parentId: string | null; na
       description: child.description,
       children: buildPublicChildren(all, child.id).map(({ id, name, slug, description }) => ({ id, name, slug, description })),
     }));
+}
+
+/** Public home page Treatment directory — thin pass-through to `popular-treatment.service.ts`'s
+ *  own public function, which already selects only public-safe fields (id/name/slug + category
+ *  slug) and filters to active groups/treatments server-side. */
+export async function getPublicPopularTreatments() {
+  return getPublicTreatmentDirectory();
 }
 
 export async function getPublicCategoryTree() {

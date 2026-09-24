@@ -11,6 +11,7 @@ import {
   assertVendorHasCategoryAccess,
   assertBranchHasCategoryAccess,
   assertBranchHasSubcategoryAccess,
+  assertBranchHasAnyCategoryAccessOfType,
 } from './category.service';
 import { getProductScopedOrThrow } from './product.service';
 import * as mediaService from './media.service';
@@ -732,12 +733,27 @@ export async function listAllTherapists(opts: { page: number; pageSize: number; 
 
 // ─── Branch (shared by admin `:vendorId` path and self-derived vendorId) ─────
 
+/**
+ * `categoryTypes` — the distinct `CategoryType`s this branch currently has ANY `BranchCategoryAccess`
+ * grant for (e.g. `['THERAPY']`) — lets a caller (the Add Therapist/Deal forms' branch picker)
+ * know which branches are currently eligible for a given module WITHOUT a separate
+ * `getBranchCategoryAccess` round-trip per branch. Computed from the same single query as the
+ * rest of this response (`include`, not a follow-up call), so listing N branches is still exactly
+ * one query — never N+1 — regardless of how many categories each branch has mapped.
+ */
 export async function listBranches(vendorId: string) {
-  return prisma.branch.findMany({
+  const branches = await prisma.branch.findMany({
     where: { vendorId },
     orderBy: { createdAt: 'desc' },
-    include: { _count: { select: { deals: true } } },
+    include: {
+      _count: { select: { deals: true } },
+      categoryAccess: { select: { category: { select: { type: true } } } },
+    },
   });
+  return branches.map(({ categoryAccess, ...branch }) => ({
+    ...branch,
+    categoryTypes: [...new Set(categoryAccess.map((a) => a.category.type).filter((t): t is CategoryType => t !== null))],
+  }));
 }
 
 /** 404 if the branch doesn't exist at all; 403 if it exists but belongs to a different vendor. */
@@ -927,6 +943,10 @@ async function assertBranchHasSpecializationCategoryAccess(branchId: string, spe
 
 export async function createTherapist(vendorId: string, branchId: string, input: TherapistCreateInput) {
   await getBranchScopedOrThrow(vendorId, branchId);
+  // Unconditional — `specializationCategoryId` is optional on the input, so without this a
+  // branch with zero THERAPY access could still receive a therapist just by omitting that
+  // field. This is the real security boundary; the frontend's branch picker filtering is UX only.
+  await assertBranchHasAnyCategoryAccessOfType(branchId, 'THERAPY');
   const recentDuplicate = await prisma.therapist.findFirst({
     where: {
       vendorId,

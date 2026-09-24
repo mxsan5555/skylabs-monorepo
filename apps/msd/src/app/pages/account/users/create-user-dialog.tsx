@@ -5,6 +5,9 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { createUser, type UserRecord } from '../../../../api/rbac/users';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import type { Role } from '../../../../api/rbac/roles';
+import { extractFieldErrors } from '../../../../utils/field-errors';
+
+type CreateUserFieldKey = 'name' | 'email' | 'phone';
 
 export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreated: (user: UserRecord) => void }) {
   const { token } = useAuth();
@@ -13,6 +16,7 @@ export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreate
   const [roleIds, setRoleIds] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<CreateUserFieldKey, string>> | null>(null);
 
   const toggleRole = (roleId: string) => {
     setRoleIds((prev) => {
@@ -25,6 +29,7 @@ export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreate
 
   const submit = async () => {
     setError('');
+    setFieldErrors(null);
     if (!form.name.trim()) {
       setError('Name is required.');
       return;
@@ -46,7 +51,13 @@ export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreate
       setRoleIds(new Set());
       dialogRef.current?.close();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not create user.');
+      const fields = extractFieldErrors<CreateUserFieldKey>(err);
+      if (fields) {
+        setFieldErrors(fields);
+        setError('Fix the highlighted fields and try again.');
+      } else {
+        setError(err instanceof ApiRequestError ? err.message : 'Could not create user.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -63,21 +74,28 @@ export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreate
         <div slot="content" className="form-grid">
           <OutlinedTextField
             label="Name"
+            required
             value={form.name}
             onInput={(e: Event) => setForm((f) => ({ ...f, name: (e.target as HTMLInputElement).value }))}
+            error={Boolean(fieldErrors?.name)}
           />
+          {fieldErrors?.name && <p className="error-state" role="alert">{fieldErrors.name}</p>}
           <OutlinedTextField
             label="Email"
             type="email"
             value={form.email}
             onInput={(e: Event) => setForm((f) => ({ ...f, email: (e.target as HTMLInputElement).value }))}
+            error={Boolean(fieldErrors?.email)}
           />
+          {fieldErrors?.email && <p className="error-state" role="alert">{fieldErrors.email}</p>}
           <OutlinedTextField
             label="Phone"
             type="tel"
             value={form.phone}
             onInput={(e: Event) => setForm((f) => ({ ...f, phone: (e.target as HTMLInputElement).value }))}
+            error={Boolean(fieldErrors?.phone)}
           />
+          {fieldErrors?.phone && <p className="error-state" role="alert">{fieldErrors.phone}</p>}
           <fieldset>
             <legend>Roles</legend>
             {roles.map((role) => (

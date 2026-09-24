@@ -20,6 +20,7 @@ import {
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useToast } from '../../../../toast/toast-context';
 import { extractSiteContentFieldErrors } from './field-errors';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { CareersJobFormDialog } from './careers-job-form-dialog';
 
 type ContentFieldKey = keyof CareersPageContentInput;
@@ -51,6 +52,7 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
  */
 export function CareersPage() {
   const { token, can } = useAuth();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const { showToast } = useToast();
   const canEditContent = can('cms.careers', 'edit');
   const canCreate = can('cms.careers', 'create');
@@ -188,7 +190,7 @@ export function CareersPage() {
   };
 
   const removeJob = async (job: CareersJobListing) => {
-    if (!window.confirm(`Delete "${job.jobTitle}"? This cannot be undone.`)) return;
+    if (!(await confirm(`Delete "${job.jobTitle}"? This cannot be undone.`))) return;
     setJobsError('');
     try {
       await deleteCareersJob(token, job.id);
@@ -372,6 +374,7 @@ export function CareersPage() {
           onClose={() => setEditingJob(null)}
         />
       )}
+      {ConfirmDialog}
     </div>
   );
 }

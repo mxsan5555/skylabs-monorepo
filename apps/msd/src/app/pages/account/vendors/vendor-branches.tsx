@@ -42,6 +42,7 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { MediaUploader } from '../../../components/media-uploader';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { useToast } from '../../../../toast/toast-context';
 import { STATES, citiesForState } from '../../../../data/india-locations';
 
@@ -54,6 +55,15 @@ interface VendorBranchesProps {
   /** Superadmin-only hard delete — no self-service equivalent exists (vendors can only
    *  Activate/Deactivate their own deals), so this is always `false` on the `isSelf` surface. */
   canDeleteDeal?: boolean;
+  /**
+   * Forwarded straight to `BranchDialog`'s own `onCategoryAccessSaved` — see that prop's doc
+   * comment. This admin-only "Branches & Deals" tab previously had NO way at all to tell its
+   * caller that a branch's category save may have just flipped `Vendor.offersService`/
+   * `offersTherapy` server-side, so the vendor object rendered elsewhere (e.g. the Overview tab's
+   * Therapy/Product wizard steps) could go stale indefinitely until a full page reload. Omitted
+   * on the `isSelf` surface's call site below since `BranchDialog` never fires it there anyway.
+   */
+  onVendorRefresh?: () => void;
   /** The vendor's granted SERVICE categories (`listCategories({ type: 'SERVICE', vendorId })`)
    *  — a service Deal picks directly from these, no global Service master any more. */
   categories: Category[];
@@ -77,13 +87,14 @@ export function groupBranchesByState(branches: Branch[]): { state: string; branc
 
 /** Branch list + nested Deal list for a single vendor — reused for both the admin
  *  (`/vendors/:vendorId/branches...`) and self-service (`/vendors/me/branches...`) surfaces. */
-export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDeal, canDeleteDeal = false, categories }: VendorBranchesProps) {
+export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDeal, canDeleteDeal = false, categories, onVendorRefresh }: VendorBranchesProps) {
   // Deep-link support for a "New Deal Pending Approval" notification click (see
   // notification-bell.tsx) — both params are optional and purely additive; this page behaves
   // exactly as before when neither is present.
   const [searchParams] = useSearchParams();
   const dealIdParam = searchParams.get('dealId');
   const branchIdParam = searchParams.get('branchId');
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchesLoading, setBranchesLoading] = useState(true);
   const [error, setError] = useState('');
@@ -248,7 +259,7 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
 
   const doDeleteDeal = async (deal: Deal) => {
     if (!selectedBranchId) return;
-    if (!window.confirm(`Delete "${deal.title}"? This cannot be undone.`)) return;
+    if (!(await confirm(`Delete "${deal.title}"? This cannot be undone.`))) return;
     try {
       await deleteDeal(token, vendorId, selectedBranchId, deal.id);
       reloadDeals();
@@ -268,6 +279,7 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
               vendorId={vendorId}
               isSelf={isSelf}
               onSave={(input) => saveBranch(input).then((data) => { setError(''); return data; })}
+              onCategoryAccessSaved={onVendorRefresh}
             />
           )}
         </div>
@@ -300,7 +312,7 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
                 </button>
                 {canEdit && (
                   <div className="page-head__actions">
-                    <BranchDialog branch={branch} token={token} vendorId={vendorId} isSelf={isSelf} onSave={(input) => saveBranch(input, branch)} />
+                    <BranchDialog branch={branch} token={token} vendorId={vendorId} isSelf={isSelf} onSave={(input) => saveBranch(input, branch)} onCategoryAccessSaved={onVendorRefresh} />
                     <OutlinedButton onClick={() => toggleBranchStatus(branch)}>
                       {branch.isActive ? 'Deactivate' : 'Activate'}
                     </OutlinedButton>
@@ -368,6 +380,7 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
           </>
         )}
       </section>
+      {ConfirmDialog}
     </div>
   );
 }
@@ -405,6 +418,39 @@ const WEEKDAYS: { key: WeekdayKey; label: string }[] = [
 ];
 
 const DEFAULT_DAY_HOURS = { open: true, start: '09:00', end: '20:00' };
+
+const WEEKDAY_KEYS: WeekdayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const LEGACY_HOURS_PATTERN = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * Pre-migration `Branch.openingHours` rows were written as a plain string per day
+ * (`"09:00-20:00"` / `"closed"`) — a convention that predates the current structured
+ * `{ open, start, end }` per-day shape (`OpeningHoursSchema` on the server, `DayHours` here).
+ * `Json?` columns carry no schema, so nothing ever migrated those rows. Left unnormalized, this
+ * dialog would silently echo the legacy string blob straight back in the save payload for a
+ * branch whose Operating Hours the admin never even touched, which the server's Zod schema then
+ * rightly rejects (`expected object, received string`) — the actual root cause behind "editing
+ * any field and saving" failing with a generic `VALIDATION_ERROR` on branches seeded before the
+ * structured-hours migration. This is a one-time read-side compatibility shim, not a schema
+ * change: the server contract stays exactly as strict as before, this just guarantees the value
+ * this dialog holds (and ultimately re-submits) is always in the shape that contract expects,
+ * regardless of which shape the branch happened to load with.
+ */
+function normalizeOpeningHours(raw: unknown): OpeningHours {
+  if (!raw || typeof raw !== 'object') return {};
+  const result: OpeningHours = {};
+  for (const key of WEEKDAY_KEYS) {
+    const value = (raw as Record<string, unknown>)[key];
+    if (value == null) continue;
+    if (typeof value === 'string') {
+      const match = LEGACY_HOURS_PATTERN.exec(value);
+      result[key] = match ? { open: true, start: match[0].slice(0, 5), end: match[0].slice(6) } : { open: false };
+    } else if (typeof value === 'object') {
+      result[key] = value as { open: boolean; start?: string; end?: string };
+    }
+  }
+  return result;
+}
 
 /** A structured 7-day operating-hours editor writing to `Branch.openingHours` (a loosely-
  *  structured `Json?` column — see `OpeningHours`'s own doc comment) — replaces having no UI at
@@ -486,6 +532,7 @@ function OpeningHoursEditor({ value, onChange }: { value: OpeningHours; onChange
 export function BranchDialog({
   branch,
   onSave,
+  onCategoryAccessSaved,
   token,
   vendorId,
   isSelf = false,
@@ -497,16 +544,29 @@ export function BranchDialog({
    *  is the only place its real `id` becomes available, needed to save this dialog's own category
    *  mapping against the right branch right after creation. */
   onSave: (input: BranchInput) => Promise<Branch>;
+  /**
+   * Fired right after `setBranchCategoryAccess` succeeds below — NOT after `onSave` (the branch
+   * fields save). That call can auto-grant a vendor-level `VendorCategoryAccess` row and flip
+   * `offersService`/`offersTherapy` server-side (see `setBranchCategoryAccess`'s own doc comment
+   * in msd-api's vendor.service.ts), so any caller that gates a screen on those flags (e.g. the
+   * Therapy/Product wizard steps' "module not enabled" message) must refetch the vendor AFTER
+   * this fires, never right after `onSave` alone — refetching too early is a real race that can
+   * silently capture the pre-grant `offersTherapy: false`, which is exactly the "granted category
+   * access but the module still shows as disabled" bug this callback exists to prevent. Omitted
+   * (not called) on the `isSelf` surface, where the whole Categories & Subcategories section
+   * doesn't render at all.
+   */
+  onCategoryAccessSaved?: () => void;
   token: string | null;
   vendorId: string;
   /** True on the self-service "Branches & Deals" surface — see this component's own doc comment
    *  on why the category section is entirely omitted rather than attempting a save that has no
    *  backend route to land on. Defaults to `false` since most call sites are admin-scoped. */
   isSelf?: boolean;
-  /** Lets a caller drive this dialog open from more than one trigger (e.g. `vendor-wizard-branches.tsx`'s
-   *  "Edit" and "Categories" buttons both opening this same dialog instance) instead of using this
-   *  component's own built-in trigger button — same opt-in pattern as `DealDialog`'s own
-   *  `dialogRef`/`hideTrigger`. */
+  /** Lets a caller drive this dialog open from a trigger it renders itself (e.g.
+   *  `vendor-wizard-branches.tsx`'s `BranchRow`, which owns a per-branch "Edit" button so opening
+   *  one branch's dialog can never affect another's) instead of using this component's own
+   *  built-in trigger button — same opt-in pattern as `DealDialog`'s own `dialogRef`/`hideTrigger`. */
   dialogRef?: RefObject<MdDialog | null>;
   hideTrigger?: boolean;
 }) {
@@ -521,8 +581,8 @@ export function BranchDialog({
     pincode: branch?.pincode ?? '',
     mapLocationUrl: branch?.mapLocationUrl ?? '',
   });
-  const [openingHours, setOpeningHours] = useState<OpeningHours>(branch?.openingHours ?? {});
-  const [errors, setErrors] = useState<Partial<Record<'pincode' | 'mapLocationUrl', string>>>({});
+  const [openingHours, setOpeningHours] = useState<OpeningHours>(() => normalizeOpeningHours(branch?.openingHours));
+  const [errors, setErrors] = useState<Partial<Record<'name' | 'pincode' | 'mapLocationUrl', string>>>({});
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   // Same double-submit guard convention used elsewhere in this file (DealDialog's submittingRef).
@@ -550,16 +610,20 @@ export function BranchDialog({
     setCategoriesError('');
     (async () => {
       try {
-        const [{ data: svc }, { data: thr }] = await Promise.all([
+        // All three calls are independent (`getBranchCategoryAccess` needs only `vendorId`/
+        // `branchId`, already known before this effect runs — it doesn't need `svc`/`thr` first),
+        // so they're fired together instead of awaiting the category lists before even starting
+        // the access fetch. That serial chain was measured as a real, avoidable extra round trip
+        // on every branch Edit dialog open (see Phase D's performance investigation report).
+        const [{ data: svc }, { data: thr }, access] = await Promise.all([
           listCategories(token, { type: 'SERVICE' }),
           listCategories(token, { type: 'THERAPY' }),
+          branchId ? getBranchCategoryAccess(token, vendorId, branchId).then((r) => r.data) : Promise.resolve(null),
         ]);
         if (cancelled) return;
         setServiceCategories(svc);
         setTherapyCategories(thr);
-        if (branchId) {
-          const { data: access } = await getBranchCategoryAccess(token, vendorId, branchId);
-          if (cancelled) return;
+        if (access) {
           const next = new Map<string, Set<string>>();
           access.forEach((row) => next.set(row.categoryId, new Set(row.subcategories.map((s) => s.subcategoryId))));
           setCategoryMap(next);
@@ -607,11 +671,8 @@ export function BranchDialog({
 
   const submit = async () => {
     if (submittingRef.current) return;
-    if (!form.name.trim()) {
-      setError('Branch name is required.');
-      return;
-    }
     const nextErrors: typeof errors = {
+      name: form.name.trim() ? undefined : 'Branch name is required.',
       pincode: validateBranchPincode(form.pincode) ?? undefined,
       mapLocationUrl: validateMapLocationUrl(form.mapLocationUrl) ?? undefined,
     };
@@ -640,6 +701,7 @@ export function BranchDialog({
         try {
           const mappings = [...categoryMap.entries()].map(([categoryId, subcategoryIds]) => ({ categoryId, subcategoryIds: [...subcategoryIds] }));
           await setBranchCategoryAccess(token, vendorId, savedBranch.id, { mappings });
+          onCategoryAccessSaved?.();
         } catch (categoryErr) {
           // The branch itself already saved successfully above — never leave the admin unsure
           // whether that part worked, and never silently drop the category data either.
@@ -654,12 +716,34 @@ export function BranchDialog({
       showToast(branch ? 'Branch updated successfully.' : 'Branch created successfully.');
       dialogRef.current?.close();
     } catch (err) {
-      // The Google Maps URL resolver throws a single `ApiError('VALIDATION_ERROR', message)`
-      // with no per-field `details.fieldErrors` breakdown (it's not a Zod validation error) —
-      // surface it directly under the Map Location field rather than only as a generic banner.
       if (err instanceof ApiRequestError && err.code === 'VALIDATION_ERROR') {
-        setErrors((e) => ({ ...e, mapLocationUrl: err.message }));
-        setError('Fix the highlighted fields before saving.');
+        // Two different things share this one code, distinguished by whether a per-field
+        // breakdown is present:
+        //  - `validateBody`'s Zod schema failure — `details.fieldErrors` names the actual
+        //    field(s) that failed (which may not be Map Location at all — e.g. a branch whose
+        //    stored `openingHours` predates the current structured shape). Route each reported
+        //    field to its own error slot instead of always blaming Map Location, so the real
+        //    cause is visible and nothing is silently misattributed.
+        //  - the Google Maps URL resolver's own `ApiError('VALIDATION_ERROR', message)` — no
+        //    `details`, always about the Map Location field specifically.
+        const fieldErrors = (err.details as { fieldErrors?: Record<string, string[]> } | undefined)?.fieldErrors;
+        if (fieldErrors && Object.keys(fieldErrors).length > 0) {
+          const known: typeof errors = {};
+          const other: string[] = [];
+          for (const [field, messages] of Object.entries(fieldErrors)) {
+            const message = messages[0];
+            if (field === 'name' || field === 'pincode' || field === 'mapLocationUrl') {
+              known[field] = message;
+            } else {
+              other.push(`${field}: ${message}`);
+            }
+          }
+          setErrors((e) => ({ ...e, ...known }));
+          setError(other.length > 0 ? `Could not save: ${other.join('; ')}` : 'Fix the highlighted fields before saving.');
+        } else {
+          setErrors((e) => ({ ...e, mapLocationUrl: err.message }));
+          setError('Fix the highlighted fields before saving.');
+        }
       } else {
         setError(err instanceof ApiRequestError ? err.message : 'Could not save branch.');
       }
@@ -682,7 +766,14 @@ export function BranchDialog({
       <Dialog ref={dialogRef}>
         <div slot="headline">{branch ? 'Edit branch' : 'Add branch'}</div>
         <div slot="content" className="form-grid">
-          <OutlinedTextField label="Branch Name" value={form.name} onInput={(e: Event) => set('name', (e.target as HTMLInputElement).value)} />
+          <OutlinedTextField
+            label="Branch Name"
+            required
+            value={form.name}
+            onInput={(e: Event) => set('name', (e.target as HTMLInputElement).value)}
+            error={Boolean(errors.name)}
+          />
+          {errors.name && <p className="error-state" role="alert">{errors.name}</p>}
           <OutlinedTextField label="Address" value={form.address} onInput={(e: Event) => set('address', (e.target as HTMLInputElement).value)} />
 
           <OutlinedSelect label="State" value={form.state} onChange={(e: Event) => set('state', (e.target as HTMLSelectElement).value)}>

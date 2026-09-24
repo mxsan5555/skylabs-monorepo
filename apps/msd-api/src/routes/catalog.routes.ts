@@ -23,6 +23,14 @@ router.get('/categories', async (_req, res, next) => {
   }
 });
 
+router.get('/popular-treatments', async (_req, res, next) => {
+  try {
+    sendData(res, await catalogService.getPublicPopularTreatments());
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/categories/:slug', validateParams(z.object({ slug: z.string().min(1) })), async (req, res, next) => {
   try {
     sendData(res, await catalogService.getPublicCategoryBySlug(req.params.slug));

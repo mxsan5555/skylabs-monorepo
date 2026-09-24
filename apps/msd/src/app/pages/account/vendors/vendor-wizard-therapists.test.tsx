@@ -33,6 +33,7 @@ const BRANCH: Branch = {
   isActive: true,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
+  categoryTypes: ['THERAPY'],
 };
 
 const THERAPY_CATEGORIES: Category[] = [
@@ -115,8 +116,8 @@ beforeEach(() => {
  *   is replaced with a "grant a category" hint instead of an empty/broken select
  */
 describe('VendorTherapistsStep — module gating', () => {
-  it('shows a "module not enabled" message and no therapist CRUD when offersTherapy is false', async () => {
-    renderStep({ offersTherapy: false });
+  it('shows a "module not enabled" message and no therapist CRUD when offersTherapy is false and no branch has real Therapy access', async () => {
+    renderStep({ offersTherapy: false, branches: [{ ...BRANCH, categoryTypes: [] }] });
     expect(screen.getByText('This vendor has not enabled the Therapy business module in Step 2.')).toBeTruthy();
     expect(screen.queryAllByText('Add therapist').length).toBe(0);
     expect(screen.queryByText('No therapists added yet.')).toBeNull();
@@ -139,6 +140,27 @@ describe('VendorTherapistsStep — module gating', () => {
     // canAdd is false, so neither the trigger button nor the (unmounted) dialog render at all.
     expect(screen.queryAllByText('Add therapist').length).toBe(0);
     expect(screen.getByText('Add a branch in Step 2 before adding therapists.')).toBeTruthy();
+  });
+
+  /**
+   * Regression test for the real Issue #1 bug: `vendor.offersTherapy` is a denormalized
+   * convenience flag that can drift out of sync with the vendor's real category grants (e.g.
+   * branches mapped outside the normal grant-flips-the-flag save path). A vendor that already
+   * holds real branch-level THERAPY access must never be blocked by a stale `false` flag.
+   */
+  it('renders therapist CRUD (never the blocked message) when offersTherapy is false but a branch already has real THERAPY category access', async () => {
+    renderStep({ offersTherapy: false }); // default BRANCH fixture already carries categoryTypes: ['THERAPY']
+    await waitFor(() => expect(listVendorTherapistsForAdminMock).toHaveBeenCalled());
+    expect(screen.queryByText('This vendor has not enabled the Therapy business module in Step 2.')).toBeNull();
+    expect(screen.getAllByText('Add therapist').length).toBeGreaterThan(0);
+  });
+
+  it('shows the branch-level empty-state hint (not the module-disabled message) when branches exist but none have Therapy access', async () => {
+    renderStep({ branches: [{ ...BRANCH, categoryTypes: [] }] });
+    await waitFor(() => expect(listVendorTherapistsForAdminMock).toHaveBeenCalled());
+    expect(screen.queryByText('This vendor has not enabled the Therapy business module in Step 2.')).toBeNull();
+    expect(screen.queryAllByText('Add therapist').length).toBe(0);
+    expect(screen.getByText(/No branch currently has Therapy category access/)).toBeTruthy();
   });
 });
 

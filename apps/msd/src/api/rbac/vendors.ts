@@ -200,6 +200,11 @@ export interface Branch {
   createdAt: string;
   updatedAt: string;
   _count?: { deals: number };
+  /** The distinct `CategoryType`s this branch currently has ANY `BranchCategoryAccess` grant
+   *  for (e.g. `['THERAPY']`) — lets the Add Therapist/Deal branch pickers filter to branches
+   *  currently eligible for a module, computed server-side in the same query as the rest of this
+   *  list (see msd-api's `vendor.service.ts#listBranches`), never a separate per-branch fetch. */
+  categoryTypes: CategoryType[];
   /** Only present on the cross-vendor `GET /vendors/branches` sidebar listing. */
   vendor?: { id: string; businessName: string | null };
 }

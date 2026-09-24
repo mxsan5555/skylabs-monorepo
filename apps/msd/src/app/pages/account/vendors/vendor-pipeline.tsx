@@ -225,17 +225,25 @@ export function VendorPipeline({
     }
   };
 
-  // A branch save may have gone through `BranchDialog`'s "Categories & Subcategories" section,
-  // which can auto-grant a vendor-level `VendorCategoryAccess` row + flip `offersService`/
-  // `offersTherapy` server-side (see `setBranchCategoryAccess`'s own doc comment in
-  // msd-api's vendor.service.ts). Both `vendor` and `categoryAccess` are otherwise only ever
-  // fetched once (the bulk-load effect above) — without this refetch they'd go stale, and the
-  // NEXT "Save product categories" click in `VendorProductCategoryAccess` would resubmit the
-  // stale (pre-grant) `offersService`/`offersTherapy`/`categoryIds`, silently wiping out the
-  // branch-level auto-grant via that endpoint's replace-the-full-set semantics.
   const handleBranchesChange = (next: Branch[]) => {
     setBranches(next);
     reloadDealCount(next);
+  };
+
+  // Wired to `VendorBranchListStep`'s `onVendorRefresh`, which fires from `BranchDialog`'s
+  // `onCategoryAccessSaved` — AFTER a branch's category-access save actually completes, never
+  // bundled into `handleBranchesChange` above. That save (`BranchDialog`'s own "Categories &
+  // Subcategories" section) can auto-grant a vendor-level `VendorCategoryAccess` row + flip
+  // `offersService`/`offersTherapy` server-side (see `setBranchCategoryAccess`'s own doc comment
+  // in msd-api's vendor.service.ts), and it happens as a SEPARATE, LATER network call than the
+  // branch-fields save `handleBranchesChange` reacts to — refetching here instead of there is
+  // what closes that race: `vendor`/`categoryAccess` are otherwise only ever fetched once (the
+  // bulk-load effect above), so without a refetch timed to land after the category save actually
+  // finishes, the NEXT "Save product categories" click in `VendorProductCategoryAccess` could
+  // resubmit stale (pre-grant) `offersService`/`offersTherapy`/`categoryIds`, silently wiping out
+  // the branch-level auto-grant via that endpoint's replace-the-full-set semantics — and Step
+  // 4/5's own "module not enabled" gate could render the stale flag in the meantime too.
+  const refreshVendorAndCategoryAccess = () => {
     if (!vendorId) return;
     getVendor(token, vendorId)
       .then(({ data }) => {
@@ -346,6 +354,7 @@ export function VendorPipeline({
             canEdit
             branches={branches}
             onBranchesChange={handleBranchesChange}
+            onVendorRefresh={refreshVendorAndCategoryAccess}
           />
         </section>
       )}

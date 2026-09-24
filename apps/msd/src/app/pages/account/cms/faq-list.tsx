@@ -14,6 +14,7 @@ import {
 } from '../../../../api/rbac/faqs';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useToast } from '../../../../toast/toast-context';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { FaqFormDialog } from './faq-form-dialog';
 
 const COLUMNS = JSON.stringify([
@@ -45,6 +46,7 @@ function excerpt(text: string, maxLength = 80): string {
  */
 export function FaqList() {
   const { token, can } = useAuth();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const { showToast } = useToast();
   const canCreate = can('cms.faq', 'create');
   const canEdit = can('cms.faq', 'edit');
@@ -111,7 +113,7 @@ export function FaqList() {
   };
 
   const remove = async (faq: Faq) => {
-    if (!window.confirm(`Delete "${excerpt(faq.question, 60)}"? This cannot be undone.`)) return;
+    if (!(await confirm(`Delete "${excerpt(faq.question, 60)}"? This cannot be undone.`))) return;
     setError('');
     try {
       await deleteFaq(token, faq.id);
@@ -225,6 +227,7 @@ export function FaqList() {
           onClose={() => setEditingFaq(null)}
         />
       )}
+      {ConfirmDialog}
     </div>
   );
 }

@@ -18,6 +18,7 @@ import {
 } from '../../../../api/rbac/how-it-works';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useToast } from '../../../../toast/toast-context';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { extractHowItWorksStepFieldErrors, extractSiteContentFieldErrors, type HowItWorksStepFieldKey } from './field-errors';
 
 type ContentFieldKey = keyof HowItWorksContentInput;
@@ -138,6 +139,7 @@ function StepFormDialog({
  */
 export function HowItWorksPage() {
   const { token, can } = useAuth();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const { showToast } = useToast();
   const canEdit = can('cms.how-it-works', 'edit');
   const canCreate = can('cms.how-it-works', 'create');
@@ -243,7 +245,7 @@ export function HowItWorksPage() {
   };
 
   const removeStep = async (step: HowItWorksStep) => {
-    if (!window.confirm(`Delete "${step.title}"? This cannot be undone.`)) return;
+    if (!(await confirm(`Delete "${step.title}"? This cannot be undone.`))) return;
     setStepsError('');
     try {
       await deleteHowItWorksStep(token, step.id);
@@ -420,6 +422,7 @@ export function HowItWorksPage() {
           onClose={() => setEditingStep(null)}
         />
       )}
+      {ConfirmDialog}
     </div>
   );
 }

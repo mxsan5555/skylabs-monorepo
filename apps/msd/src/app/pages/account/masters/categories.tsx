@@ -24,6 +24,10 @@ import {
 } from '../../../../api/rbac/categories';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { MediaUploader } from '../../../components/media-uploader';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
+import { extractFieldErrors } from '../../../../utils/field-errors';
+
+type CategoryFieldKey = 'name' | 'slug' | 'description' | 'parentId' | 'sortOrder' | 'type';
 
 interface CategoryManagementProps {
   /** 'top' → the Categories page (parentId: null rows); 'sub' → Sub Categories (parentId set,
@@ -92,6 +96,7 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
  */
 export function CategoryManagement({ scope }: CategoryManagementProps) {
   const { token, can } = useAuth();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const canCreate = can('masters.categories', 'create');
   const canEdit = can('masters.categories', 'edit');
   const canDelete = can('masters.categories', 'delete');
@@ -184,7 +189,7 @@ export function CategoryManagement({ scope }: CategoryManagementProps) {
   // referenced by a Product can fall through to a raw FK-constraint error. This catch's fallback
   // message is unchanged from before and applies uniformly to any delete failure.
   const remove = async (category: Category) => {
-    if (!window.confirm(`Delete "${category.name}"? This cannot be undone.`)) return;
+    if (!(await confirm(`Delete "${category.name}"? This cannot be undone.`))) return;
     setError('');
     try {
       await deleteCategory(token, category.id);
@@ -318,6 +323,7 @@ export function CategoryManagement({ scope }: CategoryManagementProps) {
           onClose={() => setEditingCategory(null)}
         />
       )}
+      {ConfirmDialog}
     </div>
   );
 }
@@ -355,6 +361,7 @@ function CategoryFormDialog({
     type: category?.type ?? 'SERVICE',
   });
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<CategoryFieldKey, string>> | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // Checked/set synchronously at the very top of submit(), before any await — a `submitting`
   // state guard alone can't stop a second click/tap/Enter that fires before React commits the
@@ -400,6 +407,7 @@ function CategoryFormDialog({
     if (saveButtonRef.current) saveButtonRef.current.disabled = true;
     setSubmitting(true);
     setError('');
+    setFieldErrors(null);
     // `type` only ever applies to a top-level row — a subcategory row inherits its top-level
     // ancestor's type by join and never carries its own (see msd-api's category.schema.ts doc
     // comment), so it's omitted from a non-top payload.
@@ -414,7 +422,13 @@ function CategoryFormDialog({
         dialogRef.current?.close();
       }
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not save.');
+      const fields = extractFieldErrors<CategoryFieldKey>(err);
+      if (fields) {
+        setFieldErrors(fields);
+        setError('Fix the highlighted fields and try again.');
+      } else {
+        setError(err instanceof ApiRequestError ? err.message : 'Could not save.');
+      }
     } finally {
       submittingRef.current = false;
       if (saveButtonRef.current) saveButtonRef.current.disabled = false;
@@ -437,29 +451,57 @@ function CategoryFormDialog({
         )}
 
         {scope === 'sub' && !parentOptionsLoading && !parentOptionsError && parentOptions.length > 0 && (
-          <OutlinedSelect
-            label="Parent category"
-            value={form.parentId ?? ''}
-            onChange={(e: Event) => setForm((f) => ({ ...f, parentId: (e.target as HTMLSelectElement).value }))}
-          >
-            {parentOptions.map((p) => (
-              <SelectOption key={p.id} value={p.id}>
-                <div slot="headline">{p.name}</div>
-              </SelectOption>
-            ))}
-          </OutlinedSelect>
+          <>
+            <OutlinedSelect
+              label="Parent category"
+              value={form.parentId ?? ''}
+              onChange={(e: Event) => setForm((f) => ({ ...f, parentId: (e.target as HTMLSelectElement).value }))}
+              error={Boolean(fieldErrors?.parentId)}
+            >
+              {parentOptions.map((p) => (
+                <SelectOption key={p.id} value={p.id}>
+                  <div slot="headline">{p.name}</div>
+                </SelectOption>
+              ))}
+            </OutlinedSelect>
+            {fieldErrors?.parentId && <p className="error-state" role="alert">{fieldErrors.parentId}</p>}
+          </>
         )}
 
-        <OutlinedTextField label="Name" value={form.name} onInput={(e: Event) => setForm((f) => ({ ...f, name: (e.target as HTMLInputElement).value }))} />
-        <OutlinedTextField label="Slug" value={form.slug} onInput={(e: Event) => setForm((f) => ({ ...f, slug: (e.target as HTMLInputElement).value }))} />
-        <OutlinedTextField label="Description" value={form.description ?? ''} onInput={(e: Event) => setForm((f) => ({ ...f, description: (e.target as HTMLInputElement).value }))} />
+        <OutlinedTextField
+          label="Name"
+          required
+          value={form.name}
+          onInput={(e: Event) => setForm((f) => ({ ...f, name: (e.target as HTMLInputElement).value }))}
+          error={Boolean(fieldErrors?.name)}
+        />
+        {fieldErrors?.name && <p className="error-state" role="alert">{fieldErrors.name}</p>}
+
+        <OutlinedTextField
+          label="Slug"
+          required
+          value={form.slug}
+          onInput={(e: Event) => setForm((f) => ({ ...f, slug: (e.target as HTMLInputElement).value }))}
+          error={Boolean(fieldErrors?.slug)}
+        />
+        {fieldErrors?.slug && <p className="error-state" role="alert">{fieldErrors.slug}</p>}
+
+        <OutlinedTextField
+          label="Description"
+          value={form.description ?? ''}
+          onInput={(e: Event) => setForm((f) => ({ ...f, description: (e.target as HTMLInputElement).value }))}
+          error={Boolean(fieldErrors?.description)}
+        />
+        {fieldErrors?.description && <p className="error-state" role="alert">{fieldErrors.description}</p>}
 
         <OutlinedTextField
           label="Sort order"
           type="number"
           value={String(form.sortOrder ?? 0)}
           onInput={(e: Event) => setForm((f) => ({ ...f, sortOrder: Number((e.target as HTMLInputElement).value) || 0 }))}
+          error={Boolean(fieldErrors?.sortOrder)}
         />
+        {fieldErrors?.sortOrder && <p className="error-state" role="alert">{fieldErrors.sortOrder}</p>}
 
         {scope === 'top' ? (
           <>
@@ -467,6 +509,7 @@ function CategoryFormDialog({
               label="Type"
               value={form.type ?? 'SERVICE'}
               onChange={(e: Event) => setForm((f) => ({ ...f, type: (e.target as HTMLSelectElement).value as CategoryInput['type'] }))}
+              error={Boolean(fieldErrors?.type)}
             >
               {CATEGORY_TYPE_OPTIONS.map((opt) => (
                 <SelectOption key={opt.value} value={opt.value}>
@@ -474,6 +517,7 @@ function CategoryFormDialog({
                 </SelectOption>
               ))}
             </OutlinedSelect>
+            {fieldErrors?.type && <p className="error-state" role="alert">{fieldErrors.type}</p>}
           </>
         ) : (
           <p className="field-hint">Type is inherited from the parent category.</p>
