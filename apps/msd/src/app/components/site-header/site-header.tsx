@@ -1,4 +1,6 @@
+import { useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useCustomEvent } from '../../../hooks/use-custom-event';
 import { useHideOnScroll } from '../../../hooks/use-hide-on-scroll';
 import { CategoryStrip } from './category-strip';
 import { CityChip } from './city-chip';
@@ -15,11 +17,12 @@ import './site-header.css';
 export function SiteHeader() {
   const navigate = useNavigate();
   const compact = useHideOnScroll();
+  const fieldRef = useRef<HTMLElement>(null);
 
-  const onSearch = (e: CustomEvent<{ value: string }>) => {
+  useCustomEvent<{ value: string }>(fieldRef, 'sky-submit', (e) => {
     const q = e.detail.value;
     navigate(q ? `/explore?q=${encodeURIComponent(q)}` : '/explore');
-  };
+  });
 
   return (
     <>
@@ -33,6 +36,7 @@ export function SiteHeader() {
           </Link>
           <CityChip />
           <sky-action-field
+            ref={fieldRef}
             className="site-header__search"
             role="search"
             dense
@@ -42,7 +46,6 @@ export function SiteHeader() {
             label={content.header.searchLabel}
             placeholder={content.header.searchPlaceholder}
             action-label={content.header.searchAction}
-            onsky-submit={onSearch}
           />
           <HeaderActions />
         </div>

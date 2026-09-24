@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { useCustomEvent } from '../../../hooks/use-custom-event';
 import content from '../../../content.json';
 
 const t = content.nav.footer;
@@ -11,6 +12,12 @@ export function NewsletterBand() {
   const [done, setDone] = useState(false);
   const fieldRef = useRef<HTMLElement & { value: string }>(null);
   const statusRef = useRef<HTMLParagraphElement>(null);
+
+  useCustomEvent<{ value: string }>(fieldRef, 'sky-submit', (e) => {
+    if (!e.detail.value) return;
+    if (fieldRef.current) fieldRef.current.value = '';
+    setDone(true);
+  });
 
   useEffect(() => {
     if (done) statusRef.current?.focus();
@@ -35,11 +42,6 @@ export function NewsletterBand() {
             label={t.newsletter.emailLabel}
             placeholder={t.newsletter.emailLabel}
             action-label={t.newsletter.submitLabel}
-            onsky-submit={(e) => {
-              if (!e.detail.value) return;
-              if (fieldRef.current) fieldRef.current.value = '';
-              setDone(true);
-            }}
           />
           <p ref={statusRef} role="status" tabIndex={-1} className="newsletter-band__status body-large">
             {done ? t.newsletter.successMessage : ''}
