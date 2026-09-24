@@ -74,7 +74,9 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] msd: other public pages without a meta description (cart, sign-in, otp, orders, invoice, choose-experience) should move to Seo
 - [ ] msd: footer brand block contact details (phone/email) pending from owner
 - [ ] msd: set PRERENDER_API_URL and VITE_SITE_URL in Vercel (Production + Preview); the build machine must reach the Railway msd-api
-- [ ] msd: on the first Vercel preview verify /api/geo, prerendered routes with and without trailing slash, and that non-prerendered routes get spa.html
+- [ ] msd: on the first Vercel preview verify /api/geo, that `/category/x/` and `/spa.html` 308 to `/category/x` and `/spa` (trailingSlash/cleanUrls), and that non-prerendered routes get the SPA shell via the `/spa` rewrite
+- [ ] msd: add a Vercel deploy hook (cron or on catalog change) so prerendered pages rebuild when deals change
+- [ ] msd: decide whether /category/product and /category/therapy should be indexable or redirect to /products and /therapists
 - [ ] msd: add prerender/ to a tsconfig so it's type-checked
 - [ ] msd: showcase.tsx and unused product-card.tsx still use camelCase props on raw custom elements (fix if ever prerendered; delete product-card.tsx if unused)
 - [ ] msd: audit app-level CSS in dark theme now that the footer theme switch exposes it
