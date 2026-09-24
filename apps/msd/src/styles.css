@@ -110,222 +110,15 @@ input[type='checkbox'] {
   flex-wrap: wrap;
 }
 
-/* ── Dashboard ───────────────────────────────────────────────────────────── */
-
 .dashboard-page {
   gap: 24px;
 }
 
-/* Dashboard hero */
-
-.dashboard-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  min-height: 132px;
-
-  padding: 24px 28px;
-
-  box-sizing: border-box;
-
-  border: 1px solid
-    var(--md-sys-color-outline-variant, #c4c7c5);
-
-  border-radius: 20px;
-
-  background:
-    linear-gradient(
-      135deg,
-      var(--md-sys-color-primary-container, #dff3df),
-      var(--md-sys-color-surface-container-low, #f7f9fc)
-    );
-
-  overflow: hidden;
-}
-
-.dashboard-hero__content {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
-
-.dashboard-hero__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 56px;
-  height: 56px;
-  flex: 0 0 56px;
-
-  border-radius: 18px;
-
-  background-color: var(
-    --md-sys-color-primary,
-    #007c2b
-  );
-
-  color: var(
-    --md-sys-color-on-primary,
-    #ffffff
-  );
-
-  --md-icon-size: 28px;
-}
-.dashboard-hero__eyebrow {
-  margin: 0 0 4px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--md-sys-color-primary);
-}
-
-.dashboard-hero__title {
-  margin: 0;
-  font-size: clamp(1.6rem, 2vw, 2rem);
-  line-height: 1.2;
-  font-weight: 700;
-  color: var(--md-sys-color-on-surface);
-}
-
-.dashboard-hero__subtitle {
-  margin: 6px 0 0;
-  color: var(--md-sys-color-on-surface-variant);
-  font-size: 0.95rem;
-}
 .dashboard-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 16px;
   width: 100%;
-}
-
-.dashboard-kpi-card {
-  min-width: 0;
-  min-height: 150px;
-  display: flex;
-  align-items: stretch;
-
-  box-sizing: border-box;
-
-  border: 1px solid var(
-    --md-sys-color-outline-variant,
-    #c4c7c5
-  );
-
-  border-radius: 18px;
-
-  background: var(
-    --md-sys-color-surface-container-low,
-    #f7f9fc
-  );
-
-  overflow: hidden;
-
-  transition:
-    transform 160ms ease,
-    box-shadow 160ms ease,
-    border-color 160ms ease;
-}
-
-.dashboard-kpi-card:hover {
-  transform: translateY(-2px);
-
-  border-color: var(
-    --md-sys-color-primary,
-    #007c2b
-  );
-
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.06);
-}
-
-.dashboard-kpi-card sky-info-card {
-  width: 100%;
-  min-width: 0;
-}/* =========================================================
-   Marketplace Overview
-   ========================================================= */
-
-.dashboard-marketplace {
-  width: 100%;
-}
-
-.dashboard-marketplace__metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  width: 100%;
-}
-
-.dashboard-marketplace__metric {
-  min-width: 0;
-  min-height: 150px;
-
-  display: flex;
-  align-items: stretch;
-
-  box-sizing: border-box;
-
-  border: 1px solid
-    var(--md-sys-color-outline-variant, #c4c7c5);
-
-  border-radius: 18px;
-
-  background: var(
-    --md-sys-color-surface-container-low,
-    #f7f9fc
-  );
-
-  overflow: hidden;
-
-  transition:
-    transform 160ms ease,
-    box-shadow 160ms ease,
-    border-color 160ms ease;
-}
-
-.dashboard-marketplace__metric:hover {
-  transform: translateY(-2px);
-
-  border-color: var(
-    --md-sys-color-primary,
-    #007c2b
-  );
-
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.06);
-}
-
-.dashboard-marketplace__metric sky-info-card {
-  width: 100%;
-  min-width: 0;
-}
-.dashboard-empty {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin: 0;
-  border: 1px dashed var(--md-sys-color-outline-variant, #c4c7c5);
-  background-color: var(--md-sys-color-surface-container-low,
-      #f7f9fc);
-}
-
-.dashboard-empty>md-icon {
-  flex: 0 0 auto;
-  --md-icon-size: 28px;
-  color: var(--md-sys-color-primary);
-}
-
-.dashboard-empty h2 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.dashboard-empty p {
-  margin: 4px 0 0;
-  color: var(--md-sys-color-on-surface-variant);
 }
 
 .two-pane {
@@ -416,14 +209,12 @@ input[type='checkbox'] {
   font-weight: 600;
 }
 
-/* The row a notification deep-link (?dealId=) scrolled to and is pointing the admin at. */
 .entity-list__item--highlighted {
   outline: 2px solid var(--md-sys-color-primary);
   outline-offset: -2px;
   background-color: var(--md-sys-color-primary-container, #d7e3ff);
 }
 
-/* Status pill */
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -465,7 +256,6 @@ input[type='checkbox'] {
   background-color: var(--md-sys-color-primary);
 }
 
-/* Data table */
 .data-table-wrap {
   overflow-x: auto;
 }
@@ -498,7 +288,6 @@ input[type='checkbox'] {
   flex-wrap: wrap;
 }
 
-/* Permission matrix */
 .perm-matrix-wrap {
   overflow-x: auto;
 }
@@ -571,9 +360,6 @@ input[type='checkbox'] {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 14px 20px;
-  /* Every admin form in the app (Deal/Product/Therapist/Branch/Vendor) uses this class —
-     collapses to one column below ~500px (minmax's floor), up to 2-3 columns on wider
-     viewports, without a dedicated breakpoint per form. */
   max-width: 100%;
 }
 
@@ -796,23 +582,6 @@ input[type='checkbox'] {
 
 @media (max-width: 600px) {
   .dashboard-stats {
-    grid-template-columns: 1fr;
-  }
-}
-@media (max-width: 1100px) {
-  .dashboard-marketplace__metrics {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 800px) {
-  .dashboard-marketplace__metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 500px) {
-  .dashboard-marketplace__metrics {
-    grid-template-columns: 1fr;
+    grid-template-columns: 2fr;
   }
 }

@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { DashboardProcessFlow } from './dashboard-process-flow';
 import {
   getDashboardStats,
   type DashboardStats,
 } from '../../../api/rbac/dashboard';
-
 import { ApiRequestError } from '../../../api/rbac/client';
 
-interface DashboardMetric {
+export interface DashboardMetric {
   key: string;
   label: string;
   icon: string;
@@ -43,6 +41,7 @@ function getMetricValue(
 
     case 'orders-recent':
       return stats.orders.toLocaleString('en-IN');
+
     default:
       return '—';
   }
@@ -98,12 +97,9 @@ export function Dashboard() {
 
   /*
    * Existing role-based dashboard widget configuration.
-   * We are keeping this logic unchanged.
    */
   const widgets = [...(bootstrap?.dashboardWidgets ?? [])]
-    .filter((widget) =>
-      DASHBOARD_CARD_ORDER.includes(widget.key)
-    )
+    .filter((widget) => DASHBOARD_CARD_ORDER.includes(widget.key))
     .sort(
       (a, b) =>
         DASHBOARD_CARD_ORDER.indexOf(a.key) -
@@ -111,19 +107,15 @@ export function Dashboard() {
     );
 
   /*
-   * Existing permission check.
-   *
-   * Users with reports:view can see the complete marketplace
-   * statistics. Other users continue to see only the widgets
-   * assigned to their dashboard.
+   * Users with reports:view can see marketplace statistics.
    */
   const showMarketplaceMetrics = can('reports', 'view');
 
+  /*
+   * Existing role-based dashboard widgets.
+   */
   const dashboardMetrics: DashboardMetric[] = [];
 
-  /*
-   * First add the existing role-based dashboard widgets.
-   */
   widgets.forEach((widget) => {
     const metricConfig: Record<
       string,
@@ -162,105 +154,47 @@ export function Dashboard() {
     });
   });
 
-  /*
-   * For users who have reports:view, add the remaining
-   * marketplace statistics to the SAME card grid.
-   *
-   * Customers, Vendors, Products and Orders are already present
-   * above, so we only add the remaining five metrics here.
-   */
   return (
     <div className="admin-page admin-page--wide dashboard-page">
       <title>Dashboard · MSD</title>
 
       {/* Dashboard Hero */}
-      <header className="dashboard-hero">
-        <div className="dashboard-hero__content">
-          <div className="dashboard-hero__icon">
-            <Icon aria-hidden="true">dashboard</Icon>
-          </div>
-
-          <div>
-            <p className="dashboard-hero__eyebrow">
-              MSD ADMIN CONSOLE
-            </p>
-
-            <h1 className="dashboard-hero__title">
-              Dashboard
-            </h1>
-
-            <p className="dashboard-hero__subtitle">
-              Welcome back, {bootstrap?.user.name ?? 'there'}.
-              Here's your marketplace overview.
-            </p>
-          </div>
-        </div>
-      </header>
-
-      {/* Dashboard Statistics */}
-      {statsError ? (
-        <section
-          className="dashboard-error"
-          aria-label="Dashboard error"
-        >
-          <Icon aria-hidden="true">error</Icon>
-
-          <div>
-            <h2>Unable to load dashboard statistics</h2>
-            <p>{statsError}</p>
-          </div>
-        </section>
-      ) : dashboardMetrics.length === 0 ? (
-        <section
-          className="dashboard-empty panel"
-          aria-label="Dashboard widgets"
-        >
-          <Icon aria-hidden="true">
-            dashboard_customize
-          </Icon>
-
-          <div>
-            <h2>No dashboard widgets</h2>
-
-            <p>
-              No dashboard widgets are assigned to your role yet.
-            </p>
-          </div>
-        </section>
-   ) : (
-  <>
-    <section
-      className="dashboard-stats"
-      aria-label="Dashboard statistics"
-    >
-      {dashboardMetrics.map((metric) => (
-        <div
-          key={metric.key}
-          className="dashboard-kpi-card"
-        >
-          <sky-info-card
-            align="center"
-            icon={metric.icon}
-            heading={
-              statsLoading
-                ? '—'
-                : metric.value
-            }
-            subheading={metric.label}
-          />
-        </div>
-      ))}
-    </section>
-
-    {showMarketplaceMetrics && (
-      <DashboardProcessFlow
-        stats={stats}
-        loading={statsLoading}
-        error={statsError}
+      <sky-feature-card
+        color="secondary"
+        icon="dashboard"
+        iconStyle="surface"
+        variant="filled"
+        iconShape="full"
+        headline="Dashboard"
+        text={`Welcome back, ${bootstrap?.user.name ?? 'there'
+          }. Here's your marketplace overview.`}
       />
-    )}
-  </>
-)}
+
+      {/* Dashboard Content */}
+      {statsError ? (
+        <sky-feature-card
+          color="tertiary"
+          icon="error"
+          iconStyle="surface"
+          headline="Unable to load dashboard statistics"
+          text={statsError}
+        />
+      ) : dashboardMetrics.length === 0 ? (
+        <sky-feature-card
+          color="surface-high"
+          icon="dashboard_customize"
+          iconStyle="surface"
+          headline="No dashboard widgets"
+          text="No dashboard widgets are assigned to your role yet."
+        />
+      ) : (
+        <DashboardProcessFlow
+          stats={stats}
+          loading={statsLoading}
+          dashboardMetrics={dashboardMetrics}
+          showMarketplaceMetrics={showMarketplaceMetrics}
+        />
+      )}
     </div>
   );
 }

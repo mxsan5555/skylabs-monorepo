@@ -16,7 +16,7 @@ import { getCart, subscribeCartUpdated } from '../../api/cart';
 import { useWishlist } from '../../wishlist/wishlist-context';
 import { isCustomerUser, isStaffUser } from '../../auth/role-routing';
 import content from '../../content.json';
-import logo from '../../assets/logo.jpg';
+import logo from '../../assets/LOGO.jpeg';
 import './header-v2.css';
 
 interface NavItem {
@@ -713,7 +713,7 @@ export function HeaderV3() {
                   <Icon>favorite_border</Icon>
                 </FilledTonalIconButton>
                 {wishlistCount > 0 && (
-                  <span className="hv3-badge" aria-hidden="true">{wishlistCount}</span>
+                  <span className="notification-bell__badge" aria-hidden="true">{wishlistCount}</span>
                 )}
               </span>
 
@@ -726,7 +726,7 @@ export function HeaderV3() {
                   <Icon>shopping_bag</Icon>
                 </FilledTonalIconButton>
                 {totalItems > 0 && (
-                  <span className="hv3-badge" aria-hidden="true">{totalItems}</span>
+                  <span className="notification-bell__badge" aria-hidden="true">{totalItems}</span>
                 )}
               </span>
 
