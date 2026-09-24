@@ -128,12 +128,24 @@ Carousel prev/next buttons stay in the section header row with accessible names.
 
 ### 8.1 Prerender
 
-- `entry-server.tsx` renders `<App>` in `StaticRouter`; the script injects the HTML and a `<script type="application/json" id="__MSD_DATA__">` payload into `index.html`, then writes `dist/apps/msd/<route>/index.html`.
-- `main.tsx` uses `hydrateRoot` when `#root` has children, else `createRoot`.
-- Routes in this spec: `/` and `/category/:slug/:city` (every pair from `/catalog/locations`).
-- If `PRERENDER_API_URL` is unreachable, the route falls back to the plain shell and the build logs a warning; the build does not fail.
-- New Nx target `msd:prerender` depends on `msd:build`; `vercel.json` `buildCommand` runs it. The existing SPA rewrite stays for non-prerendered routes.
+Shipped in plan 4 (`docs/superpowers/plans/2026-09-24-msd-shell-04-prerender.md`).
+
+- **Routes prerendered:** `/`, every `/category/:slug`, and `/category/:slug/:city` for each deal category (any type other than `PRODUCT`/`THERAPY`) crossed with every unique city slug from `/catalog/locations`. Category and city routes come from `buildRoutes(shell)` in `apps/msd/prerender/routes.ts`.
+- **SSR input:** `apps/msd/prerender/server-entry.ts` re-exports `render(url, payload)` from `apps/msd/src/entry-server.tsx` (renders `<App>` in `StaticRouter`) plus the loaders and the pure prerender helpers, so the whole SSR bundle goes through Vite (app modules read `import.meta.env` at import time, which plain `tsx` does not provide).
+- **Payload keys:** `shell` (categories, locations, social links; always present), `home` (only on `/`), and `category:<slug>` or `category:<slug>:<city>` (only on that category/city route). `PrerenderDataProvider`/`usePrerenderedData` (`apps/msd/src/prerender-data/prerender-data.tsx`) read them; `categoryDataKey(slug, city?)` builds the key.
+- **Assembly:** `assembleHtml` (`apps/msd/prerender/html.ts`) moves every `<title>`, `<meta>` and canonical `<link>` React 19 hoisted to the top of `renderToString`'s output into `<head>`, puts the rest of the render inside `<div id="root" data-prerendered>`, and appends the payload as `<script type="application/json" id="__MSD_DATA__">` before `</body>` (`<` escaped so no payload value can close the script or break out into markup). JSON-LD `<script>` tags stay in the body.
+- **Hydration:** `main.tsx` reads `#root[data-prerendered]`; when present it calls `hydrateRoot` with a `PrerenderDataProvider` seeded from `readPrerenderPayload()` (the `__MSD_DATA__` script's JSON, or `{}` on a route that was not prerendered), otherwise it calls `createRoot`. `catalog-shell.tsx`, `home-data.ts` and `category.tsx` start their state from the matching payload key when present and skip their first fetch for that data.
+- **SPA rewrite:** `vercel.json` `rewrites` sends every non-`/api` path to `/spa.html`, an untouched copy of the client build's `index.html` that the prerender script keeps before it starts overwriting `index.html` with the prerendered `/` route. Routes that were not prerendered (or a build where prerendering was skipped) render as a normal client-only SPA from `spa.html`.
+- **API failure and timeout:** the prerender script (`apps/msd/prerender/prerender.ts`) wraps every data load in `withTimeout` (`apps/msd/prerender/timeout.ts`), `PRERENDER_TIMEOUT_MS` (default 15000ms). If the shell load fails or times out, or `PRERENDER_API_URL` returns no categories/locations/social links at all, the build treats it as "API unreachable": it skips prerendering, still writes `sitemap.xml`/`robots.txt`/`llms.txt` from the static public paths, and exits 0 so the SPA still ships. A single route's data load timing out or failing only skips that route (with a warning); the rest of the run continues.
+- New Nx target `msd:prerender` depends on `msd:build`; `vercel.json` `buildCommand` runs `cd ../.. && npx nx run msd:prerender`.
 - SEO-critical text lives in light DOM (slots or plain markup), since shadow DOM content is not in the prerendered HTML.
+
+**Plan 4 prerequisites, resolved:**
+
+(a) `sky-action-field` `sky-submit` listeners are attached via `useCustomEvent` (a ref + `addEventListener`), not the `onsky-submit` prop, so they survive hydration (`apps/msd/src/hooks/use-custom-event.ts`).
+(b) and (c) camelCase props on raw custom elements (`cta-label`, `icon-style`, `icon-shape`, `cta-href`, `cta-icon`, `image-alt`, `eyebrow-href`, `original-price`, `price-note`, `price-prefix`, `favorite-active`) are passed as their kebab-case attributes, and the welcome offer CTA is a light-DOM `Link`, so both survive `renderToString` and hydration.
+(d) `useHomeCatalog`/`CatalogShellProvider`/the category page start from `usePrerenderedData` and mark themselves loaded, so hydration does not re-fetch what the server already rendered.
+(e) the gift and member `sky-feature-card` copy stays in shadow DOM. It is promotional, not a search landing target; the crawlable content on home is the h1, tiles, deals JSON-LD, How it works, directory and FAQ.
 
 ### 8.2 `Seo` component
 
@@ -147,9 +159,11 @@ Props `{ title, description, path, image?, noindex?, jsonLd? }`. Emits `<title>`
 
 ### 8.4 Crawler files (generated by the prerender script)
 
-- `robots.txt`: allow all; disallow `/account`, `/my-account`, `/cart`, `/checkout`, `/orders`, `/sign-in`, `/otp`; `Sitemap:` line.
-- `sitemap.xml`: static public routes, every category, every category/city pair.
-- `llms.txt`: plain-text summary of MySpaDeal and links to main sections.
+Written by `apps/msd/prerender/crawler-files.ts` (`robotsTxt`, `sitemapXml`, `llmsTxt`), called from `prerender.ts`. All three need `VITE_SITE_URL` set (absolute URLs); if it is empty the script logs a warning and skips writing them, even when prerendering itself succeeded.
+
+- `robots.txt`: allow all; disallow `/account`, `/my-account`, `/cart`, `/checkout`, `/orders`, `/sign-in`, `/otp`, `/wishlist`, `/choose-experience`; ends with a `Sitemap:` line pointing at `<siteUrl>/sitemap.xml`.
+- `sitemap.xml`: `STATIC_PUBLIC_PATHS` (`apps/msd/prerender/routes.ts`) plus every route the run actually rendered, deduplicated, each with a `<lastmod>` of the build date. When the API is unreachable this is the static paths only, since no route was rendered.
+- `llms.txt`: starts with `# MySpaDeal`, a one-paragraph summary from `content.json`'s `site` copy, a "## Categories" list linking every category, and a "## Pages" list of the main static sections.
 
 ## 9. Environment variables
 

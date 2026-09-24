@@ -54,6 +54,7 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] msd shell plan 1: location provider (saved/browser/IP), shared catalog shell, SiteHeader, MobileTabBar — 2026-09-22
 - [x] msd shell plan 2: SiteFooter, Seo component, JSON-LD, city landing pages — 2026-09-23
 - [x] msd shell plan 3: home page (10 fixed sections, CardRail, SectionHead, Seo + ItemList/FAQPage JSON-LD, location-aware catalog fetch) — 2026-09-23
+- [x] msd shell plan 4: build-time prerender (`/`, every `/category/:slug`, deal-category `/category/:slug/:city`) with `__MSD_DATA__` payload hydration, `spa.html` SPA rewrite, timed-out/unreachable-API fallback, sitemap.xml/robots.txt/llms.txt — 2026-09-24
 
 ### Content pages — both apps (`pages/` + route)
 - [ ] Contact page~
@@ -72,7 +73,10 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] msd: /help and /gifting footer links have no routes (404)
 - [ ] msd: other public pages without a meta description (cart, sign-in, otp, orders, invoice, choose-experience) should move to Seo
 - [ ] msd: footer brand block contact details (phone/email) pending from owner
-- [ ] msd: set VITE_SITE_URL in Vercel (Production + Preview) so canonical/OG/JSON-LD emit absolute URLs
+- [ ] msd: set PRERENDER_API_URL and VITE_SITE_URL in Vercel (Production + Preview); the build machine must reach the Railway msd-api
+- [ ] msd: on the first Vercel preview verify /api/geo, prerendered routes with and without trailing slash, and that non-prerendered routes get spa.html
+- [ ] msd: add prerender/ to a tsconfig so it's type-checked
+- [ ] msd: showcase.tsx and unused product-card.tsx still use camelCase props on raw custom elements (fix if ever prerendered; delete product-card.tsx if unused)
 - [ ] msd: audit app-level CSS in dark theme now that the footer theme switch exposes it
 - [ ] msd: city filter for products/therapists APIs so Product/Therapy city pages and popular searches can include them
 - [ ] msd: popular searches are only in the client render until plan 4 seeds the catalog into the prerender
@@ -80,11 +84,7 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] msd: migrate remaining useCurrentLocation callers (category, search, therapists, vendor) to useVisitorLocation
 
 #### Plan 4 prerender prerequisites
-- [ ] msd: `sky-action-field` `onsky-submit` listeners aren't attached on hydrate: attach via ref + addEventListener (hero, header, footer newsletter)
-- [ ] msd: camelCase props on raw custom elements serialize as lowercase attributes and are lost in server HTML: switch to kebab-case attributes (`cta-label`, `icon-style`, `icon-shape`, `cta-href`, `cta-icon`, `image-alt`, `eyebrow-href`, `original-price`, `price-note`, `price-prefix`, `favorite-active`) in `sky-cta-banner`/`sky-feature-card` usages and `SkyProductCardWC`
-- [ ] msd: @lit/react wrappers drop prototype props in server HTML (e.g. `FilledButton href`): render SEO-relevant links as light-DOM anchors
-- [ ] msd: `useHomeCatalog`/`CatalogShellProvider` need `initialData` from the prerender payload and a seeded `hasLoadedRef`
-- [ ] msd: gift/member `sky-feature-card` copy is shadow-DOM only: decide on light-DOM slots
+- [x] (e) decided: gift/member `sky-feature-card` copy stays in shadow DOM. It is promotional, not a search landing target; the crawlable content on home is the h1, tiles, deals JSON-LD, How it works, directory and FAQ. See spec section 8.1.
 
 ### Account & admin — both apps (remaining)
 - [ ] Logout from inside the console (currently in the public header)
