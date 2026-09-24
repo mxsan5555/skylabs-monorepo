@@ -74,9 +74,10 @@ export function SkyProductCardWC({
     if (el && gallery) el.gallery = gallery;
   }, [gallery]);
 
-  // camelCase props become their kebab-case attributes: under renderToString React writes a
-  // camelCase prop as a lowercase attribute Lit ignores, and hydration never sets it as a
-  // property. For those, `true` is an empty attribute and `false`/null/undefined omit it.
+  // camelCase props become their kebab-case attributes: React 19 keeps a camelCase prop's case
+  // verbatim on a custom element (e.g. `imageAlt="x"`), but Lit only observes the hyphenated
+  // attribute name it declared, so it ignores that attribute either on first render or on
+  // hydration. For those, `true` is an empty attribute and `false`/null/undefined omit it.
   // Single-word props (`favorite`, `rating`, ...) pass through unchanged.
   const attrs: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(props)) {
