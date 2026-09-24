@@ -143,21 +143,49 @@ describe('useHomeCatalog with prerendered data', () => {
     <PrerenderDataProvider payload={{ home }}>{children}</PrerenderDataProvider>
   );
 
-  it('starts ready with the prerendered lists and does not fetch', async () => {
+  it('starts ready with the prerendered lists and waits for the location before refreshing lists', async () => {
     const { result } = renderHook(() => useHomeCatalog(undefined), { wrapper });
     expect(result.current.status).toBe('ready');
     expect(result.current.deals).toEqual([{ id: 'p1' }]);
-    expect(result.current.faqs).toEqual(home.faqs);
     await Promise.resolve();
     expect(m.deals).not.toHaveBeenCalled();
-    expect(m.faqs).not.toHaveBeenCalled();
   });
 
-  it('does not refetch when the location resolves to none (same query as the prerender)', async () => {
+  it('refreshes once without coordinates when the location resolves to none', async () => {
+    const firstRender: { calls: number; deals: unknown }[] = [];
+    const { result, rerender } = renderHook(() => {
+      const r = useHomeCatalog(null);
+      firstRender.push({ calls: m.deals.mock.calls.length, deals: r.deals });
+      return r;
+    }, { wrapper });
+    expect(firstRender[0]).toEqual({ calls: 0, deals: [{ id: 'p1' }] });
+    await waitFor(() => expect(result.current.deals).toEqual([{ id: 'd1' }]));
+    rerender();
+    expect(m.deals).toHaveBeenCalledTimes(1);
+    expect(m.deals.mock.calls[0][0]).not.toHaveProperty('latitude', expect.anything());
+    expect(result.current.status).toBe('ready');
+  });
+
+  it('keeps the prerendered lists when the refresh fails', async () => {
+    m.deals.mockRejectedValue(new Error('down'));
     const { result } = renderHook(() => useHomeCatalog(null), { wrapper });
+    await waitFor(() => expect(m.deals).toHaveBeenCalledTimes(1));
     await Promise.resolve();
-    expect(m.deals).not.toHaveBeenCalled();
+    expect(result.current.status).toBe('ready');
     expect(result.current.deals).toEqual([{ id: 'p1' }]);
+  });
+
+  it('refreshes FAQs once in the background, keeping the payload FAQs on failure', async () => {
+    const { result } = renderHook(() => useHomeCatalog(undefined), { wrapper });
+    expect(result.current.faqs).toEqual(home.faqs);
+    await waitFor(() => expect(result.current.faqs).toEqual([{ id: 'f1', question: 'Q', answer: 'A' }]));
+    expect(m.faqs).toHaveBeenCalledTimes(1);
+
+    m.faqs.mockRejectedValue(new Error('down'));
+    const failed = renderHook(() => useHomeCatalog(undefined), { wrapper });
+    await waitFor(() => expect(m.faqs).toHaveBeenCalledTimes(2));
+    await Promise.resolve();
+    expect(failed.result.current.faqs).toEqual(home.faqs);
   });
 
   it('refetches nearest-first when coordinates arrive, keeping the prerendered data on screen', async () => {

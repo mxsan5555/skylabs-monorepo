@@ -84,7 +84,8 @@ export interface HomeCatalog {
  * FAQs are CMS-managed and non-critical: a failure just leaves them empty.
  */
 export function useHomeCatalog(coords: Coordinates | null | undefined): HomeCatalog {
-  // A prerendered home embeds its lists (fetched without coordinates): start ready from them.
+  // A prerendered home embeds its lists (build-time, fetched without coordinates): start ready
+  // from them, then refresh once the location resolves so visitors never keep stale build data.
   const initial = usePrerenderedData<HomeData>('home');
   const prerendered = !!initial;
   const [state, setState] = useState<Omit<HomeCatalog, 'faqs'>>(() =>
@@ -103,8 +104,6 @@ export function useHomeCatalog(coords: Coordinates | null | undefined): HomeCata
 
   useEffect(() => {
     if (!resolved) return;
-    // No coordinates is the exact query the prerender already ran.
-    if (prerendered && latitude === undefined && longitude === undefined) return;
     let cancelled = false;
     if (!hasLoadedRef.current) {
       setState((s) => ({ ...s, status: 'loading', error: '' }));
@@ -131,19 +130,18 @@ export function useHomeCatalog(coords: Coordinates | null | undefined): HomeCata
     return () => {
       cancelled = true;
     };
-  }, [resolved, latitude, longitude, prerendered]);
+  }, [resolved, latitude, longitude]);
 
-  // FAQs are CMS-managed and non-critical: a failure just leaves them empty. `cancelled` guards
-  // against setting state from a fetch that resolves after this hook's component has unmounted.
+  // FAQs are CMS-managed and non-critical: a failure leaves them empty, or keeps the prerendered
+  // ones. `cancelled` guards against setting state after this hook's component has unmounted.
   useEffect(() => {
-    if (prerendered) return;
     let cancelled = false;
     listCatalogFaqs()
       .then(({ data }) => {
         if (!cancelled) setFaqs(data ?? []);
       })
       .catch(() => {
-        if (!cancelled) setFaqs([]);
+        if (!cancelled && !prerendered) setFaqs([]);
       });
     return () => {
       cancelled = true;

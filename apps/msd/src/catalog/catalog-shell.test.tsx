@@ -130,20 +130,49 @@ describe('citySlug / cityHref', () => {
 });
 
 describe('CatalogShellProvider with prerendered data', () => {
-  it('renders the prerendered shell on the first render without fetching', () => {
-    const shell = {
-      categories: [{ id: 'c1', name: 'Massage', slug: 'massage', description: null, children: [] }],
-      locations: [{ state: 'Maharashtra', city: 'Pune' }],
-      socialLinks: [],
-    };
+  const shell = {
+    categories: [{ id: 'c1', name: 'Massage', slug: 'massage', description: null, children: [] }],
+    locations: [{ state: 'Maharashtra', city: 'Pune' }],
+    socialLinks: [],
+  };
+  const PAYLOAD_TEXT = 'ready|Massage>/category/massage|Pune';
+  const renders: string[] = [];
+  function RecordingProbe() {
+    const { status, locations, categories } = useCatalogShell();
+    renders.push(`${listCatalogCategoriesMock.mock.calls.length}:${status}:${categories.map((c) => c.name).join(',')}:${locations.map((l) => l.city).join(',')}`);
+    return <Probe />;
+  }
+  const renderShell = () =>
     render(
       <PrerenderDataProvider payload={{ shell }}>
-        <CatalogShellProvider><Probe /></CatalogShellProvider>
+        <CatalogShellProvider><RecordingProbe /></CatalogShellProvider>
       </PrerenderDataProvider>,
     );
-    expect(screen.getByText('ready|Massage>/category/massage|Pune')).toBeTruthy();
-    expect(listCatalogCategoriesMock).not.toHaveBeenCalled();
-    expect(listCatalogLocationsMock).not.toHaveBeenCalled();
-    expect(listCatalogSocialLinksMock).not.toHaveBeenCalled();
+
+  beforeEach(() => {
+    renders.length = 0;
+  });
+
+  it('renders the payload first, then refreshes once in the background and shows the fresh data', async () => {
+    listCatalogCategoriesMock.mockResolvedValue({ data: [{ id: 'c2', name: 'Spa', slug: 'spa', description: null, children: [] }] });
+    listCatalogLocationsMock.mockResolvedValue({ data: [{ state: 'UP', city: 'Gorakhpur' }] });
+    renderShell();
+    expect(renders[0]).toBe('0:ready:Massage:Pune');
+    await waitFor(() => expect(screen.getByText('ready|Spa>/category/spa|Gorakhpur')).toBeTruthy());
+    expect(listCatalogCategoriesMock).toHaveBeenCalledTimes(1);
+    expect(listCatalogLocationsMock).toHaveBeenCalledTimes(1);
+    expect(listCatalogSocialLinksMock).toHaveBeenCalledTimes(1);
+    expect(renders.some((r) => r.includes(':loading:'))).toBe(false);
+  });
+
+  it('keeps the payload data when the refresh fails', async () => {
+    listCatalogCategoriesMock.mockRejectedValue(new Error('down'));
+    listCatalogLocationsMock.mockRejectedValue(new Error('down'));
+    listCatalogSocialLinksMock.mockRejectedValue(new Error('down'));
+    renderShell();
+    await waitFor(() => expect(listCatalogSocialLinksMock).toHaveBeenCalled());
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(screen.getByText(PAYLOAD_TEXT)).toBeTruthy();
   });
 });

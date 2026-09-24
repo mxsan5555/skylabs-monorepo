@@ -8,6 +8,7 @@ import content from '../../../content.json';
 import { Category } from './category';
 import { PrerenderDataProvider, categoryDataKey, type PrerenderPayload } from '../../../prerender-data/prerender-data';
 import { ToastProvider } from '../../../toast/toast-context';
+import { ApiRequestError } from '../../../api/rbac/client';
 
 const {
   getCatalogCategoryMock,
@@ -245,26 +246,49 @@ describe('Category page with prerendered data', () => {
     );
   const countText = () => document.querySelector('.category-page__count')?.textContent;
 
-  it('renders the prerendered category and deals on the first render without fetching', async () => {
+  it('renders the prerendered category and deals first, then refreshes both once in the background', async () => {
+    let resolveCategory!: (v: { data: CatalogCategoryWithChildren }) => void;
+    let resolveDeals!: (v: { data: (typeof DEAL)[] }) => void;
+    getCatalogCategoryMock.mockImplementation(() => new Promise((r) => { resolveCategory = r; }));
+    listCatalogDealsMock.mockImplementation(() => new Promise((r) => { resolveDeals = r; }));
     renderWith('/category/massage', { [categoryDataKey('massage')]: { category: CATEGORY, deals: [DEAL] } });
+    // Payload on screen, no loading state, while the refresh is in flight.
     expect(screen.getByRole('heading', { level: 1, name: 'Massage' })).toBeTruthy();
     expect(countText()).toBe(`1 ${content.category.dealCount.singular}`);
+    expect(getCatalogCategoryMock).toHaveBeenCalledTimes(1);
+    expect(listCatalogDealsMock).toHaveBeenCalledTimes(1);
+    expect(listCatalogDealsMock).toHaveBeenCalledWith(expect.objectContaining({ categoryId: 'c1', pageSize: 60 }));
+    expect(lastSubcategoryId()).toBeUndefined();
+    await act(async () => {
+      resolveCategory({ data: { ...CATEGORY, name: 'Massage Therapy' } });
+      resolveDeals({ data: [DEAL, { ...DEAL, id: 'd2', title: 'Thai 90' }] });
+    });
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Massage Therapy' })).toBeTruthy());
+    expect(countText()).toBe(`2 ${content.category.dealCount.plural}`);
+    // The refreshed category object must not trigger a second deals fetch.
+    expect(getCatalogCategoryMock).toHaveBeenCalledTimes(1);
+    expect(listCatalogDealsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the prerendered data when the refresh fails', async () => {
+    getCatalogCategoryMock.mockRejectedValue(new Error('down'));
+    listCatalogDealsMock.mockRejectedValue(new Error('down'));
+    renderWith('/category/massage', { [categoryDataKey('massage')]: { category: CATEGORY, deals: [DEAL] } });
     await act(async () => {
       await Promise.resolve();
     });
-    expect(getCatalogCategoryMock).not.toHaveBeenCalled();
-    expect(listCatalogDealsMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('heading', { level: 1, name: 'Massage' })).toBeTruthy();
+    expect(countText()).toBe(`1 ${content.category.dealCount.singular}`);
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('keys a city page by the resolved city name', async () => {
+  it('keys a city page by the resolved city name and refreshes that city', async () => {
     renderWith('/category/massage/pune', { [categoryDataKey('massage', 'Pune')]: { category: CATEGORY, deals: [] } });
     expect(screen.getByRole('heading', { level: 1, name: 'Massage in Pune' })).toBeTruthy();
     expect(countText()).toBe(`0 ${content.category.dealCount.plural}`);
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(getCatalogCategoryMock).not.toHaveBeenCalled();
-    expect(listCatalogDealsMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalledTimes(1));
+    expect(listCatalogDealsMock).toHaveBeenCalledWith(expect.objectContaining({ city: 'Pune', state: 'Maharashtra' }));
   });
 
   it('still fetches when the payload is for another slug or city', async () => {
@@ -276,15 +300,14 @@ describe('Category page with prerendered data', () => {
   it('still fetches the subcategory list when ?sub= is set', async () => {
     renderWith('/category/massage?sub=swedish', { [categoryDataKey('massage')]: { category: CATEGORY, deals: [] } });
     await waitFor(() => expect(lastSubcategoryId()).toBe('s1'));
-    expect(getCatalogCategoryMock).not.toHaveBeenCalled();
+    expect(getCatalogCategoryMock).toHaveBeenCalledTimes(1);
   });
 
-  it('a prerendered 404 renders not found without fetching', async () => {
+  it('a prerendered 404 renders not found on the first render', async () => {
+    getCatalogCategoryMock.mockRejectedValue(new ApiRequestError('NOT_FOUND', 'Not found', 404));
     renderWith('/category/nope', { [categoryDataKey('nope')]: { category: null, deals: [] } });
     expect(document.querySelector('sky-info-card')).toBeTruthy();
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(getCatalogCategoryMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(getCatalogCategoryMock).toHaveBeenCalledTimes(1));
+    expect(document.querySelector('sky-info-card')).toBeTruthy();
   });
 });

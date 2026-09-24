@@ -35,32 +35,35 @@ const CatalogShellContext = createContext<CatalogShellValue>(EMPTY);
 /** One fetch of categories + cities + social links for the whole shell (header, tab bar, footer,
  *  home). The requests settle independently so one failing never hides the others. */
 export function CatalogShellProvider({ children }: { children: ReactNode }) {
-  // A prerendered page embeds the shell data, so it starts ready and skips the fetch.
+  // A prerendered page embeds the shell data (build-time), so it starts ready from it and then
+  // refreshes once in the background; a failed refresh keeps the embedded data.
   const initial = usePrerenderedData<ShellData>('shell');
   const [value, setValue] = useState<CatalogShellValue>(() =>
     initial ? { status: 'ready', locationsStatus: 'ready', ...initial } : EMPTY,
   );
-  const prerendered = !!initial;
 
   useEffect(() => {
-    if (prerendered) return;
     let cancelled = false;
     Promise.allSettled([listCatalogCategories(), listCatalogLocations(), listCatalogSocialLinks()]).then(
       ([cats, locs, social]) => {
         if (cancelled) return;
-        setValue({
-          status: cats.status === 'fulfilled' ? 'ready' : 'error',
-          locationsStatus: locs.status === 'fulfilled' ? 'ready' : 'error',
-          categories: cats.status === 'fulfilled' ? (cats.value.data ?? []) : [],
-          locations: locs.status === 'fulfilled' ? (locs.value.data ?? []) : [],
-          socialLinks: social.status === 'fulfilled' ? (social.value.data ?? []) : [],
+        setValue((prev) => {
+          const keep = prev.status === 'ready';
+          const keepLocations = prev.locationsStatus === 'ready';
+          return {
+            status: cats.status === 'fulfilled' || keep ? 'ready' : 'error',
+            locationsStatus: locs.status === 'fulfilled' || keepLocations ? 'ready' : 'error',
+            categories: cats.status === 'fulfilled' ? (cats.value.data ?? []) : prev.categories,
+            locations: locs.status === 'fulfilled' ? (locs.value.data ?? []) : prev.locations,
+            socialLinks: social.status === 'fulfilled' ? (social.value.data ?? []) : prev.socialLinks,
+          };
         });
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [prerendered]);
+  }, []);
 
   return <CatalogShellContext.Provider value={value}>{children}</CatalogShellContext.Provider>;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Icon,
@@ -91,6 +91,10 @@ export function Category() {
   const [deals, setDeals] = useState<CatalogDeal[]>(initialHasDeals ? initial.deals : []);
   const [dealsLoading, setDealsLoading] = useState(!initialHasDeals);
   const [dealsError, setDealsError] = useState('');
+  // The "All" deals list the page shows unfiltered (the prerendered one, then its refresh), and
+  // whether that background refresh has run.
+  const allDealsRef = useRef<CatalogDeal[] | undefined>(initialHasDeals ? initial.deals : undefined);
+  const dealsRefreshedRef = useRef(false);
   const [therapists, setTherapists] = useState<CatalogTherapist[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const cityUnresolved = !!citySlugParam && !cityLocation;
@@ -101,8 +105,21 @@ export function Category() {
   const cityMissing = cityUnresolved && locationsStatus === 'ready';
 
   useEffect(() => {
-    // Still showing the prerendered category for this slug: nothing to fetch.
-    if (initial && category === initial.category) return;
+    // Still showing the prerendered (build-time) category for this slug: keep it on screen and
+    // refresh it once in the background. Only a 404 replaces it; any other failure keeps it.
+    if (initial && category === initial.category) {
+      let cancelled = false;
+      getCatalogCategory(slug)
+        .then(({ data }) => {
+          if (!cancelled && JSON.stringify(data) !== JSON.stringify(initial.category)) setCategory(data);
+        })
+        .catch((err) => {
+          if (!cancelled && err instanceof ApiRequestError && err.status === 404) setCategory(null);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
     setCategoryLoading(true);
     setCategoryError('');
     getCatalogCategory(slug)
@@ -161,16 +178,25 @@ export function Category() {
 
   useEffect(() => {
     if (!category) return;
-    // The prerendered "All" list for this route, before any filter or location applies.
+    // The prerendered "All" list for this route, before any filter or location applies: keep it
+    // on screen and refresh it once in the background; a failed refresh keeps it.
     if (
       initialHasDeals &&
-      category === initial.category &&
-      deals === initial.deals &&
+      category.id === initial.category?.id &&
+      deals === allDealsRef.current &&
       !activeSubcategory &&
       !search &&
       coords?.latitude == null &&
       coords?.longitude == null
     ) {
+      if (dealsRefreshedRef.current) return;
+      dealsRefreshedRef.current = true;
+      listCatalogDeals({ categoryId: category.id, city: cityLocation?.city, state: cityLocation?.state, pageSize: 60 })
+        .then(({ data }) => {
+          allDealsRef.current = data ?? [];
+          setDeals(allDealsRef.current);
+        })
+        .catch(() => undefined);
       return;
     }
     setDealsLoading(true);
