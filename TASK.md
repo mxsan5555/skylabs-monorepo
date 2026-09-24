@@ -73,7 +73,7 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] msd: /help and /gifting footer links have no routes (404)
 - [ ] msd: other public pages without a meta description (cart, sign-in, otp, orders, invoice, choose-experience) should move to Seo
 - [ ] msd: footer brand block contact details (phone/email) pending from owner
-- [ ] msd: set PRERENDER_API_URL and VITE_SITE_URL in Vercel (Production + Preview); the build machine must reach the Railway msd-api
+- [ ] msd: when the custom domain goes live, set VITE_SITE_URL (the website origin, e.g. https://www.myspadeal.in, not the API) for Vercel Production and redeploy; until then canonicals/OG/most JSON-LD and sitemap/robots/llms are omitted. VITE_API_URL (already set to the Railway msd-api) is used for prerender data; PRERENDER_API_URL is optional. The Vercel build machine must reach the Railway msd-api.
 - [ ] msd: on the first Vercel preview verify /api/geo, that `/category/x/` and `/spa.html` 308 to `/category/x` and `/spa` (trailingSlash/cleanUrls), and that non-prerendered routes get the SPA shell via the `/spa` rewrite
 - [ ] msd: add a Vercel deploy hook (cron or on catalog change) so prerendered pages rebuild when deals change
 - [ ] msd: decide whether /category/product and /category/therapy should be indexable or redirect to /products and /therapists
