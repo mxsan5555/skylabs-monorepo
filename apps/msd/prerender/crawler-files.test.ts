@@ -6,10 +6,12 @@ const site = 'https://www.myspadeal.in';
 
 describe('robotsTxt', () => {
   const txt = robotsTxt(site);
-  it('allows all and disallows private routes', () => {
+  it('allows all and disallows each private route exactly and below it, never as a bare prefix', () => {
     expect(txt).toMatch(/^User-agent: \*\nAllow: \//);
-    for (const p of ['/account', '/my-account', '/cart', '/checkout', '/orders', '/sign-in', '/otp', '/wishlist', '/choose-experience'])
-      expect(txt).toContain(`Disallow: ${p}\n`);
+    for (const p of ['/account', '/my-account', '/cart', '/checkout', '/orders', '/sign-in', '/otp', '/wishlist', '/choose-experience', '/showcase']) {
+      expect(txt).toContain(`Disallow: ${p}$\nDisallow: ${p}/\n`);
+      expect(txt).not.toContain(`Disallow: ${p}\n`);
+    }
   });
   it('ends with the sitemap line', () => {
     expect(txt.trimEnd().endsWith(`Sitemap: ${site}/sitemap.xml`)).toBe(true);
@@ -17,14 +19,14 @@ describe('robotsTxt', () => {
 });
 
 describe('sitemapXml', () => {
-  const xml = sitemapXml(site, ['/', '/category/spa&wellness'], '2026-09-24');
-  it('is a urlset with one escaped url per path and a lastmod', () => {
+  const xml = sitemapXml(site, ['/', '/category/spa&wellness']);
+  it('is a urlset with one escaped url per path and no lastmod', () => {
     expect(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>')).toBe(true);
     expect(xml).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
     expect(xml.match(/<url>/g)).toHaveLength(2);
     expect(xml).toContain(`<loc>${site}/</loc>`);
     expect(xml).toContain(`<loc>${site}/category/spa&amp;wellness</loc>`);
-    expect(xml.match(/<lastmod>2026-09-24<\/lastmod>/g)).toHaveLength(2);
+    expect(xml).not.toContain('lastmod');
     expect(xml.trimEnd().endsWith('</urlset>')).toBe(true);
   });
 });

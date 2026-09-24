@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRoutes, STATIC_PUBLIC_PATHS } from './routes';
+import { buildRoutes, isEmptyCityPage, STATIC_PUBLIC_PATHS } from './routes';
 import type { ShellData } from '../src/prerender-data/loaders';
 
 const cat = (slug: string, type?: 'SERVICE' | 'PRODUCT' | 'THERAPY' | null) =>
@@ -37,6 +37,19 @@ describe('buildRoutes', () => {
 
   it('returns only home for an empty shell', () => {
     expect(buildRoutes({ categories: [], locations: [], socialLinks: [] })).toEqual([{ path: '/' }]);
+  });
+});
+
+describe('isEmptyCityPage', () => {
+  const route = { path: '/category/massage/pune', slug: 'massage', city: 'Pune', state: 'Maharashtra' };
+  it('is true for a city route with no deals', () => {
+    expect(isEmptyCityPage(route, { deals: [] })).toBe(true);
+  });
+  it('is false for a city route with deals', () => {
+    expect(isEmptyCityPage(route, { deals: [{}] })).toBe(false);
+  });
+  it('is false for a plain category route, even with no deals', () => {
+    expect(isEmptyCityPage({ path: '/category/massage', slug: 'massage' }, { deals: [] })).toBe(false);
   });
 });
 

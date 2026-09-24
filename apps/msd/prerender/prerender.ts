@@ -2,7 +2,7 @@
  * Build-time prerender for the msd storefront (`npx nx run msd:prerender`, after `msd:build`).
  *
  * Builds an SSR bundle of `server-entry.ts`, fetches catalog data from PRERENDER_API_URL, renders
- * `/`, every `/category/<slug>` and every deal-category `/category/<slug>/<city>` into
+ * `/`, every `/category/<slug>` and every deal-category `/category/<slug>/<city>` that has deals into
  * `dist/apps/msd/<route>/index.html`, keeps the untouched template as `spa.html` (served at `/spa` under vercel.json's
  * `cleanUrls`, which is the SPA rewrite's destination) for the SPA
  * rewrite, and writes sitemap.xml, robots.txt and llms.txt. An unreachable API skips the
@@ -103,6 +103,10 @@ async function main() {
             warn(`${route.path}: category not found, skipped`);
             continue;
           }
+          if (bundle.isEmptyCityPage(route, data)) {
+            log(`${route.path}: no deals in this city, skipped (not in the sitemap)`);
+            continue;
+          }
           payload = { shell, [bundle.categoryDataKey(route.slug, route.city)]: data };
         }
       } catch (err) {
@@ -127,7 +131,7 @@ async function main() {
 
   if (siteUrl) {
     const paths = [...new Set<string>([...bundle.STATIC_PUBLIC_PATHS, ...rendered])];
-    write(join(OUT_DIR, 'sitemap.xml'), bundle.sitemapXml(siteUrl, paths, new Date().toISOString().slice(0, 10)));
+    write(join(OUT_DIR, 'sitemap.xml'), bundle.sitemapXml(siteUrl, paths));
     write(join(OUT_DIR, 'robots.txt'), bundle.robotsTxt(siteUrl));
     write(join(OUT_DIR, 'llms.txt'), bundle.llmsTxt(siteUrl, shell));
     log(`wrote sitemap.xml (${paths.length} URLs), robots.txt, llms.txt`);

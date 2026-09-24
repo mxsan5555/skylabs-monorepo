@@ -29,6 +29,12 @@ export const STATIC_PUBLIC_PATHS = [
   '/cookies',
 ] as const;
 
+/** A city page with no deals is thin content: it is neither prerendered nor listed in the
+ *  sitemap (the SPA still serves it if someone links to it). */
+export function isEmptyCityPage(route: PrerenderRoute, data: { deals: readonly unknown[] }): boolean {
+  return !!route.city && data.deals.length === 0;
+}
+
 const hasDeals = (type: string | null | undefined) => type !== 'PRODUCT' && type !== 'THERAPY';
 
 /** `/`, every `/category/<slug>`, and `/category/<slug>/<city>` for each deal category x unique

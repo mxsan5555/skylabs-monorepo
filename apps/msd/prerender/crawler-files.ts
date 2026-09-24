@@ -2,13 +2,27 @@ import { categoryHref } from '../src/catalog/catalog-shell';
 import content from '../src/content.json';
 import type { ShellData } from '../src/prerender-data/loaders';
 
-const PRIVATE_PATHS = ['/account', '/my-account', '/cart', '/checkout', '/orders', '/sign-in', '/otp', '/wishlist', '/choose-experience'];
+const PRIVATE_PATHS = [
+  '/account',
+  '/my-account',
+  '/cart',
+  '/checkout',
+  '/orders',
+  '/sign-in',
+  '/otp',
+  '/wishlist',
+  '/choose-experience',
+  '/showcase',
+];
+
+/** Each private path blocks itself exactly (`$`) and everything below it, so `/account` never
+ *  over-matches a public URL such as `/accounting`. */
 
 export function robotsTxt(siteUrl: string): string {
   return [
     'User-agent: *',
     'Allow: /',
-    ...PRIVATE_PATHS.map((p) => `Disallow: ${p}`),
+    ...PRIVATE_PATHS.flatMap((p) => [`Disallow: ${p}$`, `Disallow: ${p}/`]),
     '',
     `Sitemap: ${siteUrl}/sitemap.xml`,
     '',
@@ -18,9 +32,10 @@ export function robotsTxt(siteUrl: string): string {
 const xmlEscape = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 
-/** `lastmod` is a W3C date, e.g. 2026-09-24. */
-export function sitemapXml(siteUrl: string, paths: readonly string[], lastmod: string): string {
-  const urls = paths.map((p) => `  <url><loc>${xmlEscape(siteUrl + p)}</loc><lastmod>${lastmod}</lastmod></url>`);
+/** No `lastmod`: there is no real per-URL modification date, and a build date on every URL
+ *  teaches crawlers to ignore the field. */
+export function sitemapXml(siteUrl: string, paths: readonly string[]): string {
+  const urls = paths.map((p) => `  <url><loc>${xmlEscape(siteUrl + p)}</loc></url>`);
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
