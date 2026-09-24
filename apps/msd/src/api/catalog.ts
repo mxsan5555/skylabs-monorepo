@@ -185,6 +185,26 @@ export function getCatalogCategory(slug: string) {
   return apiGet<CatalogCategoryWithChildren>(`/catalog/categories/${encodeURIComponent(slug)}`, null);
 }
 
+export interface CatalogPopularTreatment {
+  id: string;
+  name: string;
+  slug: string;
+  categorySlug: string | null;
+}
+
+export interface CatalogPopularTreatmentGroup {
+  id: string;
+  name: string;
+  slug: string;
+  treatments: CatalogPopularTreatment[];
+}
+
+/** Public home page Treatment directory — active groups only, each holding only its own active
+ *  treatments (server-filtered; see msd-api's `popular-treatment.service.ts#getPublicTreatmentDirectory`). */
+export function listCatalogPopularTreatments() {
+  return apiGet<CatalogPopularTreatmentGroup[]>('/catalog/popular-treatments', null);
+}
+
 export function listCatalogDeals(opts: {
   page?: number;
   pageSize?: number;

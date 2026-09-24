@@ -199,7 +199,7 @@ export function HeaderV2() {
   const { ids: wishlistIds } = useWishlist();
 
   const isCustomer = !!bootstrap && isCustomerUser(bootstrap) && !isStaffUser(bootstrap);
-  const myAccountPath = isCustomer ? '/my-account' : '/account';
+  const myAccountPath = isCustomer ? '/my-account' : '/account/dashboard';
 
   const [totalItems, setTotalItems] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -602,7 +602,7 @@ export function HeaderV3() {
   const { ids: wishlistIds } = useWishlist();
 
   const isCustomer = !!bootstrap && isCustomerUser(bootstrap) && !isStaffUser(bootstrap);
-  const myAccountPath = isCustomer ? '/my-account' : '/account';
+  const myAccountPath = isCustomer ? '/my-account' : '/account/dashboard';
 
   const [totalItems, setTotalItems] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);

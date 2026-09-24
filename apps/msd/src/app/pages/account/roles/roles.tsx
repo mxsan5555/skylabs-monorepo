@@ -10,6 +10,7 @@ import {
   Icon,
 } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
 import {
   cloneRole,
   createRole,
@@ -35,15 +36,19 @@ import { WidgetAssignments } from './widget-assignments';
  * Role Management — list + select a role, edit its name/description/status,
  * and assign its permission matrix + dashboard widgets.
  *
- * Permissions are preloaded via `GET /rbac/roles/:id/permissions` on role
- * selection, so the matrix reflects saved grants. Known API gap: msd-api has
- * no equivalent GET for a role's current widget grants, only
- * `PUT /rbac/roles/:id/widgets` (write + return new state) — so the widget
- * assignments still start empty on every role selection rather than silently
- * guessing (and possibly overwriting) existing grants.
+ * Both the permission matrix and the widget assignments are preloaded on role
+ * selection (`GET /rbac/roles/:id/permissions`, `GET /rbac/roles/:id/widgets`),
+ * so both reflect the role's actual saved grants — not just immediately after
+ * a Save on the same page load. The widget GET used to be missing entirely
+ * (only `PUT /rbac/roles/:id/widgets`, write + return new state, existed), so
+ * this screen had no way to learn what was actually saved after a role switch
+ * or a page reload and always rendered every widget unchecked regardless of
+ * its real state — the checkboxes looked like they'd "lost" the selection
+ * even though `RoleDashboardWidget` still held it correctly the whole time.
  */
 export function RoleManagement() {
   const { token, can } = useAuth();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const [roles, setRoles] = useState<Role[]>([]);
   const [rolesLoading, setRolesLoading] = useState(true);
@@ -63,6 +68,7 @@ export function RoleManagement() {
 
   const [detailForm, setDetailForm] = useState({ name: '', description: '' });
   const [permissionsLoading, setPermissionsLoading] = useState(false);
+  const [widgetsLoading, setWidgetsLoading] = useState(false);
   const [savingDetails, setSavingDetails] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [savingWidgets, setSavingWidgets] = useState(false);
@@ -119,9 +125,10 @@ export function RoleManagement() {
     };
   }, [token]);
 
-  // Selecting a different role resets the widget state (msd-api has no GET for a
-  // role's current widget grants yet) and reloads the permission matrix from the
-  // role's actual saved grants via getRolePermissionIds.
+  // Selecting a different role reloads both the permission matrix and the widget assignments
+  // from the role's actual saved grants (getRolePermissionIds / getRoleWidgets) — neither is
+  // ever left to just reset to empty and stay that way, or a role's real grants would appear
+  // to have vanished on every switch/reload even though they're still saved server-side.
   useEffect(() => {
     let cancelled = false;
     setSelectedPermissionIds(new Set());
@@ -140,6 +147,18 @@ export function RoleManagement() {
         })
         .finally(() => {
           if (!cancelled) setPermissionsLoading(false);
+        });
+
+      setWidgetsLoading(true);
+      getRoleWidgets(token, selectedRole.id)
+        .then(({ data }) => {
+          if (!cancelled) setSelectedWidgets(new Map(data.map((row) => [row.widgetId, row.order])));
+        })
+        .catch((err) => {
+          if (!cancelled) setActionError(err instanceof ApiRequestError ? err.message : "Could not load this role's saved dashboard widgets.");
+        })
+        .finally(() => {
+          if (!cancelled) setWidgetsLoading(false);
         });
     }
     return () => {
@@ -199,7 +218,7 @@ export function RoleManagement() {
 
   const removeRole = async () => {
     if (!selectedRole) return;
-    if (!window.confirm(`Delete role "${selectedRole.name}"? This cannot be undone.`)) return;
+    if (!(await confirm(`Delete role "${selectedRole.name}"? This cannot be undone.`))) return;
     try {
       await deleteRole(token, selectedRole.id);
       setRoles((prev) => prev.filter((r) => r.id !== selectedRole.id));
@@ -355,8 +374,8 @@ export function RoleManagement() {
               )}
 
               <h2 className="section-title">Dashboard widgets</h2>
-              {widgetsCatalogLoading ? (
-                <p className="loading-state">Loading widget catalog…</p>
+              {widgetsCatalogLoading || widgetsLoading ? (
+                <p className="loading-state">Loading dashboard widgets…</p>
               ) : widgetsCatalogError ? (
                 <p className="error-state">{widgetsCatalogError}</p>
               ) : (
@@ -381,6 +400,7 @@ export function RoleManagement() {
           )}
         </section>
       </div>
+      {ConfirmDialog}
     </div>
   );
 }

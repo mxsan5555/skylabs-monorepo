@@ -445,6 +445,54 @@ describe('PUT /api/v1/rbac/roles/:id/permissions', () => {
   });
 });
 
+/**
+ * Regression coverage for the real bug: `roles.tsx` had no way to learn a role's saved
+ * dashboard-widget grants after a role switch or page reload (only `PUT .../widgets` existed —
+ * write + return new state), so the UI always rendered every widget unchecked regardless of what
+ * was actually saved in `RoleDashboardWidget`. This is the read half of that same table, mirroring
+ * `GET /roles/:id/permissions` exactly.
+ */
+describe('GET /api/v1/rbac/roles/:id/widgets', () => {
+  const WIDGET_ID = '3b9a4f6c-9f0f-4a4c-8f9a-2f6f1a0e5d3a';
+
+  it('returns 401 with no token', async () => {
+    const res = await request(app).get(`/api/v1/rbac/roles/${ROLE_ID}/widgets`);
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 422 for a malformed :id', async () => {
+    resolveMock.mockResolvedValue(['rbac.roles:view']);
+    const res = await request(app)
+      .get('/api/v1/rbac/roles/not-a-uuid/widgets')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
+    expect(res.status).toBe(422);
+  });
+
+  it("returns 200 with the role's currently saved widget rows, not an empty list, when grants exist", async () => {
+    resolveMock.mockResolvedValue(['rbac.roles:view']);
+    prismaMock.role.findUnique.mockResolvedValue(roleFixture);
+    prismaMock.roleDashboardWidget.findMany.mockResolvedValue([
+      { roleId: ROLE_ID, widgetId: WIDGET_ID, order: 0, widget: { id: WIDGET_ID, key: 'orders-recent', title: 'Total Orders', module: 'orders' } },
+    ]);
+    const res = await request(app)
+      .get(`/api/v1/rbac/roles/${ROLE_ID}/widgets`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([
+      { roleId: ROLE_ID, widgetId: WIDGET_ID, order: 0, widget: { id: WIDGET_ID, key: 'orders-recent', title: 'Total Orders', module: 'orders' } },
+    ]);
+  });
+
+  it('returns 404 when the role does not exist', async () => {
+    resolveMock.mockResolvedValue(['rbac.roles:view']);
+    prismaMock.role.findUnique.mockResolvedValue(null);
+    const res = await request(app)
+      .get(`/api/v1/rbac/roles/${OTHER_ROLE_ID}/widgets`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
+    expect(res.status).toBe(404);
+  });
+});
+
 describe('GET /api/v1/rbac/bootstrap', () => {
   it('returns 401 with no token', async () => {
     const res = await request(app).get('/api/v1/rbac/bootstrap');

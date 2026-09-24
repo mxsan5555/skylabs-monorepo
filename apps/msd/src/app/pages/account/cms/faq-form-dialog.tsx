@@ -69,8 +69,10 @@ export function FaqFormDialog({
           label="Question"
           type="textarea"
           rows={2}
+          required
           value={form.question}
           onInput={(e: Event) => setForm((f) => ({ ...f, question: (e.target as HTMLTextAreaElement).value }))}
+          error={Boolean(fieldErrors?.question)}
         />
         {fieldErrors?.question && <p className="error-state" role="alert">{fieldErrors.question}</p>}
 
@@ -78,8 +80,10 @@ export function FaqFormDialog({
           label="Answer"
           type="textarea"
           rows={5}
+          required
           value={form.answer}
           onInput={(e: Event) => setForm((f) => ({ ...f, answer: (e.target as HTMLTextAreaElement).value }))}
+          error={Boolean(fieldErrors?.answer)}
         />
         {fieldErrors?.answer && <p className="error-state" role="alert">{fieldErrors.answer}</p>}
 
@@ -88,6 +92,7 @@ export function FaqFormDialog({
           type="number"
           value={String(form.sortOrder ?? 0)}
           onInput={(e: Event) => setForm((f) => ({ ...f, sortOrder: Number((e.target as HTMLInputElement).value) || 0 }))}
+          error={Boolean(fieldErrors?.sortOrder)}
         />
         <p className="field-hint">Lower numbers show first on the public FAQ list.</p>
         {fieldErrors?.sortOrder && <p className="error-state" role="alert">{fieldErrors.sortOrder}</p>}

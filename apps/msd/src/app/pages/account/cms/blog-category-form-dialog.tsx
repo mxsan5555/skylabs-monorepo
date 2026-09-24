@@ -88,15 +88,19 @@ export function BlogCategoryFormDialog({
       <div slot="content" className="form-grid">
         <OutlinedTextField
           label="Name"
+          required
           value={form.name}
           onInput={(e: Event) => setName((e.target as HTMLInputElement).value)}
+          error={Boolean(fieldErrors?.name)}
         />
         {fieldErrors?.name && <p className="error-state" role="alert">{fieldErrors.name}</p>}
 
         <OutlinedTextField
           label="Slug"
+          required
           value={form.slug}
           onInput={(e: Event) => setSlug((e.target as HTMLInputElement).value)}
+          error={Boolean(fieldErrors?.slug)}
         />
         <p className="field-hint">Auto-generated from the name — edit it directly to override.</p>
         {fieldErrors?.slug && <p className="error-state" role="alert">{fieldErrors.slug}</p>}
@@ -107,6 +111,7 @@ export function BlogCategoryFormDialog({
           rows={3}
           value={form.description ?? ''}
           onInput={(e: Event) => setForm((f) => ({ ...f, description: (e.target as HTMLTextAreaElement).value }))}
+          error={Boolean(fieldErrors?.description)}
         />
         {fieldErrors?.description && <p className="error-state" role="alert">{fieldErrors.description}</p>}
 
@@ -115,6 +120,7 @@ export function BlogCategoryFormDialog({
           type="number"
           value={String(form.sortOrder ?? 0)}
           onInput={(e: Event) => setForm((f) => ({ ...f, sortOrder: Number((e.target as HTMLInputElement).value) || 0 }))}
+          error={Boolean(fieldErrors?.sortOrder)}
         />
         {fieldErrors?.sortOrder && <p className="error-state" role="alert">{fieldErrors.sortOrder}</p>}
 

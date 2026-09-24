@@ -25,13 +25,17 @@ import {
   listCatalogCategories,
   listCatalogDeals,
   listCatalogLocations,
+  listCatalogProducts,
+  listCatalogTherapists,
   type CatalogCategoryWithChildren,
   type CatalogDeal,
   type CatalogLocation,
+  type CatalogProduct,
+  type CatalogTherapist,
 } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { formatINR } from '../../../utils/format';
-import { resolveDealMedia, primaryImage } from '../../../utils/media';
+import { resolveDealMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import content from '../../../content.json';
 import './search.css';
@@ -177,6 +181,55 @@ export function Search() {
       .finally(() => setDealsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, selectedCategoryEntry?.id, suggested, priceMax, selectedState, selectedCity, categoriesLoading, coords?.latitude, coords?.longitude]);
+
+  // ── Products (real, server-filtered) — Product has no branch/location, so `state`/`city`
+  // aren't sent (the public endpoint doesn't accept them; see `listCatalogProducts`'s own doc
+  // comment) — everything else (search text, category, sort, price) matches the Deal fetch above,
+  // so the same query returns the same "kind" of results across both listing types. ────────────
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+
+  useEffect(() => {
+    if (categoriesLoading) return;
+    setProductsLoading(true);
+    listCatalogProducts({
+      search: query || undefined,
+      categoryId: selectedCategoryEntry?.id,
+      sort: suggested ? 'discount' : undefined,
+      maxPrice: priceMax < searchContent.filters.price.max ? priceMax : undefined,
+      pageSize: 100,
+    })
+      .then(({ data }) => setProducts(data))
+      .catch(() => setProducts([]))
+      .finally(() => setProductsLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, selectedCategoryEntry?.id, suggested, priceMax, categoriesLoading]);
+
+  // ── Therapists (real, server-filtered) — supports the same search/category/lat-lng shape as
+  // Deal, but no price/sort/state/city filters exist on this endpoint (a Therapist has no price
+  // of its own — pricing lives on its packages — and no state/city query param; see
+  // `listCatalogTherapists`'s own doc comment). ──────────────────────────────────────────────
+  const [therapists, setTherapists] = useState<CatalogTherapist[]>([]);
+  const [therapistsLoading, setTherapistsLoading] = useState(true);
+
+  useEffect(() => {
+    if (categoriesLoading) return;
+    setTherapistsLoading(true);
+    listCatalogTherapists({
+      search: query || undefined,
+      categoryId: selectedCategoryEntry?.id,
+      pageSize: 100,
+      latitude: coords?.latitude,
+      longitude: coords?.longitude,
+    })
+      .then(({ data }) => setTherapists(data))
+      .catch(() => setTherapists([]))
+      .finally(() => setTherapistsLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, selectedCategoryEntry?.id, categoriesLoading, coords?.latitude, coords?.longitude]);
+
+  const resultsLoading = dealsLoading || productsLoading || therapistsLoading;
+  const totalResultCount = deals.length + products.length + therapists.length;
 
   function selectCategory(slug: string) {
     setSelectedCategory(slug);
@@ -359,17 +412,17 @@ export function Search() {
           aria-live="polite"
           aria-atomic="true"
         >
-          {dealsLoading ? '…' : `${deals.length} ${searchContent.resultLabel}`}
+          {resultsLoading ? '…' : `${totalResultCount} ${searchContent.resultLabel}`}
         </p>
 
         {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
         {actionError && <p className="error-state" role="alert">{actionError}</p>}
 
-        {dealsLoading ? (
+        {resultsLoading ? (
           <p className="loading-state"> {searchContent.loading.deals}</p>
         ) : dealsError ? (
           <p className="error-state" role="alert">{dealsError}</p>
-        ) : deals.length === 0 ? (
+        ) : totalResultCount === 0 ? (
           <p className="search-page__empty">{searchContent.noResults}</p>
         ) : (
           <>
@@ -459,6 +512,95 @@ export function Search() {
                     );
                   })}
                 </ul>
+
+                {/* Product/Therapist results — simpler cards (no inline Add to Cart/wishlist:
+                    Product has no dedicated add-to-cart dialog yet, and wishlist is Deal-only —
+                    see `useWishlist`'s own `dealId`-typed signature); each links straight to its
+                    own detail page. */}
+                {products.length > 0 && (
+                  <>
+                    <h2 className="search-results-list__subheading">Products</h2>
+                    <ul className="search-results-list">
+                      {products.map((product) => (
+                        <li key={product.id} className="search-results-list__item">
+                          <article className="search-result-card">
+                            <Link to={`/products/${product.id}`} className="search-result-card__img-link" tabIndex={-1} aria-hidden="true">
+                              {product.image && (
+                                <img className="search-result-card__img" src={product.image} alt={product.imageAlt ?? product.name} width={140} height={140} loading="lazy" />
+                              )}
+                            </Link>
+                            <div className="search-result-card__body">
+                              <div className="search-result-card__top">
+                                <div>
+                                  <h3 className="search-result-card__title">
+                                    <Link to={`/products/${product.id}`}>{product.name}</Link>
+                                  </h3>
+                                  {product.vendor?.businessName && (
+                                    <p className="search-result-card__provider">
+                                      {product.vendor.slug ? (
+                                        <Link to={`/vendor/${product.vendor.slug}`}>{product.vendor.businessName}</Link>
+                                      ) : (
+                                        product.vendor.businessName
+                                      )}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="search-result-card__desc">{product.summary ?? product.description}</p>
+                              <div className="search-result-card__meta">
+                                <span className="search-result-card__price">{formatINR(Number(product.price))}</span>
+                              </div>
+                            </div>
+                          </article>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+
+                {therapists.length > 0 && (
+                  <>
+                    <h2 className="search-results-list__subheading">Therapists</h2>
+                    <ul className="search-results-list">
+                      {therapists.map((therapist) => {
+                        const image = primaryImage(resolveTherapistMedia(therapist));
+                        const fromPrice = therapist.packages.length > 0
+                          ? Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)))
+                          : null;
+                        return (
+                          <li key={therapist.id} className="search-results-list__item">
+                            <article className="search-result-card">
+                              <Link to={`/therapist/${therapist.id}`} className="search-result-card__img-link" tabIndex={-1} aria-hidden="true">
+                                {image && (
+                                  <img className="search-result-card__img" src={image} alt={therapist.personName} width={140} height={140} loading="lazy" />
+                                )}
+                              </Link>
+                              <div className="search-result-card__body">
+                                <div className="search-result-card__top">
+                                  <div>
+                                    <h3 className="search-result-card__title">
+                                      <Link to={`/therapist/${therapist.id}`}>{therapist.therapistType}</Link>
+                                    </h3>
+                                    <p className="search-result-card__provider">
+                                      {therapist.personName}
+                                      {therapist.vendor?.businessName ? ` · ${therapist.vendor.businessName}` : ''}
+                                    </p>
+                                  </div>
+                                </div>
+                                {therapist.bio && <p className="search-result-card__desc">{therapist.bio}</p>}
+                                {fromPrice != null && (
+                                  <div className="search-result-card__meta">
+                                    <span className="search-result-card__price">From {formatINR(fromPrice)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </article>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </>
+                )}
               </section>
             )}
 
@@ -492,6 +634,49 @@ export function Search() {
                       />
                     </li>
                   ))}
+                  {products.map((product) => (
+                    <li key={product.id}>
+                      <SkyProductCardWC
+                        image={product.image ?? undefined}
+                        imageAlt={product.imageAlt ?? product.name}
+                        badge="Product"
+                        tag={product.popularTags?.[0]?.name}
+                        heading={product.name}
+                        eyebrow={product.vendor?.businessName ?? undefined}
+                        eyebrowHref={product.vendor?.slug ? `/vendor/${product.vendor.slug}` : undefined}
+                        price={formatINR(Number(product.price))}
+                        originalPrice={
+                          product.originalPrice && Number(product.originalPrice) !== Number(product.price)
+                            ? formatINR(Number(product.originalPrice))
+                            : undefined
+                        }
+                        href={`/products/${product.id}`}
+                      />
+                    </li>
+                  ))}
+                  {therapists.map((therapist) => {
+                    const fromPrice = therapist.packages.length > 0
+                      ? Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)))
+                      : null;
+                    return (
+                      <li key={therapist.id}>
+                        <SkyProductCardWC
+                          image={primaryImage(resolveTherapistMedia(therapist))}
+                          imageAlt={therapist.personName}
+                          badge="Therapist"
+                          tag={therapist.popularTags?.[0]?.name}
+                          heading={therapist.therapistType}
+                          eyebrow={[therapist.personName, therapist.vendor?.businessName].filter(Boolean).join(' · ')}
+                          eyebrowHref={therapist.vendor?.slug ? `/vendor/${therapist.vendor.slug}` : undefined}
+                          location={therapist.branch?.city ?? undefined}
+                          distance={therapist.distanceKm != null ? `${Math.round(therapist.distanceKm * 10) / 10} km` : undefined}
+                          pricePrefix={fromPrice != null ? 'From' : undefined}
+                          price={fromPrice != null ? formatINR(fromPrice) : undefined}
+                          href={`/therapist/${therapist.id}`}
+                        />
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
             )}

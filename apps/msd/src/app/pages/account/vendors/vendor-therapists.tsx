@@ -161,6 +161,11 @@ export function VendorTherapists() {
 
   const total = therapists.length;
   const rows = useMemo(() => JSON.stringify(therapists.map(toRow)), [therapists]);
+  // Only a branch with at least one currently-granted THERAPY category (`categoryTypes`,
+  // computed server-side by `listMyBranches`/`listBranches`) is eligible to host a therapist —
+  // mirrors the admin-side `vendor-wizard-therapists.tsx` filter so revoking a branch's Therapy
+  // access in Branch Access hides it here immediately and after a refresh.
+  const therapyBranches = useMemo(() => branches.filter((b) => b.categoryTypes.includes('THERAPY')), [branches]);
 
   useEffect(() => {
     const el = tableRef.current;
@@ -203,7 +208,7 @@ export function VendorTherapists() {
           <p>Staff therapists across your business's branches.</p>
         </div>
         <div className="page-head__actions">
-          {branches.length > 0 && (
+          {therapyBranches.length > 0 && (
             <OutlinedButton onClick={() => addDialogRef.current?.show()}>
               <Icon slot="icon" aria-hidden="true">add</Icon>
               Add therapist
@@ -214,6 +219,10 @@ export function VendorTherapists() {
 
       {message && <p className="field-hint" role="status">{message}</p>}
       {error && <p className="error-state" role="alert">{error}</p>}
+
+      {!loading && branches.length > 0 && therapyBranches.length === 0 && (
+        <p className="empty-state">No branch currently has Therapy category access — map one under "Branches &amp; Deals" first.</p>
+      )}
 
       {!loading && branches.length === 0 ? (
         <p className="empty-state">Add a branch under "Branches &amp; Deals" before adding therapists.</p>
@@ -231,10 +240,10 @@ export function VendorTherapists() {
         />
       )}
 
-      {branches.length > 0 && (
+      {therapyBranches.length > 0 && (
         <TherapistFormDialog
           dialogRef={addDialogRef}
-          branches={branches}
+          branches={therapyBranches}
           specializationCategories={specializationCategories}
           token={token}
           onSave={(input, branchId) => save(input, branchId)}

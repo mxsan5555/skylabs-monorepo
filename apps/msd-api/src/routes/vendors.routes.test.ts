@@ -119,6 +119,11 @@ beforeEach(() => {
   // default (zero superadmins to notify) for every test in this file that isn't specifically
   // asserting notification behavior (see the dedicated describe block below).
   prismaMock.user.findMany.mockResolvedValue([]);
+  // createTherapist/updateTherapist now unconditionally assert the target branch has SOME
+  // THERAPY category access (see vendor.service.ts's assertBranchHasAnyCategoryAccessOfType) —
+  // harmless "branch has Therapy access" default for every therapist test in this file that
+  // isn't specifically asserting that gate's rejection path (which overrides with `null`).
+  prismaMock.branchCategoryAccess.findFirst.mockResolvedValue({ id: 'default-branch-therapy-access' });
 });
 
 describe('GET /api/v1/vendors/me', () => {
@@ -871,7 +876,10 @@ describe('mapLocationUrl — update-time resolve/skip semantics + resolver-rejec
 
   it('GET returns a pre-migration branch row (latitude/longitude set, mapLocationUrl null) unchanged — never broken by the new resolve logic', async () => {
     resolveMock.mockResolvedValue(['vendors.branches:view']);
-    const preMigrationBranch = { ...branchAFixture, latitude: 26.7606, longitude: 83.3732, mapLocationUrl: null };
+    // `categoryAccess: []` mirrors what Prisma's real `include` always returns (an array, even
+    // when empty) — listBranches (see vendor.service.ts) maps it into `categoryTypes` and would
+    // throw on a hand-built fixture that omits it entirely, which a real query never does.
+    const preMigrationBranch = { ...branchAFixture, latitude: 26.7606, longitude: 83.3732, mapLocationUrl: null, categoryAccess: [] };
     prismaMock.branch.findMany.mockResolvedValue([preMigrationBranch]);
 
     const res = await request(app)

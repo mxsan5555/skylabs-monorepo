@@ -96,11 +96,8 @@ export function setRolePermissions(token: string | null, id: string, permissionI
   return apiPut<RolePermissionRow[]>(`/rbac/roles/${id}/permissions`, token, { permissionIds });
 }
 
-export function getRoleWidgets(token: string | null, roleId: string) {
-  return apiGet<RoleWidgetAssignment[]>(
-    `/rbac/roles/${roleId}/widgets`,
-    token,
-  );
+export function getRoleWidgets(token: string | null, id: string) {
+  return apiGet<RoleWidgetRow[]>(`/rbac/roles/${id}/widgets`, token);
 }
 
 export function setRoleWidgets(token: string | null, id: string, widgets: { widgetId: string; order: number }[]) {

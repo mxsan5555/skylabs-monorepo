@@ -21,6 +21,7 @@ import howItWorksRoutes from './routes/how-it-works.routes';
 import careersRoutes from './routes/careers.routes';
 import socialMediaRoutes from './routes/social-media.routes';
 import popularTagsRoutes from './routes/popular-tags.routes';
+import popularTreatmentsRoutes from './routes/popular-treatments.routes';
 import catalogRoutes from './routes/catalog.routes';
 import cartRoutes from './routes/cart.routes';
 import wishlistRoutes from './routes/wishlist.routes';
@@ -94,6 +95,7 @@ export function createApp(): express.Express {
   api.use('/careers', careersRoutes);
   api.use('/social-media', socialMediaRoutes);
   api.use('/popular-tags', popularTagsRoutes);
+  api.use('/popular-treatments', popularTreatmentsRoutes);
   api.use('/catalog', catalogRoutes);
   api.use('/cart', cartRoutes);
   api.use('/wishlist', wishlistRoutes);

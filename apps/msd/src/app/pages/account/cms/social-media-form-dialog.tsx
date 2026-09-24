@@ -93,6 +93,7 @@ export function SocialMediaFormDialog({
           label="Platform"
           value={platformSelect}
           onChange={(e: Event) => onPlatformSelectChange((e.target as HTMLSelectElement).value)}
+          error={Boolean(fieldErrors?.platform)}
         >
           {PLATFORM_OPTIONS.map((opt) => (
             <SelectOption key={opt} value={opt}>
@@ -106,22 +107,27 @@ export function SocialMediaFormDialog({
             label="Platform name"
             value={otherPlatform}
             onInput={(e: Event) => onOtherPlatformChange((e.target as HTMLInputElement).value)}
+            error={Boolean(fieldErrors?.platform)}
           />
         )}
         {fieldErrors?.platform && <p className="error-state" role="alert">{fieldErrors.platform}</p>}
 
         <OutlinedTextField
           label="Display name"
+          required
           value={form.displayName}
           onInput={(e: Event) => setForm((f) => ({ ...f, displayName: (e.target as HTMLInputElement).value }))}
+          error={Boolean(fieldErrors?.displayName)}
         />
         {fieldErrors?.displayName && <p className="error-state" role="alert">{fieldErrors.displayName}</p>}
 
         <OutlinedTextField
           label="URL"
           type="url"
+          required
           value={form.url}
           onInput={(e: Event) => setForm((f) => ({ ...f, url: (e.target as HTMLInputElement).value }))}
+          error={Boolean(fieldErrors?.url)}
         />
         {fieldErrors?.url && <p className="error-state" role="alert">{fieldErrors.url}</p>}
 
@@ -130,6 +136,7 @@ export function SocialMediaFormDialog({
           type="number"
           value={String(form.sortOrder ?? 0)}
           onInput={(e: Event) => setForm((f) => ({ ...f, sortOrder: Number((e.target as HTMLInputElement).value) || 0 }))}
+          error={Boolean(fieldErrors?.sortOrder)}
         />
         {fieldErrors?.sortOrder && <p className="error-state" role="alert">{fieldErrors.sortOrder}</p>}
 

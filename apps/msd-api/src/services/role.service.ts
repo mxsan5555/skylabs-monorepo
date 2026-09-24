@@ -115,20 +115,15 @@ export async function setRolePermissions(roleId: string, permissionIds: string[]
   return prisma.rolePermission.findMany({ where: { roleId }, include: { permission: true } });
 }
 
-/** The dashboard widgets currently assigned to a role. */
+/** A role's currently granted dashboard widgets — lets a client pre-check boxes before editing
+ *  via `setRoleWidgets`, same purpose as `getRolePermissionIds` above for the permission matrix.
+ *  Previously missing entirely (only the write side existed), so the admin UI could never learn
+ *  what was actually saved after a role switch or page reload and had to blindly render every
+ *  widget unchecked — this is the read half of the same `RoleDashboardWidget` table
+ *  `setRoleWidgets` already writes to, not a new data model. */
 export async function getRoleWidgets(roleId: string) {
   await getRole(roleId);
-
-  return prisma.roleDashboardWidget.findMany({
-    where: { roleId },
-    select: {
-      widgetId: true,
-      order: true,
-    },
-    orderBy: {
-      order: 'asc',
-    },
-  });
+  return prisma.roleDashboardWidget.findMany({ where: { roleId }, include: { widget: true } });
 }
 
 export async function setRoleWidgets(roleId: string, widgets: { widgetId: string; order: number }[]) {

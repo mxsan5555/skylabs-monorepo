@@ -6,7 +6,7 @@ vi.mock('../lib/prisma', async () => {
 });
 
 import { prisma } from '../lib/prisma';
-import { createVendorOwner, checkVendorOwnerAvailability } from './vendor.service';
+import { createVendorOwner, checkVendorOwnerAvailability, createTherapist } from './vendor.service';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -134,5 +134,43 @@ describe('checkVendorOwnerAvailability', () => {
   it('throws a validation error when neither email nor phone is given', async () => {
     await expect(checkVendorOwnerAvailability(undefined, undefined)).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
     expect(prismaMock.user.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+const VENDOR_ID = 'e0e0e0e0-0000-4000-8000-000000000005';
+const BRANCH_ID = 'f0f0f0f0-0000-4000-8000-000000000006';
+
+function branchFixture(overrides: Partial<{ id: string; vendorId: string }> = {}) {
+  return { id: BRANCH_ID, vendorId: VENDOR_ID, ...overrides };
+}
+
+/**
+ * Feature: branch-level Therapy access is a real, backend-enforced gate — never just a
+ * frontend branch-picker filter.
+ * Scenario: a branch with zero `BranchCategoryAccess` rows of type THERAPY must be rejected by
+ * `createTherapist` even when the caller simply omits `specializationCategoryId` (the one field
+ * the pre-existing code already validated) — this is the exact bypass the Issue #2 fix closes.
+ */
+describe('createTherapist — branch-level Therapy access gate', () => {
+  it('rejects with VALIDATION_ERROR when the branch has zero THERAPY category access, even with no specializationCategoryId given', async () => {
+    prismaMock.branch.findUnique.mockResolvedValue(branchFixture());
+    prismaMock.branchCategoryAccess.findFirst.mockResolvedValue(null);
+
+    await expect(
+      createTherapist(VENDOR_ID, BRANCH_ID, { therapistType: 'Physio', personName: 'Alex' }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect(prismaMock.therapist.create).not.toHaveBeenCalled();
+  });
+
+  it('creates the therapist when the branch has at least one THERAPY category access row', async () => {
+    prismaMock.branch.findUnique.mockResolvedValue(branchFixture());
+    prismaMock.branchCategoryAccess.findFirst.mockResolvedValue({ id: 'bca-1' });
+    prismaMock.therapist.findFirst.mockResolvedValue(null);
+    prismaMock.therapist.create.mockResolvedValue({ id: 'th-1' });
+
+    const result = await createTherapist(VENDOR_ID, BRANCH_ID, { therapistType: 'Physio', personName: 'Alex' });
+
+    expect(result).toEqual({ id: 'th-1' });
+    expect(prismaMock.therapist.create).toHaveBeenCalled();
   });
 });

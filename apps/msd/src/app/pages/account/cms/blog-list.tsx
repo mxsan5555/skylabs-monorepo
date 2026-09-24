@@ -17,6 +17,7 @@ import { listBlogCategories, type BlogCategory } from '../../../../api/rbac/blog
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useToast } from '../../../../toast/toast-context';
 import { formatDate } from '../../../../blog/blog';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { BlogFormDialog } from './blog-form-dialog';
 
 const COLUMNS = JSON.stringify([
@@ -47,6 +48,7 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
  */
 export function BlogList() {
   const { token, can } = useAuth();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const navigate = useNavigate();
   const { showToast } = useToast();
   const canCreate = can('cms.blog.pages', 'create');
@@ -127,7 +129,7 @@ export function BlogList() {
   };
 
   const remove = async (post: BlogPost) => {
-    if (!window.confirm(`Delete "${post.title}"? This cannot be undone.`)) return;
+    if (!(await confirm(`Delete "${post.title}"? This cannot be undone.`))) return;
     setError('');
     try {
       await deleteBlogPost(token, post.id);
@@ -257,6 +259,7 @@ export function BlogList() {
           onClose={() => setEditingPost(null)}
         />
       )}
+      {ConfirmDialog}
     </div>
   );
 }

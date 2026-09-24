@@ -537,6 +537,8 @@ model Category {
   deals                    Deal[]                 @relation("DealCategory")
   subcategoryDeals         Deal[]                 @relation("DealSubcategory")
   popularTagLinks          PopularTagCategory[]
+  popularTreatments        PopularTreatment[]     @relation("PopularTreatmentCategory")
+  popularTreatmentSubcats  PopularTreatment[]     @relation("PopularTreatmentSubcategory")
   products                 Product[]              @relation("ProductCategory")
   subcategoryProducts      Product[]              @relation("ProductSubcategory")
   therapistSpecializations Therapist[]            @relation("TherapistSpecialization")
@@ -863,6 +865,55 @@ model BranchSubcategoryAccess {
   @@unique([branchCategoryAccessId, subcategoryId])
   @@index([branchCategoryAccessId])
   @@index([subcategoryId])
+}
+
+/// A named grouping of "Popular Treatments" chips for the public home page's Treatment
+/// directory (e.g. "Massage", "Facials") — order + `isActive` are both Master-editable; an
+/// inactive group hides itself AND every one of its treatments from the public listing without
+/// touching either the group's or its treatments' own rows (matches `PopularTag.isActive`'s same
+/// "hide, don't destroy" discipline — see `PopularTreatment`'s own doc comment).
+model PopularTreatmentGroup {
+  id         String             @id @default(uuid())
+  name       String
+  slug       String             @unique
+  sortOrder  Int                @default(0)
+  isActive   Boolean            @default(true)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  treatments PopularTreatment[]
+
+  @@index([sortOrder])
+}
+
+/// One clickable chip on the public home page's Treatment directory (e.g. "Swedish Massage"
+/// under the "Massage" group) — NOT a bookable listing itself. Clicking it navigates to
+/// `/explore?q=<name>` (optionally `&category=<slug>` when `categoryId` is set, for a more
+/// precise match), which runs the EXISTING public search against real Deal/Product/Therapist
+/// rows — this table has no direct FK to any of them, unlike `PopularTag`'s per-listing mapping
+/// join tables, because a treatment is a search shortcut, not a curated set of specific listings.
+/// `categoryId`/`subcategoryId` are optional hints only (never required for the chip to work,
+/// since the query-text match alone is often sufficient). Deactivating a treatment only ever
+/// flips `isActive` — it never touches any Deal/Product/Therapist row, so existing listings that
+/// happen to match the treatment's name are completely unaffected; reactivating instantly makes
+/// the chip public again with no other side effect.
+model PopularTreatment {
+  id            String                @id @default(uuid())
+  groupId       String
+  name          String
+  slug          String                @unique
+  categoryId    String?
+  subcategoryId String?
+  sortOrder     Int                   @default(0)
+  isActive      Boolean               @default(true)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  group         PopularTreatmentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  category      Category?             @relation("PopularTreatmentCategory", fields: [categoryId], references: [id], onDelete: SetNull)
+  subcategory   Category?             @relation("PopularTreatmentSubcategory", fields: [subcategoryId], references: [id], onDelete: SetNull)
+
+  @@index([groupId])
+  @@index([categoryId])
+  @@index([sortOrder])
 }
 
 /// A Superadmin-managed marketing label ("Trending", "Best Seller", ...) mappable onto any mix
