@@ -121,6 +121,31 @@ describe('SiteFooter', () => {
     container.remove();
   });
 
+  it('hydrates without a mismatch when the year changed since the prerender', async () => {
+    const tree = <MemoryRouter><SiteFooter /></MemoryRouter>;
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const recoverable: unknown[] = [];
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-12-31T12:00:00Z'));
+      container.innerHTML = renderToString(tree);
+      vi.setSystemTime(new Date('2027-01-02T12:00:00Z'));
+      await act(async () => {
+        root = hydrateRoot(container, tree, { onRecoverableError: (e) => recoverable.push(e) });
+      });
+      expect(recoverable).toEqual([]);
+      expect(errors.mock.calls.some((c) => String(c[0]).includes('hydrat'))).toBe(false);
+    } finally {
+      vi.useRealTimers();
+      errors.mockRestore();
+      act(() => root?.unmount());
+      container.remove();
+    }
+  });
+
   it('renders one anchor per social link, with a platform icon distinct from the fallback', () => {
     renderFooter();
     const list = screen.getByRole('list', { name: 'MySpaDeal on social media' });

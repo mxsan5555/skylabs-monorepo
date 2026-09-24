@@ -39,14 +39,14 @@ import { SITE_URL } from '../../seo/site-url';
 import './category.css';
 import content from '../../../content.json';
 
-/** Lowest active package price for a therapist listing card — mirrors `therapists.tsx`'s own
- *  `fromPrice` exactly (kept as a small local copy rather than a shared export, same as that
- *  file already does for its own single use). */
 /** SERVICE (or untyped, legacy) categories list deals; PRODUCT/THERAPY list their own entities. */
 function isDealCategory(category: CatalogCategoryWithChildren): boolean {
   return category.type !== 'PRODUCT' && category.type !== 'THERAPY';
 }
 
+/** Lowest active package price for a therapist listing card — mirrors `therapists.tsx`'s own
+ *  `fromPrice` exactly (kept as a small local copy rather than a shared export, same as that
+ *  file already does for its own single use). */
 function therapistFromPrice(therapist: CatalogTherapist): number | null {
   if (therapist.packages.length === 0) return null;
   return Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)));

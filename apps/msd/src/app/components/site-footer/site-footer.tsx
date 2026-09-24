@@ -76,7 +76,11 @@ export function SiteFooter() {
       )}
 
       <div className="site-footer__legal">
-        <p className="body-small">© {year} {t.copyright}</p>
+        <p className="body-small">
+          {/* The year is baked in at prerender time; a new year before the next build must not
+              fail hydration. */}
+          © <span suppressHydrationWarning>{year}</span> {t.copyright}
+        </p>
         <nav aria-label={t.legalLabel}>
           {/* eslint-disable-next-line jsx-a11y/no-redundant-roles -- Safari/VoiceOver drops list semantics when list-style is none */}
           <ul className="site-footer__legal-links" role="list">
