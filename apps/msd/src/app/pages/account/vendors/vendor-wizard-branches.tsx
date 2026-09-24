@@ -147,10 +147,10 @@ function BranchRow({
             <Icon slot="icon" aria-hidden="true">edit</Icon>
             Edit
           </OutlinedButton>
-          <OutlinedButton onClick={() => branchDialogRef.current?.show()}>
+          {/* <OutlinedButton onClick={() => branchDialogRef.current?.show()}>
             <Icon slot="icon" aria-hidden="true">category</Icon>
             Categories
-          </OutlinedButton>
+          </OutlinedButton> */}
           <OutlinedButton onClick={onToggleStatus}>{branch.isActive ? 'Deactivate' : 'Activate'}</OutlinedButton>
         </div>
       )}

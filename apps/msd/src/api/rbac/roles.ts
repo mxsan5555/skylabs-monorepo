@@ -55,6 +55,11 @@ export interface RoleWidgetRow {
   widget: DashboardWidgetRecord;
 }
 
+export interface RoleWidgetAssignment {
+  widgetId: string;
+  order: number;
+}
+
 export function listRoles(token: string | null) {
   return apiGet<Role[]>('/rbac/roles', token);
 }
@@ -89,6 +94,13 @@ export function getRolePermissionIds(token: string | null, id: string) {
 
 export function setRolePermissions(token: string | null, id: string, permissionIds: string[]) {
   return apiPut<RolePermissionRow[]>(`/rbac/roles/${id}/permissions`, token, { permissionIds });
+}
+
+export function getRoleWidgets(token: string | null, roleId: string) {
+  return apiGet<RoleWidgetAssignment[]>(
+    `/rbac/roles/${roleId}/widgets`,
+    token,
+  );
 }
 
 export function setRoleWidgets(token: string | null, id: string, widgets: { widgetId: string; order: number }[]) {

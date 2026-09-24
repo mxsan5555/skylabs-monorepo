@@ -66,6 +66,8 @@ export function VendorTherapistsStep({
 }: VendorTherapistsStepProps) {
   const { showToast } = useToast();
   const [therapists, setTherapists] = useState<AdminTherapist[]>([]);
+  const [therapyBranches, setTherapyBranches] = useState<Branch[]>([]);
+  const [therapyBranchesLoading, setTherapyBranchesLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingTherapist, setEditingTherapist] = useState<AdminTherapist | null>(null);
@@ -90,6 +92,65 @@ export function VendorTherapistsStep({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, vendorId]);
+
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTherapyBranches = async () => {
+      if (!branches.length || !offersTherapy) {
+        setTherapyBranches([]);
+        setTherapyBranchesLoading(false);
+        return;
+      }
+
+      setTherapyBranchesLoading(true);
+
+      try {
+        const results = await Promise.all(
+          branches.map(async (branch) => {
+            const { data } = await getBranchCategoryAccess(
+              token,
+              vendorId,
+              branch.id,
+            );
+
+            const hasTherapyCategory = data.some(
+              (row) => row.category?.type === 'THERAPY',
+            );
+
+            return {
+              branch,
+              hasTherapyCategory,
+            };
+          }),
+        );
+
+        if (cancelled) return;
+
+        setTherapyBranches(
+          results
+            .filter((result) => result.hasTherapyCategory)
+            .map((result) => result.branch),
+        );
+      } catch {
+        if (cancelled) return;
+
+        setTherapyBranches([]);
+      } finally {
+        if (!cancelled) {
+          setTherapyBranchesLoading(false);
+        }
+      }
+    };
+
+    loadTherapyBranches();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, vendorId, branches, offersTherapy]);
+
 
   // Returns the saved row (like `VendorProductsStep`'s own `save`) so `WizardTherapistFormDialog`
   // can key its `MediaUploader` off a real id right after a fresh create — `load()` separately
@@ -119,7 +180,10 @@ export function VendorTherapistsStep({
     return <p className="empty-state">This vendor has not enabled the Therapy business module in Step 2.</p>;
   }
 
-  const canAdd = canEdit && branches.length > 0;
+  const canAdd =
+    canEdit &&
+    !therapyBranchesLoading &&
+    therapyBranches.length > 0;
 
   return (
     <section aria-label="Therapy">
@@ -137,6 +201,16 @@ export function VendorTherapistsStep({
       {canEdit && branches.length === 0 && (
         <p className="empty-state">Add a branch in Step 2 before adding therapists.</p>
       )}
+
+      {canEdit &&
+        branches.length > 0 &&
+        !therapyBranchesLoading &&
+        therapyBranches.length === 0 && (
+          <p className="empty-state">
+            Enable Therapy for at least one branch in Step 2 before adding
+            therapists.
+          </p>
+        )}
 
       {loading ? (
         <p className="loading-state">Loading therapists…</p>
@@ -181,11 +255,12 @@ export function VendorTherapistsStep({
           dialogRef={addDialogRef}
           vendorId={vendorId}
           token={token}
-          branches={branches}
+          branches={therapyBranches}
           specializationCategories={categories}
           onSave={(input, branchId) => save(input, branchId)}
         />
       )}
+
       {editingTherapist && (
         <WizardTherapistFormDialog
           key={editingTherapist.id}
@@ -234,13 +309,13 @@ function WizardTherapistFormDialog({
   const [form, setForm] = useState<TherapistInput>(
     therapist
       ? {
-          therapistType: therapist.therapistType,
-          personName: therapist.personName,
-          gender: therapist.gender ?? undefined,
-          specialization: therapist.specialization ?? undefined,
-          bio: therapist.bio ?? undefined,
-          experienceYears: therapist.experienceYears ?? undefined,
-        }
+        therapistType: therapist.therapistType,
+        personName: therapist.personName,
+        gender: therapist.gender ?? undefined,
+        specialization: therapist.specialization ?? undefined,
+        bio: therapist.bio ?? undefined,
+        experienceYears: therapist.experienceYears ?? undefined,
+      }
       : { ...EMPTY_INPUT },
   );
   const [branchId, setBranchId] = useState(therapist?.branchId ?? branches[0]?.id ?? '');

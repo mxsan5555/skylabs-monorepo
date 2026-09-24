@@ -49,6 +49,8 @@ export function Dashboard() {
     };
   }, [token]);
 
+  console.log("the data in the stats is", stats);
+
   if (loading) {
     return (
       <div className="admin-page admin-page--wide dashboard-page">
@@ -62,6 +64,8 @@ export function Dashboard() {
     'vendors-count',
     'products-count',
     'orders-recent',
+    'deals-count',
+    'services-coount'
   ];
 
   const widgets = [...(bootstrap?.dashboardWidgets ?? [])]

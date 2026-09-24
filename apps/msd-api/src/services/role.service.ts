@@ -115,6 +115,22 @@ export async function setRolePermissions(roleId: string, permissionIds: string[]
   return prisma.rolePermission.findMany({ where: { roleId }, include: { permission: true } });
 }
 
+/** The dashboard widgets currently assigned to a role. */
+export async function getRoleWidgets(roleId: string) {
+  await getRole(roleId);
+
+  return prisma.roleDashboardWidget.findMany({
+    where: { roleId },
+    select: {
+      widgetId: true,
+      order: true,
+    },
+    orderBy: {
+      order: 'asc',
+    },
+  });
+}
+
 export async function setRoleWidgets(roleId: string, widgets: { widgetId: string; order: number }[]) {
   await getRole(roleId);
   const ids = widgets.map((w) => w.widgetId);

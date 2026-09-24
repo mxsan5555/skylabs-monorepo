@@ -17,7 +17,7 @@ export async function buildBootstrapResponse(claims: AccessTokenPayload): Promis
 
   const roleIds = roles.map((r) => r.id);
   const roleWidgets = await prisma.roleDashboardWidget.findMany({
-    where: { roleId: { in: roleIds } },
+    where: { roleId: { in: roleIds } },v
     include: { widget: true },
     orderBy: { order: 'asc' },
   });
