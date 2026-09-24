@@ -5,7 +5,9 @@
  * `/`, every `/category/<slug>` and every deal-category `/category/<slug>/<city>` into
  * `dist/apps/msd/<route>/index.html`, keeps the untouched template as `spa.html` for the SPA
  * rewrite, and writes sitemap.xml, robots.txt and llms.txt. An unreachable API skips the
- * prerender (the SPA still serves every route) and exits 0. Every data load is bounded by
+ * prerender (the SPA still serves every route) and exits 0, except on a Vercel production build
+ * (`VERCEL_ENV=production`), which exits 1 when the API is down or nothing rendered unless
+ * `PRERENDER_ALLOW_EMPTY=1` (see `./build-policy.ts`). Every data load is bounded by
  * `PRERENDER_TIMEOUT_MS` (default 15000ms, see `withTimeout` in `./timeout.ts`): a timed-out
  * shell load counts as "API unreachable" (crawler files still get written); a timed-out route
  * is skipped with a warning and the rest of the run continues.
@@ -15,6 +17,7 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { PrerenderPayload } from '../src/prerender-data/prerender-data';
 import { withTimeout } from './timeout';
+import { shouldFailBuild } from './build-policy';
 
 type ServerBundle = typeof import('./server-entry');
 
@@ -131,6 +134,14 @@ async function main() {
     warn('VITE_SITE_URL is not set; sitemap.xml, robots.txt and llms.txt need absolute URLs and were skipped');
   }
   log(`prerendered ${rendered.length} routes`);
+
+  const failure = shouldFailBuild({
+    vercelEnv: env.VERCEL_ENV,
+    rendered: rendered.length,
+    apiDown,
+    allowEmpty: env.PRERENDER_ALLOW_EMPTY === '1',
+  });
+  if (failure) throw new Error(`[prerender] ${failure}`);
 }
 
 main().then(
