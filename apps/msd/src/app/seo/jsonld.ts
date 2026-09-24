@@ -84,7 +84,8 @@ export function faqPageJsonLd(faqs: { question: string; answer: string }[]): Jso
   };
 }
 
-/** JSON for an inline <script>: escapes `<` so data can never close the script element. */
+/** JSON for an inline <script>: escapes `<` (and U+2028/U+2029) so data can never close the
+ *  script element. */
 export function serializeJsonLd(data: JsonLdObject | JsonLdObject[]): string {
-  return JSON.stringify(data).replace(/</g, '\\u003c');
+  return JSON.stringify(data).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 }

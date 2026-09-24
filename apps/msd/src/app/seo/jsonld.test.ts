@@ -38,6 +38,13 @@ describe('jsonld builders', () => {
 
   it('serializes safely for an inline script', () => {
     expect(serializeJsonLd({ name: '</script><b>' })).not.toContain('</script>');
+    expect(serializeJsonLd({ name: '</script><b>' })).toContain(String.raw`\u003c/script>`);
+  });
+
+  it('escapes U+2028 and U+2029', () => {
+    const out = serializeJsonLd({ name: 'a\u2028b\u2029c' });
+    expect(out).not.toMatch(/[\u2028\u2029]/);
+    expect(out).toContain(String.raw`a\u2028b\u2029c`);
   });
 });
 

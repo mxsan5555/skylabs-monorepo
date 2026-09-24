@@ -31,9 +31,16 @@ describe('assembleHtml', () => {
   });
 
   it('appends the escaped data script before </body>', () => {
+    expect(body).not.toContain('</script><b>');
     expect(body).toContain(
-      '<script type="application/json" id="__MSD_DATA__">{"shell":{"note":"\u003c/script>\u003cb>"}}</script></body>',
+      String.raw`<script type="application/json" id="__MSD_DATA__">{"shell":{"note":"\u003c/script>\u003cb>"}}</script></body>`,
     );
+  });
+
+  it('escapes U+2028 and U+2029 in the payload', () => {
+    const html = assembleHtml(template, { appHtml: '', payload: { shell: { note: 'a\u2028b\u2029c' } } });
+    expect(html).not.toMatch(/[\u2028\u2029]/);
+    expect(html).toContain(String.raw`a\u2028b\u2029c`);
   });
 
   it('leaves JSON-LD in the body', () => {

@@ -4,8 +4,10 @@ import { PRERENDER_SCRIPT_ID, type PrerenderPayload } from '../src/prerender-dat
  *  matched and stay in the body. */
 const HEAD_TAG = /<title>[\s\S]*?<\/title>|<meta\b[^>]*>|<link\b[^>]*\brel="canonical"[^>]*>/g;
 
-/** Inline JSON safe inside <script>: no `</script>` or `<!--` can close or confuse it. */
-const scriptJson = (value: unknown) => JSON.stringify(value).replace(/</g, '\u003c');
+/** Inline JSON safe inside <script>: `<` becomes the six characters `\u003c`, so no `</script>`
+ *  or `<!--` can close or confuse it; U+2028/U+2029 are escaped for older JS parsers. */
+const scriptJson = (value: unknown) =>
+  JSON.stringify(value).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 
 /** Fills the client build's index.html with one prerendered route. */
 export function assembleHtml(template: string, { appHtml, payload }: { appHtml: string; payload: PrerenderPayload }): string {
