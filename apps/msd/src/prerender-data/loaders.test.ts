@@ -99,3 +99,81 @@ describe('loadCategoryData', () => {
     expect(m.deals).not.toHaveBeenCalled();
   });
 });
+
+describe('payload trimming', () => {
+  const fullDeal = {
+    id: 'd1',
+    title: 'Swedish',
+    slug: 'swedish',
+    shortDescription: 'short',
+    description: 'long text',
+    termsAndConditions: 'terms',
+    notes: 'secret',
+    policy: 'policy',
+    originalPrice: '2000',
+    salePrice: '1500',
+    discountPercent: 25,
+    durationMinutes: 60,
+    images: ['a.jpg'],
+    category: { id: 'c1', name: 'Massage', slug: 'massage', description: 'cat text' },
+    subcategory: { id: 's1', name: 'Swedish', slug: 'swedish', description: null },
+    vendor: { id: 'v1', slug: 'spa', businessName: 'Spa', city: 'Pune', logoUrl: 'l.png' },
+    branch: { id: 'b1', name: 'Main', city: 'Pune', address: '1 Road', latitude: '1', longitude: '2' },
+    packages: [{ id: 'p1', durationMinutes: 60, sellingPrice: '1500', originalPrice: null }],
+    mediaImages: [{ id: 'm1', storageKey: 'k', originalFilename: 'x.jpg', mimeType: 'image/jpeg', sizeBytes: 9, sortOrder: 0, isPrimary: true }],
+    mediaVideo: null,
+    popularTags: [{ id: 't1', name: 'Trending', slug: 'trending' }],
+    distanceKm: null,
+  };
+  const fullTherapist = {
+    id: 't1',
+    therapistType: 'Legs',
+    personName: 'Ramesh',
+    gender: 'M',
+    specialization: 'x',
+    bio: 'long bio',
+    experienceYears: 5,
+    photoUrl: 'p.jpg',
+    packages: [],
+    vendor: fullDeal.vendor,
+    branch: fullDeal.branch,
+  };
+  const fullProduct = {
+    id: 'p1',
+    name: 'Oil',
+    slug: 'oil',
+    brand: 'B',
+    description: 'long product text',
+    summary: 'sum',
+    image: 'o.jpg',
+    imageAlt: 'Oil',
+    price: '100',
+    originalPrice: '120',
+    discount: 10,
+    category: null,
+    subcategory: null,
+    vendor: fullDeal.vendor,
+  };
+
+  it('keeps only the fields the home cards render', async () => {
+    m.deals.mockResolvedValue({ data: [fullDeal] });
+    m.products.mockResolvedValue({ data: [fullProduct] });
+    m.therapists.mockResolvedValue({ data: [fullTherapist] });
+    const home = await loadHomeData();
+    const json = JSON.stringify(home);
+    for (const key of ['notes', 'termsAndConditions', 'policy', 'description', 'shortDescription', 'bio', 'summary', 'address', 'originalFilename']) {
+      expect(json).not.toContain(`"${key}"`);
+    }
+    expect(home.deals[0]).toMatchObject({ id: 'd1', title: 'Swedish', salePrice: '1500', packages: fullDeal.packages });
+    expect(home.deals[0].mediaImages).toEqual([{ storageKey: 'k', sortOrder: 0, isPrimary: true }]);
+    expect(home.therapists[0]).toMatchObject({ id: 't1', personName: 'Ramesh', photoUrl: 'p.jpg' });
+    expect(home.products[0]).toMatchObject({ id: 'p1', name: 'Oil', image: 'o.jpg', price: '100' });
+  });
+
+  it('trims category page deals the same way', async () => {
+    m.deals.mockResolvedValue({ data: [fullDeal] });
+    const data = await loadCategoryData('massage');
+    expect(JSON.stringify(data.deals)).not.toMatch(/"notes"|"termsAndConditions"/);
+    expect(data.deals[0].branch).toEqual({ id: 'b1', name: 'Main', city: 'Pune' });
+  });
+});
