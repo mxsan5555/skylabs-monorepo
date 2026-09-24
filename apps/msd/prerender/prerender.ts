@@ -3,7 +3,8 @@
  *
  * Builds an SSR bundle of `server-entry.ts`, fetches catalog data from PRERENDER_API_URL, renders
  * `/`, every `/category/<slug>` and every deal-category `/category/<slug>/<city>` into
- * `dist/apps/msd/<route>/index.html`, keeps the untouched template as `spa.html` for the SPA
+ * `dist/apps/msd/<route>/index.html`, keeps the untouched template as `spa.html` (served at `/spa` under vercel.json's
+ * `cleanUrls`, which is the SPA rewrite's destination) for the SPA
  * rewrite, and writes sitemap.xml, robots.txt and llms.txt. An unreachable API skips the
  * prerender (the SPA still serves every route) and exits 0, except on a Vercel production build
  * (`VERCEL_ENV=production`), which exits 1 when the API is down or nothing rendered unless
