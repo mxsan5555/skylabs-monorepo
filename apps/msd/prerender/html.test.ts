@@ -43,6 +43,19 @@ describe('assembleHtml', () => {
     expect(html).toContain(String.raw`a\u2028b\u2029c`);
   });
 
+  it('moves only the leading hoisted tags, not a later svg title or itemprop meta', () => {
+    const html = assembleHtml(template, {
+      appHtml:
+        '<title>T</title><meta name="description" content="d"/>' +
+        '<main><svg><title>Icon</title></svg><meta itemprop="price" content="1"/><link rel="canonical" href="/x"/></main>',
+      payload: {},
+    });
+    const [h, b] = html.split('</head>');
+    expect(h).toContain('<title>T</title>');
+    expect(h).not.toContain('Icon');
+    expect(b).toContain('<svg><title>Icon</title></svg><meta itemprop="price" content="1"/><link rel="canonical" href="/x"/>');
+  });
+
   it('leaves JSON-LD in the body', () => {
     expect(body).toContain('<script type="application/ld+json">{"@type":"WebSite"}</script>');
   });

@@ -1,8 +1,10 @@
 import { PRERENDER_SCRIPT_ID, type PrerenderPayload } from '../src/prerender-data/prerender-data';
 
-/** Head tags React 19 hoists to the start of `renderToString` output. JSON-LD scripts are not
- *  matched and stay in the body. */
-const HEAD_TAG = /<title>[\s\S]*?<\/title>|<meta\b[^>]*>|<link\b[^>]*\brel="canonical"[^>]*>/g;
+/** The leading run of head tags React 19 hoists to the start of `renderToString` output. Anchored,
+ *  so a later <title> (inside an inline <svg>) or <meta itemprop> stays in the body, as do JSON-LD
+ *  scripts. */
+const LEADING_HEAD_TAGS = /^(?:\s*(?:<title>[\s\S]*?<\/title>|<meta\b[^>]*>|<link\b[^>]*>))+/;
+const HEAD_TAG = /<title>[\s\S]*?<\/title>|<meta\b[^>]*>|<link\b[^>]*>/g;
 
 /** Inline JSON safe inside <script>: `<` becomes the six characters `\u003c`, so no `</script>`
  *  or `<!--` can close or confuse it; U+2028/U+2029 are escaped for older JS parsers. */
@@ -11,8 +13,9 @@ const scriptJson = (value: unknown) =>
 
 /** Fills the client build's index.html with one prerendered route. */
 export function assembleHtml(template: string, { appHtml, payload }: { appHtml: string; payload: PrerenderPayload }): string {
-  const headTags = appHtml.match(HEAD_TAG) ?? [];
-  const body = appHtml.replace(HEAD_TAG, '');
+  const lead = appHtml.match(LEADING_HEAD_TAGS)?.[0] ?? '';
+  const headTags = lead.match(HEAD_TAG) ?? [];
+  const body = appHtml.slice(lead.length);
   const data = `<script type="application/json" id="${PRERENDER_SCRIPT_ID}">${scriptJson(payload)}</script>`;
   // Function replacers: `$` in page content must not be read as a replacement pattern.
   return template
