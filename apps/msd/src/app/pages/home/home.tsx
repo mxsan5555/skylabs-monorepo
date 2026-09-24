@@ -5,6 +5,7 @@ import type { CatalogDeal } from '../../../api/catalog';
 import { useCatalogShell } from '../../../catalog/catalog-shell';
 import { useVisitorLocation } from '../../../location/location-context';
 import { useWishlist } from '../../../wishlist/wishlist-context';
+import { useHydrated } from '../../../hooks/use-hydrated';
 import { formatINR } from '../../../utils/format';
 import { primaryImage, resolveDealMedia, resolveTherapistMedia } from '../../../utils/media';
 import { CardRail } from '../../components/card-rail/card-rail';
@@ -29,6 +30,8 @@ const { home } = content;
 export function Home() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  // Rendering decisions wait for hydration so they match the prerendered (signed-out) HTML.
+  const signedIn = useHydrated() && isAuthenticated;
   const { toggle, has } = useWishlist();
   const { categories } = useCatalogShell();
   const { status: locationStatus, coords } = useVisitorLocation();
@@ -75,7 +78,7 @@ export function Home() {
       <DealCard
         deal={toDealCardDeal(deal)}
         eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
-        favoriteActive={isAuthenticated && has(deal.id)}
+        favoriteActive={signedIn && has(deal.id)}
         onFavorite={() => handleFavorite(deal.id)}
       />
     </swiper-slide>
@@ -131,7 +134,7 @@ export function Home() {
           </div>
         </section>
       )}
-      <HomeOffers isAuthenticated={isAuthenticated} />
+      <HomeOffers isAuthenticated={signedIn} />
       {ready && catalog.products.length > 0 && (
         <section className="home-band home-band--tint" aria-labelledby="products-heading">
           <div className="home-container">
@@ -146,7 +149,7 @@ export function Home() {
                   <DealCard
                     deal={toProductCardDeal(product)}
                     href={`/products/${product.id}`}
-                    favoriteActive={isAuthenticated && has(product.id)}
+                    favoriteActive={signedIn && has(product.id)}
                     onFavorite={() => handleFavorite(product.id)}
                   />
                 </swiper-slide>

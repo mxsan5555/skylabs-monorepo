@@ -24,6 +24,7 @@ import { DealCard } from '../../components/deal-card';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
+import { useHydrated } from '../../../hooks/use-hydrated';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { formatINR } from '../../../utils/format';
@@ -63,6 +64,8 @@ export function Category() {
   const { slug = '', city: citySlugParam } = useParams<{ slug: string; city?: string }>();
   const navigate = useNavigate();
   const { token, isAuthenticated } = useAuth();
+  // Rendering decisions wait for hydration so they match the prerendered (signed-out) HTML.
+  const signedIn = useHydrated() && isAuthenticated;
   const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
@@ -416,7 +419,7 @@ export function Category() {
                         ? `/vendor/${deal.vendor.slug}`
                         : undefined
                     }
-                    favoriteActive={isWishlisted(deal.id)}
+                    favoriteActive={signedIn && isWishlisted(deal.id)}
                     onFavorite={() => toggleFavorite(deal)}
                     actions={
                       <DealAddToCartDialog
