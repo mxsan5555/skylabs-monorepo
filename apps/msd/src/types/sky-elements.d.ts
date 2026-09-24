@@ -23,6 +23,9 @@ type SkyIconOptions = {
   icon?: string;
   iconStyle?: 'filled' | 'tonal' | 'surface' | 'plain';
   iconShape?: 'none' | 'small' | 'medium' | 'large' | 'full';
+  /** Attribute forms; survive server rendering / prerendering. */
+  'icon-style'?: 'filled' | 'tonal' | 'surface' | 'plain';
+  'icon-shape'?: 'none' | 'small' | 'medium' | 'large' | 'full';
 };
 type SkyFeatureProps = SkySurface &
   SkyIconOptions & {
@@ -31,6 +34,10 @@ type SkyFeatureProps = SkySurface &
     ctaLabel?: string;
     ctaHref?: string;
     ctaIcon?: string;
+    /** Attribute forms; survive server rendering / prerendering. */
+    'cta-label'?: string;
+    'cta-href'?: string;
+    'cta-icon'?: string;
     layout?: 'vertical' | 'horizontal';
   };
 

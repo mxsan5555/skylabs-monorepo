@@ -163,11 +163,11 @@ export function Home() {
           <sky-cta-banner
             color="inverse"
             icon={home.partnerBanner.icon}
-            iconStyle="tonal"
-            iconShape="full"
-            ctaLabel={home.partnerBanner.cta}
-            ctaHref={home.partnerBanner.href}
-            ctaIcon="arrow_forward"
+            icon-style="tonal"
+            icon-shape="full"
+            cta-label={home.partnerBanner.cta}
+            cta-href={home.partnerBanner.href}
+            cta-icon="arrow_forward"
           >
             <h2 id="partner-heading" className="home-partner__title title-large">{home.partnerBanner.heading}</h2>
             <p className="home-partner__text body-large">{home.partnerBanner.body}</p>

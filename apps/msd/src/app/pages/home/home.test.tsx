@@ -283,10 +283,24 @@ describe('Home', () => {
     expect((await screen.findByTestId('location')).textContent).toBe('/explore');
   });
 
-  it('links the welcome offer CTA to /explore', () => {
+  it('links the welcome offer CTA to /explore with a light-DOM link', () => {
     renderHome();
-    const cta = document.querySelector('.home-offer--welcome md-filled-button') as Element & { href?: string };
-    expect(cta.getAttribute('href') ?? cta.href).toBe('/explore');
+    const cta = screen.getByRole('link', { name: content.home.welcomeOffer.cta });
+    expect(cta.getAttribute('href')).toBe('/explore');
+  });
+
+  it('passes banner and feature-card options as kebab-case attributes (survive server rendering)', () => {
+    renderHome();
+    const partner = document.querySelector('sky-cta-banner') as Element;
+    expect(partner.getAttribute('cta-label')).toBe(content.home.partnerBanner.cta);
+    expect(partner.getAttribute('cta-href')).toBe(content.home.partnerBanner.href);
+    expect(partner.getAttribute('cta-icon')).toBe('arrow_forward');
+    expect(partner.getAttribute('icon-style')).toBe('tonal');
+    expect(partner.getAttribute('icon-shape')).toBe('full');
+    const gift = document.querySelector('sky-feature-card.home-offer--gift') as Element;
+    expect(gift.getAttribute('cta-label')).toBe(content.home.giftCard.cta);
+    expect(gift.getAttribute('cta-href')).toBe('/gift-cards');
+    expect(gift.getAttribute('icon-style')).toBe('surface');
   });
 
   it('toggles the wishlist when a signed-in visitor favourites a deal', async () => {

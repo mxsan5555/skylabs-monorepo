@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { Link } from 'react-router-dom';
 import content from '../../../content.json';
 
 const { home } = content;
@@ -15,8 +15,8 @@ export function HomeOffers({ isAuthenticated }: { isAuthenticated: boolean }) {
             <h2 id="offers-heading" className="home-offer__title">{home.welcomeOffer.title}</h2>
             <p className="home-offer__subtitle">{home.welcomeOffer.subtitle}</p>
             <p className="home-offer__text">{home.welcomeOffer.description}</p>
-            {/* Raw tag so `href` is set outside the browser build too (the @lit/react wrapper drops it). */}
-            {createElement('md-filled-button', { href: '/explore' }, home.welcomeOffer.cta)}
+            {/* Light-DOM link so the CTA is real, crawlable HTML in prerendered pages. */}
+            <Link to="/explore" className="home-offer__cta label-large">{home.welcomeOffer.cta}</Link>
           </div>
         </article>
 
@@ -24,22 +24,22 @@ export function HomeOffers({ isAuthenticated }: { isAuthenticated: boolean }) {
           className="home-offer--gift"
           color="primary"
           icon="card_giftcard"
-          iconStyle="surface"
+          icon-style="surface"
           headline={home.giftCard.heading}
           text={home.giftCard.body}
-          ctaLabel={home.giftCard.cta}
-          ctaHref="/gift-cards"
+          cta-label={home.giftCard.cta}
+          cta-href="/gift-cards"
         />
 
         {!isAuthenticated && (
           <sky-feature-card
             color="surface-high"
             icon={home.memberBanner.icon}
-            iconStyle="surface"
+            icon-style="surface"
             headline={home.memberBanner.heading}
             text={home.memberBanner.body}
-            ctaLabel={home.memberBanner.button}
-            ctaHref={home.memberBanner.buttonLink}
+            cta-label={home.memberBanner.button}
+            cta-href={home.memberBanner.buttonLink}
           />
         )}
       </div>
