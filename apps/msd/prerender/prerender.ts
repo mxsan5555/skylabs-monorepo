@@ -5,12 +5,16 @@
  * `/`, every `/category/<slug>` and every deal-category `/category/<slug>/<city>` into
  * `dist/apps/msd/<route>/index.html`, keeps the untouched template as `spa.html` for the SPA
  * rewrite, and writes sitemap.xml, robots.txt and llms.txt. An unreachable API skips the
- * prerender (the SPA still serves every route) and exits 0.
+ * prerender (the SPA still serves every route) and exits 0. Every data load is bounded by
+ * `PRERENDER_TIMEOUT_MS` (default 15000ms, see `withTimeout` in `./timeout.ts`): a timed-out
+ * shell load counts as "API unreachable" (crawler files still get written); a timed-out route
+ * is skipped with a warning and the rest of the run continues.
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { PrerenderPayload } from '../src/prerender-data/prerender-data';
+import { withTimeout } from './timeout';
 
 type ServerBundle = typeof import('./server-entry');
 
@@ -18,6 +22,13 @@ const ROOT = process.cwd(); // nx run-commands runs from the workspace root
 const APP_DIR = resolve(ROOT, 'apps/msd');
 const OUT_DIR = resolve(ROOT, 'dist/apps/msd');
 const SSR_DIR = resolve(ROOT, 'dist/apps/msd-ssr');
+
+// Per-route data-load budget: a hanging PRERENDER_API_URL must not stall the Vercel build.
+const DEFAULT_TIMEOUT_MS = 15000;
+const timeoutMs = (() => {
+  const raw = Number(process.env.PRERENDER_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_TIMEOUT_MS;
+})();
 
 const log = (msg: string) => console.log(`[prerender] ${msg}`);
 const warn = (msg: string) => console.warn(`[prerender] WARN ${msg}`);
@@ -47,7 +58,7 @@ async function main() {
   // Vite inlines import.meta.env at build time, so the API and site URLs go in before the build.
   process.env.VITE_API_URL = apiUrl;
   process.env.VITE_SITE_URL = siteUrl;
-  log(`SSR build (api ${apiUrl || '(none)'}, site ${siteUrl || '(none)'})`);
+  log(`SSR build (api ${apiUrl || '(none)'}, site ${siteUrl || '(none)'}, timeout ${timeoutMs}ms)`);
   await build({
     configFile: join(APP_DIR, 'vite.config.mts'),
     mode: 'production',
@@ -62,8 +73,15 @@ async function main() {
   });
   const bundle = (await import(pathToFileURL(join(SSR_DIR, 'server-entry.mjs')).href)) as ServerBundle;
 
-  const shell = await bundle.loadShellData();
-  const apiDown = !shell.categories.length && !shell.locations.length && !shell.socialLinks.length;
+  let shell: Awaited<ReturnType<typeof bundle.loadShellData>> = { categories: [], locations: [], socialLinks: [] };
+  let apiDown: boolean;
+  try {
+    shell = await withTimeout(bundle.loadShellData(), timeoutMs, 'shell');
+    apiDown = !shell.categories.length && !shell.locations.length && !shell.socialLinks.length;
+  } catch (err) {
+    apiDown = true;
+    warn(`shell data load failed (${(err as Error).message}) from ${apiUrl || '(no API URL)'}`);
+  }
   const rendered: string[] = [];
   let homeHtml: string | undefined;
 
@@ -74,9 +92,9 @@ async function main() {
       let payload: PrerenderPayload;
       try {
         if (!route.slug) {
-          payload = { shell, home: await bundle.loadHomeData() };
+          payload = { shell, home: await withTimeout(bundle.loadHomeData(), timeoutMs, route.path) };
         } else {
-          const data = await bundle.loadCategoryData(route.slug, route.city, route.state);
+          const data = await withTimeout(bundle.loadCategoryData(route.slug, route.city, route.state), timeoutMs, route.path);
           if (!data.category) {
             warn(`${route.path}: category not found, skipped`);
             continue;
