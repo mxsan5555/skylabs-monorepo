@@ -13,17 +13,22 @@ import '@skylabs-monorepo/shared-ui/layout.css';
 import './assets/theme/index.css';
 
 import App from './app/app';
+import { PrerenderDataProvider, readPrerenderPayload } from './prerender-data/prerender-data';
 
 initThemePreference();
 
-const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement,
-);
-
-root.render(
+// A prerendered page (see entry-server.tsx) marks its root and embeds its data; hydrate it from
+// that same data so the first client render matches the server HTML. Every other route mounts fresh.
+const container = document.getElementById('root') as HTMLElement;
+const payload = readPrerenderPayload();
+const app = (
   <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </StrictMode>,
+    <PrerenderDataProvider payload={payload}>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </PrerenderDataProvider>
+  </StrictMode>
 );
+if (container.hasAttribute('data-prerendered')) ReactDOM.hydrateRoot(container, app);
+else ReactDOM.createRoot(container).render(app);
