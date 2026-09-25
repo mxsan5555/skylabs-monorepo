@@ -13,6 +13,15 @@ describe('PriceRangeField', () => {
     expect(document.querySelector('md-slider')).toBeTruthy();
   });
 
+  it('sets the slider start/end aria labels as properties, not raw aria- attributes', () => {
+    render(<PriceRangeField bounds={bounds} value={{}} onChange={vi.fn()} copy={copy} />);
+    const slider = document.querySelector('md-slider') as HTMLElement & { ariaLabelStart?: string; ariaLabelEnd?: string };
+    expect(slider.ariaLabelStart).toBe('Minimum price');
+    expect(slider.ariaLabelEnd).toBe('Maximum price');
+    expect(slider.getAttribute('aria-label-start')).toBeNull();
+    expect(slider.getAttribute('aria-label-end')).toBeNull();
+  });
+
   it('reports a range when the slider changes', () => {
     const onChange = vi.fn();
     render(<PriceRangeField bounds={bounds} value={{}} onChange={onChange} copy={copy} />);

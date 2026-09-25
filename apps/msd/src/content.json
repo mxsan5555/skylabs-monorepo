@@ -542,14 +542,6 @@
       "status": "Showing {shown} of {total}"
     },
     "filters": {
-      "title": "Filters",
-      "price": "Price",
-      "priceValue": "{min} to {max}",
-      "minLabel": "Minimum price",
-      "maxLabel": "Maximum price",
-      "reset": "Reset",
-      "cancel": "Cancel",
-      "apply": "Apply",
       "min": 0,
       "max": 10000,
       "step": 100

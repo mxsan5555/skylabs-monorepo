@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { CatalogCategoryWithChildren } from '../../../api/catalog';
 import type { CatalogShellValue } from '../../../catalog/catalog-shell';
 import content from '../../../content.json';
@@ -14,8 +14,11 @@ const {
   listCatalogDealsMock,
   listCatalogProductsMock,
   listCatalogTherapistsMock,
+  getCatalogDealFacetsMock,
   shellState,
   defaultShell,
+  VENDOR_A,
+  BRANCH_A,
 } = vi.hoisted(() => {
   const defaultShell: CatalogShellValue = {
     status: 'ready',
@@ -31,6 +34,9 @@ const {
     listCatalogDealsMock: vi.fn(),
     listCatalogProductsMock: vi.fn(),
     listCatalogTherapistsMock: vi.fn(),
+    getCatalogDealFacetsMock: vi.fn(),
+    VENDOR_A: '11111111-1111-4111-8111-111111111111',
+    BRANCH_A: '22222222-2222-4222-8222-222222222222',
   };
 });
 
@@ -42,6 +48,7 @@ vi.mock('../../../api/catalog', async () => {
     listCatalogDeals: (...args: unknown[]) => listCatalogDealsMock(...args),
     listCatalogProducts: (...args: unknown[]) => listCatalogProductsMock(...args),
     listCatalogTherapists: (...args: unknown[]) => listCatalogTherapistsMock(...args),
+    getCatalogDealFacets: (...args: unknown[]) => getCatalogDealFacetsMock(...args),
   };
 });
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
@@ -112,15 +119,48 @@ const chip = (label: string) =>
   (Array.from(document.querySelectorAll('md-filter-chip')) as Chip[]).find((c) => (c.label ?? c.getAttribute('label')) === label) as Chip;
 const isSelected = (c: Chip) => c.selected ?? c.hasAttribute('selected');
 
+const FACETS_DEFAULT = {
+  vendors: [{ id: VENDOR_A, name: 'Glow', count: 2 }],
+  branches: [{ id: BRANCH_A, name: 'Main', city: 'Pune', vendorName: 'Glow', count: 2 }],
+  distance: [] as { km: number; count: number }[],
+  price: { min: 299, max: 3499 },
+};
+
+function stubMedia(matches: boolean) {
+  vi.stubGlobal('matchMedia', () => ({
+    matches,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+}
+
+/** Finds a `md-checkbox`/`md-radio` by its adjacent option-row label text (as `CheckboxFacet` and
+ *  the distance list render each option: a raw M3 control + a `.checkbox-facet__label` span). */
+function controlByLabel(tag: string, label: string): (HTMLElement & { checked?: boolean; value?: string }) | undefined {
+  const span = Array.from(document.querySelectorAll('.checkbox-facet__label')).find((s) => s.textContent === label);
+  return (span?.closest('label')?.querySelector(tag) ?? undefined) as (HTMLElement & { checked?: boolean; value?: string }) | undefined;
+}
+
+/** Same as `controlByLabel`, but throws instead of returning `undefined` — for call sites that
+ *  already awaited the control's presence and just want it without a non-null assertion. */
+function requireControl(tag: string, label: string): HTMLElement & { checked?: boolean; value?: string } {
+  const el = controlByLabel(tag, label);
+  if (!el) throw new Error(`No <${tag}> found for label "${label}"`);
+  return el;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   getCatalogCategoryMock.mockResolvedValue({ data: CATEGORY });
   listCatalogDealsMock.mockResolvedValue({ data: [] });
   listCatalogProductsMock.mockResolvedValue({ data: [] });
   listCatalogTherapistsMock.mockResolvedValue({ data: [] });
+  getCatalogDealFacetsMock.mockResolvedValue({ data: FACETS_DEFAULT });
   shellState.value = defaultShell;
   visitor.value = { status: 'none', source: 'none', city: null, state: null, coords: null };
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('Category page ?sub=', () => {
   it('opens on the subcategory named by ?sub=', async () => {
@@ -396,22 +436,111 @@ describe('Category page layout', () => {
     expect(await screen.findByText(`0 ${content.category.resultCount.therapist.plural}`)).toBeTruthy();
   });
 
-  it('applies a price filter from the Filters dialog', async () => {
-    renderAt('/category/massage');
-    await screen.findByRole('group', { name: content.category.toolbar.label });
-    const filters = Array.from(document.querySelectorAll('md-assist-chip')).find(
-      (c) => ((c as HTMLElement & { label?: string }).label ?? c.getAttribute('label')) === content.category.toolbar.filters,
-    ) as HTMLElement;
-    fireEvent.click(filters);
-    const slider = (await waitFor(() => document.querySelector('md-slider'))) as HTMLElement & { valueStart: number; valueEnd: number };
-    slider.valueStart = 500;
-    slider.valueEnd = 2000;
-    fireEvent(slider, new Event('input', { bubbles: true }));
-    fireEvent.click(
-      Array.from(document.querySelectorAll('md-filled-button')).find((b) => b.textContent === content.category.filters.apply) as HTMLElement,
-    );
-    await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage?min=500&max=2000'));
-    await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ minPrice: 500, maxPrice: 2000 })));
+  describe('filter side panel', () => {
+    it('desktop: shows the panel open by default; the Filters button toggles Hide/Show filters', async () => {
+      stubMedia(true);
+      renderAt('/category/massage');
+      await screen.findByRole('group', { name: content.category.toolbar.label });
+      expect(await screen.findByRole('complementary', { name: content.category.filterPanel.title })).toBeTruthy();
+      const toggle = () =>
+        Array.from(document.querySelectorAll('md-text-button')).find(
+          (b) => b.textContent?.includes(content.category.toolbar.hideFilters) || b.textContent?.includes(content.category.toolbar.showFilters),
+        ) as HTMLElement;
+      expect(toggle().textContent).toContain(content.category.toolbar.hideFilters);
+
+      fireEvent.click(toggle());
+      expect(screen.queryByRole('complementary', { name: content.category.filterPanel.title })).toBeNull();
+      expect(toggle().textContent).toContain(content.category.toolbar.showFilters);
+
+      fireEvent.click(toggle());
+      expect(await screen.findByRole('complementary', { name: content.category.filterPanel.title })).toBeTruthy();
+      expect(toggle().textContent).toContain(content.category.toolbar.hideFilters);
+    });
+
+    it('ticking a business checkbox sets ?vendor= and sends vendorIds to both the deals and facets calls', async () => {
+      stubMedia(true);
+      renderAt('/category/massage');
+      await waitFor(() => expect(controlByLabel('md-checkbox', 'Glow')).toBeTruthy());
+      const checkbox = requireControl('md-checkbox', 'Glow');
+      checkbox.checked = true;
+      fireEvent.change(checkbox);
+      await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe(`/category/massage?vendor=${VENDOR_A}`));
+      await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.vendorIds).toEqual([VENDOR_A]));
+      await waitFor(() => expect(getCatalogDealFacetsMock.mock.calls.at(-1)?.[0]?.vendorIds).toEqual([VENDOR_A]));
+    });
+
+    it('ticking a branch checkbox sets ?branch= and sends branchIds', async () => {
+      stubMedia(true);
+      renderAt('/category/massage');
+      await waitFor(() => expect(controlByLabel('md-checkbox', 'Main, Pune')).toBeTruthy());
+      const checkbox = requireControl('md-checkbox', 'Main, Pune');
+      checkbox.checked = true;
+      fireEvent.change(checkbox);
+      await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe(`/category/massage?branch=${BRANCH_A}`));
+      await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.branchIds).toEqual([BRANCH_A]));
+    });
+
+    it('picking a distance radio sets ?radius= and sends radiusKm, with visitor coordinates', async () => {
+      stubMedia(true);
+      visitor.value = { ...visitor.value, status: 'ready', city: 'Gorakhpur', coords: { latitude: 26.76, longitude: 83.37 } };
+      getCatalogDealFacetsMock.mockResolvedValue({ data: { ...FACETS_DEFAULT, distance: [{ km: 5, count: 3 }] } });
+      renderAt('/category/massage');
+      const label = content.category.filterPanel.distance.within.replace('{km}', '5');
+      await waitFor(() => expect(controlByLabel('md-radio', label)).toBeTruthy());
+      fireEvent.change(requireControl('md-radio', label));
+      await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage?radius=5'));
+      await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.radiusKm).toBe(5));
+    });
+
+    it('changing the price slider sets ?min= and ?max=', async () => {
+      stubMedia(true);
+      renderAt('/category/massage');
+      await waitFor(() => expect(document.querySelector('md-slider')).toBeTruthy());
+      const slider = document.querySelector('md-slider') as HTMLElement & { valueStart: number; valueEnd: number };
+      slider.valueStart = 500;
+      slider.valueEnd = 2000;
+      fireEvent.change(slider);
+      await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage?min=500&max=2000'));
+      await waitFor(() =>
+        expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ minPrice: 500, maxPrice: 2000 })),
+      );
+    });
+
+    it('Clear all removes radius, min, max, vendor and branch from the URL', async () => {
+      stubMedia(true);
+      visitor.value = { ...visitor.value, status: 'ready', city: 'Gorakhpur', coords: { latitude: 26.76, longitude: 83.37 } };
+      renderAt(`/category/massage?radius=5&min=500&max=2000&vendor=${VENDOR_A}&branch=${BRANCH_A}`);
+      await screen.findByRole('group', { name: content.category.toolbar.label });
+      const clearAll = Array.from(document.querySelectorAll('md-text-button')).find(
+        (b) => b.textContent === content.category.filterPanel.clearAll,
+      ) as HTMLElement;
+      fireEvent.click(clearAll);
+      await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage'));
+    });
+
+    it('phone: panel closed by default; the Filters button opens it as a dialog', async () => {
+      stubMedia(false);
+      renderAt('/category/massage');
+      await screen.findByRole('group', { name: content.category.toolbar.label });
+      expect(screen.queryByRole('complementary', { name: content.category.filterPanel.title })).toBeNull();
+      expect(screen.queryByRole('dialog', { name: content.category.filterPanel.title })).toBeNull();
+      const filtersButton = Array.from(document.querySelectorAll('md-text-button')).find((b) =>
+        b.textContent?.includes(content.category.toolbar.filters),
+      ) as HTMLElement;
+      fireEvent.click(filtersButton);
+      expect(await screen.findByRole('dialog', { name: content.category.filterPanel.title })).toBeTruthy();
+    });
+
+    it('product category: does not request facets; the panel shows only Price', async () => {
+      stubMedia(true);
+      getCatalogCategoryMock.mockResolvedValue({ data: { ...CATEGORY, type: 'PRODUCT' } });
+      renderAt('/category/massage');
+      await waitFor(() => expect(listCatalogProductsMock).toHaveBeenCalled());
+      const aside = await screen.findByRole('complementary', { name: content.category.filterPanel.title });
+      const sections = Array.from(aside.querySelectorAll('sky-accordion-item')) as (HTMLElement & { header?: string })[];
+      expect(sections.map((s) => s.header ?? s.getAttribute('header'))).toEqual([content.category.filterPanel.price.title]);
+      expect(getCatalogDealFacetsMock).not.toHaveBeenCalled();
+    });
   });
 
   it('switches between list, grid and map views', async () => {

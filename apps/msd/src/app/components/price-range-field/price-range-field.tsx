@@ -75,8 +75,8 @@ export function PriceRangeField({ bounds, value, onChange, copy }: PriceRangeFie
         step: bounds.step,
         'value-start': min,
         'value-end': max,
-        'aria-label-start': copy.minLabel,
-        'aria-label-end': copy.maxLabel,
+        ariaLabelStart: copy.minLabel,
+        ariaLabelEnd: copy.maxLabel,
         onChange: onSliderChange,
       })}
     </div>

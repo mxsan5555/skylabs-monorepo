@@ -4,11 +4,13 @@ import { Icon, FilledButton, OutlinedButton } from '@skylabs-monorepo/shared-ui/
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   getCatalogCategory,
+  getCatalogDealFacets,
   listCatalogDeals,
   listCatalogProducts,
   listCatalogTherapists,
   type CatalogCategoryWithChildren,
   type CatalogDeal,
+  type CatalogDealFacets,
   type CatalogDealSort,
   type CatalogProduct,
   type CatalogTherapist,
@@ -19,6 +21,7 @@ import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { useHydrated } from '../../../hooks/use-hydrated';
+import { useMediaQuery } from '../../../hooks/use-media-query';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { CardGrid } from '../../components/card-grid/card-grid';
 import { PageSection } from '../../components/page-section/page-section';
@@ -29,7 +32,10 @@ import { ListingToolbar } from '../../components/listing-toolbar/listing-toolbar
 import { ChoiceMenu } from '../../components/choice-menu/choice-menu';
 import { ViewSwitch, type ViewOption } from '../../components/view-switch/view-switch';
 import { LoadMore } from '../../components/load-more/load-more';
-import { PriceFilterDialog, type PriceRange } from '../../components/price-filter-dialog/price-filter-dialog';
+import { SidebarLayout } from '../../components/sidebar-layout/sidebar-layout';
+import { FilterPanel } from '../../components/filter-panel/filter-panel';
+import { CityPickerDialog } from '../../components/city-picker-dialog/city-picker-dialog';
+import type { PriceRange } from '../../components/price-range-field/price-range-field';
 import { DealMap, type DealMapPoint } from '../../components/deal-map/deal-map';
 import { usePagedList } from '../../../hooks/use-paged-list';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
@@ -70,6 +76,14 @@ function toPrice(value: string | null): number | undefined {
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** UUID-looking ids from a comma-joined query param (`?vendor=id,id`), invalid entries dropped. */
+function toIds(value: string | null): string[] {
+  if (!value) return [];
+  return value.split(',').filter((v) => UUID_RE.test(v));
+}
+
 /**
  * Category → Sub Category → (Deal | Product | Therapist) discovery page — the customer
  * catalogue's single canonical entry point. Composes PageSection, SectionHead and CardGrid with
@@ -94,7 +108,7 @@ export function Category() {
   const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
-  const { coords } = useVisitorLocation();
+  const { coords, city: visitorCity } = useVisitorLocation();
   const { locationsStatus, locations } = useCatalogShell();
   const cityLocation = citySlugParam ? locations.find((l) => citySlug(l.city) === citySlugParam) : undefined;
   // A prerendered page embeds this slug's (and resolved city's) category + "All" deals. The key
@@ -158,22 +172,12 @@ export function Category() {
   const view = viewParam === 'list' || viewParam === 'map' ? viewParam : 'grid';
   const minPrice = toPrice(searchParams.get('min'));
   const maxPrice = toPrice(searchParams.get('max'));
-  const activeFilters = minPrice != null || maxPrice != null ? 1 : 0;
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const applyPrice = ({ min, max }: PriceRange) => {
-    setFiltersOpen(false);
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        for (const [key, value] of [['min', min], ['max', max]] as const) {
-          if (value == null) next.delete(key);
-          else next.set(key, String(value));
-        }
-        return next;
-      },
-      { replace: true },
-    );
-  };
+  const radius = toPrice(searchParams.get('radius'));
+  const vendorIds = toIds(searchParams.get('vendor'));
+  const branchIds = toIds(searchParams.get('branch'));
+  const activeFilters = [radius != null, minPrice != null || maxPrice != null, vendorIds.length > 0, branchIds.length > 0].filter(
+    Boolean,
+  ).length;
   /** Writes one query param (or removes it when empty), keeping the others. */
   const setParam = (key: string, value: string | undefined) => {
     setSearchParams(
@@ -181,6 +185,20 @@ export function Category() {
         const next = new URLSearchParams(prev);
         if (value) next.set(key, value);
         else next.delete(key);
+        return next;
+      },
+      { replace: true },
+    );
+  };
+  /** Writes several query params at once (or removes ones set to `undefined`), keeping the others. */
+  const setListParams = (patch: Record<string, string | undefined>) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        for (const [key, value] of Object.entries(patch)) {
+          if (value) next.set(key, value);
+          else next.delete(key);
+        }
         return next;
       },
       { replace: true },
@@ -218,9 +236,30 @@ export function Category() {
     pageSize: CATEGORY_PAGE_SIZE,
   };
   // Any change here restarts the list at page 1.
-  const listKey = JSON.stringify([category?.id, activeSubcategory?.id, sort, minPrice, maxPrice, cityLocation?.city, lat, lng]);
+  const listKey = JSON.stringify([
+    category?.id,
+    activeSubcategory?.id,
+    sort,
+    minPrice,
+    maxPrice,
+    cityLocation?.city,
+    lat,
+    lng,
+    radius,
+    vendorIds.join(),
+    branchIds.join(),
+  ]);
   // The prerendered first page only describes the default ("All", unsorted, no location) view.
-  const isDefaultView = !activeSubcategory && !sort && minPrice == null && maxPrice == null && lat == null && lng == null;
+  const isDefaultView =
+    !activeSubcategory &&
+    !sort &&
+    minPrice == null &&
+    maxPrice == null &&
+    lat == null &&
+    lng == null &&
+    radius == null &&
+    vendorIds.length === 0 &&
+    branchIds.length === 0;
   const loadError = (err: unknown) => (err instanceof ApiRequestError ? err.message : t.errors.loadDeals);
   const dealList = usePagedList<CatalogDeal>(
     (page) =>
@@ -234,6 +273,9 @@ export function Category() {
         maxPrice,
         latitude: lat,
         longitude: lng,
+        vendorIds,
+        branchIds,
+        radiusKm: hasCoords ? radius : undefined,
       }),
     listKey,
     {
@@ -280,6 +322,57 @@ export function Category() {
   const dealsLoading = list.status === 'loading';
   const dealsError = list.status === 'error' ? list.error : '';
 
+  // Filter-panel facet counts (business/branch/distance/price) for deal categories only; ignores
+  // stale responses and keeps the previous facets on error so the panel never flashes empty.
+  const [facets, setFacets] = useState<CatalogDealFacets | null>(null);
+  useEffect(() => {
+    if (!category || !isDealCategory(category) || cityPending || cityMissing) return;
+    let cancelled = false;
+    getCatalogDealFacets({
+      categoryId: category.id,
+      subcategoryId: activeSubcategory?.id,
+      city: cityLocation?.city,
+      state: cityLocation?.state,
+      latitude: lat,
+      longitude: lng,
+      radiusKm: hasCoords ? radius : undefined,
+      vendorIds,
+      branchIds,
+      minPrice,
+      maxPrice,
+    })
+      .then(({ data }) => {
+        if (!cancelled) setFacets(data);
+      })
+      .catch(() => {
+        // Keep the previous facets on a failed refetch.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category?.id, activeSubcategory?.id, cityLocation?.city, lat, lng, radius, vendorIds.join(), branchIds.join(), minPrice, maxPrice]);
+
+  // Filter side panel: a column open by default on desktop, a closed side sheet on phones, until
+  // the visitor overrides it (`panelOpen`), which then wins regardless of viewport.
+  const desktop = useMediaQuery('(min-width: 840px)', true);
+  const [panelOpen, setPanelOpen] = useState<boolean | null>(null);
+  const filtersOpen = panelOpen ?? desktop;
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
+  const priceBounds = facets?.price
+    ? {
+        min: Math.floor(facets.price.min / t.filters.step) * t.filters.step,
+        max: Math.ceil(facets.price.max / t.filters.step) * t.filters.step,
+        step: t.filters.step,
+      }
+    : { min: t.filters.min, max: t.filters.max, step: t.filters.step };
+  const onRadius = (km: number | undefined) => setListParams({ radius: km != null ? String(km) : undefined });
+  const onPrice = ({ min, max }: PriceRange) =>
+    setListParams({ min: min != null ? String(min) : undefined, max: max != null ? String(max) : undefined });
+  const onVendors = (ids: string[]) => setListParams({ vendor: ids.length ? ids.join(',') : undefined });
+  const onBranches = (ids: string[]) => setListParams({ branch: ids.length ? ids.join(',') : undefined });
+  const onClearAll = () => setListParams({ radius: undefined, min: undefined, max: undefined, vendor: undefined, branch: undefined });
+
   // Hold the page (and its canonical) until the city resolves, so a city URL never briefly
   // announces itself as the plain category page.
   if (categoryLoading || cityPending) {
@@ -314,15 +407,21 @@ export function Category() {
     ...(activeCity ? [{ name: activeCity.city, path }] : []),
   ];
 
-  const filtersChip = !isTherapyCategory
+  const filtersToggle = !isTherapyCategory
     ? createElement(
-        'md-assist-chip',
+        'md-text-button',
         {
-          label: activeFilters ? t.toolbar.filtersActive.replace('{count}', String(activeFilters)) : t.toolbar.filters,
-          'aria-haspopup': 'dialog',
-          onClick: () => setFiltersOpen(true),
+          'aria-expanded': String(filtersOpen),
+          onClick: () => setPanelOpen(!filtersOpen),
         },
         createElement('md-icon', { slot: 'icon', 'aria-hidden': 'true' }, 'tune'),
+        desktop
+          ? filtersOpen
+            ? t.toolbar.hideFilters
+            : t.toolbar.showFilters
+          : activeFilters
+            ? t.toolbar.filtersActive.replace('{count}', String(activeFilters))
+            : t.toolbar.filters,
       )
     : null;
 
@@ -482,7 +581,7 @@ export function Category() {
       <PageSection tone="tint" stack aria-label={`${category.name} ${t.dealsAriaLabelSuffix}`}>
         <ListingToolbar
           ariaLabel={t.toolbar.label}
-          start={filtersChip ?? undefined}
+          start={filtersToggle ?? undefined}
           end={
             <>
               <ViewSwitch
@@ -505,43 +604,61 @@ export function Category() {
             </>
           }
         />
-        {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
-        {actionError && <p className="error-state" role="alert">{actionError}</p>}
-        {showingMap ? (
-          <>
-            <DealMap points={mapPoints} ariaLabel={t.map.label} loadingLabel={t.map.loading} />
-            {deals.length > mapPoints.length && (
-              <p className="body-medium">
-                {deals.length - mapPoints.length === 1
-                  ? t.map.missingOne
-                  : t.map.missing.replace('{count}', String(deals.length - mapPoints.length))}
-              </p>
-            )}
-          </>
-        ) : (
-          <CardGrid layout={view === 'list' ? 'list' : 'grid'} fallback={fallback}>
-            {cards}
-          </CardGrid>
-        )}
-        {list.status === 'ready' && list.items.length > 0 && (
-          <LoadMore
-            hasMore={list.hasMore}
-            loading={list.loadingMore}
-            error={list.error}
-            status={t.loadMore.status.replace('{shown}', String(list.items.length)).replace('{total}', String(list.total))}
-            onLoadMore={list.loadMore}
-            copy={t.loadMore}
-          />
-        )}
-        {filtersOpen && (
-          <PriceFilterDialog
-            range={{ min: minPrice, max: maxPrice }}
-            bounds={{ min: t.filters.min, max: t.filters.max, step: t.filters.step }}
-            copy={t.filters}
-            onApply={applyPrice}
-            onClose={() => setFiltersOpen(false)}
-          />
-        )}
+        <SidebarLayout
+          open={filtersOpen && !isTherapyCategory}
+          onClose={() => setPanelOpen(false)}
+          sidebarLabel={t.filterPanel.title}
+          closeLabel={t.filterPanel.close}
+          sidebar={
+            <FilterPanel
+              kind={isProductCategory ? 'products' : 'deals'}
+              facets={facets}
+              location={{ city: visitorCity, hasCoords }}
+              onChangeLocation={() => setCityPickerOpen(true)}
+              radiusKm={radius}
+              onRadius={onRadius}
+              price={{ min: minPrice, max: maxPrice }}
+              priceBounds={priceBounds}
+              onPrice={onPrice}
+              vendorIds={vendorIds}
+              onVendors={onVendors}
+              branchIds={branchIds}
+              onBranches={onBranches}
+              onClearAll={onClearAll}
+              copy={t.filterPanel}
+            />
+          }
+        >
+          {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
+          {actionError && <p className="error-state" role="alert">{actionError}</p>}
+          {showingMap ? (
+            <>
+              <DealMap points={mapPoints} ariaLabel={t.map.label} loadingLabel={t.map.loading} />
+              {deals.length > mapPoints.length && (
+                <p className="body-medium">
+                  {deals.length - mapPoints.length === 1
+                    ? t.map.missingOne
+                    : t.map.missing.replace('{count}', String(deals.length - mapPoints.length))}
+                </p>
+              )}
+            </>
+          ) : (
+            <CardGrid layout={view === 'list' ? 'list' : 'grid'} fallback={fallback}>
+              {cards}
+            </CardGrid>
+          )}
+          {list.status === 'ready' && list.items.length > 0 && (
+            <LoadMore
+              hasMore={list.hasMore}
+              loading={list.loadingMore}
+              error={list.error}
+              status={t.loadMore.status.replace('{shown}', String(list.items.length)).replace('{total}', String(list.total))}
+              onLoadMore={list.loadMore}
+              copy={t.loadMore}
+            />
+          )}
+        </SidebarLayout>
+        {cityPickerOpen && <CityPickerDialog onClose={() => setCityPickerOpen(false)} />}
       </PageSection>
     </>
   );
