@@ -1,0 +1,32 @@
+/* Card grid. 272px = card-rail slide width, so grid and rail cards match. 840px = M3 expanded. */
+.card-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+/* Tabs above the grid sit on the band's own tone. */
+.card-grid > md-tabs {
+  background-color: transparent;
+  --md-secondary-tab-container-color: transparent;
+}
+.card-grid__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(272px, 100%), 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card-grid__item {
+  display: flex;
+  min-inline-size: 0;
+}
+.card-grid__item > * {
+  flex: 1;
+  min-inline-size: 0;
+}
+@media (min-width: 840px) {
+  .card-grid__list {
+    gap: 20px;
+  }
+}
