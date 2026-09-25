@@ -1,6 +1,6 @@
-import { createElement, useEffect, useRef, useState } from 'react';
+import { createElement, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Icon, FilledButton, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
+import { Icon, FilledButton, OutlinedButton, TextButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   getCatalogCategory,
@@ -28,6 +28,7 @@ import { ListingToolbar } from '../../components/listing-toolbar/listing-toolbar
 import { ChoiceMenu } from '../../components/choice-menu/choice-menu';
 import { LoadMore } from '../../components/load-more/load-more';
 import { PriceFilterDialog, type PriceRange } from '../../components/price-filter-dialog/price-filter-dialog';
+import { DealMap, type DealMapPoint } from '../../components/deal-map/deal-map';
 import { useCustomEvent } from '../../../hooks/use-custom-event';
 import { usePagedList } from '../../../hooks/use-paged-list';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
@@ -111,6 +112,7 @@ export function Category() {
   const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
+  const [view, setView] = useState<'grid' | 'map'>('grid');
   const { coords } = useCurrentLocation();
   const { locationsStatus, locations } = useCatalogShell();
   const cityLocation = citySlugParam ? locations.find((l) => citySlug(l.city) === citySlugParam) : undefined;
@@ -274,6 +276,17 @@ export function Category() {
   const deals = dealList.items;
   const products = productList.items;
   const therapists = therapistList.items;
+  const mapPoints = useMemo<DealMapPoint[]>(
+    () =>
+      deals.flatMap((d) =>
+        d.branch?.latitude != null && d.branch?.longitude != null
+          ? [{ id: d.id, lat: Number(d.branch.latitude), lng: Number(d.branch.longitude), label: formatINR(Number(d.salePrice)), title: d.title, href: `/deal/${d.id}` }]
+          : [],
+      ),
+    [deals],
+  );
+  const showMapToggle = !!category && isDealCategory(category) && mapPoints.length > 0;
+  const showingMap = view === 'map' && showMapToggle;
   const dealsLoading = list.status === 'loading';
   const dealsError = list.status === 'error' ? list.error : '';
 
@@ -494,6 +507,14 @@ export function Category() {
           end={
             <>
               <SearchField value={search} placeholder={t.search.placeholder.replace('{category}', category.name)} onSearch={setSearch} />
+              {showMapToggle && (
+                <TextButton onClick={() => setView(showingMap ? 'grid' : 'map')}>
+                  <Icon slot="icon" aria-hidden="true">
+                    {showingMap ? 'grid_view' : 'map'}
+                  </Icon>
+                  {showingMap ? t.toolbar.showGrid : t.toolbar.showMap}
+                </TextButton>
+              )}
               {!isTherapyCategory && (
                 <ChoiceMenu
                   trigger="text"
@@ -510,7 +531,20 @@ export function Category() {
         />
         {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
         {actionError && <p className="error-state" role="alert">{actionError}</p>}
-        <CardGrid fallback={fallback}>{cards}</CardGrid>
+        {showingMap ? (
+          <>
+            <DealMap points={mapPoints} ariaLabel={t.map.label} loadingLabel={t.map.loading} />
+            {deals.length > mapPoints.length && (
+              <p className="body-medium">
+                {deals.length - mapPoints.length === 1
+                  ? t.map.missingOne
+                  : t.map.missing.replace('{count}', String(deals.length - mapPoints.length))}
+              </p>
+            )}
+          </>
+        ) : (
+          <CardGrid fallback={fallback}>{cards}</CardGrid>
+        )}
         {list.status === 'ready' && list.items.length > 0 && (
           <LoadMore
             hasMore={list.hasMore}

@@ -61,6 +61,9 @@ vi.mock('../../seo/site-url', () => ({
 vi.mock('../../../hooks/useCurrentLocation', () => ({
   useCurrentLocation: () => ({ location: null, coords: null }),
 }));
+vi.mock('../../components/deal-map/deal-map', () => ({
+  DealMap: ({ points }: { points: unknown[] }) => <div data-testid="deal-map">{points.length}</div>,
+}));
 
 const CATEGORY: CatalogCategoryWithChildren = {
   id: 'c1',
@@ -422,5 +425,21 @@ describe('Category page layout', () => {
     );
     await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage?min=500&max=2000'));
     await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ minPrice: 500, maxPrice: 2000 })));
+  });
+
+  it('toggles a map of the loaded deals that have coordinates', async () => {
+    listCatalogDealsMock.mockResolvedValue({
+      data: [
+        deal('d1', { branch: { id: 'b1', name: 'Main', city: 'Pune', address: null, latitude: '18.52', longitude: '73.85' } }),
+        deal('d2'),
+      ],
+      meta: { total: 2 },
+    });
+    renderAt('/category/massage');
+    await screen.findByText(`2 ${content.category.dealCount.plural}`);
+    const toggle = Array.from(document.querySelectorAll('md-text-button')).find((b) => b.textContent?.includes(content.category.toolbar.showMap)) as HTMLElement;
+    fireEvent.click(toggle);
+    expect((await screen.findByTestId('deal-map')).textContent).toBe('1');
+    expect(screen.getByText(content.category.map.missingOne)).toBeTruthy();
   });
 });

@@ -35,7 +35,7 @@ import { resolveDealMedia, primaryImage } from '../../../utils/media';
 import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import content from '../../../content.json';
 import './search.css';
-import { Map } from '../../components/map';
+import { DealMap } from '../../components/deal-map/deal-map';
 
 const { search: searchContent } = content;
 
@@ -236,7 +236,9 @@ export function Search() {
     id: deal.id,
     lat: Number(deal.branch.latitude),
     lng: Number(deal.branch.longitude),
-    price: Number(deal.salePrice),
+    label: formatINR(Number(deal.salePrice)),
+    title: deal.title,
+    href: `/deal/${deal.id}`,
   }));
 
   return (
@@ -503,8 +505,8 @@ export function Search() {
                   <p className="search-page__empty">{searchContent.noResults}</p>
                 ) : (
                   <>
-                    <div className="search-map__canvas" role="img" aria-label={searchContent.results.mapImageLabel}>
-                      <Map deals={mappableDeals} />
+                    <div className="search-map__canvas">
+                      <DealMap points={mappableDeals} ariaLabel={searchContent.results.mapImageLabel} loadingLabel={searchContent.results.mapImageLabel} />
                     </div>
                     <div className="search-map__sidebar">
                       <p className="search-map__sidebar-count">{mappableDeals.length}  {searchContent.results.mapResultsSuffix}</p>
