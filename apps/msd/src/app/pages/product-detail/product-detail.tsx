@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Divider, FilledButton, Icon, OutlinedIconButton, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import { getCatalogProduct, listCatalogProducts, type CatalogProduct, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
@@ -25,6 +26,7 @@ const SITE_URL = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
 export function ProductDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { token, isAuthenticated } = useAuth();
   const [product, setProduct] = useState<CatalogProduct | null>(null);
   const [loading, setLoading] = useState(true);
@@ -122,9 +124,7 @@ export function ProductDetail() {
       return true;
     }
 
-    navigate(
-      `/sign-in?next=${encodeURIComponent(`/products/${id}`)}`,
-    );
+    navigate(signInPathWithReturnTo(location));
 
     return false;
   };

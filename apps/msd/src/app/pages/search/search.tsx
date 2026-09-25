@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
-import { useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { useSearchParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   OutlinedTextField,
   OutlinedSelect,
@@ -21,6 +21,7 @@ import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import {
   listCatalogCategories,
   listCatalogDeals,
@@ -65,6 +66,7 @@ type ActiveDialog = 'price' | 'category' | 'location' | null;
  */
 export function Search() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated } = useAuth();
   const [params, setParams] = useSearchParams();
   const [view, setView] = useState<View>('list');
@@ -275,8 +277,7 @@ export function Search() {
 
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
-    const query = params.toString();
-    navigate(`/sign-in?next=${encodeURIComponent(`/explore${query ? `?${query}` : ''}`)}`);
+    navigate(signInPathWithReturnTo(location));
     return false;
   };
 

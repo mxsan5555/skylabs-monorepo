@@ -1,9 +1,16 @@
-import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  FilledButton,
+  Icon,
+  OutlinedIconButton,
+  SecondaryTab,
+  Tabs,
+} from '@skylabs-monorepo/shared-ui/react';
+import '@skylabs-monorepo/shared-ui/carousel';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import type { CatalogDeal } from '../../../api/catalog';
-import { useCatalogShell } from '../../../catalog/catalog-shell';
-import { useVisitorLocation } from '../../../location/location-context';
+import { formatINR } from '../../../utils/format';
+import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { useHydrated } from '../../../hooks/use-hydrated';
 import { formatINR } from '../../../utils/format';
@@ -30,6 +37,7 @@ const { home } = content;
 
 export function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated } = useAuth();
   // Rendering decisions wait for hydration so they match the prerendered (signed-out) HTML.
   const signedIn = useHydrated() && isAuthenticated;
@@ -68,7 +76,7 @@ export function Home() {
 
   const handleFavorite = (id: string) => {
     if (!isAuthenticated) {
-      navigate('/sign-in');
+      navigate(signInPathWithReturnTo(location));
       return;
     }
     toggle(id);
