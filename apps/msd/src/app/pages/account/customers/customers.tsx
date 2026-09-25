@@ -109,7 +109,6 @@ export function CustomerManagement() {
     setActiveTab(0);
     loadDetail();
   }, [loadDetail]);
-
   /** Fired from the customer-list actions column (`customer-list.tsx`'s row-action handler
    *  already resolved the clicked action to a target status and guarded the no-op case). Only
    *  updates local state after the API call resolves — never optimistically — so a failed

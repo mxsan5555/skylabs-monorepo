@@ -1,0 +1,295 @@
+/* Site header. Colours: app theme (--md-sys-color-*); shape/type/motion/elevation: shared-ui
+   theme/base.css. 840px is the M3 "expanded" window-size class (media queries cannot read
+   custom properties).
+
+   Desktop layout: row 1 is the sticky header's only in-flow content. The category strip is
+   absolutely positioned just below it, in space the header reserves with its bottom margin, so
+   hiding the strip (sliding it up under row 1) never changes any element's layout box: no page
+   reflow, and scroll anchoring cannot oscillate. */
+
+.site-skip {
+  position: fixed;
+  inset-inline-start: 8px;
+  inset-block-start: -100px;
+  z-index: 100;
+  padding: 12px 16px;
+  border-radius: var(--md-sys-shape-corner-small);
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+.site-skip:focus {
+  inset-block-start: 8px;
+}
+
+.site-header {
+  /* Row 1 height and strip height (desktop); the mega panel's max height derives from both. */
+  --site-header-top-size: 64px;
+  --site-header-strip-size: 56px;
+  --site-header-strip-link-size: 40px;
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 50;
+}
+
+/* <main tabindex="-1"> takes focus from the skip link; no ring for pointer-initiated focus. */
+.app-main:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.site-header__top {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'brand city'
+    'search search';
+  align-items: center;
+  gap: 8px 12px;
+  position: relative;
+  z-index: 1;
+  /* Full-bleed surface (the strip slides beneath it) with content centred at 1280px. */
+  padding: 8px max(16px, calc((100% - 1280px) / 2 + 16px));
+  background-color: var(--md-sys-color-surface);
+  border-block-end: 1px solid var(--md-sys-color-outline-variant);
+}
+.site-header__brand {
+  grid-area: brand;
+  display: inline-flex;
+  border-radius: var(--md-sys-shape-corner-small);
+}
+.site-header__logo {
+  block-size: 40px;
+  inline-size: auto;
+}
+.site-header__search {
+  grid-area: search;
+}
+.city-chip {
+  grid-area: city;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-block-size: 48px;
+  max-inline-size: 60vw;
+  padding-inline: 12px 16px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-corner-full);
+  background-color: transparent;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+  --md-icon-size: 20px;
+}
+.city-chip__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.city-chip:hover,
+.category-strip__all:hover,
+.category-strip__link:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--md-sys-color-on-surface) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+    transparent
+  );
+}
+
+.site-header :is(a, button):focus-visible,
+.site-skip:focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.header-actions,
+.category-strip {
+  display: none;
+}
+
+.city-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.city-dialog__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-block-size: 50vh;
+  overflow-y: auto;
+}
+.city-dialog__option {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  inline-size: 100%;
+  min-block-size: 48px;
+  padding-inline: 12px;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+  text-align: start;
+}
+.city-dialog__option[aria-current='true'] {
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.city-dialog__state {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+@media (min-width: 840px) {
+  .site-header__top {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: 'brand city search actions';
+    gap: 16px;
+    min-block-size: var(--site-header-top-size);
+    padding-block: 8px;
+  }
+  .site-header {
+    margin-block-end: var(--site-header-strip-size);
+  }
+  .site-header__logo {
+    block-size: 48px;
+  }
+  .site-header__search {
+    max-inline-size: 640px;
+  }
+  .header-actions {
+    grid-area: actions;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .header-actions__member {
+    padding: 12px;
+    color: var(--md-sys-color-primary);
+    text-decoration: none;
+  }
+  .header-actions__member:hover {
+    text-decoration: underline;
+  }
+  .header-actions__counted {
+    position: relative;
+    display: inline-flex;
+  }
+  .header-actions__badge {
+    position: absolute;
+    inset-block-start: -2px;
+    inset-inline-end: -2px;
+    pointer-events: none;
+  }
+
+  .category-strip {
+    display: block;
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 100%;
+    block-size: var(--site-header-strip-size);
+    box-sizing: border-box;
+    background-color: var(--md-sys-color-surface);
+    border-block-end: 1px solid var(--md-sys-color-outline-variant);
+    transition:
+      translate var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard),
+      opacity var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+  }
+  /* Slide up under row 1 while scrolling down, unless the strip holds focus or its panel is open. */
+  .site-header--compact .category-strip:not(:focus-within, :has(> .mega-panel:not([hidden]))) {
+    translate: 0 -100%;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .category-strip__inner {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    max-inline-size: 1280px;
+    block-size: 100%;
+    margin-inline: auto;
+    padding-inline: 8px 16px;
+  }
+  .category-strip__all,
+  .category-strip__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-block-size: var(--site-header-strip-link-size);
+    padding-inline: 12px;
+    border: 0;
+    border-radius: var(--md-sys-shape-corner-full);
+    background: transparent;
+    color: var(--md-sys-color-on-surface-variant);
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    --md-icon-size: 20px;
+  }
+  .category-strip__all {
+    color: var(--md-sys-color-primary);
+  }
+  .category-strip__all[aria-expanded='true'] .category-strip__chevron {
+    transform: rotate(180deg);
+  }
+  .category-strip__chevron {
+    transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+  }
+  .category-strip__link.active {
+    color: var(--md-sys-color-on-secondary-container);
+    background-color: var(--md-sys-color-secondary-container);
+  }
+  /* Scrolls sideways instead of clipping, so no link is focusable yet invisible (the browser
+     scrolls a focused link into view); the padding leaves room for the focus outline. */
+  .category-strip__links {
+    display: flex;
+    flex: 1;
+    min-inline-size: 0;
+    gap: 4px;
+    margin: 0;
+    padding: 0 8px;
+    padding-block: calc((var(--site-header-strip-size) - var(--site-header-strip-link-size)) / 2);
+    list-style: none;
+    overflow-x: auto;
+    scroll-padding-inline: 8px;
+    scrollbar-width: none;
+  }
+
+  .mega-panel {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 100%;
+    max-block-size: calc(100dvh - var(--site-header-top-size) - var(--site-header-strip-size));
+    overflow-y: auto;
+    background-color: var(--md-sys-color-surface-container-low);
+    border-block-end: 1px solid var(--md-sys-color-outline-variant);
+    box-shadow: var(--sky-elevation-2);
+  }
+  .mega-panel__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 24px;
+    max-inline-size: 1280px;
+    margin-inline: auto;
+    padding: 24px 16px;
+  }
+  .mega-panel__heading {
+    color: var(--md-sys-color-on-surface);
+    text-decoration: none;
+  }
+  .mega-panel__list {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .mega-panel__link {
+    display: block;
+    padding-block: 6px;
+    color: var(--md-sys-color-on-surface-variant);
+    text-decoration: none;
+  }
+  .mega-panel__heading:hover,
+  .mega-panel__link:hover {
+    color: var(--md-sys-color-primary);
+    text-decoration: underline;
+  }
+}

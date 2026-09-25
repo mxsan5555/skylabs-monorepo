@@ -17,14 +17,31 @@ import { NotificationBell } from '../components/notification-bell';
  */
 export function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { bootstrap, isPreviewing, returnToSuperAdmin } = useAuth();
+  console.log('PREVIEW BOOTSTRAP:', {
+  isPreviewing,
+  roles: bootstrap?.roles,
+  permissions: bootstrap?.permissions,
+  menu: bootstrap?.menu,
+});
   const current = findMenuNodeByRoute(bootstrap?.menu ?? [], location.pathname);
 
   return (
     <AccountProvider>
       <div className={`admin-layout${collapsed ? ' is-collapsed' : ''}`}>
-        <Sidebar />
+        <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+
+        {mobileOpen && (
+          <button
+            type="button"
+            className="admin-sidebar-backdrop"
+            aria-label="Close navigation"
+            onClick={() => setMobileOpen(false)}
+          />
+        )}
+
         <div className="admin-main">
           {isPreviewing && (
             <div className="preview-banner" role="status">
@@ -37,17 +54,34 @@ export function AdminLayout() {
           )}
           <div className="admin-topbar">
             <IconButton
-              aria-label={collapsed ? 'Show sidebar' : 'Hide sidebar'}
-              onClick={() => setCollapsed((c) => !c)}
+              className="admin-sidebar-toggle"
+              aria-label={
+                mobileOpen
+                  ? 'Close navigation'
+                  : collapsed
+                    ? 'Show navigation'
+                    : 'Hide navigation'
+              }
+              onClick={() => {
+                if (window.innerWidth <= 767) {
+                  setMobileOpen((open) => !open);
+                } else {
+                  setCollapsed((c) => !c);
+                }
+              }}
             >
-              <Icon aria-hidden="true">dock_to_right</Icon>
+              <Icon aria-hidden="true">
+                {mobileOpen ? 'close' : 'dock_to_right'}
+              </Icon>
             </IconButton>
+
             <nav aria-label="Breadcrumb">
               <ol className="admin-breadcrumb">
                 <li>Account</li>
                 {current && <li aria-current="page">{current.title}</li>}
               </ol>
             </nav>
+
             <NotificationBell />
           </div>
           <main className="admin-content">

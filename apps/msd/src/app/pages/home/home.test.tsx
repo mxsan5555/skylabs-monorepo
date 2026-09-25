@@ -1,36 +1,39 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { CatalogCategoryWithChildren, CatalogDeal } from '../../../api/catalog';
-
-const listCatalogCategoriesMock = vi.fn();
-const listCatalogDealsMock = vi.fn();
-
-vi.mock('../../../api/catalog', async () => {
-  const actual = await vi.importActual<typeof import('../../../api/catalog')>('../../../api/catalog');
-  return {
-    ...actual,
-    listCatalogCategories: (...args: unknown[]) => listCatalogCategoriesMock(...args),
-    listCatalogDeals: (...args: unknown[]) => listCatalogDealsMock(...args),
-    listCatalogProducts: () => Promise.resolve({ data: [] }),
-    listCatalogTherapists: () => Promise.resolve({ data: [] }),
-    listCatalogFaqs: () => Promise.resolve({ data: [] }),
-  };
-});
-
-vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
-  useAuth: () => ({ isAuthenticated: false, token: null }),
-}));
-
-vi.mock('../../../wishlist/wishlist-context', () => ({
-  useWishlist: () => ({ toggle: vi.fn(), has: () => false }),
-}));
-
-vi.mock('../../../hooks/useCurrentLocation', () => ({
-  useCurrentLocation: () => ({ location: null }),
-}));
-
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+import type { CatalogCategoryWithChildren, CatalogDeal, CatalogProduct, CatalogTherapist } from '../../../api/catalog';
+import content from '../../../content.json';
 import { Home } from './home';
+
+const m = vi.hoisted(() => ({
+  deals: vi.fn(),
+  products: vi.fn(),
+  therapists: vi.fn(),
+  faqs: vi.fn(),
+  categories: [] as unknown[],
+  location: { status: 'ready', coords: null as null | { latitude: number; longitude: number } },
+  auth: { isAuthenticated: false, token: null as string | null },
+  toggle: vi.fn(),
+}));
+
+vi.mock('../../../api/catalog', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/catalog')>()),
+  listCatalogDeals: (...a: unknown[]) => m.deals(...a),
+  listCatalogProducts: (...a: unknown[]) => m.products(...a),
+  listCatalogTherapists: (...a: unknown[]) => m.therapists(...a),
+  listCatalogFaqs: (...a: unknown[]) => m.faqs(...a),
+}));
+vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../catalog/catalog-shell')>()),
+  useCatalogShell: () => ({ status: 'ready', locationsStatus: 'ready', categories: m.categories, locations: [], socialLinks: [] }),
+}));
+vi.mock('../../../location/location-context', () => ({ useVisitorLocation: () => m.location }));
+vi.mock('@skylabs-monorepo/shared-auth/react', () => ({ useAuth: () => m.auth }));
+vi.mock('../../../wishlist/wishlist-context', () => ({ useWishlist: () => ({ toggle: m.toggle, has: () => false }) }));
+vi.mock('../../seo/site-url', () => ({
+  SITE_URL: 'https://example.test',
+  absoluteUrl: (p: string) => new URL(p, 'https://example.test/').toString(),
+}));
 
 function cat(overrides: Partial<CatalogCategoryWithChildren>): CatalogCategoryWithChildren {
   return {
@@ -66,127 +69,311 @@ function deal(overrides: Partial<CatalogDeal>): CatalogDeal {
   } as CatalogDeal;
 }
 
-function renderHome() {
-  return render(
+const MASSAGE = { id: 'c-m', name: 'Massage', slug: 'massage', description: null };
+const SPA = { id: 'c-s', name: 'Spa', slug: 'spa-retreats', description: null };
+const FAQ = { id: 'f1', question: 'Can I cancel a booking?', answer: 'Yes, up to 24 hours before.' };
+
+const THERAPIST = {
+  id: 't1',
+  personName: 'Asha',
+  therapistType: 'Physiotherapist',
+  packages: [],
+  vendor: null,
+  branch: null,
+} as unknown as CatalogTherapist;
+const PRODUCT = {
+  id: 'p1',
+  name: 'Massage Oil',
+  slug: 'massage-oil',
+  image: null,
+  imageAlt: null,
+  price: '499',
+  originalPrice: null,
+  discount: null,
+  vendor: null,
+} as unknown as CatalogProduct;
+
+function LocationProbe() {
+  const { pathname, search } = useLocation();
+  return <p data-testid="location">{pathname + search}</p>;
+}
+
+function HomeRoutes() {
+  return (
     <MemoryRouter>
-      <Home />
-    </MemoryRouter>,
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/sign-in" element={<p>Sign-in page</p>} />
+        <Route path="/explore" element={<LocationProbe />} />
+      </Routes>
+    </MemoryRouter>
   );
 }
 
+function renderHome() {
+  return render(<HomeRoutes />);
+}
+
+const dealsSection = () => document.querySelector('section[aria-labelledby="deals-heading"]') as HTMLElement;
+
 beforeEach(() => {
   vi.clearAllMocks();
+  m.categories = [
+    cat({
+      ...MASSAGE,
+      children: [
+        { id: 'c-m-1', name: 'Swedish', slug: 'swedish', description: null },
+        { id: 'c-m-2', name: 'Thai', slug: 'thai', description: null },
+      ],
+    }),
+    cat({ ...SPA }),
+    cat({ id: 'c-h', name: 'Hair', slug: 'hair-nails', children: [{ id: 'c-h-1', name: 'Cut', slug: 'cut', description: null }] }),
+  ];
+  m.deals.mockResolvedValue({
+    data: [
+      deal({ id: 'd1', title: 'Full Body Massage', category: MASSAGE, images: ['https://cdn.test/d1.jpg'] }),
+      deal({ id: 'd2', title: 'Foot Massage', category: MASSAGE }),
+      deal({ id: 'd3', title: 'Weekend Spa', category: SPA }),
+    ],
+  });
+  m.products.mockResolvedValue({ data: [] });
+  m.therapists.mockResolvedValue({ data: [] });
+  m.faqs.mockResolvedValue({ data: [FAQ] });
+  m.location = { status: 'ready', coords: null };
+  m.auth = { isAuthenticated: false, token: null };
 });
 
-/**
- * Feature: Home page — "popular category" carousels
- * Scenario: sections are driven by real `PopularTag` assignments (a category counts as
- * "popular" once it has at least one `popularTags` entry), not the old `Category.isPopular`
- * boolean, and not the older hardcoded keyword-matching table (`MOCK_CATEGORY_MATCH`), both of
- * which have been deleted entirely.
- *
- * Given: the catalog returns categories, some with a non-empty `popularTags` array
- * When: the home page loads
- * Then: one carousel section renders per popular category (sorted by sortOrder), each showing
- *       only deals whose `category.id` matches that category — non-popular categories get no
- *       dedicated carousel
- *
- * Edge cases:
- * - a popular category with zero matching deals renders no section for it (no empty carousel)
- * - the catalog fetch fails -> a page-level error state, not a crash
- */
-describe('Home — popular-category-driven sections', () => {
-  it('renders a section per popular category, ordered by sortOrder, using real category data', async () => {
-    const categories = [
-      cat({ id: 'cat-massage', name: 'Massage', slug: 'massage', popularTags: [{ id: 'tag-massage', name: 'Trending', slug: 'trending' }], sortOrder: 2 }),
-      cat({ id: 'cat-spa', name: 'Spa Days', slug: 'spa-days', popularTags: [{ id: 'tag-spa', name: 'Trending', slug: 'trending' }], sortOrder: 1 }),
-      cat({ id: 'cat-facial', name: 'Facials', slug: 'facials', popularTags: [], sortOrder: 3 }),
-    ];
-    const deals = [
-      deal({ id: 'd1', title: 'Full Body Massage', category: { id: 'cat-massage', name: 'Massage', slug: 'massage', description: null } }),
-      deal({ id: 'd2', title: 'Weekend Spa', category: { id: 'cat-spa', name: 'Spa Days', slug: 'spa-days', description: null } }),
-      deal({ id: 'd3', title: 'Deep Cleanse Facial', category: { id: 'cat-facial', name: 'Facials', slug: 'facials', description: null } }),
-    ];
-    listCatalogCategoriesMock.mockResolvedValue({ data: categories });
-    listCatalogDealsMock.mockResolvedValue({ data: deals });
-
+describe('Home', () => {
+  it('renders the static sections at once and a busy deals placeholder while the catalog loads', () => {
+    m.deals.mockReturnValue(new Promise(() => undefined));
     renderHome();
-
-    // Each popular category gets its own dedicated section, addressable by a stable
-    // `popular-category-<id>-heading` id — this is unambiguous even though the plain "Browse by
-    // Category" grid elsewhere on the page also renders an <h3> with the same category name.
-    await waitFor(() => expect(document.getElementById('popular-category-cat-spa-heading')).toBeTruthy());
-    const spaHeading = document.getElementById('popular-category-cat-spa-heading')!;
-    const massageHeading = document.getElementById('popular-category-cat-massage-heading')!;
-    expect(spaHeading.textContent).toBe('Spa Days');
-    expect(massageHeading.textContent).toBe('Massage');
-    // "Spa Days" (sortOrder 1) renders before "Massage" (sortOrder 2).
-    expect(
-      spaHeading.compareDocumentPosition(massageHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-
-    // "Facials" isn't popular, so it never gets its own dedicated carousel section.
-    expect(document.getElementById('popular-category-cat-facial-heading')).toBeNull();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'Massage' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: content.home.howItWorks.heading })).toBeTruthy();
+    const status = within(dealsSection()).getByRole('status');
+    expect(status.getAttribute('aria-busy')).toBe('true');
+    expect(screen.queryByRole('heading', { level: 2, name: content.home.faq.heading })).toBeNull();
   });
 
-  it('shows the Massage deal card only inside the Massage carousel, not the Spa one (category-filtered)', async () => {
-    const categories = [
-      cat({ id: 'cat-massage', name: 'Massage', slug: 'massage', popularTags: [{ id: 'tag-massage', name: 'Trending', slug: 'trending' }], sortOrder: 1 }),
-      cat({ id: 'cat-spa', name: 'Spa Days', slug: 'spa-days', popularTags: [{ id: 'tag-spa', name: 'Trending', slug: 'trending' }], sortOrder: 2 }),
-    ];
-    const deals = [
-      deal({ id: 'd1', title: 'Full Body Massage', category: { id: 'cat-massage', name: 'Massage', slug: 'massage', description: null } }),
-      deal({ id: 'd2', title: 'Weekend Spa', category: { id: 'cat-spa', name: 'Spa Days', slug: 'spa-days', description: null } }),
-    ];
-    listCatalogCategoriesMock.mockResolvedValue({ data: categories });
-    listCatalogDealsMock.mockResolvedValue({ data: deals });
-
+  it('shows the load error inside the deals section and keeps the static sections', async () => {
+    m.deals.mockRejectedValue(new Error('network down'));
     renderHome();
-    await waitFor(() => expect(document.getElementById('popular-category-cat-massage-heading')).toBeTruthy());
-
-    // `<sky-product-card heading="...">`'s `heading` is a plain (non-attribute-reflecting) LIT
-    // reactive property — React sets it as a JS property, not an HTML attribute, and it renders
-    // inside the card's shadow root, so it's reachable only by reading the property directly, not
-    // via `.textContent` (light-DOM only) or a `[heading=...]` attribute selector.
-    const massageSection = document.getElementById('popular-category-cat-massage-heading')!.closest('section')!;
-    const spaSection = document.getElementById('popular-category-cat-spa-heading')!.closest('section')!;
-    const headingsIn = (section: Element) =>
-      Array.from(section.querySelectorAll('sky-product-card')).map((el) => (el as unknown as { heading?: string }).heading);
-    expect(headingsIn(massageSection)).toEqual(['Full Body Massage']);
-    expect(headingsIn(spaSection)).toEqual(['Weekend Spa']);
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe(content.home.ui.messages.loadError);
+    expect(dealsSection().contains(alert)).toBe(true);
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'Massage' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: content.home.partnerBanner.heading })).toBeTruthy();
   });
 
-  // Edge case: a popular category with zero matching deals gets no section
-  it('renders no section for a popular category that has zero matching deals', async () => {
-    const categories = [cat({ id: 'cat-empty', name: 'Empty Popular', slug: 'empty-popular', popularTags: [{ id: 'tag-empty', name: 'Trending', slug: 'trending' }], sortOrder: 1 })];
-    listCatalogCategoriesMock.mockResolvedValue({ data: categories });
-    listCatalogDealsMock.mockResolvedValue({ data: [] });
+  it('waits for the visitor location before fetching deals, then sends its coordinates', async () => {
+    m.location = { status: 'locating', coords: null };
+    const { rerender } = renderHome();
+    await Promise.resolve();
+    expect(m.deals).not.toHaveBeenCalled();
 
-    renderHome();
-    await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
-    expect(document.getElementById('popular-category-cat-empty-heading')).toBeNull();
+    m.location = { status: 'ready', coords: { latitude: 26.7, longitude: 83.4 } };
+    rerender(<HomeRoutes />);
+    await waitFor(() => expect(m.deals).toHaveBeenCalledWith(expect.objectContaining({ latitude: 26.7, longitude: 83.4 })));
   });
 
-  // Edge case: catalog fetch failure
-  it('shows a page-level error state when the catalog fetch fails, instead of crashing', async () => {
-    listCatalogCategoriesMock.mockRejectedValue(new Error('network down'));
-    listCatalogDealsMock.mockResolvedValue({ data: [] });
-
+  it('renders one h1 and the sections in the approved order', async () => {
+    m.therapists.mockResolvedValue({ data: [THERAPIST] });
+    m.products.mockResolvedValue({ data: [PRODUCT] });
     renderHome();
-    expect(await screen.findByRole('alert')).toBeTruthy();
+    await screen.findByRole('heading', { level: 2, name: content.home.sections.dealsNearYou.heading });
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    const h2s = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    const order = [
+      content.home.sections.browseByCategory.heading,
+      content.home.sections.dealsNearYou.heading,
+      content.home.howItWorks.heading,
+      content.home.sections.therapists.heading,
+      content.home.sections.featuredProducts.heading,
+      content.home.searchByDestination.heading,
+      content.home.faq.heading,
+      content.home.partnerBanner.heading,
+    ].map((text) => h2s.indexOf(text));
+    order.forEach((index, i) => {
+      expect(index).toBeGreaterThan(-1);
+      if (i > 0) expect(index).toBeGreaterThan(order[i - 1]);
+    });
   });
 
-  // Confirms the old hardcoded keyword-matching table is genuinely gone — "Hot Right Now" tabs
-  // are built purely from the real popular categories fetched above, never a fixed bucket list.
-  it('builds "Hot Right Now" tabs from real popular categories, not a fixed keyword bucket list', async () => {
-    const categories = [cat({ id: 'cat-massage', name: 'Massage', slug: 'massage', popularTags: [{ id: 'tag-massage', name: 'Trending', slug: 'trending' }], sortOrder: 1 })];
-    listCatalogCategoriesMock.mockResolvedValue({ data: categories });
-    listCatalogDealsMock.mockResolvedValue({ data: [] });
+  it('renders category tiles as real light-DOM links', async () => {
+    renderHome();
+    const heading = await screen.findByRole('heading', { level: 2, name: content.home.sections.browseByCategory.heading });
+    const list = within(heading.closest('section') as HTMLElement).getByRole('list');
+    expect(within(list).getByRole('link', { name: 'Massage' }).getAttribute('href')).toBe('/category/massage');
+    expect(within(list).queryByRole('link', { name: 'Skin' })).toBeNull();
+    expect(within(list).getByRole('heading', { level: 3, name: 'Massage' })).toBeTruthy();
+    const texts = Array.from(list.querySelectorAll('sky-tile-card')).map((el) => (el as unknown as { text?: string }).text);
+    expect(texts).toEqual([
+      content.home.categoryTileText.replace('{count}', '2'),
+      undefined,
+      content.home.categoryTileTextOne,
+    ]);
+  });
+
+  it('filters the deals carousel with category tabs, skipping categories without deals', async () => {
+    renderHome();
+    await screen.findByRole('heading', { level: 2, name: content.home.sections.dealsNearYou.heading });
+    const tabs = Array.from(dealsSection().querySelectorAll('md-secondary-tab'));
+    expect(tabs.map((tab) => tab.textContent)).toEqual([content.home.sections.dealsNearYou.allTab, 'Massage', 'Spa']);
+    expect(dealsSection().querySelectorAll('sky-product-card')).toHaveLength(3);
+
+    expect(tabs.map((tab) => tab.id)).toEqual(['deals-tab-all', 'deals-tab-c-m', 'deals-tab-c-s']);
+    for (const tab of tabs) expect(tab.getAttribute('aria-controls')).toBe('deals-panel');
+    const panel = within(dealsSection()).getByRole('tabpanel');
+    expect(panel.id).toBe('deals-panel');
+    expect(panel.getAttribute('aria-labelledby')).toBe('deals-tab-all');
+
+    fireEvent.click(tabs[2]);
+    await waitFor(() => expect(dealsSection().querySelectorAll('sky-product-card')).toHaveLength(1));
+    expect(within(dealsSection()).getByRole('tabpanel').getAttribute('aria-labelledby')).toBe('deals-tab-c-s');
+  });
+
+  it('hides the member banner when signed in', async () => {
+    const headlines = () =>
+      Array.from(document.querySelectorAll('sky-feature-card')).map((el) => (el as unknown as { headline?: string }).headline);
+    const { unmount } = renderHome();
+    await screen.findByRole('heading', { level: 2, name: content.home.sections.dealsNearYou.heading });
+    expect(headlines()).toContain(content.home.memberBanner.heading);
+    unmount();
+
+    m.auth = { isAuthenticated: true, token: 't' };
+    renderHome();
+    await screen.findByRole('heading', { level: 2, name: content.home.sections.dealsNearYou.heading });
+    expect(headlines()).not.toContain(content.home.memberBanner.heading);
+  });
+
+  it('sends a signed-out visitor to sign in when they favourite a deal', async () => {
+    renderHome();
+    // The card attaches its `favorite` listener in an effect, so re-dispatch until it is wired up.
+    await waitFor(() => {
+      const card = dealsSection()?.querySelector('sky-product-card');
+      if (card) fireEvent(card, new CustomEvent('favorite'));
+      expect(screen.getByText('Sign-in page')).toBeTruthy();
+    });
+  });
+
+  it('describes the spotlight price for screen readers and serves a responsive hero image', async () => {
+    renderHome();
+    const spotlight = await waitFor(() => {
+      const el = document.querySelector('.home-spotlight');
+      if (!el) throw new Error('no spotlight yet');
+      return el;
+    });
+    expect(spotlight.textContent).toContain(content.home.hero.spotlightWas);
+    expect(spotlight.textContent).toContain(content.home.hero.spotlightOff);
+    const hero = screen.getByRole('img', { name: content.home.hero.imageAlt });
+    expect(hero.getAttribute('srcset')).toContain('640w');
+    expect(hero.getAttribute('sizes')).toBe('(min-width: 840px) 52vw, 100vw');
+  });
+
+  it('hero search navigates to /explore with the trimmed query, or to /explore when empty', async () => {
+    const field = () => document.querySelector('.home-hero sky-action-field') as Element;
+    const { unmount } = renderHome();
+    fireEvent(field(), new CustomEvent('sky-submit', { detail: { value: 'hot stone' } }));
+    expect((await screen.findByTestId('location')).textContent).toBe('/explore?q=hot%20stone');
+    unmount();
 
     renderHome();
-    await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
-    // The "Massage" tab exists because it's a real popular category, not a hardcoded bucket name
-    // like the deleted MOCK_CATEGORY_MATCH table used (e.g. "Deep Tissue", "Facial Glow", ...).
-    expect(screen.getAllByText('Massage').length).toBeGreaterThan(0);
+    fireEvent(field(), new CustomEvent('sky-submit', { detail: { value: '' } }));
+    expect((await screen.findByTestId('location')).textContent).toBe('/explore');
+  });
+
+  it('links the welcome offer CTA to /explore with a light-DOM link', () => {
+    renderHome();
+    const cta = screen.getByRole('link', { name: content.home.welcomeOffer.cta });
+    expect(cta.getAttribute('href')).toBe('/explore');
+  });
+
+  it('passes banner and feature-card options as kebab-case attributes (survive server rendering)', () => {
+    renderHome();
+    const partner = document.querySelector('sky-cta-banner') as Element;
+    expect(partner.getAttribute('cta-label')).toBe(content.home.partnerBanner.cta);
+    expect(partner.getAttribute('cta-href')).toBe(content.home.partnerBanner.href);
+    expect(partner.getAttribute('cta-icon')).toBe('arrow_forward');
+    expect(partner.getAttribute('icon-style')).toBe('tonal');
+    expect(partner.getAttribute('icon-shape')).toBe('full');
+    const gift = document.querySelector('sky-feature-card.home-offer--gift') as Element;
+    expect(gift.getAttribute('cta-label')).toBe(content.home.giftCard.cta);
+    expect(gift.getAttribute('cta-href')).toBe('/gift-cards');
+    expect(gift.getAttribute('icon-style')).toBe('surface');
+  });
+
+  it('toggles the wishlist when a signed-in visitor favourites a deal', async () => {
+    m.auth = { isAuthenticated: true, token: 't' };
+    renderHome();
+    await waitFor(() => {
+      const card = dealsSection()?.querySelector('sky-product-card');
+      if (card) fireEvent(card, new CustomEvent('favorite'));
+      expect(m.toggle).toHaveBeenCalledWith('d1');
+    });
+  });
+
+  it('links popular treatments to an /explore search', () => {
+    renderHome();
+    const [group] = content.home.searchByDestination.columns.flat();
+    const link = screen.getByRole('link', { name: group.items[0] });
+    expect(link.getAttribute('href')).toBe(`/explore?q=${encodeURIComponent(group.items[0])}`);
+  });
+
+  it('renders no tabs or tabpanel when the deals share no category', async () => {
+    m.deals.mockResolvedValue({ data: [deal({ id: 'x1' }), deal({ id: 'x2' })] });
+    renderHome();
+    await waitFor(() => expect(dealsSection().querySelectorAll('sky-product-card')).toHaveLength(2));
+    expect(dealsSection().querySelector('md-secondary-tab')).toBeNull();
+    expect(within(dealsSection()).queryByRole('tabpanel')).toBeNull();
+  });
+
+  it('falls back to the All tab when the active category disappears after a refetch', async () => {
+    const { rerender } = renderHome();
+    await waitFor(() => expect(dealsSection().querySelectorAll('md-secondary-tab')).toHaveLength(3));
+    fireEvent.click(dealsSection().querySelectorAll('md-secondary-tab')[2]);
+    await waitFor(() => expect(dealsSection().querySelectorAll('sky-product-card')).toHaveLength(1));
+
+    m.deals.mockResolvedValue({
+      data: [deal({ id: 'd1', title: 'Full Body Massage', category: MASSAGE }), deal({ id: 'd2', title: 'Foot Massage', category: MASSAGE })],
+    });
+    m.location = { status: 'ready', coords: { latitude: 1, longitude: 2 } };
+    rerender(<HomeRoutes />);
+    await waitFor(() => expect(dealsSection().querySelectorAll('md-secondary-tab')).toHaveLength(2));
+    expect(within(dealsSection()).getByRole('tabpanel').getAttribute('aria-labelledby')).toBe('deals-tab-all');
+    expect(dealsSection().querySelectorAll('sky-product-card')).toHaveLength(2);
+  });
+
+  it('lists the three "How it works" steps', async () => {
+    renderHome();
+    const heading = await screen.findByRole('heading', { level: 2, name: content.home.howItWorks.heading });
+    const items = (heading.closest('section') as HTMLElement).querySelectorAll('ol > li');
+    expect(items).toHaveLength(3);
+    content.home.howItWorks.steps.forEach((step, i) => {
+      expect(within(items[i] as HTMLElement).getByRole('heading', { level: 3 }).textContent).toBe(step.title);
+    });
+  });
+
+  it('emits ItemList and FAQPage JSON-LD', async () => {
+    renderHome();
+    await screen.findByRole('heading', { level: 2, name: content.home.faq.heading });
+    const blocks = Array.from(document.querySelectorAll('script[type="application/ld+json"]')).flatMap((s) => {
+      const data = JSON.parse(s.textContent ?? 'null');
+      return Array.isArray(data) ? data : [data];
+    });
+    const list = blocks.find((b) => b['@type'] === 'ItemList');
+    expect(list.itemListElement).toHaveLength(3);
+    for (const entry of list.itemListElement) expect(entry.item.url.startsWith('https://example.test/deal/')).toBe(true);
+    expect(list.itemListElement[0].item.image).toBe('https://cdn.test/d1.jpg');
+    expect(list.itemListElement[1].item.image).toBeUndefined();
+    const faq = blocks.find((b) => b['@type'] === 'FAQPage');
+    expect(faq.mainEntity[0].name).toBe(FAQ.question);
+  });
+
+  it('sets the page title and canonical URL', async () => {
+    renderHome();
+    await screen.findByRole('heading', { level: 1 });
+    await waitFor(() => expect(document.title).toBe(content.meta.home.title));
+    expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe('https://example.test/');
   });
 });

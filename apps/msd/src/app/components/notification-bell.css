@@ -11,17 +11,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
+  width: 18px;
   height: 18px;
-  padding: 0 3px;
+  padding: 0;
   border-radius: 50%;
   background: var(--md-sys-color-error);
   color: var(--md-sys-color-on-error);
   font-size: 0.65rem;
   font-weight: 600;
+  line-height: 1;
   pointer-events: none;
 }
-
 .notification-bell__header {
   display: flex;
   align-items: center;

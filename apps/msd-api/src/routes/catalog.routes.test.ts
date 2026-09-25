@@ -407,13 +407,23 @@ describe('GET /api/v1/catalog/vendors/:slug', () => {
 });
 
 describe('GET /api/v1/catalog/locations', () => {
-  it('returns distinct {state, city} pairs from active branches only', async () => {
-    prismaMock.branch.findMany.mockResolvedValue([{ state: 'Uttar Pradesh', city: 'Gorakhpur' }]);
+  it('returns {state, city, latitude, longitude} per active city, averaging branch coordinates', async () => {
+    prismaMock.branch.groupBy.mockResolvedValue([
+      { state: 'Maharashtra', city: 'Pune', _avg: { latitude: '18.520400', longitude: '73.856700' } },
+      { state: 'Uttar Pradesh', city: 'Gorakhpur', _avg: { latitude: null, longitude: null } },
+    ]);
     const res = await request(app).get('/api/v1/catalog/locations');
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual([{ state: 'Uttar Pradesh', city: 'Gorakhpur' }]);
-    expect(prismaMock.branch.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ isActive: true }), distinct: ['state', 'city'] }),
+    expect(res.body.data).toEqual([
+      { state: 'Maharashtra', city: 'Pune', latitude: 18.5204, longitude: 73.8567 },
+      { state: 'Uttar Pradesh', city: 'Gorakhpur', latitude: null, longitude: null },
+    ]);
+    expect(prismaMock.branch.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        by: ['state', 'city'],
+        where: expect.objectContaining({ isActive: true }),
+        _avg: { latitude: true, longitude: true },
+      }),
     );
   });
 });

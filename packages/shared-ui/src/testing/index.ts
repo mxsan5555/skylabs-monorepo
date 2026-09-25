@@ -54,6 +54,13 @@ export function installMaterialJsdomPolyfills(): void {
     };
   }
 
+  // `<md-tabs>` reads the active tab indicator's running animations when selection changes.
+  if (typeof Element !== 'undefined' && !Element.prototype.getAnimations) {
+    Element.prototype.getAnimations = function getAnimations() {
+      return [];
+    };
+  }
+
   // Form-associated custom elements (checkbox, switch, radio, text field, ...)
   // call attachInternals(), which jsdom does not implement.
   if (

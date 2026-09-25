@@ -1,13 +1,51 @@
 import { useEffect, useState } from 'react';
-import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { WIDGET_REGISTRY } from '../../dashboard/widget-registry';
+import { DashboardProcessFlow } from './dashboard-process-flow';
 import {
   getDashboardStats,
   type DashboardStats,
 } from '../../../api/rbac/dashboard';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { DashboardProcessFlow } from './dashboard-process-flow';
+
+export interface DashboardMetric {
+  key: string;
+  label: string;
+  icon: string;
+  value: string;
+}
+
+const DASHBOARD_CARD_ORDER = [
+  'customers-count',
+  'vendors-count',
+  'products-count',
+  'orders-recent',
+];
+
+function getMetricValue(
+  stats: DashboardStats | null,
+  key: string
+): string {
+  if (!stats) {
+    return '—';
+  }
+
+  switch (key) {
+    case 'customers-count':
+      return stats.customers.toLocaleString('en-IN');
+
+    case 'vendors-count':
+      return stats.vendors.toLocaleString('en-IN');
+
+    case 'products-count':
+      return stats.products.toLocaleString('en-IN');
+
+    case 'orders-recent':
+      return stats.orders.toLocaleString('en-IN');
+
+    default:
+      return '—';
+  }
+}
 
 export function Dashboard() {
   const { bootstrap, loading, token, can } = useAuth();
@@ -69,93 +107,101 @@ export function Dashboard() {
   ];
 
   const widgets = [...(bootstrap?.dashboardWidgets ?? [])]
-    .filter((widget) => dashboardCardOrder.includes(widget.key))
+    .filter((widget) => DASHBOARD_CARD_ORDER.includes(widget.key))
     .sort(
       (a, b) =>
-        dashboardCardOrder.indexOf(a.key) -
-        dashboardCardOrder.indexOf(b.key)
+        DASHBOARD_CARD_ORDER.indexOf(a.key) -
+        DASHBOARD_CARD_ORDER.indexOf(b.key)
     );
 
-  const showProcessFlow = can('reports', 'view');
+  /*
+   * Users with reports:view can see marketplace statistics.
+   */
+  const showMarketplaceMetrics = can('reports', 'view');
+
+  /*
+   * Existing role-based dashboard widgets.
+   */
+  const dashboardMetrics: DashboardMetric[] = [];
+
+  widgets.forEach((widget) => {
+    const metricConfig: Record<
+      string,
+      { label: string; icon: string }
+    > = {
+      'customers-count': {
+        label: widget.title || 'Customers',
+        icon: 'groups',
+      },
+
+      'vendors-count': {
+        label: widget.title || 'Vendors',
+        icon: 'storefront',
+      },
+
+      'products-count': {
+        label: widget.title || 'Products',
+        icon: 'inventory_2',
+      },
+
+      'orders-recent': {
+        label: widget.title || 'Orders',
+        icon: 'shopping_bag',
+      },
+    };
+
+    const config = metricConfig[widget.key];
+
+    if (!config) return;
+
+    dashboardMetrics.push({
+      key: widget.key,
+      label: config.label,
+      icon: config.icon,
+      value: getMetricValue(stats, widget.key),
+    });
+  });
+
   return (
     <div className="admin-page admin-page--wide dashboard-page">
       <title>Dashboard · MSD</title>
-      <header className="dashboard-hero">
-        <div className="dashboard-hero__content">
-          <div className="dashboard-hero__icon">
-            <Icon aria-hidden="true">dashboard</Icon>
-          </div>
-          <div>
-            <p className="dashboard-hero__eyebrow">MSD ADMIN CONSOLE</p>
 
-            <h1 className="dashboard-hero__title">Dashboard</h1>
+      {/* Dashboard Hero */}
+      <sky-feature-card
+        color="secondary"
+        icon="dashboard"
+        iconStyle="surface"
+        variant="filled"
+        iconShape="full"
+        headline="Dashboard"
+        text={`Welcome back, ${bootstrap?.user.name ?? 'there'
+          }. Here's your marketplace overview.`}
+      />
 
-            <p className="dashboard-hero__subtitle">
-              Welcome back, {bootstrap?.user.name ?? 'there'}. Here's your
-              marketplace overview.
-            </p>
-          </div>
-        </div>
-      </header>
-
-      {/* Dynamic role-based widgets */}
-      {widgets.length === 0 ? (
-        <section className="dashboard-empty panel">
-          <Icon aria-hidden="true">dashboard_customize</Icon>
-
-          <div>
-            <h2>No dashboard widgets</h2>
-            <p>
-              No dashboard widgets are assigned to your role yet.
-            </p>
-          </div>
-        </section>
+      {/* Dashboard Content */}
+      {statsError ? (
+        <sky-feature-card
+          color="tertiary"
+          icon="error"
+          iconStyle="surface"
+          headline="Unable to load dashboard statistics"
+          text={statsError}
+        />
+      ) : dashboardMetrics.length === 0 ? (
+        <sky-feature-card
+          color="surface-high"
+          icon="dashboard_customize"
+          iconStyle="surface"
+          headline="No dashboard widgets"
+          text="No dashboard widgets are assigned to your role yet."
+        />
       ) : (
-        <section
-          className="dashboard-stats"
-          aria-label="Marketplace statistics"
-        >
-          {widgets.map((widget) => {
-            const Widget = WIDGET_REGISTRY[widget.key];
-
-            if (!Widget) return null;
-
-            return (
-              <Widget
-                key={widget.key}
-                title={widget.title}
-                stats={stats}
-                statsLoading={statsLoading}
-                statsError={statsError}
-              />
-            );
-          })}
-        </section>
-      )}
-      {/* Marketplace Overview */}
-      {showProcessFlow && (
-        <section className="dashboard-section" aria-labelledby="marketplace-heading">
-          <div className="dashboard-section__header">
-            <div>
-              <h2
-                id="marketplace-heading"
-                className="dashboard-section__title"
-              >
-                Marketplace Overview
-              </h2>
-
-              <p className="dashboard-section__description">
-                Catalog, supply and activity at a glance
-              </p>
-            </div>
-          </div>
-
-          <DashboardProcessFlow
-            stats={stats}
-            loading={statsLoading}
-            error={statsError}
-          />
-        </section>
+        <DashboardProcessFlow
+          stats={stats}
+          loading={statsLoading}
+          dashboardMetrics={dashboardMetrics}
+          showMarketplaceMetrics={showMarketplaceMetrics}
+        />
       )}
     </div>
   );
