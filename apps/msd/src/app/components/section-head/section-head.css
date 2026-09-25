@@ -21,10 +21,20 @@
   max-inline-size: 60ch;
   color: var(--md-sys-color-on-surface-variant);
 }
+/* Actions wrap as a group; short labels (counts, See all) never break mid-phrase. */
 .section-head__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  white-space: nowrap;
+}
+/* A search field in the row takes the free space and a full row on phones. */
+.section-head__actions > sky-action-field {
+  flex: 1 1 280px;
+  min-inline-size: 0;
 }
 .section-head__link {
   display: inline-flex;
