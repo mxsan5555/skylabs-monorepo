@@ -164,8 +164,10 @@ export function VendorTherapists() {
   // Only a branch with at least one currently-granted THERAPY category (`categoryTypes`,
   // computed server-side by `listMyBranches`/`listBranches`) is eligible to host a therapist —
   // mirrors the admin-side `vendor-wizard-therapists.tsx` filter so revoking a branch's Therapy
-  // access in Branch Access hides it here immediately and after a refresh.
-  const therapyBranches = useMemo(() => branches.filter((b) => b.categoryTypes.includes('THERAPY')), [branches]);
+  // access in Branch Access hides it here immediately and after a refresh. `?.` mirrors that same
+  // file's guard — `updateBranch`/`createBranch`/`setBranchStatus` never return `categoryTypes`
+  // (only `listBranches` computes it), so a freshly-saved branch object can transiently lack it.
+  const therapyBranches = useMemo(() => branches.filter((b) => b.categoryTypes?.includes('THERAPY')), [branches]);
 
   useEffect(() => {
     const el = tableRef.current;

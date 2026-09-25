@@ -11,6 +11,7 @@ interface WidgetAssignmentsProps {
 /** Dashboard widgets a role's members see on `/dashboard`, with a display order. */
 export function WidgetAssignments({ catalog, selected, onToggle, onOrderChange, disabled }: WidgetAssignmentsProps) {
   if (catalog.length === 0) {
+    console.log("the catalog is", catalog);
     return <p className="empty-state">No dashboard widgets have been created yet.</p>;
   }
 

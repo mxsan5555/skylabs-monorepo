@@ -48,14 +48,24 @@ export function VendorBranchListStep({
 }: VendorBranchListStepProps) {
   const [error, setError] = useState('');
 
+  // `updateBranch`/`createBranch`/`setBranchStatus` all return the raw Prisma row — `categoryTypes`
+  // is a computed join only `listBranches` performs (see vendor.service.ts), so it's never present
+  // on any of these three responses. Splicing that response straight into `branches` (as this used
+  // to do) silently drops `categoryTypes` to `undefined` for the affected branch — inert until
+  // something reads it, which `VendorTherapistsStep`'s `branches.filter(b =>
+  // b.categoryTypes.includes('THERAPY'))` does the moment Step 4 is opened without an intervening
+  // reload, throwing and taking down the whole wizard via the top-level ErrorBoundary. Preserving
+  // the previous value (a brand-new branch legitimately has none yet, hence `?? []`) keeps every
+  // branch object well-formed the instant this resolves — `onVendorRefresh` below is what brings
+  // it back in sync with the server's real, fresh value shortly after.
   const saveBranch = async (input: BranchInput, existing?: Branch): Promise<Branch> => {
     if (existing) {
       const { data } = await updateBranch(token, vendorId, existing.id, input);
-      onBranchesChange(branches.map((b) => (b.id === data.id ? data : b)));
+      onBranchesChange(branches.map((b) => (b.id === data.id ? { ...data, categoryTypes: b.categoryTypes } : b)));
       return data;
     }
     const { data } = await createBranch(token, vendorId, input);
-    onBranchesChange([data, ...branches]);
+    onBranchesChange([{ ...data, categoryTypes: data.categoryTypes ?? [] }, ...branches]);
     return data;
   };
 
@@ -63,7 +73,7 @@ export function VendorBranchListStep({
     setError('');
     try {
       const { data } = await setBranchStatus(token, vendorId, branch.id, !branch.isActive);
-      onBranchesChange(branches.map((b) => (b.id === data.id ? data : b)));
+      onBranchesChange(branches.map((b) => (b.id === data.id ? { ...data, categoryTypes: b.categoryTypes } : b)));
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not change branch status.');
     }
@@ -162,6 +172,10 @@ function BranchRow({
             <Icon slot="icon" aria-hidden="true">edit</Icon>
             Edit
           </OutlinedButton>
+          {/* <OutlinedButton onClick={() => branchDialogRef.current?.show()}>
+            <Icon slot="icon" aria-hidden="true">category</Icon>
+            Categories
+          </OutlinedButton> */}
           <OutlinedButton onClick={onToggleStatus}>{branch.isActive ? 'Deactivate' : 'Activate'}</OutlinedButton>
         </div>
       )}

@@ -33,7 +33,7 @@
     "countLabel": "{label}, {count} items",
     "countLabelOne": "{label}, 1 item",
     "becomeMember": "Become a Member",
-    "becomeMemberTo": "/member",
+    "becomeMemberTo": "/become-member",
     "allCategories": "All categories",
     "categoriesNavLabel": "Categories",
     "accountMenuLabel": "Account menu",
@@ -178,11 +178,11 @@
       ],
       "partners": [
         {
-          "label": "Partner with us",
-          "to": "/become-vendor"
+          "label": "Partner with Us",
+          "to": "/become-member"
         },
         {
-          "label": "Partner sign in",
+          "label": "Partner Sign In",
           "to": "/sign-in"
         }
       ],
@@ -393,10 +393,9 @@
       "icon": "storefront",
       "heading": "Own a spa or salon?",
       "body": "List your services and reach customers near you.",
-      "cta": "Partner with us",
-      "href": "/become-vendor"
-    },
-    "categoryTileTextOne": "1 treatment"
+      "cta": "Partner with Us",
+      "href": "/become-member"
+    }
   },
   "search": {
     "placeholder": "Search spas, treatments, locations…",

@@ -13,6 +13,7 @@ export interface DashboardStats {
   categories: number;
   subCategories: number;
   products: number;
+  therapists: number;
   deals: number;
   orders: number;
   revenue: string;

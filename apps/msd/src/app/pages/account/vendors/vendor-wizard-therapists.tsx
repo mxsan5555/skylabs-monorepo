@@ -69,6 +69,8 @@ export function VendorTherapistsStep({
 }: VendorTherapistsStepProps) {
   const { showToast } = useToast();
   const [therapists, setTherapists] = useState<AdminTherapist[]>([]);
+  const [eligibleTherapyBranches, setEligibleTherapyBranches] = useState<Branch[]>([]);
+  const [therapyBranchesLoading, setTherapyBranchesLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingTherapist, setEditingTherapist] = useState<AdminTherapist | null>(null);
@@ -93,6 +95,65 @@ export function VendorTherapistsStep({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, vendorId]);
+
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTherapyBranches = async () => {
+      if (!branches.length || !offersTherapy) {
+        setEligibleTherapyBranches([]);
+        setTherapyBranchesLoading(false);
+        return;
+      }
+
+      setTherapyBranchesLoading(true);
+
+      try {
+        const results = await Promise.all(
+          branches.map(async (branch) => {
+            const { data } = await getBranchCategoryAccess(
+              token,
+              vendorId,
+              branch.id,
+            );
+
+            const hasTherapyCategory = data.some(
+              (row) => row.category?.type === 'THERAPY',
+            );
+
+            return {
+              branch,
+              hasTherapyCategory,
+            };
+          }),
+        );
+
+        if (cancelled) return;
+
+        setEligibleTherapyBranches(
+          results
+            .filter((result) => result.hasTherapyCategory)
+            .map((result) => result.branch),
+        );
+      } catch {
+        if (cancelled) return;
+
+        setEligibleTherapyBranches([]);
+      } finally {
+        if (!cancelled) {
+          setTherapyBranchesLoading(false);
+        }
+      }
+    };
+
+    loadTherapyBranches();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, vendorId, branches, offersTherapy]);
+
 
   // Returns the saved row (like `VendorProductsStep`'s own `save`) so `WizardTherapistFormDialog`
   // can key its `MediaUploader` off a real id right after a fresh create — `load()` separately
@@ -123,7 +184,15 @@ export function VendorTherapistsStep({
   // to host a therapist. Revoking a branch's Therapy access in Step 2 removes it from here
   // immediately (this list is always the live `branches` prop, never cached) and after a refresh
   // (the server recomputes `categoryTypes` from the live `BranchCategoryAccess` rows every time).
-  const therapyBranches = branches.filter((b) => b.categoryTypes.includes('THERAPY'));
+  // `?.` guards a real crash (not just a hypothetical): `updateBranch`/`createBranch`/
+  // `setBranchStatus` never return `categoryTypes` (only `listBranches` computes it), so the
+  // instant after a Branch Access save — before `onVendorRefresh`'s reload lands — a branch
+  // object here could still be missing it; this was the exact root cause of a crash landing
+  // straight in the top-level ErrorBoundary when Step 4 was opened right after saving Step 2
+  // without a reload in between. A branch this happens to is simply excluded from
+  // `therapyBranches` for that one render, not a false positive — see `VendorBranchListStep`'s
+  // own doc comment for why it resolves within one round trip either way.
+  const therapyBranches = branches.filter((b) => b.categoryTypes?.includes('THERAPY'));
 
   // `vendor.offersTherapy` is a denormalized convenience flag, not the ground truth — real
   // category grants (`VendorCategoryAccess`/`BranchCategoryAccess`) are. It can be `false` while
@@ -136,7 +205,10 @@ export function VendorTherapistsStep({
     return <p className="empty-state">This vendor has not enabled the Therapy business module in Step 2.</p>;
   }
 
-  const canAdd = canEdit && therapyBranches.length > 0;
+  const canAdd =
+    canEdit &&
+    !therapyBranchesLoading &&
+    therapyBranches.length > 0;
 
   return (
     <section aria-label="Therapy">
@@ -157,6 +229,16 @@ export function VendorTherapistsStep({
       {canEdit && branches.length > 0 && therapyBranches.length === 0 && (
         <p className="empty-state">No branch currently has Therapy category access — map one under Business Modules &amp; Category Access first.</p>
       )}
+
+      {canEdit &&
+        branches.length > 0 &&
+        !therapyBranchesLoading &&
+        therapyBranches.length === 0 && (
+          <p className="empty-state">
+            Enable Therapy for at least one branch in Step 2 before adding
+            therapists.
+          </p>
+        )}
 
       {loading ? (
         <p className="loading-state">Loading therapists…</p>
@@ -206,6 +288,7 @@ export function VendorTherapistsStep({
           onSave={(input, branchId) => save(input, branchId)}
         />
       )}
+
       {editingTherapist && (
         <WizardTherapistFormDialog
           key={editingTherapist.id}
@@ -254,13 +337,13 @@ function WizardTherapistFormDialog({
   const [form, setForm] = useState<TherapistInput>(
     therapist
       ? {
-          therapistType: therapist.therapistType,
-          personName: therapist.personName,
-          gender: therapist.gender ?? undefined,
-          specialization: therapist.specialization ?? undefined,
-          bio: therapist.bio ?? undefined,
-          experienceYears: therapist.experienceYears ?? undefined,
-        }
+        therapistType: therapist.therapistType,
+        personName: therapist.personName,
+        gender: therapist.gender ?? undefined,
+        specialization: therapist.specialization ?? undefined,
+        bio: therapist.bio ?? undefined,
+        experienceYears: therapist.experienceYears ?? undefined,
+      }
       : { ...EMPTY_INPUT },
   );
   const [branchId, setBranchId] = useState(therapist?.branchId ?? branches[0]?.id ?? '');

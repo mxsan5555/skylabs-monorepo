@@ -61,6 +61,8 @@ const SubCategoriesCountWidget = makeCountWidget('subCategories', 'SubCategories
 const ProductsCountWidget = makeCountWidget('products', 'ProductsCountWidget', 'inventory_2');
 const DealsCountWidget = makeCountWidget('deals', 'DealsCountWidget', 'local_offer');
 const OrdersCountWidget = makeCountWidget('orders', 'OrdersCountWidget', 'shopping_bag');
+const ServicesCountWidget = makeCountWidget('products', 'ServicesCountWidget', 'miscellaneous_services');
+const TherapistsCountWidget = makeCountWidget('therapists','TherapistsCountWidget','person');
 
 function RevenueSummaryWidget({ title, stats, statsLoading, statsError }: WidgetProps) {
   const value = stats ? formatINR(Number(stats.revenue)) : undefined;
@@ -96,4 +98,6 @@ export const WIDGET_REGISTRY: Record<string, ComponentType<WidgetProps>> = {
   'subcategories-count': SubCategoriesCountWidget,
   'products-count': ProductsCountWidget,
   'deals-count': DealsCountWidget,
+  'services-count': ServicesCountWidget,
+  'therapists-count': TherapistsCountWidget,
 };

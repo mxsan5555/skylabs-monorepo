@@ -23,7 +23,6 @@ import {
   setRolePermissions,
   setRoleStatus,
   setRoleWidgets,
-  updateRole,
   type DashboardWidgetRecord,
   type PermissionCatalogRow,
   type Role,

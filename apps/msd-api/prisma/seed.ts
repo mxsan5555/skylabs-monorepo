@@ -1160,8 +1160,8 @@ async function seedCart(customerId:string,dealIdBySlug:Map<string,string>,produc
 }
 
 async function seedWishlist(customerId:string,dealIdBySlug:Map<string,string>):Promise<void>{
-  for(const slug of ['premium-glow-facial-glow-delhi','head-neck-relaxation-urban-delhi']){
-    const dealId=dealIdBySlug.get(slug)!;
+  for(const slug of ['premium-glow-facial-glow-delhi','head-neck-relaxation-glow-delhi']){
+    const dealId=dealIdBySlug.get(slug);
     if(!dealId) continue;
     await prisma.wishlistItem.upsert({where:{customerId_dealId:{customerId,dealId}},update:{},create:{customerId,dealId}});
   }

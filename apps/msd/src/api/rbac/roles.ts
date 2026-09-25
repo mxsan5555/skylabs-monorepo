@@ -55,6 +55,11 @@ export interface RoleWidgetRow {
   widget: DashboardWidgetRecord;
 }
 
+export interface RoleWidgetAssignment {
+  widgetId: string;
+  order: number;
+}
+
 export function listRoles(token: string | null) {
   return apiGet<Role[]>('/rbac/roles', token);
 }
