@@ -1,5 +1,4 @@
-import type { ReactNode } from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { CatalogCategoryWithChildren } from '../../../api/catalog';
@@ -15,7 +14,6 @@ const {
   listCatalogDealsMock,
   listCatalogProductsMock,
   listCatalogTherapistsMock,
-  tabsStub,
   shellState,
   defaultShell,
 } = vi.hoisted(() => {
@@ -33,17 +31,8 @@ const {
     listCatalogDealsMock: vi.fn(),
     listCatalogProductsMock: vi.fn(),
     listCatalogTherapistsMock: vi.fn(),
-    tabsStub: { onChange: undefined as undefined | ((e: { target: { activeTabIndex: number } }) => void) },
   };
 });
-
-vi.mock('@skylabs-monorepo/shared-ui/react', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@skylabs-monorepo/shared-ui/react')>()),
-  Tabs: ({ onChange, children }: { onChange?: typeof tabsStub.onChange; children?: ReactNode }) => {
-    tabsStub.onChange = onChange;
-    return <div role="tablist">{children}</div>;
-  },
-}));
 
 vi.mock('../../../api/catalog', async () => {
   const actual = await vi.importActual<typeof import('../../../api/catalog')>('../../../api/catalog');
@@ -104,14 +93,10 @@ const robots = () => document.head.querySelector('meta[name="robots"]')?.getAttr
 
 const lastSubcategoryId = () => listCatalogDealsMock.mock.calls.at(-1)?.[0]?.subcategoryId;
 
-/** Under vitest, @lit/react resolves to its node build, which never wires element events, so the
- *  Tabs wrapper is swapped for a stub that captures `onChange`; `pickTab` then calls it the way
- *  md-tabs' `change` would. */
-function pickTab(index: number) {
-  act(() => {
-    tabsStub.onChange?.({ target: { activeTabIndex: index } });
-  });
-}
+type Chip = HTMLElement & { label?: string; selected?: boolean };
+const chip = (label: string) =>
+  (Array.from(document.querySelectorAll('md-filter-chip')) as Chip[]).find((c) => (c.label ?? c.getAttribute('label')) === label) as Chip;
+const isSelected = (c: Chip) => c.selected ?? c.hasAttribute('selected');
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -136,13 +121,13 @@ describe('Category page ?sub=', () => {
 
   it('writes the picked subcategory to ?sub= and removes it for "All"', async () => {
     renderAt('/category/massage');
-    await waitFor(() => expect(screen.getByRole('tablist')).toBeTruthy());
+    await waitFor(() => expect(chip('Swedish')).toBeTruthy());
 
-    pickTab(1);
+    fireEvent.click(chip('Swedish'));
     await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage?sub=swedish'));
     await waitFor(() => expect(lastSubcategoryId()).toBe('s1'));
 
-    pickTab(0);
+    fireEvent.click(chip(content.category.tabs.all));
     await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage'));
     await waitFor(() => expect(lastSubcategoryId()).toBeUndefined());
   });
@@ -314,11 +299,18 @@ describe('Category page with prerendered data', () => {
 });
 
 describe('Category page layout', () => {
-  it('renders secondary tabs that control the results panel', async () => {
+  it('renders subcategory pills with the active one selected', async () => {
+    renderAt('/category/massage?sub=swedish');
+    await waitFor(() => expect(document.querySelectorAll('md-filter-chip')).toHaveLength(3));
+    expect(document.querySelector('md-chip-set')?.getAttribute('aria-label')).toBe(content.category.pills.label);
+    expect(isSelected(chip('Swedish'))).toBe(true);
+    expect(isSelected(chip(content.category.tabs.all))).toBe(false);
+  });
+
+  it('puts search in the listing toolbar', async () => {
     renderAt('/category/massage');
-    await waitFor(() => expect(document.querySelectorAll('md-secondary-tab')).toHaveLength(3));
-    expect(document.getElementById('category-tab-all')).toBeTruthy();
-    expect(screen.getByRole('tabpanel').getAttribute('aria-labelledby')).toBe('category-tab-all');
+    const toolbar = await screen.findByRole('group', { name: content.category.toolbar.label });
+    expect(toolbar.querySelector('sky-action-field')).toBeTruthy();
   });
 
   it('searches on sky-submit, not on every keystroke', async () => {

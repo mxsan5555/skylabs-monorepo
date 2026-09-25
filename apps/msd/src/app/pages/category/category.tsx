@@ -1,6 +1,6 @@
-import { createElement, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Icon, Tabs, FilledButton, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
+import { Icon, FilledButton, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   getCatalogCategory,
@@ -22,6 +22,9 @@ import { Breadcrumb } from '../../components/breadcrumb';
 import { CardGrid } from '../../components/card-grid/card-grid';
 import { PageSection } from '../../components/page-section/page-section';
 import { SectionHead } from '../../components/section-head/section-head';
+import { ChipNav } from '../../components/chip-nav/chip-nav';
+import { ClampText } from '../../components/clamp-text/clamp-text';
+import { ListingToolbar } from '../../components/listing-toolbar/listing-toolbar';
 import { useCustomEvent } from '../../../hooks/use-custom-event';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { formatINR } from '../../../utils/format';
@@ -36,14 +39,6 @@ import { SITE_URL } from '../../seo/site-url';
 import content from '../../../content.json';
 
 const t = content.category;
-const PANEL_ID = 'category-results';
-const tabId = (id: string) => `category-tab-${id}`;
-
-/** Raw `md-secondary-tab` so `id`/`aria-controls`/`active` render as attributes (same reason as
- *  home's DealsTab: the @lit/react wrapper sets `id` as a property only in the browser build). */
-function SubcategoryTab({ id, active, children }: { id: string; active: boolean; children: ReactNode }) {
-  return createElement('md-secondary-tab', { id: tabId(id), 'aria-controls': PANEL_ID, active }, children);
-}
 
 /** Search field. Its own component so `useCustomEvent` attaches when the element mounts
  *  (the page renders it only after the category loads). Controlled by `value`, so the active
@@ -84,7 +79,7 @@ function therapistFromPrice(therapist: CatalogTherapist): number | null {
 /**
  * Category → Sub Category → (Deal | Product | Therapist) discovery page — the customer
  * catalogue's single canonical entry point. Composes PageSection, SectionHead and CardGrid with
- * the existing `Tabs`/`DealCard` components unchanged, but reads real Vendor/Branch/Deal/Therapist data from
+ * the existing `DealCard` components unchanged, but reads real Vendor/Branch/Deal/Therapist data from
  * `GET /catalog/*` — only active, approved records with an active vendor/branch are ever
  * returned (enforced server-side in `catalog.service.ts`).
  *
@@ -93,7 +88,7 @@ function therapistFromPrice(therapist: CatalogTherapist): number | null {
  * /catalog/deals`), a PRODUCT category shows Product cards (`GET /catalog/products` — Product is
  * a fully independent catalog entity now, never a Deal), and a THERAPY category shows Therapist
  * cards (`GET /catalog/therapists`, filtered by `categoryId`/`subcategoryId`). "All" (the
- * default) shows every record in the category; selecting a subcategory tab narrows to that
+ * default) shows every record in the category; selecting a subcategory pill narrows to that
  * subcategory only.
  */
 export function Category() {
@@ -169,13 +164,13 @@ export function Category() {
   const subSlug = searchParams.get('sub');
   const subcategoryIdx = (category?.children.findIndex((c) => c.slug === subSlug) ?? -1) + 1;
   const activeSubcategory = subcategoryIdx === 0 ? undefined : category?.children[subcategoryIdx - 1];
-  const setSubcategoryIdx = (idx: number) => {
-    const sub = idx === 0 ? undefined : category?.children[idx - 1];
+  /** Writes one query param (or removes it when empty), keeping the others. */
+  const setParam = (key: string, value: string | undefined) => {
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (sub) next.set('sub', sub.slug);
-        else next.delete('sub');
+        if (value) next.set(key, value);
+        else next.delete(key);
         return next;
       },
       { replace: true },
@@ -330,18 +325,14 @@ export function Category() {
     <sky-info-card icon="sentiment_dissatisfied" heading={empty.heading} subheading={empty.subheading} />
   ) : undefined;
 
-  const tabs =
+  const pills =
     category.children.length > 0 ? (
-      <Tabs
-        aria-label={t.tabsLabel}
-        onChange={(e) => setSubcategoryIdx((e.target as unknown as { activeTabIndex: number }).activeTabIndex)}
-      >
-        {[{ id: 'all', name: t.tabs.all }, ...category.children].map((tab, i) => (
-          <SubcategoryTab key={tab.id} id={tab.id} active={subcategoryIdx === i}>
-            {tab.name}
-          </SubcategoryTab>
-        ))}
-      </Tabs>
+      <ChipNav
+        ariaLabel={t.pills.label}
+        items={[{ value: '', label: t.tabs.all }, ...category.children.map((c) => ({ value: c.slug, label: c.name }))]}
+        value={activeSubcategory?.slug ?? ''}
+        onSelect={(value) => setParam('sub', value || undefined)}
+      />
     ) : null;
 
   const cards = isTherapyCategory
@@ -462,31 +453,23 @@ export function Category() {
           id="category-heading"
           titleClassName="headline-large"
           heading={displayName}
-          subheading={category.description ?? undefined}
+          subheading={category.description ? <ClampText text={category.description} more={t.description.more} less={t.description.less} /> : undefined}
           actions={
-            <>
-              <span className="body-medium" aria-live="polite" aria-atomic="true">
-                {countText}
-              </span>
-              <SearchField value={search} placeholder={t.search.placeholder.replace('{category}', category.name)} onSearch={setSearch} />
-            </>
+            <span className="body-medium" aria-live="polite" aria-atomic="true">
+              {countText}
+            </span>
           }
         />
+        {pills}
       </PageSection>
-      <PageSection tone="tint" aria-label={`${category.name} ${t.dealsAriaLabelSuffix}`}>
-        <CardGrid
-          above={
-            <>
-              {tabs}
-              {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
-              {actionError && <p className="error-state" role="alert">{actionError}</p>}
-            </>
-          }
-          panel={tabs ? { id: PANEL_ID, labelledBy: tabId(activeSubcategory?.id ?? 'all') } : undefined}
-          fallback={fallback}
-        >
-          {cards}
-        </CardGrid>
+      <PageSection tone="tint" stack aria-label={`${category.name} ${t.dealsAriaLabelSuffix}`}>
+        <ListingToolbar
+          ariaLabel={t.toolbar.label}
+          end={<SearchField value={search} placeholder={t.search.placeholder.replace('{category}', category.name)} onSearch={setSearch} />}
+        />
+        {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
+        {actionError && <p className="error-state" role="alert">{actionError}</p>}
+        <CardGrid fallback={fallback}>{cards}</CardGrid>
       </PageSection>
     </>
   );
