@@ -98,7 +98,7 @@ export function Home() {
       />
       <HowItWorks />
       {ready && catalog.therapists.length > 0 && (
-        <section className="home-band" aria-labelledby="therapists-heading">
+        <section className="home-band home-band--tint" aria-labelledby="therapists-heading">
           <div className="home-container">
             <CardRail
               id="therapists-heading"

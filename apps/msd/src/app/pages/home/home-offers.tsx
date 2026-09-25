@@ -11,7 +11,6 @@ export function HomeOffers({ isAuthenticated }: { isAuthenticated: boolean }) {
         <article className="home-offer home-offer--welcome">
           <img className="home-offer__bg" src={home.welcomeOffer.image} alt="" loading="lazy" decoding="async" />
           <div className="home-offer__content">
-            <p className="home-offer__badge">{home.welcomeOffer.badge}</p>
             <h2 id="offers-heading" className="home-offer__title">{home.welcomeOffer.title}</h2>
             <p className="home-offer__subtitle">{home.welcomeOffer.subtitle}</p>
             <p className="home-offer__text">{home.welcomeOffer.description}</p>
@@ -22,7 +21,7 @@ export function HomeOffers({ isAuthenticated }: { isAuthenticated: boolean }) {
 
         <sky-feature-card
           className="home-offer--gift"
-          color="primary"
+          color="secondary"
           icon="card_giftcard"
           icon-style="surface"
           headline={home.giftCard.heading}

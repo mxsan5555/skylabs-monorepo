@@ -25,7 +25,10 @@ export function CategoryTiles({ categories }: { categories: CatalogCategoryWithC
         <ul className="home-cats" role="list">
           {categories.map((cat) => (
             <li key={cat.id}>
-              <sky-tile-card icon={icons[cat.slug] ?? icons.default} text={tileText(cat.children.length)}>
+              <sky-tile-card
+                color="secondary"
+                icon-style="surface"
+                icon={icons[cat.slug] ?? icons.default} text={tileText(cat.children.length)}>
                 <h3 slot="headline" className="home-cats__name title-medium">
                   <Link to={categoryHref(cat.slug)} className="home-cats__link">{cat.name}</Link>
                 </h3>
