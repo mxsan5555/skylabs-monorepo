@@ -8,7 +8,8 @@ import {
   SelectOption,
 } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { useNavigate } from 'react-router-dom';
+import { signInPathWithReturnTo } from '../../../auth/role-routing';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { DealCard } from '../../components/deal-card';
 import {
   listCatalogProducts,
@@ -42,6 +43,7 @@ export function ProductListing() {
   const { token, isAuthenticated } = useAuth();
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [productsData, setProductsData] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,11 +131,7 @@ export function ProductListing() {
       return true;
     }
 
-    navigate(
-      `/sign-in?next=${encodeURIComponent(
-        '/products',
-      )}`,
-    );
+    navigate(signInPathWithReturnTo(location));
 
     return false;
   };
