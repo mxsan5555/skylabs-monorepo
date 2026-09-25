@@ -33,8 +33,8 @@ Renders `<section>` → band → container.
 - Props:
   - `tone?: 'surface' | 'tint'` (default `surface`). `tint` = `--md-sys-color-surface-container`.
   - `flush?: boolean`: 16px top / 32px bottom (home's current `--flush`).
-  - `className?`, plus `aria-labelledby` / `aria-label` passed to the `<section>`.
-  - `as?: 'section' | 'div'` for wrappers that should not be landmarks (breadcrumb row). Default `section`.
+  - `stack?: boolean`: the container becomes a 16px-gap vertical stack (for a section with several direct children, e.g. breadcrumb + header).
+  - `className?` (on the `<section>`), plus `aria-labelledby` / `aria-label` passed to the `<section>`.
 - Stylesheet: `page-section.css`, token-only.
 
 ### `CardGrid` (`components/card-grid/`)
@@ -42,7 +42,8 @@ Renders `<section>` → band → container.
 - `<ul role="list">` with `grid-template-columns: repeat(auto-fill, minmax(min(272px, 100%), 1fr))`, gap 16px (20px from 840px).
 - 272px matches the card rail slide width, so grid cards and rail cards are the same size.
 - Each child is wrapped in `<li>` that stretches its card to full height (equal-height rows, fixes clipping).
-- Props: `children` (array of keyed nodes), `aria-label?`.
+- Same shape as `CardRail`: `above?` (content between section start and the grid, e.g. tabs and cart messages), `panel?: { id, labelledBy }` (wraps the grid in a `tabpanel`), plus `fallback?` (loading / error / empty node shown instead of the list) and `children`.
+- `md-tabs` placed in `above` get a transparent container so they sit on the band's tone.
 - Stylesheet: `card-grid.css`, token-only.
 
 ### `SectionHead` (existing)
@@ -54,22 +55,22 @@ Renders `<section>` → band → container.
 
 Top to bottom:
 
-1. **Breadcrumb**: existing `Breadcrumb` inside `PageSection as="div" flush`.
-2. **Header + filters** (`PageSection tone="surface"`, labelled by the h1):
-   - `SectionHead as="h1" titleClassName="headline-large"`: title = category name (or "{category} in {city}"), subheading = category description (when present), actions = result count (`aria-live="polite"`).
-   - Subcategory tabs (only when the category has children): shared-ui `Tabs` with raw `md-secondary-tab` children, the same pattern as home's `DealsNearYou` (`id`/`aria-controls` rendered as attributes). "All" plus one tab per subcategory. The `?sub=<slug>` query param stays the source of truth.
-   - Search: `sky-action-field` with `role="search"`, `type="search"`, `icon="search"`, `variant="outlined"`, `dense`, `action-label` from content. It fires on `sky-submit` (Enter or button), not on every keystroke.
-3. **Results** (`PageSection tone="tint"`, `aria-label` = "{category} deals" as today): `CardGrid` of
+1. **Header** (`PageSection stack`, labelled by the h1):
+   - existing `Breadcrumb`;
+   - `SectionHead as="h1" titleClassName="headline-large"`: title = category name (or "{category} in {city}"), subheading = category description (when present), actions = result count (`aria-live="polite"`) + search.
+   - Search: `sky-action-field` with `role="search"`, `type="search"`, `icon="search"`, `variant="outlined"`, `dense`, `action-label` from content (measured 341px wide in the actions row). It fires on `sky-submit` (Enter or button), not on every keystroke. It lives in a small local `SearchField` component so `useCustomEvent` attaches when the element mounts (the page returns early while loading).
+2. **Results** (`PageSection tone="tint"`, `aria-label` = "{category} deals" as today):
+   - `above`: subcategory tabs (only when the category has children), shared-ui `Tabs` with raw `md-secondary-tab` children, the same pattern as home's `DealsNearYou` (`id`/`aria-controls` rendered as attributes). "All" plus one tab per subcategory. The `?sub=<slug>` query param stays the source of truth. Cart feedback messages follow the tabs.
+   - `CardGrid` of
    - SERVICE / legacy: `DealCard` with the add-to-cart dialog action (unchanged props),
    - PRODUCT: `DealCard` with the add-to-cart button (unchanged),
    - THERAPY: `SkyProductCardWC` (unchanged props).
-   - The tab panel wraps this section's grid (`role="tabpanel"`, `aria-labelledby` = active tab id) when tabs exist.
-4. **States**:
+   - The tab panel wraps the grid (`role="tabpanel"`, `aria-labelledby` = active tab id) when tabs exist.
+3. **States**:
    - loading: existing global `loading-state` paragraph;
    - error: `error-state` alert (global class);
    - empty: `sky-info-card` (deals/products copy existing; therapists copy moves to `content.json`);
-   - not found / unknown city: `PageSection` with `sky-info-card` + `FilledButton` to `/categories`, `noindex` as today.
-   - Cart feedback messages (`field-hint` status / `error-state` alert) render inside the results section above the grid.
+   - not found / unknown city: `PageSection stack` with `sky-info-card` + `FilledButton` to `/categories`, `noindex` as today.
 
 ## Content
 
@@ -77,13 +78,14 @@ Move to `content.json` → `category`:
 
 - `resultCount.therapist.{singular,plural}`, `resultCount.product.{singular,plural}` (deals already have `dealCount`),
 - `emptyTherapists.{heading,subheading}`,
-- `actions.addToCartDeal` ("Add to Cart"), `messages.addedDeal` (`Added "{item}" to your cart.`),
+- reuse existing `actions.addToCart` and `messages.addToCartSuccess` for the deal add-to-cart button and message (today hardcoded),
+- `tabsLabel` ("Filter by sub-category"),
 - `therapistPricePrefix` ("From"),
-- `search.{label,placeholder,action}` for the action field (the existing `searchLabel` is reused as the label).
+- `search.{placeholder,action}` for the action field (the existing `searchLabel` is reused as the label).
 
 ## Removals
 
-- Delete `apps/msd/src/app/pages/category/category.css` and its import.
+- Remove the `category.css` import (and every `category-page__*` class) from the category page. The file itself stays: `/categories`, therapists, orders, invoices and payments still import it. Migrating those five pages to `PageSection` / `CardGrid` is a recorded follow-up in `TASK.md`, not part of this change.
 - Home: replace every `home-band` / `home-container` wrapper with `PageSection` (`tint` where `home-band--tint` was, `flush` for the partner banner). Remove `.home-container`, `.home-band`, `.home-band--tint`, `.home-band--flush` from `home.css`. The hero becomes `PageSection className="home-hero"` (band padding from `PageSection`) with its `home-hero__inner` grid as the child. Home's section-specific rules (hero, spotlight, cats, steps, offers, directory, faq, skeleton) stay as they are.
 
 ## Unchanged
@@ -92,8 +94,8 @@ Data fetching and its effects, prerender payload and hydration path, background 
 
 ## Testing
 
-- `page-section.test.tsx`: renders a section with the tone class, forwards `aria-labelledby`, `as="div"` renders no landmark.
-- `card-grid.test.tsx`: renders a list with one `li` per child.
+- `page-section.test.tsx`: renders a section with the tone class, forwards `aria-labelledby`, `stack` and `flush` classes.
+- `card-grid.test.tsx`: one `li` per child, `fallback` replaces the list, `panel` wraps it in a tabpanel after `above`.
 - `section-head` test: `as="h1"` renders a level-1 heading.
 - `category.test.tsx`: update for `md-secondary-tab` (tab click sets `?sub=`), search fires on `sky-submit`, count text from content, empty therapist copy from content.
 - Existing home tests and `hydration.test.tsx` pass unchanged (band swap must not change markup semantics: same sections, same headings, same labels).
