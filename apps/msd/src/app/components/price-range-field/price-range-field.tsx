@@ -1,4 +1,4 @@
-import { createElement, type ChangeEvent } from 'react';
+import { createElement, useEffect, useRef, type ChangeEvent } from 'react';
 import '@skylabs-monorepo/shared-ui';
 import './price-range-field.css';
 
@@ -32,6 +32,15 @@ function normalize(min: number, max: number, bounds: { min: number; max: number 
 export function PriceRangeField({ bounds, value, onChange, copy }: PriceRangeFieldProps) {
   const min = value.min ?? bounds.min;
   const max = value.max ?? bounds.max;
+  // md-slider's handle names are properties (ariaLabelStart/End), not aria-* attributes; set them
+  // directly so React's aria-prop validator never sees them.
+  const sliderRef = useRef<HTMLElement & { ariaLabelStart?: string; ariaLabelEnd?: string }>(null);
+  useEffect(() => {
+    const slider = sliderRef.current;
+    if (!slider) return;
+    slider.ariaLabelStart = copy.minLabel;
+    slider.ariaLabelEnd = copy.maxLabel;
+  }, [copy.minLabel, copy.maxLabel]);
 
   const onSliderChange = (e: ChangeEvent<HTMLElement & { valueStart?: number; valueEnd?: number }>) => {
     const el = e.currentTarget;
@@ -68,6 +77,7 @@ export function PriceRangeField({ bounds, value, onChange, copy }: PriceRangeFie
         })}
       </div>
       {createElement('md-slider', {
+        ref: sliderRef,
         range: true,
         labeled: true,
         min: bounds.min,
@@ -75,8 +85,6 @@ export function PriceRangeField({ bounds, value, onChange, copy }: PriceRangeFie
         step: bounds.step,
         'value-start': min,
         'value-end': max,
-        ariaLabelStart: copy.minLabel,
-        ariaLabelEnd: copy.maxLabel,
         onChange: onSliderChange,
       })}
     </div>
