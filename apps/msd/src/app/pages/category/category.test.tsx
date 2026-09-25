@@ -480,6 +480,21 @@ describe('Category page layout', () => {
       await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.branchIds).toEqual([BRANCH_A]));
     });
 
+    it('ignores a radius that is not one of the offered distances', async () => {
+      stubMedia(true);
+      visitor.value = { ...visitor.value, status: 'ready', city: 'Gorakhpur', coords: { latitude: 26.76, longitude: 83.37 } };
+      renderAt('/category/massage?radius=600');
+      await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
+      expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.radiusKm).toBeUndefined();
+    });
+
+    it('treats ?sort=distance without coordinates as relevance', async () => {
+      stubMedia(true);
+      renderAt('/category/massage?sort=distance');
+      await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
+      expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.sort).toBeUndefined();
+    });
+
     it('picking a distance radio sets ?radius= and sends radiusKm, with visitor coordinates', async () => {
       stubMedia(true);
       visitor.value = { ...visitor.value, status: 'ready', city: 'Gorakhpur', coords: { latitude: 26.76, longitude: 83.37 } };

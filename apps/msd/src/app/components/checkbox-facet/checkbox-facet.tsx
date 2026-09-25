@@ -17,11 +17,13 @@ export interface CheckboxFacetProps {
   showLess: string;
   /** @default 5 */
   limit?: number;
+  /** Screen-reader text for a count (e.g. ", 3 deals"); the visible number is hidden from them. */
+  countLabel?: (count: number) => string;
 }
 
 /** A searchable, "show more"-limited list of checkbox options with a live count per option. Raw
  *  M3 elements so tests can drive checkbox/search state directly. */
-export function CheckboxFacet({ options, selected, onChange, searchLabel, showMore, showLess, limit = 5 }: CheckboxFacetProps) {
+export function CheckboxFacet({ options, selected, onChange, searchLabel, showMore, showLess, limit = 5, countLabel }: CheckboxFacetProps) {
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState(false);
   const selectedSet = new Set(selected);
@@ -58,7 +60,10 @@ export function CheckboxFacet({ options, selected, onChange, searchLabel, showMo
                   onChange: (e: ChangeEvent<HTMLElement & { checked: boolean }>) => toggle(option.value, e.currentTarget.checked),
                 })}
                 <span className="checkbox-facet__label body-medium">{option.label}</span>
-                <span className="checkbox-facet__count label-small">{option.count}</span>
+                <span className="checkbox-facet__count label-small" aria-hidden={countLabel ? 'true' : undefined}>
+                  {option.count}
+                </span>
+                {countLabel && <span className="sr-only">{countLabel(option.count)}</span>}
               </label>
             </li>
           );

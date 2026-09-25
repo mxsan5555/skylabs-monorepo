@@ -48,6 +48,7 @@ export function FilterPanel({
   onClearAll,
   copy,
 }: FilterPanelProps) {
+  const countLabel = (count: number) => (count === 1 ? copy.countOne : copy.countMany.replace('{count}', String(count)));
   const isDeals = kind === 'deals';
   const distance = facets?.distance ?? [];
   const distanceDisabled = !location.hasCoords;
@@ -99,7 +100,10 @@ export function FilterPanel({
                       <span className="checkbox-facet__label body-medium">
                         {copy.distance.within.replace('{km}', String(bucket.km))}
                       </span>
-                      <span className="checkbox-facet__count label-small">{bucket.count}</span>
+                      <span className="checkbox-facet__count label-small" aria-hidden="true">
+                        {bucket.count}
+                      </span>
+                      <span className="sr-only">{countLabel(bucket.count)}</span>
                     </label>
                   </li>
                 ))}
@@ -122,6 +126,7 @@ export function FilterPanel({
               searchLabel={copy.business.search}
               showMore={copy.showMore}
               showLess={copy.showLess}
+              countLabel={countLabel}
             />
           </sky-accordion-item>
         )}
@@ -137,6 +142,7 @@ export function FilterPanel({
               selected={branchIds}
               onChange={onBranches}
               searchLabel={copy.branches.search}
+              countLabel={countLabel}
               showMore={copy.showMore}
               showLess={copy.showLess}
             />

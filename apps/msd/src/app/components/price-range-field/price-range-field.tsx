@@ -46,11 +46,16 @@ export function PriceRangeField({ bounds, value, onChange, copy }: PriceRangeFie
     const el = e.currentTarget;
     onChange(normalize(el.valueStart ?? bounds.min, el.valueEnd ?? bounds.max, bounds));
   };
+  // An emptied (or non-numeric) field means "no limit" on that side, never 0.
+  const parse = (raw: string, fallback: number) => {
+    const n = raw.trim() === '' ? NaN : Number(raw);
+    return Number.isFinite(n) ? n : fallback;
+  };
   const onMinChange = (e: ChangeEvent<HTMLElement & { value: string }>) => {
-    onChange(normalize(Number(e.currentTarget.value), max, bounds));
+    onChange(normalize(parse(e.currentTarget.value, bounds.min), max, bounds));
   };
   const onMaxChange = (e: ChangeEvent<HTMLElement & { value: string }>) => {
-    onChange(normalize(min, Number(e.currentTarget.value), bounds));
+    onChange(normalize(min, parse(e.currentTarget.value, bounds.max), bounds));
   };
 
   return (

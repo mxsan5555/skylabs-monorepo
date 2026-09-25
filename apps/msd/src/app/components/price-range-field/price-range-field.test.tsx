@@ -59,4 +59,16 @@ describe('PriceRangeField', () => {
     fireEvent.change(minField);
     expect(onChange).toHaveBeenCalledWith({ min: 1000, max: 1000 });
   });
+
+  it('treats an emptied field as no limit, not 0', () => {
+    const onChange = vi.fn();
+    render(<PriceRangeField bounds={{ min: 200, max: 3500, step: 100 }} value={{ min: 500, max: 2000 }} onChange={onChange} copy={copy} />);
+    const [minField, maxField] = Array.from(document.querySelectorAll('md-outlined-text-field')) as (HTMLElement & { value: string })[];
+    maxField.value = '';
+    fireEvent.change(maxField);
+    expect(onChange).toHaveBeenLastCalledWith({ min: 500, max: undefined });
+    minField.value = '  ';
+    fireEvent.change(minField);
+    expect(onChange).toHaveBeenLastCalledWith({ min: undefined, max: 2000 });
+  });
 });

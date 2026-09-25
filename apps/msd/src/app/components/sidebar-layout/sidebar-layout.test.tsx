@@ -56,4 +56,24 @@ describe('SidebarLayout', () => {
     fireEvent.click(scrim);
     expect(onClose).toHaveBeenCalledTimes(3);
   });
+
+  it('traps focus on phones: the rest of the page is inert while the sheet is open, restored after', () => {
+    stubMedia(false);
+    const { container, rerender } = render(
+      <SidebarLayout open sidebar={<p>Sidebar content</p>} sidebarLabel="Filters" closeLabel="Close filters" onClose={vi.fn()}>
+        <p>Main content</p>
+      </SidebarLayout>,
+    );
+    const aside = screen.getByRole('dialog', { name: 'Filters' });
+    expect(container.contains(aside)).toBe(false); // portalled to <body>
+    expect(container.inert).toBe(true);
+    expect(document.activeElement).toBe(aside);
+
+    rerender(
+      <SidebarLayout open={false} sidebar={<p>Sidebar content</p>} sidebarLabel="Filters" closeLabel="Close filters" onClose={vi.fn()}>
+        <p>Main content</p>
+      </SidebarLayout>,
+    );
+    expect(container.inert).toBe(false);
+  });
 });

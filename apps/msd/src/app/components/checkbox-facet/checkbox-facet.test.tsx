@@ -14,7 +14,8 @@ const options = [
 
 const copy = { searchLabel: 'Search businesses', showMore: 'Show more', showLess: 'Show less' };
 
-const rowText = (el: Element) => Array.from(el.querySelectorAll('span')).map((s) => s.textContent).join(' ');
+const rowText = (el: Element) =>
+  Array.from(el.querySelectorAll('span:not(.sr-only)')).map((s) => s.textContent?.trim()).join(' ');
 const rows = () => Array.from(document.querySelectorAll('.checkbox-facet__row'));
 
 describe('CheckboxFacet', () => {
@@ -73,5 +74,21 @@ describe('CheckboxFacet', () => {
     fireEvent.input(search);
     const visible = rows().map(rowText);
     expect(visible).toEqual(['Zen Spa 2']);
+  });
+
+  it('gives screen readers the count as words and hides the bare number', () => {
+    render(
+      <CheckboxFacet
+        options={[{ value: 'v1', label: 'Glow Beauty Studio', count: 3 }]}
+        selected={[]}
+        onChange={vi.fn()}
+        searchLabel="Search"
+        showMore="Show more"
+        showLess="Show less"
+        countLabel={(n) => `, ${n} deals`}
+      />,
+    );
+    expect(document.querySelector('.checkbox-facet__count')?.getAttribute('aria-hidden')).toBe('true');
+    expect(document.querySelector('.checkbox-facet__row .sr-only')?.textContent).toBe(', 3 deals');
   });
 });

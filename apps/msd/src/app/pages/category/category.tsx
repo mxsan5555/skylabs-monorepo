@@ -76,6 +76,15 @@ function toPrice(value: string | null): number | undefined {
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 }
 
+/** Distance filter options (km); must match the API's facet buckets. */
+const RADIUS_KM = [1, 5, 10, 20, 50, 100];
+
+/** A radius from the URL, only when it is one of the offered distances. */
+function toRadius(value: string | null): number | undefined {
+  const n = toPrice(value);
+  return n != null && RADIUS_KM.includes(n) ? n : undefined;
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** UUID-looking ids from a comma-joined query param (`?vendor=id,id`), invalid entries dropped. */
@@ -162,22 +171,30 @@ export function Category() {
   const subSlug = searchParams.get('sub');
   const subcategoryIdx = (category?.children.findIndex((c) => c.slug === subSlug) ?? -1) + 1;
   const activeSubcategory = subcategoryIdx === 0 ? undefined : category?.children[subcategoryIdx - 1];
-  const sortParam = searchParams.get('sort');
-  const sort =
-    (SORTS as readonly string[]).includes(sortParam ?? '') && sortParam !== 'relevance' ? (sortParam as CatalogDealSort) : undefined;
   const hasCoords = coords?.latitude != null && coords?.longitude != null;
+  const sortParam = searchParams.get('sort');
+  // Distance sort needs the visitor's coordinates; without them it is plain relevance.
+  const sort =
+    (SORTS as readonly string[]).includes(sortParam ?? '') && sortParam !== 'relevance' && (sortParam !== 'distance' || hasCoords)
+      ? (sortParam as CatalogDealSort)
+      : undefined;
   const sortOption = t.sortOptions.find((o) => o.value === (sort ?? 'relevance')) ?? t.sortOptions[0];
   const sortMenuOptions = t.sortOptions.filter((o) => o.value !== 'distance' || hasCoords);
   const viewParam = searchParams.get('view');
   const view = viewParam === 'list' || viewParam === 'map' ? viewParam : 'grid';
   const minPrice = toPrice(searchParams.get('min'));
   const maxPrice = toPrice(searchParams.get('max'));
-  const radius = toPrice(searchParams.get('radius'));
+  const radius = toRadius(searchParams.get('radius'));
   const vendorIds = toIds(searchParams.get('vendor'));
   const branchIds = toIds(searchParams.get('branch'));
-  const activeFilters = [radius != null, minPrice != null || maxPrice != null, vendorIds.length > 0, branchIds.length > 0].filter(
-    Boolean,
-  ).length;
+  // Only filters the current listing can apply count toward the "Filters (n)" badge.
+  const dealFilters = category?.type !== 'PRODUCT';
+  const activeFilters = [
+    dealFilters && hasCoords && radius != null,
+    minPrice != null || maxPrice != null,
+    dealFilters && vendorIds.length > 0,
+    dealFilters && branchIds.length > 0,
+  ].filter(Boolean).length;
   /** Writes one query param (or removes it when empty), keeping the others. */
   const setParam = (key: string, value: string | undefined) => {
     setSearchParams(
@@ -325,6 +342,8 @@ export function Category() {
   // Filter-panel facet counts (business/branch/distance/price) for deal categories only; ignores
   // stale responses and keeps the previous facets on error so the panel never flashes empty.
   const [facets, setFacets] = useState<CatalogDealFacets | null>(null);
+  // Another category's businesses/branches/price range must never show while this one loads.
+  useEffect(() => setFacets(null), [category?.id]);
   useEffect(() => {
     if (!category || !isDealCategory(category) || cityPending || cityMissing) return;
     let cancelled = false;
@@ -614,7 +633,12 @@ export function Category() {
               kind={isProductCategory ? 'products' : 'deals'}
               facets={facets}
               location={{ city: visitorCity, hasCoords }}
-              onChangeLocation={() => setCityPickerOpen(true)}
+              onChangeLocation={() => {
+                // The phone sheet is modal (the page behind it is inert); close it so the city
+                // dialog is usable. On desktop the panel stays open.
+                if (!desktop) setPanelOpen(false);
+                setCityPickerOpen(true);
+              }}
               radiusKm={radius}
               onRadius={onRadius}
               price={{ min: minPrice, max: maxPrice }}

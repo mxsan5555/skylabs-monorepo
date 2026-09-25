@@ -529,6 +529,8 @@
       "clearAll": "Clear all",
       "showMore": "Show more",
       "showLess": "Show less",
+      "countOne": ", 1 deal",
+      "countMany": ", {count} deals",
       "location": { "title": "Your location", "notSet": "Not set", "change": "Change location" },
       "distance": { "title": "Distance", "any": "Any distance", "within": "Within {km} km", "needsLocation": "Set your location to filter by distance." },
       "price": { "title": "Price", "min": "Min", "max": "Max", "minLabel": "Minimum price", "maxLabel": "Maximum price" },
