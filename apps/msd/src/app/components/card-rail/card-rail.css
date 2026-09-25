@@ -1,0 +1,20 @@
+/* Carousel track + nav. Header row styles live in section-head.css. 840px = M3 expanded window class. */
+.card-rail__nav {
+  display: none;
+}
+.card-rail__track swiper-container {
+  padding-block: 4px 8px;
+}
+.card-rail__slide {
+  display: flex;
+  inline-size: min(272px, 80vw);
+  block-size: auto;
+}
+.card-rail__slide > * {
+  flex: 1;
+}
+@media (min-width: 840px) {
+  .card-rail__nav {
+    display: inline-flex;
+  }
+}

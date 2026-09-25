@@ -1,0 +1,121 @@
+/* Phone bottom navigation; hidden from 840px (M3 expanded window class). */
+:root {
+  /* One source for the bar's height: the items' min size, the public layout's bottom padding
+     and the toast offset (toast.css) all read it. */
+  --tab-bar-size: 64px;
+}
+.tab-bar {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  z-index: 50;
+  padding-block-end: env(safe-area-inset-bottom);
+  background-color: var(--md-sys-color-surface-container);
+  border-block-start: 1px solid var(--md-sys-color-outline-variant);
+}
+.tab-bar__list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tab-bar__item {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  inline-size: 100%;
+  min-block-size: var(--tab-bar-size);
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  text-decoration: none;
+  cursor: pointer;
+}
+.tab-bar__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  inline-size: min(64px, 100%);
+  block-size: 32px;
+  border-radius: var(--md-sys-shape-corner-full);
+  transition: background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+/* Clip long labels at 320px; the visible text is cut, the accessible name stays whole. */
+.tab-bar__label {
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab-bar__item[aria-current='page'] {
+  color: var(--md-sys-color-on-surface);
+}
+.tab-bar__item[aria-current='page'] .tab-bar__icon {
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.tab-bar__item:not([aria-current='page']):hover .tab-bar__icon {
+  background-color: color-mix(
+    in srgb,
+    var(--md-sys-color-on-surface) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+    transparent
+  );
+}
+.tab-bar__item:focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: -3px;
+}
+.tab-bar__badge {
+  position: absolute;
+  inset-block-start: -2px;
+  inset-inline-end: 12px;
+}
+
+/* Keep public page content clear of the fixed bar. */
+@media (max-width: 839.98px) {
+  .public-layout {
+    box-sizing: border-box;
+    padding-block-end: calc(var(--tab-bar-size) + env(safe-area-inset-bottom));
+  }
+}
+
+.category-sheet {
+  --md-dialog-container-shape: 0;
+  max-inline-size: 100vw;
+  max-block-size: 100dvh;
+  inline-size: 100vw;
+  block-size: 100dvh;
+}
+.category-sheet__headline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.category-sheet__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.category-sheet__link {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  min-block-size: 48px;
+  color: var(--md-sys-color-on-surface);
+  text-decoration: none;
+}
+.category-sheet__link:focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: -3px;
+}
+
+@media (min-width: 840px) {
+  .tab-bar {
+    display: none;
+  }
+}

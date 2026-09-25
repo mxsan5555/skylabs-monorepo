@@ -1497,7 +1497,9 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/catalog/locations',
-    summary: 'Distinct {state, city} pairs from active branches — drives the public location picker',
+    summary:
+      'Distinct {state, city} pairs from active branches — drives the public location picker; each entry ' +
+      'also includes latitude/longitude: the average of that city\'s active branch coordinates, null when none have coordinates',
     tags: ['Catalogue (public)'],
     responses: { 200: { description: 'Locations' } },
   });

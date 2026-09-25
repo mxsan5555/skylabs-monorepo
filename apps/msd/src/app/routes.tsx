@@ -106,6 +106,7 @@ export function AppRoutes() {
             source). */}
         <Route path="/categories" element={<CategoriesIndex />} />
         <Route path="/category/:slug" element={<Category />} />
+        <Route path="/category/:slug/:city" element={<Category />} />
         <Route path="/deal/:id" element={<DealDetail />} />
         <Route path="/products" element={<ProductListing />} />
         <Route path="/products/:id" element={<ProductDetail />} />

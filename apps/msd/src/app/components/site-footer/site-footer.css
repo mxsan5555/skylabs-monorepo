@@ -1,0 +1,251 @@
+/* Site footer. Colours: app theme (--md-sys-color-*); shape/type/motion: shared-ui base.css.
+   840px = M3 expanded window class. */
+.site-footer {
+  margin-block-start: auto;
+  background-color: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-on-surface);
+  border-block-start: 1px solid var(--md-sys-color-outline-variant);
+}
+.site-footer :is(a, button, input):focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.trust-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 32px;
+  margin: 0;
+  padding: 16px;
+  list-style: none;
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.trust-strip__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  --md-icon-size: 20px;
+}
+
+.newsletter-band {
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+.newsletter-band__inner,
+.site-footer__main,
+.site-footer__popular,
+.site-footer__legal {
+  max-inline-size: 1280px;
+  margin-inline: auto;
+  padding-inline: 16px;
+}
+.newsletter-band__inner {
+  display: grid;
+  /* minmax(0, …) lets the column shrink below the email field's min-content at 320-360px. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  padding-block: 24px;
+}
+.newsletter-band__form {
+  min-inline-size: 0;
+}
+.newsletter-band__status {
+  margin: 0;
+}
+.newsletter-band__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.site-footer__main {
+  display: grid;
+  gap: 8px;
+  padding-block: 32px 16px;
+}
+.site-footer__brand {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding-block-end: 16px;
+}
+.site-footer__logo {
+  display: inline-flex;
+  justify-self: start;
+  border-radius: var(--md-sys-shape-corner-small);
+}
+.site-footer__logo img {
+  block-size: 48px;
+  inline-size: auto;
+}
+.site-footer__desc {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.site-footer__social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.site-footer__social-link {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 48px;
+  block-size: 48px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-full);
+  color: var(--md-sys-color-on-surface);
+}
+.site-footer__social-link:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--md-sys-color-on-surface) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+    transparent
+  );
+}
+
+.footer-col {
+  border-block-start: 1px solid var(--md-sys-color-outline-variant);
+}
+.footer-col__heading {
+  margin: 0;
+}
+.footer-col__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  inline-size: 100%;
+  min-block-size: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.footer-col__chevron {
+  transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.footer-col__toggle[aria-expanded='true'] .footer-col__chevron {
+  transform: rotate(180deg);
+}
+.footer-col__list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0 0 16px;
+  list-style: none;
+}
+.footer-col__list[data-collapsed='true'] {
+  display: none;
+}
+.footer-col__link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 40px;
+  color: var(--md-sys-color-on-surface-variant);
+  text-decoration: none;
+}
+.footer-col__link:hover {
+  color: var(--md-sys-color-primary);
+  text-decoration: underline;
+}
+.footer-col--inline .footer-col__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+}
+.footer-col--inline .footer-col__list[data-collapsed='true'] {
+  display: none;
+}
+
+.site-footer__legal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding-block: 16px 24px;
+  border-block-start: 1px solid var(--md-sys-color-outline-variant);
+  color: var(--md-sys-color-on-surface-variant);
+}
+.site-footer__legal p {
+  margin: 0;
+}
+.site-footer__legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.site-footer__legal-links a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 40px;
+  color: inherit;
+}
+
+.theme-switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-inline-size: 0; /* fieldset defaults to min-content; let the pills wrap at 320px */
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.theme-switch legend {
+  margin-inline-end: 8px;
+  padding: 0;
+}
+.theme-switch__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-block-size: 40px;
+  padding-inline: 12px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-corner-full);
+  cursor: pointer;
+}
+.theme-switch__option:has(input:checked) {
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  border-color: var(--md-sys-color-secondary-container);
+}
+.theme-switch__option:has(input:focus-visible) {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+.theme-switch__option input {
+  accent-color: var(--md-sys-color-primary);
+}
+
+@media (min-width: 840px) {
+  .newsletter-band__inner {
+    grid-template-columns: 1fr minmax(0, 480px);
+    align-items: center;
+    gap: 32px;
+  }
+  .site-footer__main {
+    grid-template-columns: 1.6fr repeat(4, 1fr);
+    gap: 32px;
+    padding-block: 48px 24px;
+  }
+  .footer-col {
+    border-block-start: 0;
+  }
+  .footer-col__heading {
+    margin-block-end: 8px;
+  }
+  .site-footer__popular .footer-col {
+    padding-block: 16px;
+    border-block-start: 1px solid var(--md-sys-color-outline-variant);
+  }
+}

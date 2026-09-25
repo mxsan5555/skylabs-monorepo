@@ -1,341 +1,260 @@
-/* =========================================================
-   HOME (msd storefront)
-   Tokens only (--md-sys-color-*), so light/dark and the green
-   brand come from shared-ui's theme. Radius scale: 24px media
-   and panels, 16px tiles, full pill for interactive controls.
-========================================================= */
-
+/* Home page. Colours: app theme; type/shape/motion/state/elevation: shared-ui base.css.
+   Carousel header styles live in card-rail.css. 600px = M3 medium, 840px = M3 expanded window class. */
 .home {
-  --home-gutter: 24px;
-  --home-radius-lg: 24px;
-  --home-radius-md: 16px;
-  --home-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --home-shadow: 0 1px 2px rgb(0 60 20 / 0.06), 0 12px 32px -12px rgb(0 60 20 / 0.18);
-  color: var(--md-sys-color-on-surface);
-  background: var(--md-sys-color-surface);
-}
-
-.home-container {
-  max-width: 1280px;
-  margin-inline: auto;
-  padding-inline: var(--home-gutter);
-  box-sizing: border-box;
-}
-
-.home-band {
-  padding-block: 56px;
-}
-
-.home-band--tint {
-  background: var(--md-sys-color-surface-container-low);
-}
-
-/* ── Section header ───────────────────────────────────── */
-
-.home-head {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.home-head--stack {
   flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.home-head__title {
-  margin: 0;
-  font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem);
-  line-height: 1.15;
-  font-weight: 600;
-  letter-spacing: -0.02em;
   color: var(--md-sys-color-on-surface);
 }
-
-.home-head__sub {
-  margin: 0;
-  max-width: 60ch;
-  font-size: 1rem;
-  line-height: 1.6;
-  color: var(--md-sys-color-on-surface-variant);
+.home-container {
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: 1280px;
+  margin-inline: auto;
+  padding-inline: 16px;
 }
-
-.home-head__actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
+.home-band {
+  padding-block: 32px;
 }
-
-.home-head__link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-right: 8px;
-  padding: 8px 4px;
-  font-weight: 600;
-  font-size: 0.9375rem;
-  color: var(--md-sys-color-primary);
-  text-decoration: none;
-  border-radius: 999px;
+.home-band--tint {
+  background-color: var(--md-sys-color-surface-container-low);
 }
-
-.home-head__link md-icon {
-  --md-icon-size: 18px;
-  transition: transform 0.25s var(--home-ease);
+.home-band--flush {
+  padding-block: 16px 32px;
 }
-
-.home-head__link:hover md-icon {
-  transform: translateX(3px);
-}
-
-.home-head__link:hover {
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
-
-.home-head__link:focus-visible,
+/* Focus rings for the page's own links. SectionHead links style theirs in section-head.css;
+   tile links draw theirs on the tile (below). */
 .home-spotlight:focus-visible,
 .home-directory__links a:focus-visible {
   outline: 3px solid var(--md-sys-color-primary);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 
-/* ── Card rails ───────────────────────────────────────── */
-
-.home-rail swiper-container {
-  display: block;
-  overflow: hidden;
-  /* keep card shadows/focus rings from being clipped at the edges */
-  padding: 4px 4px 12px;
-  margin: -4px -4px -12px;
-}
-
-.home-rail__slide {
-  width: 272px;
-  height: auto;
-}
-
-.home-rail__slide > * {
-  height: 100%;
-}
-
-.home-tabs {
-  margin-bottom: 24px;
-  background: transparent;
-  --md-secondary-tab-container-color: transparent;
-}
-
-.home-empty {
-  margin: 0;
-  padding: 32px 0;
-  color: var(--md-sys-color-on-surface-variant);
-}
-
-/* ── Hero ─────────────────────────────────────────────── */
-
+/* Hero */
 .home-hero {
-  padding-block: 48px 64px;
-  background:
-    radial-gradient(1200px 480px at 85% 0%, var(--md-sys-color-primary-container) 0%, transparent 60%),
-    var(--md-sys-color-surface);
+  padding-block: 32px;
+  background-color: var(--md-sys-color-surface);
 }
-
 .home-hero__inner {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  align-items: center;
-  gap: 56px;
+  gap: 24px;
 }
-
+.home-hero__copy {
+  display: grid;
+  gap: 16px;
+  align-content: center;
+  min-inline-size: 0;
+}
 .home-hero__title {
   margin: 0;
-  font-size: clamp(2.25rem, 1.6rem + 2.6vw, 3.75rem);
-  line-height: 1.05;
+  font-family: var(--md-sys-typescale-display-medium-font);
+  font-size: clamp(var(--md-sys-typescale-headline-large-size), 1.6rem + 2.6vw, var(--md-sys-typescale-display-medium-size));
+  line-height: 1.15;
   font-weight: 700;
-  letter-spacing: -0.035em;
   color: var(--md-sys-color-on-surface);
   text-wrap: balance;
 }
-
 .home-hero__sub {
-  margin: 20px 0 32px;
-  max-width: 44ch;
-  font-size: 1.125rem;
-  line-height: 1.6;
+  margin: 0;
+  max-inline-size: 44ch;
+  font-size: var(--md-sys-typescale-body-large-size);
+  line-height: var(--md-sys-typescale-body-large-line-height);
   color: var(--md-sys-color-on-surface-variant);
 }
-
 .home-hero__search {
-  max-width: 560px;
+  max-inline-size: 560px;
 }
-
-.home-hero__copy,
 .home-hero__visual {
   position: relative;
-  min-width: 0;
+  min-inline-size: 0;
 }
-
 .home-hero__img {
   display: block;
-  width: 100%;
-  height: auto;
+  inline-size: 100%;
+  block-size: auto;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  border-radius: var(--home-radius-lg);
-  background: var(--md-sys-color-surface-container);
-  box-shadow: var(--home-shadow);
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background-color: var(--md-sys-color-surface-container);
 }
-
-/* Floating "top deal" preview: a real deal, rendered live. */
+/* Phones: the spotlight sits below the photo so it never covers it; from 600px it floats over it. */
 .home-spotlight {
-  position: absolute;
-  left: -40px;
-  bottom: -28px;
+  position: static;
   display: flex;
   align-items: center;
-  gap: 14px;
-  max-width: min(380px, 90%);
-  padding: 12px 16px 12px 12px;
-  border-radius: var(--home-radius-md);
-  background: var(--md-sys-color-surface-container-lowest);
+  gap: 12px;
+  margin-block-start: 12px;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-large);
+  background-color: var(--md-sys-color-surface-container-lowest);
   color: var(--md-sys-color-on-surface);
   text-decoration: none;
-  box-shadow: var(--home-shadow);
-  border: 1px solid var(--md-sys-color-outline-variant);
-  transition: transform 0.3s var(--home-ease), box-shadow 0.3s var(--home-ease);
+  transition: background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
 }
-
 .home-spotlight:hover {
-  transform: translateY(-3px);
+  background-color: var(--md-sys-color-surface-container-low);
 }
-
 .home-spotlight__thumb {
-  width: 64px;
-  height: 64px;
-  flex-shrink: 0;
-  border-radius: 12px;
+  inline-size: 64px;
+  block-size: 64px;
+  flex: none;
   object-fit: cover;
-  background: var(--md-sys-color-surface-container);
+  border-radius: var(--md-sys-shape-corner-medium);
+  background-color: var(--md-sys-color-surface-container);
 }
-
 .home-spotlight__body {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  flex: 1;
   gap: 2px;
-  min-width: 0;
+  min-inline-size: 0;
 }
-
 .home-spotlight__label {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: var(--md-sys-typescale-label-medium-size);
+  line-height: var(--md-sys-typescale-label-medium-line-height);
+  font-weight: var(--md-sys-typescale-label-medium-weight);
   color: var(--md-sys-color-primary);
 }
-
 .home-spotlight__title {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  line-height: 1.3;
-  overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  overflow: hidden;
   -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: var(--md-sys-typescale-title-small-size);
+  line-height: var(--md-sys-typescale-title-small-line-height);
+  font-weight: var(--md-sys-typescale-title-small-weight);
 }
-
 .home-spotlight__price {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
-  margin-top: 2px;
-  font-size: 0.875rem;
+  gap: 6px;
+  font-size: var(--md-sys-typescale-body-medium-size);
 }
-
-.home-spotlight__price strong {
-  font-size: 1rem;
-  color: var(--md-sys-color-on-surface);
-}
-
 .home-spotlight__price s {
   color: var(--md-sys-color-on-surface-variant);
 }
-
 .home-spotlight__off {
+  color: var(--md-sys-color-primary);
   font-weight: 600;
-  color: var(--md-sys-color-primary);
 }
-
 .home-spotlight__arrow {
-  flex-shrink: 0;
+  flex: none;
   color: var(--md-sys-color-primary);
 }
 
-/* ── Categories ───────────────────────────────────────── */
-
+/* Category tiles (tile surface is sky-tile-card; the slotted link stretches over it).
+   136px min keeps 2 columns in a 288px content box (320px viewport). */
 .home-cats {
-  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+  gap: 12px;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 16px;
+  list-style: none;
+}
+.home-cats__name {
+  margin: 0;
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+.home-cats__link {
+  color: inherit;
+  text-decoration: none;
+}
+.home-cats__link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--md-sys-shape-corner-large);
+}
+.home-cats__link:hover {
+  text-decoration: underline;
+}
+.home-cats__link:focus-visible {
+  outline: none;
+}
+.home-cats sky-tile-card:has(.home-cats__link:focus-visible) {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+  border-radius: var(--md-sys-shape-corner-large);
 }
 
-/* ── Offers bento ─────────────────────────────────────── */
+/* Deals tabs */
+.home-tabs {
+  margin-block-end: 16px;
+  background-color: transparent;
+  --md-secondary-tab-container-color: transparent;
+}
+/* How it works */
+.home-steps {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.home-steps__item {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 20px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background-color: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+}
+.home-steps__item :is(h3, p) {
+  margin: 0;
+}
+.home-steps__item p {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.home-steps__icon {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 48px;
+  block-size: 48px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
 
+/* Offers bento. Phones: one column; 600px: welcome full width over gift + member;
+   840px: welcome spans both rows on the left. */
 .home-offers {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-  grid-template-rows: auto auto;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
 }
-
 .home-offer {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
-  padding: 32px;
-  border-radius: var(--home-radius-lg);
+  padding: 24px;
+  border-radius: var(--md-sys-shape-corner-extra-large);
   overflow: hidden;
 }
-
 .home-offer--welcome {
-  grid-row: span 2;
   justify-content: flex-end;
-  min-height: 420px;
-  color: #f6fbf3;
-  background: #0f2a17;
+  min-block-size: 360px;
+  color: var(--sky-color-on-scrim);
+  background-color: var(--md-sys-color-scrim);
 }
-
-.home-offers--member .home-offer--gift {
-  grid-row: span 2;
-}
-
 .home-offer__bg {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  inline-size: 100%;
+  block-size: 100%;
   object-fit: cover;
-  transition: transform 0.8s var(--home-ease);
 }
-
-.home-offer--welcome:hover .home-offer__bg {
-  transform: scale(1.03);
-}
-
 /* Scrim keeps overlay copy at AA contrast on any photo. */
 .home-offer--welcome::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, rgb(8 28 14 / 0.88) 0%, rgb(8 28 14 / 0.6) 45%, rgb(8 28 14 / 0.05) 80%);
+  background: color-mix(in srgb, var(--md-sys-color-scrim) 70%, transparent);
 }
-
 .home-offer__content {
   position: relative;
   z-index: 1;
@@ -343,281 +262,181 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
-  max-width: 420px;
+  max-inline-size: 420px;
 }
-
 .home-offer__badge {
   margin: 0 0 4px;
   padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  background: rgb(255 255 255 / 0.16);
-  border: 1px solid rgb(255 255 255 / 0.28);
+  border: 1px solid color-mix(in srgb, var(--sky-color-on-scrim) 28%, transparent);
+  border-radius: var(--md-sys-shape-corner-full);
+  background-color: color-mix(in srgb, var(--sky-color-on-scrim) 16%, transparent);
+  font-size: var(--md-sys-typescale-label-large-size);
+  line-height: var(--md-sys-typescale-label-large-line-height);
+  font-weight: var(--md-sys-typescale-label-large-weight);
 }
-
 .home-offer__title {
   margin: 0;
-  font-size: clamp(2rem, 1.5rem + 2vw, 3rem);
-  line-height: 1.05;
+  font-size: clamp(var(--md-sys-typescale-headline-large-size), 1.5rem + 2vw, var(--md-sys-typescale-display-medium-size));
+  line-height: 1.1;
   font-weight: 700;
-  letter-spacing: -0.03em;
 }
-
 .home-offer__subtitle {
   margin: 0;
-  font-size: 1.125rem;
-  font-weight: 500;
+  font-size: var(--md-sys-typescale-title-large-size);
+  line-height: var(--md-sys-typescale-title-large-line-height);
+  font-weight: var(--md-sys-typescale-title-medium-weight);
 }
-
-.home-offer--welcome .home-offer__text {
-  color: rgb(246 251 243 / 0.86);
-  margin-bottom: 12px;
-}
-
 .home-offer__text {
   margin: 0 0 8px;
-  max-width: 44ch;
-  line-height: 1.55;
+  max-inline-size: 44ch;
+  font-size: var(--md-sys-typescale-body-large-size);
+  line-height: var(--md-sys-typescale-body-large-line-height);
+}
+.home-offer--welcome .home-offer__text {
+  margin-block-end: 12px;
+}
+/* M3 filled button look on a light-DOM link (crawlable in prerendered HTML). */
+.home-offer__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 40px;
+  padding-inline: 24px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  text-decoration: none;
+  transition: background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.home-offer__cta:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--md-sys-color-on-primary) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+    var(--md-sys-color-primary)
+  );
+}
+.home-offer__cta:focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
 }
 
-.home-band--flush {
-  padding-block-end: 0;
-}
-
-/* ── Treatment directory ──────────────────────────────── */
-
+/* Treatment directory */
 .home-directory {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 32px 24px;
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+  gap: 24px;
 }
-
 .home-directory__title {
-  margin: 0 0 12px;
-  font-size: 1rem;
-  font-weight: 600;
+  margin: 0 0 8px;
 }
-
 .home-directory__links {
-  list-style: none;
-  margin: 0;
-  padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-
 .home-directory__links a {
-  display: inline-block;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--md-sys-color-outline-variant);
-  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 40px;
   color: var(--md-sys-color-on-surface-variant);
-  text-decoration: none;
-  transition: background-color 0.2s var(--home-ease), color 0.2s var(--home-ease);
 }
-
 .home-directory__links a:hover {
-  background: var(--md-sys-color-secondary-container);
-  color: var(--md-sys-color-on-secondary-container);
-  border-color: transparent;
+  color: var(--md-sys-color-primary);
 }
 
-/* ── FAQ ──────────────────────────────────────────────── */
-
+/* FAQ */
 .home-faq {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr);
-  gap: 48px;
+  gap: 24px;
   align-items: start;
 }
 
-.home-faq__intro {
-  position: sticky;
-  top: 140px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* Partner banner: heading + body slotted into sky-cta-banner's copy column. */
+.home-partner__title,
+.home-partner__text {
+  margin: 0;
 }
 
-/* ── Loading skeleton ─────────────────────────────────── */
-
-.home-skeleton {
-  padding-block: 48px;
-}
-
-.home-skeleton__hero {
-  display: grid;
-  grid-template-columns: 1fr 1.1fr;
-  gap: 56px;
-  margin-bottom: 56px;
-}
-
+/* Deals placeholder: card-sized blocks laid out like the rail. */
 .home-skeleton__row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
+  grid-auto-flow: column;
+  grid-auto-columns: min(272px, 80vw);
+  gap: 16px;
+  overflow: hidden;
 }
-
 .home-skeleton__block {
-  border-radius: var(--home-radius-md);
-  background: linear-gradient(
-    90deg,
-    var(--md-sys-color-surface-container) 0%,
-    var(--md-sys-color-surface-container-high) 50%,
-    var(--md-sys-color-surface-container) 100%
-  );
-  background-size: 200% 100%;
+  border-radius: var(--md-sys-shape-corner-large);
+  background-color: var(--md-sys-color-surface-container);
 }
-
-.home-skeleton__block--copy {
-  height: 240px;
-}
-
-.home-skeleton__block--media {
-  aspect-ratio: 4 / 3;
-  border-radius: var(--home-radius-lg);
-}
-
 .home-skeleton__block--card {
-  height: 340px;
+  aspect-ratio: 3 / 4;
 }
 
-/* ── Motion (only when the user allows it) ────────────── */
-
-@media (prefers-reduced-motion: no-preference) {
-  .home-hero__copy > * {
-    animation: home-rise 0.7s var(--home-ease) both;
-  }
-  .home-hero__copy > :nth-child(2) {
-    animation-delay: 80ms;
-  }
-  .home-hero__copy > :nth-child(3) {
-    animation-delay: 160ms;
-  }
-  .home-hero__img {
-    animation: home-fade 0.9s var(--home-ease) both;
-  }
+@media (min-width: 600px) {
   .home-spotlight {
-    animation: home-rise 0.7s var(--home-ease) 350ms both;
-  }
-  .home-skeleton__block {
-    animation: home-shimmer 1.4s linear infinite;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .home-spotlight,
-  .home-offer__bg,
-  .home-head__link md-icon {
-    transition: none;
-  }
-}
-
-@keyframes home-rise {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes home-fade {
-  from {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes home-shimmer {
-  to {
-    background-position: -200% 0;
-  }
-}
-
-/* ── Responsive ───────────────────────────────────────── */
-
-@media (max-width: 1023px) {
-  .home-hero__inner {
-    grid-template-columns: 1fr;
-    gap: 48px;
-  }
-  .home-spotlight {
-    left: 16px;
+    position: absolute;
+    inset-inline-start: 16px;
+    inset-block-end: 16px;
+    max-inline-size: min(380px, calc(100% - 32px));
+    margin: 0;
+    border: 0;
+    box-shadow: var(--sky-elevation-2);
   }
   .home-offers {
-    grid-template-columns: 1fr 1fr;
-  }
-  .home-offer--welcome {
-    grid-column: 1 / -1;
-    grid-row: auto;
-    min-height: 360px;
-  }
-  .home-offers--member .home-offer--gift {
-    grid-column: 1 / -1;
-    grid-row: auto;
-  }
-  .home-faq {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
-  .home-faq__intro {
-    position: static;
-  }
-}
-
-@media (max-width: 767px) {
-  .home {
-    --home-gutter: 16px;
-  }
-  .home-band {
-    padding-block: 40px;
-  }
-  .home-hero {
-    padding-block: 28px 56px;
-  }
-  .home-hero__sub {
-    margin: 16px 0 24px;
-    font-size: 1rem;
-  }
-  .home-spotlight {
-    left: 12px;
-    right: 12px;
-    max-width: none;
-  }
-  .home-head__nav {
-    display: none;
-  }
-  .home-head__link {
-    margin-right: 0;
-  }
-  .home-cats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-  .home-rail__slide {
-    width: 78vw;
-    max-width: 300px;
-  }
-  .home-offers {
-    grid-template-columns: 1fr;
   }
   .home-offer {
-    padding: 24px;
+    padding: 32px;
   }
-  .home-skeleton__hero {
-    grid-template-columns: 1fr;
+  .home-offer--welcome,
+  .home-offers--member .home-offer--gift {
+    grid-column: 1 / -1;
   }
-  .home-skeleton__row {
-    grid-template-columns: 1fr 1fr;
+}
+@media (min-width: 840px) {
+  .home-band {
+    padding-block: 48px;
+  }
+  .home-hero {
+    padding-block: 48px;
+  }
+  .home-hero__inner {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 48px;
+  }
+  .home-offers {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    gap: 20px;
+  }
+  .home-offer--welcome {
+    grid-column: auto;
+    grid-row: span 2;
+    min-block-size: 420px;
+  }
+  .home-offers--member .home-offer--gift {
+    grid-column: auto;
+    grid-row: span 2;
+  }
+  /* The copy column is at most 32px padding + 420px wide, so the scrim stays at 70% or more
+     up to 460px (or 80% of a narrower card) and only fades beyond the text. */
+  .home-offer--welcome::after {
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--md-sys-color-scrim) 80%, transparent) 0,
+      color-mix(in srgb, var(--md-sys-color-scrim) 70%, transparent) min(460px, 80%),
+      color-mix(in srgb, var(--md-sys-color-scrim) 15%, transparent) 100%
+    );
+  }
+  .home-steps {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .home-faq {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr);
+    gap: 48px;
   }
 }

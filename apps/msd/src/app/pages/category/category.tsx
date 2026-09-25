@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Icon,
   Tabs,
@@ -24,13 +24,25 @@ import { DealCard } from '../../components/deal-card';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
+import { useHydrated } from '../../../hooks/use-hydrated';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { formatINR } from '../../../utils/format';
 import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
+import { citySlug, cityHref, categoryHref, useCatalogShell } from '../../../catalog/catalog-shell';
+import { categoryDataKey, usePrerenderedData } from '../../../prerender-data/prerender-data';
+import type { CategoryData } from '../../../prerender-data/loaders';
+import { Seo } from '../../seo/seo';
+import { breadcrumbJsonLd } from '../../seo/jsonld';
+import { SITE_URL } from '../../seo/site-url';
 import './category.css';
 import content from '../../../content.json';
+
+/** SERVICE (or untyped, legacy) categories list deals; PRODUCT/THERAPY list their own entities. */
+function isDealCategory(category: CatalogCategoryWithChildren): boolean {
+  return category.type !== 'PRODUCT' && category.type !== 'THERAPY';
+}
 
 /** Lowest active package price for a therapist listing card — mirrors `therapists.tsx`'s own
  *  `fromPrice` exactly (kept as a small local copy rather than a shared export, same as that
@@ -56,28 +68,60 @@ function therapistFromPrice(therapist: CatalogTherapist): number | null {
  * subcategory only.
  */
 export function Category() {
-  const { slug = '' } = useParams<{ slug: string }>();
+  const { slug = '', city: citySlugParam } = useParams<{ slug: string; city?: string }>();
   const navigate = useNavigate();
   const { token, isAuthenticated } = useAuth();
+  // Rendering decisions wait for hydration so they match the prerendered (signed-out) HTML.
+  const signedIn = useHydrated() && isAuthenticated;
   const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
-  const [category, setCategory] = useState<CatalogCategoryWithChildren | null>(null);
-  const [categoryLoading, setCategoryLoading] = useState(true);
+  const { coords } = useCurrentLocation();
+  const { locationsStatus, locations } = useCatalogShell();
+  const cityLocation = citySlugParam ? locations.find((l) => citySlug(l.city) === citySlugParam) : undefined;
+  // A prerendered page embeds this slug's (and resolved city's) category + "All" deals. The key
+  // includes both, so `initial` only exists when it describes exactly this route.
+  const initial = usePrerenderedData<CategoryData>(categoryDataKey(slug, cityLocation?.city));
+  const initialHasDeals = !!initial?.category && isDealCategory(initial.category);
+  const [category, setCategory] = useState<CatalogCategoryWithChildren | null>(initial?.category ?? null);
+  const [categoryLoading, setCategoryLoading] = useState(!initial);
   const [categoryError, setCategoryError] = useState('');
-  const [subcategoryIdx, setSubcategoryIdx] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [deals, setDeals] = useState<CatalogDeal[]>([]);
-  const [dealsLoading, setDealsLoading] = useState(true);
+  const [deals, setDeals] = useState<CatalogDeal[]>(initialHasDeals ? initial.deals : []);
+  const [dealsLoading, setDealsLoading] = useState(!initialHasDeals);
   const [dealsError, setDealsError] = useState('');
+  // The "All" deals list the page shows unfiltered (the prerendered one, then its refresh), and
+  // whether that background refresh has run.
+  const allDealsRef = useRef<CatalogDeal[] | undefined>(initialHasDeals ? initial.deals : undefined);
+  const dealsRefreshedRef = useRef(false);
   const [therapists, setTherapists] = useState<CatalogTherapist[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
-  const { coords } = useCurrentLocation();
+  const cityUnresolved = !!citySlugParam && !cityLocation;
+  // Locations arrive with the catalog shell; until then a city URL can't be resolved.
+  const cityPending = cityUnresolved && locationsStatus === 'loading';
+  // Only a successful locations fetch can prove a city doesn't exist. If it failed, the page
+  // falls back to the plain (noindexed) category page rather than 404ing a real city.
+  const cityMissing = cityUnresolved && locationsStatus === 'ready';
 
   useEffect(() => {
+    // Still showing the prerendered (build-time) category for this slug: keep it on screen and
+    // refresh it once in the background. Only a 404 replaces it; any other failure keeps it.
+    if (initial && category === initial.category) {
+      let cancelled = false;
+      getCatalogCategory(slug)
+        .then(({ data }) => {
+          if (!cancelled && JSON.stringify(data) !== JSON.stringify(initial.category)) setCategory(data);
+        })
+        .catch((err) => {
+          if (!cancelled && err instanceof ApiRequestError && err.status === 404) setCategory(null);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
     setCategoryLoading(true);
     setCategoryError('');
-    setSubcategoryIdx(0);
     getCatalogCategory(slug)
       .then(({ data }) => setCategory(data))
       .catch((err) => {
@@ -89,8 +133,25 @@ export function Category() {
         }
       })
       .finally(() => setCategoryLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
+  // The subcategory tab lives in `?sub=<slug>` so header/sheet links can open a tab directly;
+  // an unknown slug falls back to "All" (index 0).
+  const subSlug = searchParams.get('sub');
+  const subcategoryIdx = (category?.children.findIndex((c) => c.slug === subSlug) ?? -1) + 1;
   const activeSubcategory = subcategoryIdx === 0 ? undefined : category?.children[subcategoryIdx - 1];
+  const setSubcategoryIdx = (idx: number) => {
+    const sub = idx === 0 ? undefined : category?.children[idx - 1];
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (sub) next.set('sub', sub.slug);
+        else next.delete('sub');
+        return next;
+      },
+      { replace: true },
+    );
+  };
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
     navigate(`/sign-in?next=${encodeURIComponent(`/category/${slug}`)}`);
@@ -117,6 +178,27 @@ export function Category() {
 
   useEffect(() => {
     if (!category) return;
+    // The prerendered "All" list for this route, before any filter or location applies: keep it
+    // on screen and refresh it once in the background; a failed refresh keeps it.
+    if (
+      initialHasDeals &&
+      category.id === initial.category?.id &&
+      deals === allDealsRef.current &&
+      !activeSubcategory &&
+      !search &&
+      coords?.latitude == null &&
+      coords?.longitude == null
+    ) {
+      if (dealsRefreshedRef.current) return;
+      dealsRefreshedRef.current = true;
+      listCatalogDeals({ categoryId: category.id, city: cityLocation?.city, state: cityLocation?.state, pageSize: 60 })
+        .then(({ data }) => {
+          allDealsRef.current = data ?? [];
+          setDeals(allDealsRef.current);
+        })
+        .catch(() => undefined);
+      return;
+    }
     setDealsLoading(true);
     setDealsError('');
     if (category.type === 'THERAPY') {
@@ -147,8 +229,11 @@ export function Category() {
         .finally(() => setDealsLoading(false));
       return;
     }
+    if (cityPending) return;
     listCatalogDeals({
       categoryId: category.id,
+      city: cityLocation?.city,
+      state: cityLocation?.state,
       subcategoryId: activeSubcategory?.id,
       search: search || undefined,
       pageSize: 60,
@@ -159,30 +244,69 @@ export function Category() {
       .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : content.category.errors.loadDeals))
       .finally(() => setDealsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, activeSubcategory?.id, search, coords?.latitude, coords?.longitude]);
+  }, [
+    category,
+    activeSubcategory?.id,
+    search,
+    coords?.latitude,
+    coords?.longitude,
+    cityPending,
+    cityLocation?.city,
+    cityLocation?.state,
+  ]);
 
-  if (categoryLoading) {
+  // Hold the page (and its canonical) until the city resolves, so a city URL never briefly
+  // announces itself as the plain category page.
+  if (categoryLoading || cityPending) {
     return <p className="loading-state"> {content.category.loading}</p>;
   }
-  if (categoryError || !category) {
+  if (categoryError || !category || cityMissing) {
     return (
       <div className="category-page category-page--empty">
-        <title>{content.category.notFound.metaTitle}</title>
+        <Seo
+          title={content.category.notFound.metaTitle}
+          description={content.category.notFound.subheading}
+          path={categoryHref(slug)}
+          noindex
+        />
         <sky-info-card icon="search_off" heading={content.category.notFound.heading} subheading={categoryError || content.category.notFound.subheading} />
         <FilledButton onClick={() => navigate('/categories')}>{content.category.notFound.cta}</FilledButton>
       </div>
     );
   }
+  // Product and therapist listings can't be filtered by city, so a city URL on those categories
+  // shows the plain category page (noindexed) rather than a thin "X in City" duplicate.
+  const cityFilterable = category.type !== 'PRODUCT' && category.type !== 'THERAPY';
+  const activeCity = cityFilterable ? cityLocation : undefined;
+  const displayName = activeCity
+    ? content.category.cityTitleTemplate.replace('{category}', category.name).replace('{city}', activeCity.city)
+    : category.name;
+  const description = activeCity
+    ? content.category.cityMetaDescriptionTemplate.replace('{category}', category.name).replace('{city}', activeCity.city)
+    : (category.description ?? content.category.metaDescriptionTemplate.replace('{category}', category.name));
+  const path = activeCity ? cityHref(category.slug, activeCity.city) : categoryHref(category.slug);
+  const crumbs = [
+    { name: content.category.breadcrumb.home, path: '/' },
+    { name: content.category.breadcrumb.categories, path: '/categories' },
+    { name: category.name, path: categoryHref(category.slug) },
+    ...(activeCity ? [{ name: activeCity.city, path }] : []),
+  ];
   return (
     <div className="category-page">
-      <title>{`${category.name}${content.category.metaTitleSuffix}`}</title>
-      <meta name="description" content={category.description ?? content.category.metaDescriptionTemplate.replace('{category}', category.name)} />
+      <Seo
+        title={`${displayName}${content.category.metaTitleSuffix}`}
+        description={description}
+        path={path}
+        noindex={!!citySlugParam && !activeCity}
+        jsonLd={SITE_URL ? breadcrumbJsonLd(SITE_URL, crumbs) : undefined}
+      />
       <Breadcrumb
         className="category-page__breadcrumb"
         items={[
           { label: content.category.breadcrumb.home, to: '/' },
           { label: content.category.breadcrumb.categories, to: '/categories' },
-          { label: category.name }
+          activeCity ? { label: category.name, to: categoryHref(category.slug) } : { label: category.name },
+          ...(activeCity ? [{ label: activeCity.city }] : []),
         ]} />
       <header className="category-page__hero">
         <div className="category-page__hero-inner">
@@ -190,7 +314,7 @@ export function Category() {
             <Icon>category</Icon>
           </div>
           <div>
-            <h1 className="category-page__title">{category.name}</h1>
+            <h1 className="category-page__title">{displayName}</h1>
             {category.description && <p className="category-page__subtitle">{category.description}</p>}
           </div>
         </div>
@@ -347,7 +471,7 @@ export function Category() {
                         ? `/vendor/${deal.vendor.slug}`
                         : undefined
                     }
-                    favoriteActive={isWishlisted(deal.id)}
+                    favoriteActive={signedIn && isWishlisted(deal.id)}
                     onFavorite={() => toggleFavorite(deal)}
                     actions={
                       <DealAddToCartDialog

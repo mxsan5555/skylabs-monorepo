@@ -109,6 +109,7 @@ export function createPrismaMock() {
     branch: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
+      groupBy: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       count: vi.fn(),

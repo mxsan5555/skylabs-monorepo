@@ -124,7 +124,8 @@ export const coverImage = css`
   }
 `;
 
-/** M3 type roles as classes. Typography only; colour stays with the component. */
+/** M3 type roles as classes. Typography only; colour stays with the component. The same
+ *  classes exist globally in `theme/base.css` for light DOM markup. */
 export const typescale = css`
   .title-large,
   .title-medium,
