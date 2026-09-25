@@ -50,7 +50,7 @@ Response `data`:
 ```
 - Each facet's counts apply every filter **except its own** (vendors ignore `vendorIds`, branches ignore `branchIds`, distance ignores `radiusKm`, price ignores `minPrice/maxPrice`).
 - `distance` is `[]` without coordinates; buckets are fixed at 1, 5, 10, 20, 50, 100 km and count deals within that radius.
-- Vendors sorted by count desc then name; branches likewise. `price` is `null` when nothing matches.
+- Vendors sorted by count desc (ties keep first-seen order); branches likewise. `price` is `null` when nothing matches.
 - Implementation: one `findMany` of the base-filtered deals selecting only `id, vendorId, branchId, salePrice, vendor.businessName, branch.name/city/latitude/longitude`, counted in memory.
 - Registered in the OpenAPI registry; route tests cover counts-exclude-own-filter, distance buckets, empty result.
 

@@ -88,6 +88,7 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] msd: reviews system (customers rate completed orders) so the category page can add rating sort, rating filter and card ratings
 - [ ] msd: explore page adopts FilterPanel/SidebarLayout and the horizontal card list view
 - [ ] msd: product vendor facet for the product category filter panel
+- [ ] msd: filter panel polish: keep selected Business/Branch options visible when outside the facet list or past "Show more"; clamp URL min/max into the slider bounds when facets narrow
 - [ ] msd: deal page single-location map using DealMap
 - [ ] msd: before traffic grows, move VITE_MAP_TILE_URL off tile.openstreetmap.org to a free-tier tile provider (OSM tile policy: no heavy commercial use)
 - [ ] mera-driver: 12 pre-existing failing specs (app.routes RBAC wiring, users "Login As", drivers page: rbac.permissionsCatalog is not a function)
