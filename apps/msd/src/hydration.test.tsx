@@ -138,7 +138,7 @@ describe('prerender hydration round-trip', () => {
   it('hydrates a city page without a mismatch', async () => {
     const { html, recoverable, hydrationErrors, container } = await roundTrip('/category/massage/gorakhpur', {
       shell: fx.shell,
-      [categoryDataKey('massage', 'Gorakhpur')]: { category: fx.massage, deals: [fx.deal] },
+      [categoryDataKey('massage', 'Gorakhpur')]: { category: fx.massage, deals: [fx.deal], total: 1 },
     });
     expect(html).toContain('Massage in Gorakhpur');
     expect(recoverable).toEqual([]);

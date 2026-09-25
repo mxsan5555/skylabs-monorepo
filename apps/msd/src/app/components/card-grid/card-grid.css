@@ -17,6 +17,9 @@
   padding: 0;
   list-style: none;
 }
+.card-grid__list--list {
+  grid-template-columns: minmax(0, 1fr);
+}
 .card-grid__item {
   display: flex;
   min-inline-size: 0;

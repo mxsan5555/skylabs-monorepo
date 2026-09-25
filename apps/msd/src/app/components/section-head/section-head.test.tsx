@@ -41,4 +41,10 @@ describe('SectionHead', () => {
     expect(h1.id).toBe('page-heading');
     expect(h1.className).toBe('section-head__title headline-large');
   });
+
+  it('renders a node subheading as is (no wrapping p)', () => {
+    renderHead(<SectionHead id="h" heading="Massage" subheading={<div data-testid="desc">Long text</div>} />);
+    const desc = screen.getByTestId('desc');
+    expect(desc.parentElement?.tagName).not.toBe('P');
+  });
 });

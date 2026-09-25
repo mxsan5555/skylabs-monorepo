@@ -82,6 +82,7 @@ declare module 'react' {
         priceNote?: string;
         href?: string;
         align?: 'left' | 'center' | 'right';
+        layout?: 'vertical' | 'horizontal';
       }>;
 
       // ── sky-image-card ─────────────────────────────────────────────────────

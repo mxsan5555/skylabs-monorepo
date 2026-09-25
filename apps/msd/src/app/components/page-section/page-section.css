@@ -24,6 +24,10 @@
   flex-direction: column;
   gap: 16px;
 }
+/* The stack gap is the only spacing between stacked children. */
+.page-section__container--stack > * {
+  margin-block: 0;
+}
 @media (min-width: 840px) {
   .page-section:not(.page-section--flush) {
     padding-block: 48px;

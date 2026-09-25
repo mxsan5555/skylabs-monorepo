@@ -12,7 +12,7 @@ export interface SectionHeadProps {
   heading: string;
   /** Type role class for the h2. */
   titleClassName?: string;
-  subheading?: string;
+  subheading?: ReactNode;
   seeAll?: string;
   seeAllTo?: string;
   /** Trailing controls after the See all link (e.g. carousel prev/next). */
@@ -29,7 +29,7 @@ export function SectionHead({ id, as: Heading = 'h2', heading, titleClassName = 
     <div className="section-head">
       <div className="section-head__text">
         <Heading id={id} className={`section-head__title ${titleClassName}`}>{heading}</Heading>
-        {subheading && <p className="section-head__sub body-large">{subheading}</p>}
+        {typeof subheading === 'string' ? <p className="section-head__sub body-large">{subheading}</p> : subheading}
       </div>
       {(link || actions) && (
         <div className="section-head__actions">

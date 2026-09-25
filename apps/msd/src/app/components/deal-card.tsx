@@ -52,6 +52,8 @@ interface DealCardProps {
    *  stopPropagation/preventDefault div (same pattern as category.tsx's existing card action row)
    *  so the click never falls through to the card's own stretched link. */
   actions?: ReactNode;
+  /** `sky-product-card`'s `layout` — 'vertical' (default) or 'horizontal' for the list view. */
+  layout?: 'vertical' | 'horizontal';
 }
 
 export function DealCard({
@@ -61,6 +63,7 @@ export function DealCard({
   eyebrowHref,
   href,
   actions,
+  layout,
 }: DealCardProps) {
   const swiperRef = useRef<any>(null);
   return (
@@ -78,6 +81,7 @@ export function DealCard({
       distance={deal.distance !== undefined ? `${deal.distance} km` : undefined}
       rating={deal.rating}
       reviews={deal.reviews}
+      layout={layout}
       originalPrice={
         deal.originalPrice
           ? formatINR(deal.originalPrice)

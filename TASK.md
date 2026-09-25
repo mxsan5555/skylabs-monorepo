@@ -85,6 +85,13 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] msd: shared --sky-content-max token for 1280px/16px containers (header, footer, home)
 - [ ] msd: migrate remaining useCurrentLocation callers (category, search, therapists, vendor) to useVisitorLocation
 - [ ] msd: move /categories, therapists, orders, invoices and payments off `category.css` onto PageSection/CardGrid, then delete `category.css`
+- [ ] msd: reviews system (customers rate completed orders) so the category page can add rating sort, rating filter and card ratings
+- [ ] msd: explore page adopts FilterPanel/SidebarLayout and the horizontal card list view
+- [ ] msd: product vendor facet for the product category filter panel
+- [ ] msd: filter panel polish: keep selected Business/Branch options visible when outside the facet list or past "Show more"; clamp URL min/max into the slider bounds when facets narrow
+- [ ] msd: deal page single-location map using DealMap
+- [ ] msd: before traffic grows, move VITE_MAP_TILE_URL off tile.openstreetmap.org to a free-tier tile provider (OSM tile policy: no heavy commercial use)
+- [ ] mera-driver: 12 pre-existing failing specs (app.routes RBAC wiring, users "Login As", drivers page: rbac.permissionsCatalog is not a function)
 
 #### Plan 4 prerender prerequisites
 - [x] (e) decided: gift/member `sky-feature-card` copy stays in shadow DOM. It is promotional, not a search landing target; the crawlable content on home is the h1, tiles, deals JSON-LD, How it works, directory and FAQ. See spec section 8.1.
