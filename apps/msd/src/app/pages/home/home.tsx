@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   FilledButton,
@@ -10,6 +10,7 @@ import {
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { formatINR } from '../../../utils/format';
+import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import {
   listCatalogCategories,
@@ -172,6 +173,7 @@ function HomeSkeleton() {
 
 export function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated } = useAuth();
   const { toggle, has } = useWishlist();
   const { coords } = useCurrentLocation();
@@ -278,7 +280,7 @@ export function Home() {
 
   function handleFavorite(id: string) {
     if (!isAuthenticated) {
-      navigate('/sign-in');
+      navigate(signInPathWithReturnTo(location));
       return;
     }
     toggle(id);

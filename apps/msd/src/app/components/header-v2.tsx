@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   FilledButton,
   OutlinedButton,
@@ -14,7 +14,7 @@ import {
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCart, subscribeCartUpdated } from '../../api/cart';
 import { useWishlist } from '../../wishlist/wishlist-context';
-import { isCustomerUser, isStaffUser } from '../../auth/role-routing';
+import { isCustomerUser, isStaffUser, signInPathWithReturnTo } from '../../auth/role-routing';
 import content from '../../content.json';
 import logo from '../../assets/logo.jpg';
 import './header-v2.css';
@@ -599,6 +599,7 @@ function CatStripItem({ menu }: { menu: NavMenu }) {
 export function HeaderV3() {
   const { isAuthenticated, signOut, token, bootstrap } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { ids: wishlistIds } = useWishlist();
 
   const isCustomer = !!bootstrap && isCustomerUser(bootstrap) && !isStaffUser(bootstrap);
@@ -763,7 +764,7 @@ export function HeaderV3() {
                     )}
                   </>
                 ) : (
-                  <FilledButton onClick={() => navigate('/sign-in')}>Sign In</FilledButton>
+                  <FilledButton onClick={() => navigate(signInPathWithReturnTo(location))}>Sign In</FilledButton>
                 )}
               </div>
             </div>
@@ -881,7 +882,7 @@ export function HeaderV3() {
                 <TextButton onClick={handleSignOut}>{content.header.signOut}</TextButton>
               </>
             ) : (
-              <FilledButton onClick={() => { navigate('/sign-in'); closeDrawer(); }}>{content.header.signIn}</FilledButton>
+              <FilledButton onClick={() => { navigate(signInPathWithReturnTo(location)); closeDrawer(); }}>{content.header.signIn}</FilledButton>
             )}
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Icon,
   Tabs,
@@ -9,6 +9,7 @@ import {
   OutlinedButton,
 } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import {
   getCatalogCategory,
   listCatalogDeals,
@@ -58,6 +59,7 @@ function therapistFromPrice(therapist: CatalogTherapist): number | null {
 export function Category() {
   const { slug = '' } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { token, isAuthenticated } = useAuth();
   const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
   const [actionMessage, setActionMessage] = useState('');
@@ -93,7 +95,7 @@ export function Category() {
   const activeSubcategory = subcategoryIdx === 0 ? undefined : category?.children[subcategoryIdx - 1];
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
-    navigate(`/sign-in?next=${encodeURIComponent(`/category/${slug}`)}`);
+    navigate(signInPathWithReturnTo(location));
     return false;
   };
   const addProductToCart = async (product: CatalogProduct) => {
