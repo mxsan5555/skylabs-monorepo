@@ -151,7 +151,7 @@ export function BecomeVendor() {
       <title>Become a Vendor · MSD</title>
       <meta name="description" content="Apply to list your spa or wellness business on MySpaDeal." />
       <header className="become-vendor__hero">
-        <h1>Become a Vendor</h1>
+        <h1>Become a Member</h1>
         <p>Tell us about your business — our team will review your application and follow up to complete onboarding.</p>
       </header>
 

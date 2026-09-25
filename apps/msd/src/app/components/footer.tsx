@@ -1,215 +1,182 @@
-import { useState, useEffect } from 'react';
-import { Link, } from 'react-router-dom';
-import { OutlinedTextField, FilledButton, Icon, Divider, } from '@skylabs-monorepo/shared-ui/react';
-import { inputValue } from '../../utils/format';
+import { useEffect, useState } from 'react';
+import { Link, NavLink } from 'react-router-dom';
+import { listCatalogSocialLinks, type CatalogSocialMediaLink } from '../../api/catalog';
 import content from '../../content.json';
+import logo from '../../assets/logo.png';
+import logo2 from '../../assets/logo2.jpg';
 import './footer.css';
-import logo from "../../assets/logo5.jpeg";
-import logo2 from "../../assets/logo2.jpg";
-import { listCatalogCategories, listCatalogSocialLinks, type CatalogCategoryWithChildren, type CatalogSocialMediaLink, } from '../../api/catalog';
-import { ApiRequestError } from '../../api/rbac/client';
-/** Generic "link" glyph — fallback icon for any `platform` key an operator adds via the CMS
- *  Social Media admin screen that isn't one of the known keys below (`platform` is freeform text
- *  server-side, see `CatalogSocialMediaLink`'s doc comment), so a 7th+ platform never breaks
- *  rendering. */
-const DEFAULT_SOCIAL_ICON = (
-  <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-    <path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z" />
-  </svg>
-);
-const SOCIAL_ICONS: Record<string, React.ReactElement> = {
-  facebook: (
-    <svg viewBox="0 0 200 200" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-      <path fill="currentColor" d="M180 100c0-44.179-35.821-80-80-80s-80 35.821-80 80c0 39.927 29.25 73.025 67.501 79.033V123.13H67.183V100h20.318V82.371c0-20.048 11.948-31.129 30.218-31.129c8.753 0 17.91 1.564 17.91 1.564v19.688h-10.092c-9.934 0-13.038 6.165-13.038 12.499V100h22.185l-3.543 23.13h-18.642v55.902C150.75 173.036 180 139.938 180 100z" />
+
+const DEFAULT_ICON_PATH_D =
+  'M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z';
+
+function GenericSocialIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d={DEFAULT_ICON_PATH_D} fill="currentColor" />
     </svg>
-  ),
-  x: (
-    <svg viewBox="0 0 200 200" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-      <path fill="currentColor" d="M113.96 88.51L168.6 25h-12.95l-47.44 55.15L70.32 25H26.61l57.3 83.4l-57.3 66.6h12.95l50.1-58.24L129.68 175h43.71l-59.43-86.49h0zm-17.74 20.61l-5.81-8.3l-46.18-66.07h19.89l37.28 53.33l5.81 8.3l48.46 69.32h-19.89l-39.54-56.56h0z" />
-    </svg>
-  ),
-  youtube: (
-    <svg viewBox="0 0 200 200" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-      <path fill="currentColor" d="M176.66 61.49c-1.84-6.89-7.27-12.31-14.15-14.15C150.03 44 100 44 100 44s-50.03 0-62.51 3.34c-6.88 1.84-12.31 7.26-14.15 14.15C20 73.97 20 100 20 100s0 26.03 3.34 38.51c1.84 6.89 7.27 12.31 14.15 14.15C49.97 156 100 156 100 156s50.03 0 62.51-3.34c6.88-1.84 12.31-7.26 14.15-14.15C180 126.03 180 100 180 100s0-26.03-3.34-38.51zM84 124V76l41.57 24L84 124z" />
-    </svg>
-  ),
-  instagram: (
-    <svg viewBox="0 0 200 200" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-      <path fill="currentColor" d="M132.313 34.909c21.483.98 31.797 11.276 32.778 32.778c.668 14.642.668 49.977 0 64.625c-.98 21.483-11.276 31.797-32.778 32.778c-14.64.668-49.979.668-64.625 0c-21.483-.98-31.797-11.276-32.778-32.778c-.668-14.642-.668-49.977 0-64.625c.98-21.483 11.276-31.797 32.778-32.778c14.641-.668 49.976-.668 64.625 0zM67.031 20.516C38.273 21.828 21.85 37.812 20.516 67.031c-.688 15.09-.688 50.854 0 65.939c1.312 28.751 17.288 45.181 46.514 46.514c15.086.688 50.856.688 65.939 0c28.751-1.312 45.181-17.288 46.514-46.514c.688-15.09.688-50.854 0-65.939c-1.312-28.758-17.296-45.181-46.514-46.514c-15.089-.689-50.854-.689-65.938-.001zM100 58.937c-22.678 0-41.063 18.385-41.063 41.063S77.322 141.063 100 141.063s41.063-18.385 41.063-41.063c0-22.679-18.385-41.063-41.063-41.063zm0 67.718c-14.721 0-26.655-11.934-26.655-26.655c0-14.721 11.934-26.655 26.655-26.655c14.721 0 26.655 11.934 26.655 26.655c0 14.721-11.934 26.655-26.655 26.655z" />
-      <circle fill="currentColor" cx="142.685" cy="57.315" r="9.596" />
-    </svg>
-  ),
-  linkedin: (
-    <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-      <path fill="currentColor" d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-    </svg>
-  ),
-  whatsapp: (
-    <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-      <path fill="currentColor" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347M12.05 21.785h-.004a9.83 9.83 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.52 3.449C18.24 1.176 15.207 0 12.05 0 5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893 0-3.176-1.237-6.165-3.423-8.452" />
-    </svg>
-  ),
-};
+  );
+}
+
+function SocialIcon({ platform }: { platform: string }) {
+  const normalized = platform.toLowerCase();
+
+  switch (normalized) {
+    case 'instagram':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          <circle cx="17.4" cy="6.7" r="1.2" fill="currentColor" />
+        </svg>
+      );
+    case 'facebook':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M13.5 21v-8h2.6l.4-3h-3V7.3c0-.9.3-1.5 1.7-1.5H16V3.1c-.4-.1-1.7-.2-3.2-.2-3.2 0-5.3 1.9-5.3 5.4V10H5v3h2.5v8h6z" fill="currentColor" />
+        </svg>
+      );
+    case 'youtube':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M21 12c0-1.8-.2-3.2-.5-4.4-.4-1.3-1.5-2.3-2.8-2.6C16.6 4.7 14.8 4 12 4s-4.6.7-5.7 1c-1.3.3-2.4 1.2-2.8 2.6C3.2 8.8 3 10.2 3 12s.2 3.2.5 4.4c.4 1.3 1.5 2.3 2.8 2.6.9.2 2.4.4 5.7.4s4.8-.2 5.7-.4c1.3-.3 2.4-1.2 2.8-2.6.3-1.2.5-2.6.5-4.4zm-10.1 3.1V8.9l5.3 3.1-5.3 3.1z" fill="currentColor" />
+        </svg>
+      );
+    case 'linkedin':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M6.9 8.3A1.8 1.8 0 1 1 6.9 4.7a1.8 1.8 0 0 1 0 3.6zm-1.4 1.8h2.8v9.3H5.5zm4.9 0h2.7v1.3h.1c.4-.7 1.3-1.5 2.7-1.5 2.9 0 3.4 1.9 3.4 4.4v3.1h-2.8v-2.8c0-1 0-2.3-1.4-2.3s-1.6 1.1-1.6 2.2v2.9H10.4z" fill="currentColor" />
+        </svg>
+      );
+    case 'x':
+    case 'twitter':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M18.9 3h3.2l-7 8 8.3 10h-6.5l-5.1-6.4-5.8 6.4H3l7.5-8.5L2.8 3h6.8l4.6 6.1L18.9 3zm-1.1 15.4h1.8L7.3 4.5H5.4l12.4 13.9z" fill="currentColor" />
+        </svg>
+      );
+    case 'whatsapp':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M19.1 4.9A9.8 9.8 0 0 0 4.3 17.6L3 21l3.5-1.1a9.8 9.8 0 0 0 12.6-14.9zm-2.2 12.7c-.4.1-.9.2-2.9-.6-2.4-1-4-3.5-4.1-3.7-.1-.2-1.3-1.7-1.3-3.3 0-1.6 1-2.4 1.3-2.7.3-.3.7-.4 1-.4h.6c.2 0 .5 0 .8.6.3.7.9 2.3 1 2.5.1.2.2.4.1.7-.1.2-.2.4-.3.6-.2.2-.3.4-.6.7-.2.2-.4.5-.2.8.2.3.9 1.5 2 2.4 1.3 1.2 2.4 1.5 2.7 1.7.3.2.5.2.7.1.2-.1.9-.9 1.2-1.2.2-.3.5-.2.8-.1.3.1 2 1.1 2.4 1.3.3.2.6.2.7.3.2.1.2.6.1 1.1-.1.6-1.1 1.6-1.6 1.8-.5.2-1.3.4-2.7.2z" fill="currentColor" />
+        </svg>
+      );
+    case 'tiktok':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M15.8 3.5c.4 1.6 1.5 2.9 3.1 3.5v2.7c-1.3 0-2.5-.3-3.6-.9v5.5c0 3.1-2.5 5.6-5.6 5.6s-5.6-2.5-5.6-5.6 2.5-5.6 5.6-5.6c.3 0 .7 0 1 .1v2.8a3.9 3.9 0 0 0-1-.1c-1.7 0-3 1.4-3 3.1s1.3 3.1 3 3.1 3-1.4 3-3.1V3.5h3.2z" fill="currentColor" />
+        </svg>
+      );
+    default:
+      return <GenericSocialIcon />;
+  }
+}
+
 export function Footer() {
-  const [email, setEmail] = useState('');
-  const [subscribed, setSubscribed] = useState(false);
-  const [categories, setCategories] = useState<CatalogCategoryWithChildren[]>([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [socialLinks, setSocialLinks] = useState<CatalogSocialMediaLink[]>([]);
   const [socialLoading, setSocialLoading] = useState(true);
+
   useEffect(() => {
-    let cancelled = false;
-    listCatalogCategories()
-      .then(({ data }) => {
-        if (!cancelled) { setCategories(data); }
+    let active = true;
+
+    void listCatalogSocialLinks()
+      .then((response) => {
+        if (!active) return;
+        setSocialLinks(response?.data ?? []);
       })
-      .catch((err) => {
-        if (!cancelled) {
-          console.error(err instanceof ApiRequestError ? err.message : 'Failed to load footer categories',);
-          setCategories([]);
-        }
+      .catch(() => {
+        if (!active) return;
+        setSocialLinks([]);
       })
       .finally(() => {
-        if (!cancelled) { setCategoriesLoading(false); }
+        if (active) setSocialLoading(false);
       });
-    return () => { cancelled = true; };
+
+    return () => {
+      active = false;
+    };
   }, []);
-  useEffect(() => {
-    let cancelled = false;
-    listCatalogSocialLinks()
-      .then(({ data }) => {
-        if (!cancelled) { setSocialLinks(data); }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          console.error(err instanceof ApiRequestError ? err.message : 'Failed to load footer social links',);
-          setSocialLinks([]);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) { setSocialLoading(false); }
-      });
-    return () => { cancelled = true; };
-  }, []);
-  function handleSubscribe(e: React.FormEvent) {
-    e.preventDefault();
-    if (email.trim()) {
-      setSubscribed(true);
-      setEmail('');
-    }
-  }
-  const { footer } = content.nav;
-  const year = new Date().getFullYear();
+
   return (
     <footer className="site-footer" role="contentinfo">
       <div className="site-footer__inner">
         <div className="site-footer__brand">
-          <Link to="/" className="site-footer__logo" aria-label="MSD – MySpaDeal home">
-            <img
-              src={logo}
-              alt="MySpaDeal"
-              className="site-footer__logo-image site-footer__logo-image--desktop"
-            />
-            <img
-              src={logo2}
-              alt="MySpaDeal"
-              className="site-footer__logo-image site-footer__logo-image--mobile"
-            />
-          </Link>
+          <NavLink to="/" className="site-footer__logo" aria-label={content.site.name}>
+            <img src={logo} alt={content.site.name} className="site-footer__logo-image site-footer__logo-image--desktop" />
+            <img src={logo2} alt={content.site.name} className="site-footer__logo-image site-footer__logo-image--mobile" />
+          </NavLink>
           <p className="site-footer__desc">{content.site.description}</p>
-          <h3 className="site-footer__col-heading">{footer.headings.newsletter}</h3>
-          <p className="site-footer__newsletter-sub">{footer.newsletter.sub}</p>
-          {subscribed ? (
-            <p className="site-footer__newsletter-success" role="status">
-              <Icon aria-hidden="true">check_circle</Icon>
-              {footer.newsletter.successMessage}
-            </p>
-          ) : (
-            <form
-              className="site-footer__newsletter-form"
-              onSubmit={handleSubscribe}
-              aria-label="Email newsletter signup"
-            >
-              <OutlinedTextField
-                type="email"
-                label={footer.newsletter.emailLabel}
-                value={email}
-                required
-                onInput={(e) => setEmail(inputValue(e as unknown as Event))}
-              >
-                <Icon slot="leading-icon" aria-hidden="true">mail</Icon>
-              </OutlinedTextField>
-              <FilledButton type="submit">{footer.newsletter.submitLabel}</FilledButton>
-            </form>
-          )}
         </div>
-        <nav className="site-footer__col" aria-label="Company">
-          <h3 className="site-footer__col-heading">{footer.headings.company}</h3>
+
+        <div className="site-footer__col">
+          <h3 className="site-footer__col-heading">{content.nav.footer.headings.company}</h3>
           <ul className="site-footer__list">
-            {footer.company.map((link) => (
-              <li key={link.to}>
-                <Link to={link.to} className="site-footer__link">{link.label}</Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <nav className="site-footer__col" aria-label="Discover">
-          <h3 className="site-footer__col-heading">{footer.headings.discover}</h3>
-          <ul className="site-footer__list">
-            {categoriesLoading ? (
-              <li className="site-footer__link">Loading...</li>
-            ) : (
-              categories.map((category) => (
-                <li key={category.id}>
-                  <Link
-                    to={`/category/${category.slug}`}
-                    className="site-footer__link"
-                  >
-                    {category.name}
-                  </Link>
-                </li>
-              ))
-            )}
-           
-          </ul>
-        </nav>
-        <nav className="site-footer__col" aria-label="Help and Info">
-          <h3 className="site-footer__col-heading">{footer.headings.help}</h3>
-          <ul className="site-footer__list">
-            {footer.help.map((item) => (
-              <li key={item.to}>
+            {content.nav.footer.company.map((item) => (
+              <li key={item.label}>
                 <Link to={item.to} className="site-footer__link">{item.label}</Link>
               </li>
             ))}
           </ul>
-        </nav>
+        </div>
+
+        <div className="site-footer__col">
+          <h3 className="site-footer__col-heading">{content.nav.footer.headings.discover}</h3>
+          <ul className="site-footer__list">
+            {content.nav.footer.discover.map((item) => (
+              <li key={item.label}>
+                <Link to={item.to} className="site-footer__link">{item.label}</Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="site-footer__col">
+          <h3 className="site-footer__col-heading">{content.nav.footer.headings.help}</h3>
+          <ul className="site-footer__list">
+            {content.nav.footer.help.map((item) => (
+              <li key={item.label}>
+                <Link to={item.to} className="site-footer__link">{item.label}</Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="site-footer__col site-footer__col--newsletter">
+          <h3 className="site-footer__col-heading">{content.nav.footer.headings.newsletter}</h3>
+          <p className="site-footer__newsletter-sub">{content.nav.footer.newsletter.sub}</p>
+          <form className="site-footer__newsletter-form">
+            <label htmlFor="footer-email" className="sr-only">{content.nav.footer.newsletter.emailLabel}</label>
+            <input id="footer-email" type="email" placeholder={content.nav.footer.newsletter.emailLabel} aria-label={content.nav.footer.newsletter.emailLabel} />
+            <button type="submit">{content.nav.footer.newsletter.submitLabel}</button>
+          </form>
+        </div>
       </div>
-      <Divider />
+
       <div className="site-footer__bottom">
         <div className="site-footer__bottom-inner">
-          <address className="site-footer__address"> © {year} {footer.copyright} </address>
-          <nav className="site-footer__legal" aria-label="Legal links">
-            {footer.legal.map((item, i) => (
-              <span key={item.to}>
-                {i > 0 && <span aria-hidden="true"> · </span>}
-                <Link to={item.to} className="site-footer__link site-footer__link--legal"> {item.label}</Link>
-              </span>
+          <div className="site-footer__legal">
+            <div className="site-footer__address">{content.nav.footer.copyright}</div>
+            {content.nav.footer.legal.map((item) => (
+              <Link key={item.label} to={item.to} className="site-footer__link site-footer__link--legal">
+                {item.label}
+              </Link>
             ))}
-          </nav>
-          <div className="site-footer__social" aria-label="Follow us on social media">
+          </div>
+
+          <div className="site-footer__social" aria-label="Social media links">
             {socialLoading ? (
               <span className="site-footer__social-loading">Loading...</span>
             ) : (
-              socialLinks.map((s) => (
+              socialLinks.map((link) => (
                 <a
-                  key={s.id}
-                  href={s.url}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                  aria-label={s.displayName}
+                  key={link.id}
+                  href={link.url}
                   className="site-footer__social-link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={link.displayName}
+                  title={link.displayName}
                 >
-                  {SOCIAL_ICONS[s.platform.toLowerCase()] ?? DEFAULT_SOCIAL_ICON}
+                  <SocialIcon platform={link.platform} />
                 </a>
               ))
             )}

@@ -69,7 +69,7 @@ export function VendorTherapistsStep({
 }: VendorTherapistsStepProps) {
   const { showToast } = useToast();
   const [therapists, setTherapists] = useState<AdminTherapist[]>([]);
-  const [therapyBranches, setTherapyBranches] = useState<Branch[]>([]);
+  const [eligibleTherapyBranches, setEligibleTherapyBranches] = useState<Branch[]>([]);
   const [therapyBranchesLoading, setTherapyBranchesLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -102,7 +102,7 @@ export function VendorTherapistsStep({
 
     const loadTherapyBranches = async () => {
       if (!branches.length || !offersTherapy) {
-        setTherapyBranches([]);
+        setEligibleTherapyBranches([]);
         setTherapyBranchesLoading(false);
         return;
       }
@@ -131,7 +131,7 @@ export function VendorTherapistsStep({
 
         if (cancelled) return;
 
-        setTherapyBranches(
+        setEligibleTherapyBranches(
           results
             .filter((result) => result.hasTherapyCategory)
             .map((result) => result.branch),
@@ -139,7 +139,7 @@ export function VendorTherapistsStep({
       } catch {
         if (cancelled) return;
 
-        setTherapyBranches([]);
+        setEligibleTherapyBranches([]);
       } finally {
         if (!cancelled) {
           setTherapyBranchesLoading(false);

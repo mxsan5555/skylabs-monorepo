@@ -171,7 +171,7 @@
         },
         {
           "label": "Partner With Us",
-          "to": "/become-vendor"
+          "to": "/become-member"
         },
         {
           "label": "Wishlist",
@@ -565,7 +565,7 @@
       "heading": "Own a spa or salon?",
       "body": "List your services and reach customers near you.",
       "cta": "Partner with us",
-      "href": "/become-vendor"
+      "href": "/become-member"
     }
   },
   "search": {

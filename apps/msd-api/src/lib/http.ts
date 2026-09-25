@@ -39,7 +39,6 @@ export function sendData<T>(
   data: T,
   opts: { status?: number; meta?: ApiEnvelope<T>['meta'] } = {},
 ): void {
-  console.log("the dashboard widget data is", data);
   const body: ApiEnvelope<T> = { data, error: null, ...(opts.meta ? { meta: opts.meta } : {}) };
   res.status(opts.status ?? 200).json(body);
 }

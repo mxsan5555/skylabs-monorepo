@@ -198,7 +198,7 @@ export function AppRoutes() {
         {/* Public, unauthenticated Vendor self-registration ("Become a Vendor") — the storefront
             counterpart of the admin "Add Vendor" wizard, see become-vendor.tsx's own doc
             comment. Linked from the footer's "Partner With Us" entry (content.json). */}
-        <Route path="/become-vendor" element={<BecomeVendor />} />
+        <Route path="/become-member" element={<BecomeVendor />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
         {/* WebsitePage is one reusable component parameterized by `slug` — wired to all 4 fixed
             `WebsitePage` rows (see website-page.tsx's own doc comment), not 4 separate files. */}
