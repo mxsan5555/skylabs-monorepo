@@ -1,0 +1,31 @@
+/* msd page band. Colour split: surface = 60 (page base), tint = 30 (surface-container);
+   primary (10) stays on actions inside the band. 840px = M3 expanded window class. */
+.page-section {
+  padding-block: 32px;
+}
+.page-section--surface {
+  background-color: var(--md-sys-color-surface);
+}
+.page-section--tint {
+  background-color: var(--md-sys-color-surface-container);
+}
+.page-section--flush {
+  padding-block: 16px 32px;
+}
+.page-section__container {
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: 1280px;
+  margin-inline: auto;
+  padding-inline: 16px;
+}
+.page-section__container--stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+@media (min-width: 840px) {
+  .page-section:not(.page-section--flush) {
+    padding-block: 48px;
+  }
+}
