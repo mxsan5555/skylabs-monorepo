@@ -1,0 +1,12 @@
+/* Load-more footer under a card grid. */
+.load-more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding-block-start: 8px;
+}
+.load-more__status {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}

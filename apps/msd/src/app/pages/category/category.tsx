@@ -1,22 +1,18 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import {
-  Icon,
-  Tabs,
-  PrimaryTab,
-  OutlinedTextField,
-  FilledButton,
-  OutlinedButton,
-} from '@skylabs-monorepo/shared-ui/react';
+import { createElement, useEffect, useMemo, useState } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Icon, FilledButton, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import {
   getCatalogCategory,
+  getCatalogDealFacets,
   listCatalogDeals,
   listCatalogProducts,
   listCatalogTherapists,
   type CatalogCategoryWithChildren,
   type CatalogDeal,
+  type CatalogDealFacets,
+  type CatalogDealSort,
   type CatalogProduct,
   type CatalogTherapist,
 } from '../../../api/catalog';
@@ -26,55 +22,40 @@ import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { useHydrated } from '../../../hooks/use-hydrated';
+import { useMediaQuery } from '../../../hooks/use-media-query';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { CardGrid } from '../../components/card-grid/card-grid';
 import { PageSection } from '../../components/page-section/page-section';
 import { SectionHead } from '../../components/section-head/section-head';
-import { useCustomEvent } from '../../../hooks/use-custom-event';
+import { ChipNav } from '../../components/chip-nav/chip-nav';
+import { ClampText } from '../../components/clamp-text/clamp-text';
+import { ListingToolbar } from '../../components/listing-toolbar/listing-toolbar';
+import { ChoiceMenu } from '../../components/choice-menu/choice-menu';
+import { ViewSwitch, type ViewOption } from '../../components/view-switch/view-switch';
+import { LoadMore } from '../../components/load-more/load-more';
+import { SidebarLayout } from '../../components/sidebar-layout/sidebar-layout';
+import { FilterPanel } from '../../components/filter-panel/filter-panel';
+import { CityPickerDialog } from '../../components/city-picker-dialog/city-picker-dialog';
+import type { PriceRange } from '../../components/price-range-field/price-range-field';
+import { DealMap, type DealMapPoint } from '../../components/deal-map/deal-map';
+import { usePagedList } from '../../../hooks/use-paged-list';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { formatINR } from '../../../utils/format';
 import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
-import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
+import { useVisitorLocation } from '../../../location/location-context';
 import { citySlug, cityHref, categoryHref, useCatalogShell } from '../../../catalog/catalog-shell';
 import { categoryDataKey, usePrerenderedData } from '../../../prerender-data/prerender-data';
-import type { CategoryData } from '../../../prerender-data/loaders';
+import { CATEGORY_PAGE_SIZE, type CategoryData } from '../../../prerender-data/loaders';
 import { Seo } from '../../seo/seo';
 import { breadcrumbJsonLd } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
 import content from '../../../content.json';
 
 const t = content.category;
-const PANEL_ID = 'category-results';
-const tabId = (id: string) => `category-tab-${id}`;
 
-/** Raw `md-secondary-tab` so `id`/`aria-controls`/`active` render as attributes (same reason as
- *  home's DealsTab: the @lit/react wrapper sets `id` as a property only in the browser build). */
-function SubcategoryTab({ id, active, children }: { id: string; active: boolean; children: ReactNode }) {
-  return createElement('md-secondary-tab', { id: tabId(id), 'aria-controls': PANEL_ID, active }, children);
-}
-
-/** Search field. Its own component so `useCustomEvent` attaches when the element mounts
- *  (the page renders it only after the category loads). Controlled by `value`, so the active
- *  search stays visible after the field remounts (e.g. moving to another category). */
-function SearchField({ value, placeholder, onSearch }: { value: string; placeholder: string; onSearch: (query: string) => void }) {
-  const ref = useRef<HTMLElement>(null);
-  useCustomEvent<{ value: string }>(ref, 'sky-submit', (e) => onSearch(e.detail.value));
-  return (
-    <sky-action-field
-      ref={ref}
-      role="search"
-      type="search"
-      enterkeyhint="search"
-      icon="search"
-      variant="outlined"
-      dense
-      label={t.searchLabel}
-      value={value}
-      placeholder={placeholder}
-      action-label={t.search.action}
-    />
-  );
-}
+/** msd-api's deal sort enum, minus `newest`/`discount` (superseded by price/distance sorts on
+ *  this page; those two values are kept server-side only for other, unmigrated callers). */
+const SORTS = ['relevance', 'price_asc', 'price_desc', 'distance'] as const;
 
 /** SERVICE (or untyped, legacy) categories list deals; PRODUCT/THERAPY list their own entities. */
 function isDealCategory(category: CatalogCategoryWithChildren): boolean {
@@ -89,10 +70,34 @@ function therapistFromPrice(therapist: CatalogTherapist): number | null {
   return Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)));
 }
 
+/** A non-negative number from a query param, or undefined. */
+function toPrice(value: string | null): number | undefined {
+  if (value == null || value === '') return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+
+/** Distance filter options (km); must match the API's facet buckets. */
+const RADIUS_KM = [1, 5, 10, 20, 50, 100];
+
+/** A radius from the URL, only when it is one of the offered distances. */
+function toRadius(value: string | null): number | undefined {
+  const n = toPrice(value);
+  return n != null && RADIUS_KM.includes(n) ? n : undefined;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** UUID-looking ids from a comma-joined query param (`?vendor=id,id`), invalid entries dropped. */
+function toIds(value: string | null): string[] {
+  if (!value) return [];
+  return value.split(',').filter((v) => UUID_RE.test(v));
+}
+
 /**
  * Category → Sub Category → (Deal | Product | Therapist) discovery page — the customer
  * catalogue's single canonical entry point. Composes PageSection, SectionHead and CardGrid with
- * the existing `Tabs`/`DealCard` components unchanged, but reads real Vendor/Branch/Deal/Therapist data from
+ * the existing `DealCard` components unchanged, but reads real Vendor/Branch/Deal/Therapist data from
  * `GET /catalog/*` — only active, approved records with an active vendor/branch are ever
  * returned (enforced server-side in `catalog.service.ts`).
  *
@@ -101,7 +106,7 @@ function therapistFromPrice(therapist: CatalogTherapist): number | null {
  * /catalog/deals`), a PRODUCT category shows Product cards (`GET /catalog/products` — Product is
  * a fully independent catalog entity now, never a Deal), and a THERAPY category shows Therapist
  * cards (`GET /catalog/therapists`, filtered by `categoryId`/`subcategoryId`). "All" (the
- * default) shows every record in the category; selecting a subcategory tab narrows to that
+ * default) shows every record in the category; selecting a subcategory pill narrows to that
  * subcategory only.
  */
 export function Category() {
@@ -114,7 +119,7 @@ export function Category() {
   const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
-  const { coords } = useCurrentLocation();
+  const { coords, city: visitorCity } = useVisitorLocation();
   const { locationsStatus, locations } = useCatalogShell();
   const cityLocation = citySlugParam ? locations.find((l) => citySlug(l.city) === citySlugParam) : undefined;
   // A prerendered page embeds this slug's (and resolved city's) category + "All" deals. The key
@@ -125,16 +130,6 @@ export function Category() {
   const [categoryLoading, setCategoryLoading] = useState(!initial);
   const [categoryError, setCategoryError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
-  const [search, setSearch] = useState('');
-  const [deals, setDeals] = useState<CatalogDeal[]>(initialHasDeals ? initial.deals : []);
-  const [dealsLoading, setDealsLoading] = useState(!initialHasDeals);
-  const [dealsError, setDealsError] = useState('');
-  // The "All" deals list the page shows unfiltered (the prerendered one, then its refresh), and
-  // whether that background refresh has run.
-  const allDealsRef = useRef<CatalogDeal[] | undefined>(initialHasDeals ? initial.deals : undefined);
-  const dealsRefreshedRef = useRef(false);
-  const [therapists, setTherapists] = useState<CatalogTherapist[]>([]);
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
   const cityUnresolved = !!citySlugParam && !cityLocation;
   // Locations arrive with the catalog shell; until then a city URL can't be resolved.
   const cityPending = cityUnresolved && locationsStatus === 'loading';
@@ -178,13 +173,51 @@ export function Category() {
   const subSlug = searchParams.get('sub');
   const subcategoryIdx = (category?.children.findIndex((c) => c.slug === subSlug) ?? -1) + 1;
   const activeSubcategory = subcategoryIdx === 0 ? undefined : category?.children[subcategoryIdx - 1];
-  const setSubcategoryIdx = (idx: number) => {
-    const sub = idx === 0 ? undefined : category?.children[idx - 1];
+  const hasCoords = coords?.latitude != null && coords?.longitude != null;
+  const sortParam = searchParams.get('sort');
+  // Distance sort needs the visitor's coordinates; without them it is plain relevance.
+  const sort =
+    (SORTS as readonly string[]).includes(sortParam ?? '') && sortParam !== 'relevance' && (sortParam !== 'distance' || hasCoords)
+      ? (sortParam as CatalogDealSort)
+      : undefined;
+  const sortOption = t.sortOptions.find((o) => o.value === (sort ?? 'relevance')) ?? t.sortOptions[0];
+  const sortMenuOptions = t.sortOptions.filter((o) => o.value !== 'distance' || hasCoords);
+  const viewParam = searchParams.get('view');
+  const view = viewParam === 'list' || viewParam === 'map' ? viewParam : 'grid';
+  const minPrice = toPrice(searchParams.get('min'));
+  const maxPrice = toPrice(searchParams.get('max'));
+  const radius = toRadius(searchParams.get('radius'));
+  const vendorIds = toIds(searchParams.get('vendor'));
+  const branchIds = toIds(searchParams.get('branch'));
+  // Only filters the current listing can apply count toward the "Filters (n)" badge.
+  const dealFilters = category?.type !== 'PRODUCT';
+  const activeFilters = [
+    dealFilters && hasCoords && radius != null,
+    minPrice != null || maxPrice != null,
+    dealFilters && vendorIds.length > 0,
+    dealFilters && branchIds.length > 0,
+  ].filter(Boolean).length;
+  /** Writes one query param (or removes it when empty), keeping the others. */
+  const setParam = (key: string, value: string | undefined) => {
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (sub) next.set('sub', sub.slug);
-        else next.delete('sub');
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      },
+      { replace: true },
+    );
+  };
+  /** Writes several query params at once (or removes ones set to `undefined`), keeping the others. */
+  const setListParams = (patch: Record<string, string | undefined>) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        for (const [key, value] of Object.entries(patch)) {
+          if (value) next.set(key, value);
+          else next.delete(key);
+        }
         return next;
       },
       { replace: true },
@@ -214,84 +247,152 @@ export function Category() {
   const isTherapyCategory = category?.type === 'THERAPY';
   const isProductCategory = category?.type === 'PRODUCT';
 
+  const lat = coords?.latitude ?? undefined;
+  const lng = coords?.longitude ?? undefined;
+  const common = {
+    categoryId: category?.id,
+    subcategoryId: activeSubcategory?.id,
+    pageSize: CATEGORY_PAGE_SIZE,
+  };
+  // Any change here restarts the list at page 1.
+  const listKey = JSON.stringify([
+    category?.id,
+    activeSubcategory?.id,
+    sort,
+    minPrice,
+    maxPrice,
+    cityLocation?.city,
+    lat,
+    lng,
+    radius,
+    vendorIds.join(),
+    branchIds.join(),
+  ]);
+  // The prerendered first page only describes the default ("All", unsorted, no location) view.
+  const isDefaultView =
+    !activeSubcategory &&
+    !sort &&
+    minPrice == null &&
+    maxPrice == null &&
+    lat == null &&
+    lng == null &&
+    radius == null &&
+    vendorIds.length === 0 &&
+    branchIds.length === 0;
+  const loadError = (err: unknown) => (err instanceof ApiRequestError ? err.message : t.errors.loadDeals);
+  const dealList = usePagedList<CatalogDeal>(
+    (page) =>
+      listCatalogDeals({
+        ...common,
+        page,
+        city: cityLocation?.city,
+        state: cityLocation?.state,
+        sort,
+        minPrice,
+        maxPrice,
+        latitude: lat,
+        longitude: lng,
+        vendorIds,
+        branchIds,
+        radiusKm: hasCoords ? radius : undefined,
+      }),
+    listKey,
+    {
+      enabled: !!category && isDealCategory(category) && !cityPending && !cityMissing,
+      errorMessage: loadError,
+      initial:
+        initialHasDeals && isDefaultView ? { items: initial.deals, total: initial.total ?? initial.deals.length } : undefined,
+    },
+  );
+  const productList = usePagedList<CatalogProduct>(
+    // Products have no distance concept — a `distance` sort never reaches this call.
+    (page) => listCatalogProducts({ ...common, page, sort: sort !== 'distance' ? sort : undefined, minPrice, maxPrice }),
+    listKey,
+    {
+      enabled: category?.type === 'PRODUCT',
+      errorMessage: loadError,
+    },
+  );
+  const therapistList = usePagedList<CatalogTherapist>(
+    (page) => listCatalogTherapists({ ...common, page, latitude: lat, longitude: lng }),
+    listKey,
+    { enabled: category?.type === 'THERAPY', errorMessage: loadError },
+  );
+  const list = isTherapyCategory ? therapistList : isProductCategory ? productList : dealList;
+  const deals = dealList.items;
+  const products = productList.items;
+  const therapists = therapistList.items;
+  const mapPoints = useMemo<DealMapPoint[]>(
+    () =>
+      deals.flatMap((d) =>
+        d.branch?.latitude != null && d.branch?.longitude != null
+          ? [{ id: d.id, lat: Number(d.branch.latitude), lng: Number(d.branch.longitude), label: formatINR(Number(d.salePrice)), title: d.title, href: `/deal/${d.id}` }]
+          : [],
+      ),
+    [deals],
+  );
+  const showMap = !!category && isDealCategory(category) && mapPoints.length > 0;
+  const showingMap = view === 'map' && showMap;
+  const viewOptions: ViewOption[] = [
+    { value: 'list', label: t.view.list, icon: 'view_list' },
+    { value: 'grid', label: t.view.grid, icon: 'grid_view' },
+    ...(showMap ? [{ value: 'map', label: t.view.map, icon: 'map' }] : []),
+  ];
+  const dealsLoading = list.status === 'loading';
+  const dealsError = list.status === 'error' ? list.error : '';
+
+  // Filter-panel facet counts (business/branch/distance/price) for deal categories only; ignores
+  // stale responses and keeps the previous facets on error so the panel never flashes empty.
+  const [facets, setFacets] = useState<CatalogDealFacets | null>(null);
+  // Another category's businesses/branches/price range must never show while this one loads.
+  useEffect(() => setFacets(null), [category?.id]);
   useEffect(() => {
-    if (!category) return;
-    // The prerendered "All" list for this route, before any filter or location applies: keep it
-    // on screen and refresh it once in the background; a failed refresh keeps it.
-    if (
-      initialHasDeals &&
-      category.id === initial.category?.id &&
-      deals === allDealsRef.current &&
-      !activeSubcategory &&
-      !search &&
-      coords?.latitude == null &&
-      coords?.longitude == null
-    ) {
-      if (dealsRefreshedRef.current) return;
-      dealsRefreshedRef.current = true;
-      listCatalogDeals({ categoryId: category.id, city: cityLocation?.city, state: cityLocation?.state, pageSize: 60 })
-        .then(({ data }) => {
-          allDealsRef.current = data ?? [];
-          setDeals(allDealsRef.current);
-        })
-        .catch(() => undefined);
-      return;
-    }
-    setDealsLoading(true);
-    setDealsError('');
-    if (category.type === 'THERAPY') {
-      listCatalogTherapists({
-        categoryId: category.id,
-        subcategoryId: activeSubcategory?.id,
-        search: search || undefined,
-        pageSize: 60,
-        latitude: coords?.latitude,
-        longitude: coords?.longitude,
-      })
-        .then(({ data }) => setTherapists(data))
-        .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : content.category.errors.loadDeals))
-        .finally(() => setDealsLoading(false));
-      return;
-    }
-    if (category.type === 'PRODUCT') {
-      // Product is a fully independent catalog entity now — its own listing API, never a
-      // Deal with a `type` filter (see catalog.ts's own doc comment).
-      listCatalogProducts({
-        categoryId: category.id,
-        subcategoryId: activeSubcategory?.id,
-        search: search || undefined,
-        pageSize: 60,
-      })
-        .then(({ data }) => setProducts(data))
-        .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : content.category.errors.loadDeals))
-        .finally(() => setDealsLoading(false));
-      return;
-    }
-    if (cityPending) return;
-    listCatalogDeals({
+    if (!category || !isDealCategory(category) || cityPending || cityMissing) return;
+    let cancelled = false;
+    getCatalogDealFacets({
       categoryId: category.id,
+      subcategoryId: activeSubcategory?.id,
       city: cityLocation?.city,
       state: cityLocation?.state,
-      subcategoryId: activeSubcategory?.id,
-      search: search || undefined,
-      pageSize: 60,
-      latitude: coords?.latitude,
-      longitude: coords?.longitude,
+      latitude: lat,
+      longitude: lng,
+      radiusKm: hasCoords ? radius : undefined,
+      vendorIds,
+      branchIds,
+      minPrice,
+      maxPrice,
     })
-      .then(({ data }) => setDeals(data))
-      .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : content.category.errors.loadDeals))
-      .finally(() => setDealsLoading(false));
+      .then(({ data }) => {
+        if (!cancelled) setFacets(data);
+      })
+      .catch(() => {
+        // Keep the previous facets on a failed refetch.
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    category,
-    activeSubcategory?.id,
-    search,
-    coords?.latitude,
-    coords?.longitude,
-    cityPending,
-    cityLocation?.city,
-    cityLocation?.state,
-  ]);
+  }, [category?.id, activeSubcategory?.id, cityLocation?.city, lat, lng, radius, vendorIds.join(), branchIds.join(), minPrice, maxPrice]);
+
+  // Filter side panel: a column open by default on desktop, a closed side sheet on phones, until
+  // the visitor overrides it (`panelOpen`), which then wins regardless of viewport.
+  const desktop = useMediaQuery('(min-width: 840px)', true);
+  const [panelOpen, setPanelOpen] = useState<boolean | null>(null);
+  const filtersOpen = panelOpen ?? desktop;
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
+  const priceBounds = facets?.price
+    ? {
+        min: Math.floor(facets.price.min / t.filters.step) * t.filters.step,
+        max: Math.ceil(facets.price.max / t.filters.step) * t.filters.step,
+        step: t.filters.step,
+      }
+    : { min: t.filters.min, max: t.filters.max, step: t.filters.step };
+  const onRadius = (km: number | undefined) => setListParams({ radius: km != null ? String(km) : undefined });
+  const onPrice = ({ min, max }: PriceRange) =>
+    setListParams({ min: min != null ? String(min) : undefined, max: max != null ? String(max) : undefined });
+  const onVendors = (ids: string[]) => setListParams({ vendor: ids.length ? ids.join(',') : undefined });
+  const onBranches = (ids: string[]) => setListParams({ branch: ids.length ? ids.join(',') : undefined });
+  const onClearAll = () => setListParams({ radius: undefined, min: undefined, max: undefined, vendor: undefined, branch: undefined });
 
   // Hold the page (and its canonical) until the city resolves, so a city URL never briefly
   // announces itself as the plain category page.
@@ -327,7 +428,25 @@ export function Category() {
     ...(activeCity ? [{ name: activeCity.city, path }] : []),
   ];
 
-  const count = isTherapyCategory ? therapists.length : isProductCategory ? products.length : deals.length;
+  const filtersToggle = !isTherapyCategory
+    ? createElement(
+        'md-text-button',
+        {
+          'aria-expanded': String(filtersOpen),
+          onClick: () => setPanelOpen(!filtersOpen),
+        },
+        createElement('md-icon', { slot: 'icon', 'aria-hidden': 'true' }, 'tune'),
+        desktop
+          ? filtersOpen
+            ? t.toolbar.hideFilters
+            : t.toolbar.showFilters
+          : activeFilters
+            ? t.toolbar.filtersActive.replace('{count}', String(activeFilters))
+            : t.toolbar.filters,
+      )
+    : null;
+
+  const count = list.total;
   const noun = isTherapyCategory ? t.resultCount.therapist : isProductCategory ? t.resultCount.product : t.dealCount;
   const countText = dealsLoading ? '' : `${count} ${count === 1 ? noun.singular : noun.plural}`;
   const empty = isTherapyCategory ? t.emptyTherapists : t.emptyDeals;
@@ -335,24 +454,21 @@ export function Category() {
     <p className="loading-state">{t.loadingDeals}</p>
   ) : dealsError ? (
     <p className="error-state" role="alert">{dealsError}</p>
-  ) : count === 0 ? (
+  ) : list.items.length === 0 ? (
     <sky-info-card icon="sentiment_dissatisfied" heading={empty.heading} subheading={empty.subheading} />
   ) : undefined;
 
-  const tabs =
+  const pills =
     category.children.length > 0 ? (
-      <Tabs
-        aria-label={t.tabsLabel}
-        onChange={(e) => setSubcategoryIdx((e.target as unknown as { activeTabIndex: number }).activeTabIndex)}
-      >
-        {[{ id: 'all', name: t.tabs.all }, ...category.children].map((tab, i) => (
-          <SubcategoryTab key={tab.id} id={tab.id} active={subcategoryIdx === i}>
-            {tab.name}
-          </SubcategoryTab>
-        ))}
-      </Tabs>
+      <ChipNav
+        ariaLabel={t.pills.label}
+        items={[{ value: '', label: t.tabs.all }, ...category.children.map((c) => ({ value: c.slug, label: c.name }))]}
+        value={activeSubcategory?.slug ?? ''}
+        onSelect={(value) => setParam('sub', value || undefined)}
+      />
     ) : null;
 
+  const cardLayout = view === 'list' ? 'horizontal' : undefined;
   const cards = isTherapyCategory
     ? therapists.map((therapist) => {
         const price = therapistFromPrice(therapist);
@@ -369,6 +485,7 @@ export function Category() {
             pricePrefix={price != null ? t.therapistPricePrefix : undefined}
             price={price != null ? formatINR(price) : undefined}
             href={`/therapist/${therapist.id}`}
+            layout={cardLayout}
           />
         );
       })
@@ -396,6 +513,7 @@ export function Category() {
             eyebrowHref={product.vendor?.slug ? `/vendor/${product.vendor.slug}` : undefined}
             favoriteActive={false}
             onFavorite={() => {}}
+            layout={cardLayout}
             actions={
               <FilledButton onClick={() => addProductToCart(product)}>
                 <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
@@ -429,6 +547,7 @@ export function Category() {
             eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
             favoriteActive={signedIn && isWishlisted(deal.id)}
             onFavorite={() => toggleFavorite(deal)}
+            layout={cardLayout}
             actions={
               <DealAddToCartDialog
                 deal={deal}
@@ -471,31 +590,101 @@ export function Category() {
           id="category-heading"
           titleClassName="headline-large"
           heading={displayName}
-          subheading={category.description ?? undefined}
+          subheading={category.description ? <ClampText text={category.description} more={t.description.more} less={t.description.less} /> : undefined}
           actions={
+            <span className="body-medium" aria-live="polite" aria-atomic="true">
+              {countText}
+            </span>
+          }
+        />
+        {pills}
+      </PageSection>
+      <PageSection tone="tint" stack aria-label={`${category.name} ${t.dealsAriaLabelSuffix}`}>
+        <ListingToolbar
+          ariaLabel={t.toolbar.label}
+          start={filtersToggle ?? undefined}
+          end={
             <>
-              <span className="body-medium" aria-live="polite" aria-atomic="true">
-                {countText}
-              </span>
-              <SearchField value={search} placeholder={t.search.placeholder.replace('{category}', category.name)} onSearch={setSearch} />
+              <ViewSwitch
+                label={t.view.label}
+                options={viewOptions}
+                value={view}
+                onChange={(v) => setParam('view', v === 'grid' ? undefined : v)}
+              />
+              {!isTherapyCategory && (
+                <ChoiceMenu
+                  trigger="text"
+                  icon="swap_vert"
+                  label={t.toolbar.sort.replace('{label}', sortOption.label)}
+                  menuLabel={t.toolbar.sortMenu}
+                  options={sortMenuOptions}
+                  value={sortOption.value}
+                  onChange={(value) => setParam('sort', value === 'relevance' ? undefined : value)}
+                />
+              )}
             </>
           }
         />
-      </PageSection>
-      <PageSection tone="tint" aria-label={`${category.name} ${t.dealsAriaLabelSuffix}`}>
-        <CardGrid
-          above={
-            <>
-              {tabs}
-              {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
-              {actionError && <p className="error-state" role="alert">{actionError}</p>}
-            </>
+        <SidebarLayout
+          open={filtersOpen && !isTherapyCategory}
+          onClose={() => setPanelOpen(false)}
+          sidebarLabel={t.filterPanel.title}
+          closeLabel={t.filterPanel.close}
+          sidebar={
+            <FilterPanel
+              kind={isProductCategory ? 'products' : 'deals'}
+              facets={facets}
+              location={{ city: visitorCity, hasCoords }}
+              onChangeLocation={() => {
+                // The phone sheet is modal (the page behind it is inert); close it so the city
+                // dialog is usable. On desktop the panel stays open.
+                if (!desktop) setPanelOpen(false);
+                setCityPickerOpen(true);
+              }}
+              radiusKm={radius}
+              onRadius={onRadius}
+              price={{ min: minPrice, max: maxPrice }}
+              priceBounds={priceBounds}
+              onPrice={onPrice}
+              vendorIds={vendorIds}
+              onVendors={onVendors}
+              branchIds={branchIds}
+              onBranches={onBranches}
+              onClearAll={onClearAll}
+              copy={t.filterPanel}
+            />
           }
-          panel={tabs ? { id: PANEL_ID, labelledBy: tabId(activeSubcategory?.id ?? 'all') } : undefined}
-          fallback={fallback}
         >
-          {cards}
-        </CardGrid>
+          {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
+          {actionError && <p className="error-state" role="alert">{actionError}</p>}
+          {showingMap ? (
+            <>
+              <DealMap points={mapPoints} ariaLabel={t.map.label} loadingLabel={t.map.loading} />
+              {deals.length > mapPoints.length && (
+                <p className="body-medium">
+                  {deals.length - mapPoints.length === 1
+                    ? t.map.missingOne
+                    : t.map.missing.replace('{count}', String(deals.length - mapPoints.length))}
+                </p>
+              )}
+            </>
+          ) : (
+            <CardGrid layout={view === 'list' ? 'list' : 'grid'} fallback={fallback}>
+              {cards}
+            </CardGrid>
+          )}
+          {list.status === 'ready' && list.items.length > 0 && (
+            <LoadMore
+              hasMore={list.hasMore}
+              loading={list.loadingMore}
+              error={list.error}
+              status={t.loadMore.status.replace('{shown}', String(list.items.length)).replace('{total}', String(list.total))}
+              onLoadMore={list.loadMore}
+              copy={t.loadMore}
+            />
+          )}
+        </SidebarLayout>
+        {cityPickerOpen && <CityPickerDialog onClose={() => setCityPickerOpen(false)} />}
       </PageSection>
     </>
   );

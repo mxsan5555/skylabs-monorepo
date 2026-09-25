@@ -187,45 +187,55 @@ export function getCatalogCategory(slug: string) {
   return apiGet<CatalogCategoryWithChildren>(`/catalog/categories/${encodeURIComponent(slug)}`, null);
 }
 
-export interface CatalogPopularTreatment {
-  id: string;
-  name: string;
-  slug: string;
-  categorySlug: string | null;
-}
+/** Mirrors msd-api's `CatalogDealQuerySchema.sort`/`CatalogProductQuerySchema.sort` enums. */
+export type CatalogDealSort = 'relevance' | 'price_asc' | 'price_desc' | 'distance' | 'newest' | 'discount';
+export type CatalogProductSort = 'relevance' | 'price_asc' | 'price_desc' | 'newest' | 'discount';
 
-export interface CatalogPopularTreatmentGroup {
-  id: string;
-  name: string;
-  slug: string;
-  treatments: CatalogPopularTreatment[];
-}
-
-/** Public home page Treatment directory — active groups only, each holding only its own active
- *  treatments (server-filtered; see msd-api's `popular-treatment.service.ts#getPublicTreatmentDirectory`). */
-export function listCatalogPopularTreatments() {
-  return apiGet<CatalogPopularTreatmentGroup[]>('/catalog/popular-treatments', null);
-}
-
-export function listCatalogDeals(opts: {
+export interface ListCatalogDealsOpts {
   page?: number;
   pageSize?: number;
   categoryId?: string;
   subcategoryId?: string;
   vendorId?: string;
   branchId?: string;
+  /** Comma-joined server-side; wins over the single `vendorId`/`branchId` above when both are given. */
+  vendorIds?: string[];
+  branchIds?: string[];
   search?: string;
   state?: string;
   city?: string;
-  sort?: 'newest' | 'discount';
+  sort?: CatalogDealSort;
   minPrice?: number;
   maxPrice?: number;
   /** From `useCurrentLocation`'s raw `coords` — when both are present, results come back
    *  nearest-first with a real `distanceKm` per item; omitted → unchanged behavior. */
   latitude?: number;
   longitude?: number;
-} = {}) {
-  return apiGet<CatalogDeal[]>(`/catalog/deals${toQuery(opts)}`, null);
+  /** Radius in km around `latitude`/`longitude`; ignored without coordinates. */
+  radiusKm?: number;
+}
+
+export function listCatalogDeals(opts: ListCatalogDealsOpts = {}) {
+  return apiGet<CatalogDeal[]>(
+    `/catalog/deals${toQuery({ ...opts, vendorIds: opts.vendorIds?.length ? opts.vendorIds.join(',') : undefined, branchIds: opts.branchIds?.length ? opts.branchIds.join(',') : undefined })}`,
+    null,
+  );
+}
+
+export interface CatalogDealFacets {
+  vendors: { id: string; name: string; count: number }[];
+  branches: { id: string; name: string; city: string | null; vendorName: string; count: number }[];
+  distance: { km: number; count: number }[];
+  price: { min: number; max: number } | null;
+}
+
+/** Filter-panel counts for the same filters as `listCatalogDeals` (no paging/sort). */
+export function getCatalogDealFacets(opts: Omit<ListCatalogDealsOpts, 'page' | 'pageSize' | 'sort'> = {}) {
+  const { vendorIds, branchIds, ...rest } = opts;
+  return apiGet<CatalogDealFacets>(
+    `/catalog/deals/facets${toQuery({ ...rest, vendorIds: vendorIds?.length ? vendorIds.join(',') : undefined, branchIds: branchIds?.length ? branchIds.join(',') : undefined })}`,
+    null,
+  );
 }
 
 export function getCatalogDeal(id: string) {
@@ -262,7 +272,7 @@ export function listCatalogProducts(opts: {
   subcategoryId?: string;
   vendorId?: string;
   search?: string;
-  sort?: 'newest' | 'discount';
+  sort?: CatalogProductSort;
   minPrice?: number;
   maxPrice?: number;
 } = {}) {

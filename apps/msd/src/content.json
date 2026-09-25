@@ -485,27 +485,12 @@
   },
   "category": {
     "sortOptions": [
-      {
-        "value": "popular",
-        "label": "Popular"
-      },
-      {
-        "value": "rating",
-        "label": "Top Rated"
-      },
-      {
-        "value": "price-asc",
-        "label": "Price: Low to High"
-      },
-      {
-        "value": "price-desc",
-        "label": "Price: High to Low"
-      },
-      {
-        "value": "distance",
-        "label": "Nearest First"
-      }
+      { "value": "relevance", "label": "Relevance" },
+      { "value": "price_asc", "label": "Price: Low to High" },
+      { "value": "price_desc", "label": "Price: High to Low" },
+      { "value": "distance", "label": "Distance: Nearest" }
     ],
+    "view": { "label": "Results view", "list": "List view", "grid": "Grid view", "map": "Map view" },
     "timeSlots": [
       "9:00 AM",
       "10:00 AM",
@@ -540,7 +525,6 @@
       "placeholder": "Search {category}",
       "action": "Search"
     },
-    "tabsLabel": "Filter by sub-category",
     "resultCount": {
       "therapist": { "singular": "therapist", "plural": "therapists" },
       "product": { "singular": "product", "plural": "products" }
@@ -550,6 +534,48 @@
       "subheading": "Check back soon."
     },
     "therapistPricePrefix": "From",
+    "description": { "more": "More", "less": "Less" },
+    "pills": { "label": "Sub-categories" },
+    "toolbar": {
+      "label": "Listing tools",
+      "filters": "Filters",
+      "filtersActive": "Filters ({count})",
+      "sort": "Sort: {label}",
+      "sortMenu": "Sort by",
+      "showFilters": "Show filters",
+      "hideFilters": "Hide filters"
+    },
+    "filterPanel": {
+      "title": "Filters",
+      "close": "Close filters",
+      "clearAll": "Clear all",
+      "showMore": "Show more",
+      "showLess": "Show less",
+      "countOne": ", 1 deal",
+      "countMany": ", {count} deals",
+      "location": { "title": "Your location", "notSet": "Not set", "change": "Change location" },
+      "distance": { "title": "Distance", "any": "Any distance", "within": "Within {km} km", "needsLocation": "Set your location to filter by distance." },
+      "price": { "title": "Price", "min": "Min", "max": "Max", "minLabel": "Minimum price", "maxLabel": "Maximum price" },
+      "business": { "title": "Business", "search": "Search businesses" },
+      "branches": { "title": "Branches", "search": "Search branches" }
+    },
+    "loadMore": {
+      "button": "Show more",
+      "loading": "Loading more",
+      "retry": "Try again",
+      "status": "Showing {shown} of {total}"
+    },
+    "filters": {
+      "min": 0,
+      "max": 10000,
+      "step": 100
+    },
+    "map": {
+      "label": "Deals on the map",
+      "loading": "Loading map",
+      "missingOne": "1 deal has no map location",
+      "missing": "{count} deals have no map location"
+    },
     "dealCount": {
       "singular": "deal",
       "plural": "deals"

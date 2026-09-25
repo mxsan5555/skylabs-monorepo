@@ -233,42 +233,7 @@
 }
 
 .search-map__canvas {
-  position: relative;
-  border-radius: 16px;
-  overflow: hidden;
-  background:
-    repeating-linear-gradient(
-      0deg,
-      var(--md-sys-color-outline-variant) 0px,
-      var(--md-sys-color-outline-variant) 1px,
-      transparent 1px,
-      transparent 60px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      var(--md-sys-color-outline-variant) 0px,
-      var(--md-sys-color-outline-variant) 1px,
-      transparent 1px,
-      transparent 60px
-    ),
-    var(--md-sys-color-surface-container-low);
-  border: 1px solid var(--md-sys-color-outline-variant);
-  min-height: 400px;
-}
-
-.search-map__canvas::after {
-  content: 'Map · Real-time map available after API integration';
-  position: absolute;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.72rem;
-  color: var(--md-sys-color-on-surface-variant);
-  background: var(--md-sys-color-surface-container);
-  padding: 4px 10px;
-  border-radius: 8px;
-  white-space: nowrap;
-  opacity: 0.8;
+  min-inline-size: 0;
 }
 
 .search-map__pin {

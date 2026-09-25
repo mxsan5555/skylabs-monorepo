@@ -1,0 +1,18 @@
+/* Clamped description with a More / Less toggle. */
+.clamp-text {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+.clamp-text__body {
+  margin: 0;
+  max-inline-size: 72ch;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.clamp-text__body--clamped {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
