@@ -45,7 +45,7 @@ export const splitIds = (value?: string) => (value ? value.split(',').filter(Boo
 
 /** `GET /catalog/deals/facets` — every base/facet filter `CatalogDealQuerySchema` accepts, minus
  *  paging and sort (facets counts, never paginates or sorts a list). */
-export const CatalogDealFacetQuerySchema = CatalogDealQuerySchema.omit({ page: true, pageSize: true, sort: true }).openapi('CatalogDealFacetQuery');
+export const CatalogDealFacetQuerySchema = CatalogDealQuerySchema.omit({ page: true, pageSize: true, sort: true, vendorId: true, branchId: true }).openapi('CatalogDealFacetQuery');
 
 /** `GET /catalog/products` — mirrors CatalogDealQuerySchema minus the branch/location/duration
  *  concepts Product doesn't have (no branchId, no packages, no geo distance sort). */

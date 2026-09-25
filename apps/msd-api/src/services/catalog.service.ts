@@ -464,9 +464,9 @@ export async function listPublicDeals(
   // given — is applied in memory by `rankDeals` below, not in SQL) falls back to `createdAt desc`.
   const orderBy =
     sort === 'price_asc'
-      ? [{ salePrice: 'asc' as const }, { createdAt: 'desc' as const }]
+      ? [{ salePrice: 'asc' as const }, { createdAt: 'desc' as const }, { id: 'asc' as const }]
       : sort === 'price_desc'
-        ? [{ salePrice: 'desc' as const }, { createdAt: 'desc' as const }]
+        ? [{ salePrice: 'desc' as const }, { createdAt: 'desc' as const }, { id: 'asc' as const }]
         : sort === 'discount'
           ? [{ discountPercent: { sort: 'desc' as const, nulls: 'last' as const } }]
           : { createdAt: 'desc' as const };
@@ -605,9 +605,9 @@ export async function listPublicProducts(opts: {
   };
   const orderBy =
     opts.sort === 'price_asc'
-      ? [{ price: 'asc' as const }, { createdAt: 'desc' as const }]
+      ? [{ price: 'asc' as const }, { createdAt: 'desc' as const }, { id: 'asc' as const }]
       : opts.sort === 'price_desc'
-        ? [{ price: 'desc' as const }, { createdAt: 'desc' as const }]
+        ? [{ price: 'desc' as const }, { createdAt: 'desc' as const }, { id: 'asc' as const }]
         : opts.sort === 'discount'
           ? [{ discount: { sort: 'desc' as const, nulls: 'last' as const } }]
           : { createdAt: 'desc' as const };

@@ -113,7 +113,10 @@ export function computeDealFacets(rows: FacetRow[], sel: FacetSelection): DealFa
     : [];
 
   const prices = rows.filter((r) => passes(r, 'price')).map((r) => Number(r.salePrice));
-  const price = prices.length ? { min: Math.min(...prices), max: Math.max(...prices) } : null;
+  // reduce, not Math.min(...prices): spreading a very large array can exceed the call-stack limit.
+  const price = prices.length
+    ? prices.reduce((acc, p) => ({ min: Math.min(acc.min, p), max: Math.max(acc.max, p) }), { min: prices[0], max: prices[0] })
+    : null;
 
   return { vendors: [...vendors.values()].sort(byCount), branches: [...branches.values()].sort(byCount), distance, price };
 }

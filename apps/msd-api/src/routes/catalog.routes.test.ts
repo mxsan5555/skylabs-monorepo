@@ -300,7 +300,7 @@ describe('GET /api/v1/catalog/deals sorts and filters', () => {
     prismaMock.deal.count.mockResolvedValue(0);
     await request(app).get('/api/v1/catalog/deals?sort=price_asc');
     expect(prismaMock.deal.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: [{ salePrice: 'asc' }, { createdAt: 'desc' }] }),
+      expect.objectContaining({ orderBy: [{ salePrice: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }] }),
     );
   });
 
@@ -309,7 +309,7 @@ describe('GET /api/v1/catalog/deals sorts and filters', () => {
     prismaMock.deal.count.mockResolvedValue(0);
     await request(app).get('/api/v1/catalog/deals?sort=price_desc');
     expect(prismaMock.deal.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: [{ salePrice: 'desc' }, { createdAt: 'desc' }] }),
+      expect.objectContaining({ orderBy: [{ salePrice: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }] }),
     );
   });
 
@@ -498,7 +498,7 @@ describe('GET /api/v1/catalog/products', () => {
     prismaMock.product.count.mockResolvedValue(0);
     await request(app).get('/api/v1/catalog/products?sort=price_asc');
     expect(prismaMock.product.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: [{ price: 'asc' }, { createdAt: 'desc' }] }),
+      expect.objectContaining({ orderBy: [{ price: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }] }),
     );
   });
 
@@ -507,7 +507,7 @@ describe('GET /api/v1/catalog/products', () => {
     prismaMock.product.count.mockResolvedValue(0);
     await request(app).get('/api/v1/catalog/products?sort=price_desc');
     expect(prismaMock.product.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: [{ price: 'desc' }, { createdAt: 'desc' }] }),
+      expect.objectContaining({ orderBy: [{ price: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }] }),
     );
   });
 
