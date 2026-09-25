@@ -25,6 +25,24 @@ describe('CardGrid', () => {
     expect(screen.getByText('Loading')).toBeTruthy();
   });
 
+  it('has no --list modifier by default', () => {
+    render(
+      <CardGrid>
+        <article key="a">A</article>
+      </CardGrid>,
+    );
+    expect(screen.getByRole('list').className).toBe('card-grid__list');
+  });
+
+  it('adds the --list modifier for layout="list"', () => {
+    render(
+      <CardGrid layout="list">
+        <article key="a">A</article>
+      </CardGrid>,
+    );
+    expect(screen.getByRole('list').className).toBe('card-grid__list card-grid__list--list');
+  });
+
   it('renders above content first and wraps the grid in a tabpanel', () => {
     render(
       <CardGrid above={<div role="tablist" />} panel={{ id: 'p', labelledBy: 'tab-all' }}>

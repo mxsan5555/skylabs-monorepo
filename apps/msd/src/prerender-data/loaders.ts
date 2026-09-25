@@ -37,14 +37,16 @@ export interface HomeData {
 }
 
 /** Payload for key `categoryDataKey(slug, city)` (read by the category page). `category: null`
- *  means the slug does not exist; `deals` is empty for PRODUCT/THERAPY categories. */
+ *  means the slug does not exist; `deals` is empty for PRODUCT/THERAPY categories. `total` = all
+ *  matching deals (API `meta.total`), `deals` = the first page. */
 export interface CategoryData {
   category: CatalogCategoryWithChildren | null;
   deals: CatalogDeal[];
+  total: number;
 }
 
-/** Same deal page size the category page requests. */
-export const CATEGORY_DEALS_PAGE_SIZE = 60;
+/** Cards per page on the category page (and its prerendered first page). */
+export const CATEGORY_PAGE_SIZE = 12;
 
 /** Copies only `keys` that are present, so the embedded payload carries no `undefined` noise. */
 function pick<T extends object, K extends keyof T>(obj: T, keys: readonly K[]): Pick<T, K> {
@@ -128,15 +130,15 @@ export async function loadCategoryData(slug: string, city?: string, state?: stri
   try {
     category = (await getCatalogCategory(slug)).data ?? null;
   } catch (err) {
-    if (err instanceof ApiRequestError && err.status === 404) return { category: null, deals: [] };
+    if (err instanceof ApiRequestError && err.status === 404) return { category: null, deals: [], total: 0 };
     throw err;
   }
-  if (!category || category.type === 'PRODUCT' || category.type === 'THERAPY') return { category, deals: [] };
-  const { data } = await listCatalogDeals({
+  if (!category || category.type === 'PRODUCT' || category.type === 'THERAPY') return { category, deals: [], total: 0 };
+  const { data, meta } = await listCatalogDeals({
     categoryId: category.id,
-    pageSize: CATEGORY_DEALS_PAGE_SIZE,
+    pageSize: CATEGORY_PAGE_SIZE,
     ...(city ? { city } : {}),
     ...(state ? { state } : {}),
   });
-  return { category, deals: (data ?? []).map(trimDeal) };
+  return { category, deals: (data ?? []).map(trimDeal), total: meta?.total ?? (data ?? []).length };
 }

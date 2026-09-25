@@ -1,7 +1,10 @@
 .vendor-document-upload {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 12px;
   border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: 8px;
@@ -11,31 +14,92 @@
 .vendor-document-upload__label {
   margin: 0;
   font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.25;
 }
 
 .vendor-document-upload__file {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.vendor-document-upload__file-header {
+  display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.vendor-document-upload__file-header > md-icon {
+  flex: 0 0 auto;
 }
 
 .vendor-document-upload__file-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
   flex: 1;
-  min-width: 120px;
 }
 
 .vendor-document-upload__filename {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
+  line-height: 1.2;
 }
 
 .vendor-document-upload__filesize {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  line-height: 1.2;
   color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vendor-document-upload__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.vendor-document-upload__actions md-outlined-button {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Compact icon-only buttons */
+.vendor-document-upload__actions md-outlined-button {
+  --md-outlined-button-container-height: 36px;
+  --md-outlined-button-container-width: 36px;
+  --md-outlined-button-icon-size: 18px;
+
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  padding: 0;
+}
+
+/* Upload button when there is no document */
+.vendor-document-upload > md-outlined-button {
+  width: fit-content;
+  max-width: 100%;
+}
+.field-hint{
+  margin-top: 10px;
+}
+@media (max-width: 700px) {
+  .vendor-document-upload {
+    padding: 10px;
+  }
+
+  .vendor-document-upload__actions {
+    gap: 5px;
+  }
 }

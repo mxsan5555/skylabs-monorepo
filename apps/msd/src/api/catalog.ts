@@ -187,83 +187,55 @@ export function getCatalogCategory(slug: string) {
   return apiGet<CatalogCategoryWithChildren>(`/catalog/categories/${encodeURIComponent(slug)}`, null);
 }
 
-export interface CatalogPopularTreatment {
-  id: string;
-  name: string;
-  slug: string;
-  categorySlug: string | null;
-}
+/** Mirrors msd-api's `CatalogDealQuerySchema.sort`/`CatalogProductQuerySchema.sort` enums. */
+export type CatalogDealSort = 'relevance' | 'price_asc' | 'price_desc' | 'distance' | 'newest' | 'discount';
+export type CatalogProductSort = 'relevance' | 'price_asc' | 'price_desc' | 'newest' | 'discount';
 
-export interface CatalogPopularTreatmentGroup {
-  id: string;
-  name: string;
-  slug: string;
-  treatments: CatalogPopularTreatment[];
-}
-
-/** Public home page Treatment directory — active groups only, each holding only its own active
- *  treatments (server-filtered; see msd-api's `popular-treatment.service.ts#getPublicTreatmentDirectory`). */
-export function listCatalogPopularTreatments() {
-  return apiGet<CatalogPopularTreatmentGroup[]>('/catalog/popular-treatments', null);
-}
-
-/** One active Home page promotion card — server-filtered to `isActive` + within its (optional)
- *  visibility window (see msd-api's `promotion.service.ts#getPublicPromotions`). `image` is a raw
- *  `storageKey` (or `null`) — pass it through `resolveMediaUrl` from `api/media.ts` before
- *  rendering, same as every other media-backed entity. */
-export interface CatalogPromotion {
-  id: string;
-  title: string;
-  description: string | null;
-  buttonLabel: string | null;
-  destinationType: 'ROUTE' | 'CATEGORY' | 'DEAL';
-  destinationRoute: string | null;
-  category: { id: string; name: string; slug: string } | null;
-  deal: { id: string; title: string; slug: string } | null;
-  image: string | null;
-}
-
-export function listCatalogPromotions() {
-  return apiGet<CatalogPromotion[]>('/catalog/promotions', null);
-}
-
-/** Public Home Hero Deal slider — `state: null` means the Global/Default slider served (either
- *  because the requested state has no publishable slider of its own yet, or none was requested).
- *  `slides` is empty when even the Global/Default slider isn't publishable yet (fewer than 5
- *  eligible Deals) — the frontend degrades gracefully, never crashes on an empty list. */
-export interface CatalogHomeHeroSlide {
-  id: string;
-  deal: CatalogDeal;
-}
-
-export interface CatalogHomeHero {
-  state: string | null;
-  slides: CatalogHomeHeroSlide[];
-}
-
-export function getCatalogHomeHero(state?: string) {
-  return apiGet<CatalogHomeHero>(`/catalog/home-hero${state ? `?state=${encodeURIComponent(state)}` : ''}`, null);
-}
-
-export function listCatalogDeals(opts: {
+export interface ListCatalogDealsOpts {
   page?: number;
   pageSize?: number;
   categoryId?: string;
   subcategoryId?: string;
   vendorId?: string;
   branchId?: string;
+  /** Comma-joined server-side; wins over the single `vendorId`/`branchId` above when both are given. */
+  vendorIds?: string[];
+  branchIds?: string[];
   search?: string;
   state?: string;
   city?: string;
-  sort?: 'newest' | 'discount';
+  sort?: CatalogDealSort;
   minPrice?: number;
   maxPrice?: number;
   /** From `useCurrentLocation`'s raw `coords` — when both are present, results come back
    *  nearest-first with a real `distanceKm` per item; omitted → unchanged behavior. */
   latitude?: number;
   longitude?: number;
-} = {}) {
-  return apiGet<CatalogDeal[]>(`/catalog/deals${toQuery(opts)}`, null);
+  /** Radius in km around `latitude`/`longitude`; ignored without coordinates. */
+  radiusKm?: number;
+}
+
+export function listCatalogDeals(opts: ListCatalogDealsOpts = {}) {
+  return apiGet<CatalogDeal[]>(
+    `/catalog/deals${toQuery({ ...opts, vendorIds: opts.vendorIds?.length ? opts.vendorIds.join(',') : undefined, branchIds: opts.branchIds?.length ? opts.branchIds.join(',') : undefined })}`,
+    null,
+  );
+}
+
+export interface CatalogDealFacets {
+  vendors: { id: string; name: string; count: number }[];
+  branches: { id: string; name: string; city: string | null; vendorName: string; count: number }[];
+  distance: { km: number; count: number }[];
+  price: { min: number; max: number } | null;
+}
+
+/** Filter-panel counts for the same filters as `listCatalogDeals` (no paging/sort). */
+export function getCatalogDealFacets(opts: Omit<ListCatalogDealsOpts, 'page' | 'pageSize' | 'sort'> = {}) {
+  const { vendorIds, branchIds, ...rest } = opts;
+  return apiGet<CatalogDealFacets>(
+    `/catalog/deals/facets${toQuery({ ...rest, vendorIds: vendorIds?.length ? vendorIds.join(',') : undefined, branchIds: branchIds?.length ? branchIds.join(',') : undefined })}`,
+    null,
+  );
 }
 
 export function getCatalogDeal(id: string) {
@@ -300,7 +272,7 @@ export function listCatalogProducts(opts: {
   subcategoryId?: string;
   vendorId?: string;
   search?: string;
-  sort?: 'newest' | 'discount';
+  sort?: CatalogProductSort;
   minPrice?: number;
   maxPrice?: number;
 } = {}) {

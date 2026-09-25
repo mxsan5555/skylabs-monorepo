@@ -87,8 +87,8 @@ describe('loadCategoryData', () => {
   it('fetches the category and its city deals', async () => {
     const data = await loadCategoryData('massage', 'Pune');
     expect(m.category).toHaveBeenCalledWith('massage');
-    expect(m.deals).toHaveBeenCalledWith(expect.objectContaining({ categoryId: 'c1', city: 'Pune', pageSize: 60 }));
-    expect(data).toEqual({ category: expect.objectContaining({ id: 'c1' }), deals: [{ id: 'd1' }] });
+    expect(m.deals).toHaveBeenCalledWith(expect.objectContaining({ categoryId: 'c1', city: 'Pune', pageSize: 12 }));
+    expect(data).toEqual({ category: expect.objectContaining({ id: 'c1' }), deals: [{ id: 'd1' }], total: 1 });
   });
 
   it('fetches without city when none is given', async () => {
@@ -98,7 +98,7 @@ describe('loadCategoryData', () => {
 
   it('a 404 category returns { category: null, deals: [] }', async () => {
     m.category.mockRejectedValue(new ApiRequestError('NOT_FOUND', 'Not found', 404));
-    expect(await loadCategoryData('nope')).toEqual({ category: null, deals: [] });
+    expect(await loadCategoryData('nope')).toEqual({ category: null, deals: [], total: 0 });
     expect(m.deals).not.toHaveBeenCalled();
   });
 

@@ -259,9 +259,9 @@ export function VendorPipeline({
         setVendor(data);
         onVendorChange(data);
       })
-      .catch(() => {});
-    getVendorCategoryAccess(token, vendorId).then(({ data }) => setCategoryAccess(data)).catch(() => {});
-    reloadBranches().catch(() => {});
+      .catch(() => { });
+    getVendorCategoryAccess(token, vendorId).then(({ data }) => setCategoryAccess(data)).catch(() => { });
+    reloadBranches().catch(() => { });
   };
 
   if (!vendor) {
@@ -278,7 +278,25 @@ export function VendorPipeline({
     );
   }
 
+  const refreshVendorAfterKycChange = useCallback(async () => {
+    if (!vendorId) return;
+
+    try {
+      const { data } = await getVendor(token, vendorId);
+
+      setVendor(data);
+      onVendorChange(data);
+    } catch (err) {
+      console.error(
+        'Could not refresh vendor after KYC document change:',
+        err,
+      );
+    }
+  }, [token, vendorId, onVendorChange]);
+
+
   const kycDocOk = hasMinimumKycDocument(vendor);
+  console.log('the kycDocOk is', kycDocOk, 'the vendor is', vendor);
 
   return (
     <div className="admin-page">
@@ -319,6 +337,7 @@ export function VendorPipeline({
             onSave={saveSection}
             onKycReview={onKycReview}
             serverFieldErrors={fieldErrors}
+            onKycDocumentChanged={refreshVendorAfterKycChange}
           />
           {!kycDocOk && (
             <p className="error-state" role="alert">
@@ -326,15 +345,20 @@ export function VendorPipeline({
             </p>
           )}
 
-          <h3 className="section-title">Profile Image</h3>
-          <MediaUploader
-            entityType="vendor"
-            entityId={vendor.id}
-            existingImages={vendor.mediaImages ?? []}
-            existingVideo={vendor.mediaVideo ?? null}
-            token={token}
-          />
-
+          <sky-tile-card
+            className="vendor-section-card"
+            headline="Profile Image"
+            text="Upload and manage the vendor profile images."
+            color="none"
+          >
+            <MediaUploader
+              entityType="vendor"
+              entityId={vendor.id}
+              existingImages={vendor.mediaImages ?? []}
+              existingVideo={vendor.mediaVideo ?? null}
+              token={token}
+            />
+          </sky-tile-card>
           <div className="form-actions">
             <FilledButton onClick={() => setActiveStep(2)} disabled={!kycDocOk}>
               Continue

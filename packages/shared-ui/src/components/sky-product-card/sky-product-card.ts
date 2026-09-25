@@ -15,6 +15,8 @@ import { alignment, coverImage, focusRing, hostBase, nextId, pill, typescale } f
  * Rating has two mutually-exclusive styles: pass `rating`+`reviews` for stars, or
  * `score`+`score-label`+`reviews` for a score badge (hotel style).
  *
+ * `layout="horizontal"`: media left, content right; stacks when the card is narrower than 600px.
+ *
  * @example
  * <sky-product-card
  *   image="…" eyebrow="Just Relax Spa"
@@ -51,6 +53,7 @@ export class SkyProductCard extends LitElement {
     priceNote: { type: String, attribute: 'price-note' },
     href: { type: String },
     align: { type: String, reflect: true },
+    layout: { type: String, reflect: true },
   };
 
   declare image?: string;
@@ -81,6 +84,9 @@ export class SkyProductCard extends LitElement {
   declare href?: string;
   /** Content alignment: 'left' (default) | 'center' | 'right'. */
   declare align: 'left' | 'center' | 'right';
+  /** Card layout: 'vertical' (default) | 'horizontal' (media left, content right; stacks under
+   *  600px of the card's own inline size). */
+  declare layout: 'vertical' | 'horizontal';
 
   /** Per-instance id wiring aria-labelledby from the article to its heading. */
   private readonly _headingId = nextId('sky-product-heading');
@@ -91,6 +97,7 @@ export class SkyProductCard extends LitElement {
     this.favorite = false;
     this.favoriteActive = false;
     this.align = 'left';
+    this.layout = 'vertical';
   }
 
   static override styles = css`
@@ -102,6 +109,7 @@ export class SkyProductCard extends LitElement {
     :host {
       display: flex;
       flex-direction: column;
+      container-type: inline-size;
     }
     .card {
       position: relative;
@@ -128,6 +136,16 @@ export class SkyProductCard extends LitElement {
     }
     .media {
       aspect-ratio: 3 / 2;
+    }
+    @container (min-width: 600px) {
+      :host([layout='horizontal']) .card {
+        flex-direction: row;
+      }
+      :host([layout='horizontal']) .media {
+        flex: 0 0 40%;
+        min-inline-size: 160px;
+        aspect-ratio: auto;
+      }
     }
     .favorite {
       position: absolute;

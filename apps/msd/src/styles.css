@@ -396,10 +396,12 @@ input[type='checkbox'] {
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
   margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
 }
-
 .empty-state,
 .error-state,
 .loading-state {
@@ -568,7 +570,166 @@ input[type='checkbox'] {
 .category-grant-grid__option--indented {
   min-height: 40px;
 }
+/* ── Vendor Profile Form ─────────────────────────────────────────────── */
+.vendor-fields-grid md-outlined-text-field {
+  width: 100%;
+  min-width: 0;
+}
+.form-grid > sky-tile-card {
+  grid-column: 1 / -1;
+  width: 100%;
+  display: block;
+  box-sizing: border-box;
+}
+.vendor-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
+  row-gap: 24px;
+  width: 100%;
+}
 
+.vendor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+.vendor-field md-outlined-text-field {
+  width: 100%;
+  min-width: 0;
+}
+
+.vendor-field .error-state {
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  font-size: 0.75rem;
+}
+
+.form-grid > sky-tile-card {
+  grid-column: 1 / -1;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-grid > sky-tile-card .vendor-fields-grid {
+  margin-top: 16px;
+}
+.vendor-section-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+.kyc-document-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.vendor-kyc-document-card {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.vendor-kyc-document-card .kyc-document-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}/* ── KYC Review ─────────────────────────────────────────────────────── */
+
+.kyc-review {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 4px 0 0;
+  padding: 16px;
+  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-radius: 12px;
+  background: var(--md-sys-color-surface-container-low, #f7f8fa);
+}
+
+.kyc-review legend {
+  padding: 0 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+}
+
+.kyc-review-status {
+  margin-left: 8px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-weight: 400;
+}
+
+/* Rejection reason on first row */
+.kyc-review-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.kyc-review-actions md-outlined-text-field {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Buttons on second row */
+.kyc-review-buttons {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.vendor-kyc-document-card {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.vendor-kyc-document-card .kyc-document-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+@media (max-width: 700px) {
+  .vendor-fields-grid {
+    grid-template-columns: 1fr;
+    row-gap: 20px;
+  }
+  .kyc-review-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .kyc-review-actions md-outlined-text-field {
+    width: 100%;
+  }
+    .vendor-kyc-document-card .kyc-document-list {
+    grid-template-columns: 1fr;
+  }
+    .kyc-review {
+    padding: 14px;
+  }
+
+  .kyc-review-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .kyc-review-buttons md-filled-button,
+  .kyc-review-buttons md-outlined-button {
+    width: 100%;
+  }
+}
 @media (max-width: 900px) {
   .two-pane {
     grid-template-columns: 1fr;
@@ -583,5 +744,14 @@ input[type='checkbox'] {
 @media (max-width: 600px) {
   .dashboard-stats {
     grid-template-columns: 2fr;
+  }
+   .form-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .form-actions md-filled-button,
+  .form-actions md-outlined-button {
+    width: 100%;
   }
 }

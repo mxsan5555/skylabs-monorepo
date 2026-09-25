@@ -277,7 +277,9 @@ Do this once the API has a Railway domain and the bucket has a public URL.
    - `VITE_API_URL = https://<railway-domain>/api/v1` (msd) — mera-driver sets its
      API base in `environment.prod.ts` instead.
    - `VITE_MEDIA_BASE_URL = https://pub-<hash>.r2.dev`
-   - msd only: `VITE_GOOGLE_MAPS_API_KEY` (restricted by referrer).
+   - msd only: `VITE_MAP_PROVIDER` (`leaflet` default, free OpenStreetMap tiles; `google`
+     switches back to Google Maps), optional `VITE_MAP_TILE_URL` / `VITE_MAP_TILE_ATTRIBUTION`,
+     and `VITE_GOOGLE_MAPS_API_KEY` (restricted by referrer; only used when the provider is `google`).
    - Scope Production vs Preview, then **redeploy** (Vite bakes at build).
 2. **Railway →** set the CORS allowlist to the exact Vercel domain(s),
    comma-separated for prod + preview: `CORS_ORIGIN` on **msd-api**, `CORS_ORIGINS`
@@ -319,7 +321,10 @@ to — see §5. 🔒 = secret (Railway Variables / local `.env.local` only, neve
 |---|---|
 | `VITE_API_URL` | `https://<msd-api-railway-domain>/api/v1` |
 | `VITE_MEDIA_BASE_URL` | `https://pub-<hash>.r2.dev` (R2 bucket public URL) |
-| `VITE_GOOGLE_MAPS_API_KEY` | your Maps JS API key (restrict by HTTP referrer) |
+| `VITE_MAP_PROVIDER` | `leaflet` (default, free OSM tiles, no key) or `google` |
+| `VITE_MAP_TILE_URL` | optional Leaflet tile URL (default `https://tile.openstreetmap.org/{z}/{x}/{y}.png`) |
+| `VITE_MAP_TILE_ATTRIBUTION` | optional tile attribution (default OpenStreetMap contributors; must stay visible) |
+| `VITE_GOOGLE_MAPS_API_KEY` | Maps JS API key, only used when `VITE_MAP_PROVIDER=google` (restrict by HTTP referrer) |
 
 `mera-driver` project: no variables — set the API base in
 `apps/mera-driver/src/environments/environment.prod.ts` to
