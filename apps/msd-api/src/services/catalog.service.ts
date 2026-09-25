@@ -1,7 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import type { Prisma } from '../generated/prisma-client';
-import { rankDeals, type DealSort } from './deal-ranking';
+import { rankDeals, computeDealFacets, type DealSort } from './deal-ranking';
 import { listActiveCategories, getActiveCategoryBySlugOrThrow } from './category.service';
 import { getActiveTagNamesFor } from './popular-tag.service';
 import * as blogPostService from './blog-post.service';
@@ -498,6 +498,41 @@ export async function listPublicDeals(
   return { items, total };
 }
 
+/** Only what the facet counters (`computeDealFacets`) need — never the full `PUBLIC_DEAL_SELECT`
+ *  (facets don't render a card, just counts/labels). */
+const FACET_DEAL_SELECT = {
+  id: true,
+  vendorId: true,
+  branchId: true,
+  salePrice: true,
+  vendor: { select: { businessName: true } },
+  branch: { select: { name: true, city: true, latitude: true, longitude: true } },
+} as const;
+
+/**
+ * Filter-panel facet counts for the public deal list (`GET /catalog/deals/facets`) — every base
+ * filter (category/subcategory/search/state/city) goes to SQL via `buildDealWhere` exactly like
+ * `listPublicDeals`, but vendor(s), branch(es), radius and price are deliberately left OUT of
+ * that `where` and instead applied in memory by `computeDealFacets`, so each facet's own counts
+ * can ignore its own selection (see that function's own doc comment) while still respecting every
+ * other active filter. No paging/sort — this always counts the full base-filtered set.
+ */
+export async function getPublicDealFacets(
+  opts: Omit<DealWhereOpts, 'vendorIds' | 'branchIds' | 'minPrice' | 'maxPrice' | 'vendorId' | 'branchId'> & {
+    vendorIds?: string[];
+    branchIds?: string[];
+    radiusKm?: number;
+    minPrice?: number;
+    maxPrice?: number;
+    latitude?: number;
+    longitude?: number;
+  },
+) {
+  const { vendorIds = [], branchIds = [], radiusKm, minPrice, maxPrice, latitude, longitude, ...base } = opts;
+  const rows = await prisma.deal.findMany({ where: buildDealWhere(base), select: FACET_DEAL_SELECT });
+  return computeDealFacets(rows, { vendorIds, branchIds, radiusKm, minPrice, maxPrice, latitude, longitude });
+}
+
 /** Distinct active {state, city} pairs plus the average of that city's branch coordinates, so
  *  the storefront can map browser coordinates to the nearest city without a geocoding API.
  *  `latitude`/`longitude` are null when no branch in the city has coordinates. */
@@ -537,10 +572,12 @@ export async function listPublicProducts(opts: {
   subcategoryId?: string;
   vendorId?: string;
   search?: string;
-  /** 'newest' (default) preserves the original unconditional `{createdAt: 'desc'}` ordering.
-   *  'discount' is the only non-fabricated "best deals" proxy on Product (no Review/Rating model
-   *  exists) — mirrors listPublicDeals's own `sort` option. */
-  sort?: 'newest' | 'discount';
+  /** 'relevance' (default) and 'newest' both order by `createdAt desc` — every pre-existing
+   *  caller that omits this gets byte-identical results. 'price_asc'/'price_desc' order by
+   *  `price` asc/desc, ties by `createdAt desc`. 'discount' is the only non-fabricated "best
+   *  deals" proxy on Product (no Review/Rating model exists) — mirrors listPublicDeals's own
+   *  `sort` option. */
+  sort?: 'relevance' | 'price_asc' | 'price_desc' | 'newest' | 'discount';
   minPrice?: number;
   maxPrice?: number;
 }) {
@@ -567,9 +604,13 @@ export async function listPublicProducts(opts: {
       : {}),
   };
   const orderBy =
-    opts.sort === 'discount'
-      ? [{ discount: { sort: 'desc' as const, nulls: 'last' as const } }]
-      : { createdAt: 'desc' as const };
+    opts.sort === 'price_asc'
+      ? [{ price: 'asc' as const }, { createdAt: 'desc' as const }]
+      : opts.sort === 'price_desc'
+        ? [{ price: 'desc' as const }, { createdAt: 'desc' as const }]
+        : opts.sort === 'discount'
+          ? [{ discount: { sort: 'desc' as const, nulls: 'last' as const } }]
+          : { createdAt: 'desc' as const };
   const [rows, total] = await Promise.all([
     prisma.product.findMany({
       where,

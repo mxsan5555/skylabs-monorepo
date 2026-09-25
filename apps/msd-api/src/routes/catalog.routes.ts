@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { validateParams, validateQuery } from '../middleware/validate';
-import { CatalogDealQuerySchema, CatalogProductQuerySchema, CatalogTherapistQuerySchema, CatalogVendorQuerySchema, splitIds } from '../schemas/catalog.schema';
+import { CatalogDealQuerySchema, CatalogDealFacetQuerySchema, CatalogProductQuerySchema, CatalogTherapistQuerySchema, CatalogVendorQuerySchema, splitIds } from '../schemas/catalog.schema';
 import { PublicBlogPostListQuerySchema } from '../schemas/blog-post.schema';
 import { z } from 'zod';
 import * as catalogService from '../services/catalog.service';
@@ -55,6 +55,34 @@ router.get('/deals', validateQuery(CatalogDealQuerySchema), async (req, res, nex
       longitude,
     });
     sendData(res, items, { meta: { total, page, pageSize } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Registered BEFORE `/deals/:id` — Express matches routes in registration order, and `:id` is a
+// UUID-validated param, so `/deals/facets` must come first or it would 422 as an invalid UUID.
+router.get('/deals/facets', validateQuery(CatalogDealFacetQuerySchema), async (req, res, next) => {
+  try {
+    const { categoryId, subcategoryId, vendorIds, branchIds, search, state, city, minPrice, maxPrice, radiusKm, latitude, longitude } =
+      req.validatedQuery as ReturnType<typeof CatalogDealFacetQuerySchema.parse>;
+    sendData(
+      res,
+      await catalogService.getPublicDealFacets({
+        categoryId,
+        subcategoryId,
+        search,
+        state,
+        city,
+        vendorIds: splitIds(vendorIds),
+        branchIds: splitIds(branchIds),
+        minPrice,
+        maxPrice,
+        radiusKm,
+        latitude,
+        longitude,
+      }),
+    );
   } catch (err) {
     next(err);
   }

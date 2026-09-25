@@ -43,6 +43,10 @@ export const CatalogDealQuerySchema = PaginationQuerySchema.extend({
  *  when the query param was omitted. */
 export const splitIds = (value?: string) => (value ? value.split(',').filter(Boolean) : undefined);
 
+/** `GET /catalog/deals/facets` — every base/facet filter `CatalogDealQuerySchema` accepts, minus
+ *  paging and sort (facets counts, never paginates or sorts a list). */
+export const CatalogDealFacetQuerySchema = CatalogDealQuerySchema.omit({ page: true, pageSize: true, sort: true }).openapi('CatalogDealFacetQuery');
+
 /** `GET /catalog/products` — mirrors CatalogDealQuerySchema minus the branch/location/duration
  *  concepts Product doesn't have (no branchId, no packages, no geo distance sort). */
 export const CatalogProductQuerySchema = PaginationQuerySchema.extend({
@@ -50,9 +54,11 @@ export const CatalogProductQuerySchema = PaginationQuerySchema.extend({
   subcategoryId: z.string().uuid().optional(),
   vendorId: z.string().uuid().optional(),
   search: z.string().max(200).optional(),
-  /** See `CatalogDealQuerySchema`'s identical param doc comment — 'discount' orders by
-   *  Product.discount desc instead of Deal.discountPercent. */
-  sort: z.enum(['newest', 'discount']).optional().default('newest'),
+  /** 'relevance' (default) orders by createdAt desc, same as 'newest' (kept for existing
+   *  callers). 'price_asc'/'price_desc' order by Product.price asc/desc, ties by createdAt desc.
+   *  'discount' orders by Product.discount desc (deals with no discount sort last) — the only
+   *  non-fabricated "best deals" proxy available on Product (no Review/Rating model exists). */
+  sort: z.enum(['relevance', 'price_asc', 'price_desc', 'newest', 'discount']).optional().default('relevance'),
   minPrice: z.coerce.number().min(0).optional(),
   maxPrice: z.coerce.number().min(0).optional(),
 }).openapi('CatalogProductQuery');
