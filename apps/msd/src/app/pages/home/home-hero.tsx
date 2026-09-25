@@ -5,6 +5,7 @@ import type { CatalogDeal } from '../../../api/catalog';
 import { useCustomEvent } from '../../../hooks/use-custom-event';
 import { formatINR } from '../../../utils/format';
 import { imageSrcSet, toDealCardDeal } from './home-data';
+import { PageSection } from '../../components/page-section/page-section';
 import content from '../../../content.json';
 
 const { home } = content;
@@ -22,8 +23,8 @@ export function HomeHero({ spotlight }: { spotlight?: CatalogDeal }) {
   });
 
   return (
-    <section className="home-hero" aria-labelledby="hero-heading">
-      <div className="home-container home-hero__inner">
+    <PageSection className="home-hero" aria-labelledby="hero-heading">
+      <div className="home-hero__inner">
         <div className="home-hero__copy">
           <h1 id="hero-heading" className="home-hero__title">{home.hero.heading}</h1>
           <p className="home-hero__sub">{home.hero.subheading}</p>
@@ -79,6 +80,6 @@ export function HomeHero({ spotlight }: { spotlight?: CatalogDeal }) {
           )}
         </div>
       </div>
-    </section>
+    </PageSection>
   );
 }

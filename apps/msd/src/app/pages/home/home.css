@@ -1,32 +1,14 @@
 /* Home page. Colours: app theme; type/shape/motion/state/elevation: shared-ui base.css.
    Carousel header styles live in card-rail.css. 600px = M3 medium, 840px = M3 expanded window class.
 
-   Colour split (60/30/10), M3 roles only:
-     60  surface                      page base: hero, categories band, steps, offers, directory
-     30  surface-container            alternating commerce bands (deals, therapists, products, FAQ)
-         secondary-container          category tiles, step markers, gift card
-     10  primary                      actions only: buttons, active tab, links, prices, focus */
+   Bands, container and the 60/30/10 band tones come from PageSection (page-section.css).
+   Inside bands: secondary-container = category tiles, step markers, gift card (30);
+   primary = actions only (10). */
 .home {
   display: flex;
   flex-direction: column;
   background-color: var(--md-sys-color-surface);
   color: var(--md-sys-color-on-surface);
-}
-.home-container {
-  box-sizing: border-box;
-  inline-size: 100%;
-  max-inline-size: 1280px;
-  margin-inline: auto;
-  padding-inline: 16px;
-}
-.home-band {
-  padding-block: 32px;
-}
-.home-band--tint {
-  background-color: var(--md-sys-color-surface-container);
-}
-.home-band--flush {
-  padding-block: 16px 32px;
 }
 /* Focus rings for the page's own links. SectionHead links style theirs in section-head.css;
    tile links draw theirs on the tile (below). */
@@ -37,10 +19,6 @@
 }
 
 /* Hero */
-.home-hero {
-  padding-block: 32px;
-  background-color: var(--md-sys-color-surface);
-}
 .home-hero__inner {
   display: grid;
   gap: 24px;
@@ -416,12 +394,6 @@
   }
 }
 @media (min-width: 840px) {
-  .home-band {
-    padding-block: 48px;
-  }
-  .home-hero {
-    padding-block: 48px;
-  }
   .home-hero__inner {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
     gap: 48px;

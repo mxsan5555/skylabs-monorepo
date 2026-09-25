@@ -3,6 +3,7 @@ import { Tabs } from '@skylabs-monorepo/shared-ui/react';
 import type { CatalogCategoryWithChildren, CatalogDeal } from '../../../api/catalog';
 import { CardRail } from '../../components/card-rail/card-rail';
 import { SectionHead } from '../../components/section-head/section-head';
+import { PageSection } from '../../components/page-section/page-section';
 import type { HomeCatalog } from './home-data';
 import content from '../../../content.json';
 
@@ -49,46 +50,44 @@ export function DealsNearYou({
   const shown = current === ALL ? deals : deals.filter((d) => d.category?.id === current);
 
   return (
-    <section className="home-band home-band--tint" aria-labelledby="deals-heading">
-      <div className="home-container">
-        {status === 'ready' ? (
-          <CardRail
-            id="deals-heading"
-            heading={t.heading}
-            seeAll={t.seeAll}
-            seeAllTo={t.seeAllTo}
-            railKey={current}
-            panel={hasTabs ? { id: PANEL_ID, labelledBy: tabId(current) } : undefined}
-            above={
-              hasTabs ? (
-                <Tabs className="home-tabs" aria-label={t.tabsLabel}>
-                  {tabs.map((tab) => (
-                    <DealsTab key={tab.id} id={tab.id} active={current === tab.id} onSelect={() => setActive(tab.id)}>
-                      {tab.label}
-                    </DealsTab>
-                  ))}
-                </Tabs>
-              ) : null
-            }
-          >
-            {shown.map(renderDeal)}
-          </CardRail>
-        ) : (
-          <>
-            <SectionHead id="deals-heading" heading={t.heading} seeAll={t.seeAll} seeAllTo={t.seeAllTo} />
-            {status === 'loading' ? (
-              <div className="home-skeleton__row" role="status" aria-busy="true">
-                <span className="sr-only">{content.home.ui.messages.loading}</span>
-                {Array.from({ length: 4 }, (_, i) => (
-                  <div key={i} className="home-skeleton__block home-skeleton__block--card" />
+    <PageSection tone="tint" aria-labelledby="deals-heading">
+      {status === 'ready' ? (
+        <CardRail
+          id="deals-heading"
+          heading={t.heading}
+          seeAll={t.seeAll}
+          seeAllTo={t.seeAllTo}
+          railKey={current}
+          panel={hasTabs ? { id: PANEL_ID, labelledBy: tabId(current) } : undefined}
+          above={
+            hasTabs ? (
+              <Tabs className="home-tabs" aria-label={t.tabsLabel}>
+                {tabs.map((tab) => (
+                  <DealsTab key={tab.id} id={tab.id} active={current === tab.id} onSelect={() => setActive(tab.id)}>
+                    {tab.label}
+                  </DealsTab>
                 ))}
-              </div>
-            ) : (
-              <p className="error-state" role="alert">{error}</p>
-            )}
-          </>
-        )}
-      </div>
-    </section>
+              </Tabs>
+            ) : null
+          }
+        >
+          {shown.map(renderDeal)}
+        </CardRail>
+      ) : (
+        <>
+          <SectionHead id="deals-heading" heading={t.heading} seeAll={t.seeAll} seeAllTo={t.seeAllTo} />
+          {status === 'loading' ? (
+            <div className="home-skeleton__row" role="status" aria-busy="true">
+              <span className="sr-only">{content.home.ui.messages.loading}</span>
+              {Array.from({ length: 4 }, (_, i) => (
+                <div key={i} className="home-skeleton__block home-skeleton__block--card" />
+              ))}
+            </div>
+          ) : (
+            <p className="error-state" role="alert">{error}</p>
+          )}
+        </>
+      )}
+    </PageSection>
   );
 }
