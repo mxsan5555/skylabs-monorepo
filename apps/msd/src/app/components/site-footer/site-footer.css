@@ -30,8 +30,8 @@
 }
 
 .newsletter-band {
-  background-color: var(--md-sys-color-primary-container);
-  color: var(--md-sys-color-on-primary-container);
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
 }
 .newsletter-band__inner,
 .site-footer__main,

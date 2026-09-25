@@ -321,7 +321,6 @@
       "cta": "Buy Gift Card"
     },
     "welcomeOffer": {
-      "badge": "New member offer",
       "title": "Flat 40% OFF",
       "subtitle": "On Your First Spa Booking",
       "description": "Get introductory pricing at partner spas across India on your first booking.",
@@ -537,6 +536,20 @@
       "products": "Products"
     },
     "searchLabel": "Search",
+    "search": {
+      "placeholder": "Search {category}",
+      "action": "Search"
+    },
+    "tabsLabel": "Filter by sub-category",
+    "resultCount": {
+      "therapist": { "singular": "therapist", "plural": "therapists" },
+      "product": { "singular": "product", "plural": "products" }
+    },
+    "emptyTherapists": {
+      "heading": "No therapists yet",
+      "subheading": "Check back soon."
+    },
+    "therapistPricePrefix": "From",
     "dealCount": {
       "singular": "deal",
       "plural": "deals"

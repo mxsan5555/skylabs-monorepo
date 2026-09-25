@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { PageSection } from '../../components/page-section/page-section';
 import content from '../../../content.json';
 
 const { home } = content;
@@ -6,12 +7,11 @@ const { home } = content;
 /** Offers bento: welcome offer photo card, gift cards, and member pricing (signed-out only). */
 export function HomeOffers({ isAuthenticated }: { isAuthenticated: boolean }) {
   return (
-    <section className="home-band" aria-labelledby="offers-heading">
-      <div className={`home-container home-offers${isAuthenticated ? ' home-offers--member' : ''}`}>
+    <PageSection aria-labelledby="offers-heading">
+      <div className={`home-offers${isAuthenticated ? ' home-offers--member' : ''}`}>
         <article className="home-offer home-offer--welcome">
           <img className="home-offer__bg" src={home.welcomeOffer.image} alt="" loading="lazy" decoding="async" />
           <div className="home-offer__content">
-            <p className="home-offer__badge">{home.welcomeOffer.badge}</p>
             <h2 id="offers-heading" className="home-offer__title">{home.welcomeOffer.title}</h2>
             <p className="home-offer__subtitle">{home.welcomeOffer.subtitle}</p>
             <p className="home-offer__text">{home.welcomeOffer.description}</p>
@@ -22,7 +22,7 @@ export function HomeOffers({ isAuthenticated }: { isAuthenticated: boolean }) {
 
         <sky-feature-card
           className="home-offer--gift"
-          color="primary"
+          color="secondary"
           icon="card_giftcard"
           icon-style="surface"
           headline={home.giftCard.heading}
@@ -43,6 +43,6 @@ export function HomeOffers({ isAuthenticated }: { isAuthenticated: boolean }) {
           />
         )}
       </div>
-    </section>
+    </PageSection>
   );
 }

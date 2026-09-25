@@ -244,7 +244,8 @@ describe('Category page with prerendered data', () => {
         </ToastProvider>
       </PrerenderDataProvider>,
     );
-  const countText = () => document.querySelector('.category-page__count')?.textContent;
+  const countText = () =>
+    document.getElementById('category-heading')?.closest('.section-head')?.querySelector('[aria-live]')?.textContent;
 
   it('renders the prerendered category and deals first, then refreshes both once in the background', async () => {
     let resolveCategory!: (v: { data: CatalogCategoryWithChildren }) => void;
@@ -309,5 +310,44 @@ describe('Category page with prerendered data', () => {
     expect(document.querySelector('sky-info-card')).toBeTruthy();
     await waitFor(() => expect(getCatalogCategoryMock).toHaveBeenCalledTimes(1));
     expect(document.querySelector('sky-info-card')).toBeTruthy();
+  });
+});
+
+describe('Category page layout', () => {
+  it('renders secondary tabs that control the results panel', async () => {
+    renderAt('/category/massage');
+    await waitFor(() => expect(document.querySelectorAll('md-secondary-tab')).toHaveLength(3));
+    expect(document.getElementById('category-tab-all')).toBeTruthy();
+    expect(screen.getByRole('tabpanel').getAttribute('aria-labelledby')).toBe('category-tab-all');
+  });
+
+  it('searches on sky-submit, not on every keystroke', async () => {
+    renderAt('/category/massage');
+    await screen.findByRole('heading', { level: 1, name: 'Massage' });
+    await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
+    const field = document.querySelector('sky-action-field') as HTMLElement;
+    expect(field.getAttribute('role')).toBe('search');
+    act(() => {
+      field.dispatchEvent(new CustomEvent('sky-submit', { detail: { value: 'swedish' } }));
+    });
+    await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.search).toBe('swedish'));
+    // The field shows the active search (it is controlled, so a remount keeps the term visible).
+    const shown = document.querySelector('sky-action-field') as HTMLElement & { value?: string };
+    expect(shown.getAttribute('value') ?? shown.value).toBe('swedish');
+  });
+
+  it('announces the result count from content', async () => {
+    renderAt('/category/massage');
+    expect(await screen.findByText(`0 ${content.category.dealCount.plural}`)).toBeTruthy();
+  });
+
+  it('uses the therapist empty copy from content', async () => {
+    getCatalogCategoryMock.mockResolvedValue({ data: { ...CATEGORY, type: 'THERAPY' } });
+    renderAt('/category/massage');
+    await waitFor(() => {
+      const card = document.querySelector('sky-info-card') as (HTMLElement & { heading?: string }) | null;
+      expect(card?.getAttribute('heading') ?? card?.heading).toBe(content.category.emptyTherapists.heading);
+    });
+    expect(await screen.findByText(`0 ${content.category.resultCount.therapist.plural}`)).toBeTruthy();
   });
 });

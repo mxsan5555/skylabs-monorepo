@@ -1,25 +1,14 @@
 /* Home page. Colours: app theme; type/shape/motion/state/elevation: shared-ui base.css.
-   Carousel header styles live in card-rail.css. 600px = M3 medium, 840px = M3 expanded window class. */
+   Carousel header styles live in card-rail.css. 600px = M3 medium, 840px = M3 expanded window class.
+
+   Bands, container and the 60/30/10 band tones come from PageSection (page-section.css).
+   Inside bands: secondary-container = category tiles, step markers, gift card (30);
+   primary = actions only (10). */
 .home {
   display: flex;
   flex-direction: column;
+  background-color: var(--md-sys-color-surface);
   color: var(--md-sys-color-on-surface);
-}
-.home-container {
-  box-sizing: border-box;
-  inline-size: 100%;
-  max-inline-size: 1280px;
-  margin-inline: auto;
-  padding-inline: 16px;
-}
-.home-band {
-  padding-block: 32px;
-}
-.home-band--tint {
-  background-color: var(--md-sys-color-surface-container-low);
-}
-.home-band--flush {
-  padding-block: 16px 32px;
 }
 /* Focus rings for the page's own links. SectionHead links style theirs in section-head.css;
    tile links draw theirs on the tile (below). */
@@ -30,10 +19,6 @@
 }
 
 /* Hero */
-.home-hero {
-  padding-block: 32px;
-  background-color: var(--md-sys-color-surface);
-}
 .home-hero__inner {
   display: grid;
   gap: 24px;
@@ -185,37 +170,58 @@
   background-color: transparent;
   --md-secondary-tab-container-color: transparent;
 }
-/* How it works */
+/* How it works: a numbered sequence on the page surface, joined by a rule (no cards).
+   Phones: a vertical timeline; 840px: three columns with the rule running between markers. */
 .home-steps {
   display: grid;
-  gap: 16px;
+  gap: 24px;
   margin: 0;
   padding: 0;
   list-style: none;
+  counter-reset: step;
 }
 .home-steps__item {
+  position: relative;
   display: grid;
-  gap: 8px;
-  justify-items: start;
-  padding: 20px;
-  border-radius: var(--md-sys-shape-corner-large);
-  background-color: var(--md-sys-color-surface-container);
-  color: var(--md-sys-color-on-surface);
+  grid-template-columns: 48px minmax(0, 1fr);
+  column-gap: 16px;
+  row-gap: 4px;
+  align-content: start;
+  counter-increment: step;
 }
 .home-steps__item :is(h3, p) {
+  grid-column: 2;
   margin: 0;
 }
+.home-steps__item h3 {
+  padding-block-start: 12px;
+}
+/* The ordered list already announces the number; this is the visual echo. */
+.home-steps__item h3::before {
+  content: counter(step) '. ';
+  color: var(--md-sys-color-on-surface-variant);
+}
 .home-steps__item p {
+  max-inline-size: 36ch;
   color: var(--md-sys-color-on-surface-variant);
 }
 .home-steps__icon {
+  grid-row: span 2;
   display: inline-grid;
   place-items: center;
   inline-size: 48px;
   block-size: 48px;
-  border-radius: var(--md-sys-shape-corner-medium);
-  background-color: var(--md-sys-color-primary-container);
-  color: var(--md-sys-color-on-primary-container);
+  border-radius: var(--md-sys-shape-corner-full);
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.home-steps__item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  inset-block: 56px -16px;
+  inset-inline-start: 23.5px;
+  inline-size: 1px;
+  background-color: var(--md-sys-color-outline-variant);
 }
 
 /* Offers bento. Phones: one column; 600px: welcome full width over gift + member;
@@ -263,16 +269,6 @@
   align-items: flex-start;
   gap: 8px;
   max-inline-size: 420px;
-}
-.home-offer__badge {
-  margin: 0 0 4px;
-  padding: 6px 12px;
-  border: 1px solid color-mix(in srgb, var(--sky-color-on-scrim) 28%, transparent);
-  border-radius: var(--md-sys-shape-corner-full);
-  background-color: color-mix(in srgb, var(--sky-color-on-scrim) 16%, transparent);
-  font-size: var(--md-sys-typescale-label-large-size);
-  line-height: var(--md-sys-typescale-label-large-line-height);
-  font-weight: var(--md-sys-typescale-label-large-weight);
 }
 .home-offer__title {
   margin: 0;
@@ -398,12 +394,6 @@
   }
 }
 @media (min-width: 840px) {
-  .home-band {
-    padding-block: 48px;
-  }
-  .home-hero {
-    padding-block: 48px;
-  }
   .home-hero__inner {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
     gap: 48px;
@@ -433,7 +423,28 @@
     );
   }
   .home-steps {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 32px;
+  }
+  .home-steps__item {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
+  }
+  .home-steps__item :is(h3, p) {
+    grid-column: 1;
+  }
+  .home-steps__item h3 {
+    padding-block-start: 8px;
+  }
+  .home-steps__icon {
+    grid-row: auto;
+  }
+  /* Rule from this marker to the next one (48px marker + 32px column gap). */
+  .home-steps__item:not(:last-child)::after {
+    inset-block: 23.5px auto;
+    inset-inline: 64px -16px;
+    inline-size: auto;
+    block-size: 1px;
   }
   .home-faq {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr);

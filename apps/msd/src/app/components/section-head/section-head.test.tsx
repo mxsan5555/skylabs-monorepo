@@ -34,4 +34,11 @@ describe('SectionHead', () => {
     const button = screen.getByRole('button', { name: 'Next' });
     expect(link.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it('renders an h1 when as="h1"', () => {
+    renderHead(<SectionHead as="h1" id="page-heading" heading="Hair & Nails" titleClassName="headline-large" />);
+    const h1 = screen.getByRole('heading', { level: 1, name: 'Hair & Nails' });
+    expect(h1.id).toBe('page-heading');
+    expect(h1.className).toBe('section-head__title headline-large');
+  });
 });
