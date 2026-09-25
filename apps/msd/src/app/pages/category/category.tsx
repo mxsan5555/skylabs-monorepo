@@ -1,6 +1,6 @@
-import { createElement, useEffect, useMemo, useRef, useState } from 'react';
+import { createElement, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Icon, FilledButton, OutlinedButton, TextButton } from '@skylabs-monorepo/shared-ui/react';
+import { Icon, FilledButton, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   getCatalogCategory,
@@ -9,6 +9,7 @@ import {
   listCatalogTherapists,
   type CatalogCategoryWithChildren,
   type CatalogDeal,
+  type CatalogDealSort,
   type CatalogProduct,
   type CatalogTherapist,
 } from '../../../api/catalog';
@@ -26,15 +27,15 @@ import { ChipNav } from '../../components/chip-nav/chip-nav';
 import { ClampText } from '../../components/clamp-text/clamp-text';
 import { ListingToolbar } from '../../components/listing-toolbar/listing-toolbar';
 import { ChoiceMenu } from '../../components/choice-menu/choice-menu';
+import { ViewSwitch, type ViewOption } from '../../components/view-switch/view-switch';
 import { LoadMore } from '../../components/load-more/load-more';
 import { PriceFilterDialog, type PriceRange } from '../../components/price-filter-dialog/price-filter-dialog';
 import { DealMap, type DealMapPoint } from '../../components/deal-map/deal-map';
-import { useCustomEvent } from '../../../hooks/use-custom-event';
 import { usePagedList } from '../../../hooks/use-paged-list';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { formatINR } from '../../../utils/format';
 import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
-import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
+import { useVisitorLocation } from '../../../location/location-context';
 import { citySlug, cityHref, categoryHref, useCatalogShell } from '../../../catalog/catalog-shell';
 import { categoryDataKey, usePrerenderedData } from '../../../prerender-data/prerender-data';
 import { CATEGORY_PAGE_SIZE, type CategoryData } from '../../../prerender-data/loaders';
@@ -45,28 +46,9 @@ import content from '../../../content.json';
 
 const t = content.category;
 
-/** Search field. Its own component so `useCustomEvent` attaches when the element mounts
- *  (the page renders it only after the category loads). Controlled by `value`, so the active
- *  search stays visible after the field remounts (e.g. moving to another category). */
-function SearchField({ value, placeholder, onSearch }: { value: string; placeholder: string; onSearch: (query: string) => void }) {
-  const ref = useRef<HTMLElement>(null);
-  useCustomEvent<{ value: string }>(ref, 'sky-submit', (e) => onSearch(e.detail.value));
-  return (
-    <sky-action-field
-      ref={ref}
-      role="search"
-      type="search"
-      enterkeyhint="search"
-      icon="search"
-      variant="outlined"
-      dense
-      label={t.searchLabel}
-      value={value}
-      placeholder={placeholder}
-      action-label={t.search.action}
-    />
-  );
-}
+/** msd-api's deal sort enum, minus `newest`/`discount` (superseded by price/distance sorts on
+ *  this page; those two values are kept server-side only for other, unmigrated callers). */
+const SORTS = ['relevance', 'price_asc', 'price_desc', 'distance'] as const;
 
 /** SERVICE (or untyped, legacy) categories list deals; PRODUCT/THERAPY list their own entities. */
 function isDealCategory(category: CatalogCategoryWithChildren): boolean {
@@ -112,8 +94,7 @@ export function Category() {
   const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
-  const [view, setView] = useState<'grid' | 'map'>('grid');
-  const { coords } = useCurrentLocation();
+  const { coords } = useVisitorLocation();
   const { locationsStatus, locations } = useCatalogShell();
   const cityLocation = citySlugParam ? locations.find((l) => citySlug(l.city) === citySlugParam) : undefined;
   // A prerendered page embeds this slug's (and resolved city's) category + "All" deals. The key
@@ -124,7 +105,6 @@ export function Category() {
   const [categoryLoading, setCategoryLoading] = useState(!initial);
   const [categoryError, setCategoryError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
-  const [search, setSearch] = useState('');
   const cityUnresolved = !!citySlugParam && !cityLocation;
   // Locations arrive with the catalog shell; until then a city URL can't be resolved.
   const cityPending = cityUnresolved && locationsStatus === 'loading';
@@ -169,8 +149,13 @@ export function Category() {
   const subcategoryIdx = (category?.children.findIndex((c) => c.slug === subSlug) ?? -1) + 1;
   const activeSubcategory = subcategoryIdx === 0 ? undefined : category?.children[subcategoryIdx - 1];
   const sortParam = searchParams.get('sort');
-  const sort = sortParam === 'discount' || sortParam === 'newest' ? sortParam : undefined;
-  const sortOption = t.sortOptions.find((o) => o.value === (sort ?? 'recommended')) ?? t.sortOptions[0];
+  const sort =
+    (SORTS as readonly string[]).includes(sortParam ?? '') && sortParam !== 'relevance' ? (sortParam as CatalogDealSort) : undefined;
+  const hasCoords = coords?.latitude != null && coords?.longitude != null;
+  const sortOption = t.sortOptions.find((o) => o.value === (sort ?? 'relevance')) ?? t.sortOptions[0];
+  const sortMenuOptions = t.sortOptions.filter((o) => o.value !== 'distance' || hasCoords);
+  const viewParam = searchParams.get('view');
+  const view = viewParam === 'list' || viewParam === 'map' ? viewParam : 'grid';
   const minPrice = toPrice(searchParams.get('min'));
   const maxPrice = toPrice(searchParams.get('max'));
   const activeFilters = minPrice != null || maxPrice != null ? 1 : 0;
@@ -230,13 +215,12 @@ export function Category() {
   const common = {
     categoryId: category?.id,
     subcategoryId: activeSubcategory?.id,
-    search: search || undefined,
     pageSize: CATEGORY_PAGE_SIZE,
   };
   // Any change here restarts the list at page 1.
-  const listKey = JSON.stringify([category?.id, activeSubcategory?.id, search, sort, minPrice, maxPrice, cityLocation?.city, lat, lng]);
-  // The prerendered first page only describes the default ("All", unsorted, no search, no location) view.
-  const isDefaultView = !activeSubcategory && !search && !sort && minPrice == null && maxPrice == null && lat == null && lng == null;
+  const listKey = JSON.stringify([category?.id, activeSubcategory?.id, sort, minPrice, maxPrice, cityLocation?.city, lat, lng]);
+  // The prerendered first page only describes the default ("All", unsorted, no location) view.
+  const isDefaultView = !activeSubcategory && !sort && minPrice == null && maxPrice == null && lat == null && lng == null;
   const loadError = (err: unknown) => (err instanceof ApiRequestError ? err.message : t.errors.loadDeals);
   const dealList = usePagedList<CatalogDeal>(
     (page) =>
@@ -260,7 +244,8 @@ export function Category() {
     },
   );
   const productList = usePagedList<CatalogProduct>(
-    (page) => listCatalogProducts({ ...common, page, sort, minPrice, maxPrice }),
+    // Products have no distance concept — a `distance` sort never reaches this call.
+    (page) => listCatalogProducts({ ...common, page, sort: sort !== 'distance' ? sort : undefined, minPrice, maxPrice }),
     listKey,
     {
       enabled: category?.type === 'PRODUCT',
@@ -285,8 +270,13 @@ export function Category() {
       ),
     [deals],
   );
-  const showMapToggle = !!category && isDealCategory(category) && mapPoints.length > 0;
-  const showingMap = view === 'map' && showMapToggle;
+  const showMap = !!category && isDealCategory(category) && mapPoints.length > 0;
+  const showingMap = view === 'map' && showMap;
+  const viewOptions: ViewOption[] = [
+    { value: 'list', label: t.view.list, icon: 'view_list' },
+    { value: 'grid', label: t.view.grid, icon: 'grid_view' },
+    ...(showMap ? [{ value: 'map', label: t.view.map, icon: 'map' }] : []),
+  ];
   const dealsLoading = list.status === 'loading';
   const dealsError = list.status === 'error' ? list.error : '';
 
@@ -324,21 +314,6 @@ export function Category() {
     ...(activeCity ? [{ name: activeCity.city, path }] : []),
   ];
 
-  const locationMenu = cityFilterable ? (
-    <ChoiceMenu
-      trigger="chip"
-      icon="location_on"
-      label={activeCity?.city ?? t.toolbar.allCities}
-      menuLabel={t.toolbar.location}
-      options={[{ value: '', label: t.toolbar.allCities }, ...locations.map((l) => ({ value: l.city, label: l.city }))]}
-      value={activeCity?.city ?? ''}
-      onChange={(city) => {
-        const query = searchParams.toString();
-        navigate(`${city ? cityHref(category.slug, city) : categoryHref(category.slug)}${query ? `?${query}` : ''}`);
-      }}
-    />
-  ) : null;
-
   const filtersChip = !isTherapyCategory
     ? createElement(
         'md-assist-chip',
@@ -373,6 +348,7 @@ export function Category() {
       />
     ) : null;
 
+  const cardLayout = view === 'list' ? 'horizontal' : undefined;
   const cards = isTherapyCategory
     ? therapists.map((therapist) => {
         const price = therapistFromPrice(therapist);
@@ -389,6 +365,7 @@ export function Category() {
             pricePrefix={price != null ? t.therapistPricePrefix : undefined}
             price={price != null ? formatINR(price) : undefined}
             href={`/therapist/${therapist.id}`}
+            layout={cardLayout}
           />
         );
       })
@@ -416,6 +393,7 @@ export function Category() {
             eyebrowHref={product.vendor?.slug ? `/vendor/${product.vendor.slug}` : undefined}
             favoriteActive={false}
             onFavorite={() => {}}
+            layout={cardLayout}
             actions={
               <FilledButton onClick={() => addProductToCart(product)}>
                 <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
@@ -449,6 +427,7 @@ export function Category() {
             eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
             favoriteActive={signedIn && isWishlisted(deal.id)}
             onFavorite={() => toggleFavorite(deal)}
+            layout={cardLayout}
             actions={
               <DealAddToCartDialog
                 deal={deal}
@@ -503,27 +482,24 @@ export function Category() {
       <PageSection tone="tint" stack aria-label={`${category.name} ${t.dealsAriaLabelSuffix}`}>
         <ListingToolbar
           ariaLabel={t.toolbar.label}
-          start={filtersChip || locationMenu ? <>{filtersChip}{locationMenu}</> : undefined}
+          start={filtersChip ?? undefined}
           end={
             <>
-              <SearchField value={search} placeholder={t.search.placeholder.replace('{category}', category.name)} onSearch={setSearch} />
-              {showMapToggle && (
-                <TextButton onClick={() => setView(showingMap ? 'grid' : 'map')}>
-                  <Icon slot="icon" aria-hidden="true">
-                    {showingMap ? 'grid_view' : 'map'}
-                  </Icon>
-                  {showingMap ? t.toolbar.showGrid : t.toolbar.showMap}
-                </TextButton>
-              )}
+              <ViewSwitch
+                label={t.view.label}
+                options={viewOptions}
+                value={view}
+                onChange={(v) => setParam('view', v === 'grid' ? undefined : v)}
+              />
               {!isTherapyCategory && (
                 <ChoiceMenu
                   trigger="text"
                   icon="swap_vert"
                   label={t.toolbar.sort.replace('{label}', sortOption.label)}
                   menuLabel={t.toolbar.sortMenu}
-                  options={t.sortOptions}
+                  options={sortMenuOptions}
                   value={sortOption.value}
-                  onChange={(value) => setParam('sort', value === 'recommended' ? undefined : value)}
+                  onChange={(value) => setParam('sort', value === 'relevance' ? undefined : value)}
                 />
               )}
             </>
@@ -543,7 +519,9 @@ export function Category() {
             )}
           </>
         ) : (
-          <CardGrid fallback={fallback}>{cards}</CardGrid>
+          <CardGrid layout={view === 'list' ? 'list' : 'grid'} fallback={fallback}>
+            {cards}
+          </CardGrid>
         )}
         {list.status === 'ready' && list.items.length > 0 && (
           <LoadMore

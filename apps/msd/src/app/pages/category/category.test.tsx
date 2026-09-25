@@ -58,8 +58,17 @@ vi.mock('../../seo/site-url', () => ({
   SITE_URL: 'https://example.test',
   absoluteUrl: (path: string) => `https://example.test${path}`,
 }));
-vi.mock('../../../hooks/useCurrentLocation', () => ({
-  useCurrentLocation: () => ({ location: null, coords: null }),
+const visitor = vi.hoisted(() => ({
+  value: {
+    status: 'none' as 'none' | 'locating' | 'ready',
+    source: 'none' as 'none' | 'saved' | 'browser' | 'ip',
+    city: null as string | null,
+    state: null as string | null,
+    coords: null as { latitude: number; longitude: number } | null,
+  },
+}));
+vi.mock('../../../location/location-context', () => ({
+  useVisitorLocation: () => ({ ...visitor.value, setCity: vi.fn(), requestBrowser: vi.fn() }),
 }));
 vi.mock('../../components/deal-map/deal-map', () => ({
   DealMap: ({ points }: { points: unknown[] }) => <div data-testid="deal-map">{points.length}</div>,
@@ -110,6 +119,7 @@ beforeEach(() => {
   listCatalogProductsMock.mockResolvedValue({ data: [] });
   listCatalogTherapistsMock.mockResolvedValue({ data: [] });
   shellState.value = defaultShell;
+  visitor.value = { status: 'none', source: 'none', city: null, state: null, coords: null };
 });
 
 describe('Category page ?sub=', () => {
@@ -312,25 +322,11 @@ describe('Category page layout', () => {
     expect(isSelected(chip(content.category.tabs.all))).toBe(false);
   });
 
-  it('puts search in the listing toolbar', async () => {
+  it('has no search field and no city chip in the toolbar', async () => {
     renderAt('/category/massage');
     const toolbar = await screen.findByRole('group', { name: content.category.toolbar.label });
-    expect(toolbar.querySelector('sky-action-field')).toBeTruthy();
-  });
-
-  it('searches on sky-submit, not on every keystroke', async () => {
-    renderAt('/category/massage');
-    await screen.findByRole('heading', { level: 1, name: 'Massage' });
-    await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
-    const field = document.querySelector('sky-action-field') as HTMLElement;
-    expect(field.getAttribute('role')).toBe('search');
-    act(() => {
-      field.dispatchEvent(new CustomEvent('sky-submit', { detail: { value: 'swedish' } }));
-    });
-    await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.search).toBe('swedish'));
-    // The field shows the active search (it is controlled, so a remount keeps the term visible).
-    const shown = document.querySelector('sky-action-field') as HTMLElement & { value?: string };
-    expect(shown.getAttribute('value') ?? shown.value).toBe('swedish');
+    expect(toolbar.querySelector('sky-action-field')).toBeNull();
+    expect(screen.queryByText('All cities')).toBeNull();
   });
 
   it('announces the result count from content', async () => {
@@ -338,14 +334,26 @@ describe('Category page layout', () => {
     expect(await screen.findByText(`0 ${content.category.dealCount.plural}`)).toBeTruthy();
   });
 
-  it('sorts from the toolbar menu and keeps the choice in ?sort=', async () => {
+  it('sorts by price and sends the API sort', async () => {
     renderAt('/category/massage');
     await screen.findByRole('group', { name: content.category.toolbar.label });
     const trigger = Array.from(document.querySelectorAll('md-text-button')).find((b) => b.textContent?.includes('Sort:')) as HTMLElement;
     fireEvent.click(trigger);
-    fireEvent.click(screen.getByText('Biggest discount'));
-    await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage?sort=discount'));
-    await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.sort).toBe('discount'));
+    expect(screen.queryByText('Distance: Nearest')).toBeNull(); // no coordinates yet
+    fireEvent.click(screen.getByText('Price: Low to High'));
+    await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage?sort=price_asc'));
+    await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.sort).toBe('price_asc'));
+  });
+
+  it('offers distance sort once the visitor has coordinates and sends them', async () => {
+    visitor.value = { ...visitor.value, status: 'ready', city: 'Gorakhpur', coords: { latitude: 26.76, longitude: 83.37 } };
+    renderAt('/category/massage');
+    await waitFor(() =>
+      expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ latitude: 26.76, longitude: 83.37 })),
+    );
+    const trigger = Array.from(document.querySelectorAll('md-text-button')).find((b) => b.textContent?.includes('Sort:')) as HTMLElement;
+    fireEvent.click(trigger);
+    expect(screen.getByText('Distance: Nearest')).toBeTruthy();
   });
 
   const deal = (id: string, extra: Record<string, unknown> = {}) =>
@@ -388,27 +396,6 @@ describe('Category page layout', () => {
     expect(await screen.findByText(`0 ${content.category.resultCount.therapist.plural}`)).toBeTruthy();
   });
 
-  it('switches city from the location chip', async () => {
-    renderAt('/category/massage');
-    await screen.findByRole('group', { name: content.category.toolbar.label });
-    const chip = Array.from(document.querySelectorAll('md-assist-chip')).find(
-      (c) => ((c as HTMLElement & { label?: string }).label ?? c.getAttribute('label')) === content.category.toolbar.allCities,
-    ) as HTMLElement;
-    fireEvent.click(chip);
-    fireEvent.click(screen.getByText('Pune'));
-    await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage/pune'));
-  });
-
-  it('hides the location chip for product categories', async () => {
-    getCatalogCategoryMock.mockResolvedValue({ data: { ...CATEGORY, type: 'PRODUCT' } });
-    renderAt('/category/massage');
-    await screen.findByRole('group', { name: content.category.toolbar.label });
-    const labels = Array.from(document.querySelectorAll('md-assist-chip')).map(
-      (c) => (c as HTMLElement & { label?: string }).label ?? c.getAttribute('label'),
-    );
-    expect(labels).not.toContain(content.category.toolbar.allCities);
-  });
-
   it('applies a price filter from the Filters dialog', async () => {
     renderAt('/category/massage');
     await screen.findByRole('group', { name: content.category.toolbar.label });
@@ -427,7 +414,7 @@ describe('Category page layout', () => {
     await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ minPrice: 500, maxPrice: 2000 })));
   });
 
-  it('toggles a map of the loaded deals that have coordinates', async () => {
+  it('switches between list, grid and map views', async () => {
     listCatalogDealsMock.mockResolvedValue({
       data: [
         deal('d1', { branch: { id: 'b1', name: 'Main', city: 'Pune', address: null, latitude: '18.52', longitude: '73.85' } }),
@@ -436,9 +423,14 @@ describe('Category page layout', () => {
       meta: { total: 2 },
     });
     renderAt('/category/massage');
-    await screen.findByText(`2 ${content.category.dealCount.plural}`);
-    const toggle = Array.from(document.querySelectorAll('md-text-button')).find((b) => b.textContent?.includes(content.category.toolbar.showMap)) as HTMLElement;
-    fireEvent.click(toggle);
+    const group = await screen.findByRole('group', { name: content.category.view.label });
+    // The map option only appears once the deals (with their coordinates) have loaded.
+    await waitFor(() => expect(group.querySelectorAll('md-icon-button')).toHaveLength(3));
+    const [list, , map] = Array.from(group.querySelectorAll('md-icon-button')) as HTMLElement[];
+    fireEvent.click(list);
+    await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage?view=list'));
+    expect(document.querySelector('.card-grid__list--list')).toBeTruthy();
+    fireEvent.click(map);
     expect((await screen.findByTestId('deal-map')).textContent).toBe('1');
     expect(screen.getByText(content.category.map.missingOne)).toBeTruthy();
   });

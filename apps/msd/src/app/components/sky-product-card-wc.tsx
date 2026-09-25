@@ -80,11 +80,19 @@ export function SkyProductCardWC({
   // attribute name it declared, so it ignores that attribute either on first render or on
   // hydration. For those, `true` is an empty attribute and `false`/null/undefined omit it.
   // Single-word props (`favorite`, `rating`, ...) pass through unchanged.
+  // `undefined` is always skipped entirely (never forwarded as `prop={undefined}`) — for a
+  // reflecting Lit property with a non-empty default (e.g. `layout`'s `'vertical'`), rendering
+  // it as an explicit React prop makes React own that attribute during hydration; once Lit's own
+  // constructor default reflects the attribute onto the real element before React hydrates,
+  // React sees a mismatch against the `undefined` it would have rendered server-side. Omitting
+  // the key outright (same as callers who never pass it, e.g. `variant`) keeps the attribute
+  // entirely Lit's concern on both server and client, so there is nothing to mismatch.
   const attrs: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(props)) {
+    if (value === undefined) continue;
     const name = ATTRIBUTE_NAMES[key as keyof typeof ATTRIBUTE_NAMES];
     if (!name) attrs[key] = value;
-    else if (value !== undefined && value !== null && value !== false) attrs[name] = value === true ? '' : value;
+    else if (value !== null && value !== false) attrs[name] = value === true ? '' : value;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -463,10 +463,12 @@
   },
   "category": {
     "sortOptions": [
-      { "value": "recommended", "label": "Recommended" },
-      { "value": "discount", "label": "Biggest discount" },
-      { "value": "newest", "label": "Newest" }
+      { "value": "relevance", "label": "Relevance" },
+      { "value": "price_asc", "label": "Price: Low to High" },
+      { "value": "price_desc", "label": "Price: High to Low" },
+      { "value": "distance", "label": "Distance: Nearest" }
     ],
+    "view": { "label": "Results view", "list": "List view", "grid": "Grid view", "map": "Map view" },
     "timeSlots": [
       "9:00 AM",
       "10:00 AM",
@@ -516,10 +518,6 @@
       "label": "Listing tools",
       "filters": "Filters",
       "filtersActive": "Filters ({count})",
-      "location": "Choose a city",
-      "allCities": "All cities",
-      "showMap": "Show on map",
-      "showGrid": "Show grid",
       "sort": "Sort: {label}",
       "sortMenu": "Sort by"
     },
