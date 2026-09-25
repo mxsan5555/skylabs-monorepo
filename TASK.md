@@ -84,6 +84,7 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] msd: popular searches are only in the client render until plan 4 seeds the catalog into the prerender
 - [ ] msd: shared --sky-content-max token for 1280px/16px containers (header, footer, home)
 - [ ] msd: migrate remaining useCurrentLocation callers (category, search, therapists, vendor) to useVisitorLocation
+- [ ] msd: move /categories, therapists, orders, invoices and payments off `category.css` onto PageSection/CardGrid, then delete `category.css`
 
 #### Plan 4 prerender prerequisites
 - [x] (e) decided: gift/member `sky-feature-card` copy stays in shadow DOM. It is promotional, not a search landing target; the crawlable content on home is the h1, tiles, deals JSON-LD, How it works, directory and FAQ. See spec section 8.1.
