@@ -243,6 +243,15 @@ export function VendorPipeline({
   // resubmit stale (pre-grant) `offersService`/`offersTherapy`/`categoryIds`, silently wiping out
   // the branch-level auto-grant via that endpoint's replace-the-full-set semantics — and Step
   // 4/5's own "module not enabled" gate could render the stale flag in the meantime too.
+  //
+  // Also reloads `branches` — `VendorBranchListStep`'s own save already preserves each branch's
+  // PREVIOUS `categoryTypes` so it's never `undefined` (see that file's own doc comment on why),
+  // but "previous" is stale the instant a category was actually added/removed, and
+  // `VendorTherapistsStep`/`VendorProductsStep` gate branch eligibility on exactly that field
+  // (`branches.filter(b => b.categoryTypes.includes('THERAPY'))`). This fires unconditionally on
+  // every Branch Access save (not just ones that touch categories — see `BranchDialog.submit()`),
+  // so `categoryTypes` is back in sync with the server within one round trip, no page reload
+  // needed for a branch's Therapy/Product eligibility to update after its access changed.
   const refreshVendorAndCategoryAccess = () => {
     if (!vendorId) return;
     getVendor(token, vendorId)
@@ -252,6 +261,7 @@ export function VendorPipeline({
       })
       .catch(() => {});
     getVendorCategoryAccess(token, vendorId).then(({ data }) => setCategoryAccess(data)).catch(() => {});
+    reloadBranches().catch(() => {});
   };
 
   if (!vendor) {

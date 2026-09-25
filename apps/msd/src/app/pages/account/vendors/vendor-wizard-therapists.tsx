@@ -184,7 +184,15 @@ export function VendorTherapistsStep({
   // to host a therapist. Revoking a branch's Therapy access in Step 2 removes it from here
   // immediately (this list is always the live `branches` prop, never cached) and after a refresh
   // (the server recomputes `categoryTypes` from the live `BranchCategoryAccess` rows every time).
-  const therapyBranches = branches.filter((b) => b.categoryTypes.includes('THERAPY'));
+  // `?.` guards a real crash (not just a hypothetical): `updateBranch`/`createBranch`/
+  // `setBranchStatus` never return `categoryTypes` (only `listBranches` computes it), so the
+  // instant after a Branch Access save — before `onVendorRefresh`'s reload lands — a branch
+  // object here could still be missing it; this was the exact root cause of a crash landing
+  // straight in the top-level ErrorBoundary when Step 4 was opened right after saving Step 2
+  // without a reload in between. A branch this happens to is simply excluded from
+  // `therapyBranches` for that one render, not a false positive — see `VendorBranchListStep`'s
+  // own doc comment for why it resolves within one round trip either way.
+  const therapyBranches = branches.filter((b) => b.categoryTypes?.includes('THERAPY'));
 
   // `vendor.offersTherapy` is a denormalized convenience flag, not the ground truth — real
   // category grants (`VendorCategoryAccess`/`BranchCategoryAccess`) are. It can be `false` while
