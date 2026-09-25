@@ -1,13 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { createElement, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  Icon,
-  Tabs,
-  PrimaryTab,
-  OutlinedTextField,
-  FilledButton,
-  OutlinedButton,
-} from '@skylabs-monorepo/shared-ui/react';
+import { Icon, Tabs, FilledButton, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   getCatalogCategory,
@@ -26,6 +19,10 @@ import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { useHydrated } from '../../../hooks/use-hydrated';
 import { Breadcrumb } from '../../components/breadcrumb';
+import { CardGrid } from '../../components/card-grid/card-grid';
+import { PageSection } from '../../components/page-section/page-section';
+import { SectionHead } from '../../components/section-head/section-head';
+import { useCustomEvent } from '../../../hooks/use-custom-event';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { formatINR } from '../../../utils/format';
 import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
@@ -36,8 +33,38 @@ import type { CategoryData } from '../../../prerender-data/loaders';
 import { Seo } from '../../seo/seo';
 import { breadcrumbJsonLd } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
-import './category.css';
 import content from '../../../content.json';
+
+const t = content.category;
+const PANEL_ID = 'category-results';
+const tabId = (id: string) => `category-tab-${id}`;
+
+/** Raw `md-secondary-tab` so `id`/`aria-controls`/`active` render as attributes (same reason as
+ *  home's DealsTab: the @lit/react wrapper sets `id` as a property only in the browser build). */
+function SubcategoryTab({ id, active, children }: { id: string; active: boolean; children: ReactNode }) {
+  return createElement('md-secondary-tab', { id: tabId(id), 'aria-controls': PANEL_ID, active }, children);
+}
+
+/** Search field. Its own component so `useCustomEvent` attaches when the element mounts
+ *  (the page renders it only after the category loads). */
+function SearchField({ placeholder, onSearch }: { placeholder: string; onSearch: (query: string) => void }) {
+  const ref = useRef<HTMLElement>(null);
+  useCustomEvent<{ value: string }>(ref, 'sky-submit', (e) => onSearch(e.detail.value));
+  return (
+    <sky-action-field
+      ref={ref}
+      role="search"
+      type="search"
+      enterkeyhint="search"
+      icon="search"
+      variant="outlined"
+      dense
+      label={t.searchLabel}
+      placeholder={placeholder}
+      action-label={t.search.action}
+    />
+  );
+}
 
 /** SERVICE (or untyped, legacy) categories list deals; PRODUCT/THERAPY list their own entities. */
 function isDealCategory(category: CatalogCategoryWithChildren): boolean {
@@ -54,8 +81,8 @@ function therapistFromPrice(therapist: CatalogTherapist): number | null {
 
 /**
  * Category → Sub Category → (Deal | Product | Therapist) discovery page — the customer
- * catalogue's single canonical entry point. Reuses `category.css` and the existing
- * `Tabs`/`DealCard` components unchanged, but reads real Vendor/Branch/Deal/Therapist data from
+ * catalogue's single canonical entry point. Composes PageSection, SectionHead and CardGrid with
+ * the existing `Tabs`/`DealCard` components unchanged, but reads real Vendor/Branch/Deal/Therapist data from
  * `GET /catalog/*` — only active, approved records with an active vendor/branch are ever
  * returned (enforced server-side in `catalog.service.ts`).
  *
@@ -258,20 +285,17 @@ export function Category() {
   // Hold the page (and its canonical) until the city resolves, so a city URL never briefly
   // announces itself as the plain category page.
   if (categoryLoading || cityPending) {
-    return <p className="loading-state"> {content.category.loading}</p>;
+    return <p className="loading-state"> {t.loading}</p>;
   }
   if (categoryError || !category || cityMissing) {
     return (
-      <div className="category-page category-page--empty">
-        <Seo
-          title={content.category.notFound.metaTitle}
-          description={content.category.notFound.subheading}
-          path={categoryHref(slug)}
-          noindex
-        />
-        <sky-info-card icon="search_off" heading={content.category.notFound.heading} subheading={categoryError || content.category.notFound.subheading} />
-        <FilledButton onClick={() => navigate('/categories')}>{content.category.notFound.cta}</FilledButton>
-      </div>
+      <PageSection stack aria-label={t.notFound.heading}>
+        <Seo title={t.notFound.metaTitle} description={t.notFound.subheading} path={categoryHref(slug)} noindex />
+        <sky-info-card icon="search_off" heading={t.notFound.heading} subheading={categoryError || t.notFound.subheading} />
+        <div>
+          <FilledButton onClick={() => navigate('/categories')}>{t.notFound.cta}</FilledButton>
+        </div>
+      </PageSection>
     );
   }
   // Product and therapist listings can't be filtered by city, so a city URL on those categories
@@ -279,226 +303,190 @@ export function Category() {
   const cityFilterable = category.type !== 'PRODUCT' && category.type !== 'THERAPY';
   const activeCity = cityFilterable ? cityLocation : undefined;
   const displayName = activeCity
-    ? content.category.cityTitleTemplate.replace('{category}', category.name).replace('{city}', activeCity.city)
+    ? t.cityTitleTemplate.replace('{category}', category.name).replace('{city}', activeCity.city)
     : category.name;
   const description = activeCity
-    ? content.category.cityMetaDescriptionTemplate.replace('{category}', category.name).replace('{city}', activeCity.city)
-    : (category.description ?? content.category.metaDescriptionTemplate.replace('{category}', category.name));
+    ? t.cityMetaDescriptionTemplate.replace('{category}', category.name).replace('{city}', activeCity.city)
+    : (category.description ?? t.metaDescriptionTemplate.replace('{category}', category.name));
   const path = activeCity ? cityHref(category.slug, activeCity.city) : categoryHref(category.slug);
   const crumbs = [
-    { name: content.category.breadcrumb.home, path: '/' },
-    { name: content.category.breadcrumb.categories, path: '/categories' },
+    { name: t.breadcrumb.home, path: '/' },
+    { name: t.breadcrumb.categories, path: '/categories' },
     { name: category.name, path: categoryHref(category.slug) },
     ...(activeCity ? [{ name: activeCity.city, path }] : []),
   ];
+
+  const count = isTherapyCategory ? therapists.length : isProductCategory ? products.length : deals.length;
+  const noun = isTherapyCategory ? t.resultCount.therapist : isProductCategory ? t.resultCount.product : t.dealCount;
+  const countText = dealsLoading ? '' : `${count} ${count === 1 ? noun.singular : noun.plural}`;
+  const empty = isTherapyCategory ? t.emptyTherapists : t.emptyDeals;
+  const fallback = dealsLoading ? (
+    <p className="loading-state">{t.loadingDeals}</p>
+  ) : dealsError ? (
+    <p className="error-state" role="alert">{dealsError}</p>
+  ) : count === 0 ? (
+    <sky-info-card icon="sentiment_dissatisfied" heading={empty.heading} subheading={empty.subheading} />
+  ) : undefined;
+
+  const tabs =
+    category.children.length > 0 ? (
+      <Tabs
+        aria-label={t.tabsLabel}
+        onChange={(e) => setSubcategoryIdx((e.target as unknown as { activeTabIndex: number }).activeTabIndex)}
+      >
+        {[{ id: 'all', name: t.tabs.all }, ...category.children].map((tab, i) => (
+          <SubcategoryTab key={tab.id} id={tab.id} active={subcategoryIdx === i}>
+            {tab.name}
+          </SubcategoryTab>
+        ))}
+      </Tabs>
+    ) : null;
+
+  const cards = isTherapyCategory
+    ? therapists.map((therapist) => {
+        const price = therapistFromPrice(therapist);
+        return (
+          <SkyProductCardWC
+            key={therapist.id}
+            image={primaryImage(resolveTherapistMedia(therapist))}
+            eyebrow={therapist.personName}
+            eyebrowHref={therapist.vendor?.slug ? `/vendor/${therapist.vendor.slug}` : undefined}
+            heading={therapist.therapistType}
+            location={therapist.branch?.city ?? undefined}
+            distance={therapist.distanceKm != null ? `${Math.round(therapist.distanceKm * 10) / 10} km` : undefined}
+            tag={therapist.popularTags?.[0]?.name}
+            pricePrefix={price != null ? t.therapistPricePrefix : undefined}
+            price={price != null ? formatINR(price) : undefined}
+            href={`/therapist/${therapist.id}`}
+          />
+        );
+      })
+    : isProductCategory
+      ? products.map((product) => (
+          <DealCard
+            key={product.id}
+            deal={{
+              id: product.id,
+              title: product.name,
+              image: primaryImage(resolveProductMedia(product)) ?? '',
+              imageAlt: product.imageAlt ?? '',
+              gallery: resolveProductMedia(product).images,
+              badge: t.offeringLabels.product,
+              providerName: product.vendor?.businessName ?? '',
+              price: Number(product.price),
+              originalPrice:
+                product.originalPrice && Number(product.originalPrice) !== Number(product.price)
+                  ? Number(product.originalPrice)
+                  : undefined,
+              discount: product.discount ?? undefined,
+              tag: product.popularTags?.[0]?.name,
+            }}
+            href={`/products/${product.id}`}
+            eyebrowHref={product.vendor?.slug ? `/vendor/${product.vendor.slug}` : undefined}
+            favoriteActive={false}
+            onFavorite={() => {}}
+            actions={
+              <FilledButton onClick={() => addProductToCart(product)}>
+                <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                {t.actions.addToCart}
+              </FilledButton>
+            }
+          />
+        ))
+      : deals.map((deal) => (
+          <DealCard
+            key={deal.id}
+            deal={{
+              id: deal.id,
+              title: deal.title,
+              image: primaryImage(resolveDealMedia(deal)) ?? '',
+              imageAlt: '',
+              gallery: resolveDealMedia(deal).images,
+              badge: t.offeringLabels.service,
+              providerName: [deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · '),
+              location: deal.branch?.city ?? undefined,
+              distance: deal.distanceKm != null ? Math.round(deal.distanceKm * 10) / 10 : undefined,
+              price: Number(deal.salePrice),
+              originalPrice:
+                deal.originalPrice && Number(deal.originalPrice) !== Number(deal.salePrice)
+                  ? Number(deal.originalPrice)
+                  : undefined,
+              discount: deal.discountPercent ? Number(deal.discountPercent) : undefined,
+              priceNote: deal.durationMinutes ? `${deal.durationMinutes} ${t.durationSuffix}` : undefined,
+              tag: deal.popularTags?.[0]?.name,
+            }}
+            eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
+            favoriteActive={signedIn && isWishlisted(deal.id)}
+            onFavorite={() => toggleFavorite(deal)}
+            actions={
+              <DealAddToCartDialog
+                deal={deal}
+                onAdded={(label) => setActionMessage(t.messages.addToCartSuccess.replace('{item}', label))}
+                renderTrigger={(open) => (
+                  <OutlinedButton
+                    onClick={() => {
+                      if (requireAuthOrRedirect()) open();
+                    }}
+                  >
+                    <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                    {t.actions.addToCart}
+                  </OutlinedButton>
+                )}
+              />
+            }
+          />
+        ));
+
   return (
-    <div className="category-page">
+    <>
       <Seo
-        title={`${displayName}${content.category.metaTitleSuffix}`}
+        title={`${displayName}${t.metaTitleSuffix}`}
         description={description}
         path={path}
         noindex={!!citySlugParam && !activeCity}
         jsonLd={SITE_URL ? breadcrumbJsonLd(SITE_URL, crumbs) : undefined}
       />
-      <Breadcrumb
-        className="category-page__breadcrumb"
-        items={[
-          { label: content.category.breadcrumb.home, to: '/' },
-          { label: content.category.breadcrumb.categories, to: '/categories' },
-          activeCity ? { label: category.name, to: categoryHref(category.slug) } : { label: category.name },
-          ...(activeCity ? [{ label: activeCity.city }] : []),
-        ]} />
-      <header className="category-page__hero">
-        <div className="category-page__hero-inner">
-          <div className="category-page__hero-icon" aria-hidden="true">
-            <Icon>category</Icon>
-          </div>
-          <div>
-            <h1 className="category-page__title">{displayName}</h1>
-            {category.description && <p className="category-page__subtitle">{category.description}</p>}
-          </div>
-        </div>
-      </header>
-      {category.children.length > 0 && (
-        <div className="category-page__tabs-wrap">
-          <Tabs
-            className="category-page__tabs"
-            onChange={(e) => setSubcategoryIdx((e.target as unknown as { activeTabIndex: number }).activeTabIndex)}
-          >
-            <PrimaryTab active={subcategoryIdx === 0}> {content.category.tabs.all}</PrimaryTab>
-            {category.children.map((sub, i) => (
-              <PrimaryTab key={sub.id} active={subcategoryIdx === i + 1}>
-                {sub.name}
-              </PrimaryTab>
-            ))}
-          </Tabs>
-        </div>
-      )}
-      <div className="category-page__sort">
-        <div className="category-page__sort-inner">
-          <OutlinedTextField
-            label={content.category.searchLabel}
-            value={search}
-            onInput={(e: Event) => setSearch((e.target as HTMLInputElement).value)}
-          />
-          <p className="category-page__count" aria-live="polite" aria-atomic="true">
-            {dealsLoading
-              ? '…'
-              : isTherapyCategory
-                ? `${therapists.length} ${therapists.length === 1 ? 'therapist' : 'therapists'}`
-                : isProductCategory
-                  ? `${products.length} ${products.length === 1 ? 'product' : 'products'}`
-                  : `${deals.length} ${deals.length === 1 ? content.category.dealCount.singular : content.category.dealCount.plural}`}
-          </p>
-        </div>
-      </div>
-      {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
-      {actionError && <p className="error-state" role="alert">{actionError}</p>}
-      <section className="category-page__grid-wrap" aria-label={`${category.name} ${content.category.dealsAriaLabelSuffix}`}>
-        <div className="category-page__grid-inner">
-          {dealsLoading ? (
-            <p className="loading-state">{content.category.loadingDeals}</p>
-          ) : dealsError ? (
-            <p className="error-state" role="alert">{dealsError}</p>
-          ) : isTherapyCategory ? (
-            therapists.length === 0 ? (
-              <div className="category-page__empty">
-                <sky-info-card icon="sentiment_dissatisfied" heading="No therapists yet" subheading="Check back soon." />
-              </div>
-            ) : (
-              <ul className="category-page__grid">
-                {therapists.map((t) => {
-                  const price = therapistFromPrice(t);
-                  return (
-                    <li key={t.id}>
-                      <SkyProductCardWC
-                        image={primaryImage(resolveTherapistMedia(t))}
-                        eyebrow={t.personName}
-                        eyebrowHref={t.vendor?.slug ? `/vendor/${t.vendor.slug}` : undefined}
-                        heading={t.therapistType}
-                        location={t.branch?.city ?? undefined}
-                        distance={t.distanceKm != null ? `${(Math.round(t.distanceKm * 10) / 10)} km` : undefined}
-                        tag={t.popularTags?.[0]?.name}
-                        pricePrefix={price != null ? 'From' : undefined}
-                        price={price != null ? formatINR(price) : undefined}
-                        href={`/therapist/${t.id}`}
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
-            )
-          ) : isProductCategory ? (
-            products.length === 0 ? (
-              <div className="category-page__empty">
-                <sky-info-card icon="sentiment_dissatisfied" heading={content.category.emptyDeals.heading} subheading={content.category.emptyDeals.subheading} />
-              </div>
-            ) : (
-              <ul className="category-page__grid">
-                {products.map((product) => (
-                  <li key={product.id}>
-                    <DealCard
-                      deal={{
-                        id: product.id,
-                        title: product.name,
-                        image: primaryImage(resolveProductMedia(product)) ?? '',
-                        imageAlt: product.imageAlt ?? '',
-                        gallery: resolveProductMedia(product).images,
-                        badge: content.category.offeringLabels.product,
-                        providerName: product.vendor?.businessName ?? '',
-                        price: Number(product.price),
-                        originalPrice:
-                          product.originalPrice && Number(product.originalPrice) !== Number(product.price)
-                            ? Number(product.originalPrice)
-                            : undefined,
-                        discount: product.discount ?? undefined,
-                        tag: product.popularTags?.[0]?.name,
-                      }}
-                      href={`/products/${product.id}`}
-                      eyebrowHref={product.vendor?.slug ? `/vendor/${product.vendor.slug}` : undefined}
-                      favoriteActive={false}
-                      onFavorite={() => {}}
-                      actions={
-                        <FilledButton onClick={() => addProductToCart(product)}>
-                          <Icon slot="icon" aria-hidden="true">
-                            shopping_bag
-                          </Icon>
-                          {content.category.actions.addToCart}
-                        </FilledButton>
-                      }
-                    />
-                  </li>
-                ))}
-              </ul>
-            )
-          ) : deals.length === 0 ? (
-            <div className="category-page__empty">
-              <sky-info-card icon="sentiment_dissatisfied" heading={content.category.emptyDeals.heading} subheading={content.category.emptyDeals.subheading} />
-            </div>
-          ) : (
-            <ul className="category-page__grid">
-              {deals.map((deal) => (
-                <li key={deal.id}>
-                  <DealCard
-                    deal={{
-                      id: deal.id,
-                      title: deal.title,
-                      image: primaryImage(resolveDealMedia(deal)) ?? '',
-                      imageAlt: '',
-                      gallery: resolveDealMedia(deal).images,
-                      badge: content.category.offeringLabels.service,
-                      providerName: [deal.vendor?.businessName, deal.branch?.name]
-                        .filter(Boolean)
-                        .join(' · '),
-                      location: deal.branch?.city ?? undefined,
-                      distance: deal.distanceKm != null ? Math.round(deal.distanceKm * 10) / 10 : undefined,
-                      price: Number(deal.salePrice),
-                      originalPrice:
-                        deal.originalPrice &&
-                          Number(deal.originalPrice) !== Number(deal.salePrice)
-                          ? Number(deal.originalPrice)
-                          : undefined,
-                      discount: deal.discountPercent
-                        ? Number(deal.discountPercent)
-                        : undefined,
-                      priceNote: deal.durationMinutes
-                        ? `${deal.durationMinutes} ${content.category.durationSuffix}`
-                        : undefined,
-                      tag: deal.popularTags?.[0]?.name,
-                    }}
-                    eyebrowHref={
-                      deal.vendor?.slug
-                        ? `/vendor/${deal.vendor.slug}`
-                        : undefined
-                    }
-                    favoriteActive={signedIn && isWishlisted(deal.id)}
-                    onFavorite={() => toggleFavorite(deal)}
-                    actions={
-                      <DealAddToCartDialog
-                        deal={deal}
-                        onAdded={(label) => setActionMessage(`Added "${label}" to your cart.`)}
-                        renderTrigger={(open) => (
-                          <OutlinedButton
-                            onClick={() => {
-                              if (requireAuthOrRedirect()) open();
-                            }}
-                          >
-                            <Icon slot="icon" aria-hidden="true">
-                              shopping_bag
-                            </Icon>
-                            Add to Cart
-                          </OutlinedButton>
-                        )}
-                      />
-                    }
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
-    </div>
+      <PageSection stack aria-labelledby="category-heading">
+        <Breadcrumb
+          items={[
+            { label: t.breadcrumb.home, to: '/' },
+            { label: t.breadcrumb.categories, to: '/categories' },
+            activeCity ? { label: category.name, to: categoryHref(category.slug) } : { label: category.name },
+            ...(activeCity ? [{ label: activeCity.city }] : []),
+          ]}
+        />
+        <SectionHead
+          as="h1"
+          id="category-heading"
+          titleClassName="headline-large"
+          heading={displayName}
+          subheading={category.description ?? undefined}
+          actions={
+            <>
+              <span className="body-medium" aria-live="polite" aria-atomic="true">
+                {countText}
+              </span>
+              <SearchField placeholder={t.search.placeholder.replace('{category}', category.name)} onSearch={setSearch} />
+            </>
+          }
+        />
+      </PageSection>
+      <PageSection tone="tint" aria-label={`${category.name} ${t.dealsAriaLabelSuffix}`}>
+        <CardGrid
+          above={
+            <>
+              {tabs}
+              {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
+              {actionError && <p className="error-state" role="alert">{actionError}</p>}
+            </>
+          }
+          panel={tabs ? { id: PANEL_ID, labelledBy: tabId(activeSubcategory?.id ?? 'all') } : undefined}
+          fallback={fallback}
+        >
+          {cards}
+        </CardGrid>
+      </PageSection>
+    </>
   );
 }
 export default Category;
