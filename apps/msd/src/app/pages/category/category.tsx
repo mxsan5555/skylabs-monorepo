@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { createElement, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, FilledButton, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
@@ -27,6 +27,7 @@ import { ClampText } from '../../components/clamp-text/clamp-text';
 import { ListingToolbar } from '../../components/listing-toolbar/listing-toolbar';
 import { ChoiceMenu } from '../../components/choice-menu/choice-menu';
 import { LoadMore } from '../../components/load-more/load-more';
+import { PriceFilterDialog, type PriceRange } from '../../components/price-filter-dialog/price-filter-dialog';
 import { useCustomEvent } from '../../../hooks/use-custom-event';
 import { usePagedList } from '../../../hooks/use-paged-list';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
@@ -77,6 +78,13 @@ function isDealCategory(category: CatalogCategoryWithChildren): boolean {
 function therapistFromPrice(therapist: CatalogTherapist): number | null {
   if (therapist.packages.length === 0) return null;
   return Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)));
+}
+
+/** A non-negative number from a query param, or undefined. */
+function toPrice(value: string | null): number | undefined {
+  if (value == null || value === '') return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
 }
 
 /**
@@ -161,6 +169,24 @@ export function Category() {
   const sortParam = searchParams.get('sort');
   const sort = sortParam === 'discount' || sortParam === 'newest' ? sortParam : undefined;
   const sortOption = t.sortOptions.find((o) => o.value === (sort ?? 'recommended')) ?? t.sortOptions[0];
+  const minPrice = toPrice(searchParams.get('min'));
+  const maxPrice = toPrice(searchParams.get('max'));
+  const activeFilters = minPrice != null || maxPrice != null ? 1 : 0;
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const applyPrice = ({ min, max }: PriceRange) => {
+    setFiltersOpen(false);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        for (const [key, value] of [['min', min], ['max', max]] as const) {
+          if (value == null) next.delete(key);
+          else next.set(key, String(value));
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  };
   /** Writes one query param (or removes it when empty), keeping the others. */
   const setParam = (key: string, value: string | undefined) => {
     setSearchParams(
@@ -206,13 +232,23 @@ export function Category() {
     pageSize: CATEGORY_PAGE_SIZE,
   };
   // Any change here restarts the list at page 1.
-  const listKey = JSON.stringify([category?.id, activeSubcategory?.id, search, sort, cityLocation?.city, lat, lng]);
+  const listKey = JSON.stringify([category?.id, activeSubcategory?.id, search, sort, minPrice, maxPrice, cityLocation?.city, lat, lng]);
   // The prerendered first page only describes the default ("All", unsorted, no search, no location) view.
-  const isDefaultView = !activeSubcategory && !search && !sort && lat == null && lng == null;
+  const isDefaultView = !activeSubcategory && !search && !sort && minPrice == null && maxPrice == null && lat == null && lng == null;
   const loadError = (err: unknown) => (err instanceof ApiRequestError ? err.message : t.errors.loadDeals);
   const dealList = usePagedList<CatalogDeal>(
     (page) =>
-      listCatalogDeals({ ...common, page, city: cityLocation?.city, state: cityLocation?.state, sort, latitude: lat, longitude: lng }),
+      listCatalogDeals({
+        ...common,
+        page,
+        city: cityLocation?.city,
+        state: cityLocation?.state,
+        sort,
+        minPrice,
+        maxPrice,
+        latitude: lat,
+        longitude: lng,
+      }),
     listKey,
     {
       enabled: !!category && isDealCategory(category) && !cityPending && !cityMissing,
@@ -221,10 +257,14 @@ export function Category() {
         initialHasDeals && isDefaultView ? { items: initial.deals, total: initial.total ?? initial.deals.length } : undefined,
     },
   );
-  const productList = usePagedList<CatalogProduct>((page) => listCatalogProducts({ ...common, page, sort }), listKey, {
-    enabled: category?.type === 'PRODUCT',
-    errorMessage: loadError,
-  });
+  const productList = usePagedList<CatalogProduct>(
+    (page) => listCatalogProducts({ ...common, page, sort, minPrice, maxPrice }),
+    listKey,
+    {
+      enabled: category?.type === 'PRODUCT',
+      errorMessage: loadError,
+    },
+  );
   const therapistList = usePagedList<CatalogTherapist>(
     (page) => listCatalogTherapists({ ...common, page, latitude: lat, longitude: lng }),
     listKey,
@@ -285,6 +325,18 @@ export function Category() {
       }}
     />
   ) : null;
+
+  const filtersChip = !isTherapyCategory
+    ? createElement(
+        'md-assist-chip',
+        {
+          label: activeFilters ? t.toolbar.filtersActive.replace('{count}', String(activeFilters)) : t.toolbar.filters,
+          'aria-haspopup': 'dialog',
+          onClick: () => setFiltersOpen(true),
+        },
+        createElement('md-icon', { slot: 'icon', 'aria-hidden': 'true' }, 'tune'),
+      )
+    : null;
 
   const count = list.total;
   const noun = isTherapyCategory ? t.resultCount.therapist : isProductCategory ? t.resultCount.product : t.dealCount;
@@ -438,7 +490,7 @@ export function Category() {
       <PageSection tone="tint" stack aria-label={`${category.name} ${t.dealsAriaLabelSuffix}`}>
         <ListingToolbar
           ariaLabel={t.toolbar.label}
-          start={locationMenu}
+          start={filtersChip || locationMenu ? <>{filtersChip}{locationMenu}</> : undefined}
           end={
             <>
               <SearchField value={search} placeholder={t.search.placeholder.replace('{category}', category.name)} onSearch={setSearch} />
@@ -467,6 +519,15 @@ export function Category() {
             status={t.loadMore.status.replace('{shown}', String(list.items.length)).replace('{total}', String(list.total))}
             onLoadMore={list.loadMore}
             copy={t.loadMore}
+          />
+        )}
+        {filtersOpen && (
+          <PriceFilterDialog
+            range={{ min: minPrice, max: maxPrice }}
+            bounds={{ min: t.filters.min, max: t.filters.max, step: t.filters.step }}
+            copy={t.filters}
+            onApply={applyPrice}
+            onClose={() => setFiltersOpen(false)}
           />
         )}
       </PageSection>

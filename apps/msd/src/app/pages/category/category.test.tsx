@@ -405,4 +405,22 @@ describe('Category page layout', () => {
     );
     expect(labels).not.toContain(content.category.toolbar.allCities);
   });
+
+  it('applies a price filter from the Filters dialog', async () => {
+    renderAt('/category/massage');
+    await screen.findByRole('group', { name: content.category.toolbar.label });
+    const filters = Array.from(document.querySelectorAll('md-assist-chip')).find(
+      (c) => ((c as HTMLElement & { label?: string }).label ?? c.getAttribute('label')) === content.category.toolbar.filters,
+    ) as HTMLElement;
+    fireEvent.click(filters);
+    const slider = (await waitFor(() => document.querySelector('md-slider'))) as HTMLElement & { valueStart: number; valueEnd: number };
+    slider.valueStart = 500;
+    slider.valueEnd = 2000;
+    fireEvent(slider, new Event('input', { bubbles: true }));
+    fireEvent.click(
+      Array.from(document.querySelectorAll('md-filled-button')).find((b) => b.textContent === content.category.filters.apply) as HTMLElement,
+    );
+    await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage?min=500&max=2000'));
+    await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ minPrice: 500, maxPrice: 2000 })));
+  });
 });
