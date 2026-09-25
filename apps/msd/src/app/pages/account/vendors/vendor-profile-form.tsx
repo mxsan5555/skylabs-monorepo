@@ -163,10 +163,10 @@ const KYC_DOCUMENT_TYPES: {
   type: VendorDocumentType;
   label: string;
 }[] = [
-  { type: 'GST', label: 'GST Certificate' },
-  { type: 'PAN', label: 'PAN Card' },
-  { type: 'AADHAAR', label: 'Aadhaar Card' },
-];
+    { type: 'GST', label: 'GST Certificate' },
+    { type: 'PAN', label: 'PAN Card' },
+    { type: 'AADHAAR', label: 'Aadhaar Card' },
+  ];
 
 // ─── Field-level validation (UX only) ─────────────────────────────────────────
 // Mirrors `VendorFieldsSchema` in msd-api's `vendor.schema.ts` exactly — same regexes, same
@@ -408,20 +408,20 @@ export function VendorProfileForm({
     setErrors((e) =>
       e[key]
         ? {
-            ...e,
-            [key]: undefined,
-          }
+          ...e,
+          [key]: undefined,
+        }
         : e,
     );
   };
 
   const text =
     (key: keyof VendorFields) =>
-    (e: Event) =>
-      set(
-        key,
-        (e.target as HTMLInputElement).value as never,
-      );
+      (e: Event) =>
+        set(
+          key,
+          (e.target as HTMLInputElement).value as never,
+        );
 
   /** Phone fields only ever hold digits, max 10 — strips anything else (letters, spaces,
    *  `+`/`-`, a pasted `+91` prefix) on every keystroke AND on paste, since a paste also fires
@@ -430,13 +430,13 @@ export function VendorProfileForm({
    *  then re-synced to the filtered value on the next render via the controlled `value` prop. */
   const phoneInput =
     (key: keyof VendorFields) =>
-    (e: Event) => {
-      const digitsOnly = (e.target as HTMLInputElement)
-        .value.replace(/\D/g, '')
-        .slice(0, 10);
+      (e: Event) => {
+        const digitsOnly = (e.target as HTMLInputElement)
+          .value.replace(/\D/g, '')
+          .slice(0, 10);
 
-      set(key, digitsOnly as never);
-    };
+        set(key, digitsOnly as never);
+      };
 
   /** Validates every field in the currently rendered `sections` only — fields the user can't
    *  see right now are never checked, matching how each admin-pipeline/self-service step
@@ -601,295 +601,13 @@ export function VendorProfileForm({
                 onInput={text('businessName')}
                 error={Boolean(errors.businessName)}
               />
+
               {errors.businessName && (
                 <p className="error-state" role="alert">
                   {errors.businessName}
                 </p>
               )}
             </div>
-        <>
-          <h3 className="section-title">
-            Business Details
-          </h3>
-
-          <OutlinedTextField
-            label="Business name"
-            value={form.businessName ?? ''}
-            disabled={!canEdit}
-            onInput={text('businessName')}
-            error={Boolean(errors.businessName)}
-          />
-
-          {errors.businessName && (
-            <p className="error-state" role="alert">
-              {errors.businessName}
-            </p>
-          )}
-
-          <OutlinedTextField
-            label="Description"
-            value={form.businessDescription ?? ''}
-            disabled={!canEdit}
-            onInput={text('businessDescription')}
-          />
-
-          <OutlinedTextField
-            label="Business email"
-            type="email"
-            value={form.businessEmail ?? ''}
-            disabled={!canEdit}
-            onInput={text('businessEmail')}
-            error={Boolean(errors.businessEmail)}
-          />
-
-          {errors.businessEmail && (
-            <p className="error-state" role="alert">
-              {errors.businessEmail}
-            </p>
-          )}
-
-          <OutlinedTextField
-            label="Business phone"
-            type="tel"
-            inputMode="numeric"
-            maxLength={10}
-            value={form.businessPhone ?? ''}
-            disabled={!canEdit}
-            onInput={phoneInput('businessPhone')}
-            error={Boolean(errors.businessPhone)}
-          />
-
-          {errors.businessPhone && (
-            <p className="error-state" role="alert">
-              {errors.businessPhone}
-            </p>
-          )}
-        </>
-      )}
-
-      {show('owner') && (
-        <>
-          <h3 className="section-title">
-            Personal Information
-          </h3>
-
-          <OutlinedTextField
-            label="First Name"
-            value={form.ownerFirstName ?? ''}
-            disabled={!canEdit}
-            onInput={text('ownerFirstName')}
-          />
-
-          <OutlinedTextField
-            label="Last Name"
-            value={form.ownerLastName ?? ''}
-            disabled={!canEdit}
-            onInput={text('ownerLastName')}
-          />
-
-          <OutlinedTextField
-            label="Phone Number"
-            type="tel"
-            inputMode="numeric"
-            maxLength={10}
-            value={form.ownerMobile ?? ''}
-            disabled={!canEdit}
-            onInput={phoneInput('ownerMobile')}
-            error={Boolean(errors.ownerMobile)}
-          />
-
-          {errors.ownerMobile && (
-            <p className="error-state" role="alert">
-              {errors.ownerMobile}
-            </p>
-          )}
-
-          <OutlinedTextField
-            label="Email"
-            type="email"
-            value={form.ownerEmail ?? ''}
-            disabled={!canEdit}
-            onInput={text('ownerEmail')}
-            error={Boolean(errors.ownerEmail)}
-          />
-
-          {errors.ownerEmail && (
-            <p className="error-state" role="alert">
-              {errors.ownerEmail}
-            </p>
-          )}
-        </>
-      )}
-
-      {show('address') && (
-        <>
-          <h3 className="section-title">
-            Registered Address
-          </h3>
-
-          <OutlinedTextField
-            label="Address 1"
-            value={form.address ?? ''}
-            disabled={!canEdit}
-            onInput={text('address')}
-          />
-
-          <OutlinedTextField
-            label="Address 2"
-            value={form.addressLine2 ?? ''}
-            disabled={!canEdit}
-            onInput={text('addressLine2')}
-          />
-
-          <OutlinedTextField
-            label="City"
-            value={form.city ?? ''}
-            disabled={!canEdit}
-            onInput={text('city')}
-          />
-
-          <OutlinedTextField
-            label="State"
-            value={form.state ?? ''}
-            disabled={!canEdit}
-            onInput={text('state')}
-          />
-
-          <OutlinedTextField
-            label="PIN Code"
-            value={form.pincode ?? ''}
-            disabled={!canEdit}
-            onInput={text('pincode')}
-            error={Boolean(errors.pincode)}
-          />
-
-          {errors.pincode && (
-            <p className="error-state" role="alert">
-              {errors.pincode}
-            </p>
-          )}
-
-          <OutlinedTextField
-            label="Map Location"
-            type="url"
-            placeholder="Paste Google Maps location link"
-            value={form.mapLocationUrl ?? ''}
-            disabled={!canEdit}
-            onInput={text('mapLocationUrl')}
-            error={Boolean(errors.mapLocationUrl)}
-          />
-
-          {errors.mapLocationUrl && (
-            <p className="error-state" role="alert">
-              {errors.mapLocationUrl}
-            </p>
-          )}
-        </>
-      )}
-
-      {show('kyc') && (
-        <>
-          <h3 className="section-title">
-            KYC Documents
-          </h3>
-
-          <p className="field-hint">
-            Upload any ONE of the following.
-          </p>
-
-          {KYC_DOCUMENT_TYPES.map(
-            ({ type, label }) => (
-              <VendorDocumentUpload
-                key={type}
-                documentType={type}
-                label={label}
-                vendorId={vendor?.id ?? null}
-                selfService={selfService}
-                existingDocument={documents.find(
-                  (d) => d.documentType === type,
-                )}
-                token={token}
-
-                onUploaded={(doc) => {
-                  setDocuments((prev) => [
-                    ...prev.filter(
-                      (d) => d.documentType !== type,
-                    ),
-                    doc,
-                  ]);
-
-                  // IMPORTANT:
-                  // Tell VendorPipeline that the KYC document
-                  // has changed so it can fetch the latest vendor
-                  // and immediately recalculate kycDocOk.
-                  onKycDocumentChanged?.();
-                }}
-
-                onDeleted={() => {
-                  setDocuments((prev) =>
-                    prev.filter(
-                      (d) => d.documentType !== type,
-                    ),
-                  );
-
-                  // IMPORTANT:
-                  // Refresh parent state after deletion as well.
-                  // Otherwise deleting the last document would leave
-                  // the parent's kycDocOk=true until page refresh.
-                  onKycDocumentChanged?.();
-                }}
-
-                onStagedChange={(hasFile) =>
-                  setKycSlotHasFile((prev) => ({
-                    ...prev,
-                    [type]: hasFile,
-                  }))
-                }
-              />
-            ),
-          )}
-
-          {canReviewKyc && onKycReview && (
-            <fieldset>
-              <legend>
-                Review KYC (current:{' '}
-                {vendor?.kycStatus ?? 'PENDING'})
-              </legend>
-
-              <FilledButton
-                onClick={() =>
-                  onKycReview('VERIFIED')
-                }
-              >
-                Verify KYC
-              </FilledButton>
-
-              <OutlinedTextField
-                label="Rejection reason"
-                value={kycRejectReason}
-                onInput={(e: Event) =>
-                  setKycRejectReason(
-                    (e.target as HTMLInputElement)
-                      .value,
-                  )
-                }
-              />
-
-              <OutlinedButton
-                onClick={() =>
-                  onKycReview(
-                    'REJECTED',
-                    kycRejectReason,
-                  )
-                }
-                disabled={!kycRejectReason.trim()}
-              >
-                Reject KYC
-              </OutlinedButton>
-            </fieldset>
-          )}
-        </>
-      )}
 
             <div className="vendor-field">
               <OutlinedTextField
@@ -909,6 +627,7 @@ export function VendorProfileForm({
                 onInput={text('businessEmail')}
                 error={Boolean(errors.businessEmail)}
               />
+
               {errors.businessEmail && (
                 <p className="error-state" role="alert">
                   {errors.businessEmail}
@@ -927,6 +646,7 @@ export function VendorProfileForm({
                 onInput={phoneInput('businessPhone')}
                 error={Boolean(errors.businessPhone)}
               />
+
               {errors.businessPhone && (
                 <p className="error-state" role="alert">
                   {errors.businessPhone}
@@ -1216,46 +936,6 @@ export function VendorProfileForm({
             </div>
           </div>
         </sky-tile-card>
-        <>
-          <h3 className="section-title">
-            Bank Details
-          </h3>
-
-          <OutlinedTextField
-            label="Account holder"
-            value={form.bankAccountHolder ?? ''}
-            disabled={!canEdit}
-            onInput={text('bankAccountHolder')}
-          />
-
-          <OutlinedTextField
-            label="Bank name"
-            value={form.bankName ?? ''}
-            disabled={!canEdit}
-            onInput={text('bankName')}
-          />
-
-          <OutlinedTextField
-            label="Account number"
-            value={form.bankAccountNumber ?? ''}
-            disabled={!canEdit}
-            onInput={text('bankAccountNumber')}
-          />
-
-          <OutlinedTextField
-            label="IFSC"
-            value={form.bankIfsc ?? ''}
-            disabled={!canEdit}
-            onInput={text('bankIfsc')}
-          />
-
-          <OutlinedTextField
-            label="UPI ID"
-            value={form.upiId ?? ''}
-            disabled={!canEdit}
-            onInput={text('upiId')}
-          />
-        </>
       )}
 
       {canEdit && (

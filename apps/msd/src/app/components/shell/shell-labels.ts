@@ -20,6 +20,7 @@ export function useAccountLinks() {
   return {
     isAuthenticated: signedIn,
     isCustomer,
-    accountPath: !signedIn ? '/sign-in' : isCustomer ? '/my-account' : '/account',
+    accountPath: !signedIn ? '/sign-in' : isCustomer ? '/my-account' : '/account/dashboard',
   };
 }
+
