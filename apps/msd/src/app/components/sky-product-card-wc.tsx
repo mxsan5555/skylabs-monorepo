@@ -38,6 +38,7 @@ interface SkyProductCardProps {
   priceNote?: string;
   href?: string;
   align?: 'left' | 'center' | 'right';
+  layout?: 'vertical' | 'horizontal';
   onFavorite?: () => void;
 }
 
