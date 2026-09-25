@@ -1,0 +1,55 @@
+/* Deal map (Leaflet or Google). Markers are M3 primary pills. 840px = M3 expanded. */
+.deal-map {
+  position: relative;
+  inline-size: 100%;
+  block-size: 480px;
+  overflow: hidden;
+  border-radius: var(--md-sys-shape-corner-large);
+  background-color: var(--md-sys-color-surface-container-high);
+}
+.deal-map__canvas,
+.deal-map__loading {
+  inline-size: 100%;
+  block-size: 100%;
+}
+.deal-map__loading {
+  display: grid;
+  place-items: center;
+}
+.deal-map .leaflet-container {
+  font: inherit;
+  background-color: var(--md-sys-color-surface-container-high);
+}
+.deal-map__marker-host {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.deal-map__marker {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 32px;
+  padding-inline: 12px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  box-shadow: var(--sky-elevation-2);
+  white-space: nowrap;
+  text-decoration: none;
+}
+.deal-map__marker:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--md-sys-color-on-primary) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+    var(--md-sys-color-primary)
+  );
+}
+.deal-map__marker:focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+@media (min-width: 840px) {
+  .deal-map {
+    block-size: 600px;
+  }
+}
