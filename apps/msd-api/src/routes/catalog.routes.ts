@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { validateParams, validateQuery } from '../middleware/validate';
-import { CatalogDealQuerySchema, CatalogProductQuerySchema, CatalogTherapistQuerySchema, CatalogVendorQuerySchema } from '../schemas/catalog.schema';
+import { CatalogDealQuerySchema, CatalogProductQuerySchema, CatalogTherapistQuerySchema, CatalogVendorQuerySchema, splitIds } from '../schemas/catalog.schema';
 import { PublicBlogPostListQuerySchema } from '../schemas/blog-post.schema';
 import { z } from 'zod';
 import * as catalogService from '../services/catalog.service';
@@ -33,7 +33,7 @@ router.get('/categories/:slug', validateParams(z.object({ slug: z.string().min(1
 
 router.get('/deals', validateQuery(CatalogDealQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, categoryId, subcategoryId, vendorId, branchId, search, state, city, sort, minPrice, maxPrice, latitude, longitude } =
+    const { page, pageSize, categoryId, subcategoryId, vendorId, branchId, vendorIds, branchIds, search, state, city, sort, minPrice, maxPrice, radiusKm, latitude, longitude } =
       req.validatedQuery as ReturnType<typeof CatalogDealQuerySchema.parse>;
     const { items, total } = await catalogService.listPublicDeals({
       page,
@@ -42,12 +42,15 @@ router.get('/deals', validateQuery(CatalogDealQuerySchema), async (req, res, nex
       subcategoryId,
       vendorId,
       branchId,
+      vendorIds: splitIds(vendorIds),
+      branchIds: splitIds(branchIds),
       search,
       state,
       city,
       sort,
       minPrice,
       maxPrice,
+      radiusKm,
       latitude,
       longitude,
     });

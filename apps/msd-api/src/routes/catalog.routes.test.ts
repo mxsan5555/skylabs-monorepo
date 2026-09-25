@@ -290,6 +290,95 @@ describe('GET /api/v1/catalog/deals', () => {
   });
 });
 
+describe('GET /api/v1/catalog/deals sorts and filters', () => {
+  const VENDOR_ID_1 = 'f1f1f1f1-0000-4000-8000-000000000001';
+  const VENDOR_ID_2 = 'f2f2f2f2-0000-4000-8000-000000000002';
+  const BRANCH_ID_1 = 'f3f3f3f3-0000-4000-8000-000000000003';
+
+  it('1. sort=price_asc orders by salePrice asc, ties by createdAt desc', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([]);
+    prismaMock.deal.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/deals?sort=price_asc');
+    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: [{ salePrice: 'asc' }, { createdAt: 'desc' }] }),
+    );
+  });
+
+  it('2. sort=price_desc orders by salePrice desc, ties by createdAt desc', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([]);
+    prismaMock.deal.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/deals?sort=price_desc');
+    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: [{ salePrice: 'desc' }, { createdAt: 'desc' }] }),
+    );
+  });
+
+  it('3. no sort defaults to relevance, which is createdAt desc without coordinates (unchanged SQL order)', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([]);
+    prismaMock.deal.count.mockResolvedValue(0);
+    await request(app).get('/api/v1/catalog/deals');
+    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: { createdAt: 'desc' } }),
+    );
+  });
+
+  it('4. vendorIds=<uuid1>,<uuid2> filters via vendorId in [...]; branchIds=<uuid> filters via branchId in [...]', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([]);
+    prismaMock.deal.count.mockResolvedValue(0);
+    await request(app).get(`/api/v1/catalog/deals?vendorIds=${VENDOR_ID_1},${VENDOR_ID_2}&branchIds=${BRANCH_ID_1}`);
+    const call = prismaMock.deal.findMany.mock.calls[0][0];
+    expect(call.where.vendorId).toEqual({ in: [VENDOR_ID_1, VENDOR_ID_2] });
+    expect(call.where.branchId).toEqual({ in: [BRANCH_ID_1] });
+  });
+
+  it('5. vendorIds=not-a-uuid fails validation', async () => {
+    const res = await request(app).get('/api/v1/catalog/deals?vendorIds=not-a-uuid');
+    expect(res.status).toBe(422);
+    expect(prismaMock.deal.findMany).not.toHaveBeenCalled();
+  });
+
+  it('6. radiusKm + coordinates: drops out-of-radius deals, without skip/take (full-set filter+sort+paginate in memory)', async () => {
+    const nearDeal = { ...serviceDealFixture, id: 'near-deal', branch: { ...serviceDealFixture.branch, latitude: '26.7606', longitude: '83.3732' } };
+    const farDeal = { ...serviceDealFixture, id: 'far-deal', branch: { ...serviceDealFixture.branch, latitude: '26.5', longitude: '83.3732' } }; // ~29km south
+    prismaMock.deal.findMany.mockResolvedValue([farDeal, nearDeal]);
+    prismaMock.deal.count.mockResolvedValue(2);
+    const res = await request(app).get('/api/v1/catalog/deals?radiusKm=5&latitude=26.7606&longitude=83.3732');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].id).toBe('near-deal');
+    expect(res.body.meta.total).toBe(1);
+    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(expect.not.objectContaining({ skip: expect.anything(), take: expect.anything() }));
+  });
+
+  it('7. radiusKm without coordinates is ignored; the normal SQL skip/take path is used', async () => {
+    prismaMock.deal.findMany.mockResolvedValue([serviceDealFixture]);
+    prismaMock.deal.count.mockResolvedValue(1);
+    const res = await request(app).get('/api/v1/catalog/deals?radiusKm=5');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 0, take: expect.any(Number) }));
+  });
+
+  it('8. radiusKm=0 and radiusKm=501 fail validation', async () => {
+    const zero = await request(app).get('/api/v1/catalog/deals?radiusKm=0');
+    expect(zero.status).toBe(422);
+    const tooBig = await request(app).get('/api/v1/catalog/deals?radiusKm=501');
+    expect(tooBig.status).toBe(422);
+  });
+
+  it('9. sort=discount with coordinates keeps the findMany (discount) order instead of forcing nearest-first', async () => {
+    const nearDeal = { ...serviceDealFixture, id: 'near-deal', discountPercent: 10, branch: { ...serviceDealFixture.branch, latitude: '26.7606', longitude: '83.3732' } };
+    const farDeal = { ...serviceDealFixture, id: 'far-deal', discountPercent: 50, branch: { ...serviceDealFixture.branch, latitude: '28.6139', longitude: '77.2090' } };
+    // findMany already returns them in "discount desc" order (as the DB's own ORDER BY would) —
+    // farDeal (50% off) before nearDeal (10% off), even though nearDeal is geographically closer.
+    prismaMock.deal.findMany.mockResolvedValue([farDeal, nearDeal]);
+    prismaMock.deal.count.mockResolvedValue(2);
+    const res = await request(app).get('/api/v1/catalog/deals?sort=discount&latitude=26.7606&longitude=83.3732');
+    expect(res.status).toBe(200);
+    expect(res.body.data.map((d: { id: string }) => d.id)).toEqual(['far-deal', 'near-deal']);
+  });
+});
+
 describe('GET /api/v1/catalog/products', () => {
   it('lists active products with an active vendor, no branch/approval concepts (Product is fully independent of Deal)', async () => {
     prismaMock.product.findMany.mockResolvedValue([productFixture]);

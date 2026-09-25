@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import type { Prisma } from '../generated/prisma-client';
+import { rankDeals, type DealSort } from './deal-ranking';
 import { listActiveCategories, getActiveCategoryBySlugOrThrow } from './category.service';
 import { getActiveTagNamesFor } from './popular-tag.service';
 import * as blogPostService from './blog-post.service';
@@ -374,38 +375,42 @@ export async function getPublicCategoryBySlug(slug: string) {
   };
 }
 
-export async function listPublicDeals(opts: {
-  page: number;
-  pageSize: number;
+/** The base (non-facet) filters a public deal query can carry — category/subcategory/vendor(s)/
+ *  branch(es)/search/state/city/price. Shared by `listPublicDeals` and `getPublicDealFacets`
+ *  (the latter omits vendor(s)/branch(es)/price so those stay in-memory facet selections — see
+ *  that function's own doc comment). */
+export interface DealWhereOpts {
   categoryId?: string;
   subcategoryId?: string;
   vendorId?: string;
   branchId?: string;
+  /** Comma-split vendor UUIDs → `vendorId: { in: [...] }`; wins over the single `vendorId` above
+   *  when both are given (see `splitIds` in `catalog.schema.ts`). */
+  vendorIds?: string[];
+  /** Same as `vendorIds`, for `branchId`. */
+  branchIds?: string[];
   search?: string;
   /** Narrow to deals whose branch is in this state/city — merged into the existing
    *  `branch: {isActive: true}` clause below, never overwriting it. Omitted → unchanged
    *  behavior (every existing caller that omits these gets byte-identical results). */
   state?: string;
   city?: string;
-  /** 'newest' (default) preserves the original unconditional `{createdAt: 'desc'}` ordering —
-   *  every pre-existing caller that omits this gets byte-identical results. 'discount' is the
-   *  only non-fabricated "best deals" proxy on Deal (no Review/Rating model exists). */
-  sort?: 'newest' | 'discount';
   minPrice?: number;
   maxPrice?: number;
-  /** The customer's own browser-geolocation coordinates (see `useCurrentLocation`'s doc comment)
-   *  — reuses the vendor's/branch's already-existing `latitude`/`longitude` columns for the
-   *  distance calc, never persisted, never a new location model. Omitted → completely unchanged
-   *  behavior (byte-identical to every pre-existing caller). */
-  latitude?: number;
-  longitude?: number;
-}) {
-  const where = {
+}
+
+/** Builds `Deal.findMany`'s/`Deal.count`'s shared `where` — always visibility-gated (see
+ *  `VISIBLE_DEAL_WHERE`), every other clause additive and omitted when its input is omitted
+ *  (byte-identical to the pre-existing behavior for any caller that sends none of the new
+ *  fields). Extracted out of `listPublicDeals` so `getPublicDealFacets` (Task 3) can reuse the
+ *  exact same base-filter semantics without duplicating them. */
+export function buildDealWhere(opts: DealWhereOpts) {
+  return {
     ...VISIBLE_DEAL_WHERE,
     ...(opts.categoryId ? { categoryId: opts.categoryId } : {}),
     ...(opts.subcategoryId ? { subcategoryId: opts.subcategoryId } : {}),
-    ...(opts.vendorId ? { vendorId: opts.vendorId } : {}),
-    ...(opts.branchId ? { branchId: opts.branchId } : {}),
+    ...(opts.vendorIds?.length ? { vendorId: { in: opts.vendorIds } } : opts.vendorId ? { vendorId: opts.vendorId } : {}),
+    ...(opts.branchIds?.length ? { branchId: { in: opts.branchIds } } : opts.branchId ? { branchId: opts.branchId } : {}),
     ...(opts.state || opts.city
       ? { branch: { is: { isActive: true, ...(opts.state ? { state: opts.state } : {}), ...(opts.city ? { city: opts.city } : {}) } } }
       : {}),
@@ -426,27 +431,55 @@ export async function listPublicDeals(opts: {
         }
       : {}),
   };
-  // 'discount' sorts deals with the biggest discountPercent first; deals with no discount
-  // (null) are pushed to the end via `nulls: 'last'` rather than sorting ahead of real
-  // discounts (Prisma's null-sort-order support is GA on PostgreSQL — no preview flag needed).
+}
+
+export async function listPublicDeals(
+  opts: DealWhereOpts & {
+    page: number;
+    pageSize: number;
+    /** 'relevance' (default): nearest first with coordinates, otherwise `createdAt desc` — every
+     *  pre-existing caller that omits this (and coordinates) gets byte-identical results.
+     *  'price_asc'/'price_desc': `salePrice` asc/desc, ties by `createdAt desc`. 'distance':
+     *  nearest first (same as 'relevance' with coordinates). 'newest'/'discount': kept for
+     *  existing callers (home, explore) — unchanged. See `deal-ranking.ts`'s own doc comment for
+     *  how coordinates/radius interact with each sort. */
+    sort?: DealSort;
+    /** Radius in km around `latitude`/`longitude` — ignored without coordinates (see
+     *  `rankDeals`'s own doc comment). */
+    radiusKm?: number;
+    /** The customer's own browser-geolocation coordinates (see `useCurrentLocation`'s doc
+     *  comment) — reuses the vendor's/branch's already-existing `latitude`/`longitude` columns
+     *  for the distance calc, never persisted, never a new location model. Omitted → completely
+     *  unchanged behavior (byte-identical to every pre-existing caller). */
+    latitude?: number;
+    longitude?: number;
+  },
+) {
+  const where = buildDealWhere(opts);
+  const sort: DealSort = opts.sort ?? 'relevance';
+  // 'discount' sorts deals with the biggest discountPercent first; deals with no discount (null)
+  // are pushed to the end via `nulls: 'last'` rather than sorting ahead of real discounts
+  // (Prisma's null-sort-order support is GA on PostgreSQL — no preview flag needed). Every other
+  // sort (including 'relevance'/'distance', whose nearest-first ordering — when coordinates are
+  // given — is applied in memory by `rankDeals` below, not in SQL) falls back to `createdAt desc`.
   const orderBy =
-    opts.sort === 'discount'
-      ? [{ discountPercent: { sort: 'desc' as const, nulls: 'last' as const } }]
-      : { createdAt: 'desc' as const };
-  // With coordinates, "nearest first" replaces whatever `sort` would otherwise apply — there is
-  // no existing radius/city-state priority system to layer on top of (confirmed by research), so
-  // per this app's own "keep it simple" fallback rule this is a plain full-set distance sort, not
-  // a new business rule. Distance can't be computed/sorted in SQL without a raw query per row's
-  // Decimal lat/lng, and the realistic result-set size here is small, so the full matching set is
-  // fetched, sorted in memory, then paginated — never a per-page-only (and therefore wrong)
-  // nearest-first ordering.
+    sort === 'price_asc'
+      ? [{ salePrice: 'asc' as const }, { createdAt: 'desc' as const }]
+      : sort === 'price_desc'
+        ? [{ salePrice: 'desc' as const }, { createdAt: 'desc' as const }]
+        : sort === 'discount'
+          ? [{ discountPercent: { sort: 'desc' as const, nulls: 'last' as const } }]
+          : { createdAt: 'desc' as const };
+  // With coordinates, the full matching set is fetched (radius/relevance/distance ranking can't
+  // be done correctly a page at a time), ranked in memory by `rankDeals`, then paginated —
+  // `radiusKm` only ever applies alongside coordinates (see `rankDeals`'s own doc comment); a
+  // `radiusKm` sent without coordinates is silently ignored and falls through to the plain SQL
+  // path below, same as every other pre-existing caller that sends no coordinates.
   if (opts.latitude !== undefined && opts.longitude !== undefined) {
-    const [allRows, total] = await Promise.all([
-      prisma.deal.findMany({ where, select: PUBLIC_DEAL_SELECT }),
-      prisma.deal.count({ where }),
-    ]);
-    const sorted = withDistance(allRows, opts.latitude, opts.longitude);
-    const page = sorted.slice((opts.page - 1) * opts.pageSize, (opts.page - 1) * opts.pageSize + opts.pageSize);
+    const allRows = await prisma.deal.findMany({ where, orderBy, select: PUBLIC_DEAL_SELECT });
+    const ranked = rankDeals(allRows, { sort, latitude: opts.latitude, longitude: opts.longitude, radiusKm: opts.radiusKm });
+    const total = ranked.length;
+    const page = ranked.slice((opts.page - 1) * opts.pageSize, (opts.page - 1) * opts.pageSize + opts.pageSize);
     const items = await withDealPopularTags(page);
     return { items, total };
   }
@@ -461,7 +494,7 @@ export async function listPublicDeals(opts: {
     }),
     prisma.deal.count({ where }),
   ]);
-  const items = await withDealPopularTags(withDistance(rows));
+  const items = await withDealPopularTags(rankDeals(rows, { sort }));
   return { items, total };
 }
 
