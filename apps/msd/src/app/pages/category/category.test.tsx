@@ -331,6 +331,9 @@ describe('Category page layout', () => {
       field.dispatchEvent(new CustomEvent('sky-submit', { detail: { value: 'swedish' } }));
     });
     await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.search).toBe('swedish'));
+    // The field shows the active search (it is controlled, so a remount keeps the term visible).
+    const shown = document.querySelector('sky-action-field') as HTMLElement & { value?: string };
+    expect(shown.getAttribute('value') ?? shown.value).toBe('swedish');
   });
 
   it('announces the result count from content', async () => {

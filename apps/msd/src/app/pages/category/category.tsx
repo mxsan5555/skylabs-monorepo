@@ -46,8 +46,9 @@ function SubcategoryTab({ id, active, children }: { id: string; active: boolean;
 }
 
 /** Search field. Its own component so `useCustomEvent` attaches when the element mounts
- *  (the page renders it only after the category loads). */
-function SearchField({ placeholder, onSearch }: { placeholder: string; onSearch: (query: string) => void }) {
+ *  (the page renders it only after the category loads). Controlled by `value`, so the active
+ *  search stays visible after the field remounts (e.g. moving to another category). */
+function SearchField({ value, placeholder, onSearch }: { value: string; placeholder: string; onSearch: (query: string) => void }) {
   const ref = useRef<HTMLElement>(null);
   useCustomEvent<{ value: string }>(ref, 'sky-submit', (e) => onSearch(e.detail.value));
   return (
@@ -60,6 +61,7 @@ function SearchField({ placeholder, onSearch }: { placeholder: string; onSearch:
       variant="outlined"
       dense
       label={t.searchLabel}
+      value={value}
       placeholder={placeholder}
       action-label={t.search.action}
     />
@@ -466,7 +468,7 @@ export function Category() {
               <span className="body-medium" aria-live="polite" aria-atomic="true">
                 {countText}
               </span>
-              <SearchField placeholder={t.search.placeholder.replace('{category}', category.name)} onSearch={setSearch} />
+              <SearchField value={search} placeholder={t.search.placeholder.replace('{category}', category.name)} onSearch={setSearch} />
             </>
           }
         />

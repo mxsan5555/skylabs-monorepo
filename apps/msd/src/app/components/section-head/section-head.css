@@ -33,7 +33,7 @@
 }
 /* A search field in the row takes the free space and a full row on phones. */
 .section-head__actions > sky-action-field {
-  flex: 1 1 280px;
+  flex: 1 1 272px;
   min-inline-size: 0;
 }
 .section-head__link {
