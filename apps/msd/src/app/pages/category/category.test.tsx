@@ -80,12 +80,14 @@ function LocationBar() {
 
 const renderAt = (path: string) =>
   render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/category/:slug" element={<><Category /><LocationBar /></>} />
-        <Route path="/category/:slug/:city" element={<><Category /><LocationBar /></>} />
-      </Routes>
-    </MemoryRouter>,
+    <ToastProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/category/:slug" element={<><Category /><LocationBar /></>} />
+          <Route path="/category/:slug/:city" element={<><Category /><LocationBar /></>} />
+        </Routes>
+      </MemoryRouter>
+    </ToastProvider>,
   );
 
 const canonical = () => document.head.querySelector('link[rel="canonical"]')?.getAttribute('href');
@@ -243,7 +245,7 @@ describe('Category page with prerendered data', () => {
     expect(countText()).toBe(`1 ${content.category.dealCount.singular}`);
     expect(getCatalogCategoryMock).toHaveBeenCalledTimes(1);
     expect(listCatalogDealsMock).toHaveBeenCalledTimes(1);
-    expect(listCatalogDealsMock).toHaveBeenCalledWith(expect.objectContaining({ categoryId: 'c1', pageSize: 60 }));
+    expect(listCatalogDealsMock).toHaveBeenCalledWith(expect.objectContaining({ categoryId: 'c1', pageSize: 12 }));
     expect(lastSubcategoryId()).toBeUndefined();
     await act(async () => {
       resolveCategory({ data: { ...CATEGORY, name: 'Massage Therapy' } });
@@ -341,6 +343,36 @@ describe('Category page layout', () => {
     fireEvent.click(screen.getByText('Biggest discount'));
     await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage?sort=discount'));
     await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.sort).toBe('discount'));
+  });
+
+  const deal = (id: string, extra: Record<string, unknown> = {}) =>
+    ({
+      id,
+      title: `Deal ${id}`,
+      salePrice: '999',
+      originalPrice: null,
+      discountPercent: null,
+      durationMinutes: null,
+      vendor: null,
+      branch: { id: 'b1', name: 'Main', city: 'Pune', address: null, latitude: null, longitude: null },
+      mediaImages: [],
+      popularTags: [],
+      ...extra,
+    }) as unknown;
+
+  it('loads 12 at a time and shows the API total', async () => {
+    const first = Array.from({ length: 12 }, (_, i) => deal(`d${i}`));
+    listCatalogDealsMock.mockImplementation((opts: { page?: number }) =>
+      Promise.resolve(opts.page === 2 ? { data: [deal('d12')], meta: { total: 13 } } : { data: first, meta: { total: 13 } }),
+    );
+    renderAt('/category/massage');
+    expect(await screen.findByText(`13 ${content.category.dealCount.plural}`)).toBeTruthy();
+    expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ page: 1, pageSize: 12 }));
+    expect(screen.getByText('Showing 12 of 13')).toBeTruthy();
+    const more = Array.from(document.querySelectorAll('md-outlined-button')).find((b) => b.textContent === content.category.loadMore.button) as HTMLElement;
+    fireEvent.click(more);
+    await waitFor(() => expect(screen.getByText('Showing 13 of 13')).toBeTruthy());
+    expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ page: 2 }));
   });
 
   it('uses the therapist empty copy from content', async () => {

@@ -26,14 +26,16 @@ import { ChipNav } from '../../components/chip-nav/chip-nav';
 import { ClampText } from '../../components/clamp-text/clamp-text';
 import { ListingToolbar } from '../../components/listing-toolbar/listing-toolbar';
 import { ChoiceMenu } from '../../components/choice-menu/choice-menu';
+import { LoadMore } from '../../components/load-more/load-more';
 import { useCustomEvent } from '../../../hooks/use-custom-event';
+import { usePagedList } from '../../../hooks/use-paged-list';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { formatINR } from '../../../utils/format';
 import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import { citySlug, cityHref, categoryHref, useCatalogShell } from '../../../catalog/catalog-shell';
 import { categoryDataKey, usePrerenderedData } from '../../../prerender-data/prerender-data';
-import type { CategoryData } from '../../../prerender-data/loaders';
+import { CATEGORY_PAGE_SIZE, type CategoryData } from '../../../prerender-data/loaders';
 import { Seo } from '../../seo/seo';
 import { breadcrumbJsonLd } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
@@ -113,15 +115,6 @@ export function Category() {
   const [categoryError, setCategoryError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [deals, setDeals] = useState<CatalogDeal[]>(initialHasDeals ? initial.deals : []);
-  const [dealsLoading, setDealsLoading] = useState(!initialHasDeals);
-  const [dealsError, setDealsError] = useState('');
-  // The "All" deals list the page shows unfiltered (the prerendered one, then its refresh), and
-  // whether that background refresh has run.
-  const allDealsRef = useRef<CatalogDeal[] | undefined>(initialHasDeals ? initial.deals : undefined);
-  const dealsRefreshedRef = useRef(false);
-  const [therapists, setTherapists] = useState<CatalogTherapist[]>([]);
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
   const cityUnresolved = !!citySlugParam && !cityLocation;
   // Locations arrive with the catalog shell; until then a city URL can't be resolved.
   const cityPending = cityUnresolved && locationsStatus === 'loading';
@@ -204,88 +197,45 @@ export function Category() {
   const isTherapyCategory = category?.type === 'THERAPY';
   const isProductCategory = category?.type === 'PRODUCT';
 
-  useEffect(() => {
-    if (!category) return;
-    // The prerendered "All" list for this route, before any filter or location applies: keep it
-    // on screen and refresh it once in the background; a failed refresh keeps it.
-    if (
-      initialHasDeals &&
-      category.id === initial.category?.id &&
-      deals === allDealsRef.current &&
-      !activeSubcategory &&
-      !search &&
-      !sort &&
-      coords?.latitude == null &&
-      coords?.longitude == null
-    ) {
-      if (dealsRefreshedRef.current) return;
-      dealsRefreshedRef.current = true;
-      listCatalogDeals({ categoryId: category.id, city: cityLocation?.city, state: cityLocation?.state, pageSize: 60 })
-        .then(({ data }) => {
-          allDealsRef.current = data ?? [];
-          setDeals(allDealsRef.current);
-        })
-        .catch(() => undefined);
-      return;
-    }
-    setDealsLoading(true);
-    setDealsError('');
-    if (category.type === 'THERAPY') {
-      listCatalogTherapists({
-        categoryId: category.id,
-        subcategoryId: activeSubcategory?.id,
-        search: search || undefined,
-        pageSize: 60,
-        latitude: coords?.latitude,
-        longitude: coords?.longitude,
-      })
-        .then(({ data }) => setTherapists(data))
-        .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : content.category.errors.loadDeals))
-        .finally(() => setDealsLoading(false));
-      return;
-    }
-    if (category.type === 'PRODUCT') {
-      // Product is a fully independent catalog entity now — its own listing API, never a
-      // Deal with a `type` filter (see catalog.ts's own doc comment).
-      listCatalogProducts({
-        categoryId: category.id,
-        subcategoryId: activeSubcategory?.id,
-        search: search || undefined,
-        sort,
-        pageSize: 60,
-      })
-        .then(({ data }) => setProducts(data))
-        .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : content.category.errors.loadDeals))
-        .finally(() => setDealsLoading(false));
-      return;
-    }
-    if (cityPending) return;
-    listCatalogDeals({
-      categoryId: category.id,
-      city: cityLocation?.city,
-      state: cityLocation?.state,
-      subcategoryId: activeSubcategory?.id,
-      search: search || undefined,
-      sort,
-      pageSize: 60,
-      latitude: coords?.latitude,
-      longitude: coords?.longitude,
-    })
-      .then(({ data }) => setDeals(data))
-      .catch((err) => setDealsError(err instanceof ApiRequestError ? err.message : content.category.errors.loadDeals))
-      .finally(() => setDealsLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    category,
-    activeSubcategory?.id,
-    search,
-    sort,
-    coords?.latitude,
-    coords?.longitude,
-    cityPending,
-    cityLocation?.city,
-    cityLocation?.state,
-  ]);
+  const lat = coords?.latitude ?? undefined;
+  const lng = coords?.longitude ?? undefined;
+  const common = {
+    categoryId: category?.id,
+    subcategoryId: activeSubcategory?.id,
+    search: search || undefined,
+    pageSize: CATEGORY_PAGE_SIZE,
+  };
+  // Any change here restarts the list at page 1.
+  const listKey = JSON.stringify([category?.id, activeSubcategory?.id, search, sort, cityLocation?.city, lat, lng]);
+  // The prerendered first page only describes the default ("All", unsorted, no search, no location) view.
+  const isDefaultView = !activeSubcategory && !search && !sort && lat == null && lng == null;
+  const loadError = (err: unknown) => (err instanceof ApiRequestError ? err.message : t.errors.loadDeals);
+  const dealList = usePagedList<CatalogDeal>(
+    (page) =>
+      listCatalogDeals({ ...common, page, city: cityLocation?.city, state: cityLocation?.state, sort, latitude: lat, longitude: lng }),
+    listKey,
+    {
+      enabled: !!category && isDealCategory(category) && !cityPending && !cityMissing,
+      errorMessage: loadError,
+      initial:
+        initialHasDeals && isDefaultView ? { items: initial.deals, total: initial.total ?? initial.deals.length } : undefined,
+    },
+  );
+  const productList = usePagedList<CatalogProduct>((page) => listCatalogProducts({ ...common, page, sort }), listKey, {
+    enabled: category?.type === 'PRODUCT',
+    errorMessage: loadError,
+  });
+  const therapistList = usePagedList<CatalogTherapist>(
+    (page) => listCatalogTherapists({ ...common, page, latitude: lat, longitude: lng }),
+    listKey,
+    { enabled: category?.type === 'THERAPY', errorMessage: loadError },
+  );
+  const list = isTherapyCategory ? therapistList : isProductCategory ? productList : dealList;
+  const deals = dealList.items;
+  const products = productList.items;
+  const therapists = therapistList.items;
+  const dealsLoading = list.status === 'loading';
+  const dealsError = list.status === 'error' ? list.error : '';
 
   // Hold the page (and its canonical) until the city resolves, so a city URL never briefly
   // announces itself as the plain category page.
@@ -321,7 +271,7 @@ export function Category() {
     ...(activeCity ? [{ name: activeCity.city, path }] : []),
   ];
 
-  const count = isTherapyCategory ? therapists.length : isProductCategory ? products.length : deals.length;
+  const count = list.total;
   const noun = isTherapyCategory ? t.resultCount.therapist : isProductCategory ? t.resultCount.product : t.dealCount;
   const countText = dealsLoading ? '' : `${count} ${count === 1 ? noun.singular : noun.plural}`;
   const empty = isTherapyCategory ? t.emptyTherapists : t.emptyDeals;
@@ -329,7 +279,7 @@ export function Category() {
     <p className="loading-state">{t.loadingDeals}</p>
   ) : dealsError ? (
     <p className="error-state" role="alert">{dealsError}</p>
-  ) : count === 0 ? (
+  ) : list.items.length === 0 ? (
     <sky-info-card icon="sentiment_dissatisfied" heading={empty.heading} subheading={empty.subheading} />
   ) : undefined;
 
@@ -493,6 +443,16 @@ export function Category() {
         {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
         {actionError && <p className="error-state" role="alert">{actionError}</p>}
         <CardGrid fallback={fallback}>{cards}</CardGrid>
+        {list.status === 'ready' && list.items.length > 0 && (
+          <LoadMore
+            hasMore={list.hasMore}
+            loading={list.loadingMore}
+            error={list.error}
+            status={t.loadMore.status.replace('{shown}', String(list.items.length)).replace('{total}', String(list.total))}
+            onLoadMore={list.loadMore}
+            copy={t.loadMore}
+          />
+        )}
       </PageSection>
     </>
   );
