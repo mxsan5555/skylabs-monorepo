@@ -276,6 +276,9 @@
         "allTab": "All",
         "tabsLabel": "Filter deals by category"
       },
+      "offers": {
+        "heading": "Offers"
+      },
       "featuredProducts": {
         "heading": "Featured Products",
         "seeAll": "See all",
@@ -319,18 +322,6 @@
       "default": "spa"
     },
     "categoryTileText": "{count} treatments",
-    "giftCard": {
-      "heading": "Give the Gift of Wellness",
-      "body": "Gift a spa day. Redeemable at 200+ partner spas across India.",
-      "cta": "Buy Gift Card"
-    },
-    "welcomeOffer": {
-      "title": "Flat 40% OFF",
-      "subtitle": "On Your First Spa Booking",
-      "description": "Get introductory pricing at partner spas across India on your first booking.",
-      "cta": "Browse deals",
-      "image": "https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&w=1400&q=80"
-    },
     "memberBanner": {
       "icon": "payments",
       "heading": "Unlock member-only pricing",

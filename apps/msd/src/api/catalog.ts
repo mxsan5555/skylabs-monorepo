@@ -207,6 +207,44 @@ export function listCatalogPopularTreatments() {
   return apiGet<CatalogPopularTreatmentGroup[]>('/catalog/popular-treatments', null);
 }
 
+/** One active Home page promotion card — server-filtered to `isActive` + within its (optional)
+ *  visibility window (see msd-api's `promotion.service.ts#getPublicPromotions`). `image` is a raw
+ *  `storageKey` (or `null`) — pass it through `resolveMediaUrl` from `api/media.ts` before
+ *  rendering, same as every other media-backed entity. */
+export interface CatalogPromotion {
+  id: string;
+  title: string;
+  description: string | null;
+  buttonLabel: string | null;
+  destinationType: 'ROUTE' | 'CATEGORY' | 'DEAL';
+  destinationRoute: string | null;
+  category: { id: string; name: string; slug: string } | null;
+  deal: { id: string; title: string; slug: string } | null;
+  image: string | null;
+}
+
+export function listCatalogPromotions() {
+  return apiGet<CatalogPromotion[]>('/catalog/promotions', null);
+}
+
+/** Public Home Hero Deal slider — `state: null` means the Global/Default slider served (either
+ *  because the requested state has no publishable slider of its own yet, or none was requested).
+ *  `slides` is empty when even the Global/Default slider isn't publishable yet (fewer than 5
+ *  eligible Deals) — the frontend degrades gracefully, never crashes on an empty list. */
+export interface CatalogHomeHeroSlide {
+  id: string;
+  deal: CatalogDeal;
+}
+
+export interface CatalogHomeHero {
+  state: string | null;
+  slides: CatalogHomeHeroSlide[];
+}
+
+export function getCatalogHomeHero(state?: string) {
+  return apiGet<CatalogHomeHero>(`/catalog/home-hero${state ? `?state=${encodeURIComponent(state)}` : ''}`, null);
+}
+
 export function listCatalogDeals(opts: {
   page?: number;
   pageSize?: number;

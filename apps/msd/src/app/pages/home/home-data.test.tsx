@@ -9,6 +9,7 @@ const m = vi.hoisted(() => ({
   products: vi.fn(),
   therapists: vi.fn(),
   faqs: vi.fn(),
+  popularTreatments: vi.fn(),
 }));
 
 vi.mock('../../../api/catalog', async (importOriginal) => ({
@@ -17,6 +18,7 @@ vi.mock('../../../api/catalog', async (importOriginal) => ({
   listCatalogProducts: (...a: unknown[]) => m.products(...a),
   listCatalogTherapists: (...a: unknown[]) => m.therapists(...a),
   listCatalogFaqs: (...a: unknown[]) => m.faqs(...a),
+  listCatalogPopularTreatments: (...a: unknown[]) => m.popularTreatments(...a),
 }));
 
 beforeEach(() => {
@@ -25,6 +27,7 @@ beforeEach(() => {
   m.products.mockResolvedValue({ data: [] });
   m.therapists.mockResolvedValue({ data: [] });
   m.faqs.mockResolvedValue({ data: [{ id: 'f1', question: 'Q', answer: 'A' }] });
+  m.popularTreatments.mockResolvedValue({ data: [] });
 });
 
 describe('useHomeCatalog', () => {

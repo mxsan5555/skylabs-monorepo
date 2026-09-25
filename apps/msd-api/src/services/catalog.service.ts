@@ -4,6 +4,12 @@ import type { Prisma } from '../generated/prisma-client';
 import { listActiveCategories, getActiveCategoryBySlugOrThrow } from './category.service';
 import { getActiveTagNamesFor } from './popular-tag.service';
 import { getPublicTreatmentDirectory } from './popular-treatment.service';
+import { getPublicPromotions as getPublicPromotionsList } from './promotion.service';
+// Home Hero's public read is NOT wrapped here — home-hero.service.ts imports
+// `VISIBLE_DEAL_WHERE`/`PUBLIC_DEAL_SELECT` FROM this file, so importing it back here would be a
+// circular module dependency. `catalog.routes.ts` calls `homeHeroService.getPublicHomeHero`
+// directly instead — the one deliberate exception to this file's usual "every /catalog/* route
+// goes through catalogService" wrapper convention.
 import * as blogPostService from './blog-post.service';
 import * as siteContentService from './site-content.service';
 import * as faqService from './faq.service';
@@ -333,6 +339,12 @@ function buildPublicChildren<T extends { id: string; parentId: string | null; na
  *  slug) and filters to active groups/treatments server-side. */
 export async function getPublicPopularTreatments() {
   return getPublicTreatmentDirectory();
+}
+
+/** Public Home page "Promotions" read — thin pass-through to `promotion.service.ts`'s own public
+ *  function, which already filters to active + within its visibility window server-side. */
+export async function getPublicPromotions() {
+  return getPublicPromotionsList();
 }
 
 export async function getPublicCategoryTree() {

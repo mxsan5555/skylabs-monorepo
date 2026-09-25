@@ -35,6 +35,8 @@ import { VendorProducts } from './pages/account/vendors/vendor-products';
 import { CategoryManagement } from './pages/account/masters/categories';
 import { PopularTagManagement } from './pages/account/masters/popular-tags';
 import { PopularTreatmentManagement } from './pages/account/masters/popular-treatments';
+import { PromotionManagement } from './pages/account/masters/promotions';
+import { HomeHeroManagement } from './pages/account/masters/home-hero';
 import { BlogList } from './pages/account/cms/blog-list';
 import { BlogDetailAdmin } from './pages/account/cms/blog-detail-admin';
 import { BlogCategoriesList } from './pages/account/cms/blog-categories-list';
@@ -465,6 +467,22 @@ export function AppRoutes() {
           element={
             <RequirePermission menuKey="masters.popular-treatments">
               <PopularTreatmentManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/masters/promotions"
+          element={
+            <RequirePermission menuKey="masters.promotions">
+              <PromotionManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/masters/home-hero"
+          element={
+            <RequirePermission menuKey="masters.home-hero">
+              <HomeHeroManagement />
             </RequirePermission>
           }
         />

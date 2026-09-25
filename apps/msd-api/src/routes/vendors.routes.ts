@@ -21,6 +21,7 @@ import {
   VendorUserSearchQuerySchema,
   VendorOwnerLookupQuerySchema,
   CrossVendorListQuerySchema,
+  CrossVendorDealListQuerySchema,
   BranchCreateSchema,
   BranchUpdateSchema,
   BranchStatusUpdateSchema,
@@ -164,10 +165,10 @@ router.get('/branches', requirePermission('vendors.branches', 'view'), validateQ
   }
 });
 
-router.get('/deals', requirePermission('vendors.deals', 'view'), validateQuery(CrossVendorListQuerySchema), async (req, res, next) => {
+router.get('/deals', requirePermission('vendors.deals', 'view'), validateQuery(CrossVendorDealListQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, search } = req.validatedQuery as ReturnType<typeof CrossVendorListQuerySchema.parse>;
-    const { items, total } = await vendorService.listAllDeals({ page, pageSize, search });
+    const { page, pageSize, search, state } = req.validatedQuery as ReturnType<typeof CrossVendorDealListQuerySchema.parse>;
+    const { items, total } = await vendorService.listAllDeals({ page, pageSize, search, state });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);

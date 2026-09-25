@@ -8,8 +8,9 @@ import { validateMediaFile, MAX_IMAGES_PER_ENTITY } from './media-validation.ser
  *  table, image-only (no `videoAdapter` entry — see `CategoryImage`'s schema doc comment).
  *  `blog` (BlogPost) and `about-us` (the singleton AboutUsContent row) are the CMS module's
  *  entries — both image-only, same as `category` (no `videoAdapter` entry for either — see
- *  `BlogPostImage`/`AboutUsImage`'s schema doc comments). */
-export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor' | 'category' | 'blog' | 'about-us';
+ *  `BlogPostImage`/`AboutUsImage`'s schema doc comments). `promotion` (Home page Promotions
+ *  module) is image-only too — a promo card has no video slot. */
+export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor' | 'category' | 'blog' | 'about-us' | 'promotion';
 
 export interface MediaFile {
   buffer: Buffer;
@@ -52,6 +53,7 @@ function imageAdapter(entityType: MediaEntityType): ImageAdapter {
     category: { subdir: 'categories', column: 'categoryId', delegate: 'categoryImage' },
     blog: { subdir: 'blog-posts', column: 'blogPostId', delegate: 'blogPostImage' },
     'about-us': { subdir: 'about-us', column: 'aboutUsId', delegate: 'aboutUsImage' },
+    promotion: { subdir: 'promotions', column: 'promotionId', delegate: 'promotionImage' },
   };
   const { subdir, column, delegate } = config[entityType];
   return {

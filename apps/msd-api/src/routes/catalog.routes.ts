@@ -4,6 +4,10 @@ import { CatalogDealQuerySchema, CatalogProductQuerySchema, CatalogTherapistQuer
 import { PublicBlogPostListQuerySchema } from '../schemas/blog-post.schema';
 import { z } from 'zod';
 import * as catalogService from '../services/catalog.service';
+// Called directly (not through catalog.service.ts) — see catalog.service.ts's own doc comment
+// on why Home Hero's public read is the one deliberate exception to this file's usual pattern.
+import { getPublicHomeHero } from '../services/home-hero.service';
+import { PublicHomeHeroQuerySchema } from '../schemas/home-hero.schema';
 import { sendData } from '../lib/http';
 
 /**
@@ -26,6 +30,23 @@ router.get('/categories', async (_req, res, next) => {
 router.get('/popular-treatments', async (_req, res, next) => {
   try {
     sendData(res, await catalogService.getPublicPopularTreatments());
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/promotions', async (_req, res, next) => {
+  try {
+    sendData(res, await catalogService.getPublicPromotions());
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/home-hero', validateQuery(PublicHomeHeroQuerySchema), async (req, res, next) => {
+  try {
+    const { state } = req.validatedQuery as ReturnType<typeof PublicHomeHeroQuerySchema.parse>;
+    sendData(res, await getPublicHomeHero(state));
   } catch (err) {
     next(err);
   }

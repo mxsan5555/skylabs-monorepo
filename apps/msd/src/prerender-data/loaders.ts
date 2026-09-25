@@ -4,6 +4,7 @@ import {
   listCatalogDeals,
   listCatalogFaqs,
   listCatalogLocations,
+  listCatalogPopularTreatments,
   listCatalogProducts,
   listCatalogSocialLinks,
   listCatalogTherapists,
@@ -11,6 +12,7 @@ import {
   type CatalogDeal,
   type CatalogFaq,
   type CatalogLocation,
+  type CatalogPopularTreatmentGroup,
   type CatalogProduct,
   type CatalogSocialMediaLink,
   type CatalogTherapist,
@@ -31,6 +33,7 @@ export interface HomeData {
   products: CatalogProduct[];
   therapists: CatalogTherapist[];
   faqs: CatalogFaq[];
+  popularTreatments: CatalogPopularTreatmentGroup[];
 }
 
 /** Payload for key `categoryDataKey(slug, city)` (read by the category page). `category: null`
@@ -101,11 +104,12 @@ export async function loadShellData(): Promise<ShellData> {
 /** The home lists as `useHomeCatalog` fetches them with no visitor location. Rejects when a
  *  core list fails (so the caller can skip prerendering it); FAQs are non-critical and yield []. */
 export async function loadHomeData(): Promise<HomeData> {
-  const [deals, products, therapists, faqs] = await Promise.allSettled([
+  const [deals, products, therapists, faqs, popularTreatments] = await Promise.allSettled([
     listCatalogDeals({ pageSize: HOME_DEALS_PAGE_SIZE }),
     listCatalogProducts({ pageSize: HOME_RAIL_SIZE, sort: 'newest' }),
     listCatalogTherapists({ pageSize: HOME_RAIL_SIZE }),
     listCatalogFaqs(),
+    listCatalogPopularTreatments(),
   ]);
   for (const r of [deals, products, therapists]) if (r.status === 'rejected') throw r.reason;
   return {
@@ -113,6 +117,7 @@ export async function loadHomeData(): Promise<HomeData> {
     products: valueOr(products).map(trimProduct),
     therapists: valueOr(therapists).map(trimTherapist),
     faqs: valueOr(faqs),
+    popularTreatments: valueOr(popularTreatments),
   };
 }
 

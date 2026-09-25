@@ -674,16 +674,27 @@ export async function listAllBranches(opts: { page: number; pageSize: number; se
   return { items, total };
 }
 
-export async function listAllDeals(opts: { page: number; pageSize: number; search?: string }) {
-  const where = opts.search
-    ? {
-        OR: [
-          { title: { contains: opts.search, mode: 'insensitive' as const } },
-          { vendor: { businessName: { contains: opts.search, mode: 'insensitive' as const } } },
-          { branch: { name: { contains: opts.search, mode: 'insensitive' as const } } },
-        ],
-      }
-    : {};
+/** Same "is this deal eligible to go public" bar as `catalog.service.ts`'s `VISIBLE_DEAL_WHERE`
+ *  (duplicated as a plain boolean check, not imported, to avoid a cross-service module
+ *  dependency for four conditions) — used only to LABEL each row for the admin (e.g. the Home
+ *  Hero slide picker's "X/5 eligible" indicator), never to filter what an admin can see. */
+function isDealPubliclyEligible(deal: { status: string; approvalStatus: string; vendor: { status: string }; branch: { isActive: boolean } }): boolean {
+  return deal.status === 'ACTIVE' && deal.approvalStatus === 'APPROVED' && deal.vendor.status === 'ACTIVE' && deal.branch.isActive;
+}
+
+export async function listAllDeals(opts: { page: number; pageSize: number; search?: string; state?: string }) {
+  const where = {
+    ...(opts.state ? { branch: { is: { state: opts.state } } } : {}),
+    ...(opts.search
+      ? {
+          OR: [
+            { title: { contains: opts.search, mode: 'insensitive' as const } },
+            { vendor: { businessName: { contains: opts.search, mode: 'insensitive' as const } } },
+            { branch: { name: { contains: opts.search, mode: 'insensitive' as const } } },
+          ],
+        }
+      : {}),
+  };
   const [items, total] = await Promise.all([
     prisma.deal.findMany({
       where,
@@ -691,8 +702,8 @@ export async function listAllDeals(opts: { page: number; pageSize: number; searc
       skip: (opts.page - 1) * opts.pageSize,
       take: opts.pageSize,
       include: {
-        vendor: { select: { id: true, businessName: true } },
-        branch: { select: { id: true, name: true } },
+        vendor: { select: { id: true, businessName: true, status: true } },
+        branch: { select: { id: true, name: true, state: true, isActive: true } },
         // Reuses the same OFFERING_INCLUDE shape (packages + media) every single-vendor deal
         // read already uses — the cross-vendor Deals list needed these too for a "From ₹X"
         // package summary and a thumbnail image, previously omitted here.
@@ -701,7 +712,7 @@ export async function listAllDeals(opts: { page: number; pageSize: number; searc
     }),
     prisma.deal.count({ where }),
   ]);
-  return { items, total };
+  return { items: items.map((d) => ({ ...d, eligible: isDealPubliclyEligible(d) })), total };
 }
 
 export async function listAllTherapists(opts: { page: number; pageSize: number; search?: string }) {

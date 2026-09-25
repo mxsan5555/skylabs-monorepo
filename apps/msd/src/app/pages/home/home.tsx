@@ -169,7 +169,7 @@ export function Home() {
           </CardRail>
         </PageSection>
       )}
-      <TreatmentDirectory />
+      <TreatmentDirectory groups={catalog.popularTreatments} />
       {ready && <HomeFaq faqs={catalog.faqs} />}
       <PageSection flush aria-labelledby="partner-heading">
         {/* Heading and body are slotted light DOM so the section has a real h2. */}

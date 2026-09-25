@@ -370,9 +370,15 @@ export function listAllBranches(token: string | null, opts: { page?: number; pag
   return apiGet<Branch[]>(`/vendors/branches${toQuery(opts)}`, token);
 }
 
-/** Cross-vendor deal list for the sidebar's standalone "Deals" page. */
-export function listAllDeals(token: string | null, opts: { page?: number; pageSize?: number; search?: string } = {}) {
-  return apiGet<Deal[]>(`/vendors/deals${toQuery(opts)}`, token);
+/** Cross-vendor deal list for the sidebar's standalone "Deals" page, and (with `state`) for the
+ *  Home Hero admin screen's "search deals in this state" Deal picker — each row carries an
+ *  `eligible` flag (same bar as the public `VISIBLE_DEAL_WHERE`) so the picker can show why a
+ *  deal isn't eligible yet without silently filtering it out. */
+export function listAllDeals(
+  token: string | null,
+  opts: { page?: number; pageSize?: number; search?: string; state?: string } = {},
+) {
+  return apiGet<(Deal & { eligible?: boolean })[]>(`/vendors/deals${toQuery(opts)}`, token);
 }
 
 /** Cross-vendor therapist list for the sidebar's standalone "Therapists" page. */
