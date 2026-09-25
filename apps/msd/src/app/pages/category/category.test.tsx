@@ -384,4 +384,25 @@ describe('Category page layout', () => {
     });
     expect(await screen.findByText(`0 ${content.category.resultCount.therapist.plural}`)).toBeTruthy();
   });
+
+  it('switches city from the location chip', async () => {
+    renderAt('/category/massage');
+    await screen.findByRole('group', { name: content.category.toolbar.label });
+    const chip = Array.from(document.querySelectorAll('md-assist-chip')).find(
+      (c) => ((c as HTMLElement & { label?: string }).label ?? c.getAttribute('label')) === content.category.toolbar.allCities,
+    ) as HTMLElement;
+    fireEvent.click(chip);
+    fireEvent.click(screen.getByText('Pune'));
+    await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage/pune'));
+  });
+
+  it('hides the location chip for product categories', async () => {
+    getCatalogCategoryMock.mockResolvedValue({ data: { ...CATEGORY, type: 'PRODUCT' } });
+    renderAt('/category/massage');
+    await screen.findByRole('group', { name: content.category.toolbar.label });
+    const labels = Array.from(document.querySelectorAll('md-assist-chip')).map(
+      (c) => (c as HTMLElement & { label?: string }).label ?? c.getAttribute('label'),
+    );
+    expect(labels).not.toContain(content.category.toolbar.allCities);
+  });
 });

@@ -271,6 +271,21 @@ export function Category() {
     ...(activeCity ? [{ name: activeCity.city, path }] : []),
   ];
 
+  const locationMenu = cityFilterable ? (
+    <ChoiceMenu
+      trigger="chip"
+      icon="location_on"
+      label={activeCity?.city ?? t.toolbar.allCities}
+      menuLabel={t.toolbar.location}
+      options={[{ value: '', label: t.toolbar.allCities }, ...locations.map((l) => ({ value: l.city, label: l.city }))]}
+      value={activeCity?.city ?? ''}
+      onChange={(city) => {
+        const query = searchParams.toString();
+        navigate(`${city ? cityHref(category.slug, city) : categoryHref(category.slug)}${query ? `?${query}` : ''}`);
+      }}
+    />
+  ) : null;
+
   const count = list.total;
   const noun = isTherapyCategory ? t.resultCount.therapist : isProductCategory ? t.resultCount.product : t.dealCount;
   const countText = dealsLoading ? '' : `${count} ${count === 1 ? noun.singular : noun.plural}`;
@@ -423,6 +438,7 @@ export function Category() {
       <PageSection tone="tint" stack aria-label={`${category.name} ${t.dealsAriaLabelSuffix}`}>
         <ListingToolbar
           ariaLabel={t.toolbar.label}
+          start={locationMenu}
           end={
             <>
               <SearchField value={search} placeholder={t.search.placeholder.replace('{category}', category.name)} onSearch={setSearch} />
