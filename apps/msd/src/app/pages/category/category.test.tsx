@@ -333,6 +333,16 @@ describe('Category page layout', () => {
     expect(await screen.findByText(`0 ${content.category.dealCount.plural}`)).toBeTruthy();
   });
 
+  it('sorts from the toolbar menu and keeps the choice in ?sort=', async () => {
+    renderAt('/category/massage');
+    await screen.findByRole('group', { name: content.category.toolbar.label });
+    const trigger = Array.from(document.querySelectorAll('md-text-button')).find((b) => b.textContent?.includes('Sort:')) as HTMLElement;
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByText('Biggest discount'));
+    await waitFor(() => expect(screen.getByTestId('location-bar').textContent).toBe('/category/massage?sort=discount'));
+    await waitFor(() => expect(listCatalogDealsMock.mock.calls.at(-1)?.[0]?.sort).toBe('discount'));
+  });
+
   it('uses the therapist empty copy from content', async () => {
     getCatalogCategoryMock.mockResolvedValue({ data: { ...CATEGORY, type: 'THERAPY' } });
     renderAt('/category/massage');

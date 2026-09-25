@@ -25,6 +25,7 @@ import { SectionHead } from '../../components/section-head/section-head';
 import { ChipNav } from '../../components/chip-nav/chip-nav';
 import { ClampText } from '../../components/clamp-text/clamp-text';
 import { ListingToolbar } from '../../components/listing-toolbar/listing-toolbar';
+import { ChoiceMenu } from '../../components/choice-menu/choice-menu';
 import { useCustomEvent } from '../../../hooks/use-custom-event';
 import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 import { formatINR } from '../../../utils/format';
@@ -164,6 +165,9 @@ export function Category() {
   const subSlug = searchParams.get('sub');
   const subcategoryIdx = (category?.children.findIndex((c) => c.slug === subSlug) ?? -1) + 1;
   const activeSubcategory = subcategoryIdx === 0 ? undefined : category?.children[subcategoryIdx - 1];
+  const sortParam = searchParams.get('sort');
+  const sort = sortParam === 'discount' || sortParam === 'newest' ? sortParam : undefined;
+  const sortOption = t.sortOptions.find((o) => o.value === (sort ?? 'recommended')) ?? t.sortOptions[0];
   /** Writes one query param (or removes it when empty), keeping the others. */
   const setParam = (key: string, value: string | undefined) => {
     setSearchParams(
@@ -210,6 +214,7 @@ export function Category() {
       deals === allDealsRef.current &&
       !activeSubcategory &&
       !search &&
+      !sort &&
       coords?.latitude == null &&
       coords?.longitude == null
     ) {
@@ -246,6 +251,7 @@ export function Category() {
         categoryId: category.id,
         subcategoryId: activeSubcategory?.id,
         search: search || undefined,
+        sort,
         pageSize: 60,
       })
         .then(({ data }) => setProducts(data))
@@ -260,6 +266,7 @@ export function Category() {
       state: cityLocation?.state,
       subcategoryId: activeSubcategory?.id,
       search: search || undefined,
+      sort,
       pageSize: 60,
       latitude: coords?.latitude,
       longitude: coords?.longitude,
@@ -272,6 +279,7 @@ export function Category() {
     category,
     activeSubcategory?.id,
     search,
+    sort,
     coords?.latitude,
     coords?.longitude,
     cityPending,
@@ -465,7 +473,22 @@ export function Category() {
       <PageSection tone="tint" stack aria-label={`${category.name} ${t.dealsAriaLabelSuffix}`}>
         <ListingToolbar
           ariaLabel={t.toolbar.label}
-          end={<SearchField value={search} placeholder={t.search.placeholder.replace('{category}', category.name)} onSearch={setSearch} />}
+          end={
+            <>
+              <SearchField value={search} placeholder={t.search.placeholder.replace('{category}', category.name)} onSearch={setSearch} />
+              {!isTherapyCategory && (
+                <ChoiceMenu
+                  trigger="text"
+                  icon="swap_vert"
+                  label={t.toolbar.sort.replace('{label}', sortOption.label)}
+                  menuLabel={t.toolbar.sortMenu}
+                  options={t.sortOptions}
+                  value={sortOption.value}
+                  onChange={(value) => setParam('sort', value === 'recommended' ? undefined : value)}
+                />
+              )}
+            </>
+          }
         />
         {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
         {actionError && <p className="error-state" role="alert">{actionError}</p>}
