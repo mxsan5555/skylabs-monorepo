@@ -39,6 +39,14 @@ export async function buildBootstrapResponse(claims: AccessTokenPayload): Promis
     select: { id: true, firstName: true, lastName: true, status: true },
   });
 
+  // Same ownership signal for the customer self-service portal — exact parallel to `driver`
+  // above, never a role-name check. `null` for every non-customer user and for a
+  // customer-role user not yet linked by an admin.
+  const customer = await prisma.customer.findUnique({
+    where: { userId: claims.sub },
+    select: { id: true, firstName: true, lastName: true, accountStatus: true },
+  });
+
   return {
     user: { id: user.id, name: user.name, email: user.email ?? undefined, phone: user.phone ?? undefined, status: user.status },
     roles: roles.map((r) => ({ id: r.id, key: r.key, name: r.name, isSuperAdmin: r.isSuperAdmin })),
@@ -46,6 +54,7 @@ export async function buildBootstrapResponse(claims: AccessTokenPayload): Promis
     menu,
     dashboardWidgets,
     driver,
+    customer,
     ...(claims.isPreview && claims.impersonatedBy
       ? { preview: { isPreview: true as const, impersonatedBy: claims.impersonatedBy } }
       : {}),

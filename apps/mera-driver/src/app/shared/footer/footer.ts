@@ -29,9 +29,7 @@ interface FooterColumn {
   styleUrl: './footer.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
-export class Footer implements OnInit {
-  private readonly http = inject(HttpClient);
-  private readonly router = inject(Router);
+export class Footer {
   protected readonly year = new Date().getFullYear();
 
   ngOnInit(): void {}

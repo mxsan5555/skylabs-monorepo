@@ -1,0 +1,17 @@
+.website-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px 72px;
+}
+
+.website-page h1 {
+  margin: 0 0 24px;
+  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--md-sys-color-on-surface, #1a1c19);
+}
+
+.website-page__body {
+  margin-top: 8px;
+}

@@ -13,6 +13,34 @@ import type { DetailedHTMLProps, HTMLAttributes } from 'react';
 
 type SkyEl<T = object> = DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & T;
 
+/** M3 surface options shared by sky-image / sky-tile-card / sky-feature-card / sky-cta-banner. */
+type SkySurface = {
+  color?: 'none' | 'surface' | 'surface-high' | 'primary' | 'secondary' | 'tertiary' | 'inverse';
+  variant?: 'filled' | 'outlined' | 'elevated';
+  shape?: 'none' | 'extra-small' | 'small' | 'medium' | 'large' | 'extra-large' | 'full';
+};
+type SkyIconOptions = {
+  icon?: string;
+  iconStyle?: 'filled' | 'tonal' | 'surface' | 'plain';
+  iconShape?: 'none' | 'small' | 'medium' | 'large' | 'full';
+  /** Attribute forms; survive server rendering / prerendering. */
+  'icon-style'?: 'filled' | 'tonal' | 'surface' | 'plain';
+  'icon-shape'?: 'none' | 'small' | 'medium' | 'large' | 'full';
+};
+type SkyFeatureProps = SkySurface &
+  SkyIconOptions & {
+    headline?: string;
+    text?: string;
+    ctaLabel?: string;
+    ctaHref?: string;
+    ctaIcon?: string;
+    /** Attribute forms; survive server rendering / prerendering. */
+    'cta-label'?: string;
+    'cta-href'?: string;
+    'cta-icon'?: string;
+    layout?: 'vertical' | 'horizontal';
+  };
+
 declare module 'react' {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
@@ -100,6 +128,29 @@ declare module 'react' {
         level?: number;
       }>;
 
+      // ── sky-action-field ───────────────────────────────────────────────────
+      'sky-action-field': SkyEl<{
+        label?: string;
+        placeholder?: string;
+        value?: string;
+        name?: string;
+        type?: 'text' | 'search' | 'email' | 'tel' | 'url' | 'number';
+        autocomplete?: string;
+        enterkeyhint?: 'enter' | 'done' | 'go' | 'next' | 'previous' | 'search' | 'send';
+        icon?: string;
+        actionLabel?: string;
+        /** Attribute form of `actionLabel`; survives server rendering / prerendering. */
+        'action-label'?: string;
+        actionIcon?: string;
+        variant?: 'filled' | 'outlined';
+        shape?: 'none' | 'extra-small' | 'small' | 'medium' | 'large' | 'extra-large' | 'full';
+        dense?: boolean;
+        required?: boolean;
+        disabled?: boolean;
+        /** React 19 attaches on<event> props on custom elements as listeners. */
+        'onsky-submit'?: (event: CustomEvent<{ value: string }>) => void;
+      }>;
+
       // ── sky-data-table ─────────────────────────────────────────────────────
       'sky-data-table': SkyEl<{
         caption?: string;
@@ -121,6 +172,29 @@ declare module 'react' {
         actions?: string;
         exportable?: boolean;
       }>;
+
+      // ── sky-image ──────────────────────────────────────────────────────────
+      'sky-image': SkyEl<
+        SkySurface & {
+          src?: string;
+          alt?: string;
+          href?: string;
+          label?: string;
+          ratio?: string;
+          fit?: 'cover' | 'contain';
+          placeholderIcon?: string;
+        }
+      >;
+
+      // ── sky-tile-card ──────────────────────────────────────────────────────
+      'sky-tile-card': SkyEl<
+        SkySurface &
+          SkyIconOptions & { headline?: string; text?: string; href?: string; align?: 'start' | 'center' }
+      >;
+
+      // ── sky-feature-card / sky-cta-banner ──────────────────────────────────
+      'sky-feature-card': SkyEl<SkyFeatureProps>;
+      'sky-cta-banner': SkyEl<SkyFeatureProps>;
     }
   }
 }

@@ -25,11 +25,11 @@ export async function listBlogPosts(opts: {
   pageSize: number;
   search?: string;
   status?: 'DRAFT' | 'PUBLISHED';
-  categorySlug?: string;
+  categoryId?: string;
 }) {
   const where = {
     ...(opts.status ? { status: opts.status } : {}),
-    ...(opts.categorySlug ? { categorySlug: opts.categorySlug } : {}),
+    ...(opts.categoryId ? { categoryId: opts.categoryId } : {}),
     ...(opts.search ? { title: { contains: opts.search, mode: 'insensitive' as const } } : {}),
   };
   const [items, total] = await Promise.all([
@@ -38,7 +38,7 @@ export async function listBlogPosts(opts: {
       orderBy: [{ createdAt: 'desc' }],
       skip: (opts.page - 1) * opts.pageSize,
       take: opts.pageSize,
-      include: { mediaImages: { orderBy: BLOG_POST_IMAGE_ORDER_BY } },
+      include: { category: true, mediaImages: { orderBy: BLOG_POST_IMAGE_ORDER_BY } },
     }),
     prisma.blogPost.count({ where }),
   ]);
@@ -48,7 +48,7 @@ export async function listBlogPosts(opts: {
 export async function getBlogPostOrThrow(id: string) {
   const post = await prisma.blogPost.findUnique({
     where: { id },
-    include: { mediaImages: { orderBy: BLOG_POST_IMAGE_ORDER_BY } },
+    include: { category: true, mediaImages: { orderBy: BLOG_POST_IMAGE_ORDER_BY } },
   });
   if (!post) throw new ApiError('NOT_FOUND', 'Blog post not found');
   return post;
@@ -65,9 +65,15 @@ export async function createBlogPost(input: BlogPostCreateInput) {
   await assertSlugAvailable(input.slug);
   // App-layer pre-check above is a racy read, not an atomic guarantee — BlogPost.slug's DB-level
   // @unique is the hard backstop, same discipline as category.service.ts#createCategory.
+  const { categoryId, ...rest } = input;
   try {
     return await prisma.blogPost.create({
-      data: { ...input, body: input.body as Prisma.InputJsonValue, tags: input.tags as Prisma.InputJsonValue },
+      data: {
+        ...rest,
+        category: { connect: { id: categoryId } },
+        body: input.body as Prisma.InputJsonValue,
+        tags: input.tags as Prisma.InputJsonValue,
+      },
     });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -80,10 +86,12 @@ export async function createBlogPost(input: BlogPostCreateInput) {
 export async function updateBlogPost(id: string, input: BlogPostUpdateInput) {
   await getBlogPostOrThrow(id);
   if (input.slug) await assertSlugAvailable(input.slug, id);
+  const { categoryId, ...rest } = input;
   return prisma.blogPost.update({
     where: { id },
     data: {
-      ...input,
+      ...rest,
+      ...(categoryId ? { category: { connect: { id: categoryId } } } : {}),
       ...(input.body ? { body: input.body as Prisma.InputJsonValue } : {}),
       ...(input.tags ? { tags: input.tags as Prisma.InputJsonValue } : {}),
     },
@@ -135,7 +143,11 @@ const PUBLIC_BLOG_POST_SELECT = {
   title: true,
   slug: true,
   excerpt: true,
-  categorySlug: true,
+  // categoryId is a real FK now (see schema.prisma's BlogPost doc comment), but the public read
+  // contract still speaks in terms of the category's slug — select just the slug through the
+  // relation and flatten it back onto a top-level `categorySlug` field below
+  // (`toPublicBlogPost`), so callers of this public endpoint see no shape change at all.
+  category: { select: { slug: true } },
   body: true,
   author: true,
   readMinutes: true,
@@ -150,6 +162,14 @@ const PUBLIC_BLOG_POST_SELECT = {
   mediaImages: { orderBy: BLOG_POST_IMAGE_ORDER_BY, select: { id: true, storageKey: true, isPrimary: true, sortOrder: true } },
 } as const;
 
+/** Flattens the `{ category: { slug } }` relation select back into a top-level `categorySlug`
+ *  field — the exact shape the public contract had before `categoryId` replaced the old
+ *  free-text `categorySlug` column (see this module's own migration doc comment). */
+function toPublicBlogPost<T extends { category: { slug: string } }>(post: T) {
+  const { category, ...rest } = post;
+  return { ...rest, categorySlug: category.slug };
+}
+
 export async function getPublishedBlogPosts(opts: {
   page: number;
   pageSize: number;
@@ -158,7 +178,7 @@ export async function getPublishedBlogPosts(opts: {
 }) {
   const where = {
     status: 'PUBLISHED' as const,
-    ...(opts.categorySlug ? { categorySlug: opts.categorySlug } : {}),
+    ...(opts.categorySlug ? { category: { is: { slug: opts.categorySlug } } } : {}),
     ...(opts.search ? { title: { contains: opts.search, mode: 'insensitive' as const } } : {}),
   };
   const [items, total] = await Promise.all([
@@ -171,7 +191,7 @@ export async function getPublishedBlogPosts(opts: {
     }),
     prisma.blogPost.count({ where }),
   ]);
-  return { items, total };
+  return { items: items.map(toPublicBlogPost), total };
 }
 
 export async function getPublishedBlogPostBySlugOrThrow(slug: string) {
@@ -180,5 +200,5 @@ export async function getPublishedBlogPostBySlugOrThrow(slug: string) {
     select: PUBLIC_BLOG_POST_SELECT,
   });
   if (!post) throw new ApiError('NOT_FOUND', 'Blog post not found');
-  return post;
+  return toPublicBlogPost(post);
 }

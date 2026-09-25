@@ -243,6 +243,48 @@ export async function assertVendorHasCategoryAccess(vendorId: string, categoryId
   }
 }
 
+/**
+ * The branch-level counterpart to `assertVendorHasCategoryAccess` — a `BranchCategoryAccess`
+ * grant only ever narrows what the vendor already holds (see
+ * `vendor.service.ts#setBranchCategoryAccess`), so this only needs to resolve `categoryId` to
+ * its top-level ancestor (same `resolveTopLevelCategory` used vendor-side) and check a
+ * `BranchCategoryAccess` row exists for that branch + top-level category — the vendor-level type
+ * check already happened via `assertVendorHasCategoryAccess`, so it isn't repeated here.
+ */
+export async function assertBranchHasCategoryAccess(branchId: string, categoryId: string) {
+  const topLevel = await resolveTopLevelCategory(categoryId);
+  const grant = await prisma.branchCategoryAccess.findUnique({
+    where: { branchId_categoryId: { branchId, categoryId: topLevel.id } },
+  });
+  if (!grant) {
+    throw new ApiError('VALIDATION_ERROR', 'This branch is not mapped to this category');
+  }
+}
+
+/**
+ * The branch-level counterpart to `assertCategoryChildOf`'s subcategory check — `categoryId` here
+ * is already the resolved TOP-LEVEL id (the caller resolves it once via
+ * `assertBranchHasCategoryAccess`/`resolveTopLevelCategory` and passes it straight through; this
+ * function does not re-resolve it). Throws if the branch isn't even mapped to the top-level
+ * category at all, or if it's mapped but `subcategoryId` wasn't explicitly enabled under it (see
+ * `BranchSubcategoryAccess`'s own schema doc comment — subcategory access is always explicit,
+ * never implied by the parent grant).
+ */
+export async function assertBranchHasSubcategoryAccess(branchId: string, categoryId: string, subcategoryId: string) {
+  const categoryGrant = await prisma.branchCategoryAccess.findUnique({
+    where: { branchId_categoryId: { branchId, categoryId } },
+  });
+  if (!categoryGrant) {
+    throw new ApiError('VALIDATION_ERROR', 'This branch is not mapped to this category');
+  }
+  const subcategoryGrant = await prisma.branchSubcategoryAccess.findUnique({
+    where: { branchCategoryAccessId_subcategoryId: { branchCategoryAccessId: categoryGrant.id, subcategoryId } },
+  });
+  if (!subcategoryGrant) {
+    throw new ApiError('VALIDATION_ERROR', 'This branch is not mapped to this subcategory');
+  }
+}
+
 export async function createCategory(input: CategoryCreateInput) {
   await assertSlugAvailable(input.slug);
   await assertValidParent(input.parentId);

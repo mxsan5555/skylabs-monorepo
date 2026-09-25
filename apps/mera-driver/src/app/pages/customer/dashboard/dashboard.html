@@ -1,0 +1,36 @@
+<md-admin-page title="Welcome" subtitle="Your account at a glance.">
+  @if (loading()) {
+    <p class="otp-muted">Loading…</p>
+  } @else if (customer(); as c) {
+    <section class="account-card">
+      <div class="account-card__head">
+        <h2>{{ c.firstName }} {{ c.lastName }}</h2>
+        <sky-badge [variant]="c.accountStatus === 'Active' ? 'primary' : 'error'">{{ c.accountStatus }}</sky-badge>
+      </div>
+      <p class="otp-muted">{{ c.mobileNumber }} @if (c.email) { · {{ c.email }} }</p>
+    </section>
+
+    <div class="driver-dash-grid">
+      <button type="button" class="driver-dash-card" (click)="go('/customer/profile')">
+        <md-icon aria-hidden="true">person</md-icon>
+        <span class="driver-dash-card__label">My Profile</span>
+        <span class="driver-dash-card__hint">Edit your details</span>
+      </button>
+      <button type="button" class="driver-dash-card" (click)="go('/customer/bookings')">
+        <md-icon aria-hidden="true">book_online</md-icon>
+        <span class="driver-dash-card__label">My Bookings</span>
+        <span class="driver-dash-card__hint">View your trips</span>
+      </button>
+      <button type="button" class="driver-dash-card" (click)="go('/customer/notifications')">
+        <md-icon aria-hidden="true">notifications</md-icon>
+        <span class="driver-dash-card__label">Notifications</span>
+        <span class="driver-dash-card__hint">Coming soon</span>
+      </button>
+      <button type="button" class="driver-dash-card" (click)="go('/customer/support')">
+        <md-icon aria-hidden="true">support_agent</md-icon>
+        <span class="driver-dash-card__label">Support</span>
+        <span class="driver-dash-card__hint">Get help</span>
+      </button>
+    </div>
+  }
+</md-admin-page>

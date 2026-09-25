@@ -425,8 +425,9 @@
     padding: 12px;
   }
 }
+/* clip (not hidden) blocks sideways scroll without making these scroll containers, so position: sticky keeps working */
 html,
 body,
 #root {
-  overflow-x: hidden;
+  overflow-x: clip;
 }

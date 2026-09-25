@@ -47,6 +47,8 @@ function createPrismaMock() {
     impersonationSession: delegate(),
     driver: delegate(),
     driverDocument: delegate(),
+    customer: delegate(),
+    booking: delegate(),
     // Supports both `$transaction([...])` (array of already-created promises — just
     // await them as Prisma would) and `$transaction(async (tx) => ...)` (callback
     // form — invoke it with the mock itself standing in for `tx`).

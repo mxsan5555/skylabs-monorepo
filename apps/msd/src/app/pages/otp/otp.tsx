@@ -31,9 +31,10 @@ export function Otp() {
   const otpContent = content.auth.otp;
   const [loading, setLoading] = useState(false);
   const [awaitingBootstrap, setAwaitingBootstrap] = useState(false);
-  const { identifier, method } = (location.state as {
+  const { identifier, method, next } = (location.state as {
     identifier: string;
     method: 'email' | 'phone';
+    next?: string | null;
   }) || {};
   const [code, setCode] = useState('');
   const [seconds, setSeconds] = useState(RESEND_SECONDS);
@@ -138,6 +139,14 @@ export function Otp() {
             setCode(otp);
             if (error) setError('');
           }}
+          onKeyDown={(event) => {
+            if (
+              event.key === 'Enter' && code.length === 6 && !loading && !awaitingBootstrap
+            ) {
+              event.preventDefault();
+              verify();
+            }
+          }}
         />
         {error && <p className="auth-error">{error}</p>}
         <FilledButton className="auth-submit" onClick={verify} disabled={loading || awaitingBootstrap || code.length !== 6}>
@@ -146,13 +155,18 @@ export function Otp() {
       </div>
 
       <p className="otp-resend">
-        {otpContent.resend.question}{' '}
+        <span>{otpContent.resend.question}</span>
+
         {seconds > 0 ? (
-          <span className="otp-muted">{otpContent.resend.countdown} {seconds}s</span>
+          <span className="otp-muted">
+            {otpContent.resend.countdown} {seconds}s
+          </span>
         ) : (
-          <TextButton onClick={resend}>
-            {otpContent.resend.button}
-          </TextButton>
+          <span className="otp-resend__button">
+            <TextButton onClick={resend}>
+              {otpContent.resend.button}
+            </TextButton>
+          </span>
         )}
       </p>
     </div>

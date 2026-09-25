@@ -1,9 +1,11 @@
-import { apiGet } from './client';
+import { apiGet, apiPatch } from './client';
 
 /**
  * SuperAdmin/staff customer directory (`customers:view`) — apps/msd-api/src/routes/customers.routes.ts.
- * Read-only: a customer's own data is only ever editable by the customer themself via the
- * storefront `/my-account` flow, never here.
+ * Mostly read-only: a customer's own data is only ever editable by the customer themself via the
+ * storefront `/my-account` flow, never here — the one exception is status (Active/Inactive/
+ * Suspended), gated on its own `customers:status_change` permission (a different permission from
+ * the RBAC Users screen's `rbac.users:status_change` — unrelated, do not conflate).
  */
 
 export type CustomerStatus = 'active' | 'inactive' | 'blocked';
@@ -36,4 +38,11 @@ export function listCustomers(
 
 export function getCustomer(token: string | null, id: string) {
   return apiGet<Customer>(`/customers/${id}`, token);
+}
+
+/** `customers:status_change` — the DB enum literal stays `active | inactive | blocked`; the UI
+ *  displays `blocked` as "Suspended" (see `customerStatusLabel` in `customer-list.tsx`), but the
+ *  value sent here must always be the raw enum literal. */
+export function setCustomerStatus(token: string | null, id: string, status: CustomerStatus) {
+  return apiPatch<Customer>(`/customers/${id}/status`, token, { status });
 }

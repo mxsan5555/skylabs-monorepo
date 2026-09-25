@@ -80,7 +80,13 @@ export const env = {
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET ?? '',
   razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? '',
 
-  // Media upload system (Deal/Product/Therapist images+video). Local disk, relative to this
-  // app's own directory by default — override for a persistent-volume mount in a real deploy.
-  mediaUploadDir: process.env.MEDIA_UPLOAD_DIR ?? '',
+  // Media storage (Deal/Product/Therapist/Vendor/Category/CMS images+video) → Cloudflare R2
+  // (S3-compatible object storage). Optional here — validated at first upload by lib/media-storage
+  // (the S3 client is constructed lazily), same "optional here, needed at use time" rationale as
+  // the SMS/SMTP/Razorpay vars above. `R2_PUBLIC_BASE_URL` is the frontend's concern
+  // (VITE_MEDIA_BASE_URL), not the API's — the API only needs the four upload credentials.
+  r2AccountId: process.env.R2_ACCOUNT_ID ?? '',
+  r2AccessKeyId: process.env.R2_ACCESS_KEY_ID ?? '',
+  r2SecretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? '',
+  r2Bucket: process.env.R2_BUCKET ?? '',
 };

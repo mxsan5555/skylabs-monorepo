@@ -42,15 +42,19 @@ export async function listUsers(options: ListUsersOptions = {}) {
   const page = options.page ?? 1;
   const pageSize = options.pageSize ?? 25;
 
-  // Driver users have their own dedicated lifecycle — created/linked exclusively via
-  // Driver Management → Driver List → "Create Driver User" (see `driver.service.ts`'s
-  // `createAndLinkDriverUser`), never via this admin User Management screen. Excluding
-  // anyone holding the `driver` role keeps them out of the list AND any search over it,
-  // since this WHERE clause is what every query (including search) is built on.
+  // Driver and Customer users each have their own dedicated lifecycle — created/linked
+  // exclusively via Driver Management → Driver List → "Create Driver User" (see
+  // `driver.service.ts`'s `createAndLinkDriverUser`) or the equivalent Customer linkage
+  // (see `customer.service.ts`'s `createAndLinkCustomerUser`/`linkCustomerToUser`), never
+  // via this admin User Management screen. Both flows auto-assign their respective role on
+  // link (same guarantee this exclusion already relied on for `driver`), so role-key is a
+  // reliable identifier — no fragile name/email matching, no hardcoded ids. Excluding
+  // anyone holding either role keeps them out of the list AND any search over it, since
+  // this WHERE clause is what every query (including search) is built on.
   const where = {
     deletedAt: null,
     ...(options.status ? { status: options.status } : {}),
-    roles: { none: { role: { key: 'driver' } } },
+    roles: { none: { role: { key: { in: ['driver', 'customer'] } } } },
   };
 
   const [rows, total] = await prisma.$transaction([

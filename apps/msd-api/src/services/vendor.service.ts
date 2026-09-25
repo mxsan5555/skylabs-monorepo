@@ -5,7 +5,13 @@ import { ApiError } from '../lib/http';
 import { ensureUniqueSlug } from '../lib/slug';
 import { resolveGoogleMapsLocation } from '../providers/maps/googleMapsUrlResolver.provider';
 import { assignRole, serializeUser } from './user.service';
-import { listActiveCategories, assertCategoryChildOf, assertVendorHasCategoryAccess } from './category.service';
+import {
+  listActiveCategories,
+  assertCategoryChildOf,
+  assertVendorHasCategoryAccess,
+  assertBranchHasCategoryAccess,
+  assertBranchHasSubcategoryAccess,
+} from './category.service';
 import { getProductScopedOrThrow } from './product.service';
 import * as mediaService from './media.service';
 import type { MediaFile } from './media.service';
@@ -18,6 +24,7 @@ import type {
   VendorSelfUpdateSchema,
   BranchCreateSchema,
   BranchUpdateSchema,
+  BranchCategoryAccessInputSchema,
   DealCreateSchema,
   DealUpdateSchema,
   TherapistCreateSchema,
@@ -32,6 +39,7 @@ type VendorSelfCreateInput = z.infer<typeof VendorSelfCreateSchema>;
 type VendorSelfUpdateInput = z.infer<typeof VendorSelfUpdateSchema>;
 type BranchCreateInput = z.infer<typeof BranchCreateSchema>;
 type BranchUpdateInput = z.infer<typeof BranchUpdateSchema>;
+type BranchCategoryAccessInput = z.infer<typeof BranchCategoryAccessInputSchema>;
 type DealCreateInput = z.infer<typeof DealCreateSchema>;
 type DealUpdateInput = z.infer<typeof DealUpdateSchema>;
 type TherapistCreateInput = z.infer<typeof TherapistCreateSchema>;
@@ -193,6 +201,72 @@ async function ensureVendorRoleAssigned(userId: string) {
 }
 
 /**
+ * Vendor owner identity is ALWAYS a brand-new User — a Vendor must never be linked to an
+ * existing account (customer, staff, or otherwise), even if the admin/applicant happens to
+ * supply an email or phone that already belongs to someone. This is a deliberate business rule,
+ * not a technical limitation: Vendor accounts are managed exclusively through Vendor
+ * List/Management, never through User Management, so there is no "convert this Customer to a
+ * Vendor" concept anywhere in this system.
+ *
+ * Read-only, UX-only preview for the "Add Vendor" form (and the public registration form) — lets
+ * the frontend show a clear "this email/phone is already taken" message BEFORE the admin/
+ * applicant fills in the rest of the form. Never creates anything; the actual `POST /vendors`/
+ * public-register call (`createVendorOwner` below) re-checks independently and is the only place
+ * a User/Vendor actually gets created — this is purely advisory, per "frontend checks are UX
+ * assistance only, backend is the source of truth."
+ */
+export async function checkVendorOwnerAvailability(email: string | undefined, phone: string | undefined) {
+  if (!email && !phone) {
+    throw new ApiError('VALIDATION_ERROR', 'Provide an owner email or mobile number');
+  }
+  const [byEmail, byPhone] = await Promise.all([
+    email ? prisma.user.findFirst({ where: { email, deletedAt: null }, select: { id: true } }) : Promise.resolve(null),
+    phone ? prisma.user.findFirst({ where: { phone, deletedAt: null }, select: { id: true } }) : Promise.resolve(null),
+  ]);
+  const conflicts: ('email' | 'phone')[] = [];
+  if (byEmail) conflicts.push('email');
+  if (byPhone) conflicts.push('phone');
+  return { available: conflicts.length === 0, conflicts };
+}
+
+/**
+ * Creates the brand-new User who becomes `Vendor.ownerUserId` — reused by both the admin "Add
+ * Vendor" flow and the public "Become a Vendor" registration, one implementation, not two.
+ * Rejects outright (never reuses, never merges, never silently proceeds) if EITHER the email or
+ * the phone already belongs to any existing User — including the case where both belong to the
+ * very same existing User (e.g. an existing Customer supplying their own details). This is
+ * intentionally stricter than a plain uniqueness check on each field independently: even a
+ * partial match on just one identifier is rejected, so there is no path — deliberate or
+ * accidental — from an existing account to a Vendor link.
+ *
+ * The new User is created with only `name`/`email`/`phone` set — no password field exists in
+ * this system (auth is OTP + Google only), status defaults to `active`, and holds no roles until
+ * `ensureVendorRoleAssigned` (called by the caller, right after this) grants `vendor` — a fresh
+ * User can only ever hold that one role at creation time, never `customer` or anything else.
+ *
+ * Concurrent-duplicate protection is the existing `User.email`/`User.phone` unique constraints
+ * plus this codebase's existing global P2002→409 backstop (`errorHandler.ts`), not an
+ * application-level check alone — two near-simultaneous submissions for the same identifiers
+ * can't both succeed even if both read-checks below raced past each other.
+ */
+export async function createVendorOwner(email: string | undefined, phone: string | undefined, name: string | undefined): Promise<string> {
+  if (!email && !phone) {
+    throw new ApiError('VALIDATION_ERROR', 'Provide an owner email or mobile number');
+  }
+  const [byEmail, byPhone] = await Promise.all([
+    email ? prisma.user.findFirst({ where: { email, deletedAt: null }, select: { id: true } }) : Promise.resolve(null),
+    phone ? prisma.user.findFirst({ where: { phone, deletedAt: null }, select: { id: true } }) : Promise.resolve(null),
+  ]);
+  if (byEmail || byPhone) {
+    throw new ApiError('CONFLICT', 'A user with this email or phone already exists. Please use a different email/phone to create this Vendor.');
+  }
+  const created = await prisma.user.create({
+    data: { name: name?.trim() || email || phone!, email: email || undefined, phone: phone || undefined },
+  });
+  return created.id;
+}
+
+/**
  * The "Add Vendor → Select Existing User" search — filters out ineligible users server-side
  * (never trust the frontend to have already excluded them): must be active, and must not
  * already own another vendor (`vendorProfile: null`, via the existing back-relation). This is
@@ -228,28 +302,19 @@ export async function searchEligibleOwnerCandidates(query: string | undefined, p
   return { items: items.map(serializeUser), total };
 }
 
-export async function createVendor(input: VendorCreateInput, createdByUserId: string) {
-  await assertOwnerUserAvailable(input.ownerUserId);
-  // Double-submit guard — previously this only had protection via assertOwnerUserAvailable's
-  // "already associated with a vendor" check, and only when `ownerUserId` was provided (the
-  // admin pipeline's Step 1 can also persist a Vendor with no owner yet — see this function's
-  // slug-derivation comment below). Same window-based idempotency as createTherapist below,
-  // keyed on the same admin/self-service caller submitting the same businessName again within
-  // the window, so a rapid double-click doesn't create two draft Vendor rows.
-  const recentDuplicate = await prisma.vendor.findFirst({
-    where: {
-      createdByUserId,
-      businessName: input.businessName ?? null,
-      createdAt: { gte: new Date(Date.now() - DUPLICATE_SUBMIT_WINDOW_MS) },
-    },
-    orderBy: { createdAt: 'desc' },
-    include: OWNER_INCLUDE,
-  });
-  if (recentDuplicate) return serializeVendor(recentDuplicate);
-  if (input.ownerUserId) await ensureVendorRoleAssigned(input.ownerUserId);
-  // Generated up front (rather than relying on the schema's `@default(uuid())`) so it's
-  // available as ensureUniqueSlug's id-based fallback/placeholder in the same insert — see
-  // that function's doc comment for why a plain businessName-derived slug isn't always enough.
+/**
+ * The actual DB insert, factored out of `createVendor` so the new `registerPublicVendor` below
+ * can reuse it verbatim rather than re-implementing slug/map-location resolution. Generates the
+ * id up front (rather than relying on the schema's `@default(uuid())`) so it's available as
+ * `ensureUniqueSlug`'s id-based fallback/placeholder in the same insert — see that function's
+ * doc comment for why a plain businessName-derived slug isn't always enough.
+ */
+async function buildAndInsertVendor(
+  input: VendorCreateInput | VendorSelfCreateInput,
+  ownerUserId: string | undefined,
+  createdByUserId: string | null,
+  status: VendorStatus,
+) {
   const id = randomUUID();
   const slug = await ensureUniqueSlug(input.businessName || id, id, (candidate) =>
     prisma.vendor.findUnique({ where: { slug: candidate } }).then(Boolean),
@@ -261,12 +326,78 @@ export async function createVendor(input: VendorCreateInput, createdByUserId: st
       ...mapLocation,
       id,
       slug,
-      status: heuristicInitialStatus(input),
+      ownerUserId,
+      status,
       createdByUserId,
     } as Prisma.VendorUncheckedCreateInput,
     include: OWNER_INCLUDE,
   });
   return serializeVendor(vendor);
+}
+
+/**
+ * Vendor creation ALWAYS creates a brand-new owner User — there is no "pick an existing user"
+ * path here at all (see `createVendorOwner`'s own doc comment for why). A client-supplied
+ * `input.ownerUserId` is deliberately never read/honored by this function — `VendorCreateSchema`
+ * still declares the field only because `VendorUpdateSchema` (`VendorCreateSchema.partial()`)
+ * needs it for `updateVendor`'s own, separate, pre-existing re-link-on-edit capability, which
+ * this correction doesn't touch.
+ */
+export async function createVendor(input: VendorCreateInput, createdByUserId: string) {
+  // Double-submit guard, unchanged — keyed on the same admin submitting the same businessName
+  // again within the window, so a rapid double-click doesn't create two draft Vendor rows (and,
+  // now, doesn't call `createVendorOwner` twice for the same typed email/mobile either — the
+  // second call would otherwise legitimately 409 against the first call's own freshly-created
+  // User, which would be a confusing false-positive "already exists" error for a genuine
+  // double-click rather than a real duplicate).
+  const recentDuplicate = await prisma.vendor.findFirst({
+    where: {
+      createdByUserId,
+      businessName: input.businessName ?? null,
+      createdAt: { gte: new Date(Date.now() - DUPLICATE_SUBMIT_WINDOW_MS) },
+    },
+    orderBy: { createdAt: 'desc' },
+    include: OWNER_INCLUDE,
+  });
+  if (recentDuplicate) return serializeVendor(recentDuplicate);
+
+  // Step 1 of the admin pipeline can be businessName-only OR owner-only (see
+  // VendorFieldsSchema's relaxed businessName) — only resolve/create an owner when owner
+  // identity was actually given; a businessName-only draft has no owner yet, added on a later step.
+  let ownerUserId: string | undefined;
+  if (input.ownerEmail || input.ownerMobile) {
+    ownerUserId = await createVendorOwner(
+      input.ownerEmail,
+      input.ownerMobile,
+      [input.ownerFirstName, input.ownerLastName].filter(Boolean).join(' ').trim() || input.contactPerson,
+    );
+    await ensureVendorRoleAssigned(ownerUserId);
+  }
+
+  return buildAndInsertVendor(input, ownerUserId, createdByUserId, heuristicInitialStatus(input));
+}
+
+/**
+ * The public, unauthenticated "Become a Vendor" registration (`POST /vendors/public/register`,
+ * its own router with no `authenticate` — see that route file's own doc comment). Input is the
+ * existing `VendorSelfCreateSchema` shape, which structurally has no `ownerUserId`/status/role/
+ * branch/category-access fields — there is nothing privileged for an anonymous caller to send,
+ * not just something stripped at runtime. `createdByUserId` is always `null` here (this
+ * codebase's existing "self-registration" encoding — see `Vendor.createdByUserId`'s own schema
+ * doc comment), which doubles as this feature's Source signal for the admin Vendor List (ADMIN
+ * when set, WEBSITE when null). Status is always `PENDING_VERIFICATION` — never the
+ * `heuristicInitialStatus` draft-in-progress heuristic `createVendor` uses, since a public
+ * submission is always a complete application, never a draft — and never auto-approved; only
+ * the existing `approveVendor`/`rejectVendor` admin actions can move it further.
+ */
+export async function registerPublicVendor(input: VendorSelfCreateInput) {
+  const ownerUserId = await createVendorOwner(
+    input.ownerEmail,
+    input.ownerMobile,
+    [input.ownerFirstName, input.ownerLastName].filter(Boolean).join(' ').trim() || input.contactPerson,
+  );
+  await ensureVendorRoleAssigned(ownerUserId);
+  return buildAndInsertVendor(input, ownerUserId, null, 'PENDING_VERIFICATION');
 }
 
 export async function updateVendor(id: string, input: VendorUpdateInput) {
@@ -637,6 +768,93 @@ export async function setBranchStatus(vendorId: string, branchId: string, isActi
   return prisma.branch.update({ where: { id: branchId }, data: { isActive } });
 }
 
+// ─── Branch category access (narrows the vendor's own VendorCategoryAccess grants — see
+// BranchCategoryAccess/BranchSubcategoryAccess's own schema doc comments) ────────────────────
+
+export async function getBranchCategoryAccess(vendorId: string, branchId: string) {
+  await getBranchScopedOrThrow(vendorId, branchId);
+  return prisma.branchCategoryAccess.findMany({
+    where: { branchId },
+    include: { category: true, subcategories: { include: { subcategory: true } } },
+  });
+}
+
+/**
+ * Replace-the-full-set pattern (same shape as `setVendorModulesAndCategoryAccess` above) — each
+ * `categoryId` must be a top-level SERVICE/THERAPY category, and each `subcategoryIds` entry must
+ * be a real child of that `categoryId` (`assertCategoryChildOf`).
+ *
+ * Unlike the original design, this no longer requires the vendor to already hold a
+ * `VendorCategoryAccess` grant for the category — Step 2's separate "Business Modules + Category
+ * Access" screen for Service/Therapy was removed (category/subcategory access for those two
+ * modules is now managed entirely from the branch), so this is the only place left that grants
+ * them. A category with no existing vendor-level grant gets one created here automatically
+ * (`offersService`/`offersTherapy` flipped to `true` as needed) in the same transaction, rather
+ * than rejecting the save — see `category.type` below. Never auto-*revokes* on removal: unmapping
+ * a category from one branch must never invalidate an existing Deal/Therapist at a different
+ * branch still relying on that same vendor-level grant (`assertVendorHasCategoryAccess`) or flip a
+ * module flag back off under a vendor's feet. Product is unaffected — it still only ever goes
+ * through the explicit `setVendorModulesAndCategoryAccess` grant, since Product has no branch
+ * scoping and never flows through this function.
+ */
+export async function setBranchCategoryAccess(vendorId: string, branchId: string, input: BranchCategoryAccessInput) {
+  await getBranchScopedOrThrow(vendorId, branchId);
+
+  const categoriesById = new Map<string, { id: string; name: string; type: CategoryType | null }>();
+  for (const mapping of input.mappings) {
+    const category = await prisma.category.findUnique({ where: { id: mapping.categoryId } });
+    if (!category) throw new ApiError('VALIDATION_ERROR', 'categoryId does not exist');
+    if (category.parentId !== null) {
+      throw new ApiError('VALIDATION_ERROR', `Category "${category.name}" is a subcategory — map its top-level category instead`);
+    }
+    if (category.type !== 'SERVICE' && category.type !== 'THERAPY') {
+      throw new ApiError('VALIDATION_ERROR', `Category "${category.name}" is not a Service or Therapy category`);
+    }
+    categoriesById.set(category.id, category);
+    for (const subcategoryId of mapping.subcategoryIds) {
+      await assertCategoryChildOf(mapping.categoryId, subcategoryId);
+    }
+  }
+
+  const existingGrants = await prisma.vendorCategoryAccess.findMany({
+    where: { vendorId, categoryId: { in: [...categoriesById.keys()] } },
+    select: { categoryId: true },
+  });
+  const grantedIds = new Set(existingGrants.map((g) => g.categoryId));
+  const toGrant = [...categoriesById.values()].filter((c) => !grantedIds.has(c.id));
+
+  await prisma.$transaction(async (tx) => {
+    if (toGrant.length > 0) {
+      await tx.vendorCategoryAccess.createMany({
+        data: toGrant.map((c) => ({ vendorId, categoryId: c.id })),
+        skipDuplicates: true,
+      });
+      const flags: Prisma.VendorUpdateInput = {};
+      if (toGrant.some((c) => c.type === 'SERVICE')) flags.offersService = true;
+      if (toGrant.some((c) => c.type === 'THERAPY')) flags.offersTherapy = true;
+      if (Object.keys(flags).length > 0) {
+        await tx.vendor.update({ where: { id: vendorId }, data: flags });
+      }
+    }
+
+    // Cascades to BranchSubcategoryAccess automatically (onDelete: Cascade).
+    await tx.branchCategoryAccess.deleteMany({ where: { branchId } });
+    for (const mapping of input.mappings) {
+      await tx.branchCategoryAccess.create({
+        data: {
+          branchId,
+          categoryId: mapping.categoryId,
+          subcategories: {
+            create: mapping.subcategoryIds.map((subcategoryId) => ({ subcategoryId })),
+          },
+        },
+      });
+    }
+  });
+
+  return getBranchCategoryAccess(vendorId, branchId);
+}
+
 // ─── Therapist (shared by self-derived vendorId, mirrors Branch's scoping pattern) ───────────
 
 /** Same "declared outside the `as const` object" reasoning as DEAL_IMAGE_ORDER_BY — used only by
@@ -688,6 +906,25 @@ export async function getTherapistScopedOrThrow(vendorId: string, therapistId: s
  *  find-recent-then-reuse idempotency pattern rather than inventing a new mechanism. */
 const DUPLICATE_SUBMIT_WINDOW_MS = 10_000;
 
+/**
+ * `Therapist.specializationCategoryId` may point at ANY tree depth (unlike Deal's two-column
+ * categoryId/subcategoryId split — see Therapist's own schema doc comment), so the branch-access
+ * check walks at most one `parentId` hop: a top-level pick only needs the branch's own
+ * `BranchCategoryAccess` grant; a child pick needs the branch mapped to its parent (as the
+ * category) AND that specific child explicitly enabled as a subcategory under it (see
+ * BranchSubcategoryAccess's own schema doc comment on why subcategory access is always explicit).
+ */
+async function assertBranchHasSpecializationCategoryAccess(branchId: string, specializationCategoryId: string) {
+  const category = await prisma.category.findUnique({ where: { id: specializationCategoryId } });
+  if (!category) throw new ApiError('VALIDATION_ERROR', 'specializationCategoryId does not exist');
+  if (category.parentId === null) {
+    await assertBranchHasCategoryAccess(branchId, specializationCategoryId);
+  } else {
+    await assertBranchHasCategoryAccess(branchId, category.parentId);
+    await assertBranchHasSubcategoryAccess(branchId, category.parentId, specializationCategoryId);
+  }
+}
+
 export async function createTherapist(vendorId: string, branchId: string, input: TherapistCreateInput) {
   await getBranchScopedOrThrow(vendorId, branchId);
   const recentDuplicate = await prisma.therapist.findFirst({
@@ -704,6 +941,7 @@ export async function createTherapist(vendorId: string, branchId: string, input:
   if (recentDuplicate) return recentDuplicate;
   if (input.specializationCategoryId) {
     await assertVendorHasCategoryAccess(vendorId, input.specializationCategoryId, 'THERAPY');
+    await assertBranchHasSpecializationCategoryAccess(branchId, input.specializationCategoryId);
   }
   return prisma.therapist.create({
     data: { ...input, vendorId, branchId } as Prisma.TherapistUncheckedCreateInput,
@@ -712,9 +950,10 @@ export async function createTherapist(vendorId: string, branchId: string, input:
 }
 
 export async function updateTherapist(vendorId: string, therapistId: string, input: TherapistUpdateInput) {
-  await getTherapistScopedOrThrow(vendorId, therapistId);
+  const therapist = await getTherapistScopedOrThrow(vendorId, therapistId);
   if (input.specializationCategoryId) {
     await assertVendorHasCategoryAccess(vendorId, input.specializationCategoryId, 'THERAPY');
+    await assertBranchHasSpecializationCategoryAccess(therapist.branchId, input.specializationCategoryId);
   }
   return prisma.therapist.update({
     where: { id: therapistId },
@@ -1064,6 +1303,10 @@ export async function createDeal(
   await getBranchScopedOrThrow(vendorId, branchId);
   await assertCategoryChildOf(input.categoryId, input.subcategoryId);
   await assertVendorHasCategoryAccess(vendorId, input.categoryId, 'SERVICE');
+  await assertBranchHasCategoryAccess(branchId, input.categoryId);
+  if (input.subcategoryId) {
+    await assertBranchHasSubcategoryAccess(branchId, input.categoryId, input.subcategoryId);
+  }
   assertDurationRequiredForService(input.durationMinutes);
   // App-layer pre-check for a clean 409 in the common case — Deal.slug's DB-level @unique is
   // the hard guarantee this can't fully replace under a genuine race (two near-simultaneous
@@ -1136,6 +1379,11 @@ export async function updateDeal(vendorId: string, branchId: string, dealId: str
   if (touchesOffering) {
     const effectiveCategoryId = input.categoryId ?? deal.categoryId;
     await assertVendorHasCategoryAccess(vendorId, effectiveCategoryId, 'SERVICE');
+    await assertBranchHasCategoryAccess(branchId, effectiveCategoryId);
+    const effectiveSubcategoryId = input.subcategoryId ?? deal.subcategoryId ?? undefined;
+    if (effectiveSubcategoryId) {
+      await assertBranchHasSubcategoryAccess(branchId, effectiveCategoryId, effectiveSubcategoryId);
+    }
     const effectiveDuration = 'durationMinutes' in input ? input.durationMinutes : deal.durationMinutes ?? undefined;
     assertDurationRequiredForService(effectiveDuration);
   }

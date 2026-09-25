@@ -107,7 +107,7 @@ export function BlogDetailAdmin() {
         <img src={resolveMediaUrl(primaryImage.storageKey)} alt={post.title} width={800} height={480} className="post__cover" />
       )}
 
-      <p className="field-hint">Category: {post.categorySlug}</p>
+      <p className="field-hint">Category: {post.category?.name ?? '—'}</p>
       {post.metaTitle && <p className="field-hint">Meta title: {post.metaTitle}</p>}
       {post.metaDescription && <p className="field-hint">Meta description: {post.metaDescription}</p>}
 

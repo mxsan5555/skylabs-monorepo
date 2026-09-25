@@ -127,6 +127,11 @@ apps/<name>-api/
 └── .env.local          Never committed
 ```
 
+- **Hosting** — each API deploys **off Vercel on Railway** (always-on Node process,
+  `node dist/apps/<name>-api/main.js`). msd-api reuses the **Neon** Postgres DB (via
+  `DATABASE_URL`) and stores uploaded media on **Cloudflare R2**; mera-driver-api will
+  follow the identical pattern with its own DB + bucket. Step-by-step:
+  `DEPLOYMENT.md → Deploying msd-api`.
 - **PostgreSQL** — msd-api → db `msd`; mera-driver-api → db `mera_driver`. Never shared.
 - **Prisma**, pinned `6.19.3` (Prisma 7 dropped `datasource.url` from the schema file,
   which the classic singleton-client pattern relies on). Each app generates its client
@@ -225,7 +230,7 @@ Project-scoped agents, skills, and commands live here. Claude Code loads them au
 │   ├── skylabs-ravi.md          ← Frontend (React 19 + Angular 21)
 │   ├── skylabs-neha.md          ← UI/UX design (60/30/10 + M3)
 │   ├── skylabs-dev.md           ← QA (Vitest + Playwright + Angular tests)
-│   ├── skylabs-vivek.md         ← SEO + GA4 + social media
+│   ├── skylabs-udaya.md         ← SEO + GA4 + social media
 │   └── skylabs-reena.md         ← Content management
 ├── skills/                      ← Reference docs agents load on demand
 │   ├── msd-stack.md             ← React 19 + Vite patterns, auth, routing

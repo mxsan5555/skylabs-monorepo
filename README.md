@@ -36,6 +36,7 @@ npx nx affected -t build --base=main
 
 ## Docs
 
+- [`SETUP.md`](SETUP.md) — from-zero setup: local dev + cloud (Vercel/Railway/Neon/R2)
 - [`PLANNING.md`](PLANNING.md) — scope, stack, roadmap
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — layout, what goes where
 - [`TASK.md`](TASK.md) — what's done / in progress / backlog
@@ -49,7 +50,10 @@ Branch flow `feature/* → develop → release → main`. The two frontends depl
 `nx-ignore`, so a commit only rebuilds the app(s) it actually affects. `main` is
 Production (custom domain); `release`/`develop` use Vercel preview URLs.
 Versioning is `npx nx release --skip-publish` run on the `release` branch. The two
-Express APIs host off Vercel (Railway/Fly).
+Express APIs host **off Vercel on Railway** (always-on Node servers), each with its
+own Neon Postgres database and Cloudflare R2 bucket. New here? Start with
+[`SETUP.md`](SETUP.md). Step-by-step deploy guide (Railway + Neon + R2 + wiring the
+Vercel frontends, for both APIs): [`DEPLOYMENT.md`](DEPLOYMENT.md#5-apis--railway).
 
 ```mermaid
 flowchart TD

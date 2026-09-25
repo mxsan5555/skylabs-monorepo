@@ -1,7 +1,24 @@
 import { prisma } from '../lib/prisma';
+import { ApiError } from '../lib/http';
 import { signAccessToken } from '../lib/jwt';
 import { issueRefreshSession } from './token.service';
 import type { LoginMethod } from '../generated/prisma-client';
+
+/** Shared by both login paths below — a brand-new User always defaults to `active` (this
+ *  function is a no-op for them), so this only ever actually blocks a RETURNING user whose
+ *  account was disabled since their last login. Never issues a token for a blocked/inactive
+ *  account; the calling function's own LoginHistory row is written with `success: false` so a
+ *  blocked login attempt is still visible in the account's history, matching the existing
+ *  `success: true` write on the happy path. */
+async function assertUserMayLogIn(
+  user: { id: string; status: string },
+  meta: { ip?: string; userAgent?: string },
+  method: LoginMethod,
+) {
+  if (user.status === 'active') return;
+  await prisma.loginHistory.create({ data: { userId: user.id, method, success: false, ...meta } });
+  throw new ApiError('FORBIDDEN', 'This account has been disabled. Please contact support.');
+}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -17,6 +34,13 @@ interface SessionMeta {
 /** Upserts the User by identifier (email or phone), issues a JWT pair, and records LoginHistory. */
 export async function loginWithIdentifier(identifier: string, meta: SessionMeta = {}) {
   const kind = identifierKind(identifier);
+  const method: LoginMethod = kind === 'email' ? 'otp_email' : 'otp_phone';
+
+  // Checked via a plain read BEFORE the upsert below — a blocked/inactive RETURNING user must
+  // never have `lastLoginAt` touched (misleading for a rejected attempt) or a token issued. A
+  // brand-new identifier has no row yet, so this is a no-op for the signup path.
+  const existing = await prisma.user.findUnique({ where: kind === 'email' ? { email: identifier } : { phone: identifier } });
+  if (existing) await assertUserMayLogIn(existing, meta, method);
 
   const user = await prisma.user.upsert({
     where: kind === 'email' ? { email: identifier } : { phone: identifier },
@@ -50,12 +74,7 @@ export async function loginWithIdentifier(identifier: string, meta: SessionMeta 
   const refreshToken = await issueRefreshSession(user.id, meta);
 
   await prisma.loginHistory.create({
-    data: {
-      userId: user.id,
-      method: (kind === 'email' ? 'otp_email' : 'otp_phone') as LoginMethod,
-      success: true,
-      ...meta,
-    },
+    data: { userId: user.id, method, success: true, ...meta },
   });
 
   return {
@@ -73,6 +92,7 @@ export async function loginWithGoogle(
   meta: SessionMeta = {},
 ) {
   const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) await assertUserMayLogIn(existing, meta, 'google');
 
   const user = existing
     ? await prisma.user.update({

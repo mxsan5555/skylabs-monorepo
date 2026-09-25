@@ -151,8 +151,10 @@ export class SignIn implements OnInit {
       next: async (result) => {
         await this.auth.signIn(result.accessToken, result.refreshToken);
         this.passwordLoading.set(false);
-        // A linked Driver account lands on the self-service portal, not the admin console.
-        this.router.navigate([this.auth.bootstrap()?.driver ? '/driver' : '/account/dashboard']);
+        // A linked Driver or Customer account lands on its own self-service portal, never
+        // the admin console — same ownership signal as `driverPortalGuard`/`customerPortalGuard`.
+        const bootstrap = this.auth.bootstrap();
+        this.router.navigate([bootstrap?.driver ? '/driver' : bootstrap?.customer ? '/customer' : '/account/dashboard']);
       },
       error: () => {
         this.passwordLoading.set(false);

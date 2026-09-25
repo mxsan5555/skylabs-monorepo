@@ -28,7 +28,8 @@ const existingPost: BlogPost = {
   title: 'Deep Tissue Massage Benefits',
   slug: 'deep-tissue-massage-benefits',
   excerpt: 'Everything you need to know.',
-  categorySlug: 'wellness',
+  categoryId: 'cat-1',
+  category: { id: 'cat-1', name: 'Wellness', slug: 'wellness' },
   body: [{ type: 'paragraph', text: 'Hello world' }],
   author: 'Jane Doe',
   readMinutes: 4,
@@ -42,16 +43,42 @@ const existingPost: BlogPost = {
   mediaImages: [],
 };
 
-function renderDialog(props: { post?: BlogPost; onSave: (input: unknown) => Promise<BlogPost | void> }) {
+const CATEGORIES = [
+  { id: 'cat-1', name: 'Wellness', slug: 'wellness', description: '', isActive: true, sortOrder: 0, createdAt: '', updatedAt: '' },
+  { id: 'cat-2', name: 'Skincare', slug: 'skincare', description: '', isActive: true, sortOrder: 1, createdAt: '', updatedAt: '' },
+];
+
+function renderDialog(props: {
+  post?: BlogPost;
+  onSave: (input: unknown) => Promise<BlogPost | void>;
+  categories?: typeof CATEGORIES;
+  categoriesLoading?: boolean;
+}) {
   function Harness() {
     const dialogRef = useRef<MdDialog>(null);
     return (
       <ToastProvider>
-        <BlogFormDialog dialogRef={dialogRef} token="tok" post={props.post} onSave={props.onSave} />
+        <BlogFormDialog
+          dialogRef={dialogRef}
+          token="tok"
+          post={props.post}
+          categories={props.categories ?? CATEGORIES}
+          categoriesLoading={props.categoriesLoading ?? false}
+          onSave={props.onSave}
+        />
       </ToastProvider>
     );
   }
   return render(<Harness />);
+}
+
+/** Distinguishes the Category select from `BlogBlockEditor`'s own "Block type" select(s) — both
+ *  render as plain `md-outlined-select` tags with no upgraded custom-element property/attribute
+ *  to key off under jsdom (light DOM only, not upgraded — same limitation this file's other
+ *  doc comments call out for simulated typing/change events). The Category select is the only
+ *  one rendered outside the `.block-editor` fieldset, so that's the disambiguator used here. */
+function categorySelect(): HTMLElement | undefined {
+  return Array.from(document.querySelectorAll('md-outlined-select')).find((el) => !el.closest('.block-editor'));
 }
 
 function saveButton(): HTMLElement {
@@ -98,7 +125,7 @@ describe('BlogFormDialog — submit payload', () => {
         title: existingPost.title,
         slug: existingPost.slug,
         excerpt: existingPost.excerpt,
-        categorySlug: existingPost.categorySlug,
+        categoryId: existingPost.categoryId,
         author: existingPost.author,
         readMinutes: existingPost.readMinutes,
         tags: ['wellness', 'self-care'],
@@ -142,5 +169,46 @@ describe('BlogFormDialog — submit payload', () => {
     // (see `submit()`'s catch block: both `setError(msg)` and `showToast(msg, 'error')` fire).
     await waitFor(() => expect(screen.getAllByText('Blog post slug already exists').length).toBeGreaterThan(0));
     expect(screen.queryByText('Fix the highlighted fields and try again.')).toBeNull();
+  });
+
+  it('the Category select is populated from the `categories` prop (fed by listBlogCategories() in blog-list.tsx), not hardcoded', () => {
+    renderDialog({ post: existingPost, onSave: vi.fn() });
+
+    const select = categorySelect();
+    if (!select) throw new Error('Category select not found');
+    const optionLabels = Array.from(select.querySelectorAll('md-select-option')).map((o) => o.textContent?.trim());
+    expect(optionLabels).toEqual(['Wellness', 'Skincare']);
+  });
+
+  it('a post pre-filled with a different category (cat-2) submits that category\'s id, not the first option in the list', async () => {
+    const postInSecondCategory: BlogPost = { ...existingPost, categoryId: 'cat-2', category: { id: 'cat-2', name: 'Skincare', slug: 'skincare' } };
+    const onSave = vi.fn().mockResolvedValue(postInSecondCategory);
+    renderDialog({ post: postInSecondCategory, onSave });
+
+    // The select's live DOM value/onChange can't be driven by fireEvent under this jsdom +
+    // @lit/react + React 19 stack (same documented limitation as this file's own doc comment on
+    // simulated typing) — so this asserts the same "seeded from the post prop, submitted
+    // verbatim" contract the text fields use above, applied to the category FK: form state is
+    // initialized directly from `post.categoryId` (see the dialog's own `useState` initializer),
+    // independent of which option the (inert-under-jsdom) select visually shows as selected.
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+    expect(onSave.mock.calls[0][0]).toEqual(expect.objectContaining({ categoryId: 'cat-2' }));
+  });
+
+  it('renders an empty-state message instead of the select when no blog categories exist yet, and blocks submission client-side (empty state)', async () => {
+    const onSave = vi.fn();
+    renderDialog({ post: existingPost, categories: [], categoriesLoading: false, onSave });
+
+    expect(screen.getByText('No blog categories yet — add one first.')).toBeTruthy();
+    expect(categorySelect()).toBeUndefined();
+  });
+
+  it('shows a loading message instead of the select while categories are still being fetched', () => {
+    renderDialog({ post: existingPost, categories: [], categoriesLoading: true, onSave: vi.fn() });
+
+    expect(screen.getByText('Loading categories…')).toBeTruthy();
+    expect(categorySelect()).toBeUndefined();
   });
 });

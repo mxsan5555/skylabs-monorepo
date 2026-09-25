@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
-import { Dialog, Divider, FilledButton, Icon, OutlinedIconButton, TextButton,} from '@skylabs-monorepo/shared-ui/react';
+import { Divider, FilledButton, Icon, OutlinedIconButton } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { addCartItem } from '../../../api/cart';
 import { getCatalogDeal, listCatalogDeals, type CatalogDeal, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { Breadcrumb } from '../../components/breadcrumb';
-import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
-
+import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selection';
+import { DurationPackageSelector } from '../../components/duration-package-selector';
 import { formatINR } from '../../../utils/format';
 import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
@@ -24,12 +25,8 @@ import './deal-detail.css';
 export function DealDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
-  const {
-    has: isWishlisted,
-    toggle: toggleWishlist,
-    isPending: wishlistPending,
-  } = useWishlist();
+  const { isAuthenticated, token } = useAuth();
+  const { has: isWishlisted, toggle: toggleWishlist, isPending: wishlistPending, } = useWishlist();
   const { dealDetail } = content;
   const [deal, setDeal] = useState<CatalogDeal | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,6 +36,7 @@ export function DealDetail() {
   const [activeImg, setActiveImg] = useState(0);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
+  const [quantity, setQuantity] = useState(1);
   useEffect(() => {
     if (!id) {
       setDeal(null);
@@ -50,20 +48,15 @@ export function DealDetail() {
     setError('');
     setActiveImg(0);
     getCatalogDeal(id)
-      .then(({ data }) => {
-        setDeal(data);
-      })
+      .then(({ data }) => { setDeal(data); })
       .catch((err: unknown) => {
-        if (
-          err instanceof ApiRequestError &&
-          err.status === 404
-        ) {
+        if (err instanceof ApiRequestError && err.status === 404) {
           setDeal(null);
           return;
         }
-        setError(err instanceof ApiRequestError? err.message: dealDetail.errors.loadDeal);
+        setError(err instanceof ApiRequestError ? err.message : dealDetail.errors.loadDeal);
       })
-      .finally(() => {setLoading(false);});
+      .finally(() => { setLoading(false); });
   }, [id]);
   useEffect(() => {
     if (!deal?.category?.id) {
@@ -76,15 +69,14 @@ export function DealDetail() {
     })
       .then(({ data }) => {
         setRelated(
-          data
-            .filter((item) => item.id !== deal.id)
-            .slice(0, 6),
+          data.filter((item) => item.id !== deal.id).slice(0, 6),
         );
       })
       .catch(() => {
         setRelated([]);
       });
   }, [deal]);
+  const purchaseSelection = useDealPurchaseSelection(deal);
   if (loading) {
     return (
       <p className="loading-state">{dealDetail.loading}</p>
@@ -94,153 +86,109 @@ export function DealDetail() {
     return (
       <div className="deal-detail deal-detail--empty">
         <title>{dealDetail.notFound.metaTitle}</title>
-
         <sky-info-card
           icon="search_off"
           heading={dealDetail.notFound.heading}
           subheading={dealDetail.notFound.subheading}
         />
-
-        <FilledButton
-          type="button"
-          onClick={() => navigate('/categories')}
-        >
-          {dealDetail.notFound.cta}
-        </FilledButton>
+        <FilledButton type="button" onClick={() => navigate('/categories')} > {dealDetail.notFound.cta} </FilledButton>
       </div>
     );
   }
-
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) {
       return true;
     }
-
-    navigate(
-      `/sign-in?next=${encodeURIComponent(`/deal/${id}`)}`,
-    );
-
+    navigate(`/sign-in?next=${encodeURIComponent(`/deal/${id}`)}`,);
     return false;
   };
-
   const name = deal.title;
-
   const dealMedia = resolveDealMedia(deal);
   const gallery = dealMedia.images;
   const video = dealMedia.video;
-
-  const description =
-    deal.description ??
-    deal.shortDescription ??
-    '';
-
-  const salePrice = Number(deal.salePrice);
-
-  const originalPrice =
-    deal.originalPrice != null
-      ? Number(deal.originalPrice)
-      : undefined;
-
-  const discountPct =
-    deal.discountPercent ??
-    (originalPrice !== undefined &&
-      originalPrice > salePrice
-      ? Math.round(
-        ((originalPrice - salePrice) /
-          originalPrice) *
-        100,
-      )
-      : 0);
-
+  const description = deal.description ?? deal.shortDescription ?? '';
+  const salePrice = purchaseSelection.unitPrice;
+  const originalPrice = purchaseSelection.activePackage?.originalPrice != null
+    ? Number(purchaseSelection.activePackage.originalPrice)
+    : deal.originalPrice != null ? Number(deal.originalPrice) : undefined;
+  const discountPct = deal.discountPercent ??
+    (originalPrice !== undefined && originalPrice > salePrice
+      ? Math.round(((originalPrice - salePrice) / originalPrice) * 100,) : 0);
   const dealId = deal.id;
-
   function toggleFavorite() {
     if (!requireAuthOrRedirect()) {
       return;
     }
-
     void toggleWishlist(dealId);
+  }
+  async function handleAddToCart() {
+    if (!deal) return;
+    if (!requireAuthOrRedirect()) return;
+    const activePackage = purchaseSelection.activePackage;
+    if (!activePackage) {
+      setActionError(
+        purchaseSelection.missingSelection ?? 'Please select a package.'
+      );
+      setActionMessage('');
+      return;
+    }
+    setActionError('');
+    setActionMessage('');
+    try {
+      await addCartItem(token, {
+        dealId: deal.id,
+        dealPackageId: activePackage.id,
+        quantity,
+      });
+      setActionMessage(`Added "${deal.title}" to your cart.`);
+    } catch (err) {
+      const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
+      setActionError(message);
+    }
   }
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(window.location.href);
-
       setCopied(true);
-
-      setTimeout(() => {
-        setCopied(false);
-      }, 2000);
+      setTimeout(() => { setCopied(false); }, 2000);
     } catch {
       setCopied(false);
     }
   }
   return (
     <div className="deal-detail">
-      <title>
-        {`${name} – ${deal.vendor?.businessName ?? 'MSD'
-          } | MSD`}
-      </title>
-
+      <title>{`${name} – ${deal.vendor?.businessName ?? 'MSD'} | MSD`}</title>
       <meta
         name="description"
-        content={`${description ||
-          `Book ${name} at MSD.`
-          } ${formatINR(salePrice)}${deal.branch?.city
-            ? ` in ${deal.branch.city}`
-            : ''
-          }.`}
+        content={`${description || `Book ${name} at MSD.`} ${formatINR(salePrice)}${deal.branch?.city ? ` in ${deal.branch.city}` : ''}.`}
       />
-
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'Service',
+            '@context': 'https://schema.org', '@type': 'Service',
             name,
             description,
-            provider:
-              deal.vendor?.businessName
-                ? {
-                  '@type': 'Organization',
-                  name: deal.vendor.businessName,
-                }
-                : undefined,
+            provider: deal.vendor?.businessName ? { '@type': 'Organization', name: deal.vendor.businessName, } : undefined,
             offers: {
               '@type': 'Offer',
               price: salePrice,
               priceCurrency: 'INR',
-              availability:
-                'https://schema.org/InStock',
+              availability: 'https://schema.org/InStock',
             },
           }),
         }}
       />
-
-      {/* Breadcrumb */}
       <Breadcrumb
         className="deal-detail__breadcrumb"
         items={[
-          {
-            label: content.categories.breadcrumb.home,
-            to: '/',
-          },
-          ...(deal.category
-            ? [
-              {
-                label: deal.category.name,
-                to: `/category/${deal.category.slug}`,
-              },
-            ]
-            : []),
-          {
-            label: name,
-          },
-        ]}
+          { label: content.categories.breadcrumb.home, to: '/', },
+          ...(deal.category ? [
+            { label: deal.category.name, to: `/category/${deal.category.slug}`, },
+          ] : []),
+          { label: name, },]}
       />
-
       <div className="deal-detail__layout">
-        {/* Gallery */}
         <div className="deal-detail__gallery">
           <div className="deal-detail__main-img-wrap">
             {gallery[activeImg] && (
@@ -252,17 +200,12 @@ export function DealDetail() {
                 height={450}
               />
             )}
-
             {discountPct > 0 && (
-              <span
-                className="deal-detail__badge"
-                aria-label={`${discountPct}% ${dealDetail.labels.off}`}
-              >
+              <span className="deal-detail__badge" aria-label={`${discountPct}% ${dealDetail.labels.off}`}>
                 {discountPct}% {dealDetail.labels.off}
               </span>
             )}
           </div>
-
           {gallery.length > 1 && (
             <div
               className="deal-detail__thumbs"
@@ -272,17 +215,10 @@ export function DealDetail() {
                 <button
                   key={`${image}-${index}`}
                   type="button"
-                  className={`deal-detail__thumb${index === activeImg
-                    ? ' deal-detail__thumb--active'
-                    : ''
-                    }`}
-                  onClick={() =>
-                    setActiveImg(index)
-                  }
+                  className={`deal-detail__thumb${index === activeImg ? ' deal-detail__thumb--active' : ''}`}
+                  onClick={() => setActiveImg(index)}
                   aria-label={`${dealDetail.gallery.viewImage} ${index + 1}`}
-                  aria-pressed={
-                    index === activeImg
-                  }
+                  aria-pressed={index === activeImg}
                 >
                   <img
                     src={image}
@@ -295,254 +231,124 @@ export function DealDetail() {
               ))}
             </div>
           )}
-
-          {video && (
-            <video className="deal-detail__video" controls src={video} />
-          )}
+          {video && (<video className="deal-detail__video" controls src={video} />)}
         </div>
-
-        {/* Info panel */}
         <div className="deal-detail__info">
-          {/* Provider + category */}
           <div className="deal-detail__meta-row">
             {deal.vendor?.businessName &&
               (deal.vendor.slug ? (
-                <Link
-                  to={`/vendor/${deal.vendor.slug}`}
-                  className="deal-detail__provider"
-                >
-                  {deal.vendor.businessName}
-                </Link>
+                <Link to={`/vendor/${deal.vendor.slug}`} className="deal-detail__provider">{deal.vendor.businessName}</Link>
               ) : (
-                <span className="deal-detail__provider">
-                  {deal.vendor.businessName}
-                </span>
+                <span className="deal-detail__provider">{deal.vendor.businessName}</span>
               ))}
-
             {deal.category && (
-              <sky-badge
-                variant="secondary"
-                size="small"
-              >
-                {deal.category.name}
-              </sky-badge>
+              <sky-badge variant="secondary" size="small"> {deal.category.name} </sky-badge>
             )}
-
-            <sky-badge
-              variant="primary"
-              size="small"
-            >
-              {dealDetail.serviceType.service}
-            </sky-badge>
+            <sky-badge variant="primary" size="small">{dealDetail.serviceType.service}</sky-badge>
           </div>
-
-          <h1 className="deal-detail__title">
-            {name}
-          </h1>
-
-          {(deal.branch?.city ||
-            deal.branch?.address) && (
-              <p
-                className="deal-detail__dist"
-                aria-label={dealDetail.labels.location}
-              >
-                <Icon aria-hidden="true">
-                  near_me
-                </Icon>
-
-                {[
-                  deal.branch?.name,
-                  deal.branch?.address ??
-                  deal.branch?.city,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </p>
-            )}
-
-          <Divider />
-
-          {/* Price */}
-          <div className="deal-detail__price-row">
-            <div>
-              <span className="deal-detail__price">
-                {formatINR(salePrice)}
-              </span>
-            </div>
-
-            {originalPrice !== undefined &&
-              originalPrice !== salePrice && (
-                <div className="deal-detail__original">
-                  <s
-                    className="deal-detail__original-price"
-                    aria-label={`${dealDetail.labels.originalPrice} ${formatINR(originalPrice)}`}
-                  >
-                    {formatINR(originalPrice)}
-                  </s>
-
-                  {discountPct > 0 && (
-                    <sky-badge
-                      variant="error"
-                      size="small"
-                    >
-                      {discountPct}% {dealDetail.labels.off}
-                    </sky-badge>
-                  )}
-                </div>
-              )}
-          </div>
-
-          {/* Duration */}
-          {deal.durationMinutes != null &&
-            deal.durationMinutes > 0 && (
-              <p className="deal-detail__duration">
-                <Icon aria-hidden="true">
-                  schedule
-                </Icon>
-                {deal.durationMinutes} {dealDetail.labels.durationSuffix}
-              </p>
-            )}
-
-          {/* CTA */}
+          <h1 className="deal-detail__title">{name}</h1>
+          {(deal.branch?.city || deal.branch?.address) && (
+            <p className="deal-detail__dist" aria-label={dealDetail.labels.location}>
+              <Icon aria-hidden="true"> near_me</Icon>
+              {[deal.branch?.name, deal.branch?.address ?? deal.branch?.city,]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          )}
+          <DurationPackageSelector selection={purchaseSelection} />
           <div className="deal-detail__cta">
-            <DealAddToCartDialog
-              deal={deal}
-              onAdded={(label) => setActionMessage(`Added "${label}" to your cart.`)}
-              renderTrigger={(open) => (
+            <div className="deal-detail__purchase">
+              <div className="deal-detail__quantity">
+                <span>Quantity</span>
+                <div
+                  className="deal-detail__quantity-control"
+                  role="group"
+                  aria-label="Quantity"
+                >
+                  <button
+                    type="button"
+                    aria-label="Decrease quantity"
+                    disabled={quantity <= 1}
+                    onClick={() => setQuantity((current) => Math.max(1, current - 1))}
+                  >−</button>
+                  <span aria-live="polite">{quantity}</span>
+                  <button
+                    type="button"
+                    aria-label="Increase quantity"
+                    onClick={() => setQuantity((current) => current + 1)
+                    }
+                  >+</button>
+                </div>
+              </div>
+              <div className="deal-detail__total">
+                <span>Total</span>
+                <strong>{formatINR(purchaseSelection.unitPrice * quantity)}</strong>
+              </div>
+              <div className="deal-detail__action-row">
                 <FilledButton
                   type="button"
                   className="deal-detail__add-btn"
-                  onClick={() => {
-                    if (requireAuthOrRedirect()) open();
-                  }}
+                  onClick={handleAddToCart}
+                  disabled={!!purchaseSelection.missingSelection}
                 >
-                  <Icon slot="icon" aria-hidden="true">
-                    shopping_bag
-                  </Icon>
-                  Add to Cart
-                </FilledButton>
-              )}
-            />
-
-            {/* Wishlist */}
-            <OutlinedIconButton
-              className="deal-detail__action-icon"
-              aria-label={
-                isWishlisted(dealId)
-                  ? dealDetail.wishlist.remove
-                  : dealDetail.wishlist.save
-              }
-              aria-pressed={isWishlisted(dealId)}
-              disabled={wishlistPending(dealId)}
-              onClick={toggleFavorite}
-            >
-              <Icon aria-hidden="true">
-                {isWishlisted(dealId)
-                  ? 'favorite'
-                  : 'favorite_border'}
-              </Icon>
-            </OutlinedIconButton>
-
-            {/* Share */}
-            <OutlinedIconButton
-              className="deal-detail__action-icon"
-              aria-label={
-                copied
-                  ? 'Link copied'
-                  : 'Share deal'
-              }
-              onClick={copyLink}
-            >
-              <Icon aria-hidden="true">
-                {copied ? 'check' : 'link'}
-              </Icon>
-            </OutlinedIconButton>
+                  <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>Add to Cart</FilledButton>
+                <OutlinedIconButton
+                  className="deal-detail__action-icon"
+                  aria-label={isWishlisted(dealId) ? dealDetail.wishlist.remove : dealDetail.wishlist.save}
+                  aria-pressed={isWishlisted(dealId)}
+                  disabled={wishlistPending(dealId)}
+                  onClick={toggleFavorite}
+                >
+                  <Icon aria-hidden="true">{isWishlisted(dealId) ? 'favorite' : 'favorite_border'}</Icon>
+                </OutlinedIconButton>
+                <OutlinedIconButton
+                  className="deal-detail__action-icon"
+                  aria-label={copied ? 'Link copied' : 'Share deal'}
+                  onClick={copyLink}
+                >
+                  <Icon aria-hidden="true">{copied ? 'check' : 'link'}</Icon>
+                </OutlinedIconButton>
+              </div>
+            </div>
           </div>
-
           {actionMessage && (
-            <p
-              className="field-hint"
-              role="status"
-            >
-              {actionMessage}
-            </p>
+            <p className="field-hint" role="status"> {actionMessage} </p>
           )}
-
           {actionError && (
-            <p
-              className="error-state"
-              role="alert"
-            >
-              {actionError}
-            </p>
+            <p className="error-state" role="alert">{actionError} </p>
           )}
-
           <Divider />
-
-          {/* Description + policy */}
           <sky-accordion>
             {description && (
-              <sky-accordion-item
-                header={dealDetail.description}
-                open
-              >
-                <p className="deal-detail__desc">
-                  {description}
-                </p>
+              <sky-accordion-item header={dealDetail.description} open>
+                <p className="deal-detail__desc">{description}</p>
               </sky-accordion-item>
             )}
-
             {deal.notes && (
               <sky-accordion-item header="Notes">
-                <p className="deal-detail__desc">
-                  {deal.notes}
-                </p>
+                <p className="deal-detail__desc">{deal.notes}</p>
               </sky-accordion-item>
             )}
-
             {deal.policy && (
               <sky-accordion-item header="Policy">
-                <p className="deal-detail__policy">
-                  {deal.policy}
-                </p>
+                <p className="deal-detail__policy">{deal.policy}</p>
               </sky-accordion-item>
             )}
-
-            <sky-accordion-item
-              header={
-                dealDetail.cancellationPolicy
-              }
-            >
-              <p className="deal-detail__policy">
-                {dealDetail.cancellationText}
-              </p>
+            <sky-accordion-item header={dealDetail.cancellationPolicy}>
+              <p className="deal-detail__policy">{dealDetail.cancellationText}</p>
             </sky-accordion-item>
-
             {deal.termsAndConditions && (
               <sky-accordion-item header="Terms & Conditions">
-                <p className="deal-detail__policy">
-                  {deal.termsAndConditions}
-                </p>
+                <p className="deal-detail__policy">{deal.termsAndConditions}</p>
               </sky-accordion-item>
             )}
           </sky-accordion>
         </div>
       </div>
-
-      {/* Related Deals */}
       {related.length > 0 && (
-        <section
-          className="deal-detail__related"
-          aria-labelledby="related-heading"
-        >
+        <section className="deal-detail__related" aria-labelledby="related-heading">
           <div className="deal-detail__related-inner">
-            <h2
-              id="related-heading"
-              className="deal-detail__related-heading"
-            >
-              {dealDetail.relatedDeals}
-            </h2>
-
+            <h2 id="related-heading" className="deal-detail__related-heading">{dealDetail.relatedDeals}</h2>
             <div className="deal-detail__related-carousel">
               <swiper-container
                 slides-per-view="auto"
@@ -552,7 +358,6 @@ export function DealDetail() {
               >
                 {related.map((item) => {
                   const media = resolveDealMedia(item);
-
                   const relatedDeal: DealCardDeal = {
                     id: item.id,
                     title: item.title,
@@ -563,30 +368,16 @@ export function DealDetail() {
                     badge: dealDetail.serviceType.service,
                     providerName: item.vendor?.businessName ?? undefined,
                     price: Number(item.salePrice),
-                    originalPrice:
-                      item.originalPrice != null &&
-                        Number(item.originalPrice) !== Number(item.salePrice)
-                        ? Number(item.originalPrice)
-                        : undefined,
-                    discount: item.discountPercent ?? undefined,
+                    originalPrice: item.originalPrice != null && Number(item.originalPrice) !== Number(item.salePrice) ? Number(item.originalPrice) : undefined, discount: item.discountPercent ?? undefined,
                   };
-
                   return (
-                    <swiper-slide
-                      key={item.id}
-                      style={{ width: '260px', height: 'auto' }}
-                    >
+                    <swiper-slide key={item.id} style={{ width: '260px', height: 'auto' }}>
                       <DealCard
                         deal={relatedDeal}
-                        eyebrowHref={
-                          item.vendor?.slug
-                            ? `/vendor/${item.vendor.slug}`
-                            : undefined
-                        }
+                        eyebrowHref={item.vendor?.slug ? `/vendor/${item.vendor.slug}` : undefined}
                         favoriteActive={isWishlisted(item.id)}
                         onFavorite={() => {
-                          if (!requireAuthOrRedirect()) return;
-                          void toggleWishlist(item.id);
+                          if (!requireAuthOrRedirect()) return; void toggleWishlist(item.id);
                         }}
                       />
                     </swiper-slide>
@@ -600,5 +391,4 @@ export function DealDetail() {
     </div>
   );
 }
-
 export default DealDetail;

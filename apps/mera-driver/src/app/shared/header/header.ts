@@ -7,6 +7,7 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
 
@@ -78,14 +79,36 @@ const STAFFING: NavLink[] = [
 export class Header implements OnInit {
   protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly http = inject(HttpClient);
   private readonly host = inject(ElementRef<HTMLElement>);
-
-  protected readonly helplineNumber = signal('1800-123-4567');
-
-  ngOnInit(): void {}
 
   protected readonly services = SERVICES;
   protected readonly staffing = STAFFING;
+  protected readonly brandName = signal('mera-driver');
+  protected readonly driversOnlineCount = signal(124);
+  protected readonly driversOnlineLabel = signal('Online Drivers');
+  protected readonly helplineLabel = signal('Emergency');
+  protected readonly helplineNumber = signal('+91 99999 99999');
+  protected readonly navLinks = signal<NavLink[]>([]);
+  protected readonly isLoading = signal(false);
+
+  ngOnInit(): void {
+    this.http.get<any>('/data/layout.json').subscribe({
+      next: (data) => {
+        const header = data?.header;
+        if (!header) return;
+        this.brandName.set(header.brand ?? 'mera-driver');
+        this.driversOnlineCount.set(header.driversOnlineCount ?? 124);
+        this.driversOnlineLabel.set(header.driversOnlineLabel ?? 'Online Drivers');
+        this.helplineLabel.set(header.helplineLabel ?? 'Emergency');
+        this.helplineNumber.set(header.helplineNumber ?? '+91 99999 99999');
+        this.navLinks.set(header.navLinks ?? []);
+      },
+      error: () => {
+        this.isLoading.set(false);
+      },
+    });
+  }
 
   /** Which desktop dropdown is open (one at a time). */
   protected readonly openMenu = signal<'services' | 'staffing' | null>(null);

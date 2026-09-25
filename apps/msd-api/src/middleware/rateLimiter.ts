@@ -15,3 +15,19 @@ export const otpRequestRateLimiter = rateLimit({
     sendError(res, 'RATE_LIMITED', 'Too many OTP requests, please try again later');
   },
 });
+
+/** The public "Become a Vendor" registration is this codebase's only other anonymous-write
+ *  surface besides OTP request — same discipline reused rather than inventing a separate
+ *  rate-limiting mechanism: same window, same configured limit, same IP+identifier key shape
+ *  (keyed on whichever of ownerEmail/ownerMobile was submitted). */
+export const vendorPublicRegisterRateLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: env.otpRequestRateLimitPer10Min,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) =>
+    `${ipKeyGenerator(req.ip ?? '')}:${(req.body?.ownerEmail as string | undefined) ?? (req.body?.ownerMobile as string | undefined) ?? ''}`,
+  handler: (req, res) => {
+    sendError(res, 'RATE_LIMITED', 'Too many registration attempts, please try again later');
+  },
+});

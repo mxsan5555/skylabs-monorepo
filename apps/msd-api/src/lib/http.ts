@@ -42,7 +42,7 @@ export function sendData<T>(
   const body: ApiEnvelope<T> = { data, error: null, ...(opts.meta ? { meta: opts.meta } : {}) };
   res.status(opts.status ?? 200).json(body);
 }
-
+  
 export function sendError(res: Response, code: ErrorCode, message: string, details?: unknown): void {
   const body: ApiEnvelope<null> = { data: null, error: { code, message, details } };
   res.status(STATUS_BY_CODE[code]).json(body);

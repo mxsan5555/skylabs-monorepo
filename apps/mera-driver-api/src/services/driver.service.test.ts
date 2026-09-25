@@ -3,7 +3,17 @@ import { mockPrisma, resetPrismaMock } from '../test-utils/prisma-mock';
 
 vi.mock('../lib/prisma', () => ({ prisma: mockPrisma }));
 
-import { createDriver, updateDriver, setDriverAccountStatus, assertDriverAccountActive } from './driver.service';
+import {
+  createDriver,
+  updateDriver,
+  setDriverAccountStatus,
+  assertDriverAccountActive,
+  assignVerifier,
+  listDriversAssignedTo,
+  getAssignedDriverById,
+  setKycChecklistItem,
+  listAvailableDrivers,
+} from './driver.service';
 
 beforeEach(() => {
   resetPrismaMock();
@@ -148,5 +158,132 @@ describe('driver account status (Active/Inactive portal login gate)', () => {
   it('assertDriverAccountActive is a no-op for a User with no linked Driver record', async () => {
     mockPrisma.driver.findUnique.mockResolvedValue(null);
     await expect(assertDriverAccountActive('user-1')).resolves.toBeUndefined();
+  });
+});
+
+describe('DOB -> automatic age derivation', () => {
+  function isoYearsAgo(years: number): string {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - years);
+    return d.toISOString().slice(0, 10);
+  }
+
+  it('derives age from dob on create, ignoring any client-supplied age', async () => {
+    await createDriver({ firstName: 'A', dob: isoYearsAgo(20), age: '999' });
+    const data = mockPrisma.driver.create.mock.calls[0][0].data;
+
+    expect(data.age).toBe('20');
+  });
+
+  it('does not set age when dob is absent', async () => {
+    await createDriver({ firstName: 'A', age: '25' });
+    const data = mockPrisma.driver.create.mock.calls[0][0].data;
+
+    expect(data.age).toBeUndefined();
+  });
+
+  it('recomputes age on update only when dob is part of that update', async () => {
+    await updateDriver('driver-1', { dob: isoYearsAgo(10), age: '999' });
+    const data = mockPrisma.driver.update.mock.calls[0][0].data;
+
+    expect(data.age).toBe('10');
+  });
+
+  it('leaves age untouched on an update that does not include dob', async () => {
+    await updateDriver('driver-1', { firstName: 'Renamed', age: '999' });
+    const data = mockPrisma.driver.update.mock.calls[0][0].data;
+
+    expect(data.age).toBeUndefined();
+    expect(data.firstName).toBe('Renamed');
+  });
+});
+
+describe('KYC verifier assignment', () => {
+  it('assignVerifier sets assignedVerifierId after confirming the verifier user exists', async () => {
+    mockPrisma.driver.findUnique.mockResolvedValue({ id: 'driver-1', assignedVerifierId: 'verifier-1', documents: [] });
+    mockPrisma.user.findFirst.mockResolvedValue({ id: 'verifier-1', deletedAt: null });
+    mockPrisma.driver.update.mockResolvedValue({});
+
+    const result = await assignVerifier('driver-1', 'verifier-1');
+
+    expect(mockPrisma.driver.update).toHaveBeenCalledWith({ where: { id: 'driver-1' }, data: { assignedVerifierId: 'verifier-1' } });
+    expect(result.assignedVerifierId).toBe('verifier-1');
+  });
+
+  it('assignVerifier 404s when the target verifier user does not exist, and never writes', async () => {
+    mockPrisma.user.findFirst.mockResolvedValue(null);
+
+    await expect(assignVerifier('driver-1', 'nobody')).rejects.toMatchObject({ status: 404 });
+    expect(mockPrisma.driver.update).not.toHaveBeenCalled();
+  });
+
+  it('assignVerifier(null) clears the assignment without checking for a user', async () => {
+    mockPrisma.driver.update.mockResolvedValue({});
+
+    await assignVerifier('driver-1', null);
+
+    expect(mockPrisma.user.findFirst).not.toHaveBeenCalled();
+    expect(mockPrisma.driver.update).toHaveBeenCalledWith({ where: { id: 'driver-1' }, data: { assignedVerifierId: null } });
+  });
+});
+
+describe('KYC queue ownership scoping', () => {
+  it("listDriversAssignedTo only queries by the caller's own userId", async () => {
+    mockPrisma.driver.findMany.mockResolvedValue([{ id: 'driver-1' }]);
+    await listDriversAssignedTo('verifier-1');
+    expect(mockPrisma.driver.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { assignedVerifierId: 'verifier-1' } }),
+    );
+  });
+
+  it('getAssignedDriverById returns the driver when it is assigned to the caller', async () => {
+    mockPrisma.driver.findFirst.mockResolvedValue({ id: 'driver-1', assignedVerifierId: 'verifier-1' });
+    const result = await getAssignedDriverById('driver-1', 'verifier-1');
+    expect(result.id).toBe('driver-1');
+    expect(mockPrisma.driver.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'driver-1', assignedVerifierId: 'verifier-1' } }),
+    );
+  });
+
+  it('getAssignedDriverById 404s when the driver is assigned to someone else (no existence leak)', async () => {
+    mockPrisma.driver.findFirst.mockResolvedValue(null);
+    await expect(getAssignedDriverById('driver-1', 'someone-else')).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('KYC checklist', () => {
+  it('setKycChecklistItem updates the right category fields, ownership-checked', async () => {
+    mockPrisma.driver.findFirst.mockResolvedValue({ id: 'driver-1', assignedVerifierId: 'verifier-1' });
+    mockPrisma.driver.update.mockResolvedValue({});
+
+    await setKycChecklistItem('driver-1', 'verifier-1', 'health', 'Rejected', 'Blurry photo');
+
+    expect(mockPrisma.driver.update).toHaveBeenCalledWith({
+      where: { id: 'driver-1' },
+      data: { healthDocsStatus: 'Rejected', healthDocsNotes: 'Blurry photo' },
+    });
+  });
+
+  it('setKycChecklistItem 404s when the driver is not assigned to the caller, and never writes', async () => {
+    mockPrisma.driver.findFirst.mockResolvedValue(null);
+
+    await expect(setKycChecklistItem('driver-1', 'someone-else', 'personal', 'Verified', undefined)).rejects.toMatchObject({
+      status: 404,
+    });
+    expect(mockPrisma.driver.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('customer-safe available drivers', () => {
+  it('only returns Verified + Active drivers, with a minimal field selection', async () => {
+    mockPrisma.driver.findMany.mockResolvedValue([]);
+    await listAvailableDrivers();
+
+    expect(mockPrisma.driver.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { status: 'Verified', accountStatus: 'Active' },
+        select: { id: true, firstName: true, lastName: true, avatar: true, vehicle: true, driverType: true },
+      }),
+    );
   });
 });

@@ -15,7 +15,6 @@ vi.mock('../services/permission-resolver.service', () => ({
 }));
 
 vi.mock('../lib/media-storage', () => ({
-  getUploadRoot: vi.fn(() => '/fake/uploads/media'),
   writeMediaFile: vi.fn(async (subdir: string, parentId: string, buffer: Buffer) => ({
     storageKey: `${subdir}/${parentId}/fake.jpg`,
     sizeBytes: buffer.length,

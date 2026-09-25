@@ -25,6 +25,7 @@ import {
 import { issueTokenPair, rotateRefreshToken, revokeRefreshToken, revokeAllSessionsForUser } from '../services/token.service';
 import { findUserWithPasswordByIdentifier, verifyPassword, setPassword, changeOwnPassword } from '../services/password.service';
 import { assertDriverAccountActive } from '../services/driver.service';
+import { assertCustomerAccountActive } from '../services/customer.service';
 import { writeAuditLog } from '../services/audit.service';
 import { passport } from '../lib/passport';
 
@@ -63,6 +64,7 @@ router.post('/otp/verify', validateBody(OtpVerifySchema), async (req, res, next)
     await verifyOtp(identifier, purpose, otp);
     const user = await upsertUserByIdentifier(identifier);
     await assertDriverAccountActive(user.id);
+    await assertCustomerAccountActive(user.id);
     const roles = await getRoleKeysForUser(user.id);
     const tokens = await issueTokenPair(user.id, roles, requestMeta(req));
 
@@ -102,6 +104,7 @@ router.get(
 
       const user = await upsertUserFromGoogle({ googleId: profile.id, email, name: profile.displayName ?? email });
       await assertDriverAccountActive(user.id);
+      await assertCustomerAccountActive(user.id);
       const roles = await getRoleKeysForUser(user.id);
       const tokens = await issueTokenPair(user.id, roles, requestMeta(req));
 
@@ -174,6 +177,7 @@ router.post('/password/login', validateBody(PasswordLoginSchema), async (req, re
 
     try {
       await assertDriverAccountActive(user.id);
+      await assertCustomerAccountActive(user.id);
     } catch (err) {
       await recordLoginHistory(user.id, 'password', false, requestMeta(req)).catch(() => undefined);
       throw err;

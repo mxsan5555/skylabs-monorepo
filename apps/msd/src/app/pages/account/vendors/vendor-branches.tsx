@@ -10,13 +10,17 @@ import {
   createMyBranch,
   createMyDeal,
   deleteDeal,
+  getBranchCategoryAccess,
+  getMyBranchCategoryAccess,
   listBranches,
+  listCategories,
   listDeals,
   listMyBranches,
   listMyDeals,
   listMyProducts,
   listVendorProducts,
   rejectDeal,
+  setBranchCategoryAccess,
   setBranchStatus,
   setDealStatus,
   setMyBranchStatus,
@@ -26,6 +30,7 @@ import {
   updateMyBranch,
   updateMyDeal,
   type Branch,
+  type BranchCategoryAccessRow,
   type BranchInput,
   type Category,
   type Deal,
@@ -39,7 +44,6 @@ import { ApiRequestError } from '../../../../api/rbac/client';
 import { MediaUploader } from '../../../components/media-uploader';
 import { useToast } from '../../../../toast/toast-context';
 import { STATES, citiesForState } from '../../../../data/india-locations';
-import { resolveCategoryTiers } from '../../../../utils/category-tree';
 
 interface VendorBranchesProps {
   token: string | null;
@@ -175,14 +179,15 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
     });
   };
 
-  const saveBranch = async (input: BranchInput, existing?: Branch) => {
+  const saveBranch = async (input: BranchInput, existing?: Branch): Promise<Branch> => {
     if (existing) {
       const { data } = isSelf ? await updateMyBranch(token, existing.id, input) : await updateBranch(token, vendorId, existing.id, input);
       setBranches((prev) => prev.map((b) => (b.id === data.id ? data : b)));
-    } else {
-      const { data } = isSelf ? await createMyBranch(token, input) : await createBranch(token, vendorId, input);
-      setBranches((prev) => [data, ...prev]);
+      return data;
     }
+    const { data } = isSelf ? await createMyBranch(token, input) : await createBranch(token, vendorId, input);
+    setBranches((prev) => [data, ...prev]);
+    return data;
   };
 
   const toggleBranchStatus = async (branch: Branch) => {
@@ -257,7 +262,14 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
       <section className="panel" aria-label="Branches">
         <div className="page-head">
           <h2>Branches</h2>
-          {canEdit && <BranchDialog onSave={(input) => saveBranch(input).then(() => setError(''))} />}
+          {canEdit && (
+            <BranchDialog
+              token={token}
+              vendorId={vendorId}
+              isSelf={isSelf}
+              onSave={(input) => saveBranch(input).then((data) => { setError(''); return data; })}
+            />
+          )}
         </div>
         {error && <p className="error-state" role="alert">{error}</p>}
         {branchesLoading ? (
@@ -288,7 +300,7 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
                 </button>
                 {canEdit && (
                   <div className="page-head__actions">
-                    <BranchDialog branch={branch} onSave={(input) => saveBranch(input, branch)} />
+                    <BranchDialog branch={branch} token={token} vendorId={vendorId} isSelf={isSelf} onSave={(input) => saveBranch(input, branch)} />
                     <OutlinedButton onClick={() => toggleBranchStatus(branch)}>
                       {branch.isActive ? 'Deactivate' : 'Activate'}
                     </OutlinedButton>
@@ -309,7 +321,7 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
             <div className="page-head">
               <h2>Deals</h2>
               {canEdit && (categories.length > 0 || products.length > 0) && (
-                <DealDialog categories={categories} products={products} token={token} fixedBranchId={selectedBranchId ?? undefined} onSave={(input) => saveDeal(input)} />
+                <DealDialog categories={categories} products={products} token={token} vendorId={vendorId} isSelf={isSelf} fixedBranchId={selectedBranchId ?? undefined} onSave={(input) => saveDeal(input)} />
               )}
             </div>
             {dealsLoading ? (
@@ -335,7 +347,7 @@ export function VendorBranches({ token, vendorId, isSelf, canEdit, canApproveDea
                     </div>
                     {deal.approvalRejectionReason && <p className="error-state">Rejected: {deal.approvalRejectionReason}</p>}
                     <div className="page-head__actions">
-                      {canEdit && <DealDialog categories={categories} products={products} deal={deal} token={token} fixedBranchId={selectedBranchId ?? undefined} onSave={(input) => saveDeal(input, deal)} />}
+                      {canEdit && <DealDialog categories={categories} products={products} deal={deal} token={token} vendorId={vendorId} isSelf={isSelf} fixedBranchId={selectedBranchId ?? undefined} onSave={(input) => saveDeal(input, deal)} />}
                       {canEdit && (
                         <OutlinedButton onClick={() => toggleDealActive(deal)}>
                           {deal.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
@@ -450,10 +462,57 @@ function OpeningHoursEditor({ value, onChange }: { value: OpeningHours; onChange
   );
 }
 
-/** Branch create/edit dialog — exported so it can be reused verbatim by the onboarding wizard's
- *  Step 2 (`vendor-wizard-branches.tsx`) as well as this file's own two-pane `VendorBranches`. */
-export function BranchDialog({ branch, onSave }: { branch?: Branch; onSave: (input: BranchInput) => Promise<void> }) {
-  const dialogRef = useRef<MdDialog>(null);
+/**
+ * Branch create/edit dialog — exported so it can be reused verbatim by the onboarding wizard's
+ * Step 2 (`vendor-wizard-branches.tsx`) as well as this file's own two-pane `VendorBranches`.
+ *
+ * Also owns the branch's Service/Therapy "Categories & Subcategories" mapping (folded in from the
+ * now-deleted `branch-category-access-dialog.tsx` — see that file's own former doc comment for the
+ * original design). Service/Therapy category access is per-branch only now: there's no more
+ * vendor-wide grant screen for those two types (see `VendorProductCategoryAccess` in
+ * `vendor-wizard-modules.tsx`, which keeps that grant screen for Product alone), so the category
+ * picker here fetches every active top-level SERVICE + THERAPY category unfiltered by vendor
+ * (`listCategories({ type })`, no `vendorId`) — this dialog IS the granting surface for those two
+ * types now. The backend (`setBranchCategoryAccess`) auto-creates the vendor's `VendorCategoryAccess`
+ * grant the first time any branch maps a category, so no separate "grant it first" step exists any
+ * more either.
+ *
+ * Admin-only (`!isSelf`): there is no self-service `PUT` route for a branch's category mapping
+ * (see msd-api's `GET /vendors/me/branches/:branchId/category-access` route doc comment — reading
+ * your own branch's mapping is self-service, editing it stays an admin/Data-Entry action), so the
+ * whole Categories & Subcategories section is omitted entirely on the `isSelf` surface rather than
+ * rendering controls that would silently fail to save.
+ */
+export function BranchDialog({
+  branch,
+  onSave,
+  token,
+  vendorId,
+  isSelf = false,
+  dialogRef: externalDialogRef,
+  hideTrigger,
+}: {
+  branch?: Branch;
+  /** Resolves to the created/updated `Branch` (never just `void`) — for a brand-new branch this
+   *  is the only place its real `id` becomes available, needed to save this dialog's own category
+   *  mapping against the right branch right after creation. */
+  onSave: (input: BranchInput) => Promise<Branch>;
+  token: string | null;
+  vendorId: string;
+  /** True on the self-service "Branches & Deals" surface — see this component's own doc comment
+   *  on why the category section is entirely omitted rather than attempting a save that has no
+   *  backend route to land on. Defaults to `false` since most call sites are admin-scoped. */
+  isSelf?: boolean;
+  /** Lets a caller drive this dialog open from more than one trigger (e.g. `vendor-wizard-branches.tsx`'s
+   *  "Edit" and "Categories" buttons both opening this same dialog instance) instead of using this
+   *  component's own built-in trigger button — same opt-in pattern as `DealDialog`'s own
+   *  `dialogRef`/`hideTrigger`. */
+  dialogRef?: RefObject<MdDialog | null>;
+  hideTrigger?: boolean;
+}) {
+  const internalDialogRef = useRef<MdDialog>(null);
+  const dialogRef = externalDialogRef ?? internalDialogRef;
+  const { showToast } = useToast();
   const [form, setForm] = useState({
     name: branch?.name ?? '',
     address: branch?.address ?? '',
@@ -466,6 +525,80 @@ export function BranchDialog({ branch, onSave }: { branch?: Branch; onSave: (inp
   const [errors, setErrors] = useState<Partial<Record<'pincode' | 'mapLocationUrl', string>>>({});
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Same double-submit guard convention used elsewhere in this file (DealDialog's submittingRef).
+  const submittingRef = useRef(false);
+
+  // ─── Categories & Subcategories (admin-only — see this component's own doc comment) ─────────
+  const [serviceCategories, setServiceCategories] = useState<Category[]>([]);
+  const [therapyCategories, setTherapyCategories] = useState<Category[]>([]);
+  const [categoryMap, setCategoryMap] = useState<Map<string, Set<string>>>(new Map());
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [categoriesError, setCategoriesError] = useState('');
+
+  // Flat set of every active top-level SERVICE/THERAPY category (top level + children) — fetched
+  // once on mount (same "fetch alongside the dialog it belongs to" pattern as this file's own
+  // `DealDialog`'s branch-category-access effect), unfiltered by vendor (see this component's own
+  // doc comment).
+  const flatCategories = [...serviceCategories, ...therapyCategories];
+  const topLevelCategories = flatCategories.filter((c) => !c.parentId);
+  const branchId = branch?.id;
+
+  useEffect(() => {
+    if (isSelf) return; // no self-service category editing — see this component's own doc comment
+    let cancelled = false;
+    setCategoriesLoading(true);
+    setCategoriesError('');
+    (async () => {
+      try {
+        const [{ data: svc }, { data: thr }] = await Promise.all([
+          listCategories(token, { type: 'SERVICE' }),
+          listCategories(token, { type: 'THERAPY' }),
+        ]);
+        if (cancelled) return;
+        setServiceCategories(svc);
+        setTherapyCategories(thr);
+        if (branchId) {
+          const { data: access } = await getBranchCategoryAccess(token, vendorId, branchId);
+          if (cancelled) return;
+          const next = new Map<string, Set<string>>();
+          access.forEach((row) => next.set(row.categoryId, new Set(row.subcategories.map((s) => s.subcategoryId))));
+          setCategoryMap(next);
+        } else {
+          setCategoryMap(new Map());
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setCategoriesError(err instanceof ApiRequestError ? err.message : 'Could not load categories.');
+      } finally {
+        if (!cancelled) setCategoriesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, vendorId, branchId, isSelf]);
+
+  const toggleCategory = (categoryId: string) =>
+    setCategoryMap((prev) => {
+      const next = new Map(prev);
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.set(categoryId, new Set());
+      return next;
+    });
+
+  const toggleSubcategory = (categoryId: string, subcategoryId: string) =>
+    setCategoryMap((prev) => {
+      const next = new Map(prev);
+      // A subcategory can't be enabled without its parent — auto-check the parent category too
+      // if the user reaches for a subcategory checkbox first (mirrors BranchDialog's own
+      // State-clears-City idiom: related fields reset/adjust in the same state update).
+      const current = next.get(categoryId) ?? new Set<string>();
+      const subs = new Set(current);
+      if (subs.has(subcategoryId)) subs.delete(subcategoryId);
+      else subs.add(subcategoryId);
+      next.set(categoryId, subs);
+      return next;
+    });
 
   const set = (key: keyof typeof form, value: string) => {
     setForm((f) => ({ ...f, [key]: value, ...(key === 'state' ? { city: '' } : {}) }));
@@ -473,6 +606,7 @@ export function BranchDialog({ branch, onSave }: { branch?: Branch; onSave: (inp
   };
 
   const submit = async () => {
+    if (submittingRef.current) return;
     if (!form.name.trim()) {
       setError('Branch name is required.');
       return;
@@ -487,6 +621,7 @@ export function BranchDialog({ branch, onSave }: { branch?: Branch; onSave: (inp
       return;
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
     setError('');
     try {
@@ -499,7 +634,24 @@ export function BranchDialog({ branch, onSave }: { branch?: Branch; onSave: (inp
         mapLocationUrl: form.mapLocationUrl.trim() || undefined,
         openingHours: Object.keys(openingHours).length > 0 ? openingHours : undefined,
       };
-      await onSave(input);
+      const savedBranch = await onSave(input);
+
+      if (!isSelf) {
+        try {
+          const mappings = [...categoryMap.entries()].map(([categoryId, subcategoryIds]) => ({ categoryId, subcategoryIds: [...subcategoryIds] }));
+          await setBranchCategoryAccess(token, vendorId, savedBranch.id, { mappings });
+        } catch (categoryErr) {
+          // The branch itself already saved successfully above — never leave the admin unsure
+          // whether that part worked, and never silently drop the category data either.
+          const message = categoryErr instanceof ApiRequestError ? categoryErr.message : 'Could not save categories.';
+          const combined = `Branch saved, but categories could not be saved: ${message}`;
+          setError(combined);
+          showToast(combined, 'error');
+          return; // keep the dialog open so the admin can retry the category save
+        }
+      }
+
+      showToast(branch ? 'Branch updated successfully.' : 'Branch created successfully.');
       dialogRef.current?.close();
     } catch (err) {
       // The Google Maps URL resolver throws a single `ApiError('VALIDATION_ERROR', message)`
@@ -512,6 +664,7 @@ export function BranchDialog({ branch, onSave }: { branch?: Branch; onSave: (inp
         setError(err instanceof ApiRequestError ? err.message : 'Could not save branch.');
       }
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -520,10 +673,12 @@ export function BranchDialog({ branch, onSave }: { branch?: Branch; onSave: (inp
 
   return (
     <>
-      <OutlinedButton onClick={() => dialogRef.current?.show()}>
-        <Icon slot="icon" aria-hidden="true">{branch ? 'edit' : 'add'}</Icon>
-        {branch ? 'Edit' : 'Add branch'}
-      </OutlinedButton>
+      {!hideTrigger && (
+        <OutlinedButton onClick={() => dialogRef.current?.show()}>
+          <Icon slot="icon" aria-hidden="true">{branch ? 'edit' : 'add'}</Icon>
+          {branch ? 'Edit' : 'Add branch'}
+        </OutlinedButton>
+      )}
       <Dialog ref={dialogRef}>
         <div slot="headline">{branch ? 'Edit branch' : 'Add branch'}</div>
         <div slot="content" className="form-grid">
@@ -573,11 +728,53 @@ export function BranchDialog({ branch, onSave }: { branch?: Branch; onSave: (inp
 
           <OpeningHoursEditor value={openingHours} onChange={setOpeningHours} />
 
+          {!isSelf && (
+            <>
+              <h3 className="section-title">Categories &amp; Subcategories</h3>
+              {categoriesLoading ? (
+                <p className="loading-state">Loading categories…</p>
+              ) : categoriesError ? (
+                <p className="error-state" role="alert">{categoriesError}</p>
+              ) : topLevelCategories.length === 0 ? (
+                <p className="empty-state">No active Service or Therapy categories exist in Category Master yet.</p>
+              ) : (
+                <div className="category-grant-grid">
+                  {topLevelCategories.map((category) => {
+                    const subcategoryOptions = flatCategories.filter((c) => c.parentId === category.id);
+                    const checked = categoryMap.has(category.id);
+                    return (
+                      <div className="category-grant-grid__group" key={category.id}>
+                        <label className="category-grant-grid__option">
+                          <input type="checkbox" checked={checked} onChange={() => toggleCategory(category.id)} />
+                          {category.name}
+                        </label>
+                        {checked && subcategoryOptions.length > 0 && (
+                          <div className="category-grant-grid__subgroup">
+                            {subcategoryOptions.map((sub) => (
+                              <label key={sub.id} className="category-grant-grid__option category-grant-grid__option--indented">
+                                <input
+                                  type="checkbox"
+                                  checked={categoryMap.get(category.id)?.has(sub.id) ?? false}
+                                  onChange={() => toggleSubcategory(category.id, sub.id)}
+                                />
+                                {sub.name}
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
           {error && <p className="error-state" role="alert">{error}</p>}
         </div>
         <div slot="actions">
           <TextButton onClick={() => dialogRef.current?.close()}>Cancel</TextButton>
-          <FilledButton onClick={submit} disabled={submitting}>{submitting ? 'Saving…' : 'Save'}</FilledButton>
+          <FilledButton onClick={submit} disabled={submitting || categoriesLoading}>{submitting ? 'Saving…' : 'Save'}</FilledButton>
         </div>
       </Dialog>
     </>
@@ -602,6 +799,14 @@ export function BranchDialog({ branch, onSave }: { branch?: Branch; onSave: (inp
  *  - `dialogRef`/`hideTrigger`: let a caller drive the dialog open/closed itself (e.g. from a
  *    `sky-data-table` row action) instead of using this component's own built-in trigger
  *    button — again opt-in, this page's own two call sites don't pass them.
+ *
+ * Category/Subcategory are now branch-scoped: whichever branch is active (the `branches`
+ * selector's current pick, or `fixedBranchId` when there's no selector) drives a
+ * `getBranchCategoryAccess` fetch, and the Category/Subcategory pickers below list only what
+ * THIS branch has been mapped to (`branch-category-access-dialog.tsx`'s Step 2 config) — never
+ * the vendor-wide `categories` prop, which now only backs the "no longer mapped" stale-value
+ * name lookup (see `categoryStale`/`subcategoryStale` below). The backend hard-validates the
+ * same mapping server-side regardless of what this form sends (see `vendor.service.ts`).
  */
 export function DealDialog({
   deal,
@@ -609,6 +814,8 @@ export function DealDialog({
   products,
   branches,
   token,
+  vendorId,
+  isSelf = false,
   fixedBranchId,
   dialogRef: externalDialogRef,
   hideTrigger,
@@ -617,18 +824,30 @@ export function DealDialog({
 }: {
   deal?: Deal;
   /** The vendor's granted SERVICE categories (`listCategories({ type: 'SERVICE', vendorId })`)
-   *  — a flat list containing both top-level rows and their subcategories (parentId set); this
-   *  component filters by `parentId` locally to build the Category → Subcategory cascade, same
-   *  pattern as `products.tsx`'s `ProductFormDialog`. */
+   *  — a flat list containing both top-level rows and their subcategories (parentId set). No
+   *  longer the source of the Category/Subcategory picker options (that's branch-scoped now,
+   *  see this component's own doc comment) — kept only as a name-lookup fallback for a stale
+   *  category/subcategory value that's no longer in the branch's mapping. */
   categories: Category[];
   products: VendorProduct[];
   branches?: Branch[];
   token: string | null;
+  /** The vendor this deal belongs to — needed (alongside the active branch) to fetch that
+   *  branch's `getBranchCategoryAccess` mapping. */
+  vendorId: string;
+  /** True on the self-service surface (`VendorBranches`/`vendor-deals.tsx` with `isSelf`), where
+   *  the caller only holds `vendors:custom`, not `vendors:view` — routes the category-access
+   *  fetch below to `getMyBranchCategoryAccess` (`/vendors/me/branches/:branchId/category-access`)
+   *  instead of the admin-scoped `getBranchCategoryAccess`, which would otherwise 403. Defaults
+   *  to `false` since most call sites (the admin wizard) are admin-scoped. */
+  isSelf?: boolean;
   /** The branch this dialog is already scoped to when the caller doesn't pass a `branches`
    *  selector (e.g. `VendorBranches`'s per-branch "Deals" tab, which knows its own
    *  `selectedBranchId` but never lets this dialog switch branches) — needed so `MediaUploader`
    *  knows the right branch to upload against even before the create-flow's own `branchId`
-   *  state would otherwise resolve to one. */
+   *  state would otherwise resolve to one, and now also so the category-access fetch tracks a
+   *  branch switch made in the caller (e.g. picking a different branch in the left pane) even
+   *  though this dialog never remounts for it. */
   fixedBranchId?: string;
   dialogRef?: RefObject<MdDialog | null>;
   hideTrigger?: boolean;
@@ -700,19 +919,66 @@ export function DealDialog({
   const addPackage = () => setPackages((prev) => [...prev, { durationMinutes: 30, sellingPrice: 0 }]);
   const removePackage = (index: number) => setPackages((prev) => prev.filter((_, i) => i !== index));
 
+  // The branch whose category access mapping actually drives the pickers below: the `branches`
+  // selector's live pick when one is rendered, otherwise `fixedBranchId` read directly (not the
+  // `branchId` state, which never changes in that mode) — this dialog is never remounted when
+  // the caller's `fixedBranchId` prop changes (e.g. VendorBranches's left-pane branch switch), so
+  // reading the prop directly here is what lets the fetch below react to that switch anyway.
+  const activeBranchId = branches ? branchId : (fixedBranchId ?? '');
+  const [branchCategoryAccess, setBranchCategoryAccess] = useState<BranchCategoryAccessRow[]>([]);
+  // Starts `true` so the very first render (before the effect below has had a chance to run)
+  // never briefly flags the deal's existing category/subcategory as "stale" just because
+  // `branchCategoryAccess` hasn't loaded yet.
+  const [branchCategoryAccessLoading, setBranchCategoryAccessLoading] = useState(true);
+  const [branchCategoryAccessError, setBranchCategoryAccessError] = useState('');
+
+  useEffect(() => {
+    if (!activeBranchId || !vendorId) {
+      setBranchCategoryAccess([]);
+      setBranchCategoryAccessError('');
+      setBranchCategoryAccessLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setBranchCategoryAccessLoading(true);
+    setBranchCategoryAccessError('');
+    (isSelf ? getMyBranchCategoryAccess(token, activeBranchId) : getBranchCategoryAccess(token, vendorId, activeBranchId))
+      .then(({ data }) => {
+        if (cancelled) return;
+        setBranchCategoryAccess(data);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setBranchCategoryAccess([]);
+        setBranchCategoryAccessError(err instanceof ApiRequestError ? err.message : "Could not load this branch's category access.");
+      })
+      .finally(() => {
+        if (!cancelled) setBranchCategoryAccessLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, vendorId, activeBranchId, isSelf]);
+
   /** Service offering only — category/subcategory are picked directly (no catalog item to
-   *  derive them from any more), restricted to the vendor's granted SERVICE categories. This
-   *  form no longer offers a 3rd, Type-tier picker (removed — see the "Category Types" Master
-   *  screen's own removal) — `subcategoryTierId` still resolves the correct Subcategory-select
-   *  display value even for a pre-existing Deal whose stored `subcategoryId` happens to be a
-   *  Type-tier id from before that picker existed (untouched unless the vendor re-picks a
-   *  Subcategory here). */
-  const parentCategories = categories.filter((c) => !c.parentId);
-  const { subcategoryOptions, subcategoryTierId } = resolveCategoryTiers(
-    categories,
-    form.categoryId,
-    form.subcategoryId,
-  );
+   *  derive them from any more), restricted to whatever THIS branch has been mapped to in Step 2
+   *  (`branch-category-access-dialog.tsx`), not merely the vendor-wide grant. A deal's existing
+   *  category/subcategory that's since fallen out of the branch's mapping (branch remapped after
+   *  the deal was created) is never silently cleared — `categoryStale`/`subcategoryStale` drive an
+   *  injected option + warning banner instead, so saving without touching the field keeps the
+   *  existing value (the backend re-validates it regardless — see `vendor.service.ts`). */
+  const matchedCategoryRow = branchCategoryAccess.find((row) => row.categoryId === form.categoryId);
+  const subcategoryOptions = matchedCategoryRow?.subcategories.map((s) => s.subcategory) ?? [];
+  const branchCategoryAccessReady = !branchCategoryAccessLoading && !branchCategoryAccessError;
+  const categoryStale = branchCategoryAccessReady && Boolean(form.categoryId) && !matchedCategoryRow;
+  const subcategoryStale =
+    branchCategoryAccessReady &&
+    !categoryStale &&
+    Boolean(form.subcategoryId) &&
+    !subcategoryOptions.some((c) => c.id === form.subcategoryId);
+  const staleCategoryName = deal?.category?.name ?? categories.find((c) => c.id === form.categoryId)?.name ?? 'Unknown category';
+  const staleSubcategoryName =
+    deal?.subcategory?.name ?? categories.find((c) => c.id === form.subcategoryId)?.name ?? 'Unknown subcategory';
 
   const submit = async () => {
     if (submittingRef.current) return;
@@ -814,7 +1080,18 @@ export function DealDialog({
                 deal ? (
                   <p className="field-hint">Branch: {branches.find((b) => b.id === deal.branchId)?.name ?? deal.branch?.name ?? '—'} (cannot be changed)</p>
                 ) : (
-                  <OutlinedSelect label="Branch" value={branchId} onChange={(e: Event) => setBranchId((e.target as HTMLSelectElement).value)}>
+                  <OutlinedSelect
+                    label="Branch"
+                    value={branchId}
+                    onChange={(e: Event) => {
+                      const value = (e.target as HTMLSelectElement).value;
+                      // Same reset-in-same-update idiom as BranchDialog's State→City cascade —
+                      // a category/subcategory picked for the previous branch is never valid
+                      // (or even meaningful) under a newly-picked branch's own mapping.
+                      setBranchId(value);
+                      setForm((f) => ({ ...f, categoryId: '', subcategoryId: undefined }));
+                    }}
+                  >
                     {branches.map((b) => (
                       <SelectOption key={b.id} value={b.id}>
                         <div slot="headline">{b.name}</div>
@@ -826,27 +1103,44 @@ export function DealDialog({
               <OutlinedSelect
                 label="Category"
                 value={form.categoryId}
+                disabled={branchCategoryAccessLoading}
                 onChange={(e: Event) => setForm((f) => ({ ...f, categoryId: (e.target as HTMLSelectElement).value, subcategoryId: undefined }))}
               >
                 <SelectOption value="">
-                  <div slot="headline">Select a category</div>
+                  <div slot="headline">{branchCategoryAccessLoading ? 'Loading categories…' : 'Select a category'}</div>
                 </SelectOption>
-                {parentCategories.map((c) => (
-                  <SelectOption key={c.id} value={c.id}>
-                    <div slot="headline">{c.name}</div>
+                {categoryStale && (
+                  <SelectOption value={form.categoryId}>
+                    <div slot="headline">{staleCategoryName}</div>
+                  </SelectOption>
+                )}
+                {branchCategoryAccess.map((row) => (
+                  <SelectOption key={row.categoryId} value={row.categoryId}>
+                    <div slot="headline">{row.category.name}</div>
                   </SelectOption>
                 ))}
               </OutlinedSelect>
+              {categoryStale && (
+                <p className="error-state" role="alert">
+                  This category is no longer mapped to this branch. Saving without changing it keeps the existing value — or pick a currently mapped option.
+                </p>
+              )}
 
-              {subcategoryOptions.length > 0 && (
+              {(subcategoryOptions.length > 0 || subcategoryStale) && (
                 <OutlinedSelect
                   label="Subcategory (optional)"
-                  value={subcategoryTierId ?? ''}
+                  value={form.subcategoryId ?? ''}
+                  disabled={branchCategoryAccessLoading}
                   onChange={(e: Event) => setForm((f) => ({ ...f, subcategoryId: (e.target as HTMLSelectElement).value || undefined }))}
                 >
                   <SelectOption value="">
                     <div slot="headline">None</div>
                   </SelectOption>
+                  {subcategoryStale && (
+                    <SelectOption value={form.subcategoryId ?? ''}>
+                      <div slot="headline">{staleSubcategoryName}</div>
+                    </SelectOption>
+                  )}
                   {subcategoryOptions.map((c) => (
                     <SelectOption key={c.id} value={c.id}>
                       <div slot="headline">{c.name}</div>
@@ -854,9 +1148,16 @@ export function DealDialog({
                   ))}
                 </OutlinedSelect>
               )}
+              {subcategoryStale && (
+                <p className="error-state" role="alert">
+                  This subcategory is no longer mapped to this branch/category. Saving without changing it keeps the existing value — or pick a currently mapped option.
+                </p>
+              )}
 
-              {parentCategories.length === 0 && (
-                <p className="empty-state">This business has no granted Service categories yet — grant one under Business Modules &amp; Category Access first.</p>
+              {branchCategoryAccessError && <p className="error-state" role="alert">{branchCategoryAccessError}</p>}
+
+              {!branchCategoryAccessLoading && !branchCategoryAccessError && branchCategoryAccess.length === 0 && !categoryStale && (
+                <p className="empty-state">No categories are mapped to this branch yet — map one under Business Modules &amp; Category Access first.</p>
               )}
 
               <OutlinedTextField label="Title" value={form.title} onInput={(e: Event) => setForm((f) => ({ ...f, title: (e.target as HTMLInputElement).value }))} />

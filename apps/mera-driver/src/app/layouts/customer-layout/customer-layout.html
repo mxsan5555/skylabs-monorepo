@@ -1,0 +1,92 @@
+<div class="driver-shell">
+  <header class="driver-topbar">
+    <md-icon-button aria-label="Open menu" (click)="toggleNav()">
+      <md-icon aria-hidden="true">menu</md-icon>
+    </md-icon-button>
+    <span class="driver-topbar__title">Mera Driver</span>
+    <md-icon-button aria-label="Log out" (click)="signOut()">
+      <md-icon aria-hidden="true">logout</md-icon>
+    </md-icon-button>
+  </header>
+
+  <div class="driver-content">
+    <router-outlet></router-outlet>
+  </div>
+
+  @if (navOpen()) {
+    <div class="driver-nav-scrim" (click)="closeNav()"></div>
+    <nav class="driver-nav-drawer" aria-label="Customer portal navigation">
+      <div class="driver-nav-drawer__head">
+        <span>Menu</span>
+        <md-icon-button aria-label="Close menu" (click)="closeNav()">
+          <md-icon aria-hidden="true">close</md-icon>
+        </md-icon-button>
+      </div>
+      <ul class="driver-nav-drawer__list">
+        @for (item of navItems; track item.path) {
+          <li>
+            <button
+              type="button"
+              class="driver-nav-drawer__item"
+              [class.active]="isActive(item.path)"
+              [attr.aria-current]="isActive(item.path) ? 'page' : null"
+              (click)="go(item.path)"
+            >
+              <md-icon aria-hidden="true">{{ item.icon }}</md-icon>
+              {{ item.label }}
+            </button>
+          </li>
+        }
+        <li>
+          <button type="button" class="driver-nav-drawer__item driver-nav-drawer__item--logout" (click)="signOut()">
+            <md-icon aria-hidden="true">logout</md-icon>
+            Logout
+          </button>
+        </li>
+      </ul>
+    </nav>
+  }
+
+  <nav class="rider-nav" aria-label="Primary">
+    <button
+      type="button"
+      class="rider-nav__item"
+      [class.active]="isActive('/customer')"
+      [attr.aria-current]="isActive('/customer') ? 'page' : null"
+      (click)="go('/customer')"
+    >
+      <md-icon aria-hidden="true">home</md-icon>
+      Home
+    </button>
+    <button
+      type="button"
+      class="rider-nav__item"
+      [class.active]="isActive('/customer/profile')"
+      [attr.aria-current]="isActive('/customer/profile') ? 'page' : null"
+      (click)="go('/customer/profile')"
+    >
+      <md-icon aria-hidden="true">person</md-icon>
+      Profile
+    </button>
+    <button
+      type="button"
+      class="rider-nav__item"
+      [class.active]="isActive('/customer/bookings')"
+      [attr.aria-current]="isActive('/customer/bookings') ? 'page' : null"
+      (click)="go('/customer/bookings')"
+    >
+      <md-icon aria-hidden="true">book_online</md-icon>
+      Bookings
+    </button>
+    <button
+      type="button"
+      class="rider-nav__item"
+      [class.active]="isActive('/customer/support')"
+      [attr.aria-current]="isActive('/customer/support') ? 'page' : null"
+      (click)="go('/customer/support')"
+    >
+      <md-icon aria-hidden="true">support_agent</md-icon>
+      Support
+    </button>
+  </nav>
+</div>

@@ -180,6 +180,7 @@ export function VendorDealsStep({ token, vendorId, canEdit, canApprove, branches
           products={products}
           branches={branches}
           token={token}
+          vendorId={vendorId}
           dialogRef={addDialogRef}
           hideTrigger
           onSave={(input, branchId) => save(input, branchId)}
@@ -194,6 +195,7 @@ export function VendorDealsStep({ token, vendorId, canEdit, canApprove, branches
           products={products}
           branches={branches}
           token={token}
+          vendorId={vendorId}
           dialogRef={editDialogRef}
           hideTrigger
           onSave={(input) => save(input, undefined, editingDeal)}

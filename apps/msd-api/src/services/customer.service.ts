@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import type { UserStatus } from '../generated/prisma-client';
+import { setUserStatus } from './user.service';
 
 /**
  * SuperAdmin/staff-facing customer directory (`customers:view`). "Customer" = any `User` row
@@ -66,4 +67,23 @@ export async function getCustomerOrThrow(id: string) {
   });
   if (!customer) throw new ApiError('NOT_FOUND', 'Customer not found');
   return customer;
+}
+
+/**
+ * Customer Management's status change (Active/Inactive/Suspended — `blocked` in the DB, see
+ * `CustomerStatusUpdateSchema`'s own doc comment on why the enum value isn't renamed). Route-
+ * level permission is the new, separate `customers:status_change` — never the RBAC Users
+ * screen's own `rbac.users:status_change` — but the actual persistence reuses
+ * `user.service.ts#setUserStatus` verbatim rather than a second `prisma.user.update`, so there
+ * is exactly one place `User.status` is ever written.
+ *
+ * `getCustomerOrThrow` is the scoping guard: it 404s (never confirms existence) for a User that
+ * exists but doesn't hold the `customer` role, so this endpoint can structurally never reach a
+ * pure staff/admin/vendor-only account — not just "the frontend only shows customers here".
+ */
+export async function setCustomerStatus(id: string, status: UserStatus) {
+  const before = await getCustomerOrThrow(id);
+  await setUserStatus(id, status);
+  const after = await getCustomerOrThrow(id);
+  return { customer: after, previousStatus: before.status };
 }

@@ -233,4 +233,23 @@ describe('sky-product-card', () => {
       expect(el.getAttribute('variant')).toBe('outlined');
     });
   });
+
+  describe('slotted action content (e.g. Add to Cart)', () => {
+    // Regression guard for a real click-through bug: the stretched link's `::after` (position:
+    // absolute, inset: 0, z-index: 1) covers the whole card. Slotted content (an action button
+    // passed as a child, e.g. "Add to Cart") must sit in its own stacking context ABOVE that
+    // overlay, or clicks on it are intercepted by the invisible link and incorrectly navigate.
+    // jsdom doesn't resolve shadow-DOM adoptedStyleSheets for `getComputedStyle`, so this asserts
+    // directly on the component's own stylesheet source rather than a computed value.
+    it('default slot rule sits above the stretched link in the stacking order', () => {
+      const cssText = SkyProductCard.styles.toString();
+      const slotRuleMatch = cssText.match(/(?<!name-)slot\s*\{[^}]*\}/);
+      expect(slotRuleMatch).toBeTruthy();
+      const slotRule = slotRuleMatch![0];
+      expect(slotRule).toContain('position: relative');
+      const zIndexMatch = slotRule.match(/z-index:\s*(\d+)/);
+      expect(zIndexMatch).toBeTruthy();
+      expect(Number(zIndexMatch![1])).toBeGreaterThan(1); // above `.heading a::after`'s z-index: 1
+    });
+  });
 });

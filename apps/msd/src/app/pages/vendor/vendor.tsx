@@ -6,6 +6,7 @@ import { getCatalogVendor, listCatalogDeals, listCatalogProducts, type CatalogVe
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
+import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { DurationPackageSelector } from '../../components/duration-package-selector';
@@ -103,6 +104,41 @@ function therapistFromPrice(therapist: CatalogVendorTherapist): number | null {
   return Math.min(...therapist.packages.map((p) => Number(p.sellingPrice)));
 }
 
+type VendorSection = 'deals' | 'products' | 'therapies';
+
+/** Great-circle distance in kilometers — mirrors msd-api's own `haversineKm` (catalog.service.ts).
+ *  Kept as an independent client-side copy rather than a shared package, per this app's "app-local
+ *  logic, never shared between frontend and backend" convention. */
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return earthRadiusKm * 2 * Math.asin(Math.sqrt(a));
+}
+
+/** The customer's "serviceable branch" — always the nearest branch to their browser-geolocation
+ *  coordinates (no radius cutoff), falling back to the vendor's first active branch when
+ *  coordinates are unavailable (denied/unsupported) or no branch has coordinates set yet. The
+ *  customer never picks a branch manually — see this page's removed branch-tabs selector. */
+function resolveBranch(branches: CatalogVendorBranch[], coords: { latitude: number; longitude: number } | null): CatalogVendorBranch | null {
+  if (branches.length === 0) return null;
+  if (!coords) return branches[0];
+  let nearest: CatalogVendorBranch | null = null;
+  let nearestDistance = Infinity;
+  for (const branch of branches) {
+    if (branch.latitude == null || branch.longitude == null) continue;
+    const distance = haversineKm(coords.latitude, coords.longitude, Number(branch.latitude), Number(branch.longitude));
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearest = branch;
+    }
+  }
+  return nearest ?? branches[0];
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function VendorPage() {
@@ -112,11 +148,13 @@ export function VendorPage() {
   const { has: isWishlisted, toggle: toggleWishlist, isPending: wishlistPending } = useWishlist();
   const { showToast } = useToast();
 
+  const { coords } = useCurrentLocation();
+
   const [vendor, setVendor] = useState<CatalogVendorDetail | null>(null);
   const [vendorLoading, setVendorLoading] = useState(true);
   const [vendorError, setVendorError] = useState('');
 
-  const [branchIndex, setBranchIndex] = useState(0);
+  const [activeSection, setActiveSection] = useState<VendorSection>('deals');
 
   const [serviceDeals, setServiceDeals] = useState<CatalogDeal[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
@@ -140,7 +178,7 @@ export function VendorPage() {
     setVendorLoading(true);
     setVendorError('');
     setVendor(null);
-    setBranchIndex(0);
+    setActiveSection('deals');
     getCatalogVendor(slug)
       .then(({ data }) => setVendor(data))
       .catch((err) => {
@@ -154,7 +192,10 @@ export function VendorPage() {
       .finally(() => setVendorLoading(false));
   }, [slug]);
 
-  const selectedBranch: CatalogVendorBranch | null = vendor?.branches[branchIndex] ?? vendor?.branches[0] ?? null;
+  const selectedBranch = useMemo(
+    () => resolveBranch(vendor?.branches ?? [], coords),
+    [vendor, coords],
+  );
 
   const resetSelection = () => {
     setActiveCategoryName('all');
@@ -164,14 +205,21 @@ export function VendorPage() {
     setProductActionMessage('');
   };
 
-  const handleBranchSelect = (index: number) => {
-    setBranchIndex(index);
+  const handleSectionSelect = (section: VendorSection) => {
+    setActiveSection(section);
     resetSelection();
   };
 
   // ── Fetch service deals for the selected branch ──────────────────────────
   useEffect(() => {
-    if (!vendor || !selectedBranch) return;
+    if (!vendor) return;
+    if (!selectedBranch) {
+      // No active branch at all (e.g. vendor has none) — nothing to fetch, show the empty state
+      // immediately rather than spinning forever.
+      setServiceDeals([]);
+      setDealsLoading(false);
+      return;
+    }
     setDealsLoading(true);
     setDealsError('');
     listCatalogDeals({ vendorId: vendor.id, branchId: selectedBranch.id, pageSize: 100 })
@@ -265,7 +313,7 @@ export function VendorPage() {
 
   const canonicalUrl = `${SITE_URL}/vendor/${vendor.slug}`;
   const metaDescription = vendor.businessDescription
-    ?? `Book services at ${vendor.businessName}${vendor.city ? `, ${vendor.city}` : ''}.`;
+    ?? `Book deals at ${vendor.businessName}${vendor.city ? `, ${vendor.city}` : ''}.`;
 
   return (
     <div id="main-content" className="vendor-page">
@@ -334,8 +382,8 @@ export function VendorPage() {
         {vendor.logoUrl && <img src={vendor.logoUrl} alt="" />}
       </div>
 
-      {/* Two-panel body overlapping the hero */}
-      <div className="vendor-page__body">
+      {/* Two-panel body overlapping the hero — full-width when the Products tab has no aside */}
+      <div className={`vendor-page__body${activeSection === 'products' ? ' vendor-page__body--full-width' : ''}`}>
 
         {/* ── Left: main content card ──────────────────────────────────────── */}
         <div className="vendor-page__main-card">
@@ -368,25 +416,11 @@ export function VendorPage() {
             )}
           </div>
 
-          {/* Branch selector — only when there's a real choice to make */}
-          {vendor.branches.length > 1 && (
-            <div className="vendor-page__branch-tabs-wrap">
-              <Tabs
-                className="vendor-page__branch-tabs"
-                onChange={(e) => handleBranchSelect((e.target as unknown as { activeTabIndex: number }).activeTabIndex)}
-              >
-                {vendor.branches.map((b, i) => (
-                  <PrimaryTab key={b.id} active={i === branchIndex}>{b.name}</PrimaryTab>
-                ))}
-              </Tabs>
-            </div>
-          )}
-
           {/* Opening hours — always rendered (never silently omitted) so a branch with no
               schedule set yet still tells the customer that, instead of just vanishing. Reads
-              this SELECTED branch's own `openingHours` object fresh on every render (never a
-              hardcoded day/time literal), so switching branch tabs always shows that branch's
-              own real schedule, never a stale/different branch's. */}
+              the customer's auto-resolved nearest branch's own `openingHours` object fresh on
+              every render (never a hardcoded day/time literal) — the customer never picks a
+              branch manually. */}
           <div className="vendor-page__hours-section">
             <h2 className="vendor-page__hours-title">{vendorContent.labels.workingHours}</h2>
             {selectedBranch?.openingHours && Object.keys(selectedBranch.openingHours).length > 0 ? (
@@ -411,7 +445,24 @@ export function VendorPage() {
 
           <Divider />
 
+          {/* Deals / Products / Therapies — the customer's branch is auto-resolved from their
+              location above, never picked manually, so this is the only tab switcher on the
+              page. */}
+          <div className="vendor-page__section-tabs-wrap">
+            <Tabs
+              className="vendor-page__section-tabs"
+              onChange={(e) => handleSectionSelect(
+                (['deals', 'products', 'therapies'] as const)[(e.target as unknown as { activeTabIndex: number }).activeTabIndex],
+              )}
+            >
+              <PrimaryTab active={activeSection === 'deals'}>{vendorContent.tabs.deals}</PrimaryTab>
+              <PrimaryTab active={activeSection === 'products'}>{vendorContent.tabs.products}</PrimaryTab>
+              <PrimaryTab active={activeSection === 'therapies'}>{vendorContent.tabs.therapies}</PrimaryTab>
+            </Tabs>
+          </div>
+
           {/* Select Service */}
+          {activeSection === 'deals' && (
           <section className="vendor-page__section" aria-label={vendorContent.accessibility.services}>
             <h2 className="vendor-page__section-title"> {vendorContent.labels.selectService}</h2>
 
@@ -527,10 +578,10 @@ export function VendorPage() {
               </div>
             )}
           </section>
-
-          <Divider />
+          )}
 
           {/* Products */}
+          {activeSection === 'products' && (
           <section className="vendor-page__section" aria-label={vendorContent.accessibility.products}>
             <h2 className="vendor-page__section-title">Products</h2>
             {productActionMessage && <p className="field-hint" role="status">{productActionMessage}</p>}
@@ -571,10 +622,10 @@ export function VendorPage() {
               </ul>
             )}
           </section>
-
-          <Divider />
+          )}
 
           {/* Therapists */}
+          {activeSection === 'therapies' && (
           <section className="vendor-page__section" aria-label={vendorContent.accessibility.therapists}>
             <h2 className="vendor-page__section-title">Meet Our Therapists</h2>
             {selectedBranch && selectedBranch.therapists.length > 0 ? (
@@ -635,9 +686,12 @@ export function VendorPage() {
               <p className="vendor-page__deal-empty">{vendorContent.empty.noTherapists}</p>
             )}
           </section>
+          )}
         </div>
 
-        {/* ── Right: Your selection card ───────────────────────────────────── */}
+        {/* ── Right: Your selection card — Deals/Therapies only, Products uses its own inline
+            Add to Cart per card ─────────────────────────────────────────────── */}
+        {activeSection !== 'products' && (
         <aside className="vendor-page__selection-card" aria-label={vendorContent.accessibility.yourSelection}>
           <h2 className="vendor-page__selection-title"> {vendorContent.labels.yourSelection}</h2>
 
@@ -656,10 +710,11 @@ export function VendorPage() {
           ) : (
             <div className="vendor-page__selection-empty">
               <Icon aria-hidden="true" className="vendor-page__empty-icon">spa</Icon>
-              <p>Select a service or therapist to see packages and pricing.</p>
+              <p>Select a deal or therapist to see packages and pricing.</p>
             </div>
           )}
         </aside>
+        )}
 
       </div>
     </div>

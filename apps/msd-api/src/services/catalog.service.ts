@@ -5,6 +5,12 @@ import { listActiveCategories, getActiveCategoryBySlugOrThrow } from './category
 import { getActiveTagNamesFor } from './popular-tag.service';
 import * as blogPostService from './blog-post.service';
 import * as siteContentService from './site-content.service';
+import * as faqService from './faq.service';
+import * as blogCategoryService from './blog-category.service';
+import * as websitePageService from './website-page.service';
+import * as howItWorksService from './how-it-works.service';
+import * as careersService from './careers.service';
+import * as socialMediaService from './social-media.service';
 
 type TagRef = { id: string; name: string; slug: string };
 
@@ -190,6 +196,8 @@ const PUBLIC_VENDOR_DETAIL_SELECT = {
       pincode: true,
       phone: true,
       openingHours: true,
+      latitude: true,
+      longitude: true,
       therapists: {
         where: { isActive: true },
         select: PUBLIC_THERAPIST_SELECT,
@@ -328,12 +336,11 @@ export async function getPublicCategoryTree() {
     name: parent.name,
     slug: parent.slug,
     description: parent.description,
-    // `type`/`isPopular` only ever live on a top-level row (see Category's schema doc comment)
-    // — exposed here so the public storefront can drive the "Popular Category" homepage
-    // carousels without a second admin-only fetch. Already ordered by sortOrder via
-    // listActiveCategories, so no extra sort needed here.
+    // `type` only ever lives on a top-level row (see Category's schema doc comment). The
+    // "Popular Category"/"Popular Therapy" homepage carousels are driven entirely by
+    // `popularTags` below (PopularTag/PopularTagCategory), not by a flag on Category itself.
+    // Already ordered by sortOrder via listActiveCategories, so no extra sort needed here.
     type: parent.type,
-    isPopular: parent.isPopular,
     sortOrder: parent.sortOrder,
     popularTags: parent.popularTags,
     children: buildPublicChildren(categories, parent.id),
@@ -351,11 +358,10 @@ export async function getPublicCategoryBySlug(slug: string) {
     name: category.name,
     slug: category.slug,
     description: category.description,
-    // `type`/`isPopular`/`sortOrder` only ever live on a top-level row (same as
-    // getPublicCategoryTree above) — this is the field the storefront's category page reads to
-    // automatically pick Deal vs Product vs Therapist listing, so it must round-trip here too.
+    // `type`/`sortOrder` only ever live on a top-level row (same as getPublicCategoryTree
+    // above) — `type` is the field the storefront's category page reads to automatically pick
+    // Deal vs Product vs Therapist listing, so it must round-trip here too.
     type: category.type,
-    isPopular: category.isPopular,
     sortOrder: category.sortOrder,
     popularTags: withTags.popularTags,
     children: category.children.map((child) => ({
@@ -459,19 +465,23 @@ export async function listPublicDeals(opts: {
   return { items, total };
 }
 
-/**
- * Distinct {state, city} pairs from active branches — drives the public location picker's
- * dropdown without a full branch fetch. Never includes an inactive branch's location (matches
- * every other public read's "active gating" convention in this file).
- */
+/** Distinct active {state, city} pairs plus the average of that city's branch coordinates, so
+ *  the storefront can map browser coordinates to the nearest city without a geocoding API.
+ *  `latitude`/`longitude` are null when no branch in the city has coordinates. */
 export async function listPublicLocations() {
-  const rows = await prisma.branch.findMany({
+  const rows = await prisma.branch.groupBy({
+    by: ['state', 'city'],
     where: { isActive: true, state: { not: null }, city: { not: null } },
-    select: { state: true, city: true },
-    distinct: ['state', 'city'],
+    _avg: { latitude: true, longitude: true },
     orderBy: [{ state: 'asc' }, { city: 'asc' }],
   });
-  return rows as { state: string; city: string }[];
+  const toNumber = (v: unknown) => (v == null ? null : Number(v));
+  return rows.map((r) => ({
+    state: r.state as string,
+    city: r.city as string,
+    latitude: toNumber(r._avg.latitude),
+    longitude: toNumber(r._avg.longitude),
+  }));
 }
 
 export async function getPublicDealOrThrow(id: string) {
@@ -690,4 +700,28 @@ export async function getPublicAboutUs() {
 
 export async function getPublicContactUs() {
   return siteContentService.getPublicContactUs();
+}
+
+export async function listPublicFaqs() {
+  return faqService.listPublicFaqs();
+}
+
+export async function listPublicBlogCategories() {
+  return blogCategoryService.listPublicBlogCategories();
+}
+
+export async function getPublicWebsitePageBySlug(slug: string) {
+  return websitePageService.getPublicWebsitePageBySlugOrThrow(slug);
+}
+
+export async function getPublicHowItWorks() {
+  return howItWorksService.getPublicHowItWorks();
+}
+
+export async function getPublicCareers() {
+  return careersService.getPublicCareers();
+}
+
+export async function listPublicSocialMediaLinks() {
+  return socialMediaService.listPublicSocialMediaLinks();
 }

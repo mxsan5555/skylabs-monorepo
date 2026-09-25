@@ -134,14 +134,20 @@ describe('media API client — other entity basePaths still behave unchanged (re
 });
 
 describe('resolveMediaUrl', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   it('passes a legacy absolute http(s) storageKey through unchanged', () => {
     expect(resolveMediaUrl('https://legacy.example.com/old-photo.jpg')).toBe('https://legacy.example.com/old-photo.jpg');
     expect(resolveMediaUrl('http://legacy.example.com/old-photo.jpg')).toBe('http://legacy.example.com/old-photo.jpg');
   });
 
-  it('prefixes a real relative storageKey with the API origin\'s /media mount', () => {
-    const url = resolveMediaUrl('categories/abc123.webp');
-    expect(url.endsWith('/media/categories/abc123.webp')).toBe(true);
-    expect(url).not.toMatch(/^https?:\/\/.*\/api\/v1\/media/); // the /api/v1 suffix must be stripped, not doubled up
+  it('prefixes a real relative storageKey with the R2 public base URL', () => {
+    vi.stubEnv('VITE_MEDIA_BASE_URL', 'https://pub-abc.r2.dev');
+    expect(resolveMediaUrl('categories/abc123.webp')).toBe('https://pub-abc.r2.dev/categories/abc123.webp');
+  });
+
+  it('does not double a trailing slash on the base URL', () => {
+    vi.stubEnv('VITE_MEDIA_BASE_URL', 'https://pub-abc.r2.dev/');
+    expect(resolveMediaUrl('deals/d1/x.jpg')).toBe('https://pub-abc.r2.dev/deals/d1/x.jpg');
   });
 });

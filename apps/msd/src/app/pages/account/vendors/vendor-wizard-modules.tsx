@@ -5,22 +5,13 @@ import {
   setMyVendorModulesAndCategoryAccess,
   setVendorModulesAndCategoryAccess,
   type Category,
-  type CategoryType,
   type Vendor,
   type VendorCategoryAccessRow,
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useToast } from '../../../../toast/toast-context';
 
-type ModuleKey = 'offersService' | 'offersProduct' | 'offersTherapy';
-
-const MODULES: { key: ModuleKey; type: CategoryType; label: string }[] = [
-  { key: 'offersService', type: 'SERVICE', label: 'Service' },
-  { key: 'offersProduct', type: 'PRODUCT', label: 'Product' },
-  { key: 'offersTherapy', type: 'THERAPY', label: 'Therapy' },
-];
-
-interface VendorModulesAndCategoryAccessProps {
+interface VendorProductCategoryAccessProps {
   token: string | null;
   vendorId: string;
   isSelf: boolean;
@@ -30,54 +21,59 @@ interface VendorModulesAndCategoryAccessProps {
 }
 
 /**
- * Onboarding wizard Step 2's "Business Modules + Category Access" editor — Service/Product/
- * Therapy checkboxes bound to the three `Vendor` booleans, plus one category checklist per
- * enabled module, sourced unfiltered by vendor (`listCategories({ type })`, no `vendorId`) since
- * this IS the granting screen — every active category of that module shows here regardless of
- * what's granted yet. Saved as one replace-the-full-set call, same shape as
- * `rbac.routes.ts`'s `PUT /roles/:id/permissions`.
+ * Onboarding wizard Step 2's "Product Categories" editor — Service/Therapy category access is
+ * now managed entirely per-branch (see `BranchDialog`'s own "Categories & Subcategories" section
+ * in `vendor-branches.tsx`), so this screen is Product-only: the `offersProduct` toggle bound to
+ * `Vendor.offersProduct`, plus its own Product category checklist, sourced unfiltered by vendor
+ * (`listCategories({ type: 'PRODUCT' })`, no `vendorId`) since this IS the granting screen for
+ * Product — Product never flows through branch-level access (a branch's `setBranchCategoryAccess`
+ * call rejects a PRODUCT-type category outright; Products aren't sold per-branch).
+ *
+ * Saved via the same replace-the-full-set `setVendorModulesAndCategoryAccess`/
+ * `setMyVendorModulesAndCategoryAccess` call as before — that endpoint still expects all three
+ * module flags plus the vendor's FULL granted `categoryId` set (every type, not just Product), so
+ * `offersService`/`offersTherapy` and any Service/Therapy grants already on the vendor (created by
+ * the branch-level flow) are carried through untouched in the payload rather than
+ * rendered/edited here — dropping them would silently wipe the `VendorCategoryAccess` grants
+ * backing every branch's own category mapping.
  */
-export function VendorModulesAndCategoryAccess({ token, vendorId, isSelf, vendor, access, onSaved }: VendorModulesAndCategoryAccessProps) {
+export function VendorProductCategoryAccess({ token, vendorId, isSelf, vendor, access, onSaved }: VendorProductCategoryAccessProps) {
   const { showToast } = useToast();
-  const [modules, setModules] = useState<Record<ModuleKey, boolean>>({
-    offersService: vendor.offersService,
-    offersProduct: vendor.offersProduct,
-    offersTherapy: vendor.offersTherapy,
-  });
+  const [offersProduct, setOffersProduct] = useState(vendor.offersProduct);
+  // Every currently-granted category id, of EVERY type (Service/Therapy included) — only the
+  // PRODUCT-type ones are ever rendered/toggled below; the rest ride along untouched in the
+  // replace-the-full-set payload (see this component's own doc comment).
   const [grantedIds, setGrantedIds] = useState<Set<string>>(new Set(access.map((a) => a.categoryId)));
-  const [catalogs, setCatalogs] = useState<Record<CategoryType, Category[]>>({ SERVICE: [], PRODUCT: [], THERAPY: [] });
+  const [catalog, setCatalog] = useState<Category[]>([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const submittingRef = useRef(false);
 
   useEffect(() => {
-    setModules({ offersService: vendor.offersService, offersProduct: vendor.offersProduct, offersTherapy: vendor.offersTherapy });
+    setOffersProduct(vendor.offersProduct);
     setGrantedIds(new Set(access.map((a) => a.categoryId)));
   }, [vendor, access]);
 
   useEffect(() => {
     setError('');
-    (['SERVICE', 'PRODUCT', 'THERAPY'] as const).forEach((type) => {
-      listCategories(token, { type })
-        .then(({ data }) => setCatalogs((prev) => ({ ...prev, [type]: data.filter((c) => !c.parentId) })))
-        .catch((err) => {
-          setCatalogs((prev) => ({ ...prev, [type]: [] }));
-          setError(err instanceof ApiRequestError ? err.message : 'Could not load categories.');
-        });
-    });
+    listCategories(token, { type: 'PRODUCT' })
+      .then(({ data }) => setCatalog(data.filter((c) => !c.parentId)))
+      .catch((err) => {
+        setCatalog([]);
+        setError(err instanceof ApiRequestError ? err.message : 'Could not load categories.');
+      });
   }, [token]);
 
-  const toggleModule = (key: ModuleKey) => {
-    const moduleDef = MODULES.find((m) => m.key === key);
-    if (!moduleDef) return;
-    const { type } = moduleDef;
-    const turningOff = modules[key];
-    setModules((m) => ({ ...m, [key]: !m[key] }));
+  const productCategoryIds = new Set(catalog.map((c) => c.id));
+
+  const toggleModule = () => {
+    const turningOff = offersProduct;
+    setOffersProduct((v) => !v);
     if (turningOff) {
-      // A module a vendor no longer offers can't keep categories granted under it — the backend
-      // rejects a categoryId whose type doesn't match an enabled module, so drop them here too.
-      const idsForType = new Set(catalogs[type].map((c) => c.id));
-      setGrantedIds((prev) => new Set([...prev].filter((id) => !idsForType.has(id))));
+      // A vendor that no longer offers Product can't keep Product categories granted — the
+      // backend rejects a categoryId whose type doesn't match an enabled module, so drop them
+      // here too (Service/Therapy grants, of a different type, are untouched by this filter).
+      setGrantedIds((prev) => new Set([...prev].filter((id) => !productCategoryIds.has(id))));
     }
   };
 
@@ -95,64 +91,61 @@ export function VendorModulesAndCategoryAccess({ token, vendorId, isSelf, vendor
     setSaving(true);
     setError('');
     try {
-      const input = { ...modules, categoryIds: [...grantedIds] };
+      const input = {
+        offersService: vendor.offersService,
+        offersProduct,
+        offersTherapy: vendor.offersTherapy,
+        categoryIds: [...grantedIds],
+      };
       const { data } = isSelf
         ? await setMyVendorModulesAndCategoryAccess(token, input)
         : await setVendorModulesAndCategoryAccess(token, vendorId, input);
-      showToast('Business modules and category access saved successfully');
-      onSaved({ ...vendor, ...modules }, data);
+      showToast('Product categories saved successfully');
+      onSaved({ ...vendor, offersProduct }, data);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not save business modules and category access.');
+      setError(err instanceof ApiRequestError ? err.message : 'Could not save product categories.');
     } finally {
       submittingRef.current = false;
       setSaving(false);
     }
   };
 
-  const enabledModules = MODULES.filter((m) => modules[m.key]);
-
   return (
-    <section aria-label="Business modules and category access">
-      <h3 className="section-title">Business Modules</h3>
-      <p className="field-hint">Choose which kinds of offerings this business sells, then grant it access to the categories it can sell under each.</p>
+    <section aria-label="Product categories">
+      <h3 className="section-title">Product Categories</h3>
+      <p className="field-hint">Enable the Product module if this business sells physical products, then grant it the categories it can sell under.</p>
       <div className="form-grid">
-        {MODULES.map(({ key, label }) => (
-          <label key={key} className="category-grant-grid__option">
-            <input type="checkbox" checked={modules[key]} onChange={() => toggleModule(key)} />
-            {label}
-          </label>
-        ))}
+        <label className="category-grant-grid__option">
+          <input type="checkbox" checked={offersProduct} onChange={toggleModule} />
+          Product
+        </label>
       </div>
 
-      <h3 className="section-title">Category Access</h3>
-      {enabledModules.length === 0 ? (
-        <p className="empty-state">Enable a business module above to grant it categories.</p>
+      {!offersProduct ? (
+        <p className="empty-state">Enable the Product module above to grant it categories.</p>
       ) : (
         <div className="category-grant-grid">
-          {enabledModules.map(({ type, label }) => (
-            <div className="category-grant-grid__group" key={type}>
-              <h4>{label} categories</h4>
-              {catalogs[type].length === 0 ? (
-                <p className="empty-state">No active {label} categories exist yet.</p>
-              ) : (
-                catalogs[type].map((c) => (
-                  <label key={c.id} className="category-grant-grid__option">
-                    <input type="checkbox" checked={grantedIds.has(c.id)} onChange={() => toggleCategory(c.id)} />
-                    {c.name}
-                  </label>
-                ))
-              )}
-            </div>
-          ))}
+          <div className="category-grant-grid__group">
+            {catalog.length === 0 ? (
+              <p className="empty-state">No active Product categories exist yet.</p>
+            ) : (
+              catalog.map((c) => (
+                <label key={c.id} className="category-grant-grid__option">
+                  <input type="checkbox" checked={grantedIds.has(c.id)} onChange={() => toggleCategory(c.id)} />
+                  {c.name}
+                </label>
+              ))
+            )}
+          </div>
         </div>
       )}
 
       {error && <p className="error-state" role="alert">{error}</p>}
       <div className="form-actions">
-        <FilledButton onClick={submit} disabled={saving}>{saving ? 'Saving…' : 'Save modules & category access'}</FilledButton>
+        <FilledButton onClick={submit} disabled={saving}>{saving ? 'Saving…' : 'Save product categories'}</FilledButton>
       </div>
     </section>
   );
 }
 
-export default VendorModulesAndCategoryAccess;
+export default VendorProductCategoryAccess;

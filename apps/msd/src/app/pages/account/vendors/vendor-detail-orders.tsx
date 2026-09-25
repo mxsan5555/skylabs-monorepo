@@ -56,7 +56,7 @@ function toOrderRow(order: Order): Record<string, string | number> {
     'Created At': new Date(order.createdAt).toLocaleString(),
     'Customer Phone': order.customer.phone ?? '—',
     'Customer Email': order.customer.email ?? '—',
-    'Branch Address': [order.branch.address, order.branch.city].filter(Boolean).join(', ') || '—',
+    'Branch Address': order.branch ? [order.branch.address, order.branch.city].filter(Boolean).join(', ') || '—' : '—',
     Subtotal: `₹${order.subtotal}`,
     Quantity: order.items.reduce((n, i) => n + i.quantity, 0),
     'Payment Provider': latestPayment?.provider ?? '—',

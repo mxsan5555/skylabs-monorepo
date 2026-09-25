@@ -230,7 +230,6 @@ export interface Category {
   /** Only ever set on a top-level row (`parentId: null`) — a subcategory inherits its parent's
    *  type by join, never duplicated here (see msd-api's `category.service.ts`). */
   type?: CategoryType | null;
-  isPopular?: boolean;
 }
 
 /** A vendor's direct grant of access to one top-level Category — see msd-api's
@@ -380,6 +379,16 @@ export function createVendor(token: string | null, input: VendorCreateInput) {
   return apiPost<Vendor>('/vendors', token, input);
 }
 
+/** Genuinely public, unauthenticated "Become a Vendor" registration (`POST
+ *  /vendors/public/register`) — no token is ever sent (mirrors `api/catalog.ts`'s public reads,
+ *  which likewise call `apiGet(path, null)`). Same `VendorSelfInput` shape as `createMyVendor`
+ *  below; the backend resolves/creates the owner from `ownerEmail`/`ownerMobile` itself and
+ *  always lands the result as `PENDING_VERIFICATION` with `createdByUserId: null`. Rate-limited
+ *  server-side — a 429 surfaces as an ordinary `ApiRequestError` with code `RATE_LIMITED`. */
+export function registerPublicVendor(input: VendorSelfInput) {
+  return apiPost<Vendor>('/vendors/public/register', null, input);
+}
+
 export function getVendor(token: string | null, id: string) {
   return apiGet<Vendor>(`/vendors/${id}`, token);
 }
@@ -388,6 +397,20 @@ export function getVendor(token: string | null, id: string) {
  *  search/pagination shape as the RBAC Users screen, scoped to the `vendors:create` permission. */
 export function searchUsersForVendor(token: string | null, q: string) {
   return apiGet<UserSummary[]>(`/vendors/users/search${toQuery({ q })}`, token);
+}
+
+export interface VendorOwnerAvailability {
+  available: boolean;
+  conflicts: ('email' | 'phone')[];
+}
+
+/** "Add Vendor" owner-identity AVAILABILITY preview (`GET /vendors/users/lookup`) — UX only. A
+ *  Vendor's owner is always a brand-new User (see msd-api's `createVendorOwner` doc comment) —
+ *  this just lets the frontend show "already taken" before the admin fills in the rest of the
+ *  form; `createVendor`/`registerPublicVendor` always re-check independently regardless of what
+ *  this returned (backend is always the source of truth). */
+export function getVendorOwnerAvailability(token: string | null, opts: { email?: string; mobile?: string }) {
+  return apiGet<VendorOwnerAvailability>(`/vendors/users/lookup${toQuery(opts)}`, token);
 }
 
 export function updateVendor(token: string | null, id: string, input: VendorUpdateInput) {
@@ -440,6 +463,41 @@ export function updateBranch(token: string | null, vendorId: string, branchId: s
 
 export function setBranchStatus(token: string | null, vendorId: string, branchId: string, isActive: boolean) {
   return apiPatch<Branch>(`/vendors/${vendorId}/branches/${branchId}/status`, token, { isActive });
+}
+
+/** A branch's own category/subcategory access map — narrows the vendor-level
+ *  `VendorCategoryAccess` grants (see that interface's own doc comment): each `categoryId` here
+ *  must be a top-level category the vendor already holds, and each `subcategories` entry a real
+ *  child of that category explicitly enabled for this branch. Mirrors msd-api's
+ *  `BranchCategoryAccess`/`BranchSubcategoryAccess` include shape exactly (`getBranchCategoryAccess`
+ *  in `vendor.service.ts`). */
+export interface BranchCategoryAccessRow {
+  id: string;
+  branchId: string;
+  categoryId: string;
+  createdAt: string;
+  category: Category;
+  subcategories: { id: string; subcategoryId: string; subcategory: Category }[];
+}
+
+export interface BranchCategoryAccessInput {
+  mappings: { categoryId: string; subcategoryIds: string[] }[];
+}
+
+export function getBranchCategoryAccess(token: string | null, vendorId: string, branchId: string) {
+  return apiGet<BranchCategoryAccessRow[]>(`/vendors/${vendorId}/branches/${branchId}/category-access`, token);
+}
+
+export function setBranchCategoryAccess(token: string | null, vendorId: string, branchId: string, input: BranchCategoryAccessInput) {
+  return apiPut<BranchCategoryAccessRow[]>(`/vendors/${vendorId}/branches/${branchId}/category-access`, token, input);
+}
+
+/** Self-service read mirror of `getBranchCategoryAccess` — a vendor owner has no `vendors:view`,
+ *  only `vendors:custom`, so `DealDialog`'s branch-scoped Category/Subcategory pickers must call
+ *  this on the `isSelf` surface instead of the admin-scoped function above. Read-only: branch
+ *  category mapping is only ever edited by an admin in Step 2 of the onboarding wizard. */
+export function getMyBranchCategoryAccess(token: string | null, branchId: string) {
+  return apiGet<BranchCategoryAccessRow[]>(`/vendors/me/branches/${branchId}/category-access`, token);
 }
 
 export function listDeals(token: string | null, vendorId: string, branchId: string) {

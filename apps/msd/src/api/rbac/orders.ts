@@ -53,7 +53,9 @@ export interface Order {
   items: OrderItem[];
   customer: { id: string; name: string; phone: string | null; email: string | null };
   vendor: { id: string; businessName: string | null };
-  branch: { id: string; name: string; address: string | null; city: string | null };
+  /** Nullable — a Product-only order has no branch (Product is vendor-level, not branch-level).
+   *  See Order.branchId's schema doc comment in msd-api. */
+  branch: { id: string; name: string; address: string | null; city: string | null } | null;
   payments: OrderPayment[];
 }
 

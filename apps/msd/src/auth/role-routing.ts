@@ -63,3 +63,38 @@ export function setExperienceMode(mode: ExperienceMode): void {
   if (typeof localStorage === 'undefined') return;
   localStorage.setItem(EXPERIENCE_STORAGE_KEY, mode);
 }
+
+/**
+ * Post-login "return to where the user came from" — the single place both existing,
+ * previously-unwired return-path conventions in this app are read and validated:
+ *
+ * 1. `?next=<path>` on `/sign-in` — set by every storefront page's own `requireAuthOrRedirect()`
+ *    (vendor.tsx, category.tsx, deal-detail.tsx, product-detail.tsx, products.tsx, search.tsx,
+ *    therapist-detail.tsx) before an imperative action (Add to Cart, wishlist, etc.).
+ * 2. `location.state.from` — set by `shared-auth`'s `<RequireAuth>` route guard (used by
+ *    `/cart`, `/wishlist`, `/checkout`, `/my-account/*`, `/account/*`) via React Router's
+ *    `<Navigate to="/sign-in" state={{ from: location }} />`.
+ *
+ * Never a third mechanism — `sign-in.tsx`/`otp.tsx` read whichever of these produced the visit.
+ */
+export function extractReturnUrl(location: { search?: string; state?: unknown }): string | null {
+  const params = new URLSearchParams(location.search ?? '');
+  const next = params.get('next');
+  if (next) return sanitizeReturnUrl(next);
+
+  const state = location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null | undefined;
+  if (state?.from?.pathname) {
+    return sanitizeReturnUrl(`${state.from.pathname}${state.from.search ?? ''}${state.from.hash ?? ''}`);
+  }
+  return null;
+}
+
+/** A return URL must be an in-app relative path (never `//host/...` or an absolute
+ *  `https://...` URL — that would be an open-redirect) and must never point back into the auth
+ *  flow itself (`/sign-in`/`/otp`), or a successful login would bounce straight back to login. */
+function sanitizeReturnUrl(url: string): string | null {
+  if (!url || !url.startsWith('/') || url.startsWith('//')) return null;
+  if (url === '/sign-in' || url.startsWith('/sign-in?') || url.startsWith('/sign-in/')) return null;
+  if (url === '/otp' || url.startsWith('/otp?') || url.startsWith('/otp/')) return null;
+  return url;
+}

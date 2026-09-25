@@ -79,6 +79,7 @@ describe('loginWithGoogle', () => {
       name: 'Existing Name',
       email: 'existing@example.com',
       phone: '+911234567890',
+      status: 'active',
     });
     prismaMock.user.update.mockResolvedValue({
       id: 'existing-user-id',

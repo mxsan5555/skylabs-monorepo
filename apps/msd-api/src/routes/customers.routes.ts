@@ -1,16 +1,24 @@
 import { Router } from 'express';
+import type { Request } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/requirePermission';
-import { validateParams, validateQuery } from '../middleware/validate';
+import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema } from '../schemas/common.schema';
-import { CustomerListQuerySchema } from '../schemas/customer.schema';
+import { CustomerListQuerySchema, CustomerStatusUpdateSchema } from '../schemas/customer.schema';
 import * as customerService from '../services/customer.service';
+import { writeAuditLog } from '../services/audit.service';
 import { sendData } from '../lib/http';
+
+function requestMeta(req: Request) {
+  return { ip: req.ip, userAgent: req.headers['user-agent'] };
+}
 
 /**
  * SuperAdmin/staff customer directory — `customers:view` (already seeded, granted to
- * super_admin/admin). Read-only: a customer's own data is still only ever editable by the
- * customer themself via the storefront `/my-account` flow, never here.
+ * super_admin/admin). Mostly read-only: a customer's own data is still only ever editable by
+ * the customer themself via the storefront `/my-account` flow — the one exception is account
+ * status (Active/Inactive/Suspended), gated on its own `customers:status_change` permission
+ * below, never the RBAC Users screen's `rbac.users:status_change`.
  */
 const router = Router();
 router.use(authenticate);
@@ -32,5 +40,29 @@ router.get('/:id', requirePermission('customers', 'view'), validateParams(UuidPa
     next(err);
   }
 });
+
+router.patch(
+  '/:id/status',
+  requirePermission('customers', 'status_change'),
+  validateParams(UuidParamSchema),
+  validateBody(CustomerStatusUpdateSchema),
+  async (req, res, next) => {
+    try {
+      const { customer, previousStatus } = await customerService.setCustomerStatus(req.params.id, req.body.status);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'customer.status_change',
+        targetType: 'User',
+        targetId: customer.id,
+        before: { status: previousStatus },
+        after: { status: customer.status },
+        ...requestMeta(req),
+      });
+      sendData(res, customer);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 export default router;

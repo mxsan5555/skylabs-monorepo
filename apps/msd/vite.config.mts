@@ -37,7 +37,7 @@ export default defineConfig(() => ({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['../../packages/shared-ui/src/testing/index.ts'],
-    include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    include: ['{src,tests,prerender}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     reporters: ['default'],
     coverage: {
       reportsDirectory: '../../coverage/apps/msd',

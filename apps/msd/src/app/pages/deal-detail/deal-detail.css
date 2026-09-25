@@ -201,23 +201,6 @@ a.deal-detail__provider:focus-visible {
   font-weight: 600;
   color: var(--md-sys-color-primary);
 }
-
-.deal-detail__cta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 16px 0;
-}
-
-.deal-detail__add-btn {
-  flex: 1;
-}
-.deal-detail__action-icon {
-  width: 48px;
-  height: 48px;
-  flex-shrink: 0;
-}
-
 .deal-detail__action-icon md-icon,
 .deal-detail__action-icon sky-icon {
   font-size: 24px;
@@ -366,6 +349,105 @@ a.deal-detail__provider:focus-visible {
   outline: 2px solid var(--md-sys-color-primary);
   outline-offset: 2px;
 }
+.deal-detail__cta {
+  width: 100%;
+  margin: 16px 0;
+}
+
+.deal-detail__purchase {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 16px;
+}
+
+.deal-detail__quantity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 1rem;
+}
+
+.deal-detail__quantity-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.deal-detail__quantity-control button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.deal-detail__quantity-control button:hover:not(:disabled) {
+  background: var(--md-sys-color-surface-container-high);
+}
+
+.deal-detail__quantity-control button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.deal-detail__quantity-control span {
+  min-width: 24px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.deal-detail__total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 1rem;
+}
+
+.deal-detail__total strong {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+/* Add to Cart + Wishlist + Share */
+.deal-detail__action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.deal-detail__add-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+.deal-detail__action-icon {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+.deal-detail__action-icon md-icon,
+.deal-detail__action-icon sky-icon {
+  font-size: 24px;
+}
+.deal-detail__total strong {
+  color:var(--md-sys-color-primary) !important;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 960px) {
   .deal-detail__layout {
@@ -375,15 +457,12 @@ a.deal-detail__provider:focus-visible {
   }
 }
 @media (max-width: 480px) {
-  .deal-detail__cta {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    align-items: center;
-    gap: 8px;
+  .deal-detail__purchase {
+    gap: 14px;
   }
 
-  .deal-detail__add-btn {
-    width: 100%;
+  .deal-detail__action-row {
+    gap: 8px;
   }
 
   .deal-detail__action-icon {
@@ -394,5 +473,14 @@ a.deal-detail__provider:focus-visible {
   .deal-detail__action-icon md-icon,
   .deal-detail__action-icon sky-icon {
     font-size: 22px;
+  }
+
+  .deal-detail__quantity-control {
+    gap: 10px;
+  }
+
+  .deal-detail__quantity-control button {
+    width: 34px;
+    height: 34px;
   }
 }

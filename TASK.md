@@ -15,6 +15,24 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] Add the CI check as a required status check in branch protection
 - [ ] After each `release → main`, back-merge `main → develop` (recurring — see `DEPLOYMENT.md`)
 
+### Deploy msd-api (Railway + Neon + Cloudflare R2) — see `DEPLOYMENT.md → Deploying msd-api`
+- [x] **Code:** media storage switched from local disk to Cloudflare R2 —
+      `lib/media-storage.ts` (S3 client, lazy init), removed `/media` static mount in
+      `app.ts`, added `R2_*` to `config/env.ts` + `.env.example`, added
+      `@aws-sdk/client-s3`. Frontend `resolveMediaUrl()` now prefixes
+      `VITE_MEDIA_BASE_URL` (images served directly from R2); media tests updated — 2026-09-08
+- [x] **Security:** blanked the real secrets in `apps/msd-api/.env.example` (now a
+      pure template) — 2026-09-08
+- [ ] **Security follow-up:** rotate the previously-committed secrets at each provider
+      (Gmail app password, ConnectExpress SMS key, Razorpay keys, `JWT_SECRET`) — they
+      remain in git history
+- [ ] Locally: point `DATABASE_URL` at Neon, `prisma generate` + `migrate deploy` + `seed`, verify `/docs`
+- [ ] Railway: new service from repo, build `npm ci && npx nx build msd-api`, start `node dist/apps/msd-api/main.js`, deploy step runs `prisma generate` + `migrate deploy`
+- [ ] Railway env vars: `DATABASE_URL` (Neon), JWT/OTP/OAuth/SMTP/SMS/Razorpay, `CORS_ORIGIN` (Vercel domain), `R2_*`
+- [ ] Cloudflare R2: create `msd-media` bucket + API token + public URL
+- [ ] Set `VITE_API_URL` on the msd Vercel project to the Railway origin + redeploy; update Google OAuth redirect URI
+- [ ] Verify: `/docs` on Railway, image upload lands in R2 + survives a redeploy, live msd sign-in with no CORS errors
+
 ## Backlog
 
 ### MSD — Consumer storefront (pages + shell)
@@ -33,10 +51,43 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] New type definitions: Deal, Category, Subcategory, CartItem, WishlistItem, SearchFilter, SearchView, PriceLevel, CheckoutStep, DealSort — 2026-07-12
 - [x] Routes: added /explore, /category/:slug, /deal/:id, /cart, /wishlist (RequireAuth), /checkout (RequireAuth) to PublicLayout — 2026-07-12
 - [x] Wired CartProvider + WishlistProvider in main.tsx — 2026-07-12
+- [x] msd shell plan 1: location provider (saved/browser/IP), shared catalog shell, SiteHeader, MobileTabBar — 2026-09-22
+- [x] msd shell plan 2: SiteFooter, Seo component, JSON-LD, city landing pages — 2026-09-23
+- [x] msd shell plan 3: home page (10 fixed sections, CardRail, SectionHead, Seo + ItemList/FAQPage JSON-LD, location-aware catalog fetch) — 2026-09-23
+- [x] msd shell plan 4: build-time prerender (`/`, every `/category/:slug`, deal-category `/category/:slug/:city`) with `__MSD_DATA__` payload hydration, `spa.html` SPA rewrite, timed-out/unreachable-API fallback, sitemap.xml/robots.txt/llms.txt — 2026-09-24
 
 ### Content pages — both apps (`pages/` + route)
 - [ ] Contact page~
 - [ ] Blog category (filtered list)
+
+### msd shell — follow-ups
+- [ ] msd: create `/member` page (header "Become a Member" links to it)
+- [ ] msd: newsletter backend (msd-api table + endpoint) for footer signup
+- [ ] msd: transparent/dark-mode logo asset (`logo.jpg` has a white background)
+- [ ] msd: fix pre-existing lint (~43 errors) and tsc (~28 errors) so CI `nx affected -t lint` passes
+- [ ] msd: staff/admin "Account" on phones lands in admin console without bottom nav (decide UX)
+- [ ] msd: 10 public pages render their own `<main>` inside PublicLayout's `<main>` (about, become-vendor, blog, blog-detail, careers, checkout, contact, how-it-works, showcase, website-page): change page roots to div/article
+- [ ] msd: tell the user when 'Use my current location' fails or is >75 km from any partner city
+- [ ] msd: header/tab bar tests for search submit, signed-in account menu, useAccountLinks role branches
+- [x] msd: pages without their own `<title>`/`Seo`: checked, none missing. account/profile.tsx and my-account/profile.tsx get their titles from `AdminPage`; dashboard-process-flow.tsx, profile-form.tsx and my-account/my-account-layout.tsx are components, not routes
+- [ ] msd: /help and /gifting footer links have no routes (404)
+- [ ] msd: other public pages without a meta description (cart, sign-in, otp, orders, invoice, choose-experience) should move to Seo
+- [ ] msd: footer brand block contact details (phone/email) pending from owner
+- [ ] msd: when the custom domain goes live, set VITE_SITE_URL (the website origin, e.g. https://www.myspadeal.in, not the API) for Vercel Production and redeploy; until then canonicals/OG/most JSON-LD and sitemap/robots/llms are omitted. VITE_API_URL (already set to the Railway msd-api) is used for prerender data; PRERENDER_API_URL is optional. The Vercel build machine must reach the Railway msd-api.
+- [ ] msd: on the first Vercel preview verify /api/geo, that `/category/x/` and `/spa.html` 308 to `/category/x` and `/spa` (trailingSlash/cleanUrls), and that non-prerendered routes get the SPA shell via the `/spa` rewrite
+- [ ] msd: add a Vercel deploy hook (cron or on catalog change) so prerendered pages rebuild when deals change
+- [ ] msd: decide whether /category/product and /category/therapy should be indexable or redirect to /products and /therapists
+- [ ] msd: add prerender/ to a tsconfig so it's type-checked
+- [ ] msd: showcase.tsx and unused product-card.tsx still use camelCase props on raw custom elements (fix if ever prerendered; delete product-card.tsx if unused)
+- [ ] msd: audit app-level CSS in dark theme now that the footer theme switch exposes it
+- [ ] msd: city filter for products/therapists APIs so Product/Therapy city pages and popular searches can include them
+- [ ] msd: popular searches are only in the client render until plan 4 seeds the catalog into the prerender
+- [ ] msd: shared --sky-content-max token for 1280px/16px containers (header, footer, home)
+- [ ] msd: migrate remaining useCurrentLocation callers (category, search, therapists, vendor) to useVisitorLocation
+- [ ] msd: move /categories, therapists, orders, invoices and payments off `category.css` onto PageSection/CardGrid, then delete `category.css`
+
+#### Plan 4 prerender prerequisites
+- [x] (e) decided: gift/member `sky-feature-card` copy stays in shadow DOM. It is promotional, not a search landing target; the crawlable content on home is the h1, tiles, deals JSON-LD, How it works, directory and FAQ. See spec section 8.1.
 
 ### Account & admin — both apps (remaining)
 - [ ] Logout from inside the console (currently in the public header)
@@ -44,13 +95,12 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [ ] Real role assignment + enforcement once backends exist (JWT claim + per-request API check); remove the "View as" demo switcher
 - [ ] Replace localStorage account store with profile API
 
-### Backends — one per app (deferred until pages need real data)
-- [ ] Scaffold `apps/msd-api` (Express + TS, `@nx/express`)
-- [ ] Scaffold `apps/mera-driver-api` (Express + TS)
-- [ ] PostgreSQL + Prisma schema per domain (massage deals / driver booking)
-- [ ] Zod + `zod-to-openapi` validation & spec, `swagger-ui-express` at `/docs`
-- [ ] Auth endpoints: phone/email OTP, Google OAuth, JWT issue/verify
-- [ ] Domain endpoints (blog, profile, admin, deals/bookings)
+### Backends — one per app
+- [x] `apps/msd-api` built: Express + TS, PostgreSQL + Prisma (35+ migrations), Zod +
+      `zod-to-openapi` + `swagger-ui-express` at `/docs`, OTP/Google/JWT auth, dynamic
+      RBAC, media uploads, business modules (Customers/Vendors/Orders/Products/
+      Inventory/Reports) — see `CLAUDE.md`, `ARCHITECTURE.md`, `DEVELOPER_PROCESS.md`
+- [ ] `apps/mera-driver-api` — same pattern, own DB + bucket (pending)
 
 ### Auth integration (after backends)
 - [ ] Wire sign-in / OTP / Google to real endpoints (replace mock token)
@@ -137,7 +187,7 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] `ARCHITECTURE.md`, `PLANNING.md`, `TASK.md`, updated `CLAUDE.md`
 
 ### AI Dev Team
-- [x] Project-scoped agent team: 6 agents (`skylabs-abhi`, `skylabs-ravi`, `skylabs-neha`, `skylabs-dev`, `skylabs-vivek`, `skylabs-reena`) in `.claude/agents/` — 2026-07-18
+- [x] Project-scoped agent team: 6 agents (`skylabs-abhi`, `skylabs-ravi`, `skylabs-neha`, `skylabs-dev`, `skylabs-udaya`, `skylabs-reena`) in `.claude/agents/` — 2026-07-18
 - [x] 8 skill reference docs in `.claude/skills/` (msd-stack, mera-driver-stack, skylabs-auth, skylabs-api, shared-ui-usage, skylabs-testing, skylabs-seo, skylabs-content) — 2026-07-18
 - [x] 5 command pipelines in `.claude/commands/` (`/msd-feature`, `/mera-driver-feature`, `/new-endpoint`, `/new-shared-component`, `/skylabs-audit`) — 2026-07-18
 - [x] Updated `CLAUDE.md`, `PLANNING.md`, `ARCHITECTURE.md`, `TASK.md` with AI dev team docs — 2026-07-18

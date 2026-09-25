@@ -129,6 +129,10 @@ export interface BootstrapResponse {
    *  this). This is the ownership signal the driver self-service portal's route guard and
    *  post-login redirect key off, not a role-name check. */
   driver?: { id: string; firstName: string; lastName: string | null; status: string } | null;
+  /** The Customer record linked to this User, if any (mera-driver only — msd never
+   *  populates this). Exact parallel to `driver` above — the ownership signal the customer
+   *  self-service portal's route guard and post-login redirect key off, not a role-name check. */
+  customer?: { id: string; firstName: string; lastName: string | null; accountStatus: string } | null;
 }
 
 export interface AuditLogEntry {

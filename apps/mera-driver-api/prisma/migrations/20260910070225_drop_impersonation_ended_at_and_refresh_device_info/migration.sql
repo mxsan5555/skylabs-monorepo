@@ -6,7 +6,7 @@
 
 */
 -- AlterTable
-ALTER TABLE "ImpersonationSession" DROP COLUMN "endedAt";
+ALTER TABLE "ImpersonationSession" DROP COLUMN IF EXISTS "endedAt";
 
 -- AlterTable
-ALTER TABLE "RefreshSession" DROP COLUMN "deviceInfo";
+ALTER TABLE "RefreshSession" DROP COLUMN IF EXISTS "deviceInfo";

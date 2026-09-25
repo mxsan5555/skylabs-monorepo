@@ -40,12 +40,21 @@ const KYC_STATUS_MAP: Record<string, 'success' | 'warning' | 'error'> = {
   REJECTED: 'error',
 };
 
+/** `Vendor.createdByUserId` doubles as the Source signal (see msd-api's own doc comment on that
+ *  column): ADMIN when an admin created the vendor via "Add Vendor", WEBSITE when it arrived
+ *  through the public "Become a Vendor" self-registration (`createdByUserId: null`). */
+const SOURCE_STATUS_MAP: Record<string, 'success' | 'warning' | 'error' | 'info'> = {
+  ADMIN: 'info',
+  WEBSITE: 'success',
+};
+
 const VENDOR_COLUMNS = JSON.stringify([
   { key: 'Business Name', label: 'Business Name' },
   { key: 'Owner', label: 'Owner' },
   { key: 'Contact', label: 'Contact' },
   { key: 'Status', label: 'Status', type: 'status', statusMap: VENDOR_STATUS_MAP },
   { key: 'KYC Status', label: 'KYC Status', type: 'status', statusMap: KYC_STATUS_MAP },
+  { key: 'Source', label: 'Source', type: 'status', statusMap: SOURCE_STATUS_MAP },
   { key: 'Branch Count', label: 'Branch Count' },
 ]);
 
@@ -63,6 +72,7 @@ function toVendorRow(vendor: Vendor): Record<string, string | number> {
     Contact: vendor.businessPhone || vendor.ownerMobile || '—',
     Status: vendor.status,
     'KYC Status': vendor.kycStatus,
+    Source: vendor.createdByUserId ? 'ADMIN' : 'WEBSITE',
     'Branch Count': vendor._count?.branches ?? 0,
   };
 }

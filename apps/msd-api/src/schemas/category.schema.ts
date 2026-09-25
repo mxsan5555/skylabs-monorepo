@@ -20,7 +20,7 @@ const slugString = z
 export const CategoryListQuerySchema = PaginationQuerySchema.extend({
   search: z.string().max(200).optional(),
   scope: z.enum(['top', 'sub', 'leaf']).optional(),
-  parentId: z.string().uuid().optional(),
+  parentId: z.string().uuid().nullable().optional(),
   type: z.enum(['SERVICE', 'PRODUCT', 'THERAPY']).optional(),
   vendorId: z.string().uuid().optional(),
 });
@@ -30,14 +30,12 @@ const CategoryFieldsSchema = z.object({
   slug: slugString,
   description: z.string().max(2000).optional(),
   /** Present + a real Category id → this row is a subcategory. Omitted/undefined → top-level. */
-  parentId: z.string().uuid().optional(),
+  parentId: z.string().uuid().nullable().optional(),
   sortOrder: z.number().int().min(0).default(0),
   /** Only meaningful on a top-level row (parentId omitted) — a subcategory inherits its
    *  parent's type by join, never carries its own (see Category's schema doc comment and
    *  the `Category_type_required_for_top_level` DB check constraint). */
   type: z.enum(['SERVICE', 'PRODUCT', 'THERAPY']).optional(),
-  /** Drives the storefront's "Popular Category"/"Popular Therapy" carousels. */
-  isPopular: z.boolean().optional(),
 });
 
 export const CategoryCreateSchema = CategoryFieldsSchema

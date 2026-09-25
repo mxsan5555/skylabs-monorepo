@@ -3,6 +3,7 @@ import type { MdFilledButton } from '@material/web/button/filled-button.js';
 import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
 import {
   createVendor,
+  getVendor,
   getVendorCategoryAccess,
   listBranches,
   listCategories,
@@ -13,17 +14,17 @@ import {
   type AdminTherapist,
   type Branch,
   type Category,
-  type UserSummary,
   type Vendor,
   type VendorCategoryAccessRow,
+  type VendorCreateInput,
   type VendorFields,
   type VendorProduct,
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { VendorUserPicker } from './vendor-user-picker';
+import { VendorUserPicker, type PendingVendorOwner } from './vendor-user-picker';
 import { VendorProfileForm, extractVendorFieldErrors, type VendorFieldErrors } from './vendor-profile-form';
 import { MediaUploader } from '../../../components/media-uploader';
-import { VendorModulesAndCategoryAccess } from './vendor-wizard-modules';
+import { VendorProductCategoryAccess } from './vendor-wizard-modules';
 import { VendorBranchListStep } from './vendor-wizard-branches';
 import { VendorDealsStep } from './vendor-wizard-deals';
 import { VendorTherapistsStep } from './vendor-wizard-therapists';
@@ -98,7 +99,10 @@ export function VendorPipeline({
   onReject,
 }: VendorPipelineProps) {
   const [vendor, setVendor] = useState<Vendor | null>(initialVendor);
-  const [pendingOwner, setPendingOwner] = useState<UserSummary | null>(initialVendor?.owner ?? null);
+  // Only ever rendered/read before the Vendor row exists at all (see the `!vendor` branch
+  // below) — once `saveUser()` succeeds, `vendor` is set and `VendorUserPicker` never renders
+  // again for this vendor, so there's no "seed from an already-linked owner" case to handle.
+  const [pendingOwner, setPendingOwner] = useState<PendingVendorOwner | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<VendorFieldErrors | null>(null);
@@ -125,7 +129,7 @@ export function VendorPipeline({
 
   useEffect(() => {
     setVendor(initialVendor);
-    setPendingOwner(initialVendor?.owner ?? null);
+    setPendingOwner(null);
     setError('');
     setFieldErrors(null);
     setActiveStep(1);
@@ -183,9 +187,17 @@ export function VendorPipeline({
     setSaving(true);
     setError('');
     try {
-      const { data } = vendor
-        ? await updateVendor(token, vendor.id, { ownerUserId: pendingOwner.id })
-        : await createVendor(token, { ownerUserId: pendingOwner.id });
+      // Always a brand-new owner identity — the backend independently creates the User from
+      // these fields (or rejects outright if the email/mobile already belongs to anyone), never
+      // trusting anything decided client-side (see `createVendorOwner`'s own doc comment in
+      // msd-api's vendor.service.ts). There is no "reuse an existing user" path.
+      const input: VendorCreateInput = {
+        ownerFirstName: pendingOwner.ownerFirstName,
+        ownerLastName: pendingOwner.ownerLastName,
+        ownerEmail: pendingOwner.ownerEmail,
+        ownerMobile: pendingOwner.ownerMobile,
+      };
+      const { data } = vendor ? await updateVendor(token, vendor.id, input) : await createVendor(token, input);
       setVendor(data);
       onVendorChange(data);
     } catch (err) {
@@ -213,16 +225,32 @@ export function VendorPipeline({
     }
   };
 
+  // A branch save may have gone through `BranchDialog`'s "Categories & Subcategories" section,
+  // which can auto-grant a vendor-level `VendorCategoryAccess` row + flip `offersService`/
+  // `offersTherapy` server-side (see `setBranchCategoryAccess`'s own doc comment in
+  // msd-api's vendor.service.ts). Both `vendor` and `categoryAccess` are otherwise only ever
+  // fetched once (the bulk-load effect above) — without this refetch they'd go stale, and the
+  // NEXT "Save product categories" click in `VendorProductCategoryAccess` would resubmit the
+  // stale (pre-grant) `offersService`/`offersTherapy`/`categoryIds`, silently wiping out the
+  // branch-level auto-grant via that endpoint's replace-the-full-set semantics.
   const handleBranchesChange = (next: Branch[]) => {
     setBranches(next);
     reloadDealCount(next);
+    if (!vendorId) return;
+    getVendor(token, vendorId)
+      .then(({ data }) => {
+        setVendor(data);
+        onVendorChange(data);
+      })
+      .catch(() => {});
+    getVendorCategoryAccess(token, vendorId).then(({ data }) => setCategoryAccess(data)).catch(() => {});
   };
 
   if (!vendor) {
     return (
       <div className="admin-page">
         {error && <p className="error-state" role="alert">{error}</p>}
-        <VendorUserPicker selectedUser={pendingOwner} onSelect={setPendingOwner} />
+        <VendorUserPicker value={pendingOwner} onChange={setPendingOwner} disabled={saving} />
         <div className="form-actions">
           <FilledButton ref={saveButtonRef} onClick={saveUser} disabled={!pendingOwner || saving}>
             {saving ? 'Creating…' : 'Create Vendor'}
@@ -298,9 +326,9 @@ export function VendorPipeline({
       )}
 
       {activeStep === 2 && (
-        <section aria-label="Branches, Modules & Category Access">
-          <h2 className="section-title">Step 2: Branches, Modules &amp; Category Access</h2>
-          <VendorModulesAndCategoryAccess
+        <section aria-label="Branches & Access">
+          <h2 className="section-title">Step 2: Branches &amp; Access</h2>
+          <VendorProductCategoryAccess
             token={token}
             vendorId={vendor.id}
             isSelf={false}
@@ -312,7 +340,13 @@ export function VendorPipeline({
               setCategoryAccess(nextAccess);
             }}
           />
-          <VendorBranchListStep token={token} vendorId={vendor.id} canEdit branches={branches} onBranchesChange={handleBranchesChange} />
+          <VendorBranchListStep
+            token={token}
+            vendorId={vendor.id}
+            canEdit
+            branches={branches}
+            onBranchesChange={handleBranchesChange}
+          />
         </section>
       )}
 

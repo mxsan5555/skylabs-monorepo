@@ -17,7 +17,7 @@ vi.mock('../../../../api/rbac/vendors', async () => {
   };
 });
 
-import { VendorModulesAndCategoryAccess } from './vendor-wizard-modules';
+import { VendorProductCategoryAccess } from './vendor-wizard-modules';
 
 /**
  * `<md-filled-button>` is a Material Web custom element — jsdom's accessibility tree doesn't
@@ -27,19 +27,17 @@ import { VendorModulesAndCategoryAccess } from './vendor-wizard-modules';
  */
 function findSaveButton(): HTMLElement {
   const el = Array.from(document.querySelectorAll('md-filled-button')).find((node) =>
-    (node.textContent ?? '').includes('Save modules & category access'),
+    (node.textContent ?? '').includes('Save product categories'),
   );
   if (!el) throw new Error('Save button not found');
   return el as HTMLElement;
 }
 
-function cat(id: string, name: string, type: Category['type'] = 'SERVICE'): Category {
+function cat(id: string, name: string, type: Category['type'] = 'PRODUCT'): Category {
   return { id, name, slug: id, parentId: null, isActive: true, type };
 }
 
-const SERVICE_CATS = [cat('svc-1', 'Massage'), cat('svc-2', 'Spa')];
-const PRODUCT_CATS = [cat('prod-1', 'Oils', 'PRODUCT')];
-const THERAPY_CATS = [cat('ther-1', 'Physiotherapy', 'THERAPY')];
+const PRODUCT_CATS = [cat('prod-1', 'Oils'), cat('prod-2', 'Supplements')];
 
 function baseVendor(overrides: Partial<Vendor> = {}): Vendor {
   return {
@@ -66,7 +64,7 @@ function renderModules(vendor: Vendor, access: VendorCategoryAccessRow[] = []) {
   const onSaved = vi.fn();
   render(
     <ToastProvider>
-      <VendorModulesAndCategoryAccess token="tok" vendorId={vendor.id} isSelf={false} vendor={vendor} access={access} onSaved={onSaved} />
+      <VendorProductCategoryAccess token="tok" vendorId={vendor.id} isSelf={false} vendor={vendor} access={access} onSaved={onSaved} />
     </ToastProvider>,
   );
   return { onSaved };
@@ -74,101 +72,136 @@ function renderModules(vendor: Vendor, access: VendorCategoryAccessRow[] = []) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  listCategoriesMock.mockImplementation((_token: string | null, opts: { type: string }) => {
-    if (opts.type === 'SERVICE') return Promise.resolve({ data: SERVICE_CATS });
-    if (opts.type === 'PRODUCT') return Promise.resolve({ data: PRODUCT_CATS });
-    return Promise.resolve({ data: THERAPY_CATS });
-  });
+  listCategoriesMock.mockResolvedValue({ data: PRODUCT_CATS });
 });
 
 /**
- * Feature: Vendor onboarding Step 2 — Business Modules + Category Access
- * Scenario: Category checklists are scoped to enabled modules only
+ * Feature: Vendor onboarding Step 2 — Product Categories (Service/Therapy moved to per-branch)
+ * Scenario: Service/Therapy category access is now managed entirely inside `BranchDialog`
+ * (`vendor-branches.tsx`) — this screen only ever renders the Product module toggle and its own
+ * Product category checklist.
  *
- * Given: a vendor with no business modules enabled yet
+ * Given: a vendor with the Product module enabled or disabled
  * When: Step 2 renders
- * Then: no category checklist is shown, only an empty-state hint
+ * Then: only a Product checkbox and Product category checklist ever appear — never a
+ *       Service/Therapy checkbox or category
  *
  * Edge cases:
- * - enabling a module reveals only that module's categories
- * - disabling a previously-enabled module drops its granted categories from the save payload
+ * - disabling Product drops its granted categories from the save payload
+ * - any pre-existing Service/Therapy grants (created by the branch-level flow) are carried
+ *   through the save payload untouched, never wiped by this Product-only screen
  */
-describe('VendorModulesAndCategoryAccess — module-scoped category checklists', () => {
-  it('shows an empty state and no category groups when no module is enabled', async () => {
+describe('VendorProductCategoryAccess — Product-only scope', () => {
+  it('fetches only PRODUCT categories, never SERVICE/THERAPY', async () => {
+    renderModules(baseVendor({ offersProduct: true }));
+    await waitFor(() => expect(listCategoriesMock).toHaveBeenCalledWith('tok', { type: 'PRODUCT' }));
+    expect(listCategoriesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('never renders a Service or Therapy checkbox', async () => {
+    renderModules(baseVendor({ offersProduct: true }));
+    await waitFor(() => expect(screen.getByText('Oils')).toBeTruthy());
+    expect(screen.queryByRole('checkbox', { name: 'Service' })).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: 'Therapy' })).toBeNull();
+  });
+
+  it('shows an empty state and no category checklist when Product is not enabled', async () => {
     renderModules(baseVendor());
     await waitFor(() => expect(listCategoriesMock).toHaveBeenCalled());
-    expect(screen.getByText('Enable a business module above to grant it categories.')).toBeTruthy();
-    expect(screen.queryByText('Massage')).toBeNull();
+    expect(screen.getByText('Enable the Product module above to grant it categories.')).toBeTruthy();
     expect(screen.queryByText('Oils')).toBeNull();
   });
 
-  it('reveals only the Service category group when only Service is enabled', async () => {
-    renderModules(baseVendor({ offersService: true }));
-    await waitFor(() => expect(screen.getByText('Massage')).toBeTruthy());
-    expect(screen.getByText('Spa')).toBeTruthy();
-    // Product/Therapy categories must not leak in when their module isn't enabled.
-    expect(screen.queryByText('Oils')).toBeNull();
-    expect(screen.queryByText('Physiotherapy')).toBeNull();
+  it('reveals the Product category checklist once the Product module is enabled', async () => {
+    renderModules(baseVendor({ offersProduct: true }));
+    await waitFor(() => expect(screen.getByText('Oils')).toBeTruthy());
+    expect(screen.getByText('Supplements')).toBeTruthy();
   });
 
-  it('reveals both Service and Product groups when both modules are enabled', async () => {
-    renderModules(baseVendor({ offersService: true, offersProduct: true }));
-    await waitFor(() => expect(screen.getByText('Massage')).toBeTruthy());
-    expect(screen.getByText('Oils')).toBeTruthy();
-    expect(screen.queryByText('Physiotherapy')).toBeNull();
-  });
-
-  it('pre-checks categories already present in the `access` prop', async () => {
-    const vendor = baseVendor({ offersService: true });
+  it('pre-checks Product categories already present in the `access` prop', async () => {
+    const vendor = baseVendor({ offersProduct: true });
     const access: VendorCategoryAccessRow[] = [
-      { id: 'a1', vendorId: vendor.id, categoryId: 'svc-1', createdAt: '2026-01-01T00:00:00Z', category: SERVICE_CATS[0] },
+      { id: 'a1', vendorId: vendor.id, categoryId: 'prod-1', createdAt: '2026-01-01T00:00:00Z', category: PRODUCT_CATS[0] },
     ];
     renderModules(vendor, access);
-    await waitFor(() => expect(screen.getByText('Massage')).toBeTruthy());
-    const massageCheckbox = screen.getByRole('checkbox', { name: 'Massage' }) as HTMLInputElement;
-    const spaCheckbox = screen.getByRole('checkbox', { name: 'Spa' }) as HTMLInputElement;
-    expect(massageCheckbox.checked).toBe(true);
-    expect(spaCheckbox.checked).toBe(false);
+    await waitFor(() => expect(screen.getByText('Oils')).toBeTruthy());
+    const oilsCheckbox = screen.getByRole('checkbox', { name: 'Oils' }) as HTMLInputElement;
+    const supplementsCheckbox = screen.getByRole('checkbox', { name: 'Supplements' }) as HTMLInputElement;
+    expect(oilsCheckbox.checked).toBe(true);
+    expect(supplementsCheckbox.checked).toBe(false);
   });
 
-  it('turning a module off removes its categories from the checklist and drops them from the saved grant set', async () => {
-    const vendor = baseVendor({ offersService: true });
+  it('turning Product off removes its checklist and drops its granted categories from the save payload', async () => {
+    const vendor = baseVendor({ offersProduct: true });
     const access: VendorCategoryAccessRow[] = [
-      { id: 'a1', vendorId: vendor.id, categoryId: 'svc-1', createdAt: '2026-01-01T00:00:00Z', category: SERVICE_CATS[0] },
+      { id: 'a1', vendorId: vendor.id, categoryId: 'prod-1', createdAt: '2026-01-01T00:00:00Z', category: PRODUCT_CATS[0] },
     ];
     setVendorModulesAndCategoryAccessMock.mockResolvedValue({ data: [] });
     renderModules(vendor, access);
-    await waitFor(() => expect(screen.getByText('Massage')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Oils')).toBeTruthy());
 
-    // Turn off the Service module — its checklist (and the previously-granted 'Massage') should vanish.
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Service' }));
-    expect(screen.queryByText('Massage')).toBeNull();
-    expect(screen.getByText('Enable a business module above to grant it categories.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Product' }));
+    expect(screen.queryByText('Oils')).toBeNull();
+    expect(screen.getByText('Enable the Product module above to grant it categories.')).toBeTruthy();
 
     fireEvent.click(findSaveButton());
     await waitFor(() => expect(setVendorModulesAndCategoryAccessMock).toHaveBeenCalled());
     const [, , payload] = setVendorModulesAndCategoryAccessMock.mock.calls[0];
-    expect(payload.offersService).toBe(false);
-    expect(payload.categoryIds).not.toContain('svc-1');
+    expect(payload.offersProduct).toBe(false);
+    expect(payload.categoryIds).not.toContain('prod-1');
   });
 
-  // Edge case: empty state — no active categories of an enabled module's type exist yet
-  it('shows a per-module empty state when an enabled module has zero active categories', async () => {
-    listCategoriesMock.mockImplementation((_token: string | null, opts: { type: string }) => {
-      if (opts.type === 'THERAPY') return Promise.resolve({ data: [] });
-      return Promise.resolve({ data: [] });
-    });
-    renderModules(baseVendor({ offersTherapy: true }));
-    await waitFor(() => expect(listCategoriesMock).toHaveBeenCalled());
-    expect(await screen.findByText('No active Therapy categories exist yet.')).toBeTruthy();
+  // Regression guard: `setVendorModulesAndCategoryAccess` is a replace-the-full-set call across
+  // EVERY category type, not just Product (see msd-api's own doc comment on that function) — a
+  // vendor's Service/Therapy grants are now created by the branch-level flow
+  // (`setBranchCategoryAccess`), and this Product-only screen must never wipe them by omitting
+  // them from the payload.
+  it('carries pre-existing Service/Therapy grants through the save payload untouched', async () => {
+    const vendor = baseVendor({ offersProduct: true, offersService: true, offersTherapy: true });
+    const access: VendorCategoryAccessRow[] = [
+      { id: 'a1', vendorId: vendor.id, categoryId: 'prod-1', createdAt: '2026-01-01T00:00:00Z', category: PRODUCT_CATS[0] },
+      { id: 'a2', vendorId: vendor.id, categoryId: 'svc-branch-granted', createdAt: '2026-01-01T00:00:00Z', category: cat('svc-branch-granted', 'Massage', 'SERVICE') },
+      { id: 'a3', vendorId: vendor.id, categoryId: 'ther-branch-granted', createdAt: '2026-01-01T00:00:00Z', category: cat('ther-branch-granted', 'Physiotherapy', 'THERAPY') },
+    ];
+    setVendorModulesAndCategoryAccessMock.mockResolvedValue({ data: [] });
+    renderModules(vendor, access);
+    await waitFor(() => expect(screen.getByText('Oils')).toBeTruthy());
+
+    fireEvent.click(findSaveButton());
+    await waitFor(() => expect(setVendorModulesAndCategoryAccessMock).toHaveBeenCalled());
+    const [, , payload] = setVendorModulesAndCategoryAccessMock.mock.calls[0];
+    expect(payload.offersService).toBe(true);
+    expect(payload.offersTherapy).toBe(true);
+    expect(payload.categoryIds).toEqual(expect.arrayContaining(['prod-1', 'svc-branch-granted', 'ther-branch-granted']));
+  });
+
+  // Edge case: empty state — no active Product categories exist yet
+  it('shows an empty state when Product is enabled but zero active Product categories exist', async () => {
+    listCategoriesMock.mockResolvedValue({ data: [] });
+    renderModules(baseVendor({ offersProduct: true }));
+    expect(await screen.findByText('No active Product categories exist yet.')).toBeTruthy();
   });
 
   // Edge case: error state — save fails
   it('shows an inline error message when saving fails', async () => {
     setVendorModulesAndCategoryAccessMock.mockRejectedValue(new Error('network down'));
-    renderModules(baseVendor({ offersService: true }));
-    await waitFor(() => expect(screen.getByText('Massage')).toBeTruthy());
+    renderModules(baseVendor({ offersProduct: true }));
+    await waitFor(() => expect(screen.getByText('Oils')).toBeTruthy());
     fireEvent.click(findSaveButton());
-    expect(await screen.findByText('Could not save business modules and category access.')).toBeTruthy();
+    expect(await screen.findByText('Could not save product categories.')).toBeTruthy();
+  });
+
+  it('isSelf routes the save through setMyVendorModulesAndCategoryAccess, never the admin-scoped function', async () => {
+    setMyVendorModulesAndCategoryAccessMock.mockResolvedValue({ data: [] });
+    const vendor = baseVendor({ offersProduct: true });
+    render(
+      <ToastProvider>
+        <VendorProductCategoryAccess token="tok" vendorId={vendor.id} isSelf vendor={vendor} access={[]} onSaved={vi.fn()} />
+      </ToastProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('Oils')).toBeTruthy());
+    fireEvent.click(findSaveButton());
+    await waitFor(() => expect(setMyVendorModulesAndCategoryAccessMock).toHaveBeenCalled());
+    expect(setVendorModulesAndCategoryAccessMock).not.toHaveBeenCalled();
   });
 });

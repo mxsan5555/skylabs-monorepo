@@ -1,0 +1,56 @@
+.become-vendor {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px 72px;
+}
+
+.become-vendor__hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 8px 0 32px;
+}
+
+.become-vendor__hero h1 {
+  margin: 0;
+  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--md-sys-color-on-surface, #1a1c19);
+}
+
+.become-vendor__hero p {
+  margin: 0;
+  font-size: 1.075rem;
+  color: var(--md-sys-color-on-surface-variant, #424940);
+}
+
+.become-vendor__success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 64px 16px;
+  color: var(--md-sys-color-on-surface, #1a1c19);
+}
+
+.become-vendor__success md-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  color: var(--md-sys-color-primary, #3a693c);
+}
+
+.become-vendor__success h1 {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.become-vendor__success p {
+  margin: 0;
+  max-width: 480px;
+  color: var(--md-sys-color-on-surface-variant, #424940);
+  line-height: 1.6;
+}

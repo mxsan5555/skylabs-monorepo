@@ -2,70 +2,135 @@ import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import type { DashboardStats } from '../../../api/rbac/dashboard';
 import { formatINR } from '../../../utils/format';
 
-interface Stage {
-  key: string;
-  label: string;
-  value: (stats: DashboardStats) => string;
-}
-
-const nf = (n: number) => n.toLocaleString('en-IN');
-
-/** The marketplace's real business flow, each stage annotated with its live count from the
- *  same `GET /dashboard/stats` payload the stat widgets use — informational only, no CRUD. */
-const STAGES: Stage[] = [
-  { key: 'category', label: 'Category', value: (s) => nf(s.categories) },
-  { key: 'sub-category', label: 'Sub Category', value: (s) => nf(s.subCategories) },
-  { key: 'product', label: 'Product', value: (s) => `${nf(s.products)} products` },
-  { key: 'vendor', label: 'Vendor', value: (s) => nf(s.vendors) },
-  { key: 'branch', label: 'Branch', value: (s) => nf(s.branches) },
-  { key: 'deal-package', label: 'Deal / Package', value: (s) => nf(s.deals) },
-  { key: 'customer-order', label: 'Customer Order', value: (s) => `${nf(s.orders)} orders` },
-  { key: 'payment-revenue', label: 'Payment / Revenue', value: (s) => formatINR(Number(s.revenue)) },
-];
-
-interface DashboardProcessFlowProps {
+interface DashboardMarketplaceOverviewProps {
   stats: DashboardStats | null;
   loading: boolean;
   error: string;
 }
 
-/**
- * Marketplace-wide "how a listing turns into revenue" overview: Category → Sub Category →
- * Product → Vendor → Branch → Deal/Package → Customer Order → Payment/Revenue.
- * Gated by the caller (`dashboard.tsx`, on a permission check, not a role-name check) — this
- * component just renders whatever `stats` it's handed and its own loading/error/empty states.
- */
-export function DashboardProcessFlow({ stats, loading, error }: DashboardProcessFlowProps) {
-  return (
-    <section className="panel process-flow" aria-labelledby="process-flow-heading">
-      <h2 id="process-flow-heading" className="section-title">
-        Marketplace Flow
-      </h2>
+interface MarketplaceMetric {
+  label: string;
+  value: string;
+  icon: string;
+}
 
-      {loading && <p className="loading-state">Loading marketplace flow…</p>}
+export function DashboardProcessFlow({
+  stats,
+  loading,
+  error,
+}: DashboardMarketplaceOverviewProps) {
+  const catalogMetrics: MarketplaceMetric[] = [
+    {
+      label: 'Categories',
+      value: stats ? stats.categories.toLocaleString('en-IN') : '—',
+      icon: 'category',
+    },
+    {
+      label: 'Sub Categories',
+      value: stats ? stats.subCategories.toLocaleString('en-IN') : '—',
+      icon: 'account_tree',
+    },
+    {
+      label: 'Products',
+      value: stats ? stats.products.toLocaleString('en-IN') : '—',
+      icon: 'inventory_2',
+    },
+    {
+      label: 'Deals',
+      value: stats ? stats.deals.toLocaleString('en-IN') : '—',
+      icon: 'local_offer',
+    },
+  ];
+
+  const supplyMetrics: MarketplaceMetric[] = [
+    {
+      label: 'Vendors',
+      value: stats ? stats.vendors.toLocaleString('en-IN') : '—',
+      icon: 'storefront',
+    },
+    {
+      label: 'Branches',
+      value: stats ? stats.branches.toLocaleString('en-IN') : '—',
+      icon: 'location_on',
+    },
+  ];
+
+  const activityMetrics: MarketplaceMetric[] = [
+    {
+      label: 'Orders',
+      value: stats ? stats.orders.toLocaleString('en-IN') : '—',
+      icon: 'shopping_bag',
+    },
+    {
+      label: 'Revenue',
+      value: stats ? formatINR(Number(stats.revenue)) : '—',
+      icon: 'payments',
+    },
+  ];
+
+  const groups = [
+    {
+      key: 'catalog',
+      title: 'CATALOG',
+      icon: 'inventory_2',
+      metrics: catalogMetrics,
+    },
+    {
+      key: 'supply',
+      title: 'SUPPLY',
+      icon: 'storefront',
+      metrics: supplyMetrics,
+    },
+    {
+      key: 'activity',
+      title: 'ACTIVITY',
+      icon: 'monitoring',
+      metrics: activityMetrics,
+    },
+  ];
+
+  return (
+    <section className="dashboard-marketplace" aria-label="Marketplace overview">
+      {loading && (
+        <p className="loading-state">Loading marketplace overview…</p>
+      )}
+
       {!loading && error && (
         <p className="error-state" role="alert">
           {error}
         </p>
       )}
-      {!loading && !error && !stats && <p className="empty-state">No flow data available yet.</p>}
 
-      {!loading && !error && stats && (
-        <ol className="process-flow__steps">
-          {STAGES.map((stage, i) => (
-            <li key={stage.key} className="process-flow__step">
-              <article className="stat-card process-flow__card">
-                <h3 className="stat-card__title">{stage.label}</h3>
-                <p className="stat-card__value process-flow__value">{stage.value(stats)}</p>
-              </article>
-              {i < STAGES.length - 1 && (
-                <Icon aria-hidden="true" className="process-flow__arrow">
-                  arrow_forward
-                </Icon>
-              )}
-            </li>
+      {!loading && !error && (
+        <div className="dashboard-marketplace__grid">
+          {groups.map((group) => (
+            <article
+              key={group.key}
+              className="dashboard-marketplace__group"
+            >
+              <div className="dashboard-marketplace__group-header">
+                <Icon aria-hidden="true">{group.icon}</Icon>
+                <h3>{group.title}</h3>
+              </div>
+
+              <div className="dashboard-marketplace__metrics">
+                {group.metrics.map((metric) => (
+                  <div
+                    key={metric.label}
+                    className="dashboard-marketplace__metric"
+                  >
+                    <div className="dashboard-marketplace__metric-label">
+                      <Icon aria-hidden="true">{metric.icon}</Icon>
+                      <span>{metric.label}</span>
+                    </div>
+
+                    <strong>{metric.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </article>
           ))}
-        </ol>
+        </div>
       )}
     </section>
   );

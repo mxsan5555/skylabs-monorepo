@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ToastProvider } from '../../../../toast/toast-context';
-import type { Branch, Category, VendorProduct } from '../../../../api/rbac/vendors';
+import type { Branch, BranchCategoryAccessRow, Category, VendorProduct } from '../../../../api/rbac/vendors';
 
 const listDealsMock = vi.fn();
 const createDealMock = vi.fn();
@@ -9,6 +9,10 @@ const updateDealMock = vi.fn();
 const setDealStatusMock = vi.fn();
 const approveDealMock = vi.fn();
 const rejectDealMock = vi.fn();
+// DealDialog's Category picker is now branch-scoped (`getBranchCategoryAccess`), not sourced
+// directly from the `categories` prop any more — see `DealDialog`'s own doc comment in
+// vendor-branches.tsx.
+const getBranchCategoryAccessMock = vi.fn();
 
 vi.mock('../../../../api/rbac/vendors', async () => {
   const actual = await vi.importActual<typeof import('../../../../api/rbac/vendors')>('../../../../api/rbac/vendors');
@@ -20,6 +24,7 @@ vi.mock('../../../../api/rbac/vendors', async () => {
     setDealStatus: (...args: unknown[]) => setDealStatusMock(...args),
     approveDeal: (...args: unknown[]) => approveDealMock(...args),
     rejectDeal: (...args: unknown[]) => rejectDealMock(...args),
+    getBranchCategoryAccess: (...args: unknown[]) => getBranchCategoryAccessMock(...args),
   };
 });
 
@@ -38,6 +43,17 @@ const SERVICE_CATEGORIES: Category[] = [
   { id: 'svc-1', name: 'Massage', slug: 'massage', parentId: null, isActive: true, type: 'SERVICE' },
   { id: 'svc-2', name: 'Facial', slug: 'facial', parentId: null, isActive: true, type: 'SERVICE' },
 ];
+
+// This branch's own mapping — the Category picker is scoped to THIS (not the vendor-wide
+// `categories` prop, which now only backs the "stale value" name lookup).
+const BRANCH_CATEGORY_ACCESS: BranchCategoryAccessRow[] = SERVICE_CATEGORIES.map((c) => ({
+  id: `bca-${c.id}`,
+  branchId: BRANCH.id,
+  categoryId: c.id,
+  createdAt: '2026-01-01T00:00:00Z',
+  category: c,
+  subcategories: [],
+}));
 
 const PRODUCT: VendorProduct = {
   id: 'product-1',
@@ -74,6 +90,7 @@ function renderStep(overrides: Partial<React.ComponentProps<typeof VendorDealsSt
 beforeEach(() => {
   vi.clearAllMocks();
   listDealsMock.mockResolvedValue({ data: [] });
+  getBranchCategoryAccessMock.mockResolvedValue({ data: BRANCH_CATEGORY_ACCESS });
 });
 
 /**
@@ -118,26 +135,35 @@ describe('VendorDealsStep — gating on branches + category/product availability
 
 /**
  * Feature: Vendor onboarding Step 3 — Deals
- * Scenario: the Service-offering Category select in the Add Deal dialog only offers the vendor's
- * granted SERVICE categories — the removed global Service master's dropdown is gone.
+ * Scenario: the Service-offering Category select in the Add Deal dialog is scoped to the ACTIVE
+ * BRANCH's own `BranchCategoryAccess` mapping (`getBranchCategoryAccess`), not the vendor-wide
+ * `categories` prop any more — the removed global Service master's dropdown is gone, and the
+ * vendor-wide grant list is now only a name-lookup fallback for a stale value (see `DealDialog`'s
+ * own doc comment in vendor-branches.tsx).
  */
 describe('VendorDealsStep — category-access-scoped Deal Category picker', () => {
-  it('lists exactly the vendor-granted SERVICE categories as Category options for a service deal', async () => {
+  it('lists exactly the branch-mapped SERVICE categories as Category options for a service deal', async () => {
     renderStep();
-    await waitFor(() => expect(listDealsMock).toHaveBeenCalled());
+    await waitFor(() => expect(getBranchCategoryAccessMock).toHaveBeenCalledWith('tok', 'vendor-1', BRANCH.id));
     // The default offering type is "service", so the Category select renders immediately.
-    const selects = Array.from(document.querySelectorAll('md-outlined-select'));
-    const categorySelect = selects.find((el) => el.textContent?.includes('Massage'));
-    expect(categorySelect).toBeTruthy();
-    const optionLabels = Array.from(categorySelect!.querySelectorAll('md-select-option')).map((o) => o.textContent?.trim());
+    const categorySelect = await waitFor(() => {
+      const selects = Array.from(document.querySelectorAll('md-outlined-select'));
+      const found = selects.find((el) => el.textContent?.includes('Massage'));
+      expect(found).toBeTruthy();
+      return found!;
+    });
+    const optionLabels = Array.from(categorySelect.querySelectorAll('md-select-option')).map((o) => o.textContent?.trim());
     expect(optionLabels).toEqual(['Select a category', 'Massage', 'Facial']);
   });
 
-  it('shows a "grant a category" hint instead of the Category select body when zero SERVICE categories are granted (product-only vendor)', async () => {
+  it('shows a "map a category" hint instead of the Category select body when zero categories are mapped to the branch (product-only vendor)', async () => {
+    getBranchCategoryAccessMock.mockResolvedValue({ data: [] });
     renderStep({ categories: [], products: [PRODUCT] });
-    await waitFor(() => expect(listDealsMock).toHaveBeenCalled());
-    expect(
-      screen.getByText('This business has no granted Service categories yet — grant one under Business Modules & Category Access first.'),
-    ).toBeTruthy();
+    await waitFor(() => expect(getBranchCategoryAccessMock).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(
+        screen.getByText('No categories are mapped to this branch yet — map one under Business Modules & Category Access first.'),
+      ).toBeTruthy(),
+    );
   });
 });

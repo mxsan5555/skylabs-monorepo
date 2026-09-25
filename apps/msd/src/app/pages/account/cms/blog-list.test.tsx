@@ -18,6 +18,9 @@ const createBlogPostMock = vi.fn();
 const updateBlogPostMock = vi.fn();
 const setBlogPostStatusMock = vi.fn();
 const deleteBlogPostMock = vi.fn();
+// BlogList fetches the category picker options once on mount (see its own `useEffect`) — mocked
+// to an empty resolved list so this file's tests don't need real category fixtures.
+const listBlogCategoriesMock = vi.fn();
 
 vi.mock('../../../../api/rbac/blog-posts', async () => {
   const actual = await vi.importActual<typeof import('../../../../api/rbac/blog-posts')>('../../../../api/rbac/blog-posts');
@@ -28,6 +31,14 @@ vi.mock('../../../../api/rbac/blog-posts', async () => {
     updateBlogPost: (...args: unknown[]) => updateBlogPostMock(...args),
     setBlogPostStatus: (...args: unknown[]) => setBlogPostStatusMock(...args),
     deleteBlogPost: (...args: unknown[]) => deleteBlogPostMock(...args),
+  };
+});
+
+vi.mock('../../../../api/rbac/blog-categories', async () => {
+  const actual = await vi.importActual<typeof import('../../../../api/rbac/blog-categories')>('../../../../api/rbac/blog-categories');
+  return {
+    ...actual,
+    listBlogCategories: (...args: unknown[]) => listBlogCategoriesMock(...args),
   };
 });
 
@@ -53,7 +64,8 @@ const POST: BlogPost = {
   title: 'Deep Tissue Massage Benefits',
   slug: 'deep-tissue-massage-benefits',
   excerpt: 'Everything you need to know.',
-  categorySlug: 'wellness',
+  categoryId: 'cat-1',
+  category: { id: 'cat-1', name: 'Wellness', slug: 'wellness' },
   body: [{ type: 'paragraph', text: 'Hello world' }],
   author: 'Jane Doe',
   readMinutes: 4,
@@ -99,10 +111,31 @@ function dispatchRowAction(action: string, rowIndex = 0): void {
   fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action, row: {}, rowIndex } }));
 }
 
+/**
+ * `dispatchRowAction` fires the row-action event immediately after `waitForTableLoaded` resolves
+ * — but that helper only waits for the `total` DOM attribute (reflecting the just-committed
+ * render) to update, not for BlogList's own row-action `useEffect` (keyed on `[posts]`) to have
+ * re-subscribed its listener with the now-populated `posts` closure. Under real browser paint
+ * timing a user physically cannot click a row before that effect settles; under jsdom + RTL's
+ * `waitFor` (which polls with real timers, decoupled from React's own commit/effect scheduling)
+ * the two can race, so the very first dispatch can land on a listener whose `posts` closure is
+ * still `[]` and silently no-ops. Retrying the dispatch inside `waitFor` — instead of dispatching
+ * once and only polling the assertion — self-heals once the effect catches up; extra dispatches
+ * to an already-correct listener are harmless (the mocked handlers are idempotent no-ops beyond
+ * recording the call).
+ */
+async function dispatchRowActionUntil(action: string, assert: () => void, rowIndex = 0): Promise<void> {
+  await waitFor(() => {
+    dispatchRowAction(action, rowIndex);
+    assert();
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   grantedPermissions = new Set(['cms.blog:create', 'cms.blog:edit', 'cms.blog:delete']);
   listBlogPostsMock.mockResolvedValue({ data: [POST], meta: { total: 1 } });
+  listBlogCategoriesMock.mockResolvedValue({ data: [{ id: 'cat-1', name: 'Wellness', slug: 'wellness', description: '', isActive: true, sortOrder: 0, createdAt: '', updatedAt: '' }] });
 });
 
 afterEach(() => {
@@ -132,21 +165,38 @@ describe('BlogList', () => {
     expect(table().getAttribute('rows')).toContain('Deep Tissue Massage Benefits');
   });
 
+  it('fetches the category picker options via listBlogCategories() on mount and renders the row\'s category name (from the post\'s category relation, not a hardcoded slug)', async () => {
+    renderList();
+    await waitForTableLoaded(1);
+
+    expect(listBlogCategoriesMock).toHaveBeenCalledWith('test-token', { pageSize: 100 });
+    expect(table().getAttribute('rows')).toContain('Wellness');
+  });
+
+  it('renders "—" in the Category column for a post with no resolved category relation (empty state)', async () => {
+    listBlogPostsMock.mockResolvedValue({ data: [{ ...POST, category: undefined }], meta: { total: 1 } });
+    renderList();
+    await waitForTableLoaded(1);
+
+    const rows = JSON.parse(table().getAttribute('rows') ?? '[]') as { Category: string }[];
+    expect(rows[0].Category).toBe('—');
+  });
+
   it('edit opens the dialog pre-filled — Save resubmits the row\'s own fields via updateBlogPost', async () => {
     updateBlogPostMock.mockResolvedValue({ data: { ...POST, title: 'Deep Tissue Massage Benefits' } });
     renderList();
     await waitForTableLoaded(1);
 
-    dispatchRowAction('edit');
-
     // The Edit dialog's key changes from 'edit-empty' to the post id once editingPost is set,
     // remounting BlogFormDialog with `post={editingPost}` — its headline flips from "New blog
-    // post" to "Edit blog post" once that happens.
-    const editDialog = await waitFor(() => {
+    // post" to "Edit blog post" once that happens. Dispatch is retried (see
+    // `dispatchRowActionUntil`'s doc comment) since the row-action listener may not yet be
+    // subscribed with the loaded post the first time this poll runs.
+    await dispatchRowActionUntil('edit', () => {
       const dialog = Array.from(document.querySelectorAll('md-dialog')).find((d) => d.textContent?.includes('Edit blog post'));
       if (!dialog) throw new Error('Edit dialog not yet showing the pre-filled post');
-      return dialog;
     });
+    const editDialog = Array.from(document.querySelectorAll('md-dialog')).find((d) => d.textContent?.includes('Edit blog post'))!;
     const editSaveButton = editDialog.querySelector('md-filled-button') as HTMLElement;
     fireEvent.click(editSaveButton);
 
@@ -162,9 +212,9 @@ describe('BlogList', () => {
     renderList();
     await waitForTableLoaded(1);
 
-    dispatchRowAction('toggle-status');
-
-    await waitFor(() => expect(setBlogPostStatusMock).toHaveBeenCalledWith('test-token', POST.id, 'PUBLISHED'));
+    await dispatchRowActionUntil('toggle-status', () => {
+      expect(setBlogPostStatusMock).toHaveBeenCalledWith('test-token', POST.id, 'PUBLISHED');
+    });
     expect(await screen.findByText('Post published.')).toBeTruthy();
   });
 
@@ -174,19 +224,24 @@ describe('BlogList', () => {
     renderList();
     await waitForTableLoaded(1);
 
-    dispatchRowAction('delete');
-
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining(POST.title));
+    await dispatchRowActionUntil('delete', () => {
+      expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining(POST.title));
+    });
     await waitFor(() => expect(deleteBlogPostMock).toHaveBeenCalledWith('test-token', POST.id));
     expect(await screen.findByText('Blog post deleted.')).toBeTruthy();
   });
 
   it('delete does NOT call deleteBlogPost when window.confirm is cancelled', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderList();
     await waitForTableLoaded(1);
 
-    dispatchRowAction('delete');
+    // Confirms the row-action listener genuinely ran (not just that deleteBlogPost happens to
+    // have never been called, which would trivially — and misleadingly — pass even if the
+    // dispatch never reached a listener at all).
+    await dispatchRowActionUntil('delete', () => {
+      expect(confirmSpy).toHaveBeenCalled();
+    });
 
     // Give any (incorrect) async delete call a chance to fire before asserting it never did.
     await new Promise((resolve) => setTimeout(resolve, 0));

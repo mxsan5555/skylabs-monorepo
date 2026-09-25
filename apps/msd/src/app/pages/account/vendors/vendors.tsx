@@ -127,6 +127,14 @@ function AdminVendorManagement({
   canDelete: boolean;
 }) {
   const navigate = useNavigate();
+  const { can, loginAsUser } = useAuth();
+  // Same gate as the RBAC Users screen's own "Login as" (`/rbac/impersonate` is itself gated on
+  // this exact permission, auto-granted only to super_admin) — reused here rather than a new
+  // `vendors`-scoped permission, since it's the same underlying preview-session mechanism, just
+  // initiated from Vendor List instead of User Management (Vendor owners are excluded from User
+  // Management's list entirely — see `user.service.ts#listUsers`'s own doc comment — so this is
+  // now the only place to reach a vendor's own dashboard on their behalf).
+  const canAccessDashboard = can('rbac.users', 'custom');
   const { showToast } = useToast();
   const [searchParams] = useSearchParams();
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -142,9 +150,24 @@ function AdminVendorManagement({
   // The selected vendor's granted SERVICE categories — a service Deal picks directly from these
   // (see vendor-branches.tsx's DealDialog); scoped per-vendor since access is vendor-specific.
   const [categories, setCategories] = useState<Category[]>([]);
-
+  const vendorDetailsRef = useRef<HTMLElement>(null);
   const selectedVendor = useMemo(() => vendors.find((v) => v.id === selectedId) ?? null, [vendors, selectedId]);
+ const handleVendorSelect = useCallback((id: string) => {
+  setSelectedId(id);
+}, []);
 
+useEffect(() => {
+  if (!selectedVendor) return;
+
+  const timer = window.setTimeout(() => {
+    vendorDetailsRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }, 50);
+
+  return () => window.clearTimeout(timer);
+}, [selectedVendor]);
   useEffect(() => {
     if (!selectedVendor) {
       setCategories([]);
@@ -290,6 +313,15 @@ function AdminVendorManagement({
     }
   };
 
+  const doAccessDashboard = async (ownerId: string) => {
+    try {
+      await loginAsUser(ownerId);
+      navigate('/account/dashboard');
+    } catch {
+      setError('Could not start preview session.');
+    }
+  };
+
   const doDelete = async () => {
     if (!selectedVendor) return;
     if (!window.confirm(`Delete "${selectedVendor.businessName || 'this vendor'}"? This cannot be undone.`)) return;
@@ -327,7 +359,8 @@ function AdminVendorManagement({
         <VendorList
           vendors={vendors}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          // onSelect={setSelectedId}
+          onSelect={handleVendorSelect}
           total={total}
           page={params.page}
           pageSize={params.pageSize}
@@ -337,13 +370,19 @@ function AdminVendorManagement({
       </section>
 
       {selectedVendor && (
-        <section className="panel vendor-detail" aria-label="Vendor details">
+        <section  ref={vendorDetailsRef} className="panel vendor-detail" aria-label="Vendor details">
           {message && <p className="field-hint" role="status">{message}</p>}
           {error && <p className="error-state" role="alert">{error}</p>}
 
           <div className="page-head">
             <h2>{selectedVendor.businessName || selectedVendor.owner?.name || 'Draft vendor'}</h2>
             <div className="page-head__actions">
+              {canAccessDashboard && selectedVendor.owner && (
+                <OutlinedButton onClick={() => doAccessDashboard(selectedVendor.owner!.id)}>
+                  <Icon slot="icon" aria-hidden="true">visibility</Icon>
+                  Access Dashboard
+                </OutlinedButton>
+              )}
               {canApprove && selectedVendor.status !== 'ACTIVE' && <FilledButton onClick={doApprove}>Approve</FilledButton>}
               {canReject && selectedVendor.status !== 'REJECTED' && <OutlinedButton onClick={doReject}>Reject</OutlinedButton>}
               {canStatusChange && selectedVendor.status === 'ACTIVE' && (

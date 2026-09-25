@@ -2,7 +2,7 @@ import type { ComponentType } from 'react';
 import { Link } from 'react-router-dom';
 import type { DashboardStats } from '../../api/rbac/dashboard';
 import { formatINR } from '../../utils/format';
-
+import { Icon } from '@skylabs-monorepo/shared-ui/react';
 interface WidgetProps {
   title: string;
   /** Marketplace-wide counts from `GET /dashboard/stats`, fetched once by the Dashboard page
@@ -36,11 +36,14 @@ type CountKey = Exclude<keyof DashboardStats, 'revenue'>;
 /** Factory for the plain "one number" widgets — every stat except revenue renders identically,
  *  just reading a different `DashboardStats` field, so there's no value in hand-writing eight
  *  near-identical components. */
-function makeCountWidget(key: CountKey, displayName: string): ComponentType<WidgetProps> {
+function makeCountWidget(key: CountKey, displayName: string, icon: string): ComponentType<WidgetProps> {
   function CountWidget({ title, stats, statsLoading, statsError }: WidgetProps) {
     const value = stats ? stats[key].toLocaleString('en-IN') : undefined;
     return (
       <article className="stat-card">
+        <div className="stat-card__icon">
+          <Icon aria-hidden="true">{icon}</Icon>
+        </div>
         <h2 className="stat-card__title">{title}</h2>
         <StatCardBody loading={statsLoading} error={statsError} value={value} />
       </article>
@@ -50,14 +53,14 @@ function makeCountWidget(key: CountKey, displayName: string): ComponentType<Widg
   return CountWidget;
 }
 
-const CustomersCountWidget = makeCountWidget('customers', 'CustomersCountWidget');
-const VendorsCountWidget = makeCountWidget('vendors', 'VendorsCountWidget');
-const BranchesCountWidget = makeCountWidget('branches', 'BranchesCountWidget');
-const CategoriesCountWidget = makeCountWidget('categories', 'CategoriesCountWidget');
-const SubCategoriesCountWidget = makeCountWidget('subCategories', 'SubCategoriesCountWidget');
-const ProductsCountWidget = makeCountWidget('products', 'ProductsCountWidget');
-const DealsCountWidget = makeCountWidget('deals', 'DealsCountWidget');
-const OrdersCountWidget = makeCountWidget('orders', 'OrdersCountWidget');
+const CustomersCountWidget = makeCountWidget('customers', 'CustomersCountWidget', 'group');
+const VendorsCountWidget = makeCountWidget('vendors', 'VendorsCountWidget', 'storefront');
+const BranchesCountWidget = makeCountWidget('branches', 'BranchesCountWidget', 'location_on');
+const CategoriesCountWidget = makeCountWidget('categories', 'CategoriesCountWidget', 'category');
+const SubCategoriesCountWidget = makeCountWidget('subCategories', 'SubCategoriesCountWidget', 'subdirectory_arrow_right');
+const ProductsCountWidget = makeCountWidget('products', 'ProductsCountWidget', 'inventory_2');
+const DealsCountWidget = makeCountWidget('deals', 'DealsCountWidget', 'local_offer');
+const OrdersCountWidget = makeCountWidget('orders', 'OrdersCountWidget', 'shopping_bag');
 
 function RevenueSummaryWidget({ title, stats, statsLoading, statsError }: WidgetProps) {
   const value = stats ? formatINR(Number(stats.revenue)) : undefined;
