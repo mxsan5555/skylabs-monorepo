@@ -55,6 +55,13 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] msd shell plan 2: SiteFooter, Seo component, JSON-LD, city landing pages — 2026-09-23
 - [x] msd shell plan 3: home page (10 fixed sections, CardRail, SectionHead, Seo + ItemList/FAQPage JSON-LD, location-aware catalog fetch) — 2026-09-23
 - [x] msd shell plan 4: build-time prerender (`/`, every `/category/:slug`, deal-category `/category/:slug/:city`) with `__MSD_DATA__` payload hydration, `spa.html` SPA rewrite, timed-out/unreachable-API fallback, sitemap.xml/robots.txt/llms.txt — 2026-09-24
+- [x] msd home 60/30/10 colour pass on M3 roles (tinted bands, secondary-container tiles/steps/gift card, primary for actions only; "How it works" as a numbered sequence) — 2026-09-24
+- [x] msd storefront building blocks `PageSection`, `CardGrid`, `SectionHead as="h1"`; home moved onto `PageSection`; category page rebuilt with no page CSS — 2026-09-24
+- [x] msd category toolbar: subcategory pills, clamped description, sort menu, 12-per-page lazy loading (`usePagedList` + `LoadMore`, prerendered first page + total) — 2026-09-25
+- [x] msd `DealMap`: Leaflet + OpenStreetMap by default, Google behind `VITE_MAP_PROVIDER`; category map view; explore map fixed (was blocked by a missing Google key and a placeholder overlay) — 2026-09-25
+- [x] msd category filter side panel (Your location, Distance, Price, Business, Branches, Clear all; phone side sheet with focus trap), sorts Relevance / Price / Distance, List-Grid-Map switch, `sky-product-card` `layout="horizontal"` — 2026-09-25
+- [x] msd-api catalog: deal sorts `relevance|price_asc|price_desc|distance`, `vendorIds` / `branchIds` / `radiusKm` filters, `GET /catalog/deals/facets`, product price sorts — 2026-09-25
+- [x] Docs aligned with the storefront work and current API status (CLAUDE, ARCHITECTURE, DEPLOYMENT, DEVELOPER_PROCESS §19–21, docs/README, api-schema as-built notes) — 2026-09-26
 
 ### Content pages — both apps (`pages/` + route)
 - [ ] Contact page~
