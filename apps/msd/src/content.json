@@ -55,6 +55,18 @@
       "useCurrent": "Use my current location",
       "listLabel": "Cities with partner spas",
       "close": "Close"
+    },
+    "searchSuggestions": {
+      "listLabel": "Search suggestions",
+      "loading": "Searching…",
+      "noResults": "No results found",
+      "groups": {
+        "deals": "Deals",
+        "products": "Products",
+        "therapists": "Therapists",
+        "categories": "Categories",
+        "subcategories": "Subcategories"
+      }
     }
   },
   "tabBar": {
