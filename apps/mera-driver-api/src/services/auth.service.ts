@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import type { LoginMethod } from '../generated/prisma-client';
 
 /** Role key auto-granted to a brand-new mera-driver user (see CLAUDE.md role table). */
@@ -9,7 +10,8 @@ function isEmail(identifier: string): boolean {
 }
 
 export function loginMethodForIdentifier(identifier: string): LoginMethod {
-  return isEmail(identifier) ? 'otp_email' : 'otp_phone';
+  const normalized = normalizeIdentifier(identifier);
+  return isEmail(normalized) ? 'otp_email' : 'otp_phone';
 }
 
 async function ensureDefaultRole(userId: string): Promise<void> {
@@ -24,14 +26,24 @@ async function ensureDefaultRole(userId: string): Promise<void> {
 
 /** Finds or creates a User for an OTP identifier (email or phone), granting the default role on first login. */
 export async function upsertUserByIdentifier(identifier: string) {
-  const field = isEmail(identifier) ? 'email' : 'phone';
+  const normalized = normalizeIdentifier(identifier);
+  const field = isEmail(normalized) ? 'email' : 'phone';
 
-  const existing = await prisma.user.findFirst({ where: { [field]: identifier, deletedAt: null } });
+  const existing = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: field === 'email' ? normalized.toLowerCase() : undefined },
+        { phone: field === 'phone' ? normalized : undefined },
+        { phone: field === 'phone' && normalized.startsWith('+91') ? normalized.slice(3) : undefined },
+      ],
+      deletedAt: null,
+    },
+  });
   if (existing) return existing;
 
   const user = await prisma.user.create({
     data: {
-      [field]: identifier,
+      [field]: field === 'email' ? normalized.toLowerCase() : normalized,
       name: identifier,
     },
   });

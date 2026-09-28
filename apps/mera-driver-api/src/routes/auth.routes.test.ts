@@ -81,8 +81,16 @@ describe('auth.routes', () => {
 
     it('routes a phone identifier through the SMS provider, not the email provider', async () => {
       await request(app).post('/auth/otp/request').send({ identifier: '7234882093', purpose: 'login' });
-      expect(sendSmsOtpMock).toHaveBeenCalledWith('7234882093', expect.any(String));
+      expect(sendSmsOtpMock).toHaveBeenCalledWith('+917234882093', expect.any(String));
       expect(sendOtpEmailMock).not.toHaveBeenCalled();
+    });
+
+    it('normalizes a bare Indian phone number before storing and sending the OTP challenge', async () => {
+      await request(app).post('/auth/otp/request').send({ identifier: '7234882093', purpose: 'login' });
+      expect(mockPrisma.otpChallenge.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ identifier: '+917234882093', purpose: 'login' }) }),
+      );
+      expect(sendSmsOtpMock).toHaveBeenCalledWith('+917234882093', expect.any(String));
     });
 
     it('returns 500 when the delivery provider reports failure', async () => {
@@ -311,6 +319,33 @@ describe('auth.routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.data.accessToken).toEqual(expect.any(String));
       expect(res.body.data.user).toEqual(expect.objectContaining({ id: 'user-1', roles: ['admin'] }));
+    });
+
+    it('normalizes a 10-digit phone before password lookup and login', async () => {
+      const passwordHash = await bcrypt.hash(PASSWORD, 10);
+      mockPrisma.user.findFirst.mockResolvedValue({
+        id: 'user-1',
+        email: null,
+        phone: '+919876543210',
+        name: 'Driver A',
+        status: 'active',
+        passwordHash,
+      });
+      mockPrisma.userRole.findMany.mockResolvedValue([{ role: { key: 'driver' } }]);
+      mockPrisma.refreshSession.create.mockResolvedValue({ id: 'session-1' });
+      mockPrisma.user.update.mockResolvedValue({});
+      mockPrisma.loginHistory.create.mockResolvedValue({});
+
+      const res = await request(app).post('/auth/password/login').send({ identifier: '9876543210', password: PASSWORD });
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.user.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.arrayContaining([{ phone: '+919876543210' }]),
+          }),
+        }),
+      );
     });
 
     it('returns 401 for a wrong password', async () => {

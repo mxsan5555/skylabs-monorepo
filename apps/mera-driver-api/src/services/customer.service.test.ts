@@ -96,7 +96,7 @@ describe('Customer <-> User linkage', () => {
     await createAndLinkCustomerUser('customer-1');
 
     expect(mockPrisma.user.create).toHaveBeenCalledWith({
-      data: { name: 'Anita Sharma', email: undefined, phone: '9000000000' },
+      data: { name: 'Anita Sharma', email: undefined, phone: '+919000000000' },
     });
     expect(mockPrisma.userRole.create).toHaveBeenCalledWith({ data: { userId: USER_2_ID, roleId: 'role-customer' } });
     expect(mockPrisma.customer.update).toHaveBeenCalledWith({ where: { id: 'customer-1' }, data: { userId: USER_2_ID } });

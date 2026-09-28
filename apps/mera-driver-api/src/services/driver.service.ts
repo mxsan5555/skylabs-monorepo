@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import { HttpError } from '../middleware/errorHandler';
 
 const LINKED_USER_SELECT = { id: true, name: true, email: true, phone: true } as const;
@@ -276,7 +277,11 @@ export async function createAndLinkDriverUser(driverId: string) {
 
   await prisma.$transaction(async (tx) => {
     const user = await tx.user.create({
-      data: { name, email: driver.email ?? undefined, phone: driver.phone ?? undefined },
+      data: {
+        name,
+        email: driver.email ? normalizeIdentifier(driver.email) : undefined,
+        phone: driver.phone ? normalizeIdentifier(driver.phone) : undefined,
+      },
     });
     await tx.userRole.create({ data: { userId: user.id, roleId: driverRole.id } });
     await tx.driver.update({ where: { id: driverId }, data: { userId: user.id } });
