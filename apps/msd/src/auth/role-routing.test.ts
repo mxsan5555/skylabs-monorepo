@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractReturnUrl } from './role-routing';
+import { extractReturnUrl, sanitizeReturnUrl, signInPathWithNext, signInPathWithReturnTo } from './role-routing';
 
 describe('extractReturnUrl', () => {
   it('reads a plain ?next= path', () => {
@@ -64,5 +64,53 @@ describe('extractReturnUrl', () => {
 
   it('rejects an empty ?next= value', () => {
     expect(extractReturnUrl({ search: '?next=' })).toBeNull();
+  });
+});
+
+describe('sanitizeReturnUrl', () => {
+  it('accepts a plain in-app path', () => {
+    expect(sanitizeReturnUrl('/explore?q=Swedish%20Massage')).toBe('/explore?q=Swedish%20Massage');
+  });
+
+  it('rejects an external absolute URL', () => {
+    expect(sanitizeReturnUrl('https://evil.example.com/phish')).toBeNull();
+  });
+
+  it('rejects a protocol-relative URL', () => {
+    expect(sanitizeReturnUrl('//evil.example.com')).toBeNull();
+  });
+
+  it('rejects a path back into /sign-in or /otp', () => {
+    expect(sanitizeReturnUrl('/sign-in')).toBeNull();
+    expect(sanitizeReturnUrl('/otp')).toBeNull();
+  });
+});
+
+describe('signInPathWithNext', () => {
+  it('builds /sign-in?next=<encoded returnUrl> when a returnUrl is given', () => {
+    expect(signInPathWithNext('/explore?q=Swedish Massage')).toBe('/sign-in?next=%2Fexplore%3Fq%3DSwedish%20Massage');
+  });
+
+  it('builds plain /sign-in when returnUrl is null/undefined/empty', () => {
+    expect(signInPathWithNext(null)).toBe('/sign-in');
+    expect(signInPathWithNext(undefined)).toBe('/sign-in');
+    expect(signInPathWithNext('')).toBe('/sign-in');
+  });
+});
+
+describe('signInPathWithReturnTo', () => {
+  it('captures pathname + search + hash from a Location-like object', () => {
+    expect(signInPathWithReturnTo({ pathname: '/category/spa', search: '?sort=price-asc', hash: '#top' })).toBe(
+      `/sign-in?next=${encodeURIComponent('/category/spa?sort=price-asc#top')}`,
+    );
+  });
+
+  it('handles a bare pathname with no search or hash', () => {
+    expect(signInPathWithReturnTo({ pathname: '/products' })).toBe('/sign-in?next=%2Fproducts');
+  });
+
+  it('preserves a multi-value query string exactly, per requirement 1\'s /explore example', () => {
+    const location = { pathname: '/explore', search: '?q=Swedish%20Massage', hash: '' };
+    expect(signInPathWithReturnTo(location)).toBe(`/sign-in?next=${encodeURIComponent('/explore?q=Swedish%20Massage')}`);
   });
 });

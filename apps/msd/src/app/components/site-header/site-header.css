@@ -60,8 +60,12 @@
   block-size: 40px;
   inline-size: auto;
 }
-.site-header__search {
+.site-header__search-wrap {
+  position: relative;
   grid-area: search;
+}
+.site-header__search {
+  inline-size: 100%;
 }
 .city-chip {
   grid-area: city;
@@ -119,7 +123,7 @@
   .site-header__logo {
     block-size: 48px;
   }
-  .site-header__search {
+  .site-header__search-wrap {
     max-inline-size: 640px;
   }
   .header-actions {

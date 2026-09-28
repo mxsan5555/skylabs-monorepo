@@ -83,14 +83,15 @@ afterEach(() => {
 
 /**
  * Feature: Customer Management — status-change confirm/API/toast flow
- * Scenario: `doStatusChange` confirms via `window.confirm`, calls `setCustomerStatus`, updates
- * local state only on success (never optimistically), and shows a success/error toast — same
- * `blog-list.tsx#toggleStatus` pattern this codebase already uses elsewhere.
+ * Scenario: `doStatusChange` confirms via the themed `useConfirmDialog` (M3 Dialog, matching the
+ * Showcase's `/showcase#dialog` component — see `confirm-dialog.tsx`), calls `setCustomerStatus`,
+ * updates local state only on success (never optimistically), and shows a success/error toast —
+ * same `blog-list.tsx#toggleStatus` pattern this codebase already uses elsewhere.
  *
  * Given: a SuperAdmin/staff viewing the Customer directory with `customers:status_change`
  * When: a status-change row action fires
- * Then: window.confirm gates the call; a confirmed call updates the table/detail and shows a
- *       success toast; a cancelled confirm never calls the API; a failed API call shows an error
+ * Then: the confirm dialog gates the call; confirming it updates the table/detail and shows a
+ *       success toast; cancelling it never calls the API; a failed API call shows an error
  *       toast and leaves the displayed status unchanged
  *
  * Edge cases:
@@ -114,42 +115,42 @@ describe('CustomerManagement — status change', () => {
     expect(actions.map((a) => a.event)).toEqual(['select']);
   });
 
-  it('confirms via window.confirm, then calls setCustomerStatus and shows a success toast', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('confirms via the themed dialog, then calls setCustomerStatus and shows a success toast', async () => {
     setCustomerStatusMock.mockResolvedValue({ data: { ...CUSTOMER, status: 'blocked' } });
     renderPage();
     await waitForTableLoaded(1);
 
     await dispatchRowActionUntil('suspend', { 'Customer ID': CUSTOMER.id, 'Customer Status': 'active' }, () => {
-      expect(confirmSpy).toHaveBeenCalledWith('Are you sure you want to suspend this customer?');
+      expect(screen.getByText('Are you sure you want to suspend this customer?')).toBeTruthy();
     });
+    fireEvent.click(screen.getByText('Confirm'));
 
     await waitFor(() => expect(setCustomerStatusMock).toHaveBeenCalledWith('test-token', CUSTOMER.id, 'blocked'));
     expect(await screen.findByText('Customer suspended.')).toBeTruthy();
   });
 
-  it('does NOT call setCustomerStatus when window.confirm is cancelled', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('does NOT call setCustomerStatus when the confirm dialog is cancelled', async () => {
     renderPage();
     await waitForTableLoaded(1);
 
     await dispatchRowActionUntil('suspend', { 'Customer ID': CUSTOMER.id, 'Customer Status': 'active' }, () => {
-      expect(confirmSpy).toHaveBeenCalled();
+      expect(screen.getByText('Are you sure you want to suspend this customer?')).toBeTruthy();
     });
+    fireEvent.click(screen.getByText('Cancel'));
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(setCustomerStatusMock).not.toHaveBeenCalled();
   });
 
   it('a failed status-change call shows an error toast and never changes the displayed status', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     setCustomerStatusMock.mockRejectedValue(new ApiRequestError('CONFLICT', 'Could not change status.', 409));
     renderPage();
     await waitForTableLoaded(1);
 
     await dispatchRowActionUntil('suspend', { 'Customer ID': CUSTOMER.id, 'Customer Status': 'active' }, () => {
-      expect(setCustomerStatusMock).toHaveBeenCalled();
+      expect(screen.getByText('Are you sure you want to suspend this customer?')).toBeTruthy();
     });
+    fireEvent.click(screen.getByText('Confirm'));
 
     expect(await screen.findByText('Could not change status.')).toBeTruthy();
     // Still showing the original active-derived row — never optimistically flipped to Suspended.

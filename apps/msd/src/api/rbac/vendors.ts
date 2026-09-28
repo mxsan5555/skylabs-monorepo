@@ -113,7 +113,7 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
   offersService: boolean;
   offersProduct: boolean;
   offersTherapy: boolean;
-  _count?: { branches: number };
+  _count?: { branches: number; deals: number; products: number;};
   /** Only present on `GET /vendors/me` — the self-service "complete your profile" checklist. */
   profileCompletion?: { percent: number; sections: { key: string; label: string; complete: boolean }[] };
   /** The existing User account this vendor is linked to — null if an admin created the
@@ -200,6 +200,11 @@ export interface Branch {
   createdAt: string;
   updatedAt: string;
   _count?: { deals: number };
+  /** The distinct `CategoryType`s this branch currently has ANY `BranchCategoryAccess` grant
+   *  for (e.g. `['THERAPY']`) — lets the Add Therapist/Deal branch pickers filter to branches
+   *  currently eligible for a module, computed server-side in the same query as the rest of this
+   *  list (see msd-api's `vendor.service.ts#listBranches`), never a separate per-branch fetch. */
+  categoryTypes: CategoryType[];
   /** Only present on the cross-vendor `GET /vendors/branches` sidebar listing. */
   vendor?: { id: string; businessName: string | null };
 }
@@ -365,9 +370,15 @@ export function listAllBranches(token: string | null, opts: { page?: number; pag
   return apiGet<Branch[]>(`/vendors/branches${toQuery(opts)}`, token);
 }
 
-/** Cross-vendor deal list for the sidebar's standalone "Deals" page. */
-export function listAllDeals(token: string | null, opts: { page?: number; pageSize?: number; search?: string } = {}) {
-  return apiGet<Deal[]>(`/vendors/deals${toQuery(opts)}`, token);
+/** Cross-vendor deal list for the sidebar's standalone "Deals" page, and (with `state`) for the
+ *  Home Hero admin screen's "search deals in this state" Deal picker — each row carries an
+ *  `eligible` flag (same bar as the public `VISIBLE_DEAL_WHERE`) so the picker can show why a
+ *  deal isn't eligible yet without silently filtering it out. */
+export function listAllDeals(
+  token: string | null,
+  opts: { page?: number; pageSize?: number; search?: string; state?: string } = {},
+) {
+  return apiGet<(Deal & { eligible?: boolean })[]>(`/vendors/deals${toQuery(opts)}`, token);
 }
 
 /** Cross-vendor therapist list for the sidebar's standalone "Therapists" page. */

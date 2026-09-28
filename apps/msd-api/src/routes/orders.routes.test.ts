@@ -361,6 +361,26 @@ describe('GET /api/v1/orders — admin / vendor scoping', () => {
     );
   });
 
+  it("a vendor caller holding only 'vendors:custom' (never 'orders:view') can still list its own orders", async () => {
+    // Vendor role no longer holds orders:view directly (see seed.ts) — 'vendors:custom' is the
+    // sole gate for its own order access, same self-service permission every other /vendors/me/*
+    // route already runs on (see requireOrdersOrVendorSelf's doc comment in orders.routes.ts).
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
+    prismaMock.order.findMany.mockResolvedValue([]);
+    prismaMock.order.count.mockResolvedValue(0);
+    const res = await request(app)
+      .get('/api/v1/orders')
+      .set('Authorization', bearerFor({ sub: 'vendor-user-1', roles: ['vendor'] }));
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 403 for a caller with neither 'orders:view' nor 'vendors:custom'", async () => {
+    resolveMock.mockResolvedValue(['dashboard:view']);
+    const res = await request(app).get('/api/v1/orders').set('Authorization', bearerFor({ sub: 'vendor-user-1', roles: ['vendor'] }));
+    expect(res.status).toBe(403);
+  });
+
   it('admin (no vendor profile) can filter by an explicit vendorId', async () => {
     resolveMock.mockResolvedValue(['orders:view']);
     prismaMock.vendor.findUnique.mockResolvedValue(null); // caller owns no vendor profile
@@ -447,6 +467,19 @@ describe('PATCH /api/v1/orders/:id/status — admin', () => {
       .send({ status: 'CONFIRMED' });
     expect(res.status).toBe(409);
     expect(prismaMock.order.update).not.toHaveBeenCalled();
+  });
+
+  it("a vendor caller holding only 'vendors:custom' can confirm/complete its own single-vendor order", async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
+    prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
+    prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'COMPLETED' });
+    const res = await request(app)
+      .patch(`/api/v1/orders/${ORDER_ID}/status`)
+      .set('Authorization', bearerFor({ sub: 'vendor-user-1', roles: ['vendor'] }))
+      .send({ status: 'COMPLETED' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('COMPLETED');
   });
 
   it('a vendor caller cannot change status on a multi-vendor order — only admin may', async () => {

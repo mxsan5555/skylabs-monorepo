@@ -20,6 +20,13 @@ export const CrossVendorListQuerySchema = PaginationQuerySchema.extend({
   search: z.string().max(200).optional(),
 });
 
+/** Same as `CrossVendorListQuerySchema` plus an optional branch-state filter — used only by the
+ *  cross-vendor Deals list, for the Home Hero admin screen's "search deals in this state" Deal
+ *  picker (see `home-hero.tsx`). */
+export const CrossVendorDealListQuerySchema = CrossVendorListQuerySchema.extend({
+  state: z.string().max(100).optional(),
+});
+
 /** Route param for the admin-scoped `/:vendorId/...` sub-resources — same shape as
  *  `UuidParamSchema` in `common.schema.ts`, just keyed `vendorId` to match the param name. */
 export const VendorIdParamSchema = z.object({

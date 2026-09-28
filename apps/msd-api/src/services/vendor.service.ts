@@ -11,6 +11,7 @@ import {
   assertVendorHasCategoryAccess,
   assertBranchHasCategoryAccess,
   assertBranchHasSubcategoryAccess,
+  assertBranchHasAnyCategoryAccessOfType,
 } from './category.service';
 import { getProductScopedOrThrow } from './product.service';
 import * as mediaService from './media.service';
@@ -110,7 +111,7 @@ const VENDOR_IMAGE_ORDER_BY: Prisma.VendorImageOrderByWithRelationInput[] = [
 const VENDOR_MEDIA_INCLUDE = { mediaImages: { orderBy: VENDOR_IMAGE_ORDER_BY }, mediaVideo: true, documents: true } as const;
 
 /** Standard `include` for any Vendor read/write that should carry its linked-owner summary + branch count. */
-const OWNER_INCLUDE = { _count: { select: { branches: true } }, owner: OWNER_SUMMARY_SELECT, ...VENDOR_MEDIA_INCLUDE } as const;
+const OWNER_INCLUDE = { _count: { select: { branches: true,  deals: true, products: true, } }, owner: OWNER_SUMMARY_SELECT, ...VENDOR_MEDIA_INCLUDE } as const;
 
 function heuristicInitialStatus(input: { gstNumber?: string; panNumber?: string }): VendorStatus {
   return input.gstNumber && input.panNumber ? 'PENDING_VERIFICATION' : 'PROFILE_INCOMPLETE';
@@ -673,16 +674,27 @@ export async function listAllBranches(opts: { page: number; pageSize: number; se
   return { items, total };
 }
 
-export async function listAllDeals(opts: { page: number; pageSize: number; search?: string }) {
-  const where = opts.search
-    ? {
-        OR: [
-          { title: { contains: opts.search, mode: 'insensitive' as const } },
-          { vendor: { businessName: { contains: opts.search, mode: 'insensitive' as const } } },
-          { branch: { name: { contains: opts.search, mode: 'insensitive' as const } } },
-        ],
-      }
-    : {};
+/** Same "is this deal eligible to go public" bar as `catalog.service.ts`'s `VISIBLE_DEAL_WHERE`
+ *  (duplicated as a plain boolean check, not imported, to avoid a cross-service module
+ *  dependency for four conditions) — used only to LABEL each row for the admin (e.g. the Home
+ *  Hero slide picker's "X/5 eligible" indicator), never to filter what an admin can see. */
+function isDealPubliclyEligible(deal: { status: string; approvalStatus: string; vendor: { status: string }; branch: { isActive: boolean } }): boolean {
+  return deal.status === 'ACTIVE' && deal.approvalStatus === 'APPROVED' && deal.vendor.status === 'ACTIVE' && deal.branch.isActive;
+}
+
+export async function listAllDeals(opts: { page: number; pageSize: number; search?: string; state?: string }) {
+  const where = {
+    ...(opts.state ? { branch: { is: { state: opts.state } } } : {}),
+    ...(opts.search
+      ? {
+          OR: [
+            { title: { contains: opts.search, mode: 'insensitive' as const } },
+            { vendor: { businessName: { contains: opts.search, mode: 'insensitive' as const } } },
+            { branch: { name: { contains: opts.search, mode: 'insensitive' as const } } },
+          ],
+        }
+      : {}),
+  };
   const [items, total] = await Promise.all([
     prisma.deal.findMany({
       where,
@@ -690,8 +702,8 @@ export async function listAllDeals(opts: { page: number; pageSize: number; searc
       skip: (opts.page - 1) * opts.pageSize,
       take: opts.pageSize,
       include: {
-        vendor: { select: { id: true, businessName: true } },
-        branch: { select: { id: true, name: true } },
+        vendor: { select: { id: true, businessName: true, status: true } },
+        branch: { select: { id: true, name: true, state: true, isActive: true } },
         // Reuses the same OFFERING_INCLUDE shape (packages + media) every single-vendor deal
         // read already uses — the cross-vendor Deals list needed these too for a "From ₹X"
         // package summary and a thumbnail image, previously omitted here.
@@ -700,7 +712,7 @@ export async function listAllDeals(opts: { page: number; pageSize: number; searc
     }),
     prisma.deal.count({ where }),
   ]);
-  return { items, total };
+  return { items: items.map((d) => ({ ...d, eligible: isDealPubliclyEligible(d) })), total };
 }
 
 export async function listAllTherapists(opts: { page: number; pageSize: number; search?: string }) {
@@ -732,12 +744,27 @@ export async function listAllTherapists(opts: { page: number; pageSize: number; 
 
 // ─── Branch (shared by admin `:vendorId` path and self-derived vendorId) ─────
 
+/**
+ * `categoryTypes` — the distinct `CategoryType`s this branch currently has ANY `BranchCategoryAccess`
+ * grant for (e.g. `['THERAPY']`) — lets a caller (the Add Therapist/Deal forms' branch picker)
+ * know which branches are currently eligible for a given module WITHOUT a separate
+ * `getBranchCategoryAccess` round-trip per branch. Computed from the same single query as the
+ * rest of this response (`include`, not a follow-up call), so listing N branches is still exactly
+ * one query — never N+1 — regardless of how many categories each branch has mapped.
+ */
 export async function listBranches(vendorId: string) {
-  return prisma.branch.findMany({
+  const branches = await prisma.branch.findMany({
     where: { vendorId },
     orderBy: { createdAt: 'desc' },
-    include: { _count: { select: { deals: true } } },
+    include: {
+      _count: { select: { deals: true } },
+      categoryAccess: { select: { category: { select: { type: true } } } },
+    },
   });
+  return branches.map(({ categoryAccess, ...branch }) => ({
+    ...branch,
+    categoryTypes: [...new Set(categoryAccess.map((a) => a.category.type).filter((t): t is CategoryType => t !== null))],
+  }));
 }
 
 /** 404 if the branch doesn't exist at all; 403 if it exists but belongs to a different vendor. */
@@ -927,6 +954,10 @@ async function assertBranchHasSpecializationCategoryAccess(branchId: string, spe
 
 export async function createTherapist(vendorId: string, branchId: string, input: TherapistCreateInput) {
   await getBranchScopedOrThrow(vendorId, branchId);
+  // Unconditional — `specializationCategoryId` is optional on the input, so without this a
+  // branch with zero THERAPY access could still receive a therapist just by omitting that
+  // field. This is the real security boundary; the frontend's branch picker filtering is UX only.
+  await assertBranchHasAnyCategoryAccessOfType(branchId, 'THERAPY');
   const recentDuplicate = await prisma.therapist.findFirst({
     where: {
       vendorId,

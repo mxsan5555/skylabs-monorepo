@@ -5,6 +5,10 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { createUser, type UserRecord } from '../../../../api/rbac/users';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import type { Role } from '../../../../api/rbac/roles';
+import { extractFieldErrors } from '../../../../utils/field-errors';
+import content from '../../../../content.json';
+import { validateEmail, validatePhone } from '../../../../utils/validation';
+type CreateUserFieldKey = 'name' | 'email' | 'phone';
 
 export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreated: (user: UserRecord) => void }) {
   const { token } = useAuth();
@@ -13,6 +17,7 @@ export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreate
   const [roleIds, setRoleIds] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<CreateUserFieldKey, string>> | null>(null);
 
   const toggleRole = (roleId: string) => {
     setRoleIds((prev) => {
@@ -25,33 +30,69 @@ export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreate
 
   const submit = async () => {
     setError('');
-    if (!form.name.trim()) {
+    setFieldErrors(null);
+
+    const errors: Partial<Record<CreateUserFieldKey, string>> = {};
+
+    const name = form.name.trim();
+    const email = form.email.trim();
+    const phone = form.phone.trim();
+
+    if (!name) {
       setError('Name is required.');
       return;
     }
-    if (!form.email.trim() && !form.phone.trim()) {
+
+    if (!email && !phone) {
       setError('Provide at least an email or a phone number.');
       return;
     }
+
+    if (email && !validateEmail(email)) {
+      errors.email = content.validation.email.invalid;
+    }
+
+    if (phone && !validatePhone(phone)) {
+      errors.phone = content.validation.phone.invalid;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError('Fix the highlighted fields and try again.');
+      return;
+    }
+
     setSubmitting(true);
+
     try {
       const { data } = await createUser(token, {
-        name: form.name,
-        email: form.email || undefined,
-        phone: form.phone || undefined,
+        name,
+        email: email || undefined,
+        phone: phone || undefined,
         roleIds: Array.from(roleIds),
       });
+
       onCreated(data);
       setForm({ name: '', email: '', phone: '' });
       setRoleIds(new Set());
       dialogRef.current?.close();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not create user.');
+      const fields = extractFieldErrors<CreateUserFieldKey>(err);
+
+      if (fields) {
+        setFieldErrors(fields);
+        setError('Fix the highlighted fields and try again.');
+      } else {
+        setError(
+          err instanceof ApiRequestError
+            ? err.message
+            : 'Could not create user.'
+        );
+      }
     } finally {
       setSubmitting(false);
     }
   };
-
   return (
     <>
       <FilledButton onClick={() => dialogRef.current?.show()}>
@@ -63,21 +104,28 @@ export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreate
         <div slot="content" className="form-grid">
           <OutlinedTextField
             label="Name"
+            required
             value={form.name}
             onInput={(e: Event) => setForm((f) => ({ ...f, name: (e.target as HTMLInputElement).value }))}
+            error={Boolean(fieldErrors?.name)}
           />
+          {fieldErrors?.name && <p className="error-state" role="alert">{fieldErrors.name}</p>}
           <OutlinedTextField
             label="Email"
             type="email"
             value={form.email}
             onInput={(e: Event) => setForm((f) => ({ ...f, email: (e.target as HTMLInputElement).value }))}
+            error={Boolean(fieldErrors?.email)}
           />
+          {fieldErrors?.email && <p className="error-state" role="alert">{fieldErrors.email}</p>}
           <OutlinedTextField
             label="Phone"
             type="tel"
             value={form.phone}
             onInput={(e: Event) => setForm((f) => ({ ...f, phone: (e.target as HTMLInputElement).value }))}
+            error={Boolean(fieldErrors?.phone)}
           />
+          {fieldErrors?.phone && <p className="error-state" role="alert">{fieldErrors.phone}</p>}
           <fieldset>
             <legend>Roles</legend>
             {roles.map((role) => (

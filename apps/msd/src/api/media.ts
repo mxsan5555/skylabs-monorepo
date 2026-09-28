@@ -10,7 +10,7 @@ import { apiPostForm, apiDelete, apiPatch } from './rbac/client';
  * `onVideoChange`.
  */
 
-export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor' | 'category' | 'blog' | 'about-us';
+export type MediaEntityType = 'deal' | 'product' | 'therapist' | 'vendor' | 'category' | 'blog' | 'about-us' | 'promotion';
 
 export interface MediaImage {
   id: string;
@@ -71,6 +71,11 @@ function basePath(ref: EntityRef): string {
       // About Us is a singleton row — its image routes have no `:id` param at all
       // (`/about-us/images...`, see site-content.routes.ts), so `entityId` is ignored here.
       return '/about-us';
+    case 'promotion':
+      // Promotion's image routes are top-level (`/promotions/:id/images...`, see
+      // promotions.routes.ts) — image-only (no `/video` route exists server-side, same as
+      // `category`/`blog` above).
+      return `/promotions/${ref.entityId}`;
   }
 }
 

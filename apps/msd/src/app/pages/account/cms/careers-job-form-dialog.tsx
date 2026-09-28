@@ -99,8 +99,10 @@ export function CareersJobFormDialog({
       <div slot="content" className="form-grid">
         <OutlinedTextField
           label="Job title"
+          required
           value={form.jobTitle}
           onInput={(e: Event) => setForm((f) => ({ ...f, jobTitle: (e.target as HTMLInputElement).value }))}
+          error={Boolean(fieldErrors?.jobTitle)}
         />
         {fieldErrors?.jobTitle && <p className="error-state" role="alert">{fieldErrors.jobTitle}</p>}
 
@@ -108,6 +110,7 @@ export function CareersJobFormDialog({
           label="Department"
           value={form.department}
           onInput={(e: Event) => setForm((f) => ({ ...f, department: (e.target as HTMLInputElement).value }))}
+          error={Boolean(fieldErrors?.department)}
         />
         {fieldErrors?.department && <p className="error-state" role="alert">{fieldErrors.department}</p>}
 
@@ -115,6 +118,7 @@ export function CareersJobFormDialog({
           label="Location"
           value={form.location}
           onInput={(e: Event) => setForm((f) => ({ ...f, location: (e.target as HTMLInputElement).value }))}
+          error={Boolean(fieldErrors?.location)}
         />
         {fieldErrors?.location && <p className="error-state" role="alert">{fieldErrors.location}</p>}
 
@@ -122,6 +126,7 @@ export function CareersJobFormDialog({
           label="Employment type"
           value={form.employmentType}
           onChange={(e: Event) => setForm((f) => ({ ...f, employmentType: (e.target as HTMLSelectElement).value }))}
+          error={Boolean(fieldErrors?.employmentType)}
         >
           {EMPLOYMENT_TYPE_OPTIONS.map((opt) => (
             <SelectOption key={opt} value={opt}>
@@ -135,8 +140,10 @@ export function CareersJobFormDialog({
           label="Description"
           type="textarea"
           rows={4}
+          required
           value={form.description}
           onInput={(e: Event) => setForm((f) => ({ ...f, description: (e.target as HTMLTextAreaElement).value }))}
+          error={Boolean(fieldErrors?.description)}
         />
         {fieldErrors?.description && <p className="error-state" role="alert">{fieldErrors.description}</p>}
 
@@ -146,6 +153,7 @@ export function CareersJobFormDialog({
           rows={4}
           value={form.responsibilities}
           onInput={(e: Event) => setForm((f) => ({ ...f, responsibilities: (e.target as HTMLTextAreaElement).value }))}
+          error={Boolean(fieldErrors?.responsibilities)}
         />
         {fieldErrors?.responsibilities && <p className="error-state" role="alert">{fieldErrors.responsibilities}</p>}
 
@@ -155,6 +163,7 @@ export function CareersJobFormDialog({
           rows={4}
           value={form.requirements}
           onInput={(e: Event) => setForm((f) => ({ ...f, requirements: (e.target as HTMLTextAreaElement).value }))}
+          error={Boolean(fieldErrors?.requirements)}
         />
         {fieldErrors?.requirements && <p className="error-state" role="alert">{fieldErrors.requirements}</p>}
 
@@ -163,6 +172,7 @@ export function CareersJobFormDialog({
           type="url"
           value={form.applyUrl ?? ''}
           onInput={(e: Event) => setForm((f) => ({ ...f, applyUrl: (e.target as HTMLInputElement).value }))}
+          error={Boolean(fieldErrors?.applyUrl)}
         />
         {fieldErrors?.applyUrl && <p className="error-state" role="alert">{fieldErrors.applyUrl}</p>}
 
@@ -172,6 +182,7 @@ export function CareersJobFormDialog({
           rows={2}
           value={form.applyInstructions ?? ''}
           onInput={(e: Event) => setForm((f) => ({ ...f, applyInstructions: (e.target as HTMLTextAreaElement).value }))}
+          error={Boolean(fieldErrors?.applyInstructions)}
         />
         {fieldErrors?.applyInstructions && <p className="error-state" role="alert">{fieldErrors.applyInstructions}</p>}
 
@@ -192,6 +203,7 @@ export function CareersJobFormDialog({
           type="number"
           value={String(form.sortOrder ?? 0)}
           onInput={(e: Event) => setForm((f) => ({ ...f, sortOrder: Number((e.target as HTMLInputElement).value) || 0 }))}
+          error={Boolean(fieldErrors?.sortOrder)}
         />
         {fieldErrors?.sortOrder && <p className="error-state" role="alert">{fieldErrors.sortOrder}</p>}
 

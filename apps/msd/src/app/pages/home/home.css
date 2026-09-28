@@ -254,13 +254,7 @@
   block-size: 100%;
   object-fit: cover;
 }
-/* Scrim keeps overlay copy at AA contrast on any photo. */
-.home-offer--welcome::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: color-mix(in srgb, var(--md-sys-color-scrim) 70%, transparent);
-}
+
 .home-offer__content {
   position: relative;
   z-index: 1;
@@ -414,14 +408,7 @@
   }
   /* The copy column is at most 32px padding + 420px wide, so the scrim stays at 70% or more
      up to 460px (or 80% of a narrower card) and only fades beyond the text. */
-  .home-offer--welcome::after {
-    background: linear-gradient(
-      to right,
-      color-mix(in srgb, var(--md-sys-color-scrim) 80%, transparent) 0,
-      color-mix(in srgb, var(--md-sys-color-scrim) 70%, transparent) min(460px, 80%),
-      color-mix(in srgb, var(--md-sys-color-scrim) 15%, transparent) 100%
-    );
-  }
+
   .home-steps {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 32px;

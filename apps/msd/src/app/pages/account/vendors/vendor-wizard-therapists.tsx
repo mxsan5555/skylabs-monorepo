@@ -27,6 +27,9 @@ import {
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useToast } from '../../../../toast/toast-context';
 import { MediaUploader } from '../../../components/media-uploader';
+import { extractFieldErrors } from '../../../../utils/field-errors';
+
+type TherapistFieldKey = 'therapistType' | 'personName' | 'gender' | 'specializationCategoryId' | 'bio' | 'experienceYears';
 
 interface VendorTherapistsStepProps {
   token: string | null;
@@ -66,6 +69,8 @@ export function VendorTherapistsStep({
 }: VendorTherapistsStepProps) {
   const { showToast } = useToast();
   const [therapists, setTherapists] = useState<AdminTherapist[]>([]);
+  const [eligibleTherapyBranches, setEligibleTherapyBranches] = useState<Branch[]>([]);
+  const [therapyBranchesLoading, setTherapyBranchesLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingTherapist, setEditingTherapist] = useState<AdminTherapist | null>(null);
@@ -91,6 +96,65 @@ export function VendorTherapistsStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, vendorId]);
 
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTherapyBranches = async () => {
+      if (!branches.length || !offersTherapy) {
+        setEligibleTherapyBranches([]);
+        setTherapyBranchesLoading(false);
+        return;
+      }
+
+      setTherapyBranchesLoading(true);
+
+      try {
+        const results = await Promise.all(
+          branches.map(async (branch) => {
+            const { data } = await getBranchCategoryAccess(
+              token,
+              vendorId,
+              branch.id,
+            );
+
+            const hasTherapyCategory = data.some(
+              (row) => row.category?.type === 'THERAPY',
+            );
+
+            return {
+              branch,
+              hasTherapyCategory,
+            };
+          }),
+        );
+
+        if (cancelled) return;
+
+        setEligibleTherapyBranches(
+          results
+            .filter((result) => result.hasTherapyCategory)
+            .map((result) => result.branch),
+        );
+      } catch {
+        if (cancelled) return;
+
+        setEligibleTherapyBranches([]);
+      } finally {
+        if (!cancelled) {
+          setTherapyBranchesLoading(false);
+        }
+      }
+    };
+
+    loadTherapyBranches();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, vendorId, branches, offersTherapy]);
+
+
   // Returns the saved row (like `VendorProductsStep`'s own `save`) so `WizardTherapistFormDialog`
   // can key its `MediaUploader` off a real id right after a fresh create — `load()` separately
   // refreshes the admin-shaped list (with `branch` nested in) that the list view and
@@ -115,11 +179,36 @@ export function VendorTherapistsStep({
     }
   };
 
-  if (!offersTherapy) {
+  // Only a branch with at least one currently-granted THERAPY category (`categoryTypes`, computed
+  // server-side in the same query as the branch list — see msd-api's `listBranches`) is eligible
+  // to host a therapist. Revoking a branch's Therapy access in Step 2 removes it from here
+  // immediately (this list is always the live `branches` prop, never cached) and after a refresh
+  // (the server recomputes `categoryTypes` from the live `BranchCategoryAccess` rows every time).
+  // `?.` guards a real crash (not just a hypothetical): `updateBranch`/`createBranch`/
+  // `setBranchStatus` never return `categoryTypes` (only `listBranches` computes it), so the
+  // instant after a Branch Access save — before `onVendorRefresh`'s reload lands — a branch
+  // object here could still be missing it; this was the exact root cause of a crash landing
+  // straight in the top-level ErrorBoundary when Step 4 was opened right after saving Step 2
+  // without a reload in between. A branch this happens to is simply excluded from
+  // `therapyBranches` for that one render, not a false positive — see `VendorBranchListStep`'s
+  // own doc comment for why it resolves within one round trip either way.
+  const therapyBranches = branches.filter((b) => b.categoryTypes?.includes('THERAPY'));
+
+  // `vendor.offersTherapy` is a denormalized convenience flag, not the ground truth — real
+  // category grants (`VendorCategoryAccess`/`BranchCategoryAccess`) are. It can be `false` while
+  // a branch already genuinely holds THERAPY access (e.g. data mapped outside the normal
+  // grant-flips-the-flag save path, such as seeded/imported branches), which used to hard-block
+  // this whole step with a misleading "not enabled" message despite valid access existing —
+  // this was the exact root cause of that bug. Any real THERAPY branch access is sufficient to
+  // proceed, regardless of what the flag currently says.
+  if (!offersTherapy && therapyBranches.length === 0) {
     return <p className="empty-state">This vendor has not enabled the Therapy business module in Step 2.</p>;
   }
 
-  const canAdd = canEdit && branches.length > 0;
+  const canAdd =
+    canEdit &&
+    !therapyBranchesLoading &&
+    therapyBranches.length > 0;
 
   return (
     <section aria-label="Therapy">
@@ -137,6 +226,19 @@ export function VendorTherapistsStep({
       {canEdit && branches.length === 0 && (
         <p className="empty-state">Add a branch in Step 2 before adding therapists.</p>
       )}
+      {canEdit && branches.length > 0 && therapyBranches.length === 0 && (
+        <p className="empty-state">No branch currently has Therapy category access — map one under Business Modules &amp; Category Access first.</p>
+      )}
+
+      {canEdit &&
+        branches.length > 0 &&
+        !therapyBranchesLoading &&
+        therapyBranches.length === 0 && (
+          <p className="empty-state">
+            Enable Therapy for at least one branch in Step 2 before adding
+            therapists.
+          </p>
+        )}
 
       {loading ? (
         <p className="loading-state">Loading therapists…</p>
@@ -181,11 +283,12 @@ export function VendorTherapistsStep({
           dialogRef={addDialogRef}
           vendorId={vendorId}
           token={token}
-          branches={branches}
+          branches={therapyBranches}
           specializationCategories={categories}
           onSave={(input, branchId) => save(input, branchId)}
         />
       )}
+
       {editingTherapist && (
         <WizardTherapistFormDialog
           key={editingTherapist.id}
@@ -234,17 +337,18 @@ function WizardTherapistFormDialog({
   const [form, setForm] = useState<TherapistInput>(
     therapist
       ? {
-          therapistType: therapist.therapistType,
-          personName: therapist.personName,
-          gender: therapist.gender ?? undefined,
-          specialization: therapist.specialization ?? undefined,
-          bio: therapist.bio ?? undefined,
-          experienceYears: therapist.experienceYears ?? undefined,
-        }
+        therapistType: therapist.therapistType,
+        personName: therapist.personName,
+        gender: therapist.gender ?? undefined,
+        specialization: therapist.specialization ?? undefined,
+        bio: therapist.bio ?? undefined,
+        experienceYears: therapist.experienceYears ?? undefined,
+      }
       : { ...EMPTY_INPUT },
   );
   const [branchId, setBranchId] = useState(therapist?.branchId ?? branches[0]?.id ?? '');
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<TherapistFieldKey, string>> | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Two-tier Category → Subcategory UI state, mirroring DealDialog's cascade — the backend still
@@ -365,6 +469,7 @@ function WizardTherapistFormDialog({
     if (saveButtonRef.current) saveButtonRef.current.disabled = true;
     setSubmitting(true);
     setError('');
+    setFieldErrors(null);
     try {
       // Only one field is actually submitted (`specializationCategoryId`) — the two-tier
       // Category/Subcategory UI is purely local; whichever tier the admin picked last wins,
@@ -380,7 +485,13 @@ function WizardTherapistFormDialog({
         dialogRef.current?.close();
       }
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not save therapist.');
+      const fields = extractFieldErrors<TherapistFieldKey>(err);
+      if (fields) {
+        setFieldErrors(fields);
+        setError('Fix the highlighted fields and try again.');
+      } else {
+        setError(err instanceof ApiRequestError ? err.message : 'Could not save therapist.');
+      }
     } finally {
       submittingRef.current = false;
       if (saveButtonRef.current) saveButtonRef.current.disabled = false;
@@ -394,19 +505,27 @@ function WizardTherapistFormDialog({
       <div slot="content" className="form-grid">
         <OutlinedTextField
           label="Therapist Type / Service Name"
+          required
           value={form.therapistType}
           onInput={(e: Event) => set('therapistType', (e.target as HTMLInputElement).value)}
+          error={Boolean(fieldErrors?.therapistType)}
         />
+        {fieldErrors?.therapistType && <p className="error-state" role="alert">{fieldErrors.therapistType}</p>}
         <OutlinedTextField
           label="Person Name"
+          required
           value={form.personName}
           onInput={(e: Event) => set('personName', (e.target as HTMLInputElement).value)}
+          error={Boolean(fieldErrors?.personName)}
         />
+        {fieldErrors?.personName && <p className="error-state" role="alert">{fieldErrors.personName}</p>}
         <OutlinedTextField
           label="Gender"
           value={form.gender ?? ''}
           onInput={(e: Event) => set('gender', (e.target as HTMLInputElement).value || undefined)}
+          error={Boolean(fieldErrors?.gender)}
         />
+        {fieldErrors?.gender && <p className="error-state" role="alert">{fieldErrors.gender}</p>}
 
         {therapist ? (
           <p className="field-hint">Branch: {therapist.branch.name} (cannot be changed)</p>
@@ -507,14 +626,18 @@ function WizardTherapistFormDialog({
           label="Bio"
           value={form.bio ?? ''}
           onInput={(e: Event) => set('bio', (e.target as HTMLInputElement).value || undefined)}
+          error={Boolean(fieldErrors?.bio)}
         />
+        {fieldErrors?.bio && <p className="error-state" role="alert">{fieldErrors.bio}</p>}
 
         <OutlinedTextField
           label="Experience (years)"
           type="number"
           value={form.experienceYears !== undefined ? String(form.experienceYears) : ''}
           onInput={(e: Event) => set('experienceYears', Number((e.target as HTMLInputElement).value) || undefined)}
+          error={Boolean(fieldErrors?.experienceYears)}
         />
+        {fieldErrors?.experienceYears && <p className="error-state" role="alert">{fieldErrors.experienceYears}</p>}
 
         <MediaUploader
           entityType="therapist"

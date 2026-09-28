@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FilledButton, OutlinedIconButton, Icon, Divider, Radio, ChipSet, FilterChip, SuggestionChip, Tabs, PrimaryTab, OutlinedTextField, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import { getCatalogVendor, listCatalogDeals, listCatalogProducts, type CatalogVendorDetail, type CatalogVendorBranch, type CatalogDeal, type CatalogProduct, type CatalogVendorTherapist, type CatalogOpeningHours, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { addCartItem } from '../../../api/cart';
@@ -144,6 +145,7 @@ function resolveBranch(branches: CatalogVendorBranch[], coords: { latitude: numb
 export function VendorPage() {
   const { slug = '' } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated } = useAuth();
   const { has: isWishlisted, toggle: toggleWishlist, isPending: wishlistPending } = useWishlist();
   const { showToast } = useToast();
@@ -269,7 +271,7 @@ export function VendorPage() {
 
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
-    navigate(`/sign-in?next=${encodeURIComponent(`/vendor/${slug}`)}`);
+    navigate(signInPathWithReturnTo(location));
     return false;
   };
 

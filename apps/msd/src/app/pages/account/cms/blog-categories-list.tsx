@@ -13,6 +13,7 @@ import {
 } from '../../../../api/rbac/blog-categories';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useToast } from '../../../../toast/toast-context';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { BlogCategoryFormDialog } from './blog-category-form-dialog';
 
 const COLUMNS = JSON.stringify([
@@ -43,6 +44,7 @@ function excerpt(text: string, maxLength = 80): string {
  */
 export function BlogCategoriesList() {
   const { token, can } = useAuth();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const { showToast } = useToast();
   const canCreate = can('cms.blog-category', 'create');
   const canEdit = can('cms.blog-category', 'edit');
@@ -109,7 +111,7 @@ export function BlogCategoriesList() {
   };
 
   const remove = async (category: BlogCategory) => {
-    if (!window.confirm(`Delete "${category.name}"? This cannot be undone.`)) return;
+    if (!(await confirm(`Delete "${category.name}"? This cannot be undone.`))) return;
     setError('');
     try {
       await deleteBlogCategory(token, category.id);
@@ -224,6 +226,7 @@ export function BlogCategoriesList() {
           onClose={() => setEditingCategory(null)}
         />
       )}
+      {ConfirmDialog}
     </div>
   );
 }

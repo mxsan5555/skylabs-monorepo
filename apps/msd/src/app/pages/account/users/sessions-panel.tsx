@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { DeviceSession } from '@skylabs-monorepo/shared-types';
 
 interface Props {
@@ -6,39 +7,41 @@ interface Props {
   error: string;
 }
 
+const COLUMNS = JSON.stringify([
+  { key: 'Device', label: 'Device' },
+  { key: 'IP', label: 'IP' },
+  { key: 'Created', label: 'Created' },
+  { key: 'Expires', label: 'Expires' },
+  { key: 'Status', label: 'Status', type: 'status', statusMap: { Active: 'success', Revoked: 'error' } },
+]);
+
+/** Read-only, no toolbar (no search/filter/export) — same minimal `<sky-data-table>` config as
+ *  the Showcase's own "Data Table — Minimal" demo (`/showcase#data-table-minimal-sort-only`). */
 export function SessionsPanel({ sessions, loading, error }: Props) {
-  if (loading) return <p className="loading-state">Loading sessions…</p>;
+  const rows = useMemo(
+    () =>
+      JSON.stringify(
+        sessions.map((session) => ({
+          Device: session.deviceInfo ?? '—',
+          IP: session.ip ?? '—',
+          Created: new Date(session.createdAt).toLocaleString(),
+          Expires: new Date(session.expiresAt).toLocaleString(),
+          Status: session.revokedAt ? 'Revoked' : 'Active',
+        })),
+      ),
+    [sessions],
+  );
+
   if (error) return <p className="error-state">{error}</p>;
-  if (sessions.length === 0) return <p className="empty-state">No active or past sessions.</p>;
 
   return (
-    <div className="data-table-wrap">
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th scope="col">Device</th>
-            <th scope="col">IP</th>
-            <th scope="col">Created</th>
-            <th scope="col">Expires</th>
-            <th scope="col">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sessions.map((session) => (
-            <tr key={session.id}>
-              <td>{session.deviceInfo ?? '—'}</td>
-              <td>{session.ip ?? '—'}</td>
-              <td>{new Date(session.createdAt).toLocaleString()}</td>
-              <td>{new Date(session.expiresAt).toLocaleString()}</td>
-              <td>
-                <span className={`status-pill ${session.revokedAt ? 'status-pill--blocked' : 'status-pill--active'}`}>
-                  {session.revokedAt ? 'Revoked' : 'Active'}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <sky-data-table
+      caption="Sessions"
+      columns={COLUMNS}
+      rows={rows}
+      total={sessions.length}
+      page-size={10}
+      loading={loading}
+    />
   );
 }

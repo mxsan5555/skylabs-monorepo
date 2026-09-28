@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ToastProvider } from '../../../../toast/toast-context';
 import type { SocialMediaLink } from '../../../../api/rbac/social-media';
@@ -162,27 +162,30 @@ describe('SocialMediaList', () => {
     expect(await screen.findByText('Link deactivated.')).toBeTruthy();
   });
 
-  it('delete confirms via window.confirm, then calls deleteSocialMediaLink only when confirmed', async () => {
+  it('delete confirms via the themed dialog, then calls deleteSocialMediaLink only when confirmed', async () => {
     deleteSocialMediaLinkMock.mockResolvedValue({ data: null });
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderList();
     await waitForTableLoaded(1);
 
     await dispatchRowActionUntil('delete', () => {
-      expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining(LINK.displayName));
+      expect(screen.getByText(`Delete "${LINK.displayName}"? This cannot be undone.`)).toBeTruthy();
     });
+    const confirmDialog = screen.getByText(`Delete "${LINK.displayName}"? This cannot be undone.`).closest('md-dialog')!;
+    fireEvent.click(within(confirmDialog).getByText('Confirm'));
+
     await waitFor(() => expect(deleteSocialMediaLinkMock).toHaveBeenCalledWith('test-token', LINK.id));
     expect(await screen.findByText('Social media link deleted.')).toBeTruthy();
   });
 
-  it('delete does NOT call deleteSocialMediaLink when window.confirm is cancelled', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('delete does NOT call deleteSocialMediaLink when the confirm dialog is cancelled', async () => {
     renderList();
     await waitForTableLoaded(1);
 
     await dispatchRowActionUntil('delete', () => {
-      expect(confirmSpy).toHaveBeenCalled();
+      expect(screen.getByText(`Delete "${LINK.displayName}"? This cannot be undone.`)).toBeTruthy();
     });
+    const confirmDialog = screen.getByText(`Delete "${LINK.displayName}"? This cannot be undone.`).closest('md-dialog')!;
+    fireEvent.click(within(confirmDialog).getByText('Cancel'));
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(deleteSocialMediaLinkMock).not.toHaveBeenCalled();
   });

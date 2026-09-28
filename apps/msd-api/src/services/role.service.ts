@@ -115,6 +115,17 @@ export async function setRolePermissions(roleId: string, permissionIds: string[]
   return prisma.rolePermission.findMany({ where: { roleId }, include: { permission: true } });
 }
 
+/** A role's currently granted dashboard widgets — lets a client pre-check boxes before editing
+ *  via `setRoleWidgets`, same purpose as `getRolePermissionIds` above for the permission matrix.
+ *  Previously missing entirely (only the write side existed), so the admin UI could never learn
+ *  what was actually saved after a role switch or page reload and had to blindly render every
+ *  widget unchecked — this is the read half of the same `RoleDashboardWidget` table
+ *  `setRoleWidgets` already writes to, not a new data model. */
+export async function getRoleWidgets(roleId: string) {
+  await getRole(roleId);
+  return prisma.roleDashboardWidget.findMany({ where: { roleId }, include: { widget: true } });
+}
+
 export async function setRoleWidgets(roleId: string, widgets: { widgetId: string; order: number }[]) {
   await getRole(roleId);
   const ids = widgets.map((w) => w.widgetId);
@@ -148,6 +159,11 @@ export async function getPermissionCatalog() {
   const existingByKey = new Map(existing.map((p) => [p.key, p]));
 
   return menu.map((node) => ({
+    // The menu node's own unique id — distinct from `menuKey`, which two different nodes may
+    // deliberately share (e.g. CMS "Pages"/"Articles" both grant `cms.blog`, two views of the
+    // same content by design). The frontend keys table rows on `id`, never `menuKey`, so two
+    // rows sharing a `menuKey` never collide as React list keys.
+    id: node.id,
     menuKey: node.permissionKey,
     title: node.title,
     actions: PERMISSION_ACTIONS.map((action: PermissionAction) => {
