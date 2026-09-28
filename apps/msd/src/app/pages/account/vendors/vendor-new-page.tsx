@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { useNavigate } from 'react-router-dom';
 import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
@@ -25,6 +25,12 @@ export function VendorNewPage() {
   const navigate = useNavigate();
   const canCreate = can('vendors', 'create');
   const [vendor, setVendor] = useState<Vendor | null>(null);
+
+  useEffect(() => {
+    if (vendor) {
+      navigate(`/account/vendors?vendorId=${vendor.id}`, { replace: true });
+    }
+  }, [vendor, navigate]);
 
   if (!canCreate) {
     return <p className="empty-state">You do not have access to add a vendor.</p>;

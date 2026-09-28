@@ -264,20 +264,6 @@ export function VendorPipeline({
     reloadBranches().catch(() => { });
   };
 
-  if (!vendor) {
-    return (
-      <div className="admin-page">
-        {error && <p className="error-state" role="alert">{error}</p>}
-        <VendorUserPicker value={pendingOwner} onChange={setPendingOwner} disabled={saving} />
-        <div className="form-actions">
-          <FilledButton ref={saveButtonRef} onClick={saveUser} disabled={!pendingOwner || saving}>
-            {saving ? 'Creating…' : 'Create Vendor'}
-          </FilledButton>
-        </div>
-      </div>
-    );
-  }
-
   const refreshVendorAfterKycChange = useCallback(async () => {
     if (!vendorId) return;
 
@@ -294,9 +280,47 @@ export function VendorPipeline({
     }
   }, [token, vendorId, onVendorChange]);
 
+  /**
+   * Keep the pipeline's local vendor state in sync immediately after a KYC review.
+   * `onKycReview` is intentionally a fire-and-forget callback, so waiting for it here
+   * cannot guarantee that the parent's API request has completed before this component
+   * renders again. Updating the local vendor first prevents the KYC status label from
+   * remaining on the old `PENDING` value. The parent callback is still invoked so the
+   * server-side review operation remains unchanged.
+   */
+  const handleKycReview = useCallback(
+    (kycStatus: 'VERIFIED' | 'REJECTED', rejectionReason?: string) => {
+      if (!vendor) return;
+
+      const nextVendor: Vendor = {
+        ...vendor,
+        kycStatus,
+        kycRejectionReason:
+          kycStatus === 'REJECTED' ? rejectionReason?.trim() || null : null,
+      };
+
+      setVendor(nextVendor);
+      onVendorChange(nextVendor);
+      onKycReview?.(kycStatus, rejectionReason);
+    },
+    [vendor, onVendorChange, onKycReview],
+  );
+
+  if (!vendor) {
+    return (
+      <div className="admin-page">
+        {error && <p className="error-state" role="alert">{error}</p>}
+        <VendorUserPicker value={pendingOwner} onChange={setPendingOwner} disabled={saving} />
+        <div className="form-actions">
+          <FilledButton ref={saveButtonRef} onClick={saveUser} disabled={!pendingOwner || saving}>
+            {saving ? 'Creating…' : 'Create Vendor'}
+          </FilledButton>
+        </div>
+      </div>
+    );
+  }
 
   const kycDocOk = hasMinimumKycDocument(vendor);
-  console.log('the kycDocOk is', kycDocOk, 'the vendor is', vendor);
 
   return (
     <div className="admin-page">
@@ -335,7 +359,7 @@ export function VendorPipeline({
             sections={['business', 'owner', 'address', 'kyc', 'bank']}
             saveLabel="Save"
             onSave={saveSection}
-            onKycReview={onKycReview}
+            onKycReview={handleKycReview}
             serverFieldErrors={fieldErrors}
             onKycDocumentChanged={refreshVendorAfterKycChange}
           />
@@ -345,20 +369,15 @@ export function VendorPipeline({
             </p>
           )}
 
-          <sky-tile-card
-            className="vendor-section-card"
-            headline="Profile Image"
-            text="Upload and manage the vendor profile images."
-            color="none"
-          >
-            <MediaUploader
-              entityType="vendor"
-              entityId={vendor.id}
-              existingImages={vendor.mediaImages ?? []}
-              existingVideo={vendor.mediaVideo ?? null}
-              token={token}
-            />
-          </sky-tile-card>
+          <h3 className="section-title">Profile Image</h3>
+          <MediaUploader
+            entityType="vendor"
+            entityId={vendor.id}
+            existingImages={vendor.mediaImages ?? []}
+            existingVideo={vendor.mediaVideo ?? null}
+            token={token}
+          />
+
           <div className="form-actions">
             <FilledButton onClick={() => setActiveStep(2)} disabled={!kycDocOk}>
               Continue
