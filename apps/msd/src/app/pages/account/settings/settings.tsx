@@ -5,7 +5,8 @@ import { getMyProfile, updateMyProfile } from '../../../../api/rbac/me';
 import type { UserRecord } from '../../../../api/rbac/users';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { extractFieldErrors } from '../../../../utils/field-errors';
-
+import content from '../../../../content.json';
+import { validateEmail, validatePhone } from '../../../../utils/validation';
 type ProfileFieldKey = 'name' | 'email' | 'phone';
 
 /**
@@ -37,25 +38,52 @@ export function MyProfileSettings() {
   }, [token]);
 
   const save = async () => {
-    setSaving(true);
     setError('');
     setFieldErrors(null);
     setMessage('');
+
+    const errors: Partial<Record<ProfileFieldKey, string>> = {};
+
+    const email = form.email.trim();
+    const phone = form.phone.trim();
+
+    if (email && !validateEmail(email)) {
+      errors.email = content.validation.email.invalid;
+    }
+
+    if (phone && !validatePhone(phone)) {
+      errors.phone = content.validation.phone.invalid;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError('Fix the highlighted fields and try again.');
+      return;
+    }
+
+    setSaving(true);
+
     try {
       const { data } = await updateMyProfile(token, {
         name: form.name,
-        email: form.email || undefined,
-        phone: form.phone || undefined,
+        email: email || undefined,
+        phone: phone || undefined,
       });
+
       setUser(data);
       setMessage('Profile saved.');
     } catch (err) {
       const fields = extractFieldErrors<ProfileFieldKey>(err);
+
       if (fields) {
         setFieldErrors(fields);
         setError('Fix the highlighted fields and try again.');
       } else {
-        setError(err instanceof ApiRequestError ? err.message : 'Could not save your profile.');
+        setError(
+          err instanceof ApiRequestError
+            ? err.message
+            : 'Could not save your profile.'
+        );
       }
     } finally {
       setSaving(false);

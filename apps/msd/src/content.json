@@ -5,6 +5,16 @@
     "message": "The page you’re looking for doesn’t exist or has moved.",
     "backToHome": "Back to home"
   },
+  "validation": {
+    "email": {
+      "empty": "Please enter your email address.",
+      "invalid": "Please enter a valid email address."
+    },
+    "phone": {
+      "empty": "Please enter your mobile number.",
+      "invalid": "Please enter a valid 10-digit mobile number."
+    }
+  },
   "site": {
     "name": "MSD",
     "fullName": "MySpaDeal",
@@ -475,12 +485,29 @@
   },
   "category": {
     "sortOptions": [
-      { "value": "relevance", "label": "Relevance" },
-      { "value": "price_asc", "label": "Price: Low to High" },
-      { "value": "price_desc", "label": "Price: High to Low" },
-      { "value": "distance", "label": "Distance: Nearest" }
+      {
+        "value": "relevance",
+        "label": "Relevance"
+      },
+      {
+        "value": "price_asc",
+        "label": "Price: Low to High"
+      },
+      {
+        "value": "price_desc",
+        "label": "Price: High to Low"
+      },
+      {
+        "value": "distance",
+        "label": "Distance: Nearest"
+      }
     ],
-    "view": { "label": "Results view", "list": "List view", "grid": "Grid view", "map": "Map view" },
+    "view": {
+      "label": "Results view",
+      "list": "List view",
+      "grid": "Grid view",
+      "map": "Map view"
+    },
     "timeSlots": [
       "9:00 AM",
       "10:00 AM",
@@ -516,16 +543,27 @@
       "action": "Search"
     },
     "resultCount": {
-      "therapist": { "singular": "therapist", "plural": "therapists" },
-      "product": { "singular": "product", "plural": "products" }
+      "therapist": {
+        "singular": "therapist",
+        "plural": "therapists"
+      },
+      "product": {
+        "singular": "product",
+        "plural": "products"
+      }
     },
     "emptyTherapists": {
       "heading": "No therapists yet",
       "subheading": "Check back soon."
     },
     "therapistPricePrefix": "From",
-    "description": { "more": "More", "less": "Less" },
-    "pills": { "label": "Sub-categories" },
+    "description": {
+      "more": "More",
+      "less": "Less"
+    },
+    "pills": {
+      "label": "Sub-categories"
+    },
     "toolbar": {
       "label": "Listing tools",
       "filters": "Filters",
@@ -543,11 +581,32 @@
       "showLess": "Show less",
       "countOne": ", 1 deal",
       "countMany": ", {count} deals",
-      "location": { "title": "Your location", "notSet": "Not set", "change": "Change location" },
-      "distance": { "title": "Distance", "any": "Any distance", "within": "Within {km} km", "needsLocation": "Set your location to filter by distance." },
-      "price": { "title": "Price", "min": "Min", "max": "Max", "minLabel": "Minimum price", "maxLabel": "Maximum price" },
-      "business": { "title": "Business", "search": "Search businesses" },
-      "branches": { "title": "Branches", "search": "Search branches" }
+      "location": {
+        "title": "Your location",
+        "notSet": "Not set",
+        "change": "Change location"
+      },
+      "distance": {
+        "title": "Distance",
+        "any": "Any distance",
+        "within": "Within {km} km",
+        "needsLocation": "Set your location to filter by distance."
+      },
+      "price": {
+        "title": "Price",
+        "min": "Min",
+        "max": "Max",
+        "minLabel": "Minimum price",
+        "maxLabel": "Maximum price"
+      },
+      "business": {
+        "title": "Business",
+        "search": "Search businesses"
+      },
+      "branches": {
+        "title": "Branches",
+        "search": "Search branches"
+      }
     },
     "loadMore": {
       "button": "Show more",
