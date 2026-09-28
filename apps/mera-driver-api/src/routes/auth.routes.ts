@@ -28,6 +28,7 @@ import { assertDriverAccountActive } from '../services/driver.service';
 import { assertCustomerAccountActive } from '../services/customer.service';
 import { writeAuditLog } from '../services/audit.service';
 import { passport } from '../lib/passport';
+import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 
 const router = Router();
 
@@ -43,7 +44,8 @@ function toPublicUser(user: { id: string; name: string; email: string | null; ph
 // user, so this endpoint can never be used to enumerate accounts.
 router.post('/otp/request', validateBody(OtpRequestSchema), async (req, res, next) => {
   try {
-    const { identifier, purpose } = req.body as { identifier: string; purpose: 'login' | 'signup' | 'change_phone' | 'change_email' };
+    const { purpose } = req.body as { identifier: string; purpose: 'login' | 'signup' | 'change_phone' | 'change_email' };
+    const identifier = normalizeIdentifier(req.body.identifier as string);
     await requestOtp(identifier, purpose);
     res.json({ data: { message: 'If the identifier is valid, an OTP has been sent.' }, error: null });
   } catch (err) {
@@ -53,11 +55,12 @@ router.post('/otp/request', validateBody(OtpRequestSchema), async (req, res, nex
 
 // POST /auth/otp/verify — verifies the OTP, upserts the user, issues a JWT pair.
 router.post('/otp/verify', validateBody(OtpVerifySchema), async (req, res, next) => {
-  const { identifier, otp, purpose } = req.body as {
+  const { otp, purpose } = req.body as {
     identifier: string;
     otp: string;
     purpose: 'login' | 'signup' | 'change_phone' | 'change_email';
   };
+  const identifier = normalizeIdentifier(req.body.identifier as string);
   const method = loginMethodForIdentifier(identifier);
 
   try {
@@ -163,7 +166,8 @@ router.post('/logout-all', authenticate, async (req, res, next) => {
 // POST /auth/password/login — same anti-enumeration posture as OTP verify: a
 // nonexistent identifier and a wrong password both fail with the same message/shape.
 router.post('/password/login', validateBody(PasswordLoginSchema), async (req, res, next) => {
-  const { identifier, password } = req.body as { identifier: string; password: string };
+  const { password } = req.body as { identifier: string; password: string };
+  const identifier = normalizeIdentifier(req.body.identifier as string);
   const method = loginMethodForIdentifier(identifier);
 
   try {
@@ -200,7 +204,7 @@ router.post('/password/login', validateBody(PasswordLoginSchema), async (req, re
 // Same generic response regardless of whether the identifier exists (anti-enumeration).
 router.post('/password/forgot', validateBody(ForgotPasswordSchema), async (req, res, next) => {
   try {
-    const { identifier } = req.body as { identifier: string };
+    const identifier = normalizeIdentifier(req.body.identifier as string);
     await requestOtp(identifier, 'password_reset');
     res.json({ data: { message: 'If the identifier is valid, a reset code has been sent.' }, error: null });
   } catch (err) {
@@ -211,7 +215,8 @@ router.post('/password/forgot', validateBody(ForgotPasswordSchema), async (req, 
 // POST /auth/password/reset — verifies the password_reset OTP, then sets the new password.
 router.post('/password/reset', validateBody(ResetPasswordSchema), async (req, res, next) => {
   try {
-    const { identifier, otp, newPassword } = req.body as { identifier: string; otp: string; newPassword: string };
+    const { otp, newPassword } = req.body as { identifier: string; otp: string; newPassword: string };
+    const identifier = normalizeIdentifier(req.body.identifier as string);
     await verifyOtp(identifier, 'password_reset', otp);
 
     const user = await upsertUserByIdentifier(identifier);

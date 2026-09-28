@@ -92,6 +92,8 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   'masters.sub-categories': ['create', 'edit', 'delete'],
   'masters.tags': ['create', 'edit', 'delete'],
   'masters.popular-treatments': ['create', 'edit', 'delete'],
+  'masters.promotions': ['create', 'edit', 'delete'],
+  'masters.home-hero': ['create', 'edit', 'delete'],
   'rbac.roles': ['create', 'edit', 'delete', 'status_change'],
   'rbac.users': ['create', 'edit', 'delete', 'assign', 'status_change', 'custom'],
   'rbac.audit-logs': [],
@@ -268,6 +270,8 @@ async function grantStarterPermissions(
     'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit', 'masters.sub-categories:delete',
     'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
     'masters.popular-treatments:view', 'masters.popular-treatments:create', 'masters.popular-treatments:edit', 'masters.popular-treatments:delete',
+    'masters.promotions:view', 'masters.promotions:create', 'masters.promotions:edit', 'masters.promotions:delete',
+    'masters.home-hero:view', 'masters.home-hero:create', 'masters.home-hero:edit', 'masters.home-hero:delete',
     'settings:view', 'settings:edit',
     'cms:view',
     'cms.blog.pages:view', 'cms.blog.pages:create', 'cms.blog.pages:edit', 'cms.blog.pages:delete',
@@ -281,6 +285,8 @@ async function grantStarterPermissions(
     'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit',
     'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
     'masters.popular-treatments:view', 'masters.popular-treatments:create', 'masters.popular-treatments:edit', 'masters.popular-treatments:delete',
+    'masters.promotions:view', 'masters.promotions:create', 'masters.promotions:edit', 'masters.promotions:delete',
+    'masters.home-hero:view', 'masters.home-hero:create', 'masters.home-hero:edit', 'masters.home-hero:delete',
     'reports:view',
     // No 'cms.blog.pages:delete'/'cms.blog.articles:delete' — mirrors this same role's
     // create/edit-but-no-delete grant on 'masters.categories' above.
@@ -541,13 +547,22 @@ async function seedPopularTreatments(): Promise<{ groupsCreated: number; treatme
   return { groupsCreated, treatmentsCreated };
 }
 
+/**
+ * Idempotent, find-or-create-only: `update` is a true no-op on every rerun — an existing row's
+ * `name`/`isActive`/`sortOrder` is never touched, only ever set at `create` time. A prior version
+ * did `update: { isActive: true }`, which force-reactivated every taxonomy row on every reseed,
+ * silently undoing an admin's manual deactivation (same bug class as the Dashboard Widgets
+ * destructive-reseed fix elsewhere in this codebase). Renames/reactivations/reordering for
+ * already-existing, already-drifted rows are handled once by `reconcile-category-master.ts`, not
+ * by this per-run seed step.
+ */
 async function seedCategoryTaxonomy(): Promise<Map<string, string>> {
   const categoryIdBySlug = new Map<string, string>();
 
   for (const top of CATEGORY_TAXONOMY) {
     const topRow = await prisma.category.upsert({
       where: { slug: top.slug },
-      update: { isActive: true },
+      update: {},
       create: { name: top.name, slug: top.slug, type: top.type },
     });
     categoryIdBySlug.set(top.slug, topRow.id);
@@ -555,7 +570,7 @@ async function seedCategoryTaxonomy(): Promise<Map<string, string>> {
     for (const [subIdx, sub] of top.children.entries()) {
       const subRow = await prisma.category.upsert({
         where: { slug: sub.slug },
-        update: { isActive: true },
+        update: {},
         create: { name: sub.name, slug: sub.slug, parentId: topRow.id, sortOrder: subIdx },
       });
       categoryIdBySlug.set(sub.slug, subRow.id);
@@ -563,7 +578,7 @@ async function seedCategoryTaxonomy(): Promise<Map<string, string>> {
       for (const [leafIdx, leaf] of (sub.children ?? []).entries()) {
         const leafRow = await prisma.category.upsert({
           where: { slug: leaf.slug },
-          update: { isActive: true },
+          update: {},
           create: { name: leaf.name, slug: leaf.slug, parentId: subRow.id, sortOrder: leafIdx },
         });
         categoryIdBySlug.set(leaf.slug, leafRow.id);
@@ -1425,7 +1440,12 @@ function validateDemoSeedDataset():void{
   for(const x of PRODUCT_SEEDS)seeded.add(x.subcategorySlug);
   for(const x of THERAPIST_SEEDS)if(x.specializationCategorySlug)seeded.add(x.specializationCategorySlug);
   const missing=taxonomySubcategories.filter((slug)=>!seeded.has(slug));
-  if(missing.length)throw new Error(`Seed validation failed: subcategories without data: ${missing.join(', ')}`);
+  // Non-fatal: a taxonomy subcategory with no demo-seed example listing is still perfectly valid
+  // once real data exists via live admin usage or `reconcile-category-master.ts` (which populates
+  // several final-business-structure subcategories from pre-existing, non-demo-seed relations —
+  // see that script's own doc comment). This only used to be a hard gate back when every taxonomy
+  // subcategory was guaranteed to come solely from SERVICE_DEAL_SEEDS/PRODUCT_SEEDS/THERAPIST_SEEDS.
+  if(missing.length)console.warn(`Seed warning: taxonomy subcategories with no demo-seed example listing (fine if populated via live/reconciled data): ${missing.join(', ')}`);
   const branchKeys=new Set(VENDOR_SEEDS.flatMap((v)=>v.branches.map((b)=>b.key)));
   const count=(rows:any[])=>rows.reduce((m,row)=>(m.set(row.branchKey,(m.get(row.branchKey)??0)+1),m),new Map<string,number>());
   const dc=count(SERVICE_DEAL_SEEDS),pc=count(PRODUCT_SEEDS),tc=count(THERAPIST_SEEDS);

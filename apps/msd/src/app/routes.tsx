@@ -35,6 +35,8 @@ import { VendorProducts } from './pages/account/vendors/vendor-products';
 import { CategoryManagement } from './pages/account/masters/categories';
 import { PopularTagManagement } from './pages/account/masters/popular-tags';
 import { PopularTreatmentManagement } from './pages/account/masters/popular-treatments';
+import { PromotionManagement } from './pages/account/masters/promotions';
+import { HomeHeroManagement } from './pages/account/masters/home-hero';
 import { BlogList } from './pages/account/cms/blog-list';
 import { BlogDetailAdmin } from './pages/account/cms/blog-detail-admin';
 import { BlogCategoriesList } from './pages/account/cms/blog-categories-list';
@@ -446,144 +448,159 @@ export function AppRoutes() {
             }
           />
 
-          <Route
-            path="/account/masters/deals"
-            element={
-              <RequirePermission menuKey="masters.deals">
-                <AdminPage title="Deals" subtitle="Module coming soon." />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/masters/tags"
-            element={
-              <RequirePermission menuKey="masters.tags">
-                <PopularTagManagement />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/masters/popular-treatments"
-            element={
-              <RequirePermission menuKey="masters.popular-treatments">
-                <PopularTreatmentManagement />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/cms/blog"
-            element={
-              <RequirePermission menuKey="cms.blog.pages">
-                <BlogList />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/cms/blog/:id"
-            element={
-              <RequirePermission menuKey="cms.blog.pages">
-                <BlogDetailAdmin />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/cms/about-us"
-            element={
-              <RequirePermission menuKey="cms.about-us">
-                <AboutUsPage />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/cms/contact-us"
-            element={
-              <RequirePermission menuKey="cms.contact-us">
-                <ContactUsPage />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/cms/faq"
-            element={
-              <RequirePermission menuKey="cms.faq">
-                <FaqList />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/cms/blog-categories"
-            element={
-              <RequirePermission menuKey="cms.blog-category">
-                <BlogCategoriesList />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/cms/how-it-works"
-            element={
-              <RequirePermission menuKey="cms.how-it-works">
-                <HowItWorksPage />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/cms/careers"
-            element={
-              <RequirePermission menuKey="cms.careers">
-                <CareersPage />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/cms/legal-pages"
-            element={
-              <RequirePermission menuKey="cms.website-pages">
-                <LegalPagesList />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/cms/social-media"
-            element={
-              <RequirePermission menuKey="cms.social-media">
-                <SocialMediaList />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/administration/roles"
-            element={
-              <RequirePermission menuKey="rbac.roles">
-                <RoleManagement />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/administration/users"
-            element={
-              <RequirePermission menuKey="rbac.users">
-                <UserManagement />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/administration/audit-logs"
-            element={
-              <RequirePermission menuKey="rbac.audit-logs">
-                <AuditLogs />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/account/settings"
-            element={
-              <RequirePermission menuKey="settings">
-                <MyProfileSettings />
-              </RequirePermission>
-            }
-          />
-        </Route>
-      </Routes>
-    </>
+         <Route
+          path="/account/masters/deals"
+          element={
+            <RequirePermission menuKey="masters.deals">
+              <AdminPage title="Deals" subtitle="Module coming soon." />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/masters/tags"
+          element={
+            <RequirePermission menuKey="masters.tags">
+              <PopularTagManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/masters/popular-treatments"
+          element={
+            <RequirePermission menuKey="masters.popular-treatments">
+              <PopularTreatmentManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/masters/promotions"
+          element={
+            <RequirePermission menuKey="masters.promotions">
+              <PromotionManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/masters/home-hero"
+          element={
+            <RequirePermission menuKey="masters.home-hero">
+              <HomeHeroManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/blog"
+          element={
+            <RequirePermission menuKey="cms.blog.pages">
+              <BlogList />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/blog/:id"
+          element={
+            <RequirePermission menuKey="cms.blog.pages">
+              <BlogDetailAdmin />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/about-us"
+          element={
+            <RequirePermission menuKey="cms.about-us">
+              <AboutUsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/contact-us"
+          element={
+            <RequirePermission menuKey="cms.contact-us">
+              <ContactUsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/faq"
+          element={
+            <RequirePermission menuKey="cms.faq">
+              <FaqList />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/blog-categories"
+          element={
+            <RequirePermission menuKey="cms.blog-category">
+              <BlogCategoriesList />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/how-it-works"
+          element={
+            <RequirePermission menuKey="cms.how-it-works">
+              <HowItWorksPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/careers"
+          element={
+            <RequirePermission menuKey="cms.careers">
+              <CareersPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/legal-pages"
+          element={
+            <RequirePermission menuKey="cms.website-pages">
+              <LegalPagesList />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/cms/social-media"
+          element={
+            <RequirePermission menuKey="cms.social-media">
+              <SocialMediaList />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/administration/roles"
+          element={
+            <RequirePermission menuKey="rbac.roles">
+              <RoleManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/administration/users"
+          element={
+            <RequirePermission menuKey="rbac.users">
+              <UserManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/administration/audit-logs"
+          element={
+            <RequirePermission menuKey="rbac.audit-logs">
+              <AuditLogs />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/settings"
+          element={
+            <RequirePermission menuKey="settings">
+              <MyProfileSettings />
+            </RequirePermission>
+          }
+        />
+      </Route>
+    </Routes>
   );
 }

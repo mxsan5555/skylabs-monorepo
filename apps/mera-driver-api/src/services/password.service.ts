@@ -1,14 +1,23 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';
+import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import { HttpError } from '../middleware/errorHandler';
 
 const BCRYPT_ROUNDS = 10;
 
 /** Finds an active, non-deleted user with a password set, by email or phone identifier. */
 export async function findUserWithPasswordByIdentifier(identifier: string) {
-  const isEmail = identifier.includes('@');
+  const normalized = normalizeIdentifier(identifier);
+  const legacyPhone = normalized.startsWith('+91') ? normalized.slice(3) : normalized;
+  const isEmail = normalized.includes('@');
+
   const user = await prisma.user.findFirst({
-    where: { [isEmail ? 'email' : 'phone']: identifier, deletedAt: null },
+    where: {
+      OR: isEmail
+        ? [{ email: normalized.toLowerCase() }]
+        : [{ phone: normalized }, { phone: legacyPhone }],
+      deletedAt: null,
+    },
   });
   return user;
 }

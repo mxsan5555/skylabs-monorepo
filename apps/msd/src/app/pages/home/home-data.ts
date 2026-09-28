@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import {
   listCatalogDeals,
   listCatalogFaqs,
+  listCatalogPopularTreatments,
   listCatalogProducts,
   listCatalogTherapists,
   type CatalogDeal,
   type CatalogFaq,
+  type CatalogPopularTreatmentGroup,
   type CatalogProduct,
   type CatalogTherapist,
 } from '../../../api/catalog';
@@ -75,6 +77,7 @@ export interface HomeCatalog {
   products: CatalogProduct[];
   therapists: CatalogTherapist[];
   faqs: CatalogFaq[];
+  popularTreatments: CatalogPopularTreatmentGroup[];
 }
 
 /**
@@ -94,6 +97,9 @@ export function useHomeCatalog(coords: Coordinates | null | undefined): HomeCata
       : { status: 'loading', error: '', deals: [], products: [], therapists: [] },
   );
   const [faqs, setFaqs] = useState<CatalogFaq[]>(() => initial?.faqs ?? []);
+  const [popularTreatments, setPopularTreatments] = useState<CatalogPopularTreatmentGroup[]>(
+    () => initial?.popularTreatments ?? [],
+  );
   const resolved = coords !== undefined;
   const latitude = coords?.latitude;
   const longitude = coords?.longitude;
@@ -148,7 +154,22 @@ export function useHomeCatalog(coords: Coordinates | null | undefined): HomeCata
     };
   }, [prerendered]);
 
-  return { ...state, faqs };
+  // Same non-critical, CMS-managed treatment as FAQs above.
+  useEffect(() => {
+    let cancelled = false;
+    listCatalogPopularTreatments()
+      .then(({ data }) => {
+        if (!cancelled) setPopularTreatments(data ?? []);
+      })
+      .catch(() => {
+        if (!cancelled && !prerendered) setPopularTreatments([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [prerendered]);
+
+  return { ...state, faqs, popularTreatments };
 }
 
 /** `srcset` for a CDN image whose width is a `w=` query param (e.g. Unsplash): one candidate per

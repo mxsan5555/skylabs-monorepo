@@ -369,6 +369,22 @@
         "permissionKey": "masters.popular-treatments",
         "parent": "masters",
         "order": 3
+      },
+      {
+        "id": "masters-promotions",
+        "title": "Promotions",
+        "route": "/account/masters/promotions",
+        "permissionKey": "masters.promotions",
+        "parent": "masters",
+        "order": 4
+      },
+      {
+        "id": "masters-home-hero",
+        "title": "Home Hero",
+        "route": "/account/masters/home-hero",
+        "permissionKey": "masters.home-hero",
+        "parent": "masters",
+        "order": 5
       }
     ]
   },

@@ -539,6 +539,7 @@ model Category {
   popularTagLinks          PopularTagCategory[]
   popularTreatments        PopularTreatment[]     @relation("PopularTreatmentCategory")
   popularTreatmentSubcats  PopularTreatment[]     @relation("PopularTreatmentSubcategory")
+  promotionLinks           Promotion[]
   products                 Product[]              @relation("ProductCategory")
   subcategoryProducts      Product[]              @relation("ProductSubcategory")
   therapistSpecializations Therapist[]            @relation("TherapistSpecialization")
@@ -916,6 +917,88 @@ model PopularTreatment {
   @@index([sortOrder])
 }
 
+/// Admin-managed Home page promotion card (the "Offers" section — welcome offer/gift card/etc.
+/// slots, previously hardcoded copy in content.json). `destinationType` picks which of the three
+/// destination fields is meaningful: ROUTE uses `destinationRoute` (a fixed, server-validated
+/// internal path — see promotion.service.ts's allow-list, mirroring the login-redirect
+/// `sanitizeReturnUrl` discipline so this can never point off-site), CATEGORY/DEAL use the
+/// matching FK (`categoryId`/`dealId`) so the link always resolves to a real, still-existing
+/// row — never a duplicated/stale URL string. `startDate`/`endDate` are optional time-window
+/// gates (both null = always visible while `isActive`) — same "hard-coded server-side visibility
+/// filter, never trust a caller-supplied override" discipline as `VISIBLE_DEAL_WHERE`.
+model Promotion {
+  id               String                @id @default(uuid())
+  title            String
+  description      String?
+  buttonLabel      String?
+  destinationType  PromotionDestination  @default(ROUTE)
+  destinationRoute String?
+  categoryId       String?
+  dealId           String?
+  sortOrder        Int                   @default(0)
+  isActive         Boolean               @default(true)
+  startDate        DateTime?
+  endDate          DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  category         Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  deal             Deal?                 @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  mediaImages      PromotionImage[]
+
+  @@index([sortOrder])
+  @@index([categoryId])
+  @@index([dealId])
+}
+
+enum PromotionDestination {
+  ROUTE
+  CATEGORY
+  DEAL
+}
+
+/// One uploaded image for a Promotion row — same shared Deal/Product/Therapist/Category/Vendor
+/// media-upload system (see DealImage's doc comment for the full architecture rationale). A
+/// promotion card only ever shows one image in the UI, but this stays a join table (not a plain
+/// `imageUrl` string column) to match this schema's uniform per-entity media pattern (`isPrimary`
+/// picks which uploaded image is "the" card image) rather than a one-off exception.
+model PromotionImage {
+  id               String    @id @default(uuid())
+  promotionId      String
+  storageKey       String
+  originalFilename String?
+  mimeType         String
+  sizeBytes        Int
+  sortOrder        Int       @default(0)
+  isPrimary        Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  promotion        Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+
+  @@index([promotionId])
+}
+
+/// Admin-managed Home page hero deal slider slot — always a live reference to an existing Deal
+/// (`dealId`, required), never a duplicated snapshot of its title/price/image, so a slide always
+/// reflects that Deal's current data. `state: null` is the Global/Default slider (shown when the
+/// visitor's resolved state has no publishable slider of its own, or geolocation is
+/// denied/unavailable) — see home-hero.service.ts's publish-eligibility gate (a state's slider,
+/// including Global/Default, only ever serves publicly once it has 5+ currently-eligible slides;
+/// `isActive`/fewer than 5 is a valid *draft* state, just never returned by the public read).
+model HomeHeroSlide {
+  id        String   @id @default(uuid())
+  dealId    String
+  state     String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([state])
+  @@index([dealId])
+  @@index([sortOrder])
+}
+
 /// A Superadmin-managed marketing label ("Trending", "Best Seller", ...) mappable onto any mix
 /// of Category/Deal/Product/Therapist rows. `isActive` is the ONLY thing a deactivate/reactivate
 /// toggle touches — mapping rows are never deleted or recreated by a status change, so
@@ -1034,6 +1117,8 @@ model Deal {
   mediaVideo              DealVideo?
   orderItems              OrderItem[]
   popularTagLinks         PopularTagDeal[]
+  promotionLinks          Promotion[]
+  heroSlides              HomeHeroSlide[]
   wishlistItems           WishlistItem[]
 
   @@index([vendorId])

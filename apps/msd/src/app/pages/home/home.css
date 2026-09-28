@@ -126,6 +126,24 @@
   flex: none;
   color: var(--md-sys-color-primary);
 }
+/* Broken/missing Deal image fallback — same frame size as a real thumbnail, a neutral icon
+   instead of a browser's broken-image glyph. */
+.home-spotlight__thumb--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--md-sys-color-on-surface-variant);
+}
+/* Admin Home Hero slider — the swiper wraps the exact same .home-spotlight markup/classes as the
+   single-deal fallback above, so a multi-slide slider looks identical to one slide, just
+   swipeable/auto-rotating. */
+.home-spotlight__carousel {
+  display: block;
+  width: 100%;
+}
+.home-spotlight__carousel .home-spotlight {
+  margin-block-start: 0;
+}
 
 /* Category tiles (tile surface is sky-tile-card; the slotted link stretches over it).
    136px min keeps 2 columns in a 288px content box (320px viewport). */
@@ -373,14 +391,34 @@
 }
 
 @media (min-width: 600px) {
-  .home-spotlight {
+  /* Whichever renders — the plain single-deal fallback (.home-spotlight is a direct child of
+     .home-hero__visual) or the Admin-managed slider (.home-spotlight is nested inside
+     .home-spotlight__carousel) — the SAME overlay box (position/inset/max-width) is owned by
+     whichever element is the direct child of .home-hero__visual, so the card is always
+     correctly positioned AND correctly stacked above .home-hero__img (a static-position sibling
+     always paints under an absolutely-positioned one). Previously `.home-spotlight` alone had
+     this positioning always — nesting it one level deeper inside the carousel without moving the
+     positioning to the new wrapper left `.home-spotlight` visually coincident with the image but
+     not reliably clickable above it (confirmed via live browser click testing, not just
+     automation noise) — this fixes that real stacking bug, not just a test-script workaround. */
+  .home-spotlight,
+  .home-spotlight__carousel {
     position: absolute;
     inset-inline-start: 16px;
     inset-block-end: 16px;
     max-inline-size: min(380px, calc(100% - 32px));
+    z-index: 1;
+  }
+  .home-spotlight {
     margin: 0;
     border: 0;
     box-shadow: var(--sky-elevation-2);
+  }
+  /* Inside the carousel, the wrapper above already owns the absolute overlay box — the card
+     itself just fills it in normal flow. */
+  .home-spotlight__carousel .home-spotlight {
+    position: static;
+    max-inline-size: none;
   }
   .home-offers {
     grid-template-columns: repeat(2, minmax(0, 1fr));

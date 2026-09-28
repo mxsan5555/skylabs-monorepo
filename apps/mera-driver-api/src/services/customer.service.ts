@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import { HttpError } from '../middleware/errorHandler';
 
 const LINKED_USER_SELECT = { id: true, name: true, email: true, phone: true } as const;
@@ -125,7 +126,11 @@ export async function createAndLinkCustomerUser(customerId: string) {
 
   await prisma.$transaction(async (tx) => {
     const user = await tx.user.create({
-      data: { name, email: customer.email ?? undefined, phone: customer.mobileNumber ?? undefined },
+      data: {
+        name,
+        email: customer.email ? normalizeIdentifier(customer.email) : undefined,
+        phone: customer.mobileNumber ? normalizeIdentifier(customer.mobileNumber) : undefined,
+      },
     });
     await tx.userRole.create({ data: { userId: user.id, roleId: customerRole.id } });
     await tx.customer.update({ where: { id: customerId }, data: { userId: user.id } });

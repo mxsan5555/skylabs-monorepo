@@ -585,7 +585,7 @@ export function VendorProfileForm({
           </p>
         )}
 
-      {show('business') && (
+     {show('business') && (
         <sky-tile-card
           className="vendor-section-card"
           headline="Business Details"
