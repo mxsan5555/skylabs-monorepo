@@ -1,0 +1,33 @@
+.city-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.city-dialog__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-block-size: 50vh;
+  overflow-y: auto;
+}
+.city-dialog__option {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  inline-size: 100%;
+  min-block-size: 48px;
+  padding-inline: 12px;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+  text-align: start;
+}
+.city-dialog__option[aria-current='true'] {
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.city-dialog__state {
+  color: var(--md-sys-color-on-surface-variant);
+}

@@ -4,8 +4,22 @@ import type { PendingVendorOwner } from './vendor-user-picker';
 import type { Vendor } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 
+const navigateMock = vi.fn();
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+  };
+});
+
 const createVendorMock = vi.fn();
 const updateVendorMock = vi.fn();
+
+vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
+  useAuth: () => ({ token: 'tok', can: () => true }),
+}));
 
 vi.mock('../../../../api/rbac/vendors', async () => {
   const actual = await vi.importActual<typeof import('../../../../api/rbac/vendors')>('../../../../api/rbac/vendors');
@@ -37,6 +51,7 @@ vi.mock('./vendor-user-picker', () => ({
 }));
 
 import { VendorPipeline } from './vendor-pipeline';
+import { VendorNewPage } from './vendor-new-page';
 
 function findButtonByText(text: string): HTMLElement {
   const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.trim() === text);
@@ -64,6 +79,7 @@ const CREATED_VENDOR: Vendor = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  navigateMock.mockReset();
 });
 
 /**
@@ -91,6 +107,17 @@ beforeEach(() => {
  * `disabled={!pendingOwner || saving}` prop plus this repo's Playwright E2E suite.
  */
 describe('VendorPipeline#saveUser — owner is always a brand-new identity', () => {
+  it('redirects back to the vendor list immediately after a fresh vendor is created', async () => {
+    createVendorMock.mockResolvedValue({ data: CREATED_VENDOR });
+    render(<VendorNewPage />);
+
+    fireEvent.click(screen.getByText('pick-identity'));
+    fireEvent.click(findButtonByText('Create Vendor'));
+
+    await waitFor(() => expect(createVendorMock).toHaveBeenCalledOnce());
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith(`/account/vendors?vendorId=${CREATED_VENDOR.id}`, { replace: true }));
+  });
+
   it('submitting sends ownerFirstName/ownerLastName/ownerEmail/ownerMobile, never ownerUserId', async () => {
     createVendorMock.mockResolvedValue({ data: CREATED_VENDOR });
     const onVendorChange = vi.fn();

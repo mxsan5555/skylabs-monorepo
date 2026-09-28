@@ -1,9 +1,7 @@
 import { LitElement, html, css, nothing } from 'lit';
 // Register the M3 icon used for the chevron indicator.
 import '@material/web/icon/icon.js';
-import { hostBase } from '../shared-styles.js';
-
-let uid = 0;
+import { focusRing, hostBase, nextId, typescale } from '../shared-styles.js';
 
 /**
  * <sky-accordion-item> — a single expandable panel, styled as an M3 card.
@@ -38,13 +36,8 @@ export class SkyAccordionItem extends LitElement {
   /** Heading level for the trigger (1–6), for a correct document outline. */
   declare level: number;
 
-  private readonly _uid = ++uid;
-  private get _panelId() {
-    return `sky-acc-panel-${this._uid}`;
-  }
-  private get _triggerId() {
-    return `sky-acc-trigger-${this._uid}`;
-  }
+  private readonly _panelId = nextId('sky-acc-panel');
+  private readonly _triggerId = nextId('sky-acc-trigger');
 
   constructor() {
     super();
@@ -56,23 +49,21 @@ export class SkyAccordionItem extends LitElement {
 
   static override styles = css`
     ${hostBase}
+    ${typescale}
     .item {
-      border-radius: 12px;
+      border-radius: var(--md-sys-shape-corner-medium);
       overflow: hidden;
       background-color: var(--md-sys-color-surface);
     }
     :host([variant='outlined']) .item {
       border: 1px solid var(--md-sys-color-outline-variant);
-      box-shadow: 0 1px 2px color-mix(in srgb, var(--md-sys-color-shadow) 8%, transparent);
     }
     :host([variant='filled']) .item {
       background-color: var(--md-sys-color-surface-container);
     }
     :host([variant='elevated']) .item {
       background-color: var(--md-sys-color-surface-container-low);
-      box-shadow:
-        0 1px 2px color-mix(in srgb, var(--md-sys-color-shadow) 30%, transparent),
-        0 1px 3px 1px color-mix(in srgb, var(--md-sys-color-shadow) 15%, transparent);
+      box-shadow: var(--sky-elevation-1);
     }
     .heading {
       margin: 0;
@@ -82,59 +73,49 @@ export class SkyAccordionItem extends LitElement {
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      width: 100%;
-      box-sizing: border-box;
+      inline-size: 100%;
       margin: 0;
       padding: 16px 20px;
       border: none;
       background: transparent;
       color: inherit;
-      font: inherit;
-      font-size: 1rem;
-      font-weight: 500;
-      text-align: left;
+      text-align: start;
       cursor: pointer;
     }
     .trigger:hover {
       background-color: color-mix(
         in srgb,
-        var(--md-sys-color-on-surface) 6%,
+        var(--md-sys-color-on-surface) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
         transparent
       );
     }
     .trigger:focus-visible {
-      outline: 3px solid var(--md-sys-color-primary);
+      ${focusRing}
       outline-offset: -3px;
     }
     .trigger:disabled {
       cursor: default;
-      color: color-mix(
-        in srgb,
-        var(--md-sys-color-on-surface) 38%,
-        transparent
-      );
+      background-color: transparent;
+      opacity: var(--md-sys-state-disabled-opacity);
     }
     .title {
       flex: 1;
-      min-width: 0;
+      min-inline-size: 0;
     }
     .chevron {
       flex: none;
       color: var(--md-sys-color-on-surface-variant);
-      transition: transform 200ms ease;
+      transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
     }
     .trigger[aria-expanded='true'] .chevron {
       transform: rotate(180deg);
     }
     .panel {
-      border-top: 1px solid var(--md-sys-color-outline-variant);
+      border-block-start: 1px solid var(--md-sys-color-outline-variant);
     }
     .content {
       padding: 16px 20px;
       color: var(--md-sys-color-on-surface-variant);
-    }
-    [hidden] {
-      display: none;
     }
   `;
 
@@ -156,7 +137,7 @@ export class SkyAccordionItem extends LitElement {
         <div class="heading" role="heading" aria-level=${this.level}>
           <button
             id=${this._triggerId}
-            class="trigger"
+            class="trigger title-medium"
             type="button"
             aria-expanded=${this.open ? 'true' : 'false'}
             aria-controls=${this._panelId}
@@ -176,7 +157,7 @@ export class SkyAccordionItem extends LitElement {
           aria-labelledby=${this._triggerId}
           ?hidden=${!this.open}
         >
-          <div class="content"><slot></slot></div>
+          <div class="content body-medium"><slot></slot></div>
         </div>
       </div>
     `;

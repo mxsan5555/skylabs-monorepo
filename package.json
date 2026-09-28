@@ -8,6 +8,7 @@
     "msd-api:prisma:migrate": "dotenv -e apps/msd-api/.env.local -- prisma migrate dev --schema=apps/msd-api/prisma/schema.prisma",
     "msd-api:prisma:studio": "dotenv -e apps/msd-api/.env.local -- prisma studio --schema=apps/msd-api/prisma/schema.prisma",
     "msd-api:prisma:seed": "dotenv -e apps/msd-api/.env.local -- tsx --tsconfig tsconfig.base.json apps/msd-api/prisma/seed.ts",
+    "msd-api:prisma:reconcile-category-master": "dotenv -e apps/msd-api/.env.local -- tsx --tsconfig tsconfig.base.json apps/msd-api/prisma/reconcile-category-master.ts",
     "mera-driver-api:prisma:generate": "prisma generate --schema=apps/mera-driver-api/prisma/schema.prisma",
     "mera-driver-api:prisma:validate": "prisma validate --schema=apps/mera-driver-api/prisma/schema.prisma",
     "mera-driver-api:prisma:migrate": "dotenv -e apps/mera-driver-api/.env.local -- prisma migrate dev --schema=apps/mera-driver-api/prisma/schema.prisma",

@@ -234,6 +234,21 @@ describe('sky-product-card', () => {
     });
   });
 
+  describe('layout', () => {
+    it('defaults to vertical', async () => {
+      const el = createElement();
+      await el.updateComplete;
+      expect(el.layout).toBe('vertical');
+    });
+
+    it('reflects layout="horizontal" as an attribute', async () => {
+      const el = createElement();
+      el.layout = 'horizontal';
+      await el.updateComplete;
+      expect(el.getAttribute('layout')).toBe('horizontal');
+    });
+  });
+
   describe('slotted action content (e.g. Add to Cart)', () => {
     // Regression guard for a real click-through bug: the stretched link's `::after` (position:
     // absolute, inset: 0, z-index: 1) covers the whole card. Slotted content (an action button

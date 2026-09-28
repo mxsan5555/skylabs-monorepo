@@ -48,9 +48,16 @@
   }
 }
 
+/* Keep toasts above the phone tab bar (mobile-tab-bar.css owns --tab-bar-size). */
+@media (max-width: 839.98px) {
+  .toast-stack {
+    bottom: calc(var(--tab-bar-size, 64px) + env(safe-area-inset-bottom) + 24px);
+  }
+}
+
 @media (max-width: 600px) {
   .toast-stack {
-    bottom: 16px;
+    bottom: calc(var(--tab-bar-size, 64px) + env(safe-area-inset-bottom) + 16px);
     left: 16px;
     right: 16px;
     transform: none;

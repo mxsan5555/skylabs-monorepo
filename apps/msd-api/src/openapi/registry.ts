@@ -75,7 +75,7 @@ import {
   PopularTagMapSchema,
 } from '../schemas/popular-tag.schema';
 import { ProductCreateSchema, ProductUpdateSchema, ProductStatusUpdateSchema } from '../schemas/product.schema';
-import { CatalogDealQuerySchema, CatalogProductQuerySchema, CatalogTherapistQuerySchema, CatalogVendorQuerySchema } from '../schemas/catalog.schema';
+import { CatalogDealQuerySchema, CatalogDealFacetQuerySchema, CatalogProductQuerySchema, CatalogTherapistQuerySchema, CatalogVendorQuerySchema } from '../schemas/catalog.schema';
 import { CartAddItemSchema, CartUpdateItemSchema } from '../schemas/cart.schema';
 import { WishlistAddItemSchema } from '../schemas/wishlist.schema';
 import { OrderCheckoutSchema, OrderCustomerCancelSchema, OrderStatusUpdateSchema } from '../schemas/order.schema';
@@ -1467,6 +1467,18 @@ export function buildOpenApiDocument() {
 
   registry.registerPath({
     method: 'get',
+    path: '/catalog/deals/facets',
+    summary:
+      'Filter-panel facet counts for the deal list — same filters as GET /catalog/deals minus paging/sort; ' +
+      'each facet (vendors, branches, distance, price) applies every OTHER active filter but ignores its own selection. ' +
+      'Registered before /catalog/deals/{id} so "facets" is never parsed as a deal id.',
+    tags: ['Catalogue (public)'],
+    request: { query: CatalogDealFacetQuerySchema },
+    responses: { 200: { description: 'Deal facets: { vendors[], branches[], distance[], price | null }' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
     path: '/catalog/deals/{id}',
     summary: 'A single public deal — 404s if not currently visible (inactive/unapproved/hidden vendor or branch)',
     tags: ['Catalogue (public)'],
@@ -1497,7 +1509,9 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/catalog/locations',
-    summary: 'Distinct {state, city} pairs from active branches — drives the public location picker',
+    summary:
+      'Distinct {state, city} pairs from active branches — drives the public location picker; each entry ' +
+      'also includes latitude/longitude: the average of that city\'s active branch coordinates, null when none have coordinates',
     tags: ['Catalogue (public)'],
     responses: { 200: { description: 'Locations' } },
   });

@@ -25,6 +25,10 @@ export interface PermissionCatalogAction {
 }
 
 export interface PermissionCatalogRow {
+  /** The menu node's own unique id — distinct from `menuKey`, which two nodes may deliberately
+   *  share (e.g. CMS "Pages"/"Articles" both grant `cms.blog`). Always use `id` as a React list
+   *  key, never `menuKey`, or two same-`menuKey` rows collide. */
+  id: string;
   menuKey: string;
   title: string;
   actions: PermissionCatalogAction[];
@@ -49,6 +53,11 @@ export interface RoleWidgetRow {
   widgetId: string;
   order: number;
   widget: DashboardWidgetRecord;
+}
+
+export interface RoleWidgetAssignment {
+  widgetId: string;
+  order: number;
 }
 
 export function listRoles(token: string | null) {
@@ -85,6 +94,10 @@ export function getRolePermissionIds(token: string | null, id: string) {
 
 export function setRolePermissions(token: string | null, id: string, permissionIds: string[]) {
   return apiPut<RolePermissionRow[]>(`/rbac/roles/${id}/permissions`, token, { permissionIds });
+}
+
+export function getRoleWidgets(token: string | null, id: string) {
+  return apiGet<RoleWidgetRow[]>(`/rbac/roles/${id}/widgets`, token);
 }
 
 export function setRoleWidgets(token: string | null, id: string, widgets: { widgetId: string; order: number }[]) {

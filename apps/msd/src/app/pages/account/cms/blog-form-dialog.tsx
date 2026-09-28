@@ -119,15 +119,19 @@ export function BlogFormDialog({
       <div slot="content" className="form-grid">
         <OutlinedTextField
           label="Title"
+          required
           value={form.title}
           onInput={(e: Event) => setForm((f) => ({ ...f, title: (e.target as HTMLInputElement).value }))}
+          error={Boolean(fieldErrors?.title)}
         />
         {fieldErrors?.title && <p className="error-state" role="alert">{fieldErrors.title}</p>}
 
         <OutlinedTextField
           label="Slug"
+          required
           value={form.slug}
           onInput={(e: Event) => setForm((f) => ({ ...f, slug: (e.target as HTMLInputElement).value }))}
+          error={Boolean(fieldErrors?.slug)}
         />
         {fieldErrors?.slug && <p className="error-state" role="alert">{fieldErrors.slug}</p>}
 
@@ -137,6 +141,7 @@ export function BlogFormDialog({
           rows={3}
           value={form.excerpt}
           onInput={(e: Event) => setForm((f) => ({ ...f, excerpt: (e.target as HTMLTextAreaElement).value }))}
+          error={Boolean(fieldErrors?.excerpt)}
         />
         {fieldErrors?.excerpt && <p className="error-state" role="alert">{fieldErrors.excerpt}</p>}
 
@@ -147,6 +152,7 @@ export function BlogFormDialog({
             label="Category"
             value={form.categoryId}
             onChange={(e: Event) => setForm((f) => ({ ...f, categoryId: (e.target as HTMLSelectElement).value }))}
+            error={Boolean(fieldErrors?.categoryId)}
           >
             {categories.map((c) => (
               <SelectOption key={c.id} value={c.id}>
@@ -161,6 +167,7 @@ export function BlogFormDialog({
           label="Author"
           value={form.author}
           onInput={(e: Event) => setForm((f) => ({ ...f, author: (e.target as HTMLInputElement).value }))}
+          error={Boolean(fieldErrors?.author)}
         />
         {fieldErrors?.author && <p className="error-state" role="alert">{fieldErrors.author}</p>}
 
@@ -169,6 +176,7 @@ export function BlogFormDialog({
           type="number"
           value={String(form.readMinutes)}
           onInput={(e: Event) => setForm((f) => ({ ...f, readMinutes: Number((e.target as HTMLInputElement).value) || 1 }))}
+          error={Boolean(fieldErrors?.readMinutes)}
         />
         {fieldErrors?.readMinutes && <p className="error-state" role="alert">{fieldErrors.readMinutes}</p>}
 
@@ -176,6 +184,7 @@ export function BlogFormDialog({
           label="Tags (comma-separated)"
           value={tagsText}
           onInput={(e: Event) => setTagsText((e.target as HTMLInputElement).value)}
+          error={Boolean(fieldErrors?.tags)}
         />
         {fieldErrors?.tags && <p className="error-state" role="alert">{fieldErrors.tags}</p>}
 
@@ -188,6 +197,7 @@ export function BlogFormDialog({
             label="Meta title"
             value={form.metaTitle ?? ''}
             onInput={(e: Event) => setForm((f) => ({ ...f, metaTitle: (e.target as HTMLInputElement).value }))}
+            error={Boolean(fieldErrors?.metaTitle)}
           />
           {fieldErrors?.metaTitle && <p className="error-state" role="alert">{fieldErrors.metaTitle}</p>}
           <OutlinedTextField
@@ -196,6 +206,7 @@ export function BlogFormDialog({
             rows={2}
             value={form.metaDescription ?? ''}
             onInput={(e: Event) => setForm((f) => ({ ...f, metaDescription: (e.target as HTMLTextAreaElement).value }))}
+            error={Boolean(fieldErrors?.metaDescription)}
           />
           {fieldErrors?.metaDescription && <p className="error-state" role="alert">{fieldErrors.metaDescription}</p>}
         </fieldset>

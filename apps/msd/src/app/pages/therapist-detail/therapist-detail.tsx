@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Divider, FilledButton, Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import { getCatalogTherapist, type CatalogTherapist } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { Breadcrumb } from '../../components/breadcrumb';
@@ -21,6 +22,7 @@ import './therapist-detail.css';
 export function TherapistDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated } = useAuth();
   const [therapist, setTherapist] = useState<CatalogTherapist | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +65,7 @@ export function TherapistDetail() {
   }
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
-    navigate(`/sign-in?next=${encodeURIComponent(`/therapist/${id}`)}`);
+    navigate(signInPathWithReturnTo(location));
     return false;
   };
   const fromPrice = therapist.packages.length > 0 ? Math.min(...therapist.packages.map((p) => Number(p.sellingPrice))) : null;

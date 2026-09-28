@@ -150,37 +150,66 @@ export function VendorDocumentUpload({
   const sizeBytes = document?.sizeBytes ?? staged?.size;
 
   return (
-    <div className="vendor-document-upload">
+    <sky-tile-card>
       <p className="vendor-document-upload__label">{label}</p>
       {busy && <LinearProgress indeterminate />}
       {filename ? (
         <div className="vendor-document-upload__file">
-          <Icon aria-hidden="true">description</Icon>
-          <div className="vendor-document-upload__file-info">
-            <span className="vendor-document-upload__filename">{filename}</span>
-            <span className="vendor-document-upload__filesize">
-              {sizeBytes != null ? `${Math.round(sizeBytes / 1024)} KB` : ''}
-              {staged && !document && ' — will upload on save'}
-              {document && ' — uploaded'}
-            </span>
+          <div className="vendor-document-upload__file-header">
+            <Icon aria-hidden="true">description</Icon>
+
+            <div className="vendor-document-upload__file-info">
+              <span className="vendor-document-upload__filename">
+                {filename}
+              </span>
+
+              <span className="vendor-document-upload__filesize">
+                {sizeBytes != null
+                  ? `${Math.round(sizeBytes / 1024)} KB`
+                  : ''}
+                {staged && !document && ' — will upload on save'}
+                {document && ' — uploaded'}
+              </span>
+            </div>
           </div>
-          {document && (
-            // Same link serves both "View" (self-service) and Superadmin's "View/Download" KYC
-            // review requirement — a same-tab open lets the browser handle PDF preview or
-            // download per its own MIME handling, matching every other media link in this app.
-            <OutlinedButton href={resolveMediaUrl(document.storageKey)} target="_blank" rel="noreferrer">
-              <Icon slot="icon" aria-hidden="true">visibility</Icon>
-              View
+
+          <div className="vendor-document-upload__actions">
+            {document && (
+              <OutlinedButton
+                href={resolveMediaUrl(document.storageKey)}
+                target="_blank"
+                rel="noreferrer"
+                title="View document"
+                aria-label="View document"
+              >
+                <Icon slot="icon" aria-hidden="true">
+                  visibility
+                </Icon>
+              </OutlinedButton>
+            )}
+
+            <OutlinedButton
+              onClick={() => inputRef.current?.click()}
+              disabled={busy}
+              title="Replace document"
+              aria-label="Replace document"
+            >
+              <Icon slot="icon" aria-hidden="true">
+                upload_file
+              </Icon>
             </OutlinedButton>
-          )}
-          <OutlinedButton onClick={() => inputRef.current?.click()} disabled={busy}>
-            <Icon slot="icon" aria-hidden="true">upload_file</Icon>
-            Replace
-          </OutlinedButton>
-          <OutlinedButton onClick={remove} disabled={busy}>
-            <Icon slot="icon" aria-hidden="true">delete</Icon>
-            Remove
-          </OutlinedButton>
+
+            <OutlinedButton
+              onClick={remove}
+              disabled={busy}
+              title="Remove document"
+              aria-label="Remove document"
+            >
+              <Icon slot="icon" aria-hidden="true">
+                delete
+              </Icon>
+            </OutlinedButton>
+          </div>
         </div>
       ) : (
         <OutlinedButton onClick={() => inputRef.current?.click()} disabled={busy}>
@@ -197,7 +226,7 @@ export function VendorDocumentUpload({
       />
       <p className="field-hint">PDF, JPG, JPEG, or PNG — up to 5 MB.</p>
       {error && <p className="error-state" role="alert">{error}</p>}
-    </div>
+    </sky-tile-card>
   );
 }
 

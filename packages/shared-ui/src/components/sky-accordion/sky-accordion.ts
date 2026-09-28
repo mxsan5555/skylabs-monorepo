@@ -35,7 +35,7 @@ export class SkyAccordion extends LitElement {
       display: flex;
       flex-direction: column;
       gap: 12px;
-      width: 100%;
+      inline-size: 100%;
       box-sizing: border-box;
     }
   `;

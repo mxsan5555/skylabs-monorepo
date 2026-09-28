@@ -105,14 +105,14 @@ The project ships with 6 project-scoped AI agents, 8 skill reference docs, and 5
 | `skylabs-ravi` | React 19 (msd) + Angular 21 (mera-driver) frontend |
 | `skylabs-neha` | UI/UX design — 60/30/10 rule, M3 tokens, accessibility specs |
 | `skylabs-dev` | QA — Vitest, Angular unit tests, Playwright e2e |
-| `skylabs-vivek` | SEO/GEO/AEO, GA4/GTM, social media copy |
+| `skylabs-udaya` | SEO/GEO/AEO, GA4/GTM, social media copy |
 | `skylabs-reena` | Content — `content.json`, blog posts, marketing copy |
 
 ### Commands
 
 | Command | Triggers |
 |---------|---------|
-| `/msd-feature` | Full pipeline: neha → abhi → ravi → dev → vivek → reena |
+| `/msd-feature` | Full pipeline: neha → abhi → ravi → dev → udaya → reena |
 | `/mera-driver-feature` | Same pipeline scoped to mera-driver |
 | `/new-endpoint` | abhi builds endpoint + dev writes integration tests |
 | `/new-shared-component` | neha spec → ravi LIT + React wrapper → dev unit test |
@@ -131,7 +131,7 @@ Full agent file map: `.claude/agents/` · Full skill file map: `.claude/skills/`
   option works.
 - Use the AI agent team (above) for all new features — never build outside the
   defined pipeline or bypass a step (e.g. shipping without skylabs-dev tests or
-  skylabs-vivek SEO on public pages).
+  skylabs-udaya SEO on public pages).
 - Branch flow `feature/* → develop → release → main`: branch new work off
   `develop` (never `main`), and **back-merge `main` into `develop` after every
   release** so `develop` never trails production. Full detail: `DEPLOYMENT.md`.
@@ -141,12 +141,14 @@ Full agent file map: `.claude/agents/` · Full skill file map: `.claude/skills/`
 1. **Foundation** — M3 design system + theming + app scaffolding ✅
 2. **Auth screens** — sign-in, OTP (both apps) ✅
 3. **Account/admin console** — role-based admin layout + My Account (profile + address CRUD) + role gating ✅
-4. **Content pages** — home ✅, then contact, blog, blog-detail, blog-category 🔜
+4. **Content pages** — home ✅, category page (filters, sorts, list/grid/map, lazy loading) ✅,
+   then contact, blog, blog-detail, blog-category 🔜
 5. **Account extras** — logout from console, admin/marketing/sales feature pages 🔜
 6. **Backends** — `apps/msd-api` (Express + Postgres + Prisma + OpenAPI) **built**:
-   dynamic RBAC + business modules (Customers/Vendors/Orders/Products/Inventory/
-   Reports), auth (OTP/Google/JWT), media uploads, 35+ Prisma migrations. ✅
-   `apps/mera-driver-api` follows the same pattern ⏳
+   dynamic RBAC + business modules (Customers/Vendors/Orders/Products/Reports/Cart/
+   Payments/CMS + public storefront catalog; Inventory still a stub), auth (OTP/Google/JWT),
+   media uploads, 35+ Prisma migrations. ✅
+   `apps/mera-driver-api` built on the same pattern (Payments and Reports still stubs) ✅
 7. **Auth integration** — OTP/Google + dynamic RBAC wired to msd-api via
    `GET /rbac/bootstrap` (see `CLAUDE.md` → "Auth & roles" and `DEVELOPER_PROCESS.md`) ✅ (msd)
 8. **Deployment** — frontends live on Vercel; **msd-api deploys to Railway** (Neon DB

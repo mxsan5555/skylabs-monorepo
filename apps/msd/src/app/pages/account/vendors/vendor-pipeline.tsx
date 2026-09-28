@@ -225,26 +225,86 @@ export function VendorPipeline({
     }
   };
 
-  // A branch save may have gone through `BranchDialog`'s "Categories & Subcategories" section,
-  // which can auto-grant a vendor-level `VendorCategoryAccess` row + flip `offersService`/
-  // `offersTherapy` server-side (see `setBranchCategoryAccess`'s own doc comment in
-  // msd-api's vendor.service.ts). Both `vendor` and `categoryAccess` are otherwise only ever
-  // fetched once (the bulk-load effect above) — without this refetch they'd go stale, and the
-  // NEXT "Save product categories" click in `VendorProductCategoryAccess` would resubmit the
-  // stale (pre-grant) `offersService`/`offersTherapy`/`categoryIds`, silently wiping out the
-  // branch-level auto-grant via that endpoint's replace-the-full-set semantics.
   const handleBranchesChange = (next: Branch[]) => {
     setBranches(next);
     reloadDealCount(next);
+  };
+
+  // Wired to `VendorBranchListStep`'s `onVendorRefresh`, which fires from `BranchDialog`'s
+  // `onCategoryAccessSaved` — AFTER a branch's category-access save actually completes, never
+  // bundled into `handleBranchesChange` above. That save (`BranchDialog`'s own "Categories &
+  // Subcategories" section) can auto-grant a vendor-level `VendorCategoryAccess` row + flip
+  // `offersService`/`offersTherapy` server-side (see `setBranchCategoryAccess`'s own doc comment
+  // in msd-api's vendor.service.ts), and it happens as a SEPARATE, LATER network call than the
+  // branch-fields save `handleBranchesChange` reacts to — refetching here instead of there is
+  // what closes that race: `vendor`/`categoryAccess` are otherwise only ever fetched once (the
+  // bulk-load effect above), so without a refetch timed to land after the category save actually
+  // finishes, the NEXT "Save product categories" click in `VendorProductCategoryAccess` could
+  // resubmit stale (pre-grant) `offersService`/`offersTherapy`/`categoryIds`, silently wiping out
+  // the branch-level auto-grant via that endpoint's replace-the-full-set semantics — and Step
+  // 4/5's own "module not enabled" gate could render the stale flag in the meantime too.
+  //
+  // Also reloads `branches` — `VendorBranchListStep`'s own save already preserves each branch's
+  // PREVIOUS `categoryTypes` so it's never `undefined` (see that file's own doc comment on why),
+  // but "previous" is stale the instant a category was actually added/removed, and
+  // `VendorTherapistsStep`/`VendorProductsStep` gate branch eligibility on exactly that field
+  // (`branches.filter(b => b.categoryTypes.includes('THERAPY'))`). This fires unconditionally on
+  // every Branch Access save (not just ones that touch categories — see `BranchDialog.submit()`),
+  // so `categoryTypes` is back in sync with the server within one round trip, no page reload
+  // needed for a branch's Therapy/Product eligibility to update after its access changed.
+  const refreshVendorAndCategoryAccess = () => {
     if (!vendorId) return;
     getVendor(token, vendorId)
       .then(({ data }) => {
         setVendor(data);
         onVendorChange(data);
       })
-      .catch(() => {});
-    getVendorCategoryAccess(token, vendorId).then(({ data }) => setCategoryAccess(data)).catch(() => {});
+      .catch(() => { });
+    getVendorCategoryAccess(token, vendorId).then(({ data }) => setCategoryAccess(data)).catch(() => { });
+    reloadBranches().catch(() => { });
   };
+
+  const refreshVendorAfterKycChange = useCallback(async () => {
+    if (!vendorId) return;
+
+    try {
+      const { data } = await getVendor(token, vendorId);
+
+      setVendor(data);
+      onVendorChange(data);
+    } catch (err) {
+      console.error(
+        'Could not refresh vendor after KYC document change:',
+        err,
+      );
+    }
+  }, [token, vendorId, onVendorChange]);
+
+  /**
+   * Keep the pipeline's local vendor state in sync immediately after a KYC review.
+   * `onKycReview` is intentionally a fire-and-forget callback, so waiting for it here
+   * cannot guarantee that the parent's API request has completed before this component
+   * renders again. Updating the local vendor first prevents the KYC status label from
+   * remaining on the old `PENDING` value. The parent callback is still invoked so the
+   * server-side review operation remains unchanged.
+   */
+  const handleKycReview = useCallback(
+    (kycStatus: 'VERIFIED' | 'REJECTED', rejectionReason?: string) => {
+      if (!vendor) return;
+
+      const nextVendor: Vendor = {
+        ...vendor,
+        kycStatus,
+        kycRejectionReason:
+          kycStatus === 'REJECTED' ? rejectionReason?.trim() || null : null,
+      };
+
+      setVendor(nextVendor);
+      onVendorChange(nextVendor);
+      onKycReview?.(kycStatus, rejectionReason);
+    },
+    [vendor, onVendorChange, onKycReview],
+  );
 
   if (!vendor) {
     return (
@@ -299,8 +359,9 @@ export function VendorPipeline({
             sections={['business', 'owner', 'address', 'kyc', 'bank']}
             saveLabel="Save"
             onSave={saveSection}
-            onKycReview={onKycReview}
+            onKycReview={handleKycReview}
             serverFieldErrors={fieldErrors}
+            onKycDocumentChanged={refreshVendorAfterKycChange}
           />
           {!kycDocOk && (
             <p className="error-state" role="alert">
@@ -346,6 +407,7 @@ export function VendorPipeline({
             canEdit
             branches={branches}
             onBranchesChange={handleBranchesChange}
+            onVendorRefresh={refreshVendorAndCategoryAccess}
           />
         </section>
       )}

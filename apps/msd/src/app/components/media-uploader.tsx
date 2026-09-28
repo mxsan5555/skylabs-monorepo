@@ -270,7 +270,6 @@ export function MediaUploader({
       <legend>Media</legend>
 
       <div className="media-uploader__section">
-        <p className="field-hint">Images</p>
         {busy && <LinearProgress indeterminate />}
         <div className="media-uploader__grid">
           {images.map((img, i) => (
@@ -288,15 +287,35 @@ export function MediaUploader({
                     Set primary
                   </OutlinedButton>
                 )}
-                <OutlinedButton onClick={() => move(img.id, -1)} disabled={busy || i === 0} aria-label="Move earlier">
+
+                <OutlinedButton
+                  className="media-icon-button"
+                  onClick={() => move(img.id, -1)}
+                  disabled={busy || i === 0}
+                  aria-label="Move earlier"
+                  title="Move earlier"
+                >
                   <Icon slot="icon" aria-hidden="true">arrow_upward</Icon>
                 </OutlinedButton>
-                <OutlinedButton onClick={() => move(img.id, 1)} disabled={busy || i === images.length - 1} aria-label="Move later">
+
+                <OutlinedButton
+                  className="media-icon-button"
+                  onClick={() => move(img.id, 1)}
+                  disabled={busy || i === images.length - 1}
+                  aria-label="Move later"
+                  title="Move later"
+                >
                   <Icon slot="icon" aria-hidden="true">arrow_downward</Icon>
                 </OutlinedButton>
-                <OutlinedButton onClick={() => removeImage(img.id)} disabled={busy}>
+
+                <OutlinedButton
+                  className="media-icon-button"
+                  onClick={() => removeImage(img.id)}
+                  disabled={busy}
+                  aria-label="Remove image"
+                  title="Remove image"
+                >
                   <Icon slot="icon" aria-hidden="true">delete</Icon>
-                  Remove
                 </OutlinedButton>
               </div>
             </figure>

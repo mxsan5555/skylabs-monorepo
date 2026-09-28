@@ -49,12 +49,13 @@ interface TherapistWithBranch extends Therapist {
   branchName: string;
 }
 
-function toRow(t: TherapistWithBranch): Record<string, string | number> {
+function toRow(t: TherapistWithBranch, specializationNameMap: Map<string, string>): Record<string, string | number> {
+  const specialization = t.specialization?.trim() || (t.specializationCategoryId ? specializationNameMap.get(t.specializationCategoryId) ?? '—' : '—');
   return {
     Type: t.therapistType,
     Name: t.personName,
     Branch: t.branchName,
-    Specialization: t.specialization || '—',
+    Specialization: specialization,
     Experience: t.experienceYears ? `${t.experienceYears} yrs` : '—',
     Status: t.isActive ? 'Active' : 'Inactive',
   };
@@ -160,7 +161,18 @@ export function VendorTherapists() {
   };
 
   const total = therapists.length;
-  const rows = useMemo(() => JSON.stringify(therapists.map(toRow)), [therapists]);
+  const specializationNameMap = useMemo(
+    () => new Map(specializationCategories.map((category) => [category.id, category.name])),
+    [specializationCategories],
+  );
+  const rows = useMemo(() => JSON.stringify(therapists.map((t) => toRow(t, specializationNameMap))), [therapists, specializationNameMap]);
+  // Only a branch with at least one currently-granted THERAPY category (`categoryTypes`,
+  // computed server-side by `listMyBranches`/`listBranches`) is eligible to host a therapist —
+  // mirrors the admin-side `vendor-wizard-therapists.tsx` filter so revoking a branch's Therapy
+  // access in Branch Access hides it here immediately and after a refresh. `?.` mirrors that same
+  // file's guard — `updateBranch`/`createBranch`/`setBranchStatus` never return `categoryTypes`
+  // (only `listBranches` computes it), so a freshly-saved branch object can transiently lack it.
+  const therapyBranches = useMemo(() => branches.filter((b) => b.categoryTypes?.includes('THERAPY')), [branches]);
 
   useEffect(() => {
     const el = tableRef.current;
@@ -203,7 +215,7 @@ export function VendorTherapists() {
           <p>Staff therapists across your business's branches.</p>
         </div>
         <div className="page-head__actions">
-          {branches.length > 0 && (
+          {therapyBranches.length > 0 && (
             <OutlinedButton onClick={() => addDialogRef.current?.show()}>
               <Icon slot="icon" aria-hidden="true">add</Icon>
               Add therapist
@@ -214,6 +226,10 @@ export function VendorTherapists() {
 
       {message && <p className="field-hint" role="status">{message}</p>}
       {error && <p className="error-state" role="alert">{error}</p>}
+
+      {!loading && branches.length > 0 && therapyBranches.length === 0 && (
+        <p className="empty-state">No branch currently has Therapy category access — map one under "Branches &amp; Deals" first.</p>
+      )}
 
       {!loading && branches.length === 0 ? (
         <p className="empty-state">Add a branch under "Branches &amp; Deals" before adding therapists.</p>
@@ -231,10 +247,10 @@ export function VendorTherapists() {
         />
       )}
 
-      {branches.length > 0 && (
+      {therapyBranches.length > 0 && (
         <TherapistFormDialog
           dialogRef={addDialogRef}
-          branches={branches}
+          branches={therapyBranches}
           specializationCategories={specializationCategories}
           token={token}
           onSave={(input, branchId) => save(input, branchId)}
@@ -277,7 +293,7 @@ function TherapistFormDialog({
   onSave,
   onClose,
 }: {
-  dialogRef: RefObject<MdDialog>;
+  dialogRef: RefObject<MdDialog | null>;
   branches: Branch[];
   /** The vendor's granted THERAPY categories — restricts the Specialization picker instead of
    *  the old free-text field (see `Therapist.specializationCategoryId`'s own doc comment). */
@@ -323,12 +339,8 @@ function TherapistFormDialog({
     setSubmitting(true);
     setError('');
     try {
-      const result = await onSave(form, branchId);
-      if (!therapist && result) {
-        setSavedTherapist(result);
-      } else {
-        dialogRef.current?.close();
-      }
+      await onSave(form, branchId);
+      dialogRef.current?.close();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not save.');
     } finally {
@@ -438,7 +450,7 @@ function TherapistPackagesDialog({
   therapist,
   onClose,
 }: {
-  dialogRef: RefObject<MdDialog>;
+  dialogRef: RefObject<MdDialog | null>;
   therapist: TherapistWithBranch;
   onClose: () => void;
 }) {
@@ -581,7 +593,7 @@ function PackageFormDialog({
   pkg,
   onSave,
 }: {
-  dialogRef: RefObject<MdDialog>;
+  dialogRef: RefObject<MdDialog | null>;
   pkg: TherapistPackage | null;
   onSave: (input: TherapistPackageInput) => Promise<void>;
 }) {

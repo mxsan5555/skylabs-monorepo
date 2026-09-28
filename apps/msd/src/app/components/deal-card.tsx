@@ -8,8 +8,7 @@ import '@skylabs-monorepo/shared-ui';
 
 /**
  * What `DealCard` actually needs to render — a relaxed superset of the mock `Deal` type (still
- * satisfied by it structurally, so existing mock-data callers like `home-deal-card.tsx` keep
- * compiling unchanged) that also accepts a real `CatalogDeal` adapted to this shape. Real deals
+ * satisfied by it structurally) that also accepts a real `CatalogDeal` adapted to this shape. Real deals
  * have no rating/reviews/distance/location/badge fields (none exist on the real `Deal` model),
  * so those stay optional here and are simply omitted rather than fabricated when absent.
  */
@@ -53,6 +52,8 @@ interface DealCardProps {
    *  stopPropagation/preventDefault div (same pattern as category.tsx's existing card action row)
    *  so the click never falls through to the card's own stretched link. */
   actions?: ReactNode;
+  /** `sky-product-card`'s `layout` — 'vertical' (default) or 'horizontal' for the list view. */
+  layout?: 'vertical' | 'horizontal';
 }
 
 export function DealCard({
@@ -62,6 +63,7 @@ export function DealCard({
   eyebrowHref,
   href,
   actions,
+  layout,
 }: DealCardProps) {
   const swiperRef = useRef<any>(null);
   return (
@@ -79,6 +81,7 @@ export function DealCard({
       distance={deal.distance !== undefined ? `${deal.distance} km` : undefined}
       rating={deal.rating}
       reviews={deal.reviews}
+      layout={layout}
       originalPrice={
         deal.originalPrice
           ? formatINR(deal.originalPrice)
@@ -107,6 +110,8 @@ export function DealCard({
               <img
                 src={img}
                 alt={deal.imageAlt}
+                loading="lazy"
+                decoding="async"
               />
             </swiper-slide>
           ))}

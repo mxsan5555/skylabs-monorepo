@@ -1,12 +1,107 @@
 /* Showcase layout. Colors come from the active M3 theme tokens so the page
    re-themes with the components. */
-.showcase {
-  max-width: 880px;
+.showcase-shell {
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 24px 16px 64px;
+  padding: 0 16px;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 32px;
+}
+
+.showcase {
+  min-width: 0;
+  padding: 24px 0 64px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.showcase__card {
+  /* keep the jumped-to heading clear of the sticky site header */
+  scroll-margin-top: 140px;
+}
+
+/* --- Quick-jump nav: M3 navigation drawer item styling --- */
+.showcase-nav {
+  position: sticky;
+  top: 140px;
+  align-self: start;
+  max-height: calc(100dvh - 160px);
+  overflow-y: auto;
+  padding-block: 24px;
+}
+
+.showcase-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.showcase-nav__link {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: var(--md-sys-shape-corner-full, 9999px);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-large-size, 0.875rem);
+  font-weight: var(--md-sys-typescale-label-large-weight, 500);
+  line-height: 1.25rem;
+  text-decoration: none;
+}
+
+.showcase-nav__link:hover {
+  background-color: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+
+.showcase-nav__link:focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.showcase-nav__link[aria-current] {
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+/* Phone / tablet: the nav becomes a horizontal, scrollable chip row. */
+@media (max-width: 839px) {
+  .showcase-shell {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .showcase-nav {
+    top: 72px;
+    z-index: 1;
+    max-height: none;
+    padding-block: 12px;
+    background-color: var(--md-sys-color-surface);
+  }
+  .showcase-nav ul {
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    gap: 8px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+  /* M3 filter-chip proportions: 32px tall, small corner */
+  .showcase-nav__link {
+    min-height: 32px;
+    padding: 6px 16px;
+    border-radius: var(--md-sys-shape-corner-small, 8px);
+    scroll-snap-align: start;
+    border: 1px solid var(--md-sys-color-outline-variant);
+  }
+  .showcase-nav__link[aria-current] {
+    border-color: transparent;
+  }
+  .showcase__card {
+    scroll-margin-top: 136px;
+  }
 }
 
 .showcase__bar {
@@ -145,4 +240,25 @@
 /* Fixed width so `slides-per-view="auto"` and centered/free-mode demos work. */
 .demo-slide--auto {
   width: 200px;
+}
+
+/* --- sky-image / sky-tile-card / sky-feature-card / sky-cta-banner demos --- */
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 16px;
+}
+
+.demo-grid--images {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  align-items: start;
+}
+
+.demo-grid--wide {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.demo-stack {
+  display: grid;
+  gap: 16px;
 }

@@ -17,7 +17,7 @@ Full audit of the skylabs-monorepo. Produces a prioritised findings report.
    - Flag any test files using mocks where real implementations could be used
    - Run all tests and report failures: `npx nx run-many -t test --projects=shared-ui,msd,mera-driver`
 
-3. **skylabs-vivek** — SEO + analytics audit
+3. **skylabs-udaya** — SEO + analytics audit
    - Check every public route has `<title>` and `<meta name="description">`
    - Check all account/auth routes have `noindex`
    - Verify Open Graph tags on key landing pages

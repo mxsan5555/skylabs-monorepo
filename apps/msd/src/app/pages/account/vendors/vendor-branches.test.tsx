@@ -324,6 +324,163 @@ describe('BranchDialog — Map Location URL', () => {
     await waitFor(() => expect(onSave).toHaveBeenCalled());
     await waitFor(() => expect(screen.getByText('Could not save branch.')).toBeTruthy());
   });
+
+  /** Regression test — a fresh Add dialog's Branch Name starts empty, so clicking Save with
+   *  nothing else touched exercises the "name is required" client-side gate directly. Confirms
+   *  the message is field-scoped (same `errors.X && <p role="alert">` convention as
+   *  `errors.mapLocationUrl` above), not only a generic banner, and that onSave is never called. */
+  it('an empty Branch Name renders "Branch name is required." inline under the field, alongside the generic banner, and never calls onSave', async () => {
+    const onSave = vi.fn();
+    renderBranchDialog({ onSave });
+
+    fireEvent.click(findSaveButton());
+
+    await waitFor(() => expect(screen.getByText('Branch name is required.')).toBeTruthy());
+    expect(screen.getByText('Fix the highlighted fields before saving.')).toBeTruthy();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Regression suite for the real bug: editing ANY field of a branch and saving failed with a
+   * generic "Invalid request body", wrongly appearing to be caused by Map Location. Root cause
+   * was `validateBody`'s Zod `VALIDATION_ERROR` (with a per-field `details.fieldErrors`
+   * breakdown) being conflated with the Google Maps resolver's own single-message
+   * `VALIDATION_ERROR` (no `details`) — `submit()`'s catch block always attributed both to
+   * `mapLocationUrl`, hiding which field actually failed. These tests exercise the fixed
+   * catch-block routing directly via a mocked `onSave` rejection, since driving live text-field
+   * input isn't reliable in this test environment (see this suite's own file-level doc comment).
+   */
+  it('a Zod validateBody failure that does NOT name mapLocationUrl is never shown under the Map Location field — routed to the generic banner instead, naming the real field', async () => {
+    const onSave = vi.fn().mockRejectedValue(
+      new ApiRequestError('VALIDATION_ERROR', 'Invalid request body', 422, {
+        formErrors: [],
+        fieldErrors: { openingHours: ['Invalid input: expected object, received string'] },
+      }),
+    );
+    renderBranchDialog({ branch: BRANCH_WITH_LOCATION, onSave });
+
+    fireEvent.click(findSaveButton());
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    // If this had been misattributed to Map Location (the pre-fix behavior), the generic banner
+    // would read "Fix the highlighted fields before saving." instead — this combined-message
+    // form only ever renders for a field with no dedicated error slot.
+    await waitFor(() =>
+      expect(screen.getByText('Could not save: openingHours: Invalid input: expected object, received string')).toBeTruthy(),
+    );
+  });
+
+  it('a Zod validateBody failure that DOES name mapLocationUrl is routed to the Map Location field specifically', async () => {
+    const onSave = vi.fn().mockRejectedValue(
+      new ApiRequestError('VALIDATION_ERROR', 'Invalid request body', 422, {
+        formErrors: [],
+        fieldErrors: { mapLocationUrl: ['Invalid url'] },
+      }),
+    );
+    renderBranchDialog({ branch: BRANCH_WITH_LOCATION, onSave });
+
+    fireEvent.click(findSaveButton());
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(await screen.findByText('Invalid url')).toBeTruthy();
+  });
+
+  it('a failed save never closes the dialog and never re-renders it with fewer fields — the branch\'s previously-saved data is never lost', async () => {
+    const resolverMessage = 'That is not a supported Google Maps URL. Please paste a link from Google Maps (e.g. maps.app.goo.gl or google.com/maps).';
+    const onSave = vi.fn().mockRejectedValue(new ApiRequestError('VALIDATION_ERROR', resolverMessage, 422));
+    renderBranchDialog({ branch: BRANCH_WITH_LOCATION, onSave });
+
+    fireEvent.click(findSaveButton());
+
+    await waitFor(() => expect(screen.getByText(resolverMessage)).toBeTruthy());
+    expect(document.querySelectorAll('md-outlined-text-field').length).toBe(4);
+  });
+
+  it('saving with Map Location left exactly as loaded still submits branch details AND category/subcategory access together', async () => {
+    getBranchCategoryAccessMock.mockResolvedValue({ data: [] });
+    const onSave = vi.fn().mockResolvedValue(BRANCH_WITH_LOCATION);
+    renderBranchDialog({ branch: BRANCH_WITH_LOCATION, onSave });
+
+    const massageCheckbox = await screen.findByRole('checkbox', { name: 'Massage' });
+    fireEvent.click(massageCheckbox);
+
+    fireEvent.click(findSaveButton());
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0].mapLocationUrl).toBe(BRANCH_WITH_LOCATION.mapLocationUrl);
+    await waitFor(() =>
+      expect(setBranchCategoryAccessMock).toHaveBeenCalledWith('tok', 'vendor-1', BRANCH_WITH_LOCATION.id, {
+        mappings: [{ categoryId: BD_TOP_MASSAGE.id, subcategoryIds: [] }],
+      }),
+    );
+  });
+});
+
+/**
+ * Feature: BranchDialog — legacy Operating Hours compatibility (the actual root cause)
+ * Scenario: pre-migration `Branch.openingHours` rows were written as a plain string per day
+ * (`"09:00-20:00"` / `"closed"`) — a convention that predates the current structured
+ * `{ open, start, end }` per-day shape the server's `OpeningHoursSchema` requires. `Json?` has no
+ * schema, so nothing ever migrated those rows. Left unnormalized, this dialog echoed the raw
+ * legacy blob straight back in the save payload for a branch whose Operating Hours the admin
+ * never even touched — the server's Zod schema then rightly rejected it
+ * (`expected object, received string`), surfaced to the admin as a generic, misattributed
+ * "Invalid request body" near whichever field they actually edited (commonly Map Location).
+ * `normalizeOpeningHours` (this file) fixes this by normalizing on load, so the value this
+ * dialog holds — and ultimately re-submits — is always in the shape the server's contract (left
+ * intact, never loosened) expects.
+ */
+describe('BranchDialog — legacy Operating Hours compatibility', () => {
+  it('normalizes legacy string-per-day openingHours into the structured shape before ever submitting, even when Operating Hours is never touched', async () => {
+    const legacyBranch = {
+      ...BRANCH_WITH_LOCATION,
+      openingHours: { mon: '09:00-20:00', tue: '09:00-20:00', sun: 'closed' },
+    } as unknown as Branch;
+    const onSave = vi.fn().mockResolvedValue(BRANCH_WITH_LOCATION);
+    renderBranchDialog({ branch: legacyBranch, onSave });
+
+    fireEvent.click(findSaveButton());
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0].openingHours).toEqual({
+      mon: { open: true, start: '09:00', end: '20:00' },
+      tue: { open: true, start: '09:00', end: '20:00' },
+      sun: { open: false },
+    });
+  });
+
+  it('a legacy-format day with unparseable text normalizes to closed rather than submitting garbage', async () => {
+    const legacyBranch = { ...BRANCH_WITH_LOCATION, openingHours: { wed: 'ask the vendor' } } as unknown as Branch;
+    const onSave = vi.fn().mockResolvedValue(BRANCH_WITH_LOCATION);
+    renderBranchDialog({ branch: legacyBranch, onSave });
+
+    fireEvent.click(findSaveButton());
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0].openingHours).toEqual({ wed: { open: false } });
+  });
+
+  it('an already-structured openingHours value (a branch saved since the fix) passes through unchanged', async () => {
+    const branch: Branch = { ...BRANCH_WITH_LOCATION, openingHours: { mon: { open: true, start: '10:00', end: '18:00' } } };
+    const onSave = vi.fn().mockResolvedValue(BRANCH_WITH_LOCATION);
+    renderBranchDialog({ branch, onSave });
+
+    fireEvent.click(findSaveButton());
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0].openingHours).toEqual({ mon: { open: true, start: '10:00', end: '18:00' } });
+  });
+
+  it('a branch with no openingHours at all (never configured) submits undefined, same as before this fix', async () => {
+    const branch: Branch = { ...BRANCH_WITH_LOCATION, openingHours: null };
+    const onSave = vi.fn().mockResolvedValue(BRANCH_WITH_LOCATION);
+    renderBranchDialog({ branch, onSave });
+
+    fireEvent.click(findSaveButton());
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0].openingHours).toBeUndefined();
+  });
 });
 
 /**
