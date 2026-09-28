@@ -26,6 +26,9 @@ interface SwiperContainerAttributes {
   scrollbar?: SwiperBool;
   speed?: number | string;
   init?: SwiperBool;
+  /** Swiper's A11y module: adds slide roles/labels and scrolls a slide into view when a
+   *  descendant inside it receives keyboard focus (`scrollOnFocus`, on by default). */
+  a11y?: SwiperBool;
 }
 
 type SwiperElement<T = SwiperContainerAttributes> = DetailedHTMLProps<

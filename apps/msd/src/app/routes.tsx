@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { RequireAuth, RequirePermission, useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { PublicLayout } from './layouts/public-layout';
+import { useShadowLinkNavigation } from '../hooks/use-shadow-link-navigation';
 import { AuthLayout } from './layouts/auth-layout';
 import { AdminLayout } from './layouts/admin-layout';
 import { AdminPage } from './admin/admin-page';
@@ -90,6 +91,7 @@ function VendorsRouteGuard({ children }: { children: ReactNode }) {
 }
 
 export function AppRoutes() {
+  useShadowLinkNavigation();
   return (
     <Routes>
       <Route element={<PublicLayout />}>
@@ -102,6 +104,7 @@ export function AppRoutes() {
             source). */}
         <Route path="/categories" element={<CategoriesIndex />} />
         <Route path="/category/:slug" element={<Category />} />
+        <Route path="/category/:slug/:city" element={<Category />} />
         <Route path="/deal/:id" element={<DealDetail />} />
         <Route path="/products" element={<ProductListing />} />
         <Route path="/products/:id" element={<ProductDetail />} />

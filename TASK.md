@@ -51,10 +51,57 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] New type definitions: Deal, Category, Subcategory, CartItem, WishlistItem, SearchFilter, SearchView, PriceLevel, CheckoutStep, DealSort — 2026-07-12
 - [x] Routes: added /explore, /category/:slug, /deal/:id, /cart, /wishlist (RequireAuth), /checkout (RequireAuth) to PublicLayout — 2026-07-12
 - [x] Wired CartProvider + WishlistProvider in main.tsx — 2026-07-12
+- [x] msd shell plan 1: location provider (saved/browser/IP), shared catalog shell, SiteHeader, MobileTabBar — 2026-09-22
+- [x] msd shell plan 2: SiteFooter, Seo component, JSON-LD, city landing pages — 2026-09-23
+- [x] msd shell plan 3: home page (10 fixed sections, CardRail, SectionHead, Seo + ItemList/FAQPage JSON-LD, location-aware catalog fetch) — 2026-09-23
+- [x] msd shell plan 4: build-time prerender (`/`, every `/category/:slug`, deal-category `/category/:slug/:city`) with `__MSD_DATA__` payload hydration, `spa.html` SPA rewrite, timed-out/unreachable-API fallback, sitemap.xml/robots.txt/llms.txt — 2026-09-24
+- [x] msd home 60/30/10 colour pass on M3 roles (tinted bands, secondary-container tiles/steps/gift card, primary for actions only; "How it works" as a numbered sequence) — 2026-09-24
+- [x] msd storefront building blocks `PageSection`, `CardGrid`, `SectionHead as="h1"`; home moved onto `PageSection`; category page rebuilt with no page CSS — 2026-09-24
+- [x] msd category toolbar: subcategory pills, clamped description, sort menu, 12-per-page lazy loading (`usePagedList` + `LoadMore`, prerendered first page + total) — 2026-09-25
+- [x] msd `DealMap`: Leaflet + OpenStreetMap by default, Google behind `VITE_MAP_PROVIDER`; category map view; explore map fixed (was blocked by a missing Google key and a placeholder overlay) — 2026-09-25
+- [x] msd category filter side panel (Your location, Distance, Price, Business, Branches, Clear all; phone side sheet with focus trap), sorts Relevance / Price / Distance, List-Grid-Map switch, `sky-product-card` `layout="horizontal"` — 2026-09-25
+- [x] msd-api catalog: deal sorts `relevance|price_asc|price_desc|distance`, `vendorIds` / `branchIds` / `radiusKm` filters, `GET /catalog/deals/facets`, product price sorts — 2026-09-25
+- [x] Docs aligned with the storefront work and current API status (CLAUDE, ARCHITECTURE, DEPLOYMENT, DEVELOPER_PROCESS §19–21, docs/README, api-schema as-built notes) — 2026-09-26
 
 ### Content pages — both apps (`pages/` + route)
 - [ ] Contact page~
 - [ ] Blog category (filtered list)
+
+### msd shell — follow-ups
+- [ ] msd: create `/member` page (header "Become a Member" links to it)
+- [ ] msd: newsletter backend (msd-api table + endpoint) for footer signup
+- [ ] msd: transparent/dark-mode logo asset (`logo.jpg` has a white background)
+- [ ] msd: fix pre-existing lint (~43 errors) and tsc (~28 errors) so CI `nx affected -t lint` passes
+- [ ] msd: staff/admin "Account" on phones lands in admin console without bottom nav (decide UX)
+- [ ] msd: 10 public pages render their own `<main>` inside PublicLayout's `<main>` (about, become-vendor, blog, blog-detail, careers, checkout, contact, how-it-works, showcase, website-page): change page roots to div/article
+- [ ] msd: tell the user when 'Use my current location' fails or is >75 km from any partner city
+- [ ] msd: header/tab bar tests for search submit, signed-in account menu, useAccountLinks role branches
+- [x] msd: pages without their own `<title>`/`Seo`: checked, none missing. account/profile.tsx and my-account/profile.tsx get their titles from `AdminPage`; dashboard-process-flow.tsx, profile-form.tsx and my-account/my-account-layout.tsx are components, not routes
+- [ ] msd: /help and /gifting footer links have no routes (404)
+- [ ] msd: other public pages without a meta description (cart, sign-in, otp, orders, invoice, choose-experience) should move to Seo
+- [ ] msd: footer brand block contact details (phone/email) pending from owner
+- [ ] msd: when the custom domain goes live, set VITE_SITE_URL (the website origin, e.g. https://www.myspadeal.in, not the API) for Vercel Production and redeploy; until then canonicals/OG/most JSON-LD and sitemap/robots/llms are omitted. VITE_API_URL (already set to the Railway msd-api) is used for prerender data; PRERENDER_API_URL is optional. The Vercel build machine must reach the Railway msd-api.
+- [ ] msd: on the first Vercel preview verify /api/geo, that `/category/x/` and `/spa.html` 308 to `/category/x` and `/spa` (trailingSlash/cleanUrls), and that non-prerendered routes get the SPA shell via the `/spa` rewrite
+- [ ] msd: add a Vercel deploy hook (cron or on catalog change) so prerendered pages rebuild when deals change
+- [ ] msd: decide whether /category/product and /category/therapy should be indexable or redirect to /products and /therapists
+- [ ] msd: add prerender/ to a tsconfig so it's type-checked
+- [ ] msd: showcase.tsx and unused product-card.tsx still use camelCase props on raw custom elements (fix if ever prerendered; delete product-card.tsx if unused)
+- [ ] msd: audit app-level CSS in dark theme now that the footer theme switch exposes it
+- [ ] msd: city filter for products/therapists APIs so Product/Therapy city pages and popular searches can include them
+- [ ] msd: popular searches are only in the client render until plan 4 seeds the catalog into the prerender
+- [ ] msd: shared --sky-content-max token for 1280px/16px containers (header, footer, home)
+- [ ] msd: migrate remaining useCurrentLocation callers (category, search, therapists, vendor) to useVisitorLocation
+- [ ] msd: move /categories, therapists, orders, invoices and payments off `category.css` onto PageSection/CardGrid, then delete `category.css`
+- [ ] msd: reviews system (customers rate completed orders) so the category page can add rating sort, rating filter and card ratings
+- [ ] msd: explore page adopts FilterPanel/SidebarLayout and the horizontal card list view
+- [ ] msd: product vendor facet for the product category filter panel
+- [ ] msd: filter panel polish: keep selected Business/Branch options visible when outside the facet list or past "Show more"; clamp URL min/max into the slider bounds when facets narrow
+- [ ] msd: deal page single-location map using DealMap
+- [ ] msd: before traffic grows, move VITE_MAP_TILE_URL off tile.openstreetmap.org to a free-tier tile provider (OSM tile policy: no heavy commercial use)
+- [ ] mera-driver: 12 pre-existing failing specs (app.routes RBAC wiring, users "Login As", drivers page: rbac.permissionsCatalog is not a function)
+
+#### Plan 4 prerender prerequisites
+- [x] (e) decided: gift/member `sky-feature-card` copy stays in shadow DOM. It is promotional, not a search landing target; the crawlable content on home is the h1, tiles, deals JSON-LD, How it works, directory and FAQ. See spec section 8.1.
 
 ### Account & admin — both apps (remaining)
 - [ ] Logout from inside the console (currently in the public header)
@@ -154,7 +201,7 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] `ARCHITECTURE.md`, `PLANNING.md`, `TASK.md`, updated `CLAUDE.md`
 
 ### AI Dev Team
-- [x] Project-scoped agent team: 6 agents (`skylabs-abhi`, `skylabs-ravi`, `skylabs-neha`, `skylabs-dev`, `skylabs-vivek`, `skylabs-reena`) in `.claude/agents/` — 2026-07-18
+- [x] Project-scoped agent team: 6 agents (`skylabs-abhi`, `skylabs-ravi`, `skylabs-neha`, `skylabs-dev`, `skylabs-udaya`, `skylabs-reena`) in `.claude/agents/` — 2026-07-18
 - [x] 8 skill reference docs in `.claude/skills/` (msd-stack, mera-driver-stack, skylabs-auth, skylabs-api, shared-ui-usage, skylabs-testing, skylabs-seo, skylabs-content) — 2026-07-18
 - [x] 5 command pipelines in `.claude/commands/` (`/msd-feature`, `/mera-driver-feature`, `/new-endpoint`, `/new-shared-component`, `/skylabs-audit`) — 2026-07-18
 - [x] Updated `CLAUDE.md`, `PLANNING.md`, `ARCHITECTURE.md`, `TASK.md` with AI dev team docs — 2026-07-18

@@ -31,7 +31,7 @@ export class SkyCard extends LitElement {
     ${hostBase}
     :host {
       padding: 16px 20px;
-      border-radius: var(--md-sys-shape-corner-large, 16px);
+      border-radius: var(--md-sys-shape-corner-large);
       background-color: var(--md-sys-color-surface-container);
     }
     :host([variant='outlined']) {
@@ -40,9 +40,7 @@ export class SkyCard extends LitElement {
     }
     :host([variant='elevated']) {
       background-color: var(--md-sys-color-surface-container-low);
-      box-shadow:
-        0 1px 2px color-mix(in srgb, var(--md-sys-color-shadow) 30%, transparent),
-        0 1px 3px 1px color-mix(in srgb, var(--md-sys-color-shadow) 15%, transparent);
+      box-shadow: var(--sky-elevation-1);
     }
   `;
 

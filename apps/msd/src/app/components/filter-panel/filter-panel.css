@@ -1,0 +1,23 @@
+.filter-panel__title {
+  margin: 0 0 8px;
+}
+.filter-panel__location {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.filter-panel__radio {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-block-size: 40px;
+}
+.filter-panel__hint {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.filter-panel__footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-start: 16px;
+}

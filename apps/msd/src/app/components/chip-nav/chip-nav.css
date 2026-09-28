@@ -1,0 +1,15 @@
+/* Pill row: wraps from 600px; a single scrolling row on phones. */
+.chip-nav {
+  max-inline-size: 100%;
+}
+@media (max-width: 599px) {
+  .chip-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-block: 2px;
+    scrollbar-width: none;
+  }
+  .chip-nav > * {
+    flex: none;
+  }
+}
