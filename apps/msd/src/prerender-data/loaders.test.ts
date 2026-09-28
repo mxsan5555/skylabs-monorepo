@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   products: vi.fn(),
   therapists: vi.fn(),
   faqs: vi.fn(),
+  popularTreatments: vi.fn(),
 }));
 
 vi.mock('../api/catalog', async (importOriginal) => ({
@@ -24,6 +25,7 @@ vi.mock('../api/catalog', async (importOriginal) => ({
   listCatalogProducts: (...a: unknown[]) => m.products(...a),
   listCatalogTherapists: (...a: unknown[]) => m.therapists(...a),
   listCatalogFaqs: (...a: unknown[]) => m.faqs(...a),
+  listCatalogPopularTreatments: (...a: unknown[]) => m.popularTreatments(...a),
 }));
 
 beforeEach(() => {
@@ -36,6 +38,7 @@ beforeEach(() => {
   m.products.mockResolvedValue({ data: [{ id: 'p1' }] });
   m.therapists.mockResolvedValue({ data: [{ id: 't1' }] });
   m.faqs.mockResolvedValue({ data: [{ id: 'f1' }] });
+  m.popularTreatments.mockResolvedValue({ data: [{ id: 'g1', name: 'Massage', slug: 'massage', treatments: [] }] });
 });
 
 describe('loadShellData', () => {
@@ -62,6 +65,7 @@ describe('loadHomeData', () => {
       products: [{ id: 'p1' }],
       therapists: [{ id: 't1' }],
       faqs: [{ id: 'f1' }],
+      popularTreatments: [{ id: 'g1', name: 'Massage', slug: 'massage', treatments: [] }],
     });
     expect(m.deals).toHaveBeenCalledWith({ pageSize: HOME_DEALS_PAGE_SIZE });
     expect(m.products).toHaveBeenCalledWith({ pageSize: HOME_RAIL_SIZE, sort: 'newest' });
@@ -71,6 +75,11 @@ describe('loadHomeData', () => {
   it('a failing FAQ call yields []', async () => {
     m.faqs.mockRejectedValue(new Error('down'));
     expect((await loadHomeData()).faqs).toEqual([]);
+  });
+
+  it('a failing Popular Treatments call yields []', async () => {
+    m.popularTreatments.mockRejectedValue(new Error('down'));
+    expect((await loadHomeData()).popularTreatments).toEqual([]);
   });
 });
 

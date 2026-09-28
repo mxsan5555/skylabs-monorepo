@@ -33,6 +33,7 @@ const BRANCH: Branch = {
   isActive: true,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
+  categoryTypes: ['THERAPY'],
 };
 
 const THERAPY_CATEGORIES: Category[] = [
@@ -115,8 +116,8 @@ beforeEach(() => {
  *   is replaced with a "grant a category" hint instead of an empty/broken select
  */
 describe('VendorTherapistsStep — module gating', () => {
-  it('shows a "module not enabled" message and no therapist CRUD when offersTherapy is false', async () => {
-    renderStep({ offersTherapy: false });
+  it('shows a "module not enabled" message and no therapist CRUD when offersTherapy is false and no branch has real Therapy access', async () => {
+    renderStep({ offersTherapy: false, branches: [{ ...BRANCH, categoryTypes: [] }] });
     expect(screen.getByText('This vendor has not enabled the Therapy business module in Step 2.')).toBeTruthy();
     expect(screen.queryAllByText('Add therapist').length).toBe(0);
     expect(screen.queryByText('No therapists added yet.')).toBeNull();
@@ -139,6 +140,88 @@ describe('VendorTherapistsStep — module gating', () => {
     // canAdd is false, so neither the trigger button nor the (unmounted) dialog render at all.
     expect(screen.queryAllByText('Add therapist').length).toBe(0);
     expect(screen.getByText('Add a branch in Step 2 before adding therapists.')).toBeTruthy();
+  });
+
+  /**
+   * Regression test for the real Issue #1 bug: `vendor.offersTherapy` is a denormalized
+   * convenience flag that can drift out of sync with the vendor's real category grants (e.g.
+   * branches mapped outside the normal grant-flips-the-flag save path). A vendor that already
+   * holds real branch-level THERAPY access must never be blocked by a stale `false` flag.
+   */
+  it('renders therapist CRUD (never the blocked message) when offersTherapy is false but a branch already has real THERAPY category access', async () => {
+    renderStep({ offersTherapy: false }); // default BRANCH fixture already carries categoryTypes: ['THERAPY']
+    await waitFor(() => expect(listVendorTherapistsForAdminMock).toHaveBeenCalled());
+    expect(screen.queryByText('This vendor has not enabled the Therapy business module in Step 2.')).toBeNull();
+    expect(screen.getAllByText('Add therapist').length).toBeGreaterThan(0);
+  });
+
+  it('shows the branch-level empty-state hint (not the module-disabled message) when branches exist but none have Therapy access', async () => {
+    renderStep({ branches: [{ ...BRANCH, categoryTypes: [] }] });
+    await waitFor(() => expect(listVendorTherapistsForAdminMock).toHaveBeenCalled());
+    expect(screen.queryByText('This vendor has not enabled the Therapy business module in Step 2.')).toBeNull();
+    expect(screen.queryAllByText('Add therapist').length).toBe(0);
+    expect(screen.getByText(/No branch currently has Therapy category access/)).toBeTruthy();
+  });
+});
+
+/**
+ * Feature: Vendor onboarding Step 4 — Therapy
+ * Scenario: regression test for the real "Branch Access Save -> Therapy tab crash" bug.
+ *
+ * Root cause: `updateBranch`/`createBranch`/`setBranchStatus` (Branch Access's own save calls)
+ * return the raw Prisma branch row, which never includes `categoryTypes` — that field is a
+ * server-side join only `listBranches` computes. Before the fix, `vendor-wizard-branches.tsx`
+ * spliced that incomplete response straight into wizard state, leaving the just-saved branch's
+ * `categoryTypes` as `undefined` until `onVendorRefresh` caught up. If the admin switched to Step
+ * 4 in that window (no reload), `therapyBranches = branches.filter(b =>
+ * b.categoryTypes.includes('THERAPY'))` threw `TypeError: Cannot read properties of undefined
+ * (reading 'includes')`, which the top-level ErrorBoundary caught as "Something went wrong" —
+ * confirmed via a live captured stack trace at vendor-wizard-therapists.tsx:75.
+ *
+ * The real fix has two layers: (1) `vendor-wizard-branches.tsx` now preserves/defaults
+ * `categoryTypes` on save so it's never dropped to `undefined`, and (2) this component's own
+ * `.filter()` uses `?.` as an unconditional backstop. This suite regression-tests layer (2)
+ * directly — it must never crash regardless of what shape an upstream caller's `branches` prop is
+ * in — since that's the guarantee that holds even if a future change reintroduces an incomplete
+ * branch object somewhere else in the tree.
+ */
+describe('VendorTherapistsStep — resilience to a branch missing categoryTypes (regression: Branch Access save -> Therapy tab crash)', () => {
+  it('never throws when a branch in the branches prop has categoryTypes undefined (the exact shape a raw updateBranch/createBranch/setBranchStatus response has)', async () => {
+    const incompleteBranch = { ...BRANCH, categoryTypes: undefined } as unknown as Branch;
+    expect(() => renderStep({ branches: [incompleteBranch] })).not.toThrow();
+    await waitFor(() => expect(listVendorTherapistsForAdminMock).toHaveBeenCalled());
+    // Treated as not-yet-Therapy-eligible (not a crash) until a fresh `categoryTypes` value lands.
+    expect(screen.getByText(/No branch currently has Therapy category access/)).toBeTruthy();
+  });
+
+  it('re-rendering an already-mounted step with a freshly-saved branch (categoryTypes missing) never crashes — the exact "Save then switch tabs without reload" sequence', async () => {
+    const { rerender } = renderStep({ branches: [BRANCH] });
+    await waitFor(() => expect(screen.getAllByText('Add therapist').length).toBeGreaterThan(0));
+
+    const staleBranch = { ...BRANCH, address: 'Updated address', categoryTypes: undefined } as unknown as Branch;
+    expect(() =>
+      rerender(
+        <ToastProvider>
+          <VendorTherapistsStep
+            token="tok"
+            vendorId="vendor-1"
+            canEdit
+            offersTherapy
+            branches={[staleBranch]}
+            categories={THERAPY_CATEGORIES}
+            onTherapistsChange={vi.fn()}
+          />
+        </ToastProvider>,
+      ),
+    ).not.toThrow();
+  });
+
+  it('excludes only the branch missing categoryTypes — a sibling well-formed branch keeps therapist CRUD available', async () => {
+    const wellFormedBranch: Branch = { ...BRANCH, id: 'branch-2', name: 'Second Branch' };
+    const staleBranch = { ...BRANCH, id: 'branch-1', categoryTypes: undefined } as unknown as Branch;
+    renderStep({ branches: [staleBranch, wellFormedBranch] });
+    await waitFor(() => expect(listVendorTherapistsForAdminMock).toHaveBeenCalled());
+    expect(screen.getAllByText('Add therapist').length).toBeGreaterThan(0);
   });
 });
 

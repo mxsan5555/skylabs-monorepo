@@ -112,7 +112,7 @@ describe('POST /customers/:id/create-user', () => {
 
     expect(res.status).toBe(201);
     expect(mockPrisma.user.create).toHaveBeenCalledWith({
-      data: { name: 'Anita Sharma', email: undefined, phone: '9000000000' },
+      data: { name: 'Anita Sharma', email: undefined, phone: '+919000000000' },
     });
     expect(mockPrisma.customer.update).toHaveBeenCalledWith({ where: { id: 'customer-1' }, data: { userId: USER_2_ID } });
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(

@@ -22,11 +22,13 @@ import { RoleAssignment } from './role-assignment';
 import { LoginHistoryPanel } from './login-history-panel';
 import { SessionsPanel } from './sessions-panel';
 import { CreateUserDialog } from './create-user-dialog';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
 
 const PAGE_SIZE = 20;
 
 export function UserManagement() {
   const { token, can, loginAsUser } = useAuth();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const navigate = useNavigate();
 
   const [users, setUsers] = useState<UserRecord[]>([]);
@@ -186,7 +188,7 @@ export function UserManagement() {
 
   const doRevokeSessions = async () => {
     if (!selectedUser) return;
-    if (!window.confirm(`Revoke every active session for ${selectedUser.name}? They'll be signed out everywhere.`)) return;
+    if (!(await confirm(`Revoke every active session for ${selectedUser.name}? They'll be signed out everywhere.`))) return;
     try {
       await revokeAllSessions(token, selectedUser.id);
       setActionMessage('All sessions revoked.');
@@ -381,6 +383,7 @@ export function UserManagement() {
           )}
         </section>
       </div>
+      {ConfirmDialog}
     </div>
   );
 }

@@ -58,9 +58,9 @@ export function SignIn() {
     setLoading(true);
     try {
       await requestOtp(input, 'login');
-      const next = new URLSearchParams(location.search).get('next');
+      const returnUrl = extractReturnUrl(location);
       navigate('/otp', {
-        state: { identifier: input, method, next, },
+        state: { identifier: input, method, returnUrl },
       });
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : auth.validation.somethingWentWrong);

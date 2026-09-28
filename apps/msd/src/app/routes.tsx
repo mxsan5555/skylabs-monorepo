@@ -31,8 +31,12 @@ import { VendorBranchesDeals } from './pages/account/vendors/vendor-branches-dea
 import { VendorCustomers } from './pages/account/vendors/vendor-customers';
 import { VendorTherapists } from './pages/account/vendors/vendor-therapists';
 import { VendorDeals } from './pages/account/vendors/vendor-deals';
+import { VendorProducts } from './pages/account/vendors/vendor-products';
 import { CategoryManagement } from './pages/account/masters/categories';
 import { PopularTagManagement } from './pages/account/masters/popular-tags';
+import { PopularTreatmentManagement } from './pages/account/masters/popular-treatments';
+import { PromotionManagement } from './pages/account/masters/promotions';
+import { HomeHeroManagement } from './pages/account/masters/home-hero';
 import { BlogList } from './pages/account/cms/blog-list';
 import { BlogDetailAdmin } from './pages/account/cms/blog-detail-admin';
 import { BlogCategoriesList } from './pages/account/cms/blog-categories-list';
@@ -84,7 +88,7 @@ import { MyAccountPayments } from './pages/my-account/payments';
 
 function VendorsRouteGuard({ children }: { children: ReactNode }) {
   const { can } = useAuth();
-  if (!can('vendors', 'view') && !can('vendors', 'custom') && !can('vendor-portal', 'view')) {
+  if (!can('vendors', 'view') && !can('vendors', 'custom') && !can('vendor-portal.profile', 'view')) {
     return <Navigate to="/account/profile" replace />;
   }
   return <>{children}</>;
@@ -197,7 +201,7 @@ export function AppRoutes() {
         {/* Public, unauthenticated Vendor self-registration ("Become a Vendor") — the storefront
             counterpart of the admin "Add Vendor" wizard, see become-vendor.tsx's own doc
             comment. Linked from the footer's "Partner With Us" entry (content.json). */}
-        <Route path="/become-vendor" element={<BecomeVendor />} />
+        <Route path="/become-member" element={<BecomeVendor />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
         {/* WebsitePage is one reusable component parameterized by `slug` — wired to all 4 fixed
             `WebsitePage` rows (see website-page.tsx's own doc comment), not 4 separate files. */}
@@ -292,7 +296,7 @@ export function AppRoutes() {
         <Route
           path="/account/vendor-profile"
           element={
-            <RequirePermission menuKey="vendor-portal">
+            <RequirePermission menuKey="vendor-portal.profile">
               <VendorBusinessProfile />
             </RequirePermission>
           }
@@ -300,7 +304,7 @@ export function AppRoutes() {
         <Route
           path="/account/vendor-branches-deals"
           element={
-            <RequirePermission menuKey="vendor-portal">
+            <RequirePermission menuKey="vendor-portal.branches">
               <VendorBranchesDeals />
             </RequirePermission>
           }
@@ -311,7 +315,7 @@ export function AppRoutes() {
         <Route
           path="/account/vendor-deals"
           element={
-            <RequirePermission menuKey="vendor-portal">
+            <RequirePermission menuKey="vendor-portal.deals">
               <VendorDeals />
             </RequirePermission>
           }
@@ -322,7 +326,7 @@ export function AppRoutes() {
         <Route
           path="/account/vendor-customers"
           element={
-            <RequirePermission menuKey="vendor-portal">
+            <RequirePermission menuKey="vendor-portal.customers">
               <VendorCustomers />
             </RequirePermission>
           }
@@ -332,15 +336,41 @@ export function AppRoutes() {
         <Route
           path="/account/vendor-therapists"
           element={
-            <RequirePermission menuKey="vendor-portal">
+            <RequirePermission menuKey="vendor-portal.therapists">
               <VendorTherapists />
+            </RequirePermission>
+          }
+        />
+        {/* Vendor-facing "Product" — same self-service /vendors/me/products* routes
+            (`vendors:custom`) the onboarding wizard's admin-on-behalf Products step already
+            uses, just the ongoing-management surface. Never the read-only admin oversight
+            `/account/products` page below. */}
+        <Route
+          path="/account/vendor-products"
+          element={
+            <RequirePermission menuKey="vendor-portal.products">
+              <VendorProducts />
+            </RequirePermission>
+          }
+        />
+        {/* Vendor-facing "Order" — reuses the exact same <OrderManagement/> component as the
+            admin `/account/orders` route below (its GET/PATCH calls already force-scope a vendor
+            caller to its own vendorId server-side, see order.service.ts#listOrders) — just a
+            second route/nav entry gated `vendor-portal` instead of `orders`, so a vendor never
+            needs the admin-wide `orders:view` permission that would otherwise leak the top-level
+            "Orders" sidebar node (see msd-menu.json). */}
+        <Route
+          path="/account/vendor-orders"
+          element={
+            <RequirePermission menuKey="vendor-portal.orders">
+              <OrderManagement />
             </RequirePermission>
           }
         />
         <Route
           path="/account/branches"
           element={
-            <RequirePermission menuKey="vendors">
+            <RequirePermission menuKey="vendors.branches">
               <BranchList />
             </RequirePermission>
           }
@@ -348,7 +378,7 @@ export function AppRoutes() {
         <Route
           path="/account/deals"
           element={
-            <RequirePermission menuKey="vendors">
+            <RequirePermission menuKey="vendors.deals">
               <DealList />
             </RequirePermission>
           }
@@ -356,7 +386,7 @@ export function AppRoutes() {
         <Route
           path="/account/therapists"
           element={
-            <RequirePermission menuKey="vendors">
+            <RequirePermission menuKey="vendors.therapists">
               <TherapistList />
             </RequirePermission>
           }
@@ -433,9 +463,33 @@ export function AppRoutes() {
           }
         />
         <Route
+          path="/account/masters/popular-treatments"
+          element={
+            <RequirePermission menuKey="masters.popular-treatments">
+              <PopularTreatmentManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/masters/promotions"
+          element={
+            <RequirePermission menuKey="masters.promotions">
+              <PromotionManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/account/masters/home-hero"
+          element={
+            <RequirePermission menuKey="masters.home-hero">
+              <HomeHeroManagement />
+            </RequirePermission>
+          }
+        />
+        <Route
           path="/account/cms/blog"
           element={
-            <RequirePermission menuKey="cms.blog">
+            <RequirePermission menuKey="cms.blog.pages">
               <BlogList />
             </RequirePermission>
           }
@@ -443,7 +497,7 @@ export function AppRoutes() {
         <Route
           path="/account/cms/blog/:id"
           element={
-            <RequirePermission menuKey="cms.blog">
+            <RequirePermission menuKey="cms.blog.pages">
               <BlogDetailAdmin />
             </RequirePermission>
           }

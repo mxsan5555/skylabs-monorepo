@@ -10,8 +10,11 @@ const m = vi.hoisted(() => ({
   products: vi.fn(),
   therapists: vi.fn(),
   faqs: vi.fn(),
+  popularTreatments: vi.fn(),
+  promotions: vi.fn(),
+  homeHero: vi.fn(),
   categories: [] as unknown[],
-  location: { status: 'ready', coords: null as null | { latitude: number; longitude: number } },
+  location: { status: 'ready', coords: null as null | { latitude: number; longitude: number }, state: null as string | null },
   auth: { isAuthenticated: false, token: null as string | null },
   toggle: vi.fn(),
 }));
@@ -22,6 +25,9 @@ vi.mock('../../../api/catalog', async (importOriginal) => ({
   listCatalogProducts: (...a: unknown[]) => m.products(...a),
   listCatalogTherapists: (...a: unknown[]) => m.therapists(...a),
   listCatalogFaqs: (...a: unknown[]) => m.faqs(...a),
+  listCatalogPopularTreatments: (...a: unknown[]) => m.popularTreatments(...a),
+  listCatalogPromotions: (...a: unknown[]) => m.promotions(...a),
+  getCatalogHomeHero: (...a: unknown[]) => m.homeHero(...a),
 }));
 vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../catalog/catalog-shell')>()),
@@ -139,7 +145,33 @@ beforeEach(() => {
   m.products.mockResolvedValue({ data: [] });
   m.therapists.mockResolvedValue({ data: [] });
   m.faqs.mockResolvedValue({ data: [FAQ] });
-  m.location = { status: 'ready', coords: null };
+  m.popularTreatments.mockResolvedValue({
+    data: [
+      {
+        id: 'g1',
+        name: 'Massage',
+        slug: 'massage',
+        treatments: [{ id: 't1', name: 'Swedish Massage', slug: 'swedish-massage', categorySlug: 'massage' }],
+      },
+    ],
+  });
+  m.promotions.mockResolvedValue({
+    data: [
+      {
+        id: 'promo-1',
+        title: 'Welcome Offer',
+        description: 'Introductory pricing on your first booking.',
+        buttonLabel: 'Browse deals',
+        destinationType: 'ROUTE',
+        destinationRoute: '/explore',
+        category: null,
+        deal: null,
+        image: null,
+      },
+    ],
+  });
+  m.homeHero.mockResolvedValue({ data: { state: null, slides: [] } });
+  m.location = { status: 'ready', coords: null, state: null };
   m.auth = { isAuthenticated: false, token: null };
 });
 
@@ -283,13 +315,22 @@ describe('Home', () => {
     expect((await screen.findByTestId('location')).textContent).toBe('/explore');
   });
 
-  it('links the welcome offer CTA to /explore with a light-DOM link', () => {
+  it('renders Admin-managed promotions (from GET /catalog/promotions) with a light-DOM CTA link, not hardcoded content.json copy', async () => {
     renderHome();
-    const cta = screen.getByRole('link', { name: content.home.welcomeOffer.cta });
+    const cta = await screen.findByRole('link', { name: 'Browse deals' });
     expect(cta.getAttribute('href')).toBe('/explore');
+    expect(screen.getByText('Welcome Offer')).toBeTruthy();
   });
 
-  it('passes banner and feature-card options as kebab-case attributes (survive server rendering)', () => {
+  it('omits the Offers section entirely when there are no active promotions and the visitor is signed in', async () => {
+    m.promotions.mockResolvedValue({ data: [] });
+    m.auth = { isAuthenticated: true, token: 't' };
+    renderHome();
+    await screen.findByRole('heading', { level: 2, name: content.home.sections.dealsNearYou.heading });
+    expect(screen.queryByText('Welcome Offer')).toBeNull();
+  });
+
+  it('passes banner options as kebab-case attributes (survive server rendering)', () => {
     renderHome();
     const partner = document.querySelector('sky-cta-banner') as Element;
     expect(partner.getAttribute('cta-label')).toBe(content.home.partnerBanner.cta);
@@ -297,10 +338,6 @@ describe('Home', () => {
     expect(partner.getAttribute('cta-icon')).toBe('arrow_forward');
     expect(partner.getAttribute('icon-style')).toBe('tonal');
     expect(partner.getAttribute('icon-shape')).toBe('full');
-    const gift = document.querySelector('sky-feature-card.home-offer--gift') as Element;
-    expect(gift.getAttribute('cta-label')).toBe(content.home.giftCard.cta);
-    expect(gift.getAttribute('cta-href')).toBe('/gift-cards');
-    expect(gift.getAttribute('icon-style')).toBe('surface');
   });
 
   it('toggles the wishlist when a signed-in visitor favourites a deal', async () => {
@@ -313,11 +350,17 @@ describe('Home', () => {
     });
   });
 
-  it('links popular treatments to an /explore search', () => {
+  it('links popular treatments (Admin-managed via the Popular Treatments API) to an /explore search', async () => {
     renderHome();
-    const [group] = content.home.searchByDestination.columns.flat();
-    const link = screen.getByRole('link', { name: group.items[0] });
-    expect(link.getAttribute('href')).toBe(`/explore?q=${encodeURIComponent(group.items[0])}`);
+    const link = await screen.findByRole('link', { name: 'Swedish Massage' });
+    expect(link.getAttribute('href')).toBe('/explore?q=Swedish%20Massage&category=massage');
+  });
+
+  it('omits the Popular Treatments section entirely when the API returns no active groups', async () => {
+    m.popularTreatments.mockResolvedValue({ data: [] });
+    renderHome();
+    await screen.findByRole('heading', { level: 2, name: content.home.sections.dealsNearYou.heading });
+    expect(screen.queryByRole('heading', { level: 2, name: content.home.searchByDestination.heading })).toBeNull();
   });
 
   it('renders no tabs or tabpanel when the deals share no category', async () => {

@@ -5,7 +5,7 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import content from '../../../content.json';
 import { requestOtp, verifyOtp } from '../../../api/rbac/auth';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { resolvePostLoginPath } from '../../../auth/role-routing';
+import { resolvePostLoginPath, sanitizeReturnUrl, signInPathWithNext } from '../../../auth/role-routing';
 const RESEND_SECONDS = 24;
 
 /**
@@ -16,12 +16,20 @@ const RESEND_SECONDS = 24;
  * `/rbac/bootstrap` fetch, but doesn't await it synchronously in a way this
  * component can rely on (the `bootstrap` value here is only current after a
  * re-render). So the redirect itself is driven by a `useEffect` that watches
- * `bootstrap` becoming available post sign-in, then routes by role via
- * `resolvePostLoginPath` — staff always land on `/account/dashboard`
- * (unchanged), a vendor lands on the admin console, a customer lands on the
- * storefront home, and a user holding both `customer` and `vendor` (the
- * common case — self-registering as a vendor never removes `customer`) is
- * sent to `/choose-experience` instead of guessing for them.
+ * `bootstrap` becoming available post sign-in, then decides where to land:
+ * `returnUrl` (the page the visitor was on before `sign-in.tsx` sent them
+ * here — see `extractReturnUrl`) wins, but ONLY for the plain-customer
+ * destination (`resolvePostLoginPath` resolving to `/`) — staff always land
+ * on `/account/dashboard`, a vendor lands on the admin console, and a dual
+ * customer+vendor user still goes to `/choose-experience`, exactly as
+ * before `returnUrl` existed. `returnUrl` is re-validated with
+ * `sanitizeReturnUrl` right here too, not just trusted from `sign-in.tsx`.
+ * Never consumed until this effect actually fires (i.e. only after a real,
+ * successful `verifyOtp` + `signIn`) — a failed or abandoned OTP attempt
+ * leaves it untouched in this screen's own `location.state`, so a retry (or
+ * the back button, which re-appends it to `/sign-in?next=...`) never loses
+ * it; navigating away via a *successful* login replaces this history entry,
+ * so nothing lingers for a later, unrelated login to accidentally reuse.
  */
 export function Otp() {
   const navigate = useNavigate();
@@ -31,10 +39,10 @@ export function Otp() {
   const otpContent = content.auth.otp;
   const [loading, setLoading] = useState(false);
   const [awaitingBootstrap, setAwaitingBootstrap] = useState(false);
-  const { identifier, method, next } = (location.state as {
+  const { identifier, method, returnUrl } = (location.state as {
     identifier: string;
     method: 'email' | 'phone';
-    next?: string | null;
+    returnUrl?: string | null;
   }) || {};
   const [code, setCode] = useState('');
   const [seconds, setSeconds] = useState(RESEND_SECONDS);
@@ -43,21 +51,25 @@ export function Otp() {
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {
-    if (!identifier) { navigate('/sign-in', { replace: true }); }
-  }, [identifier, navigate]);
+    if (!identifier) { navigate(signInPathWithNext(returnUrl), { replace: true }); }
+  }, [identifier, returnUrl, navigate]);
 
   // Once `signIn()` has kicked off the bootstrap fetch, wait for it to land in context, then
-  // route by role. If it fails (token cleared by `loadBootstrap`'s own error handling), fall
-  // back to an error instead of hanging on this screen forever.
+  // decide where to land. `returnUrl` only ever overrides the plain-customer destination ('/')
+  // — staff/vendor/dual-role destinations are untouched, see this component's own doc comment.
+  // If it fails (token cleared by `loadBootstrap`'s own error handling), fall back to an error
+  // instead of hanging on this screen forever.
   useEffect(() => {
     if (!awaitingBootstrap) return;
     if (bootstrap) {
-      navigate(resolvePostLoginPath(bootstrap), { replace: true });
+      const roleDestination = resolvePostLoginPath(bootstrap);
+      const safeReturnUrl = returnUrl ? sanitizeReturnUrl(returnUrl) : null;
+      navigate(roleDestination === '/' && safeReturnUrl ? safeReturnUrl : roleDestination, { replace: true });
     } else if (!token) {
       setAwaitingBootstrap(false);
       setError(otpContent.validation.invalidOtp);
     }
-  }, [awaitingBootstrap, bootstrap, token, navigate, otpContent.validation.invalidOtp]);
+  }, [awaitingBootstrap, bootstrap, token, returnUrl, navigate, otpContent.validation.invalidOtp]);
 
   const verify = async () => {
     setError('');
@@ -70,7 +82,7 @@ export function Otp() {
       return;
     }
     if (!identifier) {
-      navigate('/sign-in');
+      navigate(signInPathWithNext(returnUrl));
       return;
     }
     setLoading(true);
@@ -103,7 +115,7 @@ export function Otp() {
       <IconButton
         className="otp-back"
         aria-label={otpContent.backAriaLabel}
-        onClick={() => navigate('/sign-in')}
+        onClick={() => navigate(signInPathWithNext(returnUrl))}
       >
         <Icon aria-hidden="true">{otpContent.icons.back}</Icon>
       </IconButton>

@@ -270,7 +270,6 @@ export function MediaUploader({
       <legend>Media</legend>
 
       <div className="media-uploader__section">
-        <p className="field-hint">Images</p>
         {busy && <LinearProgress indeterminate />}
         <div className="media-uploader__grid">
           {images.map((img, i) => (
@@ -281,24 +280,44 @@ export function MediaUploader({
                 <span className="media-uploader__filename">{img.originalFilename ?? 'image'}</span>
                 <span className="media-uploader__filesize">{Math.round(img.sizeBytes / 1024)} KB</span>
               </figcaption>
-              <div className="media-uploader__actions">
-                {!img.isPrimary && (
-                  <OutlinedButton onClick={() => makePrimary(img.id)} disabled={busy}>
-                    <Icon slot="icon" aria-hidden="true">star</Icon>
-                    Set primary
-                  </OutlinedButton>
-                )}
-                <OutlinedButton onClick={() => move(img.id, -1)} disabled={busy || i === 0} aria-label="Move earlier">
-                  <Icon slot="icon" aria-hidden="true">arrow_upward</Icon>
-                </OutlinedButton>
-                <OutlinedButton onClick={() => move(img.id, 1)} disabled={busy || i === images.length - 1} aria-label="Move later">
-                  <Icon slot="icon" aria-hidden="true">arrow_downward</Icon>
-                </OutlinedButton>
-                <OutlinedButton onClick={() => removeImage(img.id)} disabled={busy}>
-                  <Icon slot="icon" aria-hidden="true">delete</Icon>
-                  Remove
-                </OutlinedButton>
-              </div>
+             <div className="media-uploader__actions">
+  {!img.isPrimary && (
+    <OutlinedButton onClick={() => makePrimary(img.id)} disabled={busy}>
+      <Icon slot="icon" aria-hidden="true">star</Icon>
+      Set primary
+    </OutlinedButton>
+  )}
+
+  <OutlinedButton
+    className="media-icon-button"
+    onClick={() => move(img.id, -1)}
+    disabled={busy || i === 0}
+    aria-label="Move earlier"
+    title="Move earlier"
+  >
+    <Icon slot="icon" aria-hidden="true">arrow_upward</Icon>
+  </OutlinedButton>
+
+  <OutlinedButton
+    className="media-icon-button"
+    onClick={() => move(img.id, 1)}
+    disabled={busy || i === images.length - 1}
+    aria-label="Move later"
+    title="Move later"
+  >
+    <Icon slot="icon" aria-hidden="true">arrow_downward</Icon>
+  </OutlinedButton>
+
+  <OutlinedButton
+    className="media-icon-button"
+    onClick={() => removeImage(img.id)}
+    disabled={busy}
+    aria-label="Remove image"
+    title="Remove image"
+  >
+    <Icon slot="icon" aria-hidden="true">delete</Icon>
+  </OutlinedButton>
+</div>
             </figure>
           ))}
           {staged.map((item) => (

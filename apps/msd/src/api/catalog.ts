@@ -191,7 +191,58 @@ export function getCatalogCategory(slug: string) {
 export type CatalogDealSort = 'relevance' | 'price_asc' | 'price_desc' | 'distance' | 'newest' | 'discount';
 export type CatalogProductSort = 'relevance' | 'price_asc' | 'price_desc' | 'newest' | 'discount';
 
-export interface ListCatalogDealsOpts {
+export interface CatalogPopularTreatmentGroup {
+  id: string;
+  name: string;
+  slug: string;
+  treatments: CatalogPopularTreatmentGroup[];
+}
+
+/** Public home page Treatment directory — active groups only, each holding only its own active
+ *  treatments (server-filtered; see msd-api's `popular-treatment.service.ts#getPublicTreatmentDirectory`). */
+export function listCatalogPopularTreatments() {
+  return apiGet<CatalogPopularTreatmentGroup[]>('/catalog/popular-treatments', null);
+}
+
+/** One active Home page promotion card — server-filtered to `isActive` + within its (optional)
+ *  visibility window (see msd-api's `promotion.service.ts#getPublicPromotions`). `image` is a raw
+ *  `storageKey` (or `null`) — pass it through `resolveMediaUrl` from `api/media.ts` before
+ *  rendering, same as every other media-backed entity. */
+export interface CatalogPromotion {
+  id: string;
+  title: string;
+  description: string | null;
+  buttonLabel: string | null;
+  destinationType: 'ROUTE' | 'CATEGORY' | 'DEAL';
+  destinationRoute: string | null;
+  category: { id: string; name: string; slug: string } | null;
+  deal: { id: string; title: string; slug: string } | null;
+  image: string | null;
+}
+
+export function listCatalogPromotions() {
+  return apiGet<CatalogPromotion[]>('/catalog/promotions', null);
+}
+
+/** Public Home Hero Deal slider — `state: null` means the Global/Default slider served (either
+ *  because the requested state has no publishable slider of its own yet, or none was requested).
+ *  `slides` is empty when even the Global/Default slider isn't publishable yet (fewer than 5
+ *  eligible Deals) — the frontend degrades gracefully, never crashes on an empty list. */
+export interface CatalogHomeHeroSlide {
+  id: string;
+  deal: CatalogDeal;
+}
+
+export interface CatalogHomeHero {
+  state: string | null;
+  slides: CatalogHomeHeroSlide[];
+}
+
+export function getCatalogHomeHero(state?: string) {
+  return apiGet<CatalogHomeHero>(`/catalog/home-hero${state ? `?state=${encodeURIComponent(state)}` : ''}`, null);
+}
+
+export interface CatalogDealListOptions {
   page?: number;
   pageSize?: number;
   categoryId?: string;
@@ -215,7 +266,7 @@ export interface ListCatalogDealsOpts {
   radiusKm?: number;
 }
 
-export function listCatalogDeals(opts: ListCatalogDealsOpts = {}) {
+export function listCatalogDeals(opts: CatalogDealListOptions = {}) {
   return apiGet<CatalogDeal[]>(
     `/catalog/deals${toQuery({ ...opts, vendorIds: opts.vendorIds?.length ? opts.vendorIds.join(',') : undefined, branchIds: opts.branchIds?.length ? opts.branchIds.join(',') : undefined })}`,
     null,
@@ -230,7 +281,7 @@ export interface CatalogDealFacets {
 }
 
 /** Filter-panel counts for the same filters as `listCatalogDeals` (no paging/sort). */
-export function getCatalogDealFacets(opts: Omit<ListCatalogDealsOpts, 'page' | 'pageSize' | 'sort'> = {}) {
+export function getCatalogDealFacets(opts: Omit<CatalogDealListOptions, 'page' | 'pageSize' | 'sort'> = {}) {
   const { vendorIds, branchIds, ...rest } = opts;
   return apiGet<CatalogDealFacets>(
     `/catalog/deals/facets${toQuery({ ...rest, vendorIds: vendorIds?.length ? vendorIds.join(',') : undefined, branchIds: branchIds?.length ? branchIds.join(',') : undefined })}`,

@@ -1,7 +1,15 @@
-import { createElement, useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Icon, FilledButton, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
+import { useParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState,  useMemo, createElement, type ReactNode } from 'react';
+import {
+  Icon,
+  Tabs,
+  PrimaryTab,
+  OutlinedTextField,
+  FilledButton,
+  OutlinedButton,
+} from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import {
   getCatalogCategory,
   getCatalogDealFacets,
@@ -111,6 +119,7 @@ function toIds(value: string | null): string[] {
 export function Category() {
   const { slug = '', city: citySlugParam } = useParams<{ slug: string; city?: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { token, isAuthenticated } = useAuth();
   // Rendering decisions wait for hydration so they match the prerendered (signed-out) HTML.
   const signedIn = useHydrated() && isAuthenticated;
@@ -223,7 +232,7 @@ export function Category() {
   };
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
-    navigate(`/sign-in?next=${encodeURIComponent(`/category/${slug}`)}`);
+    navigate(signInPathWithReturnTo(location));
     return false;
   };
   const addProductToCart = async (product: CatalogProduct) => {

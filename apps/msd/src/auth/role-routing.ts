@@ -91,10 +91,29 @@ export function extractReturnUrl(location: { search?: string; state?: unknown })
 
 /** A return URL must be an in-app relative path (never `//host/...` or an absolute
  *  `https://...` URL — that would be an open-redirect) and must never point back into the auth
- *  flow itself (`/sign-in`/`/otp`), or a successful login would bounce straight back to login. */
-function sanitizeReturnUrl(url: string): string | null {
+ *  flow itself (`/sign-in`/`/otp`), or a successful login would bounce straight back to login.
+ *  Exported so `otp.tsx` can re-validate a `returnUrl` it received via `location.state` right
+ *  before actually navigating to it — defense in depth on top of `extractReturnUrl` already
+ *  sanitizing it once, on the way in. */
+export function sanitizeReturnUrl(url: string): string | null {
   if (!url || !url.startsWith('/') || url.startsWith('//')) return null;
   if (url === '/sign-in' || url.startsWith('/sign-in?') || url.startsWith('/sign-in/')) return null;
   if (url === '/otp' || url.startsWith('/otp?') || url.startsWith('/otp/')) return null;
   return url;
+}
+
+/** Builds the `/sign-in?next=...` URL for an already-known return-path string — used to
+ *  re-bounce from `/otp` back to `/sign-in` (the back button, or a direct `/otp` visit missing
+ *  its `identifier`) without losing the destination that was already captured. */
+export function signInPathWithNext(returnUrl: string | null | undefined): string {
+  return returnUrl ? `/sign-in?next=${encodeURIComponent(returnUrl)}` : '/sign-in';
+}
+
+/** Builds the same `/sign-in?next=...` URL, but from a `Location`-like object (pathname +
+ *  search + hash) instead of an already-known string — the single place every "please sign in
+ *  to do X" trigger (header Sign In, a page's own Sign In button, an Add to Cart/wishlist
+ *  prompt via `requireAuthOrRedirect`) builds this URL, so the full current route (query
+ *  parameters and hash included, never just the bare path) is always captured consistently. */
+export function signInPathWithReturnTo(location: { pathname: string; search?: string; hash?: string }): string {
+  return signInPathWithNext(`${location.pathname}${location.search ?? ''}${location.hash ?? ''}`);
 }

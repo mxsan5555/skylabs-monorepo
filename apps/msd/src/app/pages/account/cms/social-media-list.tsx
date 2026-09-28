@@ -13,6 +13,7 @@ import {
 } from '../../../../api/rbac/social-media';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useToast } from '../../../../toast/toast-context';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { SocialMediaFormDialog } from './social-media-form-dialog';
 
 const COLUMNS = JSON.stringify([
@@ -39,6 +40,7 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
  */
 export function SocialMediaList() {
   const { token, can } = useAuth();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const { showToast } = useToast();
   const canCreate = can('cms.social-media', 'create');
   const canEdit = can('cms.social-media', 'edit');
@@ -105,7 +107,7 @@ export function SocialMediaList() {
   };
 
   const remove = async (link: SocialMediaLink) => {
-    if (!window.confirm(`Delete "${link.displayName}"? This cannot be undone.`)) return;
+    if (!(await confirm(`Delete "${link.displayName}"? This cannot be undone.`))) return;
     setError('');
     try {
       await deleteSocialMediaLink(token, link.id);
@@ -220,6 +222,7 @@ export function SocialMediaList() {
           onClose={() => setEditingLink(null)}
         />
       )}
+      {ConfirmDialog}
     </div>
   );
 }

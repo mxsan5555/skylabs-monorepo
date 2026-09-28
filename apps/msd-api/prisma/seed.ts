@@ -21,6 +21,7 @@ import { permissionKeyFor } from '@skylabs-monorepo/shared-permissions';
 import { ensureUniqueSlug } from '../src/lib/slug';
 import { getMenuForApp } from '@skylabs-monorepo/shared-menu';
 import { normalizeIdentifier } from '../src/lib/normalizeIdentifier';
+import { migrateSharedKeySplitGrants } from '../src/services/permission-migration.service';
 import { CATEGORY_TAXONOMY } from './category-taxonomy';
 
 const prisma = new PrismaClient();
@@ -42,7 +43,17 @@ const ROLES: RoleSeed[] = [
   { key: 'sales', name: 'Sales', description: 'Vendor accounts and reporting.', isSystem: true, isSuperAdmin: false },
 ];
 
-/** Per-menuKey action subset. Every node gets 'view' at minimum (added below); this map adds the rest. */
+/**
+ * Per-menuKey EXTRA actions, beyond the universal View/Create/Edit/Delete baseline every
+ * menuKey now gets automatically (see `actionsForMenuKey`) — the Role Permission Matrix always
+ * renders all 4 baseline columns for every row, never a "—" for one of those 4, even for a
+ * navigation-only group header or a read-only screen with no real create/edit/delete endpoint.
+ * Granting one of these baseline actions where the backend has no matching route is inert (no
+ * `requirePermission` call ever checks it) — the checkbox exists for UI/RBAC-editing
+ * completeness only, per the "menu grants a checkbox, ownership/route-existence grants access"
+ * split documented in `requirePermission.ts`. This map is now only for genuinely EXTRA actions
+ * (export/approve/reject/status_change/custom/assign/etc.) that a real route actually checks.
+ */
 const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   // 'status_change' is deliberately its OWN action here, distinct from `rbac.users:status_change`
   // (the Users Management screen's own status control) — a role can hold one without the other,
@@ -50,8 +61,24 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   // management, and vice versa (see customer.service.ts#setCustomerStatus's own doc comment).
   customers: ['create', 'edit', 'delete', 'export', 'status_change'],
   // 'custom' gates the vendor's own `/vendors/me*` self-service surface — granted only to the
-  // `vendor` role (never 'view', which would leak the admin "list every vendor" endpoint).
+  // `vendor` role (never `view`, which would leak the admin "list every vendor" endpoint).
+  // Scoped to the Vendor entity itself (profile/KYC/approve/reject/status/delete) — Branch/Deal/
+  // Product/Therapist sub-resources moved to their own `vendors.*` keys below so each admin
+  // sidebar item (and its Role Permission Matrix row) is independently grantable, matching
+  // `vendors.routes.ts`'s per-resource `requirePermission` calls.
   vendors: ['create', 'edit', 'delete', 'export', 'approve', 'reject', 'status_change', 'custom'],
+  // Admin-on-behalf Branch CRUD — no delete endpoint exists (Branch is only ever soft-disabled
+  // via `status_change`, see Branch's own schema doc comment), so no `delete` action is seeded;
+  // the Role Permission Matrix shows a disabled dash for that cell, same as any other
+  // not-yet-grantable action (see permission-matrix.tsx's own doc comment).
+  'vendors.branches': ['create', 'edit', 'status_change'],
+  // Admin-on-behalf Deal CRUD, including the admin-only approve/reject moderation actions.
+  'vendors.deals': ['create', 'edit', 'delete', 'status_change', 'approve', 'reject'],
+  // Admin-on-behalf Therapist CRUD — no delete-via-status distinction beyond status_change/delete
+  // both existing as real endpoints.
+  'vendors.therapists': ['create', 'edit', 'delete', 'status_change'],
+  // Admin-on-behalf Product CRUD (status changes go through the same `edit` action as the route).
+  'vendors.products': ['create', 'edit', 'delete'],
   orders: ['create', 'edit', 'delete', 'export', 'status_change'],
   products: ['create', 'edit', 'delete', 'export'],
   services: ['create', 'edit', 'delete', 'export'],
@@ -64,15 +91,47 @@ const EXTRA_ACTIONS_BY_MENU_KEY: Record<string, PermissionAction[]> = {
   'masters.categories': ['create', 'edit', 'delete'],
   'masters.sub-categories': ['create', 'edit', 'delete'],
   'masters.tags': ['create', 'edit', 'delete'],
+  'masters.popular-treatments': ['create', 'edit', 'delete'],
+  'masters.promotions': ['create', 'edit', 'delete'],
+  'masters.home-hero': ['create', 'edit', 'delete'],
   'rbac.roles': ['create', 'edit', 'delete', 'status_change'],
   'rbac.users': ['create', 'edit', 'delete', 'assign', 'status_change', 'custom'],
   'rbac.audit-logs': [],
   settings: ['edit'],
-  // CMS: Blog is full CRUD; About Us/Contact Us are singleton content rows — edit-only, mirrors
-  // 'settings' above exactly (no create/delete concept for a row that always exists).
-  'cms.blog': ['create', 'edit', 'delete'],
+  // CMS Blog was previously ONE key ('cms.blog') shared by the "Pages" and "Articles" sidebar
+  // rows — split into two distinct keys so their Role Permission Matrix checkboxes toggle
+  // independently (see msd-menu.json). `cms.blog.pages` is the real, currently-implemented
+  // route (blog-posts.routes.ts); `cms.blog.articles` has no frontend route or backend gate of
+  // its own yet — its checkbox exists for matrix completeness/future wiring, same "grantable but
+  // currently inert" pattern as any navigation-only row. `migrateSharedKeySplitGrants` below
+  // (not this map) is what preserves every role's existing 'cms.blog:*' grant onto both new keys.
+  'cms.blog.pages': ['create', 'edit', 'delete'],
+  'cms.blog.articles': ['create', 'edit', 'delete'],
   'cms.about-us': ['edit'],
   'cms.contact-us': ['edit'],
+  'cms.faq': ['create', 'edit', 'delete'],
+  // Phase 1 CMS content types (add_cms_content_types migration): Blog Categories/How It
+  // Works/Careers are full CRUD; Website Pages (the 4 fixed legal pages) is edit-only, same
+  // "no create/delete concept for a row that always exists" convention as About Us/Contact Us.
+  'cms.blog-category': ['create', 'edit', 'delete'],
+  'cms.website-pages': ['edit'],
+  'cms.how-it-works': ['create', 'edit', 'delete'],
+  'cms.careers': ['create', 'edit', 'delete'],
+  'cms.social-media': ['create', 'edit', 'delete'],
+  // The vendor's own self-service "Business" surface — one key per sidebar node (see
+  // msd-menu.json's `business` group) so each is independently grantable, mirroring the
+  // `vendors.*` split above. Action sets mirror what `vendors.routes.ts`'s `/me/*` routes
+  // actually support: Business Profile is edit-only (singleton, no create/delete concept, same
+  // convention as `settings`); Branch/Therapist have no self-service delete endpoint (soft-
+  // disable via status_change only); Deal's self-service surface has no delete endpoint either
+  // (only the admin-on-behalf path does); Product has full CRUD; Customer/Order are read-only.
+  'vendor-portal.profile': ['edit'],
+  'vendor-portal.branches': ['create', 'edit', 'status_change'],
+  'vendor-portal.deals': ['create', 'edit', 'status_change'],
+  'vendor-portal.products': ['create', 'edit', 'delete'],
+  'vendor-portal.therapists': ['create', 'edit', 'status_change'],
+  'vendor-portal.customers': [],
+  'vendor-portal.orders': [],
 };
 
 function flattenMenu(nodes: readonly MenuNode[]): MenuNode[] {
@@ -84,9 +143,13 @@ function flattenMenu(nodes: readonly MenuNode[]): MenuNode[] {
   return out;
 }
 
+/** The 4 actions the Role Permission Matrix UI always renders a column for — every menuKey gets
+ *  a real Permission row for all 4, regardless of whether any route actually checks them. */
+const BASELINE_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete'];
+
 function actionsForMenuKey(menuKey: string): PermissionAction[] {
   const extra = EXTRA_ACTIONS_BY_MENU_KEY[menuKey] ?? [];
-  return ['view' as PermissionAction, ...extra.filter((a) => a !== 'view')];
+  return [...new Set([...BASELINE_ACTIONS, ...extra])];
 }
 
 async function seedRoles() {
@@ -145,7 +208,7 @@ async function grantAllPermissionsToSuperAdmins(
   permissionIdByKey: Map<string, string>,
 ) {
   const allPermissionIds = [...permissionIdByKey.entries()]
-    .filter(([key]) => !key.startsWith('vendor-portal:'))
+    .filter(([key]) => !key.startsWith('vendor-portal.'))
     .map(([, id]) => id);
   for (const role of roles.values()) {
     if (!role.isSuperAdmin) continue;
@@ -172,6 +235,27 @@ async function grantStarterPermissions(
     });
   };
 
+  /**
+   * Authoritative (delete-then-recreate) variant of `grant` above — used only for `vendor`.
+   * `grant`'s additive `createMany`/`skipDuplicates` can only ever ADD permissions on a re-run;
+   * it can never retract a grant that was added by an older seed revision or hand-edited via the
+   * Role Permission Matrix UI. That matters specifically for `vendor`: it must never hold
+   * `vendors:view`/`customers:view`/`products:view`/`orders:view` etc. (those would leak the
+   * admin-wide Vendor List/Customers/Products/Orders sidebar nodes and their backing endpoints to
+   * every vendor owner — see CLAUDE.md's vendor-isolation rules), so its RolePermission set is
+   * reset to exactly this list on every seed run rather than only ever growing.
+   */
+  const resetGrant = async (roleKey: string, keys: string[]) => {
+    const role = roles.get(roleKey);
+    if (!role) return;
+    const ids = keys.map((k) => permissionIdByKey.get(k)).filter((v): v is string => Boolean(v));
+    await prisma.rolePermission.deleteMany({ where: { roleId: role.id } });
+    await prisma.rolePermission.createMany({
+      data: ids.map((permissionId) => ({ roleId: role.id, permissionId })),
+      skipDuplicates: true,
+    });
+  };
+
   await grant('admin', [
     'dashboard:view',
     'customers:view', 'customers:create', 'customers:edit', 'customers:delete', 'customers:status_change',
@@ -185,8 +269,13 @@ async function grantStarterPermissions(
     'masters:view', 'masters.categories:view', 'masters.categories:create', 'masters.categories:edit', 'masters.categories:delete',
     'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit', 'masters.sub-categories:delete',
     'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
+    'masters.popular-treatments:view', 'masters.popular-treatments:create', 'masters.popular-treatments:edit', 'masters.popular-treatments:delete',
+    'masters.promotions:view', 'masters.promotions:create', 'masters.promotions:edit', 'masters.promotions:delete',
+    'masters.home-hero:view', 'masters.home-hero:create', 'masters.home-hero:edit', 'masters.home-hero:delete',
     'settings:view', 'settings:edit',
-    'cms:view', 'cms.blog:view', 'cms.blog:create', 'cms.blog:edit', 'cms.blog:delete',
+    'cms:view',
+    'cms.blog.pages:view', 'cms.blog.pages:create', 'cms.blog.pages:edit', 'cms.blog.pages:delete',
+    'cms.blog.articles:view', 'cms.blog.articles:create', 'cms.blog.articles:edit', 'cms.blog.articles:delete',
     'cms.about-us:view', 'cms.about-us:edit', 'cms.contact-us:view', 'cms.contact-us:edit',
   ]);
 
@@ -195,11 +284,18 @@ async function grantStarterPermissions(
     'masters:view', 'masters.categories:view', 'masters.categories:create', 'masters.categories:edit',
     'masters.sub-categories:view', 'masters.sub-categories:create', 'masters.sub-categories:edit',
     'masters.tags:view', 'masters.tags:create', 'masters.tags:edit', 'masters.tags:delete',
+    'masters.popular-treatments:view', 'masters.popular-treatments:create', 'masters.popular-treatments:edit', 'masters.popular-treatments:delete',
+    'masters.promotions:view', 'masters.promotions:create', 'masters.promotions:edit', 'masters.promotions:delete',
+    'masters.home-hero:view', 'masters.home-hero:create', 'masters.home-hero:edit', 'masters.home-hero:delete',
     'reports:view',
-    // No 'cms.blog:delete' — mirrors this same role's create/edit-but-no-delete grant on
-    // 'masters.categories' above.
-    'cms:view', 'cms.blog:view', 'cms.blog:create', 'cms.blog:edit',
+    // No 'cms.blog.pages:delete'/'cms.blog.articles:delete' — mirrors this same role's
+    // create/edit-but-no-delete grant on 'masters.categories' above.
+    'cms:view',
+    'cms.blog.pages:view', 'cms.blog.pages:create', 'cms.blog.pages:edit',
+    'cms.blog.articles:view', 'cms.blog.articles:create', 'cms.blog.articles:edit',
     'cms.about-us:view', 'cms.about-us:edit', 'cms.contact-us:view', 'cms.contact-us:edit',
+    // No 'cms.faq:delete' — same create/edit-but-no-delete grant as this role's blog grants above.
+    'cms.faq:view', 'cms.faq:create', 'cms.faq:edit',
   ]);
 
   await grant('sales', [
@@ -210,15 +306,28 @@ async function grantStarterPermissions(
   ]);
 
   await grant('customer', ['dashboard:view']);
-  // Deliberately NOT 'vendors:view' — that would also unlock the admin "list every vendor"
-  // endpoint (requirePermission only checks the boolean grant, not who's asking). 'custom'
-  // gates only the ownership-scoped `/vendors/me*` self-service surface. 'vendor-portal:view'
-  // is a separate, narrower menu key that only surfaces the "My Business" sidebar item —
-  // never granted to admin/customer/etc., so it can't leak the admin Vendors/Branches/Deals nav.
-  // 'orders:status_change' lets a vendor confirm/complete/cancel its OWN orders —
-  // order.service.ts still enforces vendor-ownership scoping and a narrower transition set
-  // server-side; the permission alone only gates whether the action UI/route is reachable at all.
-  await grant('vendor', ['dashboard:view', 'orders:view', 'orders:status_change', 'products:view', 'services:view', 'vendors:custom', 'vendor-portal:view']);
+  // Deliberately NOT 'vendors:view'/'customers:view'/'products:*'/'orders:*' — any of those would
+  // also unlock the matching admin-wide sidebar node AND its backing endpoint (requirePermission
+  // only checks the boolean grant, not who's asking): 'vendors:custom' is the one gate every
+  // vendor self-service route (`/vendors/me/*`, including its own Order/Product access via the
+  // `orders`/`vendors` OR-checks in orders.routes.ts and vendors.routes.ts) already runs on, and
+  // the `vendor-portal.*` keys below are the separate, narrower per-node menu keys that only
+  // surface the "Business" sidebar group's own children — never granted to admin/customer/etc.,
+  // so they can't leak the admin Vendor List/Customers/Products/Orders nav or their endpoints to
+  // a vendor owner. Uses `resetGrant` (not `grant`) so a re-seed always converges back to exactly
+  // this set, even if an older seed revision or a hand-edit via the Role Permission Matrix UI had
+  // granted this role more.
+  await resetGrant('vendor', [
+    'dashboard:view',
+    'vendors:custom',
+    'vendor-portal.profile:view', 'vendor-portal.profile:edit',
+    'vendor-portal.branches:view', 'vendor-portal.branches:create', 'vendor-portal.branches:edit', 'vendor-portal.branches:status_change',
+    'vendor-portal.deals:view', 'vendor-portal.deals:create', 'vendor-portal.deals:edit', 'vendor-portal.deals:status_change',
+    'vendor-portal.products:view', 'vendor-portal.products:create', 'vendor-portal.products:edit', 'vendor-portal.products:delete',
+    'vendor-portal.therapists:view', 'vendor-portal.therapists:create', 'vendor-portal.therapists:edit', 'vendor-portal.therapists:status_change',
+    'vendor-portal.customers:view',
+    'vendor-portal.orders:view',
+  ]);
 }
 
 async function seedDashboardWidgets(roles: Map<string, { id: string; isSuperAdmin: boolean }>) {
@@ -250,10 +359,18 @@ async function seedDashboardWidgets(roles: Map<string, { id: string; isSuperAdmi
     widgetIdByKey.set(widget.key, row.id);
   }
 
+  // Find-or-create-only, same discipline as every other admin-editable seed in this file (see
+  // `seedPopularTreatments`'s own doc comment): a role's widget assignment is only ever applied
+  // ONCE, the first time this role has zero `RoleDashboardWidget` rows. Once any row exists —
+  // whether from this very seed or from an admin's own edit via the Role Management UI's Save
+  // widgets — a reseed must never touch it again. The old `deleteMany` + `createMany` on every
+  // run unconditionally reset every system role's widgets back to these hardcoded defaults,
+  // silently discarding any admin customization each time the seed reran.
   const assign = async (roleKey: string, keysInOrder: string[]) => {
     const role = roles.get(roleKey);
     if (!role) return;
-    await prisma.roleDashboardWidget.deleteMany({ where: { roleId: role.id } });
+    const existingCount = await prisma.roleDashboardWidget.count({ where: { roleId: role.id } });
+    if (existingCount > 0) return;
     await prisma.roleDashboardWidget.createMany({
       data: keysInOrder.map((key, order) => ({
         roleId: role.id,
@@ -349,13 +466,103 @@ async function seedSuperAdminUser(roles: Map<string, { id: string; isSuperAdmin:
  *  (e.g. a vendor-reset side effect) is unconditionally restored, rather than silently staying
  *  hidden until someone notices and hand-fixes the DB row again. Never touches `name`/`slug`/
  *  `type` on the update path — only the activeness guarantee. */
+/** Starter "Popular Treatments" directory (groups + chips) migrated from the old hardcoded
+ *  `content.json#home.searchByDestination` data — this is the ONE-TIME initial data only.
+ *  Find-or-create-only (never `upsert`'s `update` branch): once a group/treatment row exists (by
+ *  slug), this function never touches its `name`/`sortOrder`/`isActive` again on a later re-run,
+ *  so an admin's edit or Active/Inactive toggle via the Master screen is never reverted by
+ *  reseeding — the opposite discipline from `seedCategoryTaxonomy`'s own forced-active taxonomy
+ *  rows just below (see that function's doc comment for why THAT one differs). `categoryId` is
+ *  deliberately left unset here — it's an optional refinement hint the admin can add later via
+ *  the Master screen, not something this starter data guesses at. */
+const POPULAR_TREATMENT_SEED: { name: string; slug: string; treatments: { name: string; slug: string }[] }[] = [
+  { name: 'Massage', slug: 'massage', treatments: [
+    { name: 'Swedish Massage', slug: 'swedish-massage' },
+    { name: 'Deep Tissue Massage', slug: 'deep-tissue-massage' },
+    { name: 'Thai Massage', slug: 'thai-massage' },
+    { name: 'Hot Stone Massage', slug: 'hot-stone-massage' },
+  ] },
+  { name: 'Facials', slug: 'facials', treatments: [
+    { name: 'Hydra Facial', slug: 'hydra-facial' },
+    { name: 'Gold Facial', slug: 'gold-facial' },
+    { name: 'Anti Aging Facial', slug: 'anti-aging-facial' },
+  ] },
+  { name: 'Hair Spa', slug: 'hair-spa', treatments: [
+    { name: 'Hair Spa', slug: 'hair-spa-treatment' },
+    { name: 'Hair Smoothening', slug: 'hair-smoothening' },
+    { name: 'Keratin Treatment', slug: 'keratin-treatment' },
+  ] },
+  { name: 'Spa Packages', slug: 'spa-packages', treatments: [
+    { name: 'Couple Spa', slug: 'couple-spa' },
+    { name: 'Luxury Spa', slug: 'luxury-spa' },
+    { name: 'Weekend Spa', slug: 'weekend-spa' },
+  ] },
+  { name: 'Wellness', slug: 'wellness', treatments: [
+    { name: 'Yoga', slug: 'yoga' },
+    { name: 'Meditation', slug: 'meditation' },
+    { name: 'Detox Therapy', slug: 'detox-therapy' },
+  ] },
+  { name: 'Beauty', slug: 'beauty', treatments: [
+    { name: 'Waxing', slug: 'waxing' },
+    { name: 'Threading', slug: 'threading' },
+    { name: 'Makeup', slug: 'makeup' },
+  ] },
+  { name: 'Nails', slug: 'nails', treatments: [
+    { name: 'Manicure', slug: 'manicure' },
+    { name: 'Pedicure', slug: 'pedicure' },
+    { name: 'Nail Art', slug: 'nail-art' },
+  ] },
+  { name: 'Body Care', slug: 'body-care', treatments: [
+    { name: 'Body Polish', slug: 'body-polish' },
+    { name: 'Body Scrub', slug: 'body-scrub' },
+    { name: 'Body Wrap', slug: 'body-wrap' },
+  ] },
+  { name: 'More Deals', slug: 'more-deals', treatments: [
+    { name: 'Steam Bath', slug: 'steam-bath' },
+    { name: 'Sauna', slug: 'sauna' },
+    { name: 'Aromatherapy', slug: 'aromatherapy' },
+  ] },
+];
+
+async function seedPopularTreatments(): Promise<{ groupsCreated: number; treatmentsCreated: number }> {
+  let groupsCreated = 0;
+  let treatmentsCreated = 0;
+  for (const [groupIdx, group] of POPULAR_TREATMENT_SEED.entries()) {
+    let groupRow = await prisma.popularTreatmentGroup.findUnique({ where: { slug: group.slug } });
+    if (!groupRow) {
+      groupRow = await prisma.popularTreatmentGroup.create({
+        data: { name: group.name, slug: group.slug, sortOrder: groupIdx },
+      });
+      groupsCreated++;
+    }
+    for (const [treatmentIdx, treatment] of group.treatments.entries()) {
+      const existing = await prisma.popularTreatment.findUnique({ where: { slug: treatment.slug } });
+      if (existing) continue;
+      await prisma.popularTreatment.create({
+        data: { name: treatment.name, slug: treatment.slug, groupId: groupRow.id, sortOrder: treatmentIdx },
+      });
+      treatmentsCreated++;
+    }
+  }
+  return { groupsCreated, treatmentsCreated };
+}
+
+/**
+ * Idempotent, find-or-create-only: `update` is a true no-op on every rerun — an existing row's
+ * `name`/`isActive`/`sortOrder` is never touched, only ever set at `create` time. A prior version
+ * did `update: { isActive: true }`, which force-reactivated every taxonomy row on every reseed,
+ * silently undoing an admin's manual deactivation (same bug class as the Dashboard Widgets
+ * destructive-reseed fix elsewhere in this codebase). Renames/reactivations/reordering for
+ * already-existing, already-drifted rows are handled once by `reconcile-category-master.ts`, not
+ * by this per-run seed step.
+ */
 async function seedCategoryTaxonomy(): Promise<Map<string, string>> {
   const categoryIdBySlug = new Map<string, string>();
 
   for (const top of CATEGORY_TAXONOMY) {
     const topRow = await prisma.category.upsert({
       where: { slug: top.slug },
-      update: { isActive: true },
+      update: {},
       create: { name: top.name, slug: top.slug, type: top.type },
     });
     categoryIdBySlug.set(top.slug, topRow.id);
@@ -363,7 +570,7 @@ async function seedCategoryTaxonomy(): Promise<Map<string, string>> {
     for (const [subIdx, sub] of top.children.entries()) {
       const subRow = await prisma.category.upsert({
         where: { slug: sub.slug },
-        update: { isActive: true },
+        update: {},
         create: { name: sub.name, slug: sub.slug, parentId: topRow.id, sortOrder: subIdx },
       });
       categoryIdBySlug.set(sub.slug, subRow.id);
@@ -371,7 +578,7 @@ async function seedCategoryTaxonomy(): Promise<Map<string, string>> {
       for (const [leafIdx, leaf] of (sub.children ?? []).entries()) {
         const leafRow = await prisma.category.upsert({
           where: { slug: leaf.slug },
-          update: { isActive: true },
+          update: {},
           create: { name: leaf.name, slug: leaf.slug, parentId: subRow.id, sortOrder: leafIdx },
         });
         categoryIdBySlug.set(leaf.slug, leafRow.id);
@@ -968,8 +1175,9 @@ async function seedCart(customerId:string,dealIdBySlug:Map<string,string>,produc
 }
 
 async function seedWishlist(customerId:string,dealIdBySlug:Map<string,string>):Promise<void>{
-  for(const slug of ['premium-glow-facial-glow-delhi','head-neck-relaxation-urban-delhi']){
-    const dealId=dealIdBySlug.get(slug)!;
+  for(const slug of ['premium-glow-facial-glow-delhi','head-neck-relaxation-glow-delhi']){
+    const dealId=dealIdBySlug.get(slug);
+    if(!dealId) continue;
     await prisma.wishlistItem.upsert({where:{customerId_dealId:{customerId,dealId}},update:{},create:{customerId,dealId}});
   }
 }
@@ -1232,7 +1440,12 @@ function validateDemoSeedDataset():void{
   for(const x of PRODUCT_SEEDS)seeded.add(x.subcategorySlug);
   for(const x of THERAPIST_SEEDS)if(x.specializationCategorySlug)seeded.add(x.specializationCategorySlug);
   const missing=taxonomySubcategories.filter((slug)=>!seeded.has(slug));
-  if(missing.length)throw new Error(`Seed validation failed: subcategories without data: ${missing.join(', ')}`);
+  // Non-fatal: a taxonomy subcategory with no demo-seed example listing is still perfectly valid
+  // once real data exists via live admin usage or `reconcile-category-master.ts` (which populates
+  // several final-business-structure subcategories from pre-existing, non-demo-seed relations —
+  // see that script's own doc comment). This only used to be a hard gate back when every taxonomy
+  // subcategory was guaranteed to come solely from SERVICE_DEAL_SEEDS/PRODUCT_SEEDS/THERAPIST_SEEDS.
+  if(missing.length)console.warn(`Seed warning: taxonomy subcategories with no demo-seed example listing (fine if populated via live/reconciled data): ${missing.join(', ')}`);
   const branchKeys=new Set(VENDOR_SEEDS.flatMap((v)=>v.branches.map((b)=>b.key)));
   const count=(rows:any[])=>rows.reduce((m,row)=>(m.set(row.branchKey,(m.get(row.branchKey)??0)+1),m),new Map<string,number>());
   const dc=count(SERVICE_DEAL_SEEDS),pc=count(PRODUCT_SEEDS),tc=count(THERAPIST_SEEDS);
@@ -1248,6 +1461,14 @@ async function main() {
   validateDemoSeedDataset();
   const roles = await seedRoles();
   const permissionIdByKey = await seedPermissions();
+  // Every menuKey that used to be shared by multiple menu nodes and has since been split into
+  // distinct per-node keys — add a new `{ oldMenuKey, newMenuKeys }` entry here whenever another
+  // such split happens, so every role's (including custom roles') existing access is preserved.
+  await migrateSharedKeySplitGrants(
+    prisma,
+    [{ oldMenuKey: 'cms.blog', newMenuKeys: ['cms.blog.pages', 'cms.blog.articles'] }],
+    permissionIdByKey,
+  );
   await grantAllPermissionsToSuperAdmins(roles, permissionIdByKey);
   await grantStarterPermissions(roles, permissionIdByKey);
   await seedDashboardWidgets(roles);
@@ -1256,6 +1477,10 @@ async function main() {
 
   const categoryIdBySlug = await seedCategoryTaxonomy();
   const retiredTaxonomyRows = await deactivateRemovedTaxonomyRows();
+  const { groupsCreated, treatmentsCreated } = await seedPopularTreatments();
+  if (groupsCreated > 0 || treatmentsCreated > 0) {
+    console.log(`Seeded ${groupsCreated} new popular treatment group(s) and ${treatmentsCreated} new treatment(s).`);
+  }
   // Vendors must exist before Products (Product.vendorId is required — see the
   // direct_category_access migration), unlike the old shared-master-row model's ordering.
   const { vendorIdByKey, branchIdByKey } = await seedVendorsAndBranches(roles);

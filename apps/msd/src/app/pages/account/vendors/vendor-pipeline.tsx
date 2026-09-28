@@ -225,25 +225,43 @@ export function VendorPipeline({
     }
   };
 
-  // A branch save may have gone through `BranchDialog`'s "Categories & Subcategories" section,
-  // which can auto-grant a vendor-level `VendorCategoryAccess` row + flip `offersService`/
-  // `offersTherapy` server-side (see `setBranchCategoryAccess`'s own doc comment in
-  // msd-api's vendor.service.ts). Both `vendor` and `categoryAccess` are otherwise only ever
-  // fetched once (the bulk-load effect above) — without this refetch they'd go stale, and the
-  // NEXT "Save product categories" click in `VendorProductCategoryAccess` would resubmit the
-  // stale (pre-grant) `offersService`/`offersTherapy`/`categoryIds`, silently wiping out the
-  // branch-level auto-grant via that endpoint's replace-the-full-set semantics.
   const handleBranchesChange = (next: Branch[]) => {
     setBranches(next);
     reloadDealCount(next);
+  };
+
+  // Wired to `VendorBranchListStep`'s `onVendorRefresh`, which fires from `BranchDialog`'s
+  // `onCategoryAccessSaved` — AFTER a branch's category-access save actually completes, never
+  // bundled into `handleBranchesChange` above. That save (`BranchDialog`'s own "Categories &
+  // Subcategories" section) can auto-grant a vendor-level `VendorCategoryAccess` row + flip
+  // `offersService`/`offersTherapy` server-side (see `setBranchCategoryAccess`'s own doc comment
+  // in msd-api's vendor.service.ts), and it happens as a SEPARATE, LATER network call than the
+  // branch-fields save `handleBranchesChange` reacts to — refetching here instead of there is
+  // what closes that race: `vendor`/`categoryAccess` are otherwise only ever fetched once (the
+  // bulk-load effect above), so without a refetch timed to land after the category save actually
+  // finishes, the NEXT "Save product categories" click in `VendorProductCategoryAccess` could
+  // resubmit stale (pre-grant) `offersService`/`offersTherapy`/`categoryIds`, silently wiping out
+  // the branch-level auto-grant via that endpoint's replace-the-full-set semantics — and Step
+  // 4/5's own "module not enabled" gate could render the stale flag in the meantime too.
+  //
+  // Also reloads `branches` — `VendorBranchListStep`'s own save already preserves each branch's
+  // PREVIOUS `categoryTypes` so it's never `undefined` (see that file's own doc comment on why),
+  // but "previous" is stale the instant a category was actually added/removed, and
+  // `VendorTherapistsStep`/`VendorProductsStep` gate branch eligibility on exactly that field
+  // (`branches.filter(b => b.categoryTypes.includes('THERAPY'))`). This fires unconditionally on
+  // every Branch Access save (not just ones that touch categories — see `BranchDialog.submit()`),
+  // so `categoryTypes` is back in sync with the server within one round trip, no page reload
+  // needed for a branch's Therapy/Product eligibility to update after its access changed.
+  const refreshVendorAndCategoryAccess = () => {
     if (!vendorId) return;
     getVendor(token, vendorId)
       .then(({ data }) => {
         setVendor(data);
         onVendorChange(data);
       })
-      .catch(() => {});
-    getVendorCategoryAccess(token, vendorId).then(({ data }) => setCategoryAccess(data)).catch(() => {});
+      .catch(() => { });
+    getVendorCategoryAccess(token, vendorId).then(({ data }) => setCategoryAccess(data)).catch(() => { });
+    reloadBranches().catch(() => { });
   };
 
   if (!vendor) {
@@ -260,7 +278,25 @@ export function VendorPipeline({
     );
   }
 
+  const refreshVendorAfterKycChange = useCallback(async () => {
+    if (!vendorId) return;
+
+    try {
+      const { data } = await getVendor(token, vendorId);
+
+      setVendor(data);
+      onVendorChange(data);
+    } catch (err) {
+      console.error(
+        'Could not refresh vendor after KYC document change:',
+        err,
+      );
+    }
+  }, [token, vendorId, onVendorChange]);
+
+
   const kycDocOk = hasMinimumKycDocument(vendor);
+  console.log('the kycDocOk is', kycDocOk, 'the vendor is', vendor);
 
   return (
     <div className="admin-page">
@@ -301,6 +337,7 @@ export function VendorPipeline({
             onSave={saveSection}
             onKycReview={onKycReview}
             serverFieldErrors={fieldErrors}
+            onKycDocumentChanged={refreshVendorAfterKycChange}
           />
           {!kycDocOk && (
             <p className="error-state" role="alert">
@@ -308,15 +345,20 @@ export function VendorPipeline({
             </p>
           )}
 
-          <h3 className="section-title">Profile Image</h3>
-          <MediaUploader
-            entityType="vendor"
-            entityId={vendor.id}
-            existingImages={vendor.mediaImages ?? []}
-            existingVideo={vendor.mediaVideo ?? null}
-            token={token}
-          />
-
+          <sky-tile-card
+            className="vendor-section-card"
+            headline="Profile Image"
+            text="Upload and manage the vendor profile images."
+            color="none"
+          >
+            <MediaUploader
+              entityType="vendor"
+              entityId={vendor.id}
+              existingImages={vendor.mediaImages ?? []}
+              existingVideo={vendor.mediaVideo ?? null}
+              token={token}
+            />
+          </sky-tile-card>
           <div className="form-actions">
             <FilledButton onClick={() => setActiveStep(2)} disabled={!kycDocOk}>
               Continue
@@ -346,6 +388,7 @@ export function VendorPipeline({
             canEdit
             branches={branches}
             onBranchesChange={handleBranchesChange}
+            onVendorRefresh={refreshVendorAndCategoryAccess}
           />
         </section>
       )}

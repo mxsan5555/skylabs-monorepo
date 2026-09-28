@@ -17,15 +17,20 @@ import logo2 from '../../assets/logo2.jpg';
  * previewed sessions shouldn't surface role/user management even if a quirk
  * of permission resolution would otherwise show it).
  */
-export function Sidebar() {
+interface SidebarProps {
+  mobileOpen: boolean;
+  onClose: () => void;
+}
+
+export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const { bootstrap, isPreviewing, signOut } = useAuth();
   const navigate = useNavigate();
   const menu = bootstrap?.menu ?? [];
-   console.log('SIDEBAR MENU:', menu);
-   console.log(
-  'CUSTOMER MENU:',
-  menu.find((node) => node.id === 'customers')
-);
+  console.log('SIDEBAR MENU:', menu);
+  console.log(
+    'CUSTOMER MENU:',
+    menu.find((node) => node.id === 'customers')
+  );
   const visibleMenu = isPreviewing ? menu.filter((node) => node.id !== 'administration') : menu;
   const initial = (bootstrap?.user.name ?? '?').charAt(0).toUpperCase();
   const dualRole = bootstrap ? isDualRoleUser(bootstrap) : false;
@@ -40,7 +45,15 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="admin-sidebar">
+    <aside className={`admin-sidebar${mobileOpen ? ' is-open' : ''}`}>
+      <div className="admin-sidebar__mobile-header">
+        <IconButton
+          aria-label="Close navigation"
+          onClick={onClose}
+        >
+          <Icon aria-hidden="true">close</Icon>
+        </IconButton>
+      </div>
       <div className="admin-sidebar__brand">
         <span className="admin-sidebar__logo">
           <img
@@ -57,7 +70,7 @@ export function Sidebar() {
       </div>
 
       <nav className="admin-sidebar__nav" aria-label="Console">
-        {visibleMenu.map((node) => <MenuNodeItem key={node.id} node={node}  onLogout={doSignOut}/>)}
+        {visibleMenu.map((node) => <MenuNodeItem key={node.id} node={node} onLogout={doSignOut} />)}
         {dualRole && (
           <NavLink to="/" onClick={switchToCustomer} className="admin-nav-item">
             <Icon aria-hidden="true">storefront</Icon>
@@ -159,17 +172,17 @@ function MenuNodeItem({
 
   if (!node.route) return null;
 
-return (
-  <NavLink
-    to={node.route}
-    className={({ isActive }) =>
-      `admin-nav-item${isActive ? ' active' : ''}`
-    }
-  >
-    {node.icon && (
-      <Icon aria-hidden="true">{node.icon}</Icon>
-    )}
-    <span>{node.title}</span>
-  </NavLink>
-);
+  return (
+    <NavLink
+      to={node.route}
+      className={({ isActive }) =>
+        `admin-nav-item${isActive ? ' active' : ''}`
+      }
+    >
+      {node.icon && (
+        <Icon aria-hidden="true">{node.icon}</Icon>
+      )}
+      <span>{node.title}</span>
+    </NavLink>
+  );
 }

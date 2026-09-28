@@ -44,8 +44,8 @@ export async function resolveGrantedPermissionKeys(roleKeys: readonly string[]):
 
   let permissionKeys: string[];
   if (isSuperAdmin) {
-    // Every permission derivable from the live menu tree, EXCEPT `vendor-portal:*` — that menu
-    // key only makes sense for an actual Vendor owner (the self-service "My Business" surface,
+    // Every permission derivable from the live menu tree, EXCEPT `vendor-portal.*` — those menu
+    // keys only make sense for an actual Vendor owner (the self-service "My Business" surface,
     // scoped to the caller's own Vendor row), which a SuperAdmin never has. Without this
     // exclusion the vendor-portal Branches/Deals/Customers/Therapists sidebar nodes would appear
     // for every SuperAdmin alongside the admin-wide equivalents (same-looking titles) and 404 or
@@ -54,7 +54,7 @@ export async function resolveGrantedPermissionKeys(roleKeys: readonly string[]):
     // grantAllPermissionsToSuperAdmins — kept in sync for what the Role Permission Matrix editor
     // displays, even though THIS branch (not that table) is what actually governs a SuperAdmin's
     // live-resolved permissions/bootstrap menu.
-    permissionKeys = allPermissionKeysForMenu(getMenuForApp('msd')).filter((key) => !key.startsWith('vendor-portal:'));
+    permissionKeys = allPermissionKeysForMenu(getMenuForApp('msd')).filter((key) => !key.startsWith('vendor-portal.'));
   } else {
     const rolePermissions = await prisma.rolePermission.findMany({
       where: {

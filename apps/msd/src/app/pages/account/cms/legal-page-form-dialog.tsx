@@ -84,8 +84,10 @@ export function LegalPageFormDialog({
 
         <OutlinedTextField
           label="Title"
+          required
           value={form.title ?? ''}
           onInput={(e: Event) => setForm((f) => ({ ...f, title: (e.target as HTMLInputElement).value }))}
+          error={Boolean(fieldErrors?.title)}
         />
         {fieldErrors?.title && <p className="error-state" role="alert">{fieldErrors.title}</p>}
 
@@ -93,6 +95,7 @@ export function LegalPageFormDialog({
           label="Status"
           value={form.status ?? 'DRAFT'}
           onChange={(e: Event) => setForm((f) => ({ ...f, status: (e.target as HTMLSelectElement).value as WebsitePageStatus }))}
+          error={Boolean(fieldErrors?.status)}
         >
           {STATUS_OPTIONS.map((opt) => (
             <SelectOption key={opt.value} value={opt.value}>
@@ -111,6 +114,7 @@ export function LegalPageFormDialog({
             label="Meta title"
             value={form.metaTitle ?? ''}
             onInput={(e: Event) => setForm((f) => ({ ...f, metaTitle: (e.target as HTMLInputElement).value }))}
+            error={Boolean(fieldErrors?.metaTitle)}
           />
           {fieldErrors?.metaTitle && <p className="error-state" role="alert">{fieldErrors.metaTitle}</p>}
           <OutlinedTextField
@@ -119,6 +123,7 @@ export function LegalPageFormDialog({
             rows={2}
             value={form.metaDescription ?? ''}
             onInput={(e: Event) => setForm((f) => ({ ...f, metaDescription: (e.target as HTMLTextAreaElement).value }))}
+            error={Boolean(fieldErrors?.metaDescription)}
           />
           {fieldErrors?.metaDescription && <p className="error-state" role="alert">{fieldErrors.metaDescription}</p>}
         </fieldset>

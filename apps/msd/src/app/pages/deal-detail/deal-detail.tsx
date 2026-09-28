@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
 import { Divider, FilledButton, Icon, OutlinedIconButton } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import { addCartItem } from '../../../api/cart';
 import { getCatalogDeal, listCatalogDeals, type CatalogDeal, } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
@@ -25,6 +26,7 @@ import './deal-detail.css';
 export function DealDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, token } = useAuth();
   const { has: isWishlisted, toggle: toggleWishlist, isPending: wishlistPending, } = useWishlist();
   const { dealDetail } = content;
@@ -99,7 +101,7 @@ export function DealDetail() {
     if (isAuthenticated) {
       return true;
     }
-    navigate(`/sign-in?next=${encodeURIComponent(`/deal/${id}`)}`,);
+    navigate(signInPathWithReturnTo(location));
     return false;
   };
   const name = deal.title;
