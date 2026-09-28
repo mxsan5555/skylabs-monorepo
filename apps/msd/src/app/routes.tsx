@@ -22,6 +22,7 @@ import { UserManagement } from './pages/account/users/users';
 import { AuditLogs } from './pages/account/audit-logs/audit-logs';
 import { VendorManagement } from './pages/account/vendors/vendors';
 import { VendorNewPage } from './pages/account/vendors/vendor-new-page';
+import { VendorDetailPage } from './pages/account/vendors/vendor-detail-page';
 import { CustomerManagement } from './pages/account/customers/customers';
 import { BranchList } from './pages/account/vendors/branch-list';
 import { DealList } from './pages/account/vendors/deal-list';
@@ -288,6 +289,17 @@ export function AppRoutes() {
             element={
               <VendorsRouteGuard>
                 <VendorNewPage />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* One member's own page (summary + tabs). Admin only: VendorDetailPage checks
+            `vendors:view` itself, and every API call it makes is permission-gated server-side.
+            The static `new` route above wins over this dynamic segment. */}
+          <Route
+            path="/account/vendors/:vendorId"
+            element={
+              <VendorsRouteGuard>
+                <VendorDetailPage />
               </VendorsRouteGuard>
             }
           />

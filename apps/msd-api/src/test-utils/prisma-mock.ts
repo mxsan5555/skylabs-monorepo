@@ -115,6 +115,7 @@ export function createPrismaMock() {
       count: vi.fn(),
     },
     deal: {
+      groupBy: vi.fn(),
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
       findFirst: vi.fn(),
@@ -217,6 +218,7 @@ export function createPrismaMock() {
       delete: vi.fn(),
     },
     product: {
+      groupBy: vi.fn(),
       findUnique: vi.fn(),
       findFirst: vi.fn(),
       findUniqueOrThrow: vi.fn(),
@@ -342,6 +344,7 @@ export function createPrismaMock() {
       deleteMany: vi.fn(),
     },
     therapist: {
+      groupBy: vi.fn(),
       findUnique: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),

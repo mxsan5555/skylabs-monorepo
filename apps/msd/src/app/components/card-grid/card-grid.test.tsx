@@ -43,6 +43,15 @@ describe('CardGrid', () => {
     expect(screen.getByRole('list').className).toBe('card-grid__list card-grid__list--list');
   });
 
+  it('adds the --compact modifier for layout="compact"', () => {
+    render(
+      <CardGrid layout="compact">
+        <article key="a">A</article>
+      </CardGrid>,
+    );
+    expect(screen.getByRole('list').className).toBe('card-grid__list card-grid__list--compact');
+  });
+
   it('renders above content first and wraps the grid in a tabpanel', () => {
     render(
       <CardGrid above={<div role="tablist" />} panel={{ id: 'p', labelledBy: 'tab-all' }}>

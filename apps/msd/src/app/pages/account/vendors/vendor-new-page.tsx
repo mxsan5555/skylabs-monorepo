@@ -3,6 +3,7 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { useNavigate } from 'react-router-dom';
 import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
 import type { Vendor } from '../../../../api/rbac/vendors';
+import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
 import { VendorPipeline } from './vendor-pipeline';
 
 /**
@@ -26,9 +27,12 @@ export function VendorNewPage() {
   const canCreate = can('vendors', 'create');
   const [vendor, setVendor] = useState<Vendor | null>(null);
 
+  useSetBreadcrumbs([{ label: 'Members' }, { label: 'All Member', to: '/account/vendors' }, { label: 'Add member' }]);
+
   useEffect(() => {
     if (vendor) {
-      navigate(`/account/vendors?vendorId=${vendor.id}`, { replace: true });
+      // Land in the setup form so the member can keep filling in the profile.
+      navigate(`/account/vendors/${vendor.id}?tab=setup`, { replace: true });
     }
   }, [vendor, navigate]);
 
@@ -46,7 +50,7 @@ export function VendorNewPage() {
         </div>
         {vendor && (
           <div className="page-head__actions">
-            <FilledButton onClick={() => navigate(`/account/vendors?vendorId=${vendor.id}`)}>
+            <FilledButton onClick={() => navigate(`/account/vendors/${vendor.id}`)}>
               Done — View Vendor
             </FilledButton>
           </div>

@@ -9,6 +9,20 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 
 ## In progress
 
+### msd admin — member (vendor) console redesign (plan: one screen, one job, no popups)
+Plan file: `~/.claude/plans/our-backend-admin-layout-snug-sloth.md`. Each step ships alone.
+- [x] **1. Member page + summary** — `/account/vendors/:vendorId` (summary checklist, Actions menu with
+      inline confirm instead of `window.prompt`, locked tabs, breadcrumb via `admin/breadcrumb-context`),
+      list rows open it, list shows Branches/Deals/Therapists/Products as "live of total" (API adds
+      `liveCounts` + therapist count) — 2026-09-28. The old tab bodies are still inside it until their step.
+- [ ] 2. Profile page (replaces the "Profile & setup" tab and the six-step pill wizard)
+- [ ] 3. Branches pages (state first, rest unlocks)
+- [ ] 4. Deals pages (`DealCard` list, full-page add/edit)
+- [ ] 5. Therapists pages
+- [ ] 6. Products pages
+- [ ] 7. Remove the pill wizard + dialogs, dedupe the admin/self-service forms; add a Products tab
+- [ ] Open: confirm "live" definition (active branch/product/therapist, ACTIVE + APPROVED deal)
+
 ### Deployment (Vercel) — pipeline live, hardening pending
 - [ ] Attach the bought custom domain to each project's Production (`main`) deploy
 - [ ] Add env vars in Vercel (msd: `VITE_API_URL`, `VITE_GOOGLE_MAPS_API_KEY`)

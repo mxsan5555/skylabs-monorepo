@@ -113,7 +113,11 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
   offersService: boolean;
   offersProduct: boolean;
   offersTherapy: boolean;
-  _count?: { branches: number; deals: number; products: number;};
+  /** Every row, including drafts and inactive items. */
+  _count?: { branches: number; deals: number; products: number; therapists: number };
+  /** Active branches/products/therapists and ACTIVE + APPROVED deals. Only on `GET /vendors` and
+   *  `GET /vendors/:id`. Show it as "live of total" next to `_count`. */
+  liveCounts?: { branches: number; deals: number; products: number; therapists: number };
   /** Only present on `GET /vendors/me` — the self-service "complete your profile" checklist. */
   profileCompletion?: { percent: number; sections: { key: string; label: string; complete: boolean }[] };
   /** The existing User account this vendor is linked to — null if an admin created the
