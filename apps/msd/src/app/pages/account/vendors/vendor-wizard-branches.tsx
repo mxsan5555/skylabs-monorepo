@@ -17,6 +17,15 @@ interface VendorBranchListStepProps {
   canEdit: boolean;
   branches: Branch[];
   onBranchesChange: (branches: Branch[]) => void;
+  /**
+   * Forwarded to every `BranchDialog` instance's `onCategoryAccessSaved` — fired after a branch's
+   * category-access save (which can flip `Vendor.offersService`/`offersTherapy` server-side)
+   * actually completes, NOT bundled into `onBranchesChange` above (that fires right after the
+   * branch-FIELDS save, which happens first and is a separate, earlier network call — see
+   * `BranchDialog`'s own doc comment for why conflating the two is a real race that can refetch
+   * the vendor before the category grant has even landed).
+   */
+  onVendorRefresh?: () => void;
 }
 
 /**
@@ -35,17 +44,28 @@ export function VendorBranchListStep({
   canEdit,
   branches,
   onBranchesChange,
+  onVendorRefresh,
 }: VendorBranchListStepProps) {
   const [error, setError] = useState('');
 
+  // `updateBranch`/`createBranch`/`setBranchStatus` all return the raw Prisma row — `categoryTypes`
+  // is a computed join only `listBranches` performs (see vendor.service.ts), so it's never present
+  // on any of these three responses. Splicing that response straight into `branches` (as this used
+  // to do) silently drops `categoryTypes` to `undefined` for the affected branch — inert until
+  // something reads it, which `VendorTherapistsStep`'s `branches.filter(b =>
+  // b.categoryTypes.includes('THERAPY'))` does the moment Step 4 is opened without an intervening
+  // reload, throwing and taking down the whole wizard via the top-level ErrorBoundary. Preserving
+  // the previous value (a brand-new branch legitimately has none yet, hence `?? []`) keeps every
+  // branch object well-formed the instant this resolves — `onVendorRefresh` below is what brings
+  // it back in sync with the server's real, fresh value shortly after.
   const saveBranch = async (input: BranchInput, existing?: Branch): Promise<Branch> => {
     if (existing) {
       const { data } = await updateBranch(token, vendorId, existing.id, input);
-      onBranchesChange(branches.map((b) => (b.id === data.id ? data : b)));
+      onBranchesChange(branches.map((b) => (b.id === data.id ? { ...data, categoryTypes: b.categoryTypes } : b)));
       return data;
     }
     const { data } = await createBranch(token, vendorId, input);
-    onBranchesChange([data, ...branches]);
+    onBranchesChange([{ ...data, categoryTypes: data.categoryTypes ?? [] }, ...branches]);
     return data;
   };
 
@@ -53,7 +73,7 @@ export function VendorBranchListStep({
     setError('');
     try {
       const { data } = await setBranchStatus(token, vendorId, branch.id, !branch.isActive);
-      onBranchesChange(branches.map((b) => (b.id === data.id ? data : b)));
+      onBranchesChange(branches.map((b) => (b.id === data.id ? { ...data, categoryTypes: b.categoryTypes } : b)));
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not change branch status.');
     }
@@ -70,6 +90,7 @@ export function VendorBranchListStep({
             token={token}
             vendorId={vendorId}
             onSave={(input) => saveBranch(input).then((data) => { setError(''); return data; })}
+            onCategoryAccessSaved={onVendorRefresh}
           />
         )}
       </div>
@@ -91,6 +112,7 @@ export function VendorBranchListStep({
                 vendorId={vendorId}
                 onSaveBranch={(input) => saveBranch(input, branch)}
                 onToggleStatus={() => toggleStatus(branch)}
+                onVendorRefresh={onVendorRefresh}
               />
             ))}
           </ul>
@@ -107,6 +129,7 @@ interface BranchRowProps {
   vendorId: string;
   onSaveBranch: (input: BranchInput) => Promise<Branch>;
   onToggleStatus: () => void;
+  onVendorRefresh?: () => void;
 }
 
 /**
@@ -115,10 +138,11 @@ interface BranchRowProps {
  * callback (rules-of-hooks), and each branch needs its own `BranchDialog` instance/ref so opening
  * one branch's dialog can never affect another's.
  *
- * "Edit" and "Categories" are two triggers for the exact same `BranchDialog` instance (branch
- * fields + its own Categories & Subcategories section are now one form, not two dialogs) —
- * `BranchDialog`'s own built-in trigger button is hidden (`hideTrigger`) so both buttons here
- * drive the same `dialogRef.current?.show()`.
+ * A single "Edit" trigger opens `BranchDialog`, which now covers both the branch fields AND its
+ * own Categories & Subcategories section in one form (folded in from a separate dialog a while
+ * back) — this used to render a second "Categories" button that opened the exact same dialog
+ * instance via the same `dialogRef.current?.show()` call, a leftover duplicate from before that
+ * merge that did nothing a single button didn't already do; removed.
  */
 function BranchRow({
   branch,
@@ -127,6 +151,7 @@ function BranchRow({
   vendorId,
   onSaveBranch,
   onToggleStatus,
+  onVendorRefresh,
 }: BranchRowProps) {
   const branchDialogRef = useRef<MdDialog>(null);
 
@@ -147,10 +172,10 @@ function BranchRow({
             <Icon slot="icon" aria-hidden="true">edit</Icon>
             Edit
           </OutlinedButton>
-          <OutlinedButton onClick={() => branchDialogRef.current?.show()}>
+          {/* <OutlinedButton onClick={() => branchDialogRef.current?.show()}>
             <Icon slot="icon" aria-hidden="true">category</Icon>
             Categories
-          </OutlinedButton>
+          </OutlinedButton> */}
           <OutlinedButton onClick={onToggleStatus}>{branch.isActive ? 'Deactivate' : 'Activate'}</OutlinedButton>
         </div>
       )}
@@ -160,6 +185,7 @@ function BranchRow({
           token={token}
           vendorId={vendorId}
           onSave={onSaveBranch}
+          onCategoryAccessSaved={onVendorRefresh}
           dialogRef={branchDialogRef}
           hideTrigger
         />

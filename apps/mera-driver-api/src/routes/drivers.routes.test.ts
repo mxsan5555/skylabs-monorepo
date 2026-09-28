@@ -203,7 +203,7 @@ describe('POST /drivers/:id/create-user', () => {
 
     expect(res.status).toBe(201);
     expect(mockPrisma.user.create).toHaveBeenCalledWith({
-      data: { name: 'Ravi Kumar', email: undefined, phone: '9000000000' },
+      data: { name: 'Ravi Kumar', email: undefined, phone: '+919000000000' },
     });
     expect(mockPrisma.userRole.create).toHaveBeenCalledWith({ data: { userId: USER_2_ID, roleId: 'role-driver' } });
     expect(mockPrisma.driver.update).toHaveBeenCalledWith({ where: { id: 'driver-1' }, data: { userId: USER_2_ID } });

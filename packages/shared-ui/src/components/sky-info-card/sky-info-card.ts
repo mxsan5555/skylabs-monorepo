@@ -1,7 +1,7 @@
 import { LitElement, html, css, nothing } from 'lit';
 // Register md-icon for the optional icon fallback.
 import '@material/web/icon/icon.js';
-import { hostBase } from '../shared-styles.js';
+import { alignment, hostBase, typescale } from '../shared-styles.js';
 
 /**
  * <sky-info-card> — surface card with an illustration/icon, heading and subheading.
@@ -36,51 +36,28 @@ export class SkyInfoCard extends LitElement {
 
   static override styles = css`
     ${hostBase}
+    ${alignment}
+    ${typescale}
     .card {
       display: flex;
       flex-direction: column;
+      align-items: var(--_align);
       gap: 10px;
+      block-size: 100%;
       padding: 20px;
-      border-radius: 16px;
+      border-radius: var(--md-sys-shape-corner-large);
       background-color: var(--md-sys-color-surface-container);
-    }
-    .media {
-      display: inline-flex;
-      align-items: center;
-      justify-content: flex-start;
     }
     .media md-icon {
       --md-icon-size: 44px;
       color: var(--md-sys-color-primary);
     }
     ::slotted([slot='media']) {
-      max-height: 72px;
-      width: auto;
-    }
-    .heading {
-      margin: 0;
-      font-size: 1.05rem;
-      font-weight: 700;
-      line-height: 1.3;
+      max-block-size: 72px;
+      inline-size: auto;
     }
     .subheading {
-      margin: 0;
-      font-size: 0.875rem;
       color: var(--md-sys-color-on-surface-variant);
-    }
-    :host([align='center']) .card {
-      align-items: center;
-      text-align: center;
-    }
-    :host([align='center']) .media {
-      justify-content: center;
-    }
-    :host([align='right']) .card {
-      align-items: flex-end;
-      text-align: right;
-    }
-    :host([align='right']) .media {
-      justify-content: flex-end;
     }
   `;
 
@@ -95,10 +72,10 @@ export class SkyInfoCard extends LitElement {
           </slot>
         </span>
         ${this.heading
-          ? html`<h3 class="heading">${this.heading}</h3>`
+          ? html`<h3 class="heading title-medium">${this.heading}</h3>`
           : nothing}
         ${this.subheading
-          ? html`<p class="subheading">${this.subheading}</p>`
+          ? html`<p class="subheading body-medium">${this.subheading}</p>`
           : nothing}
         <slot></slot>
       </article>

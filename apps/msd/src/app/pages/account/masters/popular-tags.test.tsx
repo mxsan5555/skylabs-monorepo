@@ -135,15 +135,16 @@ describe('PopularTagManagement — list, create, status toggle', () => {
 
   it('blocks delete when the tag still has mappings (server-enforced, surfaced as an error)', async () => {
     deletePopularTagMock.mockRejectedValue(new Error('Popular tag still has mappings; unmap it from every item first'));
-    vi.stubGlobal('confirm', () => true);
     render(<PopularTagManagement />);
     await waitForTableLoaded(1);
 
     const table = document.querySelector('sky-data-table')!;
     fireEvent(table, new CustomEvent('sky-dt-row-action', { detail: { action: 'delete', row: {}, rowIndex: 0 } }));
 
+    await screen.findByText('Delete "Trending"? This cannot be undone.');
+    fireEvent.click(screen.getByText('Confirm'));
+
     await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
-    vi.unstubAllGlobals();
   });
 });
 

@@ -1,5 +1,5 @@
 import { LitElement, html, css, nothing } from 'lit';
-import { hostBase, stretchLink } from '../shared-styles.js';
+import { alignment, coverImage, hostBase, pill, stretchLink, typescale } from '../shared-styles.js';
 
 /**
  * <sky-category-card> — rounded image, then heading + subheading below.
@@ -44,6 +44,11 @@ export class SkyCategoryCard extends LitElement {
 
   static override styles = css`
     ${hostBase}
+    ${alignment}
+    ${typescale}
+    ${coverImage}
+    ${pill}
+    ${stretchLink}
     .card {
       position: relative;
       margin: 0;
@@ -52,32 +57,11 @@ export class SkyCategoryCard extends LitElement {
       gap: 8px;
     }
     .media {
-      position: relative;
       aspect-ratio: 1 / 1;
-      overflow: hidden;
-      border-radius: 16px;
-      background-color: var(--md-sys-color-surface-variant);
-    }
-    .tag {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 2;
-      display: inline-flex;
-      align-items: center;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background-color: var(--md-sys-color-primary);
-      color: var(--md-sys-color-on-primary);
-      font-size: 0.75rem;
-      font-weight: 600;
+      border-radius: var(--md-sys-shape-corner-large);
     }
     .media img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-      transition: transform 200ms ease;
+      transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
     }
     .card:hover .media img {
       transform: scale(1.04);
@@ -87,23 +71,9 @@ export class SkyCategoryCard extends LitElement {
       flex-direction: column;
       gap: 2px;
     }
-    .heading {
-      margin: 0;
-      font-size: 1rem;
-      font-weight: 700;
-    }
     .subheading {
-      margin: 0;
-      font-size: 0.875rem;
       color: var(--md-sys-color-on-surface-variant);
     }
-    :host([align='center']) figcaption {
-      text-align: center;
-    }
-    :host([align='right']) figcaption {
-      text-align: right;
-    }
-    ${stretchLink}
   `;
 
   protected override render() {
@@ -111,17 +81,17 @@ export class SkyCategoryCard extends LitElement {
       <figure class="card">
         <div class="media">
           ${this.image
-            ? html`<img src=${this.image} alt=${this.imageAlt ?? ''} />`
+            ? html`<img src=${this.image} alt=${this.imageAlt ?? ''} loading="lazy" decoding="async" />`
             : nothing}
-          ${this.tag ? html`<span class="tag">${this.tag}</span>` : nothing}
+          ${this.tag ? html`<span class="tag pill">${this.tag}</span>` : nothing}
         </div>
         ${this.heading || this.subheading
           ? html`<figcaption>
               ${this.heading
-                ? html`<h3 class="heading">${this.heading}</h3>`
+                ? html`<h3 class="heading title-medium">${this.heading}</h3>`
                 : nothing}
               ${this.subheading
-                ? html`<p class="subheading">${this.subheading}</p>`
+                ? html`<p class="subheading body-medium">${this.subheading}</p>`
                 : nothing}
             </figcaption>`
           : nothing}

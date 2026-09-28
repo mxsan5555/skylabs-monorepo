@@ -68,11 +68,25 @@ beforeEach(() => {
  * - offersProduct=true with granted categories -> Category select scoped to only those
  */
 describe('VendorProductsStep — module gating', () => {
-  it('shows a "module not enabled" message and no product CRUD when offersProduct is false', async () => {
-    renderStep({ offersProduct: false });
+  it('shows a "module not enabled" message and no product CRUD when offersProduct is false and no Product category is granted', async () => {
+    renderStep({ offersProduct: false, categories: [] });
     expect(screen.getByText('This vendor has not enabled the Product business module in Step 2.')).toBeTruthy();
     expect(screen.queryAllByText('Add product').length).toBe(0);
     await waitFor(() => expect(listVendorProductsMock).toHaveBeenCalled());
+  });
+
+  /**
+   * Regression test for the real Issue #1 bug (mirrors the identical fix/test in
+   * `vendor-wizard-therapists.test.tsx`): `vendor.offersProduct` is a denormalized convenience
+   * flag that can drift out of sync with the vendor's real `VendorCategoryAccess` grants. A
+   * vendor that already holds a real granted Product category must never be blocked by a stale
+   * `false` flag.
+   */
+  it('renders product CRUD (never the blocked message) when offersProduct is false but a Product category is already granted', async () => {
+    renderStep({ offersProduct: false }); // default categories={PRODUCT_CATEGORIES} is non-empty
+    await waitFor(() => expect(listVendorProductsMock).toHaveBeenCalled());
+    expect(screen.queryByText('This vendor has not enabled the Product business module in Step 2.')).toBeNull();
+    expect(screen.getAllByText('Add product').length).toBeGreaterThan(0);
   });
 
   it('renders product CRUD when offersProduct is true and categories are granted', async () => {
@@ -207,8 +221,12 @@ describe('ProductFormDialog — Type-tier select (3-level categories)', () => {
     clickEditButton();
 
     await waitFor(() => {
-      const dialogs = Array.from(document.querySelectorAll('md-dialog'));
-      const editDialog = dialogs[dialogs.length - 1]; // Edit renders after Add in document order
+      // Scoped to the dialog with the "Edit product" headline — robust against however many
+      // other always-mounted dialogs exist on the page (Add dialog, and the page's themed
+      // delete-confirm dialog from `confirm-dialog.tsx`, neither of which holds a select).
+      const editDialog = Array.from(document.querySelectorAll('md-dialog')).find(
+        (d) => d.textContent?.includes('Edit product'),
+      )!;
       const selects = editDialog.querySelectorAll('md-outlined-select');
       expect(selects.length).toBe(3); // Category, Subcategory, Type
       expect(optionLabelsOf(selects[1])).toEqual(['None', 'Essential Oils']);
@@ -227,10 +245,11 @@ describe('ProductFormDialog — Type-tier select (3-level categories)', () => {
     clickEditButton();
 
     await waitFor(() => {
-      // Only the Edit dialog's own selects matter here; scope by dialog to avoid counting the
-      // still-mounted Add dialog's own Category+Subcategory selects.
-      const dialogs = Array.from(document.querySelectorAll('md-dialog'));
-      const editDialog = dialogs[dialogs.length - 1];
+      // Only the Edit dialog's own selects matter here; scope by its "Edit product" headline to
+      // avoid counting the still-mounted Add dialog's selects or the page's confirm dialog.
+      const editDialog = Array.from(document.querySelectorAll('md-dialog')).find(
+        (d) => d.textContent?.includes('Edit product'),
+      )!;
       expect(editDialog.querySelectorAll('md-outlined-select').length).toBe(2); // Category, Subcategory — no Type
       expect(within(editDialog).queryByText('Type (optional)')).toBeNull();
     });

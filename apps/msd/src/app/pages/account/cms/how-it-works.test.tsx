@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ToastProvider } from '../../../../toast/toast-context';
 import { ApiRequestError } from '../../../../api/rbac/client';
@@ -220,25 +220,30 @@ describe('HowItWorksPage', () => {
     await waitFor(() => expect(screen.getAllByText('Could not reorder steps.').length).toBeGreaterThan(0));
   });
 
-  it('delete confirms via window.confirm, then calls deleteHowItWorksStep only when confirmed', async () => {
+  it('delete confirms via the themed dialog, then calls deleteHowItWorksStep only when confirmed', async () => {
     deleteHowItWorksStepMock.mockResolvedValue({ data: null });
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderPage();
     await screen.findByText('Choose a Deal');
 
     fireEvent.click(screen.getByLabelText('Delete Choose a Deal'));
 
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining(STEP_1.title));
+    const message = await screen.findByText(`Delete "${STEP_1.title}"? This cannot be undone.`);
+    const confirmDialog = message.closest('md-dialog')!;
+    fireEvent.click(within(confirmDialog).getByText('Confirm'));
+
     await waitFor(() => expect(deleteHowItWorksStepMock).toHaveBeenCalledWith('test-token', STEP_1.id));
     expect(await screen.findByText('Step deleted.')).toBeTruthy();
   });
 
-  it('delete does NOT call deleteHowItWorksStep when window.confirm is cancelled', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('delete does NOT call deleteHowItWorksStep when the confirm dialog is cancelled', async () => {
     renderPage();
     await screen.findByText('Choose a Deal');
 
     fireEvent.click(screen.getByLabelText('Delete Choose a Deal'));
+
+    const message = await screen.findByText(`Delete "${STEP_1.title}"? This cannot be undone.`);
+    const confirmDialog = message.closest('md-dialog')!;
+    fireEvent.click(within(confirmDialog).getByText('Cancel'));
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(deleteHowItWorksStepMock).not.toHaveBeenCalled();

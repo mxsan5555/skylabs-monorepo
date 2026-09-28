@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { LoginHistoryEntry } from '@skylabs-monorepo/shared-types';
 
 interface Props {
@@ -6,33 +7,39 @@ interface Props {
   error: string;
 }
 
+const COLUMNS = JSON.stringify([
+  { key: 'When', label: 'When' },
+  { key: 'Method', label: 'Method' },
+  { key: 'Result', label: 'Result', type: 'status', statusMap: { Success: 'success', Failed: 'error' } },
+  { key: 'IP', label: 'IP' },
+]);
+
+/** Read-only, no toolbar (no search/filter/export) — same minimal `<sky-data-table>` config as
+ *  the Showcase's own "Data Table — Minimal" demo (`/showcase#data-table-minimal-sort-only`). */
 export function LoginHistoryPanel({ entries, loading, error }: Props) {
-  if (loading) return <p className="loading-state">Loading login history…</p>;
+  const rows = useMemo(
+    () =>
+      JSON.stringify(
+        entries.map((entry) => ({
+          When: new Date(entry.createdAt).toLocaleString(),
+          Method: entry.method,
+          Result: entry.success ? 'Success' : 'Failed',
+          IP: entry.ip ?? '—',
+        })),
+      ),
+    [entries],
+  );
+
   if (error) return <p className="error-state">{error}</p>;
-  if (entries.length === 0) return <p className="empty-state">No login attempts recorded yet.</p>;
 
   return (
-    <div className="data-table-wrap">
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th scope="col">When</th>
-            <th scope="col">Method</th>
-            <th scope="col">Result</th>
-            <th scope="col">IP</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map((entry) => (
-            <tr key={entry.id}>
-              <td>{new Date(entry.createdAt).toLocaleString()}</td>
-              <td>{entry.method}</td>
-              <td>{entry.success ? 'Success' : 'Failed'}</td>
-              <td>{entry.ip ?? '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <sky-data-table
+      caption="Login history"
+      columns={COLUMNS}
+      rows={rows}
+      total={entries.length}
+      page-size={10}
+      loading={loading}
+    />
   );
 }

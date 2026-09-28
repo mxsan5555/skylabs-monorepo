@@ -1,0 +1,29 @@
+.checkbox-facet {
+  display: grid;
+  gap: 8px;
+}
+.checkbox-facet__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.checkbox-facet__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-block-size: 40px;
+  cursor: pointer;
+}
+.checkbox-facet__row:has(md-checkbox[disabled]) {
+  cursor: default;
+}
+.checkbox-facet__label {
+  flex: 1;
+  min-inline-size: 0;
+}
+.checkbox-facet__count {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.checkbox-facet__row:has(md-checkbox[disabled]) .checkbox-facet__label {
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
+}

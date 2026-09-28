@@ -1,0 +1,23 @@
+/* Listing toolbar. A search field in the end group takes the free space. */
+.listing-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+}
+.listing-toolbar__start,
+.listing-toolbar__end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-inline-size: 0;
+}
+.listing-toolbar__end {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+.listing-toolbar__end > sky-action-field {
+  flex: 1 1 272px;
+  min-inline-size: 0;
+}

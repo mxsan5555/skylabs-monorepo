@@ -1,6 +1,6 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
-import { hostBase, focusRing } from '../shared-styles.js';
+import { focusRing, hostBase, srOnly, typescale } from '../shared-styles.js';
 // Material Web — side-effect imports to register each custom element
 import '@material/web/icon/icon.js';
 import '@material/web/iconbutton/icon-button.js';
@@ -310,14 +310,14 @@ export class SkyDataTable extends LitElement {
   }
 
   private _onColToggle(key: string, e: Event) {
-    const checked = (e.target as any).checked;
+    const checked = (e.target as HTMLInputElement).checked;
     const next = new Set(this._hiddenCols);
     if (checked) {
       next.delete(key);
     } else {
       if (next.size >= this._allCols.length - 1 && !this._hiddenCols.has(key)) {
         alert("At least one column must remain visible!");
-        (e.target as any).checked = true;
+        (e.target as HTMLInputElement).checked = true;
         return;
       }
       next.add(key);
@@ -417,15 +417,15 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
     if (col.status || col.type === 'status') {
       const str = String(value ?? '');
       const statusVariant = col.statusMap?.[str] ?? (['success', 'warning', 'error', 'info'].includes(str) ? str : 'info');
-      const badgeVariant  = this._statusVariant[statusVariant as any] ?? 'primary';
+      const badgeVariant  = this._statusVariant[statusVariant] ?? 'primary';
       return html`<sky-badge variant=${badgeVariant} size="small">${str}</sky-badge>`;
     }
     if (col.type === 'image') {
       const src = String(value ?? '');
       if (src && src.startsWith('http')) {
-        return html`<img src="${src}" alt="${col.label}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--md-sys-color-outline-variant,#cbd5e1); display: inline-block; vertical-align: middle;" />`;
+        return html`<img class="cell-avatar" src=${src} alt=${col.label} loading="lazy" decoding="async" />`;
       }
-      return html`<md-icon style="font-size: 28px; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; color: var(--md-sys-color-outline,#94a3b8); vertical-align: middle;">account_circle</md-icon>`;
+      return html`<md-icon class="cell-avatar cell-avatar--empty" aria-hidden="true">account_circle</md-icon>`;
     }
     return html`${value ?? ''}`;
   }
@@ -476,71 +476,58 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
 
   static override styles = css`
     ${hostBase}
+    ${srOnly}
+    ${typescale}
 
-    /* ── Z-index custom property — consumers can override when stacking contexts conflict */
+    /* Consumers can override the overlay z-index when stacking contexts conflict. */
     :host {
-      display: block;
-      width: 100%;
       --_overlay-z: 200;
+      --_row-hover: color-mix(
+        in srgb,
+        var(--md-sys-color-primary) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+        transparent
+      );
+      --_zebra: color-mix(in srgb, var(--md-sys-color-surface-variant) 20%, transparent);
     }
 
-    /* ── Visually hidden (screen-reader only) ───────────────────────────── */
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
-    }
-
-    /* ── Container — mobile-first: full-bleed, radius added at ≥600px ───── */
+    /* ── Container: full-bleed on mobile, rounded from 600px ─────────────── */
     .wrap {
-      border-radius: 0;
       border: 1px solid var(--md-sys-color-outline-variant);
-      background: var(--md-sys-color-surface);
+      background-color: var(--md-sys-color-surface);
       overflow: hidden;
     }
 
-    /* ── Toolbar — mobile-first ─────────────────────────────────────────── */
+    /* ── Toolbar ─────────────────────────────────────────────────────────── */
     .toolbar {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 8px;
       padding: 8px 12px;
-      border-bottom: 1px solid var(--md-sys-color-outline-variant);
-      flex-wrap: wrap;
+      border-block-end: 1px solid var(--md-sys-color-outline-variant);
     }
-    .toolbar__spacer { flex: 1; min-width: 8px; }
-
-    /* md-outlined-text-field — compact size for toolbar; mobile: full width */
+    .toolbar__spacer {
+      flex: 1;
+      min-inline-size: 8px;
+    }
+    /* Compact M3 outlined fields for the toolbar. */
+    .search-field,
+    .filter-select,
+    .rpp-select {
+      --md-outlined-field-container-height: 40px;
+      --md-outlined-field-top-space: 8px;
+      --md-outlined-field-bottom-space: 8px;
+    }
     .search-field {
-      min-width: 0;
-      width: 100%;
-      max-width: 100%;
-      --md-outlined-field-container-height: 40px;
-      --md-outlined-field-top-space: 8px;
-      --md-outlined-field-bottom-space: 8px;
+      inline-size: 100%;
+      min-inline-size: 0;
     }
-
-    /* md-outlined-select — compact size for toolbar */
     .filter-select {
-      min-width: 150px;
-      --md-outlined-field-container-height: 40px;
-      --md-outlined-field-top-space: 8px;
-      --md-outlined-field-bottom-space: 8px;
+      min-inline-size: 150px;
     }
     .rpp-select {
-      min-width: 90px;
-      --md-outlined-field-container-height: 36px;
-      --md-outlined-field-top-space: 6px;
-      --md-outlined-field-bottom-space: 6px;
+      min-inline-size: 90px;
     }
-
-    /* md-icon-button — danger variant via token override */
     .act--danger {
       --md-icon-button-icon-color: var(--md-sys-color-error);
       --md-icon-button-hover-icon-color: var(--md-sys-color-error);
@@ -548,86 +535,255 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
       --md-icon-button-pressed-state-layer-color: var(--md-sys-color-error);
     }
 
+    /* ── Column selector ─────────────────────────────────────────────────── */
+    .col-selector-wrap {
+      position: relative;
+    }
+    .col-selector-menu {
+      position: absolute;
+      inset-block-start: 100%;
+      inset-inline-end: 0;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-inline-size: 180px;
+      padding: 12px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: var(--md-sys-shape-corner-medium);
+      background-color: var(--md-sys-color-surface-container-high);
+      box-shadow: var(--sky-elevation-2);
+      text-align: start;
+    }
+    .col-selector-menu__title {
+      margin-block-end: 4px;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+    .col-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--md-sys-color-on-surface);
+      cursor: pointer;
+      user-select: none;
+    }
+
     /* ── Progress bar ────────────────────────────────────────────────────── */
     .progress-rail {
-      height: 3px;
-      background: var(--md-sys-color-surface-container-low);
+      block-size: 3px;
+      background-color: var(--md-sys-color-surface-container-low);
     }
-    md-linear-progress { width: 100%; --md-linear-progress-track-height: 3px; }
+    md-linear-progress {
+      inline-size: 100%;
+      --md-linear-progress-track-height: 3px;
+    }
 
-    /* ── Table ───────────────────────────────────────────────────────────── */
-    .scroll { overflow-x: auto; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.875rem;
-    }
+    /* ── Table: stacked cards on mobile ──────────────────────────────────── */
     caption {
-      text-align: left;
-      font-weight: 600;
-      font-size: 1rem;
       padding: 14px 16px 2px;
-      color: var(--md-sys-color-on-surface);
+      text-align: start;
       caption-side: top;
+      color: var(--md-sys-color-on-surface);
     }
-    thead { background: var(--md-sys-color-surface-variant); }
-    th {
-      padding: 0 16px;
-      height: 52px;
-      text-align: left;
+    table,
+    tbody {
+      display: block;
+      inline-size: 100%;
+      border-collapse: collapse;
+    }
+    thead {
+      display: none;
+    }
+    tbody tr {
+      display: block;
+      margin: 12px;
+      padding: 12px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: var(--md-sys-shape-corner-medium);
+      background-color: var(--md-sys-color-surface-container-low);
+      transition: background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+    }
+    tbody tr:hover {
+      background-color: color-mix(
+        in srgb,
+        var(--md-sys-color-primary) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+        var(--md-sys-color-surface-container-low)
+      );
+    }
+    td {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-block-end: 1px solid var(--md-sys-color-outline-variant);
+      color: var(--md-sys-color-on-surface);
+    }
+    td::before {
+      content: attr(data-label);
+      flex-shrink: 0;
+      margin-inline-end: 12px;
+      font-size: var(--md-sys-typescale-label-medium-size);
       font-weight: 600;
-      font-size: 0.8125rem;
       color: var(--md-sys-color-on-surface-variant);
+    }
+    td.col-cb {
+      border: none;
+      padding: 0;
+    }
+    /* Align the checkbox square with the labels below (offsets its 15px touch padding). */
+    td.col-cb md-checkbox {
+      margin-inline-start: -15px;
+    }
+    tbody tr.row--selected {
+      background-color: var(--md-sys-color-secondary-container);
+      border-color: var(--md-sys-color-secondary);
+    }
+    tr.skel-row {
+      background-color: transparent;
+    }
+
+    th {
+      block-size: 52px;
+      padding: 0 16px;
+      text-align: start;
       white-space: nowrap;
       user-select: none;
-      border-bottom: 1px solid var(--md-sys-color-outline-variant);
+      color: var(--md-sys-color-on-surface-variant);
+      border-block-end: 1px solid var(--md-sys-color-outline-variant);
     }
-    th.col-sort { cursor: pointer; }
-    th.col-sort:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 5%, transparent); }
-    th.col-sort:focus-visible { ${focusRing}; outline-offset: -3px; }
-    .th-inner { display: flex; align-items: center; gap: 4px; }
-    .sort-icon { font-size: 16px; }
-    .sort-icon--idle { opacity: 0.35; }
-    .sort-icon--on { color: var(--md-sys-color-primary); }
-
-    td {
-      padding: 0 16px;
-      height: 52px;
+    th.col-sort {
+      cursor: pointer;
+    }
+    th.col-sort:hover {
+      background-color: color-mix(
+        in srgb,
+        var(--md-sys-color-on-surface) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+        transparent
+      );
+    }
+    th.col-sort:focus-visible {
+      ${focusRing}
+      outline-offset: -3px;
+    }
+    .th-inner {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .sort-icon {
+      --md-icon-size: 16px;
+    }
+    .sort-icon--idle {
+      color: var(--md-sys-color-outline);
+    }
+    .sort-icon--on {
+      color: var(--md-sys-color-primary);
+    }
+    .cell-avatar {
+      inline-size: 32px;
+      block-size: 32px;
       vertical-align: middle;
-      border-bottom: 1px solid var(--md-sys-color-outline-variant);
-      color: var(--md-sys-color-on-surface);
+      border-radius: var(--md-sys-shape-corner-full);
     }
-    tbody tr:last-child td { border-bottom: none; }
-    tbody tr { transition: background 100ms; }
-    tbody tr:hover { background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent); }
-    tbody tr.row--selected { background: var(--md-sys-color-secondary-container); }
+    img.cell-avatar {
+      object-fit: cover;
+      border: 1px solid var(--md-sys-color-outline-variant);
+    }
+    .cell-avatar--empty {
+      --md-icon-size: 32px;
+      color: var(--md-sys-color-outline);
+    }
+    .col-cb {
+      inline-size: 52px;
+      text-align: center;
+    }
+    .col-act {
+      white-space: nowrap;
+      text-align: end;
+    }
 
-    /* ── Zebra striping — M3 tokens only, works in light + dark ─────────── */
-    tbody tr:nth-child(odd) {
-      background: color-mix(in srgb, var(--md-sys-color-surface-variant) 20%, transparent);
+    /* ── Tablet and up: real table ───────────────────────────────────────── */
+    @media (min-width: 600px) {
+      .wrap {
+        border-radius: var(--md-sys-shape-corner-medium);
+      }
+      .toolbar {
+        padding: 12px 16px;
+      }
+      .search-field {
+        inline-size: auto;
+        min-inline-size: 200px;
+        max-inline-size: 320px;
+      }
+      .scroll {
+        overflow-x: auto;
+      }
+      table {
+        display: table;
+      }
+      thead {
+        display: table-header-group;
+        background-color: var(--md-sys-color-surface-variant);
+      }
+      tbody {
+        display: table-row-group;
+      }
+      tbody tr {
+        display: table-row;
+        margin: 0;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        background-color: transparent;
+      }
+      tbody tr:nth-child(odd) {
+        background-color: var(--_zebra);
+      }
+      tbody tr:hover {
+        background-color: var(--_row-hover);
+      }
+      tbody tr.row--selected {
+        background-color: var(--md-sys-color-secondary-container);
+      }
+      tr.skel-row {
+        background-color: transparent;
+      }
+      td {
+        display: table-cell;
+        block-size: 52px;
+        padding: 0 16px;
+        vertical-align: middle;
+      }
+      tbody tr:last-child td {
+        border-block-end: none;
+      }
+      td::before {
+        display: none;
+      }
+      td.col-cb {
+        padding: 0 8px;
+        border-block-end: 1px solid var(--md-sys-color-outline-variant);
+      }
+      td.col-cb md-checkbox {
+        margin-inline-start: 0;
+      }
+      .col-act {
+        padding-inline-end: 8px;
+      }
     }
-    tbody tr:nth-child(odd):hover {
-      background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
-    }
-    tbody tr.row--selected,
-    tbody tr.row--selected:nth-child(odd) {
-      background: var(--md-sys-color-secondary-container);
-    }
-    /* Skeleton rows stay neutral — override zebra */
-    tr.skel-row,
-    tr.skel-row:nth-child(odd) { background: transparent; }
 
-    .col-cb  { width: 52px; text-align: center; padding: 0 8px; }
-    .col-act { white-space: nowrap; text-align: right; padding-right: 8px; }
-
-    /* ── Skeleton shimmer ────────────────────────────────────────────────── */
+    /* ── Skeleton shimmer (duration token is 0 under reduced motion) ─────── */
     @keyframes shimmer {
-      0%   { background-position: -600px 0; }
-      100% { background-position: 600px 0; }
+      from {
+        background-position: -600px 0;
+      }
+      to {
+        background-position: 600px 0;
+      }
     }
     .skel {
-      height: 14px;
-      border-radius: 4px;
+      block-size: 14px;
+      border-radius: var(--md-sys-shape-corner-extra-small);
       background: linear-gradient(
         90deg,
         var(--md-sys-color-surface-container) 25%,
@@ -635,246 +791,165 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
         var(--md-sys-color-surface-container) 75%
       );
       background-size: 1200px 14px;
-      animation: shimmer 1.5s ease-in-out infinite;
+      animation: shimmer var(--md-sys-motion-duration-extra-long2) ease-in-out infinite;
     }
-    .skel--xs { width: 20px; margin: 0 auto; height: 20px; border-radius: 3px; }
-    .skel--sm { width: 80px; margin-left: auto; }
+    .skel--xs {
+      inline-size: 20px;
+      block-size: 20px;
+      margin-inline: auto;
+    }
+    .skel--sm {
+      inline-size: 80px;
+      margin-inline-start: auto;
+    }
 
     /* ── Empty state ─────────────────────────────────────────────────────── */
     .empty {
-      text-align: center;
       padding: 56px 16px;
+      text-align: center;
       color: var(--md-sys-color-on-surface-variant);
     }
-    .empty md-icon { font-size: 48px; display: block; margin-bottom: 12px; opacity: 0.5; }
-    .empty p { font-size: 0.9375rem; margin: 0; }
+    .empty md-icon {
+      --md-icon-size: 48px;
+      display: block;
+      margin: 0 auto 12px;
+      color: var(--md-sys-color-outline);
+    }
 
-    /* ── Footer / pagination — mobile-first: stack vertically ───────────── */
+    /* ── Footer / pagination: stacked on mobile, one row from 600px ─────── */
     .footer {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
+      flex-wrap: wrap;
       gap: 12px;
       padding: 12px;
-      border-top: 1px solid var(--md-sys-color-outline-variant);
-      font-size: 0.8125rem;
+      border-block-start: 1px solid var(--md-sys-color-outline-variant);
       color: var(--md-sys-color-on-surface-variant);
-      flex-wrap: wrap;
     }
-    .footer__range { flex: 1; min-width: 100px; }
+    .footer__range {
+      flex: 1;
+      min-inline-size: 100px;
+    }
     .footer__rpp {
       display: flex;
       align-items: center;
       gap: 6px;
+      inline-size: 100%;
       white-space: nowrap;
-      width: 100%;
     }
-
-    /* Pagination page number buttons — M3 token-only styling, no custom shadows */
     .pagination {
       display: flex;
       align-items: center;
-      gap: 2px;
-      width: 100%;
       justify-content: center;
+      gap: 2px;
+      inline-size: 100%;
     }
     .pg-btn {
-      min-width: 32px;
-      height: 32px;
+      min-inline-size: 32px;
+      block-size: 32px;
       padding: 0 6px;
-      border-radius: 6px;
       border: none;
-      background: transparent;
-      font: inherit;
-      font-size: 0.8125rem;
-      cursor: pointer;
+      border-radius: var(--md-sys-shape-corner-small);
+      background-color: transparent;
       color: var(--md-sys-color-on-surface);
-      transition: background 150ms;
+      font: inherit;
+      cursor: pointer;
+      transition: background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
     }
-    .pg-btn:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent); }
-    .pg-btn:focus-visible { ${focusRing} }
-    .pg-btn--active {
-      background: var(--md-sys-color-primary);
+    .pg-btn:hover {
+      background-color: color-mix(
+        in srgb,
+        var(--md-sys-color-on-surface) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+        transparent
+      );
+    }
+    .pg-btn:focus-visible {
+      ${focusRing}
+    }
+    .pg-btn--active,
+    .pg-btn--active:hover {
+      background-color: var(--md-sys-color-primary);
       color: var(--md-sys-color-on-primary);
       font-weight: 600;
     }
-    .pg-btn--active:hover { background: var(--md-sys-color-primary); }
-    .ellipsis { padding: 0 4px; color: var(--md-sys-color-on-surface-variant); }
-
-    /* ── Mobile card layout (base / below 600px) ────────────────────────── */
-    .scroll { overflow-x: unset; }
-    table { display: block; overflow-x: unset; }
-    thead { display: none; }
-    tbody { display: block; }
-
-    tbody tr {
-      display: block;
-      margin: 12px;
-      border-radius: 12px;
-      border: 1px solid var(--md-sys-color-outline-variant);
-      padding: 12px;
-      overflow: hidden;
-      background: var(--md-sys-color-surface-container-low);
+    .ellipsis {
+      padding: 0 4px;
     }
-    /* Reset zebra on mobile — card style takes over */
-    tbody tr:nth-child(odd) { background: var(--md-sys-color-surface-container-low); }
-    tbody tr:hover { background: color-mix(in srgb, var(--md-sys-color-primary) 8%, var(--md-sys-color-surface-container-low)); }
-    /* Selected card */
-    tbody tr.row--selected,
-    tbody tr.row--selected:nth-child(odd) {
-      background: var(--md-sys-color-secondary-container);
-      border-color: var(--md-sys-color-secondary);
-    }
-    /* Skeleton rows on mobile */
-    tr.skel-row,
-    tr.skel-row:nth-child(odd) {
-      background: transparent;
-      border-color: var(--md-sys-color-outline-variant);
-    }
-
-    td {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 6px 0;
-      height: auto;
-      border-bottom: 1px solid var(--md-sys-color-outline-variant);
-      border-right: none;
-    }
-    
-    td::before {
-      content: attr(data-label);
-      font-weight: 600;
-      color: var(--md-sys-color-on-surface-variant);
-      font-size: 0.75rem;
-      flex-shrink: 0;
-      margin-right: 12px;
-    }
-
-    td.col-cb { border: none; padding: 0; }
-    /* Pull the checkbox left by its built-in 15px touch-target padding so the
-       visible square aligns with the text labels in the rows below */
-    td.col-cb md-checkbox { margin-left: -15px; }
-
-    /* ── Tablet and up (≥600px) ─────────────────────────────────────────── */
     @media (min-width: 600px) {
-      .wrap { border-radius: 12px; }
-      .toolbar { padding: 12px 16px; }
       .footer {
         flex-direction: row;
         align-items: center;
         gap: 8px;
         padding: 8px 16px;
       }
-      .footer__rpp { width: auto; }
-      .pagination { width: auto; justify-content: flex-start; }
-      .search-field { min-width: 200px; max-width: 320px; width: auto; }
-
-      /* Restore full table layout */
-      .scroll { overflow-x: auto; }
-      table { display: table; width: 100%; overflow-x: unset; }
-      thead { display: table-header-group; }
-      tbody { display: table-row-group; }
-
-      tbody tr {
-        display: table-row;
-        margin-bottom: 0;
-        border-radius: 0;
-        border: none;
-        padding: 0;
-        background: transparent;
+      .footer__rpp,
+      .pagination {
+        inline-size: auto;
       }
-      tbody tr:nth-child(odd) {
-        background: color-mix(in srgb, var(--md-sys-color-surface-variant) 20%, transparent);
+      .pagination {
+        justify-content: flex-start;
       }
-      tbody tr:nth-child(odd):hover {
-        background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
-      }
-      tbody tr:hover { background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent); }
-      tbody tr.row--selected,
-      tbody tr.row--selected:nth-child(odd) {
-        background: var(--md-sys-color-secondary-container);
-        border-color: transparent;
-      }
-      tbody tr:last-child td { border-bottom: none; }
-
-      td {
-        display: table-cell;
-        justify-content: unset;
-        align-items: unset;
-        padding: 0 16px;
-        height: 52px;
-        vertical-align: middle;
-        border-bottom: 1px solid var(--md-sys-color-outline-variant);
-        border-right: none;
-      }
-      td::before { display: none; }
-      td.col-cb md-checkbox { margin-left: 0; }
-
-      tr.skel-row,
-      tr.skel-row:nth-child(odd) { background: transparent; }
     }
 
     /* ── Detail drawer ───────────────────────────────────────────────────── */
     .overlay {
       position: fixed;
       inset: 0;
-      background: color-mix(in srgb, var(--md-sys-color-scrim) 32%, transparent);
       z-index: var(--_overlay-z);
       display: flex;
       justify-content: flex-end;
-      animation: fade-in 180ms ease;
+      background-color: color-mix(in srgb, var(--md-sys-color-scrim) 32%, transparent);
+      animation: fade-in var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
     }
-    .overlay[hidden] { display: none; }
-    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-
+    @keyframes fade-in {
+      from {
+        opacity: 0;
+      }
+    }
     .drawer {
-      width: min(420px, 100vw);
-      height: 100%;
-      background: var(--md-sys-color-surface);
-      /* No M3 elevation token for directional shadow — kept as rgba intentionally */
-      box-shadow: -4px 0 32px rgba(0, 0, 0, 0.18);
       display: flex;
       flex-direction: column;
-      animation: slide-in 220ms cubic-bezier(0.2, 0, 0, 1);
+      inline-size: min(420px, 100vw);
+      block-size: 100%;
+      background-color: var(--md-sys-color-surface);
+      box-shadow: var(--sky-elevation-3);
+      animation: slide-in var(--md-sys-motion-duration-medium1)
+        var(--md-sys-motion-easing-emphasized-decelerate);
     }
     @keyframes slide-in {
-      from { transform: translateX(100%); }
-      to   { transform: translateX(0); }
+      from {
+        transform: translateX(100%);
+      }
     }
     .drawer__head {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 12px 16px 12px 20px;
-      border-bottom: 1px solid var(--md-sys-color-outline-variant);
+      border-block-end: 1px solid var(--md-sys-color-outline-variant);
       color: var(--md-sys-color-on-surface);
-    }
-    .drawer__title {
-      font-weight: 600;
-      font-size: 1rem;
     }
     .drawer__body {
       flex: 1;
       overflow-y: auto;
       padding: 16px 20px;
     }
-
-    /* ── Detail drawer key-value list — dl/dt/dd semantic pattern ────────── */
     dl.d-list {
       margin: 0;
-      padding: 0;
     }
     dl.d-list > div {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 2px 12px;
       padding: 10px 0;
-      border-bottom: 1px solid var(--md-sys-color-outline-variant);
+      border-block-end: 1px solid var(--md-sys-color-outline-variant);
     }
-    dl.d-list > div:last-child { border-bottom: none; }
+    dl.d-list > div:last-child {
+      border-block-end: none;
+    }
     dt {
-      font-size: 0.6875rem;
+      font-size: var(--md-sys-typescale-label-small-size);
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.06em;
@@ -882,9 +957,8 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
     }
     dd {
       margin: 0;
-      font-size: 0.875rem;
       color: var(--md-sys-color-on-surface);
-      word-break: break-word;
+      overflow-wrap: anywhere;
     }
   `;
 
@@ -950,22 +1024,22 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
             ` : nothing}
             <slot name="toolbar-actions"></slot>
 
-            <div class="col-selector-wrap" style="position: relative; display: inline-block;">
+            <div class="col-selector-wrap">
               <md-icon-button
-                aria-label="Select Columns"
-                title="Select Columns"
+                aria-label="Select columns"
+                title="Select columns"
+                aria-haspopup="true"
+                aria-expanded=${this._showColSelector ? 'true' : 'false'}
                 @click=${this._toggleColSelector}
               >
                 <md-icon aria-hidden="true">view_column</md-icon>
               </md-icon-button>
-              
+
               ${this._showColSelector ? html`
-                <div class="col-selector-menu" style="position: absolute; right: 0; top: 48px; background: var(--md-sys-color-surface-container-high, #e7e9ee); border: 1px solid var(--md-sys-color-outline-variant, #cbd5e1); border-radius: 12px; padding: 12px; z-index: 100; min-width: 180px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-align: left;">
-                  <div style="font-size: 11px; font-weight: 700; color: var(--md-sys-color-on-surface-variant); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">
-                    Visible Columns
-                  </div>
+                <div class="col-selector-menu" role="group" aria-labelledby="dt-col-title">
+                  <span id="dt-col-title" class="col-selector-menu__title label-medium">Visible columns</span>
                   ${this._allCols.map(col => html`
-                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--md-sys-color-on-surface); user-select: none;">
+                    <label class="col-option label-large">
                       <md-checkbox
                         ?checked=${!this._hiddenCols.has(col.key)}
                         @change=${(e: Event) => this._onColToggle(col.key, e)}
@@ -987,14 +1061,15 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
 
         <div class="scroll">
           <table
+            class="body-medium"
             aria-rowcount=${this.total}
             aria-busy=${this.loading ? 'true' : 'false'}
           >
-            ${this.caption ? html`<caption>${this.caption}</caption>` : nothing}
+            ${this.caption ? html`<caption class="title-medium">${this.caption}</caption>` : nothing}
             <thead>
               <tr>
                 ${this.selectable ? html`
-                  <th class="col-cb" scope="col">
+                  <th class="col-cb label-large" scope="col">
                     <md-checkbox
                       aria-label="Select all rows"
                       .checked=${this._allSelected}
@@ -1007,7 +1082,7 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
                 ${cols.map(col => html`
                   <th
                     scope="col"
-                    class=${col.sortable ? 'col-sort' : ''}
+                    class=${col.sortable ? 'label-large col-sort' : 'label-large'}
                     style=${col.width ? `width:${col.width}` : ''}
                     aria-sort=${
                       this._sortKey === col.key
@@ -1032,7 +1107,7 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
                   </th>
                 `)}
 
-                ${actionDefs.length ? html`<th scope="col" class="col-act">Actions</th>` : nothing}
+                ${actionDefs.length ? html`<th scope="col" class="col-act label-large">Actions</th>` : nothing}
               </tr>
             </thead>
 
@@ -1045,7 +1120,7 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
                       <td colspan=${colSpan}>
                         <div class="empty" role="status">
                           <md-icon aria-hidden="true">table_rows</md-icon>
-                          <p>No records found</p>
+                          <p class="body-large">No records found</p>
                         </div>
                       </td>
                     </tr>
@@ -1100,7 +1175,7 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
         </div>
 
         <!-- Footer -->
-        <div class="footer" role="group" aria-label="Table footer">
+        <div class="footer body-small" role="group" aria-label="Table footer">
           <span class="footer__range" aria-live="polite" aria-atomic="true">
             ${this.total > 0 ? `${from} – ${to} of ${this.total}` : '0 records'}
           </span>
@@ -1149,7 +1224,7 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
       >
         <div class="drawer">
           <div class="drawer__head">
-            <p id="dt-drawer-title" class="drawer__title">Details</p>
+            <h2 id="dt-drawer-title" class="drawer__title title-large">Details</h2>
             <md-icon-button
               class="close-btn-el"
               aria-label="Close details"
@@ -1165,7 +1240,7 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
                   ${Object.entries(this._detailRow).map(([k, v]) => html`
                     <div>
                       <dt>${k}</dt>
-                      <dd>${String(v ?? '')}</dd>
+                      <dd class="body-medium">${String(v ?? '')}</dd>
                     </div>
                   `)}
                 </dl>

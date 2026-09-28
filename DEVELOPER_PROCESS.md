@@ -4,9 +4,10 @@ A step-by-step handbook for working on the Role-Based Access Control system in t
 repository, written so a developer can extend it without needing an AI assistant.
 
 > Companion docs: `CLAUDE.md` (repo conventions), `ARCHITECTURE.md` (project layout).
-> This document is specifically about the **dynamic RBAC** system: roles, permissions,
-> the sidebar menu, dashboard widgets, and how they connect across the two APIs and two
-> frontends.
+> Sections 1–18 are about the **dynamic RBAC** system: roles, permissions, the sidebar
+> menu, dashboard widgets, and how they connect across the two APIs and two frontends.
+> Sections 19–21 cover the public **msd storefront** (pages, catalog API, verification),
+> which has no RBAC: anyone can browse it.
 
 ---
 
@@ -521,3 +522,72 @@ Full step-by-step guide (first-time Railway/Cloudflare friendly):
   Railway to the Vercel domain(s); update the Google OAuth redirect URI.
 - Production secrets live only on Railway/Neon/local `.env.local` — never in
   `.env.example` or any committed file.
+
+---
+
+## 19. Building an msd storefront page (public, no RBAC)
+
+Storefront pages (home, category, explore, deal, vendor, ...) are public and prerendered where
+it matters for SEO. They are **composition only**. Workflow:
+
+1. **Design first.** Write a short spec in `docs/superpowers/specs/` (what the page shows, which
+   API data, states, URL params) and get it approved; then a task plan in
+   `docs/superpowers/plans/`.
+2. **Reuse, don't restyle.** Compose from shared-ui (`sky-*`, `md-*`) and the msd building
+   blocks in `apps/msd/src/app/components/` (`PageSection`, `SectionHead`, `CardRail`,
+   `CardGrid`, `ChipNav`, `ClampText`, `ListingToolbar`, `ChoiceMenu`, `ViewSwitch`, `LoadMore`,
+   `SidebarLayout`, `FilterPanel`, `CheckboxFacet`, `PriceRangeField`, `CityPickerDialog`,
+   `DealMap`). No page CSS file.
+3. **Missing layout piece?** Build it as a new msd component (own folder, token-only CSS, test).
+   Only promote it to shared-ui if mera-driver could use it unchanged; shared-ui must stay
+   app-neutral and a new option must not change a component's default look.
+4. **Colour:** M3 roles only, 60/30/10: `surface` base, `surface-container` bands /
+   `secondary-container` fills, `primary` for actions. No hex values.
+5. **Copy** goes in `apps/msd/src/content.json`, never inline in TSX.
+6. **State in the URL.** Filters, sort, view and tabs are query params so views are shareable
+   and back/forward works; parse them defensively (unknown values fall back to defaults).
+7. **Lists:** `usePagedList` for paging (12 per page on the category page), `LoadMore` for
+   infinite scroll with a visible button fallback. Seed page 1 from prerender data only when the
+   URL shows the default view.
+8. **Location:** use `useVisitorLocation()` (city + coordinates) so the header "Set location",
+   distance sort and distance filter all agree.
+9. **Tests** (Vitest + Testing Library, jsdom): shared-ui React wrappers do not set element
+   properties under Vitest, so drive raw `md-*` elements and assert behaviour, attributes, URL
+   and API calls. Keep `src/hydration.test.tsx` green. Use `vi.fn()` for no-op callbacks.
+10. **Verify** in a browser at 1440×900 and 390×844, light and dark, with no horizontal scroll,
+    and run the Impeccable detector on changed folders (see §21).
+
+## 20. Extending the public catalog API (msd-api)
+
+The storefront reads `GET /api/v1/catalog/*` (no auth). To add a sort, filter or facet:
+
+1. **Schema**: `apps/msd-api/src/schemas/catalog.schema.ts`: add the query param to the Zod
+   schema (e.g. `CatalogDealQuerySchema`, `CatalogDealFacetQuerySchema`) with tight validation
+   (enums, UUID lists capped at 50, numeric ranges). Invalid input returns **422**.
+2. **Service**: `apps/msd-api/src/services/catalog.service.ts`: extend `buildDealWhere` for SQL
+   filters and the `orderBy` map for sorts (add `id` as the last tiebreak so paging is stable).
+   Distance/radius work happens in memory in `services/deal-ranking.ts` (`rankDeals`,
+   `computeDealFacets`); keep those pure and unit-tested.
+3. **Route**: `apps/msd-api/src/routes/catalog.routes.ts`: pass the new param through. Static
+   paths (`/deals/facets`) must be registered **before** `/deals/:id`.
+4. **OpenAPI**: register new routes in `apps/msd-api/src/openapi/registry.ts`.
+5. **Tests**: `catalog.routes.test.ts` (Prisma mocked) for query shape, validation and
+   ordering; `deal-ranking.test.ts` for in-memory logic.
+6. **Client**: `apps/msd/src/api/catalog.ts`: widen the option types; serialise arrays as
+   comma lists.
+7. **Never fabricate data.** There is no Review/Rating model, so there is no rating sort,
+   filter or card rating until one exists.
+8. **Deploy the API before the frontend** that uses the new param (`DEPLOYMENT.md` §11).
+
+## 21. Verifying storefront changes
+
+- `npx nx run msd:test`, `npx nx run msd-api:test`, `npx nx run shared-ui:test`, and
+  `npx nx run mera-driver:test` whenever shared-ui changes. Known pre-existing failures are
+  listed in `CLAUDE.md → Notes`; anything else is a regression.
+- `npx nx run-many -t build --projects=msd,msd-api,shared-ui,mera-driver`.
+- If a page renders blank or an import 500s in dev, restart `nx serve msd` (stale dev server).
+  A second dev server on another port will hit CORS, because msd-api only allows its configured
+  origin.
+- Impeccable detector: `impeccable detect --json <changed folders>` should return `[]`.
+- Git safety: never use `git stash` / `reset` / `checkout -- <file>` / `restore` / `clean` /
+  `apply` / `worktree` to compare versions; use `git show <rev>:<path>` into a temp file.

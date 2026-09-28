@@ -30,7 +30,7 @@ Builds a new feature end-to-end in the msd app (React 19 + Vite, massage deals).
    - Playwright e2e test: `e2e/msd/<feature>.spec.ts`
    - Verify: happy path + empty state + error state + auth guard redirect
 
-5. **skylabs-vivek** — SEO (public pages only — skip for account pages)
+5. **skylabs-udaya** — SEO (public pages only — skip for account pages)
    - `<title>` and `<meta name="description">` in JSX
    - Open Graph tags
    - JSON-LD (LocalBusiness or BreadcrumbList as appropriate)

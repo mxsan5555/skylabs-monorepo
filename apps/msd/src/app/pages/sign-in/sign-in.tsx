@@ -7,6 +7,7 @@ import { ApiRequestError } from '../../../api/rbac/client';
 import { extractReturnUrl } from '../../../auth/role-routing';
 import logo from '../../../assets/logo.jpg';
 import logo2 from '../../../assets/logo2.jpg';
+import { validateEmail, validatePhone } from '../../../utils/validation';
 type Method = 'email' | 'phone';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -19,11 +20,6 @@ const API_BASE_URL = import.meta.env.VITE_API_URL;
  * one a user lands on and can navigate to is entirely permission-driven via
  * `bootstrap.menu`/`bootstrap.permissions`, not anything decided here.
  */
-const validateEmail = (value: string) =>
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-
-const validatePhone = (value: string) =>
-  /^[6-9]\d{9}$/.test(value);
 export function SignIn() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -32,6 +28,7 @@ export function SignIn() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const auth = content.auth.signIn;
+  const validation = content.validation;
   const isPhone = method === 'phone';
   const onTabChange = (event: Event) => {
     const index = (event.target as HTMLElement & { activeTabIndex: number })
@@ -44,23 +41,23 @@ export function SignIn() {
     setError('');
     const input = value.trim();
     if (!input) {
-      setError(isPhone ? auth.validation.emptyPhone : auth.validation.emptyEmail);
+      setError(isPhone ? validation.phone.empty : validation.email.empty);
       return;
     }
     if (isPhone && !validatePhone(input)) {
-      setError(auth.validation.invalidPhone);
+      setError(validation.phone.invalid);
       return;
     }
     if (!isPhone && !validateEmail(input)) {
-      setError(auth.validation.invalidEmail);
+      setError(validation.email.invalid);
       return;
     }
     setLoading(true);
     try {
       await requestOtp(input, 'login');
-      const next = new URLSearchParams(location.search).get('next');
+      const returnUrl = extractReturnUrl(location);
       navigate('/otp', {
-        state: { identifier: input, method, next, },
+        state: { identifier: input, method, returnUrl },
       });
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : auth.validation.somethingWentWrong);

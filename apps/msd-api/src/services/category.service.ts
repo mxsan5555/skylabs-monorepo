@@ -262,6 +262,22 @@ export async function assertBranchHasCategoryAccess(branchId: string, categoryId
 }
 
 /**
+ * Unlike `assertBranchHasCategoryAccess` (a specific category), this checks that a branch has
+ * AT LEAST ONE `BranchCategoryAccess` grant of the given top-level `type` — the gate
+ * `createTherapist`/`updateTherapist` needs so a branch with zero Therapy mapping can't receive
+ * a therapist just by omitting `specializationCategoryId` (the frontend's own branch picker
+ * already filters to these branches; this is the real, un-bypassable enforcement).
+ */
+export async function assertBranchHasAnyCategoryAccessOfType(branchId: string, type: CategoryType) {
+  const grant = await prisma.branchCategoryAccess.findFirst({
+    where: { branchId, category: { type } },
+  });
+  if (!grant) {
+    throw new ApiError('VALIDATION_ERROR', `This branch has not been granted access to any ${type.toLowerCase()} category`);
+  }
+}
+
+/**
  * The branch-level counterpart to `assertCategoryChildOf`'s subcategory check — `categoryId` here
  * is already the resolved TOP-LEVEL id (the caller resolves it once via
  * `assertBranchHasCategoryAccess`/`resolveTopLevelCategory` and passes it straight through; this

@@ -232,3 +232,53 @@ describe('Search — location filter URL sync', () => {
     );
   });
 });
+
+/**
+ * Regression coverage for the login-redirect fix: an "Add to Cart" click while logged out
+ * (`useAuth` is mocked `isAuthenticated: false` for this whole file) must send the visitor to
+ * `/sign-in` with the CURRENT `/explore` URL — query string included — captured as `?next=`, so
+ * a successful login returns them to these exact search results instead of always landing on
+ * Home. Covers requirement 1's own named example (`/explore?q=Swedish%20Massage`).
+ */
+describe('Search — Add to Cart while logged out preserves the return destination', () => {
+  function renderSearchWithSignInRoute(initialEntries: string[]) {
+    return render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={initialEntries}>
+          <Routes>
+            <Route path="/explore" element={<><LocationBar /><Search /></>} />
+            <Route path="/sign-in" element={<LocationBar />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>,
+    );
+  }
+
+  it('redirects to /sign-in?next=<current /explore URL, query preserved> when Add to Cart is clicked while logged out', async () => {
+    renderSearchWithSignInRoute(['/explore?q=Swedish%20Massage']);
+    await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
+
+    // Two "Add to Cart" texts exist once the deal card renders: the trigger button on the card
+    // itself, and the package-selection dialog's own submit button (hidden until the trigger
+    // opens it) — the first is the one that runs requireAuthOrRedirect().
+    const [addToCartTrigger] = await screen.findAllByText('Add to Cart');
+    fireEvent.click(addToCartTrigger);
+
+    await waitFor(() =>
+      expect(currentUrl()).toBe(`/sign-in?next=${encodeURIComponent('/explore?q=Swedish%20Massage')}`),
+    );
+  });
+
+  it('redirects to /sign-in?next=%2Fexplore (bare path, no trailing query) when /explore itself has no query string', async () => {
+    renderSearchWithSignInRoute(['/explore']);
+    await waitFor(() => expect(listCatalogDealsMock).toHaveBeenCalled());
+
+    // Two "Add to Cart" texts exist once the deal card renders: the trigger button on the card
+    // itself, and the package-selection dialog's own submit button (hidden until the trigger
+    // opens it) — the first is the one that runs requireAuthOrRedirect().
+    const [addToCartTrigger] = await screen.findAllByText('Add to Cart');
+    fireEvent.click(addToCartTrigger);
+
+    await waitFor(() => expect(currentUrl()).toBe('/sign-in?next=%2Fexplore'));
+  });
+});

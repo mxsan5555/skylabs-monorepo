@@ -12,12 +12,16 @@ import { sendData } from '../lib/http';
 const router = Router();
 router.use(authenticate);
 
-router.get('/stats', requirePermission('dashboard', 'view'), async (_req, res, next) => {
-  try {
-    sendData(res, await getDashboardStats());
-  } catch (err) {
-    next(err);
+router.get(
+  '/stats',
+  requirePermission('dashboard', 'view'),
+  async (req, res, next) => {
+    try {
+      sendData(res, await getDashboardStats(req.user.sub));
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 export default router;
