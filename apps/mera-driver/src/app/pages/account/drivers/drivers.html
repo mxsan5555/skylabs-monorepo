@@ -778,7 +778,6 @@
                       }
                     </md-outlined-select>
 
-                    <!-- CONDITIONAL FIELDS DEPENDING ON PAYMENT METHOD -->
                     <!-- Bank Account -->
                     @if (inputAccountPaymentMethod() === 'Bank Account') {
                       <md-outlined-text-field label="Bank Name" [value]="inputBankName()" (input)="onInputChange('bankName', $event)" placeholder="Enter bank name"></md-outlined-text-field>

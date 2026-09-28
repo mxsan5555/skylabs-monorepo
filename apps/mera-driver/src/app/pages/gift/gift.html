@@ -1,0 +1,154 @@
+<main class="w-full max-w-[1280px] mx-auto px-3 sm:px-6 py-10 flex flex-col gap-16">
+
+  <!-- 01. HERO SECTION -->
+  <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-12 items-center w-full">
+    <!-- Left Column: Copy -->
+    <article class="lg:col-span-7 flex flex-col gap-4 text-left">
+      <sky-badge variant="primary" class="self-start rounded-none tracking-wider font-bold uppercase">
+        {{ content().badge }}
+      </sky-badge>
+
+      <h1 class="m-0 text-3xl sm:text-4xl md:text-5xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight leading-tight">
+        {{ content().title }}
+      </h1>
+
+      <p class="m-0 text-base sm:text-lg text-[var(--md-sys-color-on-surface-variant)] leading-relaxed max-w-2xl">
+        {{ content().subtitle }}
+      </p>
+
+      <div class="pt-2 flex items-center gap-4 flex-wrap">
+        <a routerLink="/ride" class="no-underline">
+          <md-filled-button class="rounded-none">
+            {{ content().ctaPrimary }}
+          </md-filled-button>
+        </a>
+        <a routerLink="/ride" class="no-underline">
+          <md-outlined-button class="rounded-none">
+            {{ content().ctaSecondary }}
+          </md-outlined-button>
+        </a>
+      </div>
+    </article>
+
+    <!-- Right Column: Hero Image -->
+    @if (content().heroImage) {
+      <div class="lg:col-span-5 w-full aspect-[4/3] rounded-none overflow-hidden">
+        <img
+          [src]="content().heroImage"
+          [alt]="content().title"
+          class="w-full h-full object-cover rounded-none block"
+        />
+      </div>
+    }
+  </section>
+
+  <!-- 02. PERFECT FOR EVERY OCCASION (3-COLUMN CARDS GRID) -->
+  @if (content().occasions && content().occasions.length) {
+    <section aria-label="Gifting Occasions" class="w-full flex flex-col gap-8">
+      <h2 class="m-0 text-2xl sm:text-3xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight text-left">
+        {{ content().occasionsTitle }}
+      </h2>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full">
+        @for (item of content().occasions; track item.title) {
+          <sky-card variant="outlined" class="block w-full rounded-none h-full">
+            <article class="p-6 flex flex-col gap-4 text-left h-full justify-between">
+              <div class="flex flex-col gap-4">
+                <div class="w-12 h-12 rounded-none bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] flex items-center justify-center shrink-0">
+                  <md-icon class="text-2xl">{{ item.icon }}</md-icon>
+                </div>
+                <h3 class="m-0 text-lg font-bold text-[var(--md-sys-color-on-surface)]">
+                  {{ item.title }}
+                </h3>
+                <p class="m-0 text-xs sm:text-sm text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+                  {{ item.desc }}
+                </p>
+              </div>
+            </article>
+          </sky-card>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- 03. HOW IT WORKS (2-COLUMN SPLIT WITH VERTICAL STEP PROCESS LIST) -->
+  @if (content().steps && content().steps.length) {
+    <section aria-label="How Gifting Works" class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center w-full">
+      <!-- Left Column: Copy & Badge -->
+      <div class="lg:col-span-5 flex flex-col gap-4 text-left">
+        @if (content().stepsBadge) {
+          <sky-badge variant="primary" class="self-start rounded-none tracking-wider font-bold uppercase">
+            {{ content().stepsBadge }}
+          </sky-badge>
+        }
+        <h2 class="m-0 text-2xl sm:text-4xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight leading-tight">
+          {{ content().stepsTitle }}
+        </h2>
+        @if (content().stepsSubtitle) {
+          <p class="m-0 text-sm sm:text-base text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+            {{ content().stepsSubtitle }}
+          </p>
+        }
+      </div>
+
+      <!-- Right Column: Vertical Process List -->
+      <div class="lg:col-span-7 flex flex-col gap-4 w-full">
+        @for (s of content().steps; track s.step) {
+          <div class="flex items-start gap-4 text-left p-5 border-l-4 border-[var(--md-sys-color-primary)] bg-[var(--md-sys-color-surface-container-low)]">
+            <span class="text-2xl font-black text-[var(--md-sys-color-primary)] tracking-tight shrink-0 pt-0.5">
+              {{ s.step }}
+            </span>
+            <div class="flex flex-col gap-1 flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <md-icon class="text-xl text-[var(--md-sys-color-primary)] shrink-0">{{ s.icon }}</md-icon>
+                  <h3 class="m-0 text-base sm:text-lg font-extrabold text-[var(--md-sys-color-on-surface)]">
+                    {{ s.title }}
+                  </h3>
+                </div>
+                @if (s.tag) {
+                  <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] shrink-0 rounded-none">
+                    {{ s.tag }}
+                  </span>
+                }
+              </div>
+              <p class="m-0 text-xs sm:text-sm text-[var(--md-sys-color-on-surface-variant)] leading-relaxed pt-1">
+                {{ s.desc }}
+              </p>
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- 04. BOTTOM CALLOUT BANNER -->
+  @if (content().bottomBanner; as banner) {
+    <section aria-label="Spread The Joy" class="w-full">
+      <sky-card variant="outlined" class="block w-full rounded-none bg-[var(--md-sys-color-surface-container-low)]">
+        <article class="p-8 sm:p-12 flex flex-col items-center justify-center text-center gap-4 max-w-2xl mx-auto">
+          <sky-badge variant="primary" class="rounded-none tracking-wider font-bold uppercase">
+            {{ banner.badge }}
+          </sky-badge>
+
+          <h2 class="m-0 text-2xl sm:text-4xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight">
+            {{ banner.title }}
+          </h2>
+
+          <p class="m-0 text-sm sm:text-base text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+            {{ banner.subtitle }}
+          </p>
+
+          <div class="pt-2">
+            <a routerLink="/ride" class="no-underline">
+              <md-filled-button class="rounded-none">
+                {{ banner.buttonText }}
+              </md-filled-button>
+            </a>
+          </div>
+        </article>
+      </sky-card>
+    </section>
+  }
+
+</main>

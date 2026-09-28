@@ -140,7 +140,7 @@ export class Header implements OnInit {
   protected goSafety(): void {
     this.openMenu.set(null);
     this.closeDrawer();
-    this.router.navigate(['/'], { fragment: 'safety' });
+    this.router.navigate(['/safety']);
   }
 
   /** Start sign-up already on the driver persona. */

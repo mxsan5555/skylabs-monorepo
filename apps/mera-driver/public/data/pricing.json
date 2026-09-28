@@ -1,0 +1,116 @@
+{
+  "packagesTitle": "Driver Booking Categories",
+  "guaranteesTitle": "Why Our Pricing Stands Out",
+  "hero": {
+    "badge": "MERA DRIVER",
+    "title": "Hire a Driver Online in 15 Minutes.",
+    "subtitle": "Book background-verified professional drivers for your personal car — hourly, outstation, or monthly long-term placement.",
+    "btnText": "Book Driver Now",
+    "link": "/ride/options",
+    "image": "/images/about/hero_driver_portrait.jpg"
+  },
+  "offerBanner": {
+    "code": "MERA100",
+    "title": "Get Flat ₹100 OFF On Your First Driver Booking!",
+    "subtitle": "Apply coupon code MERA100 at checkout for instant savings on Local Hourly or Outstation drives.",
+    "badge": "Special Offer",
+    "btnText": "Claim Offer Now",
+    "link": "/ride/options"
+  },
+  "packages": [
+    {
+      "id": "package",
+      "name": "Short-Term",
+      "badge": "Hourly Drive",
+      "price": "₹249",
+      "unit": "/ 2 Hours",
+      "subtext": "+ ₹99/hr for extra hours",
+      "features": [
+        "In-city errands, shopping & dinner trips",
+        "Background-verified professional driver",
+        "Instant dispatch within 15 minutes",
+        "Zero surge pricing guarantee"
+      ],
+      "btnText": "Book Short-Term Driver",
+      "link": "/ride/options?category=package"
+    },
+    {
+      "id": "outstation",
+      "name": "Outstation Trips",
+      "badge": "Inter-State Travel",
+      "price": "₹1,299",
+      "unit": "/ 12 Hours",
+      "subtext": "+ ₹120/hr for extra hours",
+      "features": [
+        "Highway experienced outstation drivers",
+        "Round-trip & one-way trip flexibility",
+        "Night stay driver allowance included",
+        "24/7 live telemetry tracking"
+      ],
+      "btnText": "Book Outstation Driver",
+      "link": "/ride/options?category=outstation"
+    },
+    {
+      "id": "monthly",
+      "name": "Long-Term Hire",
+      "badge": "Monthly Chauffeur",
+      "price": "₹18,500",
+      "unit": "/ Month",
+      "subtext": "8 Hours / Day dedicated service",
+      "features": [
+        "Dedicated personal car chauffeur",
+        "Police background verified & trained",
+        "Immediate replacement guarantee",
+        "Attendance & payroll managed by us"
+      ],
+      "btnText": "Hire Long-Term Chauffeur",
+      "link": "/ride/options?category=monthly"
+    }
+  ],
+  "steps": {
+    "title": "Book Your Driver in 3 Simple Steps",
+    "subtitle": "Get a verified professional driver at your doorstep in minutes",
+    "items": [
+      {
+        "step": "01",
+        "title": "Select Location & Category",
+        "description": "Enter your pickup address and choose your trip category (Short-Term, Outstation, or Long-Term Hire).",
+        "icon": "pin_drop"
+      },
+      {
+        "step": "02",
+        "title": "Pick Time & Preferences",
+        "description": "Choose your start date/time, vehicle transmission (Manual/Automatic), and trip options.",
+        "icon": "event_available"
+      },
+      {
+        "step": "03",
+        "title": "Instant Driver Allocation",
+        "description": "A verified professional driver is assigned with real-time tracking straight to your location.",
+        "icon": "directions_car"
+      }
+    ]
+  },
+  "guarantees": [
+    {
+      "icon": "price_check",
+      "title": "Zero Surge Guarantee",
+      "description": "Rain, festival, or peak rush hour — our hourly rates remain fixed without price spikes."
+    },
+    {
+      "icon": "verified_user",
+      "title": "100% Background Verified",
+      "description": "Every driver undergoes driving skill assessment, police verification, and document validation."
+    },
+    {
+      "icon": "support_agent",
+      "title": "24/7 Live Safety Desk",
+      "description": "Our safety desk monitors every ride with real-time telemetry and emergency SOS assistance."
+    },
+    {
+      "icon": "event_available",
+      "title": "Flexible Cancellation",
+      "description": "Cancel or reschedule your driver booking without hassle before trip dispatch."
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "badge": "Gift a Ride",
+  "title": "Give the gift of effortless travel with Mera Driver",
+  "subtitle": "Surprise family, friends, or corporate teams with verified, professional chauffeur-driven rides across 60+ Indian cities.",
+  "heroImage": "/images/gift/hero_gift.jpg",
+  "ctaPrimary": "Gift a Ride Now",
+  "ctaSecondary": "Corporate Gifting",
+
+  "occasionsTitle": "Perfect For Every Occasion",
+  "occasions": [
+    {
+      "icon": "card_giftcard",
+      "title": "Birthdays & Celebrations",
+      "desc": "Send instant ride credits so your loved ones arrive safely and stress-free on their special day."
+    },
+    {
+      "icon": "directions_car",
+      "title": "Outstation Family Trips",
+      "desc": "Gift comfortable long-distance chauffeur driving for weekend getaways and family vacations."
+    },
+    {
+      "icon": "business_center",
+      "title": "Corporate & Team Rewards",
+      "desc": "Reward employees, thank VIP clients, or arrange hassle-free commute vouchers for corporate events."
+    }
+  ],
+
+  "stepsBadge": "Seamless Process",
+  "stepsTitle": "How Gifting Works in 3 Easy Steps",
+  "stepsSubtitle": "Sending a chauffeur-driven ride voucher takes less than two minutes.",
+  "steps": [
+    {
+      "step": "01",
+      "icon": "tune",
+      "title": "Choose Gift Amount",
+      "tag": "Flexibility",
+      "desc": "Select a pre-set voucher value or enter custom ride credit for any budget."
+    },
+    {
+      "step": "02",
+      "icon": "edit_note",
+      "title": "Add Personal Wishes",
+      "tag": "Personal Touch",
+      "desc": "Enter the recipient's phone number and attach a heartfelt message for the occasion."
+    },
+    {
+      "step": "03",
+      "icon": "send_to_mobile",
+      "title": "Instant Delivery",
+      "tag": "Real-time SMS & Email",
+      "desc": "Your recipient receives instant ride credits to book verified drivers whenever needed."
+    }
+  ],
+
+  "bottomBanner": {
+    "badge": "Spread The Joy",
+    "title": "Make Every Journey Special Today",
+    "subtitle": "Gift safe, reliable chauffeur-driven car rides across 60+ Indian cities in less than two minutes.",
+    "buttonText": "Send Gift Ride"
+  }
+}
