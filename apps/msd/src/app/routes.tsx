@@ -23,6 +23,7 @@ import { AuditLogs } from './pages/account/audit-logs/audit-logs';
 import { VendorManagement } from './pages/account/vendors/vendors';
 import { VendorNewPage } from './pages/account/vendors/vendor-new-page';
 import { VendorDetailPage } from './pages/account/vendors/vendor-detail-page';
+import { BranchFormPage } from './pages/account/vendors/branch-form-page';
 import { CustomerManagement } from './pages/account/customers/customers';
 import { BranchList } from './pages/account/vendors/branch-list';
 import { DealList } from './pages/account/vendors/deal-list';
@@ -93,6 +94,11 @@ function VendorsRouteGuard({ children }: { children: ReactNode }) {
     return <Navigate to="/account/profile" replace />;
   }
   return <>{children}</>;
+}
+
+function BranchFormPageRoute() {
+  const { token } = useAuth();
+  return <BranchFormPage token={token} />;
 }
 
 export function AppRoutes() {
@@ -311,6 +317,24 @@ export function AppRoutes() {
             element={
               <VendorsRouteGuard>
                 <VendorDetailPage />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* Branch add/edit — real pages, never a popup (see the branch-management design spec).
+            The static `new` segment wins over the dynamic `:branchId` below it. */}
+          <Route
+            path="/account/vendors/:vendorId/branches/new"
+            element={
+              <VendorsRouteGuard>
+                <BranchFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/vendors/:vendorId/branches/:branchId"
+            element={
+              <VendorsRouteGuard>
+                <BranchFormPageRoute />
               </VendorsRouteGuard>
             }
           />
