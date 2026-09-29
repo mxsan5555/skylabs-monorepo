@@ -369,15 +369,21 @@ export function VendorPipeline({
             </p>
           )}
 
-          <h3 className="section-title">Profile Image</h3>
-          <MediaUploader
-            entityType="vendor"
-            entityId={vendor.id}
-            existingImages={vendor.mediaImages ?? []}
-            existingVideo={vendor.mediaVideo ?? null}
-            token={token}
-          />
-
+         <sky-tile-card
+            className="vendor-section-card"
+            headline="Profile Image"
+            text="Upload and manage the vendor profile images."
+            color="none"
+          >
+            <MediaUploader
+              entityType="vendor"
+              entityId={vendor.id}
+              existingImages={vendor.mediaImages ?? []}
+              existingVideo={vendor.mediaVideo ?? null}
+              token={token}
+            />
+          </sky-tile-card>
+          
           <div className="form-actions">
             <FilledButton onClick={() => setActiveStep(2)} disabled={!kycDocOk}>
               Continue
