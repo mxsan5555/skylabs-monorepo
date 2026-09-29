@@ -1,8 +1,9 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Branch, Category } from '../../../../api/rbac/vendors';
+import type { Branch, Category, Vendor } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { BreadcrumbProvider, useBreadcrumbTrail } from '../../../admin/breadcrumb-context';
 import { BranchFormPage } from './branch-form-page';
 
 const navigateMock = vi.fn();
@@ -17,6 +18,7 @@ const updateBranchMock = vi.fn();
 const listCategoriesMock = vi.fn();
 const getBranchCategoryAccessMock = vi.fn();
 const setBranchCategoryAccessMock = vi.fn();
+const getVendorMock = vi.fn();
 
 vi.mock('../../../../api/rbac/vendors', async () => {
   const actual = await vi.importActual<typeof import('../../../../api/rbac/vendors')>('../../../../api/rbac/vendors');
@@ -28,6 +30,7 @@ vi.mock('../../../../api/rbac/vendors', async () => {
     listCategories: (...args: unknown[]) => listCategoriesMock(...args),
     getBranchCategoryAccess: (...args: unknown[]) => getBranchCategoryAccessMock(...args),
     setBranchCategoryAccess: (...args: unknown[]) => setBranchCategoryAccessMock(...args),
+    getVendor: (...args: unknown[]) => getVendorMock(...args),
   };
 });
 
@@ -60,19 +63,60 @@ const EXISTING: Branch = {
 const SERVICE_CATEGORY: Category = { id: 'c1', name: 'Massage', slug: 'massage', parentId: null, isActive: true, type: 'SERVICE' };
 const THERAPY_CATEGORY: Category = { id: 'c2', name: 'Physiotherapy', slug: 'physiotherapy', parentId: null, isActive: true, type: 'THERAPY' };
 
-function renderAt(url: string) {
+const VENDOR: Vendor = {
+  id: 'v1',
+  businessName: 'Vitality Wellness & Beauty',
+  slug: 'vitality',
+  ownerUserId: 'u1',
+  kycStatus: 'VERIFIED',
+  kycRejectionReason: null,
+  status: 'ACTIVE',
+  statusReason: null,
+  createdByUserId: null,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+  offersService: true,
+  offersProduct: false,
+  offersTherapy: false,
+  owner: { id: 'u1', name: 'Arjun Malhotra', status: 'active', roles: [] },
+};
+
+/** Renders `label` for a crumb with no `to` (the current page) and `label(to)` for a crumb that
+ *  links elsewhere — same probe pattern as `vendor-detail-page.test.tsx`. */
+function TrailProbe() {
+  return (
+    <p data-testid="trail">
+      {useBreadcrumbTrail()
+        .map((c) => (c.to ? `${c.label}(${c.to})` : c.label))
+        .join(' > ')}
+    </p>
+  );
+}
+
+function renderAt(url: string, { withTrail = false }: { withTrail?: boolean } = {}) {
   listCategoriesMock.mockImplementation((_token: string | null, opts: { type?: string } = {}) =>
     Promise.resolve({ data: [opts.type === 'THERAPY' ? THERAPY_CATEGORY : SERVICE_CATEGORY] }),
   );
   getBranchCategoryAccessMock.mockResolvedValue({ data: [] });
   listBranchesMock.mockResolvedValue({ data: [EXISTING] });
-  return render(
+  getVendorMock.mockResolvedValue({ data: VENDOR });
+  const tree = (
     <MemoryRouter initialEntries={[url]}>
       <Routes>
         <Route path="/account/vendors/:vendorId/branches/new" element={<BranchFormPage token="tok" />} />
         <Route path="/account/vendors/:vendorId/branches/:branchId" element={<BranchFormPage token="tok" />} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
+  );
+  return render(
+    withTrail ? (
+      <BreadcrumbProvider>
+        <TrailProbe />
+        {tree}
+      </BreadcrumbProvider>
+    ) : (
+      tree
+    ),
   );
 }
 
@@ -260,5 +304,16 @@ describe('BranchFormPage — Edit', () => {
     await screen.findByRole('heading', { name: 'Edit branch' });
     await waitFor(() => expect(screen.getByText('Categories service is down')).toBeTruthy());
     expect(screen.queryByText('No active Service or Therapy categories exist yet.')).toBeNull();
+  });
+
+  it('shows the vendor\'s real business name in the breadcrumb, not the literal "Member"', async () => {
+    renderAt('/account/vendors/v1/branches/b1', { withTrail: true });
+    await screen.findByRole('heading', { name: 'Edit branch' });
+    expect(getVendorMock).toHaveBeenCalledWith('tok', 'v1');
+    await waitFor(() =>
+      expect(screen.getByTestId('trail').textContent).toBe(
+        'Members > All Member(/account/vendors) > Vitality Wellness & Beauty(/account/vendors/v1) > Branches(/account/vendors/v1/branches) > Lower Parel Branch',
+      ),
+    );
   });
 });

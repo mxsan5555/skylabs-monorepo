@@ -30,7 +30,7 @@ import { getMissingPoints, getSetupSteps, setupHint, type SetupStep, type SetupS
 /** No tab strip — the Overview's cards (setup-progress + records) are the navigation, each
  *  Add/Edit/View button sending the admin to that section's own URL, `/account/vendors/:id/:section`.
  *  `profile` still hosts the old six-step wizard and is replaced by the Profile page in the next
- *  step of the plan; Branches & Deals and Therapists are replaced by their own pages after that. */
+ *  step of the plan; Branches and Therapists are replaced by their own pages after that. */
 const SECTIONS = [
   { key: 'profile', label: 'Profile & setup' },
   { key: 'branches', label: 'Branches' },
@@ -111,7 +111,7 @@ function toTherapistRow(t: AdminTherapist): Record<string, string | number> {
 }
 
 /** One member's page: `/account/vendors/:vendorId` (Overview) and `/account/vendors/:vendorId/:section`
- *  (Profile & setup / Branches & Deals / Therapists / Customers / Orders). Admin only (`vendors:view`). */
+ *  (Profile & setup / Branches / Therapists / Customers / Orders). Admin only (`vendors:view`). */
 export function VendorDetailPage() {
   const { vendorId, section: rawSection } = useParams<{ vendorId: string; section?: string }>();
   const section = SECTIONS.some((s) => s.key === rawSection) ? (rawSection as SectionKey) : undefined;

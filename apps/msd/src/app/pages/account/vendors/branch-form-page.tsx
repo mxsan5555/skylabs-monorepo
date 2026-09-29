@@ -4,6 +4,7 @@ import '@skylabs-monorepo/shared-ui';
 import {
   createBranch,
   getBranchCategoryAccess,
+  getVendor,
   listBranches,
   listCategories,
   setBranchCategoryAccess,
@@ -12,6 +13,7 @@ import {
   type BranchInput,
   type Category,
   type OpeningHours,
+  type Vendor,
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
@@ -29,6 +31,13 @@ type DrivenChangeEvent = ChangeEvent<HTMLElement & { value: string }>;
  *  convention as `PriceRangeField`/`CheckboxFacet` (see those files' own doc comments: the
  *  shared-ui React wrappers set element state via an imperative property effect that does not
  *  run under Vitest's `@lit/react` resolution). */
+/** Same convention as `VendorDetailPage`'s `name` derivation: business name first, owner name as
+ *  a fallback, `null` (not a literal) when neither is known yet — the breadcrumb itself supplies
+ *  the transient/failure fallback label. */
+function vendorDisplayName(vendor: Vendor): string | null {
+  return vendor.businessName || vendor.owner?.name || null;
+}
+
 function renderSelect({
   label,
   value,
@@ -109,6 +118,8 @@ export function BranchFormPage({ token }: BranchFormPageProps) {
   const [loading, setLoading] = useState(isEdit);
   const [loadError, setLoadError] = useState('');
 
+  const [vendorName, setVendorName] = useState<string | null>(null);
+
   const [form, setForm] = useState({ name: '', address: '', city: '', state: '', pincode: '', mapLocationUrl: '' });
   const [openingHours, setOpeningHours] = useState<OpeningHours>({});
   const [errors, setErrors] = useState<Partial<Record<'name' | 'pincode' | 'mapLocationUrl', string>>>({});
@@ -119,6 +130,15 @@ export function BranchFormPage({ token }: BranchFormPageProps) {
   const [categoryMap, setCategoryMap] = useState<Map<string, Set<string>>>(new Map());
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [categoriesError, setCategoriesError] = useState('');
+
+  // Independent of the branch/category loads below — presentational only (feeds the breadcrumb),
+  // so it never blocks or gates the page's own loading state.
+  useEffect(() => {
+    if (!vendorId) return;
+    getVendor(token, vendorId)
+      .then(({ data }) => setVendorName(vendorDisplayName(data)))
+      .catch(() => setVendorName(null));
+  }, [token, vendorId]);
 
   useEffect(() => {
     if (!isEdit || !vendorId || !branchId) return;
@@ -170,7 +190,7 @@ export function BranchFormPage({ token }: BranchFormPageProps) {
   useSetBreadcrumbs([
     { label: 'Members' },
     { label: 'All Member', to: '/account/vendors' },
-    { label: 'Member', to: `/account/vendors/${vendorId}` },
+    { label: vendorName ?? 'Member', to: `/account/vendors/${vendorId}` },
     { label: 'Branches', to: `/account/vendors/${vendorId}/branches` },
     { label: isEdit ? name : 'Add branch' },
   ]);
