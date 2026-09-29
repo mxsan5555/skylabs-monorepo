@@ -32,7 +32,7 @@ export function VendorNewPage() {
   useEffect(() => {
     if (vendor) {
       // Land in the setup form so the member can keep filling in the profile.
-      navigate(`/account/vendors/${vendor.id}?tab=setup`, { replace: true });
+      navigate(`/account/vendors/${vendor.id}/profile`, { replace: true });
     }
   }, [vendor, navigate]);
 

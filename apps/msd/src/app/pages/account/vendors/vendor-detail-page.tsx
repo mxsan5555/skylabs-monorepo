@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Divider, FilledButton, Icon, List, ListItem, OutlinedButton, PrimaryTab, Tabs, TextButton, OutlinedTextField } from '@skylabs-monorepo/shared-ui/react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Divider, FilledButton, Icon, List, ListItem, TextButton, OutlinedTextField } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   approveVendor,
@@ -25,27 +25,30 @@ import { VendorBranches } from './vendor-branches';
 import { VendorDetailCustomers } from './vendor-detail-customers';
 import { VendorDetailOrders } from './vendor-detail-orders';
 import { VendorPipeline } from './vendor-pipeline';
-import { getMissingPoints, getSetupSteps, isSetupComplete, type SetupStep, type SetupStepKey } from './vendor-setup';
+import { getMissingPoints, getSetupSteps, setupHint, type SetupStep, type SetupStepKey } from './vendor-setup';
 
-/** Tabs while the redesign is in progress. `setup` still hosts the old six-step wizard and is
- *  replaced by the Profile page in the next step of the plan; Branches & Deals and Therapists
- *  are replaced by their own pages after that. */
-const TABS = [
-  { key: 'summary', label: 'Summary' },
-  { key: 'setup', label: 'Profile & setup' },
+/** No tab strip — the Overview's cards (setup-progress + records) are the navigation, each
+ *  Add/Edit/View button sending the admin to that section's own URL, `/account/vendors/:id/:section`.
+ *  `profile` still hosts the old six-step wizard and is replaced by the Profile page in the next
+ *  step of the plan; Branches & Deals and Therapists are replaced by their own pages after that. */
+const SECTIONS = [
+  { key: 'profile', label: 'Profile & setup' },
   { key: 'branches', label: 'Branches & Deals' },
   { key: 'therapists', label: 'Therapists' },
   { key: 'customers', label: 'Customers' },
   { key: 'orders', label: 'Orders' },
 ] as const;
-type TabKey = (typeof TABS)[number]['key'];
+type SectionKey = (typeof SECTIONS)[number]['key'];
+const SECTION_LABEL: Record<SectionKey, string> = Object.fromEntries(SECTIONS.map((s) => [s.key, s.label])) as Record<SectionKey, string>;
 
-const STEP_TAB: Record<SetupStepKey, TabKey> = {
-  profile: 'setup',
+/** Which section a setup-progress card's button opens. Products has no page of its own yet, so
+ *  it opens the profile wizard (which still contains the old Products step internally). */
+const STEP_SECTION: Record<SetupStepKey, SectionKey> = {
+  profile: 'profile',
   branches: 'branches',
   deals: 'branches',
   therapists: 'therapists',
-  products: 'setup',
+  products: 'profile',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -107,12 +110,13 @@ function toTherapistRow(t: AdminTherapist): Record<string, string | number> {
   };
 }
 
-/** One member's page: `/account/vendors/:vendorId`. Admin only (`vendors:view`). */
+/** One member's page: `/account/vendors/:vendorId` (Overview) and `/account/vendors/:vendorId/:section`
+ *  (Profile & setup / Branches & Deals / Therapists / Customers / Orders). Admin only (`vendors:view`). */
 export function VendorDetailPage() {
-  const { vendorId } = useParams<{ vendorId: string }>();
+  const { vendorId, section: rawSection } = useParams<{ vendorId: string; section?: string }>();
+  const section = SECTIONS.some((s) => s.key === rawSection) ? (rawSection as SectionKey) : undefined;
   const navigate = useNavigate();
   const { token, can, loginAsUser } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
   const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const canView = can('vendors', 'view');
@@ -131,9 +135,9 @@ export function VendorDetailPage() {
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+  // Set when a URL is typed/bookmarked for a section that turns out to be locked or unknown —
+  // shown once, on the Overview page this component redirects back to.
   const [lockNotice, setLockNotice] = useState('');
-  // Bumped when a locked tab is clicked so md-tabs remounts on the tab that is really active.
-  const [tabsKey, setTabsKey] = useState(0);
   const [categories, setCategories] = useState<Category[]>([]);
 
   const load = useCallback(
@@ -159,27 +163,39 @@ export function VendorDetailPage() {
 
   const steps = vendor ? getSetupSteps(vendor) : [];
   const stepByKey = (key: SetupStepKey) => steps.find((s) => s.key === key);
-  const tabLock = (key: TabKey): string | undefined => {
+  const sectionLock = (key: SectionKey): string | undefined => {
     if (key === 'branches') return stepByKey('branches')?.locked ? stepByKey('branches')?.lockedReason : undefined;
     if (key === 'therapists') return stepByKey('therapists')?.locked ? stepByKey('therapists')?.lockedReason : undefined;
     return undefined;
   };
 
-  const requested = searchParams.get('tab') as TabKey | null;
-  const tab: TabKey = requested && TABS.some((t) => t.key === requested) && !tabLock(requested) ? requested : 'summary';
-
-  const goToTab = useCallback(
-    (next: TabKey) => {
-      setLockNotice('');
-      setSearchParams(next === 'summary' ? {} : { tab: next });
+  const goToSection = useCallback(
+    (next?: SectionKey) => {
+      navigate(next ? `/account/vendors/${vendorId}/${next}` : `/account/vendors/${vendorId}`);
     },
-    [setSearchParams],
+    [navigate, vendorId],
   );
 
-  // Counts change while the member is edited on other tabs, so refresh them on the way back.
+  // A bookmarked/typed URL for a section that turns out to be unknown or locked sends the admin
+  // back to Overview with a one-line reason, instead of showing content the URL doesn't back up.
   useEffect(() => {
-    if (tab === 'summary') load(true);
-  }, [tab, load]);
+    if (!vendor || !rawSection) return;
+    if (!section) {
+      navigate(`/account/vendors/${vendorId}`, { replace: true });
+      return;
+    }
+    const lock = sectionLock(section);
+    if (lock) {
+      setLockNotice(`${SECTION_LABEL[section]} is locked. ${lock}.`);
+      navigate(`/account/vendors/${vendorId}`, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sectionLock reads `steps`, recomputed every render from `vendor`
+  }, [vendor, rawSection, section, vendorId, navigate]);
+
+  // Counts change while the member is edited in another section, so refresh them on the way back.
+  useEffect(() => {
+    if (!section) load(true);
+  }, [section, load]);
 
   useEffect(() => {
     if (!vendorId) return;
@@ -187,7 +203,11 @@ export function VendorDetailPage() {
   }, [token, vendorId]);
 
   const name = vendor ? vendor.businessName || vendor.owner?.name || 'Draft member' : 'Member';
-  useSetBreadcrumbs([{ label: 'Members' }, { label: 'All Member', to: '/account/vendors' }, { label: name }]);
+  useSetBreadcrumbs(
+    section
+      ? [{ label: 'Members' }, { label: 'All Member', to: '/account/vendors' }, { label: name, to: `/account/vendors/${vendorId}` }, { label: SECTION_LABEL[section] }]
+      : [{ label: 'Members' }, { label: 'All Member', to: '/account/vendors' }, { label: name }],
+  );
 
   const reasonRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -316,11 +336,10 @@ export function VendorDetailPage() {
   }
 
   const copy = pending ? ACTION_COPY[pending] : null;
-  const setupComplete = isSetupComplete(steps);
 
   return (
     <div className="admin-page admin-page--wide">
-      <title>{`${name} · Member · MSD`}</title>
+      <title>{`${name} · ${section ? SECTION_LABEL[section] : 'Overview'} · MSD`}</title>
       <header className="page-head">
         <div>
           <h1>{name}</h1>
@@ -366,57 +385,40 @@ export function VendorDetailPage() {
         </sky-feature-card>
       )}
 
-      <div className="admin-tabs-wrap">
-        <Tabs
-          key={tabsKey}
-          className="admin-tabs"
-          aria-label="Member sections"
-          onChange={(e) => {
-            const next = TABS[(e.target as unknown as { activeTabIndex: number }).activeTabIndex]?.key;
-            if (!next) return;
-            const lock = tabLock(next);
-            if (lock) {
-              setLockNotice(`${TABS.find((t) => t.key === next)?.label} is locked. ${lock}.`);
-              setTabsKey((k) => k + 1);
-              return;
-            }
-            goToTab(next);
-          }}
-        >
-          {TABS.map(({ key, label }) => {
-            const lock = tabLock(key);
-            return (
-              <PrimaryTab key={key} active={tab === key} aria-disabled={lock ? 'true' : undefined} title={lock}>
-                {lock && <Icon slot="icon" aria-hidden="true">lock</Icon>}
-                {label}
-              </PrimaryTab>
-            );
-          })}
-        </Tabs>
-      </div>
       {lockNotice && <p className="field-hint" role="status">{lockNotice}</p>}
 
-      {tab === 'summary' && (
-        <div className="admin-tab-panel summary-layout" aria-label="Summary">
-          <section aria-labelledby="setup-progress-title">
-            <h2 id="setup-progress-title" className="section-title">Setup progress</h2>
-            <p className="field-hint">
-              {setupComplete ? 'Everything needed is in place.' : 'Finish each step in order. Later steps unlock as you go.'}
-            </p>
-            <CardGrid layout="compact">
-              {steps
-                .filter((step) => step.key !== 'profile')
-                .map((step) => (
-                  <SetupCard key={step.key} step={step} onOpen={() => goToTab(STEP_TAB[step.key])} />
-                ))}
-            </CardGrid>
-          </section>
+      {!section && (
+        <div className="admin-tab-panel summary-layout" aria-label="Overview">
+          <div>
+            <section aria-labelledby="setup-progress-title">
+              <h2 id="setup-progress-title" className="section-title">Setup progress</h2>
+              <p className="field-hint">{setupHint(steps)}</p>
+              <CardGrid layout="compact">
+                {steps
+                  .filter((step) => step.key !== 'profile')
+                  .map((step) => (
+                    <SetupCard key={step.key} step={step} href={step.locked ? undefined : `/account/vendors/${vendorId}/${STEP_SECTION[step.key]}`} />
+                  ))}
+              </CardGrid>
+            </section>
 
-          <MemberSummaryCard vendor={vendor} steps={steps} onEditProfile={() => goToTab('setup')} />
+            <section aria-labelledby="records-title">
+              <h2 id="records-title" className="section-title">Records</h2>
+              <CardGrid layout="compact">
+                <NavCard icon="group" headline="Customers" text="This member's customers" href={`/account/vendors/${vendorId}/customers`} />
+                <NavCard icon="receipt_long" headline="Orders" text="This member's orders" href={`/account/vendors/${vendorId}/orders`} />
+              </CardGrid>
+            </section>
+          </div>
+
+          <section aria-labelledby="profile-card-title">
+            <h2 id="profile-card-title" className="section-title">Profile</h2>
+            <MemberSummaryCard vendor={vendor} steps={steps} onEditProfile={() => goToSection('profile')} />
+          </section>
         </div>
       )}
 
-      {tab === 'setup' && (
+      {section === 'profile' && (
         <div className="admin-tab-panel" aria-label="Profile and setup">
           <VendorPipeline
             token={token}
@@ -432,7 +434,7 @@ export function VendorDetailPage() {
         </div>
       )}
 
-      {tab === 'branches' && (
+      {section === 'branches' && (
         <div className="admin-tab-panel" aria-label="Branches and Deals">
           <VendorBranches
             token={token}
@@ -447,19 +449,19 @@ export function VendorDetailPage() {
         </div>
       )}
 
-      {tab === 'therapists' && (
+      {section === 'therapists' && (
         <div className="admin-tab-panel" aria-label="Therapists">
           <TherapistsTab token={token} vendorId={vendor.id} canDelete={canDelete} confirm={confirm} />
         </div>
       )}
 
-      {tab === 'customers' && (
+      {section === 'customers' && (
         <div className="admin-tab-panel" aria-label="Customers">
           <VendorDetailCustomers token={token} vendorId={vendor.id} />
         </div>
       )}
 
-      {tab === 'orders' && (
+      {section === 'orders' && (
         <div className="admin-tab-panel" aria-label="Orders">
           <VendorDetailOrders token={token} vendorId={vendor.id} />
         </div>
@@ -469,46 +471,50 @@ export function VendorDetailPage() {
   );
 }
 
-/** The one line under a step's title: why it is locked, what is missing, or how many exist. */
+/** The one line under a step's title: status, plus the action a click on the card performs (the
+ *  whole tile is the link, so this is the only place that says "Add"/"Edit"). */
 function stepText(step: SetupStep): string {
   if (step.locked) return step.lockedReason ?? 'Locked';
-  if (step.missing.length > 0) return step.key === 'profile' ? `Missing: ${step.missing.join(', ')}` : step.missing[0];
-  if (step.count !== undefined) return step.count.includes(' of ') ? `${step.count} live` : `${step.count} added`;
-  return 'Complete';
+  const status = step.missing.length > 0
+    ? step.key === 'profile'
+      ? `Missing: ${step.missing.join(', ')}`
+      : step.missing[0]
+    : step.count !== undefined
+      ? step.count.includes(' of ')
+        ? `${step.count} live`
+        : `${step.count} added`
+      : 'Complete';
+  return `${status} · ${step.done ? 'Edit' : 'Add'}`;
 }
 
-/** One setup step as a `sky-feature-card`: done = secondary, locked = surface-high (no button),
- *  to do = outlined surface. The button sits in the card's `actions` slot. */
-function SetupCard({ step, onOpen }: { step: SetupStep; onOpen: () => void }) {
+/** One setup step as a small `sky-tile-card`, the whole tile a link to its section (no `href` —
+ *  and so no link — while locked). Not-done or locked uses the `tertiary` M3 role (this app's
+ *  warning tone, same one the status badge uses for "incomplete"/"pending"); done uses
+ *  `secondary`, so what still needs attention visibly stands out from what's finished. */
+function SetupCard({ step, href }: { step: SetupStep; href?: string }) {
   const icon = step.locked ? 'lock' : step.done ? 'check_circle' : STEP_ICON[step.key];
-  const color = step.locked ? 'surface-high' : step.done ? 'secondary' : 'surface';
-  return (
-    <sky-feature-card
-      color={color}
-      variant={step.done || step.locked ? 'filled' : 'outlined'}
-      icon={icon}
-      icon-style="surface"
-      headline={step.label}
-      text={stepText(step)}
-    >
-      {!step.locked && (
-        <OutlinedButton slot="actions" onClick={onOpen}>
-          {step.done ? 'View' : 'Add'}
-        </OutlinedButton>
-      )}
-    </sky-feature-card>
-  );
+  const color = step.done ? 'secondary' : 'tertiary';
+  return <sky-tile-card color={color} variant="filled" icon={icon} icon-style="surface" headline={step.label} text={stepText(step)} href={href} />;
 }
 
-/** The right-hand column of the summary tab: the member's profile card. One `sky-card` grouping
- *  three sections (identity, what's missing, the profile action), each on its own `List`, split
- *  by `Divider` — the "list / divider / list / divider / action" reading the user asked for. */
+/** A plain browse-only tile (Customers, Orders) — no lock/done state, just a way in. */
+function NavCard({ icon, headline, text, href }: { icon: string; headline: string; text: string; href: string }) {
+  return <sky-tile-card color="surface" variant="filled" icon={icon} icon-style="surface" headline={headline} text={`${text} · View`} href={href} />;
+}
+
+/** The right-hand column of the summary tab: the member's profile card, under its own "Profile"
+ *  heading so it reads as a third section alongside "Setup progress" and "Records" rather than a
+ *  stray box. One `sky-card` (default `filled`, the same soft-surface language as the tile grid
+ *  beside it) grouping three parts — identity, what's missing, the profile action — each on its
+ *  own `List`, split by `Divider`. Every missing item carries a `sky-badge variant="error"`, the
+ *  one shared component with a literal `--md-sys-color-error` role, so what still needs fixing is
+ *  never just a plain grey row. */
 function MemberSummaryCard({ vendor, steps, onEditProfile }: { vendor: Vendor; steps: SetupStep[]; onEditProfile: () => void }) {
   const profileDone = steps.find((s) => s.key === 'profile')?.done ?? false;
   const missing = getMissingPoints(steps);
 
   return (
-    <sky-card variant="outlined" aria-label="Member profile">
+    <sky-card aria-label="Member profile">
       <List>
         <ListItem>
           <Icon slot="start" aria-hidden="true">person</Icon>
@@ -541,6 +547,7 @@ function MemberSummaryCard({ vendor, steps, onEditProfile }: { vendor: Vendor; s
               <Icon slot="start" aria-hidden="true">{STEP_ICON[point.key]}</Icon>
               <div slot="headline">{point.text}</div>
               <div slot="supporting-text">{point.label}</div>
+              <sky-badge slot="end" variant="error" size="small">Missing</sky-badge>
             </ListItem>
           ))
         )}

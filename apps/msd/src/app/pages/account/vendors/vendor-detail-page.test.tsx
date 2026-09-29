@@ -66,10 +66,10 @@ function attr(el: Element, name: string): string | null {
   return typeof value === 'string' ? value : el.getAttribute(name);
 }
 
-/** The left column's four setup-step cards (Profile is folded into the right-hand summary card,
+/** The left column's four setup-step tiles (Profile is folded into the right-hand summary card,
  *  so it is not one of these). */
 function stepCards(): Element[] {
-  return Array.from(document.querySelectorAll('section[aria-labelledby="setup-progress-title"] sky-feature-card'));
+  return Array.from(document.querySelectorAll('section[aria-labelledby="setup-progress-title"] sky-tile-card'));
 }
 
 /** The right-hand `sky-card`'s three `md-list-item` rows for a given `md-list` (identified by
@@ -87,8 +87,21 @@ function listItemText(item: Element): { headline: string | null; supporting: str
   };
 }
 
+/** Renders `label` for a crumb with no `to` (the current page) and `label(to)` for a crumb that
+ *  links elsewhere — the real link is only rendered by AdminLayout, not part of this test tree. */
 function TrailProbe() {
-  return <p data-testid="trail">{useBreadcrumbTrail().map((c) => c.label).join(' > ')}</p>;
+  return (
+    <p data-testid="trail">
+      {useBreadcrumbTrail()
+        .map((c) => (c.to ? `${c.label}(${c.to})` : c.label))
+        .join(' > ')}
+    </p>
+  );
+}
+
+/** The Records section's browse-only tiles (Customers, Orders). */
+function recordCards(): Element[] {
+  return Array.from(document.querySelectorAll('section[aria-labelledby="records-title"] sky-tile-card'));
 }
 
 function renderPage(vendor: Vendor, url = '/account/vendors/v1') {
@@ -99,6 +112,7 @@ function renderPage(vendor: Vendor, url = '/account/vendors/v1') {
       <MemoryRouter initialEntries={[url]}>
         <Routes>
           <Route path="/account/vendors/:vendorId" element={<VendorDetailPage />} />
+          <Route path="/account/vendors/:vendorId/:section" element={<VendorDetailPage />} />
         </Routes>
       </MemoryRouter>
     </BreadcrumbProvider>,
@@ -110,9 +124,12 @@ beforeEach(() => {
 });
 
 /**
- * Feature: Member page (`/account/vendors/:vendorId`)
- * Scenario: an admin opens one member and sees a plain summary, a setup checklist with real
- * counts, the actions that fit the member's status, and only the tabs that are unlocked.
+ * Feature: Member page (`/account/vendors/:vendorId` = Overview, `/account/vendors/:vendorId/:section`
+ * for each other section)
+ * Scenario: an admin opens one member and sees a card-driven Overview — no tab strip — with a
+ * setup checklist of real counts, a Records row, the actions that fit the member's status, and
+ * every card navigating to its own URL with a matching breadcrumb; a locked or unknown section in
+ * the URL falls back to Overview.
  */
 describe('VendorDetailPage', () => {
   it('loads the member by the id in the URL and shows the name, status and breadcrumb trail', async () => {
@@ -120,37 +137,73 @@ describe('VendorDetailPage', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Vitality Wellness & Beauty' })).toBeTruthy();
     expect(getVendorMock).toHaveBeenCalledWith('tok', 'v1');
     expect(screen.getAllByText('Active').length).toBeGreaterThan(0);
-    await waitFor(() => expect(screen.getByTestId('trail').textContent).toBe('Members > All Member > Vitality Wellness & Beauty'));
+    await waitFor(() => expect(screen.getByTestId('trail').textContent).toBe('Members > All Member(/account/vendors) > Vitality Wellness & Beauty'));
   });
 
-  it('shows the four content steps as cards, left of the profile card — no Profile card among them', async () => {
+  it('has no tab strip — md-tabs is not rendered', async () => {
     renderPage(COMPLETE);
     await screen.findByRole('heading', { level: 1 });
-    expect(stepCards().map((c) => [attr(c, 'headline'), attr(c, 'text'), attr(c, 'icon')])).toEqual([
-      ['Branches', '9 added', 'check_circle'],
-      ['Deals', '5 of 18 live', 'check_circle'],
-      ['Therapists', '12 added', 'check_circle'],
-      ['Products', '18 added', 'check_circle'],
-    ]);
+    expect(document.querySelector('md-tabs')).toBeNull();
   });
 
-  it('locks every content step and says why when the profile is incomplete', async () => {
-    renderPage({ ...COMPLETE, ownerMobile: '', _count: { branches: 0, deals: 0, products: 0, therapists: 0 }, liveCounts: undefined, status: 'PROFILE_INCOMPLETE' });
+  it('shows the four content steps as small linked tiles, each naming its own action', async () => {
+    renderPage(COMPLETE);
     await screen.findByRole('heading', { level: 1 });
-    expect(stepCards().map((c) => [attr(c, 'headline'), attr(c, 'text'), attr(c, 'icon')])).toEqual([
-      ['Branches', 'Finish the profile first', 'lock'],
-      ['Deals', 'Add a branch first', 'lock'],
-      ['Therapists', 'Add a branch first', 'lock'],
-      ['Products', 'Add a branch first', 'lock'],
+    expect(stepCards().map((c) => [attr(c, 'headline'), attr(c, 'text'), attr(c, 'icon'), attr(c, 'href')])).toEqual([
+      ['Branches', '9 added · Edit', 'check_circle', '/account/vendors/v1/branches'],
+      ['Deals', '5 of 18 live · Edit', 'check_circle', '/account/vendors/v1/branches'],
+      ['Therapists', '12 added · Edit', 'check_circle', '/account/vendors/v1/therapists'],
+      ['Products', '18 added · Edit', 'check_circle', '/account/vendors/v1/profile'],
     ]);
   });
 
-  it('gives a step an Add button only while it is unlocked', async () => {
+  it('a not-done or locked step uses the tertiary (warning) colour, not a plain grey', async () => {
     renderPage({ ...COMPLETE, _count: { branches: 0, deals: 0, products: 0, therapists: 0 }, liveCounts: undefined });
     await screen.findByRole('heading', { level: 1 });
-    const buttons = stepCards().map((c) => c.querySelectorAll('md-outlined-button').length);
-    // Branches is open (the profile is done); the three content steps wait for a branch.
-    expect(buttons).toEqual([1, 0, 0, 0]);
+    // Branches is unlocked and empty (tertiary/warning + a link); the rest are locked (tertiary, no link).
+    expect(stepCards().map((c) => [attr(c, 'color'), attr(c, 'href') != null])).toEqual([
+      ['tertiary', true],
+      ['tertiary', false],
+      ['tertiary', false],
+      ['tertiary', false],
+    ]);
+  });
+
+  it('locks every content step, says why, and gives it no link (nothing to click) while the profile is incomplete', async () => {
+    renderPage({ ...COMPLETE, ownerMobile: '', _count: { branches: 0, deals: 0, products: 0, therapists: 0 }, liveCounts: undefined, status: 'PROFILE_INCOMPLETE' });
+    await screen.findByRole('heading', { level: 1 });
+    expect(stepCards().map((c) => [attr(c, 'headline'), attr(c, 'text'), attr(c, 'icon'), attr(c, 'href')])).toEqual([
+      ['Branches', 'Finish the profile first', 'lock', null],
+      ['Deals', 'Add a branch first', 'lock', null],
+      ['Therapists', 'Add a branch first', 'lock', null],
+      ['Products', 'Add a branch first', 'lock', null],
+    ]);
+  });
+
+  it('a done step is coloured secondary — visibly different from a step that still needs attention', async () => {
+    renderPage(COMPLETE);
+    await screen.findByRole('heading', { level: 1 });
+    expect(stepCards().every((c) => attr(c, 'color') === 'secondary')).toBe(true);
+  });
+
+  it('the hint above the setup cards names the profile card as the way to unlock everything', async () => {
+    renderPage({ ...COMPLETE, ownerMobile: '', _count: { branches: 0, deals: 0, products: 0, therapists: 0 }, liveCounts: undefined });
+    expect(await screen.findByText('Complete the profile on the right to unlock branches, deals, therapists and products.')).toBeTruthy();
+  });
+
+  it('shows a Customers and an Orders browse tile in a Records section, linked to their own URLs', async () => {
+    renderPage(COMPLETE);
+    await screen.findByRole('heading', { level: 1 });
+    expect(recordCards().map((c) => [attr(c, 'headline'), attr(c, 'text'), attr(c, 'href')])).toEqual([
+      ['Customers', "This member's customers · View", '/account/vendors/v1/customers'],
+      ['Orders', "This member's orders · View", '/account/vendors/v1/orders'],
+    ]);
+  });
+
+  it('a Records tile stays linked even when the setup steps are locked — Customers/Orders are always reachable', async () => {
+    renderPage({ ...COMPLETE, ownerMobile: '', _count: { branches: 0, deals: 0, products: 0, therapists: 0 }, liveCounts: undefined });
+    await screen.findByRole('heading', { level: 1 });
+    expect(recordCards().every((c) => attr(c, 'href') != null)).toBe(true);
   });
 
   it('puts the owner, contact and KYC status on the right-hand profile card as a list', async () => {
@@ -179,8 +232,8 @@ describe('VendorDetailPage', () => {
     expect(button?.textContent?.trim()).toBe('Add profile');
   });
 
-  it('the profile card\'s action opens the setup tab', async () => {
-    renderPage(COMPLETE, '/account/vendors/v1');
+  it('the profile card\'s action opens the profile section', async () => {
+    renderPage(COMPLETE);
     await screen.findByRole('heading', { level: 1 });
     const button = document.querySelector('sky-card[aria-label="Member profile"] md-filled-button');
     if (!button) throw new Error('Edit profile button not found');
@@ -196,19 +249,30 @@ describe('VendorDetailPage', () => {
     expect(attr(badge as Element, 'variant')).toBe('tertiary');
   });
 
-  it('falls back to the summary when the URL asks for a tab that is still locked', async () => {
+  it('a bookmarked URL for a section that is still locked falls back to Overview with a reason', async () => {
     renderPage(
       { ...COMPLETE, ownerMobile: '', _count: { branches: 0, deals: 0, products: 0, therapists: 0 }, liveCounts: undefined },
-      '/account/vendors/v1?tab=branches',
+      '/account/vendors/v1/branches',
     );
-    await screen.findByRole('heading', { level: 1 });
+    // The redirect happens in an effect after the vendor loads, one render after the heading.
+    expect(await screen.findByText('Branches & Deals is locked. Finish the profile first.')).toBeTruthy();
     expect(screen.getByText('Setup progress')).toBeTruthy();
     expect(screen.queryByText('branches-tab')).toBeNull();
   });
 
-  it('opens an unlocked tab from the URL', async () => {
-    renderPage(COMPLETE, '/account/vendors/v1?tab=branches');
+  it('a bookmarked URL for an unknown section falls back to Overview', async () => {
+    renderPage(COMPLETE, '/account/vendors/v1/not-a-real-section');
+    expect(await screen.findByText('Setup progress')).toBeTruthy();
+  });
+
+  it('opens an unlocked section straight from the URL, with the matching breadcrumb', async () => {
+    renderPage(COMPLETE, '/account/vendors/v1/branches');
     expect(await screen.findByText('branches-tab')).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getByTestId('trail').textContent).toBe(
+        'Members > All Member(/account/vendors) > Vitality Wellness & Beauty(/account/vendors/v1) > Branches & Deals',
+      ),
+    );
   });
 
   it('offers Approve and Reject, not Deactivate, for a member waiting for approval', async () => {

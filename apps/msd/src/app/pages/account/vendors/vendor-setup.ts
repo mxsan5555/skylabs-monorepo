@@ -97,6 +97,17 @@ export function isSetupComplete(steps: SetupStep[]): boolean {
   return done('profile') && done('branches') && (done('deals') || done('therapists') || done('products'));
 }
 
+/** The one line under "Setup progress", context-aware so it always answers "what do I do next"
+ *  instead of a generic instruction — in particular naming the profile card (on the right) as
+ *  the way in when every card on the left is locked, since that connection isn't visually obvious. */
+export function setupHint(steps: SetupStep[]): string {
+  const done = (key: SetupStepKey) => steps.find((s) => s.key === key)?.done ?? false;
+  if (!done('profile')) return 'Complete the profile on the right to unlock branches, deals, therapists and products.';
+  if (!done('branches')) return 'Add a branch below to unlock deals, therapists and products.';
+  if (isSetupComplete(steps)) return 'Everything needed is in place.';
+  return 'Add at least one deal, therapist or product to finish setup.';
+}
+
 export interface MissingPoint {
   key: SetupStepKey;
   /** The step's own label, used as the point's heading. */

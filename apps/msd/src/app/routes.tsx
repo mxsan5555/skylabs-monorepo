@@ -292,11 +292,22 @@ export function AppRoutes() {
               </VendorsRouteGuard>
             }
           />
-          {/* One member's own page (summary + tabs). Admin only: VendorDetailPage checks
-            `vendors:view` itself, and every API call it makes is permission-gated server-side.
-            The static `new` route above wins over this dynamic segment. */}
+          {/* One member's own page: an Overview of cards (Branches/Deals/Therapists/Products +
+            the profile summary), each card's Add/Edit button navigating to that section's own
+            URL below — no tab strip, real routes instead, so the breadcrumb and back button
+            always match what's on screen. Admin only: VendorDetailPage checks `vendors:view`
+            itself, and every API call it makes is permission-gated server-side. The static `new`
+            route above wins over this dynamic segment. */}
           <Route
             path="/account/vendors/:vendorId"
+            element={
+              <VendorsRouteGuard>
+                <VendorDetailPage />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/vendors/:vendorId/:section"
             element={
               <VendorsRouteGuard>
                 <VendorDetailPage />

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Vendor } from '../../../../api/rbac/vendors';
-import { formatCount, getMissingPoints, getSetupSteps, isSetupComplete, missingProfileParts } from './vendor-setup';
+import { formatCount, getMissingPoints, getSetupSteps, isSetupComplete, missingProfileParts, setupHint } from './vendor-setup';
 
 const COMPLETE_PROFILE: Vendor = {
   id: 'v1',
@@ -125,6 +125,25 @@ describe('getMissingPoints', () => {
       { key: 'therapists', label: 'Therapists', text: 'No therapists yet' },
       { key: 'products', label: 'Products', text: 'No products yet' },
     ]);
+  });
+});
+
+describe('setupHint', () => {
+  it('points at the profile card when nothing is unlocked yet — the case a brand-new member lands on', () => {
+    const vendor = { ...COMPLETE_PROFILE, ownerMobile: '' };
+    expect(setupHint(getSetupSteps(vendor))).toBe('Complete the profile on the right to unlock branches, deals, therapists and products.');
+  });
+
+  it('asks for a branch once the profile is done', () => {
+    expect(setupHint(getSetupSteps(COMPLETE_PROFILE))).toBe('Add a branch below to unlock deals, therapists and products.');
+  });
+
+  it('asks for one of deals/therapists/products once a branch exists', () => {
+    expect(setupHint(getSetupSteps(withCounts({ branches: 1 })))).toBe('Add at least one deal, therapist or product to finish setup.');
+  });
+
+  it('says everything is in place once it is', () => {
+    expect(setupHint(getSetupSteps(withCounts({ branches: 1, deals: 1 })))).toBe('Everything needed is in place.');
   });
 });
 
