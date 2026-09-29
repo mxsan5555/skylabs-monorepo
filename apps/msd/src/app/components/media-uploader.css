@@ -14,12 +14,14 @@
   gap: 10px;
   margin: 0;
 }
+
 .media-uploader__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 160px));
   gap: 12px;
   width: 100%;
 }
+
 .media-uploader__thumb {
   position: relative;
   margin: 0;
@@ -30,6 +32,7 @@
   flex-direction: column;
   background: var(--md-sys-color-surface-container-low);
 }
+
 .media-uploader__thumb--staged {
   border-style: dashed;
 }
@@ -79,6 +82,7 @@
   width: 100%;
   box-sizing: border-box;
 }
+
 .media-uploader__actions .media-icon-button {
   width: 40px;
   min-width: 40px;
@@ -90,6 +94,7 @@
   box-sizing: border-box;
   align-items: center;
 }
+
 .media-uploader__actions md-outlined-button {
   flex: 0 0 auto;
 }
@@ -106,6 +111,7 @@
   border-radius: 8px;
   background: black;
 }
+
 @media (max-width: 600px) {
   .media-uploader__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -163,10 +163,10 @@ const KYC_DOCUMENT_TYPES: {
   type: VendorDocumentType;
   label: string;
 }[] = [
-  { type: 'GST', label: 'GST Certificate' },
-  { type: 'PAN', label: 'PAN Card' },
-  { type: 'AADHAAR', label: 'Aadhaar Card' },
-];
+    { type: 'GST', label: 'GST Certificate' },
+    { type: 'PAN', label: 'PAN Card' },
+    { type: 'AADHAAR', label: 'Aadhaar Card' },
+  ];
 
 // ─── Field-level validation (UX only) ─────────────────────────────────────────
 // Mirrors `VendorFieldsSchema` in msd-api's `vendor.schema.ts` exactly — same regexes, same
@@ -416,20 +416,20 @@ export function VendorProfileForm({
     setErrors((e) =>
       e[key]
         ? {
-            ...e,
-            [key]: undefined,
-          }
+          ...e,
+          [key]: undefined,
+        }
         : e,
     );
   };
 
   const text =
     (key: keyof VendorFields) =>
-    (e: Event) =>
-      set(
-        key,
-        (e.target as HTMLInputElement).value as never,
-      );
+      (e: Event) =>
+        set(
+          key,
+          (e.target as HTMLInputElement).value as never,
+        );
 
   /** Phone fields only ever hold digits, max 10 — strips anything else (letters, spaces,
    *  `+`/`-`, a pasted `+91` prefix) on every keystroke AND on paste, since a paste also fires
@@ -438,13 +438,13 @@ export function VendorProfileForm({
    *  then re-synced to the filtered value on the next render via the controlled `value` prop. */
   const phoneInput =
     (key: keyof VendorFields) =>
-    (e: Event) => {
-      const digitsOnly = (e.target as HTMLInputElement)
-        .value.replace(/\D/g, '')
-        .slice(0, 10);
+      (e: Event) => {
+        const digitsOnly = (e.target as HTMLInputElement)
+          .value.replace(/\D/g, '')
+          .slice(0, 10);
 
-      set(key, digitsOnly as never);
-    };
+        set(key, digitsOnly as never);
+      };
 
   /** Validates every field in the currently rendered `sections` only — fields the user can't
    *  see right now are never checked, matching how each admin-pipeline/self-service step
@@ -586,10 +586,83 @@ export function VendorProfileForm({
           </p>
         )}
 
-      {kycStatus === 'REJECTED' && kycRejectionReason && (
-        <p className="error-state" role="alert">
-          KYC rejected: {kycRejectionReason}
-        </p>
+      {vendor?.kycStatus === 'REJECTED' &&
+        vendor.kycRejectionReason && (
+          <p className="error-state" role="alert">
+            KYC rejected: {vendor.kycRejectionReason}
+          </p>
+        )}
+
+      {show('business') && (
+        <sky-tile-card
+          className="vendor-section-card"
+          headline="Business Details"
+          text="Basic information about the vendor business."
+          color="none"
+        >
+          <div className="vendor-fields-grid">
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="Business name"
+                value={form.businessName ?? ''}
+                disabled={!canEdit}
+                onInput={text('businessName')}
+                error={Boolean(errors.businessName)}
+              />
+
+              {errors.businessName && (
+                <p className="error-state" role="alert">
+                  {errors.businessName}
+                </p>
+              )}
+            </div>
+
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="Description"
+                value={form.businessDescription ?? ''}
+                disabled={!canEdit}
+                onInput={text('businessDescription')}
+              />
+            </div>
+
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="Business email"
+                type="email"
+                value={form.businessEmail ?? ''}
+                disabled={!canEdit}
+                onInput={text('businessEmail')}
+                error={Boolean(errors.businessEmail)}
+              />
+
+              {errors.businessEmail && (
+                <p className="error-state" role="alert">
+                  {errors.businessEmail}
+                </p>
+              )}
+            </div>
+
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="Business phone"
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                value={form.businessPhone ?? ''}
+                disabled={!canEdit}
+                onInput={phoneInput('businessPhone')}
+                error={Boolean(errors.businessPhone)}
+              />
+
+              {errors.businessPhone && (
+                <p className="error-state" role="alert">
+                  {errors.businessPhone}
+                </p>
+              )}
+            </div>
+          </div>
+        </sky-tile-card>
       )}
 
       {show('business') && (

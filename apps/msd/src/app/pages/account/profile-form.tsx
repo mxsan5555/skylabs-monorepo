@@ -1,15 +1,9 @@
 import { useState } from 'react';
-import {
-  FilledButton,
-  OutlinedButton,
-  TextButton,
-  IconButton,
-  OutlinedTextField,
-  Icon,
-} from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedButton, TextButton, IconButton, OutlinedTextField, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import { useAccount } from '../../../account/account-context';
 import type { Address } from '../../../types';
-
+import { validateEmail, validatePhone } from '../../../utils/validation';
+import content from '../../../content.json';
 type Draft = Omit<Address, 'id'>;
 
 const EMPTY: Draft = {
@@ -56,16 +50,44 @@ export function ProfileForm() {
   const [email, setEmail] = useState(profile.email);
   const [phone, setPhone] = useState(profile.phone);
   const [saved, setSaved] = useState(false);
-
+  const [error, setError] = useState('');
   const [editingId, setEditingId] = useState<string | 'new' | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY);
 
   const saveProfile = () => {
-    updateProfile({ email, phone });
+    setError('');
+
+    const trimmedEmail = email.trim();
+    const trimmedPhone = phone.trim();
+
+    if (!trimmedEmail) {
+      setError(content.validation.email.empty);
+      return;
+    }
+
+    if (!validateEmail(trimmedEmail)) {
+      setError(content.validation.email.invalid);
+      return;
+    }
+
+    if (!trimmedPhone) {
+      setError(content.validation.phone.empty);
+      return;
+    }
+
+    if (!validatePhone(trimmedPhone)) {
+      setError(content.validation.phone.invalid);
+      return;
+    }
+
+    updateProfile({
+      email: trimmedEmail,
+      phone: trimmedPhone,
+    });
+
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2000);
   };
-
   const startAdd = () => {
     setDraft(EMPTY);
     setEditingId('new');

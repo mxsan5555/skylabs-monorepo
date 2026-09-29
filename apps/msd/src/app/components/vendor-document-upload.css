@@ -32,7 +32,7 @@
   min-width: 0;
 }
 
-.vendor-document-upload__file-header > md-icon {
+.vendor-document-upload__file-header>md-icon {
   flex: 0 0 auto;
 }
 
@@ -87,13 +87,15 @@
 }
 
 /* Upload button when there is no document */
-.vendor-document-upload > md-outlined-button {
+.vendor-document-upload>md-outlined-button {
   width: fit-content;
   max-width: 100%;
 }
-.field-hint{
+
+.field-hint {
   margin-top: 10px;
 }
+
 @media (max-width: 700px) {
   .vendor-document-upload {
     padding: 10px;
