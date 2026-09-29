@@ -23,7 +23,7 @@ vi.mock('../../../../api/rbac/vendors', async () => {
 
 // The tab bodies are tested on their own; here they only mark which tab is showing.
 vi.mock('./vendor-pipeline', () => ({ VendorPipeline: () => <p>pipeline-tab</p> }));
-vi.mock('./vendor-branches', () => ({ VendorBranches: () => <p>branches-tab</p> }));
+vi.mock('./branches-list-page', () => ({ BranchesListPage: () => <p>branches-tab</p> }));
 vi.mock('./vendor-detail-customers', () => ({ VendorDetailCustomers: () => <p>customers-tab</p> }));
 vi.mock('./vendor-detail-orders', () => ({ VendorDetailOrders: () => <p>orders-tab</p> }));
 
@@ -255,7 +255,7 @@ describe('VendorDetailPage', () => {
       '/account/vendors/v1/branches',
     );
     // The redirect happens in an effect after the vendor loads, one render after the heading.
-    expect(await screen.findByText('Branches & Deals is locked. Finish the profile first.')).toBeTruthy();
+    expect(await screen.findByText('Branches is locked. Finish the profile first.')).toBeTruthy();
     expect(screen.getByText('Setup progress')).toBeTruthy();
     expect(screen.queryByText('branches-tab')).toBeNull();
   });
@@ -270,7 +270,7 @@ describe('VendorDetailPage', () => {
     expect(await screen.findByText('branches-tab')).toBeTruthy();
     await waitFor(() =>
       expect(screen.getByTestId('trail').textContent).toBe(
-        'Members > All Member(/account/vendors) > Vitality Wellness & Beauty(/account/vendors/v1) > Branches & Deals',
+        'Members > All Member(/account/vendors) > Vitality Wellness & Beauty(/account/vendors/v1) > Branches',
       ),
     );
   });

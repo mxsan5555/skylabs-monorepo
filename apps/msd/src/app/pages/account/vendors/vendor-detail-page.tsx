@@ -21,7 +21,7 @@ import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
 import { ChoiceMenu, type ChoiceOption } from '../../../components/choice-menu/choice-menu';
 import { CardGrid } from '../../../components/card-grid/card-grid';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
-import { VendorBranches } from './vendor-branches';
+import { BranchesListPage } from './branches-list-page';
 import { VendorDetailCustomers } from './vendor-detail-customers';
 import { VendorDetailOrders } from './vendor-detail-orders';
 import { VendorPipeline } from './vendor-pipeline';
@@ -33,7 +33,7 @@ import { getMissingPoints, getSetupSteps, setupHint, type SetupStep, type SetupS
  *  step of the plan; Branches & Deals and Therapists are replaced by their own pages after that. */
 const SECTIONS = [
   { key: 'profile', label: 'Profile & setup' },
-  { key: 'branches', label: 'Branches & Deals' },
+  { key: 'branches', label: 'Branches' },
   { key: 'therapists', label: 'Therapists' },
   { key: 'customers', label: 'Customers' },
   { key: 'orders', label: 'Orders' },
@@ -138,6 +138,7 @@ export function VendorDetailPage() {
   // Set when a URL is typed/bookmarked for a section that turns out to be locked or unknown —
   // shown once, on the Overview page this component redirects back to.
   const [lockNotice, setLockNotice] = useState('');
+  // kept for a later plan's branch-scoped Deal form
   const [categories, setCategories] = useState<Category[]>([]);
 
   const load = useCallback(
@@ -435,17 +436,8 @@ export function VendorDetailPage() {
       )}
 
       {section === 'branches' && (
-        <div className="admin-tab-panel" aria-label="Branches and Deals">
-          <VendorBranches
-            token={token}
-            vendorId={vendor.id}
-            isSelf={false}
-            canEdit={canEditAny}
-            canApproveDeal={canApprove}
-            canDeleteDeal={canDelete}
-            categories={categories}
-            onVendorRefresh={() => load(true)}
-          />
+        <div className="admin-tab-panel" aria-label="Branches">
+          <BranchesListPage token={token} vendorId={vendor.id} canEdit={canEditAny} />
         </div>
       )}
 
