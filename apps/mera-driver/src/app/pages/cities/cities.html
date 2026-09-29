@@ -1,0 +1,48 @@
+<main class="w-full max-w-[1280px] mx-auto px-3 sm:px-6 py-10 flex flex-col gap-12">
+
+  <!-- 01. HERO SECTION -->
+  <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-12 items-center w-full">
+    <!-- Left Column: Content -->
+    <article class="lg:col-span-7 flex flex-col gap-4 text-left">
+      <sky-badge variant="primary" class="self-start rounded-none tracking-wider font-bold uppercase">
+        {{ content().badge }}
+      </sky-badge>
+
+      <h1 class="m-0 text-3xl sm:text-4xl md:text-5xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight leading-tight">
+        {{ content().title }}
+      </h1>
+
+      <p class="m-0 text-base sm:text-lg text-[var(--md-sys-color-on-surface-variant)] leading-relaxed max-w-2xl">
+        {{ content().subtitle }}
+      </p>
+    </article>
+
+    <!-- Right Column: Clean Hero Showcase Image -->
+    @if (content().heroImage) {
+      <div class="lg:col-span-5 w-full aspect-[4/3] rounded-none overflow-hidden">
+        <img
+          [src]="content().heroImage"
+          [alt]="content().title"
+          class="w-full h-full object-cover rounded-none block"
+        />
+      </div>
+    }
+  </section>
+
+  <!-- 02. CLEAN CITY NAMES GRID (NO EXTRA WRAPPER DIVS, NO SPANS, NO BORDER LINES) -->
+  <section aria-label="Cities List" class="w-full">
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-4 w-full text-left">
+      @for (c of content().cities; track c.slug) {
+        <a [routerLink]="['/ride/options']" [queryParams]="{ location: c.slug }" class="no-underline group/item block py-1 cursor-pointer">
+          <p class="m-0 text-base font-semibold text-[var(--md-sys-color-on-surface)] group-hover/item:text-[var(--md-sys-color-primary)] transition-colors">
+            {{ c.name }}
+          </p>
+          <p class="m-0 text-xs text-[var(--md-sys-color-on-surface-variant)]">
+            {{ c.state }}
+          </p>
+        </a>
+      }
+    </div>
+  </section>
+
+</main>

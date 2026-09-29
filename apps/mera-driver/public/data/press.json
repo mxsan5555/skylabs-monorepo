@@ -1,0 +1,50 @@
+{
+  "badge": "Press & Media",
+  "title": "Press & Official News",
+  "linkText": "Know More",
+  "subtitle": "Read what leading news publications are saying about Mera Driver and our mission.",
+  "articles": [
+    {
+      "id": "press-1",
+      "image": "/images/press/press_1.jpg",
+      "snippet": "Person-to-person on-demand driver service will enable users to book verified drivers seamlessly across major metros in India.",
+      "publisher": "carandbike.com",
+      "publishedDate": "Sep 2026"
+    },
+    {
+      "id": "press-2",
+      "image": "/images/press/press_2.jpg",
+      "snippet": "Mobility startup Mera Driver raises Series-A funding to expand background-verified driver network and hourly commuting packages.",
+      "publisher": "YourStory",
+      "publishedDate": "Aug 2026"
+    },
+    {
+      "id": "press-3",
+      "image": "/images/press/press_3.jpg",
+      "snippet": "Mera Driver announces 24/7 emergency live tracking and instant driver dispatch for outstation and intra-city travel.",
+      "publisher": "The Economic Times",
+      "publishedDate": "Jul 2026"
+    },
+    {
+      "id": "press-4",
+      "image": "/images/about/jobs_team_office.jpg",
+      "snippet": "How Mera Driver is creating 100,000+ flexible micro-entrepreneurship opportunities for professional drivers across tier-1 cities.",
+      "publisher": "Inc42",
+      "publishedDate": "Jun 2026"
+    },
+    {
+      "id": "press-5",
+      "image": "/images/careers/careers_hero.jpg",
+      "snippet": "Intra-city driver booking platform sees 3x growth in daily rides as corporate commuting demand surges.",
+      "publisher": "Financial Express",
+      "publishedDate": "May 2026"
+    },
+    {
+      "id": "press-6",
+      "image": "/images/careers/careers_culture.jpg",
+      "snippet": "Mera Driver launches transparent hourly rate cards with zero surge pricing for evening and event hires.",
+      "publisher": "TechCrunch",
+      "publishedDate": "Apr 2026"
+    }
+  ]
+} 

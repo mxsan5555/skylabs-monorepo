@@ -1,0 +1,190 @@
+<main class="w-full max-w-[1280px] mx-auto px-3 sm:px-6 py-8 flex flex-col gap-16">
+
+  <!-- 01. HERO SECTION -->
+  <header class="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center py-4 sm:py-8">
+    <!-- Left Column: Copy & Actions -->
+    <article class="lg:col-span-7 flex flex-col items-start text-left gap-4 sm:gap-6">
+      <sky-badge variant="primary" class="rounded-none tracking-wider font-bold uppercase">
+        {{ content().hero.badge }}
+      </sky-badge>
+
+      <h1 class="m-0 text-3xl sm:text-4xl md:text-5xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight leading-tight">
+        {{ content().hero.title }}
+      </h1>
+
+      <p class="m-0 text-base sm:text-lg text-[var(--md-sys-color-on-surface-variant)] max-w-xl leading-relaxed">
+        {{ content().hero.subtitle }}
+      </p>
+
+      <a [routerLink]="content().hero.link" class="no-underline pt-2">
+        <md-filled-button class="rounded-none shadow-sm px-6 py-3 text-base">
+          {{ content().hero.btnText }}
+        </md-filled-button>
+      </a>
+    </article>
+
+    <!-- Right Column: Hero Graphic Showcase -->
+    <figure class="lg:col-span-5 w-full m-0">
+      <sky-card variant="outlined" class="block w-full aspect-[4/3] rounded-none overflow-hidden shadow-sm">
+        <img
+          [src]="content().hero.image"
+          alt="Professional driver partner with car"
+          class="w-full h-full object-cover object-top rounded-none block"
+        />
+      </sky-card>
+    </figure>
+  </header>
+
+  <!-- 02. PROMOTIONAL OFFER BANNER -->
+  @if (content().offerBanner) {
+    <section aria-label="Promotional Offer" class="w-full">
+      <sky-card variant="outlined" class="block w-full rounded-none bg-[var(--md-sys-color-surface-container-low)] border-2 border-[var(--md-sys-color-primary)]">
+        <article class="p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 text-left">
+          <div class="flex flex-col gap-3 max-w-3xl">
+            <header class="flex items-center gap-3">
+              <sky-badge variant="primary" class="rounded-none">
+                {{ content().offerBanner.badge }}
+              </sky-badge>
+              <sky-badge variant="tonal" class="rounded-none font-mono font-bold tracking-wider">
+                USE CODE: {{ content().offerBanner.code }}
+              </sky-badge>
+            </header>
+
+            <h2 class="m-0 text-2xl sm:text-3xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight">
+              {{ content().offerBanner.title }}
+            </h2>
+
+            <p class="m-0 text-sm sm:text-base text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+              {{ content().offerBanner.subtitle }}
+            </p>
+          </div>
+
+          <a [routerLink]="content().offerBanner.link" class="no-underline shrink-0">
+            <md-filled-button class="rounded-none shadow-sm">
+              {{ content().offerBanner.btnText }}
+            </md-filled-button>
+          </a>
+        </article>
+      </sky-card>
+    </section>
+  }
+
+  <!-- 03. DRIVER BOOKING CATEGORIES (3 MERA DRIVER CATEGORIES) -->
+  <section aria-label="Pricing Packages" class="w-full flex flex-col gap-8">
+    <h2 class="m-0 text-2xl sm:text-3xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight text-left">
+      {{ content().packagesTitle }}
+    </h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full items-stretch">
+      @for (pkg of content().packages; track pkg.id) {
+        <sky-card variant="outlined" class="block w-full rounded-none h-full">
+          <article class="p-6 flex flex-col justify-between h-full gap-6 text-left">
+            <header class="flex flex-col gap-4">
+              <sky-badge variant="primary" class="self-start rounded-none">
+                {{ pkg.badge }}
+              </sky-badge>
+
+              <h3 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-surface)]">
+                {{ pkg.name }}
+              </h3>
+
+              <!-- Price Display -->
+              <div class="flex flex-col gap-1 pt-2 border-t border-[var(--md-sys-color-outline-variant)]">
+                <p class="m-0 text-3xl sm:text-4xl font-extrabold text-[var(--md-sys-color-primary)] flex items-baseline gap-1.5">
+                  {{ pkg.price }}
+                  <span class="text-xs text-[var(--md-sys-color-on-surface-variant)] font-semibold">{{ pkg.unit }}</span>
+                </p>
+                <p class="m-0 text-xs text-[var(--md-sys-color-on-surface-variant)] font-medium">
+                  {{ pkg.subtext }}
+                </p>
+              </div>
+
+              <!-- Features Checklist -->
+              <ul class="m-0 p-0 list-none flex flex-col gap-2.5 pt-3 border-t border-[var(--md-sys-color-outline-variant)] text-xs sm:text-sm text-[var(--md-sys-color-on-surface-variant)]">
+                @for (feature of pkg.features; track feature) {
+                  <li class="flex items-start gap-2">
+                    <md-icon class="text-base text-[var(--md-sys-color-primary)] shrink-0">check_circle</md-icon>
+                    {{ feature }}
+                  </li>
+                }
+              </ul>
+            </header>
+
+            <a [routerLink]="pkg.link" class="no-underline block w-full pt-2">
+              <md-filled-button class="w-full rounded-none shadow-sm">
+                {{ pkg.btnText }}
+              </md-filled-button>
+            </a>
+          </article>
+        </sky-card>
+      }
+    </div>
+  </section>
+
+  <!-- 04. BOOK YOUR DRIVER IN 3 SIMPLE STEPS -->
+  @if (content().steps) {
+    <section aria-label="How it Works" class="w-full flex flex-col gap-8">
+      <header class="flex flex-col gap-2 text-left">
+        <h2 class="m-0 text-2xl sm:text-3xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight">
+          {{ content().steps.title }}
+        </h2>
+        <p class="m-0 text-sm sm:text-base text-[var(--md-sys-color-on-surface-variant)] leading-relaxed mt-1">
+          {{ content().steps.subtitle }}
+        </p>
+      </header>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+        @for (step of content().steps.items; track step.step) {
+          <sky-card variant="outlined" class="block w-full rounded-none h-full">
+            <article class="p-6 flex flex-col gap-4 text-left h-full justify-between">
+              <header class="flex flex-col gap-4">
+                <div class="flex items-center justify-between">
+                  <sky-badge variant="tonal" class="rounded-none font-mono font-bold">
+                    STEP {{ step.step }}
+                  </sky-badge>
+                  <md-icon class="text-2xl text-[var(--md-sys-color-primary)]">{{ step.icon }}</md-icon>
+                </div>
+
+                <h3 class="m-0 text-lg font-bold text-[var(--md-sys-color-on-surface)]">
+                  {{ step.title }}
+                </h3>
+
+                <p class="m-0 text-xs sm:text-sm text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+                  {{ step.description }}
+                </p>
+              </header>
+            </article>
+          </sky-card>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- 05. VALUE GUARANTEES / WHY CHOOSE US -->
+  @if (content().guarantees.length) {
+    <section aria-label="Value Guarantees" class="w-full flex flex-col gap-8">
+      <h2 class="m-0 text-2xl sm:text-3xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight text-left">
+        {{ content().guaranteesTitle }}
+      </h2>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+        @for (item of content().guarantees; track item.title) {
+          <sky-card variant="outlined" class="block w-full rounded-none h-full">
+            <article class="p-6 flex flex-col gap-4 text-left h-full">
+              <md-icon class="text-3xl text-[var(--md-sys-color-primary)] shrink-0">{{ item.icon }}</md-icon>
+
+              <h3 class="m-0 text-lg font-bold text-[var(--md-sys-color-on-surface)]">
+                {{ item.title }}
+              </h3>
+
+              <p class="m-0 text-xs sm:text-sm text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+                {{ item.description }}
+              </p>
+            </article>
+          </sky-card>
+        }
+      </div>
+    </section>
+  }
+
+</main>
