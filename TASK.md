@@ -10,17 +10,27 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 ## In progress
 
 ### msd admin — member (vendor) console redesign (plan: one screen, one job, no popups)
-Plan file: `~/.claude/plans/our-backend-admin-layout-snug-sloth.md`. Each step ships alone.
+Original plan file: `~/.claude/plans/our-backend-admin-layout-snug-sloth.md`. Each step ships alone.
 - [x] **1. Member page + summary** — `/account/vendors/:vendorId` (summary checklist, Actions menu with
-      inline confirm instead of `window.prompt`, locked tabs, breadcrumb via `admin/breadcrumb-context`),
-      list rows open it, list shows Branches/Deals/Therapists/Products as "live of total" (API adds
-      `liveCounts` + therapist count) — 2026-09-28. The old tab bodies are still inside it until their step.
+      inline confirm instead of `window.prompt`, breadcrumb via `admin/breadcrumb-context`), list rows
+      open it, list shows Branches/Deals/Therapists/Products as "live of total" (API adds `liveCounts` +
+      therapist count) — 2026-09-28. Reworked mid-step into a no-tab, card-driven Overview (real routes
+      per section, `sky-tile-card` warning-tone setup cards, `setupHint`) — see
+      `docs/superpowers/specs/2026-09-28-vendor-branch-management-design.md` for the "why".
 - [ ] 2. Profile page (replaces the "Profile & setup" tab and the six-step pill wizard)
-- [ ] 3. Branches pages (state first, rest unlocks)
-- [ ] 4. Deals pages (`DealCard` list, full-page add/edit)
-- [ ] 5. Therapists pages
-- [ ] 6. Products pages
-- [ ] 7. Remove the pill wizard + dialogs, dedupe the admin/self-service forms; add a Products tab
+- [x] **3a. Branches list + add/edit** — `branches-list-page.tsx` (card grid, outlined/no-fill
+      `sky-feature-card`, Edit/Deactivate — branches have no hard delete), `branch-form-page.tsx`
+      (state-gated `sky-accordion`: Location → Opening Hours → Category Access) at
+      `/account/vendors/:id/branches`, `/branches/new`, `/branches/:branchId` — 2026-09-28. Design:
+      `docs/superpowers/specs/2026-09-28-vendor-branch-management-design.md`. Plan:
+      `docs/superpowers/plans/2026-09-28-vendor-branches-crud-plan.md`.
+- [ ] 3b. Deals inside a branch — `/branches/:branchId/deals` (list + add/edit), own plan, next.
+- [ ] 3c. Therapists inside a branch — `/branches/:branchId/therapists`, own plan, after 3b. Also drops
+      the Overview's standalone Therapists tab (`TherapistsTab`/`toTherapistRow`) once it ships — that
+      tab still exists today as the only way to see a vendor's therapists.
+- [ ] 4. Products page (still vendor-level, not branch-scoped — reached via the Overview's "Products"
+      card into the profile wizard until it gets its own page)
+- [ ] 5. Remove the pill wizard + dialogs, dedupe the admin/self-service forms
 - [ ] Open: confirm "live" definition (active branch/product/therapist, ACTIVE + APPROVED deal)
 
 ### Deployment (Vercel) — pipeline live, hardening pending
