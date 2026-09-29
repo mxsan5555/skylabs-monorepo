@@ -264,20 +264,15 @@ export function VendorPipeline({
     reloadBranches().catch(() => { });
   };
 
-  if (!vendor) {
-    return (
-      <div className="admin-page">
-        {error && <p className="error-state" role="alert">{error}</p>}
-        <VendorUserPicker value={pendingOwner} onChange={setPendingOwner} disabled={saving} />
-        <div className="form-actions">
-          <FilledButton ref={saveButtonRef} onClick={saveUser} disabled={!pendingOwner || saving}>
-            {saving ? 'Creating…' : 'Create Vendor'}
-          </FilledButton>
-        </div>
-      </div>
-    );
-  }
-
+  // Declared unconditionally, above the `!vendor` early return below — every hook in this
+  // component must run on every render regardless of `vendor`'s value (Rules of Hooks). Vendor
+  // creation flips `vendor` from null to a real row on the SAME mounted VendorPipeline instance
+  // (see `saveUser` above), so a hook declared after that early return is only called on some
+  // renders, not others: React detects the hook-count mismatch on the very next render and
+  // throws "Rendered more hooks than during the previous render", which the top-level
+  // ErrorBoundary then shows as "Something went wrong" — this was a real, reproducible crash
+  // (confirmed via a live captured stack trace) immediately after "Create Vendor" succeeds,
+  // exactly when Step 1 should appear.
   const refreshVendorAfterKycChange = useCallback(async () => {
     if (!vendorId) return;
 
@@ -294,9 +289,21 @@ export function VendorPipeline({
     }
   }, [token, vendorId, onVendorChange]);
 
+  if (!vendor) {
+    return (
+      <div className="admin-page">
+        {error && <p className="error-state" role="alert">{error}</p>}
+        <VendorUserPicker value={pendingOwner} onChange={setPendingOwner} disabled={saving} />
+        <div className="form-actions">
+          <FilledButton ref={saveButtonRef} onClick={saveUser} disabled={!pendingOwner || saving}>
+            {saving ? 'Creating…' : 'Create Vendor'}
+          </FilledButton>
+        </div>
+      </div>
+    );
+  }
 
   const kycDocOk = hasMinimumKycDocument(vendor);
-  console.log('the kycDocOk is', kycDocOk, 'the vendor is', vendor);
 
   return (
     <div className="admin-page">
