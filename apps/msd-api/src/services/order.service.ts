@@ -24,6 +24,68 @@ const ORDER_INCLUDE = {
   },
 } as const;
 
+const DEAL_IMAGE_ORDER_BY: Prisma.DealImageOrderByWithRelationInput[] = [
+  { isPrimary: 'desc' },
+  { sortOrder: 'asc' },
+];
+const PRODUCT_IMAGE_ORDER_BY: Prisma.ProductImageOrderByWithRelationInput[] = [
+  { isPrimary: 'desc' },
+  { sortOrder: 'asc' },
+];
+
+const CUSTOMER_ORDER_INCLUDE = {
+  ...ORDER_INCLUDE,
+  items: {
+    include: {
+      deal: {
+        select: {
+          images: true,
+          mediaImages: {
+            orderBy: DEAL_IMAGE_ORDER_BY,
+            select: { storageKey: true, isPrimary: true, sortOrder: true },
+          },
+        },
+      },
+      product: {
+        select: {
+          image: true,
+          gallery: true,
+          mediaImages: {
+            orderBy: PRODUCT_IMAGE_ORDER_BY,
+            select: { storageKey: true, isPrimary: true, sortOrder: true },
+          },
+        },
+      },
+    },
+  },
+} as const;
+
+type CustomerOrder = Prisma.OrderGetPayload<{ include: typeof CUSTOMER_ORDER_INCLUDE }>;
+
+function firstLegacyImage(value: Prisma.JsonValue | null): string | null {
+  if (!Array.isArray(value)) return null;
+  const image = value.find((candidate) => typeof candidate === 'string');
+  return typeof image === 'string' ? image : null;
+}
+
+function firstMediaImage(images: { storageKey: string; isPrimary: boolean }[]): string | null {
+  return images.find((image) => image.isPrimary)?.storageKey ?? images[0]?.storageKey ?? null;
+}
+
+function addCustomerOrderItemImages(order: CustomerOrder) {
+  return {
+    ...order,
+    items: order.items.map(({ deal, product, ...item }) => ({
+      ...item,
+      image: deal
+        ? firstMediaImage(deal.mediaImages) ?? firstLegacyImage(deal.images)
+        : product
+          ? firstMediaImage(product.mediaImages) ?? firstLegacyImage(product.gallery) ?? product.image
+          : null,
+    })),
+  };
+}
+
 /**
  * Admin/vendor/customer order UI label ("Deal Order" / "Product Order" / "Therapist Order" /
  * "Mixed Order") — computed from the composition of an order's own items rather than stored on
@@ -226,17 +288,17 @@ export async function createOrderFromCart(customerId: string, contactDetails: Or
 export async function listMyOrders(customerId: string, opts: { page: number; pageSize: number; status?: OrderStatus }) {
   const where = { customerId, ...(opts.status ? { status: opts.status } : {}) };
   const [items, total] = await Promise.all([
-    prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (opts.page - 1) * opts.pageSize, take: opts.pageSize, include: ORDER_INCLUDE }),
+    prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (opts.page - 1) * opts.pageSize, take: opts.pageSize, include: CUSTOMER_ORDER_INCLUDE }),
     prisma.order.count({ where }),
   ]);
-  return { items, total };
+  return { items: items.map(addCustomerOrderItemImages), total };
 }
 
 /** A different customer's order 404s (not 403) — never confirms existence, same rule as Cart. */
 export async function getMyOrderOrThrow(customerId: string, id: string) {
-  const order = await prisma.order.findUnique({ where: { id }, include: ORDER_INCLUDE });
+  const order = await prisma.order.findUnique({ where: { id }, include: CUSTOMER_ORDER_INCLUDE });
   if (!order || order.customerId !== customerId) throw new ApiError('NOT_FOUND', 'Order not found');
-  return order;
+  return addCustomerOrderItemImages(order);
 }
 
 export async function cancelMyOrder(customerId: string, id: string, reason?: string) {

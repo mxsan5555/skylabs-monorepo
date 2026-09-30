@@ -10,14 +10,14 @@ import content from '../../../content.json';
  *  Therapist alike, becomes an Order here). Reuses `entity-list`/`status-pill`. Relocated here
  *  from the old marketplace orders route now that the marketplace route namespace is retired —
  *  this page never had a mock/static equivalent, so it moved rather than merged. */
- 
+
 export function Orders() {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-const { orders: ordersContent } = content;
+  const { orders: ordersContent } = content;
   const load = useCallback(() => {
     setLoading(true);
     setError('');
@@ -33,7 +33,7 @@ const { orders: ordersContent } = content;
 
   return (
     <div className="category-page">
-    <title>{ordersContent.metaTitle}</title>
+      <title>{ordersContent.metaTitle}</title>
       <meta name="robots" content="noindex" />
 
       <header className="category-page__hero">

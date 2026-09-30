@@ -311,7 +311,11 @@ interface VendorProfileFormProps {
    * Called after a KYC document is uploaded or deleted so the parent
    * VendorPipeline can refresh its vendor state immediately.
    */
-  onKycDocumentChanged?: () => void;
+  onKycDocumentChanged?: (
+    change:
+      | { action: 'uploaded'; document: VendorDocument }
+      | { action: 'deleted'; documentType: VendorDocumentType },
+  ) => void;
 }
 
 /**
@@ -821,15 +825,21 @@ export function VendorProfileForm({
                   )}
                   token={token}
                   onUploaded={(doc) =>
-                    setDocuments((prev) => [
-                      ...prev.filter((d) => d.documentType !== type),
-                      doc,
-                    ])
+                    {
+                      setDocuments((prev) => [
+                        ...prev.filter((d) => d.documentType !== type),
+                        doc,
+                      ]);
+                      onKycDocumentChanged?.({ action: 'uploaded', document: doc });
+                    }
                   }
                   onDeleted={() =>
-                    setDocuments((prev) =>
-                      prev.filter((d) => d.documentType !== type)
-                    )
+                    {
+                      setDocuments((prev) =>
+                        prev.filter((d) => d.documentType !== type)
+                      );
+                      onKycDocumentChanged?.({ action: 'deleted', documentType: type });
+                    }
                   }
                   onStagedChange={(hasFile) =>
                     setKycSlotHasFile((prev) => ({
