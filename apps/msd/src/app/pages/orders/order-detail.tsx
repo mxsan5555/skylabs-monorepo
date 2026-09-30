@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FilledButton, OutlinedButton, Divider } from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, CircularProgress, OutlinedButton, Divider } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getMyOrder, cancelMyOrder, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
@@ -45,11 +45,15 @@ export function OrderDetail() {
       setError(err instanceof ApiRequestError ? err.message : 'Could not cancel this order.');
     }
   };
-
   const vendorGroups = order ? groupOrderItemsByVendor(order.items) : [];
-
-  if (loading) return <p className="loading-state">Loading order…</p>;
-
+  if (loading) {
+    return (
+      <div className="order-loading">
+        <CircularProgress indeterminate aria-label="Loading order" />
+        <p>Loading order…</p>
+      </div>
+    );
+  }
   if (error || !order) {
     return (
       <div className="cart-page cart-page--empty">
@@ -59,17 +63,13 @@ export function OrderDetail() {
       </div>
     );
   }
-
   return (
     <div className="cart-page">
       <title>{orderDetail.metaTitle}</title>
       <meta name="robots" content="noindex" />
-
       <div className="cart-page__inner">
         <h1 className="cart-page__title"> {orderDetail.title.prefix}{' '} {order.status === 'PENDING_PAYMENT' ? orderDetail.title.placed : order.status.toLowerCase()}</h1>
-
         {error && <p className="error-state" role="alert">{error}</p>}
-
         <sky-card variant="outlined" className="cart-summary-card">
           <div className="cart-summary">
             <div className="cart-summary__row">
@@ -110,7 +110,7 @@ export function OrderDetail() {
             )}
             {order.status === 'PENDING_PAYMENT' && (
               <FilledButton onClick={() => navigate('/checkout', { state: { orderId: order.id } })}>
-                 {orderDetail.actions.payPrefix} {formatINR(Number(order.total))}
+                {orderDetail.actions.payPrefix} {formatINR(Number(order.total))}
               </FilledButton>
             )}
             {(order.status === 'PENDING_PAYMENT' || order.status === 'CONFIRMED') && (
@@ -118,12 +118,11 @@ export function OrderDetail() {
             )}
             <OutlinedButton onClick={() => navigate(`/orders/${order.id}/invoice`)}> {orderDetail.actions.downloadInvoice}</OutlinedButton>
             <OutlinedButton onClick={() => navigate('/orders')}> {orderDetail.actions.myOrders}</OutlinedButton>
-            <OutlinedButton onClick={() => navigate('/categories')}> {orderDetail.actions.continueShopping}</OutlinedButton>
+            <OutlinedButton onClick={() => navigate('/explore')}> {orderDetail.actions.continueShopping}</OutlinedButton>
           </div>
         </sky-card>
       </div>
     </div>
   );
 }
-
 export default OrderDetail;
