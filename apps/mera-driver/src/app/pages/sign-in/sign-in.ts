@@ -81,23 +81,62 @@ export class SignIn implements OnInit {
     this.error.set(null);
   }
 
-  protected onInput(val: string): void {
-    this.value = val;
+  protected onPhoneKeyDown(event: KeyboardEvent): void {
+    const allowedKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Home', 'End'];
+    if (allowedKeys.includes(event.key) || event.ctrlKey || event.metaKey) {
+      return;
+    }
+    if (!/^\d$/.test(event.key)) {
+      event.preventDefault();
+    }
+  }
+
+  protected onInput(val: string, target?: HTMLInputElement | any): void {
+    if (this.method() === 'phone') {
+      const digitsOnly = val.replace(/\D/g, '').slice(0, 10);
+      this.value = digitsOnly;
+      if (target && target.value !== digitsOnly) {
+        target.value = digitsOnly;
+      }
+    } else {
+      this.value = val;
+    }
     this.emailError.set('');
     this.phoneError.set('');
     this.error.set(null);
   }
 
-  protected sendOtp(): void {
+  protected validateInput(): boolean {
     const val = this.value.trim();
-    if (!val) {
-      if (this.method() === 'phone') {
-        this.phoneError.set('Please enter a valid phone number.');
-      } else {
-        this.emailError.set('Please enter a valid email address.');
+    if (this.method() === 'email') {
+      if (!val) {
+        this.emailError.set('Email address is required.');
+        return false;
       }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(val)) {
+        this.emailError.set('Please enter a valid email address.');
+        return false;
+      }
+    } else {
+      if (!val) {
+        this.phoneError.set('Phone number is required.');
+        return false;
+      }
+      const phoneRegex = /^\d{10}$/;
+      if (!phoneRegex.test(val)) {
+        this.phoneError.set('Please enter a valid 10-digit phone number.');
+        return false;
+      }
+    }
+    return true;
+  }
+
+  protected sendOtp(): void {
+    if (!this.validateInput()) {
       return;
     }
+    const val = this.value.trim();
 
     this.loading.set(true);
     this.error.set(null);
@@ -135,9 +174,7 @@ export class SignIn implements OnInit {
   }
 
   protected submitPassword(): void {
-    const val = this.value.trim();
-    if (!val) {
-      this.passwordError.set('Enter your email or phone number.');
+    if (!this.validateInput()) {
       return;
     }
     if (!this.password) {
@@ -145,6 +182,7 @@ export class SignIn implements OnInit {
       return;
     }
 
+    const val = this.value.trim();
     this.passwordError.set('');
     this.passwordLoading.set(true);
     this.authApi.loginWithPassword(val, this.password).subscribe({

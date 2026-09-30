@@ -51,11 +51,33 @@
     </md-tabs>
 
     @if (method() === 'phone') {
-      <md-outlined-text-field class="auth-field" [label]="content().labelPhone" type="tel" autocomplete="tel" [value]="value" (input)="onInput($any($event.target).value)"  [error]="!!phoneError()"  [errorText]="phoneError()">
+      <md-outlined-text-field
+        class="auth-field"
+        [label]="content().labelPhone"
+        type="tel"
+        inputmode="numeric"
+        autocomplete="tel"
+        placeholder="Enter 10-digit phone number"
+        [value]="value"
+        (keydown)="onPhoneKeyDown($event)"
+        (input)="onInput($any($event.target).value, $event.target)"
+        [error]="!!phoneError()"
+        [errorText]="phoneError()"
+      >
         <md-icon slot="leading-icon" aria-hidden="true">call</md-icon>
       </md-outlined-text-field>
     } @else {
-      <md-outlined-text-field class="auth-field" [label]="content().labelEmail" type="email" autocomplete="email" [value]="value" (input)="onInput($any($event.target).value)"  [error]="!!emailError()"  [errorText]="emailError()">
+      <md-outlined-text-field
+        class="auth-field"
+        [label]="content().labelEmail"
+        type="email"
+        autocomplete="email"
+        placeholder="Enter email address"
+        [value]="value"
+        (input)="onInput($any($event.target).value)"
+        [error]="!!emailError()"
+        [errorText]="emailError()"
+      >
         <md-icon slot="leading-icon" aria-hidden="true">mail</md-icon>
       </md-outlined-text-field>
     }

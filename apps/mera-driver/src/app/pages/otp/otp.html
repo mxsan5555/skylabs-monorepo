@@ -22,12 +22,15 @@
     <md-outlined-text-field
       class="otp-field"
       [label]="content().inputLabel"
-      type="text"
+      type="tel"
       inputmode="numeric"
       autocomplete="one-time-code"
-      maxlength="6"
+      placeholder="Enter 6-digit code"
       [value]="code"
-      (input)="code = $any($event.target).value"
+      (keydown)="onCodeKeyDown($event)"
+      (input)="onCodeInput($any($event.target).value, $event.target)"
+      [error]="!!error()"
+      [errorText]="error() || ''"
     ></md-outlined-text-field>
 
     @if (error()) {

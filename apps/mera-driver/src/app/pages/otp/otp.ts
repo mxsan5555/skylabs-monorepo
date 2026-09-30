@@ -94,15 +94,39 @@ export class Otp implements OnInit, OnDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
+  protected onCodeKeyDown(event: KeyboardEvent): void {
+    const allowedKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Home', 'End'];
+    if (allowedKeys.includes(event.key) || event.ctrlKey || event.metaKey) {
+      return;
+    }
+    if (!/^\d$/.test(event.key)) {
+      event.preventDefault();
+    }
+  }
+
+  protected onCodeInput(val: string, target?: HTMLInputElement | any): void {
+    const digitsOnly = val.replace(/\D/g, '').slice(0, 6);
+    this.code = digitsOnly;
+    if (target && target.value !== digitsOnly) {
+      target.value = digitsOnly;
+    }
+    this.error.set(null);
+  }
+
   protected verify(): void {
-    if (this.code.length !== 6) {
-      this.error.set('Enter the 6-digit code.');
+    const digitsOnly = this.code.trim();
+    if (!digitsOnly) {
+      this.error.set(this.content().errorOtpEmpty || 'Please enter the 6-digit verification code.');
+      return;
+    }
+    if (digitsOnly.length !== 6 || !/^\d{6}$/.test(digitsOnly)) {
+      this.error.set(this.content().errorOtpInvalid || 'Please enter a valid 6-digit numeric code.');
       return;
     }
 
     this.error.set(null);
     this.verifying.set(true);
-    this.authApi.verifyOtp(this.destination, this.code, 'login').subscribe({
+    this.authApi.verifyOtp(this.destination, digitsOnly, 'login').subscribe({
       next: async (result) => {
         await this.auth.signIn(result.accessToken, result.refreshToken);
         this.verifying.set(false);
