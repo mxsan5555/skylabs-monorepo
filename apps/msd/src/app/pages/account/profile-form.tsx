@@ -123,7 +123,7 @@ export function ProfileForm() {
           {error && (<p className="error-state" role="alert">{error}</p>)}
           <section className="account-card">
             <div className="account-card__head">
-              <h2>Contact details</h2>
+             
               {saved && (<sky-badge className="otp-muted" role="status">Saved</sky-badge>)}
             </div>
             <div className="account-fields">
@@ -148,7 +148,7 @@ export function ProfileForm() {
             </div>
             <div><FilledButton onClick={saveProfile}>Save changes</FilledButton></div>
           </section>
-          <section className="account-card">
+          {/* <section className="account-card">
             <div className="account-card__head">
               <h2>Addresses</h2>
               {editingId === null && (
@@ -207,7 +207,7 @@ export function ProfileForm() {
                 ))}
               </ul>
             )}
-          </section>
+          </section> */}
         </>
       )}
     </>

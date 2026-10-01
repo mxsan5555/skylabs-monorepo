@@ -963,8 +963,8 @@
   },
   "errors": {
     "load": "Could not load your orders."
-  },
-  "placeholderImage": "https://picsum.photos/seed/order-item/120/120"
+  }
+  
 },
   "orderDetail": {
     "loading": "Loading order…",

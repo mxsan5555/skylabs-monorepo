@@ -8,6 +8,7 @@ import { ApiRequestError } from '../../../api/rbac/client';
 import './orders.css';
 import content from '../../../content.json';
 import { CardGrid } from '../../components/card-grid/card-grid';
+import { Breadcrumb } from '../../components/breadcrumb';
 /** Customer's own orders — the Cart convergence point (every purchase kind, Deal/Product/
  *  Therapist alike, becomes an Order here). Reuses `entity-list`/`status-pill`. Relocated here
  *  from the old marketplace orders route now that the marketplace route namespace is retired —
@@ -46,14 +47,12 @@ export function Orders() {
       <title>{ordersContent.metaTitle}</title>
       <meta name="robots" content="noindex" />
 
-      <header className="category-page__hero">
-        <div className="category-page__hero-inner">
-          <div>
-            <h1 className="category-page__title">{ordersContent.title}</h1>
-            <p className="category-page__subtitle">{ordersContent.subtitle}</p>
-          </div>
-        </div>
-      </header>
+      <Breadcrumb
+        items={[
+          { label: 'Home', to: '/' },
+          { label: 'Orders' },
+        ]}
+      />
       <div className="customer-orders-filters">
         <Tabs>
           <SecondaryTab
@@ -99,18 +98,18 @@ export function Orders() {
               <FilledButton onClick={() => navigate('/categories')}>{ordersContent.empty.cta}</FilledButton>
             </div>
           ) : (
-        
-           <CardGrid layout="list">
-  {filteredOrders.map((order) => (
-    <CustomerOrderCard
-      key={order.id}
-      order={order}
-      onViewDetails={(selectedOrder) =>
-        navigate(`/orders/${selectedOrder.id}`)
-      }
-    />
-  ))}
-</CardGrid>
+
+            <CardGrid layout="list">
+              {filteredOrders.map((order) => (
+                <CustomerOrderCard
+                  key={order.id}
+                  order={order}
+                  onViewDetails={(selectedOrder) =>
+                    navigate(`/orders/${selectedOrder.id}`)
+                  }
+                />
+              ))}
+            </CardGrid>
           )}
         </div>
       </section>

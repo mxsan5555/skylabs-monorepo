@@ -160,6 +160,7 @@ export function AppRoutes() {
             deliberately stay OUTSIDE this block (see above) even though the sidebar's own
             NAV_ITEMS still links to them — clicking those links just navigates to the
             sidebar-less Cart/Wishlist routes above, same as clicking the Header icons. */}
+                   {/* Customer account pages WITH sidebar */}
           <Route
             element={
               <RequireAuth>
@@ -170,6 +171,7 @@ export function AppRoutes() {
             <Route path="/my-account" element={<MyAccountProfile />} />
             <Route path="/my-account/profile" element={<MyAccountProfile />} />
             <Route path="/my-account/payments" element={<MyAccountPayments />} />
+
             <Route
               path="/my-account/invoices"
               element={
@@ -179,6 +181,7 @@ export function AppRoutes() {
                 />
               }
             />
+
             <Route
               path="/my-account/settings"
               element={
@@ -189,10 +192,32 @@ export function AppRoutes() {
               }
             />
 
+            {/* Orders list keeps the customer account sidebar */}
             <Route path="/orders" element={<Orders />} />
-            <Route path="/orders/:id" element={<OrderDetail />} />
-            <Route path="/orders/:id/invoice" element={<Invoice />} />
           </Route>
+
+          {/* =====================================================
+              ORDER DETAIL — standalone storefront page
+              NO MyAccountLayout / NO account sidebar
+             ===================================================== */}
+          <Route
+            path="/orders/:id"
+            element={
+              <RequireAuth>
+                <OrderDetail />
+              </RequireAuth>
+            }
+          />
+
+          {/* Invoice — standalone storefront page */}
+          <Route
+            path="/orders/:id/invoice"
+            element={
+              <RequireAuth>
+                <Invoice />
+              </RequireAuth>
+            }
+          />
 
           {/* ── Content pages ── */}
           <Route path="/blog" element={<Blog />} />
