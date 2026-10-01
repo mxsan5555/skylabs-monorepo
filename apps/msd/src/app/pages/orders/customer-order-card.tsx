@@ -32,7 +32,7 @@ export function CustomerOrderCard({
   return (
         <sky-product-card
             className="customer-order-card"
-            image={content.orders.placeholderImage}
+           image={order.items?.[0]?.image || ''}
             image-alt="Order"
             // heading={`Order #${shortOrderId}...`}
             heading={`Order #${order.id}`}

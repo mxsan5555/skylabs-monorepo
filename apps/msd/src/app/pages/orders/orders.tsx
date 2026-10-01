@@ -99,18 +99,18 @@ export function Orders() {
               <FilledButton onClick={() => navigate('/categories')}>{ordersContent.empty.cta}</FilledButton>
             </div>
           ) : (
-        
-           <CardGrid layout="list">
-  {filteredOrders.map((order) => (
-    <CustomerOrderCard
-      key={order.id}
-      order={order}
-      onViewDetails={(selectedOrder) =>
-        navigate(`/orders/${selectedOrder.id}`)
-      }
-    />
-  ))}
-</CardGrid>
+
+            <CardGrid layout="list">
+              {filteredOrders.map((order) => (
+                <CustomerOrderCard
+                  key={order.id}
+                  order={order}
+                  onViewDetails={(selectedOrder) =>
+                    navigate(`/orders/${selectedOrder.id}`)
+                  }
+                />
+              ))}
+            </CardGrid>
           )}
         </div>
       </section>

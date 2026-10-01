@@ -5,6 +5,7 @@ import { Prisma, type OrderStatus, type OrderType } from '../generated/prisma-cl
 import { getVendorByOwnerUserId } from './vendor.service';
 import { VISIBLE_DEAL_WHERE, VISIBLE_PRODUCT_WHERE, VISIBLE_THERAPIST_WHERE } from './catalog.service';
 import type { OrderContactDetailsSchema } from '../schemas/order.schema';
+import { env } from '../config/env';
 
 type OrderContactDetails = z.infer<typeof OrderContactDetailsSchema>;
 
@@ -33,6 +34,11 @@ const PRODUCT_IMAGE_ORDER_BY: Prisma.ProductImageOrderByWithRelationInput[] = [
   { sortOrder: 'asc' },
 ];
 
+const THERAPIST_IMAGE_ORDER_BY: Prisma.TherapistImageOrderByWithRelationInput[] = [
+  { isPrimary: 'desc' },
+  { sortOrder: 'asc' },
+];
+
 const CUSTOMER_ORDER_INCLUDE = {
   ...ORDER_INCLUDE,
   items: {
@@ -56,6 +62,14 @@ const CUSTOMER_ORDER_INCLUDE = {
           },
         },
       },
+      therapist: {
+        select: {
+          mediaImages: {
+            orderBy: THERAPIST_IMAGE_ORDER_BY,
+            select: { storageKey: true, isPrimary: true, sortOrder: true },
+          },
+        },
+      },
     },
   },
 } as const;
@@ -75,14 +89,25 @@ function firstMediaImage(images: { storageKey: string; isPrimary: boolean }[]): 
 function addCustomerOrderItemImages(order: CustomerOrder) {
   return {
     ...order,
-    items: order.items.map(({ deal, product, ...item }) => ({
-      ...item,
-      image: deal
-        ? firstMediaImage(deal.mediaImages) ?? firstLegacyImage(deal.images)
-        : product
-          ? firstMediaImage(product.mediaImages) ?? firstLegacyImage(product.gallery) ?? product.image
-          : null,
-    })),
+    items: order.items.map(({ deal, product,therapist, ...item }) => {
+      let imageKey: string | null = null;
+
+      if (deal) {
+        imageKey = firstMediaImage(deal.mediaImages) ?? firstLegacyImage(deal.images);
+      } else if (product) {
+        imageKey =
+          firstMediaImage(product.mediaImages) ??
+          firstLegacyImage(product.gallery) ??
+          product.image;
+      }else if (therapist) {
+        imageKey = firstMediaImage(therapist.mediaImages);
+      }
+
+      return {
+        ...item,
+        image: getPublicImageUrl(imageKey),
+      };
+    }),
   };
 }
 
@@ -283,6 +308,19 @@ export async function createOrderFromCart(customerId: string, contactDetails: Or
   });
 }
 
+//HELPER FUNCTION
+
+function getPublicImageUrl(storageKey: string | null | undefined): string | null {
+  if (!storageKey) return null;
+
+  // Agar already full URL hai toh waisa hi return kar do
+  if (storageKey.startsWith('http://') || storageKey.startsWith('https://')) {
+    return storageKey;
+  }
+
+  // R2 storage key hai → public URL banao
+  return `${env.r2PublicUrl}/${storageKey}`;
+}
 // ─── Customer self-service ────────────────────────────────────────────────────
 
 export async function listMyOrders(customerId: string, opts: { page: number; pageSize: number; status?: OrderStatus }) {
