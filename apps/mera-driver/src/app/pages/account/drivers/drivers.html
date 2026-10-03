@@ -222,16 +222,9 @@
 
                     <md-outlined-text-field label="Mother Name" [value]="inputMotherName()" (input)="onInputChange('motherName', $event)" placeholder="Enter mother's name"></md-outlined-text-field>
 
-                    <md-outlined-select
-                      label="Gender"
-                      required
-                      [value]="inputGender()"
-                      (change)="onInputChange('gender', $event)"
-                      (blur)="markTouched('gender')"
-                      [error]="!!genderError()"
-                      [errorText]="genderError()"
-                    >
-                      <md-select-option value=""><div slot="headline">Select Gender</div></md-select-option>
+                    <md-outlined-text-field label="Date of Birth" type="date" [value]="inputDob()" (change)="onInputChange('dob', $event)"></md-outlined-text-field>
+
+                    <md-outlined-select label="Gender" required [value]="inputGender()" (change)="onInputChange('gender', $event)" (blur)="markTouched('gender')"  [error]="!!genderError()"  [errorText]="genderError()">
                       @for (opt of genders(); track opt) {
                         <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                       }
@@ -292,7 +285,6 @@
                       label="Phone"
                       type="tel"
                       inputmode="numeric"
-                      maxlength="10"
                       required
                       [value]="inputPhone()"
                       (input)="onInputChange('phone', $event)"
@@ -306,7 +298,6 @@
                       label="Emergency Number"
                       type="tel"
                       inputmode="numeric"
-                      maxlength="10"
                       [value]="inputEmergencyNumber()"
                       (input)="onInputChange('emergencyNumber', $event)"
                       (blur)="markTouched('emergencyNumber')"
@@ -315,13 +306,10 @@
                       placeholder="Enter 10-digit emergency number"
                     ></md-outlined-text-field>
 
-                    <md-outlined-text-field label="State" [value]="inputState()" (input)="onInputChange('state', $event)" placeholder="Enter state"></md-outlined-text-field>
-
                     <md-outlined-text-field
                       label="Pincode"
                       type="tel"
                       inputmode="numeric"
-                      maxlength="6"
                       [value]="inputPincode()"
                       (input)="onInputChange('pincode', $event)"
                       (blur)="markTouched('pincode')"
@@ -329,6 +317,10 @@
                       [errorText]="pincodeError()"
                       placeholder="Enter 6-digit pincode"
                     ></md-outlined-text-field>
+
+                    <md-outlined-text-field label="State" [value]="inputState()" (input)="onInputChange('state', $event)" placeholder="Enter state"></md-outlined-text-field>
+
+                    <md-outlined-text-field label="City" [value]="inputCity()" (input)="onInputChange('city', $event)" placeholder="Enter city"></md-outlined-text-field>
 
                     <md-outlined-text-field label="Address" [value]="inputAddress()" (input)="onInputChange('address', $event)" placeholder="Enter full address"></md-outlined-text-field>
                   </div>
@@ -339,15 +331,10 @@
               @if (activeSubSection() === 2) {
                 <sky-card class="p-6 block">
                   <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
-                    <md-outlined-text-field label="Date of Birth" type="date" [value]="inputDob()" [max]="today" (input)="onInputChange('dob', $event)"></md-outlined-text-field>
-
-                    <md-outlined-text-field label="Age (auto-calculated)" [value]="inputAge()" disabled placeholder="Set Date of Birth to calculate"></md-outlined-text-field>
-
                     <md-outlined-text-field
                       label="Height"
                       type="text"
                       inputmode="decimal"
-                      maxlength="5"
                       [value]="inputHeight()"
                       (input)="onInputChange('height', $event)"
                       placeholder="Enter height (e.g. 5.7 or 175)"
@@ -357,7 +344,6 @@
                       label="Weight"
                       type="text"
                       inputmode="decimal"
-                      maxlength="5"
                       [value]="inputWeight()"
                       (input)="onInputChange('weight', $event)"
                       placeholder="Enter weight (e.g. 68)"
@@ -388,24 +374,6 @@
                           <div slot="headline">{{ opt }}</div>
                         </md-select-option>
                       }
-                    </md-outlined-select>
-
-                    <md-outlined-select
-                      label="Driver Status"
-                      required
-                      [value]="inputStatus()"
-                      (change)="onInputChange('status', $event)"
-                      (blur)="markTouched('status')"
-                      [error]="!!statusError()"
-                      [errorText]="statusError()"
-                    >
-                      <md-select-option value="Non-Verified"><div slot="headline">Non-Verified</div></md-select-option>
-                      <md-select-option value="Verified"><div slot="headline">Verified</div></md-select-option>
-                      <md-select-option value="Partially Verified (P)"><div slot="headline">Partially Verified (PAYMENT)</div></md-select-option>
-                      <md-select-option value="Partially Verified (K)"><div slot="headline">Partially Verified (KYC)</div></md-select-option>
-                      <md-select-option value="Blacklisted"><div slot="headline">Blacklisted</div></md-select-option>
-                      <md-select-option value="Closed"><div slot="headline">Closed</div></md-select-option>
-                      <md-select-option value="Not Useful"><div slot="headline">Not Useful</div></md-select-option>
                     </md-outlined-select>
 
                     <md-outlined-select label="Job Type" [value]="inputJobType()" (change)="onInputChange('jobType', $event)">
@@ -447,6 +415,27 @@
                           </md-menu-item>
                         }
                       </md-menu>
+                    </div>
+
+                    <!-- Profile Image Upload (Mandatory) -->
+                    <div class="flex items-center gap-2 relative cursor-pointer w-full">
+                      <input type="file" accept="image/*" (change)="onAvatarFileChange($event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputAvatar>
+                      <md-outlined-text-field
+                        class="flex-1 cursor-pointer"
+                        label="Profile Image"
+                        required
+                        readonly
+                        [value]="inputAvatar() || 'No file chosen'"
+                        [error]="!!avatarError()"
+                        [errorText]="avatarError()"
+                      >
+                        <md-icon slot="leading-icon">account_circle</md-icon>
+                      </md-outlined-text-field>
+                      @if (inputAvatar()) {
+                        <md-icon-button type="button" (click)="clearAvatarFile(); $event.stopPropagation()" title="Remove Profile Image" class="shrink-0 z-20">
+                          <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
+                        </md-icon-button>
+                      }
                     </div>
                   </div>
                 </sky-card>
@@ -622,7 +611,6 @@
                     <md-outlined-text-field
                       label="Driving License No"
                       required
-                      maxlength="16"
                       [value]="inputDlNo()"
                       (input)="onInputChange('dlNo', $event)"
                       (blur)="markTouched('dlNo')"
@@ -778,7 +766,6 @@
                       }
                     </md-outlined-select>
 
-                    <!-- CONDITIONAL FIELDS DEPENDING ON PAYMENT METHOD -->
                     <!-- Bank Account -->
                     @if (inputAccountPaymentMethod() === 'Bank Account') {
                       <md-outlined-text-field label="Bank Name" [value]="inputBankName()" (input)="onInputChange('bankName', $event)" placeholder="Enter bank name"></md-outlined-text-field>
@@ -799,29 +786,50 @@
               @if (activeSubSection() === 1) {
                 <sky-card class="p-6 block">
                   <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
-                    <!-- Preferred Payment Mode Dropdown -->
-                    <md-outlined-select label="Preferred Payment Mode" [value]="inputPreferredPaymentMode()" (change)="onInputChange('preferredPaymentMode', $event)">
-                      @for (opt of registrationPaymentModes(); track opt) {
+                    <!-- Driver Status Dropdown -->
+                    <div>
+                      <md-outlined-select class="w-full" label="Driver Status" [value]="inputStatus()" (change)="onInputChange('status', $event)">
+                        @for (opt of driverStatuses(); track opt) {
+                          <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                        }
+                      </md-outlined-select>
+                      @if (statusError()) {
+                        <p class="text-xs text-red-600 mt-1" role="alert">{{ statusError() }}</p>
+                      }
+                    </div>
+
+                    <!-- Registration Fee Status Dropdown -->
+                    <md-outlined-select label="Registration Fee Status" [value]="inputRegistrationFeeStatus()" (change)="onInputChange('registrationFeeStatus', $event)">
+                      @for (opt of registrationFeeStatuses(); track opt) {
                         <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                       }
                     </md-outlined-select>
 
-                    <md-outlined-text-field label="Amount (₹)" [value]="inputAmount()" (input)="onInputChange('amount', $event)" placeholder="Enter amount"></md-outlined-text-field>
+                    @if (inputRegistrationFeeStatus() === 'Paid') {
+                      <!-- Preferred Payment Mode Dropdown -->
+                      <md-outlined-select label="Preferred Payment Mode" [value]="inputPreferredPaymentMode()" (change)="onInputChange('preferredPaymentMode', $event)">
+                        @for (opt of registrationPaymentModes(); track opt) {
+                          <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                        }
+                      </md-outlined-select>
 
-                    <md-outlined-text-field type="date" label="Payment Receipt Date" [value]="inputPaymentReceiptDate()" (input)="onInputChange('paymentReceiptDate', $event)"></md-outlined-text-field>
+                      <md-outlined-text-field label="Amount (₹)" [value]="inputAmount()" (input)="onInputChange('amount', $event)" placeholder="Enter amount"></md-outlined-text-field>
 
-                    <!-- Payment Receipt File Upload -->
-                    <div class="flex items-center gap-2 relative cursor-pointer">
-                      <input type="file" (change)="onRegistrationReceiptFileChange($event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputRegistrationReceipt>
-                      <md-outlined-text-field class="flex-1 cursor-pointer" label="Payment Receipt (Optional)" readonly [value]="inputRegistrationReceiptFile() || 'No file chosen'">
-                        <md-icon slot="leading-icon">upload_file</md-icon>
-                      </md-outlined-text-field>
-                      @if (inputRegistrationReceiptFile()) {
-                        <md-icon-button type="button" (click)="clearRegistrationReceiptFile(); $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
-                          <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
-                        </md-icon-button>
-                      }
-                    </div>
+                      <md-outlined-text-field type="date" label="Payment Receipt Date" [value]="inputPaymentReceiptDate()" (input)="onInputChange('paymentReceiptDate', $event)"></md-outlined-text-field>
+
+                      <!-- Payment Receipt File Upload -->
+                      <div class="flex items-center gap-2 relative cursor-pointer">
+                        <input type="file" (change)="onRegistrationReceiptFileChange($event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputRegistrationReceipt>
+                        <md-outlined-text-field class="flex-1 cursor-pointer" label="Payment Receipt (Optional)" readonly [value]="inputRegistrationReceiptFile() || 'No file chosen'">
+                          <md-icon slot="leading-icon">upload_file</md-icon>
+                        </md-outlined-text-field>
+                        @if (inputRegistrationReceiptFile()) {
+                          <md-icon-button type="button" (click)="clearRegistrationReceiptFile(); $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
+                            <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
+                          </md-icon-button>
+                        }
+                      </div>
+                    }
                   </div>
                 </sky-card>
               }

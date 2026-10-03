@@ -1,0 +1,140 @@
+<main class="w-full max-w-[1280px] mx-auto px-3 sm:px-6 py-8 flex flex-col gap-16">
+
+  <!-- 01. HERO SECTION -->
+  <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center w-full">
+    <!-- Left Column: Title & Description -->
+    <article class="lg:col-span-6 flex flex-col gap-4 text-left">
+      <sky-badge variant="primary" class="self-start rounded-none tracking-wider font-bold uppercase">
+        {{ content().hero.badge }}
+      </sky-badge>
+
+      <h1 class="m-0 text-3xl sm:text-4xl md:text-5xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight leading-tight">
+        {{ content().hero.title }}
+      </h1>
+
+      <p class="m-0 text-base sm:text-lg text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+        {{ content().hero.description }}
+      </p>
+    </article>
+
+    <!-- Right Column: 2 Straight Hero Showcase Images -->
+    <figure class="lg:col-span-6 grid grid-cols-2 gap-4 items-center w-full m-0">
+      <div class="block w-full aspect-square rounded-none overflow-hidden">
+        <img
+          [src]="content().hero.image1"
+          alt="Customer safety photo"
+          class="w-full h-full object-cover rounded-none block"
+        />
+      </div>
+
+      <div class="block w-full aspect-[3/4] rounded-none overflow-hidden">
+        <img
+          [src]="content().hero.image2"
+          alt="Verified driver partner photo"
+          class="w-full h-full object-cover rounded-none block"
+        />
+      </div>
+    </figure>
+  </section>
+
+  <!-- 02. COVERS EVERYONE SECTION -->
+  <section class="w-full flex flex-col gap-8">
+    <h2 class="m-0 text-2xl sm:text-3xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight text-left">
+      {{ content().coversEveryone.title }}
+    </h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+      @for (item of content().coversEveryone.items; track item.id) {
+        <sky-card variant="outlined" class="block w-full rounded-none h-full">
+          <article class="p-6 flex flex-col gap-4 text-left h-full justify-between">
+            <div class="flex flex-col gap-4">
+              <div class="block w-full aspect-[16/10] rounded-none overflow-hidden">
+                <img
+                  [src]="item.image"
+                  [alt]="item.title"
+                  class="w-full h-full object-cover rounded-none block"
+                />
+              </div>
+              <h3 class="m-0 text-xl font-bold text-[var(--md-sys-color-on-surface)]">
+                {{ item.title }}
+              </h3>
+              <p class="m-0 text-sm sm:text-base text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+                {{ item.description }}
+              </p>
+            </div>
+            <a routerLink="/contact" class="no-underline inline-flex items-center gap-1 text-sm font-semibold text-[var(--md-sys-color-primary)] hover:underline self-start pt-2">
+              <span>{{ item.linkText }}</span>
+              <md-icon class="text-sm">chevron_right</md-icon>
+            </a>
+          </article>
+        </sky-card>
+      }
+    </div>
+  </section>
+
+  <!-- 03. MEASURES BANNER SECTION -->
+  <section class="w-full">
+    <sky-card variant="outlined" class="block w-full rounded-none bg-[var(--md-sys-color-surface-container-low)] p-6 sm:p-10">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center w-full">
+        <!-- Left Column: Shield Badge & Headline -->
+        <article class="lg:col-span-5 flex flex-col gap-4 text-left">
+          <div class="w-14 h-14 rounded-full bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] flex items-center justify-center shrink-0">
+            <md-icon class="text-3xl">{{ content().measuresBanner.icon }}</md-icon>
+          </div>
+          <h2 class="m-0 text-2xl sm:text-3xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight leading-tight">
+            {{ content().measuresBanner.title }}
+          </h2>
+        </article>
+
+        <!-- Right Column: 2x2 Grid of Measure Cards -->
+        <div class="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-5 w-full">
+          @for (m of content().measuresBanner.measures; track m.title) {
+            <sky-card variant="outlined" class="block w-full rounded-none p-5 bg-[var(--md-sys-color-surface)]">
+              <article class="flex flex-col gap-2.5 text-left">
+                <md-icon class="text-2xl text-[var(--md-sys-color-primary)]">{{ m.icon }}</md-icon>
+                <h3 class="m-0 text-base font-bold text-[var(--md-sys-color-on-surface)]">
+                  {{ m.title }}
+                </h3>
+                <p class="m-0 text-xs sm:text-sm text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+                  {{ m.description }}
+                </p>
+              </article>
+            </sky-card>
+          }
+        </div>
+      </div>
+    </sky-card>
+  </section>
+
+  <!-- 04. WAY FORWARD ON SAFETY SECTION -->
+  <section class="w-full flex flex-col gap-8">
+    <header class="flex flex-col gap-2 text-left max-w-2xl">
+      <h2 class="m-0 text-2xl sm:text-3xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight">
+        {{ content().wayForward.title }}
+      </h2>
+      <p class="m-0 text-sm sm:text-base text-[var(--md-sys-color-on-surface-variant)] leading-relaxed mt-2">
+        {{ content().wayForward.subtitle }}
+      </p>
+    </header>
+
+    <!-- Feature Cards Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
+      @for (feature of content().wayForward.features; track feature.title) {
+        <sky-card variant="outlined" class="block w-full rounded-none">
+          <article class="p-6 flex flex-col gap-4 text-left">
+            <div class="w-12 h-12 rounded-full bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] flex items-center justify-center shrink-0">
+              <md-icon class="text-2xl">{{ feature.icon }}</md-icon>
+            </div>
+            <h3 class="m-0 text-lg font-bold text-[var(--md-sys-color-on-surface)]">
+              {{ feature.title }}
+            </h3>
+            <p class="m-0 text-sm sm:text-base text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+              {{ feature.description }}
+            </p>
+          </article>
+        </sky-card>
+      }
+    </div>
+  </section>
+
+</main>

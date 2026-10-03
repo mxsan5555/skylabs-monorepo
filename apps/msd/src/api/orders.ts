@@ -40,6 +40,7 @@ export interface OrderItem {
   quantity: number;
   lineTotal: string;
   durationMinutes: number | null;
+  image?: string | null;
 }
 
 export type PaymentStatus = 'CREATED' | 'PAID' | 'FAILED' | 'CANCELLED';

@@ -1,0 +1,116 @@
+<main class="w-full max-w-[1280px] mx-auto px-3 sm:px-6 py-8 flex flex-col gap-16">
+
+  <!-- 01. HERO SECTION -->
+  <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center w-full">
+    <!-- Left Column: Title & Subtitle -->
+    <article class="lg:col-span-6 flex flex-col gap-4 text-left">
+      <sky-badge variant="primary" class="self-start rounded-none tracking-wider font-bold uppercase">
+        {{ content().hero.badge }}
+      </sky-badge>
+
+      <h1 class="m-0 text-3xl sm:text-4xl md:text-5xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight leading-tight">
+        {{ content().hero.title }}
+      </h1>
+
+      <p class="m-0 text-base sm:text-lg text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+        {{ content().hero.subtitle }}
+      </p>
+    </article>
+
+    <!-- Right Column: 2 Staggered Showcase Images -->
+    <figure class="lg:col-span-6 grid grid-cols-2 gap-4 items-center w-full m-0">
+      <div class="block w-full aspect-square rounded-none overflow-hidden">
+        <img
+          [src]="content().hero.heroImage1"
+          alt="Team collaboration photo"
+          class="w-full h-full object-cover rounded-none block"
+        />
+      </div>
+
+      <div class="block w-full aspect-[3/4] rounded-none overflow-hidden">
+        <img
+          [src]="content().hero.heroImage2"
+          alt="Office culture photo"
+          class="w-full h-full object-cover rounded-none block"
+        />
+      </div>
+    </figure>
+  </section>
+
+  <!-- 02. WHY WORK WITH US -->
+  <section class="w-full flex flex-col gap-8">
+    <h2 class="m-0 text-2xl sm:text-3xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight text-left">
+      {{ content().whyWorkWithUs.title }}
+    </h2>
+
+    <!-- 3 Perks Columns -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full">
+      @for (perk of content().whyWorkWithUs.perks; track perk.text) {
+        <sky-card variant="outlined" class="block w-full rounded-none h-full">
+          <article class="p-6 flex flex-col gap-4 text-left h-full">
+            <div class="w-12 h-12 rounded-full bg-[var(--md-sys-color-primary-container)] text-[var(--md-sys-color-on-primary-container)] flex items-center justify-center shrink-0">
+              <md-icon aria-hidden="true" class="text-2xl">{{ perk.icon }}</md-icon>
+            </div>
+            <p class="m-0 text-sm sm:text-base text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+              {{ perk.text }}
+            </p>
+          </article>
+        </sky-card>
+      }
+    </div>
+
+    <!-- 3 Culture Images Row -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 w-full pt-2">
+      @for (imgSrc of content().whyWorkWithUs.images; track imgSrc) {
+        <div class="block w-full aspect-[4/3] rounded-none overflow-hidden">
+          <img
+            [src]="imgSrc"
+            alt="Mera Driver Office Culture"
+            class="w-full h-full object-cover rounded-none block"
+          />
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- 03. WHAT OUR EMPLOYEES SAY -->
+  <section class="w-full flex flex-col gap-8">
+    <h2 class="m-0 text-2xl sm:text-3xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight text-left">
+      {{ content().testimonials.title }}
+    </h2>
+
+    <!-- Employee Testimonials Swiper Carousel Component -->
+    <swiper-container
+      navigation="true"
+      pagination="true"
+      space-between="24"
+      slides-per-view="1"
+      breakpoints='{"768": {"slidesPerView": 2}}'
+      class="w-full pb-8"
+    >
+      @for (item of content().testimonials.items; track item.name) {
+        <swiper-slide class="h-auto">
+          <sky-card variant="outlined" class="block w-full rounded-none h-full">
+            <article class="p-6 flex flex-col sm:flex-row gap-5 h-full items-start">
+              <img
+                [src]="item.avatar"
+                [alt]="item.name"
+                class="w-16 h-16 object-cover rounded-full shrink-0"
+              />
+              <div class="flex flex-col gap-3 flex-grow text-left">
+                <p class="m-0 text-sm sm:text-base text-[var(--md-sys-color-on-surface-variant)] leading-relaxed italic">
+                  "{{ item.quote }}"
+                </p>
+                <div>
+                  <h3 class="m-0 text-base font-bold text-[var(--md-sys-color-on-surface)]">{{ item.name }}</h3>
+                  <p class="m-0 text-xs text-[var(--md-sys-color-on-surface-variant)] mt-0.5">{{ item.role }}</p>
+                </div>
+              </div>
+            </article>
+          </sky-card>
+        </swiper-slide>
+      }
+    </swiper-container>
+  </section>
+
+</main>
