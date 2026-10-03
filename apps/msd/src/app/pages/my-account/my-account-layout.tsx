@@ -14,6 +14,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { to: '/my-dashboard', label: 'Dashboard', icon: 'dashboard' },
   { to: '/my-account', label: 'Profile & Addresses', icon: 'person', end: true },
   { to: '/orders', label: 'Orders', icon: 'receipt_long' },
   { to: '/wishlist', label: 'Wishlist', icon: 'favorite_border' },

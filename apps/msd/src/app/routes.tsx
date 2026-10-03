@@ -76,6 +76,7 @@ import { MyAccountLayout } from './pages/my-account/my-account-layout';
 import { MyAccountProfile } from './pages/my-account/profile';
 import { MyAccountPayments } from './pages/my-account/payments';
 import { ScrollToTop } from './components/ScrollToTop';
+import CustomerDashboard from './pages/customer-dashboard/customer-dashboard';
 /**
  * `/account/vendors` serves three audiences under different permission keys: admins hold
  * `vendors:view`, vendor-role users hold `vendors:custom` (never `view` — that would also
@@ -168,6 +169,7 @@ export function AppRoutes() {
               </RequireAuth>
             }
           >
+              <Route path="/my-dashboard" element={<CustomerDashboard />} />
             <Route path="/my-account" element={<MyAccountProfile />} />
             <Route path="/my-account/profile" element={<MyAccountProfile />} />
             <Route path="/my-account/payments" element={<MyAccountPayments />} />
