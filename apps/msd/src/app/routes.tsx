@@ -160,7 +160,7 @@ export function AppRoutes() {
             deliberately stay OUTSIDE this block (see above) even though the sidebar's own
             NAV_ITEMS still links to them — clicking those links just navigates to the
             sidebar-less Cart/Wishlist routes above, same as clicking the Header icons. */}
-                   {/* Customer account pages WITH sidebar */}
+          {/* Customer account pages WITH sidebar */}
           <Route
             element={
               <RequireAuth>
