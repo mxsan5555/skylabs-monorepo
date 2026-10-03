@@ -73,7 +73,7 @@ const STAFFING: NavLink[] = [
   styleUrl: './header.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   host: {
-    'class': 'block sticky top-0 z-20'
+    'class': 'block sticky top-0 z-[1000]'
   }
 })
 export class Header implements OnInit {
@@ -140,7 +140,7 @@ export class Header implements OnInit {
   protected goSafety(): void {
     this.openMenu.set(null);
     this.closeDrawer();
-    this.router.navigate(['/'], { fragment: 'safety' });
+    this.router.navigate(['/safety']);
   }
 
   /** Start sign-up already on the driver persona. */
