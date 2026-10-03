@@ -53,12 +53,6 @@ export class Drivers implements OnInit {
   private readonly router = inject(Router);
 
   constructor() {
-    // Age is never manually entered — it's always derived from DOB, backend-authoritative
-    // (see `driver.service.ts`'s `deriveAge`), this is just the immediate on-screen echo.
-    effect(() => {
-      this.inputAge.set(calculateAge(this.inputDob()));
-    });
-
     this.router.events
       .pipe(
         filter((e): e is NavigationEnd => e instanceof NavigationEnd),
@@ -230,6 +224,13 @@ export class Drivers implements OnInit {
     return '';
   });
 
+  readonly avatarError = computed(() => {
+    if (!this.isTouched('avatar')) return '';
+    const val = this.inputAvatar().trim();
+    if (!val) return 'Profile Image is required';
+    return '';
+  });
+
   readonly dlNoError = computed(() => {
     if (!this.isTouched('dlNo')) return '';
     const val = this.inputDlNo().trim();
@@ -253,14 +254,19 @@ export class Drivers implements OnInit {
         this.markTouched('pincode');
         return !this.emailError() && !this.phoneError() && !this.emergencyNumberError() && !this.pincodeError();
       } else if (sub === 3) {
-        this.markTouched('status');
         this.markTouched('driverType');
-        return !this.statusError() && !this.driverTypeError();
+        this.markTouched('avatar');
+        return !this.driverTypeError() && !this.avatarError();
       }
     } else if (tab === 2) {
       if (sub === 0) {
         this.markTouched('dlNo');
         return !this.dlNoError();
+      }
+    } else if (tab === 3) {
+      if (sub === 1) {
+        this.markTouched('status');
+        return !this.statusError();
       }
     }
     return true;
@@ -278,19 +284,35 @@ export class Drivers implements OnInit {
   readonly inputEmergencyNumber = signal<string>('');
   readonly inputDob = signal<string>('');
   readonly inputMaritalStatus = signal<string>('Unmarried');
-  readonly inputGender = signal<string>('');
+  readonly inputGender = signal<string>('Male');
   readonly inputPassportNumber = signal<string>('');
   readonly inputReligion = signal<string>('Hindu');
   readonly inputColor = signal<string>('Light Skin');
   readonly inputLanguages = signal<string[]>(['Hindi']);
   readonly inputCountry = signal<string>('India');
   readonly inputState = signal<string>('');
+  readonly inputCity = signal<string>('');
   readonly inputPincode = signal<string>('');
   readonly inputAddress = signal<string>('');
   readonly inputDriverTypes = signal<string[]>([]);
   readonly inputStatus = signal<string>('');
   readonly inputSourceType = signal<string>('WalkIn');
   readonly inputVehicle = signal<string>('Personal Sedan');
+  readonly inputAvatar = signal<string>('');
+
+  onAvatarFileChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const file = input.files[0];
+      this.inputAvatar.set(file.name);
+      this.pendingFiles.set('avatar-0', file);
+    }
+  }
+
+  clearAvatarFile(): void {
+    this.inputAvatar.set('');
+    this.pendingFiles.delete('avatar-0');
+  }
 
   // Dropdown Open/Close Signals & Text Computeds
   readonly isLangDropdownOpen = signal<boolean>(false);
@@ -364,6 +386,8 @@ export class Drivers implements OnInit {
   // --- Form Input Signals (Tab 4: Payments) ---
   readonly inputPreferredPaymentMode = signal<string>('Cash');
   readonly inputAccountPaymentMethod = signal<string>('Bank Account');
+  readonly inputRegistrationFeeStatus = signal<string>('Unpaid');
+  readonly registrationFeeStatuses = signal<string[]>(['Unpaid', 'Paid']);
   readonly inputAmount = signal<string>('');
   readonly inputPaymentReceiptDate = signal<string>('');
   readonly inputRegistrationReceiptFile = signal<string>('');
@@ -458,6 +482,7 @@ export class Drivers implements OnInit {
   // --- Payment Master Options ---
   readonly registrationPaymentModes = signal<string[]>(['Cash', 'Cheque', 'NEFT', 'RTGS', 'Online']);
   readonly paymentModes = signal<string[]>(['Bank Account', 'UPI']);
+  readonly driverStatuses = signal<string[]>(['Verified', 'Partially Verified (P)', 'Partially Verified (K)', 'Non-Verified', 'Blacklisted', 'Closed', 'Not Useful']);
 
   protected readonly content = signal({
     title: 'Driver Registry',
@@ -661,6 +686,7 @@ export class Drivers implements OnInit {
       phone,
       email,
       vehicle: this.inputVehicle().trim(),
+      avatar: this.inputAvatar(),
       fatherName: this.inputFatherName().trim(),
       motherName: this.inputMotherName().trim(),
       emergencyNumber: this.inputEmergencyNumber().trim(),
@@ -676,6 +702,7 @@ export class Drivers implements OnInit {
       weight: this.inputWeight().trim(),
       country: this.inputCountry(),
       state: this.inputState().trim(),
+      city: this.inputCity().trim(),
       pincode: this.inputPincode().trim(),
       address: this.inputAddress().trim(),
       driverType: this.inputDriverTypes().join(', '),
@@ -701,6 +728,7 @@ export class Drivers implements OnInit {
       expectedSalary: this.inputExpectedSalary(),
       // --- Payment Details ---
       preferredPaymentMode: this.inputPreferredPaymentMode(),
+      registrationFeeStatus: this.inputRegistrationFeeStatus(),
       amount: this.inputAmount().trim(),
       paymentReceiptDate: this.inputPaymentReceiptDate(),
       bankName: this.inputBankName().trim(),
@@ -757,7 +785,7 @@ export class Drivers implements OnInit {
   // --- Final "Save & Register" / "Save Changes" action (last tab's last sub-section) ---
   async addDriver(): Promise<void> {
     this.formSubmitted.set(true);
-    if (this.firstNameError() || this.genderError() || this.phoneError() || this.emailError() || this.statusError() || this.driverTypeError()) {
+    if (this.firstNameError() || this.genderError() || this.phoneError() || this.emailError() || this.statusError() || this.driverTypeError() || this.avatarError()) {
       this.activeFormTab.set(0);
       return;
     }
@@ -766,6 +794,7 @@ export class Drivers implements OnInit {
 
   private uploadPendingDocuments(driverId: string): void {
     for (const [key, file] of this.pendingFiles.entries()) {
+      if (key === 'avatar-0') continue;
       const [category, idxStr] = key.split('-') as ['personal' | 'health' | 'education' | 'police', string];
       const idx = Number(idxStr);
       const docs =
@@ -872,7 +901,7 @@ export class Drivers implements OnInit {
     this.inputEmergencyNumber.set('');
     this.inputDob.set('');
     this.inputMaritalStatus.set('Unmarried');
-    this.inputGender.set('');
+    this.inputGender.set('Male');
     this.inputPassportNumber.set('');
     this.inputReligion.set('Hindu');
     this.inputColor.set('Light Skin');
@@ -882,12 +911,14 @@ export class Drivers implements OnInit {
     this.inputWeight.set('');
     this.inputCountry.set('India');
     this.inputState.set('');
+    this.inputCity.set('');
     this.inputPincode.set('');
     this.inputAddress.set('');
     this.inputDriverTypes.set([]);
     this.inputStatus.set('');
     this.inputSourceType.set('WalkIn');
     this.inputVehicle.set('Personal Sedan');
+    this.inputAvatar.set('');
     this.inputEducation.set('No Formal Education');
     this.inputTrainingStatus.set('No');
     this.inputTrainingCertificate.set('');
@@ -911,6 +942,7 @@ export class Drivers implements OnInit {
     this.inputDocumentUpload.set('');
     // --- Revert Payment Inputs ---
     this.inputPreferredPaymentMode.set('Cash');
+    this.inputRegistrationFeeStatus.set('Unpaid');
     this.inputAmount.set('');
     this.inputPaymentReceiptDate.set('');
     this.inputRegistrationReceiptFile.set('');
@@ -970,12 +1002,14 @@ export class Drivers implements OnInit {
       this.inputWeight.set(row.weight || '');
       this.inputCountry.set(row.country || 'India');
       this.inputState.set(row.state || '');
+      this.inputCity.set(row.city || '');
       this.inputPincode.set(row.pincode || '');
       this.inputAddress.set(row.address || '');
       this.inputDriverTypes.set(row.driverType ? row.driverType.split(', ').map((s: string) => s.trim()) : []);
       this.inputStatus.set(row.status || 'Non-Verified');
       this.inputSourceType.set(row.sourceType || 'WalkIn');
       this.inputVehicle.set(row.vehicle || 'Personal Sedan');
+      this.inputAvatar.set(row.avatar || '');
       this.inputEducation.set(row.education || 'No Formal Education');
       this.inputTrainingStatus.set(row.trainingStatus || 'No');
       this.inputTrainingCertificate.set(row.trainingCertificate || '');
@@ -997,6 +1031,7 @@ export class Drivers implements OnInit {
       this.inputDocumentCategory.set(row.documentCategory || 'Driving License');
       this.inputDocumentUpload.set(row.documentUpload || '');
       this.inputPreferredPaymentMode.set(row.preferredPaymentMode || 'Bank Account');
+      this.inputRegistrationFeeStatus.set(row.registrationFeeStatus || (row.amount ? 'Paid' : 'Unpaid'));
       this.inputAmount.set(row.amount || '');
       this.inputPaymentReceiptDate.set(row.paymentReceiptDate || '');
       this.inputBankName.set(row.bankName || '');
@@ -1261,11 +1296,13 @@ export class Drivers implements OnInit {
       case 'weight': this.inputWeight.set(val); break;
       case 'country': this.inputCountry.set(val); break;
       case 'state': this.inputState.set(val); break;
+      case 'city': this.inputCity.set(val); break;
       case 'pincode': this.inputPincode.set(val); break;
       case 'address': this.inputAddress.set(val); break;
       case 'status': this.inputStatus.set(val); break;
       case 'sourceType': this.inputSourceType.set(val); break;
       case 'vehicle': this.inputVehicle.set(val); break;
+      case 'avatar': this.inputAvatar.set(val); break;
       case 'education': this.inputEducation.set(val); break;
       case 'trainingStatus': this.inputTrainingStatus.set(val); break;
       case 'trainingCertificate': this.inputTrainingCertificate.set(val); break;
@@ -1290,6 +1327,7 @@ export class Drivers implements OnInit {
       // --- Payment details ---
       case 'preferredPaymentMode': this.inputPreferredPaymentMode.set(val); break;
       case 'accountPaymentMethod': this.inputAccountPaymentMethod.set(val); break;
+      case 'registrationFeeStatus': this.inputRegistrationFeeStatus.set(val); break;
       case 'amount': this.inputAmount.set(val); break;
       case 'paymentReceiptDate': this.inputPaymentReceiptDate.set(val); break;
       case 'bankName': this.inputBankName.set(val); break;

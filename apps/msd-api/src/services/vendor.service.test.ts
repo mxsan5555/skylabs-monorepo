@@ -6,13 +6,15 @@ vi.mock('../lib/prisma', async () => {
 });
 
 import { prisma } from '../lib/prisma';
-import { createVendorOwner, checkVendorOwnerAvailability, createTherapist } from './vendor.service';
+import { createVendorOwner, checkVendorOwnerAvailability, createTherapist, createVendor } from './vendor.service';
 
 const prismaMock = vi.mocked(prisma, true);
 
 const USER_A_ID = 'a0a0a0a0-0000-4000-8000-000000000001';
 const USER_B_ID = 'b0b0b0b0-0000-4000-8000-000000000002';
 const NEW_USER_ID = 'd0d0d0d0-0000-4000-8000-000000000004';
+const ADMIN_ID = 'c0c0c0c0-0000-4000-8000-000000000003';
+const VENDOR_ROLE_ID = 'e0e0e0e0-0000-4000-8000-0000000000ee';
 
 function userFixture(overrides: Partial<{ id: string }> = {}) {
   return { id: USER_A_ID, ...overrides };
@@ -98,6 +100,101 @@ describe('createVendorOwner', () => {
       message: 'Provide an owner email or mobile number',
     });
     expect(prismaMock.user.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Feature: `createVendor`'s double-submit guard must never collide across two DIFFERENT owner
+ * submissions.
+ * Scenario: regression test for the real "second vendor creation silently returns the first
+ * vendor" bug (confirmed via live API calls against a real Postgres). The guard is meant to
+ * catch a rapid double-click resubmitting the SAME payload, but it used to be keyed only on
+ * `(createdByUserId, businessName)` — and Step 1 of the admin "Add Vendor" pipeline always POSTs
+ * with `businessName` absent (the owner is created before any business field is filled in), so
+ * `businessName` is always `null` at this call site. That meant ANY two vendor creations by the
+ * SAME admin within the 10s window collided on `(createdByUserId, businessName: null)`
+ * regardless of owner identity: the second submission's real owner — a brand-new one, or a
+ * genuinely already-taken email/mobile — was silently discarded and the FIRST vendor was
+ * returned instead, before `createVendorOwner`'s own conflict check ever ran. So a genuinely
+ * duplicate owner never surfaced its intended 409 — it just silently returned an unrelated
+ * vendor, and two legitimately different vendors collapsed into one.
+ *
+ * The fix folds the submitted `ownerEmail`/`ownerMobile` into the guard's own `where` clause, so
+ * it only ever treats a call as "the same submission" when the owner identity matches too.
+ */
+describe('createVendor — double-submit guard scoping (regression: two different owners created seconds apart used to collapse into one vendor)', () => {
+  const ROLE_FIXTURE = { id: VENDOR_ROLE_ID, key: 'vendor' };
+
+  /** Arms every downstream call `createVendor` makes once its own double-submit guard clears —
+   *  `createVendorOwner`'s email/phone availability check, the new User insert, `assignRole`'s
+   *  own `getUserOrThrow` + role grant, and `buildAndInsertVendor`'s slug-uniqueness check +
+   *  insert. Keyed off `where.id` (only `getUserOrThrow` queries by id) so the same
+   *  `user.findFirst` mock correctly serves both callers regardless of call order. */
+  function armDownstreamSuccess(newUserId: string, vendorRow: { id: string; ownerEmail?: string }) {
+    prismaMock.user.findFirst.mockImplementation(async (args: unknown) => {
+      const where = (args as { where?: { id?: string } })?.where;
+      if (where?.id) return { id: where.id, status: 'active', deletedAt: null, roles: [] } as never;
+      return null; // createVendorOwner's own email/phone availability checks — nothing taken
+    });
+    prismaMock.user.create.mockResolvedValue({ id: newUserId } as never);
+    prismaMock.role.findUnique.mockResolvedValue(ROLE_FIXTURE as never);
+    prismaMock.userRole.upsert.mockResolvedValue({} as never);
+    prismaMock.vendor.findUnique.mockResolvedValue(null as never); // slug uniqueness check
+    prismaMock.vendor.create.mockResolvedValue({ ...vendorRow, owner: null } as never);
+  }
+
+  it("the guard query is scoped by the submitted owner's email/mobile, not businessName alone", async () => {
+    prismaMock.vendor.findFirst.mockResolvedValue(null); // no recent duplicate
+    armDownstreamSuccess(NEW_USER_ID, { id: 'vendor-a' });
+
+    await createVendor(
+      { ownerFirstName: 'Owner', ownerLastName: 'A', ownerEmail: 'owner-a@example.com', ownerMobile: '+919000000001' } as never,
+      ADMIN_ID,
+    );
+
+    expect(prismaMock.vendor.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          createdByUserId: ADMIN_ID,
+          businessName: null,
+          ownerEmail: 'owner-a@example.com',
+          ownerMobile: '+919000000001',
+        }),
+      }),
+    );
+  });
+
+  it('two different owners submitted by the same admin within the double-submit window create two distinct vendors, never the first vendor returned twice', async () => {
+    const ownerA = { ownerFirstName: 'Owner', ownerLastName: 'A', ownerEmail: 'owner-a@example.com', ownerMobile: '+919000000001' };
+    const ownerB = { ownerFirstName: 'Owner', ownerLastName: 'B', ownerEmail: 'owner-b@example.com', ownerMobile: '+919000000002' };
+    const vendorA = { id: 'vendor-a', ownerEmail: ownerA.ownerEmail };
+    const vendorB = { id: 'vendor-b', ownerEmail: ownerB.ownerEmail };
+
+    // Simulates a real Postgres row for vendor A already existing when owner B is submitted
+    // seconds later — the guard's own query is what decides whether this counts as "the same
+    // submission". A field simply absent from `where` is an unfiltered match-anything (exactly
+    // how the pre-fix guard's query — no `ownerEmail`/`ownerMobile` keys at all — matched vendor
+    // A regardless of who owner B actually was); a field present in `where` must match vendor A's
+    // own value to count as a hit. This is what makes the mock fail the same way the real Prisma
+    // query did before the fix, and pass once the guard's `where` actually includes owner identity.
+    prismaMock.vendor.findFirst.mockImplementation(async (args: unknown) => {
+      const where = (args as { where?: Record<string, unknown> })?.where ?? {};
+      if (where.createdByUserId !== ADMIN_ID) return null;
+      if (where.businessName !== null) return null;
+      if ('ownerEmail' in where && where.ownerEmail !== vendorA.ownerEmail) return null;
+      if ('ownerMobile' in where && where.ownerMobile !== ownerA.ownerMobile) return null;
+      return vendorA as never;
+    });
+    armDownstreamSuccess(NEW_USER_ID, vendorB);
+
+    const result = await createVendor(ownerB as never, ADMIN_ID);
+
+    // Before the fix: the guard matched on (createdByUserId, businessName: null) alone, ignored
+    // owner identity entirely, and returned vendorA here — a completely different, unrelated
+    // vendor silently handed back for owner B's submission.
+    expect(result.id).toBe(vendorB.id);
+    expect(result.id).not.toBe(vendorA.id);
+    expect(prismaMock.user.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ email: ownerB.ownerEmail }) }));
   });
 });
 

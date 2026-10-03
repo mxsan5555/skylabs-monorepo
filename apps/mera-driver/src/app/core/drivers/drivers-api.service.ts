@@ -72,6 +72,7 @@ export interface Driver {
   documentCategory?: string;
   documentUpload?: string;
   preferredPaymentMode?: string;
+  registrationFeeStatus?: string;
   amount?: string;
   paymentReceiptDate?: string;
   bankName?: string;

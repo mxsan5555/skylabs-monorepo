@@ -1,0 +1,70 @@
+{
+  "hero": {
+    "badge": "Safety & Trust",
+    "title": "Safety for all.",
+    "description": "At Mera Driver, the well-being of our customers and driver partners is above everything else. We are constantly in pursuit of enhancing our safety measures to ensure every Mera Driver booking is a pleasant, safe, and comfortable experience.",
+    "image1": "/images/about/hero_driver_app.jpg",
+    "image2": "/images/about/hero_driver_portrait.jpg"
+  },
+  "coversEveryone": {
+    "title": "Covers Everyone",
+    "items": [
+      {
+        "id": "customer-safety",
+        "title": "For Customers",
+        "image": "/images/press/press_1.jpg",
+        "description": "Every ride is tracked by Mera Driver 24/7, with real-time access to granular telemetry, latitudinal and longitudinal route data, and SOS support.",
+        "linkText": "Know More"
+      },
+      {
+        "id": "driver-safety",
+        "title": "For Drivers & Partners",
+        "image": "/images/press/press_2.jpg",
+        "description": "From background verification to safety training and emergency monitoring checks, we take all necessary steps to ensure our driver partners' safety.",
+        "linkText": "Know More"
+      }
+    ]
+  },
+  "measuresBanner": {
+    "title": "Measures to ensure the well-being of both, our Drivers and Customers.",
+    "icon": "shield",
+    "measures": [
+      {
+        "icon": "umbrella",
+        "title": "Comprehensive Trip Insurance",
+        "description": "Insurance coverage for any trip incident occurring during the ride covering medical treatment, hospitalization, and accidental benefits."
+      },
+      {
+        "icon": "support_agent",
+        "title": "24/7 Safety Control Desk",
+        "description": "Round-the-clock emergency assistance and real-time ride tracking team available at a single tap."
+      },
+      {
+        "icon": "verified_user",
+        "title": "Background Verified Drivers",
+        "description": "Rigorous identity checks, driving license validation, and police background verification for every driver partner."
+      },
+      {
+        "icon": "star",
+        "title": "Rating & Safety Reviews",
+        "description": "Two-way rating system ensuring respectful, reliable, and high-standard commuting environment for everyone."
+      }
+    ]
+  },
+  "wayForward": {
+    "title": "Way forward on Safety",
+    "subtitle": "To further substantiate our commitment to Safety First towards customers & driver partners, we are incorporating advanced safety features on our platform.",
+    "features": [
+      {
+        "icon": "schedule",
+        "title": "Night Ride Completion Check",
+        "description": "Anyone who takes a ride between 10 pm and 6 am is proactively contacted by Mera Driver Customer Support to ensure safe arrival."
+      },
+      {
+        "icon": "support_agent",
+        "title": "Proactive Route Check-In",
+        "description": "Every rider and driver will be alerted or called by Mera Driver Safety Team whenever an unexpected route deviation or long stop occurs."
+      }
+    ]
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "hero": {
+    "badge": "Careers @ Mera Driver",
+    "title": "Be a part of our team.",
+    "subtitle": "We are so glad you want to join us in exploring a world of endless opportunities at Mera Driver. Let’s find a spot for you.",
+    "heroImage1": "/images/careers/careers_hero.jpg",
+    "heroImage2": "/images/careers/careers_culture.jpg"
+  },
+  "whyWorkWithUs": {
+    "title": "Why work with us",
+    "perks": [
+      {
+        "icon": "payments",
+        "text": "We pride ourselves on rewarding great work with great compensation."
+      },
+      {
+        "icon": "schedule",
+        "text": "Flexible hours and vacation. Night owls welcome."
+      },
+      {
+        "icon": "public",
+        "text": "Meet new cultures and enjoy our crew from all over the world."
+      }
+    ],
+    "images": [
+      "/images/careers/careers_hero.jpg",
+      "/images/about/jobs_team_office.jpg",
+      "/images/careers/careers_culture.jpg"
+    ]
+  },
+  "testimonials": {
+    "title": "What our employees say",
+    "items": [
+      {
+        "name": "Pritha Mistry",
+        "role": "Cluster Manager",
+        "avatar": "/images/about/founder_priya.jpg",
+        "quote": "Mera Driver, for me holds a special place. I was skeptical before joining. But after I joined, the experience speaks for itself. Hardworking and goal oriented team as well as Manager."
+      },
+      {
+        "name": "Bhavana Rathi",
+        "role": "ORM Specialist",
+        "avatar": "/images/about/founder_durgesh.jpg",
+        "quote": "Mera Driver has been Home for me. Pleasant multicultural environment and the enthusiasm which everyone around carries is infectious. Proud to be a part of Mera Driver."
+      },
+      {
+        "name": "Ankit Prajapati",
+        "role": "Tech Lead",
+        "avatar": "/images/about/founder_ankit.jpg",
+        "quote": "Solving mobility challenges for millions of riders every day gives immense satisfaction. The freedom to innovate and build scalable tech at Mera Driver is unmatched."
+      }
+    ]
+  }
+}
