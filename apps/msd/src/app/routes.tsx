@@ -169,7 +169,7 @@ export function AppRoutes() {
               </RequireAuth>
             }
           >
-              <Route path="/my-dashboard" element={<CustomerDashboard />} />
+            <Route path="/my-dashboard" element={<CustomerDashboard />} />
             <Route path="/my-account" element={<MyAccountProfile />} />
             <Route path="/my-account/profile" element={<MyAccountProfile />} />
             <Route path="/my-account/payments" element={<MyAccountPayments />} />
@@ -193,9 +193,9 @@ export function AppRoutes() {
                 />
               }
             />
-
-            {/* Orders list keeps the customer account sidebar */}
             <Route path="/orders" element={<Orders />} />
+            <Route path="/my-account/cart" element={<Cart />} />
+            <Route path="/my-account/wishlist" element={<Wishlist />} />
           </Route>
 
           {/* =====================================================

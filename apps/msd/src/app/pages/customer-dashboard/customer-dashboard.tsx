@@ -1,21 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-    FilledButton,
-    OutlinedButton,
-    Icon,
-} from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedButton, Icon,} from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-
-import { getCart } from '../../../api/cart';
-import {
-    listMyOrders,
-    type Order,
-    type OrderItem,
-} from '../../../api/orders';
+import { getCustomerDashboardSummary } from '../../../api/customer-dashboard';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { useWishlist } from '../../../wishlist/wishlist-context';
-
 import './customer-dashboard.css';
 
 interface DashboardStats {
@@ -24,112 +12,49 @@ interface DashboardStats {
     cart: number;
     wishlist: number;
 }
-
-const PURCHASED_ORDER_STATUSES = new Set([
-    'CONFIRMED',
-    'COMPLETED',
-]);
-
-function isDealItem(item: OrderItem): boolean {
-    return Boolean(item.dealId);
-}
-
-function isProductItem(item: OrderItem): boolean {
-    return Boolean(item.productId);
-}
-
-function getDealCount(orders: Order[]): number {
-    return orders
-        .filter((order) => PURCHASED_ORDER_STATUSES.has(order.status))
-        .reduce((total, order) => {
-            return (
-                total +
-                order.items
-                    .filter(isDealItem)
-                    .reduce((sum, item) => sum + item.quantity, 0)
-            );
-        }, 0);
-}
-
-function getProductCount(orders: Order[]): number {
-    return orders
-        .filter((order) => PURCHASED_ORDER_STATUSES.has(order.status))
-        .reduce((total, order) => {
-            return (
-                total +
-                order.items
-                    .filter(isProductItem)
-                    .reduce((sum, item) => sum + item.quantity, 0)
-            );
-        }, 0);
-}
-
 export function CustomerDashboard() {
     const { token, signOut } = useAuth();
     const navigate = useNavigate();
-    const { ids: wishlistIds } = useWishlist();
-
     const [stats, setStats] = useState<DashboardStats>({
         deals: 0,
         products: 0,
         cart: 0,
         wishlist: 0,
     });
-
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-
-    useEffect(() => {
-        let cancelled = false;
-
-        async function loadDashboard() {
-            setLoading(true);
-            setError('');
-
-            try {
-                const [ordersResponse, cartResponse] = await Promise.all([
-                    listMyOrders(token),
-                    getCart(token),
-                ]);
-
-                if (cancelled) return;
-
-                const orders = ordersResponse.data ?? [];
-                const cartItems = cartResponse.data?.items ?? [];
-
-                const cartCount = cartItems.reduce(
-                    (sum, item) => sum + item.quantity,
-                    0,
-                );
-
-                setStats({
-                    deals: getDealCount(orders),
-                    products: getProductCount(orders),
-                    cart: cartCount,
-                    wishlist: wishlistIds.size,
-                });
-            } catch (err) {
-                if (cancelled) return;
-
-                setError(
-                    err instanceof ApiRequestError
-                        ? err.message
-                        : 'Could not load your dashboard.',
-                );
-            } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                }
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDashboard() {
+        setLoading(true);
+        setError('');
+        try {
+            const response = await getCustomerDashboardSummary(token);
+            if (cancelled) return;
+            setStats({
+                deals: response.data.totalDealCount,
+                products: response.data.totalProductBoughtCount,
+                cart: response.data.cartItemCount,
+                wishlist: response.data.wishlistItemCount,
+            });
+        } catch (err) {
+            if (cancelled) return;
+            setError(
+                err instanceof ApiRequestError? err.message: 'Could not load your dashboard.',
+            );
+        } finally {
+            if (!cancelled) {
+                setLoading(false);
             }
         }
+    }
 
-        loadDashboard();
+    loadDashboard();
 
-        return () => {
-            cancelled = true;
-        };
-    }, [token, wishlistIds.size]);
-
+    return () => {
+        cancelled = true;
+    };
+}, [token]);
     const logout = () => {
         signOut();
         navigate('/sign-in', { replace: true });
@@ -176,7 +101,7 @@ export function CustomerDashboard() {
                     headline="Deals"
                     text={`${stats.deals} booked deals`}
                     variant="elevated"
-                    href="/orders"
+                   href="/orders?type=SERVICE"
                 />
 
                 <sky-tile-card
@@ -184,7 +109,7 @@ export function CustomerDashboard() {
                     headline="Products"
                     text={`${stats.products} purchased products`}
                     variant="elevated"
-                    href="/orders"
+                    href="/orders?type=PRODUCT"
                 />
 
                 <sky-tile-card

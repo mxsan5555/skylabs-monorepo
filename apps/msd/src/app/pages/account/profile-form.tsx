@@ -7,7 +7,7 @@ import content from '../../../content.json';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getMyProfile, updateMyProfile, } from '../../../api/rbac/me';
 import { ApiRequestError } from '../../../api/rbac/client';
-
+import { useToast } from '../../../toast/toast-context';
 type Draft = Omit<Address, 'id'>;
 const EMPTY: Draft = {
   label: '',
@@ -44,10 +44,13 @@ const value = (e: Event) =>
 export function ProfileForm() {
   const { addresses, addAddress, updateAddress, removeAddress, } = useAccount();
   const { token } = useAuth();
+  const { showToast } = useToast();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [originalPhone, setOriginalPhone] = useState('');
   const [loading, setLoading] = useState(true);
-  const [saved, setSaved] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState<string | 'new' | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY);
@@ -56,7 +59,7 @@ export function ProfileForm() {
     setLoading(true);
     setError('');
     getMyProfile(token)
-      .then(({ data }) => { setEmail(data.email ?? ''); setPhone(data.phone ?? ''); })
+      .then(({ data }) => { setName(data.name ?? ''); setEmail(data.email ?? ''); setPhone(data.phone ?? ''); setOriginalPhone(data.phone ?? ''); })
       .catch((err) => {
         setError(err instanceof ApiRequestError ? err.message : 'Could not load your profile.',);
       })
@@ -64,35 +67,37 @@ export function ProfileForm() {
   }, [token]);
   const saveProfile = async () => {
     setError('');
+
+    const trimmedName = name.trim();
     const trimmedEmail = email.trim();
-    const trimmedPhone = phone.trim();
-    if (!trimmedEmail) {
-      setError(content.validation.email.empty);
+
+    if (!trimmedName) {
+      setError('Name is required.');
       return;
     }
-    if (!validateEmail(trimmedEmail)) {
+
+    if (trimmedEmail && !validateEmail(trimmedEmail)) {
       setError(content.validation.email.invalid);
       return;
     }
-    if (!trimmedPhone) {
-      setError(content.validation.phone.empty);
-      return;
-    }
-    if (!validatePhone(trimmedPhone)) {
-      setError(content.validation.phone.invalid);
-      return;
-    }
+
     try {
       const { data } = await updateMyProfile(token, {
-        email: trimmedEmail,
-        phone: trimmedPhone,
+        name: trimmedName,
+        email: trimmedEmail || undefined,
       });
+
+      setName(data.name ?? '');
       setEmail(data.email ?? '');
       setPhone(data.phone ?? '');
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 2000);
+      setEditing(false);
+      showToast('Profile updated successfully.', 'success');
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not save your profile.',);
+      setError(
+        err instanceof ApiRequestError
+          ? err.message
+          : 'Could not save your profile.',
+      );
     }
   };
   const startAdd = () => {
@@ -122,31 +127,54 @@ export function ProfileForm() {
         <>
           {error && (<p className="error-state" role="alert">{error}</p>)}
           <section className="account-card">
-            <div className="account-card__head">
-             
-              {saved && (<sky-badge className="otp-muted" role="status">Saved</sky-badge>)}
-            </div>
             <div className="account-fields">
+              <OutlinedTextField
+                label="Name"
+                value={name}
+                readOnly={!editing}
+                onInput={(e: Event) => setName(value(e))}
+              />
+
               <OutlinedTextField
                 label="Email"
                 type="email"
                 autocomplete="email"
                 value={email}
-                onInput={(e: Event) =>
-                  setEmail(value(e))
-                }
+                readOnly={!editing}
+                onInput={(e: Event) => setEmail(value(e))}
               />
+
               <OutlinedTextField
                 label="Phone"
                 type="tel"
                 autocomplete="tel"
                 value={phone}
-                onInput={(e: Event) =>
-                  setPhone(value(e))
-                }
+                readOnly
               />
             </div>
-            <div><FilledButton onClick={saveProfile}>Save changes</FilledButton></div>
+
+            <div className="account-card__actions">
+              {!editing ? (
+                <OutlinedButton onClick={() => setEditing(true)}>
+                  <Icon slot="icon" aria-hidden="true">
+                    edit
+                  </Icon>
+                  Edit
+                </OutlinedButton>
+              ) : (
+                <>
+                  <OutlinedButton onClick={() => setEditing(false)}>
+                    Cancel
+                  </OutlinedButton>
+
+                  <OutlinedButton onClick={saveProfile}>
+                    Update
+                  </OutlinedButton>
+                </>
+              )}
+            </div>
+
+
           </section>
           {/* <section className="account-card">
             <div className="account-card__head">
