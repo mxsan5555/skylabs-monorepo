@@ -115,7 +115,7 @@ describe('VendorPipeline#saveUser — owner is always a brand-new identity', () 
     fireEvent.click(findButtonByText('Create Vendor'));
 
     await waitFor(() => expect(createVendorMock).toHaveBeenCalledOnce());
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith(`/account/vendors/${CREATED_VENDOR.id}?tab=setup`, { replace: true }));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith(`/account/vendors/${CREATED_VENDOR.id}/profile`, { replace: true }));
   });
 
   it('submitting sends ownerFirstName/ownerLastName/ownerEmail/ownerMobile, never ownerUserId', async () => {

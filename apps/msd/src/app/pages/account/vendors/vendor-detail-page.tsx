@@ -1,51 +1,53 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Divider, FilledButton, Icon, List, ListItem, OutlinedButton, PrimaryTab, Tabs, TextButton, OutlinedTextField } from '@skylabs-monorepo/shared-ui/react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Divider, FilledButton, Icon, List, ListItem, OutlinedButton, TextButton, OutlinedTextField } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   approveVendor,
   deleteVendor,
-  deleteVendorTherapist,
   getVendor,
-  listCategories,
-  listVendorTherapistsForAdmin,
   rejectVendor,
   reviewVendorKyc,
   setVendorStatus,
-  type AdminTherapist,
-  type Category,
   type Vendor,
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
 import { ChoiceMenu, type ChoiceOption } from '../../../components/choice-menu/choice-menu';
 import { CardGrid } from '../../../components/card-grid/card-grid';
-import { useConfirmDialog } from '../../../components/confirm-dialog';
-import { VendorBranches } from './vendor-branches';
+import { ChipNav } from '../../../components/chip-nav/chip-nav';
+import { BranchesListPage } from './branches-list-page';
+import { DealsListPage } from './deals-list-page';
+import { TherapistsListPage } from './therapists-list-page';
+import { ProductsListPage } from './products-list-page';
 import { VendorDetailCustomers } from './vendor-detail-customers';
 import { VendorDetailOrders } from './vendor-detail-orders';
 import { VendorPipeline } from './vendor-pipeline';
-import { getMissingPoints, getSetupSteps, isSetupComplete, type SetupStep, type SetupStepKey } from './vendor-setup';
+import { getMissingPoints, getSetupSteps, setupHint, type SetupStep, type SetupStepKey } from './vendor-setup';
 
-/** Tabs while the redesign is in progress. `setup` still hosts the old six-step wizard and is
- *  replaced by the Profile page in the next step of the plan; Branches & Deals and Therapists
- *  are replaced by their own pages after that. */
-const TABS = [
-  { key: 'summary', label: 'Summary' },
-  { key: 'setup', label: 'Profile & setup' },
-  { key: 'branches', label: 'Branches & Deals' },
+/** No tab strip — the Overview's cards (setup-progress + records) are the navigation, each
+ *  Add/Edit/View button sending the admin to that section's own URL, `/account/vendors/:id/:section`.
+ *  `profile` still hosts the old six-step wizard and is replaced by the Profile page in a later
+ *  step of the plan. */
+const SECTIONS = [
+  { key: 'profile', label: 'Profile & setup' },
+  { key: 'branches', label: 'Branches' },
+  { key: 'deals', label: 'Deals' },
   { key: 'therapists', label: 'Therapists' },
+  { key: 'products', label: 'Products' },
   { key: 'customers', label: 'Customers' },
   { key: 'orders', label: 'Orders' },
 ] as const;
-type TabKey = (typeof TABS)[number]['key'];
+type SectionKey = (typeof SECTIONS)[number]['key'];
+const SECTION_LABEL: Record<SectionKey, string> = Object.fromEntries(SECTIONS.map((s) => [s.key, s.label])) as Record<SectionKey, string>;
 
-const STEP_TAB: Record<SetupStepKey, TabKey> = {
-  profile: 'setup',
+/** Which section a setup-progress card's button opens. */
+const STEP_SECTION: Record<SetupStepKey, SectionKey> = {
+  profile: 'profile',
   branches: 'branches',
-  deals: 'branches',
+  deals: 'deals',
   therapists: 'therapists',
-  products: 'setup',
+  products: 'products',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -69,13 +71,18 @@ function statusBadgeVariant(status: string): 'primary' | 'secondary' | 'tertiary
   return 'secondary';
 }
 
-type PendingAction = 'reject' | 'deactivate' | 'suspend' | 'delete';
+type PendingAction = 'reject' | 'suspend' | 'delete' | 'superadmin_deactivate' | 'superadmin_activate';
 
 const ACTION_COPY: Record<PendingAction, { icon: string; title: string; body: string; confirm: string; needsReason: boolean }> = {
   reject: { icon: 'block', title: 'Reject this member', body: 'The member is told why. They can fix the profile and send it again.', confirm: 'Reject member', needsReason: true },
-  deactivate: { icon: 'toggle_off', title: 'Deactivate this member', body: 'Their deals and products stop showing on the website. You can activate them again later.', confirm: 'Deactivate member', needsReason: true },
   suspend: { icon: 'pause_circle', title: 'Suspend this member', body: 'Use this for a rule break. Their deals and products stop showing until you activate them.', confirm: 'Suspend member', needsReason: true },
   delete: { icon: 'delete', title: 'Delete this member', body: 'This removes the member and all their branches, deals and products. It cannot be undone. If they have orders, deactivate them instead.', confirm: 'Delete member', needsReason: false },
+  // Member-level Active/Deactivate is SuperAdmin-only (see the 2026-10-04 two-column design
+  // spec §4) — the only entry point for this transition; it replaced the old `deactivate`/
+  // `activate` options that used to sit in the header's Actions menu under the weaker
+  // `vendors:status_change` permission.
+  superadmin_deactivate: { icon: 'toggle_off', title: 'Deactivate this member', body: 'Their deals and products stop showing on the website. This is the SuperAdmin-level control — use it even if a support action was already tried.', confirm: 'Deactivate member', needsReason: true },
+  superadmin_activate: { icon: 'toggle_on', title: 'Activate this member', body: 'Their deals and products become visible on the website again.', confirm: 'Activate member', needsReason: false },
 };
 
 const STEP_ICON: Record<SetupStepKey, string> = {
@@ -86,34 +93,13 @@ const STEP_ICON: Record<SetupStepKey, string> = {
   products: 'inventory_2',
 };
 
-const THERAPIST_COLUMNS = JSON.stringify([
-  { key: 'Type', label: 'Type' },
-  { key: 'Name', label: 'Name' },
-  { key: 'Branch', label: 'Branch' },
-  { key: 'Specialization', label: 'Specialization' },
-  { key: 'Experience', label: 'Experience' },
-  { key: 'Status', label: 'Status', type: 'status', statusMap: { Active: 'success', Inactive: 'error' } },
-]);
-const THERAPIST_DELETE_ACTIONS = JSON.stringify([{ icon: 'delete', label: 'Delete', event: 'delete' }]);
-
-function toTherapistRow(t: AdminTherapist): Record<string, string | number> {
-  return {
-    Type: t.therapistType,
-    Name: t.personName,
-    Branch: t.branch.name,
-    Specialization: t.specialization || '—',
-    Experience: t.experienceYears ? `${t.experienceYears} yrs` : '—',
-    Status: t.isActive ? 'Active' : 'Inactive',
-  };
-}
-
-/** One member's page: `/account/vendors/:vendorId`. Admin only (`vendors:view`). */
+/** One member's page: `/account/vendors/:vendorId` (Overview) and `/account/vendors/:vendorId/:section`
+ *  (Profile & setup / Branches / Therapists / Customers / Orders). Admin only (`vendors:view`). */
 export function VendorDetailPage() {
-  const { vendorId } = useParams<{ vendorId: string }>();
+  const { vendorId, section: rawSection } = useParams<{ vendorId: string; section?: string }>();
+  const section = SECTIONS.some((s) => s.key === rawSection) ? (rawSection as SectionKey) : undefined;
   const navigate = useNavigate();
-  const { token, can, loginAsUser } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const { confirm, ConfirmDialog } = useConfirmDialog();
+  const { token, can, loginAsUser, bootstrap } = useAuth();
 
   const canView = can('vendors', 'view');
   const canEditAny = can('vendors', 'edit');
@@ -122,6 +108,10 @@ export function VendorDetailPage() {
   const canStatusChange = can('vendors', 'status_change');
   const canDelete = can('vendors', 'delete');
   const canAccessDashboard = can('rbac.users', 'custom');
+  // Member-level Active/Deactivate is restricted to SuperAdmin, not the `vendors:status_change`
+  // permission every other status action here uses — a role flag, not a menu permission, so it
+  // has to be read off the caller's own granted roles rather than `can()`.
+  const isSuperAdmin = bootstrap?.roles.some((r) => r.isSuperAdmin) ?? false;
 
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [loading, setLoading] = useState(true);
@@ -131,10 +121,12 @@ export function VendorDetailPage() {
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+  // Set when a URL is typed/bookmarked for a section that turns out to be locked or unknown —
+  // shown once, on the Overview page this component redirects back to.
   const [lockNotice, setLockNotice] = useState('');
-  // Bumped when a locked tab is clicked so md-tabs remounts on the tab that is really active.
-  const [tabsKey, setTabsKey] = useState(0);
-  const [categories, setCategories] = useState<Category[]>([]);
+  // Overview's Records row — a ChipNav switch, not a navigation (Customers/Orders are never
+  // locked, so there's nothing to deep-link; see the 2026-10-04 two-column design spec §3).
+  const [recordsTab, setRecordsTab] = useState<'customers' | 'orders'>('customers');
 
   const load = useCallback(
     async (silent = false) => {
@@ -159,35 +151,48 @@ export function VendorDetailPage() {
 
   const steps = vendor ? getSetupSteps(vendor) : [];
   const stepByKey = (key: SetupStepKey) => steps.find((s) => s.key === key);
-  const tabLock = (key: TabKey): string | undefined => {
+  const sectionLock = (key: SectionKey): string | undefined => {
     if (key === 'branches') return stepByKey('branches')?.locked ? stepByKey('branches')?.lockedReason : undefined;
+    if (key === 'deals') return stepByKey('deals')?.locked ? stepByKey('deals')?.lockedReason : undefined;
     if (key === 'therapists') return stepByKey('therapists')?.locked ? stepByKey('therapists')?.lockedReason : undefined;
+    if (key === 'products') return stepByKey('products')?.locked ? stepByKey('products')?.lockedReason : undefined;
     return undefined;
   };
 
-  const requested = searchParams.get('tab') as TabKey | null;
-  const tab: TabKey = requested && TABS.some((t) => t.key === requested) && !tabLock(requested) ? requested : 'summary';
-
-  const goToTab = useCallback(
-    (next: TabKey) => {
-      setLockNotice('');
-      setSearchParams(next === 'summary' ? {} : { tab: next });
+  const goToSection = useCallback(
+    (next?: SectionKey) => {
+      navigate(next ? `/account/vendors/${vendorId}/${next}` : `/account/vendors/${vendorId}`);
     },
-    [setSearchParams],
+    [navigate, vendorId],
   );
 
-  // Counts change while the member is edited on other tabs, so refresh them on the way back.
+  // A bookmarked/typed URL for a section that turns out to be unknown or locked sends the admin
+  // back to Overview with a one-line reason, instead of showing content the URL doesn't back up.
   useEffect(() => {
-    if (tab === 'summary') load(true);
-  }, [tab, load]);
+    if (!vendor || !rawSection) return;
+    if (!section) {
+      navigate(`/account/vendors/${vendorId}`, { replace: true });
+      return;
+    }
+    const lock = sectionLock(section);
+    if (lock) {
+      setLockNotice(`${SECTION_LABEL[section]} is locked. ${lock}.`);
+      navigate(`/account/vendors/${vendorId}`, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sectionLock reads `steps`, recomputed every render from `vendor`
+  }, [vendor, rawSection, section, vendorId, navigate]);
 
+  // Counts change while the member is edited in another section, so refresh them on the way back.
   useEffect(() => {
-    if (!vendorId) return;
-    listCategories(token, { type: 'SERVICE', vendorId }).then(({ data }) => setCategories(data)).catch(() => setCategories([]));
-  }, [token, vendorId]);
+    if (!section) load(true);
+  }, [section, load]);
 
   const name = vendor ? vendor.businessName || vendor.owner?.name || 'Draft member' : 'Member';
-  useSetBreadcrumbs([{ label: 'Members' }, { label: 'All Member', to: '/account/vendors' }, { label: name }]);
+  useSetBreadcrumbs(
+    section
+      ? [{ label: 'Members' }, { label: 'All Member', to: '/account/vendors' }, { label: name, to: `/account/vendors/${vendorId}` }, { label: SECTION_LABEL[section] }]
+      : [{ label: 'Members' }, { label: 'All Member', to: '/account/vendors' }, { label: name }],
+  );
 
   const reasonRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -216,16 +221,6 @@ export function VendorDetailPage() {
     }
   };
 
-  const doActivate = async () => {
-    if (!vendor) return;
-    try {
-      await setVendorStatus(token, vendor.id, 'ACTIVE');
-      await finish('Member is active again.');
-    } catch (err) {
-      fail(err, 'Could not activate this member.');
-    }
-  };
-
   const doAccessDashboard = async () => {
     if (!vendor?.owner) return;
     try {
@@ -243,9 +238,13 @@ export function VendorDetailPage() {
       if (pending === 'reject') {
         await rejectVendor(token, vendor.id, reason.trim());
         await finish('Member rejected.');
-      } else if (pending === 'deactivate' || pending === 'suspend') {
-        await setVendorStatus(token, vendor.id, pending === 'deactivate' ? 'INACTIVE' : 'SUSPENDED', reason.trim());
-        await finish(pending === 'deactivate' ? 'Member deactivated.' : 'Member suspended.');
+      } else if (pending === 'suspend') {
+        await setVendorStatus(token, vendor.id, 'SUSPENDED', reason.trim());
+        await finish('Member suspended.');
+      } else if (pending === 'superadmin_deactivate' || pending === 'superadmin_activate') {
+        const nextStatus = pending === 'superadmin_deactivate' ? 'INACTIVE' : 'ACTIVE';
+        await setVendorStatus(token, vendor.id, nextStatus, nextStatus === 'INACTIVE' ? reason.trim() : undefined);
+        await finish(nextStatus === 'INACTIVE' ? 'Member deactivated.' : 'Member is active again.');
       } else {
         await deleteVendor(token, vendor.id);
         navigate('/account/vendors');
@@ -277,9 +276,9 @@ export function VendorDetailPage() {
   if (vendor) {
     if (canAccessDashboard && vendor.owner) actionOptions.push({ value: 'dashboard', label: "Open member's dashboard" });
     if (canApprove && vendor.status !== 'ACTIVE') actionOptions.push({ value: 'approve', label: 'Approve' });
-    if (canStatusChange && vendor.status === 'INACTIVE') actionOptions.push({ value: 'activate', label: 'Activate' });
     if (canReject && vendor.status !== 'REJECTED') actionOptions.push({ value: 'reject', label: 'Reject' });
-    if (canStatusChange && vendor.status === 'ACTIVE') actionOptions.push({ value: 'deactivate', label: 'Deactivate' });
+    // Deliberately no Activate/Deactivate here — that transition is SuperAdmin-only (see
+    // `isSuperAdmin` above), surfaced solely by the profile card's own control, not this menu.
     if (canStatusChange && vendor.status !== 'SUSPENDED') actionOptions.push({ value: 'suspend', label: 'Suspend' });
     if (canDelete) actionOptions.push({ value: 'delete', label: 'Delete' });
   }
@@ -289,11 +288,18 @@ export function VendorDetailPage() {
     setError('');
     if (value === 'dashboard') doAccessDashboard();
     else if (value === 'approve') doApprove();
-    else if (value === 'activate') doActivate();
-    else if (value === 'reject' || value === 'deactivate' || value === 'suspend' || value === 'delete') {
+    else if (value === 'reject' || value === 'suspend' || value === 'delete') {
       setReason('');
       setPending(value);
     }
+  };
+
+  const runSuperadminToggle = () => {
+    if (!vendor) return;
+    setMessage('');
+    setError('');
+    setReason('');
+    setPending(vendor.status === 'ACTIVE' ? 'superadmin_deactivate' : 'superadmin_activate');
   };
 
   if (!canView) {
@@ -316,11 +322,10 @@ export function VendorDetailPage() {
   }
 
   const copy = pending ? ACTION_COPY[pending] : null;
-  const setupComplete = isSetupComplete(steps);
 
   return (
     <div className="admin-page admin-page--wide">
-      <title>{`${name} · Member · MSD`}</title>
+      <title>{`${name} · ${section ? SECTION_LABEL[section] : 'Overview'} · MSD`}</title>
       <header className="page-head">
         <div>
           <h1>{name}</h1>
@@ -366,57 +371,56 @@ export function VendorDetailPage() {
         </sky-feature-card>
       )}
 
-      <div className="admin-tabs-wrap">
-        <Tabs
-          key={tabsKey}
-          className="admin-tabs"
-          aria-label="Member sections"
-          onChange={(e) => {
-            const next = TABS[(e.target as unknown as { activeTabIndex: number }).activeTabIndex]?.key;
-            if (!next) return;
-            const lock = tabLock(next);
-            if (lock) {
-              setLockNotice(`${TABS.find((t) => t.key === next)?.label} is locked. ${lock}.`);
-              setTabsKey((k) => k + 1);
-              return;
-            }
-            goToTab(next);
-          }}
-        >
-          {TABS.map(({ key, label }) => {
-            const lock = tabLock(key);
-            return (
-              <PrimaryTab key={key} active={tab === key} aria-disabled={lock ? 'true' : undefined} title={lock}>
-                {lock && <Icon slot="icon" aria-hidden="true">lock</Icon>}
-                {label}
-              </PrimaryTab>
-            );
-          })}
-        </Tabs>
-      </div>
       {lockNotice && <p className="field-hint" role="status">{lockNotice}</p>}
 
-      {tab === 'summary' && (
-        <div className="admin-tab-panel summary-layout" aria-label="Summary">
-          <section aria-labelledby="setup-progress-title">
-            <h2 id="setup-progress-title" className="section-title">Setup progress</h2>
-            <p className="field-hint">
-              {setupComplete ? 'Everything needed is in place.' : 'Finish each step in order. Later steps unlock as you go.'}
-            </p>
-            <CardGrid layout="compact">
-              {steps
-                .filter((step) => step.key !== 'profile')
-                .map((step) => (
-                  <SetupCard key={step.key} step={step} onOpen={() => goToTab(STEP_TAB[step.key])} />
-                ))}
-            </CardGrid>
-          </section>
+      {!section && (
+        <div className="admin-tab-panel summary-layout" aria-label="Overview">
+          <div>
+            <section aria-labelledby="setup-progress-title">
+              <h2 id="setup-progress-title" className="section-title">Setup progress</h2>
+              <p className="field-hint">{setupHint(steps)}</p>
+              <CardGrid layout="compact">
+                {steps
+                  .filter((step) => step.key !== 'profile')
+                  .map((step) => (
+                    <SetupCard key={step.key} step={step} href={step.locked ? undefined : `/account/vendors/${vendorId}/${STEP_SECTION[step.key]}`} />
+                  ))}
+              </CardGrid>
+            </section>
 
-          <MemberSummaryCard vendor={vendor} steps={steps} onEditProfile={() => goToTab('setup')} />
+            <section aria-labelledby="records-title">
+              <h2 id="records-title" className="section-title">Records</h2>
+              <ChipNav
+                items={[
+                  { value: 'customers', label: 'Customers' },
+                  { value: 'orders', label: 'Orders' },
+                ]}
+                value={recordsTab}
+                onSelect={(value) => setRecordsTab(value as 'customers' | 'orders')}
+                ariaLabel="Member records"
+              />
+              {recordsTab === 'customers' ? (
+                <VendorDetailCustomers token={token} vendorId={vendor.id} />
+              ) : (
+                <VendorDetailOrders token={token} vendorId={vendor.id} />
+              )}
+            </section>
+          </div>
+
+          <section aria-labelledby="profile-card-title">
+            <h2 id="profile-card-title" className="section-title">Profile</h2>
+            <MemberSummaryCard
+              vendor={vendor}
+              steps={steps}
+              onEditProfile={() => goToSection('profile')}
+              isSuperAdmin={isSuperAdmin}
+              onSuperadminToggle={runSuperadminToggle}
+            />
+          </section>
         </div>
       )}
 
-      {tab === 'setup' && (
+      {section === 'profile' && (
         <div className="admin-tab-panel" aria-label="Profile and setup">
           <VendorPipeline
             token={token}
@@ -432,83 +436,112 @@ export function VendorDetailPage() {
         </div>
       )}
 
-      {tab === 'branches' && (
-        <div className="admin-tab-panel" aria-label="Branches and Deals">
-          <VendorBranches
-            token={token}
-            vendorId={vendor.id}
-            isSelf={false}
-            canEdit={canEditAny}
-            canApproveDeal={canApprove}
-            canDeleteDeal={canDelete}
-            categories={categories}
-            onVendorRefresh={() => load(true)}
-          />
+      {section === 'branches' && (
+        <div className="admin-tab-panel" aria-label="Branches">
+          <BranchesListPage token={token} vendorId={vendor.id} canEdit={canEditAny} />
         </div>
       )}
 
-      {tab === 'therapists' && (
+      {section === 'deals' && (
+        <div className="admin-tab-panel" aria-label="Deals">
+          <DealsListPage token={token} vendorId={vendor.id} canEdit={canEditAny} canDelete={canDelete} />
+        </div>
+      )}
+
+      {section === 'therapists' && (
         <div className="admin-tab-panel" aria-label="Therapists">
-          <TherapistsTab token={token} vendorId={vendor.id} canDelete={canDelete} confirm={confirm} />
+          <TherapistsListPage token={token} vendorId={vendor.id} canEdit={canEditAny} canDelete={canDelete} />
         </div>
       )}
 
-      {tab === 'customers' && (
+      {section === 'products' && (
+        <div className="admin-tab-panel" aria-label="Products">
+          <ProductsListPage token={token} vendorId={vendor.id} canEdit={canEditAny} canDelete={canDelete} />
+        </div>
+      )}
+
+      {section === 'customers' && (
         <div className="admin-tab-panel" aria-label="Customers">
           <VendorDetailCustomers token={token} vendorId={vendor.id} />
         </div>
       )}
 
-      {tab === 'orders' && (
+      {section === 'orders' && (
         <div className="admin-tab-panel" aria-label="Orders">
           <VendorDetailOrders token={token} vendorId={vendor.id} />
         </div>
       )}
-      {ConfirmDialog}
     </div>
   );
 }
 
-/** The one line under a step's title: why it is locked, what is missing, or how many exist. */
+/** The one line under a step's title: status, plus the action a click on the card performs (the
+ *  whole tile is the link, so this is the only place that says "Add"/"Edit"). */
 function stepText(step: SetupStep): string {
   if (step.locked) return step.lockedReason ?? 'Locked';
-  if (step.missing.length > 0) return step.key === 'profile' ? `Missing: ${step.missing.join(', ')}` : step.missing[0];
-  if (step.count !== undefined) return step.count.includes(' of ') ? `${step.count} live` : `${step.count} added`;
-  return 'Complete';
+  const status = step.missing.length > 0
+    ? step.key === 'profile'
+      ? `Missing: ${step.missing.join(', ')}`
+      : step.missing[0]
+    : step.count !== undefined
+      ? step.count.includes(' of ')
+        ? `${step.count} live`
+        : `${step.count} added`
+      : 'Complete';
+  return `${status} · ${step.done ? 'Edit' : 'Add'}`;
 }
 
-/** One setup step as a `sky-feature-card`: done = secondary, locked = surface-high (no button),
- *  to do = outlined surface. The button sits in the card's `actions` slot. */
-function SetupCard({ step, onOpen }: { step: SetupStep; onOpen: () => void }) {
-  const icon = step.locked ? 'lock' : step.done ? 'check_circle' : STEP_ICON[step.key];
-  const color = step.locked ? 'surface-high' : step.done ? 'secondary' : 'surface';
-  return (
-    <sky-feature-card
-      color={color}
-      variant={step.done || step.locked ? 'filled' : 'outlined'}
-      icon={icon}
-      icon-style="surface"
-      headline={step.label}
-      text={stepText(step)}
-    >
-      {!step.locked && (
-        <OutlinedButton slot="actions" onClick={onOpen}>
-          {step.done ? 'View' : 'Add'}
-        </OutlinedButton>
-      )}
-    </sky-feature-card>
-  );
+/** One setup step as a small `sky-tile-card`, the whole tile a link to its section (no `href` —
+ *  and so no link — while locked; nothing to focus when nothing is actionable). Three visual
+ *  states, per the 2026-10-04 two-column design spec §2: **locked** uses `tertiary` (this app's
+ *  warning tone, same one the status badge uses for "incomplete"/"pending"); **done** uses
+ *  `secondary`, so what's finished visibly stands out from what still needs attention; **unlocked
+ *  but empty** uses `surface-high` — except Branches, which spends this app's one `primary`
+ *  "start here" accent (the same role every `FilledButton` uses) while it's the single mandatory
+ *  gateway nothing else unlocks without — it drops to the same `secondary` done state as the
+ *  other three the moment a branch exists. */
+function SetupCard({ step, href }: { step: SetupStep; href?: string }) {
+  if (step.locked) {
+    return <sky-tile-card color="tertiary" variant="filled" icon="lock" icon-style="surface" headline={step.label} text={stepText(step)} />;
+  }
+  if (step.done) {
+    return <sky-tile-card color="secondary" variant="filled" icon="check_circle" icon-style="surface" headline={step.label} text={stepText(step)} href={href} />;
+  }
+  if (step.key === 'branches') {
+    return <sky-tile-card color="primary" variant="filled" icon={STEP_ICON.branches} headline={step.label} text="No branch yet · Start here" href={href} />;
+  }
+  return <sky-tile-card color="surface-high" variant="filled" icon={STEP_ICON[step.key]} icon-style="surface" headline={step.label} text={stepText(step)} href={href} />;
 }
 
-/** The right-hand column of the summary tab: the member's profile card. One `sky-card` grouping
- *  three sections (identity, what's missing, the profile action), each on its own `List`, split
- *  by `Divider` — the "list / divider / list / divider / action" reading the user asked for. */
-function MemberSummaryCard({ vendor, steps, onEditProfile }: { vendor: Vendor; steps: SetupStep[]; onEditProfile: () => void }) {
+/** The right-hand column of the summary tab: the member's profile card, under its own "Profile"
+ *  heading so it reads as a third section alongside "Setup progress" and "Records" rather than a
+ *  stray box. One `sky-card` (default `filled`, the same soft-surface language as the tile grid
+ *  beside it) grouping three parts — identity, what's missing, the profile action — each on its
+ *  own `List`, split by `Divider`. Every missing item carries a `sky-badge variant="error"`, the
+ *  one shared component with a literal `--md-sys-color-error` role, so what still needs fixing is
+ *  never just a plain grey row. */
+function MemberSummaryCard({
+  vendor,
+  steps,
+  onEditProfile,
+  isSuperAdmin,
+  onSuperadminToggle,
+}: {
+  vendor: Vendor;
+  steps: SetupStep[];
+  onEditProfile: () => void;
+  /** Member-level Active/Deactivate is SuperAdmin-only — this control is absent from the DOM
+   *  entirely for anyone else, rather than disabled-but-visible (see the 2026-10-04 two-column
+   *  design spec §4: simplest implementation, and it never advertises an action a given admin
+   *  can never take). */
+  isSuperAdmin: boolean;
+  onSuperadminToggle: () => void;
+}) {
   const profileDone = steps.find((s) => s.key === 'profile')?.done ?? false;
   const missing = getMissingPoints(steps);
 
   return (
-    <sky-card variant="outlined" aria-label="Member profile">
+    <sky-card aria-label="Member profile">
       <List>
         <ListItem>
           <Icon slot="start" aria-hidden="true">person</Icon>
@@ -541,6 +574,7 @@ function MemberSummaryCard({ vendor, steps, onEditProfile }: { vendor: Vendor; s
               <Icon slot="start" aria-hidden="true">{STEP_ICON[point.key]}</Icon>
               <div slot="headline">{point.text}</div>
               <div slot="supporting-text">{point.label}</div>
+              <sky-badge slot="end" variant="error" size="small">Missing</sky-badge>
             </ListItem>
           ))
         )}
@@ -549,77 +583,17 @@ function MemberSummaryCard({ vendor, steps, onEditProfile }: { vendor: Vendor; s
       <Divider />
 
       <FilledButton onClick={onEditProfile}>{profileDone ? 'Edit profile' : 'Add profile'}</FilledButton>
+
+      {isSuperAdmin && (
+        <>
+          <Divider />
+          <OutlinedButton onClick={onSuperadminToggle}>
+            <Icon slot="icon" aria-hidden="true">{vendor.status === 'ACTIVE' ? 'toggle_off' : 'toggle_on'}</Icon>
+            {vendor.status === 'ACTIVE' ? 'Deactivate member' : 'Activate member'}
+          </OutlinedButton>
+        </>
+      )}
     </sky-card>
-  );
-}
-
-function TherapistsTab({
-  token,
-  vendorId,
-  canDelete,
-  confirm,
-}: {
-  token: string | null;
-  vendorId: string;
-  canDelete: boolean;
-  confirm: (message: string) => Promise<boolean>;
-}) {
-  const [therapists, setTherapists] = useState<AdminTherapist[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const tableRef = useRef<HTMLElement>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const { data } = await listVendorTherapistsForAdmin(token, vendorId);
-      setTherapists(data);
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not load therapists.');
-    } finally {
-      setLoading(false);
-    }
-  }, [token, vendorId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  useEffect(() => {
-    const el = tableRef.current;
-    if (!el || !canDelete) return;
-    const onRowAction = async (e: Event) => {
-      const detail = (e as CustomEvent<{ action: string; rowIndex: number }>).detail;
-      const therapist = therapists[detail.rowIndex];
-      if (!therapist || detail.action !== 'delete') return;
-      if (!(await confirm(`Delete "${therapist.personName}"? This cannot be undone.`))) return;
-      try {
-        await deleteVendorTherapist(token, vendorId, therapist.id);
-        load();
-      } catch (err) {
-        setError(err instanceof ApiRequestError ? err.message : 'Could not delete therapist.');
-      }
-    };
-    el.addEventListener('sky-dt-row-action', onRowAction);
-    return () => el.removeEventListener('sky-dt-row-action', onRowAction);
-  }, [therapists, canDelete, confirm, token, vendorId, load]);
-
-  return (
-    <>
-      {error && <p className="error-state" role="alert">{error}</p>}
-      <sky-data-table
-        ref={tableRef as RefObject<HTMLElement>}
-        caption="Therapists"
-        columns={THERAPIST_COLUMNS}
-        rows={JSON.stringify(therapists.map(toTherapistRow))}
-        total={therapists.length}
-        page={1}
-        page-size={Math.max(therapists.length, 10)}
-        loading={loading}
-        actions={canDelete ? THERAPIST_DELETE_ACTIONS : undefined}
-      />
-    </>
   );
 }
 

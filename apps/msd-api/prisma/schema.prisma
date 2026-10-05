@@ -458,6 +458,7 @@ model Therapist {
   mediaImages              TherapistImage[]
   packages                 TherapistPackage[]
   mediaVideo               TherapistVideo?
+  dealLinks                DealTherapist[]
 
   @@index([vendorId])
   @@index([branchId])
@@ -1136,6 +1137,7 @@ model Deal {
   promotionLinks          Promotion[]
   heroSlides              HomeHeroSlide[]
   wishlistItems           WishlistItem[]
+  therapistLinks          DealTherapist[]
 
   @@index([vendorId])
   @@index([branchId])
@@ -1205,6 +1207,24 @@ model DealVideo {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   deal             Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+/// Many-to-many link between a Deal and the Therapist(s) who perform it — a Deal may list
+/// several therapists, and a Therapist may appear on several Deals. Both sides are always
+/// scoped to the same Branch (Deal.branchId === Therapist.branchId), enforced in
+/// vendor.service.ts#assertTherapistsBelongToBranch before any row here is written, not by a
+/// constraint on this table itself.
+model DealTherapist {
+  id          String    @id @default(uuid())
+  dealId      String
+  therapistId String
+  createdAt   DateTime  @default(now())
+  deal        Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  therapist   Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, therapistId])
+  @@index([dealId])
+  @@index([therapistId])
 }
 
 /// Vendor-owned retail product catalog (e.g. skincare) — each Product belongs to exactly one
