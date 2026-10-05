@@ -111,7 +111,44 @@ const VENDOR_IMAGE_ORDER_BY: Prisma.VendorImageOrderByWithRelationInput[] = [
 const VENDOR_MEDIA_INCLUDE = { mediaImages: { orderBy: VENDOR_IMAGE_ORDER_BY }, mediaVideo: true, documents: true } as const;
 
 /** Standard `include` for any Vendor read/write that should carry its linked-owner summary + branch count. */
-const OWNER_INCLUDE = { _count: { select: { branches: true,  deals: true, products: true, } }, owner: OWNER_SUMMARY_SELECT, ...VENDOR_MEDIA_INCLUDE } as const;
+const OWNER_INCLUDE = { _count: { select: { branches: true, deals: true, products: true, therapists: true } }, owner: OWNER_SUMMARY_SELECT, ...VENDOR_MEDIA_INCLUDE } as const;
+
+export interface VendorLiveCounts {
+  branches: number;
+  deals: number;
+  products: number;
+  therapists: number;
+}
+
+const EMPTY_LIVE_COUNTS: VendorLiveCounts = { branches: 0, deals: 0, products: 0, therapists: 0 };
+
+/** Adds `liveCounts` (branches/products/therapists that are active, deals that are ACTIVE and
+ *  APPROVED) beside the all-rows `_count`, so the admin can show "5 of 18" instead of one number
+ *  that silently includes drafts and inactive items. Four grouped queries for the whole page,
+ *  not per vendor. Attached by the list/detail routes only: `getVendorOrThrow` is also used as
+ *  an existence check all over this file and must stay cheap. */
+export async function attachLiveCounts<T extends { id: string }>(vendors: T[]): Promise<(T & { liveCounts: VendorLiveCounts })[]> {
+  if (vendors.length === 0) return [];
+  const vendorId = { in: vendors.map((v) => v.id) };
+  const [branches, deals, products, therapists] = await Promise.all([
+    prisma.branch.groupBy({ by: ['vendorId'], where: { vendorId, isActive: true }, _count: { _all: true } }),
+    prisma.deal.groupBy({ by: ['vendorId'], where: { vendorId, status: 'ACTIVE', approvalStatus: 'APPROVED' }, _count: { _all: true } }),
+    prisma.product.groupBy({ by: ['vendorId'], where: { vendorId, isActive: true }, _count: { _all: true } }),
+    prisma.therapist.groupBy({ by: ['vendorId'], where: { vendorId, isActive: true }, _count: { _all: true } }),
+  ]);
+  const toMap = (rows: { vendorId: string; _count: { _all: number } }[]) => new Map(rows.map((r) => [r.vendorId, r._count._all]));
+  const byKey = { branches: toMap(branches), deals: toMap(deals), products: toMap(products), therapists: toMap(therapists) };
+  return vendors.map((v) => ({
+    ...v,
+    liveCounts: {
+      ...EMPTY_LIVE_COUNTS,
+      branches: byKey.branches.get(v.id) ?? 0,
+      deals: byKey.deals.get(v.id) ?? 0,
+      products: byKey.products.get(v.id) ?? 0,
+      therapists: byKey.therapists.get(v.id) ?? 0,
+    },
+  }));
+}
 
 function heuristicInitialStatus(input: { gstNumber?: string; panNumber?: string }): VendorStatus {
   return input.gstNumber && input.panNumber ? 'PENDING_VERIFICATION' : 'PROFILE_INCOMPLETE';
@@ -345,16 +382,23 @@ async function buildAndInsertVendor(
  * this correction doesn't touch.
  */
 export async function createVendor(input: VendorCreateInput, createdByUserId: string) {
-  // Double-submit guard, unchanged — keyed on the same admin submitting the same businessName
-  // again within the window, so a rapid double-click doesn't create two draft Vendor rows (and,
-  // now, doesn't call `createVendorOwner` twice for the same typed email/mobile either — the
-  // second call would otherwise legitimately 409 against the first call's own freshly-created
-  // User, which would be a confusing false-positive "already exists" error for a genuine
-  // double-click rather than a real duplicate).
+  // Double-submit guard — only short-circuits a genuine resubmission of the SAME payload within
+  // the window (same admin, same businessName, AND — whenever an owner identity was submitted —
+  // the same owner email/mobile). Scoping this by businessName alone was a real bug: Step 1 of
+  // the admin pipeline always POSTs with `businessName` absent (the owner-creation step happens
+  // before any business field is filled in — see vendor-pipeline.tsx's `saveUser`), so it's
+  // always `null` here. That meant ANY two vendor creations by the same admin within the 10s
+  // window collided on `(createdByUserId, businessName: null)` regardless of owner identity —
+  // the second submission's real owner (a brand-new one, or a genuinely already-taken email/
+  // mobile) was silently discarded and the FIRST vendor was returned instead, before
+  // `createVendorOwner`'s own conflict check ever ran. So a duplicate-owner submission never
+  // surfaced its intended 409 — it just silently handed back an unrelated vendor.
   const recentDuplicate = await prisma.vendor.findFirst({
     where: {
       createdByUserId,
       businessName: input.businessName ?? null,
+      ...(input.ownerEmail ? { ownerEmail: input.ownerEmail } : {}),
+      ...(input.ownerMobile ? { ownerMobile: input.ownerMobile } : {}),
       createdAt: { gte: new Date(Date.now() - DUPLICATE_SUBMIT_WINDOW_MS) },
     },
     orderBy: { createdAt: 'desc' },
@@ -712,7 +756,7 @@ export async function listAllDeals(opts: { page: number; pageSize: number; searc
     }),
     prisma.deal.count({ where }),
   ]);
-  return { items: items.map((d) => ({ ...d, eligible: isDealPubliclyEligible(d) })), total };
+  return { items: items.map((d) => ({ ...flattenDealTherapists(d), eligible: isDealPubliclyEligible(d) })), total };
 }
 
 export async function listAllTherapists(opts: { page: number; pageSize: number; search?: string }) {
@@ -921,6 +965,28 @@ export async function getTherapistScopedOrThrow(vendorId: string, therapistId: s
   if (!therapist) throw new ApiError('NOT_FOUND', 'Therapist not found');
   if (therapist.vendorId !== vendorId) throw new ApiError('FORBIDDEN', 'This therapist does not belong to your vendor');
   return therapist;
+}
+
+/** Every id in `therapistIds` must be a real Therapist belonging to this exact vendor AND
+ *  branch — a Deal can only link therapists who actually work at the same branch it belongs to
+ *  (mirrors getBranchScopedOrThrow/getTherapistScopedOrThrow's vendor/branch discipline). This is
+ *  the real security boundary for Deal<->Therapist linking; the frontend's branch-filtered
+ *  therapist picker is UX only. No-op for an empty list. */
+async function assertTherapistsBelongToBranch(vendorId: string, branchId: string, therapistIds: string[]) {
+  if (therapistIds.length === 0) return;
+  const uniqueIds = [...new Set(therapistIds)];
+  const therapists = await prisma.therapist.findMany({
+    where: { id: { in: uniqueIds } },
+    select: { id: true, vendorId: true, branchId: true },
+  });
+  const byId = new Map(therapists.map((t) => [t.id, t]));
+  for (const id of uniqueIds) {
+    const therapist = byId.get(id);
+    if (!therapist) throw new ApiError('VALIDATION_ERROR', `Therapist ${id} does not exist`);
+    if (therapist.vendorId !== vendorId || therapist.branchId !== branchId) {
+      throw new ApiError('VALIDATION_ERROR', `Therapist ${id} does not belong to this branch`);
+    }
+  }
 }
 
 /** A rapid double-click/double-submit sends two near-identical create requests before the
@@ -1251,7 +1317,7 @@ export async function getVendorCategoryAccess(vendorId: string) {
 
 export async function listDeals(vendorId: string, branchId: string) {
   await getBranchScopedOrThrow(vendorId, branchId);
-  return prisma.deal.findMany({
+  const deals = await prisma.deal.findMany({
     where: { branchId },
     orderBy: { createdAt: 'desc' },
     include: {
@@ -1264,8 +1330,27 @@ export async function listDeals(vendorId: string, branchId: string) {
       packages: { orderBy: DEAL_PACKAGE_ORDER_BY },
       mediaImages: { orderBy: DEAL_IMAGE_ORDER_BY },
       mediaVideo: true,
+      therapistLinks: { include: { therapist: { select: THERAPIST_LINK_SELECT } } },
     },
   });
+  return deals.map(flattenDealTherapists);
+}
+
+/**
+ * All of a vendor's deals (every status, across every branch) for the admin's vendor detail
+ * page — mirrors `listVendorTherapistsForAdmin`'s "vendor-wide, not branch-scoped" read exactly
+ * (same reasoning: the admin overview's Deals card counts/links across the whole vendor, not one
+ * branch at a time). Read-only — admin-on-behalf create/update/status-change stay branch-scoped
+ * under `/:vendorId/branches/:branchId/deals[/:dealId]`, since a Deal can never be created or
+ * edited outside the branch it belongs to.
+ */
+export async function listVendorDealsForAdmin(vendorId: string) {
+  const deals = await prisma.deal.findMany({
+    where: { vendorId },
+    orderBy: { createdAt: 'desc' },
+    include: { branch: { select: { id: true, name: true } }, ...OFFERING_INCLUDE },
+  });
+  return deals.map(flattenDealTherapists);
 }
 
 /** 404 if the deal doesn't exist; 403 if it exists but its branch/vendor don't match the caller's scope. */
@@ -1295,15 +1380,30 @@ const DEAL_IMAGE_ORDER_BY: Prisma.DealImageOrderByWithRelationInput[] = [
   { sortOrder: 'asc' },
 ];
 
+/** Minimal shape for a therapist surfaced through a Deal's `therapists` field — never the full
+ *  Therapist row (bio/photo/packages/etc. belong to the Therapist's own endpoints). */
+const THERAPIST_LINK_SELECT = { id: true, personName: true, therapistType: true, isActive: true } as const;
+
 const OFFERING_INCLUDE = {
   category: { select: { id: true, name: true } },
   subcategory: { select: { id: true, name: true } },
   packages: { orderBy: DEAL_PACKAGE_ORDER_BY },
   mediaImages: { orderBy: DEAL_IMAGE_ORDER_BY },
   mediaVideo: true,
+  therapistLinks: { include: { therapist: { select: THERAPIST_LINK_SELECT } } },
 } as const;
 
 type DealPackageInput = NonNullable<DealCreateInput['packages']>[number];
+type DealTherapistLink = { therapist: { id: string; personName: string; therapistType: string; isActive: boolean } };
+
+/** Flattens the `DealTherapist` join-table include into a plain `therapists` array — API
+ *  consumers should never see the join row shape, only the therapists it links to. Tolerates
+ *  `therapistLinks` being absent (a caller that didn't include it) rather than requiring every
+ *  caller to always fetch it. */
+function flattenDealTherapists<T extends { therapistLinks?: DealTherapistLink[] }>(deal: T) {
+  const { therapistLinks, ...rest } = deal;
+  return { ...rest, therapists: (therapistLinks ?? []).map((link) => link.therapist) };
+}
 
 /** Cheapest active package's price/duration becomes the Deal's own salePrice/originalPrice/
  *  durationMinutes — the "from price"/default-duration display cache every existing
@@ -1339,6 +1439,7 @@ export async function createDeal(
     await assertBranchHasSubcategoryAccess(branchId, input.categoryId, input.subcategoryId);
   }
   assertDurationRequiredForService(input.durationMinutes);
+  await assertTherapistsBelongToBranch(vendorId, branchId, input.therapistIds ?? []);
   // App-layer pre-check for a clean 409 in the common case — Deal.slug's DB-level @unique is
   // the hard guarantee this can't fully replace under a genuine race (two near-simultaneous
   // double-submits of the same form both reading "slug free" before either commits — see the
@@ -1346,7 +1447,7 @@ export async function createDeal(
   const existingSlug = await prisma.deal.findUnique({ where: { slug: input.slug } });
   if (existingSlug) throw new ApiError('CONFLICT', `Deal slug "${input.slug}" already exists`);
 
-  const { packages, ...dealFields } = input;
+  const { packages, therapistIds, ...dealFields } = input;
 
   try {
     return await prisma.$transaction(async (tx) => {
@@ -1374,6 +1475,12 @@ export async function createDeal(
         await syncDealPriceFromPackages(tx, deal.id);
       }
 
+      if (therapistIds && therapistIds.length > 0) {
+        await tx.dealTherapist.createMany({
+          data: [...new Set(therapistIds)].map((therapistId) => ({ dealId: deal.id, therapistId })),
+        });
+      }
+
       // A vendor-created (never admin-created) deal needs Superadmin review before it goes live
       // — see the `approvalStatus` gate above. Runs inside this same transaction so a rolled-back
       // deal creation (e.g. the P2002 slug race below) can never leave a stray notification behind.
@@ -1389,7 +1496,7 @@ export async function createDeal(
         });
       }
 
-      return tx.deal.findUniqueOrThrow({ where: { id: deal.id }, include: OFFERING_INCLUDE });
+      return flattenDealTherapists(await tx.deal.findUniqueOrThrow({ where: { id: deal.id }, include: OFFERING_INCLUDE }));
     });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -1418,8 +1525,11 @@ export async function updateDeal(vendorId: string, branchId: string, dealId: str
     const effectiveDuration = 'durationMinutes' in input ? input.durationMinutes : deal.durationMinutes ?? undefined;
     assertDurationRequiredForService(effectiveDuration);
   }
+  if (input.therapistIds) {
+    await assertTherapistsBelongToBranch(vendorId, branchId, input.therapistIds);
+  }
 
-  const { packages, ...dealFields } = input;
+  const { packages, therapistIds, ...dealFields } = input;
 
   return prisma.$transaction(async (tx) => {
     await tx.deal.update({ where: { id: dealId }, data: dealFields as unknown as Prisma.DealUncheckedUpdateInput });
@@ -1463,7 +1573,18 @@ export async function updateDeal(vendorId: string, branchId: string, dealId: str
       await syncDealPriceFromPackages(tx, dealId);
     }
 
-    return tx.deal.findUniqueOrThrow({ where: { id: dealId }, include: OFFERING_INCLUDE });
+    if (therapistIds) {
+      // Replace the full set — same semantics as `packages` above (omit the field entirely to
+      // leave existing links untouched).
+      await tx.dealTherapist.deleteMany({ where: { dealId } });
+      if (therapistIds.length > 0) {
+        await tx.dealTherapist.createMany({
+          data: [...new Set(therapistIds)].map((id) => ({ dealId, therapistId: id })),
+        });
+      }
+    }
+
+    return flattenDealTherapists(await tx.deal.findUniqueOrThrow({ where: { id: dealId }, include: OFFERING_INCLUDE }));
   });
 }
 

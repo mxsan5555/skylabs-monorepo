@@ -311,7 +311,11 @@ interface VendorProfileFormProps {
    * Called after a KYC document is uploaded or deleted so the parent
    * VendorPipeline can refresh its vendor state immediately.
    */
-  onKycDocumentChanged?: () => void;
+  onKycDocumentChanged?: (
+    change:
+      | { action: 'uploaded'; document: VendorDocument }
+      | { action: 'deleted'; documentType: VendorDocumentType },
+  ) => void;
 }
 
 /**
@@ -336,12 +340,6 @@ export function VendorProfileForm({
 }: VendorProfileFormProps) {
   const [form, setForm] = useState<VendorFields>(() => toFormFields(vendor));
   const [kycRejectReason, setKycRejectReason] = useState('');
-  const [kycStatus, setKycStatus] = useState<Vendor['kycStatus']>(
-    vendor?.kycStatus ?? 'PENDING',
-  );
-  const [kycRejectionReason, setKycRejectionReason] = useState(
-    vendor?.kycRejectionReason ?? null,
-  );
   const [errors, setErrors] = useState<VendorFieldErrors>({});
 
   // Whether each of the 3 KYC slots currently has a file — staged (pre-creation) or really
@@ -379,8 +377,6 @@ export function VendorProfileForm({
   useEffect(() => {
     setForm(toFormFields(vendor));
     setDocuments(vendor?.documents ?? []);
-    setKycStatus(vendor?.kycStatus ?? 'PENDING');
-    setKycRejectionReason(vendor?.kycRejectionReason ?? null);
     setErrors({});
   }, [vendor]);
 
@@ -664,332 +660,292 @@ export function VendorProfileForm({
           </div>
         </sky-tile-card>
       )}
-
-      {show('business') && (
-        <>
-          <h3 className="section-title">
-            Business Details
-          </h3>
-
-          <OutlinedTextField
-            label="Business name"
-            value={form.businessName ?? ''}
-            disabled={!canEdit}
-            onInput={text('businessName')}
-            error={Boolean(errors.businessName)}
-          />
-
-          {errors.businessName && (
-            <p className="error-state" role="alert">
-              {errors.businessName}
-            </p>
-          )}
-
-          <OutlinedTextField
-            label="Description"
-            value={form.businessDescription ?? ''}
-            disabled={!canEdit}
-            onInput={text('businessDescription')}
-          />
-
-          <OutlinedTextField
-            label="Business email"
-            type="email"
-            value={form.businessEmail ?? ''}
-            disabled={!canEdit}
-            onInput={text('businessEmail')}
-            error={Boolean(errors.businessEmail)}
-          />
-
-          {errors.businessEmail && (
-            <p className="error-state" role="alert">
-              {errors.businessEmail}
-            </p>
-          )}
-
-          <OutlinedTextField
-            label="Business phone"
-            type="tel"
-            inputMode="numeric"
-            maxLength={10}
-            value={form.businessPhone ?? ''}
-            disabled={!canEdit}
-            onInput={phoneInput('businessPhone')}
-            error={Boolean(errors.businessPhone)}
-          />
-
-          {errors.businessPhone && (
-            <p className="error-state" role="alert">
-              {errors.businessPhone}
-            </p>
-          )}
-        </>
-      )}
-
       {show('owner') && (
-        <>
-          <h3 className="section-title">
-            Personal Information
-          </h3>
-
-          <OutlinedTextField
-            label="First Name"
-            value={form.ownerFirstName ?? ''}
-            disabled={!canEdit}
-            onInput={text('ownerFirstName')}
-          />
-
-          <OutlinedTextField
-            label="Last Name"
-            value={form.ownerLastName ?? ''}
-            disabled={!canEdit}
-            onInput={text('ownerLastName')}
-          />
-
-          <OutlinedTextField
-            label="Phone Number"
-            type="tel"
-            inputMode="numeric"
-            maxLength={10}
-            value={form.ownerMobile ?? ''}
-            disabled={!canEdit}
-            onInput={phoneInput('ownerMobile')}
-            error={Boolean(errors.ownerMobile)}
-          />
-
-          {errors.ownerMobile && (
-            <p className="error-state" role="alert">
-              {errors.ownerMobile}
-            </p>
-          )}
-
-          <OutlinedTextField
-            label="Email"
-            type="email"
-            value={form.ownerEmail ?? ''}
-            disabled={!canEdit}
-            onInput={text('ownerEmail')}
-            error={Boolean(errors.ownerEmail)}
-          />
-
-          {errors.ownerEmail && (
-            <p className="error-state" role="alert">
-              {errors.ownerEmail}
-            </p>
-          )}
-        </>
-      )}
-
-      {show('address') && (
-        <>
-          <h3 className="section-title">
-            Registered Address
-          </h3>
-
-          <OutlinedTextField
-            label="Address 1"
-            value={form.address ?? ''}
-            disabled={!canEdit}
-            onInput={text('address')}
-          />
-
-          <OutlinedTextField
-            label="Address 2"
-            value={form.addressLine2 ?? ''}
-            disabled={!canEdit}
-            onInput={text('addressLine2')}
-          />
-
-          <OutlinedTextField
-            label="City"
-            value={form.city ?? ''}
-            disabled={!canEdit}
-            onInput={text('city')}
-          />
-
-          <OutlinedTextField
-            label="State"
-            value={form.state ?? ''}
-            disabled={!canEdit}
-            onInput={text('state')}
-          />
-
-          <OutlinedTextField
-            label="PIN Code"
-            value={form.pincode ?? ''}
-            disabled={!canEdit}
-            onInput={text('pincode')}
-            error={Boolean(errors.pincode)}
-          />
-
-          {errors.pincode && (
-            <p className="error-state" role="alert">
-              {errors.pincode}
-            </p>
-          )}
-
-          <OutlinedTextField
-            label="Map Location"
-            type="url"
-            placeholder="Paste Google Maps location link"
-            value={form.mapLocationUrl ?? ''}
-            disabled={!canEdit}
-            onInput={text('mapLocationUrl')}
-            error={Boolean(errors.mapLocationUrl)}
-          />
-
-          {errors.mapLocationUrl && (
-            <p className="error-state" role="alert">
-              {errors.mapLocationUrl}
-            </p>
-          )}
-        </>
-      )}
-
-      {show('kyc') && (
-        <>
-          <h3 className="section-title">
-            KYC Documents
-          </h3>
-
-          <p className="field-hint">
-            Upload any ONE of the following.
-          </p>
-
-          {KYC_DOCUMENT_TYPES.map(
-            ({ type, label }) => (
-              <VendorDocumentUpload
-                key={type}
-                documentType={type}
-                label={label}
-                vendorId={vendor?.id ?? null}
-                selfService={selfService}
-                existingDocument={documents.find(
-                  (d) => d.documentType === type,
-                )}
-                token={token}
-
-                onUploaded={(doc) => {
-                  setDocuments((prev) => [
-                    ...prev.filter(
-                      (d) => d.documentType !== type,
-                    ),
-                    doc,
-                  ]);
-
-                  // IMPORTANT:
-                  // Tell VendorPipeline that the KYC document
-                  // has changed so it can fetch the latest vendor
-                  // and immediately recalculate kycDocOk.
-                  onKycDocumentChanged?.();
-                }}
-
-                onDeleted={() => {
-                  setDocuments((prev) =>
-                    prev.filter(
-                      (d) => d.documentType !== type,
-                    ),
-                  );
-
-                  // IMPORTANT:
-                  // Refresh parent state after deletion as well.
-                  // Otherwise deleting the last document would leave
-                  // the parent's kycDocOk=true until page refresh.
-                  onKycDocumentChanged?.();
-                }}
-
-                onStagedChange={(hasFile) =>
-                  setKycSlotHasFile((prev) => ({
-                    ...prev,
-                    [type]: hasFile,
-                  }))
-                }
-              />
-            ),
-          )}
-
-          {canReviewKyc && onKycReview && (
-            <fieldset>
-              <legend>Review KYC (current: {kycStatus})</legend>
-
-              <FilledButton
-                onClick={() => {
-                  setKycStatus('VERIFIED');
-                  setKycRejectionReason(null);
-                  onKycReview('VERIFIED');
-                }}
-              >
-                Verify KYC
-              </FilledButton>
-
+        <sky-tile-card
+          className="vendor-section-card"
+          headline="Personal Information"
+          text="Owner and primary contact information."
+          color="none"
+        >
+          <div className="vendor-fields-grid">
+            <div className="vendor-field">
               <OutlinedTextField
-                label="Rejection reason"
-                value={kycRejectReason}
-                onInput={(e: Event) =>
-                  setKycRejectReason(
-                    (e.target as HTMLInputElement).value,
-                  )
-                }
+                label="First Name"
+                value={form.ownerFirstName ?? ''}
+                disabled={!canEdit}
+                onInput={text('ownerFirstName')}
               />
+            </div>
 
-              <OutlinedButton
-                onClick={() => {
-                  const reason = kycRejectReason.trim();
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="Last Name"
+                value={form.ownerLastName ?? ''}
+                disabled={!canEdit}
+                onInput={text('ownerLastName')}
+              />
+            </div>
 
-                  setKycStatus('REJECTED');
-                  setKycRejectionReason(reason);
-                  onKycReview('REJECTED', reason);
-                }}
-                disabled={!kycRejectReason.trim()}
-              >
-                Reject KYC
-              </OutlinedButton>
-            </fieldset>
-          )}
-        </>
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="Phone Number"
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                value={form.ownerMobile ?? ''}
+                disabled={!canEdit}
+                onInput={phoneInput('ownerMobile')}
+                error={Boolean(errors.ownerMobile)}
+              />
+              {errors.ownerMobile && (
+                <p className="error-state" role="alert">
+                  {errors.ownerMobile}
+                </p>
+              )}
+            </div>
+
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="Email"
+                type="email"
+                value={form.ownerEmail ?? ''}
+                disabled={!canEdit}
+                onInput={text('ownerEmail')}
+                error={Boolean(errors.ownerEmail)}
+              />
+              {errors.ownerEmail && (
+                <p className="error-state" role="alert">
+                  {errors.ownerEmail}
+                </p>
+              )}
+            </div>
+          </div>
+        </sky-tile-card>
       )}
+      {show('address') && (
+        <sky-tile-card
+          className="vendor-section-card"
+          headline="Registered Address"
+          text="Business address and map location."
+          color="none"
+        >
+          <div className="vendor-fields-grid">
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="Address 1"
+                value={form.address ?? ''}
+                disabled={!canEdit}
+                onInput={text('address')}
+              />
+            </div>
 
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="Address 2"
+                value={form.addressLine2 ?? ''}
+                disabled={!canEdit}
+                onInput={text('addressLine2')}
+              />
+            </div>
+
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="City"
+                value={form.city ?? ''}
+                disabled={!canEdit}
+                onInput={text('city')}
+              />
+            </div>
+
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="State"
+                value={form.state ?? ''}
+                disabled={!canEdit}
+                onInput={text('state')}
+              />
+            </div>
+
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="PIN Code"
+                value={form.pincode ?? ''}
+                disabled={!canEdit}
+                onInput={text('pincode')}
+                error={Boolean(errors.pincode)}
+              />
+              {errors.pincode && (
+                <p className="error-state" role="alert">
+                  {errors.pincode}
+                </p>
+              )}
+            </div>
+
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="Map Location"
+                type="url"
+                placeholder="Paste Google Maps location link"
+                value={form.mapLocationUrl ?? ''}
+                disabled={!canEdit}
+                onInput={text('mapLocationUrl')}
+                error={Boolean(errors.mapLocationUrl)}
+              />
+              {errors.mapLocationUrl && (
+                <p className="error-state" role="alert">
+                  {errors.mapLocationUrl}
+                </p>
+              )}
+            </div>
+          </div>
+        </sky-tile-card>
+      )}
+      {show('kyc') && (
+        <sky-tile-card
+          className="vendor-section-card"
+          headline="KYC Documents"
+          text="Upload one document for vendor verification."
+          color="none"
+        >
+          <div className="vendor-section-content">
+            <p className="field-hint">
+              Upload any ONE of the following documents.
+            </p>
+
+            <div className="kyc-document-list">
+              {KYC_DOCUMENT_TYPES.map(({ type, label }) => (
+                <VendorDocumentUpload
+                  key={type}
+                  documentType={type}
+                  label={label}
+                  vendorId={vendor?.id ?? null}
+                  selfService={selfService}
+                  existingDocument={documents.find(
+                    (d) => d.documentType === type
+                  )}
+                  token={token}
+                  onUploaded={(doc) =>
+                    {
+                      setDocuments((prev) => [
+                        ...prev.filter((d) => d.documentType !== type),
+                        doc,
+                      ]);
+                      onKycDocumentChanged?.({ action: 'uploaded', document: doc });
+                    }
+                  }
+                  onDeleted={() =>
+                    {
+                      setDocuments((prev) =>
+                        prev.filter((d) => d.documentType !== type)
+                      );
+                      onKycDocumentChanged?.({ action: 'deleted', documentType: type });
+                    }
+                  }
+                  onStagedChange={(hasFile) =>
+                    setKycSlotHasFile((prev) => ({
+                      ...prev,
+                      [type]: hasFile,
+                    }))
+                  }
+                />
+              ))}
+            </div>
+
+
+            {canReviewKyc && onKycReview && (
+              <fieldset className="kyc-review">
+                <legend>
+                  Review KYC
+                  <span className="kyc-review-status">
+                    Current: {vendor?.kycStatus ?? 'PENDING'}
+                  </span>
+                </legend>
+
+                <div className="kyc-review-actions">
+                  <OutlinedTextField
+                    label="Rejection reason"
+                    value={kycRejectReason}
+                    onInput={(e: Event) =>
+                      setKycRejectReason(
+                        (e.target as HTMLInputElement).value
+                      )
+                    }
+                  />
+
+                  <div className="kyc-review-buttons">
+                    <FilledButton onClick={() => onKycReview('VERIFIED')}>
+                      Verify KYC
+                    </FilledButton>
+
+                    <OutlinedButton
+                      onClick={() =>
+                        onKycReview('REJECTED', kycRejectReason)
+                      }
+                      disabled={!kycRejectReason.trim()}
+                    >
+                      Reject KYC
+                    </OutlinedButton>
+                  </div>
+                </div>
+              </fieldset>
+            )}
+          </div>
+        </sky-tile-card>
+      )}
       {show('bank') && (
-        <>
-          <h3 className="section-title">
-            Bank Details
-          </h3>
+        <sky-tile-card
+          className="vendor-section-card"
+          headline="Bank Details"
+          text="Payment and settlement account information."
+          color="none"
+        >
+          <div className="vendor-fields-grid">
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="Account holder"
+                value={form.bankAccountHolder ?? ''}
+                disabled={!canEdit}
+                onInput={text('bankAccountHolder')}
+              />
+            </div>
 
-          <OutlinedTextField
-            label="Account holder"
-            value={form.bankAccountHolder ?? ''}
-            disabled={!canEdit}
-            onInput={text('bankAccountHolder')}
-          />
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="Bank name"
+                value={form.bankName ?? ''}
+                disabled={!canEdit}
+                onInput={text('bankName')}
+              />
+            </div>
 
-          <OutlinedTextField
-            label="Bank name"
-            value={form.bankName ?? ''}
-            disabled={!canEdit}
-            onInput={text('bankName')}
-          />
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="Account number"
+                value={form.bankAccountNumber ?? ''}
+                disabled={!canEdit}
+                onInput={text('bankAccountNumber')}
+              />
+            </div>
 
-          <OutlinedTextField
-            label="Account number"
-            value={form.bankAccountNumber ?? ''}
-            disabled={!canEdit}
-            onInput={text('bankAccountNumber')}
-          />
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="IFSC"
+                value={form.bankIfsc ?? ''}
+                disabled={!canEdit}
+                onInput={text('bankIfsc')}
+              />
+            </div>
 
-          <OutlinedTextField
-            label="IFSC"
-            value={form.bankIfsc ?? ''}
-            disabled={!canEdit}
-            onInput={text('bankIfsc')}
-          />
-
-          <OutlinedTextField
-            label="UPI ID"
-            value={form.upiId ?? ''}
-            disabled={!canEdit}
-            onInput={text('upiId')}
-          />
-        </>
+            <div className="vendor-field">
+              <OutlinedTextField
+                label="UPI ID"
+                value={form.upiId ?? ''}
+                disabled={!canEdit}
+                onInput={text('upiId')}
+              />
+            </div>
+          </div>
+        </sky-tile-card>
       )}
 
       {canEdit && (

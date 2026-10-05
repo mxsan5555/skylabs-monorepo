@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FilledButton, OutlinedButton, Icon, Divider } from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, CircularProgress, OutlinedButton, Icon, Divider, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getMyOrder, type Order } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
@@ -33,86 +33,84 @@ export function Invoice() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { invoice } = content;
+
   useEffect(() => {
     setLoading(true);
     setError('');
     getMyOrder(token, id)
       .then(({ data }) => setOrder(data))
-      .catch((err) => setError(err instanceof ApiRequestError ? err.message : invoice.loadError))
+      .catch((err) =>
+        setError(err instanceof ApiRequestError ? err.message : invoice.loadError,),
+      )
       .finally(() => setLoading(false));
   }, [token, id]);
-
-  if (loading) return <p className="loading-state">{invoice.loading}</p>;
-
+  if (loading) {
+    return (
+      <div className="invoice-loading">
+        <CircularProgress indeterminate aria-label={invoice.loading} />
+        <p>{invoice.loading}</p>
+      </div>
+    );
+  }
   if (error || !order) {
     return (
       <div className="invoice-page invoice-page--empty">
         <title>{invoice.notFound.metaTitle}</title>
-        <sky-info-card icon="receipt_long" heading={invoice.notFound.heading} subheading={error || invoice.notFound.subheading} />
-        <FilledButton onClick={() => navigate('/orders')}> {invoice.notFound.cta}</FilledButton>
+        <sky-info-card
+          icon="receipt_long"
+          heading={invoice.notFound.heading}
+          subheading={error || invoice.notFound.subheading}
+        />
+        <FilledButton onClick={() => navigate('/orders')}>{invoice.notFound.cta}</FilledButton>
       </div>
     );
   }
-
-  const latestPayment = order.payments.length
-    ? [...order.payments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
-    : null;
+  const latestPayment = order.payments.length ? [...order.payments].sort((a, b) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),)[0] : null;
   const vendorGroups = groupOrderItemsByVendor(order.items);
   const isMultiVendor = vendorGroups.length > 1;
-
   return (
     <div className="invoice-page">
-      <title> {invoice.metaTitleTemplate.replace('{id}', order.id)}</title>
+      <title>{invoice.metaTitleTemplate.replace('{id}', order.id)}</title>
       <meta name="robots" content="noindex" />
-
       <div className="invoice-page__actions">
         <OutlinedButton onClick={() => navigate(`/orders/${order.id}`)}>
-          <Icon slot="icon" aria-hidden="true">arrow_back</Icon>
-          {invoice.backToOrder}
+          <Icon slot="icon" aria-hidden="true">arrow_back</Icon>{invoice.backToOrder}
         </OutlinedButton>
         <FilledButton onClick={() => window.print()}>
-          <Icon slot="icon" aria-hidden="true">download</Icon>
-          {invoice.downloadPrint}
+          <Icon slot="icon" aria-hidden="true">download</Icon>{invoice.downloadPrint}
         </FilledButton>
       </div>
-
       <article className="invoice">
         <header className="invoice__header">
           <div>
             <h1 className="invoice__vendor">
               {isMultiVendor ? `${vendorGroups.length} Vendors` : order.vendorNameSnapshot}
             </h1>
-            {!isMultiVendor && order.branchNameSnapshot && <p className="invoice__branch">{order.branchNameSnapshot}</p>}
+            {!isMultiVendor && order.branchNameSnapshot && (<p className="invoice__branch">{order.branchNameSnapshot}</p>)}
           </div>
           <div className="invoice__meta">
             <h2 className="invoice__title">{invoice.title}</h2>
-            <p>{invoice.labels.orderId}  {order.id}</p>
-            <p> {invoice.labels.invoiceDate}{' '} {new Date(order.createdAt).toLocaleDateString()}</p>
+            <p>{invoice.labels.orderId} {order.id}</p>
+            <p>{invoice.labels.invoiceDate}{' '}{new Date(order.createdAt).toLocaleDateString()}</p>
           </div>
         </header>
-
         <Divider />
-
         <section className="invoice__parties">
-          <div>
-            <h3>{invoice.labels.billedTo}</h3>
+          <div><h3>{invoice.labels.billedTo}</h3>
             <p>{order.contactName || '—'}</p>
-            {order.contactPhone && <p>{order.contactPhone}</p>}
-            {order.contactEmail && <p>{order.contactEmail}</p>}
+            {order.contactPhone && (<p>{order.contactPhone}</p>)}
+            {order.contactEmail && (<p>{order.contactEmail}</p>)}
           </div>
           {order.shippingAddress && (
             <div>
               <h3>{invoice.labels.shippingAddress}</h3>
               <p>{order.shippingAddress}</p>
-              <p>
-                {[order.shippingCity, order.shippingState, order.shippingPincode].filter(Boolean).join(', ')}
-              </p>
+              <p>{[order.shippingCity, order.shippingState, order.shippingPincode,].filter(Boolean).join(', ')}</p>
             </div>
           )}
         </section>
-
         <Divider />
-
         <table className="invoice__items">
           <thead>
             <tr>
@@ -127,7 +125,10 @@ export function Invoice() {
               <Fragment key={group.vendorId}>
                 {isMultiVendor && (
                   <tr className="invoice__items-vendor-row">
-                    <td colSpan={4}>{group.vendorName}{group.branchName ? ` · ${group.branchName}` : ''}</td>
+                    <td colSpan={4}>
+                      {group.vendorName}
+                      {group.branchName ? ` · ${group.branchName}` : ''}
+                    </td>
                   </tr>
                 )}
                 {group.items.map((item) => (
@@ -144,21 +145,18 @@ export function Invoice() {
               </Fragment>
             ))}
           </tbody>
+          <tfoot>
+            <tr className="invoice__summary-row">
+              <td colSpan={3}>{invoice.labels.subtotal}</td>
+              <td>{formatINR(Number(order.subtotal))}</td>
+            </tr>
+            <tr className="invoice__summary-row invoice__summary-row--grand">
+              <td colSpan={3}>{invoice.labels.total}</td>
+              <td>{formatINR(Number(order.total))}</td>
+            </tr>
+          </tfoot>
         </table>
-
-        <div className="invoice__totals">
-          <div className="invoice__totals-row">
-            <span>{invoice.labels.subtotal}</span>
-            <span>{formatINR(Number(order.subtotal))}</span>
-          </div>
-          <div className="invoice__totals-row invoice__totals-row--grand">
-            <span>{invoice.labels.total}</span>
-            <span>{formatINR(Number(order.total))}</span>
-          </div>
-        </div>
-
         <Divider />
-
         <section className="invoice__payment">
           <div>
             <h3>{invoice.labels.paymentMethod}</h3>
@@ -166,16 +164,15 @@ export function Invoice() {
           </div>
           <div>
             <h3>{invoice.labels.paymentStatus}</h3>
-            <p>{latestPayment?.status ?? '—'}</p>
+            <sky-badge>{latestPayment?.status ?? '—'}</sky-badge>
           </div>
           <div>
             <h3>{invoice.labels.orderStatus}</h3>
-            <p>{order.status}</p>
+            <sky-badge>{order.status}</sky-badge>
           </div>
         </section>
       </article>
     </div>
   );
 }
-
 export default Invoice;

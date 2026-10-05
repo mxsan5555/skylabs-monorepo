@@ -115,7 +115,7 @@ describe('VendorPipeline#saveUser — owner is always a brand-new identity', () 
     fireEvent.click(findButtonByText('Create Vendor'));
 
     await waitFor(() => expect(createVendorMock).toHaveBeenCalledOnce());
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith(`/account/vendors?vendorId=${CREATED_VENDOR.id}`, { replace: true }));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith(`/account/vendors/${CREATED_VENDOR.id}/profile`, { replace: true }));
   });
 
   it('submitting sends ownerFirstName/ownerLastName/ownerEmail/ownerMobile, never ownerUserId', async () => {
@@ -156,5 +156,55 @@ describe('VendorPipeline#saveUser — owner is always a brand-new identity', () 
     );
     expect(onVendorChange).not.toHaveBeenCalled();
     expect(screen.getByText('pick-identity')).toBeTruthy(); // still on the picker, not advanced
+  });
+});
+
+/**
+ * Feature: VendorPipeline — Rules of Hooks across the vendor-creation transition
+ * Scenario: regression test for the real "/account/vendors/new opens straight into the
+ * ErrorBoundary" bug (confirmed via a live captured stack trace).
+ *
+ * Root cause: `refreshVendorAfterKycChange` (a `useCallback`) used to be declared AFTER the
+ * `if (!vendor) return ...` early-return guard, further down this same component. On the very
+ * first render — no vendor yet, `VendorNewPage` always mounts `VendorPipeline` with
+ * `initialVendor={null}` — that early return fires and the hook is never called, so React
+ * records one fewer hook for this fiber. The moment `saveUser()` resolves and `vendor` flips
+ * from null to the newly-created row on this SAME mounted instance, the component renders past
+ * the early return and calls one more hook than the previous render. React detects the mismatch
+ * and throws "Rendered more hooks than during the previous render", which the app's top-level
+ * ErrorBoundary catches and renders as "Something went wrong" — exactly the point where Step 1
+ * (Profile & KYC) should have appeared.
+ *
+ * The fix moves that `useCallback` above the early return so it's called unconditionally on
+ * every render, matching every other hook in this component (Rules of Hooks: same hooks, same
+ * order, every render). This suite must `waitFor` all the way to the post-creation Step 1
+ * render — asserting only on the `createVendor` call site (as the suite above already does)
+ * lets a hook-order exception fire on a later microtask/render commit without ever failing the
+ * specific test (confirmed: with the bug reintroduced, vitest logs an "Unhandled Error" but
+ * still exits 0 — this suite is what actually turns that into a failing test).
+ */
+describe('VendorPipeline — direct /account/vendors/new navigation, initial wizard render (regression: hook-order crash after Create Vendor)', () => {
+  it('never throws when transitioning from no-vendor (fresh "Add Vendor") to a just-created vendor, and Step 1 renders', async () => {
+    createVendorMock.mockResolvedValue({ data: CREATED_VENDOR });
+    const onVendorChange = vi.fn();
+
+    // Matches the real /account/vendors/new route exactly: VendorNewPage always mounts
+    // VendorPipeline with `initialVendor={null}` (see vendor-new-page.tsx) — the owner-picker
+    // screen is the actual initial wizard render for a direct navigation to that route.
+    render(<VendorPipeline token="tok" initialVendor={null} onVendorChange={onVendorChange} />);
+    expect(screen.getByText('pick-identity')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('pick-identity'));
+    fireEvent.click(findButtonByText('Create Vendor'));
+
+    // The exact transition that crashed: vendor flips from null to CREATED_VENDOR on the same
+    // mounted VendorPipeline instance. Waiting for Step 1's own heading forces this test through
+    // the render where the hook-order mismatch used to throw, instead of stopping at the
+    // `createVendor` call site.
+    await waitFor(() => expect(screen.getByText('Step 1: Profile & KYC')).toBeTruthy());
+    expect(onVendorChange).toHaveBeenCalledWith(CREATED_VENDOR);
+    // The picker is gone — this is a real step-1 render, not the ErrorBoundary's fallback.
+    expect(screen.queryByText('pick-identity')).toBeNull();
+    expect(screen.queryByText('Something went wrong')).toBeNull();
   });
 });

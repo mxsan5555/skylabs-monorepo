@@ -22,6 +22,11 @@ import { UserManagement } from './pages/account/users/users';
 import { AuditLogs } from './pages/account/audit-logs/audit-logs';
 import { VendorManagement } from './pages/account/vendors/vendors';
 import { VendorNewPage } from './pages/account/vendors/vendor-new-page';
+import { VendorDetailPage } from './pages/account/vendors/vendor-detail-page';
+import { BranchFormPage } from './pages/account/vendors/branch-form-page';
+import { DealFormPage } from './pages/account/vendors/deal-form-page';
+import { TherapistFormPage } from './pages/account/vendors/therapist-form-page';
+import { ProductFormPage } from './pages/account/vendors/product-form-page';
 import { CustomerManagement } from './pages/account/customers/customers';
 import { BranchList } from './pages/account/vendors/branch-list';
 import { DealList } from './pages/account/vendors/deal-list';
@@ -76,6 +81,7 @@ import { MyAccountLayout } from './pages/my-account/my-account-layout';
 import { MyAccountProfile } from './pages/my-account/profile';
 import { MyAccountPayments } from './pages/my-account/payments';
 import { ScrollToTop } from './components/ScrollToTop';
+import CustomerDashboard from './pages/customer-dashboard/customer-dashboard';
 /**
  * `/account/vendors` serves three audiences under different permission keys: admins hold
  * `vendors:view`, vendor-role users hold `vendors:custom` (never `view` — that would also
@@ -92,6 +98,26 @@ function VendorsRouteGuard({ children }: { children: ReactNode }) {
     return <Navigate to="/account/profile" replace />;
   }
   return <>{children}</>;
+}
+
+function BranchFormPageRoute() {
+  const { token } = useAuth();
+  return <BranchFormPage token={token} />;
+}
+
+function DealFormPageRoute() {
+  const { token } = useAuth();
+  return <DealFormPage token={token} />;
+}
+
+function TherapistFormPageRoute() {
+  const { token } = useAuth();
+  return <TherapistFormPage token={token} />;
+}
+
+function ProductFormPageRoute() {
+  const { token } = useAuth();
+  return <ProductFormPage token={token} />;
 }
 
 export function AppRoutes() {
@@ -160,6 +186,7 @@ export function AppRoutes() {
             deliberately stay OUTSIDE this block (see above) even though the sidebar's own
             NAV_ITEMS still links to them — clicking those links just navigates to the
             sidebar-less Cart/Wishlist routes above, same as clicking the Header icons. */}
+          {/* Customer account pages WITH sidebar */}
           <Route
             element={
               <RequireAuth>
@@ -167,9 +194,11 @@ export function AppRoutes() {
               </RequireAuth>
             }
           >
+            <Route path="/my-dashboard" element={<CustomerDashboard />} />
             <Route path="/my-account" element={<MyAccountProfile />} />
             <Route path="/my-account/profile" element={<MyAccountProfile />} />
             <Route path="/my-account/payments" element={<MyAccountPayments />} />
+
             <Route
               path="/my-account/invoices"
               element={
@@ -179,6 +208,7 @@ export function AppRoutes() {
                 />
               }
             />
+
             <Route
               path="/my-account/settings"
               element={
@@ -188,11 +218,33 @@ export function AppRoutes() {
                 />
               }
             />
-
             <Route path="/orders" element={<Orders />} />
-            <Route path="/orders/:id" element={<OrderDetail />} />
-            <Route path="/orders/:id/invoice" element={<Invoice />} />
+            <Route path="/my-account/cart" element={<Cart />} />
+            <Route path="/my-account/wishlist" element={<Wishlist />} />
           </Route>
+
+          {/* =====================================================
+              ORDER DETAIL — standalone storefront page
+              NO MyAccountLayout / NO account sidebar
+             ===================================================== */}
+          <Route
+            path="/orders/:id"
+            element={
+              <RequireAuth>
+                <OrderDetail />
+              </RequireAuth>
+            }
+          />
+
+          {/* Invoice — standalone storefront page */}
+          <Route
+            path="/orders/:id/invoice"
+            element={
+              <RequireAuth>
+                <Invoice />
+              </RequireAuth>
+            }
+          />
 
           {/* ── Content pages ── */}
           <Route path="/blog" element={<Blog />} />
@@ -288,6 +340,100 @@ export function AppRoutes() {
             element={
               <VendorsRouteGuard>
                 <VendorNewPage />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* One member's own page: an Overview of cards (Branches/Deals/Therapists/Products +
+            the profile summary), each card's Add/Edit button navigating to that section's own
+            URL below — no tab strip, real routes instead, so the breadcrumb and back button
+            always match what's on screen. Admin only: VendorDetailPage checks `vendors:view`
+            itself, and every API call it makes is permission-gated server-side. The static `new`
+            route above wins over this dynamic segment. */}
+          <Route
+            path="/account/vendors/:vendorId"
+            element={
+              <VendorsRouteGuard>
+                <VendorDetailPage />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/vendors/:vendorId/:section"
+            element={
+              <VendorsRouteGuard>
+                <VendorDetailPage />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* Branch add/edit — real pages, never a popup (see the branch-management design spec).
+            The static `new` segment wins over the dynamic `:branchId` below it. */}
+          <Route
+            path="/account/vendors/:vendorId/branches/new"
+            element={
+              <VendorsRouteGuard>
+                <BranchFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/vendors/:vendorId/branches/:branchId"
+            element={
+              <VendorsRouteGuard>
+                <BranchFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* Deal add/edit — same real-page pattern as Branch above, never a popup. The static
+            `new` segment wins over the dynamic `:dealId` below it. */}
+          <Route
+            path="/account/vendors/:vendorId/deals/new"
+            element={
+              <VendorsRouteGuard>
+                <DealFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/vendors/:vendorId/deals/:dealId"
+            element={
+              <VendorsRouteGuard>
+                <DealFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* Therapist add/edit — same real-page pattern as Branch/Deal above, never a popup.
+            The static `new` segment wins over the dynamic `:therapistId` below it. */}
+          <Route
+            path="/account/vendors/:vendorId/therapists/new"
+            element={
+              <VendorsRouteGuard>
+                <TherapistFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/vendors/:vendorId/therapists/:therapistId"
+            element={
+              <VendorsRouteGuard>
+                <TherapistFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* Product add/edit — same real-page pattern as Branch/Deal/Therapist above, never a
+            popup. The static `new` segment wins over the dynamic `:productId` below it. */}
+          <Route
+            path="/account/vendors/:vendorId/products/new"
+            element={
+              <VendorsRouteGuard>
+                <ProductFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/vendors/:vendorId/products/:productId"
+            element={
+              <VendorsRouteGuard>
+                <ProductFormPageRoute />
               </VendorsRouteGuard>
             }
           />
