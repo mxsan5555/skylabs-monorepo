@@ -1,0 +1,116 @@
+<main class="w-full max-w-[1280px] mx-auto px-3 sm:px-6 py-8 flex flex-col gap-16">
+
+  <!-- 01. HERO SECTION -->
+  <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center w-full">
+    <!-- Left Column: Content -->
+    <article class="lg:col-span-6 flex flex-col gap-4 text-left">
+      <sky-badge variant="primary" class="self-start rounded-none tracking-wider font-bold uppercase">
+        {{ content().hero.badge }}
+      </sky-badge>
+
+      <h1 class="m-0 text-3xl sm:text-4xl md:text-5xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight leading-tight">
+        {{ content().hero.title }}
+      </h1>
+
+      <h2 class="m-0 text-base font-bold text-[var(--md-sys-color-on-surface)] mt-2">
+        {{ content().hero.subtitle1 }}
+      </h2>
+      <p class="m-0 text-sm sm:text-base text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+        {{ content().hero.description1 }}
+      </p>
+
+      <h2 class="m-0 text-base font-bold text-[var(--md-sys-color-on-surface)] pt-2">
+        {{ content().hero.subtitle2 }}
+      </h2>
+      <p class="m-0 text-sm sm:text-base text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+        {{ content().hero.description2 }}
+      </p>
+    </article>
+
+    <!-- Right Column: 2 Straight Hero Showcase Images -->
+    <figure class="lg:col-span-6 grid grid-cols-2 gap-4 items-center w-full m-0">
+      <div class="block w-full aspect-square rounded-none overflow-hidden">
+        <img
+          [src]="content().hero.heroImage1"
+          alt="Driver booking app real customer photo"
+          class="w-full h-full object-cover rounded-none block"
+        />
+      </div>
+
+      <div class="block w-full aspect-[3/4] rounded-none overflow-hidden">
+        <img
+          [src]="content().hero.heroImage2"
+          alt="Professional driver partner portrait"
+          class="w-full h-full object-cover rounded-none block"
+        />
+      </div>
+    </figure>
+  </section>
+
+  <!-- 02. CHAMPIONS OF OUR SUCCESS STORY -->
+  <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center w-full">
+    <!-- Left Column: Story Description -->
+    <article class="lg:col-span-5 flex flex-col gap-3 text-left">
+      <sky-badge variant="primary" class="self-start rounded-none tracking-wider font-bold uppercase">
+        {{ content().champions.badge }}
+      </sky-badge>
+
+      <h2 class="m-0 text-2xl sm:text-3xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight">
+        {{ content().champions.title }}
+      </h2>
+
+      <p class="m-0 text-sm sm:text-base text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+        {{ content().champions.description }}
+      </p>
+    </article>
+
+    <!-- Right Column: Founders Cards Row -->
+    <div class="lg:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-5 w-full">
+      @for (c of content().champions.founders; track c.name) {
+        <sky-card variant="outlined" class="block w-full rounded-none">
+          <article class="flex flex-col items-center text-center gap-3 p-4 w-full">
+            <img
+              [src]="c.image"
+              [alt]="c.name"
+              class="w-full aspect-square object-cover rounded-none block"
+            />
+            <div>
+              <h3 class="m-0 text-base font-bold text-[var(--md-sys-color-on-surface)]">{{ c.name }}</h3>
+              <p class="m-0 text-xs text-[var(--md-sys-color-on-surface-variant)] mt-0.5">{{ c.role }}</p>
+            </div>
+          </article>
+        </sky-card>
+      }
+    </div>
+  </section>
+
+  <!-- 03. JOBS @ MERA DRIVER BANNER -->
+  <section class="w-full relative overflow-hidden rounded-none min-h-[360px] bg-[var(--md-sys-color-surface-container-low)]">
+    <!-- Background Team Image -->
+    <img
+      [src]="content().jobs.bgImage"
+      alt="Jobs at Mera Driver Team"
+      class="absolute inset-0 w-full h-full object-cover rounded-none"
+      loading="lazy"
+    />
+
+    <!-- Full Banner Dark Overlay for Contrast -->
+    <div class="absolute inset-0 bg-black/50 z-[1]"></div>
+
+    <!-- Content Overlay -->
+    <article class="relative z-10 p-8 sm:p-14 flex flex-col items-center justify-center text-center gap-5 max-w-3xl mx-auto h-full min-h-[360px]">
+      <h2 class="m-0 text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight drop-shadow-md">
+        {{ content().jobs.title }}
+      </h2>
+      <p class="m-0 text-base sm:text-lg text-white font-normal leading-relaxed max-w-2xl drop-shadow">
+        {{ content().jobs.subtitle }}
+      </p>
+      <a routerLink="/careers" class="no-underline pt-2">
+        <md-filled-button class="rounded-none shadow-md">
+          {{ content().jobs.btnText }}
+        </md-filled-button>
+      </a>
+    </article>
+  </section>
+
+</main>

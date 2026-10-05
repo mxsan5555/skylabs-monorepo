@@ -17,6 +17,8 @@ import {
   type VendorCreateInput,
   type VendorFields,
   type VendorProduct,
+  type VendorDocument,
+  type VendorDocumentType,
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { VendorUserPicker, type PendingVendorOwner } from './vendor-user-picker';
@@ -44,8 +46,17 @@ const STEPS = [
  *  `VendorDocument` rows are the authoritative check now; the legacy `kycDocuments` JSON regex
  *  is kept only as a fallback for a vendor onboarded before real file upload existed. */
 function hasMinimumKycDocument(vendor: Vendor): boolean {
-  if ((vendor.documents ?? []).length > 0) return true;
-  return (vendor.kycDocuments ?? []).some((doc) => /gst|pan|aadhaar/i.test(doc.type) && Boolean(doc.url));
+  const hasRealKycDocument = (vendor.documents ?? []).some(
+    (doc) =>
+      ['GST', 'PAN', 'AADHAAR'].includes(doc.documentType) &&
+      Boolean(doc.storageKey),
+  );
+
+  if (hasRealKycDocument) return true;
+
+  return (vendor.kycDocuments ?? []).some(
+    (doc) => /gst|pan|aadhaar/i.test(doc.type) && Boolean(doc.url),
+  );
 }
 
 interface VendorPipelineProps {
@@ -105,6 +116,10 @@ export function VendorPipeline({
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<VendorFieldErrors | null>(null);
   const [activeStep, setActiveStep] = useState<number>(1);
+  // KYC gate is separate from vendor state so upload does not reset unsaved form fields or scroll.
+  const [hasKycDocument, setHasKycDocument] = useState<boolean>(() =>
+    initialVendor ? hasMinimumKycDocument(initialVendor) : false,
+  );
   // Same double-submit guard used by every other create flow in this app (DealDialog,
   // ProductFormDialog, TherapistFormDialog, categories.tsx) — a `saving` state guard alone can't
   // stop a second click/tap/Enter that fires before React commits the disabling re-render.
@@ -130,6 +145,7 @@ export function VendorPipeline({
     setError('');
     setFieldErrors(null);
     setActiveStep(1);
+    setHasKycDocument(initialVendor ? hasMinimumKycDocument(initialVendor) : false);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on id, not object identity, so this doesn't reset the wizard back to Step 1 after every per-step save (`initialVendor` is a new object on every parent re-render once `onVendorChange` fires)
   }, [initialVendor?.id]);
 
@@ -216,21 +232,75 @@ export function VendorPipeline({
     }
   };
 
-  const refreshVendorAfterKycChange = useCallback(async () => {
+  const handleBranchesChange = (next: Branch[]) => {
+    setBranches(next);
+    reloadDealCount(next);
+  };
+
+  // Wired to `VendorBranchListStep`'s `onVendorRefresh`, which fires from `BranchDialog`'s
+  // `onCategoryAccessSaved` — AFTER a branch's category-access save actually completes, never
+  // bundled into `handleBranchesChange` above. That save (`BranchDialog`'s own "Categories &
+  // Subcategories" section) can auto-grant a vendor-level `VendorCategoryAccess` row + flip
+  // `offersService`/`offersTherapy` server-side (see `setBranchCategoryAccess`'s own doc comment
+  // in msd-api's vendor.service.ts), and it happens as a SEPARATE, LATER network call than the
+  // branch-fields save `handleBranchesChange` reacts to — refetching here instead of there is
+  // what closes that race: `vendor`/`categoryAccess` are otherwise only ever fetched once (the
+  // bulk-load effect above), so without a refetch timed to land after the category save actually
+  // finishes, the NEXT "Save product categories" click in `VendorProductCategoryAccess` could
+  // resubmit stale (pre-grant) `offersService`/`offersTherapy`/`categoryIds`, silently wiping out
+  // the branch-level auto-grant via that endpoint's replace-the-full-set semantics — and Step
+  // 4/5's own "module not enabled" gate could render the stale flag in the meantime too.
+  //
+  // Also reloads `branches` — `VendorBranchListStep`'s own save already preserves each branch's
+  // PREVIOUS `categoryTypes` so it's never `undefined` (see that file's own doc comment on why),
+  // but "previous" is stale the instant a category was actually added/removed, and
+  // `VendorTherapistsStep`/`VendorProductsStep` gate branch eligibility on exactly that field
+  // (`branches.filter(b => b.categoryTypes.includes('THERAPY'))`). This fires unconditionally on
+  // every Branch Access save (not just ones that touch categories — see `BranchDialog.submit()`),
+  // so `categoryTypes` is back in sync with the server within one round trip, no page reload
+  // needed for a branch's Therapy/Product eligibility to update after its access changed.
+  const refreshVendorAndCategoryAccess = () => {
     if (!vendorId) return;
+    getVendor(token, vendorId)
+      .then(({ data }) => {
+        setVendor(data);
+        onVendorChange(data);
+      })
+      .catch(() => { });
+    getVendorCategoryAccess(token, vendorId).then(({ data }) => setCategoryAccess(data)).catch(() => { });
+    reloadBranches().catch(() => { });
+  };
 
-    try {
-      const { data } = await getVendor(token, vendorId);
+  const handleKycDocumentChange = useCallback(
+    (
+      change:
+        | { action: 'uploaded'; document: VendorDocument }
+        | { action: 'deleted'; documentType: VendorDocumentType },
+    ) => {
+      // Do NOT update vendor/onVendorChange here. VendorProfileForm keeps unsaved inputs locally;
+      // replacing its vendor prop would trigger its [vendor] effect and reset the form + scroll.
+      if (change.action === 'uploaded') {
+        // This callback runs after a successful API upload, so the KYC gate can unlock immediately.
+        setHasKycDocument(true);
+        return;
+      }
 
-      setVendor(data);
-      onVendorChange(data);
-    } catch (err) {
-      console.error(
-        'Could not refresh vendor after KYC document change:',
-        err,
-      );
-    }
-  }, [token, vendorId, onVendorChange]);
+      // After deletion, fetch only what is needed to recompute the gate. Keep vendor state untouched.
+      if (!vendorId) {
+        setHasKycDocument(false);
+        return;
+      }
+
+      getVendor(token, vendorId)
+        .then(({ data }) => setHasKycDocument(hasMinimumKycDocument(data)))
+        .catch((err) => {
+          console.error('Could not refresh KYC gate after document deletion:', err);
+          setHasKycDocument(false);
+        });
+    },
+    [token, vendorId],
+  );
+
 
   /**
    * Keep the pipeline's local vendor state in sync immediately after a KYC review.
@@ -272,7 +342,7 @@ export function VendorPipeline({
     );
   }
 
-  const kycDocOk = hasMinimumKycDocument(vendor);
+  const kycDocOk = hasKycDocument;
 
   return (
     <div className="admin-page">
@@ -313,7 +383,7 @@ export function VendorPipeline({
             onSave={saveSection}
             onKycReview={handleKycReview}
             serverFieldErrors={fieldErrors}
-            onKycDocumentChanged={refreshVendorAfterKycChange}
+            onKycDocumentChanged={handleKycDocumentChange}
           />
           {!kycDocOk && (
             <p className="error-state" role="alert">
@@ -321,15 +391,21 @@ export function VendorPipeline({
             </p>
           )}
 
-          <h3 className="section-title">Profile Image</h3>
-          <MediaUploader
-            entityType="vendor"
-            entityId={vendor.id}
-            existingImages={vendor.mediaImages ?? []}
-            existingVideo={vendor.mediaVideo ?? null}
-            token={token}
-          />
-
+         <sky-tile-card
+            className="vendor-section-card"
+            headline="Profile Image"
+            text="Upload and manage the vendor profile images."
+            color="none"
+          >
+            <MediaUploader
+              entityType="vendor"
+              entityId={vendor.id}
+              existingImages={vendor.mediaImages ?? []}
+              existingVideo={vendor.mediaVideo ?? null}
+              token={token}
+            />
+          </sky-tile-card>
+          
           <div className="form-actions">
             <FilledButton onClick={() => setActiveStep(2)} disabled={!kycDocOk}>
               Continue

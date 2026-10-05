@@ -560,6 +560,11 @@ export const appRoutes: Routes = [
         loadComponent: () => import('./pages/home/home').then((m) => m.Home),
       },
       {
+        path: 'about',
+        title: 'About Us · mera-driver',
+        loadComponent: () => import('./pages/about/about').then((m) => m.About),
+      },
+      {
         path: 'blog',
         title: 'Blog · mera-driver',
         loadComponent: () => import('./pages/blog/blog').then((m) => m.Blog),
@@ -568,6 +573,46 @@ export const appRoutes: Routes = [
         path: 'contact',
         title: 'Contact Us · mera-driver',
         loadComponent: () => import('./pages/contact/contact').then((m) => m.Contact),
+      },
+      {
+        path: 'careers',
+        title: 'Careers · mera-driver',
+        loadComponent: () => import('./pages/careers/careers').then((m) => m.Careers),
+      },
+      {
+        path: 'press',
+        title: 'Press and Media · mera-driver',
+        loadComponent: () => import('./pages/press/press').then((m) => m.Press),
+      },
+      {
+        path: 'press-detail',
+        title: 'Press Release Detail · mera-driver',
+        loadComponent: () => import('./pages/press-detail/press-detail').then((m) => m.PressDetail),
+      },
+      {
+        path: 'press/:slug',
+        title: 'Press Release Detail · mera-driver',
+        loadComponent: () => import('./pages/press-detail/press-detail').then((m) => m.PressDetail),
+      },
+      {
+        path: 'safety',
+        title: 'Safety and Trust · mera-driver',
+        loadComponent: () => import('./pages/safety/safety').then((m) => m.Safety),
+      },
+      {
+        path: 'pricing',
+        title: 'Pricing & Rate Cards · mera-driver',
+        loadComponent: () => import('./pages/pricing/pricing').then((m) => m.PublicPricing),
+      },
+      {
+        path: 'cities',
+        title: 'Cities We Serve · mera-driver',
+        loadComponent: () => import('./pages/cities/cities').then((m) => m.Cities),
+      },
+      {
+        path: 'gift',
+        title: 'Gift a Ride · mera-driver',
+        loadComponent: () => import('./pages/gift/gift').then((m) => m.Gift),
       },
       {
         path: 'blog/:slug',

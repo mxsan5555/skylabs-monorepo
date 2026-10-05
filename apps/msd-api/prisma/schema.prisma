@@ -33,9 +33,25 @@ model User {
   roles                  UserRole[]
   vendorProfile          Vendor?                @relation("VendorOwner")
   wishlistItems          WishlistItem[]
+  supportRequests        SupportRequest[]
 
   @@index([status])
 }
+
+model SupportRequest {
+  id         String   @id @default(uuid())
+  customerId String
+  subject    String
+  message    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customer User @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([createdAt])
+}
+
 
 model Role {
   id               String                @id @default(uuid())

@@ -1,23 +1,41 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { FilledButton, Tabs, SecondaryTab, } from '@skylabs-monorepo/shared-ui/react';
+import { CustomerOrderCard } from './customer-order-card';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { listMyOrders, type Order } from '../../../api/orders';
+import { listMyOrders, type Order, type OrderStatus, } from '../../../api/orders';
 import { ApiRequestError } from '../../../api/rbac/client';
-import '../category/category.css';
+import './orders.css';
 import content from '../../../content.json';
+import { CardGrid } from '../../components/card-grid/card-grid';
+import { Breadcrumb } from '../../components/breadcrumb';
+
 /** Customer's own orders — the Cart convergence point (every purchase kind, Deal/Product/
  *  Therapist alike, becomes an Order here). Reuses `entity-list`/`status-pill`. Relocated here
  *  from the old marketplace orders route now that the marketplace route namespace is retired —
  *  this page never had a mock/static equivalent, so it moved rather than merged. */
- 
+
 export function Orders() {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-const { orders: ordersContent } = content;
+  const [selectedStatus, setSelectedStatus] = useState<OrderStatus | 'ALL'>('ALL');
+  const { orders: ordersContent } = content;
+  const [searchParams] = useSearchParams();
+  const typeFilter = searchParams.get('type');
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const matchesStatus =
+        selectedStatus === 'ALL' || order.status === selectedStatus;
+
+      const matchesType =
+        !typeFilter || order.type === typeFilter;
+
+      return matchesStatus && matchesType;
+    });
+  }, [orders, selectedStatus, typeFilter]);
   const load = useCallback(() => {
     setLoading(true);
     setError('');
@@ -33,51 +51,54 @@ const { orders: ordersContent } = content;
 
   return (
     <div className="category-page">
-    <title>{ordersContent.metaTitle}</title>
+      <title>{ordersContent.metaTitle}</title>
       <meta name="robots" content="noindex" />
 
-      <header className="category-page__hero">
-        <div className="category-page__hero-inner">
-          <div>
-            <h1 className="category-page__title">{ordersContent.title}</h1>
-            <p className="category-page__subtitle">{ordersContent.subtitle}</p>
-          </div>
-        </div>
-      </header>
+      <Breadcrumb
+        items={[
+          { label: 'Home', to: '/' },
+          { label: 'Orders' },
+        ]}
+      />
+      <div className="customer-orders-filters">
+        <Tabs>
+          <SecondaryTab
+            onClick={() => setSelectedStatus('ALL')}
+          >
+            All
+          </SecondaryTab>
 
+          <SecondaryTab
+            onClick={() => setSelectedStatus('CANCELLED')}
+          >
+            Cancelled
+          </SecondaryTab>
+        </Tabs>
+      </div>
       <section className="category-page__grid-wrap">
         <div className="category-page__grid-inner">
           {loading ? (
             <p className="loading-state">{ordersContent.loading}</p>
           ) : error ? (
             <p className="error-state" role="alert">{error || ordersContent.errors.load}</p>
-          ) : orders.length === 0 ? (
+          ) : filteredOrders.length === 0 ? (
             <div className="category-page__empty">
               <sky-info-card icon="receipt_long" heading={ordersContent.empty.title} subheading={ordersContent.empty.description} />
               <FilledButton onClick={() => navigate('/categories')}>{ordersContent.empty.cta}</FilledButton>
             </div>
           ) : (
-            <ul className="entity-list">
-              {orders.map((order) => (
-                <li key={order.id}>
-                  <div className="entity-list__item">
-                    <span className="role-list__name">
-                      {order.items.map((i) => i.itemName).join(', ')}
-                      <span className="field-hint">
-                        {' '}
-                        · {order.type} · {order.vendorNameSnapshot} · {order.branchNameSnapshot} · ₹{order.total}
-                        {' '}
-                        · {new Date(order.createdAt).toLocaleDateString()}
-                      </span>
-                    </span>
-                    <span className={`status-pill ${order.status === 'CANCELLED' ? 'status-pill--inactive' : 'status-pill--active'}`}>
-                      {order.status}
-                    </span>
-                  </div>
-                  <Link to={`/orders/${order.id}`} className="field-hint"> {ordersContent.links.viewDetails}</Link>
-                </li>
+
+            <CardGrid layout="list">
+              {filteredOrders.map((order) => (
+                <CustomerOrderCard
+                  key={order.id}
+                  order={order}
+                  onViewDetails={(selectedOrder) =>
+                    navigate(`/orders/${selectedOrder.id}`)
+                  }
+                />
               ))}
-            </ul>
+            </CardGrid>
           )}
         </div>
       </section>

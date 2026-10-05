@@ -948,23 +948,24 @@
       "statusIconLabel": "Booking confirmed"
     }
   },
-  "orders": {
-    "metaTitle": "My Orders | MSD",
-    "title": "My Orders",
-    "subtitle": "Your product and deal orders.",
-    "loading": "Loading orders…",
-    "empty": {
-      "title": "No orders yet",
-      "description": "Orders you place will show up here.",
-      "cta": "Browse Categories"
-    },
-    "links": {
-      "viewDetails": "View details →"
-    },
-    "errors": {
-      "load": "Could not load your orders."
-    }
+ "orders": {
+  "metaTitle": "My Orders | MSD",
+  "title": "My Orders",
+  "subtitle": "Your product and deal orders.",
+  "loading": "Loading orders…",
+  "empty": {
+    "title": "No orders yet",
+    "description": "Orders you place will show up here.",
+    "cta": "Browse Categories"
   },
+  "links": {
+    "viewDetails": "View details →"
+  },
+  "errors": {
+    "load": "Could not load your orders."
+  }
+  
+},
   "orderDetail": {
     "loading": "Loading order…",
     "notFound": {

@@ -10,6 +10,7 @@
   background-color: var(--md-sys-color-surface);
   color: var(--md-sys-color-on-surface);
 }
+
 /* Focus rings for the page's own links. SectionHead links style theirs in section-head.css;
    tile links draw theirs on the tile (below). */
 .home-spotlight:focus-visible,
@@ -23,12 +24,14 @@
   display: grid;
   gap: 24px;
 }
+
 .home-hero__copy {
   display: grid;
   gap: 16px;
   align-content: center;
   min-inline-size: 0;
 }
+
 .home-hero__title {
   margin: 0;
   font-family: var(--md-sys-typescale-display-medium-font);
@@ -38,6 +41,7 @@
   color: var(--md-sys-color-on-surface);
   text-wrap: balance;
 }
+
 .home-hero__sub {
   margin: 0;
   max-inline-size: 44ch;
@@ -45,13 +49,16 @@
   line-height: var(--md-sys-typescale-body-large-line-height);
   color: var(--md-sys-color-on-surface-variant);
 }
+
 .home-hero__search {
   max-inline-size: 560px;
 }
+
 .home-hero__visual {
   position: relative;
   min-inline-size: 0;
 }
+
 .home-hero__img {
   display: block;
   inline-size: 100%;
@@ -61,6 +68,7 @@
   border-radius: var(--md-sys-shape-corner-extra-large);
   background-color: var(--md-sys-color-surface-container);
 }
+
 /* Phones: the spotlight sits below the photo so it never covers it; from 600px it floats over it. */
 .home-spotlight {
   position: static;
@@ -76,9 +84,11 @@
   text-decoration: none;
   transition: background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
 }
+
 .home-spotlight:hover {
   background-color: var(--md-sys-color-surface-container-low);
 }
+
 .home-spotlight__thumb {
   inline-size: 64px;
   block-size: 64px;
@@ -87,18 +97,21 @@
   border-radius: var(--md-sys-shape-corner-medium);
   background-color: var(--md-sys-color-surface-container);
 }
+
 .home-spotlight__body {
   display: grid;
   flex: 1;
   gap: 2px;
   min-inline-size: 0;
 }
+
 .home-spotlight__label {
   font-size: var(--md-sys-typescale-label-medium-size);
   line-height: var(--md-sys-typescale-label-medium-line-height);
   font-weight: var(--md-sys-typescale-label-medium-weight);
   color: var(--md-sys-color-primary);
 }
+
 .home-spotlight__title {
   display: -webkit-box;
   overflow: hidden;
@@ -108,6 +121,7 @@
   line-height: var(--md-sys-typescale-title-small-line-height);
   font-weight: var(--md-sys-typescale-title-small-weight);
 }
+
 .home-spotlight__price {
   display: flex;
   flex-wrap: wrap;
@@ -115,13 +129,16 @@
   gap: 6px;
   font-size: var(--md-sys-typescale-body-medium-size);
 }
+
 .home-spotlight__price s {
   color: var(--md-sys-color-on-surface-variant);
 }
+
 .home-spotlight__off {
   color: var(--md-sys-color-primary);
   font-weight: 600;
 }
+
 .home-spotlight__arrow {
   flex: none;
   color: var(--md-sys-color-primary);
@@ -137,27 +154,33 @@
   padding: 0;
   list-style: none;
 }
+
 .home-cats__name {
   margin: 0;
   color: inherit;
   overflow-wrap: anywhere;
 }
+
 .home-cats__link {
   color: inherit;
   text-decoration: none;
 }
+
 .home-cats__link::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: var(--md-sys-shape-corner-large);
 }
+
 .home-cats__link:hover {
   text-decoration: underline;
 }
+
 .home-cats__link:focus-visible {
   outline: none;
 }
+
 .home-cats sky-tile-card:has(.home-cats__link:focus-visible) {
   outline: 3px solid var(--md-sys-color-primary);
   outline-offset: 2px;
@@ -170,6 +193,7 @@
   background-color: transparent;
   --md-secondary-tab-container-color: transparent;
 }
+
 /* How it works: a numbered sequence on the page surface, joined by a rule (no cards).
    Phones: a vertical timeline; 840px: three columns with the rule running between markers. */
 .home-steps {
@@ -180,6 +204,7 @@
   list-style: none;
   counter-reset: step;
 }
+
 .home-steps__item {
   position: relative;
   display: grid;
@@ -189,22 +214,27 @@
   align-content: start;
   counter-increment: step;
 }
+
 .home-steps__item :is(h3, p) {
   grid-column: 2;
   margin: 0;
 }
+
 .home-steps__item h3 {
   padding-block-start: 12px;
 }
+
 /* The ordered list already announces the number; this is the visual echo. */
 .home-steps__item h3::before {
   content: counter(step) '. ';
   color: var(--md-sys-color-on-surface-variant);
 }
+
 .home-steps__item p {
   max-inline-size: 36ch;
   color: var(--md-sys-color-on-surface-variant);
 }
+
 .home-steps__icon {
   grid-row: span 2;
   display: inline-grid;
@@ -215,6 +245,7 @@
   background-color: var(--md-sys-color-secondary-container);
   color: var(--md-sys-color-on-secondary-container);
 }
+
 .home-steps__item:not(:last-child)::after {
   content: '';
   position: absolute;
@@ -231,6 +262,7 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
+
 .home-offer {
   position: relative;
   display: flex;
@@ -241,12 +273,14 @@
   border-radius: var(--md-sys-shape-corner-extra-large);
   overflow: hidden;
 }
+
 .home-offer--welcome {
   justify-content: flex-end;
   min-block-size: 360px;
   color: var(--sky-color-on-scrim);
   background-color: var(--md-sys-color-scrim);
 }
+
 .home-offer__bg {
   position: absolute;
   inset: 0;
@@ -264,27 +298,32 @@
   gap: 8px;
   max-inline-size: 420px;
 }
+
 .home-offer__title {
   margin: 0;
   font-size: clamp(var(--md-sys-typescale-headline-large-size), 1.5rem + 2vw, var(--md-sys-typescale-display-medium-size));
   line-height: 1.1;
   font-weight: 700;
 }
+
 .home-offer__subtitle {
   margin: 0;
   font-size: var(--md-sys-typescale-title-large-size);
   line-height: var(--md-sys-typescale-title-large-line-height);
   font-weight: var(--md-sys-typescale-title-medium-weight);
 }
+
 .home-offer__text {
   margin: 0 0 8px;
   max-inline-size: 44ch;
   font-size: var(--md-sys-typescale-body-large-size);
   line-height: var(--md-sys-typescale-body-large-line-height);
 }
+
 .home-offer--welcome .home-offer__text {
   margin-block-end: 12px;
 }
+
 /* M3 filled button look on a light-DOM link (crawlable in prerendered HTML). */
 .home-offer__cta {
   display: inline-flex;
@@ -298,13 +337,13 @@
   text-decoration: none;
   transition: background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
 }
+
 .home-offer__cta:hover {
-  background-color: color-mix(
-    in srgb,
-    var(--md-sys-color-on-primary) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
-    var(--md-sys-color-primary)
-  );
+  background-color: color-mix(in srgb,
+      var(--md-sys-color-on-primary) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
+      var(--md-sys-color-primary));
 }
+
 .home-offer__cta:focus-visible {
   outline: 3px solid var(--md-sys-color-primary);
   outline-offset: 2px;
@@ -316,9 +355,11 @@
   grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
   gap: 24px;
 }
+
 .home-directory__title {
   margin: 0 0 8px;
 }
+
 .home-directory__links {
   display: flex;
   flex-wrap: wrap;
@@ -327,12 +368,14 @@
   padding: 0;
   list-style: none;
 }
+
 .home-directory__links a {
   display: inline-flex;
   align-items: center;
   min-block-size: 40px;
   color: var(--md-sys-color-on-surface-variant);
 }
+
 .home-directory__links a:hover {
   color: var(--md-sys-color-primary);
 }
@@ -358,10 +401,12 @@
   gap: 16px;
   overflow: hidden;
 }
+
 .home-skeleton__block {
   border-radius: var(--md-sys-shape-corner-large);
   background-color: var(--md-sys-color-surface-container);
 }
+
 .home-skeleton__block--card {
   aspect-ratio: 3 / 4;
 }
@@ -376,36 +421,44 @@
     border: 0;
     box-shadow: var(--sky-elevation-2);
   }
+
   .home-offers {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
   .home-offer {
     padding: 32px;
   }
+
   .home-offer--welcome,
   .home-offers--member .home-offer--gift {
     grid-column: 1 / -1;
   }
 }
+
 @media (min-width: 840px) {
   .home-hero__inner {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
     gap: 48px;
   }
+
   .home-offers {
     grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
     grid-template-rows: auto auto;
     gap: 20px;
   }
+
   .home-offer--welcome {
     grid-column: auto;
     grid-row: span 2;
     min-block-size: 420px;
   }
+
   .home-offers--member .home-offer--gift {
     grid-column: auto;
     grid-row: span 2;
   }
+
   /* The copy column is at most 32px padding + 420px wide, so the scrim stays at 70% or more
      up to 460px (or 80% of a narrower card) and only fades beyond the text. */
 
@@ -413,19 +466,24 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 32px;
   }
+
   .home-steps__item {
     grid-template-columns: minmax(0, 1fr);
     row-gap: 8px;
   }
+
   .home-steps__item :is(h3, p) {
     grid-column: 1;
   }
+
   .home-steps__item h3 {
     padding-block-start: 8px;
   }
+
   .home-steps__icon {
     grid-row: auto;
   }
+
   /* Rule from this marker to the next one (48px marker + 32px column gap). */
   .home-steps__item:not(:last-child)::after {
     inset-block: 23.5px auto;
@@ -433,6 +491,7 @@
     inline-size: auto;
     block-size: 1px;
   }
+
   .home-faq {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr);
     gap: 48px;

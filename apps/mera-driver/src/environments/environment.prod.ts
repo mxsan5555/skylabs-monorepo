@@ -5,5 +5,5 @@
  */
 export const environment = {
   production: true,
-  apiUrl: 'https://api.mera-driver.example.com',
+  apiUrl: 'https://mera-driver-api-production.up.railway.app',
 };

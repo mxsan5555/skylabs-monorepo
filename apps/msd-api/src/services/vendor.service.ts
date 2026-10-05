@@ -382,16 +382,23 @@ async function buildAndInsertVendor(
  * this correction doesn't touch.
  */
 export async function createVendor(input: VendorCreateInput, createdByUserId: string) {
-  // Double-submit guard, unchanged — keyed on the same admin submitting the same businessName
-  // again within the window, so a rapid double-click doesn't create two draft Vendor rows (and,
-  // now, doesn't call `createVendorOwner` twice for the same typed email/mobile either — the
-  // second call would otherwise legitimately 409 against the first call's own freshly-created
-  // User, which would be a confusing false-positive "already exists" error for a genuine
-  // double-click rather than a real duplicate).
+  // Double-submit guard — only short-circuits a genuine resubmission of the SAME payload within
+  // the window (same admin, same businessName, AND — whenever an owner identity was submitted —
+  // the same owner email/mobile). Scoping this by businessName alone was a real bug: Step 1 of
+  // the admin pipeline always POSTs with `businessName` absent (the owner-creation step happens
+  // before any business field is filled in — see vendor-pipeline.tsx's `saveUser`), so it's
+  // always `null` here. That meant ANY two vendor creations by the same admin within the 10s
+  // window collided on `(createdByUserId, businessName: null)` regardless of owner identity —
+  // the second submission's real owner (a brand-new one, or a genuinely already-taken email/
+  // mobile) was silently discarded and the FIRST vendor was returned instead, before
+  // `createVendorOwner`'s own conflict check ever ran. So a duplicate-owner submission never
+  // surfaced its intended 409 — it just silently handed back an unrelated vendor.
   const recentDuplicate = await prisma.vendor.findFirst({
     where: {
       createdByUserId,
       businessName: input.businessName ?? null,
+      ...(input.ownerEmail ? { ownerEmail: input.ownerEmail } : {}),
+      ...(input.ownerMobile ? { ownerMobile: input.ownerMobile } : {}),
       createdAt: { gte: new Date(Date.now() - DUPLICATE_SUBMIT_WINDOW_MS) },
     },
     orderBy: { createdAt: 'desc' },
