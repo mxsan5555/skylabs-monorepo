@@ -392,7 +392,7 @@ const BRANCH_PINCODE_REGEX = /^\d{6}$/;
  *  actual link (host, whether it resolves to a place) is validated server-side by
  *  `googleMapsUrlResolver.provider.ts`, whose message is surfaced via `errors.mapLocationUrl`
  *  from the submit handler's catch block (see `BranchDialog`'s `submit`). */
-function validateMapLocationUrl(value: string): string | null {
+export function validateMapLocationUrl(value: string): string | null {
   if (!value.trim()) return null;
   try {
     const url = new URL(value.trim());
@@ -402,7 +402,7 @@ function validateMapLocationUrl(value: string): string | null {
   }
 }
 
-function validateBranchPincode(value: string): string | null {
+export function validateBranchPincode(value: string): string | null {
   if (!value.trim()) return null;
   return BRANCH_PINCODE_REGEX.test(value) ? null : 'Enter a valid 6-digit PIN code';
 }
@@ -436,7 +436,7 @@ const LEGACY_HOURS_PATTERN = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/
  * this dialog holds (and ultimately re-submits) is always in the shape that contract expects,
  * regardless of which shape the branch happened to load with.
  */
-function normalizeOpeningHours(raw: unknown): OpeningHours {
+export function normalizeOpeningHours(raw: unknown): OpeningHours {
   if (!raw || typeof raw !== 'object') return {};
   const result: OpeningHours = {};
   for (const key of WEEKDAY_KEYS) {
@@ -456,7 +456,7 @@ function normalizeOpeningHours(raw: unknown): OpeningHours {
  *  structured `Json?` column — see `OpeningHours`'s own doc comment) — replaces having no UI at
  *  all for a field that already existed on the model. Each day is independently open/closed;
  *  open/close times only render (and only get submitted) for a day marked open. */
-function OpeningHoursEditor({ value, onChange }: { value: OpeningHours; onChange: (next: OpeningHours) => void }) {
+export function OpeningHoursEditor({ value, onChange }: { value: OpeningHours; onChange: (next: OpeningHours) => void }) {
   const dayFor = (key: WeekdayKey) => value[key] ?? { open: false };
 
   const setDay = (key: WeekdayKey, patch: Partial<{ open: boolean; start: string; end: string }>) => {

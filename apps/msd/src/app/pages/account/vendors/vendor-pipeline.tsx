@@ -6,14 +6,12 @@ import {
   getVendor,
   getVendorCategoryAccess,
   listBranches,
-  listCategories,
-  listDeals,
+  listVendorDealsForAdmin,
   listVendorProducts,
   listVendorTherapistsForAdmin,
   updateVendor,
   type AdminTherapist,
   type Branch,
-  type Category,
   type Vendor,
   type VendorCategoryAccessRow,
   type VendorCreateInput,
@@ -117,15 +115,14 @@ export function VendorPipeline({
   // both reach saveUser() before either state update has visibly taken effect.
   const saveButtonRef = useRef<MdFilledButton>(null);
 
-  // Shared step data — see this component's own doc comment on why it's lifted here.
+  // Shared step data — see this component's own doc comment on why it's lifted here. Steps
+  // 2-5 are now read-only recaps (see `vendor-wizard-branches.tsx`'s own doc comment for why),
+  // so this is fetched once for display/the Step 6 recap, never mutated by a step itself.
   const [branches, setBranches] = useState<Branch[]>([]);
   const [categoryAccess, setCategoryAccess] = useState<VendorCategoryAccessRow[]>([]);
   const [products, setProducts] = useState<VendorProduct[]>([]);
   const [therapists, setTherapists] = useState<AdminTherapist[]>([]);
   const [dealCount, setDealCount] = useState(0);
-  const [serviceCategories, setServiceCategories] = useState<Category[]>([]);
-  const [productCategories, setProductCategories] = useState<Category[]>([]);
-  const [therapyCategories, setTherapyCategories] = useState<Category[]>([]);
 
   useEffect(() => {
     setVendor(initialVendor);
@@ -145,35 +142,29 @@ export function VendorPipeline({
     return data;
   }, [token, vendorId]);
 
-  const reloadDealCount = useCallback(
-    async (branchList: Branch[]) => {
-      if (!vendorId || branchList.length === 0) {
-        setDealCount(0);
-        return;
-      }
-      const perBranch = await Promise.all(branchList.map((b) => listDeals(token, vendorId, b.id)));
-      setDealCount(perBranch.reduce((sum, r) => sum + r.data.length, 0));
-    },
-    [token, vendorId],
-  );
+  // Vendor-wide, not per-branch — `listVendorDealsForAdmin` (added once Deals got its own admin
+  // page, see `deals-list-page.tsx`) replaces the old N+1 "one `listDeals` call per branch" loop.
+  const reloadDealCount = useCallback(async () => {
+    if (!vendorId) {
+      setDealCount(0);
+      return;
+    }
+    const { data } = await listVendorDealsForAdmin(token, vendorId);
+    setDealCount(data.length);
+  }, [token, vendorId]);
 
   // Initial load of every step's data once the vendor row exists — refetched wholesale only on
-  // a real vendor-identity change (a different vendor selected in the admin list), never on
-  // every field-level save; each step reports its own mutations back up via its own callback.
+  // a real vendor-identity change (a different vendor selected in the admin list). Steps 2-5 are
+  // now read-only recaps of this same data (see `vendor-wizard-branches.tsx`'s own doc comment),
+  // so nothing here is mutated by a step itself any more — only Step 6's Review recap and these
+  // steps' own counts read it.
   useEffect(() => {
     if (!vendorId) return;
-    reloadBranches()
-      .then(reloadDealCount)
-      .catch(() => {
-        setBranches([]);
-        setDealCount(0);
-      });
+    reloadBranches().catch(() => setBranches([]));
+    reloadDealCount().catch(() => setDealCount(0));
     getVendorCategoryAccess(token, vendorId).then(({ data }) => setCategoryAccess(data)).catch(() => setCategoryAccess([]));
     listVendorTherapistsForAdmin(token, vendorId).then(({ data }) => setTherapists(data)).catch(() => setTherapists([]));
     listVendorProducts(token, vendorId, { pageSize: 100 }).then(({ data }) => setProducts(data)).catch(() => setProducts([]));
-    listCategories(token, { type: 'SERVICE', vendorId }).then(({ data }) => setServiceCategories(data)).catch(() => setServiceCategories([]));
-    listCategories(token, { type: 'PRODUCT', vendorId }).then(({ data }) => setProductCategories(data)).catch(() => setProductCategories([]));
-    listCategories(token, { type: 'THERAPY', vendorId }).then(({ data }) => setTherapyCategories(data)).catch(() => setTherapyCategories([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendorId, token]);
 
@@ -223,45 +214,6 @@ export function VendorPipeline({
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleBranchesChange = (next: Branch[]) => {
-    setBranches(next);
-    reloadDealCount(next);
-  };
-
-  // Wired to `VendorBranchListStep`'s `onVendorRefresh`, which fires from `BranchDialog`'s
-  // `onCategoryAccessSaved` — AFTER a branch's category-access save actually completes, never
-  // bundled into `handleBranchesChange` above. That save (`BranchDialog`'s own "Categories &
-  // Subcategories" section) can auto-grant a vendor-level `VendorCategoryAccess` row + flip
-  // `offersService`/`offersTherapy` server-side (see `setBranchCategoryAccess`'s own doc comment
-  // in msd-api's vendor.service.ts), and it happens as a SEPARATE, LATER network call than the
-  // branch-fields save `handleBranchesChange` reacts to — refetching here instead of there is
-  // what closes that race: `vendor`/`categoryAccess` are otherwise only ever fetched once (the
-  // bulk-load effect above), so without a refetch timed to land after the category save actually
-  // finishes, the NEXT "Save product categories" click in `VendorProductCategoryAccess` could
-  // resubmit stale (pre-grant) `offersService`/`offersTherapy`/`categoryIds`, silently wiping out
-  // the branch-level auto-grant via that endpoint's replace-the-full-set semantics — and Step
-  // 4/5's own "module not enabled" gate could render the stale flag in the meantime too.
-  //
-  // Also reloads `branches` — `VendorBranchListStep`'s own save already preserves each branch's
-  // PREVIOUS `categoryTypes` so it's never `undefined` (see that file's own doc comment on why),
-  // but "previous" is stale the instant a category was actually added/removed, and
-  // `VendorTherapistsStep`/`VendorProductsStep` gate branch eligibility on exactly that field
-  // (`branches.filter(b => b.categoryTypes.includes('THERAPY'))`). This fires unconditionally on
-  // every Branch Access save (not just ones that touch categories — see `BranchDialog.submit()`),
-  // so `categoryTypes` is back in sync with the server within one round trip, no page reload
-  // needed for a branch's Therapy/Product eligibility to update after its access changed.
-  const refreshVendorAndCategoryAccess = () => {
-    if (!vendorId) return;
-    getVendor(token, vendorId)
-      .then(({ data }) => {
-        setVendor(data);
-        onVendorChange(data);
-      })
-      .catch(() => { });
-    getVendorCategoryAccess(token, vendorId).then(({ data }) => setCategoryAccess(data)).catch(() => { });
-    reloadBranches().catch(() => { });
   };
 
   const refreshVendorAfterKycChange = useCallback(async () => {
@@ -401,29 +353,14 @@ export function VendorPipeline({
               setCategoryAccess(nextAccess);
             }}
           />
-          <VendorBranchListStep
-            token={token}
-            vendorId={vendor.id}
-            canEdit
-            branches={branches}
-            onBranchesChange={handleBranchesChange}
-            onVendorRefresh={refreshVendorAndCategoryAccess}
-          />
+          <VendorBranchListStep vendorId={vendor.id} branches={branches} />
         </section>
       )}
 
       {activeStep === 3 && (
         <>
           <h2 className="section-title">Step 3: Deals</h2>
-          <VendorDealsStep
-            token={token}
-            vendorId={vendor.id}
-            canEdit
-            canApprove={Boolean(canApprove)}
-            branches={branches}
-            categories={serviceCategories}
-            products={products}
-          />
+          <VendorDealsStep vendorId={vendor.id} branchCount={branches.length} dealCount={dealCount} />
         </>
       )}
 
@@ -431,13 +368,10 @@ export function VendorPipeline({
         <>
           <h2 className="section-title">Step 4: Therapy</h2>
           <VendorTherapistsStep
-            token={token}
             vendorId={vendor.id}
-            canEdit
             offersTherapy={vendor.offersTherapy}
             branches={branches}
-            categories={therapyCategories}
-            onTherapistsChange={setTherapists}
+            therapistCount={therapists.length}
           />
         </>
       )}
@@ -445,14 +379,7 @@ export function VendorPipeline({
       {activeStep === 5 && (
         <>
           <h2 className="section-title">Step 5: Products</h2>
-          <VendorProductsStep
-            token={token}
-            vendorId={vendor.id}
-            canEdit
-            offersProduct={vendor.offersProduct}
-            categories={productCategories}
-            onProductsChange={setProducts}
-          />
+          <VendorProductsStep vendorId={vendor.id} offersProduct={vendor.offersProduct} productCount={products.length} />
         </>
       )}
 

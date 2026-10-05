@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import type { Vendor } from '../../../../api/rbac/vendors';
+import { formatCount } from './vendor-setup';
 
 interface VendorTableParams {
   page: number;
@@ -10,7 +11,7 @@ interface VendorTableParams {
 
 interface VendorListProps {
   vendors: Vendor[];
-  selectedId: string | null;
+  /** Called with the vendor id when a row's "Open" action is used. The parent navigates. */
   onSelect: (id: string) => void;
   total: number;
   page: number;
@@ -25,69 +26,59 @@ interface VendorListProps {
  *  APPROVED/ACTIVE read as "good", PENDING_VERIFICATION/PROFILE_INCOMPLETE as "in progress",
  *  REJECTED/SUSPENDED/INACTIVE as "bad". */
 const VENDOR_STATUS_MAP: Record<string, 'success' | 'warning' | 'error'> = {
-  APPROVED: 'success',
-  ACTIVE: 'success',
-  PENDING_VERIFICATION: 'warning',
-  PROFILE_INCOMPLETE: 'warning',
-  REJECTED: 'error',
-  SUSPENDED: 'error',
-  INACTIVE: 'error',
+  'Approved': 'success',
+  'Active': 'success',
+  'Waiting for approval': 'warning',
+  'Profile incomplete': 'warning',
+  'Rejected': 'error',
+  'Suspended': 'error',
+  'Inactive': 'error',
 };
 
-const KYC_STATUS_MAP: Record<string, 'success' | 'warning' | 'error'> = {
-  VERIFIED: 'success',
-  PENDING: 'warning',
-  REJECTED: 'error',
+const STATUS_LABEL: Record<string, string> = {
+  APPROVED: 'Approved',
+  ACTIVE: 'Active',
+  PENDING_VERIFICATION: 'Waiting for approval',
+  PROFILE_INCOMPLETE: 'Profile incomplete',
+  REJECTED: 'Rejected',
+  SUSPENDED: 'Suspended',
+  INACTIVE: 'Inactive',
 };
 
-/** `Vendor.createdByUserId` doubles as the Source signal (see msd-api's own doc comment on that
- *  column): ADMIN when an admin created the vendor via "Add Vendor", WEBSITE when it arrived
- *  through the public "Become a Vendor" self-registration (`createdByUserId: null`). */
-const SOURCE_STATUS_MAP: Record<string, 'success' | 'warning' | 'error' | 'info'> = {
-  ADMIN: 'info',
-  WEBSITE: 'success',
-};
-
+/** Counts read "5 of 18" when only some items are live, "18" when all are. */
 const VENDOR_COLUMNS = JSON.stringify([
-  { key: 'Business Name', label: 'Business Name' },
+  { key: 'Business Name', label: 'Business' },
   { key: 'Owner', label: 'Owner' },
-  { key: 'Contact', label: 'Contact' },
   { key: 'Status', label: 'Status', type: 'status', statusMap: VENDOR_STATUS_MAP },
-  { key: 'KYC Status', label: 'KYC Status', type: 'status', statusMap: KYC_STATUS_MAP },
-  // { key: 'Source', label: 'Source', type: 'status', statusMap: SOURCE_STATUS_MAP },
-  { key: 'Branch Count', label: 'Branch' },
-  { key: 'Deal Count', label: 'Deal' },
-  { key: 'Product Count', label: 'Product' },
+  { key: 'Branch Count', label: 'Branches' },
+  { key: 'Deal Count', label: 'Deals' },
+  { key: 'Therapist Count', label: 'Therapists' },
+  { key: 'Product Count', label: 'Products' },
 ]);
 
-/** Not '__view_detail__' — the real "detail view" for a vendor is the existing right-hand
- *  pipeline/profile panel in vendors.tsx (AdminVendorManagement), not the generic drawer. */
-const VENDOR_ACTIONS = JSON.stringify([{ icon: 'chevron_right', label: 'Select', event: 'select' }]);
+/** The row action opens the member's own page (`/account/vendors/:id`). */
+const VENDOR_ACTIONS = JSON.stringify([{ icon: 'chevron_right', label: 'Open member', event: 'select' }]);
 
 /** Flat row for <sky-data-table> — 'Vendor ID' is an extra (non-column) key used only to look
  *  the vendor back up on the 'select' row action; it is not one of the visible columns. */
 function toVendorRow(vendor: Vendor): Record<string, string | number> {
+  const live = vendor.liveCounts;
+  const all = vendor._count;
   return {
     'Vendor ID': vendor.id,
-    'Business Name': vendor.businessName || vendor.owner?.name || 'Draft vendor (onboarding in progress)',
+    'Business Name': vendor.businessName || vendor.owner?.name || 'Draft member (setup in progress)',
     Owner: vendor.owner?.name ?? '—',
-    Contact: vendor.businessPhone || vendor.ownerMobile || '—',
-    Status: vendor.status,
-    'KYC Status': vendor.kycStatus,
-    Source: vendor.createdByUserId ? 'ADMIN' : 'WEBSITE',
-    'Branch Count': vendor._count?.branches ?? 0,
-    'Deal Count': vendor._count?.deals ?? 0,
-    'Product Count': vendor._count?.products ?? 0,
+    Status: STATUS_LABEL[vendor.status] ?? vendor.status,
+    'Branch Count': formatCount(live?.branches, all?.branches),
+    'Deal Count': formatCount(live?.deals, all?.deals),
+    'Therapist Count': formatCount(live?.therapists, all?.therapists),
+    'Product Count': formatCount(live?.products, all?.products),
   };
 }
 
-/** Left-hand vendor picker for the admin surface — sky-data-table pattern, mirrors
- *  orders.tsx exactly (ref + sky-dt-params-change + sky-dt-row-action).
- *  Presenter-only: pagination/search state and the actual `listVendors` fetch stay owned by
- *  the parent (AdminVendorManagement in vendors.tsx); this component only renders and forwards
- *  table events. `selectedId` is accepted for API-contract parity with the previous
- *  hand-rolled list but sky-data-table has no non-checkbox "current row" highlight concept, so
- *  it is intentionally unused here — consistent with Order's table, not a regression. */
+/** Member list — sky-data-table pattern, mirrors orders.tsx (ref + sky-dt-params-change +
+ *  sky-dt-row-action). Presenter-only: pagination/search state and the `listVendors` fetch stay
+ *  owned by the parent (AdminVendorManagement in vendors.tsx). */
 export function VendorList({ vendors, onSelect, total, page, pageSize, loading, onParamsChange }: VendorListProps) {
   const tableRef = useRef<HTMLElement>(null);
   const rows = useMemo(() => JSON.stringify(vendors.map(toVendorRow)), [vendors]);
@@ -126,7 +117,7 @@ export function VendorList({ vendors, onSelect, total, page, pageSize, loading, 
       page-size={pageSize}
       loading={loading}
       searchable
-      search-placeholder="Search vendors…"
+      search-placeholder="Search members…"
       actions={VENDOR_ACTIONS}
     />
   );

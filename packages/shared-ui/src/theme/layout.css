@@ -477,6 +477,17 @@
   font-weight: 600;
 }
 
+/* Ancestor crumbs that link back (e.g. All Member > {business}). */
+.admin-breadcrumb a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-breadcrumb a:hover {
+  color: var(--md-sys-color-primary);
+}
+
 .admin-content {
   flex: 1;
   min-width: 0;
