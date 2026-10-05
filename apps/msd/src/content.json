@@ -964,6 +964,7 @@
   "errors": {
     "load": "Could not load your orders."
   }
+  
 },
   "orderDetail": {
     "loading": "Loading order…",

@@ -1,26 +1,28 @@
-/* Storefront "My Account" shell — a nav column + content column, collapsing to a stacked
-   layout on mobile. Reuses the global `.entity-list`/`.entity-list__item` row styling for the
-   nav links (same "active" affordance already used for selectable rows elsewhere in the app)
-   instead of inventing a new nav/sidebar component. */
 .my-account-shell {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   gap: 20px;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 32px 20px 64px;
+  padding: 32px 20px 32px;
+  align-items: start;
 }
 
 .my-account-nav {
-  align-self: start;
   position: sticky;
   top: 88px;
+  align-self: start;
+  height: fit-content;
 }
 
 .my-account-nav .entity-list {
+  margin: 0;
   padding: 8px;
   border-radius: 16px;
-  background-color: var(--md-sys-color-surface-container, #eef1f6);
+  background-color: var(
+    --md-sys-color-surface-container,
+    #eef1f6
+  );
 }
 
 .my-account-nav__link {
@@ -29,7 +31,10 @@
 
 .my-account-nav__logout {
   margin-top: 8px;
-  border-top: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
+  border-top: 1px solid var(
+    --md-sys-color-outline-variant,
+    #c4c7c5
+  );
   padding-top: 12px;
 }
 

@@ -548,9 +548,15 @@
 
 .account-fields {
   display: grid;
-  gap: 14px;
+  /* grid-template-columns: repeat(2, minmax(0, 1fr)); */
+  gap: 16px;
 }
-
+.account-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+}
 .account-fields md-outlined-text-field,
 .account-fields md-filled-text-field {
   width: 100%;

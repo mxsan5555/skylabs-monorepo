@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FilledButton, Tabs, SecondaryTab, } from '@skylabs-monorepo/shared-ui/react';
 import { CustomerOrderCard } from './customer-order-card';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
@@ -8,6 +8,8 @@ import { ApiRequestError } from '../../../api/rbac/client';
 import './orders.css';
 import content from '../../../content.json';
 import { CardGrid } from '../../components/card-grid/card-grid';
+import { Breadcrumb } from '../../components/breadcrumb';
+
 /** Customer's own orders — the Cart convergence point (every purchase kind, Deal/Product/
  *  Therapist alike, becomes an Order here). Reuses `entity-list`/`status-pill`. Relocated here
  *  from the old marketplace orders route now that the marketplace route namespace is retired —
@@ -21,13 +23,19 @@ export function Orders() {
   const [error, setError] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | 'ALL'>('ALL');
   const { orders: ordersContent } = content;
+  const [searchParams] = useSearchParams();
+  const typeFilter = searchParams.get('type');
   const filteredOrders = useMemo(() => {
-    if (selectedStatus === 'ALL') {
-      return orders;
-    }
+    return orders.filter((order) => {
+      const matchesStatus =
+        selectedStatus === 'ALL' || order.status === selectedStatus;
 
-    return orders.filter((order) => order.status === selectedStatus);
-  }, [orders, selectedStatus]);
+      const matchesType =
+        !typeFilter || order.type === typeFilter;
+
+      return matchesStatus && matchesType;
+    });
+  }, [orders, selectedStatus, typeFilter]);
   const load = useCallback(() => {
     setLoading(true);
     setError('');
@@ -46,38 +54,18 @@ export function Orders() {
       <title>{ordersContent.metaTitle}</title>
       <meta name="robots" content="noindex" />
 
-      <header className="category-page__hero">
-        <div className="category-page__hero-inner">
-          <div>
-            <h1 className="category-page__title">{ordersContent.title}</h1>
-            <p className="category-page__subtitle">{ordersContent.subtitle}</p>
-          </div>
-        </div>
-      </header>
+      <Breadcrumb
+        items={[
+          { label: 'Home', to: '/' },
+          { label: 'Orders' },
+        ]}
+      />
       <div className="customer-orders-filters">
         <Tabs>
           <SecondaryTab
             onClick={() => setSelectedStatus('ALL')}
           >
             All
-          </SecondaryTab>
-
-          <SecondaryTab
-            onClick={() => setSelectedStatus('PENDING_PAYMENT')}
-          >
-            Pending Payment
-          </SecondaryTab>
-
-          <SecondaryTab
-            onClick={() => setSelectedStatus('CONFIRMED')}
-          >
-            Confirmed
-          </SecondaryTab>
-
-          <SecondaryTab
-            onClick={() => setSelectedStatus('COMPLETED')}
-          >
-            Completed
           </SecondaryTab>
 
           <SecondaryTab
@@ -93,7 +81,7 @@ export function Orders() {
             <p className="loading-state">{ordersContent.loading}</p>
           ) : error ? (
             <p className="error-state" role="alert">{error || ordersContent.errors.load}</p>
-          ) : orders.length === 0 ? (
+          ) : filteredOrders.length === 0 ? (
             <div className="category-page__empty">
               <sky-info-card icon="receipt_long" heading={ordersContent.empty.title} subheading={ordersContent.empty.description} />
               <FilledButton onClick={() => navigate('/categories')}>{ordersContent.empty.cta}</FilledButton>
