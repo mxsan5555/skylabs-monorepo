@@ -4,7 +4,7 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { AccountProvider } from '../../../account/account-context';
 import { isDualRoleUser, setExperienceMode } from '../../../auth/role-routing';
 import './my-account.css';
-
+import { useToast } from '../../../toast/toast-context';
 interface NavItem {
   to: string;
   label: string;
@@ -14,13 +14,14 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/my-account', label: 'Profile & Addresses', icon: 'person', end: true },
+  { to: '/my-dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { to: '/my-account', label: 'Profile', icon: 'person', end: true },
   { to: '/orders', label: 'Orders', icon: 'receipt_long' },
-  { to: '/wishlist', label: 'Wishlist', icon: 'favorite_border' },
-  { to: '/cart', label: 'Cart', icon: 'shopping_cart' },
-  { to: '/my-account/payments', label: 'Payment History', icon: 'payments' },
-  { to: '/my-account/invoices', label: 'Invoices', icon: 'description' },
-  { to: '/my-account/settings', label: 'Settings', icon: 'settings' },
+ { to: '/my-account/wishlist', label: 'Wishlist', icon: 'favorite_border' },
+{ to: '/my-account/cart', label: 'Cart', icon: 'shopping_cart' },
+  { to: '/my-account/support', label: 'Support', icon: 'support' },
+  // { to: '/my-account/invoices', label: 'Invoices', icon: 'description' },
+  // { to: '/my-account/settings', label: 'Settings', icon: 'settings' },
 ];
 
 /**
@@ -34,11 +35,12 @@ const NAV_ITEMS: NavItem[] = [
 export function MyAccountLayout() {
   const { bootstrap, signOut } = useAuth();
   const dualRole = bootstrap ? isDualRoleUser(bootstrap) : false;
-
-  const switchToVendor = () => {
-    setExperienceMode('vendor');
+  const switchToVendor = () => { setExperienceMode('vendor'); };
+  const { showToast } = useToast();
+  const handleLogout = () => {
+    signOut();
+    showToast('You have been logged out successfully.', 'success');
   };
-
   return (
     <AccountProvider>
       <div className="my-account-shell">
@@ -75,14 +77,18 @@ export function MyAccountLayout() {
                 </NavLink>
               </li>
             )}
-            <li className="my-account-nav__logout">
-              <button type="button" className="entity-list__item" onClick={signOut}>
-                <span className="role-list__name">
-                  <Icon aria-hidden="true">logout</Icon>
-                  Logout
-                </span>
-              </button>
-            </li>
+              <li className="my-account-nav__logout">
+                <button
+                  type="button"
+                  className="entity-list__item"
+                  onClick={handleLogout}
+                >
+                  <span className="role-list__name">
+                    <Icon aria-hidden="true">logout</Icon>
+                    Logout
+                  </span>
+                </button>
+              </li>
           </ul>
         </nav>
         <div className="my-account-shell__content">

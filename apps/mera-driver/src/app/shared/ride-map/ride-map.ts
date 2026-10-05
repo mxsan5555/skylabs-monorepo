@@ -51,8 +51,38 @@ import type { LatLng } from '../../models';
         background: var(--md-sys-color-error, #ba1a1a);
       }
       /* Match the route/controls to the app's brand. */
+      :host ::ng-deep .leaflet-control-container .leaflet-top.leaflet-left {
+        top: 12px;
+        left: 12px;
+        z-index: 800;
+      }
+      :host ::ng-deep .leaflet-control-zoom {
+        border: 1px solid var(--md-sys-color-outline-variant, #cbd5e1) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 14px rgb(0 0 0 / 0.15) !important;
+        overflow: hidden !important;
+        background: var(--md-sys-color-surface, #ffffff) !important;
+      }
       :host ::ng-deep .leaflet-control-zoom a {
-        color: var(--md-sys-color-on-surface, #1a1c1e);
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 36px !important;
+        height: 36px !important;
+        line-height: 36px !important;
+        color: var(--md-sys-color-on-surface, #1a1c1e) !important;
+        background: var(--md-sys-color-surface, #ffffff) !important;
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        border-bottom: 1px solid var(--md-sys-color-outline-variant, #cbd5e1) !important;
+        text-decoration: none !important;
+        transition: background-color 0.2s ease;
+      }
+      :host ::ng-deep .leaflet-control-zoom a:last-child {
+        border-bottom: none !important;
+      }
+      :host ::ng-deep .leaflet-control-zoom a:hover {
+        background: var(--md-sys-color-surface-container-high, #f1f5f9) !important;
       }
     `,
   ],

@@ -44,7 +44,6 @@
       </div>
     </div>
 
-    <!-- Saved Places Quick Select Buttons -->
     <!-- Saved Places Quick Select Buttons (Hidden on Mobile) -->
     <div class="hidden sm:flex items-center gap-2 shrink-0">
       <md-outlined-button (click)="selectSavedLocation(savedHome())">
@@ -76,7 +75,16 @@
     <!-- Google Maps Element Reference -->
     <div #mapContainer class="w-full h-full"></div>
 
-    <!-- Floating Overlay Card -->
+    <!-- Floating Map Zoom Controls (+ / -) -->
+    <div class="absolute top-4 right-4 z-20 flex flex-col gap-2">
+      <md-icon-button class="bg-white shadow-md rounded-full border border-slate-200" aria-label="Zoom in" title="Zoom in" (click)="zoomIn()">
+        <md-icon>add</md-icon>
+      </md-icon-button>
+      <md-icon-button class="bg-white shadow-md rounded-full border border-slate-200" aria-label="Zoom out" title="Zoom out" (click)="zoomOut()">
+        <md-icon>remove</md-icon>
+      </md-icon-button>
+    </div>
+
     <!-- Floating Overlay Card -->
     <sky-card class="absolute bottom-6 left-6 z-10 w-[calc(100%-48px)] max-w-[380px] rounded-2xl shadow-xl max-[600px]:left-1/2 max-[600px]:-translate-x-1/2 max-[600px]:bottom-4 max-[600px]:w-[calc(100%-32px)] max-h-[90%] overflow-y-auto bg-white">
       
@@ -176,7 +184,6 @@
               </div>
             }
 
-            <!-- Duration Selector (Round Trip Only) -->
             <!-- Duration Selector (Round Trip Only) -->
             @if (tripType() === 'round-trip') {
               <div class="flex flex-col gap-1">

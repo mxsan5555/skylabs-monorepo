@@ -79,6 +79,10 @@
         }
       </div>
 
+      <button type="button" class="site-nav__link" (click)="go('/about')">
+        About Us
+      </button>
+
       <button type="button" class="site-nav__link" (click)="goSafety()">
         Safety &amp; Trust
       </button>
@@ -142,6 +146,10 @@
               </div>
             </sky-accordion-item>
           </sky-accordion>
+
+          <button type="button" class="site-drawer__link" (click)="go('/about')">
+            <md-icon aria-hidden="true">info</md-icon> About Us
+          </button>
 
           <button type="button" class="site-drawer__link" (click)="goSafety()">
             <md-icon aria-hidden="true">shield</md-icon> Safety &amp; Trust

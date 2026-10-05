@@ -1,0 +1,115 @@
+<main class="w-full max-w-[1280px] mx-auto px-3 sm:px-6 py-8 flex flex-col gap-12">
+
+  <!-- CENTERED PRESS RELEASE CONTENT CONTAINER -->
+  <article class="w-full max-w-[800px] mx-auto flex flex-col gap-8 text-left">
+
+    <!-- 01. BREADCRUMB NAVIGATION -->
+    <nav aria-label="Breadcrumb">
+      <a routerLink="/press" class="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--md-sys-color-primary)] no-underline hover:underline">
+        <md-icon class="text-lg">arrow_back</md-icon>
+        {{ labels().breadcrumb }}
+      </a>
+    </nav>
+
+    <!-- 02. PRESS RELEASE HEADER SECTION -->
+    <header class="flex flex-col gap-4 text-left">
+      <sky-badge variant="primary" class="self-start rounded-none">
+        {{ release().badge }}
+      </sky-badge>
+
+      <h1 class="m-0 text-2xl sm:text-4xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight leading-tight">
+        {{ release().title }}
+      </h1>
+
+      <p class="m-0 text-xs sm:text-sm text-[var(--md-sys-color-on-surface-variant)] pt-1">
+        By {{ release().author }} • Published on {{ release().date }}
+      </p>
+    </header>
+
+    <!-- 03. COVER IMAGE -->
+    <img
+      [src]="release().image"
+      [alt]="release().title"
+      class="w-full aspect-[16/9] object-cover rounded-none block shadow-sm"
+    />
+
+    <!-- 04. PRESS RELEASE BODY PARAGRAPHS -->
+    <div class="flex flex-col gap-6 text-base sm:text-lg text-[var(--md-sys-color-on-surface-variant)] leading-relaxed">
+      @for (paragraph of release().paragraphs; track $index) {
+        <p class="m-0">{{ paragraph }}</p>
+      }
+    </div>
+
+    <!-- 05. TAGS & BACK LINK -->
+    <div class="flex flex-col gap-6 pt-4">
+      @if (release().tags && release().tags.length) {
+        <div class="flex items-center gap-2 flex-wrap">
+          @for (tag of release().tags; track tag) {
+            <sky-badge variant="neutral" class="rounded-none text-xs">
+              #{{ tag }}
+            </sky-badge>
+          }
+        </div>
+      }
+
+      <div class="pt-2">
+        <a routerLink="/press" class="inline-flex items-center gap-2 text-sm font-semibold text-[var(--md-sys-color-primary)] no-underline hover:underline">
+          <md-icon class="text-xl">arrow_back</md-icon>
+          {{ labels().backToArticles }}
+        </a>
+      </div>
+    </div>
+  </article>
+
+  <!-- 06. MORE PRESS COVERAGE CARDS -->
+  <section aria-label="More Press Articles" class="w-full flex flex-col gap-6 pt-6">
+    <div class="flex flex-col gap-1 text-left">
+      <h2 class="m-0 text-2xl sm:text-3xl font-extrabold text-[var(--md-sys-color-on-surface)] tracking-tight">
+        {{ labels().moreCoverageTitle }}
+      </h2>
+      <p class="m-0 text-xs sm:text-sm text-[var(--md-sys-color-on-surface-variant)]">
+        {{ labels().moreCoverageSubtitle }}
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+      @for (item of recentArticles(); track item.id) {
+        <a routerLink="/press-detail" class="no-underline text-inherit block h-full">
+          <sky-card variant="outlined" class="block w-full rounded-none h-full hover:border-[var(--md-sys-color-primary)] transition-colors cursor-pointer">
+            <article class="flex flex-col h-full justify-between">
+              <div>
+                <img
+                  [src]="item.image"
+                  [alt]="item.publisher"
+                  class="w-full aspect-[16/10] object-cover rounded-none block shadow-sm"
+                  loading="lazy"
+                />
+
+                <div class="p-5 flex flex-col gap-3 text-left">
+                  <p class="m-0 text-xs sm:text-sm text-[var(--md-sys-color-on-surface-variant)] leading-relaxed line-clamp-4">
+                    {{ item.snippet }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- Publisher, Date & Know More Link -->
+              <div class="p-5 pt-0 text-left">
+                <div class="pt-3 border-t border-[var(--md-sys-color-outline-variant)] flex items-center justify-between text-xs">
+                  <div class="flex flex-col gap-0.5">
+                    <span class="font-semibold text-[var(--md-sys-color-primary)]">{{ item.publisher }}</span>
+                    <span class="text-[10px] text-[var(--md-sys-color-on-surface-variant)]">{{ item.publishedDate }}</span>
+                  </div>
+                  <span class="inline-flex items-center gap-0.5 font-bold text-[var(--md-sys-color-primary)]">
+                    {{ labels().knowMore }}
+                    <md-icon class="text-sm">chevron_right</md-icon>
+                  </span>
+                </div>
+              </div>
+            </article>
+          </sky-card>
+        </a>
+      }
+    </div>
+  </section>
+
+</main>

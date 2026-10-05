@@ -108,6 +108,37 @@ beforeEach(() => {
   prismaMock.auditLog.create.mockResolvedValue({});
 });
 
+describe('GET /api/v1/orders/me — item images', () => {
+  it('returns the primary Deal image on each matching order item', async () => {
+    prismaMock.order.findMany.mockResolvedValue([{
+      ...orderFixture,
+      type: 'SERVICE',
+      items: [{
+        ...orderFixture.items[0],
+        dealId: SERVICE_DEAL_ID,
+        productId: null,
+        deal: {
+          images: ['https://legacy.example/deal.jpg'],
+          mediaImages: [
+            { storageKey: 'deals/deal-1/secondary.jpg', isPrimary: false, sortOrder: 1 },
+            { storageKey: 'deals/deal-1/primary.jpg', isPrimary: true, sortOrder: 0 },
+          ],
+        },
+        product: null,
+      }],
+    }]);
+    prismaMock.order.count.mockResolvedValue(1);
+
+    const res = await request(app)
+      .get('/api/v1/orders/me?pageSize=50')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].items[0].image).toBe('deals/deal-1/primary.jpg');
+    expect(res.body.data[0].items[0].deal).toBeUndefined();
+  });
+});
+
 describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
   it('1. creates a PRODUCT order from the cart', async () => {
     prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);

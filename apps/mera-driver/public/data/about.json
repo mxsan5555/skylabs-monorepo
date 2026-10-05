@@ -1,0 +1,40 @@
+{
+  "hero": {
+    "badge": "India’s Beloved",
+    "title": "India’s Beloved Driver Booking Service",
+    "subtitle1": "We are not an option, we are a choice",
+    "description1": "We're #1 choice of 10 Million people because we're the solution of India's intra-city commuting problems. With assured safety, we also provide economically priced rides.",
+    "subtitle2": "What makes us different?",
+    "description2": "Our verified drivers can dodge the traffic during peak hours and get you to the destination in a jiffy! So when you think travel, think Mera Driver.",
+    "heroImage1": "/images/about/hero_driver_app.jpg",
+    "heroImage2": "/images/about/hero_driver_portrait.jpg"
+  },
+  "champions": {
+    "badge": "Leadership",
+    "title": "Champions of our success story",
+    "description": "Mera Driver has come a long way ever since its inception. With a lot of hardwork and perseverance we have made a place for ourselves in the market. As a brand and as a service, it is our constant endeavour to redefine ourselves.",
+    "founders": [
+      {
+        "name": "Durgesh Singh",
+        "role": "Founder & CEO",
+        "image": "/images/about/founder_durgesh.jpg"
+      },
+      {
+        "name": "Priya Kapoor",
+        "role": "Co-Founder & Operations",
+        "image": "/images/about/founder_priya.jpg"
+      },
+      {
+        "name": "Ankit Prajapati",
+        "role": "Co-Founder & Tech Lead",
+        "image": "/images/about/founder_ankit.jpg"
+      }
+    ]
+  },
+  "jobs": {
+    "title": "Jobs @ Mera Driver",
+    "subtitle": "Join us in exploring a world of endless opportunities. Let’s find a spot for you.",
+    "btnText": "Work with us",
+    "bgImage": "/images/about/jobs_team_office.jpg"
+  }
+}
