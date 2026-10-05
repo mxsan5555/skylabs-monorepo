@@ -1,41 +1,48 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FilledButton, OutlinedButton, Icon } from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, Icon } from '@skylabs-monorepo/shared-ui/react';
 import { listBranches, setBranchStatus, type Branch } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { CardGrid } from '../../../components/card-grid/card-grid';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 
 interface BranchesListPageProps {
   token: string | null;
   vendorId: string;
-  /** Gates "Add branch" and each card's Edit/Deactivate actions — matches `vendors:edit`,
-   *  passed down from `VendorDetailPage` the same way it already was to the old `VendorBranches`. */
+  /** Gates "Add branch" and each row's Edit/Toggle-status action — same coarse `vendors:edit`
+   *  prop `DealsListPage`/`TherapistsListPage`/`ProductsListPage` already take. */
   canEdit: boolean;
 }
 
-/** One branch's location + status + deal count, one line (no separate fields to scan). */
-function branchSummary(branch: Branch): string {
+const BRANCH_COLUMNS = JSON.stringify([
+  { key: 'Name', label: 'Name' },
+  { key: 'Location', label: 'Location' },
+  { key: 'Deals', label: 'Deals' },
+  { key: 'Status', label: 'Status', type: 'status', statusMap: { Active: 'success', Inactive: 'error' } },
+]);
+
+function toRow(branch: Branch): Record<string, string | number> {
   const location = branch.state ? `${branch.state}${branch.city ? `, ${branch.city}` : ''}` : 'No location set';
-  const status = branch.isActive ? 'Active' : 'Inactive';
   const deals = branch._count?.deals ?? 0;
-  // PLAN 2: once /branches/:branchId/deals exists, this becomes a link instead of plain text,
-  // and a Therapists count is added back once Plan 3 decides how to source it without an
-  // all-vendor therapist fetch (see this plan's "Two disclosed adjustments" note).
-  const dealsText = deals > 0 ? `${deals} deal${deals === 1 ? '' : 's'}` : 'No deals yet';
-  return `${location} · ${status} · ${dealsText}`;
+  return {
+    Name: branch.name,
+    Location: location,
+    Deals: deals > 0 ? `${deals} deal${deals === 1 ? '' : 's'}` : 'No deals yet',
+    Status: branch.isActive ? 'Active' : 'Inactive',
+  };
 }
 
-/** Branches — card grid. Plugged into `VendorDetailPage`'s `section="branches"`.
- *  Add/Edit are full pages (`/branches/new`, `/branches/:branchId`), never a popup; branches
- *  have no hard delete (they cascade to deals/therapists/orders), so the only destructive action
- *  is Deactivate, confirmed the same way as every other destructive action in this console. */
+/** Branches — data table, same presentation as Deals/Therapists/Products. Plugged into
+ *  `VendorDetailPage`'s `section="branches"`. Add/Edit are full pages (`/branches/new`,
+ *  `/branches/:branchId`), never a popup; branches have no hard delete (they cascade to
+ *  deals/therapists/orders), so the only destructive-adjacent action is the status toggle,
+ *  confirmed on deactivate the same way as every other destructive action in this console. */
 export function BranchesListPage({ token, vendorId, canEdit }: BranchesListPageProps) {
   const navigate = useNavigate();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const tableRef = useRef<HTMLElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,6 +71,23 @@ export function BranchesListPage({ token, vendorId, canEdit }: BranchesListPageP
     }
   };
 
+  const actions = canEdit ? [{ icon: 'edit', label: 'Edit', event: 'edit' }, { icon: 'toggle_on', label: 'Activate / Deactivate', event: 'toggle-status' }] : [];
+
+  useEffect(() => {
+    const el = tableRef.current;
+    if (!el || actions.length === 0) return;
+    const onRowAction = (e: Event) => {
+      const detail = (e as CustomEvent<{ action: string; rowIndex: number }>).detail;
+      const branch = branches[detail.rowIndex];
+      if (!branch) return;
+      if (detail.action === 'edit') navigate(`/account/vendors/${vendorId}/branches/${branch.id}`);
+      else if (detail.action === 'toggle-status') toggleStatus(branch);
+    };
+    el.addEventListener('sky-dt-row-action', onRowAction);
+    return () => el.removeEventListener('sky-dt-row-action', onRowAction);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- actions/toggleStatus are recreated each render; rowIndex lookup always reads the latest `branches` via closure
+  }, [branches, vendorId, navigate]);
+
   return (
     <div>
       <div className="page-head">
@@ -84,32 +108,19 @@ export function BranchesListPage({ token, vendorId, canEdit }: BranchesListPageP
       {error && <p className="error-state" role="alert">{error}</p>}
 
       {!loading && branches.length === 0 ? (
-        <p className="empty-state">No branches yet. Add one to unlock deals, therapists and products.</p>
+        <p className="empty-state">No branches yet. Add one to unlock deals and therapists.</p>
       ) : (
-        <CardGrid layout="compact">
-          {branches.map((branch) => (
-            <sky-feature-card key={branch.id} color="none" variant="outlined" headline={branch.name} text={branchSummary(branch)}>
-              {canEdit && (
-                <>
-                  <OutlinedButton
-                    slot="actions"
-                    aria-label={`Edit ${branch.name}`}
-                    onClick={() => navigate(`/account/vendors/${vendorId}/branches/${branch.id}`)}
-                  >
-                    Edit
-                  </OutlinedButton>
-                  <OutlinedButton
-                    slot="actions"
-                    aria-label={`${branch.isActive ? 'Deactivate' : 'Activate'} ${branch.name}`}
-                    onClick={() => toggleStatus(branch)}
-                  >
-                    {branch.isActive ? 'Deactivate' : 'Activate'}
-                  </OutlinedButton>
-                </>
-              )}
-            </sky-feature-card>
-          ))}
-        </CardGrid>
+        <sky-data-table
+          ref={tableRef as RefObject<HTMLElement>}
+          caption="Branches"
+          columns={BRANCH_COLUMNS}
+          rows={JSON.stringify(branches.map(toRow))}
+          total={branches.length}
+          page={1}
+          page-size={Math.max(branches.length, 10)}
+          loading={loading}
+          actions={actions.length > 0 ? JSON.stringify(actions) : undefined}
+        />
       )}
       {ConfirmDialog}
     </div>

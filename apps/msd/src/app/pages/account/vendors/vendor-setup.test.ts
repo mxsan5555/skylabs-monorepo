@@ -76,15 +76,21 @@ describe('getSetupSteps locking', () => {
     expect(step(incomplete, 'branches')).toMatchObject({ locked: true, lockedReason: 'Finish the profile first' });
   });
 
-  it('opens branches once the profile is complete, and keeps deals/therapists/products locked', () => {
+  it('opens branches and products once the profile is complete, and keeps deals/therapists locked', () => {
     const steps = getSetupSteps(COMPLETE_PROFILE);
     expect(steps.find((s) => s.key === 'branches')?.locked).toBe(false);
-    for (const key of ['deals', 'therapists', 'products']) {
+    expect(steps.find((s) => s.key === 'products')).toMatchObject({ locked: false });
+    for (const key of ['deals', 'therapists']) {
       expect(steps.find((s) => s.key === key)).toMatchObject({ locked: true, lockedReason: 'Add a branch first' });
     }
   });
 
-  it('opens deals, therapists and products once a branch exists', () => {
+  it('keeps products locked until the profile is complete, independent of branches', () => {
+    const incomplete = { ...COMPLETE_PROFILE, ownerMobile: '' };
+    expect(step(incomplete, 'products')).toMatchObject({ locked: true, lockedReason: 'Finish the profile first' });
+  });
+
+  it('opens deals and therapists once a branch exists', () => {
     const steps = getSetupSteps(withCounts({ branches: 1 }));
     for (const key of ['deals', 'therapists', 'products']) {
       expect(steps.find((s) => s.key === key)?.locked).toBe(false);
@@ -131,11 +137,11 @@ describe('getMissingPoints', () => {
 describe('setupHint', () => {
   it('points at the profile card when nothing is unlocked yet — the case a brand-new member lands on', () => {
     const vendor = { ...COMPLETE_PROFILE, ownerMobile: '' };
-    expect(setupHint(getSetupSteps(vendor))).toBe('Complete the profile on the right to unlock branches, deals, therapists and products.');
+    expect(setupHint(getSetupSteps(vendor))).toBe('Complete the profile on the right to unlock branches and products.');
   });
 
   it('asks for a branch once the profile is done', () => {
-    expect(setupHint(getSetupSteps(COMPLETE_PROFILE))).toBe('Add a branch below to unlock deals, therapists and products.');
+    expect(setupHint(getSetupSteps(COMPLETE_PROFILE))).toBe('Add a branch below to unlock deals and therapists.');
   });
 
   it('asks for one of deals/therapists/products once a branch exists', () => {
@@ -159,5 +165,9 @@ describe('isSetupComplete', () => {
   it('is false without a complete profile even if everything else exists', () => {
     const vendor = { ...withCounts({ branches: 2, deals: 3 }), businessName: null };
     expect(isSetupComplete(getSetupSteps(vendor))).toBe(false);
+  });
+
+  it('is false with a product but no branch — products do not stand in for a branch', () => {
+    expect(isSetupComplete(getSetupSteps(withCounts({ products: 1 })))).toBe(false);
   });
 });

@@ -49,9 +49,10 @@ export function missingProfileParts(vendor: Vendor): string[] {
   return missing;
 }
 
-/** The ordered setup steps for one member. Order is the unlock order:
- *  profile, then branches, then deals/therapists/products (any one of those is enough).
- *  A branch counts once it exists; the branch form (step 3 of the redesign) will require a state. */
+/** The ordered setup steps for one member. Unlock order: profile unlocks branches and
+ *  products (any one of deals/therapists/products is enough to finish setup); branches then
+ *  unlocks deals and therapists. A branch counts once it exists; the branch form (step 3 of
+ *  the redesign) will require a state. */
 export function getSetupSteps(vendor: Vendor): SetupStep[] {
   const total = vendor._count;
   const live = vendor.liveCounts;
@@ -60,15 +61,20 @@ export function getSetupSteps(vendor: Vendor): SetupStep[] {
   const branchTotal = total?.branches ?? 0;
   const branchDone = branchTotal > 0;
 
-  const content = (key: 'deals' | 'therapists' | 'products', label: string, noun: string): SetupStep => {
+  const content = (
+    key: 'deals' | 'therapists' | 'products',
+    label: string,
+    noun: string,
+    locked: boolean,
+    lockedReason: string,
+  ): SetupStep => {
     const count = total?.[key] ?? 0;
-    const locked = !branchDone;
     return {
       key,
       label,
       done: count > 0,
       locked,
-      lockedReason: locked ? 'Add a branch first' : undefined,
+      lockedReason: locked ? lockedReason : undefined,
       missing: count > 0 ? [] : [`No ${noun} yet`],
       count: formatCount(live?.[key], count),
     };
@@ -85,9 +91,11 @@ export function getSetupSteps(vendor: Vendor): SetupStep[] {
       missing: branchDone ? [] : ['No branch yet'],
       count: formatCount(live?.branches, branchTotal),
     },
-    content('deals', 'Deals', 'deals'),
-    content('therapists', 'Therapists', 'therapists'),
-    content('products', 'Products', 'products'),
+    content('deals', 'Deals', 'deals', !branchDone, 'Add a branch first'),
+    content('therapists', 'Therapists', 'therapists', !branchDone, 'Add a branch first'),
+    // Products are managed at the vendor level, independent of any branch — only the
+    // profile needs to be complete.
+    content('products', 'Products', 'products', !profileDone, 'Finish the profile first'),
   ];
 }
 
@@ -102,8 +110,8 @@ export function isSetupComplete(steps: SetupStep[]): boolean {
  *  the way in when every card on the left is locked, since that connection isn't visually obvious. */
 export function setupHint(steps: SetupStep[]): string {
   const done = (key: SetupStepKey) => steps.find((s) => s.key === key)?.done ?? false;
-  if (!done('profile')) return 'Complete the profile on the right to unlock branches, deals, therapists and products.';
-  if (!done('branches')) return 'Add a branch below to unlock deals, therapists and products.';
+  if (!done('profile')) return 'Complete the profile on the right to unlock branches and products.';
+  if (!done('branches')) return 'Add a branch below to unlock deals and therapists.';
   if (isSetupComplete(steps)) return 'Everything needed is in place.';
   return 'Add at least one deal, therapist or product to finish setup.';
 }

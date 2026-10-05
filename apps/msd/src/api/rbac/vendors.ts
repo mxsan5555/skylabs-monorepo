@@ -301,6 +301,9 @@ export interface Deal {
    *  that predate this table (see `resolveDealMedia` in `utils/media.ts`). */
   mediaImages?: MediaImage[];
   mediaVideo?: MediaVideo | null;
+  /** The therapist(s) who perform this deal (DealTherapist, many-to-many) — each must belong to
+   *  this same deal's branch. Flattened server-side; never the raw join-row shape. */
+  therapists?: { id: string; personName: string; therapistType: string; isActive: boolean }[];
 }
 
 export interface DealPackage {
@@ -349,6 +352,10 @@ export interface DealInput {
   /** Required (>=1) for a service deal — omit entirely on update to leave existing packages
    *  untouched. Never set for a product deal. */
   packages?: DealPackageInput[];
+  /** The therapist(s) to link to this deal — each must already belong to this deal's own
+   *  branch (validated server-side). Omit entirely on update to leave existing links untouched;
+   *  present (including `[]`) replaces the full set — same convention as `packages` above. */
+  therapistIds?: string[];
 }
 
 function toQuery(params: Record<string, string | number | undefined>): string {
@@ -517,6 +524,18 @@ export function getMyBranchCategoryAccess(token: string | null, branchId: string
 
 export function listDeals(token: string | null, vendorId: string, branchId: string) {
   return apiGet<Deal[]>(`/vendors/${vendorId}/branches/${branchId}/deals`, token);
+}
+
+/** A deal as seen by the admin Vendor Detail view — every deal across every branch of a given
+ *  vendor (every status; admin sees the full picture), with the branch it belongs to nested in.
+ *  See `GET /vendors/:vendorId/deals`, gated `vendors.deals:view` — mirrors
+ *  `listVendorTherapistsForAdmin`'s own "vendor-wide, not branch-scoped" shape exactly. */
+export interface AdminDeal extends Deal {
+  branch: { id: string; name: string };
+}
+
+export function listVendorDealsForAdmin(token: string | null, vendorId: string) {
+  return apiGet<AdminDeal[]>(`/vendors/${vendorId}/deals`, token);
 }
 
 export function createDeal(token: string | null, vendorId: string, branchId: string, input: DealInput) {

@@ -1515,6 +1515,37 @@ describe('GET .../branches/:branchId/deals — includes packages (regression)', 
   });
 });
 
+describe('GET /:vendorId/deals (admin, vendor-wide across every branch)', () => {
+  it('403s without vendors.deals:view', async () => {
+    resolveMock.mockResolvedValue([]);
+    const res = await request(app)
+      .get(`/api/v1/vendors/${VENDOR_A_ID}/deals`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(403);
+  });
+
+  it('returns every deal for the vendor, across branches, with branch info and a flat therapists array (not the raw join rows)', async () => {
+    resolveMock.mockResolvedValue(['vendors.deals:view']);
+    const therapistFixture = { id: 'therapist-1', personName: 'Ramesh Kumar', therapistType: 'Massage Therapist', isActive: true };
+    prismaMock.deal.findMany.mockResolvedValue([
+      {
+        ...dealAFixture,
+        branch: { id: BRANCH_A_ID, name: 'Branch A' },
+        packages: [],
+        therapistLinks: [{ therapist: therapistFixture }],
+      },
+    ]);
+    const res = await request(app)
+      .get(`/api/v1/vendors/${VENDOR_A_ID}/deals`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].branch).toEqual({ id: BRANCH_A_ID, name: 'Branch A' });
+    expect(res.body.data[0].therapists).toEqual([therapistFixture]);
+    expect(res.body.data[0].therapistLinks).toBeUndefined();
+    expect(prismaMock.deal.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { vendorId: VENDOR_A_ID } }));
+  });
+});
+
 describe('Admin nested branch/deal approval', () => {
   it('approves a deal, jumping it straight to ACTIVE', async () => {
     resolveMock.mockResolvedValue(['vendors.deals:approve']);

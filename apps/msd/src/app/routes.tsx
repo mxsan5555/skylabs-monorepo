@@ -24,6 +24,9 @@ import { VendorManagement } from './pages/account/vendors/vendors';
 import { VendorNewPage } from './pages/account/vendors/vendor-new-page';
 import { VendorDetailPage } from './pages/account/vendors/vendor-detail-page';
 import { BranchFormPage } from './pages/account/vendors/branch-form-page';
+import { DealFormPage } from './pages/account/vendors/deal-form-page';
+import { TherapistFormPage } from './pages/account/vendors/therapist-form-page';
+import { ProductFormPage } from './pages/account/vendors/product-form-page';
 import { CustomerManagement } from './pages/account/customers/customers';
 import { BranchList } from './pages/account/vendors/branch-list';
 import { DealList } from './pages/account/vendors/deal-list';
@@ -99,6 +102,21 @@ function VendorsRouteGuard({ children }: { children: ReactNode }) {
 function BranchFormPageRoute() {
   const { token } = useAuth();
   return <BranchFormPage token={token} />;
+}
+
+function DealFormPageRoute() {
+  const { token } = useAuth();
+  return <DealFormPage token={token} />;
+}
+
+function TherapistFormPageRoute() {
+  const { token } = useAuth();
+  return <TherapistFormPage token={token} />;
+}
+
+function ProductFormPageRoute() {
+  const { token } = useAuth();
+  return <ProductFormPage token={token} />;
 }
 
 export function AppRoutes() {
@@ -335,6 +353,60 @@ export function AppRoutes() {
             element={
               <VendorsRouteGuard>
                 <BranchFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* Deal add/edit — same real-page pattern as Branch above, never a popup. The static
+            `new` segment wins over the dynamic `:dealId` below it. */}
+          <Route
+            path="/account/vendors/:vendorId/deals/new"
+            element={
+              <VendorsRouteGuard>
+                <DealFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/vendors/:vendorId/deals/:dealId"
+            element={
+              <VendorsRouteGuard>
+                <DealFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* Therapist add/edit — same real-page pattern as Branch/Deal above, never a popup.
+            The static `new` segment wins over the dynamic `:therapistId` below it. */}
+          <Route
+            path="/account/vendors/:vendorId/therapists/new"
+            element={
+              <VendorsRouteGuard>
+                <TherapistFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/vendors/:vendorId/therapists/:therapistId"
+            element={
+              <VendorsRouteGuard>
+                <TherapistFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* Product add/edit — same real-page pattern as Branch/Deal/Therapist above, never a
+            popup. The static `new` segment wins over the dynamic `:productId` below it. */}
+          <Route
+            path="/account/vendors/:vendorId/products/new"
+            element={
+              <VendorsRouteGuard>
+                <ProductFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/vendors/:vendorId/products/:productId"
+            element={
+              <VendorsRouteGuard>
+                <ProductFormPageRoute />
               </VendorsRouteGuard>
             }
           />

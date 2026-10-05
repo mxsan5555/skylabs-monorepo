@@ -1744,6 +1744,26 @@ router.get(
 );
 
 /**
+ * All of a vendor's deals (every status, across every branch) for the admin's vendor detail
+ * page — same "vendor-wide, not branch-scoped" shape as `/:vendorId/therapists` above. Read-only;
+ * admin-on-behalf create/update/status-change stay branch-scoped under
+ * `/:vendorId/branches/:branchId/deals[/:dealId]` further down. Gated on `vendors.deals`, same
+ * permission key the branch-scoped deal routes already use.
+ */
+router.get(
+  '/:vendorId/deals',
+  requirePermission('vendors.deals', 'view'),
+  validateParams(VendorIdParamSchema),
+  async (req, res, next) => {
+    try {
+      sendData(res, await vendorService.listVendorDealsForAdmin(req.params.vendorId));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
  * Distinct customers who have ordered/booked from a vendor, for the admin's vendor detail page.
  * Reuses the exact same `listMyCustomers` the self-service `/me/customers` route calls — that
  * function takes `vendorId` as a plain parameter and does no ownership resolution internally

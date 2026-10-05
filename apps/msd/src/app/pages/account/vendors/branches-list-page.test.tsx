@@ -46,9 +46,10 @@ const BRANCH_A: Branch = {
 
 const BRANCH_B: Branch = { ...BRANCH_A, id: 'b2', name: 'Colaba Branch', city: 'Mumbai', isActive: false, _count: { deals: 0 } };
 
-function attr(el: Element, name: string): string | null {
-  const value = (el as unknown as Record<string, unknown>)[name];
-  return typeof value === 'string' ? value : el.getAttribute(name);
+function table(): HTMLElement {
+  const el = document.querySelector('sky-data-table');
+  if (!el) throw new Error('sky-data-table not found');
+  return el as HTMLElement;
 }
 
 function renderPage(canEdit = true) {
@@ -65,17 +66,16 @@ beforeEach(() => {
 });
 
 describe('BranchesListPage', () => {
-  it('loads and shows one card per branch, with its location and deal count', async () => {
+  it('loads and shows one row per branch, with its location and deal count', async () => {
     renderPage();
     await waitFor(() => expect(listBranchesMock).toHaveBeenCalledWith('tok', 'v1'));
-    // sky-feature-card is a custom element with no shadow-DOM rendering under jsdom (this repo's
-    // documented @lit/react gap) — assert on the attributes React sets, not on rendered text/role.
-    await waitFor(() => expect(document.querySelectorAll('sky-feature-card')).toHaveLength(2));
-    const cards = Array.from(document.querySelectorAll('sky-feature-card'));
-    expect(cards.map((c) => [attr(c, 'headline'), attr(c, 'text')])).toEqual([
-      ['Lower Parel Branch', 'Maharashtra, Mumbai · Active · 3 deals'],
-      ['Colaba Branch', 'Maharashtra, Mumbai · Inactive · No deals yet'],
-    ]);
+    const rows = await waitFor(() => {
+      const r = JSON.parse(table().getAttribute('rows') ?? '[]') as Record<string, string>[];
+      if (r.length !== 2) throw new Error('not loaded yet');
+      return r;
+    });
+    expect(rows[0]).toMatchObject({ Name: 'Lower Parel Branch', Location: 'Maharashtra, Mumbai', Deals: '3 deals', Status: 'Active' });
+    expect(rows[1]).toMatchObject({ Name: 'Colaba Branch', Deals: 'No deals yet', Status: 'Inactive' });
   });
 
   it('shows a heading with the branch count', async () => {
@@ -84,50 +84,46 @@ describe('BranchesListPage', () => {
     expect(await screen.findByText('2 branches')).toBeTruthy();
   });
 
-  it('shows "Add branch" only when canEdit is true', async () => {
+  it('shows "Add branch" only when canEdit is true, and navigates to the add page', async () => {
     renderPage(true);
-    expect(await screen.findByText('Add branch')).toBeTruthy();
+    const addButton = await screen.findByText('Add branch');
+    fireEvent.click(addButton);
+    expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/branches/new');
   });
 
-  it('hides "Add branch" when canEdit is false', async () => {
+  it('hides "Add branch" and every row action when canEdit is false', async () => {
     renderPage(false);
     await waitFor(() => expect(listBranchesMock).toHaveBeenCalled());
     expect(screen.queryByText('Add branch')).toBeNull();
+    const actions = JSON.parse(table().getAttribute('actions') ?? '[]') as { event: string }[];
+    expect(actions).toEqual([]);
   });
 
-  it('hides each card\'s Edit/Deactivate actions when canEdit is false', async () => {
-    renderPage(false);
-    await waitFor(() => expect(document.querySelectorAll('sky-feature-card')).toHaveLength(2));
-    expect(document.querySelectorAll('md-outlined-button')).toHaveLength(0);
-  });
-
-  it('Edit navigates to that branch\'s edit page', async () => {
+  it('edit row action navigates to that branch\'s edit page', async () => {
     renderPage();
-    // sky-feature-card renders headline/text into its shadow DOM (see the top-of-file note) —
-    // wait on the attribute, same pattern as vendor-detail-page.test.tsx.
-    await waitFor(() => expect(document.querySelector('sky-feature-card[headline="Lower Parel Branch"]')).toBeTruthy());
-    const editButtons = document.querySelectorAll('md-outlined-button');
-    const edit = Array.from(editButtons).find((b) => b.textContent?.trim() === 'Edit');
-    if (!edit) throw new Error('Edit button not found');
-    fireEvent.click(edit);
+    await waitFor(() => expect(JSON.parse(table().getAttribute('rows') ?? '[]')).toHaveLength(2));
+    fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'edit', rowIndex: 0 } }));
     expect(navigateMock).toHaveBeenCalledWith('/account/vendors/v1/branches/b1');
   });
 
-  it('Deactivate asks for confirmation, then calls setBranchStatus(false) and reloads the list', async () => {
+  it('toggle-status on an active branch asks for confirmation, then calls setBranchStatus(false) and reloads', async () => {
     setBranchStatusMock.mockResolvedValue({ data: { ...BRANCH_A, isActive: false } });
     renderPage();
-    await waitFor(() => expect(document.querySelector('sky-feature-card[headline="Lower Parel Branch"]')).toBeTruthy());
-    const buttons = document.querySelectorAll('md-outlined-button');
-    const deactivate = Array.from(buttons).find((b) => b.textContent?.trim() === 'Deactivate');
-    if (!deactivate) throw new Error('Deactivate button not found');
-    fireEvent.click(deactivate);
+    await waitFor(() => expect(JSON.parse(table().getAttribute('rows') ?? '[]')).toHaveLength(2));
+    fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'toggle-status', rowIndex: 0 } }));
     // useConfirmDialog renders a real <md-dialog> — confirm() only resolves once its Confirm
-    // button is actually clicked, so drive that instead of stubbing window.confirm. FilledButton's
-    // slotted "Confirm" text is light DOM (unlike sky-feature-card's shadow-DOM headline/text), so
-    // screen.getByText reaches it directly — same pattern as customers.test.tsx.
+    // button is actually clicked, so drive that instead of stubbing window.confirm.
     fireEvent.click(await screen.findByText('Confirm'));
     await waitFor(() => expect(setBranchStatusMock).toHaveBeenCalledWith('tok', 'v1', 'b1', false));
     await waitFor(() => expect(listBranchesMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('toggle-status on an inactive branch reactivates without asking for confirmation', async () => {
+    setBranchStatusMock.mockResolvedValue({ data: { ...BRANCH_B, isActive: true } });
+    renderPage();
+    await waitFor(() => expect(JSON.parse(table().getAttribute('rows') ?? '[]')).toHaveLength(2));
+    fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'toggle-status', rowIndex: 1 } }));
+    await waitFor(() => expect(setBranchStatusMock).toHaveBeenCalledWith('tok', 'v1', 'b2', true));
   });
 
   it('shows an error when loading branches fails', async () => {
@@ -140,25 +136,13 @@ describe('BranchesListPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load branches.');
   });
 
-  it('shows an error when setBranchStatus fails after confirming Deactivate', async () => {
+  it('shows an error when setBranchStatus fails after confirming', async () => {
     setBranchStatusMock.mockRejectedValue(new ApiRequestError('CONFLICT', 'Could not update this branch.', 409));
     renderPage();
-    await waitFor(() => expect(document.querySelector('sky-feature-card[headline="Lower Parel Branch"]')).toBeTruthy());
-    const buttons = document.querySelectorAll('md-outlined-button');
-    const deactivate = Array.from(buttons).find((b) => b.textContent?.trim() === 'Deactivate');
-    if (!deactivate) throw new Error('Deactivate button not found');
-    fireEvent.click(deactivate);
+    await waitFor(() => expect(JSON.parse(table().getAttribute('rows') ?? '[]')).toHaveLength(2));
+    fireEvent(table(), new CustomEvent('sky-dt-row-action', { detail: { action: 'toggle-status', rowIndex: 0 } }));
     fireEvent.click(await screen.findByText('Confirm'));
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not update this branch.');
-  });
-
-  it('an inactive branch offers Activate instead of Deactivate', async () => {
-    renderPage();
-    await waitFor(() => expect(document.querySelector('sky-feature-card[headline="Colaba Branch"]')).toBeTruthy());
-    const cards = Array.from(document.querySelectorAll('sky-feature-card'));
-    const colaba = cards.find((c) => attr(c, 'headline') === 'Colaba Branch');
-    const label = colaba?.querySelector('md-outlined-button:last-of-type')?.textContent?.trim();
-    expect(label).toBe('Activate');
   });
 
   it('shows an empty state with no branches yet', async () => {

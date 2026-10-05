@@ -149,6 +149,11 @@ export function createPrismaMock() {
       upsert: vi.fn(),
       delete: vi.fn(),
     },
+    dealTherapist: {
+      findMany: vi.fn(),
+      createMany: vi.fn(),
+      deleteMany: vi.fn(),
+    },
     productImage: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
