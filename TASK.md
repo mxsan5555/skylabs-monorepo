@@ -9,6 +9,20 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 
 ## In progress
 
+### msd admin — member (vendor) console redesign (plan: one screen, one job, no popups)
+Plan file: `~/.claude/plans/our-backend-admin-layout-snug-sloth.md`. Each step ships alone.
+- [x] **1. Member page + summary** — `/account/vendors/:vendorId` (summary checklist, Actions menu with
+      inline confirm instead of `window.prompt`, locked tabs, breadcrumb via `admin/breadcrumb-context`),
+      list rows open it, list shows Branches/Deals/Therapists/Products as "live of total" (API adds
+      `liveCounts` + therapist count) — 2026-09-28. The old tab bodies are still inside it until their step.
+- [ ] 2. Profile page (replaces the "Profile & setup" tab and the six-step pill wizard)
+- [ ] 3. Branches pages (state first, rest unlocks)
+- [ ] 4. Deals pages (`DealCard` list, full-page add/edit)
+- [ ] 5. Therapists pages
+- [ ] 6. Products pages
+- [ ] 7. Remove the pill wizard + dialogs, dedupe the admin/self-service forms; add a Products tab
+- [ ] Open: confirm "live" definition (active branch/product/therapist, ACTIVE + APPROVED deal)
+
 ### Deployment (Vercel) — pipeline live, hardening pending
 - [ ] Attach the bought custom domain to each project's Production (`main`) deploy
 - [ ] Add env vars in Vercel (msd: `VITE_API_URL`, `VITE_GOOGLE_MAPS_API_KEY`)
@@ -55,6 +69,13 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] msd shell plan 2: SiteFooter, Seo component, JSON-LD, city landing pages — 2026-09-23
 - [x] msd shell plan 3: home page (10 fixed sections, CardRail, SectionHead, Seo + ItemList/FAQPage JSON-LD, location-aware catalog fetch) — 2026-09-23
 - [x] msd shell plan 4: build-time prerender (`/`, every `/category/:slug`, deal-category `/category/:slug/:city`) with `__MSD_DATA__` payload hydration, `spa.html` SPA rewrite, timed-out/unreachable-API fallback, sitemap.xml/robots.txt/llms.txt — 2026-09-24
+- [x] msd home 60/30/10 colour pass on M3 roles (tinted bands, secondary-container tiles/steps/gift card, primary for actions only; "How it works" as a numbered sequence) — 2026-09-24
+- [x] msd storefront building blocks `PageSection`, `CardGrid`, `SectionHead as="h1"`; home moved onto `PageSection`; category page rebuilt with no page CSS — 2026-09-24
+- [x] msd category toolbar: subcategory pills, clamped description, sort menu, 12-per-page lazy loading (`usePagedList` + `LoadMore`, prerendered first page + total) — 2026-09-25
+- [x] msd `DealMap`: Leaflet + OpenStreetMap by default, Google behind `VITE_MAP_PROVIDER`; category map view; explore map fixed (was blocked by a missing Google key and a placeholder overlay) — 2026-09-25
+- [x] msd category filter side panel (Your location, Distance, Price, Business, Branches, Clear all; phone side sheet with focus trap), sorts Relevance / Price / Distance, List-Grid-Map switch, `sky-product-card` `layout="horizontal"` — 2026-09-25
+- [x] msd-api catalog: deal sorts `relevance|price_asc|price_desc|distance`, `vendorIds` / `branchIds` / `radiusKm` filters, `GET /catalog/deals/facets`, product price sorts — 2026-09-25
+- [x] Docs aligned with the storefront work and current API status (CLAUDE, ARCHITECTURE, DEPLOYMENT, DEVELOPER_PROCESS §19–21, docs/README, api-schema as-built notes) — 2026-09-26
 
 ### Content pages — both apps (`pages/` + route)
 - [ ] Contact page~

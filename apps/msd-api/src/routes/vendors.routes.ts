@@ -1290,7 +1290,7 @@ router.get('/', requirePermission('vendors', 'view'), validateQuery(VendorListQu
   try {
     const { page, pageSize, search, status } = req.validatedQuery as ReturnType<typeof VendorListQuerySchema.parse>;
     const { items, total } = await vendorService.listVendors({ page, pageSize, search, status });
-    sendData(res, items, { meta: { total, page, pageSize } });
+    sendData(res, await vendorService.attachLiveCounts(items), { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);
   }
@@ -1315,7 +1315,9 @@ router.post('/', requirePermission('vendors', 'create'), validateBody(VendorCrea
 
 router.get('/:id', requirePermission('vendors', 'view'), validateParams(UuidParamSchema), async (req, res, next) => {
   try {
-    sendData(res, withCompletion(await vendorService.getVendorOrThrow(req.params.id)));
+    const vendor = await vendorService.getVendorOrThrow(req.params.id);
+    const [withCounts] = await vendorService.attachLiveCounts([vendor]);
+    sendData(res, withCompletion(withCounts));
   } catch (err) {
     next(err);
   }

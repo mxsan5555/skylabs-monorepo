@@ -1,41 +1,27 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FilledButton, OutlinedButton, Icon, Tabs, PrimaryTab } from '@skylabs-monorepo/shared-ui/react';
+import { useCallback, useEffect, useState } from 'react';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { FilledButton, Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
-  approveVendor,
   createMyVendor,
-  deleteVendor,
-  deleteVendorTherapist,
   getMyVendor,
-  getVendor,
   listCategories,
   listVendors,
-  listVendorTherapistsForAdmin,
-  rejectVendor,
-  reviewVendorKyc,
-  setVendorStatus,
   submitMyVendor,
   updateMyVendor,
-  type AdminTherapist,
   type Category,
   type Vendor,
   type VendorFields,
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
-import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { VendorList } from './vendor-list';
 import { VendorProfileForm, extractVendorFieldErrors, type VendorFieldErrors } from './vendor-profile-form';
 import { VendorBranches } from './vendor-branches';
-import { VendorPipeline } from './vendor-pipeline';
-import { VendorDetailCustomers } from './vendor-detail-customers';
-import { VendorDetailOrders } from './vendor-detail-orders';
 
 /**
  * Vendor Management. Two audiences share this one page/route (`/account/vendors`):
- *  - Admin/SuperAdmin (`vendors:view`): full list + drill into any vendor's profile,
- *    KYC review, approve/reject/activate/suspend, and manage its branches/deals.
+ *  - Admin/SuperAdmin (`vendors:view`): the member list. Each row opens that member's own page
+ *    (`/account/vendors/:vendorId`, see vendor-detail-page.tsx).
  *  - Vendor (`vendors:custom` only, never `vendors:view` — see roles.tsx's SuperAdmin
  *    note on why a role never gets a permission wider than it needs): "my business"
  *    self-service — complete/edit own profile, submit for verification, manage own
@@ -47,24 +33,9 @@ export function VendorManagement() {
   const canView = can('vendors', 'view');
   const canCustom = can('vendors', 'custom');
   const canCreate = can('vendors', 'create');
-  const canEditAny = can('vendors', 'edit');
-  const canApprove = can('vendors', 'approve');
-  const canReject = can('vendors', 'reject');
-  const canStatusChange = can('vendors', 'status_change');
-  const canDelete = can('vendors', 'delete');
 
   if (canView) {
-    return (
-      <AdminVendorManagement
-        token={token}
-        canCreate={canCreate}
-        canEditAny={canEditAny}
-        canApprove={canApprove}
-        canReject={canReject}
-        canStatusChange={canStatusChange}
-        canDelete={canDelete}
-      />
-    );
+    return <AdminVendorManagement canCreate={canCreate} />;
   }
 
   if (canCustom) {
@@ -82,102 +53,17 @@ interface VendorTableParams {
 
 const DEFAULT_VENDOR_PARAMS: VendorTableParams = { page: 1, pageSize: 10, search: '' };
 
-const THERAPIST_COLUMNS = JSON.stringify([
-  { key: 'Type', label: 'Type' },
-  { key: 'Name', label: 'Name' },
-  { key: 'Branch', label: 'Branch' },
-  { key: 'Specialization', label: 'Specialization' },
-  { key: 'Experience', label: 'Experience' },
-  { key: 'Status', label: 'Status', type: 'status', statusMap: { Active: 'success', Inactive: 'error' } },
-]);
-
-const THERAPIST_ADMIN_DELETE_ACTIONS = JSON.stringify([{ icon: 'delete', label: 'Delete', event: 'delete' }]);
-
-function toTherapistRow(t: AdminTherapist): Record<string, string | number> {
-  return {
-    Type: t.therapistType,
-    Name: t.personName,
-    Branch: t.branch.name,
-    Specialization: t.specialization || '—',
-    Experience: t.experienceYears ? `${t.experienceYears} yrs` : '—',
-    Status: t.isActive ? 'Active' : 'Inactive',
-  };
-}
-
-/** Vendor Detail tab order — Overview (profile) first, then the two genuinely-coupled
- *  Branches & Deals (kept as one tab, same reasoning already applied to the vendor
- *  self-service side: a branch and its deals are one browsing flow, not two), then the
- *  read-only contextual views (Therapists/Customers/Orders — Orders already covers every
- *  purchase kind, Deal/Product/Therapist alike, so there is no separate Bookings tab). */
-const VENDOR_DETAIL_TABS = ['Overview', 'Branches & Deals', 'Therapists', 'Customers', 'Orders'] as const;
-
-function AdminVendorManagement({
-  token,
-  canCreate,
-  canEditAny,
-  canApprove,
-  canReject,
-  canStatusChange,
-  canDelete,
-}: {
-  token: string | null;
-  canCreate: boolean;
-  canEditAny: boolean;
-  canApprove: boolean;
-  canReject: boolean;
-  canStatusChange: boolean;
-  canDelete: boolean;
-}) {
+function AdminVendorManagement({ canCreate }: { canCreate: boolean }) {
   const navigate = useNavigate();
-  const { can, loginAsUser } = useAuth();
-  // Same gate as the RBAC Users screen's own "Login as" (`/rbac/impersonate` is itself gated on
-  // this exact permission, auto-granted only to super_admin) — reused here rather than a new
-  // `vendors`-scoped permission, since it's the same underlying preview-session mechanism, just
-  // initiated from Vendor List instead of User Management (Vendor owners are excluded from User
-  // Management's list entirely — see `user.service.ts#listUsers`'s own doc comment — so this is
-  // now the only place to reach a vendor's own dashboard on their behalf).
-  const canAccessDashboard = can('rbac.users', 'custom');
-  const { showToast } = useToast();
-  const { confirm, ConfirmDialog } = useConfirmDialog();
+  const { token } = useAuth();
   const [searchParams] = useSearchParams();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState('');
   const [params, setParams] = useState<VendorTableParams>(DEFAULT_VENDOR_PARAMS);
-  // Pre-selected from `?vendorId=` — the "View vendor" link on the Branches/Deals sidebar pages.
-  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get('vendorId'));
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState(0);
-  // The selected vendor's granted SERVICE categories — a service Deal picks directly from these
-  // (see vendor-branches.tsx's DealDialog); scoped per-vendor since access is vendor-specific.
-  const [categories, setCategories] = useState<Category[]>([]);
-  const vendorDetailsRef = useRef<HTMLElement>(null);
-  const selectedVendor = useMemo(() => vendors.find((v) => v.id === selectedId) ?? null, [vendors, selectedId]);
- const handleVendorSelect = useCallback((id: string) => {
-  setSelectedId(id);
-}, []);
 
-useEffect(() => {
-  if (!selectedVendor) return;
-
-  const timer = window.setTimeout(() => {
-    vendorDetailsRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
-  }, 50);
-
-  return () => window.clearTimeout(timer);
-}, [selectedVendor]);
-  useEffect(() => {
-    if (!selectedVendor) {
-      setCategories([]);
-      return;
-    }
-    listCategories(token, { type: 'SERVICE', vendorId: selectedVendor.id }).then(({ data }) => setCategories(data)).catch(() => setCategories([]));
-  }, [token, selectedVendor?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on id, not object identity
+  const openMember = useCallback((id: string) => navigate(`/account/vendors/${id}`), [navigate]);
 
   const loadVendors = useCallback(async () => {
     setLoading(true);
@@ -191,7 +77,7 @@ useEffect(() => {
       setVendors(data);
       setTotal(meta?.total ?? data.length);
     } catch (err) {
-      setListError(err instanceof ApiRequestError ? err.message : 'Could not load vendors.');
+      setListError(err instanceof ApiRequestError ? err.message : 'Could not load members.');
     } finally {
       setLoading(false);
     }
@@ -201,162 +87,9 @@ useEffect(() => {
     loadVendors();
   }, [loadVendors]);
 
-  useEffect(() => {
-    setMessage('');
-    setError('');
-    setActiveTab(0);
-  }, [selectedId]);
-
-  const [therapists, setTherapists] = useState<AdminTherapist[]>([]);
-  const [therapistsLoading, setTherapistsLoading] = useState(false);
-  const [therapistsError, setTherapistsError] = useState('');
-
-  const loadTherapists = useCallback(async () => {
-    if (!selectedVendor) {
-      setTherapists([]);
-      return;
-    }
-    setTherapistsLoading(true);
-    setTherapistsError('');
-    try {
-      const { data } = await listVendorTherapistsForAdmin(token, selectedVendor.id);
-      setTherapists(data);
-    } catch (err) {
-      setTherapistsError(err instanceof ApiRequestError ? err.message : 'Could not load therapists.');
-    } finally {
-      setTherapistsLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the vendor id, not the object identity (which changes on every vendors[] refresh, e.g. approve/reject)
-  }, [token, selectedVendor?.id]);
-
-  useEffect(() => {
-    loadTherapists();
-  }, [loadTherapists]);
-
-  const therapistsTableRef = useRef<HTMLElement>(null);
-
-  const doDeleteTherapist = async (therapist: AdminTherapist) => {
-    if (!selectedVendor) return;
-    if (!(await confirm(`Delete "${therapist.personName}"? This cannot be undone.`))) return;
-    try {
-      await deleteVendorTherapist(token, selectedVendor.id, therapist.id);
-      loadTherapists();
-    } catch (err) {
-      setTherapistsError(err instanceof ApiRequestError ? err.message : 'Could not delete therapist.');
-    }
-  };
-
-  useEffect(() => {
-    const el = therapistsTableRef.current;
-    if (!el || !canDelete) return;
-    const onRowAction = (e: Event) => {
-      const detail = (e as CustomEvent<{ action: string; row: Record<string, unknown>; rowIndex: number }>).detail;
-      const therapist = therapists[detail.rowIndex];
-      if (!therapist) return;
-      if (detail.action === 'delete') doDeleteTherapist(therapist);
-    };
-    el.addEventListener('sky-dt-row-action', onRowAction);
-    return () => el.removeEventListener('sky-dt-row-action', onRowAction);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [therapists, canDelete]);
-
-  /** Passed to VendorPipeline — fires after every successful per-step save, whether that
-   *  step just created the vendor (Step 1, first save) or updated an existing one. */
-  const handlePipelineChange = (vendor: Vendor) => {
-    setVendors((prev) => (prev.some((v) => v.id === vendor.id) ? prev.map((v) => (v.id === vendor.id ? vendor : v)) : [vendor, ...prev]));
-    setSelectedId(vendor.id);
-    setMessage('Saved.');
-  };
-
-  const doApprove = async () => {
-    if (!selectedVendor) return;
-    try {
-      const { data } = await approveVendor(token, selectedVendor.id);
-      setVendors((prev) => prev.map((v) => (v.id === data.id ? data : v)));
-      setMessage('Vendor approved and activated.');
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not approve vendor.');
-    }
-  };
-
-  const doReject = async () => {
-    if (!selectedVendor) return;
-    const reason = window.prompt('Reason for rejecting this vendor?');
-    if (!reason) return;
-    try {
-      const { data } = await rejectVendor(token, selectedVendor.id, reason);
-      setVendors((prev) => prev.map((v) => (v.id === data.id ? data : v)));
-      setMessage('Vendor rejected.');
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not reject vendor.');
-    }
-  };
-
-  const doStatusChange = async (status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED') => {
-    if (!selectedVendor) return;
-    const reason = status === 'ACTIVE' ? undefined : window.prompt(`Reason for setting status to ${status}?`) ?? undefined;
-    if (status !== 'ACTIVE' && !reason) return;
-    try {
-      const { data } = await setVendorStatus(token, selectedVendor.id, status, reason);
-      setVendors((prev) => prev.map((v) => (v.id === data.id ? data : v)));
-      setMessage(`Vendor status set to ${status}.`);
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not change vendor status.');
-    }
-  };
-
-  const doKycReview = async (kycStatus: 'VERIFIED' | 'REJECTED', rejectionReason?: string) => {
-    if (!selectedVendor) return;
-    try {
-      const { data } = await reviewVendorKyc(token, selectedVendor.id, kycStatus, rejectionReason);
-      setVendors((prev) => prev.map((v) => (v.id === data.id ? data : v)));
-      showToast(kycStatus === 'VERIFIED' ? 'KYC verified successfully.' : 'KYC rejected.');
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not review KYC.');
-    }
-  };
-
-  const doAccessDashboard = async (ownerId: string) => {
-    try {
-      await loginAsUser(ownerId);
-      navigate('/account/dashboard');
-    } catch {
-      setError('Could not start preview session.');
-    }
-  };
-
-  // Wired to `VendorBranches`' `onVendorRefresh` (the "Branches and Deals" tab, one level below
-  // this component) — see `BranchDialog`'s own `onCategoryAccessSaved` doc comment in
-  // vendor-branches.tsx for exactly why this exists: a branch's category-access save on THIS tab
-  // can flip `offersService`/`offersTherapy` server-side, but this tab is a completely separate
-  // component tree from the Overview tab's `VendorPipeline` (which owns its own, independently
-  // stale `vendor` state) — without this, switching to Overview afterward would still render the
-  // pre-grant flags and wrongly show "module not enabled" on Step 4/5 until a full page reload.
-  // Reuses `handlePipelineChange`'s exact update shape so both refresh paths keep `vendors`/
-  // `selectedId` in sync the same way.
-  const refreshSelectedVendorAfterBranchAccessChange = async () => {
-    if (!selectedVendor) return;
-    try {
-      const { data } = await getVendor(token, selectedVendor.id);
-      handlePipelineChange(data);
-    } catch {
-      // Non-fatal — the branch/category save itself already succeeded and its own toast fired;
-      // worst case the admin sees a stale flag until they switch tabs again or reload.
-    }
-  };
-
-  const doDelete = async () => {
-    if (!selectedVendor) return;
-    if (!(await confirm(`Delete "${selectedVendor.businessName || 'this vendor'}"? This cannot be undone.`))) return;
-    try {
-      await deleteVendor(token, selectedVendor.id);
-      setVendors((prev) => prev.filter((v) => v.id !== selectedVendor.id));
-      setSelectedId(null);
-      setMessage('Vendor deleted.');
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not delete vendor.');
-    }
-  };
+  // Old links used `/account/vendors?vendorId=<id>`; each member now has its own page.
+  const legacyVendorId = searchParams.get('vendorId');
+  if (legacyVendorId) return <Navigate to={`/account/vendors/${legacyVendorId}`} replace />;
 
   return (
     <div className="admin-page admin-page--wide">
@@ -364,26 +97,24 @@ useEffect(() => {
       <header className="page-head">
         <div>
           <h1>Member Management</h1>
-          <p>Onboard members, review KYC, and manage their branches and deals.</p>
+          <p>Open a member to review their profile, branches and deals.</p>
         </div>
         <div className="page-head__actions">
           {canCreate && (
             <FilledButton onClick={() => navigate('/account/vendors/new')}>
               <Icon slot="icon" aria-hidden="true">add</Icon>
-              Add vendor
+              Add member
             </FilledButton>
           )}
         </div>
       </header>
 
-      <section className="panel" aria-label="Vendors">
+      <section className="panel" aria-label="Members">
         <h2>Member ({total})</h2>
         {listError && <p className="error-state" role="alert">{listError}</p>}
         <VendorList
           vendors={vendors}
-          selectedId={selectedId}
-          // onSelect={setSelectedId}
-          onSelect={handleVendorSelect}
+          onSelect={openMember}
           total={total}
           page={params.page}
           pageSize={params.pageSize}
@@ -391,114 +122,6 @@ useEffect(() => {
           onParamsChange={setParams}
         />
       </section>
-
-      {selectedVendor && (
-        <section  ref={vendorDetailsRef} className="panel vendor-detail" aria-label="Vendor details">
-          {message && <p className="field-hint" role="status">{message}</p>}
-          {error && <p className="error-state" role="alert">{error}</p>}
-
-          <div className="page-head">
-            <h2>{selectedVendor.businessName || selectedVendor.owner?.name || 'Draft vendor'}</h2>
-            <div className="page-head__actions">
-              {canAccessDashboard && selectedVendor.owner && (
-                <OutlinedButton onClick={() => doAccessDashboard(selectedVendor.owner!.id)}>
-                  <Icon slot="icon" aria-hidden="true">visibility</Icon>
-                  Access Dashboard
-                </OutlinedButton>
-              )}
-              {canApprove && selectedVendor.status !== 'ACTIVE' && <FilledButton onClick={doApprove}>Approve</FilledButton>}
-              {canReject && selectedVendor.status !== 'REJECTED' && <OutlinedButton onClick={doReject}>Reject</OutlinedButton>}
-              {canStatusChange && selectedVendor.status === 'ACTIVE' && (
-                <OutlinedButton onClick={() => doStatusChange('INACTIVE')}>Deactivate</OutlinedButton>
-              )}
-              {canStatusChange && selectedVendor.status === 'INACTIVE' && (
-                <OutlinedButton onClick={() => doStatusChange('ACTIVE')}>Activate</OutlinedButton>
-              )}
-              {canStatusChange && selectedVendor.status !== 'SUSPENDED' && (
-                <OutlinedButton onClick={() => doStatusChange('SUSPENDED')}>Suspend</OutlinedButton>
-              )}
-              {canDelete && <OutlinedButton onClick={doDelete}>Delete</OutlinedButton>}
-            </div>
-          </div>
-
-          <div className="admin-tabs-wrap">
-            <Tabs
-              className="admin-tabs"
-              onChange={(e) => setActiveTab((e.target as unknown as { activeTabIndex: number }).activeTabIndex)}
-            >
-              {VENDOR_DETAIL_TABS.map((label, i) => (
-                <PrimaryTab key={label} active={activeTab === i}>
-                  {label}
-                </PrimaryTab>
-              ))}
-            </Tabs>
-          </div>
-
-          {activeTab === 0 && (
-            <div className="admin-tab-panel" aria-label="Overview">
-              <VendorPipeline
-                token={token}
-                initialVendor={selectedVendor}
-                onVendorChange={handlePipelineChange}
-                canReviewKyc={canApprove}
-                onKycReview={doKycReview}
-                canApprove={canApprove && selectedVendor.status !== 'ACTIVE'}
-                canReject={canReject && selectedVendor.status !== 'REJECTED'}
-                onApprove={doApprove}
-                onReject={doReject}
-              />
-            </div>
-          )}
-
-          {activeTab === 1 && (
-            <div className="admin-tab-panel" aria-label="Branches and Deals">
-              <VendorBranches
-                token={token}
-                vendorId={selectedVendor.id}
-                isSelf={false}
-                canEdit={canEditAny}
-                canApproveDeal={canApprove}
-                canDeleteDeal={canDelete}
-                categories={categories}
-                onVendorRefresh={refreshSelectedVendorAfterBranchAccessChange}
-              />
-            </div>
-          )}
-
-          {activeTab === 2 && (
-            <div className="admin-tab-panel" aria-label="Therapists">
-              {therapistsError && <p className="error-state" role="alert">{therapistsError}</p>}
-              <sky-data-table
-                ref={therapistsTableRef as RefObject<HTMLElement>}
-                caption="Therapists"
-                columns={THERAPIST_COLUMNS}
-                rows={JSON.stringify(therapists.map(toTherapistRow))}
-                total={therapists.length}
-                page={1}
-                page-size={Math.max(therapists.length, 10)}
-                loading={therapistsLoading}
-                actions={canDelete ? THERAPIST_ADMIN_DELETE_ACTIONS : undefined}
-              />
-            </div>
-          )}
-
-          {activeTab === 3 && (
-            <div className="admin-tab-panel" aria-label="Customers">
-              <VendorDetailCustomers token={token} vendorId={selectedVendor.id} />
-            </div>
-          )}
-
-          {activeTab === 4 && (
-            <div className="admin-tab-panel" aria-label="Orders">
-              <VendorDetailOrders token={token} vendorId={selectedVendor.id} />
-            </div>
-          )}
-
-        </section>
-      )}
-
-      {!selectedVendor && <p className="empty-state">Select a member, or add a new one.</p>}
-      {ConfirmDialog}
     </div>
   );
 }

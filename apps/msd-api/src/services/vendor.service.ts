@@ -111,7 +111,44 @@ const VENDOR_IMAGE_ORDER_BY: Prisma.VendorImageOrderByWithRelationInput[] = [
 const VENDOR_MEDIA_INCLUDE = { mediaImages: { orderBy: VENDOR_IMAGE_ORDER_BY }, mediaVideo: true, documents: true } as const;
 
 /** Standard `include` for any Vendor read/write that should carry its linked-owner summary + branch count. */
-const OWNER_INCLUDE = { _count: { select: { branches: true,  deals: true, products: true, } }, owner: OWNER_SUMMARY_SELECT, ...VENDOR_MEDIA_INCLUDE } as const;
+const OWNER_INCLUDE = { _count: { select: { branches: true, deals: true, products: true, therapists: true } }, owner: OWNER_SUMMARY_SELECT, ...VENDOR_MEDIA_INCLUDE } as const;
+
+export interface VendorLiveCounts {
+  branches: number;
+  deals: number;
+  products: number;
+  therapists: number;
+}
+
+const EMPTY_LIVE_COUNTS: VendorLiveCounts = { branches: 0, deals: 0, products: 0, therapists: 0 };
+
+/** Adds `liveCounts` (branches/products/therapists that are active, deals that are ACTIVE and
+ *  APPROVED) beside the all-rows `_count`, so the admin can show "5 of 18" instead of one number
+ *  that silently includes drafts and inactive items. Four grouped queries for the whole page,
+ *  not per vendor. Attached by the list/detail routes only: `getVendorOrThrow` is also used as
+ *  an existence check all over this file and must stay cheap. */
+export async function attachLiveCounts<T extends { id: string }>(vendors: T[]): Promise<(T & { liveCounts: VendorLiveCounts })[]> {
+  if (vendors.length === 0) return [];
+  const vendorId = { in: vendors.map((v) => v.id) };
+  const [branches, deals, products, therapists] = await Promise.all([
+    prisma.branch.groupBy({ by: ['vendorId'], where: { vendorId, isActive: true }, _count: { _all: true } }),
+    prisma.deal.groupBy({ by: ['vendorId'], where: { vendorId, status: 'ACTIVE', approvalStatus: 'APPROVED' }, _count: { _all: true } }),
+    prisma.product.groupBy({ by: ['vendorId'], where: { vendorId, isActive: true }, _count: { _all: true } }),
+    prisma.therapist.groupBy({ by: ['vendorId'], where: { vendorId, isActive: true }, _count: { _all: true } }),
+  ]);
+  const toMap = (rows: { vendorId: string; _count: { _all: number } }[]) => new Map(rows.map((r) => [r.vendorId, r._count._all]));
+  const byKey = { branches: toMap(branches), deals: toMap(deals), products: toMap(products), therapists: toMap(therapists) };
+  return vendors.map((v) => ({
+    ...v,
+    liveCounts: {
+      ...EMPTY_LIVE_COUNTS,
+      branches: byKey.branches.get(v.id) ?? 0,
+      deals: byKey.deals.get(v.id) ?? 0,
+      products: byKey.products.get(v.id) ?? 0,
+      therapists: byKey.therapists.get(v.id) ?? 0,
+    },
+  }));
+}
 
 function heuristicInitialStatus(input: { gstNumber?: string; panNumber?: string }): VendorStatus {
   return input.gstNumber && input.panNumber ? 'PENDING_VERIFICATION' : 'PROFILE_INCOMPLETE';
