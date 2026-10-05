@@ -132,8 +132,10 @@ export function Cart() {
 
         {items.length === 0 ? (
           <div className="cart-page__empty">
-            <sky-info-card icon="shopping_bag" heading="Your cart is empty" subheading="Browse categories to add products, deals, or therapists." />
-            <FilledButton onClick={() => navigate('/categories')}>Browse Categories</FilledButton>
+            <sky-info-card icon="shopping_bag" heading="Your cart is empty" subheading="Explore our wellness deals, products, and services to find something for you." />
+            <div className="cart-page__empty-action">
+              <FilledButton onClick={() => navigate('/')}> Explore Now</FilledButton>
+            </div>
           </div>
         ) : (
           <div className="cart-page__layout">
@@ -216,7 +218,7 @@ export function Cart() {
                     {content.cart.checkoutCta}
                     <Icon slot="trailing-icon" aria-hidden="true">arrow_forward</Icon>
                   </FilledButton>
-                  <OutlinedButton className="cart-summary__continue-btn" onClick={() => navigate('/categories')}>
+                  <OutlinedButton className="cart-summary__continue-btn" onClick={() => navigate('/')}>
                     {content.cart.continueBrowsing}
                   </OutlinedButton>
                 </div>
@@ -224,7 +226,7 @@ export function Cart() {
             </aside>
           </div>
         )}
-        <Link to="/orders" className="field-hint">{content.cart.links.orders}</Link>
+        {/* <Link to="/orders" className="field-hint">{content.cart.links.orders}</Link> */}
       </div>
     </div>
   );

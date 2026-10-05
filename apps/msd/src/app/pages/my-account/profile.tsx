@@ -10,7 +10,7 @@ import { ProfileForm } from '../account/profile-form';
 export function MyAccountProfile() {
   return (
     <AdminPage
-      title="My Account"
+      title="Profile Details"
       subtitle="Manage your contact details and saved addresses."
     >
       <ProfileForm />

@@ -27,12 +27,8 @@ export function Orders() {
   const typeFilter = searchParams.get('type');
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
-      const matchesStatus =
-        selectedStatus === 'ALL' || order.status === selectedStatus;
-
-      const matchesType =
-        !typeFilter || order.type === typeFilter;
-
+      const matchesStatus = selectedStatus === 'ALL' || order.status === selectedStatus;
+      const matchesType = !typeFilter || order.type === typeFilter;
       return matchesStatus && matchesType;
     });
   }, [orders, selectedStatus, typeFilter]);
@@ -44,58 +40,36 @@ export function Orders() {
       .catch((err) => setError(err instanceof ApiRequestError ? err.message : ordersContent.errors.load))
       .finally(() => setLoading(false));
   }, [token]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   return (
     <div className="category-page">
       <title>{ordersContent.metaTitle}</title>
       <meta name="robots" content="noindex" />
-
       <Breadcrumb
-        items={[
-          { label: 'Home', to: '/' },
-          { label: 'Orders' },
-        ]}
+        items={[{ label: 'Home', to: '/' }, { label: 'Orders' },]}
       />
       <div className="customer-orders-filters">
         <Tabs>
-          <SecondaryTab
-            onClick={() => setSelectedStatus('ALL')}
-          >
-            All
-          </SecondaryTab>
-
-          <SecondaryTab
-            onClick={() => setSelectedStatus('CANCELLED')}
-          >
-            Cancelled
-          </SecondaryTab>
+          <SecondaryTab onClick={() => setSelectedStatus('ALL')}>All</SecondaryTab>
+          <SecondaryTab onClick={() => setSelectedStatus('CANCELLED')}>Cancelled</SecondaryTab>
         </Tabs>
       </div>
       <section className="category-page__grid-wrap">
         <div className="category-page__grid-inner">
-          {loading ? (
-            <p className="loading-state">{ordersContent.loading}</p>
-          ) : error ? (
-            <p className="error-state" role="alert">{error || ordersContent.errors.load}</p>
+          {loading ? (<p className="loading-state">{ordersContent.loading}</p>
+          ) : error ? (<p className="error-state" role="alert">{error || ordersContent.errors.load}</p>
           ) : filteredOrders.length === 0 ? (
             <div className="category-page__empty">
               <sky-info-card icon="receipt_long" heading={ordersContent.empty.title} subheading={ordersContent.empty.description} />
-              <FilledButton onClick={() => navigate('/categories')}>{ordersContent.empty.cta}</FilledButton>
+              <FilledButton onClick={() => navigate('/')}>{ordersContent.empty.cta}</FilledButton>
             </div>
           ) : (
-
             <CardGrid layout="list">
               {filteredOrders.map((order) => (
                 <CustomerOrderCard
                   key={order.id}
                   order={order}
-                  onViewDetails={(selectedOrder) =>
-                    navigate(`/orders/${selectedOrder.id}`)
-                  }
+                  onViewDetails={(selectedOrder) => navigate(`/orders/${selectedOrder.id}`)}
                 />
               ))}
             </CardGrid>
@@ -105,5 +79,4 @@ export function Orders() {
     </div>
   );
 }
-
 export default Orders;

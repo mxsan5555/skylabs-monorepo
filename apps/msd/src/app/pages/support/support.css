@@ -1,0 +1,43 @@
+.support-page {
+    width: 100%;
+}
+
+.support-page__card {
+    width: 100%;
+    padding: 16px;
+}
+
+.support-page__form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.support-page__field {
+    width: 100%;
+    min-width: 0;
+}
+
+.support-page__field > * {
+    width: 100%;
+}
+
+.support-page__actions {
+    display: flex;
+    justify-content: flex-end;
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+    .support-page__form {
+        grid-template-columns: 1fr;
+    }
+
+    .support-page__actions {
+        grid-column: 1;
+    }
+}
