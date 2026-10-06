@@ -35,6 +35,7 @@ import reportsRoutes from './routes/reports.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import notificationsRoutes from './routes/notifications.routes';
 import customerRoutes from './routes/customersummary.routes';
+import supportRoutes from './routes/support.routes';
 /**
  * The Express app, wired up but not listening. Split out of main.ts so Supertest can
  * `import app from '../app'` and drive requests in-process without opening a real port
@@ -80,6 +81,7 @@ export function createApp(): express.Express {
   api.use('/rbac', rbacRoutes);
   api.use('/customers', customersRoutes);
   api.use('/customer', customerRoutes);
+  api.use('/customer/support', supportRoutes);
   // Mounted BEFORE the authenticated `/vendors` router so `POST /vendors/public/register`
   // (no `authenticate`) is matched first — same "public-first" ordering discipline as
   // `catalogRoutes` below, just sharing the `/vendors` prefix instead of its own.

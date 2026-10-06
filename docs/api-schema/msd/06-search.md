@@ -6,6 +6,21 @@ shipped frontend (`apps/msd/src/app/pages/search/search.tsx` + `SearchFilter` ty
 
 ## Endpoint
 
+> **As built (2026-09-26).** This file is the original design contract. The shipped public
+> storefront API is `GET /api/v1/catalog/*` in `apps/msd-api/src/routes/catalog.routes.ts`
+> (Zod schemas in `src/schemas/catalog.schema.ts`, live spec at `/docs`). Differences that matter:
+> deals belong to a **vendor** and **one branch** (`vendorId`, `branchId`, not `companyId` /
+> `locationIds`); list responses are page-based (`page`, `pageSize`, `meta.total`), not
+> cursor-based; there is **no rating/review data**, so nothing is ranked or filtered by rating.
+> Deal list params today: `categoryId`, `subcategoryId`, `vendorId` / `vendorIds`, `branchId` /
+> `branchIds`, `search`, `state`, `city`, `minPrice`, `maxPrice`, `latitude` + `longitude`,
+> `radiusKm`, `sort=relevance|price_asc|price_desc|distance|newest|discount`. Filter-panel
+> counts come from `GET /catalog/deals/facets` (vendors, branches, distance buckets 1–100 km,
+> price range; each facet ignores its own selection).
+> The explore page (`/explore`) and category page (`/category/:slug`) both use this deal list;
+> their map views plot `branch.latitude` / `longitude` with `DealMap` (Leaflet + OpenStreetMap by
+> default). There is no server-side map-bounds query yet.
+
 ```
 GET /deals
 ```

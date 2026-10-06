@@ -141,12 +141,14 @@ Full agent file map: `.claude/agents/` · Full skill file map: `.claude/skills/`
 1. **Foundation** — M3 design system + theming + app scaffolding ✅
 2. **Auth screens** — sign-in, OTP (both apps) ✅
 3. **Account/admin console** — role-based admin layout + My Account (profile + address CRUD) + role gating ✅
-4. **Content pages** — home ✅, then contact, blog, blog-detail, blog-category 🔜
+4. **Content pages** — home ✅, category page (filters, sorts, list/grid/map, lazy loading) ✅,
+   then contact, blog, blog-detail, blog-category 🔜
 5. **Account extras** — logout from console, admin/marketing/sales feature pages 🔜
 6. **Backends** — `apps/msd-api` (Express + Postgres + Prisma + OpenAPI) **built**:
-   dynamic RBAC + business modules (Customers/Vendors/Orders/Products/Inventory/
-   Reports), auth (OTP/Google/JWT), media uploads, 35+ Prisma migrations. ✅
-   `apps/mera-driver-api` follows the same pattern ⏳
+   dynamic RBAC + business modules (Customers/Vendors/Orders/Products/Reports/Cart/
+   Payments/CMS + public storefront catalog; Inventory still a stub), auth (OTP/Google/JWT),
+   media uploads, 35+ Prisma migrations. ✅
+   `apps/mera-driver-api` built on the same pattern (Payments and Reports still stubs) ✅
 7. **Auth integration** — OTP/Google + dynamic RBAC wired to msd-api via
    `GET /rbac/bootstrap` (see `CLAUDE.md` → "Auth & roles" and `DEVELOPER_PROCESS.md`) ✅ (msd)
 8. **Deployment** — frontends live on Vercel; **msd-api deploys to Railway** (Neon DB

@@ -265,6 +265,7 @@ export function Checkout() {
       setPaying(false);
     }
   };
+  
   const placeCodOrder = async () => {
     if (payingRef.current) return;
     if (!order) {
