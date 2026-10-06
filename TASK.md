@@ -9,6 +9,15 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 
 ## In progress
 
+### Mera Driver API — driver search and per-item KYC review
+- [x] Server-side driver search, filters, stable sorting, pagination and summary counts — 2026-09-30
+- [x] Assigned-reviewer item checks, changed-value detection and append-only decision history — 2026-09-30
+- [x] Ownership/permission checks for uploaded driver documents — 2026-09-30
+- [x] Backend validation: 225 tests pass and TypeScript check passes — 2026-09-30
+- [ ] Connect frontend driver list and KYC review screens (earlier UI requirements unavailable)
+- [ ] Apply `20260930100000_driver_pill_review` database migration in the target environment
+- [ ] Confirm IDSPay srv2 contract before enabling live DL verification; request helpers and failure-path tests are prepared
+
 ### Deployment (Vercel) — pipeline live, hardening pending
 - [ ] Attach the bought custom domain to each project's Production (`main`) deploy
 - [ ] Add env vars in Vercel (msd: `VITE_API_URL`, `VITE_GOOGLE_MAPS_API_KEY`)

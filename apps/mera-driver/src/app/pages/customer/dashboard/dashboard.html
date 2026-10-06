@@ -24,7 +24,7 @@
       <button type="button" class="driver-dash-card" (click)="go('/customer/notifications')">
         <md-icon aria-hidden="true">notifications</md-icon>
         <span class="driver-dash-card__label">Notifications</span>
-        <span class="driver-dash-card__hint">Coming soon</span>
+        <span class="driver-dash-card__hint">Read your updates</span>
       </button>
       <button type="button" class="driver-dash-card" (click)="go('/customer/support')">
         <md-icon aria-hidden="true">support_agent</md-icon>
@@ -33,4 +33,5 @@
       </button>
     </div>
   }
+  <md-workflow embedded="customerSummary" />
 </md-admin-page>

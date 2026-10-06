@@ -1,0 +1,26 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mockPrisma, resetPrismaMock } from '../test-utils/prisma-mock';
+vi.mock('../lib/prisma', () => ({ prisma: mockPrisma }));
+import { createDriver, updateDriver, addDriverDocument } from './driver.service';
+import { pillItems } from './driver-pill.service';
+const driver = {id:'driver',status:'Non-Verified',completedSubSteps:[],documents:[],registrationFeePaise:37000,driverStatusMasterId:null};
+const context={actorId:'admin',canChangeStatus:true};
+beforeEach(()=>{resetPrismaMock();mockPrisma.driver.findUnique.mockResolvedValue(driver);mockPrisma.driver.create.mockResolvedValue(driver);mockPrisma.moneyMovement.findMany.mockResolvedValue([]);});
+describe('registration form, separate from settlement and approval',()=>{
+  it('creates an unpaid pending-KYC driver without stale hidden payment fields',async()=>{
+    await createDriver({firstName:'New',registrationFeeEntryChoice:'Unpaid',amount:'500',preferredPaymentMode:'Cash',paymentReceiptDate:'2026-01-01',stepCompleted:4,subStepCompleted:1});
+    const data=mockPrisma.driver.create.mock.calls[0][0].data;expect(data).not.toHaveProperty('amount');expect(data).not.toHaveProperty('preferredPaymentMode');expect(data).not.toHaveProperty('registrationFeeEntryChoice');expect(data.status).toBeUndefined();expect(data.completedSubSteps).toContain(41);expect(mockPrisma.moneyMovement.create).not.toHaveBeenCalled();
+  });
+  it('partial unpaid save excludes hidden values but preserves existing payment history and progress',async()=>{await updateDriver('driver',{registrationFeeEntryChoice:'Unpaid',amount:'900',stepCompleted:4,subStepCompleted:1,completeStep:false});expect(mockPrisma.driver.update).toHaveBeenCalledWith({where:{id:'driver'},data:{}});expect(mockPrisma.moneyMovement.deleteMany).not.toHaveBeenCalled();});
+  it('rejects Paid to Unpaid when collected funds exist, rather than reversing them',async()=>{mockPrisma.moneyMovement.findMany.mockResolvedValue([{kind:'registration_payment',amountPaise:37000}]);await expect(updateDriver('driver',{registrationFeeEntryChoice:'Unpaid',stepCompleted:4,subStepCompleted:1})).rejects.toMatchObject({code:'FEE_CORRECTION_REQUIRED'});expect(mockPrisma.driver.update).not.toHaveBeenCalled();expect(mockPrisma.moneyMovement.deleteMany).not.toHaveBeenCalled();});
+  it('Paid form data cannot manufacture a settlement or final approval',async()=>{await updateDriver('driver',{registrationFeeEntryChoice:'Paid',amount:'370',preferredPaymentMode:'Online',paymentReceiptDate:'2026-10-03',status:'Verified',stepCompleted:4,subStepCompleted:1});const data=mockPrisma.driver.update.mock.calls[0][0].data;expect(data.amount).toBe('370');expect(data.status).toBeUndefined();expect(mockPrisma.moneyMovement.create).not.toHaveBeenCalled();expect(mockPrisma.paymentIntent.create).not.toHaveBeenCalled();});
+  it('requires status permission, reason and an active existing statuses Master',async()=>{
+    await expect(updateDriver('driver',{driverStatusMasterId:'master'},{})).rejects.toMatchObject({status:403});
+    await expect(updateDriver('driver',{driverStatusMasterId:'master'},context)).rejects.toMatchObject({code:'STATUS_REASON_REQUIRED'});
+    mockPrisma.masterListItem.findUnique.mockResolvedValue({id:'master',category:'statuses',status:'Inactive'});
+    await expect(updateDriver('driver',{driverStatusMasterId:'master',driverStatusChangeReason:'Change'},context)).rejects.toMatchObject({code:'MASTER_OPTION_INVALID'});
+  });
+  it('persists the Master ID and an audit reason without changing login or KYC',async()=>{mockPrisma.masterListItem.findUnique.mockResolvedValue({id:'master',category:'statuses',status:'Active'});await updateDriver('driver',{driverStatusMasterId:'master',driverStatusChangeReason:'Reviewed business status'},context);expect(mockPrisma.driver.update).toHaveBeenCalledWith({where:{id:'driver'},data:{driverStatusMasterId:'master'}});expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({data:expect.objectContaining({action:'driver.master_status_change',after:{driverStatusMasterId:'master',reason:'Reviewed business status'}})});});
+  it('retains an unchanged inactive Master ID without requiring a new decision',async()=>{mockPrisma.driver.findUnique.mockResolvedValue({...driver,status:'Verified',driverStatusMasterId:'old'});await updateDriver('driver',{driverStatusMasterId:'old',amount:'370'});expect(mockPrisma.masterListItem.findUnique).not.toHaveBeenCalled();expect(mockPrisma.driver.update.mock.calls[0][0].data.status).toBeUndefined();expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();});
+  it('receipt upload preserves approved KYC and is not a human check or payment confirmation',async()=>{mockPrisma.driverDocument.findFirst.mockResolvedValue(null);mockPrisma.driverDocument.create.mockResolvedValue({id:'receipt'});await addDriverDocument({driverId:'driver',category:'personal',type:'Registration Fee Receipt',fileName:'receipt.pdf'});expect(mockPrisma.driver.update).not.toHaveBeenCalled();expect(mockPrisma.moneyMovement.create).not.toHaveBeenCalled();const items=pillItems({...driver,documents:[{id:'receipt',category:'personal',type:'Registration Fee Receipt',filePath:null,fileName:'receipt.pdf',regNo:null}]}).flatMap(p=>p.items);expect(items.find(i=>i.key==='document:receipt')?.checkable).toBe(false);});
+});

@@ -35,8 +35,21 @@ export interface Driver {
   /** Portal login gate ('Active' | 'Inactive') — independent of `status` above (KYC stage).
    *  Toggled only via `DriversApiService.setAccountStatus`. */
   accountStatus?: string;
+  feeStatus?: string;
+  registrationFeeRequired?: boolean;
+  registrationFeePaise?: number;
+  driverStatusMasterId?: string | null;
+  driverStatusName?: string | null;
+  driverStatusChangeReason?: string;
+  registrationFeeEntryChoice?: 'Paid' | 'Unpaid';
+  licenceStatus?: string;
+  dlApiStatus?: string;
+  readyForTrips?: boolean;
+  blockingReasons?: string[];
   /** The staff User currently reviewing this driver's KYC, if any. Set only via
    *  `DriversApiService.assignVerifier`. */
+  queueState?:string;
+  assignedVerifierId?:string|null;
   assignedVerifier?: { id: string; name: string; email: string | null; phone: string | null } | null;
   /** KYC checklist — one status+notes pair per existing document category (personal, health,
    *  education, police). 'Pending' | 'Verified' | 'Rejected' | 'Correction Requested'.
@@ -66,6 +79,7 @@ export interface Driver {
   policeVerifiedNo?: string;
   policeVerifiedUpload?: string;
   jobType?: string;
+  jobChoices?:string[];workLocation?:string|null;workStates?:string[];
   experience?: string;
   currentSalary?: string;
   expectedSalary?: string;
@@ -73,8 +87,10 @@ export interface Driver {
   documentUpload?: string;
   preferredPaymentMode?: string;
   registrationFeeStatus?: string;
+  registrationReceiptFile?: string;
   amount?: string;
   paymentReceiptDate?: string;
+  accountPaymentMethod?: string;
   bankName?: string;
   bankAccountNo?: string;
   ifscCode?: string;
@@ -106,6 +122,7 @@ interface DriverDocumentDto {
   regNo: string | null;
   fileName: string | null;
   filePath: string | null;
+  archivedAt?: string | null;
 }
 
 interface DriverDto {
@@ -129,11 +146,25 @@ interface DriverDto {
   weight: string | null;
   country: string | null;
   state: string | null;
+  city: string | null;
   pincode: string | null;
   address: string | null;
   driverType: string | null;
   status: string;
   accountStatus: string;
+  feeStatus?: string;
+  registrationFeeRequired?: boolean;
+  registrationFeePaise?: number;
+  driverStatusMasterId?: string | null;
+  driverStatusName?: string | null;
+  driverStatusChangeReason?: string;
+  registrationFeeEntryChoice?: 'Paid' | 'Unpaid';
+  licenceStatus?: string;
+  dlApiStatus?: string;
+  readyForTrips?: boolean;
+  blockingReasons?: string[];
+  queueState?:string;
+  assignedVerifierId?:string|null;
   assignedVerifier: { id: string; name: string; email: string | null; phone: string | null } | null;
   personalDocsStatus: string;
   personalDocsNotes: string | null;
@@ -160,12 +191,14 @@ interface DriverDto {
   policeVerifiedStatus: string | null;
   policeVerifiedNo: string | null;
   jobType: string | null;
+  jobChoices:string[];workLocation:string|null;workStates:string[];
   experience: string | null;
   currentSalary: string | null;
   expectedSalary: string | null;
   preferredPaymentMode: string | null;
   amount: string | null;
   paymentReceiptDate: string | null;
+  accountPaymentMethod: string | null;
   bankName: string | null;
   bankAccountNo: string | null;
   ifscCode: string | null;
@@ -195,6 +228,7 @@ function fromDto(dto: DriverDto): Driver {
     name: `${firstName} ${lastName}`.trim(),
     phone: dto.phone ?? '',
     vehicle: dto.vehicle ?? '',
+    city: dto.city ?? undefined,
     firstName,
     lastName: dto.lastName ?? undefined,
     fatherName: dto.fatherName ?? undefined,
@@ -218,6 +252,10 @@ function fromDto(dto: DriverDto): Driver {
     driverType: dto.driverType ?? undefined,
     status: dto.status,
     accountStatus: dto.accountStatus,
+    registrationReceiptFile:dto.documents?.find(doc=>doc.type==='Registration Fee Receipt'&&!doc.archivedAt)?.fileName??undefined,
+    feeStatus: dto.feeStatus, registrationFeeRequired:dto.registrationFeeRequired,registrationFeePaise:dto.registrationFeePaise,driverStatusMasterId:dto.driverStatusMasterId,driverStatusName:dto.driverStatusName, licenceStatus: dto.licenceStatus, dlApiStatus:dto.dlApiStatus, readyForTrips: dto.readyForTrips, blockingReasons: dto.blockingReasons,
+    queueState:dto.queueState,
+    assignedVerifierId:dto.assignedVerifierId,
     assignedVerifier: dto.assignedVerifier,
     personalDocsStatus: dto.personalDocsStatus,
     personalDocsNotes: dto.personalDocsNotes ?? undefined,
@@ -243,12 +281,14 @@ function fromDto(dto: DriverDto): Driver {
     policeVerifiedStatus: dto.policeVerifiedStatus ?? undefined,
     policeVerifiedNo: dto.policeVerifiedNo ?? undefined,
     jobType: dto.jobType ?? undefined,
+    jobChoices:dto.jobChoices??[],workLocation:dto.workLocation,workStates:dto.workStates??[],
     experience: dto.experience ?? undefined,
     currentSalary: dto.currentSalary ?? undefined,
     expectedSalary: dto.expectedSalary ?? undefined,
     preferredPaymentMode: dto.preferredPaymentMode ?? undefined,
     amount: dto.amount ?? undefined,
     paymentReceiptDate: dto.paymentReceiptDate ?? undefined,
+    accountPaymentMethod: dto.accountPaymentMethod ?? undefined,
     bankName: dto.bankName ?? undefined,
     bankAccountNo: dto.bankAccountNo ?? undefined,
     ifscCode: dto.ifscCode ?? undefined,
@@ -268,7 +308,7 @@ function fromDto(dto: DriverDto): Driver {
   };
 }
 
-function toPayload(input: Driver, stepCompleted?: number, subStepCompleted?: number): Record<string, unknown> {
+function toPayload(input: Driver, stepCompleted?: number, subStepCompleted?: number, completeStep?: boolean): Record<string, unknown> {
   return {
     firstName: input.firstName,
     lastName: input.lastName,
@@ -294,6 +334,7 @@ function toPayload(input: Driver, stepCompleted?: number, subStepCompleted?: num
     driverType: input.driverType,
     status: input.status,
     sourceType: input.sourceType,
+    city: input.city,
     vehicle: input.vehicle,
     avatar: input.avatar,
     education: input.education,
@@ -310,12 +351,17 @@ function toPayload(input: Driver, stepCompleted?: number, subStepCompleted?: num
     policeVerifiedStatus: input.policeVerifiedStatus,
     policeVerifiedNo: input.policeVerifiedNo,
     jobType: input.jobType,
+    jobChoices:input.jobChoices,workLocation:input.workLocation,workStates:input.workStates,
     experience: input.experience,
     currentSalary: input.currentSalary,
     expectedSalary: input.expectedSalary,
+    driverStatusMasterId: input.driverStatusMasterId,
+    driverStatusChangeReason:input.driverStatusChangeReason,
+    registrationFeeEntryChoice:input.registrationFeeEntryChoice,
     preferredPaymentMode: input.preferredPaymentMode,
     amount: input.amount,
     paymentReceiptDate: input.paymentReceiptDate,
+    accountPaymentMethod: input.accountPaymentMethod,
     bankName: input.bankName,
     bankAccountNo: input.bankAccountNo,
     ifscCode: input.ifscCode,
@@ -323,11 +369,16 @@ function toPayload(input: Driver, stepCompleted?: number, subStepCompleted?: num
     upiIdOrChequeNo: input.upiIdOrChequeNo,
     ...(stepCompleted != null ? { stepCompleted } : {}),
     ...(subStepCompleted != null ? { subStepCompleted } : {}),
+    ...(completeStep === false ? { completeStep:false } : {}),
   };
 }
 
 @Injectable({ providedIn: 'root' })
 export class DriversApiService {
+  resumePdf(id: string) { return this.http.get(`${this.base}/${id}/resume.pdf`, {responseType:'blob'}); }
+  profileReport(id: string) {
+    return this.http.get(`${this.base}/${id}/profile.pdf`, { responseType: 'blob' });
+  }
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiUrl}/drivers`;
 
@@ -335,13 +386,17 @@ export class DriversApiService {
     return this.http.get<ApiEnvelope<DriverDto[]>>(this.base).pipe(map((res) => unwrap(res).map(fromDto)));
   }
 
+  search(query: Record<string, string | number>) {
+    return this.http.get<{ data: DriverDto[]; meta: { total: number; summary: { totalDrivers: number; driverUsers: number; noLogin: number; kycPending: number; feeUnpaid?:number;readyForTrips?:number } } }>(`${this.base}/search`, { params: query }).pipe(map(r => ({ rows: r.data.map(fromDto), meta: r.meta })));
+  }
+
   /** `stepCompleted` (1-4) + `subStepCompleted` (0-based, within that tab), when both passed,
    *  mark that exact nested onboarding sub-step done server-side (see `driver.service.ts`'s
    *  `deriveOnboardingFields`) — omit both for a plain full-form save (e.g. editing an
    *  already-completed driver) to leave onboarding progress alone. */
-  create(input: Driver, stepCompleted?: number, subStepCompleted?: number): Observable<Driver> {
+  create(input: Driver, stepCompleted?: number, subStepCompleted?: number, completeStep?: boolean): Observable<Driver> {
     return this.http
-      .post<ApiEnvelope<DriverDto>>(this.base, toPayload(input, stepCompleted, subStepCompleted))
+      .post<ApiEnvelope<DriverDto>>(this.base, toPayload(input, stepCompleted, subStepCompleted, completeStep))
       .pipe(map((res) => fromDto(unwrap(res))));
   }
 
@@ -349,6 +404,9 @@ export class DriversApiService {
     return this.http
       .patch<ApiEnvelope<DriverDto>>(`${this.base}/${id}`, toPayload(input, stepCompleted, subStepCompleted))
       .pipe(map((res) => fromDto(unwrap(res))));
+  }
+  saveFormPill(id:string, fields:Partial<Driver>, tab:number, pill:number, complete=true):Observable<Driver>{
+    return this.http.patch<ApiEnvelope<DriverDto>>(`${this.base}/${id}`,toPayload(fields as Driver,tab,pill,complete)).pipe(map(res=>fromDto(unwrap(res))));
   }
 
   delete(id: string): Observable<{ id: string }> {
@@ -373,28 +431,29 @@ export class DriversApiService {
   /** Activates or deactivates a driver's account (portal login gate) — independent of the
    *  KYC `status` field. A deactivated driver is rejected server-side on their next login
    *  or authenticated `/drivers/me*` call, not just hidden from this admin console. */
-  setAccountStatus(driverId: string, accountStatus: 'Active' | 'Inactive'): Observable<Driver> {
+  setAccountStatus(driverId: string, accountStatus: 'Active' | 'Inactive' | 'Suspended',reason?:string): Observable<Driver> {
     return this.http
-      .patch<ApiEnvelope<DriverDto>>(`${this.base}/${driverId}/status`, { accountStatus })
+      .patch<ApiEnvelope<DriverDto>>(`${this.base}/${driverId}/status`, { accountStatus,reason })
       .pipe(map((res) => fromDto(unwrap(res))));
   }
 
   /** Assigns (or, with `verifierId: null`, clears) the staff User responsible for this
    *  driver's KYC review. Independent of `linkToUser` — that grants the driver their own
    *  portal login, this assigns a staff reviewer to check the driver's submitted KYC. */
-  assignVerifier(driverId: string, verifierId: string | null): Observable<Driver> {
+  assignVerifier(driverId: string, verifierId: string | null, reason?: string): Observable<Driver> {
     return this.http
-      .patch<ApiEnvelope<DriverDto>>(`${this.base}/${driverId}/assign-verifier`, { verifierId })
+      .patch<ApiEnvelope<DriverDto>>(`${this.base}/${driverId}/assign-verifier`, { verifierId, reason })
       .pipe(map((res) => fromDto(unwrap(res))));
   }
 
   /** The calling KYC verifier's own assigned-driver queue. */
-  listAssignedToMe(): Observable<Driver[]> {
-    return this.http
-      .get<ApiEnvelope<DriverDto[]>>(`${this.base}/assigned-to-me`)
-      .pipe(map((res) => unwrap(res).map(fromDto)));
+  registrationState(driverId:string){return this.http.get<ApiEnvelope<{fee:string}>>(`${environment.apiUrl}/workflow/drivers/${driverId}/overview`).pipe(map(unwrap));}
+  confirmRegistrationCash(driverId:string,amountPaise:number,reference:string,reason:string){return this.http.post<ApiEnvelope<unknown>>(`${environment.apiUrl}/workflow/accounts/movements`,{driverId,kind:'registration_payment',amountPaise,method:'cash',reference,reason,confirmed:true}).pipe(map(unwrap));}
+  formOptions():Observable<Record<string,{id:string;name:string;status:string;code?:string}[]>>{return this.http.get<ApiEnvelope<Record<string,{id:string;name:string;status:string;code?:string}[]>>>(`${environment.apiUrl}/masters/onboarding-options`).pipe(map(unwrap));}
+  listAssignedToMe(): Observable<Driver[]> {return this.assignmentQueue({}).pipe(map(result=>result.rows));}
+  assignmentQueue(query:Record<string,string|number>):Observable<{rows:Driver[];meta:{total:number;page:number;pageSize:number;counts:Record<string,number>}}> {
+    return this.http.get<ApiEnvelope<DriverDto[]>>(`${this.base}/assigned-to-me`,{params:query}).pipe(map(res=>({rows:unwrap(res).map(fromDto),meta:res.meta as unknown as {total:number;page:number;pageSize:number;counts:Record<string,number>}})));
   }
-
   /** A single driver from the calling verifier's own queue — 404s if not assigned to them. */
   getAssignedDriver(driverId: string): Observable<Driver> {
     return this.http
@@ -431,7 +490,7 @@ export class DriversApiService {
     type: string,
     regNo: string,
     file: File,
-  ): Observable<{ type: string; regNo: string; file: string }> {
+  ): Observable<{ type: string; regNo: string; file: string; filePath: string | null }> {
     const form = new FormData();
     form.append('category', category);
     form.append('type', type);
@@ -442,7 +501,7 @@ export class DriversApiService {
       .pipe(
         map((res) => {
           const doc = unwrap(res);
-          return { type: doc.type, regNo: doc.regNo ?? '', file: doc.fileName ?? '' };
+          return { type: doc.type, regNo: doc.regNo ?? '', file: doc.fileName ?? '', filePath:doc.filePath };
         }),
       );
   }

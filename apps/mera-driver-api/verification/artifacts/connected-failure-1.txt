@@ -1,0 +1,19 @@
+menu
+Mera Driver
+logout
+Availability
+Ready for trips
+
+Availability: Online
+
+Go offline
+home
+Home
+person
+Profile
+verified_user
+KYC
+folder
+Documents
+support_agent
+Support

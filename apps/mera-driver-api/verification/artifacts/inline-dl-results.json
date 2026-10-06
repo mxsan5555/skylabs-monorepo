@@ -1,0 +1,34 @@
+{
+  "status": "passed",
+  "before": {
+    "users": 14,
+    "drivers": 7,
+    "customers": 3,
+    "bookings": 1,
+    "movements": 0,
+    "otp": 24
+  },
+  "after": {
+    "users": 14,
+    "drivers": 7,
+    "customers": 3,
+    "bookings": 1,
+    "movements": 0,
+    "otp": 24
+  },
+  "checks": [
+    "Missing DOB no check",
+    "Personal Details DOB saved and reused",
+    "Blur saves only DL pill",
+    "Own explicit consent",
+    "Inline contract-blocked preflight, no provider call",
+    "Repeated blur and concurrent request use one audit attempt",
+    "Reload history/status",
+    "Changed input clears applicability",
+    "Own/staff/anonymous authorization",
+    "Stale saved input rejected",
+    "Dashboard/list/details agree",
+    "Explicit premature KYC approval denied"
+  ],
+  "liveProviderCalled": false
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "file": "professional-resume-full.pdf",
+    "pages": 2,
+    "sectionOrder": true,
+    "withinPageBounds": true,
+    "entriesKeptTogether": true,
+    "noPrivateOrFictionalValues": true
+  },
+  {
+    "file": "professional-resume-partial.pdf",
+    "pages": 1,
+    "sectionOrder": true,
+    "withinPageBounds": true,
+    "entriesKeptTogether": true,
+    "noPrivateOrFictionalValues": true
+  },
+  {
+    "file": "professional-resume-own.pdf",
+    "pages": 2,
+    "sectionOrder": true,
+    "withinPageBounds": true,
+    "entriesKeptTogether": true,
+    "noPrivateOrFictionalValues": true
+  }
+]

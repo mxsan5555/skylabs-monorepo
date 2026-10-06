@@ -1,8 +1,9 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, computed, inject, OnInit } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { AdminPage } from '../../../../admin/admin-page/admin-page';
 import { MasterListApiService, type MasterOption } from '../../../../core/masters/master-list-api.service';
 
-const CATEGORY = 'source-types';
+
 
 @Component({
   selector: 'md-source-types-master',
@@ -13,6 +14,9 @@ const CATEGORY = 'source-types';
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class SourceTypesMaster implements OnInit {
+  private readonly route=inject(ActivatedRoute);
+  get category(){return this.route.snapshot.data['category']??'source-types';}
+  get masterTitle(){return this.route.snapshot.data['title']??'Source Type';}
   private readonly api = inject(MasterListApiService);
 
   readonly options = signal<MasterOption[]>([]);
@@ -41,7 +45,7 @@ export class SourceTypesMaster implements OnInit {
 
   private reload(): void {
     this.loading.set(true);
-    this.api.list(CATEGORY).subscribe({
+    this.api.list(this.category).subscribe({
       next: (data) => {
         this.options.set(data);
         this.loading.set(false);
@@ -87,7 +91,7 @@ export class SourceTypesMaster implements OnInit {
 
     const id = this.editingId();
     const payload = { name, status: this.inputStatus() };
-    const request = id === 'new' || id === null ? this.api.create(CATEGORY, payload) : this.api.update(CATEGORY, id, payload);
+    const request = id === 'new' || id === null ? this.api.create(this.category, payload) : this.api.update(this.category, id, payload);
     request.subscribe({
       next: () => {
         this.reload();
@@ -109,7 +113,7 @@ export class SourceTypesMaster implements OnInit {
 
   deleteOption(option: MasterOption): void {
     if (confirm(`Are you sure you want to delete option "${option.name}"?`)) {
-      this.api.delete(CATEGORY, option.id).subscribe({
+      this.api.delete(this.category, option.id).subscribe({
         next: () => this.reload(),
         error: (err) => {
           console.error('Failed to delete option', err);

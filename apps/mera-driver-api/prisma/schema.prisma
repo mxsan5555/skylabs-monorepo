@@ -91,6 +91,8 @@ model User {
   // Drivers currently assigned to this User for KYC review — set only via
   // `PATCH /drivers/:id/assign-verifier`. See `Driver.assignedVerifierId`.
   assignedKycDrivers          Driver[]               @relation("DriverAssignedVerifier")
+  financialMovements         MoneyMovement[]
+  paymentIntents             PaymentIntent[]
 
   @@index([status])
 }
@@ -233,6 +235,7 @@ model RefreshSession {
   updatedAt   DateTime  @updatedAt
 
   userId      String
+  portalContext String? // Signed login context retained across refresh rotation
   hashedToken String    @unique
   ip          String?
   userAgent   String?
@@ -325,7 +328,7 @@ model Customer {
   firstName           String
   lastName            String?
   profileImage        String?
-  mobileNumber        String    @unique
+  mobileNumber        String?   @unique
   email               String?
   dateOfBirth         String?
   gender              String?
@@ -379,13 +382,14 @@ model Driver {
   weight                String?
   country               String?
   state                 String?
+  city                  String?
   pincode               String?
   address               String?
   driverType            String?
   status                String    @default("Non-Verified")
   verificationNotes     String?   // staff-set reason for the current status; driver-portal read-only
   // Portal login gate — independent of `status` above (KYC verification stage). 'Active' |
-  // 'Inactive'. Changed only via `PATCH /drivers/:id/status` (drivers:status_change), never
+  // 'Inactive' | 'Suspended'. Changed only via `PATCH /drivers/:id/status` (drivers:status_change), never
   // as a side effect of the KYC `PATCH /drivers/:id`. Enforced at login (`assertDriverAccountActive`)
   // and on every authenticated `/drivers/me*` call (`resolveOwnDriver`), not just hidden in the UI.
   accountStatus         String    @default("Active")
@@ -429,12 +433,22 @@ model Driver {
   dlExpiryDate          String?
   policeVerifiedStatus  String?
   policeVerifiedNo      String?
+  jobChoices            String[] @default([])
+  workLocation          String?
+  workStates            String[] @default([])
   jobType               String?
   experience            String?
+  // Optional professional resume facts absent from the original onboarding forms.
+  // Does not grant KYC approval or change onboarding completion/eligibility.
+  resumeProfile         Json?
+  // Administrative Master choice, separate from KYC verdict and portal account state.
+  driverStatusMasterId   String?
+  driverStatusMaster     MasterListItem? @relation(fields: [driverStatusMasterId], references: [id], onDelete: Restrict)
   currentSalary         String?
   expectedSalary        String?
 
   preferredPaymentMode  String?
+  accountPaymentMethod  String?
   amount                String?
   paymentReceiptDate    String?
   bankName              String?
@@ -444,6 +458,15 @@ model Driver {
   upiIdOrChequeNo       String?
 
   documents             DriverDocument[]
+  kycChecks             DriverKycCheck[]
+  kycDecisions          DriverKycDecision[]
+  online                Boolean @default(false)
+  registrationFeeRequired Boolean @default(false)
+  registrationFeePaise Int @default(0)
+  bookings              Booking[]
+  offers                TripOffer[]
+  financialMovements    MoneyMovement[]
+  paymentIntents        PaymentIntent[]
 
   // Multi-step onboarding-form progress — set only by `driver.service.ts`'s
   // `deriveOnboardingFields`, never trusted directly from the client beyond the single
@@ -468,9 +491,40 @@ model Driver {
   @@index([assignedVerifierId])
 }
 
+// Current checklist and append-only decisions reference the existing Driver record.
+model DriverKycCheck {
+  id           String @id @default(uuid())
+  driverId     String
+  itemKey      String
+  status       String
+  reason       String?
+  valueHash    String
+  reviewerId   String
+  reviewedAt   DateTime @default(now())
+  driver       Driver @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  @@unique([driverId, itemKey])
+}
+
+model DriverKycDecision {
+  id           String @id @default(uuid())
+  driverId     String
+  itemKey      String
+  status       String
+  reason       String?
+  valueHash    String
+  submittedValue Json
+  reviewerId   String
+  createdAt    DateTime @default(now())
+  driver       Driver @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  @@index([driverId, createdAt])
+}
+
 model DriverDocument {
   id         String   @id @default(uuid())
   createdAt  DateTime @default(now())
+  version    Int @default(1)
+  archivedAt DateTime?
+  expiresAt  DateTime?
 
   driverId   String
   category   String // 'personal' | 'health' | 'education' | 'police'
@@ -562,6 +616,22 @@ model Booking {
   // to the admin booking form or that flow is wired to a real backend.
   customerId             String?
   customer               Customer? @relation(fields: [customerId], references: [id])
+  driverId               String?
+  driver                 Driver? @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  city                   String?
+  requiredSkill          String?
+  startsAt               DateTime?
+  endsAt                 DateTime?
+  farePaise              Int?
+  commissionBps          Int?
+  commissionPaise        Int?
+  driverSharePaise       Int?
+  pricingSnapshot        Json?
+  approvedDriverSnapshot Json?
+  offers                 TripOffer[]
+  events                 TripEvent[]
+  financialMovements     MoneyMovement[]
+  paymentIntents         PaymentIntent[]
   driverName             String?
   vehicleName            String?
   vehicleCategory        String?
@@ -588,6 +658,82 @@ model Booking {
 
   @@index([status])
   @@index([customerId])
+  @@index([driverId, startsAt, endsAt])
+}
+
+model TripOffer {
+  id String @id @default(uuid())
+  bookingId String
+  driverId String
+  status String @default("pending")
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+  respondedAt DateTime?
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  @@unique([bookingId, driverId])
+  @@index([driverId, status])
+}
+
+model TripEvent {
+  id String @id @default(uuid())
+  bookingId String
+  actorId String
+  status String
+  reason String?
+  createdAt DateTime @default(now())
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  @@index([bookingId, createdAt])
+}
+
+// Append-only financial movements in paise. Unique reference prevents replay.
+model MoneyMovement {
+  id String @id @default(uuid())
+  reference String @unique
+  bookingId String?
+  driverId String?
+  kind String
+  amountPaise Int
+  method String
+  actorId String
+  reason String
+  createdAt DateTime @default(now())
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  driver Driver? @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  actor User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  @@index([bookingId, kind])
+  @@index([driverId, kind])
+  @@index([createdAt])
+}
+
+model PortalMessage {
+  id String @id @default(uuid())
+  userId String
+  kind String
+  subject String
+  body String
+  readAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, kind, createdAt])
+}
+
+model PaymentIntent {
+  id String @id @default(uuid())
+  providerOrderId String? @unique
+  userId String
+  bookingId String?
+  driverId String?
+  amountPaise Int
+  kind String
+  status String @default("pending")
+  failureReason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  driver Driver? @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  @@index([bookingId, status])
+  @@index([driverId, status])
 }
 
 model DriverLocation {
@@ -635,6 +781,10 @@ model FareRule {
   surgeMultiplier        Float    @default(1.0)
   effectiveFrom          String
   isActive               Boolean  @default(true)
+  requiredDriverJobType String?
+  requiredDriverJobChoice String?
+  requiredDriverSkill    String?
+  commissionBps          Int?
 }
 
 // ---------------------------------------------------------------------------
@@ -648,6 +798,7 @@ model FareRule {
 // one row per (category, name). `category` values are the frontend's menu-route
 // segments, e.g. 'driver-types', 'education'.
 model MasterListItem {
+  drivers   Driver[]
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -5,6 +5,7 @@ import type { ApiEnvelope } from '@skylabs-monorepo/shared-types';
 import { environment } from '../../../environments/environment';
 
 export interface Customer {
+  active_booking_count?:number;
   customer_uid: string;
   first_name: string;
   last_name: string | null;
@@ -29,6 +30,7 @@ export interface Customer {
 }
 
 interface CustomerDto {
+  _count?:{bookings:number};
   id: string;
   firstName: string;
   lastName: string | null;
@@ -56,13 +58,14 @@ export type CustomerInput = Partial<
 > & {
   first_name: string;
   mobile_number: string;
+  statusReason?:string;acknowledgeActiveBookings?:boolean;
   verification_status?: Customer['verification_status'];
   account_status?: Customer['account_status'];
 };
 
 function fromDto(dto: CustomerDto): Customer {
   return {
-    customer_uid: dto.id,
+    customer_uid: dto.id,active_booking_count:dto._count?.bookings??0,
     first_name: dto.firstName,
     last_name: dto.lastName,
     profile_image: dto.profileImage,
@@ -105,7 +108,7 @@ function toPayload(input: CustomerInput): Record<string, unknown> {
     registrationSource: input.registration_source ?? undefined,
     verificationStatus: input.verification_status ?? undefined,
     accountStatus: input.account_status ?? undefined,
-    notes: input.notes ?? undefined,
+    notes: input.notes ?? undefined,statusReason:input.statusReason,acknowledgeActiveBookings:input.acknowledgeActiveBookings,
   };
 }
 
@@ -118,6 +121,7 @@ export class CustomersApiService {
     return this.http.get<ApiEnvelope<CustomerDto[]>>(this.base).pipe(map((res) => unwrap(res).map(fromDto)));
   }
 
+  search(query:Record<string,string|number>):Observable<{rows:Customer[];meta:{total:number;counts:Record<string,number>}}>{return this.http.get<ApiEnvelope<CustomerDto[]>>(this.base,{params:query}).pipe(map(res=>({rows:unwrap(res).map(fromDto),meta:res.meta as unknown as {total:number;counts:Record<string,number>}})));}
   create(input: CustomerInput): Observable<Customer> {
     return this.http.post<ApiEnvelope<CustomerDto>>(this.base, toPayload(input)).pipe(map((res) => fromDto(unwrap(res))));
   }

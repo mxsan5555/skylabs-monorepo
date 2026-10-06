@@ -1,8 +1,12 @@
+import { DriversApiService } from '../../../core/drivers/drivers-api.service';
 import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, computed, inject, signal } from '@angular/core';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { DriverSelfApiService, type DriverSelf, type DriverSelfUpdate } from '../../../core/drivers/driver-self-api.service';
 import { MasterListApiService, type MasterOption } from '../../../core/masters/master-list-api.service';
 import { calculateProfileCompletion } from '../profile-completion';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { PillReviewApi, PillReview } from '../../../core/drivers/pill-review-api.service';
+import { InlineDl } from '../../../shared/inline-dl/inline-dl';
 
 type FieldKey = keyof Omit<DriverSelfUpdate, 'languages'>;
 
@@ -27,6 +31,8 @@ const FIELDS: { key: FieldKey; label: string; type?: string; span2?: boolean }[]
   { key: 'address', label: 'Address', span2: true },
   { key: 'country', label: 'Country' },
   { key: 'state', label: 'State' },
+  { key: 'city', label: 'City' },
+  { key: 'accountPaymentMethod', label: 'Account payment method' },
   { key: 'pincode', label: 'Pincode' },
   { key: 'education', label: 'Education' },
   { key: 'trainingStatus', label: 'Training status' },
@@ -49,15 +55,26 @@ const FIELDS: { key: FieldKey; label: string; type?: string; span2?: boolean }[]
 
 @Component({
   selector: 'md-driver-profile',
-  imports: [AdminPage],
+  imports: [AdminPage, RouterLink, InlineDl],
   templateUrl: './profile.html',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class DriverProfile implements OnInit {
   private readonly api = inject(DriverSelfApiService);
-  private readonly mastersApi = inject(MasterListApiService);
+  private readonly mastersApi = inject(DriversApiService);
 
-  protected readonly fields = FIELDS;
+  private readonly route = inject(ActivatedRoute);
+  private readonly reviewApi = inject(PillReviewApi);
+  protected readonly pills = signal<PillReview | null>(null);
+  protected readonly activeTab = signal(1);
+  protected readonly activePill = signal(0);
+  protected readonly tabs = ['Personal Details', 'Education & Health Details', 'Documents Details', 'Payment Details'];
+  protected readonly selectedPill = computed(() => this.pills()?.pills.find(p => p.tab === this.activeTab() && p.pill === this.activePill()));
+  protected readonly fields = computed(() => FIELDS.filter(f => this.selectedPill()?.items.some(i => i.key === 'field:' + f.key)));
+  protected readonly readOnlyItems = computed(() => this.selectedPill()?.items.filter(i => !FIELDS.some(f => i.key === 'field:' + f.key) && i.key !== 'field:languages' && i.key !== 'field:language') ?? []);
+  protected readonly formatValue = (v: unknown) => v == null || v === '' ? 'Not provided' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+  protected selectTab(tab: number) { this.activeTab.set(tab); this.activePill.set(0); }
+  protected isDone(tab: number, pill: number) { return this.driver()?.completedSubSteps?.includes(tab * 10 + pill) ?? false; }
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   protected readonly saved = signal(false);
@@ -70,21 +87,26 @@ export class DriverProfile implements OnInit {
   /** The full last-fetched record (including `documents`) — kept separately from `draft`
    *  (the editable-fields-only subset) so profile-completion can see document/language
    *  state without the self-edit form needing to carry read-only fields around. */
-  private readonly driver = signal<DriverSelf | null>(null);
+  protected readonly driver = signal<DriverSelf | null>(null);
   protected readonly completion = computed(() => {
     const d = this.driver();
     return d ? calculateProfileCompletion(d) : null;
   });
 
   ngOnInit(): void {
-    this.mastersApi.list('languages').subscribe({
-      next: (opts) => this.languageOptions.set(opts.filter((o) => o.status === 'Active')),
+    this.reviewApi.getOwn().subscribe({ next: r => this.pills.set(r), error: () => this.error.set('Unable to load onboarding pills.') });
+    this.mastersApi.formOptions().subscribe({
+      next: (opts) => this.languageOptions.set((opts['languages'] ?? []).filter(o => o.status === 'Active').map(o=>({...o,status:'Active' as const}))),
       error: () => undefined,
     });
 
     this.api.get().subscribe({
       next: (d) => {
         this.driver.set(d);
+        const tab = Number(this.route.snapshot.queryParamMap.get('tab') ?? d.currentStep ?? 1);
+        const pill = Number(this.route.snapshot.queryParamMap.get('pill') ?? d.currentSubStep ?? 0);
+        this.activeTab.set(Math.max(1, Math.min(4, tab)));
+        this.activePill.set(Math.max(0, Math.min([4, 2, 3, 2][this.activeTab() - 1] - 1, pill)));
         this.draft.set(toDraft(d));
         this.selectedLanguages.set(d.languages ?? []);
         this.loading.set(false);
@@ -103,7 +125,7 @@ export class DriverProfile implements OnInit {
     );
   }
 
-  protected save(): void {
+  protected save(complete = false): void {
     this.saving.set(true);
     this.error.set(null);
     // Omit blank fields rather than sending `""` — several backend validators (e.g. `email`'s
@@ -111,13 +133,18 @@ export class DriverProfile implements OnInit {
     // empty string, since `.partial()` only makes a field optional, not "empty string is
     // valid". Sending only the fields the driver actually filled in also means an unfilled
     // field is never blanked out by force.
-    this.api.update({ ...stripBlank(this.draft()), languages: this.selectedLanguages() }).subscribe({
+    const fields: DriverSelfUpdate = {};
+    for (const f of this.fields()) (fields as Record<string, unknown>)[f.key] = this.draft()[f.key];
+    if (this.activeTab() === 1 && this.activePill() === 0) fields.languages = this.selectedLanguages();
+    this.api.savePill(this.activeTab(), this.activePill(), complete, stripBlank(fields)).subscribe({
       next: (d) => {
         this.driver.set(d);
         this.draft.set(toDraft(d));
         this.selectedLanguages.set(d.languages ?? []);
         this.saving.set(false);
         this.saved.set(true);
+        this.reviewApi.getOwn().subscribe({ next: r => this.pills.set(r) });
+        if (complete) { this.activeTab.set(d.currentStep); this.activePill.set(d.currentSubStep); }
         setTimeout(() => this.saved.set(false), 2000);
       },
       error: (err) => {

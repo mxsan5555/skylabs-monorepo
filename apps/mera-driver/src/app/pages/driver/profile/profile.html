@@ -1,34 +1,27 @@
 <md-admin-page title="My Profile" subtitle="Keep your details up to date. Verification status can only be changed by staff.">
+  <a routerLink="/driver/resume">My Resume</a>
   @if (loading()) {
     <p class="otp-muted">Loading…</p>
   } @else {
-    @if (completion(); as c) {
-      <section class="account-card">
-        <div class="account-card__head">
-          <h2>Profile Completion</h2>
-          <sky-badge [variant]="c.status === 'complete' ? 'primary' : c.status === 'almost-complete' ? 'tertiary' : 'secondary'">
-            {{ c.status === 'complete' ? 'Profile Complete' : c.status === 'almost-complete' ? 'Almost Complete' : 'Incomplete' }}
-          </sky-badge>
-        </div>
-        <div class="driver-completion__percent">{{ c.percentage }}%</div>
-        <md-linear-progress [value]="c.percentage / 100" [attr.aria-label]="'Profile ' + c.percentage + '% complete'"></md-linear-progress>
-        <p class="otp-muted">{{ c.completedCount }} of {{ c.totalCount }} sections complete</p>
-        @if (c.incompleteSections.length > 0) {
-          <div>
-            <p class="otp-muted">Complete these sections:</p>
-            <ul class="driver-completion__list">
-              @for (s of c.incompleteSections; track s.key) {
-                <li>{{ s.label }}</li>
-              }
-            </ul>
-          </div>
+    <section class="account-card">
+      <h2>Onboarding · {{ driver()?.completionPercentage ?? 0 }}%</h2>
+      <div class="flex flex-wrap gap-2" role="tablist">
+        @for (tab of tabs; track tab; let index = $index) {
+          <md-filter-chip [label]="tab" [selected]="activeTab() === index + 1" (click)="selectTab(index + 1)"></md-filter-chip>
         }
-      </section>
-    }
+      </div>
+      <div class="flex flex-wrap gap-2 mt-3">
+        @for (p of pills()?.pills ?? []; track p.tab * 10 + p.pill) {
+          @if (p.tab === activeTab()) {
+            <md-filter-chip [label]="p.label + (isDone(p.tab, p.pill) ? ' ✓' : '')" [selected]="activePill() === p.pill" (click)="activePill.set(p.pill)"></md-filter-chip>
+          }
+        }
+      </div>
+    </section>
 
     <section class="account-card">
       <div class="account-card__head">
-        <h2>Personal details</h2>
+        <h2>{{ selectedPill()?.label }}</h2>
         @if (saved()) {
           <span class="otp-muted" role="status">Saved</span>
         }
@@ -36,19 +29,31 @@
       @if (error()) {
         <p class="otp-muted" role="alert">{{ error() }}</p>
       }
+      @for (item of selectedPill()?.items ?? []; track item.key) {
+        @if (item.status === 'Issue') { <p role="alert">{{ item.field }}: {{ item.reason }}</p> }
+      }
+      @for (item of readOnlyItems(); track item.key) {
+        <p><strong>{{ item.field }}</strong>: {{ formatValue(item.value) }} · Read-only</p>
+      }
+      @if (activeTab() === 2 || activeTab() === 3) { <a routerLink="/driver/documents">Upload or replace documents</a> }
       <div class="address-form">
-        @for (f of fields; track f.key) {
+        @for (f of fields(); track f.key) {
+          <div [class.span-2]="f.span2" class="min-w-0 max-sm:col-span-2">
           <md-outlined-text-field
-            [class.span-2]="f.span2"
+            class="w-full"
             [label]="f.label"
             [type]="f.type ?? 'text'"
             [value]="draft()[f.key] ?? ''"
             (input)="setField(f.key, $any($event.target).value)"
+
           ></md-outlined-text-field>
+          @if(f.key==='dlNo'){<md-inline-dl [driverId]="driver()?.id??null" [own]="true" [savedRevision]="(driver()?.dlNo??'')+'|'+(driver()?.dob??'')" [dlNo]="draft().dlNo??''" [dob]="draft().dob??''" [issueDate]="draft().dlIssueDate??''" [expiryDate]="draft().dlExpiryDate??''"></md-inline-dl>}
+          </div>
         }
       </div>
     </section>
 
+    @if (activeTab() === 1 && activePill() === 0) {
     <section class="account-card">
       <div class="account-card__head">
         <h2>Languages</h2>
@@ -72,10 +77,14 @@
       }
     </section>
 
-    <div>
+    }
+    @if (!(activeTab() === 4 && activePill() === 1)) {
+    <div class="pb-8">
       <md-filled-button [disabled]="saving()" (click)="save()">
         {{ saving() ? 'Saving…' : 'Save changes' }}
       </md-filled-button>
+      <md-outlined-button [disabled]="saving()" (click)="save(true)">Save &amp; Next</md-outlined-button>
     </div>
+    }
   }
 </md-admin-page>

@@ -1,0 +1,42 @@
+[
+  {
+    "file": "driver-partial.pdf",
+    "pages": 6,
+    "textSectionsVerified": true
+  },
+  {
+    "file": "driver-complete.pdf",
+    "pages": 10,
+    "textSectionsVerified": true
+  },
+  {
+    "file": "driver-complete-with-trips.pdf",
+    "pages": 9,
+    "textSectionsVerified": true
+  },
+  {
+    "file": "booking-invoice.pdf",
+    "pages": 1,
+    "textSectionsVerified": true
+  },
+  {
+    "file": "driver-list-download.pdf",
+    "pages": 6,
+    "textSectionsVerified": true
+  },
+  {
+    "file": "driver-complete-browser.pdf",
+    "pages": 10,
+    "textSectionsVerified": true
+  },
+  {
+    "file": "driver-resume-partial.pdf",
+    "pages": 1,
+    "textSectionsVerified": true
+  },
+  {
+    "file": "driver-resume-complete.pdf",
+    "pages": 1,
+    "textSectionsVerified": true
+  }
+]

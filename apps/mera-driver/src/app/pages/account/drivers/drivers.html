@@ -3,9 +3,41 @@
   [subtitle]="showAddForm() ? (editingDriverId() !== null ? 'Edit driver lead details' : 'Add a new driver lead to the registry') : content().subtitle"
 >
   <div class="relative w-full">
+@if(showAddForm()&&masterLoading()){<p role="status">Loading Master options...</p>}
+@if(showAddForm()&&masterError()){<p role="alert">{{masterError()}}</p><md-text-button (click)="loadFormMasters()">Retry Master options</md-text-button>}
+
 
     <!-- VIEW 1: DRIVER DATA TABLE LIST -->
     @if (!showAddForm()) {
+      <div class="grid grid-cols-4 max-sm:grid-cols-2 gap-3 mt-4">
+        @for (view of listViews; track view.key) {
+          <sky-card class="p-4 block">
+            <md-text-button [attr.aria-pressed]="selectedView() === view.key" (click)="quickView(view.key)">{{ view.label }}</md-text-button>
+            <strong class="block text-xl">{{ summaryCount(view.key) }}</strong>
+          </sky-card>
+        }
+      </div>
+      <div class="flex flex-wrap gap-2 mt-4">
+        @for(view of listViews; track view.key) { <md-filter-chip [label]="view.label" [selected]="selectedView() === view.key" (click)="quickView(view.key)"></md-filter-chip> }
+      </div>
+      <div class="flex flex-wrap items-center gap-2 mt-4">
+        <md-text-button [attr.aria-expanded]="filtersVisible()" (click)="toggleFilters()">Filters · {{ filtersVisible() ? 'Hide' : 'Show' }}</md-text-button>
+        @for(filter of activeFilters(); track filter.key) { <md-filter-chip [label]="filter.label" selected (click)="setListFilter(filter.key, '')" [title]="'Clear ' + filter.label"></md-filter-chip> }
+        @if(activeFilters().length) { <md-text-button (click)="clearFilters()">Clear Filters</md-text-button> }
+      </div>
+      @if(filtersVisible()) {
+        <div class="grid grid-cols-4 max-sm:grid-cols-1 gap-3 mt-2">
+          <md-outlined-text-field label="Driver type / skills" [value]="typeFilter()" (change)="setListFilter('type', $any($event.target).value)"></md-outlined-text-field>
+          <md-outlined-text-field label="City" [value]="cityFilter()" (change)="setListFilter('city', $any($event.target).value)"></md-outlined-text-field>
+          <md-outlined-select label="KYC status" [value]="statusFilter()" (change)="setListFilter('kyc', $any($event.target).value)">
+            <md-select-option value="all"><div slot="headline">All KYC statuses</div></md-select-option>
+            @for(status of ['Verified','Non-Verified','Partially Verified (P)','Partially Verified (K)','Blacklisted','Closed','Not Useful']; track status) { <md-select-option [value]="status"><div slot="headline">{{status}}</div></md-select-option> }
+          </md-outlined-select>
+          <md-outlined-select label="Registration fee status" [value]="feeFilter()" (change)="setListFilter('fee',$any($event.target).value)"><md-select-option value=""><div slot="headline">All fee statuses</div></md-select-option>@for(status of ['Unpaid','Pending','Paid','Failed','Waived','Refunded'];track status){<md-select-option [value]="status"><div slot="headline">{{status}}</div></md-select-option>}</md-outlined-select>
+          <md-outlined-select label="Availability" [value]="availabilityFilter()" (change)="setListFilter('availability',$any($event.target).value)"><md-select-option value=""><div slot="headline">All availability</div></md-select-option><md-select-option value="online"><div slot="headline">Online</div></md-select-option><md-select-option value="offline"><div slot="headline">Offline</div></md-select-option></md-outlined-select>
+        </div>
+      }
+      @if (listError()) { <p role="alert">{{ listError() }}</p> }
       <div class="w-full mt-4">
         <sky-card class="p-6 block">
           <sky-data-table
@@ -18,8 +50,10 @@
             selectable
             exportable
             searchable
-            [filterLabel]="'Filter by Status'"
-            [filterOptions]="tableFilterOptions"
+            [_search]="searchQuery()"
+            [_sortKey]="sortKey()"
+            [_sortDir]="sortDir()"
+            search-placeholder="Name, phone, Driver ID, email or DL number"
             (sky-dt-params-change)="onParamsChange($event)"
             (sky-dt-row-select)="onRowSelect($event)"
             (sky-dt-row-action)="onRowAction($event)"
@@ -27,6 +61,7 @@
             caption="Drivers Management Database"
           >
             <!-- Projected Add button next to download/export button in the toolbar -->
+            @if(auth.can('drivers','create')) {
             <md-icon-button
               slot="toolbar-actions"
               aria-label="Add Driver Lead"
@@ -35,10 +70,27 @@
             >
               <md-icon>add</md-icon>
             </md-icon-button>
+            }
           </sky-data-table>
         </sky-card>
       </div>
 
+      <md-dialog [open]="moreDriver() !== null" (closed)="moreDriver.set(null)">
+        @if (moreDriver(); as d) {
+          <div slot="headline">More actions · {{ d.name }}</div>
+          <div slot="content" class="flex flex-col gap-3">
+            @if (auth.can('drivers', 'export')) { <md-outlined-button (click)="moreAction('download_resume', d)">Download Driver Resume</md-outlined-button><md-outlined-button (click)="moreAction('download_pdf', d)">Download Full Driver Report</md-outlined-button> }
+            @if (auth.can('drivers', 'edit')) { <md-outlined-button (click)="moreAction('edit_driver', d)">Edit driver</md-outlined-button> }
+            @if (auth.can('drivers', 'assign')) {
+              <md-outlined-button (click)="moreAction('link_driver', d)">Manage Driver User</md-outlined-button>
+              <md-outlined-button (click)="moreAction('assign_verifier', d)">Assign KYC verifier</md-outlined-button>
+            }
+            @if (auth.can('drivers', 'status_change')) { <md-outlined-button (click)="moreAction('toggle_driver_status', d)">Activate / Deactivate</md-outlined-button><md-outlined-button (click)="suspendDriver(d)">Suspend driver</md-outlined-button> }
+            @if (auth.can('drivers', 'delete')) { <md-outlined-button (click)="moreAction('delete_driver', d)">Delete driver</md-outlined-button> }
+          </div>
+          <div slot="actions"><md-text-button (click)="moreDriver.set(null)">Close</md-text-button></div>
+        }
+      </md-dialog>
       <md-dialog [open]="linkPanelDriver() !== null" (closed)="closeLinkPanel()">
         @if (linkPanelDriver(); as d) {
           <div slot="headline">
@@ -57,6 +109,8 @@
                 Unlink account
               </md-outlined-button>
             } @else {
+              <p><strong>Name:</strong> {{ d.firstName }} {{ d.lastName }}<br />
+                <strong>Phone:</strong> {{ d.phone || 'Not provided' }}</p>
               <p>
                 Creating a Driver User automatically creates a portal login for this driver,
                 assigns the <code>driver</code> role, and grants access to the driver
@@ -118,44 +172,6 @@
         }
       </md-dialog>
 
-      <!-- Read-only Driver Resume / Profile Preview — no edit controls. -->
-      <md-dialog [open]="previewDriver() !== null" (closed)="closePreview()" class="driver-resume-dialog">
-        @if (previewDriver(); as d) {
-          <div slot="headline">{{ d.firstName }} {{ d.lastName }} — Resume</div>
-          <div slot="content" class="flex flex-col gap-4">
-            <div class="account-card__head">
-              <span class="otp-muted">Status</span>
-              <sky-badge
-                [variant]="d.status === 'Verified' ? 'primary' : d.status === 'Blacklisted' || d.status === 'Closed' || d.status === 'Not Useful' ? 'error' : 'secondary'"
-              >
-                {{ d.status || 'Non-Verified' }}
-              </sky-badge>
-            </div>
-            @for (section of previewSections(); track section.title) {
-              <section class="account-card">
-                <div class="account-card__head">
-                  <h2>{{ section.title }}</h2>
-                </div>
-                <dl class="driver-resume-fields">
-                  @for (f of section.fields; track f.label) {
-                    <div>
-                      <dt>{{ f.label }}</dt>
-                      <dd>{{ f.value }}</dd>
-                    </div>
-                  }
-                </dl>
-              </section>
-            }
-          </div>
-          <div slot="actions">
-            <md-text-button (click)="closePreview()">Close</md-text-button>
-            <md-filled-button (click)="downloadPdf(d)">
-              <md-icon slot="icon" aria-hidden="true">picture_as_pdf</md-icon>
-              Download PDF
-            </md-filled-button>
-          </div>
-        }
-      </md-dialog>
     }
 
     <!-- VIEW 2: ADD DRIVER TABS PAGE -->
@@ -253,7 +269,7 @@
                         [open]="isLangDropdownOpen()"
                         (closed)="isLangDropdownOpen.set(false)"
                       >
-                        @for (opt of languages(); track opt) {
+                        @for (opt of masterNames('languages',inputLanguages()); track opt) {
                           <md-menu-item keep-open (click)="toggleLanguage(opt)">
                             <md-checkbox slot="start" [checked]="isLanguageSelected(opt)"></md-checkbox>
                             <div slot="headline">{{ opt }}</div>
@@ -368,7 +384,7 @@
               @if (activeSubSection() === 3) {
                 <sky-card class="p-6 block">
                   <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
-                    <md-outlined-select label="Source Type" [value]="inputSourceType()" (change)="onInputChange('sourceType', $event)">
+                    <md-outlined-select label="Source Type" [value]="inputSourceType()" (change)="onInputChange('sourceType', $event)">@if(inputSourceType()&&!sourceTypes().includes(inputSourceType())){<md-select-option [value]="inputSourceType()" disabled><div slot="headline">{{inputSourceType()}} (saved historical value)</div></md-select-option>}
                       @for (opt of sourceTypes(); track opt) {
                         <md-select-option [value]="opt">
                           <div slot="headline">{{ opt }}</div>
@@ -376,11 +392,9 @@
                       }
                     </md-outlined-select>
 
-                    <md-outlined-select label="Job Type" [value]="inputJobType()" (change)="onInputChange('jobType', $event)">
-                      @for (opt of jobTypeOptions(); track opt) {
-                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                      }
-                    </md-outlined-select>
+                    <fieldset><legend>Job Type</legend>@for(option of choicesWithSaved('job-types',choices(inputJobType()));track option.id){<label class="flex gap-2 items-center min-h-12"><md-checkbox aria-label="{{option.name}}" [checked]="choiceSelected(choices(inputJobType()),option.name)" [attr.data-master-id]="option.id" (change)="toggleChoice('jobType',option.name,$any($event.target).checked)"></md-checkbox>{{option.name}} @if(option.status!=='Active'){<span>(saved historical value)</span>}</label>}<p class="text-xs">Work engagement preferences; fee payment and online availability remain separate.</p></fieldset>
+                    <fieldset><legend>Job choice</legend>@for(option of choicesWithSaved('job-choices',inputJobChoices());track option.id){<label class="flex gap-2 items-center min-h-12"><md-checkbox aria-label="{{option.name}}" [checked]="choiceSelected(inputJobChoices(),option.name)" [attr.data-master-id]="option.id" (change)="toggleChoice('jobChoices',option.name,$any($event.target).checked)"></md-checkbox>{{option.name}} @if(option.status!=='Active'){<span>(saved historical value)</span>}</label>}</fieldset>
+                    <div><md-outlined-select label="Work location" [value]="inputWorkLocation()" (change)="inputWorkLocation.set($any($event.target).value)"><md-select-option value=""><div slot="headline">Not specified</div></md-select-option><md-select-option value="Same State"><div slot="headline">Same State</div></md-select-option><md-select-option value="Other States"><div slot="headline">Other States</div></md-select-option></md-outlined-select>@if(inputWorkLocation()==='Same State'){<p>Work state: {{inputState()||'Save your address state first'}}</p>}@if(inputWorkLocation()==='Other States'){<md-outlined-text-field label="Search work states" [value]="stateSearch()" (input)="stateSearch.set($any($event.target).value)"></md-outlined-text-field><div class="max-h-56 overflow-y-auto border border-slate-200 rounded-lg p-3">@for(option of stateOptions();track option.id){<label class="flex gap-2 items-center min-h-12"><md-checkbox aria-label="{{option.name}}" [checked]="choiceSelected(inputWorkStates(),option.name)" (change)="toggleChoice('workStates',option.name,$any($event.target).checked)"></md-checkbox>{{option.name}}</label>}</div><p class="text-xs">Selected: {{inputWorkStates().join(', ')||'None'}}</p>}</div>
 
                     <md-outlined-select label="Experience" [value]="inputExperience()" (change)="onInputChange('experience', $event)">
                       @for (opt of experienceOptions(); track opt) {
@@ -408,7 +422,7 @@
                         [open]="isDriverTypeDropdownOpen()"
                         (closed)="isDriverTypeDropdownOpen.set(false)"
                       >
-                        @for (opt of driverTypeOptions(); track opt) {
+                        @for (opt of masterNames('driver-types',inputDriverTypes()); track opt) {
                           <md-menu-item keep-open (click)="toggleDriverType(opt)">
                             <md-checkbox slot="start" [checked]="isDriverTypeSelected(opt)"></md-checkbox>
                             <div slot="headline">{{ opt }}</div>
@@ -458,6 +472,10 @@
                 <div class="flex flex-col gap-y-6 w-full">
                   <sky-card class="p-6 block">
                     <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
+                      <md-outlined-select label="Education" [value]="inputEducation()" (change)="onInputChange('education', $event)">
+                        <md-select-option value=""><div slot="headline">Not provided</div></md-select-option>
+                        @for(option of choicesWithSaved('education',inputEducation()?[inputEducation()]:[]);track option.id){<md-select-option [value]="option.name" [disabled]="option.status!=='Active'"><div slot="headline">{{option.name}}</div></md-select-option>}
+                      </md-outlined-select>
                       <md-outlined-select label="Training Status" [value]="inputTrainingStatus()" (change)="onInputChange('trainingStatus', $event)">
                         @for (opt of trainingStatuses(); track opt) {
                           <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
@@ -520,7 +538,7 @@
                 <div class="flex flex-col gap-y-6 w-full">
                   <sky-card class="p-6 block">
                     <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
-                      <md-outlined-select label="Eye Vision" [value]="inputEyeVision()" (change)="onInputChange('eyeVision', $event)">
+                      <md-outlined-select label="Eye Vision" [value]="inputEyeVision()" (change)="onInputChange('eyeVision', $event)">@if(inputEyeVision()&&!eyeVisions().includes(inputEyeVision())){<md-select-option [value]="inputEyeVision()" disabled><div slot="headline">{{inputEyeVision()}} (saved historical value)</div></md-select-option>}
                         @for (opt of eyeVisions(); track opt) {
                           <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                         }
@@ -548,7 +566,7 @@
                         <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
                           <md-outlined-select class="col-span-5 max-md:w-full" label="Document Type" [value]="doc.type" (change)="onDocChange('health', $index, 'type', $event)">
                             <md-select-option value="Select Document Type"><div slot="headline">Select Document Type</div></md-select-option>
-                            @for (opt of healthDocTypes(); track opt) {
+                            @for (opt of masterNames('health-docs',[doc.type]); track opt) {
                               <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                             }
                           </md-outlined-select>
@@ -602,14 +620,17 @@
               @if (activeSubSection() === 0) {
                 <sky-card class="p-6 block">
                   <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
+                    <fieldset><legend>Vehicle choice</legend>@for(option of choicesWithSaved('vehicle-types',choices(inputVehicleType()));track option.id){<label class="flex gap-2 items-center min-h-12"><md-checkbox aria-label="{{option.name}}" [checked]="choiceSelected(choices(inputVehicleType()),option.name)" [attr.data-master-id]="option.id" (change)="toggleChoice('vehicleType',option.name,$any($event.target).checked)"></md-checkbox>{{option.name}} @if(option.status!=='Active'){<span>(saved historical value)</span>}</label>}</fieldset>
                     <md-outlined-select label="License Details" [value]="inputLicenseDetails()" (change)="onInputChange('licenseDetails', $event)">
                       @for (opt of licenseDetailsOptions(); track opt) {
                         <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                       }
                     </md-outlined-select>
 
+                    <div>
                     <md-outlined-text-field
                       label="Driving License No"
+                      class="w-full"
                       required
                       [value]="inputDlNo()"
                       (input)="onInputChange('dlNo', $event)"
@@ -618,6 +639,8 @@
                       [errorText]="dlNoError()"
                       placeholder="e.g. DL-1420110012345"
                     ></md-outlined-text-field>
+                    <md-inline-dl [driverId]="editingDriverId()" [dlNo]="inputDlNo()" [dob]="inputDob()" [issueDate]="inputDlIssueDate()" [expiryDate]="inputDlExpiryDate()"></md-inline-dl>
+                    </div>
 
                     <md-outlined-text-field label="DL Issue Date" type="date" [value]="inputDlIssueDate()" (input)="onInputChange('dlIssueDate', $event)"></md-outlined-text-field>
 
@@ -652,7 +675,7 @@
                           <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
                             <md-outlined-select class="col-span-5 max-md:w-full" label="Document Type" [value]="doc.type" (change)="onDocChange('police', $index, 'type', $event)">
                               <md-select-option value="Select Document Type"><div slot="headline">Select Document Type</div></md-select-option>
-                              @for (opt of policeDocTypes(); track opt) {
+                              @for (opt of masterNames('police-docs',[doc.type]); track opt) {
                                 <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                               }
                             </md-outlined-select>
@@ -698,7 +721,7 @@
                       <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
                         <!-- Document Category Dropdown -->
                         <md-outlined-select class="col-span-5 max-md:w-full" label="Document Type" [value]="doc.type" (change)="onDocChange('personal', $index, 'type', $event)">
-                          @for (opt of documentCategoryOptions(); track opt) {
+                          @for (opt of masterNames('personal-docs',[doc.type]); track opt) {
                             <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
                           }
                         </md-outlined-select>
@@ -782,54 +805,59 @@
                 </sky-card>
               }
 
-              <!-- 2. Registration Fees -->
+              <!-- 2. Registration Fees: entry details are separate from trusted collection. -->
               @if (activeSubSection() === 1) {
                 <sky-card class="p-6 block">
-                  <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
-                    <!-- Driver Status Dropdown -->
-                    <div>
-                      <md-outlined-select class="w-full" label="Driver Status" [value]="inputStatus()" (change)="onInputChange('status', $event)">
-                        @for (opt of driverStatuses(); track opt) {
-                          <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                        }
-                      </md-outlined-select>
-                      @if (statusError()) {
-                        <p class="text-xs text-red-600 mt-1" role="alert">{{ statusError() }}</p>
-                      }
-                    </div>
-
-                    <!-- Registration Fee Status Dropdown -->
-                    <md-outlined-select label="Registration Fee Status" [value]="inputRegistrationFeeStatus()" (change)="onInputChange('registrationFeeStatus', $event)">
-                      @for (opt of registrationFeeStatuses(); track opt) {
-                        <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                      }
-                    </md-outlined-select>
-
-                    @if (inputRegistrationFeeStatus() === 'Paid') {
-                      <!-- Preferred Payment Mode Dropdown -->
-                      <md-outlined-select label="Preferred Payment Mode" [value]="inputPreferredPaymentMode()" (change)="onInputChange('preferredPaymentMode', $event)">
-                        @for (opt of registrationPaymentModes(); track opt) {
-                          <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
-                        }
-                      </md-outlined-select>
-
-                      <md-outlined-text-field label="Amount (₹)" [value]="inputAmount()" (input)="onInputChange('amount', $event)" placeholder="Enter amount"></md-outlined-text-field>
-
-                      <md-outlined-text-field type="date" label="Payment Receipt Date" [value]="inputPaymentReceiptDate()" (input)="onInputChange('paymentReceiptDate', $event)"></md-outlined-text-field>
-
-                      <!-- Payment Receipt File Upload -->
-                      <div class="flex items-center gap-2 relative cursor-pointer">
-                        <input type="file" (change)="onRegistrationReceiptFileChange($event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputRegistrationReceipt>
-                        <md-outlined-text-field class="flex-1 cursor-pointer" label="Payment Receipt (Optional)" readonly [value]="inputRegistrationReceiptFile() || 'No file chosen'">
-                          <md-icon slot="leading-icon">upload_file</md-icon>
-                        </md-outlined-text-field>
-                        @if (inputRegistrationReceiptFile()) {
-                          <md-icon-button type="button" (click)="clearRegistrationReceiptFile(); $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
-                            <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
-                          </md-icon-button>
-                        }
+                  <div class="flex flex-col gap-5">
+                    <fieldset class="flex flex-col gap-3">
+                      <legend class="text-base font-semibold">Registration Fee</legend>
+                      <div class="flex flex-wrap gap-6">
+                        <label class="flex items-center gap-2 min-h-12 cursor-pointer"><md-radio name="registration-fee" value="Paid" [checked]="inputRegistrationFeeStatus() === 'Paid'" (change)="selectRegistrationFee('Paid', $event)"></md-radio>Paid</label>
+                        <label class="flex items-center gap-2 min-h-12 cursor-pointer"><md-radio name="registration-fee" value="Unpaid" [checked]="inputRegistrationFeeStatus() === 'Unpaid'" (change)="selectRegistrationFee('Unpaid', $event)"></md-radio>Unpaid</label>
                       </div>
-                    }
+                      <p class="text-sm text-slate-600">{{ feePolicyLabel() }}</p>
+                      <p class="text-sm">Recorded payment status: <strong>{{ actualFeeStatus() }}</strong></p>
+                      @if (inputRegistrationFeeStatus() === 'Paid') {
+                        <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
+                          <md-outlined-select label="Payment Mode" [value]="inputPreferredPaymentMode()" (change)="onInputChange('preferredPaymentMode', $event)">
+                            @if(inputPreferredPaymentMode() && !registrationPaymentModes().includes(inputPreferredPaymentMode())){<md-select-option [value]="inputPreferredPaymentMode()" disabled><div slot="headline">{{inputPreferredPaymentMode()}} (saved historical mode)</div></md-select-option>}
+                            @for (opt of registrationPaymentModes(); track opt) {<md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>}
+                          </md-outlined-select>
+                          <md-outlined-text-field label="Amount (INR)" [value]="inputAmount()" (input)="onInputChange('amount', $event)" placeholder="Enter actual receipt amount"></md-outlined-text-field>
+                          <md-outlined-text-field type="date" label="Payment Receipt Date" [value]="inputPaymentReceiptDate()" (input)="onInputChange('paymentReceiptDate', $event)"></md-outlined-text-field>
+                          <div class="flex items-center gap-2 relative cursor-pointer">
+                            <input type="file" aria-label="Payment receipt upload" accept="image/png,image/jpeg,image/webp,application/pdf" (change)="onRegistrationReceiptFileChange($event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10">
+                            <md-outlined-text-field class="flex-1 min-w-0 cursor-pointer" label="Payment Receipt (Optional)" readonly [value]="inputRegistrationReceiptFile() || 'No file chosen'"><md-icon slot="leading-icon">upload_file</md-icon></md-outlined-text-field>
+                            @if (inputRegistrationReceiptFile()) {<md-icon-button type="button" (click)="clearRegistrationReceiptFile(); $event.stopPropagation()" title="Remove selected receipt" class="shrink-0 z-20"><md-icon>close</md-icon></md-icon-button>}
+                          </div>
+                        </div>
+                        <p class="text-sm text-slate-600">Save records these details only. Selecting Paid or uploading a receipt does not confirm collection. Online payments require verified Razorpay capture through the existing payment flow.</p>
+                        @if (auth.can('payments.overview','edit') && inputPreferredPaymentMode() === 'Cash' && actualFeeStatus() !== 'Paid') {
+                          <div class="rounded-lg border border-slate-200 p-4 flex flex-col gap-3">
+                            <p class="font-medium">Audited cash collection</p>
+                            <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+                              <md-outlined-text-field label="Collection transaction reference" [value]="collectionReference()" (input)="collectionReference.set($any($event.target).value)"></md-outlined-text-field>
+                              <md-outlined-text-field label="Collection audit reason" [value]="collectionReason()" (input)="collectionReason.set($any($event.target).value)"></md-outlined-text-field>
+                            </div>
+                            <label class="flex items-center gap-2 min-h-12"><md-checkbox [checked]="cashConfirmed()" (change)="cashConfirmed.set($any($event.target).checked)"></md-checkbox>I confirm the actual cash has been received</label>
+                            <md-outlined-button [disabled]="savingStep() || confirmingCollection()" (click)="confirmCashCollection()">{{ confirmingCollection() ? 'Confirming collection...' : 'Confirm cash collection' }}</md-outlined-button>
+                          </div>
+                        }
+                      } @else {
+                        <p class="text-sm text-slate-600">No payment details or receipt are required. Saving Unpaid does not create, delete or reverse a payment.</p>
+                      }
+                      @if(auth.can('payments.overview','view')){<a class="text-sm underline" routerLink="/account/accounts/registration-fees">Open Accounts Registration Fees for verified payments, policy and audited corrections</a>}
+                    </fieldset>
+                    <div class="border-t border-slate-200 pt-5 flex flex-col gap-3">
+                      <md-outlined-select label="Driver Status" [value]="inputDriverStatusMasterId() || ''" [disabled]="!auth.can('drivers','status_change') || masterLoading()" (change)="inputDriverStatusMasterId.set($any($event.target).value || null)">
+                        <md-select-option value=""><div slot="headline">Not selected</div></md-select-option>
+                        @for(option of driverStatusOptions();track option.id){<md-select-option [value]="option.id" [disabled]="option.status !== 'Active'"><div slot="headline">{{ option.name }}{{ option.status !== 'Active' ? ' (inactive saved value)' : '' }}</div></md-select-option>}
+                      </md-outlined-select>
+                      @if(editingDriverId() && inputDriverStatusMasterId() !== originalDriverStatusMasterId()) {<md-outlined-text-field label="Driver status change reason" [value]="statusReason()" (input)="statusReason.set($any($event.target).value)"></md-outlined-text-field>}
+                      @if(!masterLoading() && !driverStatusOptions().length){<p class="text-sm">No active Driver Status Master options configured.</p>}
+                      <p class="text-sm text-slate-600">Administrative Master status only. Login/account state, KYC approval and trip eligibility remain separate.</p>
+                      <p class="text-sm">KYC status: {{ inputStatus() || 'Non-Verified' }}. Saving this form does not perform final approval.</p>
+                    </div>
                   </div>
                 </sky-card>
               }
@@ -841,10 +869,10 @@
             @if (stepError()) {
               <p class="text-sm text-red-600" role="alert">{{ stepError() }}</p>
             }
-            <div class="flex justify-between items-center">
-              <md-outlined-button [disabled]="savingStep()" (click)="closeAddDriverForm()">Cancel</md-outlined-button>
+            <div class="flex flex-wrap justify-between items-center gap-3 max-sm:flex-col max-sm:items-stretch">
+              <div class="flex flex-wrap gap-3"><md-outlined-button [disabled]="savingStep()" (click)="closeAddDriverForm()">Cancel</md-outlined-button><md-outlined-button [disabled]="savingStep()" (click)="saveDraft()">Save draft</md-outlined-button></div>
 
-              <div class="flex items-center gap-3">
+              <div class="flex flex-wrap justify-end items-center gap-3">
                 @if (activeFormTab() > 0 || activeSubSection() > 0) {
                   <md-outlined-button [disabled]="savingStep()" (click)="onPrevSubSection()">
                     <md-icon slot="icon">arrow_back</md-icon>

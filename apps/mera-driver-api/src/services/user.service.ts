@@ -89,6 +89,9 @@ export async function getUserById(id: string) {
  */
 async function assertNotDriverRole(roleId: string): Promise<void> {
   const role = await prisma.role.findUnique({ where: { id: roleId } });
+  if (role?.key === 'customer') {
+    throw new HttpError(400, 'CUSTOMER_ROLE_NOT_ASSIGNABLE_HERE', 'Customer accounts are created from Customer Management, not staff User Management');
+  }
   if (role?.key === 'driver') {
     throw new HttpError(
       400,

@@ -27,6 +27,7 @@ export class DriverDocuments implements OnInit {
   protected category = signal<DriverSelfDocument['category']>('personal');
   protected docType = signal('');
   protected regNo = signal('');
+  protected expiry = signal('');
   protected file: File | null = null;
 
   ngOnInit(): void {
@@ -61,11 +62,12 @@ export class DriverDocuments implements OnInit {
     }
     this.error.set(null);
     this.uploading.set(true);
-    this.api.uploadDocument(this.category(), type, this.regNo().trim(), this.file).subscribe({
+    this.api.uploadDocument(this.category(), type, this.regNo().trim(), this.file, this.expiry() || undefined).subscribe({
       next: () => {
         this.uploading.set(false);
         this.docType.set('');
         this.regNo.set('');
+        this.expiry.set('');
         this.file = null;
         this.reload();
       },
@@ -77,7 +79,7 @@ export class DriverDocuments implements OnInit {
   }
 
   protected remove(doc: DriverSelfDocument): void {
-    if (!confirm(`Delete "${doc.type}"?`)) return;
+    if (!confirm(`Withdraw "${doc.type}" from review? Its original file and previous decisions will be preserved.`)) return;
     this.api.deleteDocument(doc.id).subscribe({
       next: () => this.reload(),
       error: (err) => this.error.set(err?.message ?? 'Delete failed. Please try again.'),

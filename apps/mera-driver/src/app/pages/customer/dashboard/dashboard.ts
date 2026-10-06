@@ -1,11 +1,12 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
+import { Workflow } from '../../workflow/workflow';
 import { CustomerSelfApiService, type CustomerSelf } from '../../../core/customers/customer-self-api.service';
 
 @Component({
   selector: 'md-customer-dashboard',
-  imports: [AdminPage],
+  imports: [AdminPage, Workflow],
   templateUrl: './dashboard.html',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })

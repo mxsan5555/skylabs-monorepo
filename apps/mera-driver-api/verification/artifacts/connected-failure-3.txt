@@ -1,0 +1,83 @@
+directions_car
+mera-driver
+Driver console
+dashboard
+Dashboard
+people
+Customers
+sports_motorsports
+Drivers
+directions_car
+Vehicles
+route
+TRIPS & BOOKINGS
+expand_more
+route
+Admin Dispatch
+sell
+Pricing
+event_available
+Attendance
+account_balance
+ACCOUNTS
+expand_more
+payments
+PAYMENTS & WALLETS
+expand_more
+local_offer
+PROMOTIONS
+expand_more
+quiz
+FAQs
+rate_review
+Feedback
+insights
+Reports
+category
+DRIVER MASTERS
+expand_more
+admin_panel_settings
+ADMINISTRATION
+expand_more
+fact_check
+KYC Assignments
+settings
+Settings
+S
+Super Admin
+9889259224
+person
+logout
+dock_to_right
+Account
+Admin Dispatch
+Admin Dispatch
+MD-6BF613CC
+Confirmed
+
+Hourly · Concurrent pickup → Concurrent drop
+
+Oct 1, 2026, 8:42:05 AM · ₹1,000.00 · Payment: pending
+
+View booking
+Offer to eligible drivers
+MD-3228F219
+Completed
+
+Hourly · Connected pickup → Connected drop
+
+Sep 30, 2026, 9:41:00 AM · ₹1,000.00 · Payment: paid
+
+View booking
+Offer to eligible drivers
+MD-72334
+Finding a driver
+
+Round Trip · vv →
+
+· ₹0.00 · Payment: pending
+
+Finding a driver
+
+View booking
+Offer to eligible drivers

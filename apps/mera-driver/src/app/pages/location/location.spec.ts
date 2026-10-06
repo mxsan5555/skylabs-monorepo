@@ -332,7 +332,8 @@ describe('Location Component', () => {
     component.transmission.set('manual');
     component.carType.set('hatchback');
 
-    // Default base: 599
+    // This test is specifically the existing four-hour round-trip quote.
+    component.tripType.set('round-trip');component.secureBooking.set(false);component.calculatePrice();
     expect(component.estimatedPrice()).toBe(599);
 
     // Invalid coupon
@@ -355,4 +356,7 @@ describe('Location Component', () => {
     expect(component.couponCode()).toBe('');
     expect(component.estimatedPrice()).toBe(599);
   });
+  it('keeps manual address entry usable without a browser Maps credential',()=>{delete (window as any).google;component.activeInput.set('drop');component.searchQuery.set('Manually entered address');component.onSearchChange();expect(component.dropAddress()).toBe('Manually entered address');expect(document.querySelector('script#google-maps-api-script')).toBeNull();});
+  it('uses the backend lookup and selected validated coordinates with no SDK',()=>{delete (window as any).google;component.searchQuery.set('Pune');component.lookupAddress();const request=httpMock.expectOne(r=>r.url.endsWith('/location/search'));expect(request.request.params.get('q')).toBe('Pune');expect(request.request.params.keys()).toEqual(['q']);request.flush({data:[{name:'Pune',address:'Pune, India',placeId:'place',lat:18.5,lng:73.8}]});component.selectLocation(component.suggestions()[0]);expect(component.pickupCoords()).toEqual([18.5,73.8]);expect(component.pickupAddress()).toBe('Pune, India');});
+
 });

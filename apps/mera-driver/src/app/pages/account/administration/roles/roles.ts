@@ -36,6 +36,7 @@ export class AdministrationRoles {
   protected readonly roles = signal<Role[]>([]);
   protected readonly rolesLoading = signal(true);
   protected readonly rolesError = signal<string | null>(null);
+  protected readonly isPortalRole = computed(() => ['customer','driver'].includes(this.selectedRole()?.key ?? ''));
   protected readonly selectedRoleId = signal<string | null>(null);
   protected readonly selectedRole = computed(() =>
     this.roles().find((r) => r.id === this.selectedRoleId()),

@@ -30,10 +30,10 @@ export const CreateCustomerSchema = z
   })
   .openapi('CreateCustomer');
 
-export const UpdateCustomerSchema = CreateCustomerSchema.partial().openapi('UpdateCustomer');
+export const UpdateCustomerSchema = CreateCustomerSchema.partial().extend({statusReason:z.string().trim().max(1000).optional(),acknowledgeActiveBookings:z.boolean().optional()}).openapi('UpdateCustomer');
 
 // ---------------------------------------------------------------------------
-// Customer <-> User linkage (admin action, self-service portal access) — mirrors
+// Customer <-> User linkage (admin action, self-service portal access) â€” mirrors
 // LinkDriverToUserSchema exactly.
 // ---------------------------------------------------------------------------
 
@@ -52,7 +52,7 @@ export const LinkCustomerToUserSchema = z
  * `driver.service.ts`), so a save can legitimately reach the backend with a later
  * sub-step's field (e.g. `email`, filled on sub-step 2) still blank because the driver
  * hasn't gotten there yet. Plain `z.string().optional()` already treats `''` as valid, but
- * `.email()`/`z.enum()` don't — this normalizes `''` to `undefined` first so "not filled in
+ * `.email()`/`z.enum()` don't â€” this normalizes `''` to `undefined` first so "not filled in
  * yet" doesn't 422 a sub-step save that's otherwise perfectly valid.
  */
 function emptyToUndefined<T extends z.ZodTypeAny>(schema: T) {
@@ -68,7 +68,7 @@ export const CreateDriverSchema = z
     email: emptyToUndefined(z.string().email().optional()),
     phone: z.string().optional(),
     emergencyNumber: z.string().optional(),
-    // `age` (below) is never trusted from the client — `driver.service.ts` always
+    // `age` (below) is never trusted from the client â€” `driver.service.ts` always
     // (re)derives it from `dob` server-side. Rejecting a future `dob` here is what keeps
     // that derived age meaningful.
     dob: emptyToUndefined(
@@ -88,6 +88,7 @@ export const CreateDriverSchema = z
     weight: z.string().optional(),
     country: z.string().optional(),
     state: z.string().optional(),
+    city: z.string().optional(),
     pincode: z.string().optional(),
     address: z.string().optional(),
     driverType: z.string().optional(),
@@ -120,11 +121,18 @@ export const CreateDriverSchema = z
     dlExpiryDate: z.string().optional(),
     policeVerifiedStatus: z.string().optional(),
     policeVerifiedNo: z.string().optional(),
-    jobType: z.string().optional(),
+    jobType: z.string().max(1000).optional(),
+    jobChoices:z.array(z.string().min(1).max(150)).max(20).optional(),
+    workLocation:z.enum(['Same State','Other States']).nullable().optional(),
+    workStates:z.array(z.string().min(1).max(150)).max(50).optional(),
     experience: z.string().optional(),
     currentSalary: z.string().optional(),
     expectedSalary: z.string().optional(),
+    driverStatusMasterId: z.string().uuid().nullable().optional(),
+    driverStatusChangeReason: z.string().trim().max(2000).optional(),
+    registrationFeeEntryChoice: z.enum(['Paid','Unpaid']).optional(),
     preferredPaymentMode: z.string().optional(),
+    accountPaymentMethod: z.string().optional(),
     amount: z.string().optional(),
     paymentReceiptDate: z.string().optional(),
     bankName: z.string().optional(),
@@ -132,13 +140,14 @@ export const CreateDriverSchema = z
     ifscCode: z.string().optional(),
     branchName: z.string().optional(),
     upiIdOrChequeNo: z.string().optional(),
-    // Not Driver columns — the onboarding-wizard tab (1-4) and, within it, the nested
+    // Not Driver columns â€” the onboarding-wizard tab (1-4) and, within it, the nested
     // sub-step (0-based) this save completes. Read by `driver.service.ts`'s
     // `deriveOnboardingFields` and stripped before hitting Prisma. Omitted entirely (a plain
     // admin edit, or the driver's own `/drivers/me`) leaves onboarding progress untouched.
     // `subStepCompleted` without `stepCompleted` is meaningless and ignored server-side.
     stepCompleted: z.number().int().min(1).max(4).optional(),
     subStepCompleted: z.number().int().min(0).max(3).optional(),
+    completeStep: z.boolean().optional(),
   })
   .openapi('CreateDriver');
 
@@ -149,6 +158,7 @@ export const CreateDriverDocumentSchema = z
     category: z.enum(['personal', 'health', 'education', 'police']),
     type: z.string().min(1),
     regNo: z.string().optional(),
+    expiresAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value=>!Number.isNaN(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value,'Use a valid expiry date').optional(),
   })
   .openapi('CreateDriverDocument');
 
@@ -216,25 +226,27 @@ export const LinkDriverToUserSchema = z
   .openapi('LinkDriverToUser');
 
 // ---------------------------------------------------------------------------
-// Driver account status (Active/Inactive) — portal login gate, independent of the KYC
+// Driver account status (Active/Inactive) â€” portal login gate, independent of the KYC
 // `status` field above. Never part of `CreateDriverSchema`/`UpdateDriverSchema`, same
 // reasoning as User's `SetUserStatusSchema`: changed only via its own dedicated endpoint.
 // ---------------------------------------------------------------------------
 
 export const SetDriverStatusSchema = z
   .object({
-    accountStatus: z.enum(['Active', 'Inactive']),
+    accountStatus: z.enum(['Active', 'Inactive', 'Suspended']),
+    reason:z.string().trim().min(1).max(2000).optional(),
   })
   .openapi('SetDriverStatus');
 
 // ---------------------------------------------------------------------------
-// KYC verifier assignment + per-category checklist — independent of the final `status`
+// KYC verifier assignment + per-category checklist â€” independent of the final `status`
 // above, which stays gated by `drivers:edit` only. See `driver.service.ts`.
 // ---------------------------------------------------------------------------
 
 export const AssignVerifierSchema = z
   .object({
     verifierId: z.string().uuid().nullable(),
+    reason:z.string().trim().max(1000).optional(),
   })
   .openapi('AssignVerifier');
 

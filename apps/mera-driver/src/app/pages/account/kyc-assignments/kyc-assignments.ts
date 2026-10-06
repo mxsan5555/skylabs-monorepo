@@ -1,6 +1,10 @@
+import { ActivatedRoute } from '@angular/router';
+import {AuthService} from '@skylabs-monorepo/shared-auth/angular';
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, inject, OnInit, computed } from '@angular/core';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { DriversApiService, type Driver } from '../../../core/drivers/drivers-api.service';
+import { httpErrorMessage } from '../../../core/http-error';
+import { PillReviewComponent } from './pill-review';
 
 type ChecklistCategory = 'personal' | 'health' | 'education' | 'police';
 type ChecklistStatus = 'Verified' | 'Rejected' | 'Correction Requested';
@@ -27,13 +31,15 @@ interface ChecklistCategoryView {
 @Component({
   selector: 'md-account-kyc-assignments',
   standalone: true,
-  imports: [AdminPage],
+  imports: [AdminPage, PillReviewComponent],
   templateUrl: './kyc-assignments.html',
-  styleUrl: '../masters/masters.css',
+  styleUrl: './kyc-assignments.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class KycAssignments implements OnInit {
   private readonly api = inject(DriversApiService);
+  readonly auth=inject(AuthService);
+  private readonly route=inject(ActivatedRoute);
 
   readonly checklistVariant = checklistVariant;
 
@@ -58,6 +64,8 @@ export class KycAssignments implements OnInit {
     { key: 'lastName', label: 'Last Name', sortable: true },
     { key: 'phone', label: 'Phone', sortable: true },
     { key: 'driverType', label: 'Driver Type', sortable: true },
+    {key:'queueState',label:'Review state'},
+    {key:'reviewerName',label:'Assigned verifier'},
     {
       key: 'status',
       label: 'KYC Status',
@@ -80,8 +88,10 @@ export class KycAssignments implements OnInit {
 
   readonly tableActions = JSON.stringify([{ icon: 'fact_check', label: 'Review KYC', event: 'review_kyc' }]);
 
-  readonly tableRowsString = computed(() => JSON.stringify(this.assignedDrivers()));
-  readonly totalDrivers = computed(() => this.assignedDrivers().length);
+  readonly tableRowsString = computed(() => JSON.stringify(this.assignedDrivers().map(driver=>({...driver,reviewerName:driver.assignedVerifier?.name??'Unassigned'}))));
+  readonly totalDrivers=signal(0);readonly page=signal(1);readonly pageSize=signal(25);readonly sort=signal('createdAt');readonly direction=signal<'asc'|'desc'>('desc');readonly search=signal('');readonly queueState=signal('');readonly counts=signal<Partial<Record<string,number>>>({});readonly queueStates=['Unassigned','Assigned','Issues Raised','Completed'];
+  filterState(state:string){this.queueState.set(state);this.page.set(1);this.reload();}
+  tableParams(event:Event){const detail=(event as CustomEvent).detail;this.page.set(detail.page??1);this.pageSize.set(detail.pageSize??25);this.sort.set(detail.sortKey||'createdAt');this.direction.set(detail.sortDir==='asc'?'asc':'desc');this.search.set(detail.search??'');this.reload();}
 
   readonly checklistCategories = computed<ChecklistCategoryView[]>(() => {
     const d = this.selectedDriver();
@@ -95,18 +105,20 @@ export class KycAssignments implements OnInit {
   });
 
   ngOnInit(): void {
+    const requested=this.route.snapshot.queryParamMap.get('review');if(requested)this.openDetail(requested);
     this.reload();
   }
 
   private reload(): void {
     this.loading.set(true);
-    this.api.listAssignedToMe().subscribe({
+    this.actionError.set(null);
+    this.api.assignmentQueue({page:this.page(),pageSize:this.pageSize(),sort:this.sort(),direction:this.direction(),search:this.search(),...(this.queueState()?{state:this.queueState()}: {})}).subscribe({
       next: (data) => {
-        this.assignedDrivers.set(data);
+        this.assignedDrivers.set(data.rows);this.totalDrivers.set(data.meta.total);this.counts.set(data.meta.counts);
         this.loading.set(false);
       },
       error: (err) => {
-        console.error('Failed to load assigned KYC queue', err);
+        void httpErrorMessage(err).then(message=>this.actionError.set(message));
         this.loading.set(false);
       },
     });

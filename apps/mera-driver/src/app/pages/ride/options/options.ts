@@ -59,7 +59,7 @@ export class RideOptions {
 
   /** Options in the active category. */
   protected readonly options = computed<RideOption[]>(() =>
-    this.booking.rideOptions.filter((o) => o.category === this.category()),
+    this.booking.rideOptions().filter((o) => o.category === this.category()),
   );
 
   /** The currently chosen option (defaults to the recommended one). */
@@ -89,6 +89,6 @@ export class RideOptions {
     const ride = this.selected();
     if (!ride) return;
     this.booking.selectRide(ride);
-    this.router.navigate(['/ride/drivers']);
+    this.router.navigate(['/ride/payment']);
   }
 }

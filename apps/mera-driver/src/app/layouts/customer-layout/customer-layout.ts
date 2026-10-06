@@ -14,11 +14,12 @@ export interface CustomerNavItem {
  *  is a "coming soon" page, not a fake data screen) — no Vehicles/Documents/Payments, since
  *  none of those have real customer-facing functionality in this codebase today. */
 export const CUSTOMER_NAV_ITEMS: CustomerNavItem[] = [
-  { path: '/customer', label: 'Dashboard', icon: 'home' },
-  { path: '/customer/profile', label: 'My Profile', icon: 'person' },
+  { path: '/customer', label: 'My Dashboard', icon: 'home' },
+  { path: '/customer/book', label: 'Book a Driver', icon: 'directions_car' },
   { path: '/customer/bookings', label: 'My Bookings', icon: 'book_online' },
-  { path: '/customer/notifications', label: 'Notifications', icon: 'notifications' },
-  { path: '/customer/support', label: 'Support', icon: 'support_agent' },
+  { path: '/customer/payments', label: 'Payments & Invoices', icon: 'payments' },
+  { path: '/customer/profile', label: 'My Profile', icon: 'person' },
+  { path: '/customer/support', label: 'Help & Support', icon: 'support_agent' },
 ];
 
 /**

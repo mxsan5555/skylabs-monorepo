@@ -1,13 +1,15 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, inject, OnInit, computed, effect } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Router, NavigationEnd } from '@angular/router';
+import { httpErrorMessage } from '../../../core/http-error';
+import { Router, NavigationEnd, ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom, filter } from 'rxjs';
 import { calculateAge } from '@skylabs-monorepo/shared-utils';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { DriversApiService, type Driver } from '../../../core/drivers/drivers-api.service';
-import { RbacApiService } from '../../../core/rbac/rbac-api.service'; 
-import { buildResumeHtml, buildResumeSections, type ResumeSection } from './driver-resume';
+import { RbacApiService } from '../../../core/rbac/rbac-api.service';
+import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
+import { InlineDl } from '../../../shared/inline-dl/inline-dl';
 
 /** The 4 tabs are the onboarding wizard's persistence checkpoints — sub-section chip
  *  navigation within a tab is a pure UI concern and never itself hits the backend. */
@@ -19,6 +21,14 @@ const TOTAL_ONBOARDING_STEPS = 4;
 const MAX_SUBS = [4, 2, 3, 2];
 
 const TAB_NAMES = ['Personal Details', 'Education & Health Details', 'Documents Details', 'Payment Details'];
+// Current pill fields only: saving finance must not replay defaults or stale
+// reviewed fields from unrelated pills. KYC status and trusted fee state are absent.
+const PILL_SAVE_FIELDS: (keyof Driver)[][][] = [
+  [['firstName','lastName','fatherName','motherName','dob','gender','maritalStatus','language'],['email','phone','emergencyNumber','pincode','state','city','address'],['height','weight','religion','color'],['sourceType','jobType','jobChoices','workLocation','workStates','experience','driverType','avatar']],
+  [['education','trainingStatus','trainingCertificate'],['eyeVision','bloodGroup','healthInsurance']],
+  [['licenseDetails','vehicleType','dlNo','dlIssueDate','dlExpiryDate'],['policeVerifiedStatus','policeVerifiedNo','currentSalary','expectedSalary'],[]],
+  [['accountPaymentMethod','bankName','bankAccountNo','ifscCode','branchName','upiIdOrChequeNo'],['preferredPaymentMode','amount','paymentReceiptDate','driverStatusMasterId']],
+];
 
 /** Driver List progress display — e.g. "In Progress — Personal Details, sub-step 2 of 4 (18%)"
  *  / "Completed — 100%". A driver with no onboarding data at all (shouldn't happen
@@ -27,7 +37,7 @@ function onboardingLabel(d: Driver): string {
   if (d.onboardingStatus === 'in_progress') {
     const tab = Math.min(Math.max(d.currentStep ?? 1, 1), TOTAL_ONBOARDING_STEPS);
     const sub = Math.min(Math.max(d.currentSubStep ?? 0, 0), MAX_SUBS[tab - 1] - 1);
-    return `In Progress — ${TAB_NAMES[tab - 1]}, sub-step ${sub + 1} of ${MAX_SUBS[tab - 1]} (${d.completionPercentage ?? 0}%)`;
+    return `${d.completionPercentage ?? 0}% · ${TAB_NAMES[tab - 1]} → pill ${sub + 1}`;
   }
   return 'Completed — 100%';
 }
@@ -41,7 +51,7 @@ function subStepKey(tabIndex: number, subIndex: number): number {
 @Component({
   selector: 'md-account-drivers',
   standalone: true,
-  imports: [AdminPage],
+  imports: [AdminPage, RouterLink, InlineDl],
   templateUrl: './drivers.html',
   styleUrl: '../masters/masters.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
@@ -51,6 +61,13 @@ export class Drivers implements OnInit {
   private readonly api = inject(DriversApiService);
   private readonly rbac = inject(RbacApiService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  protected readonly auth = inject(AuthService);
+  readonly moreDriver = signal<Driver | null>(null);
+  moreAction(action: string, driver: Driver): void {
+    this.moreDriver.set(null);
+    this.onRowAction(new CustomEvent('action', { detail: { action, row: driver } }));
+  }
 
   constructor() {
     this.router.events
@@ -81,37 +98,18 @@ export class Drivers implements OnInit {
   readonly verifierSaving = signal<boolean>(false);
   readonly verifierError = signal<string | null>(null);
 
-  // --- Read-only Driver Resume/Profile Preview ---
-  readonly previewDriver = signal<Driver | null>(null);
-  readonly previewSections = computed<ResumeSection[]>(() => {
-    const d = this.previewDriver();
-    return d ? buildResumeSections(d) : [];
-  });
+  openPreview(driver: Driver): void { void this.router.navigate(['/account/drivers', driver.id, 'details']); }
 
-  openPreview(driver: Driver): void {
-    this.previewDriver.set(driver);
-  }
-
-  closePreview(): void {
-    this.previewDriver.set(null);
-  }
-
-  /** Browser-native print-to-PDF — no new PDF library. Opens the resume in its own
-   *  window with print-only styling (not the admin console chrome) and invokes print(),
-   *  which every major browser can save as a PDF from its destination picker. */
-  downloadPdf(driver: Driver): void {
-    const html = buildResumeHtml(driver);
-    const win = window.open('', '_blank', 'width=850,height=1100');
-    if (!win) {
-      alert('Please allow pop-ups for this site to download the PDF.');
-      return;
-    }
-    win.document.write(html);
-    win.document.close();
-    win.onload = () => {
-      win.focus();
-      win.print();
-    };
+  /** Download a fresh, authorized backend-generated PDF. */
+  downloadPdf(driver: Driver, resume = false): void {
+    if (!driver.id) return;
+    (resume ? this.api.resumePdf(driver.id) : this.api.profileReport(driver.id)).subscribe({
+      next: pdf => {
+        const url = URL.createObjectURL(pdf);
+        const link = document.createElement('a'); link.href = url; link.download = resume ? `${driver.name.normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu,'_').slice(0,80)||'Driver'}_Driver_Resume.pdf` : `driver-full-report-${driver.id}.pdf`; link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      }, error: async error => { alert(await httpErrorMessage(error)); },
+    });
   }
 
   // --- Search, Filter, Sort & Pagination Signals ---
@@ -127,7 +125,6 @@ export class Drivers implements OnInit {
   readonly activeFormTab = signal<number>(0);
   readonly activeSubSection = signal<number>(0);
   readonly editingDriverId = signal<string | null>(null);
-
   // --- Step-by-step persistence (onboarding wizard) ---
   readonly savingStep = signal<boolean>(false);
   readonly stepError = signal<string | null>(null);
@@ -263,11 +260,6 @@ export class Drivers implements OnInit {
         this.markTouched('dlNo');
         return !this.dlNoError();
       }
-    } else if (tab === 3) {
-      if (sub === 1) {
-        this.markTouched('status');
-        return !this.statusError();
-      }
     }
     return true;
   }
@@ -296,7 +288,7 @@ export class Drivers implements OnInit {
   readonly inputAddress = signal<string>('');
   readonly inputDriverTypes = signal<string[]>([]);
   readonly inputStatus = signal<string>('');
-  readonly inputSourceType = signal<string>('WalkIn');
+  readonly inputSourceType = signal<string>('');
   readonly inputVehicle = signal<string>('Personal Sedan');
   readonly inputAvatar = signal<string>('');
 
@@ -304,6 +296,7 @@ export class Drivers implements OnInit {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
       const file = input.files[0];
+      if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>10*1024*1024){this.stepError.set('Upload a PNG, JPEG or WebP profile photo up to 10 MB');return;}
       this.inputAvatar.set(file.name);
       this.pendingFiles.set('avatar-0', file);
     }
@@ -360,7 +353,7 @@ export class Drivers implements OnInit {
   readonly inputAge = signal<string>('');
   readonly inputHeight = signal<string>('');
   readonly inputWeight = signal<string>('');
-  readonly inputEducation = signal<string>('No Formal Education');
+  readonly inputEducation = signal<string>('');
   readonly inputTrainingStatus = signal<string>('No');
   readonly inputTrainingCertificate = signal<string>('');
   readonly inputEyeVision = signal<string>('Normal Vision');
@@ -369,14 +362,14 @@ export class Drivers implements OnInit {
 
   // --- Form Input Signals (Tab 3: Documents) ---
   readonly inputLicenseDetails = signal<string>('LMV');
-  readonly inputVehicleType = signal<string>('SEDAN');
+  readonly inputVehicleType = signal<string>('');
   readonly inputDlNo = signal<string>('');
   readonly inputDlIssueDate = signal<string>('');
   readonly inputDlExpiryDate = signal<string>('');
   readonly inputPoliceVerifiedStatus = signal<string>('No');
   readonly inputPoliceVerifiedNo = signal<string>('');
   readonly inputPoliceVerifiedUpload = signal<string>('');
-  readonly inputJobType = signal<string>('Full time');
+  readonly inputJobType = signal<string>('');
   readonly inputExperience = signal<string>('1 Year');
   readonly inputCurrentSalary = signal<string>('');
   readonly inputExpectedSalary = signal<string>('10000-15000');
@@ -387,7 +380,46 @@ export class Drivers implements OnInit {
   readonly inputPreferredPaymentMode = signal<string>('Cash');
   readonly inputAccountPaymentMethod = signal<string>('Bank Account');
   readonly inputRegistrationFeeStatus = signal<string>('Unpaid');
-  readonly registrationFeeStatuses = signal<string[]>(['Unpaid', 'Paid']);
+  readonly actualFeeStatus = signal('Unpaid');
+  private originalRegistrationDetails = '';
+  readonly expectedRegistrationFeePaise = signal(0);
+  readonly feeRequired = signal(false);
+  readonly inputDriverStatusMasterId = signal<string | null>(null);
+  readonly originalDriverStatusMasterId = signal<string | null>(null);
+  readonly cashConfirmed = signal(false);
+  readonly collectionReference = signal('');
+  readonly collectionReason = signal('');
+  readonly confirmingCollection = signal(false);
+  private registrationReceipt: File | null = null;
+  driverStatusOptions(){const all=this.formMasters()['statuses']??[];return all.filter(option=>option.status==='Active'||option.id===this.originalDriverStatusMasterId());}
+  feePolicyLabel(){const amount=this.expectedRegistrationFeePaise();return amount>0?`${this.feeRequired()?'Required':'Optional'} fee: ${new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(amount/100)}`:'No registration amount configured; Accounts must configure a fee policy before recording collection.';}
+  selectRegistrationFee(value: 'Paid' | 'Unpaid', event?: Event){
+    if(value==='Unpaid' && this.actualFeeStatus()==='Paid'){const radio=event?.target as (HTMLElement & {checked:boolean})|undefined;if(radio){radio.checked=false;const paid=radio.closest('fieldset')?.querySelector('md-radio[value="Paid"]') as (HTMLElement & {checked:boolean})|null;if(paid)paid.checked=true;}this.stepError.set('This fee has a verified collection. Use Accounts Registration Fees refund/correction with a reason; this form cannot reverse its ledger.');return;}
+    this.inputRegistrationFeeStatus.set(value);this.stepError.set(null);this.cashConfirmed.set(false);
+    if(value==='Unpaid'){this.registrationReceipt=null;this.inputRegistrationReceiptFile.set('');}
+  }
+  private registrationDetailsError():string|null{
+    if(this.inputRegistrationFeeStatus()!=='Paid')return null;
+    if(this.actualFeeStatus()==='Paid'&&!this.registrationReceipt&&JSON.stringify([this.inputPreferredPaymentMode(),this.inputAmount(),this.inputPaymentReceiptDate()])===this.originalRegistrationDetails)return null;
+    if(!this.registrationPaymentModes().includes(this.inputPreferredPaymentMode()))return 'Choose a configured payment mode';
+    const amount=Number(this.inputAmount());
+    if(!/^\d+(\.\d{1,2})?$/.test(this.inputAmount().trim())||amount<=0||!Number.isSafeInteger(Math.round(amount*100)))return 'Enter a positive payment amount with at most two decimal places';
+    const date=this.inputPaymentReceiptDate();if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date)return 'Enter a valid receipt date';
+    return null;
+  }
+  async confirmCashCollection(){
+    this.stepError.set(null);
+    const error=this.registrationDetailsError();
+    if(error){this.stepError.set(error);return;}
+    if(!this.auth.can('payments.overview','edit')||this.inputRegistrationFeeStatus()!=='Paid'||this.inputPreferredPaymentMode()!=='Cash'||!this.cashConfirmed()||!this.collectionReference().trim()||!this.collectionReason().trim()){this.stepError.set('Confirm actual cash received and provide a transaction reference and audit reason');return;}
+    if(this.expectedRegistrationFeePaise()<=0){this.stepError.set('Configure the registration fee policy in Accounts before confirming collection');return;}
+    this.confirmingCollection.set(true);
+    try{
+      if(!await this.persistStep(3,1,false,false))return;
+      await firstValueFrom(this.api.confirmRegistrationCash(this.editingDriverId()!,Math.round(Number(this.inputAmount())*100),this.collectionReference().trim(),this.collectionReason().trim()));
+      const state=await firstValueFrom(this.api.registrationState(this.editingDriverId()!));this.actualFeeStatus.set(state.fee);this.cashConfirmed.set(false);this.reload();
+    }catch(error){this.stepError.set(await httpErrorMessage(error as Parameters<typeof httpErrorMessage>[0]));}finally{this.confirmingCollection.set(false);}
+  }
   readonly inputAmount = signal<string>('');
   readonly inputPaymentReceiptDate = signal<string>('');
   readonly inputRegistrationReceiptFile = signal<string>('');
@@ -400,12 +432,13 @@ export class Drivers implements OnInit {
   onRegistrationReceiptFileChange(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
-      this.inputRegistrationReceiptFile.set(input.files[0].name);
+      const file=input.files[0];if(!['image/png','image/jpeg','image/webp','application/pdf'].includes(file.type)||file.size>10*1024*1024){this.stepError.set('Choose an image or PDF receipt up to 10 MB');return;}this.registrationReceipt=file;
+      this.inputRegistrationReceiptFile.set(file.name);
     }
   }
 
   clearRegistrationReceiptFile(): void {
-    this.inputRegistrationReceiptFile.set('');
+    this.registrationReceipt=null;this.inputRegistrationReceiptFile.set('');
   }
 
   // --- Dynamic Document Lists ---
@@ -426,17 +459,26 @@ export class Drivers implements OnInit {
   // driver record has a real id (on save), since document rows have no id until then.
   private readonly pendingFiles = new Map<string, File>();
 
+  readonly masterLoading=signal(false);readonly masterError=signal('');readonly formMasters=signal<Record<string,{id:string;name:string;status:string;code?:string}[]>>({});
+  readonly inputJobChoices=signal<string[]>([]);readonly inputWorkLocation=signal('');readonly inputWorkStates=signal<string[]>([]);readonly stateSearch=signal('');readonly inputAccountStatus=signal('Active');readonly originalAccountStatus=signal('Active');readonly statusReason=signal('');
+  loadFormMasters(){this.masterLoading.set(true);this.masterError.set('');this.api.formOptions().subscribe({next:options=>{this.formMasters.set(options);const fields:Record<string,{set:(value:string[])=>void}>={'source-types':this.sourceTypes,languages:this.languages,'driver-types':this.driverTypeOptions,education:this.educationLevels,'eye-visions':this.eyeVisions,'vehicle-types':this.vehicleTypeOptions,'job-types':this.jobTypeOptions,'personal-docs':this.personalDocTypes,'health-docs':this.healthDocTypes,'police-docs':this.policeDocTypes};for(const[key,field]of Object.entries(fields))field.set((options[key]??[]).filter(option=>option.status==='Active').map(option=>option.name));this.masterLoading.set(false);},error:async error=>{this.masterError.set(await httpErrorMessage(error));this.masterLoading.set(false);}});}
+  choices(value:string){return value.split(',').map(v=>v.trim()).filter(Boolean);}
+  choiceSelected(value:string[],name:string){return value.some(item=>item.toLowerCase()===name.toLowerCase());}
+  masterNames(category:string,saved:string[]=[]){return this.choicesWithSaved(category,saved).map(item=>item.name);}
+  choicesWithSaved(category:string,saved:string[]){const options=(this.formMasters()[category]??[]).filter(item=>item.status==='Active');return [...options,...saved.filter(value=>!options.some(item=>item.name.toLowerCase()===value.toLowerCase())).map(name=>({id:name,name,status:'Historical'}))];}
+  toggleChoice(field:'jobType'|'vehicleType'|'jobChoices'|'workStates',name:string,checked:boolean){const signal=field==='jobType'?this.inputJobType:field==='vehicleType'?this.inputVehicleType:null;const current=signal?this.choices(signal()):field==='jobChoices'?this.inputJobChoices():this.inputWorkStates();const selected=current.filter(value=>value.toLowerCase()!==name.toLowerCase());if(checked)selected.push(name);if(signal)signal.set(selected.join(', '));else if(field==='jobChoices')this.inputJobChoices.set(selected);else this.inputWorkStates.set(selected);}
+  stateOptions(){return this.choicesWithSaved('states',this.inputWorkStates()).filter(option=>option.name.toLowerCase().includes(this.stateSearch().toLowerCase()));}
   // --- Personal Detail Master Options ---
-  readonly sourceTypes = signal<string[]>(['WalkIn', 'Website', 'Referral']);
+  readonly sourceTypes = signal<string[]>([]);
   readonly maritalStatuses = signal<string[]>(['Unmarried', 'Married', 'Divorced', 'Widowed']);
   readonly genders = signal<string[]>(['Male', 'Female', 'Other']);
   readonly religions = signal<string[]>(['Hindu', 'Muslim', 'Christian', 'Sikh', 'Buddhist', 'Jain', 'Parsi', 'Other']);
   readonly colors = signal<string[]>(['Light Skin', 'Dark Skin']);
-  readonly languages = signal<string[]>(['Hindi', 'English', 'Bhojpuri', 'Other']);
-  readonly driverTypeOptions = signal<string[]>(['Personal driver', 'Car Driver', 'Bike Rider', 'Ambulance Driver', 'Construction Vehicle Driver']);
+  readonly languages = signal<string[]>([]);
+  readonly driverTypeOptions = signal<string[]>([]);
 
   // --- Education Master Options ---
-  readonly educationLevels = signal<string[]>(['No Formal Education', 'Primary School (Class 1–5)', 'Secondary School (Class 6–10)', 'Higher Secondary (Class 11–12)', 'Diploma / Certification Course', "Bachelor's Degree", "Master's Degree", 'Doctorate / PhD']);
+  readonly educationLevels = signal<string[]>([]);
   readonly trainingStatuses = signal<string[]>(['Yes', 'No']);
   readonly educationDocTypes = signal<string[]>([
     '10th Certificate / Marksheet',
@@ -449,15 +491,15 @@ export class Drivers implements OnInit {
   ]);
 
   // --- Health Master Options ---
-  readonly eyeVisions = signal<string[]>(['Normal Vision', 'Wear Glasses', 'Color Blind']);
+  readonly eyeVisions = signal<string[]>([]);
   readonly bloodGroups = signal<string[]>(['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']);
   readonly healthInsurances = signal<string[]>(['Yes', 'No']);
 
   // --- Document Category Options ---
   readonly licenseDetailsOptions = signal<string[]>(['HMV', 'HPMV', 'HTV', 'LMV', 'LMV-TR', 'MCWG', 'MCWOG', 'MGV', 'TRAILER']);
-  readonly vehicleTypeOptions = signal<string[]>(['HUV', 'MUV', 'SUV', 'SEDAN', 'HATCHBACK']);
+  readonly vehicleTypeOptions = signal<string[]>([]);
   readonly policeVerifiedStatuses = signal<string[]>(['Yes', 'No']);
-  readonly jobTypeOptions = signal<string[]>(['Full time', 'Part Time']);
+  readonly jobTypeOptions = signal<string[]>([]);
   readonly experienceOptions = signal<string[]>(['1 Year', '2 Year', '3 Year', '4 Year', '5+ Years']);
   readonly expectedSalaryOptions = signal<string[]>(['10000-15000', '15000-20000', '20000-25000', '25000+']);
   readonly documentCategoryOptions = signal<string[]>([
@@ -475,9 +517,9 @@ export class Drivers implements OnInit {
     'Vehicle Insurance Certificate',
     'Vehicle Registration Certificate (RC)'
   ]);
-  readonly personalDocTypes = signal<string[]>(['Aadhaar / National ID', 'Passport', 'PAN Card', 'Driving License', 'Voter ID']);
-  readonly healthDocTypes = signal<string[]>(['Eye Vision Test', 'Medical Fitness Certificate', 'Health Insurance Policy', 'Vaccine Certificate']);
-  readonly policeDocTypes = signal<string[]>(['Address Proof', 'Police Clearance Certificate (PCC)', 'Character Verification Form']);
+  readonly personalDocTypes = signal<string[]>([]);
+  readonly healthDocTypes = signal<string[]>([]);
+  readonly policeDocTypes = signal<string[]>([]);
 
   // --- Payment Master Options ---
   readonly registrationPaymentModes = signal<string[]>(['Cash', 'Cheque', 'NEFT', 'RTGS', 'Online']);
@@ -494,13 +536,17 @@ export class Drivers implements OnInit {
 
   // --- Table Configuration JSON Strings ---
   readonly tableColumns = JSON.stringify([
-    { key: 'avatar', label: 'Image', type: 'image' },
-    { key: 'firstName', label: 'First Name', sortable: true },
-    { key: 'lastName', label: 'Last Name', sortable: true },
-    { key: 'email', label: 'Email', sortable: true },
-    { key: 'phone', label: 'Phone', sortable: true },
+    { key:'initials', label:'Photo / Initials', width:'56px' },
+    { key: 'name', label: 'Driver', sortable: true, width:'220px' },
+    { key:'id', label:'Driver ID', hidden:true, sortable:true },
+    { key: 'firstName', label: 'First Name', sortable: true, hidden: true },
+    { key: 'lastName', label: 'Last Name', sortable: true, hidden: true },
+    { key: 'email', label: 'Email', sortable: true, hidden: true },
+    { key: 'phone', label: 'Mobile', sortable: true, hidden:true },
+    { key: 'city', label: 'City', sortable:true },
     { key: 'driverType', label: 'Driver Type', sortable: true },
-    { key: 'status', label: 'Status', type: 'status', statusMap: {
+    { key: 'kycLabel', label: 'KYC', type: 'status', statusMap: { Pending: 'warning', Verified: 'success', Partial: 'info', Blacklisted: 'error', Closed: 'error' } },
+    { key: 'status', label: 'Full KYC Status', hidden: true, type: 'status', statusMap: {
         'Verified': 'success',
         'Partially Verified (P)': 'info',
         'Partially Verified (K)': 'info',
@@ -510,8 +556,14 @@ export class Drivers implements OnInit {
         'Not Useful': 'error'
       }
     },
-    { key: 'accountStatus', label: 'Account Status', type: 'status', statusMap: { Active: 'success', Inactive: 'error' } },
-    { key: 'onboardingLabel', label: 'Onboarding', sortable: false },
+    { key: 'accountStatus', label: 'Account Status', hidden:true, type: 'status', statusMap: { Active: 'success', Inactive: 'error',Suspended:'warning' } },
+    { key: 'feeLabel', label: 'Registration Fee', type: 'status',statusMap:{Paid:'success',Waived:'info',Unpaid:'warning',Pending:'warning',Failed:'error',Refunded:'error'} },
+    { key:'dlApiStatus',label:'DL API',type:'status',hidden:true,statusMap:{'Not checked':'neutral','Manual review required':'warning','Provider failed':'warning','Expired':'warning','Mismatch/Invalid':'error'} },
+    { key: 'licenceStatus', label: 'Licence (human review)', type: 'status',statusMap:{'Manual approved':'success','Not checked':'warning','Expired / invalid':'error'}, hidden:true },
+    { key: 'eligibilityLabel', label: 'Trip Eligibility', width:'230px' },
+    { key: 'completionPercentage', label: 'Onboarding %', sortable: true },
+    { key:'onboardingLabel', label:'Onboarding position', hidden:true },
+    { key:'feeStatus', label:'Registration fee state', hidden:true },
     { key: 'fatherName', label: 'Father Name', sortable: true, hidden: true },
     { key: 'motherName', label: 'Mother Name', sortable: true, hidden: true },
     { key: 'emergencyNumber', label: 'Emergency No', sortable: false, hidden: true },
@@ -548,12 +600,13 @@ export class Drivers implements OnInit {
     { key: 'currentSalary', label: 'Current Salary', sortable: true, hidden: true },
     { key: 'expectedSalary', label: 'Expected Salary', sortable: true, hidden: true },
     { key: 'preferredPaymentMode', label: 'Payment Mode', sortable: true, hidden: true },
+    { key: 'driverStatusName', label: 'Driver Status', hidden: true },
     { key: 'amount', label: 'Payment Amount', sortable: true, hidden: true },
     { key: 'bankName', label: 'Bank Name', sortable: true, hidden: true },
     { key: 'bankAccountNo', label: 'Bank Account No', sortable: false, hidden: true },
     { key: 'ifscCode', label: 'IFSC Code', sortable: false, hidden: true },
     { key: 'upiIdOrChequeNo', label: 'UPI / Cheque', sortable: false, hidden: true },
-    { key: 'linkedAccountLabel', label: 'Portal Account', sortable: false, hidden: true },
+    { key: 'linkedAccountLabel', label: 'Portal Account', sortable: false },
     { key: 'assignedVerifierLabel', label: 'KYC Verifier', sortable: false, hidden: true }
   ]);
 
@@ -569,58 +622,47 @@ export class Drivers implements OnInit {
   ]);
 
   readonly tableActions = JSON.stringify([
-    { icon: 'badge', label: 'Preview / View Resume', event: 'preview_driver' },
-    { icon: 'picture_as_pdf', label: 'Download PDF', event: 'download_pdf' },
-    { icon: 'visibility', label: 'View Details', event: '__view_detail__' },
-    { icon: 'edit', label: 'Edit', event: 'edit_driver' },
-    { icon: 'manage_accounts', label: 'Driver User Account', event: 'link_driver' },
-    { icon: 'power_settings_new', label: 'Activate / Deactivate', event: 'toggle_driver_status' },
-    { icon: 'assignment_ind', label: 'Assign KYC Verifier', event: 'assign_verifier' },
-    { icon: 'delete', label: 'Delete', event: 'delete_driver', variant: 'danger' }
+    { icon: 'badge', label: 'View', event: 'preview_driver' },
+    { icon: 'more_horiz', label: 'More actions', event: 'more_driver' },
   ]);
 
-  // --- Processed and Filtered Dataset ---
-  readonly processedDrivers = computed(() => {
-    let list: Driver[] = this.allDrivers();
-
-    // 1. Search Query Filter
-    const query = this.searchQuery().toLowerCase().trim();
-    if (query) {
-      list = list.filter(d =>
-        (d.firstName || '').toLowerCase().includes(query) ||
-        (d.lastName || '').toLowerCase().includes(query) ||
-        (d.email || '').toLowerCase().includes(query) ||
-        (d.phone || '').includes(query) ||
-        (d.driverType && d.driverType.toLowerCase().includes(query)) ||
-        (d.state && d.state.toLowerCase().includes(query))
-      );
-    }
-
-    // 2. Dropdown Status Filter
-    const filter = this.statusFilter();
-    if (filter !== 'all') {
-      list = list.filter(d => d.status === filter);
-    }
-
-    // 3. Columns Sort
-    const key = this.sortKey();
-    const dir = this.sortDir();
-    if (key && dir) {
-      list = [...list].sort((a: any, b: any) => {
-        const valA = String(a[key] ?? '').toLowerCase();
-        const valB = String(b[key] ?? '').toLowerCase();
-        return dir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-      });
-    }
-
-    return list;
-  });
+  readonly loginFilter = signal('');
+  readonly cityFilter = signal('');
+  readonly stateFilter = signal('');
+  readonly sourceFilter = signal('');
+  readonly typeFilter = signal('');
+  readonly accountFilter = signal('');
+  readonly feeFilter = signal('');readonly eligibilityFilter=signal('');readonly availabilityFilter=signal('');readonly licenceFilter=signal('');
+  readonly listError = signal<string | null>(null);
+  readonly summary = signal<{totalDrivers:number;driverUsers:number;noLogin:number;kycPending:number;feeUnpaid?:number;readyForTrips?:number}>({ totalDrivers: 0, driverUsers: 0, noLogin: 0, kycPending: 0 });
+  readonly totalDrivers = signal(0);
+  private searchSequence = 0;
+  readonly processedDrivers = computed(() => this.allDrivers());
+  readonly selectedView = signal('all');
+  readonly filtersVisible = signal(true);
+  readonly listViews = [{key:'all',label:'All Drivers'},{key:'users',label:'Driver Users'},{key:'review',label:'Need KYC Review'},{key:'ready',label:'Ready for Trips'}];
+  readonly activeFilters = computed(() => [
+    {key:'type',label:'Skills: '+this.typeFilter(),value:this.typeFilter()},
+    {key:'city',label:'City: '+this.cityFilter(),value:this.cityFilter()},
+    {key:'kyc',label:'KYC: '+this.statusFilter(),value:this.statusFilter()==='all'?'':this.statusFilter()},
+    {key:'fee',label:'Fee: '+this.feeFilter(),value:this.feeFilter()},
+    {key:'availability',label:'Availability: '+this.availabilityFilter(),value:this.availabilityFilter()},
+  ].filter(filter=>filter.value));
+  summaryCount(view:string) { const stats=this.summary(); return view==='users'?stats.driverUsers:view==='review'?stats.kycPending:view==='ready'?stats.readyForTrips??0:stats.totalDrivers; }
+  setListFilter(key: string, value: string) {
+    const filters: Record<string, typeof this.loginFilter> = { login: this.loginFilter, city: this.cityFilter, state: this.stateFilter, source: this.sourceFilter, type: this.typeFilter, account: this.accountFilter,fee:this.feeFilter,eligibility:this.eligibilityFilter,availability:this.availabilityFilter,licence:this.licenceFilter,kyc:this.statusFilter };
+    filters[key]?.set(key==='kyc' && !value?'all':value); this.page.set(1); this.reload();
+  }
+  quickView(view:string){this.selectedView.set(this.listViews.some(item=>item.key===view)?view:'all');this.page.set(1);this.reload();}
+  toggleFilters(){this.filtersVisible.update(value=>!value);this.saveListState();}
+  clearFilters(){this.typeFilter.set('');this.cityFilter.set('');this.statusFilter.set('all');this.feeFilter.set('');this.availabilityFilter.set('');this.page.set(1);this.reload();}
+  private saveListState(){try{sessionStorage.setItem('mera-driver-list-state',JSON.stringify({view:this.selectedView(),type:this.typeFilter(),city:this.cityFilter(),kyc:this.statusFilter(),fee:this.feeFilter(),availability:this.availabilityFilter(),visible:this.filtersVisible(),search:this.searchQuery(),page:this.page(),pageSize:this.pageSize(),sort:this.sortKey(),direction:this.sortDir()}));}catch{/* Storage may be unavailable in a private browser. */}}
+  private restoreListState(){try{const state=JSON.parse(sessionStorage.getItem('mera-driver-list-state')??'null');if(!state)return;this.selectedView.set(this.listViews.some(view=>view.key===state.view)?state.view:'all');this.typeFilter.set(state.type??'');this.cityFilter.set(state.city??'');this.statusFilter.set(state.kyc??'all');this.feeFilter.set(state.fee??'');this.availabilityFilter.set(state.availability??'');this.filtersVisible.set(state.visible!==false);this.searchQuery.set(state.search??'');this.page.set(Math.max(1,Number(state.page)||1));this.pageSize.set([10,25,50,100].includes(state.pageSize)?state.pageSize:10);this.sortKey.set(state.sort??'firstName');this.sortDir.set(state.direction==='desc'?'desc':'asc');}catch{/* Ignore invalid saved UI state. */}}
 
   // --- Paginated Rows to Pass to sky-data-table ---
   readonly tableRowsString = computed(() => {
     const list = this.processedDrivers();
-    const start = (this.page() - 1) * this.pageSize();
-    const paginated = list.slice(start, start + this.pageSize());
+    const paginated = list;
     // `linkedUser` is a nested object — the shared data table's generic detail drawer just
     // does `String(value)` per field, which would render `[object Object]`. Swap it for a
     // flat display label instead; the link/unlink panel reads the real object off
@@ -628,8 +670,13 @@ export class Drivers implements OnInit {
     return JSON.stringify(
       paginated.map((d) => ({
         ...d,
+        kycLabel: d.status === 'Non-Verified' ? 'Pending' : d.status?.startsWith('Partially Verified') ? 'Partial' : d.status,
+        initials: (d.firstName || d.name || '').slice(0,1).toUpperCase() + (d.lastName || '').slice(0,1).toUpperCase(),
+        name: `${d.name} · ID ${String(d.id).slice(0,8)} · ${d.phone || 'No mobile'}`,
+        feeLabel: d.feeStatus==='Unpaid' && d.registrationFeeRequired===false?'Optional':d.feeStatus || 'Unpaid',
+        eligibilityLabel: d.readyForTrips?'Ready':d.blockingReasons?.[0] || 'Not ready for trips',
         linkedUser: undefined,
-        linkedAccountLabel: d.linkedUser ? `${d.linkedUser.name} (${d.linkedUser.phone ?? d.linkedUser.email ?? ''})` : 'Not linked',
+        linkedAccountLabel: d.linkedUser ? `${d.linkedUser.name} (${d.linkedUser.phone ?? d.linkedUser.email ?? ''})` : 'Login not created',
         assignedVerifier: undefined,
         assignedVerifierLabel: d.assignedVerifier ? d.assignedVerifier.name : 'Unassigned',
         onboardingLabel: onboardingLabel(d),
@@ -637,9 +684,11 @@ export class Drivers implements OnInit {
     );
   });
 
-  readonly totalDrivers = computed(() => this.processedDrivers().length);
+
 
   ngOnInit(): void {
+    this.loadFormMasters();
+    this.restoreListState();
     // Load copy strings dynamically (static UI copy, not business data)
     this.http.get<any>('data/drivers-registry.json').subscribe({
       next: (data) => {
@@ -656,23 +705,31 @@ export class Drivers implements OnInit {
     });
 
     this.reload();
+    const edit=this.route.snapshot.queryParamMap.get('edit');
+    if(edit && this.auth.can('drivers','edit'))this.api.search({search:edit,page:1,pageSize:1}).subscribe({next:result=>{const driver=result.rows.find(row=>row.id===edit);if(driver)this.onRowAction(new CustomEvent('action',{detail:{action:'edit_driver',row:driver}}));else this.listError.set('Driver not found');},error:async error=>this.listError.set(await httpErrorMessage(error))});
   }
 
   private reload(): void {
-    this.loading.set(true);
-    this.api.list().subscribe({
-      next: (data) => {
-        this.allDrivers.set(data);
-        this.loading.set(false);
+    this.saveListState();
+    const sequence = ++this.searchSequence;
+    this.loading.set(true); this.listError.set(null);
+    const serverSort = this.sortKey()==='name'?'firstName':this.sortKey();
+    const sortable = ['createdAt', 'firstName', 'lastName', 'phone', 'email', 'status', 'state', 'driverType', 'accountStatus','city','id','completionPercentage'];
+    const query: Record<string, string | number> = { view:this.selectedView(), page: this.page(), pageSize: this.pageSize(), search: this.searchQuery(), sort: sortable.includes(serverSort) ? serverSort : 'createdAt', direction: this.sortDir() || 'desc' };
+    const filters = { status: this.statusFilter() === 'all' ? '' : this.statusFilter(), city: this.cityFilter(), state: this.stateFilter(), sourceType: this.sourceFilter(), driverType: this.typeFilter(), login: this.loginFilter(), accountStatus: this.accountFilter(),fee:this.feeFilter(),eligibility:this.eligibilityFilter(),availability:this.availabilityFilter(),licence:this.licenceFilter() };
+    for (const [key, value] of Object.entries(filters)) if (value) query[key] = value;
+    this.api.search(query).subscribe({
+      next: result => {
+        if (sequence !== this.searchSequence) return;
+        this.allDrivers.set(result.rows); this.totalDrivers.set(result.meta.total); this.summary.set(result.meta.summary); this.loading.set(false);
+      }, error: () => {
+        if (sequence !== this.searchSequence) return;
+        this.loading.set(false); this.listError.set('Could not load drivers. Please try again.');
       },
-      error: (err) => {
-        console.error('Failed to load drivers', err);
-        this.loading.set(false);
-      }
     });
   }
 
-  // --- Build the current full-form snapshot (reused by every step save + the final save) ---
+  // Form values are selected by the active pill, including on initial creation.
   private buildPayload(): Driver {
     const firstName = this.inputFirstName().trim();
     const lastName = this.inputLastName().trim();
@@ -706,7 +763,6 @@ export class Drivers implements OnInit {
       pincode: this.inputPincode().trim(),
       address: this.inputAddress().trim(),
       driverType: this.inputDriverTypes().join(', '),
-      status: this.inputStatus(),
       sourceType: this.inputSourceType(),
       education: this.inputEducation(),
       trainingStatus: this.inputTrainingStatus(),
@@ -722,15 +778,16 @@ export class Drivers implements OnInit {
       dlExpiryDate: this.inputDlExpiryDate(),
       policeVerifiedStatus: this.inputPoliceVerifiedStatus(),
       policeVerifiedNo: this.inputPoliceVerifiedNo().trim(),
-      jobType: this.inputJobType(),
+      jobType: this.inputJobType(),jobChoices:this.inputJobChoices(),workLocation:this.inputWorkLocation()||null,workStates:this.inputWorkStates(),
       experience: this.inputExperience(),
       currentSalary: this.inputCurrentSalary().trim(),
       expectedSalary: this.inputExpectedSalary(),
       // --- Payment Details ---
+      driverStatusMasterId:this.inputDriverStatusMasterId(),
       preferredPaymentMode: this.inputPreferredPaymentMode(),
-      registrationFeeStatus: this.inputRegistrationFeeStatus(),
       amount: this.inputAmount().trim(),
       paymentReceiptDate: this.inputPaymentReceiptDate(),
+      accountPaymentMethod: this.inputAccountPaymentMethod(),
       bankName: this.inputBankName().trim(),
       bankAccountNo: this.inputBankAccountNo().trim(),
       ifscCode: this.inputIfscCode().trim(),
@@ -739,32 +796,43 @@ export class Drivers implements OnInit {
     };
   }
 
-  /**
-   * Persists the current full-form snapshot immediately, tagged with the exact nested
-   * (tab, sub) onboarding sub-step that was just completed. The very first save (no driver
-   * yet) creates the record; every later sub-step updates the SAME record (`editingDriverId`,
-   * set from that first response) — never a second `POST`. Sending the full snapshot on every
-   * sub-step is safe (not a partial-data risk): the component's input signals already hold
-   * every previously-saved field (populated from the backend on `edit_driver`, or entered
-   * earlier in this same session), so nothing gets blanked — only the new sub-step's
-   * `completedSubSteps` entry actually changes. Resolves `true` on success (caller advances
-   * the UI), `false` on failure (caller stays put — the error is already surfaced via
-   * `stepError`).
-   */
-  private async persistStep(tabIndex: number, subIndex: number, isFinal: boolean): Promise<boolean> {
+  /** Save only the active pill; creation also supplies the required identity fields. */
+  private async persistStep(tabIndex: number, subIndex: number, isFinal: boolean, complete = true): Promise<boolean> {
     this.savingStep.set(true);
     this.stepError.set(null);
     const payload = this.buildPayload();
     const editingId = this.editingDriverId();
     const stepCompleted = tabIndex + 1;
+    const fields:Partial<Driver>={};
+    for(const key of PILL_SAVE_FIELDS[tabIndex][subIndex]) (fields as Record<string,unknown>)[key]=payload[key];
 
     try {
+      if(tabIndex===3&&subIndex===1){
+        fields.registrationFeeEntryChoice=this.inputRegistrationFeeStatus()==='Paid'?'Paid':'Unpaid';
+        if(fields.registrationFeeEntryChoice==='Unpaid')for(const key of ['preferredPaymentMode','amount','paymentReceiptDate'] as const)delete fields[key];
+        if(complete){const error=this.registrationDetailsError();if(error)throw new Error(error);}
+        if(this.inputDriverStatusMasterId()!==this.originalDriverStatusMasterId()){
+          if(!this.auth.can('drivers','status_change'))throw new Error('Driver status-change permission required');
+          if(editingId && !this.statusReason().trim())throw new Error('Enter a driver status change reason');
+          fields.driverStatusMasterId=this.inputDriverStatusMasterId();fields.driverStatusChangeReason=this.statusReason().trim();
+        }else delete fields.driverStatusMasterId;
+      }
+      const avatarFile=tabIndex===0&&subIndex===3?this.pendingFiles.get('avatar-0'):undefined;
+      if(avatarFile){
+        delete fields.avatar;
+        if(editingId){const doc=await firstValueFrom(this.api.uploadDocument(editingId,'personal','Profile Photo','',avatarFile));if(!doc.filePath)throw new Error('Profile photo upload did not return a saved file');fields.avatar=doc.filePath;this.inputAvatar.set(doc.filePath);this.pendingFiles.delete('avatar-0');}
+      }
       const driver = editingId !== null
-        ? await firstValueFrom(this.api.update(editingId, payload, stepCompleted, subIndex))
-        : await firstValueFrom(this.api.create(payload, stepCompleted, subIndex));
+        ? await firstValueFrom(this.api.saveFormPill(editingId, fields, stepCompleted, subIndex, complete))
+        : await firstValueFrom(this.api.create({ ...fields, name: payload.name, vehicle: '', phone: fields.phone ?? '', firstName: payload.firstName, gender: payload.gender }, stepCompleted, subIndex, complete));
 
       if (editingId === null) this.editingDriverId.set(driver.id!);
+      if(tabIndex===3&&subIndex===1){this.originalDriverStatusMasterId.set(this.inputDriverStatusMasterId());this.statusReason.set('');
+        if(this.inputRegistrationFeeStatus()==='Paid' && this.registrationReceipt){await firstValueFrom(this.api.uploadDocument(driver.id!,'personal','Registration Fee Receipt','',this.registrationReceipt));this.registrationReceipt=null;}
+      }
+      if(avatarFile && editingId===null){const doc=await firstValueFrom(this.api.uploadDocument(driver.id!,'personal','Profile Photo','',avatarFile));if(!doc.filePath)throw new Error('Profile photo upload did not return a saved file');this.inputAvatar.set(doc.filePath);this.pendingFiles.delete('avatar-0');}
       this.formCompletedSubSteps.set(driver.completedSubSteps ?? []);
+      this.inputStatus.set(driver.status || 'Non-Verified');
       this.uploadPendingDocuments(driver.id!);
       this.reload();
       this.savingStep.set(false);
@@ -777,7 +845,7 @@ export class Drivers implements OnInit {
     } catch (err) {
       console.error(`Failed to save tab ${stepCompleted} sub-step ${subIndex}`, err);
       this.savingStep.set(false);
-      this.stepError.set('Failed to save. Please check your connection and try again.');
+      this.stepError.set(await httpErrorMessage(err as Parameters<typeof httpErrorMessage>[0]));
       return false;
     }
   }
@@ -785,11 +853,14 @@ export class Drivers implements OnInit {
   // --- Final "Save & Register" / "Save Changes" action (last tab's last sub-section) ---
   async addDriver(): Promise<void> {
     this.formSubmitted.set(true);
-    if (this.firstNameError() || this.genderError() || this.phoneError() || this.emailError() || this.statusError() || this.driverTypeError() || this.avatarError()) {
-      this.activeFormTab.set(0);
-      return;
-    }
+    // Every pill validates its own fields. A registration save cannot require
+    // unrelated profile fields or attempt final KYC approval.
+    if (!this.validateCurrentStep()) return;
     await this.persistStep(TOTAL_ONBOARDING_STEPS - 1, MAX_SUBS[TOTAL_ONBOARDING_STEPS - 1] - 1, true);
+  }
+  async saveDraft():Promise<void>{
+    if(!this.editingDriverId()&&(!this.inputFirstName().trim()||!this.inputGender().trim())){this.markTouched('firstName');this.markTouched('gender');return;}
+    await this.persistStep(this.activeFormTab(),this.activeSubSection(),false,false);
   }
 
   private uploadPendingDocuments(driverId: string): void {
@@ -916,10 +987,10 @@ export class Drivers implements OnInit {
     this.inputAddress.set('');
     this.inputDriverTypes.set([]);
     this.inputStatus.set('');
-    this.inputSourceType.set('WalkIn');
+    this.inputSourceType.set('');
     this.inputVehicle.set('Personal Sedan');
     this.inputAvatar.set('');
-    this.inputEducation.set('No Formal Education');
+    this.inputEducation.set('');
     this.inputTrainingStatus.set('No');
     this.inputTrainingCertificate.set('');
     this.inputEyeVision.set('Normal Vision');
@@ -927,14 +998,14 @@ export class Drivers implements OnInit {
     this.inputBloodGroup.set('O+');
     // --- Revert Document Inputs ---
     this.inputLicenseDetails.set('LMV');
-    this.inputVehicleType.set('SEDAN');
+    this.inputVehicleType.set('');
     this.inputDlNo.set('');
     this.inputDlIssueDate.set('');
     this.inputDlExpiryDate.set('');
     this.inputPoliceVerifiedStatus.set('No');
     this.inputPoliceVerifiedNo.set('');
     this.inputPoliceVerifiedUpload.set('');
-    this.inputJobType.set('Full time');
+    this.inputJobType.set('');this.inputJobChoices.set([]);this.inputWorkLocation.set('');this.inputWorkStates.set([]);this.inputAccountStatus.set('Active');this.originalAccountStatus.set('Active');this.statusReason.set('');
     this.inputExperience.set('1 Year');
     this.inputCurrentSalary.set('');
     this.inputExpectedSalary.set('10000-15000');
@@ -942,7 +1013,7 @@ export class Drivers implements OnInit {
     this.inputDocumentUpload.set('');
     // --- Revert Payment Inputs ---
     this.inputPreferredPaymentMode.set('Cash');
-    this.inputRegistrationFeeStatus.set('Unpaid');
+    this.inputRegistrationFeeStatus.set('Unpaid');this.actualFeeStatus.set('Unpaid');this.expectedRegistrationFeePaise.set(0);this.feeRequired.set(false);this.inputDriverStatusMasterId.set(null);this.originalDriverStatusMasterId.set(null);this.cashConfirmed.set(false);this.collectionReference.set('');this.collectionReason.set('');this.registrationReceipt=null;this.originalRegistrationDetails='';
     this.inputAmount.set('');
     this.inputPaymentReceiptDate.set('');
     this.inputRegistrationReceiptFile.set('');
@@ -961,12 +1032,13 @@ export class Drivers implements OnInit {
   // --- DataTable Event Observers ---
   onParamsChange(event: Event): void {
     const detail = (event as CustomEvent).detail;
-    this.page.set(detail.page);
+    this.page.set((detail.search ?? '') !== this.searchQuery() ? 1 : detail.page);
     this.pageSize.set(detail.pageSize);
     this.sortKey.set(detail.sortKey);
     this.sortDir.set(detail.sortDir);
-    this.searchQuery.set(detail.search);
-    this.statusFilter.set(detail.filter || 'all');
+    this.searchQuery.set(detail.search ?? '');
+    // KYC is owned by the external filter panel, not the table's optional dropdown.
+    this.reload();
   }
 
   onRowSelect(event: Event): void {
@@ -978,6 +1050,11 @@ export class Drivers implements OnInit {
     const detail = (event as CustomEvent).detail;
     const action = detail.action;
     const row = detail.row;
+
+    if (action === 'more_driver') {
+      this.moreDriver.set(this.allDrivers().find(d => d.id === row.id) ?? null);
+      return;
+    }
 
     if (action === 'edit_driver') {
       this.editingDriverId.set(row.id);
@@ -1007,33 +1084,34 @@ export class Drivers implements OnInit {
       this.inputAddress.set(row.address || '');
       this.inputDriverTypes.set(row.driverType ? row.driverType.split(', ').map((s: string) => s.trim()) : []);
       this.inputStatus.set(row.status || 'Non-Verified');
-      this.inputSourceType.set(row.sourceType || 'WalkIn');
+      this.inputSourceType.set(row.sourceType || '');
       this.inputVehicle.set(row.vehicle || 'Personal Sedan');
       this.inputAvatar.set(row.avatar || '');
-      this.inputEducation.set(row.education || 'No Formal Education');
+      this.inputEducation.set(row.education || '');
       this.inputTrainingStatus.set(row.trainingStatus || 'No');
       this.inputTrainingCertificate.set(row.trainingCertificate || '');
       this.inputEyeVision.set(row.eyeVision || 'Normal Vision');
       this.inputHealthInsurance.set(row.healthInsurance || 'No');
       this.inputBloodGroup.set(row.bloodGroup || 'O+');
       this.inputLicenseDetails.set(row.licenseDetails || 'LMV');
-      this.inputVehicleType.set(row.vehicleType || 'SEDAN');
+      this.inputVehicleType.set(row.vehicleType || '');
       this.inputDlNo.set(row.dlNo || '');
       this.inputDlIssueDate.set(row.dlIssueDate || '');
       this.inputDlExpiryDate.set(row.dlExpiryDate || '');
       this.inputPoliceVerifiedStatus.set(row.policeVerifiedStatus || 'No');
       this.inputPoliceVerifiedNo.set(row.policeVerifiedNo || '');
       this.inputPoliceVerifiedUpload.set(row.policeVerifiedUpload || '');
-      this.inputJobType.set(row.jobType || 'Full time');
+      this.inputJobType.set(row.jobType || '');this.inputJobChoices.set(row.jobChoices??[]);this.inputWorkLocation.set(row.workLocation??'');this.inputWorkStates.set(row.workStates??[]);this.inputAccountStatus.set(row.accountStatus??'Active');this.originalAccountStatus.set(row.accountStatus??'Active');this.statusReason.set('');
       this.inputExperience.set(row.experience || '1 Year');
       this.inputCurrentSalary.set(row.currentSalary || '');
       this.inputExpectedSalary.set(row.expectedSalary || '10000-15000');
       this.inputDocumentCategory.set(row.documentCategory || 'Driving License');
       this.inputDocumentUpload.set(row.documentUpload || '');
-      this.inputPreferredPaymentMode.set(row.preferredPaymentMode || 'Bank Account');
-      this.inputRegistrationFeeStatus.set(row.registrationFeeStatus || (row.amount ? 'Paid' : 'Unpaid'));
+      this.inputPreferredPaymentMode.set(row.preferredPaymentMode || '');
+      this.actualFeeStatus.set(row.feeStatus || 'Unpaid');this.inputRegistrationFeeStatus.set(row.feeStatus==='Paid'?'Paid':'Unpaid');this.expectedRegistrationFeePaise.set(row.registrationFeePaise??0);this.feeRequired.set(row.registrationFeeRequired??false);this.inputDriverStatusMasterId.set(row.driverStatusMasterId??null);this.originalDriverStatusMasterId.set(row.driverStatusMasterId??null);this.registrationReceipt=null;this.cashConfirmed.set(false);this.collectionReference.set('');this.collectionReason.set('');
       this.inputAmount.set(row.amount || '');
-      this.inputPaymentReceiptDate.set(row.paymentReceiptDate || '');
+      this.inputPaymentReceiptDate.set(row.paymentReceiptDate || '');this.inputRegistrationReceiptFile.set(row.registrationReceiptFile??'');this.originalRegistrationDetails=JSON.stringify([this.inputPreferredPaymentMode(),this.inputAmount(),this.inputPaymentReceiptDate()]);
+      this.inputAccountPaymentMethod.set(row.accountPaymentMethod || '');
       this.inputBankName.set(row.bankName || '');
       this.inputBankAccountNo.set(row.bankAccountNo || '');
       this.inputIfscCode.set(row.ifscCode || '');
@@ -1085,7 +1163,8 @@ export class Drivers implements OnInit {
       // mutation), not the serialized table row — the resume must show the latest data.
       const driver = this.allDrivers().find((d) => d.id === row.id);
       if (driver) this.openPreview(driver);
-    } else if (action === 'download_pdf') {
+    } else if (action === 'download_resume') { const driver = this.allDrivers().find(d=>d.id===row.id); if(driver)this.downloadPdf(driver,true); }
+    else if (action === 'download_pdf') {
       const driver = this.allDrivers().find((d) => d.id === row.id);
       if (driver) this.downloadPdf(driver);
     }
@@ -1130,7 +1209,9 @@ export class Drivers implements OnInit {
     if (!driver?.id) return;
     this.verifierSaving.set(true);
     this.verifierError.set(null);
-    this.api.assignVerifier(driver.id, verifierId).subscribe({
+    let reason:string|undefined;
+    if(driver.assignedVerifierId && driver.assignedVerifierId!==verifierId){reason=window.prompt('Reason for changing the KYC verifier (previous review history is preserved)')?.trim();if(!reason){this.verifierSaving.set(false);this.verifierError.set('Reassignment reason required');return;}}
+    this.api.assignVerifier(driver.id, verifierId, reason).subscribe({
       next: (updated) => {
         this.verifierSaving.set(false);
         this.allDrivers.update((list) => list.map((d) => (d.id === updated.id ? updated : d)));
@@ -1164,6 +1245,7 @@ export class Drivers implements OnInit {
         this.linkSaving.set(false);
         this.allDrivers.update((list) => list.map((d) => (d.id === updated.id ? updated : d)));
         this.linkPanelDriver.set(updated);
+        this.reload();
       },
       error: (err) => {
         this.linkSaving.set(false);
@@ -1177,7 +1259,7 @@ export class Drivers implements OnInit {
    *  silently lock out (or restore) a driver's portal login. */
   toggleDriverStatus(driver: Driver): void {
     if (!driver.id) return;
-    const next: 'Active' | 'Inactive' = driver.accountStatus === 'Inactive' ? 'Active' : 'Inactive';
+    const next: 'Active' | 'Inactive' = driver.accountStatus !== 'Active' ? 'Active' : 'Inactive';
     const question =
       next === 'Inactive'
         ? 'Are you sure you want to deactivate this driver?'
@@ -1191,6 +1273,8 @@ export class Drivers implements OnInit {
       },
     });
   }
+
+  suspendDriver(driver:Driver):void{if(!driver.id||!this.auth.can('drivers','status_change'))return;const reason=prompt('Reason for suspending this driver');if(!reason?.trim())return;this.moreDriver.set(null);this.api.setAccountStatus(driver.id,'Suspended',reason.trim()).subscribe({next:()=>this.reload(),error:()=>alert('Unable to suspend driver')});}
 
   unlinkUser(driver: Driver): void {
     if (!driver.id) return;
@@ -1327,7 +1411,7 @@ export class Drivers implements OnInit {
       // --- Payment details ---
       case 'preferredPaymentMode': this.inputPreferredPaymentMode.set(val); break;
       case 'accountPaymentMethod': this.inputAccountPaymentMethod.set(val); break;
-      case 'registrationFeeStatus': this.inputRegistrationFeeStatus.set(val); break;
+      case 'registrationFeeStatus': this.selectRegistrationFee(val as 'Paid'|'Unpaid'); break;
       case 'amount': this.inputAmount.set(val); break;
       case 'paymentReceiptDate': this.inputPaymentReceiptDate.set(val); break;
       case 'bankName': this.inputBankName.set(val); break;

@@ -10,11 +10,19 @@
       <p class="otp-muted">{{ d.phone }} @if (d.email) { · {{ d.email }} }</p>
     </section>
 
+    @if (nextAction(); as action) {
+      <section class="account-card"><h2>Next action</h2><md-filled-button (click)="go(action.path)">{{ action.label }}</md-filled-button></section>
+    }
     <div class="driver-dash-grid">
+      <button type="button" class="driver-dash-card" (click)="go('/driver/profile?tab=3&pill=0')">
+        <md-icon aria-hidden="true">badge</md-icon>
+        <span class="driver-dash-card__label">DL API</span>
+        <span class="driver-dash-card__hint">{{ dl()?.status || 'Not checked' }}</span>
+      </button>
       <button type="button" class="driver-dash-card" (click)="go('/driver/profile')">
         <md-icon aria-hidden="true">person</md-icon>
         <span class="driver-dash-card__label">My Profile</span>
-        <span class="driver-dash-card__hint">Edit your details</span>
+        <span class="driver-dash-card__hint">{{ d.completionPercentage }}% complete</span>
       </button>
       <button type="button" class="driver-dash-card" (click)="go('/driver/kyc')">
         <md-icon aria-hidden="true">verified_user</md-icon>
@@ -26,21 +34,27 @@
         <span class="driver-dash-card__label">Documents</span>
         <span class="driver-dash-card__hint">Upload &amp; manage</span>
       </button>
-      <button type="button" class="driver-dash-card" (click)="go('/driver/vehicle')">
+      <button type="button" class="driver-dash-card" (click)="go('/driver/fee')">
+        <md-icon aria-hidden="true">payments</md-icon>
+        <span class="driver-dash-card__label">Registration Fee</span>
+        <span class="driver-dash-card__hint">{{ readiness()?.fee || 'Status unavailable' }} @if (readiness(); as r) { {{ r.driver.registrationFeeRequired ? '(Required)' : '(Optional)' }} }</span>
+      </button>
+      <button type="button" class="driver-dash-card" (click)="go('/driver/availability')">
         <md-icon aria-hidden="true">directions_car</md-icon>
-        <span class="driver-dash-card__label">My Vehicle</span>
-        <span class="driver-dash-card__hint">Coming soon</span>
+        <span class="driver-dash-card__label">Availability</span>
+        <span class="driver-dash-card__hint">@if (readiness(); as r) { {{ r.driver.online ? 'Online' : 'Offline' }} } @else { Status unavailable }</span>
       </button>
       <button type="button" class="driver-dash-card" (click)="go('/driver/trips')">
         <md-icon aria-hidden="true">route</md-icon>
         <span class="driver-dash-card__label">My Trips</span>
-        <span class="driver-dash-card__hint">Coming soon</span>
+        <span class="driver-dash-card__hint">View current data</span>
       </button>
       <button type="button" class="driver-dash-card" (click)="go('/driver/notifications')">
         <md-icon aria-hidden="true">notifications</md-icon>
         <span class="driver-dash-card__label">Notifications</span>
-        <span class="driver-dash-card__hint">Coming soon</span>
+        <span class="driver-dash-card__hint">View current data</span>
       </button>
     </div>
   }
+  <md-workflow embedded="driverSummary" />
 </md-admin-page>

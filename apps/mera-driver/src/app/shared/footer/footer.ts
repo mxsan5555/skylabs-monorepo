@@ -38,7 +38,7 @@ export class Footer {
     {
       heading: 'Driver',
       links: [
-        { label: 'Become a Driver', to: '/sign-in' },
+        { label: 'Become a Driver', to: '/become-driver' },
         { label: 'Driver requirements', to: '/', fragment: 'requirements' },
         { label: 'Earnings', to: '/', fragment: 'earnings' },
         { label: 'Safety & Trust', to: '/safety' },

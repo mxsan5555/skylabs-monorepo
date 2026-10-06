@@ -4,6 +4,7 @@ import { getMenuForApp } from '@skylabs-monorepo/shared-menu';
 import { permissionKeyFor } from '@skylabs-monorepo/shared-permissions';
 import { PERMISSION_ACTIONS, type MenuNode, type PermissionAction } from '@skylabs-monorepo/shared-types';
 import { invalidatePermissionCache } from './permission.service';
+import { isPortalRole } from './portal-context';
 
 export async function listRoles() {
   return prisma.role.findMany({ orderBy: { createdAt: 'asc' } });
@@ -48,6 +49,7 @@ export async function deleteRole(id: string) {
 
 export async function cloneRole(id: string, newKey: string, newName: string) {
   const source = await getRoleById(id);
+  if (isPortalRole(source.key)) throw new HttpError(422, 'SYSTEM_PORTAL_ROLE', 'System portal roles cannot be cloned into staff roles.');
   const permissionLinks = await prisma.rolePermission.findMany({ where: { roleId: id } });
   const widgetLinks = await prisma.roleDashboardWidget.findMany({ where: { roleId: id } });
 
@@ -85,7 +87,8 @@ export async function setRoleStatus(id: string, isActive: boolean) {
 }
 
 export async function setRolePermissions(roleId: string, permissionIds: string[]) {
-  await getRoleById(roleId);
+  const role = await getRoleById(roleId);
+  if (isPortalRole(role.key)) throw new HttpError(422, 'SYSTEM_PORTAL_ROLE', 'Customer and Driver are system portal roles; staff permissions cannot be assigned.');
 
   const validCount = await prisma.permission.count({ where: { id: { in: permissionIds } } });
   if (validCount !== permissionIds.length) {
@@ -109,7 +112,8 @@ export interface RoleWidgetInput {
 }
 
 export async function setRoleWidgets(roleId: string, widgets: RoleWidgetInput[]) {
-  await getRoleById(roleId);
+  const role = await getRoleById(roleId);
+  if (isPortalRole(role.key)) throw new HttpError(422, 'SYSTEM_PORTAL_ROLE', 'Portal roles do not have staff dashboard widgets.');
 
   const widgetIds = widgets.map((w) => w.widgetId);
   const validCount = await prisma.dashboardWidget.count({ where: { id: { in: widgetIds } } });

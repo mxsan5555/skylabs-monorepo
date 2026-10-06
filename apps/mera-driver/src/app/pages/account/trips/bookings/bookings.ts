@@ -48,8 +48,8 @@ export class Bookings implements OnInit {
   readonly vehicleCategories = signal<string[]>(['Sedan', 'Hatchback', 'SUV', 'Luxury', 'Auto', 'Bike']);
   readonly tripTypeOptions = signal<string[]>(['One Way', 'Round Trip', 'Local (Hourly)', 'Outstation', 'Airport', 'Rental']);
   readonly statusOptions = signal<string[]>(['requested', 'accepted', 'driver_arrived', 'ongoing', 'completed', 'cancelled']);
-  readonly paymentStatusOptions = signal<string[]>(['pending', 'paid', 'refunded', 'failed']);
-  readonly paymentModeOptions = signal<string[]>(['cash', 'upi', 'card', 'wallet']);
+  readonly paymentStatusOptions = signal<string[]>(['pending', 'unpaid', 'partial', 'paid', 'refunded', 'failed']);
+  readonly paymentModeOptions = signal<string[]>(['cash', 'razorpay', 'upi', 'card', 'wallet']);
 
   readonly tableColumns = JSON.stringify([
     { key: 'booking_code', label: 'Code', sortable: true },
@@ -59,6 +59,7 @@ export class Bookings implements OnInit {
     { key: 'pickup_address', label: 'Pickup', sortable: false },
     { key: 'drop_address', label: 'Drop', sortable: false },
     { key: 'status', label: 'Status', type: 'status', statusMap: { completed: 'success', ongoing: 'info', driver_arrived: 'info', accepted: 'info', requested: 'warning', cancelled: 'error' } },
+    { key: 'payment_method', label: 'Payment method', sortable: true },
     { key: 'payment_status', label: 'Payment', sortable: true },
     { key: 'final_fare', label: 'Fare (₹)', sortable: true },
   ]);
@@ -66,7 +67,7 @@ export class Bookings implements OnInit {
     { icon: 'edit', label: 'Edit', event: 'edit_option' },
     { icon: 'delete', label: 'Delete', event: 'delete_option', variant: 'danger' },
   ]);
-  readonly tableRowsString = computed(() => JSON.stringify(this.list()));
+  readonly tableRowsString = computed(() => JSON.stringify(this.list().map(b=>({...b,payment_method:b.payment_mode==='cash'?'Cash on Delivery (COD)':b.payment_mode==='razorpay'?'Razorpay':b.payment_mode}))));
 
   ngOnInit(): void {
     this.reload();

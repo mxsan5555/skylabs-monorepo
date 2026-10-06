@@ -16,7 +16,9 @@ export async function createBooking(input: Record<string, unknown>) {
 }
 
 export async function updateBooking(id: string, input: Record<string, unknown>) {
-  await getBookingById(id);
+  const booking = await getBookingById(id);
+  if (booking.farePaise != null && Object.keys(input).some(key => ['status','paymentStatus','driverName','estimatedFare','finalFare','otp','startedAt','completedAt','acceptedAt','scheduledAt','customerId'].includes(key)))
+    throw new HttpError(422, 'WORKFLOW_REQUIRED', 'Use dispatch, trip transitions or Accounts for this priced booking');
   return prisma.booking.update({ where: { id }, data: input as never });
 }
 

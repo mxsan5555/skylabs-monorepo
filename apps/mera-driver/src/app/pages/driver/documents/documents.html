@@ -28,6 +28,7 @@
         (input)="regNo.set($any($event.target).value)"
       ></md-outlined-text-field>
       <input type="file" (change)="onFileSelected($event)" aria-label="Choose file" />
+      <label>Document expiry (optional)<input type="date" [value]="expiry()" (input)="expiry.set($any($event.target).value)" /></label>
       <div class="address-form__actions">
         <md-filled-button [disabled]="uploading()" (click)="upload()">
           {{ uploading() ? 'Uploading…' : 'Upload' }}
@@ -57,11 +58,13 @@
                       {{ doc.regNo }} ·
                     }
                     {{ doc.fileName ?? 'No file' }}
+                    · Version {{doc.version ?? 1}} · {{doc.archivedAt ? 'Archived' : 'Current'}}
+                    @if(doc.expiresAt){ · Expiry {{doc.expiresAt}} }
                   </div>
                 </div>
-                <md-icon-button [attr.aria-label]="'Delete ' + doc.type" (click)="remove(doc)">
+                @if(!doc.archivedAt){<md-icon-button [attr.aria-label]="'Withdraw ' + doc.type" (click)="remove(doc)">
                   <md-icon aria-hidden="true">delete</md-icon>
-                </md-icon-button>
+                </md-icon-button>}
               </li>
             }
           </ul>

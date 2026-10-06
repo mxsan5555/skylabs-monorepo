@@ -37,10 +37,11 @@ describe('appRoutes — RBAC wiring', () => {
   it.each([
     ['dashboard', 'dashboard', 'view'],
     ['drivers', 'drivers', 'view'],
+    ['drivers/:id/details', 'drivers', 'view'],
     ['vehicles', 'vehicles', 'view'],
-    ['trips', 'trips', 'view'],
+    ['trips/bookings', 'trips.bookings', 'view'],
     ['attendance', 'attendance', 'view'],
-    ['payments', 'payments', 'view'],
+    ['accounts/booking-payments', 'payments.overview', 'view'],
     ['reports', 'reports', 'view'],
     ['masters/vehicle-types', 'masters.vehicle-types', 'view'],
     ['masters/zones', 'masters.zones', 'view'],

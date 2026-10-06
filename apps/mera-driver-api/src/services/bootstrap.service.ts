@@ -1,21 +1,22 @@
 import { prisma } from '../lib/prisma';
-import { getMenuForApp } from '@skylabs-monorepo/shared-menu';
 import { filterMenuByPermissions } from '@skylabs-monorepo/shared-permissions';
 import type { BootstrapResponse } from '@skylabs-monorepo/shared-types';
 import { HttpError } from '../middleware/errorHandler';
 import { resolveEffectivePermissionsForUser } from './permission.service';
 import type { AccessTokenPayload } from '../lib/jwt';
+import { workflowMenu } from './workflow-menu';
 
 /** Builds the `GET /rbac/bootstrap` payload exactly per `@skylabs-monorepo/shared-types#BootstrapResponse`. */
-export async function buildBootstrapResponse(claims: AccessTokenPayload): Promise<BootstrapResponse> {
+export async function buildBootstrapResponse(claims: AccessTokenPayload): Promise<BootstrapResponse & { portalContext?: string }> {
   const user = await prisma.user.findFirst({ where: { id: claims.sub, deletedAt: null } });
   if (!user) throw new HttpError(404, 'NOT_FOUND', 'User not found');
 
-  const roles = await prisma.role.findMany({ where: { key: { in: claims.roles }, isActive: true } });
+  if (user.status !== 'active') throw new HttpError(403, 'ACCOUNT_INACTIVE', 'Your login account is inactive. Contact support.');
+  const roles = await prisma.role.findMany({ where: { key: { in: claims.roles }, isActive: true, users: {some: {userId: claims.sub}} } });
   const permissions = await resolveEffectivePermissionsForUser(claims.sub, claims.roles);
-  const menu = filterMenuByPermissions(getMenuForApp('mera-driver'), permissions);
+  const menu = claims.portalContext && claims.portalContext !== 'staff' ? [] : filterMenuByPermissions(workflowMenu(), permissions);
 
-  const roleIds = roles.map((r) => r.id);
+  const roleIds = claims.portalContext !== 'staff' ? [] : roles.map((r) => r.id);
   const roleWidgets = await prisma.roleDashboardWidget.findMany({
     where: { roleId: { in: roleIds } },
     include: { widget: true },
@@ -48,6 +49,7 @@ export async function buildBootstrapResponse(claims: AccessTokenPayload): Promis
   });
 
   return {
+    portalContext: claims.portalContext,
     user: { id: user.id, name: user.name, email: user.email ?? undefined, phone: user.phone ?? undefined, status: user.status },
     roles: roles.map((r) => ({ id: r.id, key: r.key, name: r.name, isSuperAdmin: r.isSuperAdmin })),
     permissions,

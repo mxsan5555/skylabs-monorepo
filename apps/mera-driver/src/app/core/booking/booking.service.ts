@@ -1,4 +1,7 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
+import { Injectable, computed, signal, inject, effect } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 import type {
   Booking,
   DriverSummary,
@@ -7,29 +10,15 @@ import type {
   RideOption,
   TripType,
 } from '../../models';
-import {
-  DEFAULT_PICKUP,
-  DRIVERS,
-  PAYMENT_METHODS,
-  RECENT_PLACES,
-  RIDE_OPTIONS,
-  SAVED_PLACES,
-} from './mock-data';
-
-/**
- * Holds the in-progress booking as the rider moves through the flow
- * (home → choose ride → choose driver → verify → payment → confirmed).
- *
- * Signals mirror the auth service style. Data is mock today; when the
- * mera-driver API lands these setters call HTTP instead. The service is a
- * singleton so state survives navigation between the routed steps.
- */
+/** Keeps the website's in-progress selections across its existing routed steps.
+ * Available services come from active backend fare rules. Assignment and payment
+ * are confirmed through the owned customer booking workflow. */
 @Injectable({ providedIn: 'root' })
 export class BookingService {
-  // Reference data (static mock lists exposed read-only).
-  readonly savedPlaces = SAVED_PLACES;
-  readonly recentPlaces = RECENT_PLACES;
-  readonly rideOptions = RIDE_OPTIONS;
+  // Address suggestions remain empty until a real source is configured.
+  readonly savedPlaces: Place[] = [];
+  readonly recentPlaces: Place[] = [];
+  readonly rideOptions = signal<RideOption[]>([]);
 
   // Trip shape chosen on the landing hero.
   private readonly _tripType = signal<TripType>('one-way');
@@ -37,15 +26,24 @@ export class BookingService {
   private readonly _schedule = signal<string>('now');
 
   // In-progress selection.
-  private readonly _pickup = signal<Place | null>(DEFAULT_PICKUP);
+  private readonly _pickup = signal<Place | null>(null);
   private readonly _drop = signal<Place | null>(null);
   private readonly _ride = signal<RideOption | null>(null);
   private readonly _driver = signal<DriverSummary | null>(null);
-  private readonly _payment = signal<PaymentMethod | null>(
-    PAYMENT_METHODS.find((m) => !m.expired) ?? null,
-  );
-  private readonly _drivers = signal<DriverSummary[]>(DRIVERS);
-  private readonly _methods = signal<PaymentMethod[]>(PAYMENT_METHODS);
+  private readonly _payment = signal<PaymentMethod | null>(null);
+  private readonly _drivers = signal<DriverSummary[]>([]);
+  private readonly _methods = signal<PaymentMethod[]>([]);
+  private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthService);
+  private previousUser: string | null | undefined;
+  constructor(){effect(() => {
+    const id = this.auth.bootstrap()?.user.id ?? null;
+    if (this.previousUser !== undefined && this.previousUser !== id) { this.reset(); this._pickup.set(null); this._payment.set(null); this._drivers.set([]); this._methods.set([]); }
+    this.previousUser = id;
+  });this.http.get<{data:{id:string;zoneName:string;tripTypeName:string;vehicleCategoryName:string;minFare:number;baseFare:number}[]}>(`${environment.apiUrl}/workflow/catalog`).subscribe({next:r=>this.rideOptions.set(r.data.map(rule=>{
+    const name=rule.tripTypeName.toLowerCase();const category=name.includes('outstation')?'outstation':/monthly|long.term/.test(name)?'monthly':/language|special/.test(name)?'language':/hour|day|package|short.term/.test(name)?'package':'car';
+    return {id:rule.id,category,title:rule.tripTypeName,subtitle:`${rule.zoneName} · ${rule.vehicleCategoryName} · Final price calculated before booking`,icon:'directions_car',etaMinutes:0,priceINR:Math.max(rule.minFare,rule.baseFare),seats:0};
+  })),error:()=>this.rideOptions.set([])});}
 
   readonly tripType = this._tripType.asReadonly();
   readonly schedule = this._schedule.asReadonly();

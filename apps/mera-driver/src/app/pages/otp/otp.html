@@ -34,7 +34,7 @@
       <p class="auth-error" role="alert">{{ error() }}</p>
     }
 
-    <md-filled-button class="auth-submit" [disabled]="verifying()" (click)="verify()">
+    <md-filled-button class="auth-submit" [disabled]="verifying() || resending()" (click)="verify()">
       {{ verifying() ? 'Verifying…' : content().btnVerify }}
     </md-filled-button>
   </div>
@@ -44,7 +44,7 @@
     @if (seconds() > 0) {
       <span class="otp-muted">{{ content().resendCooldown }} {{ seconds() }}s</span>
     } @else {
-      <md-text-button (click)="resend()">{{ content().btnResend }}</md-text-button>
+      <md-text-button [disabled]="resending()" (click)="resend()">{{ resending() ? 'Sending...' : content().btnResend }}</md-text-button>
     }
   </p>
 </div>

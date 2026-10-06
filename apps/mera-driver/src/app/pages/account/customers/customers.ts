@@ -1,4 +1,6 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, computed, inject, OnInit } from '@angular/core';
+import {AuthService} from '@skylabs-monorepo/shared-auth/angular';
+import {httpErrorMessage} from '../../../core/http-error';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { CustomersApiService, type Customer } from '../../../core/customers/customers-api.service';
 
@@ -12,6 +14,9 @@ import { CustomersApiService, type Customer } from '../../../core/customers/cust
 })
 export class Customers implements OnInit {
   private readonly api = inject(CustomersApiService);
+  readonly auth=inject(AuthService);readonly page=signal(1);readonly pageSize=signal(25);readonly sort=signal('createdAt');readonly direction=signal<'asc'|'desc'>('desc');readonly search=signal('');readonly status=signal('');readonly total=signal(0);readonly counts=signal<Partial<Record<string,number>>>({});readonly error=signal('');
+  tableParams(event:Event){const detail=(event as CustomEvent).detail;this.page.set(detail.page??1);this.pageSize.set(detail.pageSize??25);const columns:Record<string,string>={first_name:'firstName',last_name:'lastName',mobile_number:'mobileNumber',email:'email',customer_type:'customerType',verification_status:'verificationStatus',account_status:'accountStatus'};this.sort.set(columns[detail.sortKey]??'createdAt');this.direction.set(detail.sortDir==='asc'?'asc':'desc');this.search.set(detail.search??'');this.reload();}
+  filterStatus(status:string){this.status.set(status);this.page.set(1);this.reload();}
   readonly options = signal<Customer[]>([]);
   readonly loading = signal<boolean>(false);
 
@@ -21,13 +26,13 @@ export class Customers implements OnInit {
 
   private reload(): void {
     this.loading.set(true);
-    this.api.list().subscribe({
+    this.error.set('');this.api.search({page:this.page(),pageSize:this.pageSize(),sort:this.sort(),direction:this.direction(),search:this.search(),...(this.status()?{status:this.status()}:{})}).subscribe({
       next: (data) => {
-        this.options.set(data);
+        this.options.set(data.rows);this.total.set(data.meta.total);this.counts.set(data.meta.counts);
         this.loading.set(false);
       },
       error: (err) => {
-        console.error('Failed to load customers', err);
+        void httpErrorMessage(err).then(message=>this.error.set(message));
         this.loading.set(false);
       }
     });
@@ -67,10 +72,11 @@ export class Customers implements OnInit {
     { key: 'account_status', label: 'Account Status', type: 'status', statusMap: { 'Active': 'success', 'Inactive': 'warning', 'Blocked': 'error' } }
   ]);
 
-  readonly tableActions = JSON.stringify([
+  readonly tableActions = computed(()=>JSON.stringify([
     { icon: 'edit', label: 'Edit', event: 'edit_option' },
-    { icon: 'delete', label: 'Delete', event: 'delete_option', variant: 'danger' }
-  ]);
+    { icon: 'delete', label: 'Delete', event: 'delete_option', variant: 'danger' },
+    ...(this.auth.can('customers','edit')?[{icon:'toggle_on',label:'Activate / Deactivate',event:'toggle_status'}]:[])
+  ]));
 
   readonly tableRowsString = computed(() => {
     return JSON.stringify(this.options());
@@ -80,6 +86,7 @@ export class Customers implements OnInit {
     const detail = event.detail || event;
     const action = detail.action;
     const row = detail.row;
+    if(action==='toggle_status'){this.toggleStatus(row);return;}
     if (action === 'edit_option') {
       this.startEdit(row);
     } else if (action === 'delete_option') {
@@ -87,6 +94,7 @@ export class Customers implements OnInit {
     }
   }
 
+  toggleStatus(row:Customer){if(!this.auth.can('customers','edit'))return;const next=row.account_status==='Active'?'Inactive':'Active';const impact=`${row.active_booking_count??0} active bookings remain unchanged. Inactive customers cannot login or create bookings; staff can continue existing trips.`;const reason=prompt(`${next} customer: ${row.first_name}. ${impact} Enter an audit reason:`);if(!reason?.trim())return;this.api.update(row.customer_uid,{first_name:row.first_name,mobile_number:row.mobile_number,account_status:next,statusReason:reason.trim(),acknowledgeActiveBookings:true}).subscribe({next:()=>this.reload(),error:async error=>this.error.set(await httpErrorMessage(error))});}
   startAdd(): void {
     this.editingId.set('new');
     this.inputFirstName.set('');
@@ -168,6 +176,7 @@ export class Customers implements OnInit {
     };
 
     const id = this.editingId();
+    if(id!=='new'&&this.options().find(row=>row.customer_uid===id)?.account_status!==payload.account_status){const reason=prompt('Account status changes restrict login/new bookings. Existing trips and payments are preserved. Enter an audit reason:');if(!reason?.trim())return;Object.assign(payload,{statusReason:reason.trim(),acknowledgeActiveBookings:true});}
     const request = id === 'new' ? this.api.create(payload) : this.api.update(id as string, payload);
     request.subscribe({
       next: () => {

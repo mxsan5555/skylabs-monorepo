@@ -6,6 +6,7 @@ import { passport } from './lib/passport';
 import { generateOpenApiDocument } from './openapi';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler';
 import { authenticate } from './middleware/authenticate';
+import { authorizeDriverUpload } from './middleware/authorizeDriverUpload';
 import { UPLOAD_ROOT } from './lib/upload';
 import { makeMasterListRouter } from './lib/masterListRouter';
 import authRoutes from './routes/auth.routes';
@@ -23,8 +24,9 @@ import cancellationReasonsRoutes from './routes/cancellationReasons.routes';
 import fareRulesRoutes from './routes/fareRules.routes';
 import vehicleTypesRoutes from './routes/vehicleTypes.routes';
 import serviceZonesRoutes from './routes/serviceZones.routes';
-import paymentsRoutes from './routes/payments.routes';
 import reportsRoutes from './routes/reports.routes';
+import workflowRoutes from './routes/workflow.routes';
+import { receiveWebhook } from './services/payment-provider.service';
 
 /**
  * Builds the Express app without binding a port — split out of `main.ts` so
@@ -37,12 +39,26 @@ export function createApp() {
 
   const corsOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:4400').split(',').map((s) => s.trim());
   app.use(cors({ origin: corsOrigins, credentials: true }));
+  app.post('/payments/provider/webhook', express.raw({ type: 'application/json', limit: '256kb' }), async (req,res,next) => {
+    try { res.json({ data: await receiveWebhook(req.body, req.get('X-Razorpay-Signature') ?? ''), error: null }); } catch(error) { next(error); }
+  });
   app.use(express.json());
   app.use(passport.initialize());
 
   app.get('/health', (_req, res) => {
-    res.json({ data: { status: 'ok', app: 'mera-driver-api' }, error: null });
+    res.json({ data: { status: 'ok', app: 'mera-driver-api', workflow: 'cod-razorpay-v2' }, error: null });
   });
+
+  // Bounded public website lookup; no credentials or provider payload are returned.
+  const lookupWindows=new Map<string,{started:number;count:number}>();
+  app.get('/location/search',async(req,res,next)=>{try{
+    const ip=req.ip??'unknown',now=Date.now();let window=lookupWindows.get(ip);
+    if(!window||now-window.started>60000){if(lookupWindows.size>=1000&&!lookupWindows.has(ip)){for(const [key,value] of lookupWindows)if(now-value.started>60000)lookupWindows.delete(key);if(lookupWindows.size>=1000){res.status(429).json({data:null,error:{code:'LOCATION_RATE_LIMIT',message:'Address lookup is busy. Please try again later or enter the address manually.'}});return;}}window={started:now,count:0};lookupWindows.set(ip,window);}
+    if(++window.count>10){res.status(429).json({data:null,error:{code:'LOCATION_RATE_LIMIT',message:'Too many address lookups. Please wait a minute.'}});return;}
+    if(lookupWindows.size>1000)for(const [key,value] of lookupWindows)if(now-value.started>60000)lookupWindows.delete(key);
+    const address=typeof req.query.q==='string'?req.query.q:'';
+    res.json({data:await import('./services/location-search.service').then(m=>m.searchLocation(address)),error:null});
+  }catch(error){next(error);}});
 
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(generateOpenApiDocument()));
 
@@ -52,6 +68,7 @@ export function createApp() {
   // RBAC — every route inside requires a Bearer token; most are further gated by
   // `requirePermission(menuKey, action)`.
   app.use('/rbac', rbacRoutes);
+  app.use('/workflow', workflowRoutes);
 
   // Business domain — Phase 1 (real CRUD, Postgres-backed). Each router is gated by
   // `requirePermission('<menuKey>', 'view'|'create'|'edit'|'delete')`.
@@ -74,6 +91,13 @@ export function createApp() {
 
   // Master data — 8 structurally-identical lookup lists sharing one `MasterListItem`
   // table (category baked in per mount), plus the 2 richer masters with their own tables.
+  app.get('/masters/onboarding-options',authenticate,async(req,res,next)=>{try{
+    const granted=await import('./services/permission.service').then(m=>m.resolveEffectivePermissionsForUser(req.user!.sub,req.user!.roles));
+    const own=await import('./lib/prisma').then(m=>m.prisma.driver.findFirst({where:{userId:req.user!.sub,accountStatus:'Active'},select:{id:true}}));
+    if(!own&&!['drivers:view','drivers:create','drivers:edit','payments.overview:edit'].some(key=>granted.includes(key))){res.status(403).json({data:null,error:{code:'FORBIDDEN',message:'Driver onboarding permission required'}});return;}
+    res.json({data:await import('./services/driver-preferences.service').then(m=>m.onboardingOptions()),error:null});
+  }catch(error){next(error);}});
+  for(const category of ['job-types','job-choices','states','driver-account-statuses'])app.use('/masters/'+category,makeMasterListRouter(category,'masters.source-types'));
   app.use('/masters/driver-types', makeMasterListRouter('driver-types', 'masters.driver-types'));
   app.use('/masters/education', makeMasterListRouter('education', 'masters.education'));
   app.use('/masters/eye-visions', makeMasterListRouter('eye-visions', 'masters.eye-visions'));
@@ -87,11 +111,10 @@ export function createApp() {
   app.use('/masters/languages', makeMasterListRouter('languages', 'masters.languages'));
 
   // Uploaded driver KYC documents — signed-in users only, served as static files.
-  app.use('/uploads', authenticate, express.static(UPLOAD_ROOT));
+  app.use('/uploads', authenticate, authorizeDriverUpload, express.static(UPLOAD_ROOT));
 
   // Business-domain stubs still pending (Phase 2/3) — one router per module, each
   // gated by `requirePermission('<menuKey>', 'view')`. Real CRUD is out of scope for this build.
-  app.use('/payments', paymentsRoutes);
   app.use('/reports', reportsRoutes);
 
   app.use(notFoundHandler);

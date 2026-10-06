@@ -1,3 +1,4 @@
+import { authorizedReturn, type PortalContext } from '../../core/auth/portal-routing';
 import {
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
@@ -9,6 +10,7 @@ import {
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
+import { httpErrorMessage } from '../../core/http-error';
 import { AuthApiService } from '../../core/auth/auth-api.service';
 
 const RESEND_SECONDS = 24;
@@ -39,6 +41,7 @@ export class Otp implements OnInit, OnDestroy {
   protected code = '';
   protected readonly seconds = signal(RESEND_SECONDS);
   protected readonly verifying = signal(false);
+  protected readonly resending = signal(false);
   protected readonly error = signal<string | null>(null);
 
   private timer?: ReturnType<typeof setInterval>;
@@ -58,7 +61,6 @@ export class Otp implements OnInit, OnDestroy {
     errorOtpInvalid: 'Please enter a valid 6-digit numeric code.',
     errorVerificationFailed: 'Verification failed: ',
     msgOtpSent: 'OTP sent successfully',
-    msgOtpResentMock: 'OTP resent successfully (Mock)',
     errorResendFailed: 'Failed to resend OTP: ',
     msgSuccessNoToken: 'Verification successful, but no authentication token was returned by the server.'
   });
@@ -102,14 +104,15 @@ export class Otp implements OnInit, OnDestroy {
 
     this.error.set(null);
     this.verifying.set(true);
-    this.authApi.verifyOtp(this.destination, this.code, 'login').subscribe({
+    this.authApi.verifyOtp(this.destination, this.code, 'login', (history.state?.role ?? 'customer') as PortalContext).subscribe({
       next: async (result) => {
+        this.auth.signOut();
         await this.auth.signIn(result.accessToken, result.refreshToken);
         this.verifying.set(false);
         // A linked Driver or Customer account lands on its own self-service portal, never
         // the admin console — same ownership signal as `driverPortalGuard`/`customerPortalGuard`.
         const bootstrap = this.auth.bootstrap();
-        this.router.navigate([bootstrap?.driver ? '/driver' : bootstrap?.customer ? '/customer' : '/account/dashboard']);
+        this.router.navigateByUrl(authorizedReturn(bootstrap, history.state?.redirectTo ?? null));
       },
       error: () => {
         this.verifying.set(false);
@@ -119,8 +122,12 @@ export class Otp implements OnInit, OnDestroy {
   }
 
   protected resend(): void {
-    this.authApi.requestOtp(this.destination, 'login').subscribe();
-    this.seconds.set(RESEND_SECONDS);
+    if(this.resending() || this.seconds()>0)return;
+    this.resending.set(true);this.error.set(null);
+    this.authApi.requestOtp(this.destination, 'login').subscribe({
+      next:()=>{this.resending.set(false);this.seconds.set(RESEND_SECONDS);},
+      error:async error=>{this.resending.set(false);this.error.set(await httpErrorMessage(error));},
+    });
   }
 
   protected back(): void {

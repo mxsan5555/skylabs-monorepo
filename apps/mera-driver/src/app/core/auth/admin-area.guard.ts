@@ -1,3 +1,4 @@
+import { portalContext, portalDashboard } from './portal-routing';
 import { inject } from '@angular/core';
 import { Router, type CanActivateFn } from '@angular/router';
 import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
@@ -16,5 +17,7 @@ export const adminAreaGuard: CanActivateFn = async () => {
 
   await auth.whenReady();
 
-  return auth.bootstrap()?.customer != null ? router.createUrlTree(['/customer']) : true;
+  const bootstrap = auth.bootstrap();
+  if (portalContext(bootstrap) !== 'staff') return router.createUrlTree([portalDashboard(bootstrap)]);
+  return true;
 };

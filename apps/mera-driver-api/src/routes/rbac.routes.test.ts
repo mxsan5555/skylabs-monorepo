@@ -433,7 +433,9 @@ describe('rbac.routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.user.id).toBe('user-1');
-      expect(res.body.data.permissions).toContain('dashboard:view');
+      expect(res.body.data.permissions).toEqual([]);
+      expect(res.body.data.menu).toEqual([]);
+      expect(res.body.data.portalContext).toBe('driver');
       expect(res.body.data.roles).toEqual([{ id: 'role-driver', key: 'driver', name: 'Driver', isSuperAdmin: false }]);
     });
 

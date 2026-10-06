@@ -1,3 +1,4 @@
+import {z} from 'zod';
 import { Router } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/requirePermission';
@@ -11,10 +12,11 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/', requirePermission('customers', 'view'), async (_req, res, next) => {
+router.get('/', requirePermission('customers', 'view'), async (req, res, next) => {
   try {
-    const rows = await customerService.listCustomers();
-    res.json({ data: rows, error: null, meta: { total: rows.length } });
+    const query=z.object({page:z.coerce.number().int().min(1).default(1),pageSize:z.coerce.number().int().min(1).max(100).default(25),search:z.string().max(150).optional(),sort:z.string().max(50).optional(),direction:z.enum(['asc','desc']).optional(),status:z.enum(['Active','Inactive','Blocked']).optional()}).parse(req.query);
+    const result=await customerService.searchCustomers(query);
+    res.json({data:result.rows,error:null,meta:result.meta});
   } catch (err) {
     next(err);
   }
@@ -39,13 +41,15 @@ router.post('/', requirePermission('customers', 'create'), validateBody(CreateCu
 
 router.patch('/:id', requirePermission('customers', 'edit'), validateBody(UpdateCustomerSchema), async (req, res, next) => {
   try {
+    const previous=await customerService.getCustomerById(req.params.id);
     const customer = await customerService.updateCustomer(req.params.id, req.body);
     await auditService.writeAuditLog({
       actorUserId: req.user!.sub,
-      action: 'customer.update',
+      action: previous.accountStatus!==customer.accountStatus?'customer.status_change':'customer.update',
+      before:{accountStatus:previous.accountStatus},
       targetType: 'Customer',
       targetId: customer.id,
-      after: customer,
+      after: {...customer,statusReason:req.body.statusReason??null,acknowledgeActiveBookings:req.body.acknowledgeActiveBookings??false},
       ...requestMeta(req),
     });
     res.json({ data: customer, error: null });

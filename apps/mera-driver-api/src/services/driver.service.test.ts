@@ -154,6 +154,7 @@ describe('driver account status (Active/Inactive portal login gate)', () => {
     mockPrisma.driver.findUnique.mockResolvedValue({ accountStatus: 'Active' });
     await expect(assertDriverAccountActive('user-1')).resolves.toBeUndefined();
   });
+  it('suspended drivers cannot log in and their records are preserved',async()=>{mockPrisma.driver.findUnique.mockResolvedValue({accountStatus:'Suspended'});await expect(assertDriverAccountActive('user-1')).rejects.toMatchObject({status:403});expect(mockPrisma.driver.delete).not.toHaveBeenCalled();});
 
   it('assertDriverAccountActive is a no-op for a User with no linked Driver record', async () => {
     mockPrisma.driver.findUnique.mockResolvedValue(null);
@@ -201,9 +202,10 @@ describe('DOB -> automatic age derivation', () => {
 describe('KYC verifier assignment', () => {
   it('assignVerifier sets assignedVerifierId after confirming the verifier user exists', async () => {
     mockPrisma.driver.findUnique.mockResolvedValue({ id: 'driver-1', assignedVerifierId: 'verifier-1', documents: [] });
-    mockPrisma.user.findFirst.mockResolvedValue({ id: 'verifier-1', deletedAt: null });
+    mockPrisma.user.findFirst.mockResolvedValue({ id: 'verifier-1', deletedAt: null,roles:[{role:{key:'kyc_verification'}}] });
     mockPrisma.driver.update.mockResolvedValue({});
 
+    mockPrisma.role.findMany.mockResolvedValue([{isSuperAdmin:false}]);mockPrisma.rolePermission.findMany.mockResolvedValue([{permission:{key:'kyc-assignments:view'}}]);
     const result = await assignVerifier('driver-1', 'verifier-1');
 
     expect(mockPrisma.driver.update).toHaveBeenCalledWith({ where: { id: 'driver-1' }, data: { assignedVerifierId: 'verifier-1' } });
@@ -217,6 +219,7 @@ describe('KYC verifier assignment', () => {
     expect(mockPrisma.driver.update).not.toHaveBeenCalled();
   });
 
+  it('rejects a target user without KYC review permissions',async()=>{mockPrisma.user.findFirst.mockResolvedValue({id:'ordinary-user',roles:[]});await expect(assignVerifier('driver-1','ordinary-user')).rejects.toMatchObject({code:'VERIFIER_PERMISSION_REQUIRED'});expect(mockPrisma.driver.update).not.toHaveBeenCalled();});
   it('assignVerifier(null) clears the assignment without checking for a user', async () => {
     mockPrisma.driver.update.mockResolvedValue({});
 
@@ -232,7 +235,7 @@ describe('KYC queue ownership scoping', () => {
     mockPrisma.driver.findMany.mockResolvedValue([{ id: 'driver-1' }]);
     await listDriversAssignedTo('verifier-1');
     expect(mockPrisma.driver.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { assignedVerifierId: 'verifier-1' } }),
+      expect.objectContaining({ where: { AND: expect.arrayContaining([{ assignedVerifierId: 'verifier-1' }]) }, take: 25 }),
     );
   });
 

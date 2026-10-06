@@ -1,0 +1,22 @@
+{
+  "before": 22,
+  "after": 22,
+  "evidence": [
+    {
+      "status": 503,
+      "errorCode": "OTP_PROVIDER_NOT_CONFIGURED"
+    },
+    {
+      "status": 503,
+      "errorCode": "OTP_PROVIDER_NOT_CONFIGURED"
+    }
+  ],
+  "smsSent": false,
+  "providerCredentialsVerified": false,
+  "flows": [
+    "Sign-in stays on the same page and shows the actual failure",
+    "Resend displays the failure without resetting countdown",
+    "Failed challenges expire and cannot be verified",
+    "Only generated fixture challenge IDs cleaned"
+  ]
+}

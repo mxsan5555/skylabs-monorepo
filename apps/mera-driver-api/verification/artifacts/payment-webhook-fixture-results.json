@@ -1,0 +1,14 @@
+{
+  "results": [
+    "Signed failed fixture records failed attempt, unpaid booking and zero collection/payable",
+    "Delayed captured fixture reconciles failure, duplicate webhook collects once, late failure cannot downgrade Paid; incomplete trip earns no commission/payable",
+    "Forged checkout callback rejected without provider call or additional collection"
+  ],
+  "providerFixtures": true,
+  "realGatewayPayment": false,
+  "preservedCounts": {
+    "drivers": 6,
+    "customers": 2,
+    "bookings": 1
+  }
+}

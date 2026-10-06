@@ -1,0 +1,176 @@
+{
+  "evidence": [
+    {
+      "action": "Save & Next",
+      "method": "POST",
+      "path": "/drivers",
+      "payload": {
+        "firstName": "Onboarding Save Fixture",
+        "lastName": "",
+        "fatherName": "",
+        "motherName": "",
+        "phone": "",
+        "dob": "",
+        "maritalStatus": "Unmarried",
+        "gender": "Male",
+        "language": "Hindi",
+        "vehicle": "",
+        "stepCompleted": 1,
+        "subStepCompleted": 0
+      },
+      "httpStatus": 201,
+      "kyc": "Non-Verified",
+      "progress": [
+        10
+      ]
+    },
+    {
+      "action": "Save Changes",
+      "method": "PATCH",
+      "path": "/drivers/a33a1e8d-3478-4076-aa6b-4e1ef9c9ad7c",
+      "payload": {
+        "preferredPaymentMode": "Cash",
+        "amount": "200",
+        "paymentReceiptDate": "",
+        "stepCompleted": 4,
+        "subStepCompleted": 1
+      },
+      "httpStatus": 200,
+      "kyc": "Non-Verified",
+      "progress": [
+        10,
+        11,
+        12,
+        13,
+        20,
+        21,
+        30,
+        31,
+        32,
+        40,
+        41
+      ]
+    },
+    {
+      "action": "Save Changes",
+      "method": "PATCH",
+      "path": "/drivers/341b6a76-2716-45a6-a536-4921185744ce",
+      "payload": {
+        "preferredPaymentMode": "Bank Account",
+        "amount": "350",
+        "paymentReceiptDate": "",
+        "stepCompleted": 4,
+        "subStepCompleted": 1
+      },
+      "httpStatus": 200,
+      "kyc": "Verified",
+      "progress": [
+        10,
+        11,
+        12,
+        13,
+        20,
+        21,
+        30,
+        31,
+        32,
+        40,
+        41
+      ]
+    },
+    {
+      "action": "Save & Next",
+      "method": "PATCH",
+      "path": "/drivers/341b6a76-2716-45a6-a536-4921185744ce",
+      "payload": {
+        "firstName": "Changed Approved Fixture",
+        "lastName": "",
+        "fatherName": "",
+        "motherName": "",
+        "dob": "",
+        "maritalStatus": "Unmarried",
+        "gender": "Male",
+        "language": "Hindi",
+        "stepCompleted": 1,
+        "subStepCompleted": 0
+      },
+      "httpStatus": 200,
+      "kyc": "Non-Verified",
+      "progress": [
+        10,
+        11,
+        12,
+        13,
+        20,
+        21,
+        30,
+        31,
+        32,
+        40,
+        41
+      ]
+    },
+    {
+      "action": "Final KYC approval",
+      "method": "POST",
+      "path": "/drivers/a33a1e8d-3478-4076-aa6b-4e1ef9c9ad7c/kyc-approval",
+      "payload": {},
+      "httpStatus": 422,
+      "error": "KYC_REVIEW_REQUIRED"
+    },
+    {
+      "action": "Save draft",
+      "method": "PATCH",
+      "path": "/drivers/a33a1e8d-3478-4076-aa6b-4e1ef9c9ad7c",
+      "payload": {
+        "preferredPaymentMode": "Cash",
+        "amount": "275",
+        "paymentReceiptDate": "",
+        "stepCompleted": 4,
+        "subStepCompleted": 1,
+        "completeStep": false
+      },
+      "httpStatus": 200,
+      "kyc": "Non-Verified",
+      "progress": [
+        10,
+        11,
+        12,
+        13,
+        20,
+        21,
+        30,
+        31,
+        32,
+        40,
+        41
+      ]
+    },
+    {
+      "action": "Save draft",
+      "method": "POST",
+      "path": "/drivers",
+      "payload": {
+        "firstName": "Partial Save Fixture",
+        "lastName": "",
+        "fatherName": "",
+        "motherName": "",
+        "phone": "",
+        "dob": "",
+        "maritalStatus": "Unmarried",
+        "gender": "Male",
+        "language": "Hindi",
+        "vehicle": "",
+        "stepCompleted": 1,
+        "subStepCompleted": 0,
+        "completeStep": false
+      },
+      "httpStatus": 201,
+      "kyc": "Non-Verified",
+      "progress": []
+    }
+  ],
+  "baseline": 7,
+  "after": 7,
+  "mode": "fixed"
+}

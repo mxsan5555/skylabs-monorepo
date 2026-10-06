@@ -1,0 +1,4 @@
+.pdf-tools/
+artifacts/*-pdfium-*.bmp
+artifacts/*-page-*.png
+artifacts/*-text.txt

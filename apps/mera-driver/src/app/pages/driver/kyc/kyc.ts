@@ -3,10 +3,11 @@ import { Router } from '@angular/router';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { DriverSelfApiService, type DriverSelf } from '../../../core/drivers/driver-self-api.service';
 import { statusVariant } from '../status-variant';
+import { PillReviewComponent } from '../../account/kyc-assignments/pill-review';
 
 @Component({
   selector: 'md-driver-kyc',
-  imports: [AdminPage],
+  imports: [AdminPage, PillReviewComponent],
   templateUrl: './kyc.html',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })

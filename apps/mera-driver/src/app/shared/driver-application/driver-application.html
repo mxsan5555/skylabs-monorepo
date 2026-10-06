@@ -1,0 +1,19 @@
+<md-dialog [open]="open()" (closed)="close()" aria-label="Become a Driver application">
+  <div slot="headline">Become a Driver</div>
+  <div slot="content" class="flex flex-col gap-4" style="max-width:420px">
+    @if (success()) { <p role="status">{{ success() }}</p> }
+    @else {
+      <p>Apna naam, phone aur Driver Type dein. Login hamari team review ke baad activate karegi.</p>
+      <md-outlined-text-field label="Full Name" required autocomplete="name" [value]="fullName" (input)="fullName=$any($event.target).value" [disabled]="saving()" [error]="!!fields()['fullName']" [errorText]="fields()['fullName'] || ''"></md-outlined-text-field>
+      <md-outlined-text-field label="Phone Number" required type="tel" autocomplete="tel" [value]="phone" (input)="phone=$any($event.target).value" [disabled]="saving()" [error]="!!fields()['phone']" [errorText]="fields()['phone'] || ''"></md-outlined-text-field>
+      <md-outlined-select label="Driver Type" required [value]="driverTypeId" (change)="driverTypeId=$any($event.target).value" [disabled]="loading() || saving()" [error]="!!fields()['driverTypeId']" [errorText]="fields()['driverTypeId'] || ''">
+        @for (option of options(); track option.id) {<md-select-option [value]="option.id"><div slot="headline">{{ option.label }}</div></md-select-option>}
+      </md-outlined-select>
+      @if (loading()) { <p role="status">Loading Driver Types?</p> }
+      @if (error()) { <p class="auth-error" role="alert">{{ error() }}</p> }
+    }
+  </div>
+  <div slot="actions"><md-text-button [disabled]="saving()" (click)="close()">{{ success() ? 'Close' : 'Cancel' }}</md-text-button>
+    @if (!success()) {<md-filled-button [disabled]="saving() || loading() || options().length !== 3" (click)="submit()">{{ saving() ? 'Submitting?' : 'Submit Application' }}</md-filled-button>}
+  </div>
+</md-dialog>

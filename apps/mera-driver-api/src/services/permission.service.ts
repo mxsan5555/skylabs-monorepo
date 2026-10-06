@@ -23,6 +23,8 @@ import { HttpError } from '../middleware/errorHandler';
  * callers for at most CACHE_TTL_MS.
  */
 
+import { isPortalRole } from './portal-context';
+
 const CACHE_TTL_MS = 30_000;
 
 interface CacheEntry {
@@ -37,6 +39,7 @@ function cacheKeyFor(roleKeys: readonly string[]): string {
 }
 
 export async function resolvePermissionsForRoles(roleKeys: readonly string[]): Promise<string[]> {
+  roleKeys = roleKeys.filter(key => !isPortalRole(key));
   if (roleKeys.length === 0) return [];
 
   const key = cacheKeyFor(roleKeys);
@@ -89,14 +92,23 @@ export function invalidatePermissionCache(): void {
  * resolution above is unchanged and still independently cached/tested.
  */
 export async function resolveEffectivePermissionsForUser(userId: string, roleKeys: readonly string[]): Promise<string[]> {
-  const basePermissions = await resolvePermissionsForRoles(roleKeys);
+  roleKeys = roleKeys.filter(key => !isPortalRole(key));
+  let basePermissions = await resolvePermissionsForRoles(roleKeys);
   if (roleKeys.length === 0) return basePermissions;
 
   const roles = (await prisma.role.findMany({
-    where: { key: { in: [...roleKeys] }, isActive: true },
+    where: { key: { in: [...roleKeys] }, isActive: true, users: { some: { userId, user: { status: 'active', deletedAt: null } } } },
     select: { isSuperAdmin: true },
   })) ?? [];
   if (roles.some((r) => r.isSuperAdmin)) return basePermissions;
+  // JWT roles bound the session context; live DB membership bounds grants even for old tokens.
+  const currentLinks = (await prisma.rolePermission.findMany({where: {role: {
+    key: {in: [...roleKeys]}, isActive: true,
+    users: {some: {userId, user: {status: 'active', deletedAt: null}}},
+  }}, select: {permission: {select: {key: true}}}})) ?? [];
+  const current = new Set(currentLinks.map(link => link.permission.key));
+  basePermissions = basePermissions.filter(key => current.has(key));
+  if (roles.length === 0) return basePermissions;
 
   const overrides = (await prisma.userPermissionOverride.findMany({
     where: { userId },

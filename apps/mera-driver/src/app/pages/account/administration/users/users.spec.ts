@@ -34,6 +34,8 @@ function buildRbacApiMock() {
   return {
     listUsers: () => of({ items: [USER_A], total: 1, page: 1, pageSize: 100 }),
     listRoles: () => of([ROLE_DRIVER]),
+    permissionsCatalog: () => of([]),
+    userPermissionOverrides: () => of({ grants: [], revokes: [] }),
   } as unknown as RbacApiService;
 }
 

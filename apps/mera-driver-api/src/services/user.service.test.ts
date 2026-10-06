@@ -12,6 +12,19 @@ beforeEach(() => {
   mockPrisma.user.update.mockResolvedValue({});
 });
 
+describe('customer accounts belong to customer management', () => {
+  it('rejects customer-role creation through staff management', async () => {
+    mockPrisma.role.findUnique.mockResolvedValue({ id: 'role-customer', key: 'customer' });
+    await expect(createUser({ name: 'Customer', roleIds: ['role-customer'] })).rejects.toMatchObject({ code: 'CUSTOMER_ROLE_NOT_ASSIGNABLE_HERE' });
+    expect(mockPrisma.user.create).not.toHaveBeenCalled();
+  });
+  it('rejects customer role assignment through staff management', async () => {
+    mockPrisma.role.findUnique.mockResolvedValue({ id: 'role-customer', key: 'customer' });
+    await expect(assignRoleToUser('user-1', 'role-customer')).rejects.toMatchObject({ code: 'CUSTOMER_ROLE_NOT_ASSIGNABLE_HERE' });
+    expect(mockPrisma.userRole.upsert).not.toHaveBeenCalled();
+  });
+});
+
 describe('self-lockout protection', () => {
   it('blocks deactivating the last active Super Admin', async () => {
     mockPrisma.userRole.count.mockResolvedValue(1); // target holds an isSuperAdmin role

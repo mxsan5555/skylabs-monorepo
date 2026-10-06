@@ -15,13 +15,15 @@ export interface DriverNavItem {
  *  navigation alone. */
 export const DRIVER_NAV_ITEMS: DriverNavItem[] = [
   { path: '/driver', label: 'Dashboard', icon: 'home' },
-  { path: '/driver/profile', label: 'Profile', icon: 'person' },
-  { path: '/driver/kyc', label: 'KYC', icon: 'verified_user' },
-  { path: '/driver/documents', label: 'Documents', icon: 'folder' },
-  { path: '/driver/vehicle', label: 'My Vehicle', icon: 'directions_car' },
+  { path: '/driver/profile', label: 'My Profile / Continue Onboarding', icon: 'person' },
+  { path: '/driver/kyc', label: 'KYC & Documents', icon: 'verified_user' },
+  { path: '/driver/fee', label: 'Registration Fee', icon: 'payments' },
+  { path: '/driver/availability', label: 'Availability', icon: 'toggle_on' },
+  { path: '/driver/requests', label: 'Trip Requests', icon: 'notifications_active' },
   { path: '/driver/trips', label: 'My Trips', icon: 'route' },
+  { path: '/driver/earnings', label: 'Earnings', icon: 'account_balance_wallet' },
   { path: '/driver/notifications', label: 'Notifications', icon: 'notifications' },
-  { path: '/driver/support', label: 'Support', icon: 'support_agent' },
+  { path: '/driver/support', label: 'Help & Support', icon: 'support_agent' },
 ];
 
 /**

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 
 declare global {
   interface Window {
@@ -14,6 +15,7 @@ interface SearchResult {
   name: string;
   address: string;
   placeId: string;
+  lat?:number; lng?:number; city?:string; state?:string;
 }
 
 @Component({
@@ -165,25 +167,9 @@ export class Location implements OnInit {
         }
       );
     }
-    // 3. Load Google Maps SDK script
-    const apiKey = 'AIzaSyCc0KQ40uWG_mnZOcmqYw324z9MXCjm28c';
-    if (window.google && window.google.maps) {
-      this.initializeMap();
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-    script.id = 'google-maps-api-script';
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      this.initializeMap();
-    };
-    script.onerror = () => {
-      this.apiError.set('Failed to load Google Maps SDK script. Please check your internet connection or API Key restrictions.');
-    };
-    document.head.appendChild(script);
+    // Never inject a server credential into a browser SDK. Reuse a configured host map
+    // if present; otherwise address entry remains available without a map provider.
+    if (window.google?.maps) this.initializeMap();
 
     // 3. Read query params for trip type and location pre-filling from homepage
     this.route.queryParams.subscribe(params => {
@@ -406,6 +392,7 @@ export class Location implements OnInit {
   onSearchChange(): void {
     const val = this.searchQuery();
     this.address.set(val);
+    if(this.activeInput()==='pickup')this.pickupAddress.set(val);else this.dropAddress.set(val);
 
     if (!window.google || !window.google.maps || !window.google.maps.places) return;
 
@@ -436,6 +423,13 @@ export class Location implements OnInit {
     }
   }
 
+  lookupAddress():void {
+    this.http.get<{data:SearchResult[]}>(environment.apiUrl+'/location/search',{params:{q:this.searchQuery()}}).subscribe({
+      next:response=>{this.suggestions.set(response.data);this.showSuggestions.set(true);this.apiError.set(response.data.length?null:'No address found. You can keep the manually entered address.');},
+      error:error=>{this.apiError.set(error?.error?.error?.message??'Address lookup unavailable. Enter your address manually.');this.suggestions.set([]);}
+    });
+  }
+
   // --- Handle Custom Text Field Input Change ---
   onSearchInputChange(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -448,6 +442,13 @@ export class Location implements OnInit {
     this.searchQuery.set(place.name);
     this.showSuggestions.set(false);
 
+    if(Number.isFinite(place.lat)&&Number.isFinite(place.lng)){
+      const coords:[number,number]=[place.lat!,place.lng!];
+      if(this.activeInput()==='pickup'){this.pickupAddress.set(place.address);this.pickupCoords.set(coords);this.position.set(coords);this.address.set(place.address);}
+      else{this.dropAddress.set(place.address);this.dropCoords.set(coords);}
+      if(place.city)this.detectedCity.set(place.city);
+      this.apiError.set(null);return;
+    }
     if (!window.google || !window.google.maps) return;
 
     const geocoder = new window.google.maps.Geocoder();

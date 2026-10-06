@@ -3,17 +3,17 @@
 
     <!-- VIEW 1: DATA TABLE LIST -->
     @if (!showAddForm()) {
-      <div class="w-full mt-4">
+      <div class="w-full mt-4">@if(error()){<p role="alert">{{error()}}</p>}<div class="flex gap-2 flex-wrap"><md-filter-chip [selected]="!status()" (click)="filterStatus('')">All</md-filter-chip>@for(value of ['Active','Inactive','Blocked'];track value){<md-filter-chip [selected]="status()===value" (click)="filterStatus(value)">{{value}} ({{counts()[value]??0}})</md-filter-chip>}</div><p>Deactivation blocks login and new bookings. Existing bookings and payment history are preserved.</p>
         <sky-card class="p-6 block">
           <sky-data-table
             [columns]="tableColumns"
             [rows]="tableRowsString()"
-            [total]="options().length"
+            [total]="total()" [page]="page()" [pageSize]="pageSize()" (sky-dt-params-change)="tableParams($event)"
             [loading]="loading()"
             selectable
             exportable
             searchable
-            [actions]="tableActions"
+            [actions]="tableActions()"
             (sky-dt-row-action)="onRowAction($event)"
             caption="Customers Management Database"
           >

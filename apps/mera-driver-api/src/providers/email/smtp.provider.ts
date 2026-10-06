@@ -1,4 +1,7 @@
 import nodemailer, { type Transporter } from 'nodemailer';
+import { createHash } from 'node:crypto';
+import { HttpError } from '../../middleware/errorHandler';
+import { otpDeliveryError, transportFailure } from '../otp-delivery-error';
 
 /**
  * Real SMTP email delivery for OTPs — no mock path. `EMAIL_FROM` is read fresh on every
@@ -9,13 +12,16 @@ let cachedTransporter: Transporter | null = null;
 let cachedTransportKey = '';
 
 function getTransporter(host: string, port: number, user: string, pass: string): Transporter {
-  const key = `${host}:${port}:${user}`;
+  const key = createHash('sha256').update(JSON.stringify([host,port,user,pass])).digest('hex');
   if (cachedTransporter && cachedTransportKey === key) return cachedTransporter;
   cachedTransporter = nodemailer.createTransport({
     host,
     port,
     secure: port === 465,
     auth: { user, pass },
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 10000,
   });
   cachedTransportKey = key;
   return cachedTransporter;
@@ -30,7 +36,7 @@ export async function sendOtpEmail(to: string, otp: string): Promise<boolean> {
 
   const missing = [
     !host && 'SMTP_HOST',
-    !port && 'SMTP_PORT',
+    (!Number.isInteger(port) || port < 1 || port > 65535) && 'SMTP_PORT',
     !user && 'SMTP_USER',
     !pass && 'SMTP_PASS',
     !from && 'EMAIL_FROM',
@@ -38,7 +44,7 @@ export async function sendOtpEmail(to: string, otp: string): Promise<boolean> {
 
   if (missing.length > 0) {
     console.error(`[email:smtp] cannot send — missing env var(s): ${missing.join(', ')}`);
-    return false;
+    throw otpDeliveryError('Email', 'configuration');
   }
 
   const transporter = getTransporter(host, port, user, pass);
@@ -51,21 +57,19 @@ export async function sendOtpEmail(to: string, otp: string): Promise<boolean> {
       text: `Your OTP is ${otp}. It expires shortly — do not share it with anyone.`,
     });
     const durationMs = Date.now() - startedAt;
+    const accepted = (info.accepted ?? []).some((address: string | {address:string}) => (typeof address === 'string' ? address : address.address).toLowerCase() === to.toLowerCase());
+    if (!accepted) throw otpDeliveryError('Email', 'rejected');
     console.info(
-      `[email:smtp] sent to=${maskEmail(to)} durationMs=${durationMs} messageId=${info.messageId} response=${info.response}`,
+      `[email:smtp] accepted durationMs=${durationMs}`,
     );
     return true;
   } catch (err) {
     const durationMs = Date.now() - startedAt;
+    if (err instanceof HttpError) throw err;
+    const failure = transportFailure((err as {code?:string})?.code);
     console.error(
-      `[email:smtp] FAILED to=${maskEmail(to)} durationMs=${durationMs} error=${(err as Error).message}`,
+      `[email:smtp] FAILED durationMs=${durationMs} failure=${failure}`,
     );
-    return false;
+    throw otpDeliveryError('Email', failure);
   }
-}
-
-function maskEmail(email: string): string {
-  const [user, domain] = email.split('@');
-  if (!domain) return email;
-  return `${user.slice(0, 2)}***@${domain}`;
 }

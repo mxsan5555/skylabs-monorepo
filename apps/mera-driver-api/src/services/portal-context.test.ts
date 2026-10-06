@@ -1,0 +1,25 @@
+import {describe,it,expect,beforeEach,vi} from 'vitest';
+import request from 'supertest';
+import {mockPrisma,resetPrismaMock} from '../test-utils/prisma-mock';
+vi.mock('../lib/prisma',()=>({prisma:mockPrisma}));
+import {selectPortalContext,contextRoleKeys} from './portal-context';
+import {resolveEffectivePermissionsForUser,invalidatePermissionCache} from './permission.service';
+import {setRolePermissions,setRoleWidgets} from './role.service';
+import {ensureCustomerProfile} from './auth.service';
+import {issueTokenPair,rotateRefreshToken} from './token.service';
+import {signAccessToken,verifyAccessToken} from '../lib/jwt';
+import {app} from '../app';
+beforeEach(()=>{resetPrismaMock();invalidatePermissionCache();});
+describe('portal context and system roles',()=>{
+ it('defaults a multi-role account to customer, never staff',()=>{expect(selectPortalContext(['customer','driver','super_admin'])).toBe('customer');expect(contextRoleKeys(['customer','driver','super_admin'],'customer')).toEqual(['customer']);});
+ it('permits an explicit staff context only through existing staff roles',()=>{expect(selectPortalContext(['customer','super_admin'],'staff')).toBe('staff');expect(()=>selectPortalContext(['customer'],'staff')).toThrow();});
+ it('does not trust a requested driver persona to grant a role',()=>{expect(()=>selectPortalContext(['customer'],'driver')).toThrow();});
+ it.each(['customer','driver'])('ignores staff grants and user overrides for %s',async key=>{mockPrisma.rolePermission.findMany.mockResolvedValue([{permission:{key:'drivers:view'}}]);mockPrisma.userPermissionOverride.findMany.mockResolvedValue([{effect:'grant',permission:{key:'rbac.roles:edit'}}]);expect(await resolveEffectivePermissionsForUser('own',[key])).toEqual([]);expect(mockPrisma.userPermissionOverride.findMany).not.toHaveBeenCalled();});
+ it.each(['customer','driver'])('rejects staff-permission and widget changes to %s',async key=>{mockPrisma.role.findUnique.mockResolvedValue({key,id:'role'});await expect(setRolePermissions('role',['permission'])).rejects.toMatchObject({code:'SYSTEM_PORTAL_ROLE'});await expect(setRoleWidgets('role',[])).rejects.toMatchObject({code:'SYSTEM_PORTAL_ROLE'});expect(mockPrisma.rolePermission.deleteMany).not.toHaveBeenCalled();});
+ it('rechecks live user-role membership before applying staff grants',async()=>{mockPrisma.role.findMany.mockResolvedValue([{isSuperAdmin:false}]);mockPrisma.rolePermission.findMany.mockResolvedValueOnce([{permission:{key:'drivers:view'}}]).mockResolvedValueOnce([]);expect(await resolveEffectivePermissionsForUser('revoked',['staff'])).toEqual([]);const query=mockPrisma.rolePermission.findMany.mock.calls[1][0];expect(query.where.role.users.some).toMatchObject({userId:'revoked',user:{status:'active',deletedAt:null}});});
+ it('signs only the selected existing context and persists it on refresh',async()=>{mockPrisma.refreshSession.create.mockResolvedValue({id:'next'});const pair=await issueTokenPair('u',['customer','super_admin'],{},'customer');expect(verifyAccessToken(pair.accessToken)).toMatchObject({roles:['customer'],portalContext:'customer'});expect(mockPrisma.refreshSession.create.mock.calls[0][0].data.portalContext).toBe('customer');mockPrisma.refreshSession.findUnique.mockResolvedValue({id:'old',userId:'u',expiresAt:new Date(Date.now()+60000),portalContext:'customer'});mockPrisma.userRole.findMany.mockResolvedValue([{role:{key:'customer'}},{role:{key:'super_admin'}}]);const refreshed=await rotateRefreshToken(pair.refreshToken);expect(verifyAccessToken(refreshed.accessToken)).toMatchObject({roles:['customer'],portalContext:'customer'});});
+ it('links an email-only customer without a fictional phone',async()=>{mockPrisma.customer.findUnique.mockResolvedValue(null);mockPrisma.customer.findFirst.mockResolvedValue(null);await ensureCustomerProfile({id:'u',name:'Real Saved Name',email:'fixture@example.invalid',phone:null});expect(mockPrisma.customer.upsert.mock.calls[0][0].create).toMatchObject({userId:'u',firstName:'Real Saved Name',mobileNumber:null});});
+ it('never merges another existing customer on contact match',async()=>{mockPrisma.customer.findFirst.mockResolvedValue({id:'other'});await expect(ensureCustomerProfile({id:'u',name:'Saved',email:'fixture@example.invalid',phone:null})).rejects.toMatchObject({code:'CUSTOMER_LINK_REQUIRED'});expect(mockPrisma.customer.upsert).not.toHaveBeenCalled();});
+ it.each(['customer','driver'])('denies staff API access even with contaminated %s grants',async role=>{mockPrisma.rolePermission.findMany.mockResolvedValue([{permission:{key:'drivers:view'}}]);const token=signAccessToken({sub:'u',roles:[role,'super_admin'],app:'mera-driver'});expect((await request(app).get('/workflow/dispatch').set('Authorization','Bearer '+token)).status).toBe(403);});
+ it('does not expose driver ownership in a customer context',async()=>{mockPrisma.driver.findUnique.mockResolvedValue({id:'d',userId:'u',accountStatus:'Active'});const token=signAccessToken({sub:'u',roles:['customer'],app:'mera-driver'});expect((await request(app).get('/drivers/me').set('Authorization','Bearer '+token)).status).toBe(403);});
+});
