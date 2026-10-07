@@ -22,7 +22,6 @@ import content from '../../../content.json';
 
 import './wishlist.css';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
-import { Breadcrumb } from '../../components/breadcrumb';
 const { wishlist: wishlistContent } = content;
 
 /**
