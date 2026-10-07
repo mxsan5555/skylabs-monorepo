@@ -123,7 +123,13 @@ export function Category() {
   const { token, isAuthenticated } = useAuth();
   // Rendering decisions wait for hydration so they match the prerendered (signed-out) HTML.
   const signedIn = useHydrated() && isAuthenticated;
-  const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
+  const {
+    has: isWishlisted,
+    toggle: toggleWishlist,
+    hasProduct,
+    toggleProduct,
+    isProductPending,
+  } = useWishlist();
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
   const { coords, city: visitorCity } = useVisitorLocation();
@@ -249,6 +255,12 @@ export function Category() {
   const toggleFavorite = (deal: CatalogDeal) => {
     if (!requireAuthOrRedirect()) return;
     void toggleWishlist(deal.id);
+  };
+  const toggleProductFavorite = async (productId: string) => {
+    if (!requireAuthOrRedirect()) return;
+    setActionError('');
+    const success = await toggleProduct(productId);
+    if (!success) setActionError('Unable to update product wishlist. Please try again.');
   };
 
   const isTherapyCategory = category?.type === 'THERAPY';
@@ -518,8 +530,10 @@ export function Category() {
           }}
           href={`/products/${product.id}`}
           eyebrowHref={product.vendor?.slug ? `/vendor/${product.vendor.slug}` : undefined}
-          favoriteActive={false}
-          onFavorite={() => { }}
+          favoriteActive={signedIn && hasProduct(product.id)}
+          onFavorite={() => {
+            if (!isProductPending(product.id)) void toggleProductFavorite(product.id);
+          }}
           layout={cardLayout}
           actions={
             <FilledButton onClick={() => addProductToCart(product)}>

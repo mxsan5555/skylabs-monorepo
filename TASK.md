@@ -170,6 +170,11 @@ Original plan file: `~/.claude/plans/our-backend-admin-layout-snug-sloth.md`. Ea
 
 ## Completed
 
+### MSD — wishlist product counts
+- [x] Count saved deals and products together in the wishlist heading, desktop badge, and mobile badge; use item-based wishlist copy — 2026-10-07
+- [x] Wire `/category/:slug` PRODUCT cards to product wishlist state/actions; verify heart and count update immediately and persist after reload — 2026-10-07
+- [x] Include uploaded product media in wishlist API results and resolve it to display URLs on wishlist cards — 2026-10-07
+
 ### Foundation & design system
 - [x] Nx monorepo with `msd` (React 19 + Vite) and `mera-driver` (Angular 21) — 2026-06
 - [x] `packages/shared-ui`: all 15 Material Web (M3) component groups registered

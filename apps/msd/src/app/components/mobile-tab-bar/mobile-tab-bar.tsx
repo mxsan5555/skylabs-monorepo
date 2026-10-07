@@ -51,7 +51,7 @@ function TabLink({
  * Wishlist, Cart, Account. Carries the actions the header hides below 840px.
  */
 export function MobileTabBar() {
-  const { ids } = useWishlist();
+  const { itemCount } = useWishlist();
   const cartCount = useCartCount();
   const { accountPath } = useAccountLinks();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -81,7 +81,7 @@ export function MobileTabBar() {
               <span className="tab-bar__label label-medium">{t.categories}</span>
             </button>
           </li>
-          <TabLink to="/wishlist" icon="favorite_border" label={t.wishlist} count={ids?.size ?? 0} />
+          <TabLink to="/wishlist" icon="favorite_border" label={t.wishlist} count={itemCount} />
           <TabLink to="/cart" icon="shopping_bag" label={t.cart} count={cartCount} />
           <TabLink to={accountPath} icon="person" label={t.account} />
         </ul>
