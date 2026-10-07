@@ -6,7 +6,9 @@
   .customer-orders-list .card-grid {
     gap: 12px;
   }
-
+.customer-orders-filters {
+  margin-top: 20px;
+}
   .customer-order-card {
     width: 100%;
     height: 175px;
@@ -152,4 +154,26 @@
 
 .customer-order-card-new__total {
   font-size: 0.95rem;
+}
+.order-cancellation {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-cancellation__refund {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 0 4px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.order-cancellation__refund sky-icon,
+.order-cancellation__refund Icon {
+  flex-shrink: 0;
+  color: var(--md-sys-color-primary);
 }

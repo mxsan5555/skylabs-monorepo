@@ -1,6 +1,6 @@
 import { AdminPage } from '../../admin/admin-page';
 import { ProfileForm } from '../account/profile-form';
-
+import { Breadcrumb } from '../../components/breadcrumb';
 /**
  * `/my-account` — the storefront-facing equivalent of the admin console's `/account/profile`.
  * Same thin-wrapper pattern: `AdminPage` here is just its title/subtitle card container (it
@@ -9,12 +9,21 @@ import { ProfileForm } from '../account/profile-form';
  */
 export function MyAccountProfile() {
   return (
-    <AdminPage
-      title="My Account"
-      subtitle="Manage your contact details and saved addresses."
-    >
-      <ProfileForm />
-    </AdminPage>
+    <>
+      <Breadcrumb className="my-account__breadcrumb"
+        items={[
+          { label: 'Home', to: '/' },
+          { label: 'Profile' },
+        ]}
+      />
+
+      <AdminPage
+        title="Profile Details"
+        subtitle="Manage your contact details and saved addresses."
+      >
+        <ProfileForm />
+      </AdminPage>
+    </>
   );
 }
 

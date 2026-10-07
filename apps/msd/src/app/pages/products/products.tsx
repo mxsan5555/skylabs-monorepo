@@ -43,9 +43,7 @@ import {
 } from '../../../utils/media';
 
 import type { ProductSort } from '../../../types';
-
 import content from '../../../content.json';
-
 import './products.css';
 
 const { products } = content;
@@ -134,7 +132,6 @@ export function ProductListing() {
    */
   useEffect(() => {
     let cancelled = false;
-
     setLoading(true);
     setError('');
 
@@ -145,9 +142,7 @@ export function ProductListing() {
       pageSize: 60,
     })
       .then(({ data }) => {
-        if (!cancelled) {
-          setProductsData(data);
-        }
+        if (!cancelled) { setProductsData(data); }
       })
       .catch((err: unknown) => {
         if (cancelled) {
@@ -161,15 +156,8 @@ export function ProductListing() {
                 .load,
         );
       })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      .finally(() => { if (!cancelled) { setLoading(false); } });
+    return () => { cancelled = true; };
   }, [search]);
 
   /*
@@ -236,7 +224,6 @@ export function ProductListing() {
 
     setActionError('');
     setActionMessage('');
-
     try {
       await addCartItem(
         token,
@@ -479,15 +466,9 @@ export function ProductListing() {
         aria-label="Products overview"
       >
         <div className="products-page__hero-inner">
-          <div
-            className="products-page__hero-icon"
-            aria-hidden="true"
-          >
-            <Icon>
-              local_florist
-            </Icon>
+          <div className="products-page__hero-icon" aria-hidden="true">
+            <Icon>local_florist</Icon>
           </div>
-
           <div>
             <h1 className="products-page__title">
               {products.listing.title}
@@ -531,24 +512,11 @@ export function ProductListing() {
               );
             }}
           >
-            <Icon
-              slot="leading-icon"
-              aria-hidden="true"
-            >
-              search
-            </Icon>
+            <Icon slot="leading-icon" aria-hidden="true">search</Icon>
           </OutlinedTextField>
-
-          <span
-            className="products-page__count"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            {loading
-              ? '…'
-              : `${sortedProducts.length} ${products.listing.resultLabel}`}
+          <span className="products-page__count" aria-live="polite" aria-atomic="true">
+            {loading ? '…' : `${sortedProducts.length} ${products.listing.resultLabel}`}
           </span>
-
           <OutlinedSelect
             className="products-page__sort-select"
             label={
@@ -592,7 +560,6 @@ export function ProductListing() {
           </OutlinedSelect>
         </div>
       </div>
-
       <Divider />
 
       {/* Action messages */}

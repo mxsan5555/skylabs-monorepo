@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Icon } from '@skylabs-monorepo/shared-ui/react';
+import { Divider, Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { AccountProvider } from '../../../account/account-context';
 import { isDualRoleUser, setExperienceMode } from '../../../auth/role-routing';
 import './my-account.css';
 import { useToast } from '../../../toast/toast-context';
+
 interface NavItem {
   to: string;
   label: string;
@@ -17,8 +18,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/my-dashboard', label: 'Dashboard', icon: 'dashboard' },
   { to: '/my-account', label: 'Profile', icon: 'person', end: true },
   { to: '/orders', label: 'Orders', icon: 'receipt_long' },
- { to: '/my-account/wishlist', label: 'Wishlist', icon: 'favorite_border' },
-{ to: '/my-account/cart', label: 'Cart', icon: 'shopping_cart' },
+  { to: '/my-account/wishlist', label: 'Wishlist', icon: 'favorite_border' },
+  { to: '/my-account/cart', label: 'Cart', icon: 'shopping_cart' },
   { to: '/my-account/support', label: 'Support', icon: 'support' },
   // { to: '/my-account/invoices', label: 'Invoices', icon: 'description' },
   // { to: '/my-account/settings', label: 'Settings', icon: 'settings' },
@@ -35,34 +36,62 @@ const NAV_ITEMS: NavItem[] = [
 export function MyAccountLayout() {
   const { bootstrap, signOut } = useAuth();
   const dualRole = bootstrap ? isDualRoleUser(bootstrap) : false;
-  const switchToVendor = () => { setExperienceMode('vendor'); };
+  const switchToVendor = () => {
+    setExperienceMode('vendor');
+  };
+
   const { showToast } = useToast();
+
   const handleLogout = () => {
     signOut();
     showToast('You have been logged out successfully.', 'success');
   };
+
   return (
     <AccountProvider>
       <div className="my-account-shell">
         <meta name="robots" content="noindex" />
+
         <nav className="my-account-nav" aria-label="My account">
           <ul className="entity-list">
+
+            {/* Profile */}
+            <li className="my-account-nav__profile">
+              <sky-tile-card
+                icon="person"
+                iconShape="full" 
+                headline={bootstrap?.user.email ?? bootstrap?.user.phone ?? ''}
+                align="center"
+                color="none"
+                variant="filled"
+              />
+            </li>
+
+
+           
+              <Divider />
+            
+
+            {/* Navigation */}
             {NAV_ITEMS.map((item) => (
               <li key={item.to}>
                 <NavLink
                   to={item.to}
                   end={item.end}
                   className={({ isActive }) =>
-                    `entity-list__item my-account-nav__link${isActive ? ' active' : ''}`
+                    `entity-list__item my-account-nav__link${isActive ? ' active' : ''
+                    }`
                   }
                 >
                   <span className="role-list__name">
-                    <Icon aria-hidden="true">{item.icon}</Icon>
+                    <Icon className="my-account-nav__icon" aria-hidden="true">{item.icon}</Icon>
                     {item.label}
                   </span>
                 </NavLink>
               </li>
             ))}
+
+            {/* Vendor dashboard */}
             {dualRole && (
               <li>
                 <NavLink
@@ -71,26 +100,35 @@ export function MyAccountLayout() {
                   className="entity-list__item my-account-nav__link"
                 >
                   <span className="role-list__name">
-                    <Icon aria-hidden="true">storefront</Icon>
+                    <Icon className="my-account-nav__icon" aria-hidden="true">storefront</Icon>
                     Switch to Vendor Dashboard
                   </span>
                 </NavLink>
               </li>
             )}
-              <li className="my-account-nav__logout">
-                <button
-                  type="button"
-                  className="entity-list__item"
-                  onClick={handleLogout}
-                >
-                  <span className="role-list__name">
-                    <Icon aria-hidden="true">logout</Icon>
-                    Logout
-                  </span>
-                </button>
-              </li>
+
+            {/* Divider before logout */}
+            <li className="my-account-nav__divider">
+              <Divider />
+            </li>
+
+            {/* Logout */}
+            <li className="my-account-nav__logout">
+              <button
+                type="button"
+                className="entity-list__item"
+                onClick={handleLogout}
+              >
+                <span className="role-list__name">
+                  <Icon className="my-account-nav__icon" aria-hidden="true">logout</Icon>
+                  Logout
+                </span>
+              </button>
+            </li>
+
           </ul>
         </nav>
+
         <div className="my-account-shell__content">
           <Outlet />
         </div>

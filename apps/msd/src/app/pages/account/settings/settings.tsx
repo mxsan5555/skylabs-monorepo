@@ -76,12 +76,12 @@ export function MyProfileSettings() {
   return (
     <div className="admin-page">
       <title>My Profile · MSD</title>
-      <header className="page-head">
+      {/* <header className="page-head">
         <div>
           <h1>My Profile</h1>
           <p>View and update your own account details.</p>
         </div>
-      </header>
+      </header> */}
       {loading ? (
         <div className="profile-loading">
           <CircularProgress

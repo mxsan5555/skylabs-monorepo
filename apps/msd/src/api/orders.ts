@@ -79,6 +79,7 @@ export interface Order extends OrderContactDetails {
   total: string;
   cancellationReason: string | null;
   createdAt: string;
+  updatedAt: string;
   items: OrderItem[];
   payments: PaymentSummary[];
   branch: { id: string; name: string; address: string | null; city: string | null } | null;

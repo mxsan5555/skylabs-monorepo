@@ -15,7 +15,7 @@ import type {
 import type {
   WishlistProduct,
 } from '../../../api/wishlist';
-
+import { Breadcrumb } from '../../components/breadcrumb';
 import { resolveDealMedia, resolveProductMedia } from '../../../utils/media';
 
 import content from '../../../content.json';
@@ -185,7 +185,14 @@ export function Wishlist() {
       />
 
       <div className="wishlist-page__inner">
-        <h1 className="wishlist-page__title">
+  <Breadcrumb
+    items={[
+      { label: 'Home', to: '/' },
+      { label: 'Wishlist' },
+    ]}
+  />
+
+  <h1 className="wishlist-page__title">
           {wishlistContent.title}
 
           {itemCount > 0 && (

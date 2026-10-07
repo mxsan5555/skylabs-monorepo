@@ -956,7 +956,7 @@
   "empty": {
     "title": "No orders yet",
     "description": "Orders you place will show up here.",
-    "cta": "Browse Categories"
+   "cta": "Explore Now"
   },
   "links": {
     "viewDetails": "View details →"
@@ -1006,7 +1006,11 @@
       "message": "Cancel this order?",
       "cancel": "Keep order",
       "confirm": "Cancel order"
-    }
+    },
+   "messages": {
+  "refundAfterCancellation": "Your refund will be credited to your original payment method within 5–7 business days.",
+  "cancelledWithoutReason": "This order has been cancelled."
+}
   },
   "meta": {
     "home": {
@@ -1367,6 +1371,16 @@
     "messages": {
       "addToCartSuccess": "Added \"{item}\" to your cart.",
       "bookingSuccess": "Booked \"{service}\" for {date} at {time}."
+    }
+  },
+   "support": {
+    "title": "How can we help?",
+    "description": "Find answers to common questions or get in touch with our support team.",
+    "form": {
+      "heading": "Contact Support",
+      "subheading": "Our support team is available to help you with your queries.",
+      "subject": "Support Request",
+      "message": "Please describe your issue or query and our support team will assist you."
     }
   }
 }

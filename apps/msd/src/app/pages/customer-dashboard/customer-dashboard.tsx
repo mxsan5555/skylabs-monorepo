@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FilledButton, OutlinedButton, Icon,} from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedButton, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getCustomerDashboardSummary } from '../../../api/customer-dashboard';
 import { ApiRequestError } from '../../../api/rbac/client';
 import './customer-dashboard.css';
-
+import { Breadcrumb } from '../../components/breadcrumb';
 interface DashboardStats {
     deals: number;
     products: number;
@@ -23,38 +23,38 @@ export function CustomerDashboard() {
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-  useEffect(() => {
-    let cancelled = false;
-    async function loadDashboard() {
-        setLoading(true);
-        setError('');
-        try {
-            const response = await getCustomerDashboardSummary(token);
-            if (cancelled) return;
-            setStats({
-                deals: response.data.totalDealCount,
-                products: response.data.totalProductBoughtCount,
-                cart: response.data.cartItemCount,
-                wishlist: response.data.wishlistItemCount,
-            });
-        } catch (err) {
-            if (cancelled) return;
-            setError(
-                err instanceof ApiRequestError? err.message: 'Could not load your dashboard.',
-            );
-        } finally {
-            if (!cancelled) {
-                setLoading(false);
+    useEffect(() => {
+        let cancelled = false;
+        async function loadDashboard() {
+            setLoading(true);
+            setError('');
+            try {
+                const response = await getCustomerDashboardSummary(token);
+                if (cancelled) return;
+                setStats({
+                    deals: response.data.totalDealCount,
+                    products: response.data.totalProductBoughtCount,
+                    cart: response.data.cartItemCount,
+                    wishlist: response.data.wishlistItemCount,
+                });
+            } catch (err) {
+                if (cancelled) return;
+                setError(
+                    err instanceof ApiRequestError ? err.message : 'Could not load your dashboard.',
+                );
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
             }
         }
-    }
 
-    loadDashboard();
+        loadDashboard();
 
-    return () => {
-        cancelled = true;
-    };
-}, [token]);
+        return () => {
+            cancelled = true;
+        };
+    }, [token]);
     const logout = () => {
         signOut();
         navigate('/sign-in', { replace: true });
@@ -75,17 +75,12 @@ export function CustomerDashboard() {
     return (
         <div className="customer-dashboard">
             <title>My Dashboard</title>
-
-            <sky-feature-card
-                className="customer-dashboard__hero"
-                color="secondary"
-                icon="dashboard"
-                iconStyle="surface"
-                variant="filled"
-                iconShape="full"
-                headline="My Dashboard"
-                text="Welcome back. Manage your bookings, products, cart and wishlist from one place."
-            />
+             <Breadcrumb
+        items={[
+            { label: 'Home', to: '/' },
+            { label: 'Dashboard' },
+        ]}
+    />
 
             {error && (
                 <sky-card className="customer-dashboard__error">
@@ -101,7 +96,8 @@ export function CustomerDashboard() {
                     headline="Deals"
                     text={`${stats.deals} booked deals`}
                     variant="elevated"
-                   href="/orders?type=SERVICE"
+                    align="center"
+                    href="/orders?type=SERVICE"
                 />
 
                 <sky-tile-card
@@ -109,6 +105,7 @@ export function CustomerDashboard() {
                     headline="Products"
                     text={`${stats.products} purchased products`}
                     variant="elevated"
+                    align="center"
                     href="/orders?type=PRODUCT"
                 />
 
@@ -117,6 +114,7 @@ export function CustomerDashboard() {
                     headline="Cart"
                     text={`${stats.cart} items in cart`}
                     variant="elevated"
+                    align="center"
                     href="/cart"
                 />
 
@@ -125,10 +123,44 @@ export function CustomerDashboard() {
                     headline="Wishlist"
                     text={`${stats.wishlist} saved items`}
                     variant="elevated"
+                    align="center"
                     href="/wishlist"
                 />
             </div>
-            <sky-card className="customer-dashboard__profile">
+            <div className="customer-dashboard__quick-actions">
+                <sky-card className="customer-dashboard__quick-action">
+                    <div className="customer-dashboard__quick-action-content">
+                        <Icon aria-hidden="true">person</Icon>
+
+                        <div className="customer-dashboard__quick-action-info">
+                            <h3>Profile</h3>
+                            <p>Manage your personal account information.</p>
+                        </div>
+
+                        <OutlinedButton
+                            onClick={() => navigate('/my-account')}
+                        >
+                            View Profile
+                        </OutlinedButton>
+                    </div>
+                </sky-card>
+
+                <sky-card className="customer-dashboard__quick-action">
+                    <div className="customer-dashboard__quick-action-content">
+                        <Icon aria-hidden="true">logout</Icon>
+
+                        <div className="customer-dashboard__quick-action-info">
+                            <h3>Logout</h3>
+                            <p>Sign out from your MySpaDeal account.</p>
+                        </div>
+
+                        <FilledButton onClick={logout}>
+                            Logout
+                        </FilledButton>
+                    </div>
+                </sky-card>
+            </div>
+            {/* <sky-card className="customer-dashboard__profile">
                 <div className="customer-dashboard__section-content">
                     <div>
                         <h2>Profile</h2>
@@ -164,7 +196,7 @@ export function CustomerDashboard() {
                         Logout
                     </FilledButton>
                 </div>
-            </sky-card>
+            </sky-card> */}
         </div>
     );
 }
