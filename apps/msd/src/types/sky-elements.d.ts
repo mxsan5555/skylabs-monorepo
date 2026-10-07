@@ -196,6 +196,16 @@ declare module 'react' {
       // ── sky-feature-card / sky-cta-banner ──────────────────────────────────
       'sky-feature-card': SkyEl<SkyFeatureProps>;
       'sky-cta-banner': SkyEl<SkyFeatureProps>;
+
+      // ── sky-rich-text-editor (opt-in: @skylabs-monorepo/shared-ui/editor) ──
+      'sky-rich-text-editor': SkyEl<{
+        value?: string;
+        placeholder?: string;
+        label?: string;
+        readOnly?: boolean;
+        /** React 19 attaches on<event> props on custom elements as listeners. */
+        'onsky-change'?: (event: CustomEvent<{ html: string; text: string }>) => void;
+      }>;
     }
   }
 }

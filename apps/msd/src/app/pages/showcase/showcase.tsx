@@ -3,6 +3,8 @@ import './showcase.css';
 import logo from '../../../assets/logo.jpg';
 // Opt-in: registers <swiper-container> / <swiper-slide> for the carousel demos.
 import '@skylabs-monorepo/shared-ui/carousel';
+// Opt-in: registers <sky-rich-text-editor> (Quill-backed) for the editor demo.
+import '@skylabs-monorepo/shared-ui/editor';
 import {
   applyTheme,
   type ThemeMode,
@@ -862,6 +864,29 @@ export function Showcase() {
           <sky-action-field dense icon="sell" label="Coupon code" placeholder="Enter coupon code" actionLabel="Apply" shape="small" />
           <sky-action-field dense icon="location_on" label="Check availability by pincode" placeholder="Pincode" actionIcon="arrow_forward" variant="outlined" />
           <sky-action-field label="Disabled field" placeholder="Disabled" actionLabel="Send" actionIcon="send" disabled />
+        </div>
+      </section>
+
+      <section className="showcase__card" id="rich-text-editor">
+        <h2>Rich text editor</h2>
+        <p className="demo-label">
+          Quill-backed WYSIWYG for CMS body text (blog posts, FAQ answers, pages) — bold, italic,
+          headings, lists, quote, link, image, clear formatting. Renders into light DOM (not a
+          shadow root) since Quill needs real document-level selection.
+        </p>
+        <div className="demo-stack">
+          <sky-rich-text-editor
+            label="Blog body"
+            placeholder="Write the post…"
+            value="<p>Enjoy a <strong>90-minute</strong> deep tissue massage at our top-rated downtown spa.</p>"
+            onsky-change={(e) => console.log('sky-rich-text-editor change', e.detail)}
+          />
+          <p className="demo-label">Read-only</p>
+          <sky-rich-text-editor
+            label="Read-only preview"
+            readOnly
+            value="<p>This content is <em>locked</em> for preview.</p>"
+          />
         </div>
       </section>
 
