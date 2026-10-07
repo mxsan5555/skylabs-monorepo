@@ -6,6 +6,7 @@ import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
 import './wishlist.css';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
+import { Breadcrumb } from '../../components/breadcrumb';
 const { wishlist: wishlistContent } = content;
 /**
  * Real, backend-driven wishlist (`GET /wishlist` via `WishlistProvider`) — same layout, empty
@@ -47,7 +48,14 @@ export function Wishlist() {
       <meta name="description" content={content.meta.wishlist.description} />
       <meta name="robots" content="noindex" />
       <div className="wishlist-page__inner">
-        <h1 className="wishlist-page__title">
+  <Breadcrumb
+    items={[
+      { label: 'Home', to: '/' },
+      { label: 'Wishlist' },
+    ]}
+  />
+
+  <h1 className="wishlist-page__title">
           {wishlistContent.title}
           {items.length > 0 && (
             <span className="wishlist-page__count">

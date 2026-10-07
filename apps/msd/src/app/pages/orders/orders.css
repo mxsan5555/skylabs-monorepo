@@ -6,7 +6,9 @@
   .customer-orders-list .card-grid {
     gap: 12px;
   }
-
+.customer-orders-filters {
+  margin-top: 20px;
+}
   .customer-order-card {
     width: 100%;
     height: 175px;

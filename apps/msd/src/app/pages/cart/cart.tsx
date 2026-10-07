@@ -8,7 +8,7 @@ import { formatINR, pluralize } from '../../../utils/format';
 import { resolveDealMedia, resolveProductMedia, primaryImage } from '../../../utils/media';
 import './cart.css';
 import content from '../../../content.json';
-
+import { Breadcrumb } from '../../components/breadcrumb';
 /**
  * Real, backend-driven cart. Deal/Product/Therapist are purchasable together in ONE cart, ONE
  * checkout, ONE order — there is no separate Deal Cart / Therapist Cart / Product Cart, and no
@@ -17,44 +17,36 @@ import content from '../../../content.json';
  * Multi-vendor: items from any number of vendors/branches may sit here (see `Cart`'s doc comment
  * in `api/cart.ts`) — grouped by vendor purely for display, still one page, one combined total.
  */
-
 function itemKindLabel(item: CartItem): 'Deal' | 'Product' | 'Therapist' {
   if (item.therapistId) return 'Therapist';
   if (item.productId) return 'Product';
   return 'Deal';
 }
-
 function itemTitle(item: CartItem): string {
   if (item.therapist) return `${item.therapist.therapistType} — ${item.therapist.personName}`;
   if (item.product) return item.product.name;
   return item.deal?.title ?? 'Deal';
 }
-
 function itemSubtitle(item: CartItem): string {
   const duration = item.dealPackage?.durationMinutes ?? item.therapistPackage?.durationMinutes;
   if (item.therapist) return duration ? `${duration} min` : itemKindLabel(item);
   if (item.product) return itemKindLabel(item);
   return duration ? `${duration} min` : (item.deal?.title ?? itemKindLabel(item));
 }
-
 function itemImage(item: CartItem): string | null {
   if (item.deal) return primaryImage(resolveDealMedia(item.deal)) ?? null;
   if (item.product) return primaryImage(resolveProductMedia(item.product)) ?? null;
   return item.therapist?.photoUrl ?? null;
 }
-
 function itemVendorId(item: CartItem): string {
   return item.therapist?.vendorId ?? item.deal?.vendorId ?? item.product?.vendorId ?? 'unknown';
 }
-
 function itemVendorName(item: CartItem): string {
   return item.therapist?.vendor?.businessName ?? item.deal?.vendor?.businessName ?? item.product?.vendor?.businessName ?? 'Vendor';
 }
-
 function itemBranchName(item: CartItem): string | undefined {
   return item.therapist?.branch?.name ?? item.deal?.branch?.name;
 }
-
 export function Cart() {
   const { token } = useAuth();
   const navigate = useNavigate();
@@ -69,28 +61,17 @@ export function Cart() {
       .catch((err) => setError(err instanceof ApiRequestError ? err.message : 'Could not load your cart.'))
       .finally(() => setLoading(false));
   }, [token]);
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => {load(); }, [load]);
   const items = cart?.items ?? [];
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const subtotal = items.reduce((sum, i) => sum + Number(i.unitPrice) * i.quantity, 0);
-
   // Group by vendor purely for display — checkout still sends/creates one flat order.
   const vendorGroups = items.reduce<{ vendorId: string; vendorName: string; branchName: string | undefined; items: CartItem[] }[]>(
     (groups, item) => {
       const vendorId = itemVendorId(item);
       const group = groups.find((g) => g.vendorId === vendorId);
-      if (group) {
-        group.items.push(item);
-      } else {
-        groups.push({
-          vendorId,
-          vendorName: itemVendorName(item),
-          branchName: itemBranchName(item),
-          items: [item],
-        });
-      }
+      if (group) {group.items.push(item);}
+       else {groups.push({vendorId, vendorName: itemVendorName(item), branchName: itemBranchName(item),items: [item],});}
       return groups;
     }, [],
   );
@@ -124,12 +105,17 @@ export function Cart() {
       <title>{content.meta.cart.title}</title>
       <meta name="robots" content="noindex" />
       <div className="cart-page__inner">
-        <h1 className="cart-page__title">
+          <Breadcrumb
+    items={[
+      { label: 'Home', to: '/' },
+      { label: 'Cart' },
+    ]}
+  />
+        {/* <h1 className="cart-page__title">
           {content.cart.title}
           {totalItems > 0 && <span className="cart-page__count">({totalItems} {pluralize(totalItems, 'item')})</span>}
-        </h1>
+        </h1> */}
         {error && <p className="error-state" role="alert">{error}</p>}
-
         {items.length === 0 ? (
           <div className="cart-page__empty">
             <sky-info-card icon="shopping_bag" heading="Your cart is empty" subheading="Explore our wellness deals, products, and services to find something for you." />
@@ -140,6 +126,20 @@ export function Cart() {
         ) : (
           <div className="cart-page__layout">
             <section className="cart-page__items" aria-label="Cart items">
+              <div className="cart-items-header">
+                <h2 className="cart-page__title">{content.cart.title}
+                  {totalItems > 0 && <span className="cart-page__count">({totalItems} {pluralize(totalItems, 'item')})</span>}
+                </h2>
+                <OutlinedButton
+                  onClick={() =>
+                    clearCart(token)
+                      .then(({ data }) => setCart(data))
+                      .catch((err) =>setError(err instanceof ApiRequestError? err.message: 'Could not clear your cart.',),
+                      )}>
+                  <Icon slot="icon" aria-hidden="true">delete</Icon>
+                  Remove all
+                </OutlinedButton>
+              </div>
               {vendorGroups.map((group) => (
                 <div key={group.vendorId} className="cart-vendor-group">
                   <p className="cart-vendor-group__heading">
@@ -158,28 +158,38 @@ export function Cart() {
                             width={100}
                             height={100}
                             loading="lazy"
-                          />
-                        )}
+                          />)}
                         <div className="cart-item__body">
                           <div className="cart-item__top">
-                            <div>
+                            <div className="cart-item__details">
                               <p className="cart-item__provider">{itemKindLabel(item)}</p>
                               <h3 className="cart-item__title">{itemTitle(item)}</h3>
                               <p className="cart-item__provider">{itemSubtitle(item)}</p>
                             </div>
                             <p className="cart-item__price">{formatINR(Number(item.unitPrice) * item.quantity)}</p>
                           </div>
-                          <div className="cart-item__actions">
+                          <div className="cart-item__bottom">
                             <div className="cart-item__qty" role="group" aria-label={`Quantity for ${itemTitle(item)}`}>
-                              <IconButton aria-label="Decrease quantity" disabled={item.quantity <= 1} onClick={() => changeQty(item.id, item.quantity - 1)}>
-                                <Icon aria-hidden="true">remove</Icon>
-                              </IconButton>
-                              <span className="cart-item__qty-val" aria-label={`${item.quantity} in cart`}>{item.quantity}</span>
-                              <IconButton aria-label="Increase quantity" onClick={() => changeQty(item.id, item.quantity + 1)}>
-                                <Icon aria-hidden="true">add</Icon>
-                              </IconButton>
+                              <span className="cart-item__qty-label">Quantity</span>
+                              <div className="cart-item__qty-control">
+                                <IconButton
+                                  aria-label="Decrease quantity"
+                                  disabled={item.quantity <= 1}
+                                  onClick={() =>changeQty(item.id, item.quantity - 1)}
+                                >
+                                  <Icon aria-hidden="true">remove</Icon>
+                                </IconButton>
+                                <span className="cart-item__qty-val" aria-label={`${item.quantity} in cart`}>{item.quantity}</span>
+                                <IconButton aria-label="Increase quantity" onClick={() =>changeQty(item.id, item.quantity + 1)} >
+                                  <Icon aria-hidden="true">add</Icon>
+                                </IconButton>
+                              </div>
                             </div>
-                            <IconButton aria-label={`Remove ${itemTitle(item)} from cart`} onClick={() => remove(item.id)}>
+                            <IconButton
+                              className="cart-item__remove"
+                              aria-label={`Remove ${itemTitle(item)} from cart`}
+                              onClick={() => remove(item.id)}
+                            >
                               <Icon aria-hidden="true">delete_outline</Icon>
                             </IconButton>
                           </div>
@@ -189,7 +199,7 @@ export function Cart() {
                   </ul>
                 </div>
               ))}
-              <OutlinedButton
+              {/* <OutlinedButton
                 onClick={() =>
                   clearCart(token)
                     .then(({ data }) => setCart(data))
@@ -198,7 +208,7 @@ export function Cart() {
               >
                 <Icon slot="icon" aria-hidden="true">delete_sweep</Icon>
                 Clear cart
-              </OutlinedButton>
+              </OutlinedButton> */}
             </section>
             <aside className="cart-page__summary" aria-label={content.cart.orderSummaryHeading}>
               <sky-card variant="outlined" className="cart-summary-card">

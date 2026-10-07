@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FilledButton, Tabs, SecondaryTab, } from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, Tabs, SecondaryTab, ChipSet, FilterChip, } from '@skylabs-monorepo/shared-ui/react';
 import { CustomerOrderCard } from './customer-order-card';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listMyOrders, type Order, type OrderStatus, } from '../../../api/orders';
@@ -48,11 +48,17 @@ export function Orders() {
       <Breadcrumb
         items={[{ label: 'Home', to: '/' }, { label: 'Orders' },]}
       />
-      <div className="customer-orders-filters">
+      {/* <div className="customer-orders-filters">
         <Tabs>
           <SecondaryTab onClick={() => setSelectedStatus('ALL')}>All</SecondaryTab>
           <SecondaryTab onClick={() => setSelectedStatus('CANCELLED')}>Cancelled</SecondaryTab>
         </Tabs>
+      </div> */}
+      <div className="customer-orders-filters">
+        <ChipSet className="chip-nav" aria-label="Order status filters">
+          < FilterChip selected={selectedStatus === 'ALL'} onClick={() => setSelectedStatus('ALL')}  >All</ FilterChip>
+          <FilterChip selected={selectedStatus === 'CANCELLED'} onClick={() => setSelectedStatus('CANCELLED')}> Cancelled </ FilterChip>
+        </ChipSet>
       </div>
       <section className="category-page__grid-wrap">
         <div className="category-page__grid-inner">

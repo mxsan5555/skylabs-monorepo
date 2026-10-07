@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { createCustomerSupport } from '../../../api/support';
+import { Breadcrumb } from '../../components/breadcrumb';
 export function Support() {
     const { token } = useAuth();
     const { showToast } = useToast();
@@ -12,6 +13,7 @@ export function Support() {
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    
     const handleSubmit = async () => {
         setErrorMessage('');
         if (!subject.trim() || !message.trim()) {
@@ -32,7 +34,14 @@ export function Support() {
     };
     return (
         <div className="support-page">
+            <Breadcrumb
+                items={[
+                    { label: 'Home', to: '/' },
+                    { label: 'Support' },
+                ]}
+            />
             <sky-tile-card className="support-page__card">
+
                 <div className="support-page__form">
                     <div className="support-page__field">
                         <OutlinedTextField

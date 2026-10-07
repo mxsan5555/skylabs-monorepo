@@ -551,12 +551,19 @@
   /* grid-template-columns: repeat(2, minmax(0, 1fr)); */
   gap: 16px;
 }
+
+.account-fields--readonly {
+  --md-sys-color-on-surface: var(--md-sys-color-on-surface-variant);
+  opacity: 0.95;
+}
+
 .account-card__actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   width: 100%;
 }
+
 .account-fields md-outlined-text-field,
 .account-fields md-filled-text-field {
   width: 100%;

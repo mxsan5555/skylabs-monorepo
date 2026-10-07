@@ -1,5 +1,5 @@
 import { apiGet, apiPost, apiDelete } from './rbac/client';
-import type { CatalogDeal } from './catalog';
+import type { CatalogDeal, CatalogProduct } from './catalog';
 
 /**
  * Customer wishlist — authenticated, self-service only (backend gates on `authenticate` alone,
@@ -13,11 +13,12 @@ import type { CatalogDeal } from './catalog';
  */
 export interface WishlistItem {
   id: string;
-  dealId: string;
+  dealId?: string;
+  productId?: string;
   createdAt: string;
-  deal: CatalogDeal;
+  deal?: CatalogDeal;
+  product?: CatalogProduct;
 }
-
 export function getWishlist(token: string | null) {
   return apiGet<WishlistItem[]>('/wishlist', token);
 }

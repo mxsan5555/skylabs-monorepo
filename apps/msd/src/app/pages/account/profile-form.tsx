@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { FilledButton, OutlinedButton, TextButton, IconButton, OutlinedTextField, Icon, } from '@skylabs-monorepo/shared-ui/react';
+import { OutlinedButton, OutlinedTextField, Icon, } from '@skylabs-monorepo/shared-ui/react';
 import { useAccount } from '../../../account/account-context';
 import type { Address } from '../../../types';
-import { validateEmail, validatePhone } from '../../../utils/validation';
+import { validateEmail } from '../../../utils/validation';
 import content from '../../../content.json';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getMyProfile, updateMyProfile, } from '../../../api/rbac/me';
@@ -32,8 +32,7 @@ const ADDRESS_FIELDS: {
     { key: 'postalCode', label: 'Postal code' },
     { key: 'country', label: 'Country' },
   ];
-const value = (e: Event) =>
-  (e.target as HTMLInputElement).value;
+const value = (e: Event) => (e.target as HTMLInputElement).value;
 /**
  * The actual "edit email/phone + manage saved addresses" form.
  *
@@ -67,43 +66,30 @@ export function ProfileForm() {
   }, [token]);
   const saveProfile = async () => {
     setError('');
-
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
-
     if (!trimmedName) {
       setError('Name is required.');
       return;
     }
-
     if (trimmedEmail && !validateEmail(trimmedEmail)) {
       setError(content.validation.email.invalid);
       return;
     }
-
     try {
       const { data } = await updateMyProfile(token, {
-        name: trimmedName,
-        email: trimmedEmail || undefined,
+        name: trimmedName, email: trimmedEmail || undefined,
       });
-
       setName(data.name ?? '');
       setEmail(data.email ?? '');
       setPhone(data.phone ?? '');
       setEditing(false);
       showToast('Profile updated successfully.', 'success');
     } catch (err) {
-      setError(
-        err instanceof ApiRequestError
-          ? err.message
-          : 'Could not save your profile.',
-      );
+      setError(err instanceof ApiRequestError ? err.message : 'Could not save your profile.',);
     }
   };
-  const startAdd = () => {
-    setDraft(EMPTY);
-    setEditingId('new');
-  };
+  const startAdd = () => { setDraft(EMPTY); setEditingId('new'); };
   const startEdit = (a: Address) => {
     const { id, ...rest } = a;
     void id;
@@ -111,11 +97,8 @@ export function ProfileForm() {
     setEditingId(a.id);
   };
   const submitAddress = () => {
-    if (editingId === 'new') {
-      addAddress(draft);
-    } else if (editingId) {
-      updateAddress(editingId, draft);
-    }
+    if (editingId === 'new') { addAddress(draft); }
+    else if (editingId) { updateAddress(editingId, draft); }
     setEditingId(null);
   };
   const patch = (key: keyof Draft) => (e: Event) =>
@@ -127,14 +110,13 @@ export function ProfileForm() {
         <>
           {error && (<p className="error-state" role="alert">{error}</p>)}
           <section className="account-card">
-            <div className="account-fields">
+            <div className={`account-fields ${!editing ? 'account-fields--readonly' : ''}`}>
               <OutlinedTextField
                 label="Name"
                 value={name}
                 readOnly={!editing}
                 onInput={(e: Event) => setName(value(e))}
               />
-
               <OutlinedTextField
                 label="Email"
                 type="email"
@@ -143,7 +125,6 @@ export function ProfileForm() {
                 readOnly={!editing}
                 onInput={(e: Event) => setEmail(value(e))}
               />
-
               <OutlinedTextField
                 label="Phone"
                 type="tel"
@@ -152,29 +133,17 @@ export function ProfileForm() {
                 readOnly
               />
             </div>
-
             <div className="account-card__actions">
               {!editing ? (
                 <OutlinedButton onClick={() => setEditing(true)}>
-                  <Icon slot="icon" aria-hidden="true">
-                    edit
-                  </Icon>
-                  Edit
-                </OutlinedButton>
+                  <Icon slot="icon" aria-hidden="true">edit</Icon>Edit</OutlinedButton>
               ) : (
                 <>
-                  <OutlinedButton onClick={() => setEditing(false)}>
-                    Cancel
-                  </OutlinedButton>
-
-                  <OutlinedButton onClick={saveProfile}>
-                    Update
-                  </OutlinedButton>
+                  <OutlinedButton onClick={() => setEditing(false)}>Cancel</OutlinedButton>
+                  <OutlinedButton onClick={saveProfile}>Update</OutlinedButton>
                 </>
               )}
             </div>
-
-
           </section>
           {/* <section className="account-card">
             <div className="account-card__head">

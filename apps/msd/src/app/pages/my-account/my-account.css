@@ -4,10 +4,11 @@
   gap: 20px;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 32px 20px 32px;
+  padding: 32px 20px;
   align-items: start;
 }
 
+/* Sidebar */
 .my-account-nav {
   position: sticky;
   top: 88px;
@@ -28,20 +29,38 @@
 .my-account-nav__link {
   text-decoration: none;
 }
-
-.my-account-nav__logout {
-  margin-top: 8px;
-  border-top: 1px solid var(
-    --md-sys-color-outline-variant,
-    #c4c7c5
-  );
-  padding-top: 12px;
+.my-account-nav .role-list__name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
+.my-account-nav .role-list__name md-icon {
+  font-size: 24px;
+}
+.my-account-nav__logout {
+  margin-top: 0;
+}
+.my-account-nav__icon {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  font-size: 24px;
+  line-height: 28px;
+  flex-shrink: 0;
+}
+.my-account-nav__logout .entity-list__item {
+  width: 100%;
+}
+
+/* Routed page content */
 .my-account-shell__content {
   min-width: 0;
 }
-
+.my-account__breadcrumb{
+  margin-bottom: 10px;
+}
 @media (max-width: 768px) {
   .my-account-shell {
     grid-template-columns: 1fr;
