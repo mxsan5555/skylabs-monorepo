@@ -15,7 +15,7 @@ import type {
 import type {
   WishlistProduct,
 } from '../../../api/wishlist';
-
+import { Breadcrumb } from '../../components/breadcrumb';
 import { resolveDealMedia, resolveProductMedia } from '../../../utils/media';
 
 import content from '../../../content.json';
