@@ -47,7 +47,7 @@ export function Home() {
   const { isAuthenticated } = useAuth();
   // Rendering decisions wait for hydration so they match the prerendered (signed-out) HTML.
   const signedIn = useHydrated() && isAuthenticated;
-  const { toggle, has } = useWishlist();
+  const { toggle, has, toggleProduct, hasProduct } = useWishlist();
   const { categories } = useCatalogShell();
   const { status: locationStatus, coords } = useVisitorLocation();
   const catalog = useHomeCatalog(locationStatus === 'locating' ? undefined : coords);
@@ -80,12 +80,20 @@ export function Home() {
     return blocks.length > 0 ? blocks : undefined;
   }, [catalog.deals, catalog.faqs]);
 
-  const handleFavorite = (id: string) => {
+  const handleDealFavorite = (id: string) => {
     if (!isAuthenticated) {
       navigate(signInPathWithReturnTo(location));
       return;
     }
     toggle(id);
+  };
+
+  const handleProductFavorite = (id: string) => {
+    if (!isAuthenticated) {
+      navigate(signInPathWithReturnTo(location));
+      return;
+    }
+    void toggleProduct(id);
   };
 
   const renderDeal = (deal: CatalogDeal) => (
@@ -94,7 +102,7 @@ export function Home() {
         deal={toDealCardDeal(deal)}
         eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
         favoriteActive={signedIn && has(deal.id)}
-        onFavorite={() => handleFavorite(deal.id)}
+        onFavorite={() => handleDealFavorite(deal.id)}
       />
     </swiper-slide>
   );
@@ -161,8 +169,8 @@ export function Home() {
                 <DealCard
                   deal={toProductCardDeal(product)}
                   href={`/products/${product.id}`}
-                  favoriteActive={signedIn && has(product.id)}
-                  onFavorite={() => handleFavorite(product.id)}
+                  favoriteActive={signedIn && hasProduct(product.id)}
+                  onFavorite={() => handleProductFavorite(product.id)}
                 />
               </swiper-slide>
             ))}

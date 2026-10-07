@@ -28,7 +28,7 @@ function CountedAction({ href, icon, label, count }: { href: string; icon: strin
 export function HeaderActions() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const { ids } = useWishlist();
+  const { itemCount } = useWishlist();
   const cartCount = useCartCount();
   const { isAuthenticated, isCustomer, accountPath } = useAccountLinks();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -44,7 +44,7 @@ export function HeaderActions() {
       <Link to={t.becomeMemberTo} className="header-actions__member label-large">
         {t.becomeMember}
       </Link>
-      <CountedAction href="/wishlist" icon="favorite_border" label={t.wishlist} count={ids?.size ?? 0} />
+      <CountedAction href="/wishlist" icon="favorite_border" label={t.wishlist} count={itemCount} />
       <CountedAction href="/cart" icon="shopping_bag" label={t.cart} count={cartCount} />
       {isAuthenticated ? (
         <span className="header-actions__account">

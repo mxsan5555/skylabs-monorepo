@@ -812,9 +812,9 @@
     }
   },
   "wishlist": {
-    "title": "Saved Deals",
-    "emptyHeading": "No saved deals yet",
-    "emptySubheading": "Tap the heart on any deal to save it here for later.",
+    "title": "Saved Items",
+    "emptyHeading": "No saved items yet",
+    "emptySubheading": "Tap the heart on any deal or product to save it here for later.",
     "emptyCtaLabel": "Browse Deals",
     "addToCartLabel": "Add to Cart",
     "loading": "Loading your wishlist…",
@@ -824,8 +824,8 @@
     "bookLabel": "Book",
     "addingLabel": "Adding…",
     "addToCartError": "Could not add to cart.",
-    "dealSingular": "deal",
-    "dealPlural": "deals",
+    "itemSingular": "item",
+    "itemPlural": "items",
     "removeFromWishlist": "Remove from wishlist",
     "saveToWishlist": "Save to wishlist"
   },
@@ -1026,7 +1026,7 @@
       "description": "Review your selected wellness deals and proceed to checkout."
     },
     "wishlist": {
-      "title": "Saved Deals | MSD – MySpaDeal",
+      "title": "Saved Items | MSD – MySpaDeal",
       "description": "Your saved spa and wellness deals on MySpaDeal."
     },
     "checkout": {

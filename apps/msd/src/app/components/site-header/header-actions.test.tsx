@@ -8,7 +8,13 @@ import { HeaderActions } from './header-actions';
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   useAuth: () => ({ isAuthenticated: true, token: 't', bootstrap: null, signOut: vi.fn() }),
 }));
-vi.mock('../../../wishlist/wishlist-context', () => ({ useWishlist: () => ({ ids: new Set() }) }));
+vi.mock('../../../wishlist/wishlist-context', () => ({
+  useWishlist: () => ({
+    ids: new Set(),
+    productIds: new Set(),
+    itemCount: 0,
+  }),
+}));
 vi.mock('../../../hooks/use-cart-count', () => ({ useCartCount: () => 0 }));
 
 const ui = (

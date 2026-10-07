@@ -1,86 +1,350 @@
 import { Prisma } from '../generated/prisma-client';
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
-import { PUBLIC_DEAL_SELECT, VISIBLE_DEAL_WHERE } from './catalog.service';
+import {
+  PUBLIC_DEAL_SELECT,
+  VISIBLE_DEAL_WHERE,
+} from './catalog.service';
 
 /**
- * Customer wishlist ("saved for later") — self-service only, gated on `authenticate` alone (no
- * `requirePermission`), exactly like Cart. `customerId` is always `req.user.sub`, never a
- * param/body value (route layer). Unlike Cart, a wishlisted deal can be either a service or a
- * product — there's no purchase-type restriction here, it's just a saved-items list.
+ * Customer wishlist.
+ *
+ * A wishlist item represents exactly one catalog entity:
+ * - Deal
+ * - Product
+ *
+ * customerId always comes from req.user.sub.
  */
 
 const WISHLIST_ITEM_SELECT = {
   id: true,
+  customerId: true,
   dealId: true,
+  productId: true,
   createdAt: true,
-  deal: { select: PUBLIC_DEAL_SELECT },
+
+  deal: {
+    select: PUBLIC_DEAL_SELECT,
+  },
+
+  product: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      brand: true,
+      image: true,
+      imageAlt: true,
+      mediaImages: {
+        select: {
+          storageKey: true,
+          isPrimary: true,
+          sortOrder: true,
+        },
+      },
+      price: true,
+      originalPrice: true,
+      discount: true,
+      isNew: true,
+      isFeatured: true,
+      isActive: true,
+
+      vendor: {
+        select: {
+          id: true,
+          businessName: true,
+          slug: true,
+        },
+      },
+    },
+  },
 } as const;
 
 /**
- * The caller's wishlist — items whose Deal has since gone inactive/rejected/vendor-suspended are
- * filtered out here (not deleted) by folding `VISIBLE_DEAL_WHERE` into the query's `where`, the
- * same "never show what's no longer real/purchasable" rule `catalog.service.ts` enforces for the
- * public storefront. The underlying row is left alone so it reappears automatically if the deal
- * becomes visible again — the customer's saved intent isn't silently lost.
+ * Returns the customer's wishlist.
+ *
+ * Deals are filtered using the same visibility rules
+ * used by the public catalog.
+ *
+ * Products are shown only while isActive = true.
  */
 export async function listWishlist(customerId: string) {
   return prisma.wishlistItem.findMany({
-    where: { customerId, deal: VISIBLE_DEAL_WHERE },
-    orderBy: { createdAt: 'desc' },
+    where: {
+      customerId,
+
+      OR: [
+        {
+          deal: VISIBLE_DEAL_WHERE,
+        },
+        {
+          product: {
+            isActive: true,
+          },
+        },
+      ],
+    },
+
+    orderBy: {
+      createdAt: 'desc',
+    },
+
     select: WISHLIST_ITEM_SELECT,
   });
 }
 
-/** 404s (not a leakier error) for a missing OR currently-hidden deal — never confirms whether a
- *  hidden deal id exists, matching `catalog.service.ts#getPublicDealOrThrow`'s convention. */
+/**
+ * Makes sure the Deal exists and is currently visible.
+ */
 async function assertVisibleDeal(dealId: string) {
-  const deal = await prisma.deal.findFirst({ where: { id: dealId, ...VISIBLE_DEAL_WHERE } });
-  if (!deal) throw new ApiError('NOT_FOUND', 'Deal not found');
+  const deal = await prisma.deal.findFirst({
+    where: {
+      id: dealId,
+      ...VISIBLE_DEAL_WHERE,
+    },
+  });
+
+  if (!deal) {
+    throw new ApiError('NOT_FOUND', 'Deal not found');
+  }
+
   return deal;
 }
 
 /**
- * Adds a deal to the caller's wishlist. Idempotent: wishlisting an already-saved deal returns the
- * existing item rather than erroring — checked via `findUnique` first, and the P2002 unique-
- * constraint case (a concurrent duplicate add) is caught as a fallback and treated the same way,
- * so the client never sees a raw DB conflict for what is, from its point of view, a no-op.
+ * Makes sure the Product exists and is currently active.
  */
-export async function addItem(customerId: string, dealId: string) {
+async function assertVisibleProduct(productId: string) {
+  const product = await prisma.product.findFirst({
+    where: {
+      id: productId,
+      isActive: true,
+    },
+  });
+
+  if (!product) {
+    throw new ApiError('NOT_FOUND', 'Product not found');
+  }
+
+  return product;
+}
+
+/**
+ * Add Deal to wishlist.
+ *
+ * Idempotent:
+ * if the Deal is already present, the existing wishlist item
+ * is returned.
+ */
+export async function addItem(
+  customerId: string,
+  dealId: string,
+) {
   await assertVisibleDeal(dealId);
 
   const existing = await prisma.wishlistItem.findUnique({
-    where: { customerId_dealId: { customerId, dealId } },
+    where: {
+      customerId_dealId: {
+        customerId,
+        dealId,
+      },
+    },
   });
+
   if (existing) {
-    return prisma.wishlistItem.findUniqueOrThrow({ where: { id: existing.id }, select: WISHLIST_ITEM_SELECT });
+    return prisma.wishlistItem.findUniqueOrThrow({
+      where: {
+        id: existing.id,
+      },
+      select: WISHLIST_ITEM_SELECT,
+    });
   }
 
   try {
-    const created = await prisma.wishlistItem.create({ data: { customerId, dealId } });
-    return prisma.wishlistItem.findUniqueOrThrow({ where: { id: created.id }, select: WISHLIST_ITEM_SELECT });
+    const created = await prisma.wishlistItem.create({
+      data: {
+        customerId,
+        dealId,
+      },
+    });
+
+    return prisma.wishlistItem.findUniqueOrThrow({
+      where: {
+        id: created.id,
+      },
+      select: WISHLIST_ITEM_SELECT,
+    });
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2002'
+    ) {
       const race = await prisma.wishlistItem.findUniqueOrThrow({
-        where: { customerId_dealId: { customerId, dealId } },
+        where: {
+          customerId_dealId: {
+            customerId,
+            dealId,
+          },
+        },
         select: WISHLIST_ITEM_SELECT,
       });
+
       return race;
     }
+
     throw err;
   }
 }
 
-/** Scoped by `where: { customerId, dealId }` — a delete for a dealId the caller never wishlisted,
- *  or that belongs to another customer's wishlist item, matches zero rows and 404s without ever
- *  touching another customer's row (no separate ownership lookup needed, unlike Cart's item-id
- *  form, because customerId+dealId together already are the ownership scope). */
-export async function removeItem(customerId: string, dealId: string): Promise<void> {
-  const { count } = await prisma.wishlistItem.deleteMany({ where: { customerId, dealId } });
-  if (count === 0) throw new ApiError('NOT_FOUND', 'Wishlist item not found');
+/*
+  Add Product to wishlist.
+ Idempotent:
+  if the Product is already present, the existing wishlist item
+  is returned.
+ */
+
+export async function addProductItem(
+  customerId: string,
+  productId: string,
+) {
+  await assertVisibleProduct(productId);
+
+  const existing = await prisma.wishlistItem.findUnique({
+    where: {
+      customerId_productId: {
+        customerId,
+        productId,
+      },
+    },
+  });
+
+  if (existing) {
+    return prisma.wishlistItem.findUniqueOrThrow({
+      where: {
+        id: existing.id,
+      },
+      select: WISHLIST_ITEM_SELECT,
+    });
+  }
+
+  try {
+    const created = await prisma.wishlistItem.create({
+      data: {
+        customerId,
+        productId,
+      },
+    });
+
+    return prisma.wishlistItem.findUniqueOrThrow({
+      where: {
+        id: created.id,
+      },
+      select: WISHLIST_ITEM_SELECT,
+    });
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2002'
+    ) {
+      const race = await prisma.wishlistItem.findUniqueOrThrow({
+        where: {
+          customerId_productId: {
+            customerId,
+            productId,
+          },
+        },
+        select: WISHLIST_ITEM_SELECT,
+      });
+
+      return race;
+    }
+
+    throw err;
+  }
 }
 
-export async function checkWishlisted(customerId: string, dealId: string): Promise<{ wishlisted: boolean }> {
-  const item = await prisma.wishlistItem.findUnique({ where: { customerId_dealId: { customerId, dealId } } });
-  return { wishlisted: !!item };
+
+//  Remove a Deal from the caller's wishlist.
+
+export async function removeItem(
+  customerId: string,
+  dealId: string,
+): Promise<void> {
+  const { count } = await prisma.wishlistItem.deleteMany({
+    where: {
+      customerId,
+      dealId,
+    },
+  });
+
+  if (count === 0) {
+    throw new ApiError(
+      'NOT_FOUND',
+      'Wishlist item not found',
+    );
+  }
+}
+
+
+// Remove a Product from the caller's wishlist.
+ 
+export async function removeProductItem(
+  customerId: string,
+  productId: string,
+): Promise<void> {
+  const { count } = await prisma.wishlistItem.deleteMany({
+    where: {
+      customerId,
+      productId,
+    },
+  });
+
+  if (count === 0) {
+    throw new ApiError(
+      'NOT_FOUND',
+      'Wishlist item not found',
+    );
+  }
+}
+
+
+//  Check whether a Deal is wishlisted.
+
+export async function checkWishlisted(
+  customerId: string,
+  dealId: string,
+): Promise<{ wishlisted: boolean }> {
+  const item = await prisma.wishlistItem.findUnique({
+    where: {
+      customerId_dealId: {
+        customerId,
+        dealId,
+      },
+    },
+  });
+
+  return {
+    wishlisted: !!item,
+  };
+}
+
+
+//  Check whether a Product is wishlisted.
+
+export async function checkProductWishlisted(
+  customerId: string,
+  productId: string,
+): Promise<{ wishlisted: boolean }> {
+  const item = await prisma.wishlistItem.findUnique({
+    where: {
+      customerId_productId: {
+        customerId,
+        productId,
+      },
+    },
+  });
+
+  return {
+    wishlisted: !!item,
+  };
 }

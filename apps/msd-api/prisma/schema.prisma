@@ -1272,6 +1272,7 @@ model Product {
   subcategory     Category?           @relation("ProductSubcategory", fields: [subcategoryId], references: [id])
   vendor          Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   mediaImages     ProductImage[]
+  wishlistItems   WishlistItem[]
   mediaVideo      ProductVideo?
 
   @@index([categoryId])
@@ -1399,14 +1400,19 @@ model CartItem {
 model WishlistItem {
   id         String   @id @default(uuid())
   customerId String
-  dealId     String
+  dealId     String?
+  productId  String?
   createdAt  DateTime @default(now())
-  customer   User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  deal       Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  customer User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deal     Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  product  Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([customerId, dealId])
+  @@unique([customerId, productId])
   @@index([customerId])
   @@index([dealId])
+  @@index([productId])
 }
 
 /// The single convergence point for every purchase flow (Deal, Product, and Therapist all go
