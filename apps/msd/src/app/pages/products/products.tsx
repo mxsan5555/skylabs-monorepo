@@ -4,9 +4,10 @@ import {
   useState,
 } from 'react';
 
+import { ProductCard } from '../../components/product-card';
+
 import {
   Divider,
-  FilledButton,
   Icon,
   OutlinedSelect,
   OutlinedTextField,
@@ -21,8 +22,6 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router-dom';
-
-import { DealCard } from '../../components/deal-card';
 
 import {
   listCatalogProducts,
@@ -43,7 +42,9 @@ import {
 } from '../../../utils/media';
 
 import type { ProductSort } from '../../../types';
+
 import content from '../../../content.json';
+
 import './products.css';
 
 const { products } = content;
@@ -153,7 +154,7 @@ export function ProductListing() {
           err instanceof ApiRequestError
             ? err.message
             : products.listing.errors
-                .load,
+              .load,
         );
       })
       .finally(() => { if (!cancelled) { setLoading(false); } });
@@ -247,7 +248,7 @@ export function ProductListing() {
           ApiRequestError
           ? err.message
           : products.listing
-              .addToCartError,
+            .addToCartError,
       );
     }
   };
@@ -397,48 +398,48 @@ export function ProductListing() {
 
       {sortedProducts.length >
         0 && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html:
-              JSON.stringify({
-                '@context':
-                  'https://schema.org',
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html:
+                JSON.stringify({
+                  '@context':
+                    'https://schema.org',
 
-                '@type':
-                  'ItemList',
+                  '@type':
+                    'ItemList',
 
-                name:
-                  products.meta
-                    .listingTitle,
+                  name:
+                    products.meta
+                      .listingTitle,
 
-                url: `${SITE_URL}/products`,
+                  url: `${SITE_URL}/products`,
 
-                numberOfItems:
-                  sortedProducts.length,
+                  numberOfItems:
+                    sortedProducts.length,
 
-                itemListElement:
-                  sortedProducts.map(
-                    (
-                      product,
-                      index,
-                    ) => ({
-                      '@type':
-                        'ListItem',
+                  itemListElement:
+                    sortedProducts.map(
+                      (
+                        product,
+                        index,
+                      ) => ({
+                        '@type':
+                          'ListItem',
 
-                      position:
-                        index + 1,
+                        position:
+                          index + 1,
 
-                      name:
-                        product.name,
+                        name:
+                          product.name,
 
-                      url: `${SITE_URL}/products/${product.id}`,
-                    }),
-                  ),
-              }),
-          }}
-        />
-      )}
+                        url: `${SITE_URL}/products/${product.id}`,
+                      }),
+                    ),
+                }),
+            }}
+          />
+        )}
 
       {/* Breadcrumb */}
 
@@ -634,10 +635,10 @@ export function ProductListing() {
 
                 const originalPrice =
                   product.originalPrice !=
-                  null
+                    null
                     ? Number(
-                        product.originalPrice,
-                      )
+                      product.originalPrice,
+                    )
                     : undefined;
 
                 const media =
@@ -673,87 +674,17 @@ export function ProductListing() {
                     }
                     className="products-page__card-wrap"
                   >
-                    <DealCard
-                      deal={{
-                        id: product.id,
-
-                        title:
-                          product.name,
-
-                        image:
-                          image ?? '',
-
-                        imageAlt:
-                          product.imageAlt ??
-                          product.name,
-
-                        gallery:
-                          media.images,
-
-                        badge:
-                          'Product',
-
-                        providerName:
-                          product.brand ??
-                          product.vendor
-                            ?.businessName ??
-                          undefined,
-
-                        price:
-                          salePrice,
-
-                        originalPrice:
-                          originalPrice !==
-                            undefined &&
-                          originalPrice !==
-                            salePrice
-                            ? originalPrice
-                            : undefined,
-
-                        discount:
-                          product.discount ??
-                          undefined,
-
-                        tag:
-                          product
-                            .popularTags?.[0]
-                            ?.name,
-                      }}
-                      href={`/products/${product.id}`}
-                      favoriteActive={
-                        isWishlisted
-                      }
+                    <ProductCard
+                      product={product}
+                      image={image ?? undefined}
+                      gallery={media.images}
+                      favoriteActive={isWishlisted}
                       onFavorite={() => {
-                        if (wishlistPending) {
-                          return;
-                        }
-
+                        if (wishlistPending) return;
                         void handleProductWishlist(product.id);
                       }}
-                      actions={
-                        <FilledButton
-                          type="button"
-                          className="products-page__card-btn"
-                          onClick={() =>
-                            void addToCart(
-                              product,
-                            )
-                          }
-                        >
-                          <Icon
-                            slot="icon"
-                            aria-hidden="true"
-                          >
-                            shopping_bag
-                          </Icon>
-
-                          {
-                            products
-                              .listing
-                              .addToCart
-                          }
-                        </FilledButton>
-                      }
+                      onAddToCart={() => void addToCart(product)}
+                      addToCartLabel={products.listing.addToCart}
                     />
                   </div>
                 );

@@ -1,115 +1,128 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
+
 import '@skylabs-monorepo/shared-ui/carousel';
-import { OutlinedIconButton, FilledTonalIconButton, Icon, FilledButton, } from '@skylabs-monorepo/shared-ui/react';
-import type { Product } from '../../types';
-import { formatINR } from '../../utils/format';
-import './product-card.css';
 import '@skylabs-monorepo/shared-ui';
+
+import {
+  FilledButton,
+} from '@skylabs-monorepo/shared-ui/react';
+
+import type { CatalogProduct } from '../../api/catalog';
+import { formatINR } from '../../utils/format';
+import { ProductCardGallery } from './product-card-gallery';
+import './product-card.css';
+
 interface ProductCardProps {
-    product: Product;
-    favoriteActive?: boolean;
-    onFavorite?: () => void;
+  product: CatalogProduct;
+  image?: string;
+  gallery?: string[];
+  favoriteActive?: boolean;
+  onFavorite?: () => void;
+  onAddToCart?: () => void;
+  addToCartLabel?: string;
+   layout?: 'vertical' | 'horizontal';
 }
 
 export function ProductCard({
-    product,
-    favoriteActive = false,
-    onFavorite,
+  product,
+  image,
+  gallery = [],
+  favoriteActive = false,
+  onFavorite,
+  onAddToCart,
+  addToCartLabel = 'Add to cart',
+   layout = 'vertical',
 }: ProductCardProps) {
-    const swiperRef = useRef<any>(null);
-    const discount =
-        product.originalPrice && product.originalPrice > product.price
-            ? Math.round(
-                ((product.originalPrice - product.price) /
-                    product.originalPrice) *
-                100
-            )
-            : 0;
-    return (
-        <sky-product-card
-            imageAlt={product.name}
-            eyebrow={product.brand}
-            heading={product.name}
-            rating={product.rating}
-            reviews={product.reviews}
-            originalPrice={product.originalPrice !== undefined ? formatINR(product.originalPrice) : undefined}
-            price={formatINR(product.price)}
-            discount={discount ? `-${discount}%` : undefined}
-            href={`/products/${product.id}`}
-        >
-            <div slot="media" className="product-card-slider">
-                <swiper-container
-                    ref={swiperRef}
-                    navigation={false}
-                    pagination={false}
-                    loop={true}
-                    grab-cursor={true}
-                >
-                    {(product.gallery?.length
-                        ? product.gallery
-                        : [product.image]
-                    ).map((img) => (
-                        <swiper-slide key={img}>
-                            <img
-                                src={img}
-                                alt={product.name}
-                                className="product-card__image"
-                            />
-                        </swiper-slide>
-                    ))}
-                </swiper-container>
+  const cardRef = useRef<HTMLElement | null>(null);
 
-                <FilledTonalIconButton
-                    className="slider-btn slider-btn--prev"
-                    onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        swiperRef.current?.swiper.slidePrev();
-                    }}
-                >
-                    <Icon>navigate_before</Icon>
-                </FilledTonalIconButton>
+  const price = Number(product.price);
 
-                <FilledTonalIconButton
-                    className="slider-btn slider-btn--next"
-                    onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        swiperRef.current?.swiper.slideNext();
-                    }}
-                >
-                    <Icon>navigate_next</Icon>
-                </FilledTonalIconButton>
+  const originalPrice =
+    product.originalPrice != null
+      ? Number(product.originalPrice)
+      : undefined;
 
-                {onFavorite && (
-                    <OutlinedIconButton
-                        className="product-card__wishlist"
-                        toggle
-                        selected={favoriteActive}
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onFavorite();
-                        }}
-                    >
-                        <Icon slot="selected">favorite</Icon>
-                        <Icon>favorite_border</Icon>
-                    </OutlinedIconButton>
-                )}
-            </div>
-            {/* <FilledButton
-                onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
+  const discount =
+    product.discount ??
+    (originalPrice !== undefined && originalPrice > price
+      ? Math.round(
+          ((originalPrice - price) / originalPrice) * 100,
+        )
+      : 0);
 
-                    window.open(product.affiliateUrl, '_blank');
-                }}
-            >
-                Buy Now
-            </FilledButton> */}
-        </sky-product-card>
+  const images = gallery.length
+    ? gallery
+    : image
+      ? [image]
+      : [];
 
-    );
+  useEffect(() => {
+    const card = cardRef.current;
+
+    if (!card || !onFavorite) return;
+
+    const handleFavorite = () => {
+      onFavorite();
+    };
+
+    card.addEventListener('favorite', handleFavorite);
+
+    return () => {
+      card.removeEventListener('favorite', handleFavorite);
+    };
+  }, [onFavorite]);
+
+  return (
+    <sky-product-card
+      ref={(element) => {
+        cardRef.current = element;
+      }}
+      variant="outlined"
+       layout={layout}
+      image={undefined}
+      imageAlt={product.imageAlt ?? product.name}
+      badge="Product"
+      favorite={Boolean(onFavorite)}
+      favoriteActive={favoriteActive}
+      eyebrow={
+        product.brand ??
+        product.vendor?.businessName ??
+        undefined
+      }
+      heading={product.name}
+      originalPrice={
+        originalPrice !== undefined && originalPrice !== price
+          ? formatINR(originalPrice)
+          : undefined
+      }
+      price={formatINR(price)}
+      discount={discount ? `-${discount}%` : undefined}
+      tag={product.popularTags?.[0]?.name}
+      href={`/products/${product.id}`}
+    >
+      <div slot="media">
+        <ProductCardGallery
+          images={images}
+          alt={product.imageAlt ?? product.name}
+          layout={layout}
+        />
+      </div>
+
+      {onAddToCart && (
+        <div onClick={(event) => event.stopPropagation()}>
+          <FilledButton
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onAddToCart();
+            }}
+          >
+            {addToCartLabel}
+          </FilledButton>
+        </div>
+      )}
+    </sky-product-card>
+  );
 }
 
 export default ProductCard;
