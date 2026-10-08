@@ -554,7 +554,7 @@
 
 .account-fields--readonly {
   --md-sys-color-on-surface: var(--md-sys-color-on-surface-variant);
-  opacity: 0.95;
+  opacity: 0.55;
 }
 
 .account-card__actions {
