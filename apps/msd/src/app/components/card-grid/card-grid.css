@@ -20,6 +20,11 @@
 .card-grid__list--list {
   grid-template-columns: minmax(0, 1fr);
 }
+/* Small status/step cards (e.g. a member's setup-progress row) — narrower columns so several
+   sit in one row instead of the default 272px card-rail width. */
+.card-grid__list--compact {
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+}
 .card-grid__item {
   display: flex;
   min-inline-size: 0;

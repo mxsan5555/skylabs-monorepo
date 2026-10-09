@@ -1290,7 +1290,7 @@ router.get('/', requirePermission('vendors', 'view'), validateQuery(VendorListQu
   try {
     const { page, pageSize, search, status } = req.validatedQuery as ReturnType<typeof VendorListQuerySchema.parse>;
     const { items, total } = await vendorService.listVendors({ page, pageSize, search, status });
-    sendData(res, items, { meta: { total, page, pageSize } });
+    sendData(res, await vendorService.attachLiveCounts(items), { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);
   }
@@ -1315,7 +1315,9 @@ router.post('/', requirePermission('vendors', 'create'), validateBody(VendorCrea
 
 router.get('/:id', requirePermission('vendors', 'view'), validateParams(UuidParamSchema), async (req, res, next) => {
   try {
-    sendData(res, withCompletion(await vendorService.getVendorOrThrow(req.params.id)));
+    const vendor = await vendorService.getVendorOrThrow(req.params.id);
+    const [withCounts] = await vendorService.attachLiveCounts([vendor]);
+    sendData(res, withCompletion(withCounts));
   } catch (err) {
     next(err);
   }
@@ -1735,6 +1737,26 @@ router.get(
   async (req, res, next) => {
     try {
       sendData(res, await vendorService.listVendorTherapistsForAdmin(req.params.vendorId));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * All of a vendor's deals (every status, across every branch) for the admin's vendor detail
+ * page — same "vendor-wide, not branch-scoped" shape as `/:vendorId/therapists` above. Read-only;
+ * admin-on-behalf create/update/status-change stay branch-scoped under
+ * `/:vendorId/branches/:branchId/deals[/:dealId]` further down. Gated on `vendors.deals`, same
+ * permission key the branch-scoped deal routes already use.
+ */
+router.get(
+  '/:vendorId/deals',
+  requirePermission('vendors.deals', 'view'),
+  validateParams(VendorIdParamSchema),
+  async (req, res, next) => {
+    try {
+      sendData(res, await vendorService.listVendorDealsForAdmin(req.params.vendorId));
     } catch (err) {
       next(err);
     }

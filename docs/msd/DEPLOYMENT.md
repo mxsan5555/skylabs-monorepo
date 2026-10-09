@@ -432,6 +432,27 @@ no DB and no `.env.local`. Add it as a required status check in branch protectio
 - Upload an image in the admin console → the object appears in the R2 bucket, the
   image loads in the browser, and **still loads after you redeploy the Railway
   service** (proves it's on R2, not the ephemeral disk).
+- msd storefront: `/category/<slug>` shows the filter panel with Business/Branches counts
+  (proves `GET /api/v1/catalog/deals/facets` is live), sorting by price reorders cards, and
+  the map view shows OpenStreetMap tiles with the attribution visible (or Google Maps when
+  `VITE_MAP_PROVIDER=google`).
+
+### Deploy order when the API contract changes
+
+Ship **msd-api first**, then the msd frontend, whenever the frontend starts calling a new
+endpoint or parameter. Example: the category filter panel (2026-09-25) needs
+`GET /catalog/deals/facets` and the new `sort` / `vendorIds` / `branchIds` / `radiusKm` deal
+params; a frontend deployed against an older API shows empty facets and rejects the new sorts
+(422). Additive API changes are safe to deploy ahead of the frontend.
+
+### Map tiles (OpenStreetMap usage policy)
+
+`VITE_MAP_PROVIDER=leaflet` uses `tile.openstreetmap.org` by default: free and keyless, but a
+community service whose policy allows normal interactive use only (attribution visible, no bulk
+or offline prefetching, access can be withdrawn for heavy commercial traffic). Before traffic
+grows, point `VITE_MAP_TILE_URL` / `VITE_MAP_TILE_ATTRIBUTION` at a free-tier OSM tile
+provider; no code change is needed. Setting `VITE_MAP_PROVIDER=google` switches back to Google
+Maps (`VITE_GOOGLE_MAPS_API_KEY`, which needs a billing-enabled Google Cloud project).
 
 ## 12. Cost note
 

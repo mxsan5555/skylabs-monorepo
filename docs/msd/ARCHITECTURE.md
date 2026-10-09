@@ -7,6 +7,12 @@ reuse without fighting React or Angular.
 ## The rule of thumb
 
 - **Reusable, presentational UI → `packages/shared-ui`** (framework-agnostic web components).
+  shared-ui is **app-neutral**: msd and mera-driver are different businesses with different
+  designs, so it holds only common components. New options on a shared component must keep its
+  default rendering unchanged (e.g. `sky-product-card`'s opt-in `layout="horizontal"`).
+- **App layout pieces → each app's `components/`** (page bands, grids, toolbars, filter panels).
+  msd's storefront building blocks (`PageSection`, `CardGrid`, `SidebarLayout`, `FilterPanel`, ...)
+  live in `apps/msd/src/app/components/`; pages compose them and carry no page CSS.
 - **Reusable RBAC *code* (not data) → `packages/shared-types`, `shared-permissions`,
   `shared-menu`, `shared-auth`, `shared-utils`** — see the Dynamic RBAC section below.
 - **Pages, routing, auth, data, business modules → each app** (`apps/msd` React,
@@ -18,9 +24,9 @@ reuse without fighting React or Angular.
 - **Backend → one API per app** (`apps/msd-api`, `apps/mera-driver-api`), built. msd
   (massage deals) and mera-driver (driver booking) are different businesses with different
   domains, data, and logic, so each gets its own API and database — **fully independent**:
-  own routes/controllers/services/Prisma schema/database/env/deployment. Business modules
-  (Customers/Vendors/Orders/… for msd-api; Drivers/Vehicles/Trips/… for mera-driver-api)
-  are currently permission-gated stub routers; RBAC itself is fully real.
+  own routes/controllers/services/Prisma schema/database/env/deployment. RBAC is fully real
+  in both, and most business modules are built; the remaining permission-gated stubs are
+  msd-api Inventory and mera-driver-api Payments + Reports.
 
 Pages are **not** shared web components. A page owns routing, guards, data
 fetching and SSR — all framework-specific. Sharing happens one level down, at
@@ -33,9 +39,13 @@ Presentational only. No routing, no data, no auth.
 ```
 src/
   material/      Material Web (M3) element registration (all 15 groups)
-  components/    Custom LIT components (sky-badge, sky-card, sky-product-card,
-                 sky-image-card, sky-category-card, sky-info-card, sky-accordion
-                 (+ sky-accordion-item) — compose M3 inside)
+  components/    Custom LIT components, all composing M3 inside:
+                 cards: sky-product-card (layout vertical|horizontal), sky-image-card,
+                 sky-category-card, sky-info-card, sky-card
+                 M3 surfaces (m3-surface.ts vocabulary): sky-image, sky-tile-card,
+                 sky-feature-card, sky-cta-banner
+                 inputs: sky-action-field, sky-search-bar
+                 other: sky-accordion (+ sky-accordion-item), sky-badge, sky-data-table
   react/ (react.ts)  Typed React wrappers for the above
   theme/         applyTheme(), base.css (self-hosted Material Symbols + Roboto)
   testing/       installMaterialJsdomPolyfills() for app unit tests
@@ -55,17 +65,33 @@ with raw tags. See `CLAUDE.md` → "Carousel (Swiper Element)".
 ### `apps/msd` — React (Vite, port 4200)
 ```
 src/
-  main.tsx          Bootstraps theme + router
-  api/              Fetch-based ApiClient (app-owned)
-  auth/             AuthProvider/useAuth, RequireAuth guard, token storage
-  types/            Domain models
+  main.tsx          Bootstraps theme + router (hydrates prerendered pages)
+  entry-server.tsx  Server render for the build-time prerender (../prerender/)
+  api/              Fetch-based API client per resource (catalog.ts = public storefront API)
+  auth/             Role-based post-sign-in routing (auth itself is shared-auth)
+  catalog/          Catalog shell context (categories, partner cities)
+  location/         Visitor location (useVisitorLocation: city + coordinates)
+  prerender-data/   Build-time data loaders + hydration payload (category first page + total)
+  hooks/            usePagedList, useMediaQuery, useCustomEvent, useHydrated, ...
+  content.json      All storefront copy
+  types/            Domain models + JSX typings for sky-*/md-*/swiper elements
   app/
     app.tsx         Providers wrap the route tree
     routes.tsx      Central route table
-    layouts/        App shells (public-layout; auth/admin layouts later)
-    components/      App-specific UI that knows the router/auth (header, footer)
-    pages/          One folder per page (home, not-found, showcase, …); each owns its .css
+    layouts/        App shells (public layout with site header/footer; admin console)
+    components/     App UI that knows the router/data:
+                      shell: site-header, site-footer, mobile-tab-bar, breadcrumb
+                      storefront building blocks: page-section, section-head, card-rail,
+                      card-grid, chip-nav, clamp-text, listing-toolbar, choice-menu,
+                      view-switch, load-more, sidebar-layout, filter-panel,
+                      checkbox-facet, price-range-field, city-picker-dialog, deal-map
+                      cards: deal-card, sky-product-card-wc
+    pages/          One folder per page; storefront pages compose the blocks above
+                    (no page CSS); older pages still carry their own .css
 ```
+Storefront colour rule: 60 `surface`, 30 `surface-container` bands + `secondary-container`
+fills, 10 `primary` for actions only. Maps: `DealMap` lazy-loads Leaflet + OpenStreetMap by
+default, or Google Maps with `VITE_MAP_PROVIDER=google`. See `CLAUDE.md → msd storefront`.
 
 ### `apps/mera-driver` — Angular (standalone, port 4400)
 ```
@@ -108,10 +134,15 @@ schema/database/`.env.local`/deployment. Never share tables, never share a route
 
 ```
 apps/<name>-api/src/
-├── routes/          One file per resource: auth.routes.ts, rbac.routes.ts, plus a
-│                    stub router per business module (customers/vendors/orders/… for
-│                    msd-api; drivers/vehicles/trips/… for mera-driver-api)
+├── routes/          One file per resource: auth.routes.ts, rbac.routes.ts, one router per
+│                    business module (msd-api: customers, vendors, products, orders, cart,
+│                    wishlist, payment, reports, notifications, CMS, catalog (public), …;
+│                    mera-driver-api: drivers, vehicles, bookings, tripTypes, attendance,
+│                    customers, master data (vehicleTypes, fareRules, serviceZones,
+│                    cancellationReasons), …). stub.routes.ts builds the few remaining stubs.
 ├── services/        Business logic layer; routes call services only
+│                    (msd-api: catalog.service.ts = public storefront reads;
+│                    deal-ranking.ts = in-memory distance/radius ranking + facet counts)
 ├── middleware/       authenticate.ts, requirePermission.ts (the only permission
 │                    gate — no hardcoded role checks anywhere), validate.ts, errorHandler.ts
 ├── schemas/         Zod schemas + zod-to-openapi registrations
@@ -151,10 +182,20 @@ apps/<name>-api/
   `deletedAt` where semantically right (e.g. `User`). All FKs indexed. No business logic
   in DB triggers.
 
-Business-module routes (Customers/Orders/Drivers/Trips/…) currently exist only as
-permission-gated stub routers (`GET /` behind `requirePermission(menuKey,'view')`,
-returns `[]`) — proving the gate wires up end to end. Building out real business logic
-per module is separate, future work; RBAC itself is complete.
+**Public catalog (msd-api, no auth):** `GET /api/v1/catalog/...` serves the storefront:
+`categories(/:slug)`, `deals`, `deals/facets`, `deals/:id`, `products(/:id)`, `therapists(/:id)`,
+`locations`, `vendors/:slug`, plus CMS content (`blog-posts`, `blog-categories`, `faqs`,
+`pages/:slug`, `about-us`, `contact-us`, `how-it-works`, `careers`). Deals support
+`sort=relevance|price_asc|price_desc|distance|newest|discount`, `vendorIds`/`branchIds` lists,
+`radiusKm` with visitor coordinates, price range and paging (`meta.total`); `/deals/facets`
+returns business, branch, distance-bucket and price-range counts for the filter panel (each facet
+ignores its own selection). Only approved, active records with an active vendor and branch are
+ever returned. mera-driver-api has no public catalog; its storefront work is separate.
+
+Remaining stub modules (msd-api Inventory; mera-driver-api Payments, Reports) are
+permission-gated stub routers (`GET /` behind `requirePermission(menuKey,'view')`, returns
+`[]`) that prove the gate end to end until the real module replaces them. Every real
+business route is gated by `requirePermission(menuKey, action)` the same way.
 
 ## Auth & RBAC — file reference
 
@@ -262,6 +303,8 @@ See `CLAUDE.md → AI Dev Team` for the agent routing table and command descript
 | Page UI + route | each app `pages/` + route table | framework-native |
 | Layout/shell | each app `layouts/` | public / auth / admin shells |
 | Buttons, fields, cards, OTP input, blog card | `shared-ui` | reused by both apps |
+| Page bands, grids, toolbars, filter panel, map | each app `components/` | msd: `PageSection`, `CardGrid`, `ListingToolbar`, `SidebarLayout`, `FilterPanel`, `DealMap`, ... |
+| Copy | each app's content files (msd: `src/content.json`) | never hardcoded in pages |
 | Auth state + guards | `packages/shared-auth` (`/react`, `/angular`) | `RequireAuth`/`RequirePermission` / `authGuard`/`permissionGuard` |
 | API calls + models | each app `api/` + `@skylabs-monorepo/shared-types` | hits its own `*-api` (msd → `msd-api`, mera-driver → `mera-driver-api`) |
 | Theme (brand colors) | each app `assets/theme` + `shared-ui` theme | msd green, mera-driver blue |

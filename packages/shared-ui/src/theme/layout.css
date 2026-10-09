@@ -477,6 +477,17 @@
   font-weight: 600;
 }
 
+/* Ancestor crumbs that link back (e.g. All Member > {business}). */
+.admin-breadcrumb a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-breadcrumb a:hover {
+  color: var(--md-sys-color-primary);
+}
+
 .admin-content {
   flex: 1;
   min-width: 0;
@@ -537,9 +548,15 @@
 
 .account-fields {
   display: grid;
-  gap: 14px;
+  /* grid-template-columns: repeat(2, minmax(0, 1fr)); */
+  gap: 16px;
 }
-
+.account-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+}
 .account-fields md-outlined-text-field,
 .account-fields md-filled-text-field {
   width: 100%;

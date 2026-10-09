@@ -196,6 +196,33 @@ declare module 'react' {
       // ── sky-feature-card / sky-cta-banner ──────────────────────────────────
       'sky-feature-card': SkyEl<SkyFeatureProps>;
       'sky-cta-banner': SkyEl<SkyFeatureProps>;
+
+      // ── sky-rich-text-editor (opt-in: @skylabs-monorepo/shared-ui/editor) ──
+      'sky-rich-text-editor': SkyEl<{
+        value?: string;
+        placeholder?: string;
+        label?: string;
+        readOnly?: boolean;
+        /** React 19 attaches on<event> props on custom elements as listeners. */
+        'onsky-change'?: (event: CustomEvent<{ html: string; text: string }>) => void;
+      }>;
+
+      // ── sky-snackbar ─────────────────────────────────────────────────────
+      'sky-snackbar': SkyEl<{
+        variant?: 'neutral' | 'success' | 'warning' | 'error' | 'info';
+        actionLabel?: string;
+        /** Attribute form of `actionLabel`; survives server rendering / prerendering. */
+        'action-label'?: string;
+        closable?: boolean;
+        duration?: number;
+        icon?: string;
+        open?: boolean;
+        /** React 19 attaches on<event> props on custom elements as listeners. */
+        'onsky-action'?: (event: CustomEvent<void>) => void;
+        'onsky-closed'?: (
+          event: CustomEvent<{ reason: 'timeout' | 'action' | 'close' | 'manual' }>,
+        ) => void;
+      }>;
     }
   }
 }

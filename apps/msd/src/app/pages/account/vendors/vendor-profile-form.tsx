@@ -163,10 +163,10 @@ const KYC_DOCUMENT_TYPES: {
   type: VendorDocumentType;
   label: string;
 }[] = [
-  { type: 'GST', label: 'GST Certificate' },
-  { type: 'PAN', label: 'PAN Card' },
-  { type: 'AADHAAR', label: 'Aadhaar Card' },
-];
+    { type: 'GST', label: 'GST Certificate' },
+    { type: 'PAN', label: 'PAN Card' },
+    { type: 'AADHAAR', label: 'Aadhaar Card' },
+  ];
 
 // ─── Field-level validation (UX only) ─────────────────────────────────────────
 // Mirrors `VendorFieldsSchema` in msd-api's `vendor.schema.ts` exactly — same regexes, same
@@ -311,7 +311,11 @@ interface VendorProfileFormProps {
    * Called after a KYC document is uploaded or deleted so the parent
    * VendorPipeline can refresh its vendor state immediately.
    */
-  onKycDocumentChanged?: () => void;
+  onKycDocumentChanged?: (
+    change:
+      | { action: 'uploaded'; document: VendorDocument }
+      | { action: 'deleted'; documentType: VendorDocumentType },
+  ) => void;
 }
 
 /**
@@ -408,20 +412,20 @@ export function VendorProfileForm({
     setErrors((e) =>
       e[key]
         ? {
-            ...e,
-            [key]: undefined,
-          }
+          ...e,
+          [key]: undefined,
+        }
         : e,
     );
   };
 
   const text =
     (key: keyof VendorFields) =>
-    (e: Event) =>
-      set(
-        key,
-        (e.target as HTMLInputElement).value as never,
-      );
+      (e: Event) =>
+        set(
+          key,
+          (e.target as HTMLInputElement).value as never,
+        );
 
   /** Phone fields only ever hold digits, max 10 — strips anything else (letters, spaces,
    *  `+`/`-`, a pasted `+91` prefix) on every keystroke AND on paste, since a paste also fires
@@ -430,13 +434,13 @@ export function VendorProfileForm({
    *  then re-synced to the filtered value on the next render via the controlled `value` prop. */
   const phoneInput =
     (key: keyof VendorFields) =>
-    (e: Event) => {
-      const digitsOnly = (e.target as HTMLInputElement)
-        .value.replace(/\D/g, '')
-        .slice(0, 10);
+      (e: Event) => {
+        const digitsOnly = (e.target as HTMLInputElement)
+          .value.replace(/\D/g, '')
+          .slice(0, 10);
 
-      set(key, digitsOnly as never);
-    };
+        set(key, digitsOnly as never);
+      };
 
   /** Validates every field in the currently rendered `sections` only — fields the user can't
    *  see right now are never checked, matching how each admin-pipeline/self-service step
@@ -585,7 +589,7 @@ export function VendorProfileForm({
           </p>
         )}
 
-     {show('business') && (
+      {show('business') && (
         <sky-tile-card
           className="vendor-section-card"
           headline="Business Details"
@@ -821,15 +825,21 @@ export function VendorProfileForm({
                   )}
                   token={token}
                   onUploaded={(doc) =>
-                    setDocuments((prev) => [
-                      ...prev.filter((d) => d.documentType !== type),
-                      doc,
-                    ])
+                    {
+                      setDocuments((prev) => [
+                        ...prev.filter((d) => d.documentType !== type),
+                        doc,
+                      ]);
+                      onKycDocumentChanged?.({ action: 'uploaded', document: doc });
+                    }
                   }
                   onDeleted={() =>
-                    setDocuments((prev) =>
-                      prev.filter((d) => d.documentType !== type)
-                    )
+                    {
+                      setDocuments((prev) =>
+                        prev.filter((d) => d.documentType !== type)
+                      );
+                      onKycDocumentChanged?.({ action: 'deleted', documentType: type });
+                    }
                   }
                   onStagedChange={(hasFile) =>
                     setKycSlotHasFile((prev) => ({

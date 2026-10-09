@@ -13,9 +13,9 @@ shared packages.
 
 - **`apps/msd`** — React 19 + Vite, port **4200**. Business: **massage deals** (public storefront + the full RBAC admin console under `/account/*`). Theme: green (`#007C2B`).
 - **`apps/mera-driver`** — Angular 21 (standalone) + Tailwind, port **4400**. Business: **driver booking** (same public + admin-console split as msd). Theme: blue (`#1175BC`).
-- **`apps/msd-api`** — Express + TypeScript + Prisma + PostgreSQL (db `msd`), port **3333**, all routes under `/api/v1`. MSD's own RBAC + business modules (Customers, Vendors, Orders, Products, Inventory, Reports — business logic is stubbed, RBAC is real).
-- **`apps/mera-driver-api`** — Express + TypeScript + Prisma + PostgreSQL (db `mera_driver`), port **3334**, routes mounted at root (no `/api/v1` prefix). MeraDriver's own RBAC + business modules (Drivers, Vehicles, Trips, Attendance, Payments, Reports — business logic stubbed, RBAC real).
-- **`packages/shared-ui`** (`@skylabs-monorepo/shared-ui`) — Material 3 web components (Material Web + LIT), theme, React wrappers, test helpers. Presentational only.
+- **`apps/msd-api`** — Express + TypeScript + Prisma + PostgreSQL (db `msd`), port **3333**, all routes under `/api/v1`. MSD's own RBAC + business modules: Customers, Vendors (+ KYC, branches, therapists), Products, Deals, Orders, Cart, Wishlist, Payments (Razorpay), Reports, Notifications, CMS (blog, FAQs, pages, site content) and the public storefront catalog are real; only **Inventory** is still a permission-gated stub.
+- **`apps/mera-driver-api`** — Express + TypeScript + Prisma + PostgreSQL (db `mera_driver`), port **3334**, routes mounted at root (no `/api/v1` prefix). MeraDriver's own RBAC + business modules: Drivers, Vehicles, Bookings, Trip types, Attendance, Customers and master data are real; **Payments** and **Reports** are still permission-gated stubs (see `docs/MERA_DRIVER_ARCHITECTURE.md` §20).
+- **`packages/shared-ui`** (`@skylabs-monorepo/shared-ui`) — Material 3 web components (Material Web + LIT), theme, React wrappers, test helpers. Presentational only and **app-neutral**: mera-driver consumes it with a different design and purpose, so only common components live here. App layout pieces (page bands, grids, filter panels) live in each app.
 - **`packages/shared-types`** — cross-app RBAC domain types (`Role`, `Permission`, `MenuNode`, `BootstrapResponse`, `ApiEnvelope<T>`, …). Types only, no runtime code, no business data.
 - **`packages/shared-permissions`** — pure functions `can()`, `filterMenuByPermissions()`, `permissionKeyFor()`.
 - **`packages/shared-menu`** — static menu trees `msd-menu.json` / `mera-driver-menu.json` (id/title/icon/route/permissionKey/parent/children/order) + `getMenuForApp()`.
@@ -70,7 +70,7 @@ If pages render unstyled or an import 500s in dev, it's almost always a **stale
 - **Angular (mera-driver)** uses raw `<md-*>` tags; any component using them needs `schemas: [CUSTOM_ELEMENTS_SCHEMA]`.
 - Custom in-house components live in `packages/shared-ui/src/components/` (e.g. `sky-badge`, `sky-card`), written in LIT **without decorators** for cross-framework source compatibility.
 - **Card components** (compose M3 web components inside, themed by `--md-sys-color-*`, primitive props → same usage in React/Angular):
-  - `sky-product-card` — listing card (image, badge, favorite, rating **stars** via `rating`+`reviews` _or_ a **score badge** via `score`+`score-label`, price/discount); `variant="outlined"` for the bordered look.
+  - `sky-product-card` — listing card (image, badge, favorite, rating **stars** via `rating`+`reviews` _or_ a **score badge** via `score`+`score-label`, price/discount); `variant="outlined"` for the bordered look; `layout="horizontal"` for list rows (media left, content right; stacks under 600px of its own width via a container query).
   - `sky-image-card` — full-bleed image with overlay `label` (+ optional `href`, `ratio`).
   - `sky-category-card` — rounded image + `heading`/`subheading` (+ optional `href`).
   - `sky-info-card` — surface card with an illustration (`media` slot) or `icon` + `heading`/`subheading`.
@@ -104,9 +104,76 @@ slide content is app-specific, so a wrapper would add surface for no reuse.
   object params (custom breakpoints) use `init="false"` + property assignment +
   `el.initialize()`. See the showcase in each app for all 10 demoed features.
 
+## msd storefront (public pages)
+
+Public pages (home, category, explore, ...) are **composition only**: shared-ui components plus the
+msd building blocks below. No page-specific CSS files with hardcoded colours, sizes or copy;
+copy lives in `apps/msd/src/content.json`. Page-level CSS that still exists (`home.css` for
+hero/steps/offers, `category.css` for `/categories`, therapists, orders, invoices, payments) is
+legacy and is being migrated (see `TASK.md`).
+
+**Colour split (60/30/10, M3 roles only):** 60 = `surface` (page base); 30 = `surface-container`
+bands (`PageSection tone="tint"`) + `secondary-container` fills (category tiles, step markers,
+gift card); 10 = `primary`, reserved for actions (buttons, active states, links, prices, focus).
+No hex values in app code; brand colour comes from each app's generated M3 theme.
+
+**msd building blocks** (`apps/msd/src/app/components/`, each with token-only CSS + tests):
+
+| Component | Use |
+|---|---|
+| `PageSection` | Full-bleed band (`tone="surface"` or `"tint"`, `flush`, `stack`) + 1280px / 16px container. Every page section uses it. |
+| `SectionHead` | Section header row (h2, or `as="h1"` for a page title), subheading (string or node), See all link, actions. |
+| `CardRail` / `CardGrid` | Swiper carousel / responsive grid (272px min columns, `layout="list"` one per row; `above`, `panel` tabpanel, `fallback`). |
+| `ChipNav` | Single-select pill row (`md-filter-chip`), scrolls sideways on phones. |
+| `ClampText` | Two-line clamped description with More / Less. |
+| `ListingToolbar` | Toolbar row above a listing (`start` / `end` slots). |
+| `ChoiceMenu` | Trigger (assist chip or text button) + `md-menu` of single choices (sort). |
+| `ViewSwitch` | List / Grid / Map icon-button group (`aria-pressed`). |
+| `LoadMore` | Infinite-scroll footer (IntersectionObserver) with a visible "Show more" fallback and status text. |
+| `SidebarLayout` | Filter column from 840px; below it a modal left side sheet (portal to `<body>`, rest of the page `inert`, Escape / scrim / close). |
+| `FilterPanel` | Your location, Distance, Price, Business, Branches (`sky-accordion` sections), Clear all. |
+| `CheckboxFacet` / `PriceRangeField` | Searchable checkbox list with counts / range slider + Min/Max fields. |
+| `CityPickerDialog` | City picker (used by the header `CityChip` and the filter panel). |
+| `DealMap` | Deal price markers on a map (see Maps below). |
+
+Hooks: `usePagedList` (page-by-page lists keyed by the filter set, seeded from prerender),
+`useMediaQuery(query, fallback)`, `useVisitorLocation()` (the one visitor location: city +
+coordinates, also drives the header "Set location"), `useCustomEvent` (listen to `sky-*` / `md-*`
+events on elements React hydrated from prerendered HTML).
+
+**Category page** (`/category/:slug`, `/category/:slug/:city`): h1 + total (`meta.total`),
+clamped description, subcategory pills, toolbar (Filters, List/Grid/Map, Sort: Relevance, Price
+low-high / high-low, Distance when the visitor has coordinates), filter panel, 12 cards per page.
+All view state is in the URL: `sub`, `sort`, `view`, `radius`, `vendor`, `branch`, `min`, `max`.
+No ratings anywhere until a review system exists.
+
+**Maps:** `DealMap` lazy-loads its engine only when a map view opens. `VITE_MAP_PROVIDER=leaflet`
+(default: Leaflet + OpenStreetMap tiles, free, no key; tile URL/attribution overridable via
+`VITE_MAP_TILE_URL` / `VITE_MAP_TILE_ATTRIBUTION`, attribution must stay visible) or `google`
+(uses `VITE_GOOGLE_MAPS_API_KEY`). Used by the category and explore map views.
+
+**Catalog API used by the storefront** (`msd-api`, public, under `/api/v1/catalog`):
+`GET /deals` (`sort=relevance|price_asc|price_desc|distance|newest|discount`, `vendorIds`,
+`branchIds` comma lists, `radiusKm` with `latitude`/`longitude`, `minPrice`/`maxPrice`, paging
+with `meta.total`), `GET /deals/facets` (vendor / branch / distance-bucket counts + price range,
+each facet ignoring its own selection), `GET /products` (price sorts), `GET /therapists`. With
+coordinates the deal list is ranked in memory (`services/deal-ranking.ts`).
+
+**Testing gotchas (msd, Vitest + jsdom):**
+- `@lit/react` resolves to its Node/SSR build under Vitest, so shared-ui React **wrappers**
+  (`Menu`, `Slider`, `TextButton`, `IconButton`, ...) do not set element properties in tests.
+  Components that tests must drive render raw `createElement('md-...')` elements; tests assert
+  behaviour, attributes and URLs, not wrapper-set properties.
+- Prerendered pages must hydrate cleanly: never pass `prop={undefined}` to a custom element
+  (skip it), and gate client-only state (location, panel open) behind effects or `useHydrated`.
+  `src/hydration.test.tsx` guards this.
+- ESLint rejects empty functions, including in tests: use `vi.fn()`.
+
 ## Conventions
 
 - **Pages live in each app**, never as shared web components. Reuse happens at the component level (`shared-ui`) and as app-local logic. Compose pages from `shared-ui` pieces.
+- **shared-ui stays app-neutral.** Add only components both apps could use; app layout components (bands, grids, toolbars, filter panels) go in that app's `components/`. A new option on a shared component must leave its default rendering unchanged.
+- **No page CSS on storefront pages**: compose `PageSection`, `SectionHead`, `CardGrid` and friends (see "msd storefront"). Colour through M3 roles only, following the 60/30/10 split.
 - Each app owns its **routing, layouts, auth, api client, and models** (logic is app-local, not shared between apps).
 - **Accessibility** (WCAG 2.2 AA): semantic landmarks (`<main>`, `<header>`, `<nav>`), labelled controls, `aria-hidden` on decorative icons, `autocomplete` hints on inputs, keyboard-navigable.
 - **SEO**: per-route `<title>` (React 19 hoists `<title>`/`<meta>`; Angular uses the route `title`), default `<meta name="description">` in each `index.html`, `noindex` on auth pages.
@@ -303,8 +370,17 @@ Constraints: [hard limits]
 
 Each app manages its own `.env.local` (never committed); add `.env.example` when created.
 Frontends read the API base from an env var (e.g. `VITE_API_URL`); secrets go in CI/CD env, never in source.
+msd map vars: `VITE_MAP_PROVIDER` (`leaflet` default or `google`), optional `VITE_MAP_TILE_URL` /
+`VITE_MAP_TILE_ATTRIBUTION`, and `VITE_GOOGLE_MAPS_API_KEY` (kept for the Google switch).
 
 ## Notes
+
+- **Git safety for agents:** the user keeps real work in `git stash`. No agent or subagent may run
+  `git stash`, `git reset`, `git checkout -- <file>`, `git restore`, `git clean`, `git apply`,
+  `git worktree`, or delete directories to "compare with an old version". Read old files with
+  `git show <rev>:<path> > <temp file>` instead. Stage only the files a task names.
+- Known pre-existing test failures (not caused by storefront work): msd `app.spec.tsx` (1) and
+  `otp.test.tsx` (2); mera-driver RBAC route / users "Login As" / drivers specs (12). Tracked in `TASK.md`.
 
 - `nx.json` `defaultBase` is `"main"` (matches the active branch) — `nx affected`
   in CI and `nx-ignore` on Vercel both compare against it. See `DEPLOYMENT.md`.

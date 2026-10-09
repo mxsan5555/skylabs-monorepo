@@ -6,7 +6,8 @@ import { createUser, type UserRecord } from '../../../../api/rbac/users';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import type { Role } from '../../../../api/rbac/roles';
 import { extractFieldErrors } from '../../../../utils/field-errors';
-
+import content from '../../../../content.json';
+import { validateEmail, validatePhone } from '../../../../utils/validation';
 type CreateUserFieldKey = 'name' | 'email' | 'phone';
 
 export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreated: (user: UserRecord) => void }) {
@@ -30,39 +31,68 @@ export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreate
   const submit = async () => {
     setError('');
     setFieldErrors(null);
-    if (!form.name.trim()) {
+
+    const errors: Partial<Record<CreateUserFieldKey, string>> = {};
+
+    const name = form.name.trim();
+    const email = form.email.trim();
+    const phone = form.phone.trim();
+
+    if (!name) {
       setError('Name is required.');
       return;
     }
-    if (!form.email.trim() && !form.phone.trim()) {
+
+    if (!email && !phone) {
       setError('Provide at least an email or a phone number.');
       return;
     }
+
+    if (email && !validateEmail(email)) {
+      errors.email = content.validation.email.invalid;
+    }
+
+    if (phone && !validatePhone(phone)) {
+      errors.phone = content.validation.phone.invalid;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError('Fix the highlighted fields and try again.');
+      return;
+    }
+
     setSubmitting(true);
+
     try {
       const { data } = await createUser(token, {
-        name: form.name,
-        email: form.email || undefined,
-        phone: form.phone || undefined,
+        name,
+        email: email || undefined,
+        phone: phone || undefined,
         roleIds: Array.from(roleIds),
       });
+
       onCreated(data);
       setForm({ name: '', email: '', phone: '' });
       setRoleIds(new Set());
       dialogRef.current?.close();
     } catch (err) {
       const fields = extractFieldErrors<CreateUserFieldKey>(err);
+
       if (fields) {
         setFieldErrors(fields);
         setError('Fix the highlighted fields and try again.');
       } else {
-        setError(err instanceof ApiRequestError ? err.message : 'Could not create user.');
+        setError(
+          err instanceof ApiRequestError
+            ? err.message
+            : 'Could not create user.'
+        );
       }
     } finally {
       setSubmitting(false);
     }
   };
-
   return (
     <>
       <FilledButton onClick={() => dialogRef.current?.show()}>
