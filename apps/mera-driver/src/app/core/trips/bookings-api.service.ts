@@ -128,8 +128,9 @@ export class BookingsApiService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiUrl}/trips/bookings`;
 
-  list(): Observable<Booking[]> {
-    return this.http.get<ApiEnvelope<BookingDto[]>>(this.base).pipe(map((res) => unwrap(res).map(fromDto)));
+  search(tripsOnly:boolean,params:Record<string,string|number>){return this.http.get<ApiEnvelope<BookingDto[]>>(this.base,{params:{...params,...(tripsOnly?{view:'trips'}:{})}}).pipe(map(res=>({rows:unwrap(res).map(fromDto),meta:res.meta as unknown as {total:number;page:number;pageSize:number}})));}
+  list(tripsOnly=false,filters:Record<string,string>={}): Observable<Booking[]> {
+    return this.http.get<ApiEnvelope<BookingDto[]>>(this.base,{params:{...filters,...(tripsOnly?{view:'trips'}:{})}}).pipe(map((res) => unwrap(res).map(fromDto)));
   }
 
   create(input: Booking): Observable<Booking> {

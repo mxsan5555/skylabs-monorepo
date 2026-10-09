@@ -203,12 +203,12 @@ describe('KYC verifier assignment', () => {
   it('assignVerifier sets assignedVerifierId after confirming the verifier user exists', async () => {
     mockPrisma.driver.findUnique.mockResolvedValue({ id: 'driver-1', assignedVerifierId: 'verifier-1', documents: [] });
     mockPrisma.user.findFirst.mockResolvedValue({ id: 'verifier-1', deletedAt: null,roles:[{role:{key:'kyc_verification'}}] });
-    mockPrisma.driver.update.mockResolvedValue({});
+    mockPrisma.driver.updateMany.mockResolvedValue({count:1});
 
     mockPrisma.role.findMany.mockResolvedValue([{isSuperAdmin:false}]);mockPrisma.rolePermission.findMany.mockResolvedValue([{permission:{key:'kyc-assignments:view'}}]);
     const result = await assignVerifier('driver-1', 'verifier-1');
 
-    expect(mockPrisma.driver.update).toHaveBeenCalledWith({ where: { id: 'driver-1' }, data: { assignedVerifierId: 'verifier-1' } });
+    expect(mockPrisma.driver.updateMany).toHaveBeenCalledWith({ where: { id: 'driver-1',assignedVerifierId:'verifier-1' }, data: { assignedVerifierId: 'verifier-1' } });
     expect(result.assignedVerifierId).toBe('verifier-1');
   });
 
@@ -221,12 +221,12 @@ describe('KYC verifier assignment', () => {
 
   it('rejects a target user without KYC review permissions',async()=>{mockPrisma.user.findFirst.mockResolvedValue({id:'ordinary-user',roles:[]});await expect(assignVerifier('driver-1','ordinary-user')).rejects.toMatchObject({code:'VERIFIER_PERMISSION_REQUIRED'});expect(mockPrisma.driver.update).not.toHaveBeenCalled();});
   it('assignVerifier(null) clears the assignment without checking for a user', async () => {
-    mockPrisma.driver.update.mockResolvedValue({});
+    mockPrisma.driver.updateMany.mockResolvedValue({count:1});
 
     await assignVerifier('driver-1', null);
 
     expect(mockPrisma.user.findFirst).not.toHaveBeenCalled();
-    expect(mockPrisma.driver.update).toHaveBeenCalledWith({ where: { id: 'driver-1' }, data: { assignedVerifierId: null } });
+    expect(mockPrisma.driver.updateMany).toHaveBeenCalledWith({ where: { id: 'driver-1',assignedVerifierId:null }, data: { assignedVerifierId: null } });
   });
 });
 

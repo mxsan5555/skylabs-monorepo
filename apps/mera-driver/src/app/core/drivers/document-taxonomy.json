@@ -1,0 +1,37 @@
+[
+  {
+    "id": "education:10th",
+    "name": "10th Certificate / Marksheet",
+    "status": "Active"
+  },
+  {
+    "id": "education:12th",
+    "name": "12th Certificate / Marksheet",
+    "status": "Active"
+  },
+  {
+    "id": "education:diploma",
+    "name": "Diploma / Vocational Certificate",
+    "status": "Active"
+  },
+  {
+    "id": "education:bachelor",
+    "name": "Bachelor's Degree Certificate",
+    "status": "Active"
+  },
+  {
+    "id": "education:master",
+    "name": "Master's Degree Certificate",
+    "status": "Active"
+  },
+  {
+    "id": "education:training",
+    "name": "Training Certificate",
+    "status": "Active"
+  },
+  {
+    "id": "education:other",
+    "name": "Other Educational Certificate",
+    "status": "Active"
+  }
+]

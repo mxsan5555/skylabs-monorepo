@@ -1,14 +1,15 @@
 import { DriversApiService } from '../../../core/drivers/drivers-api.service';
-import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { DriverSelfApiService, type DriverSelf, type DriverSelfUpdate } from '../../../core/drivers/driver-self-api.service';
 import { MasterListApiService, type MasterOption } from '../../../core/masters/master-list-api.service';
 import { calculateProfileCompletion } from '../profile-completion';
-import { ActivatedRoute, RouterLink } from '@angular/router';
-import { PillReviewApi, PillReview } from '../../../core/drivers/pill-review-api.service';
-import { InlineDl } from '../../../shared/inline-dl/inline-dl';
+import { Router, RouterLink } from '@angular/router';
+import { PillReviewApi, PillReview, ReviewItem } from '../../../core/drivers/pill-review-api.service';
+import { firstValueFrom } from 'rxjs';
 
 type FieldKey = keyof Omit<DriverSelfUpdate, 'languages'>;
+type PillRef = { tab: number; pill: number };
 
 /** One source of truth for the self-edit form — add a field by extending this. */
 const FIELDS: { key: FieldKey; label: string; type?: string; span2?: boolean }[] = [
@@ -53,36 +54,34 @@ const FIELDS: { key: FieldKey; label: string; type?: string; span2?: boolean }[]
   { key: 'upiIdOrChequeNo', label: 'UPI ID / cheque no.' },
 ];
 
+/** Fields rendered under "Driving Licence" vs "Experience & Skills" both belong to the
+ *  same backend pill (tab 3 / pill 0) and therefore share one save action — see `save()`. */
+const PILLS = { personal: { tab: 1, pill: 0 }, contact: { tab: 1, pill: 1 }, physical: { tab: 1, pill: 2 }, accountLead: { tab: 1, pill: 3 }, education: { tab: 2, pill: 0 }, health: { tab: 2, pill: 1 }, licence: { tab: 3, pill: 0 }, bank: { tab: 4, pill: 0 } } as const satisfies Record<string, PillRef>;
+
 @Component({
   selector: 'md-driver-profile',
-  imports: [AdminPage, RouterLink, InlineDl],
+  imports: [AdminPage, RouterLink],
   templateUrl: './profile.html',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
-export class DriverProfile implements OnInit {
+export class DriverProfile implements OnInit, OnDestroy {
   private readonly api = inject(DriverSelfApiService);
   private readonly mastersApi = inject(DriversApiService);
-
-  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly reviewApi = inject(PillReviewApi);
+
   protected readonly pills = signal<PillReview | null>(null);
-  protected readonly activeTab = signal(1);
-  protected readonly activePill = signal(0);
-  protected readonly tabs = ['Personal Details', 'Education & Health Details', 'Documents Details', 'Payment Details'];
-  protected readonly selectedPill = computed(() => this.pills()?.pills.find(p => p.tab === this.activeTab() && p.pill === this.activePill()));
-  protected readonly fields = computed(() => FIELDS.filter(f => this.selectedPill()?.items.some(i => i.key === 'field:' + f.key)));
-  protected readonly readOnlyItems = computed(() => this.selectedPill()?.items.filter(i => !FIELDS.some(f => i.key === 'field:' + f.key) && i.key !== 'field:languages' && i.key !== 'field:language') ?? []);
-  protected readonly formatValue = (v: unknown) => v == null || v === '' ? 'Not provided' : typeof v === 'object' ? JSON.stringify(v) : String(v);
-  protected selectTab(tab: number) { this.activeTab.set(tab); this.activePill.set(0); }
-  protected isDone(tab: number, pill: number) { return this.driver()?.completedSubSteps?.includes(tab * 10 + pill) ?? false; }
   protected readonly loading = signal(true);
-  protected readonly saving = signal(false);
-  protected readonly saved = signal(false);
+  protected readonly savingKey = signal<string | null>(null);
+  protected readonly savedKey = signal<string | null>(null);
   protected readonly error = signal<string | null>(null);
 
   protected readonly draft = signal<DriverSelfUpdate>({});
   protected readonly languageOptions = signal<MasterOption[]>([]);
   protected readonly selectedLanguages = signal<string[]>([]);
+  protected readonly photoUrl = signal('');
+  protected readonly photoFailed = signal(false);
+  protected readonly uploadingPhoto = signal(false);
 
   /** The full last-fetched record (including `documents`) — kept separately from `draft`
    *  (the editable-fields-only subset) so profile-completion can see document/language
@@ -93,20 +92,48 @@ export class DriverProfile implements OnInit {
     return d ? calculateProfileCompletion(d) : null;
   });
 
+  /** "Account & Lead Info" (tab 1 / pill 3) — admin-set lead/matching data. Shown read-only;
+   *  never part of `FIELDS`, so there is no path for the driver to PATCH these. */
+  protected readonly accountLeadItems = computed(() => this.pillItems(PILLS.accountLead));
+  protected readonly dl = computed(() => this.pills()?.dl ?? null);
+
+  pillItems(ref: PillRef): ReviewItem[] {
+    return this.pills()?.pills.find(p => p.tab === ref.tab && p.pill === ref.pill)?.items ?? [];
+  }
+
+  fieldsFor(ref: PillRef) {
+    const items = this.pillItems(ref);
+    return FIELDS.filter(f => items.some(i => i.key === 'field:' + f.key));
+  }
+
+  fieldValue(ref: PillRef, field: string): string {
+    const value = this.pillItems(ref).find(i => i.field === field)?.value;
+    return this.formatValue(value);
+  }
+
+  issueFor(ref: PillRef) {
+    return this.pillItems(ref).filter(i => i.status === 'Issue');
+  }
+
+  isComplete(ref: PillRef): boolean {
+    return this.driver()?.completedSubSteps?.includes(ref.tab * 10 + ref.pill) ?? false;
+  }
+
+  protected readonly formatValue = (v: unknown) => v == null || v === '' || (Array.isArray(v) && !v.length) ? 'Not provided' : Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? JSON.stringify(v) : String(v);
+
   ngOnInit(): void {
-    this.reviewApi.getOwn().subscribe({ next: r => this.pills.set(r), error: () => this.error.set('Unable to load onboarding pills.') });
+    this.reviewApi.getOwn().subscribe({
+      next: r => { this.pills.set(r); void this.loadPhoto(r.profile?.photo ?? null); },
+      error: () => this.error.set('Unable to load onboarding pills.'),
+    });
     this.mastersApi.formOptions().subscribe({
-      next: (opts) => this.languageOptions.set((opts['languages'] ?? []).filter(o => o.status === 'Active').map(o=>({...o,status:'Active' as const}))),
+      next: (opts) => this.languageOptions.set((opts['languages'] ?? []).filter(o => o.status === 'Active').map(o => ({ ...o, status: 'Active' as const }))),
       error: () => undefined,
     });
 
     this.api.get().subscribe({
       next: (d) => {
         this.driver.set(d);
-        const tab = Number(this.route.snapshot.queryParamMap.get('tab') ?? d.currentStep ?? 1);
-        const pill = Number(this.route.snapshot.queryParamMap.get('pill') ?? d.currentSubStep ?? 0);
-        this.activeTab.set(Math.max(1, Math.min(4, tab)));
-        this.activePill.set(Math.max(0, Math.min([4, 2, 3, 2][this.activeTab() - 1] - 1, pill)));
         this.draft.set(toDraft(d));
         this.selectedLanguages.set(d.languages ?? []);
         this.loading.set(false);
@@ -115,8 +142,12 @@ export class DriverProfile implements OnInit {
     });
   }
 
+  ngOnDestroy(): void {
+    if (this.photoUrl().startsWith('blob:')) URL.revokeObjectURL(this.photoUrl());
+  }
+
   protected setField(key: FieldKey, value: string): void {
-    this.draft.update((d) => ({ ...d, [key]: value }));
+    this.draft.update((d) => ({ ...d, [key]: key==='dlNo'?value.replace(/[\s-]/g,'').toUpperCase():value }));
   }
 
   protected toggleLanguage(name: string): void {
@@ -125,34 +156,79 @@ export class DriverProfile implements OnInit {
     );
   }
 
-  protected save(complete = false): void {
-    this.saving.set(true);
+  protected initials(): string {
+    const d = this.driver();
+    return d ? `${d.firstName?.[0] ?? ''}${d.lastName?.[0] ?? ''}`.toUpperCase() || '?' : '?';
+  }
+
+  /** Same authenticated-blob pattern as the shared KYC pill-review photo preview. */
+  private async loadPhoto(photo: string | null): Promise<void> {
+    this.photoFailed.set(false);
+    if (!photo) return;
+    if (photo.startsWith('data:image/')) { this.photoUrl.set(photo); return; }
+    if (!photo.startsWith('/uploads/drivers/')) { this.photoFailed.set(true); return; }
+    try {
+      // `photo` is already percent-encoded by the backend; `preview()` encodes its input
+      // itself, so decode first or a space ("%20") becomes "%2520" and 404s.
+      const blob = await firstValueFrom(this.reviewApi.preview(decodeURIComponent(photo.slice('/uploads/'.length))));
+      this.photoUrl.set(URL.createObjectURL(blob));
+    } catch {
+      this.photoFailed.set(true);
+    }
+  }
+
+  protected async onPhotoSelected(event: Event): Promise<void> {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    (event.target as HTMLInputElement).value = '';
+    if (!file) return;
+    this.uploadingPhoto.set(true);
     this.error.set(null);
-    // Omit blank fields rather than sending `""` — several backend validators (e.g. `email`'s
-    // format check, `gender`'s min-length) accept an absent key (untouched) but reject an
-    // empty string, since `.partial()` only makes a field optional, not "empty string is
-    // valid". Sending only the fields the driver actually filled in also means an unfilled
-    // field is never blanked out by force.
+    try {
+      await firstValueFrom(this.api.uploadDocument('personal', 'Profile Photo', '', file));
+      const [driver, review] = await Promise.all([firstValueFrom(this.api.get()), firstValueFrom(this.reviewApi.getOwn())]);
+      this.driver.set(driver);
+      this.pills.set(review);
+      if (this.photoUrl().startsWith('blob:')) URL.revokeObjectURL(this.photoUrl());
+      this.photoUrl.set('');
+      await this.loadPhoto(review.profile?.photo ?? null);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Could not update the profile photo.');
+    } finally {
+      this.uploadingPhoto.set(false);
+    }
+  }
+
+  protected save(ref: PillRef, complete = false): void {
+    const key = `${ref.tab}-${ref.pill}`;
+    this.savingKey.set(key);
+    this.error.set(null);
     const fields: DriverSelfUpdate = {};
-    for (const f of this.fields()) (fields as Record<string, unknown>)[f.key] = this.draft()[f.key];
-    if (this.activeTab() === 1 && this.activePill() === 0) fields.languages = this.selectedLanguages();
-    this.api.savePill(this.activeTab(), this.activePill(), complete, stripBlank(fields)).subscribe({
+    for (const f of this.fieldsFor(ref)) (fields as Record<string, unknown>)[f.key] = this.draft()[f.key];
+    if (ref.tab === 1 && ref.pill === 0) fields.languages = this.selectedLanguages();
+    const licence=fields.dlNo;const original=this.driver()?.dlNo;
+    if(licence && licence!==original && licence.replace(/[\s-]/g,'').toUpperCase()!==original?.replace(/[\s-]/g,'').toUpperCase()&&!/^[A-Z]{2}\d{13}$/.test(licence)){this.error.set('Enter 15 characters: two letters followed by 13 digits, e.g. UP3220210123456.');this.savingKey.set(null);return;}
+    this.api.savePill(ref.tab, ref.pill, complete, stripBlank(fields)).subscribe({
       next: (d) => {
         this.driver.set(d);
         this.draft.set(toDraft(d));
         this.selectedLanguages.set(d.languages ?? []);
-        this.saving.set(false);
-        this.saved.set(true);
+        this.savingKey.set(null);
+        this.savedKey.set(key);
         this.reviewApi.getOwn().subscribe({ next: r => this.pills.set(r) });
-        if (complete) { this.activeTab.set(d.currentStep); this.activePill.set(d.currentSubStep); }
-        setTimeout(() => this.saved.set(false), 2000);
+        setTimeout(() => this.savedKey.set(null), 2000);
       },
       error: (err) => {
-        this.saving.set(false);
+        this.savingKey.set(null);
         this.error.set(err?.message ?? 'Failed to save. Please try again.');
       },
     });
   }
+
+  protected go(path: string): void {
+    this.router.navigateByUrl(path);
+  }
+
+  protected readonly PILLS = PILLS;
 }
 
 /**

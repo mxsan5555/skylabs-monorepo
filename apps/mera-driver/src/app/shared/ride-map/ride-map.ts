@@ -5,23 +5,31 @@ import {
   OnChanges,
   OnDestroy,
   ViewChild,
+  inject,
   input,
+  signal,
 } from '@angular/core';
-import * as L from 'leaflet';
+import { GoogleMapsLoaderService } from '../../core/google-maps/google-maps-loader.service';
 import type { LatLng } from '../../models';
 
 /**
- * Leaflet + OpenStreetMap map for the booking screens. App-local (not shared-ui):
- * it's specific to mera-driver's rider flow and pulls in Leaflet. Draws a pickup
- * pin, a drop pin, and the route line between them, then fits the view to both.
+ * Google Maps JS API map for the booking screens. App-local (not shared-ui): it's specific
+ * to mera-driver's rider flow. Draws a pickup pin, a drop pin, and the real driving route
+ * between them (via DirectionsService), then fits the view to both.
  *
- * Default Leaflet marker images don't resolve through the app bundler, so pins
- * are `divIcon`s styled in CSS — no image assets to load. Runs browser-only
- * (init in ngAfterViewInit), so it's safe under a plain SPA build.
+ * Degrades to a plain placeholder (no crash, no fake map) if no API key is configured or
+ * the script fails to load — never silently shows a blank/broken map.
  */
 @Component({
   selector: 'md-ride-map',
-  template: `<div #map class="ride-map" role="img" [attr.aria-label]="label()"></div>`,
+  template: `
+    <div #map class="ride-map" role="img" [attr.aria-label]="label()"></div>
+    @if (loadFailed()) {
+      <div class="ride-map-fallback">
+        <p>Map unavailable. Addresses can still be entered manually.</p>
+      </div>
+    }
+  `,
   styles: [
     `
       :host {
@@ -34,55 +42,15 @@ import type { LatLng } from '../../models';
         height: 100%;
         background: var(--md-sys-color-surface-container-low, #eef1f6);
       }
-      /* divIcon pins — a colored dot with a soft ring. */
-      :host ::ng-deep .ride-pin {
+      .ride-map-fallback {
+        position: absolute;
+        inset: 0;
         display: grid;
         place-items: center;
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        border: 3px solid var(--md-sys-color-surface, #fff);
-        box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
-      }
-      :host ::ng-deep .ride-pin--pickup {
-        background: var(--md-sys-color-primary, #33618d);
-      }
-      :host ::ng-deep .ride-pin--drop {
-        background: var(--md-sys-color-error, #ba1a1a);
-      }
-      /* Match the route/controls to the app's brand. */
-      :host ::ng-deep .leaflet-control-container .leaflet-top.leaflet-left {
-        top: 12px;
-        left: 12px;
-        z-index: 800;
-      }
-      :host ::ng-deep .leaflet-control-zoom {
-        border: 1px solid var(--md-sys-color-outline-variant, #cbd5e1) !important;
-        border-radius: 12px !important;
-        box-shadow: 0 4px 14px rgb(0 0 0 / 0.15) !important;
-        overflow: hidden !important;
-        background: var(--md-sys-color-surface, #ffffff) !important;
-      }
-      :host ::ng-deep .leaflet-control-zoom a {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        width: 36px !important;
-        height: 36px !important;
-        line-height: 36px !important;
-        color: var(--md-sys-color-on-surface, #1a1c1e) !important;
-        background: var(--md-sys-color-surface, #ffffff) !important;
-        font-size: 18px !important;
-        font-weight: 600 !important;
-        border-bottom: 1px solid var(--md-sys-color-outline-variant, #cbd5e1) !important;
-        text-decoration: none !important;
-        transition: background-color 0.2s ease;
-      }
-      :host ::ng-deep .leaflet-control-zoom a:last-child {
-        border-bottom: none !important;
-      }
-      :host ::ng-deep .leaflet-control-zoom a:hover {
-        background: var(--md-sys-color-surface-container-high, #f1f5f9) !important;
+        text-align: center;
+        padding: 16px;
+        color: var(--md-sys-color-on-surface-variant, #44474a);
+        background: var(--md-sys-color-surface-container-low, #eef1f6);
       }
     `,
   ],
@@ -94,90 +62,107 @@ export class RideMap implements AfterViewInit, OnChanges, OnDestroy {
   readonly drop = input<LatLng | null>(null);
   readonly label = input<string>('Map of the trip route');
 
-  private map?: L.Map;
-  private pickupMarker?: L.Marker;
-  private dropMarker?: L.Marker;
-  private route?: L.Polyline;
+  protected readonly loadFailed = signal(false);
 
-  ngAfterViewInit(): void {
-    const start = this.pickup() ?? { lat: 12.9716, lng: 77.5946 };
-    this.map = L.map(this.mapEl.nativeElement, {
-      center: [start.lat, start.lng],
-      zoom: 13,
-      zoomControl: true,
-      attributionControl: true,
-    });
+  private readonly loader = inject(GoogleMapsLoaderService);
+  private map?: any;
+  private pickupMarker?: any;
+  private dropMarker?: any;
+  private directionsService?: any;
+  private directionsRenderer?: any;
+  private ready = false;
+  private destroyed = false;
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap contributors',
-    }).addTo(this.map);
-
-    this.render();
+  async ngAfterViewInit(): Promise<void> {
+    try {
+      const google = await this.loader.load();
+      if (this.destroyed) return;
+      const start = this.pickup() ?? { lat: 12.9716, lng: 77.5946 };
+      this.map = new google.maps.Map(this.mapEl.nativeElement, {
+        center: start,
+        zoom: 13,
+        disableDefaultUI: true,
+        zoomControl: true,
+        clickableIcons: false,
+      });
+      this.directionsService = new google.maps.DirectionsService();
+      this.directionsRenderer = new google.maps.DirectionsRenderer({
+        map: this.map,
+        suppressMarkers: true,
+        polylineOptions: { strokeColor: cssColor('--md-sys-color-primary', '#33618d'), strokeWeight: 5, strokeOpacity: 0.9 },
+      });
+      this.ready = true;
+      this.render();
+    } catch {
+      this.loadFailed.set(true);
+    }
   }
 
   ngOnChanges(): void {
-    if (this.map) this.render();
+    if (this.ready) this.render();
   }
 
   ngOnDestroy(): void {
-    this.map?.remove();
+    this.destroyed = true;
+    this.pickupMarker?.setMap(null);
+    this.dropMarker?.setMap(null);
   }
 
   /** (Re)draw pins + route and fit the view to whatever endpoints are set. */
   private render(): void {
-    if (!this.map) return;
+    if (!this.ready) return;
+    const google = window.google;
     const pickup = this.pickup();
     const drop = this.drop();
 
-    this.pickupMarker?.remove();
-    this.dropMarker?.remove();
-    this.route?.remove();
+    this.pickupMarker?.setMap(null);
+    this.dropMarker?.setMap(null);
+    this.directionsRenderer.setDirections({ routes: [] });
 
     if (pickup) {
-      this.pickupMarker = L.marker([pickup.lat, pickup.lng], {
-        icon: pinIcon('pickup'),
-        keyboard: false,
-      }).addTo(this.map);
+      this.pickupMarker = new google.maps.Marker({ position: pickup, map: this.map, icon: pinIcon(google, 'pickup') });
     }
     if (drop) {
-      this.dropMarker = L.marker([drop.lat, drop.lng], {
-        icon: pinIcon('drop'),
-        keyboard: false,
-      }).addTo(this.map);
+      this.dropMarker = new google.maps.Marker({ position: drop, map: this.map, icon: pinIcon(google, 'drop') });
     }
 
     if (pickup && drop) {
-      const points: L.LatLngExpression[] = [
-        [pickup.lat, pickup.lng],
-        [drop.lat, drop.lng],
-      ];
-      this.route = L.polyline(points, {
-        color: cssColor('--md-sys-color-primary', '#33618d'),
-        weight: 5,
-        opacity: 0.9,
-      }).addTo(this.map);
-      this.map.fitBounds(this.route.getBounds(), { padding: [56, 56] });
+      this.directionsService.route(
+        { origin: pickup, destination: drop, travelMode: google.maps.TravelMode.DRIVING },
+        (result: any, status: string) => {
+          if (status === 'OK' && result) this.directionsRenderer.setDirections(result);
+          else {
+            // No drivable route (or the Directions API isn't enabled for this key) — still
+            // show both pins so the trip endpoints remain visible.
+            const bounds = new google.maps.LatLngBounds();
+            bounds.extend(pickup);
+            bounds.extend(drop);
+            this.map.fitBounds(bounds, 56);
+          }
+        },
+      );
     } else if (pickup) {
-      this.map.setView([pickup.lat, pickup.lng], 14);
+      this.map.setCenter(pickup);
+      this.map.setZoom(14);
     }
   }
 }
 
-function pinIcon(kind: 'pickup' | 'drop'): L.DivIcon {
-  return L.divIcon({
-    className: '',
-    html: `<span class="ride-pin ride-pin--${kind}"></span>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
-  });
+function pinIcon(google: any, kind: 'pickup' | 'drop') {
+  return {
+    path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
+    fillColor: kind === 'pickup' ? cssColor('--md-sys-color-primary', '#33618d') : cssColor('--md-sys-color-error', '#ba1a1a'),
+    fillOpacity: 1,
+    strokeColor: '#ffffff',
+    strokeWeight: 2,
+    scale: 1.8,
+    anchor: new google.maps.Point(12, 22),
+  };
 }
 
-/** Read a themed CSS custom property (Leaflet needs a real color string). */
+/** Read a themed CSS custom property (Google Maps needs a real color string). */
 function cssColor(varName: string, fallback: string): string {
   if (typeof getComputedStyle === 'undefined') return fallback;
-  const v = getComputedStyle(document.documentElement)
-    .getPropertyValue(varName)
-    .trim();
+  const v = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
   return v || fallback;
 }

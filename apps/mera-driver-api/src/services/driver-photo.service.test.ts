@@ -6,3 +6,5 @@ describe('protected shared profile photo',()=>{
  it('does not expose another driver file or a previous photo as current',async()=>{expect(await driverProfilePhoto({id:'other',avatar:doc.filePath,documents:[doc]})).toBeNull();expect(await driverProfilePhoto({id:'own',documents:[{...doc,archivedAt:new Date()}]})).toBeNull();});
  it('missing legacy files do not break the details request',async()=>expect(await driverProfilePhoto({id:'own',avatar:'drivers/own/does-not-exist.png',documents:[]})).toBeNull());
 });
+
+it('does not fall back to an avatar path whose saved document was withdrawn',async()=>expect(await driverProfilePhoto({id:'own',avatar:'drivers/own/portrait.png',documents:[{type:'Profile Photo',fileName:'portrait.png',filePath:'drivers/own/portrait.png',archivedAt:new Date()}]})).toBeNull());

@@ -1,0 +1,44 @@
+{
+  "pageErrors": {},
+  "consoleErrors": {
+    "http://localhost:4400/driver/resume": [
+      "ERROR Error: An ErrorEvent with no error occurred. See Error.cause for details: ResizeObserver loop completed with undelivered notifications.\n    at errorListener (http://localhost:4400/@fs/D:/skylabs-mono/.angular/cache/21.2.13/mera-driver/vite/deps/chunk-J32GREJH.js?v=4f921597:3224:22)"
+    ]
+  },
+  "screenshots": [
+    "desktop-_driver.png",
+    "desktop-_driver_profile.png",
+    "desktop-_driver_kyc.png",
+    "desktop-_driver_documents.png",
+    "desktop-_driver_fee.png",
+    "desktop-_driver_availability.png",
+    "desktop-_driver_requests.png",
+    "desktop-_driver_trips.png",
+    "desktop-_driver_earnings.png",
+    "desktop-_driver_notifications.png",
+    "desktop-_driver_support.png",
+    "desktop-_driver_resume.png"
+  ],
+  "ownership": {
+    "status": 404,
+    "blocked": true
+  },
+  "drawer": {
+    "backdropVisibleWhenOpen": true,
+    "backdropVisibleAfterClose": false
+  },
+  "layout": {
+    "sidebarBox": {
+      "x": 0,
+      "y": 0,
+      "width": 264,
+      "height": 900
+    },
+    "contentBox": {
+      "x": 264,
+      "y": 61,
+      "width": 1176,
+      "height": 839
+    }
+  }
+}

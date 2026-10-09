@@ -1,0 +1,46 @@
+{
+  "role": {
+    "count": 13,
+    "sha256": "ec1525e01f90ad50cc046dc7c5b822bda74bda506a2537ff95236d4277524a4c"
+  },
+  "rolePermission": {
+    "count": 252,
+    "sha256": "5254841926db046fbb429b87ce179b14899db73ea2863cf8cf5fb9813e17044a"
+  },
+  "userRole": {
+    "count": 17,
+    "sha256": "64ead432cfec8ed042d248017e8588c097071dc638b6f356d081f0943c061671"
+  },
+  "userPermissionOverride": {
+    "count": 2,
+    "sha256": "0376a9bd8d0b138ee40f3f7f25c42be1837b03d8fcb368200eac04791a9e50c0"
+  },
+  "driver": {
+    "count": 7,
+    "sha256": "d3b438080c4c5609236dc5903068884061f42961841e5634dc0c7333af576f1d"
+  },
+  "driverDocument": {
+    "count": 12,
+    "sha256": "cc289e59fdf7a7db6819bb70c993c12f031b311a8fa895321989d9a5f9fb0daa"
+  },
+  "driverKycCheck": {
+    "count": 61,
+    "sha256": "7b7c6318a9c7b27a3a03574ba32455fbfd322d6c081a9d19f429e8e18b245e9a"
+  },
+  "driverKycDecision": {
+    "count": 78,
+    "sha256": "28488088df38b9d668a461ea685fc92674fcb820a5ff1d4772bd75039c894dbb"
+  },
+  "booking": {
+    "count": 1,
+    "sha256": "378464e7f6c63faa4c8c8ff71986a0eb14ba2ef8086b4750c6dc39e2c53cbbee"
+  },
+  "moneyMovement": {
+    "count": 1,
+    "sha256": "90b9a4064201b71665bd03941cb3d28d3337eaff09978ff5b463b8ea306060a7"
+  },
+  "customer": {
+    "count": 3,
+    "sha256": "2bd8680531a1897415f0da2f40b94707cc9f8800d45ee730f47b9447221266b2"
+  }
+}

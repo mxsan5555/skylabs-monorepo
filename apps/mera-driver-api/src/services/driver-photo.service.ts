@@ -10,6 +10,7 @@ export async function driverProfilePhoto(driver:{id:string;avatar?:string|null;d
   const current=driver.documents.filter(d=>!d.archivedAt&&d.filePath&&own(d.filePath));
   const doc=current.find(d=>d.filePath===avatar||d.type==='Profile Photo'&&d.fileName===avatar)??current.find(d=>d.type==='Profile Photo');
   if(doc?.filePath)return `/uploads/${doc.filePath.split('/').map(encodeURIComponent).join('/')}`;
+  if(driver.documents.some(document=>document.archivedAt&&document.filePath===avatar))return null;
   if(own(avatar)){
     const resolved=path.resolve(UPLOAD_ROOT,avatar);
     if(resolved.startsWith(path.resolve(UPLOAD_ROOT)+path.sep)&&/\.(png|jpe?g|webp)$/i.test(resolved))try{

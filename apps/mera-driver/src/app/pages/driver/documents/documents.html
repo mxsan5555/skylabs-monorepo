@@ -10,27 +10,28 @@
       <md-outlined-select
         label="Category"
         [value]="category()"
-        (change)="category.set($any($event.target).value)"
+        [disabled]="!!replacing() || uploading()" (change)="changeCategory($any($event.target).value)"
       >
         @for (c of categories; track c.value) {
           <md-select-option [value]="c.value"><div slot="headline">{{ c.label }}</div></md-select-option>
         }
       </md-outlined-select>
-      <md-outlined-text-field
-        label="Document type"
-        placeholder="e.g. Aadhaar Card"
-        [value]="docType()"
-        (input)="docType.set($any($event.target).value)"
-      ></md-outlined-text-field>
+      <md-outlined-select label="Document Type" [displayText]="selectedTypeLabel()" [value]="docType()" [disabled]="loading() || mastersLoading() || uploading() || !!replacing()" (change)="docType.set($any($event.target).value)">
+        <md-select-option value="" [selected]="!docType()"><div slot="headline">Select Document Type</div></md-select-option>
+        @for(option of options();track option.id){<md-select-option [value]="option.id"><div slot="headline">{{option.name}}</div></md-select-option>}
+      </md-outlined-select>
+      @if(!options().length&&!loading()&&!mastersLoading()){<p role="status">All document types have been added. Delete a document row to add that type again.</p>}
+      @if(replacing()){<p>Replace file for {{replacing()?.type}}. The previous version will remain in history.</p><md-text-button (click)="cancelReplacement()" [disabled]="uploading()">Cancel replacement</md-text-button>}
       <md-outlined-text-field
         label="Registration / ID number (optional)"
         [value]="regNo()"
         (input)="regNo.set($any($event.target).value)"
       ></md-outlined-text-field>
       <input type="file" (change)="onFileSelected($event)" aria-label="Choose file" />
+      @if(file){<md-text-button [disabled]="uploading()" (click)="clearFile()">Clear file</md-text-button>}
       <label>Document expiry (optional)<input type="date" [value]="expiry()" (input)="expiry.set($any($event.target).value)" /></label>
       <div class="address-form__actions">
-        <md-filled-button [disabled]="uploading()" (click)="upload()">
+        <md-filled-button [disabled]="uploading() || loading() || mastersLoading() || !options().length" (click)="upload()">
           {{ uploading() ? 'Uploading…' : 'Upload' }}
         </md-filled-button>
       </div>
@@ -41,15 +42,15 @@
     <p class="otp-muted">Loading…</p>
   } @else {
     @for (c of categories; track c.value) {
-      <section class="account-card">
+      <section class="account-card" [id]="'docs-' + c.value">
         <div class="account-card__head">
           <h2>{{ c.label }}</h2>
         </div>
-        @if (docsFor(c.value).length === 0) {
+        @if (currentDocsFor(c.value).length === 0) {
           <p class="address-empty">No {{ c.label.toLowerCase() }} documents yet.</p>
         } @else {
           <ul class="driver-doc-list">
-            @for (doc of docsFor(c.value); track doc.id) {
+            @for (doc of currentDocsFor(c.value); track doc.id) {
               <li class="driver-doc-card">
                 <div>
                   <div>{{ doc.type }}</div>
@@ -58,16 +59,57 @@
                       {{ doc.regNo }} ·
                     }
                     {{ doc.fileName ?? 'No file' }}
-                    · Version {{doc.version ?? 1}} · {{doc.archivedAt ? 'Archived' : 'Current'}}
+                    · Version {{doc.version ?? 1}} · Current
                     @if(doc.expiresAt){ · Expiry {{doc.expiresAt}} }
                   </div>
                 </div>
-                @if(!doc.archivedAt){<md-icon-button [attr.aria-label]="'Withdraw ' + doc.type" (click)="remove(doc)">
+                <div>
+                  @if(previews()[doc.id];as preview){
+                    @if(preview.loading){<p role="status">Loading authenticated preview...</p>}
+                    @if(preview.error){<p role="alert">{{preview.error}}</p>}
+                    @if(preview.pdf){<iframe [src]="preview.safe" [title]="doc.type+' PDF preview'" style="width:100%;height:20rem;border:0"></iframe>}
+                    @if(preview.image){<img [src]="preview.url" [alt]="doc.type" style="max-width:100%;max-height:20rem" />}
+                    @if(preview.url){<a [href]="preview.url" [download]="doc.fileName || 'document'">Download original</a>}
+                  }@else if(doc.filePath){<md-text-button [attr.aria-label]="'Preview '+doc.type+' version '+(doc.version || 1)" (click)="preview(doc)">Preview file</md-text-button>}
+                </div>
+                @if(duplicate(doc)){<p role="alert">Duplicate document type. All files are preserved; withdraw an unwanted row to resolve it.</p>}
+                <md-text-button (click)="replace(doc)" [disabled]="uploading() || loading()">Replace file</md-text-button><md-icon-button [disabled]="!!deleting() || uploading()" [attr.aria-label]="'Withdraw ' + doc.type" (click)="remove(doc)">
                   <md-icon aria-hidden="true">delete</md-icon>
-                </md-icon-button>}
+                </md-icon-button>
               </li>
             }
           </ul>
+        }
+        @if (historyDocsFor(c.value).length > 0) {
+          <details>
+            <summary>Previous version history ({{ historyDocsFor(c.value).length }})</summary>
+            <ul class="driver-doc-list">
+              @for (doc of historyDocsFor(c.value); track doc.id) {
+                <li class="driver-doc-card">
+                  <div>
+                    <div>{{ doc.type }}</div>
+                    <div class="driver-doc-card__meta">
+                      @if (doc.regNo) {
+                        {{ doc.regNo }} ·
+                      }
+                      {{ doc.fileName ?? 'No file' }}
+                      · Version {{doc.version ?? 1}} · Archived
+                      @if(doc.expiresAt){ · Expiry {{doc.expiresAt}} }
+                    </div>
+                  </div>
+                  <div>
+                    @if(previews()[doc.id];as preview){
+                      @if(preview.loading){<p role="status">Loading authenticated preview...</p>}
+                      @if(preview.error){<p role="alert">{{preview.error}}</p>}
+                      @if(preview.pdf){<iframe [src]="preview.safe" [title]="doc.type+' PDF preview'" style="width:100%;height:20rem;border:0"></iframe>}
+                      @if(preview.image){<img [src]="preview.url" [alt]="doc.type" style="max-width:100%;max-height:20rem" />}
+                      @if(preview.url){<a [href]="preview.url" [download]="doc.fileName || 'document'">Download original</a>}
+                    }@else if(doc.filePath){<md-text-button [attr.aria-label]="'Preview '+doc.type+' version '+(doc.version || 1)" (click)="preview(doc)">Preview file</md-text-button>}
+                  </div>
+                </li>
+              }
+            </ul>
+          </details>
         }
       </section>
     }

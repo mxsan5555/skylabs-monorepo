@@ -285,6 +285,7 @@ describe('rbac.routes', () => {
     });
 
     it('replaces the role grant set and writes an audit log for a valid request', async () => {
+      mockPrisma.permission.findMany.mockResolvedValue(validIds.map(id => ({id,key:'rbac.roles:view'})));
       mockPrisma.role.findUnique.mockResolvedValue(ROLE_ROW);
       mockPrisma.permission.count.mockResolvedValue(validIds.length);
       mockPrisma.rolePermission.deleteMany.mockResolvedValue({ count: 0 });

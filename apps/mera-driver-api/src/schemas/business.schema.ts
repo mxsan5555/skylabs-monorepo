@@ -156,7 +156,9 @@ export const UpdateDriverSchema = CreateDriverSchema.partial().openapi('UpdateDr
 export const CreateDriverDocumentSchema = z
   .object({
     category: z.enum(['personal', 'health', 'education', 'police']),
-    type: z.string().min(1),
+    type: z.string().trim().min(1).refine(value=>value!=='Select Document Type','Select Document Type'),
+    typeKey: z.string().min(1).optional(),
+    replaceDocumentId: z.string().uuid().optional(),
     regNo: z.string().optional(),
     expiresAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value=>!Number.isNaN(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value,'Use a valid expiry date').optional(),
   })
@@ -246,6 +248,7 @@ export const SetDriverStatusSchema = z
 export const AssignVerifierSchema = z
   .object({
     verifierId: z.string().uuid().nullable(),
+    expectedVerifierId: z.string().uuid().nullable().optional(),
     reason:z.string().trim().max(1000).optional(),
   })
   .openapi('AssignVerifier');

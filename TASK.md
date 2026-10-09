@@ -148,6 +148,32 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 
 ## Completed
 
+### Mera Driver — Role Management / User Management RBAC overhaul — 2026-10-07
+- [x] One-time versioned baseline reconciliation (`SystemFlag`-guarded, `prisma/seed.ts`'s
+      `applyRoleBaselineOnce`) — reduced to exactly 9 staff roles (Super Admin, Admin, Vendor,
+      Marketing, Sales, Company, Data Operator, Support, KYC Verification) + Driver/Customer
+      portal roles preserved; `contributor`/`sales_marketing` deleted (verified zero linked
+      users/audit history first); applied once to the dev DB, confirmed idempotent on re-seed
+- [x] Real backend ownership scoping (not just menu visibility): `Driver.createdByUserId`
+      (Vendor/Sales/Data Operator — own created drivers) and `Booking.createdByUserId`
+      (Company/Sales direct; Vendor transitively via owned drivers) — `src/lib/ownerScope.ts`,
+      `requireDriverOwnership` middleware, wired through `drivers.routes.ts`/`bookings.routes.ts`
+- [x] Single-staff-role guard (`assertSingleStaffRoleIntent` in `user.service.ts`) — rejects
+      assigning >1 staff role going forward while still allowing an existing multi-role user to
+      be explicitly reconciled down to one
+- [x] Role Management (`administration/roles`) rebuilt to the simple two-pane layout: compact
+      9-role list, read-only name/description/scope, granted-groups-first accordion with a
+      collapsed "Additional modules" section, Save Changes/Cancel footer — no role
+      create/clone/status-toggle UI (roles are now fixed)
+- [x] User Management (`administration/users`) — role checkbox checklist replaced with a single
+      Role dropdown (Add + Edit forms) + read-only access summary; legacy multi-role users show
+      existing assignments and require an explicit final-role pick, never silently collapsed
+- [x] Verified: full `mera-driver-api`/`mera-driver` test suites green, both production builds
+      green, live Playwright screenshots of Role Management and User Management against the
+      real dev DB (9 roles present, `Contributor` absent, Vendor's saved permissions/record
+      scope rendering correctly, User Management single-role dropdown pre-selected + access
+      summary showing)
+
 ### Foundation & design system
 - [x] Nx monorepo with `msd` (React 19 + Vite) and `mera-driver` (Angular 21) — 2026-06
 - [x] `packages/shared-ui`: all 15 Material Web (M3) component groups registered

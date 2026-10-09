@@ -25,7 +25,7 @@ export async function resolveOwnDriver(req: Request, res: Response, next: NextFu
   try {
     const driver = await prisma.driver.findUnique({
       where: { userId: req.user.sub },
-      select: { id: true, accountStatus: true },
+      select: { id: true, accountStatus: true, user: { select: { status:true, deletedAt:true } } },
     });
     if (!driver) {
       res.status(404).json({
@@ -44,6 +44,9 @@ export async function resolveOwnDriver(req: Request, res: Response, next: NextFu
         error: { code: 'DRIVER_DEACTIVATED', message: 'Your driver account has been deactivated. Please contact your administrator.' },
       });
       return;
+    }
+    if(driver.user===null || (driver.user && (driver.user.status!=='active'||driver.user.deletedAt))){
+      res.status(403).json({data:null,error:{code:'ACCOUNT_INACTIVE',message:'Your login account is inactive. Contact support.'}});return;
     }
     req.driver = { id: driver.id };
     next();

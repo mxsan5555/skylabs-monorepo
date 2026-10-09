@@ -1,7 +1,9 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, HostListener, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs';
 import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
+import { DriverSidebar } from './driver-sidebar';
 
 export interface DriverNavItem {
   path: string;
@@ -9,13 +11,13 @@ export interface DriverNavItem {
   icon: string;
 }
 
-/** Every section of the driver portal, in one place — the bottom nav shows the first 5 for
- *  quick thumb access; the drawer (opened from the topbar menu button) shows all of them
- *  plus Logout, so nothing (Vehicle/Trips/Notifications included) is unreachable from
- *  navigation alone. */
+/** Every section of the driver portal, in one place — the bottom nav (mobile only) shows
+ *  the first 5 for quick thumb access; the sidebar (persistent on desktop, a drawer on
+ *  mobile, opened from the topbar menu button) shows all of them plus Logout, so nothing
+ *  is unreachable from navigation alone. */
 export const DRIVER_NAV_ITEMS: DriverNavItem[] = [
   { path: '/driver', label: 'Dashboard', icon: 'home' },
-  { path: '/driver/profile', label: 'My Profile / Continue Onboarding', icon: 'person' },
+  { path: '/driver/profile', label: 'My Profile', icon: 'person' },
   { path: '/driver/kyc', label: 'KYC & Documents', icon: 'verified_user' },
   { path: '/driver/fee', label: 'Registration Fee', icon: 'payments' },
   { path: '/driver/availability', label: 'Availability', icon: 'toggle_on' },
@@ -27,15 +29,18 @@ export const DRIVER_NAV_ITEMS: DriverNavItem[] = [
 ];
 
 /**
- * Dedicated shell for the driver self-service portal (`/driver/*`) — deliberately
- * NOT `AdminLayout`: no sidebar, no admin nav tree, no RBAC-driven menu. A driver's
- * `bootstrap.permissions` is empty by design (Phase 3A), so this layout's own nav
- * (bottom bar + drawer) is the only navigation surface, hardcoded to the fixed set of
- * self-service pages rather than driven by the (irrelevant, permission-based) shared menu.
+ * Shell for the driver self-service portal (`/driver/*`): a persistent sidebar on
+ * desktop and a collapsible drawer on mobile, reusing the exact `.admin-layout`
+ * grid/breakpoint mechanism the admin console uses (`layouts/admin-layout`) — that
+ * shell is already documented as "reused for every role," so the driver portal gets
+ * a real sidebar + full-width content without a second layout system. No RBAC-driven
+ * menu: a driver's `bootstrap.permissions` is empty by design, so navigation is the
+ * fixed `DRIVER_NAV_ITEMS` set rather than the (irrelevant) shared permission menu.
+ * The mobile bottom tab bar is kept alongside the drawer for quick thumb access.
  */
 @Component({
   selector: 'md-driver-layout',
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, DriverSidebar],
   templateUrl: './driver-layout.html',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
@@ -44,15 +49,29 @@ export class DriverLayout {
   protected readonly auth = inject(AuthService);
 
   protected readonly url = signal(cleanUrl(this.router.url));
-  protected readonly navOpen = signal(false);
   protected readonly navItems = DRIVER_NAV_ITEMS;
+
+  protected readonly collapsed = signal(typeof window !== 'undefined' && window.innerWidth < 768);
+  private readonly viewportWidth = signal(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  protected readonly mobileMenuOpen = computed(() => this.viewportWidth() < 768 && !this.collapsed());
+
+  @HostListener('window:resize') onResize(): void {
+    const before = this.viewportWidth();
+    this.viewportWidth.set(window.innerWidth);
+    if (before >= 768 && window.innerWidth < 768) this.collapsed.set(true);
+    if (before < 768 && window.innerWidth >= 768) this.collapsed.set(false);
+  }
+
+  protected readonly currentLabel = computed(
+    () => this.navItems.find((item) => this.isActive(item.path))?.label,
+  );
 
   constructor() {
     this.router.events
-      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd), takeUntilDestroyed())
       .subscribe((e) => {
         this.url.set(cleanUrl(e.urlAfterRedirects));
-        this.navOpen.set(false);
+        if (this.viewportWidth() < 768) this.collapsed.set(true);
       });
   }
 
@@ -64,16 +83,15 @@ export class DriverLayout {
     this.router.navigateByUrl(path);
   }
 
-  protected toggleNav(): void {
-    this.navOpen.update((v) => !v);
+  protected toggleSidebar(): void {
+    this.collapsed.update((v) => !v);
   }
 
-  protected closeNav(): void {
-    this.navOpen.set(false);
+  protected closeSidebar(): void {
+    this.collapsed.set(true);
   }
 
   protected signOut(): void {
-    this.navOpen.set(false);
     this.auth.signOut();
     this.router.navigateByUrl('/sign-in');
   }

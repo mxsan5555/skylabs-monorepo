@@ -91,6 +91,11 @@ model User {
   // Drivers currently assigned to this User for KYC review — set only via
   // `PATCH /drivers/:id/assign-verifier`. See `Driver.assignedVerifierId`.
   assignedKycDrivers          Driver[]               @relation("DriverAssignedVerifier")
+  // Drivers this User (Vendor/Sales/Data Operator role) created — see `Driver.createdByUserId`.
+  createdDrivers               Driver[]               @relation("DriverCreatedBy")
+  // Bookings this User (Company/Sales role) created — see `Booking.createdByUserId`.
+  createdCustomers             Customer[]             @relation("CustomerCreatedBy")
+  createdBookings              Booking[]              @relation("BookingCreatedBy")
   financialMovements         MoneyMovement[]
   paymentIntents             PaymentIntent[]
 
@@ -253,6 +258,15 @@ model RefreshSession {
 // Audit / observability
 // ---------------------------------------------------------------------------
 
+// A durable marker for one-time, versioned migrations (e.g. the RBAC role/permission
+// baseline reconciliation) that must never re-apply on a later seed/build/restart and must
+// not depend on any User row existing yet (unlike AuditLog, whose actorUserId is required).
+model SystemFlag {
+  key       String   @id
+  appliedAt DateTime @default(now())
+  detail    Json?
+}
+
 model AuditLog {
   id          String   @id @default(uuid())
   createdAt   DateTime @default(now())
@@ -325,6 +339,10 @@ model Customer {
   userId              String?   @unique
   user                User?     @relation(fields: [userId], references: [id])
 
+  // Nullable for historical customers whose staff creator was never recorded.
+  createdByUserId     String?
+  createdByUser       User?     @relation("CustomerCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
   firstName           String
   lastName            String?
   profileImage        String?
@@ -348,11 +366,13 @@ model Customer {
   bookings            Booking[]
 
   @@index([verificationStatus])
+  @@index([createdByUserId])
   @@index([accountStatus])
 }
 
 model Driver {
   id                    String    @id @default(uuid())
+  creationRequestId     String?   @unique
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -400,6 +420,15 @@ model Driver {
   // `userId`/`resolveOwnDriver` pattern above but for staff instead of the driver themselves.
   assignedVerifierId    String?
   assignedVerifier      User?     @relation("DriverAssignedVerifier", fields: [assignedVerifierId], references: [id])
+
+  // Creator ownership — which staff User (Vendor, Sales, or Data Operator role) created
+  // this driver. Set only server-side from the caller's own id at creation time (see
+  // `driverOwnerScope`/`DriverSaveContext.ownerUserId`), never from client input. Backs
+  // each of those three roles' "own created/linked drivers" scoping; a caller with full
+  // `drivers:assign` access (Admin/Super Admin) is unscoped regardless — see
+  // `administrativeQueue` (mirrors the `assignedVerifierId` fork above).
+  createdByUserId       String?
+  createdByUser         User?     @relation("DriverCreatedBy", fields: [createdByUserId], references: [id])
 
   // KYC checklist — one status+notes pair per existing `DriverDocument` category (personal,
   // health, education, police), set only via `PATCH /drivers/:id/kyc-checklist` by the
@@ -461,6 +490,11 @@ model Driver {
   kycChecks             DriverKycCheck[]
   kycDecisions          DriverKycDecision[]
   online                Boolean @default(false)
+  // Live location — the driver's own device pushes these via the authenticated
+  // `PATCH /drivers/me/location` flow; never presented as live without `locationUpdatedAt`.
+  currentLat            Float?
+  currentLng            Float?
+  locationUpdatedAt     DateTime?
   registrationFeeRequired Boolean @default(false)
   registrationFeePaise Int @default(0)
   bookings              Booking[]
@@ -489,6 +523,7 @@ model Driver {
   @@index([status])
   @@index([accountStatus])
   @@index([assignedVerifierId])
+  @@index([createdByUserId])
 }
 
 // Current checklist and append-only decisions reference the existing Driver record.
@@ -618,6 +653,11 @@ model Booking {
   customer               Customer? @relation(fields: [customerId], references: [id])
   driverId               String?
   driver                 Driver? @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  // Creator ownership — which staff User (Company or Sales role) created this booking
+  // request. Set only server-side from the caller's own id, never from client input. Backs
+  // Company's "own company records" and Sales' "own created leads' bookings" scoping.
+  createdByUserId        String?
+  createdByUser          User?     @relation("BookingCreatedBy", fields: [createdByUserId], references: [id])
   city                   String?
   requiredSkill          String?
   startsAt               DateTime?
@@ -651,14 +691,22 @@ model Booking {
   paymentStatus          String    @default("pending")
   paymentMode            String    @default("cash")
   otp                    String?
+  // Trip-start OTP hardening: separate from login OTP (OtpChallenge), but brought up to the
+  // same safety bar — expiring, attempt-limited, regenerated on resend/reassignment.
+  otpExpiresAt           DateTime?
+  otpAttempts            Int       @default(0)
   requestedAt            String?
   acceptedAt             String?
   startedAt              String?
   completedAt            String?
+  // Client-generated key (one per booking attempt) so a double-click/retry on
+  // `POST /customer/bookings` returns the existing booking instead of creating a duplicate.
+  clientRequestId        String?   @unique
 
   @@index([status])
   @@index([customerId])
   @@index([driverId, startsAt, endsAt])
+  @@index([createdByUserId])
 }
 
 model TripOffer {
@@ -666,6 +714,8 @@ model TripOffer {
   bookingId String
   driverId String
   status String @default("pending")
+  // Null means historical provenance is unknown, rather than inferred from order.
+  isCustomerPreference Boolean?
   createdAt DateTime @default(now())
   expiresAt DateTime?
   respondedAt DateTime?

@@ -89,6 +89,6 @@ export class RideOptions {
     const ride = this.selected();
     if (!ride) return;
     this.booking.selectRide(ride);
-    this.router.navigate(['/ride/payment']);
+    this.router.navigate(['/ride/drivers']);
   }
 }

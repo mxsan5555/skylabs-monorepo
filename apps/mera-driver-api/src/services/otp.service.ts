@@ -32,6 +32,15 @@ export async function requestOtp(identifier: string, purpose: OtpPurpose): Promi
   });
 
   const channel = isPhoneIdentifier(identifier) ? 'SMS' : 'Email';
+  // Explicit opt-in, never production, and off by default (including in tests, which never
+  // set this var) — logs the OTP to the server's own console instead of attempting real
+  // SMS/SMTP delivery, so a developer can sign in as a demo/test account without live
+  // provider credentials. Verification still goes through the normal hashed, expiring,
+  // attempt-limited OtpChallenge row below — nothing about the OTP itself is weakened.
+  if (process.env.NODE_ENV !== 'production' && process.env.OTP_DEV_LOG === 'true') {
+    console.log(`[otp:dev] ${channel} OTP for ${identifier} (${purpose}): ${otp}`);
+    return;
+  }
   try {
     const delivered = channel === 'SMS' ? await sendSmsOtp(identifier, otp) : await sendOtpEmail(identifier, otp);
     if (!delivered) throw otpDeliveryError(channel, 'rejected');

@@ -18,7 +18,7 @@ beforeEach(() => {
 });
 
 async function request(userId: string, path = '/drivers/driver-1/doc.pdf') {
-  const req = { path, user: { sub: userId, roles: [] } } as unknown as Request;
+  const req = { path, user: { sub: userId, roles: userId === 'staff' ? ['admin'] : [] } } as unknown as Request;
   const res = { status: vi.fn().mockReturnThis(), json: vi.fn(), setHeader: vi.fn() };
   const next = vi.fn();
   await authorizeDriverUpload(req, res as unknown as Response, next);
@@ -55,4 +55,12 @@ describe('driver document authorization', () => {
     mockPrisma.driverDocument.findFirst.mockResolvedValue({ mimeType: 'text/html', driver: { userId: 'owner', accountStatus: 'Active' } });
     expect((await request('owner')).res.setHeader).toHaveBeenCalledWith('Content-Disposition', 'attachment');
   });
+});
+
+it.each([{status:'blocked',deletedAt:null},{status:'inactive',deletedAt:null},{status:'active',deletedAt:new Date()}])('denies an existing owner session after login-account revocation: %j',async user=>{mockPrisma.driverDocument.findFirst.mockResolvedValue({filePath:'drivers/driver-1/doc.pdf',mimeType:'application/pdf',driver:{userId:'owner',accountStatus:'Active',user}});const result=await request('owner');expect(result.res.status).toHaveBeenCalledWith(404);expect(result.next).not.toHaveBeenCalled();});
+
+it("does not let a custom role with Driver View download another creator's private document",async()=>{
+ permissions.mockResolvedValue(['drivers:view']);const req={path:'/drivers/driver-1/doc.pdf',user:{sub:'custom',roles:['custom_role'],portalContext:'staff'}} as unknown as Request;
+ const res={status:vi.fn().mockReturnThis(),json:vi.fn(),setHeader:vi.fn()},next=vi.fn();
+ await authorizeDriverUpload(req,res as unknown as Response,next);expect(res.status).toHaveBeenCalledWith(404);expect(next).not.toHaveBeenCalled();
 });

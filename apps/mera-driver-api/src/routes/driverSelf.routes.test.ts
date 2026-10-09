@@ -196,3 +196,5 @@ describe('owned professional resume',()=>{
   });
   it('cannot request another driver resume through the staff route',async()=>{mockPrisma.role.findMany.mockResolvedValue([]);mockPrisma.rolePermission.findMany.mockResolvedValue([]);const response=await request(app).get('/drivers/driver-2/resume').set('Authorization',`Bearer ${tokenFor('user-1')}`);expect(response.status).toBe(403);});
 });
+
+it.each(['/drivers/me','/drivers/me/documents','/drivers/me/resume.pdf'])('denies an existing driver session when its User account is blocked: %s',async path=>{mockPrisma.driver.findUnique.mockResolvedValue({...OWN_DRIVER,accountStatus:'Active',user:{status:'blocked',deletedAt:null}});const result=await request(app).get(path).set('Authorization',`Bearer ${tokenFor('user-1')}`);expect(result.status).toBe(403);expect(result.body.error.code).toBe('ACCOUNT_INACTIVE');expect(mockPrisma.driverDocument.findMany).not.toHaveBeenCalled();});

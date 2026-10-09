@@ -1,3 +1,5 @@
+import { RegistryIdentity } from './registry-identity';
+import { DocumentRow, DocumentSection, documentChoices, documentKey, availableDocumentChoices, duplicateDocumentRow } from '../../../core/drivers/document-type-selection';
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, inject, OnInit, computed, effect } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { httpErrorMessage } from '../../../core/http-error';
@@ -9,7 +11,6 @@ import { AdminPage } from '../../../admin/admin-page/admin-page';
 import { DriversApiService, type Driver } from '../../../core/drivers/drivers-api.service';
 import { RbacApiService } from '../../../core/rbac/rbac-api.service';
 import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
-import { InlineDl } from '../../../shared/inline-dl/inline-dl';
 
 /** The 4 tabs are the onboarding wizard's persistence checkpoints — sub-section chip
  *  navigation within a tab is a pure UI concern and never itself hits the backend. */
@@ -27,7 +28,7 @@ const PILL_SAVE_FIELDS: (keyof Driver)[][][] = [
   [['firstName','lastName','fatherName','motherName','dob','gender','maritalStatus','language'],['email','phone','emergencyNumber','pincode','state','city','address'],['height','weight','religion','color'],['sourceType','jobType','jobChoices','workLocation','workStates','experience','driverType','avatar']],
   [['education','trainingStatus','trainingCertificate'],['eyeVision','bloodGroup','healthInsurance']],
   [['licenseDetails','vehicleType','dlNo','dlIssueDate','dlExpiryDate'],['policeVerifiedStatus','policeVerifiedNo','currentSalary','expectedSalary'],[]],
-  [['accountPaymentMethod','bankName','bankAccountNo','ifscCode','branchName','upiIdOrChequeNo'],['preferredPaymentMode','amount','paymentReceiptDate','driverStatusMasterId']],
+  [['accountPaymentMethod','bankName','bankAccountNo','ifscCode','branchName','upiIdOrChequeNo'],['preferredPaymentMode','amount','paymentReceiptDate']],
 ];
 
 /** Driver List progress display — e.g. "In Progress — Personal Details, sub-step 2 of 4 (18%)"
@@ -51,7 +52,7 @@ function subStepKey(tabIndex: number, subIndex: number): number {
 @Component({
   selector: 'md-account-drivers',
   standalone: true,
-  imports: [AdminPage, RouterLink, InlineDl],
+  imports: [AdminPage, RouterLink, RegistryIdentity],
   templateUrl: './drivers.html',
   styleUrl: '../masters/masters.css',
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
@@ -70,6 +71,9 @@ export class Drivers implements OnInit {
   }
 
   constructor() {
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => {
+      const view=params.get('view');if(view && ['all','users','review','ready'].includes(view))this.selectedView.set(view as 'all'|'users'|'review'|'ready');
+    });
     this.router.events
       .pipe(
         filter((e): e is NavigationEnd => e instanceof NavigationEnd),
@@ -95,6 +99,12 @@ export class Drivers implements OnInit {
   // --- KYC Verifier Assignment ---
   readonly verifierPanelDriver = signal<Driver | null>(null);
   readonly verifierOptions = signal<{ id: string; name: string }[]>([]);
+  readonly verifierDraft = signal('');
+  readonly verifierLoading = signal(false);
+  readonly verifierSuccess = signal(false);
+  private verifierSequence = 0;
+  verifierAvailable(id: string): boolean { return this.verifierOptions().some(v => v.id === id); }
+  verifierDraftName(): string { return this.verifierOptions().find(v => v.id === this.verifierDraft())?.name ?? this.verifierPanelDriver()?.assignedVerifier?.name ?? 'Not assigned'; }
   readonly verifierSaving = signal<boolean>(false);
   readonly verifierError = signal<string | null>(null);
 
@@ -232,7 +242,8 @@ export class Drivers implements OnInit {
     if (!this.isTouched('dlNo')) return '';
     const val = this.inputDlNo().trim();
     if (!val) return 'Driving License No. is required';
-    return '';
+    if (val === this.originalDlNo || this.normalizeDl(val) === this.normalizeDl(this.originalDlNo)) return '';
+    return /^[A-Z]{2}\d{13}$/.test(this.normalizeDl(val)) ? '' : 'Enter 15 characters: two letters followed by 13 digits, e.g. UP3220210123456.';
   });
 
   validateCurrentStep(): boolean {
@@ -363,6 +374,8 @@ export class Drivers implements OnInit {
   // --- Form Input Signals (Tab 3: Documents) ---
   readonly inputLicenseDetails = signal<string>('LMV');
   readonly inputVehicleType = signal<string>('');
+  private originalDlNo = '';
+  normalizeDl(value:string){return value.replace(/[\s-]/g,'').toUpperCase();}
   readonly inputDlNo = signal<string>('');
   readonly inputDlIssueDate = signal<string>('');
   readonly inputDlExpiryDate = signal<string>('');
@@ -382,6 +395,17 @@ export class Drivers implements OnInit {
   readonly inputRegistrationFeeStatus = signal<string>('Unpaid');
   readonly actualFeeStatus = signal('Unpaid');
   private originalRegistrationDetails = '';
+  private collectionRequestReference = '';
+  private createRequestId='';
+  private feeSaveError():string|null {
+    if(this.inputRegistrationFeeStatus()!=='Paid'||this.actualFeeStatus()==='Paid')return null;
+    if(!this.auth.can('payments.overview','edit')||!this.auth.can('payments.overview','create'))return 'Accounts permission is required to record payment. Use Accounts for a verified payment.';
+    if(!['Cash','NEFT','RTGS','UPI','Bank Transfer'].includes(this.inputPreferredPaymentMode()))return 'Use the existing verified payment flow in Accounts for this payment mode.';
+    if(!this.cashConfirmed())return 'Confirm the payment has actually been received.';
+    if(!this.collectionReason().trim())return 'Enter a reason for this fee receipt.';
+    if(this.expectedRegistrationFeePaise()<=0)return 'No fee is configured for this driver.';
+    return null;
+  }
   readonly expectedRegistrationFeePaise = signal(0);
   readonly feeRequired = signal(false);
   readonly inputDriverStatusMasterId = signal<string | null>(null);
@@ -392,33 +416,21 @@ export class Drivers implements OnInit {
   readonly confirmingCollection = signal(false);
   private registrationReceipt: File | null = null;
   driverStatusOptions(){const all=this.formMasters()['statuses']??[];return all.filter(option=>option.status==='Active'||option.id===this.originalDriverStatusMasterId());}
-  feePolicyLabel(){const amount=this.expectedRegistrationFeePaise();return amount>0?`${this.feeRequired()?'Required':'Optional'} fee: ${new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(amount/100)}`:'No registration amount configured; Accounts must configure a fee policy before recording collection.';}
+  feePolicyLabel(){const amount=this.expectedRegistrationFeePaise();return amount>0?`Registration Fee: ${new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(amount/100)}`:'No fee required';}
   selectRegistrationFee(value: 'Paid' | 'Unpaid', event?: Event){
     if(value==='Unpaid' && this.actualFeeStatus()==='Paid'){const radio=event?.target as (HTMLElement & {checked:boolean})|undefined;if(radio){radio.checked=false;const paid=radio.closest('fieldset')?.querySelector('md-radio[value="Paid"]') as (HTMLElement & {checked:boolean})|null;if(paid)paid.checked=true;}this.stepError.set('This fee has a verified collection. Use Accounts Registration Fees refund/correction with a reason; this form cannot reverse its ledger.');return;}
     this.inputRegistrationFeeStatus.set(value);this.stepError.set(null);this.cashConfirmed.set(false);
+    if(value==='Paid'&&this.actualFeeStatus()!=='Paid'){this.inputAmount.set(this.inputAmount()||String(this.expectedRegistrationFeePaise()/100));if(!this.inputPaymentReceiptDate())this.inputPaymentReceiptDate.set(new Date().toISOString().slice(0,10));}
     if(value==='Unpaid'){this.registrationReceipt=null;this.inputRegistrationReceiptFile.set('');}
   }
   private registrationDetailsError():string|null{
     if(this.inputRegistrationFeeStatus()!=='Paid')return null;
-    if(this.actualFeeStatus()==='Paid'&&!this.registrationReceipt&&JSON.stringify([this.inputPreferredPaymentMode(),this.inputAmount(),this.inputPaymentReceiptDate()])===this.originalRegistrationDetails)return null;
+    if(['Paid','Waived','No fee required'].includes(this.actualFeeStatus()))return null;
     if(!this.registrationPaymentModes().includes(this.inputPreferredPaymentMode()))return 'Choose a configured payment mode';
     const amount=Number(this.inputAmount());
-    if(!/^\d+(\.\d{1,2})?$/.test(this.inputAmount().trim())||amount<=0||!Number.isSafeInteger(Math.round(amount*100)))return 'Enter a positive payment amount with at most two decimal places';
+    if(amount<=0||!Number.isSafeInteger(Math.round(amount*100)))return 'Enter a positive payment amount with at most two decimal places';
     const date=this.inputPaymentReceiptDate();if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date)return 'Enter a valid receipt date';
     return null;
-  }
-  async confirmCashCollection(){
-    this.stepError.set(null);
-    const error=this.registrationDetailsError();
-    if(error){this.stepError.set(error);return;}
-    if(!this.auth.can('payments.overview','edit')||this.inputRegistrationFeeStatus()!=='Paid'||this.inputPreferredPaymentMode()!=='Cash'||!this.cashConfirmed()||!this.collectionReference().trim()||!this.collectionReason().trim()){this.stepError.set('Confirm actual cash received and provide a transaction reference and audit reason');return;}
-    if(this.expectedRegistrationFeePaise()<=0){this.stepError.set('Configure the registration fee policy in Accounts before confirming collection');return;}
-    this.confirmingCollection.set(true);
-    try{
-      if(!await this.persistStep(3,1,false,false))return;
-      await firstValueFrom(this.api.confirmRegistrationCash(this.editingDriverId()!,Math.round(Number(this.inputAmount())*100),this.collectionReference().trim(),this.collectionReason().trim()));
-      const state=await firstValueFrom(this.api.registrationState(this.editingDriverId()!));this.actualFeeStatus.set(state.fee);this.cashConfirmed.set(false);this.reload();
-    }catch(error){this.stepError.set(await httpErrorMessage(error as Parameters<typeof httpErrorMessage>[0]));}finally{this.confirmingCollection.set(false);}
   }
   readonly inputAmount = signal<string>('');
   readonly inputPaymentReceiptDate = signal<string>('');
@@ -442,17 +454,17 @@ export class Drivers implements OnInit {
   }
 
   // --- Dynamic Document Lists ---
-  readonly personalDocs = signal<Array<{ type: string; regNo: string; file: string }>>([
-    { type: 'Aadhaar / National ID', regNo: '', file: '' }
+  readonly personalDocs = signal<DocumentRow[]>([
+    { type: '', regNo: '', file: '' }
   ]);
-  readonly healthDocs = signal<Array<{ type: string; regNo: string; file: string }>>([
-    { type: 'Select Document Type', regNo: '', file: '' }
+  readonly healthDocs = signal<DocumentRow[]>([
+    { type: '', regNo: '', file: '' }
   ]);
-  readonly educationDocs = signal<Array<{ type: string; regNo: string; file: string }>>([
-    { type: 'Select Document Type', regNo: '', file: '' }
+  readonly educationDocs = signal<DocumentRow[]>([
+    { type: '', regNo: '', file: '' }
   ]);
-  readonly policeDocs = signal<Array<{ type: string; regNo: string; file: string }>>([
-    { type: 'Select Document Type', regNo: '', file: '' }
+  readonly policeDocs = signal<DocumentRow[]>([
+    { type: '', regNo: '', file: '' }
   ]);
 
   // Raw File blobs pending upload, keyed by `${category}-${idx}` — uploaded once the
@@ -522,13 +534,13 @@ export class Drivers implements OnInit {
   readonly policeDocTypes = signal<string[]>([]);
 
   // --- Payment Master Options ---
-  readonly registrationPaymentModes = signal<string[]>(['Cash', 'Cheque', 'NEFT', 'RTGS', 'Online']);
+  readonly registrationPaymentModes = signal<string[]>(['Cash', 'Cheque', 'NEFT', 'RTGS', 'UPI', 'Online']);
   readonly paymentModes = signal<string[]>(['Bank Account', 'UPI']);
   readonly driverStatuses = signal<string[]>(['Verified', 'Partially Verified (P)', 'Partially Verified (K)', 'Non-Verified', 'Blacklisted', 'Closed', 'Not Useful']);
 
   protected readonly content = signal({
     title: 'Driver Registry',
-    subtitle: 'Manage and view registered drivers.',
+    subtitle: 'Manage drivers, verification and registration fees.',
     cardTitle: 'Add New Driver',
     btnRegister: 'Save Lead',
     errorEmptyFields: 'First Name, Email, and Phone are required.'
@@ -536,16 +548,17 @@ export class Drivers implements OnInit {
 
   // --- Table Configuration JSON Strings ---
   readonly tableColumns = JSON.stringify([
-    { key:'initials', label:'Photo / Initials', width:'56px' },
-    { key: 'name', label: 'Driver', sortable: true, width:'220px' },
+    { key:'initials', label:'Photo / Initials', width:'56px', hidden:true },
+    { key: 'name', label: 'Driver', sortable: true, width:'260px' },
     { key:'id', label:'Driver ID', hidden:true, sortable:true },
     { key: 'firstName', label: 'First Name', sortable: true, hidden: true },
     { key: 'lastName', label: 'Last Name', sortable: true, hidden: true },
     { key: 'email', label: 'Email', sortable: true, hidden: true },
     { key: 'phone', label: 'Mobile', sortable: true, hidden:true },
-    { key: 'city', label: 'City', sortable:true },
-    { key: 'driverType', label: 'Driver Type', sortable: true },
-    { key: 'kycLabel', label: 'KYC', type: 'status', statusMap: { Pending: 'warning', Verified: 'success', Partial: 'info', Blacklisted: 'error', Closed: 'error' } },
+    { key: 'cityType', label: 'City / Driver Type', width:'170px' },
+    { key: 'city', label: 'City', sortable:true, hidden:true },
+    { key: 'driverType', label: 'Driver Type', sortable: true, hidden:true },
+    { key:'kycLabel',label:'KYC status',width:'180px' },
     { key: 'status', label: 'Full KYC Status', hidden: true, type: 'status', statusMap: {
         'Verified': 'success',
         'Partially Verified (P)': 'info',
@@ -557,11 +570,11 @@ export class Drivers implements OnInit {
       }
     },
     { key: 'accountStatus', label: 'Account Status', hidden:true, type: 'status', statusMap: { Active: 'success', Inactive: 'error',Suspended:'warning' } },
-    { key: 'feeLabel', label: 'Registration Fee', type: 'status',statusMap:{Paid:'success',Waived:'info',Unpaid:'warning',Pending:'warning',Failed:'error',Refunded:'error'} },
+    { key: 'feeLabel', label: 'Registration Fee', type: 'status',statusMap:{Paid:'success',Partial:'warning','No fee required':'info',Waived:'info',Unpaid:'warning',Pending:'warning',Failed:'error',Refunded:'error'} },
     { key:'dlApiStatus',label:'DL API',type:'status',hidden:true,statusMap:{'Not checked':'neutral','Manual review required':'warning','Provider failed':'warning','Expired':'warning','Mismatch/Invalid':'error'} },
     { key: 'licenceStatus', label: 'Licence (human review)', type: 'status',statusMap:{'Manual approved':'success','Not checked':'warning','Expired / invalid':'error'}, hidden:true },
-    { key: 'eligibilityLabel', label: 'Trip Eligibility', width:'230px' },
-    { key: 'completionPercentage', label: 'Onboarding %', sortable: true },
+    { key: 'eligibilityLabel', label: 'Trip readiness', width:'230px' },
+    { key: 'completionPercentage', label: 'Onboarding %', sortable: true, hidden: true },
     { key:'onboardingLabel', label:'Onboarding position', hidden:true },
     { key:'feeStatus', label:'Registration fee state', hidden:true },
     { key: 'fatherName', label: 'Father Name', sortable: true, hidden: true },
@@ -606,7 +619,7 @@ export class Drivers implements OnInit {
     { key: 'bankAccountNo', label: 'Bank Account No', sortable: false, hidden: true },
     { key: 'ifscCode', label: 'IFSC Code', sortable: false, hidden: true },
     { key: 'upiIdOrChequeNo', label: 'UPI / Cheque', sortable: false, hidden: true },
-    { key: 'linkedAccountLabel', label: 'Portal Account', sortable: false },
+    { key: 'linkedAccountLabel', label: 'Portal Account', sortable: false, hidden: true },
     { key: 'assignedVerifierLabel', label: 'KYC Verifier', sortable: false, hidden: true }
   ]);
 
@@ -621,10 +634,12 @@ export class Drivers implements OnInit {
     { value: 'Not Useful', label: 'Not Useful' }
   ]);
 
-  readonly tableActions = JSON.stringify([
-    { icon: 'badge', label: 'View', event: 'preview_driver' },
-    { icon: 'more_horiz', label: 'More actions', event: 'more_driver' },
-  ]);
+  readonly tableActions = computed(() => JSON.stringify([
+    {icon:'visibility',label:'View',event:'preview_driver'},
+    ...(this.auth.can('drivers','edit') ? [{icon:'edit',label:'Edit',event:'edit_driver'}] : []),
+    ...(this.auth.can('drivers','assign') ? [{icon:'how_to_reg',label:'Assign Verifier',event:'assign_verifier'}] : []),
+    {icon:'more_horiz',label:'More actions',event:'more_driver'},
+  ]));
 
   readonly loginFilter = signal('');
   readonly cityFilter = signal('');
@@ -632,7 +647,8 @@ export class Drivers implements OnInit {
   readonly sourceFilter = signal('');
   readonly typeFilter = signal('');
   readonly accountFilter = signal('');
-  readonly feeFilter = signal('');readonly eligibilityFilter=signal('');readonly availabilityFilter=signal('');readonly licenceFilter=signal('');
+  readonly profileFilter=signal('');readonly documentsFilter=signal('');
+  readonly feeFilter = signal('');readonly eligibilityFilter=signal('');readonly licenceFilter=signal('');
   readonly listError = signal<string | null>(null);
   readonly summary = signal<{totalDrivers:number;driverUsers:number;noLogin:number;kycPending:number;feeUnpaid?:number;readyForTrips?:number}>({ totalDrivers: 0, driverUsers: 0, noLogin: 0, kycPending: 0 });
   readonly totalDrivers = signal(0);
@@ -640,24 +656,26 @@ export class Drivers implements OnInit {
   readonly processedDrivers = computed(() => this.allDrivers());
   readonly selectedView = signal('all');
   readonly filtersVisible = signal(true);
-  readonly listViews = [{key:'all',label:'All Drivers'},{key:'users',label:'Driver Users'},{key:'review',label:'Need KYC Review'},{key:'ready',label:'Ready for Trips'}];
+  readonly listViews = [{key:'all',label:'All Drivers'},{key:'users',label:'Driver Users'},{key:'review',label:'Need KYC Review'},{key:'ready',label:'Ready for Trip'}];
   readonly activeFilters = computed(() => [
     {key:'type',label:'Skills: '+this.typeFilter(),value:this.typeFilter()},
     {key:'city',label:'City: '+this.cityFilter(),value:this.cityFilter()},
     {key:'kyc',label:'KYC: '+this.statusFilter(),value:this.statusFilter()==='all'?'':this.statusFilter()},
     {key:'fee',label:'Fee: '+this.feeFilter(),value:this.feeFilter()},
-    {key:'availability',label:'Availability: '+this.availabilityFilter(),value:this.availabilityFilter()},
+    {key:'profile',label:'Incomplete profiles',value:this.profileFilter()},
+    {key:'documents',label:'Missing documents',value:this.documentsFilter()},
   ].filter(filter=>filter.value));
-  summaryCount(view:string) { const stats=this.summary(); return view==='users'?stats.driverUsers:view==='review'?stats.kycPending:view==='ready'?stats.readyForTrips??0:stats.totalDrivers; }
+  retryList(){this.reload();}
+  summaryCount(view:string) { if(this.loading())return 'Loading…';if(this.listError())return 'Unavailable';const stats=this.summary(); return view==='users'?stats.driverUsers:view==='review'?stats.kycPending:view==='ready'?stats.readyForTrips??0:stats.totalDrivers; }
   setListFilter(key: string, value: string) {
-    const filters: Record<string, typeof this.loginFilter> = { login: this.loginFilter, city: this.cityFilter, state: this.stateFilter, source: this.sourceFilter, type: this.typeFilter, account: this.accountFilter,fee:this.feeFilter,eligibility:this.eligibilityFilter,availability:this.availabilityFilter,licence:this.licenceFilter,kyc:this.statusFilter };
-    filters[key]?.set(key==='kyc' && !value?'all':value); this.page.set(1); this.reload();
+    const filters: Record<string, typeof this.loginFilter> = { profile:this.profileFilter,documents:this.documentsFilter,login: this.loginFilter, city: this.cityFilter, state: this.stateFilter, source: this.sourceFilter, type: this.typeFilter, account: this.accountFilter,fee:this.feeFilter,eligibility:this.eligibilityFilter,licence:this.licenceFilter,kyc:this.statusFilter };
+    filters[key]?.set(key==='kyc' && !value?'all':value);if(['profile','documents'].includes(key)&&this.route.snapshot.queryParamMap.has(key))void this.router.navigate([],{relativeTo:this.route,queryParams:{[key]:value||null,view:this.selectedView()},queryParamsHandling:'merge',replaceUrl:true}); this.page.set(1); this.reload();
   }
   quickView(view:string){this.selectedView.set(this.listViews.some(item=>item.key===view)?view:'all');this.page.set(1);this.reload();}
   toggleFilters(){this.filtersVisible.update(value=>!value);this.saveListState();}
-  clearFilters(){this.typeFilter.set('');this.cityFilter.set('');this.statusFilter.set('all');this.feeFilter.set('');this.availabilityFilter.set('');this.page.set(1);this.reload();}
-  private saveListState(){try{sessionStorage.setItem('mera-driver-list-state',JSON.stringify({view:this.selectedView(),type:this.typeFilter(),city:this.cityFilter(),kyc:this.statusFilter(),fee:this.feeFilter(),availability:this.availabilityFilter(),visible:this.filtersVisible(),search:this.searchQuery(),page:this.page(),pageSize:this.pageSize(),sort:this.sortKey(),direction:this.sortDir()}));}catch{/* Storage may be unavailable in a private browser. */}}
-  private restoreListState(){try{const state=JSON.parse(sessionStorage.getItem('mera-driver-list-state')??'null');if(!state)return;this.selectedView.set(this.listViews.some(view=>view.key===state.view)?state.view:'all');this.typeFilter.set(state.type??'');this.cityFilter.set(state.city??'');this.statusFilter.set(state.kyc??'all');this.feeFilter.set(state.fee??'');this.availabilityFilter.set(state.availability??'');this.filtersVisible.set(state.visible!==false);this.searchQuery.set(state.search??'');this.page.set(Math.max(1,Number(state.page)||1));this.pageSize.set([10,25,50,100].includes(state.pageSize)?state.pageSize:10);this.sortKey.set(state.sort??'firstName');this.sortDir.set(state.direction==='desc'?'desc':'asc');}catch{/* Ignore invalid saved UI state. */}}
+  clearFilters(){this.profileFilter.set('');this.documentsFilter.set('');if(this.route.snapshot.queryParamMap.has('profile')||this.route.snapshot.queryParamMap.has('documents'))void this.router.navigate([],{relativeTo:this.route,queryParams:{profile:null,documents:null,view:this.selectedView()},queryParamsHandling:'merge',replaceUrl:true});this.typeFilter.set('');this.cityFilter.set('');this.statusFilter.set('all');this.feeFilter.set('');this.page.set(1);this.reload();}
+  private saveListState(){try{sessionStorage.setItem('mera-driver-list-state:'+(this.auth.bootstrap()?.user.id??'anonymous'),JSON.stringify({view:this.selectedView(),type:this.typeFilter(),city:this.cityFilter(),kyc:this.statusFilter(),fee:this.feeFilter(),visible:this.filtersVisible(),search:this.searchQuery(),page:this.page(),pageSize:this.pageSize(),sort:this.sortKey(),direction:this.sortDir()}));}catch{/* Storage may be unavailable in a private browser. */}}
+  private restoreListState(){try{const state=JSON.parse(sessionStorage.getItem('mera-driver-list-state:'+(this.auth.bootstrap()?.user.id??'anonymous'))??'null');if(!state)return;this.selectedView.set(this.listViews.some(view=>view.key===state.view)?state.view:'all');this.typeFilter.set(state.type??'');this.cityFilter.set(state.city??'');this.statusFilter.set(state.kyc??'all');this.feeFilter.set(state.fee??'');this.filtersVisible.set(state.visible!==false);this.searchQuery.set(state.search??'');this.page.set(Math.max(1,Number(state.page)||1));this.pageSize.set([10,25,50,100].includes(state.pageSize)?state.pageSize:10);this.sortKey.set(state.sort??'firstName');this.sortDir.set(state.direction==='desc'?'desc':'asc');}catch{/* Ignore invalid saved UI state. */}}
 
   // --- Paginated Rows to Pass to sky-data-table ---
   readonly tableRowsString = computed(() => {
@@ -670,10 +688,11 @@ export class Drivers implements OnInit {
     return JSON.stringify(
       paginated.map((d) => ({
         ...d,
-        kycLabel: d.status === 'Non-Verified' ? 'Pending' : d.status?.startsWith('Partially Verified') ? 'Partial' : d.status,
+        kycLabel: `${d.status === 'Non-Verified' ? 'Pending' : d.status?.startsWith('Partially Verified') ? 'Partial' : d.status} \u00b7 ${d.assignedVerifier ? 'Verifier: ' + d.assignedVerifier.name : 'Not assigned'}`,
         initials: (d.firstName || d.name || '').slice(0,1).toUpperCase() + (d.lastName || '').slice(0,1).toUpperCase(),
-        name: `${d.name} · ID ${String(d.id).slice(0,8)} · ${d.phone || 'No mobile'}`,
-        feeLabel: d.feeStatus==='Unpaid' && d.registrationFeeRequired===false?'Optional':d.feeStatus || 'Unpaid',
+        name: `${d.name}\n${d.phone || 'No mobile'}`,
+        cityType: `${d.city || 'Not recorded'} / ${d.driverType || 'Not recorded'}`,
+        feeLabel: d.feeStatus || 'Unpaid',
         eligibilityLabel: d.readyForTrips?'Ready':d.blockingReasons?.[0] || 'Not ready for trips',
         linkedUser: undefined,
         linkedAccountLabel: d.linkedUser ? `${d.linkedUser.name} (${d.linkedUser.phone ?? d.linkedUser.email ?? ''})` : 'Login not created',
@@ -688,7 +707,10 @@ export class Drivers implements OnInit {
 
   ngOnInit(): void {
     this.loadFormMasters();
-    this.restoreListState();
+    if(this.route.snapshot.queryParamMap.get('from')!=='dashboard')this.restoreListState();
+    const params=this.route.snapshot.queryParamMap;this.profileFilter.set(params.get('profile')==='incomplete'?'incomplete':'');this.documentsFilter.set(params.get('documents')==='missing'?'missing':'');
+    const view=params.get('view');if(view&&['all','users','review','ready'].includes(view))this.selectedView.set(view as 'all'|'users'|'review'|'ready');
+    if(params.get('add')==='1'&&this.auth.can('drivers','create'))this.openAddDriverForm();
     // Load copy strings dynamically (static UI copy, not business data)
     this.http.get<any>('data/drivers-registry.json').subscribe({
       next: (data) => {
@@ -716,7 +738,8 @@ export class Drivers implements OnInit {
     const serverSort = this.sortKey()==='name'?'firstName':this.sortKey();
     const sortable = ['createdAt', 'firstName', 'lastName', 'phone', 'email', 'status', 'state', 'driverType', 'accountStatus','city','id','completionPercentage'];
     const query: Record<string, string | number> = { view:this.selectedView(), page: this.page(), pageSize: this.pageSize(), search: this.searchQuery(), sort: sortable.includes(serverSort) ? serverSort : 'createdAt', direction: this.sortDir() || 'desc' };
-    const filters = { status: this.statusFilter() === 'all' ? '' : this.statusFilter(), city: this.cityFilter(), state: this.stateFilter(), sourceType: this.sourceFilter(), driverType: this.typeFilter(), login: this.loginFilter(), accountStatus: this.accountFilter(),fee:this.feeFilter(),eligibility:this.eligibilityFilter(),availability:this.availabilityFilter(),licence:this.licenceFilter() };
+    if(this.profileFilter())query['profile']=this.profileFilter();if(this.documentsFilter())query['documents']=this.documentsFilter();
+    const filters = { status: this.statusFilter() === 'all' ? '' : this.statusFilter(), city: this.cityFilter(), state: this.stateFilter(), sourceType: this.sourceFilter(), driverType: this.typeFilter(), login: this.loginFilter(), accountStatus: this.accountFilter(),fee:this.feeFilter(),eligibility:this.eligibilityFilter(),licence:this.licenceFilter() };
     for (const [key, value] of Object.entries(filters)) if (value) query[key] = value;
     this.api.search(query).subscribe({
       next: result => {
@@ -773,7 +796,7 @@ export class Drivers implements OnInit {
       // --- Document Details ---
       licenseDetails: this.inputLicenseDetails(),
       vehicleType: this.inputVehicleType(),
-      dlNo: this.inputDlNo().trim(),
+      dlNo: this.inputDlNo()===this.originalDlNo?this.originalDlNo:this.normalizeDl(this.inputDlNo()),
       dlIssueDate: this.inputDlIssueDate(),
       dlExpiryDate: this.inputDlExpiryDate(),
       policeVerifiedStatus: this.inputPoliceVerifiedStatus(),
@@ -783,9 +806,8 @@ export class Drivers implements OnInit {
       currentSalary: this.inputCurrentSalary().trim(),
       expectedSalary: this.inputExpectedSalary(),
       // --- Payment Details ---
-      driverStatusMasterId:this.inputDriverStatusMasterId(),
       preferredPaymentMode: this.inputPreferredPaymentMode(),
-      amount: this.inputAmount().trim(),
+      amount: this.inputAmount()||String(this.expectedRegistrationFeePaise()/100),
       paymentReceiptDate: this.inputPaymentReceiptDate(),
       accountPaymentMethod: this.inputAccountPaymentMethod(),
       bankName: this.inputBankName().trim(),
@@ -800,6 +822,7 @@ export class Drivers implements OnInit {
   private async persistStep(tabIndex: number, subIndex: number, isFinal: boolean, complete = true): Promise<boolean> {
     this.savingStep.set(true);
     this.stepError.set(null);
+    if(tabIndex===2&&subIndex===0&&this.inputDlNo().trim()){this.markTouched('dlNo');const error=this.dlNoError();if(error){this.stepError.set(error);this.savingStep.set(false);return false;}}
     const payload = this.buildPayload();
     const editingId = this.editingDriverId();
     const stepCompleted = tabIndex + 1;
@@ -810,30 +833,36 @@ export class Drivers implements OnInit {
       if(tabIndex===3&&subIndex===1){
         fields.registrationFeeEntryChoice=this.inputRegistrationFeeStatus()==='Paid'?'Paid':'Unpaid';
         if(fields.registrationFeeEntryChoice==='Unpaid')for(const key of ['preferredPaymentMode','amount','paymentReceiptDate'] as const)delete fields[key];
-        if(complete){const error=this.registrationDetailsError();if(error)throw new Error(error);}
-        if(this.inputDriverStatusMasterId()!==this.originalDriverStatusMasterId()){
-          if(!this.auth.can('drivers','status_change'))throw new Error('Driver status-change permission required');
-          if(editingId && !this.statusReason().trim())throw new Error('Enter a driver status change reason');
-          fields.driverStatusMasterId=this.inputDriverStatusMasterId();fields.driverStatusChangeReason=this.statusReason().trim();
-        }else delete fields.driverStatusMasterId;
+        const error=this.registrationDetailsError()||(complete?this.feeSaveError():null);if(error)throw new Error(error);
+        if(fields.registrationFeeEntryChoice==='Paid')delete fields.registrationFeeEntryChoice;
       }
       const avatarFile=tabIndex===0&&subIndex===3?this.pendingFiles.get('avatar-0'):undefined;
       if(avatarFile){
         delete fields.avatar;
         if(editingId){const doc=await firstValueFrom(this.api.uploadDocument(editingId,'personal','Profile Photo','',avatarFile));if(!doc.filePath)throw new Error('Profile photo upload did not return a saved file');fields.avatar=doc.filePath;this.inputAvatar.set(doc.filePath);this.pendingFiles.delete('avatar-0');}
       }
-      const driver = editingId !== null
-        ? await firstValueFrom(this.api.saveFormPill(editingId, fields, stepCompleted, subIndex, complete))
-        : await firstValueFrom(this.api.create({ ...fields, name: payload.name, vehicle: '', phone: fields.phone ?? '', firstName: payload.firstName, gender: payload.gender }, stepCompleted, subIndex, complete));
+      const deferCompletion=complete&&Array.from(this.pendingFiles.keys()).some(key=>key!=='avatar-0');
+      let driver = editingId !== null
+        ? await firstValueFrom(this.api.saveFormPill(editingId, fields, stepCompleted, subIndex, complete&&!deferCompletion))
+        : await firstValueFrom(this.api.create({ ...fields, name: payload.name, vehicle: '', phone: fields.phone ?? '', firstName: payload.firstName, gender: payload.gender }, stepCompleted, subIndex, complete&&!deferCompletion,this.createRequestId||(this.createRequestId=crypto.randomUUID())));
 
       if (editingId === null) this.editingDriverId.set(driver.id!);
+      this.expectedRegistrationFeePaise.set(driver.registrationFeePaise??this.expectedRegistrationFeePaise());
+      if(complete && tabIndex===3&&subIndex===1 && this.inputRegistrationFeeStatus()==='Paid' && this.actualFeeStatus()!=='Paid'){
+        if(!this.collectionRequestReference)this.collectionRequestReference='registration-form:'+driver.id+':'+crypto.randomUUID();
+        const balance=await firstValueFrom(this.api.registrationState(driver.id!));
+        if(balance.remainingPaise>0)await firstValueFrom(this.api.recordRegistrationPayment(driver.id!,balance.remainingPaise,this.collectionReference().trim()||this.collectionRequestReference,this.inputPreferredPaymentMode()==='Cash'?'cash':this.inputPreferredPaymentMode()==='UPI'?'upi':'bank_transfer',this.collectionReason().trim()+' (receipt date '+this.inputPaymentReceiptDate()+')'));
+        const state=await firstValueFrom(this.api.registrationState(driver.id!));this.actualFeeStatus.set(state.fee);
+        if(state.remainingPaise>0)throw new Error('The payment was recorded, with a balance still due. Review the fee ledger in Accounts.');
+      }
       if(tabIndex===3&&subIndex===1){this.originalDriverStatusMasterId.set(this.inputDriverStatusMasterId());this.statusReason.set('');
         if(this.inputRegistrationFeeStatus()==='Paid' && this.registrationReceipt){await firstValueFrom(this.api.uploadDocument(driver.id!,'personal','Registration Fee Receipt','',this.registrationReceipt));this.registrationReceipt=null;}
       }
       if(avatarFile && editingId===null){const doc=await firstValueFrom(this.api.uploadDocument(driver.id!,'personal','Profile Photo','',avatarFile));if(!doc.filePath)throw new Error('Profile photo upload did not return a saved file');this.inputAvatar.set(doc.filePath);this.pendingFiles.delete('avatar-0');}
+      await this.uploadPendingDocuments(driver.id!);
+      if(deferCompletion)driver=await firstValueFrom(this.api.saveFormPill(driver.id!,{},stepCompleted,subIndex,true));
       this.formCompletedSubSteps.set(driver.completedSubSteps ?? []);
       this.inputStatus.set(driver.status || 'Non-Verified');
-      this.uploadPendingDocuments(driver.id!);
       this.reload();
       this.savingStep.set(false);
 
@@ -863,72 +892,68 @@ export class Drivers implements OnInit {
     await this.persistStep(this.activeFormTab(),this.activeSubSection(),false,false);
   }
 
-  private uploadPendingDocuments(driverId: string): void {
-    for (const [key, file] of this.pendingFiles.entries()) {
-      if (key === 'avatar-0') continue;
-      const [category, idxStr] = key.split('-') as ['personal' | 'health' | 'education' | 'police', string];
-      const idx = Number(idxStr);
-      const docs =
-        category === 'personal' ? this.personalDocs() :
-        category === 'health' ? this.healthDocs() :
-        category === 'education' ? this.educationDocs() :
-        this.policeDocs();
-      const doc = docs[idx];
-      if (!doc) continue;
-      this.api.uploadDocument(driverId, category, doc.type, doc.regNo, file).subscribe({
-        error: (err) => console.error(`Failed to upload ${category} document`, err)
-      });
+  readonly documentsLoading=signal(false);
+  readonly deletingDocument=signal<string|null>(null);
+  private documentLoadSequence=0;
+  docRows(category:DocumentSection){return category==='personal'?this.personalDocs:category==='health'?this.healthDocs:category==='education'?this.educationDocs:this.policeDocs;}
+  documentOptions(category:DocumentSection,index=-1){return availableDocumentChoices(documentChoices(category,this.formMasters()),this.docRows(category)(),index);}
+  documentValue(category:DocumentSection,index:number){return documentKey(this.docRows(category)()[index]?.type??'',documentChoices(category,this.formMasters()));}
+  duplicateDocument(category:DocumentSection,index:number){return duplicateDocumentRow(documentChoices(category,this.formMasters()),this.docRows(category)(),index);}
+  documentControlsLoading(){return this.masterLoading()||!!this.masterError()||this.documentsLoading()||this.savingStep()||!!this.deletingDocument();}
+  allDocumentTypesAdded(category:DocumentSection){return !this.documentOptions(category).length;}
+  canAddDocument(category:DocumentSection){return !this.documentControlsLoading()&&!this.allDocumentTypesAdded(category)&&!this.docRows(category)().some(row=>!row.type);}
+  private loadSavedDocuments(driverId:string){
+    const sequence=++this.documentLoadSequence;this.documentsLoading.set(true);
+    this.api.listDocuments(driverId).subscribe({next:docs=>{if(sequence!==this.documentLoadSequence||this.editingDriverId()!==driverId)return;
+      for(const category of ['personal','health','education','police'] as const){const active=docs.filter(doc=>doc.category===category&&!doc.archivedAt).map(doc=>({id:doc.id,type:doc.type,regNo:doc.regNo??'',file:doc.fileName??'',savedFile:doc.fileName??''}));this.docRows(category).set(active.length?active:[{type:'',regNo:'',file:''}]);}
+      this.documentsLoading.set(false);
+    },error:async err=>{if(sequence!==this.documentLoadSequence)return;this.stepError.set(await httpErrorMessage(err));/* Keep additions disabled until saved rows are loaded. */}});
+  }
+  private async uploadPendingDocuments(driverId:string):Promise<void>{
+    for(const [key,file] of Array.from(this.pendingFiles.entries())){
+      if(key==='avatar-0')continue;
+      const [category,indexText]=key.split('-') as [DocumentSection,string];const index=Number(indexText),row=this.docRows(category)()[index];
+      if(!row?.type)throw new Error('Select Document Type before uploading a file.');
+      if(!row.id&&this.duplicateDocument(category,index))throw new Error('This document type has already been added. Update the existing document or delete its row first.');
+      const choices=documentChoices(category,this.formMasters()),keyValue=documentKey(row.type,choices);
+      const saved=await firstValueFrom(this.api.uploadDocument(driverId,category,row.type,row.regNo,file,choices.some(choice=>choice.id===keyValue)?keyValue:undefined,row.id));
+      this.docRows(category).update(rows=>rows.map((item,i)=>i===index?{...item,...saved,savedFile:saved.file}:item));this.pendingFiles.delete(key);
     }
-    this.pendingFiles.clear();
   }
-
-  // --- Document List Actions ---
-  addPersonalDoc(): void {
-    this.personalDocs.update(docs => [...docs, { type: 'Aadhaar / National ID', regNo: '', file: '' }]);
-  }
-  deletePersonalDoc(idx: number): void {
-    this.personalDocs.update(docs => docs.filter((_, i) => i !== idx));
-  }
-
-  addHealthDoc(): void {
-    this.healthDocs.update(docs => [...docs, { type: 'Select Document Type', regNo: '', file: '' }]);
-  }
-  deleteHealthDoc(idx: number): void {
-    this.healthDocs.update(docs => docs.filter((_, i) => i !== idx));
-  }
-
-  addEducationDoc(): void {
-    this.educationDocs.update(docs => [...docs, { type: 'Select Document Type', regNo: '', file: '' }]);
-  }
-  deleteEducationDoc(idx: number): void {
-    this.educationDocs.update(docs => docs.filter((_, i) => i !== idx));
-  }
-
-  addPoliceDoc(): void {
-    this.policeDocs.update(docs => [...docs, { type: 'Select Document Type', regNo: '', file: '' }]);
-  }
-  deletePoliceDoc(idx: number): void {
-    this.policeDocs.update(docs => docs.filter((_, i) => i !== idx));
-  }
-
-  onDocChange(category: 'personal' | 'health' | 'education' | 'police', idx: number, field: 'type' | 'regNo' | 'file', event: Event): void {
-    const target = event.target as HTMLInputElement | HTMLSelectElement;
-    const val = target.value;
-    if (category === 'personal') {
-      this.personalDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, [field]: val } : doc));
-    } else if (category === 'health') {
-      this.healthDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, [field]: val } : doc));
-    } else if (category === 'education') {
-      this.educationDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, [field]: val } : doc));
-    } else if (category === 'police') {
-      this.policeDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, [field]: val } : doc));
+  private addDocument(category:DocumentSection){if(this.canAddDocument(category))this.docRows(category).update(rows=>[...rows,{type:'',regNo:'',file:''}]);}
+  private async deleteDocument(category:DocumentSection,index:number){
+    if(this.documentControlsLoading())return;
+    const row=this.docRows(category)()[index];if(!row)return;
+    if(row.id){
+      const driverId=this.editingDriverId();if(!driverId)return;
+      if(!confirm(`Delete "${row.type}" document row? Its original file and version history will be preserved.`))return;
+      this.deletingDocument.set(row.id);
+      try{await firstValueFrom(this.api.deleteDocument(driverId,row.id));}catch(err){this.stepError.set(await httpErrorMessage(err as Parameters<typeof httpErrorMessage>[0]));this.deletingDocument.set(null);return;}
+      this.deletingDocument.set(null);
     }
+    this.docRows(category).update(rows=>rows.filter((_,i)=>i!==index));
+    const files=Array.from(this.pendingFiles.entries()).filter(([key])=>key.startsWith(category+'-'));
+    for(const[key]of files)this.pendingFiles.delete(key);
+    for(const[key,file]of files){const i=Number(key.split('-')[1]);if(i!==index)this.pendingFiles.set(`${category}-${i>index?i-1:i}`,file);}
+  }
+  addPersonalDoc(){this.addDocument('personal');} addHealthDoc(){this.addDocument('health');} addEducationDoc(){this.addDocument('education');} addPoliceDoc(){this.addDocument('police');}
+  deletePersonalDoc(index:number){return this.deleteDocument('personal',index);} deleteHealthDoc(index:number){return this.deleteDocument('health',index);} deleteEducationDoc(index:number){return this.deleteDocument('education',index);} deletePoliceDoc(index:number){return this.deleteDocument('police',index);}
+  onDocChange(category:DocumentSection,index:number,field:'type'|'regNo'|'file',event:Event){
+    const value=(event.target as HTMLInputElement).value;
+    if(field==='type'){
+      if(this.documentControlsLoading()||this.docRows(category)()[index]?.id)return;
+      const option=this.documentOptions(category,index).find(choice=>choice.id===value);
+      if(value&&!option)return;
+      this.docRows(category).update(rows=>rows.map((row,i)=>i===index?{...row,type:option?.name??''}:row));
+    }else this.docRows(category).update(rows=>rows.map((row,i)=>i===index?{...row,[field]:value}:row));
   }
 
   onDocFileChange(category: 'personal' | 'health' | 'education' | 'police', idx: number, event: Event): void {
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
     if (!file) return;
+    const current=this.docRows(category)()[idx];
+    if(current?.id&&current.savedFile===undefined)this.docRows(category).update(rows=>rows.map((row,i)=>i===idx?{...row,savedFile:row.file}:row));
     this.pendingFiles.set(`${category}-${idx}`, file);
     const val = file.name;
     if (category === 'personal') {
@@ -945,13 +970,13 @@ export class Drivers implements OnInit {
   clearDocFile(category: 'personal' | 'health' | 'education' | 'police', idx: number): void {
     this.pendingFiles.delete(`${category}-${idx}`);
     if (category === 'personal') {
-      this.personalDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: '' } : doc));
+      this.personalDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: doc.savedFile ?? '' } : doc));
     } else if (category === 'health') {
-      this.healthDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: '' } : doc));
+      this.healthDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: doc.savedFile ?? '' } : doc));
     } else if (category === 'education') {
-      this.educationDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: '' } : doc));
+      this.educationDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: doc.savedFile ?? '' } : doc));
     } else if (category === 'police') {
-      this.policeDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: '' } : doc));
+      this.policeDocs.update(docs => docs.map((doc, i) => i === idx ? { ...doc, file: doc.savedFile ?? '' } : doc));
     }
   }
 
@@ -959,6 +984,7 @@ export class Drivers implements OnInit {
     this.formSubmitted.set(false);
     this.touchedFields.set({});
     this.editingDriverId.set(null);
+    this.createRequestId='';
     this.stepError.set(null);
     this.savingStep.set(false);
     this.formCompletedSubSteps.set([]);
@@ -999,7 +1025,7 @@ export class Drivers implements OnInit {
     // --- Revert Document Inputs ---
     this.inputLicenseDetails.set('LMV');
     this.inputVehicleType.set('');
-    this.inputDlNo.set('');
+    this.originalDlNo='';this.inputDlNo.set('');
     this.inputDlIssueDate.set('');
     this.inputDlExpiryDate.set('');
     this.inputPoliceVerifiedStatus.set('No');
@@ -1014,7 +1040,7 @@ export class Drivers implements OnInit {
     // --- Revert Payment Inputs ---
     this.inputPreferredPaymentMode.set('Cash');
     this.inputRegistrationFeeStatus.set('Unpaid');this.actualFeeStatus.set('Unpaid');this.expectedRegistrationFeePaise.set(0);this.feeRequired.set(false);this.inputDriverStatusMasterId.set(null);this.originalDriverStatusMasterId.set(null);this.cashConfirmed.set(false);this.collectionReference.set('');this.collectionReason.set('');this.registrationReceipt=null;this.originalRegistrationDetails='';
-    this.inputAmount.set('');
+    this.collectionRequestReference='';this.inputAmount.set('');
     this.inputPaymentReceiptDate.set('');
     this.inputRegistrationReceiptFile.set('');
     this.inputBankName.set('');
@@ -1022,10 +1048,11 @@ export class Drivers implements OnInit {
     this.inputIfscCode.set('');
     this.inputBranchName.set('');
     this.inputUpiIdOrChequeNo.set('');
-    this.personalDocs.set([{ type: 'Aadhaar / National ID', regNo: '', file: '' }]);
-    this.healthDocs.set([{ type: 'Select Document Type', regNo: '', file: '' }]);
-    this.educationDocs.set([{ type: 'Select Document Type', regNo: '', file: '' }]);
-    this.policeDocs.set([{ type: 'Select Document Type', regNo: '', file: '' }]);
+    ++this.documentLoadSequence;this.documentsLoading.set(false);
+    this.personalDocs.set([{ type: '', regNo: '', file: '' }]);
+    this.healthDocs.set([{ type: '', regNo: '', file: '' }]);
+    this.educationDocs.set([{ type: '', regNo: '', file: '' }]);
+    this.policeDocs.set([{ type: '', regNo: '', file: '' }]);
     this.activeFormTab.set(0);
   }
 
@@ -1095,7 +1122,7 @@ export class Drivers implements OnInit {
       this.inputBloodGroup.set(row.bloodGroup || 'O+');
       this.inputLicenseDetails.set(row.licenseDetails || 'LMV');
       this.inputVehicleType.set(row.vehicleType || '');
-      this.inputDlNo.set(row.dlNo || '');
+      this.originalDlNo=row.dlNo||'';this.inputDlNo.set(this.originalDlNo);
       this.inputDlIssueDate.set(row.dlIssueDate || '');
       this.inputDlExpiryDate.set(row.dlExpiryDate || '');
       this.inputPoliceVerifiedStatus.set(row.policeVerifiedStatus || 'No');
@@ -1108,8 +1135,8 @@ export class Drivers implements OnInit {
       this.inputDocumentCategory.set(row.documentCategory || 'Driving License');
       this.inputDocumentUpload.set(row.documentUpload || '');
       this.inputPreferredPaymentMode.set(row.preferredPaymentMode || '');
-      this.actualFeeStatus.set(row.feeStatus || 'Unpaid');this.inputRegistrationFeeStatus.set(row.feeStatus==='Paid'?'Paid':'Unpaid');this.expectedRegistrationFeePaise.set(row.registrationFeePaise??0);this.feeRequired.set(row.registrationFeeRequired??false);this.inputDriverStatusMasterId.set(row.driverStatusMasterId??null);this.originalDriverStatusMasterId.set(row.driverStatusMasterId??null);this.registrationReceipt=null;this.cashConfirmed.set(false);this.collectionReference.set('');this.collectionReason.set('');
-      this.inputAmount.set(row.amount || '');
+      this.actualFeeStatus.set(row.feeStatus || 'Unpaid');this.inputRegistrationFeeStatus.set(row.feeStatus==='Paid'?'Paid':'Unpaid');this.expectedRegistrationFeePaise.set(row.registrationFeePaise??0);this.feeRequired.set(row.registrationFeeRequired??false);this.inputDriverStatusMasterId.set(row.driverStatusMasterId??null);this.originalDriverStatusMasterId.set(row.driverStatusMasterId??null);this.registrationReceipt=null;this.cashConfirmed.set(false);this.collectionReference.set(row.registrationPaymentReference??'');this.collectionReason.set('');
+      this.inputAmount.set(row.feeStatus==='Paid'?(row.amount||String((row.registrationFeePaise??0)/100)):String((row.registrationRemainingPaise??row.registrationFeePaise??0)/100));
       this.inputPaymentReceiptDate.set(row.paymentReceiptDate || '');this.inputRegistrationReceiptFile.set(row.registrationReceiptFile??'');this.originalRegistrationDetails=JSON.stringify([this.inputPreferredPaymentMode(),this.inputAmount(),this.inputPaymentReceiptDate()]);
       this.inputAccountPaymentMethod.set(row.accountPaymentMethod || '');
       this.inputBankName.set(row.bankName || '');
@@ -1117,10 +1144,11 @@ export class Drivers implements OnInit {
       this.inputIfscCode.set(row.ifscCode || '');
       this.inputBranchName.set(row.branchName || '');
       this.inputUpiIdOrChequeNo.set(row.upiIdOrChequeNo || '');
-      this.personalDocs.set(row.personalDocs || [{ type: 'Aadhaar / National ID', regNo: '', file: '' }]);
-      this.healthDocs.set(row.healthDocs || [{ type: 'Select Document Type', regNo: '', file: '' }]);
-      this.educationDocs.set(row.educationDocs || [{ type: 'Select Document Type', regNo: '', file: '' }]);
-      this.policeDocs.set(row.policeDocs || [{ type: 'Select Document Type', regNo: '', file: '' }]);
+      this.personalDocs.set(row.personalDocs || [{ type: '', regNo: '', file: '' }]);
+      this.healthDocs.set(row.healthDocs || [{ type: '', regNo: '', file: '' }]);
+      this.educationDocs.set(row.educationDocs || [{ type: '', regNo: '', file: '' }]);
+      this.policeDocs.set(row.policeDocs || [{ type: '', regNo: '', file: '' }]);
+      if(row.id)this.loadSavedDocuments(row.id);
 
       this.formCompletedSubSteps.set(row.completedSubSteps || []);
 
@@ -1140,15 +1168,7 @@ export class Drivers implements OnInit {
       }
       this.showAddForm.set(true);
     } else if (action === 'delete_driver') {
-      if (confirm(`Are you sure you want to delete lead "${row.firstName} ${row.lastName}"?`)) {
-        this.api.delete(row.id).subscribe({
-          next: () => this.reload(),
-          error: (err) => {
-            console.error('Failed to delete driver', err);
-            alert('Failed to delete driver. Please try again.');
-          }
-        });
-      }
+      this.listError.set('Driver deletion is unavailable because this installation has no archive workflow. Existing records and history are preserved.');
     } else if (action === 'link_driver') {
       const driver = this.allDrivers().find((d) => d.id === row.id);
       if (driver) this.openLinkPanel(driver);
@@ -1175,51 +1195,71 @@ export class Drivers implements OnInit {
    *  time the panel opens — reuses the existing Administration > Users list endpoint rather
    *  than adding a new one just for this picker. */
   openVerifierPanel(driver: Driver): void {
+    if (this.verifierSaving()) return;
+    if (!driver.id) return;
+    const sequence = ++this.verifierSequence;
     this.verifierPanelDriver.set(driver);
+    this.verifierDraft.set(driver.assignedVerifierId ?? driver.assignedVerifier?.id ?? '');
     this.verifierError.set(null);
-    if (this.verifierOptions().length === 0) {
-      this.rbac.listUsers(1, 100).subscribe({
-        next: (page) => {
-          const verifiers = page.items
-            .filter((u) => u.roles.some((r) => r.role.key === 'kyc_verification'))
-            .map((u) => ({ id: u.id, name: u.name }));
-          this.verifierOptions.set(verifiers);
-        },
-        error: (err) => {
-          console.error('Failed to load KYC verifiers', err);
-          this.verifierError.set('Failed to load the list of KYC verifiers.');
-        },
-      });
-    }
+    this.verifierSuccess.set(false);
+    this.verifierLoading.set(true);
+    this.api.get(driver.id).subscribe({
+      next: current => {
+        if (sequence !== this.verifierSequence) return;
+        this.verifierPanelDriver.set(current);
+        this.verifierDraft.set(current.assignedVerifierId ?? current.assignedVerifier?.id ?? '');
+        this.verifierLoading.set(false);
+      },
+      error: async error => {
+        const message = await httpErrorMessage(error);
+        if (sequence !== this.verifierSequence) return;
+        this.verifierError.set(message);
+        this.verifierLoading.set(false);
+      },
+    });
+    this.api.eligibleVerifiers().subscribe({
+      next: users => { if (sequence === this.verifierSequence) this.verifierOptions.set(users.map(u => ({id:u.id,name:`${u.name} (${u.email || u.phone || 'No contact'})`}))); },
+      error: async error => { const message = await httpErrorMessage(error); if (sequence === this.verifierSequence) this.verifierError.set(message); },
+    });
   }
 
   closeVerifierPanel(): void {
+    if (this.verifierSaving()) return;
+    ++this.verifierSequence;
     this.verifierPanelDriver.set(null);
   }
 
   onVerifierChange(event: Event): void {
-    const val = (event.target as any).value || '';
-    this.assignVerifier(val || null);
+    this.verifierDraft.set((event.target as HTMLSelectElement).value || '');
+    this.verifierSuccess.set(false);
   }
 
   /** Assigns (`verifierId`) or clears (`null`) the driver's KYC reviewer. Independent of the
    *  self-service portal login link above. */
   assignVerifier(verifierId: string | null): void {
     const driver = this.verifierPanelDriver();
-    if (!driver?.id) return;
+    if (!driver?.id || this.verifierSaving() || this.verifierLoading()) return;
+    if ((driver.assignedVerifierId ?? driver.assignedVerifier?.id ?? null) === verifierId) return;
+    const sequence = this.verifierSequence;
     this.verifierSaving.set(true);
     this.verifierError.set(null);
     let reason:string|undefined;
     if(driver.assignedVerifierId && driver.assignedVerifierId!==verifierId){reason=window.prompt('Reason for changing the KYC verifier (previous review history is preserved)')?.trim();if(!reason){this.verifierSaving.set(false);this.verifierError.set('Reassignment reason required');return;}}
-    this.api.assignVerifier(driver.id, verifierId, reason).subscribe({
+    this.api.assignVerifier(driver.id, verifierId, reason, driver.assignedVerifierId ?? driver.assignedVerifier?.id ?? null).subscribe({
       next: (updated) => {
         this.verifierSaving.set(false);
-        this.allDrivers.update((list) => list.map((d) => (d.id === updated.id ? updated : d)));
+        this.allDrivers.update((list) => list.map((d) => (d.id === updated.id ? {...d,assignedVerifierId:updated.assignedVerifierId,assignedVerifier:updated.assignedVerifier} : d)));
+        this.reload();
+        if (sequence !== this.verifierSequence) return;
         this.verifierPanelDriver.set(updated);
+        this.verifierDraft.set(updated.assignedVerifierId ?? updated.assignedVerifier?.id ?? '');
+        this.verifierSuccess.set(true);
       },
-      error: (err) => {
+      error: async (err) => {
         this.verifierSaving.set(false);
-        this.verifierError.set(err?.message || 'Failed to assign the KYC verifier. Please try again.');
+        const message = await httpErrorMessage(err);
+        if (sequence !== this.verifierSequence) return;
+        this.verifierError.set(message);
       },
     });
   }
@@ -1297,6 +1337,7 @@ export class Drivers implements OnInit {
   }
 
   closeAddDriverForm(): void {
+    if(this.savingStep()||this.deletingDocument())return;
     this.showAddForm.set(false);
     this.resetForm();
     // A step may already have been persisted (driver created/updated mid-wizard) — refresh
@@ -1396,7 +1437,7 @@ export class Drivers implements OnInit {
       // --- Document details ---
       case 'licenseDetails': this.inputLicenseDetails.set(val); break;
       case 'vehicleType': this.inputVehicleType.set(val); break;
-      case 'dlNo': this.inputDlNo.set(val); break;
+      case 'dlNo': this.inputDlNo.set(this.normalizeDl(val)); break;
       case 'dlIssueDate': this.inputDlIssueDate.set(val); break;
       case 'dlExpiryDate': this.inputDlExpiryDate.set(val); break;
       case 'policeVerifiedStatus': this.inputPoliceVerifiedStatus.set(val); break;

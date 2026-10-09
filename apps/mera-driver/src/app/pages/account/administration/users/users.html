@@ -1,19 +1,26 @@
 <md-admin-page title="User Management" subtitle="Search, create, and manage users, their roles, and their sessions.">
   <div class="flex flex-col gap-4">
-    <sky-card *appHasPermission="{ menuKey: 'rbac.users', action: 'create' }">
-      <h2 class="m-0 mb-2 text-base font-semibold">Create user</h2>
-      <div class="flex flex-wrap items-start gap-2">
-        <md-outlined-text-field label="Name" [value]="newUserName" (input)="newUserName = $any($event.target).value"></md-outlined-text-field>
-        <md-outlined-text-field label="Email (optional)" type="email" [value]="newUserEmail" (input)="newUserEmail = $any($event.target).value"></md-outlined-text-field>
-        <md-outlined-text-field label="Phone (optional)" type="tel" [value]="newUserPhone" (input)="newUserPhone = $any($event.target).value"></md-outlined-text-field>
-        <md-filled-button [disabled]="creating()" (click)="createUser()">
-          {{ creating() ? 'Creating…' : 'Create user' }}
-        </md-filled-button>
-      </div>
-      @if (createError()) {
-        <p role="alert" class="auth-error mt-2">{{ createError() }}</p>
-      }
-    </sky-card>
+    @if (rolesError()) { <p role="alert">{{ rolesError() }}</p> }
+    <md-filled-button page-actions *appHasPermission="{menuKey:'rbac.users',action:'create'}" (click)="startAdd()">Add User</md-filled-button>
+    <div class="flex flex-wrap gap-3">
+      <md-outlined-select label="Role" [value]="roleFilter()" (change)="roleFilter.set($any($event.target).value);applyFilters()"><md-select-option value=""><div slot="headline">All roles</div></md-select-option>@for(role of roles();track role.id){<md-select-option [value]="role.id"><div slot="headline">{{role.name}}</div></md-select-option>}</md-outlined-select>
+      <md-outlined-select label="Status" [value]="statusFilter()" (change)="statusFilter.set($any($event.target).value);applyFilters()"><md-select-option value=""><div slot="headline">All statuses</div></md-select-option>@for(status of ['active','inactive','blocked'];track status){<md-select-option [value]="status"><div slot="headline">{{status}}</div></md-select-option>}</md-outlined-select>
+    </div>
+    @if(formOpen() && !selectedUser()) {
+      <sky-card><h2 class="text-base font-semibold">Add User</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-100 rounded-lg p-3">
+          <md-outlined-text-field label="Name" [value]="newUserName" (input)="newUserName=$any($event.target).value"></md-outlined-text-field>
+          <md-outlined-text-field label="Email" [value]="newUserEmail" (input)="newUserEmail=$any($event.target).value"></md-outlined-text-field>
+          <md-outlined-text-field label="Phone" [value]="newUserPhone" (input)="newUserPhone=$any($event.target).value"></md-outlined-text-field>
+          <md-outlined-select label="Role" [disabled]="rolesLoading() || !!rolesError() || !canLoginAs() || creating()" [value]="newRoleId" (change)="newRoleId=$any($event.target).value"><md-select-option value=""><div slot="headline">Select role</div></md-select-option>@for(role of roles();track role.id){<md-select-option [value]="role.id"><div slot="headline">{{role.name}}</div></md-select-option>}</md-outlined-select>
+          <md-outlined-select label="Account status" [value]="newUserStatus" [disabled]="!canChangeStatus() || creating()" (change)="newUserStatus=$any($event.target).value">@for(status of ['active','inactive','blocked'];track status){<md-select-option [value]="status"><div slot="headline">{{status}}</div></md-select-option>}</md-outlined-select>
+          @if (roleAccessSummary(newRoleId)) { <p class="text-xs">Access: {{ roleAccessSummary(newRoleId) }}</p> }
+          <p>Created By and Created At are recorded by the server.</p>
+        </div>
+        @if(createError()){<p role="alert">{{createError()}}</p>}
+        <md-filled-button [disabled]="creating()" (click)="createUser()">Create User</md-filled-button><md-text-button [disabled]="creating()" (click)="closeDetail()">Cancel</md-text-button>
+      </sky-card>
+    }
 
     @if (loadError()) {
       <p role="alert" class="auth-error">{{ loadError() }}</p>
@@ -30,13 +37,18 @@
         [loading]="loading()"
         searchable
         search-placeholder="Search by name, email, or phone…"
-        [actions]="actionsJson"
+        [actions]="actionsJson()"
         (sky-dt-params-change)="onParamsChange($event)"
         (sky-dt-row-action)="onRowAction($event)"
       ></sky-data-table>
     }
 
     @if (selectedUser(); as user) {
+      @if (accessConflicts().length) {
+        <sky-card><p role="alert">This account has direct permission overrides. They can retain grants or prevent a role permission from taking effect. Review these conflicts before changing its role.</p>
+          @for (conflict of accessConflicts(); track conflict) { <p>{{ conflict }}</p> }
+        </sky-card>
+      }
       <sky-card>
         <div class="flex items-start justify-between gap-2">
           <div>
@@ -57,47 +69,33 @@
           <p role="status" class="mt-2 text-[var(--md-sys-color-primary)]">{{ detailMessage() }}</p>
         }
 
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-100 p-3 rounded-lg mt-3">
+          <md-outlined-text-field label="Name" [disabled]="detailBusy()" [value]="editName" (input)="editName=$any($event.target).value"></md-outlined-text-field>
+          <md-outlined-text-field label="Email" [disabled]="detailBusy()" [value]="editEmail" (input)="editEmail=$any($event.target).value"></md-outlined-text-field>
+          <md-outlined-text-field label="Phone" [disabled]="detailBusy()" [value]="editPhone" (input)="editPhone=$any($event.target).value"></md-outlined-text-field>
+          <p>Created By: {{user.createdBy || 'Not recorded'}}<br>Created At: {{user.createdAt}}</p>
+        </div>
+        <div class="flex gap-2 mt-3"><md-filled-button *appHasPermission="{menuKey:'rbac.users',action:'edit'}" [disabled]="detailBusy()" (click)="saveChanges()">Save Changes</md-filled-button><md-text-button [disabled]="detailBusy()" (click)="closeDetail()">Cancel</md-text-button></div>
+        @if(auth.can('drivers','view') && auth.can('drivers','assign')) { <p>Role assignment does not assign records. Use Assign Verifier in <a href="/account/drivers">Driver Register</a> to assign review work.</p> }
         <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <section>
-            <h3 class="m-0 mb-2 text-sm font-semibold">Roles</h3>
-            <ul class="m-0 mb-2 flex list-none flex-col gap-1 p-0">
-              @for (link of user.roles; track link.role.id) {
-                <li class="flex min-h-11 items-center justify-between gap-2 text-sm">
-                  {{ link.role.name }}
-                  <button
-                    *appHasPermission="{ menuKey: 'rbac.users', action: 'assign' }"
-                    type="button"
-                    class="underline text-[var(--md-sys-color-error,#b3261e)]"
-                    [disabled]="detailBusy()"
-                    (click)="removeRole(link.role.id)"
-                  >
-                    Remove
-                  </button>
-                </li>
+          <section><h3 class="text-sm font-semibold">Role</h3>
+            @if (needsRoleReconciliation()) {
+              <p role="alert" class="text-sm">This user currently holds multiple roles — select the single final role below to reconcile:</p>
+              <p class="text-xs">Current assignments: {{ user.roles.map(link => link.role.name).join(', ') }}</p>
+            }
+            <md-outlined-select label="Role" [disabled]="rolesLoading() || !!rolesError() || detailBusy() || !canLoginAs()" [value]="editRoleId() ?? ''" (change)="setDraftRole($any($event.target).value)">
+              <md-select-option value=""><div slot="headline">{{ needsRoleReconciliation() ? 'Select final role' : 'No role' }}</div></md-select-option>
+              @for(role of editRoles();track role.id) {
+                <md-select-option [value]="role.id"><div slot="headline">{{role.name}}</div></md-select-option>
               }
-            </ul>
-            <div *appHasPermission="{ menuKey: 'rbac.users', action: 'assign' }" class="flex items-center gap-2">
-              <md-outlined-select
-                label="Add role"
-                [value]="addRoleId"
-                (change)="addRoleId = $any($event.target).value"
-              >
-                <md-select-option value=""><div slot="headline">Choose a role…</div></md-select-option>
-                @for (role of roles(); track role.id) {
-                  <md-select-option [value]="role.id"><div slot="headline">{{ role.name }}</div></md-select-option>
-                }
-              </md-outlined-select>
-              <md-text-button [disabled]="!addRoleId || detailBusy()" (click)="assignRole()">Add</md-text-button>
-            </div>
+            </md-outlined-select>
+            @if (selectedRoleAccessSummary()) { <p class="text-xs mt-2">Access: {{ selectedRoleAccessSummary() }}</p> }
           </section>
-
           <section>
             <h3 class="m-0 mb-2 text-sm font-semibold">Status &amp; access</h3>
-            <div class="flex flex-wrap gap-2" *appHasPermission="{ menuKey: 'rbac.users', action: 'status_change' }">
-              <md-outlined-button [disabled]="detailBusy() || user.status === 'active'" (click)="setStatus('active')">Activate</md-outlined-button>
-              <md-outlined-button [disabled]="detailBusy() || user.status === 'inactive'" (click)="setStatus('inactive')">Deactivate</md-outlined-button>
-              <md-outlined-button [disabled]="detailBusy() || user.status === 'blocked'" (click)="setStatus('blocked')">Block</md-outlined-button>
-            </div>
+            <md-outlined-select label="Account status" [value]="editStatus" [disabled]="detailBusy()" *appHasPermission="{menuKey:'rbac.users',action:'status_change'}" (change)="editStatus=$any($event.target).value">
+              @for(status of ['active','inactive','blocked'];track status){<md-select-option [value]="status"><div slot="headline">{{status}}</div></md-select-option>}
+            </md-outlined-select>
             <div class="mt-3 flex flex-wrap gap-2" *appHasPermission="{ menuKey: 'rbac.users', action: 'edit' }">
               <md-text-button [disabled]="detailBusy()" (click)="revokeSessions()">Reset session</md-text-button>
               <md-text-button [disabled]="detailBusy()" (click)="resetOtp()">Reset OTP</md-text-button>
@@ -149,66 +147,7 @@
         </div>
       </sky-card>
 
-      <sky-card *appHasPermission="{ menuKey: 'rbac.users', action: 'assign' }">
-        <h2 class="m-0 mb-1 text-base font-semibold">Permission overrides — {{ user.name }}</h2>
-        <p class="m-0 mb-3 text-xs text-[var(--md-sys-color-on-surface-variant)]">
-          Overrides layer on top of this user's role-derived permissions. "Always allow" grants access their roles
-          don't; "Always deny" removes access their roles would otherwise give. Has no effect on a Super Admin.
-        </p>
 
-        @if (overridesLoading()) {
-          <p role="status">Loading current overrides…</p>
-        } @else {
-          <div class="flex flex-col gap-3">
-            @for (group of overrideCatalogGroups(); track group.menuKey) {
-              <fieldset class="rounded-lg border border-[var(--md-sys-color-outline-variant,#c4c7c5)] p-3">
-                <legend class="px-1 text-sm font-medium">{{ group.title }}</legend>
-                <div class="flex flex-col gap-2">
-                  @for (entry of group.entries; track entry.key) {
-                    <label class="flex min-h-11 items-center justify-between gap-3 text-sm">
-                      <span>{{ entry.action }}</span>
-                      <md-outlined-select
-                        [value]="overrideStateFor(entry.key)"
-                        (change)="setOverrideState(entry.key, $any($event.target).value)"
-                      >
-                        <md-select-option value="inherit"><div slot="headline">Inherit (role default)</div></md-select-option>
-                        <md-select-option value="grant"><div slot="headline">Always allow</div></md-select-option>
-                        <md-select-option value="revoke"><div slot="headline">Always deny</div></md-select-option>
-                      </md-outlined-select>
-                    </label>
-                  }
-                </div>
-              </fieldset>
-            }
-          </div>
-
-          @if (overridesError()) {
-            <p role="alert" class="auth-error mt-3">{{ overridesError() }}</p>
-          }
-          @if (overridesSuccess()) {
-            <p role="status" class="mt-3 text-[var(--md-sys-color-primary)]">Overrides saved.</p>
-          }
-
-          <md-filled-button class="mt-3" [disabled]="savingOverrides()" (click)="saveOverrides()">
-            {{ savingOverrides() ? 'Saving…' : 'Save overrides' }}
-          </md-filled-button>
-        }
-
-        <div class="mt-4 border-t border-[var(--md-sys-color-outline-variant,#c4c7c5)] pt-3">
-          <md-text-button (click)="loadEffectivePermissions()">View effective permissions</md-text-button>
-          @if (effectivePermissions(); as permissions) {
-            @if (permissions.length === 0) {
-              <p class="mt-2 text-sm text-[var(--md-sys-color-on-surface-variant)]">This user has no permissions.</p>
-            } @else {
-              <ul class="m-0 mt-2 flex list-none flex-wrap gap-1 p-0 text-xs">
-                @for (key of permissions; track key) {
-                  <li class="rounded bg-[var(--md-sys-color-surface-variant)] px-2 py-1">{{ key }}</li>
-                }
-              </ul>
-            }
-          }
-        </div>
-      </sky-card>
     }
   </div>
 </md-admin-page>

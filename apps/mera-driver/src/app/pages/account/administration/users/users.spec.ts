@@ -32,8 +32,9 @@ const USER_A: User & { roles: { role: Role }[] } = {
 
 function buildRbacApiMock() {
   return {
+    refreshAuthorization:async()=>undefined,
     listUsers: () => of({ items: [USER_A], total: 1, page: 1, pageSize: 100 }),
-    listRoles: () => of([ROLE_DRIVER]),
+    assignableRoles: () => of([ROLE_DRIVER]),
     permissionsCatalog: () => of([]),
     userPermissionOverrides: () => of({ grants: [], revokes: [] }),
   } as unknown as RbacApiService;

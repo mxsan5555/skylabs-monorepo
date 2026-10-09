@@ -10,6 +10,7 @@ import { authorizeDriverUpload } from './middleware/authorizeDriverUpload';
 import { UPLOAD_ROOT } from './lib/upload';
 import { makeMasterListRouter } from './lib/masterListRouter';
 import authRoutes from './routes/auth.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 import rbacRoutes from './routes/rbac.routes';
 import customersRoutes from './routes/customers.routes';
 import customerSelfRoutes from './routes/customerSelf.routes';
@@ -64,6 +65,7 @@ export function createApp() {
 
   // Auth — public (OTP/Google) + a couple of authenticated routes (logout-all) internally.
   app.use('/auth', authRoutes);
+  app.use('/dashboard', dashboardRoutes);
 
   // RBAC — every route inside requires a Bearer token; most are further gated by
   // `requirePermission(menuKey, action)`.

@@ -38,6 +38,19 @@ router.get('/resume.pdf',async(req,res,next)=>{try{const revision=z.string().len
 router.get('/dl-verification',async(req,res,next)=>{try{res.setHeader('Cache-Control','private, no-store');res.json({data:await dlReviewState(req.driver!.id,await driverService.getDriverById(req.driver!.id)),error:null});}catch(error){next(error);}});
 router.post('/dl-verification',(_req,_res,next)=>next(new HttpError(403,'DL_REVIEW_REQUIRED','Only the assigned KYC reviewer or explicitly authorized administrator can verify a saved licence')));
 
+// Live location: the driver's own device pushes its position while online — bounded against
+// runaway client polling (a buggy/compromised client spamming this is still ownership-scoped
+// to its own driver row, but there's no reason to accept more than one update every few
+// seconds). Never trusted as "live" without the server-stamped `locationUpdatedAt`.
+router.patch('/location', publicRateLimit(20, 60000), validateBody(z.object({
+  lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180),
+}).strict()), async (req, res, next) => {
+  try {
+    const driver = await driverService.updateOwnLocation(req.driver!.id, req.body.lat, req.body.lng);
+    res.json({ data: { lat: driver.currentLat, lng: driver.currentLng, updatedAt: driver.locationUpdatedAt }, error: null });
+  } catch (error) { next(error); }
+});
+
 router.patch('/pill', validateBody(z.object({
   tab: z.number().int().min(1).max(4), pill: z.number().int().min(0).max(3),
   complete: z.boolean(), fields: z.record(z.string(), z.unknown()),
@@ -103,21 +116,16 @@ router.post('/documents', upload.single('file'), async (req, res, next) => {
       driverId: req.driver!.id,
       category: parsed.data.category,
       type: parsed.data.type,
+        typeKey: parsed.data.typeKey,
+        replaceDocumentId: parsed.data.replaceDocumentId,
       regNo: parsed.data.regNo,
       expiresAt: parsed.data.expiresAt,
       fileName: file?.originalname,
       filePath: file ? `drivers/${req.driver!.id}/${file.filename}` : undefined,
       mimeType: file?.mimetype,
       sizeBytes: file?.size,
-    });
-    await auditService.writeAuditLog({
-      actorUserId: req.user!.sub,
-      action: 'driver.self.document.upload',
-      targetType: 'Driver',
-      targetId: req.driver!.id,
-      after: doc,
-      ...requestMeta(req),
-    });
+    }, {actorUserId:req.user!.sub,action:'driver.self.document.upload',...requestMeta(req)});
+
     res.status(201).json({ data: doc, error: null });
   } catch (err) {
     next(err);
@@ -128,15 +136,7 @@ router.post('/documents', upload.single('file'), async (req, res, next) => {
 // docId belonging to another driver 404s exactly like a nonexistent one, no existence leak.
 router.delete('/documents/:docId', async (req, res, next) => {
   try {
-    const doc = await driverService.deleteDriverDocument(req.driver!.id, req.params.docId);
-    await auditService.writeAuditLog({
-      actorUserId: req.user!.sub,
-      action: 'driver.self.document.delete',
-      targetType: 'Driver',
-      targetId: req.driver!.id,
-      before: doc,
-      ...requestMeta(req),
-    });
+    const doc = await driverService.deleteDriverDocument(req.driver!.id, req.params.docId, {actorUserId:req.user!.sub,action:'driver.self.document.delete',...requestMeta(req)});
     res.json({ data: { id: req.params.docId }, error: null });
   } catch (err) {
     next(err);

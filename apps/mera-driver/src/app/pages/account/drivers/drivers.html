@@ -2,6 +2,7 @@
   [title]="showAddForm() ? (editingDriverId() !== null ? 'Edit Driver' : 'Add Driver') : content().title"
   [subtitle]="showAddForm() ? (editingDriverId() !== null ? 'Edit driver lead details' : 'Add a new driver lead to the registry') : content().subtitle"
 >
+  @if(!showAddForm() && auth.can('drivers','create')) { <md-filled-button page-actions (click)="openAddDriverForm()">Add Driver</md-filled-button> }
   <div class="relative w-full">
 @if(showAddForm()&&masterLoading()){<p role="status">Loading Master options...</p>}
 @if(showAddForm()&&masterError()){<p role="alert">{{masterError()}}</p><md-text-button (click)="loadFormMasters()">Retry Master options</md-text-button>}
@@ -11,17 +12,14 @@
     @if (!showAddForm()) {
       <div class="grid grid-cols-4 max-sm:grid-cols-2 gap-3 mt-4">
         @for (view of listViews; track view.key) {
-          <sky-card class="p-4 block">
+          <sky-card class="p-4 block" [style.outline]="selectedView() === view.key ? '2px solid var(--md-sys-color-primary)' : null">
             <md-text-button [attr.aria-pressed]="selectedView() === view.key" (click)="quickView(view.key)">{{ view.label }}</md-text-button>
             <strong class="block text-xl">{{ summaryCount(view.key) }}</strong>
           </sky-card>
         }
       </div>
-      <div class="flex flex-wrap gap-2 mt-4">
-        @for(view of listViews; track view.key) { <md-filter-chip [label]="view.label" [selected]="selectedView() === view.key" (click)="quickView(view.key)"></md-filter-chip> }
-      </div>
       <div class="flex flex-wrap items-center gap-2 mt-4">
-        <md-text-button [attr.aria-expanded]="filtersVisible()" (click)="toggleFilters()">Filters · {{ filtersVisible() ? 'Hide' : 'Show' }}</md-text-button>
+        <md-text-button [attr.aria-expanded]="filtersVisible()" (click)="toggleFilters()">{{ filtersVisible() ? 'Hide filters' : 'Show filters' }}</md-text-button>
         @for(filter of activeFilters(); track filter.key) { <md-filter-chip [label]="filter.label" selected (click)="setListFilter(filter.key, '')" [title]="'Clear ' + filter.label"></md-filter-chip> }
         @if(activeFilters().length) { <md-text-button (click)="clearFilters()">Clear Filters</md-text-button> }
       </div>
@@ -31,46 +29,34 @@
           <md-outlined-text-field label="City" [value]="cityFilter()" (change)="setListFilter('city', $any($event.target).value)"></md-outlined-text-field>
           <md-outlined-select label="KYC status" [value]="statusFilter()" (change)="setListFilter('kyc', $any($event.target).value)">
             <md-select-option value="all"><div slot="headline">All KYC statuses</div></md-select-option>
-            @for(status of ['Verified','Non-Verified','Partially Verified (P)','Partially Verified (K)','Blacklisted','Closed','Not Useful']; track status) { <md-select-option [value]="status"><div slot="headline">{{status}}</div></md-select-option> }
+            @for(status of ['Verified','Non-Verified','Partially Verified (P)','Partially Verified (K)','Blacklisted','Closed','Not Useful']; track status) { <md-select-option [value]="status"><div slot="headline">{{status==='Non-Verified'?'Pending':status}}</div></md-select-option> }
           </md-outlined-select>
-          <md-outlined-select label="Registration fee status" [value]="feeFilter()" (change)="setListFilter('fee',$any($event.target).value)"><md-select-option value=""><div slot="headline">All fee statuses</div></md-select-option>@for(status of ['Unpaid','Pending','Paid','Failed','Waived','Refunded'];track status){<md-select-option [value]="status"><div slot="headline">{{status}}</div></md-select-option>}</md-outlined-select>
-          <md-outlined-select label="Availability" [value]="availabilityFilter()" (change)="setListFilter('availability',$any($event.target).value)"><md-select-option value=""><div slot="headline">All availability</div></md-select-option><md-select-option value="online"><div slot="headline">Online</div></md-select-option><md-select-option value="offline"><div slot="headline">Offline</div></md-select-option></md-outlined-select>
+          <md-outlined-select label="Registration fee status" [value]="feeFilter()" (change)="setListFilter('fee',$any($event.target).value)"><md-select-option value=""><div slot="headline">All fee statuses</div></md-select-option>@for(status of ['Paid','Partial','Unpaid','Pending','Failed','Waived','Refunded','No fee required'];track status){<md-select-option [value]="status"><div slot="headline">{{status}}</div></md-select-option>}</md-outlined-select>
         </div>
       }
-      @if (listError()) { <p role="alert">{{ listError() }}</p> }
+      @if (listError()) { <p role="alert">{{ listError() }}</p><md-outlined-button (click)="retryList()">Retry</md-outlined-button> }
       <div class="w-full mt-4">
         <sky-card class="p-6 block">
           <sky-data-table
-            [columns]="tableColumns"
+            [registryIdentity]="allDrivers()" [columns]="tableColumns"
             [rows]="tableRowsString()"
             [total]="totalDrivers()"
             [pageSize]="pageSize()"
             [page]="page()"
             [loading]="loading()"
             selectable
-            exportable
+            [exportable]="auth.can('drivers','export')"
             searchable
             [_search]="searchQuery()"
             [_sortKey]="sortKey()"
             [_sortDir]="sortDir()"
-            search-placeholder="Name, phone, Driver ID, email or DL number"
+            search-placeholder="Search name or phone"
             (sky-dt-params-change)="onParamsChange($event)"
             (sky-dt-row-select)="onRowSelect($event)"
             (sky-dt-row-action)="onRowAction($event)"
-            [actions]="tableActions"
-            caption="Drivers Management Database"
+            [actions]="tableActions()"
+            caption="Driver Registry"
           >
-            <!-- Projected Add button next to download/export button in the toolbar -->
-            @if(auth.can('drivers','create')) {
-            <md-icon-button
-              slot="toolbar-actions"
-              aria-label="Add Driver Lead"
-              title="Add Driver Lead"
-              (click)="openAddDriverForm()"
-            >
-              <md-icon>add</md-icon>
-            </md-icon-button>
-            }
           </sky-data-table>
         </sky-card>
       </div>
@@ -86,7 +72,7 @@
               <md-outlined-button (click)="moreAction('assign_verifier', d)">Assign KYC verifier</md-outlined-button>
             }
             @if (auth.can('drivers', 'status_change')) { <md-outlined-button (click)="moreAction('toggle_driver_status', d)">Activate / Deactivate</md-outlined-button><md-outlined-button (click)="suspendDriver(d)">Suspend driver</md-outlined-button> }
-            @if (auth.can('drivers', 'delete')) { <md-outlined-button (click)="moreAction('delete_driver', d)">Delete driver</md-outlined-button> }
+            @if (auth.can('drivers', 'delete')) { <p>Delete unavailable: there is no archive workflow. Driver records and history are preserved.</p> }
           </div>
           <div slot="actions"><md-text-button (click)="moreDriver.set(null)">Close</md-text-button></div>
         }
@@ -143,12 +129,21 @@
               verifier will only see drivers assigned to them under "KYC Assignments" —
               independent of the driver's own portal login ("Driver User Account").
             </p>
+            <p>{{ d.phone }} ? Current verifier: {{ d.assignedVerifier?.name || 'Not assigned' }}</p>
+            @if (verifierDraft() !== (d.assignedVerifierId || '')) {
+              <p>Current: {{ d.assignedVerifier?.name || 'Not assigned' }} to New: {{ verifierDraftName() }}. The old verifier loses access to this review after reassignment.</p>
+            }
+            @if (verifierSuccess()) { <p role="status">Assignment saved.</p> }
             <md-outlined-select
               label="KYC Verifier"
-              [value]="d.assignedVerifier?.id || ''"
+              [value]="verifierDraft()"
+              [disabled]="verifierLoading() || verifierSaving()"
               (change)="onVerifierChange($event)"
             >
-              <md-select-option value=""><div slot="headline">Unassigned</div></md-select-option>
+              <md-select-option value=""><div slot="headline">Select verifier</div></md-select-option>
+              @if (d.assignedVerifier && !verifierAvailable(d.assignedVerifier.id)) {
+                <md-select-option [value]="d.assignedVerifier.id"><div slot="headline">{{ d.assignedVerifier.name }} (saved; currently unavailable)</div></md-select-option>
+              }
               @for (v of verifierOptions(); track v.id) {
                 <md-select-option [value]="v.id"><div slot="headline">{{ v.name }}</div></md-select-option>
               }
@@ -167,7 +162,8 @@
             }
           </div>
           <div slot="actions">
-            <md-text-button (click)="closeVerifierPanel()">Close</md-text-button>
+            <md-text-button [disabled]="verifierSaving()" (click)="closeVerifierPanel()">Cancel</md-text-button>
+            <md-filled-button [disabled]="verifierLoading() || verifierSaving() || verifierDraft() === (d.assignedVerifierId || '')" (click)="assignVerifier(verifierDraft() || null)">Save Assignment</md-filled-button>
           </div>
         }
       </md-dialog>
@@ -182,7 +178,7 @@
           <div class="text-xs text-slate-500 font-semibold tracking-wide">
             Home / <span class="text-[#2e7d32]">{{ editingDriverId() !== null ? 'Edit driver' : 'Add driver' }}</span>
           </div>
-          <md-outlined-button (click)="closeAddDriverForm()">
+          <md-outlined-button [disabled]="savingStep() || !!deletingDocument()" (click)="closeAddDriverForm()">
             <md-icon slot="icon">arrow_back</md-icon>
             Back to List
           </md-outlined-button>
@@ -494,28 +490,29 @@
                     <div class="flex flex-col gap-y-4">
                       @for (doc of educationDocs(); track $index) {
                         <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
-                          <md-outlined-select class="col-span-5 max-md:w-full" label="Document Type" [value]="doc.type" (change)="onDocChange('education', $index, 'type', $event)">
-                            <md-select-option value="Select Document Type"><div slot="headline">Select Document Type</div></md-select-option>
-                            @for (opt of educationDocTypes(); track opt) {
-                              <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                          <md-outlined-select class="col-span-5 max-md:w-full" label="Document Type" [displayText]="doc.type || 'Select Document Type'" [value]="documentValue('education', $index)" [disabled]="documentControlsLoading() || !!doc.id" (change)="onDocChange('education', $index, 'type', $event)">
+                            <md-select-option value="" [selected]="!doc.type"><div slot="headline">Select Document Type</div></md-select-option>
+                            @for (opt of documentOptions('education', $index); track opt.id) {
+                              <md-select-option [value]="opt.id"><div slot="headline">{{ opt.name }}</div></md-select-option>
                             }
                           </md-outlined-select>
+                          @if (duplicateDocument('education', $index)) {<p class="col-span-12 text-red-700" role="alert">Duplicate document type. Existing files are preserved; delete an unwanted row to resolve it.</p>}
 
                           <div class="col-span-6 max-md:w-full flex items-center gap-2 relative cursor-pointer">
-                            <input type="file" (change)="onDocFileChange('education', $index, $event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputEducation>
+                            <input type="file" [disabled]="documentControlsLoading()" (change)="onDocFileChange('education', $index, $event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputEducation>
                             <md-outlined-text-field class="flex-1 cursor-pointer" label="Document File Upload" readonly [value]="doc.file || 'No file chosen'">
                               <md-icon slot="leading-icon">upload_file</md-icon>
                             </md-outlined-text-field>
                             @if (doc.file) {
-                              <md-icon-button type="button" (click)="clearDocFile('education', $index); $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
+                              <md-icon-button type="button" (click)="clearDocFile('education', $index); fileInputEducation.value = ''; $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
                                 <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
                               </md-icon-button>
                             }
                           </div>
 
                           <div class="col-span-1 flex justify-end max-md:w-full">
-                            @if (educationDocs().length > 1) {
-                              <md-icon-button type="button" (click)="deleteEducationDoc($index)" title="Delete Document">
+                            @if (true) {
+                              <md-icon-button type="button" [disabled]="documentControlsLoading()" [attr.aria-label]="'Delete document row: ' + (doc.type || 'unselected document')" (click)="deleteEducationDoc($index)" title="Delete Document">
                                 <md-icon class="text-red-500">delete</md-icon>
                               </md-icon-button>
                             }
@@ -523,10 +520,11 @@
                         </div>
                       }
                       <div class="flex justify-start mt-2">
-                        <md-filled-tonal-button type="button" (click)="addEducationDoc()">
+                        <md-filled-tonal-button type="button" [disabled]="!canAddDocument('education')" (click)="addEducationDoc()">
                           <md-icon slot="icon">school</md-icon>
                           Add Education Document
                         </md-filled-tonal-button>
+                        @if (allDocumentTypesAdded('education')) {<p role="status">All document types have been added. Delete a document row to add that type again.</p>}
                       </div>
                     </div>
                   </sky-card>
@@ -564,28 +562,29 @@
                     <div class="flex flex-col gap-y-4">
                       @for (doc of healthDocs(); track $index) {
                         <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
-                          <md-outlined-select class="col-span-5 max-md:w-full" label="Document Type" [value]="doc.type" (change)="onDocChange('health', $index, 'type', $event)">
-                            <md-select-option value="Select Document Type"><div slot="headline">Select Document Type</div></md-select-option>
-                            @for (opt of masterNames('health-docs',[doc.type]); track opt) {
-                              <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                          <md-outlined-select class="col-span-5 max-md:w-full" label="Document Type" [displayText]="doc.type || 'Select Document Type'" [value]="documentValue('health', $index)" [disabled]="documentControlsLoading() || !!doc.id" (change)="onDocChange('health', $index, 'type', $event)">
+                            <md-select-option value="" [selected]="!doc.type"><div slot="headline">Select Document Type</div></md-select-option>
+                            @for (opt of documentOptions('health', $index); track opt.id) {
+                              <md-select-option [value]="opt.id"><div slot="headline">{{ opt.name }}</div></md-select-option>
                             }
                           </md-outlined-select>
+                          @if (duplicateDocument('health', $index)) {<p class="col-span-12 text-red-700" role="alert">Duplicate document type. Existing files are preserved; delete an unwanted row to resolve it.</p>}
 
                           <div class="col-span-6 max-md:w-full flex items-center gap-2 relative cursor-pointer">
-                            <input type="file" (change)="onDocFileChange('health', $index, $event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputHealth>
+                            <input type="file" [disabled]="documentControlsLoading()" (change)="onDocFileChange('health', $index, $event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputHealth>
                             <md-outlined-text-field class="flex-1 cursor-pointer" label="Document File Upload" readonly [value]="doc.file || 'No file chosen'">
                               <md-icon slot="leading-icon">upload_file</md-icon>
                             </md-outlined-text-field>
                             @if (doc.file) {
-                              <md-icon-button type="button" (click)="clearDocFile('health', $index); $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
+                              <md-icon-button type="button" (click)="clearDocFile('health', $index); fileInputHealth.value = ''; $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
                                 <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
                               </md-icon-button>
                             }
                           </div>
 
                           <div class="col-span-1 flex justify-end max-md:w-full">
-                            @if (healthDocs().length > 1) {
-                              <md-icon-button type="button" (click)="deleteHealthDoc($index)" title="Delete Document">
+                            @if (true) {
+                              <md-icon-button type="button" [disabled]="documentControlsLoading()" [attr.aria-label]="'Delete document row: ' + (doc.type || 'unselected document')" (click)="deleteHealthDoc($index)" title="Delete Document">
                                 <md-icon class="text-red-500">delete</md-icon>
                               </md-icon-button>
                             }
@@ -593,10 +592,11 @@
                         </div>
                       }
                       <div class="flex justify-start mt-2">
-                        <md-filled-tonal-button type="button" (click)="addHealthDoc()">
+                        <md-filled-tonal-button type="button" [disabled]="!canAddDocument('health')" (click)="addHealthDoc()">
                           <md-icon slot="icon">post_add</md-icon>
                           Add Health Document
                         </md-filled-tonal-button>
+                        @if (allDocumentTypesAdded('health')) {<p role="status">All document types have been added. Delete a document row to add that type again.</p>}
                       </div>
                     </div>
                   </sky-card>
@@ -639,7 +639,6 @@
                       [errorText]="dlNoError()"
                       placeholder="e.g. DL-1420110012345"
                     ></md-outlined-text-field>
-                    <md-inline-dl [driverId]="editingDriverId()" [dlNo]="inputDlNo()" [dob]="inputDob()" [issueDate]="inputDlIssueDate()" [expiryDate]="inputDlExpiryDate()"></md-inline-dl>
                     </div>
 
                     <md-outlined-text-field label="DL Issue Date" type="date" [value]="inputDlIssueDate()" (input)="onInputChange('dlIssueDate', $event)"></md-outlined-text-field>
@@ -673,28 +672,29 @@
                       <div class="flex flex-col gap-y-4">
                         @for (doc of policeDocs(); track $index) {
                           <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
-                            <md-outlined-select class="col-span-5 max-md:w-full" label="Document Type" [value]="doc.type" (change)="onDocChange('police', $index, 'type', $event)">
-                              <md-select-option value="Select Document Type"><div slot="headline">Select Document Type</div></md-select-option>
-                              @for (opt of masterNames('police-docs',[doc.type]); track opt) {
-                                <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                            <md-outlined-select class="col-span-5 max-md:w-full" label="Document Type" [displayText]="doc.type || 'Select Document Type'" [value]="documentValue('police', $index)" [disabled]="documentControlsLoading() || !!doc.id" (change)="onDocChange('police', $index, 'type', $event)">
+                              <md-select-option value="" [selected]="!doc.type"><div slot="headline">Select Document Type</div></md-select-option>
+                              @for (opt of documentOptions('police', $index); track opt.id) {
+                                <md-select-option [value]="opt.id"><div slot="headline">{{ opt.name }}</div></md-select-option>
                               }
                             </md-outlined-select>
+                          @if (duplicateDocument('police', $index)) {<p class="col-span-12 text-red-700" role="alert">Duplicate document type. Existing files are preserved; delete an unwanted row to resolve it.</p>}
 
                             <div class="col-span-6 max-md:w-full flex items-center gap-2 relative cursor-pointer">
-                              <input type="file" (change)="onDocFileChange('police', $index, $event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputPolice>
+                              <input type="file" [disabled]="documentControlsLoading()" (change)="onDocFileChange('police', $index, $event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputPolice>
                               <md-outlined-text-field class="flex-1 cursor-pointer" label="Document File Upload" readonly [value]="doc.file || 'No file chosen'">
                                 <md-icon slot="leading-icon">upload_file</md-icon>
                               </md-outlined-text-field>
                               @if (doc.file) {
-                                <md-icon-button type="button" (click)="clearDocFile('police', $index); $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
+                                <md-icon-button type="button" (click)="clearDocFile('police', $index); fileInputPolice.value = ''; $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
                                   <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
                                 </md-icon-button>
                               }
                             </div>
 
                             <div class="col-span-1 flex justify-end max-md:w-full">
-                              @if (policeDocs().length > 1) {
-                                <md-icon-button type="button" (click)="deletePoliceDoc($index)" title="Delete Document">
+                              @if (true) {
+                                <md-icon-button type="button" [disabled]="documentControlsLoading()" [attr.aria-label]="'Delete document row: ' + (doc.type || 'unselected document')" (click)="deletePoliceDoc($index)" title="Delete Document">
                                   <md-icon class="text-red-500">delete</md-icon>
                                 </md-icon-button>
                               }
@@ -702,10 +702,11 @@
                           </div>
                         }
                         <div class="flex justify-start mt-2">
-                          <md-filled-tonal-button type="button" (click)="addPoliceDoc()">
+                          <md-filled-tonal-button type="button" [disabled]="!canAddDocument('police')" (click)="addPoliceDoc()">
                             <md-icon slot="icon">verified</md-icon>
                             Add Verification Document
                           </md-filled-tonal-button>
+                        @if (allDocumentTypesAdded('police')) {<p role="status">All document types have been added. Delete a document row to add that type again.</p>}
                         </div>
                       </div>
                     </sky-card>
@@ -720,15 +721,17 @@
                     @for (doc of personalDocs(); track $index) {
                       <div class="grid grid-cols-12 gap-3 items-center w-full max-md:flex max-md:flex-col max-md:items-stretch pb-4">
                         <!-- Document Category Dropdown -->
-                        <md-outlined-select class="col-span-5 max-md:w-full" label="Document Type" [value]="doc.type" (change)="onDocChange('personal', $index, 'type', $event)">
-                          @for (opt of masterNames('personal-docs',[doc.type]); track opt) {
-                            <md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>
+                        <md-outlined-select class="col-span-5 max-md:w-full" label="Document Type" [displayText]="doc.type || 'Select Document Type'" [value]="documentValue('personal', $index)" [disabled]="documentControlsLoading() || !!doc.id" (change)="onDocChange('personal', $index, 'type', $event)">
+                          <md-select-option value="" [selected]="!doc.type"><div slot="headline">Select Document Type</div></md-select-option>
+                          @for (opt of documentOptions('personal', $index); track opt.id) {
+                            <md-select-option [value]="opt.id"><div slot="headline">{{ opt.name }}</div></md-select-option>
                           }
                         </md-outlined-select>
+                          @if (duplicateDocument('personal', $index)) {<p class="col-span-12 text-red-700" role="alert">Duplicate document type. Existing files are preserved; delete an unwanted row to resolve it.</p>}
 
                         <!-- Document Upload -->
                         <div class="col-span-6 max-md:w-full flex items-center gap-2 relative cursor-pointer">
-                          <input type="file" (change)="onDocFileChange('personal', $index, $event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputDocCat>
+                          <input type="file" [disabled]="documentControlsLoading()" (change)="onDocFileChange('personal', $index, $event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" #fileInputDocCat>
                           <md-outlined-text-field
                             class="flex-1 cursor-pointer"
                             label="Document File Upload"
@@ -738,7 +741,7 @@
                             <md-icon slot="leading-icon">upload_file</md-icon>
                           </md-outlined-text-field>
                           @if (doc.file) {
-                            <md-icon-button type="button" (click)="clearDocFile('personal', $index); $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
+                            <md-icon-button type="button" (click)="clearDocFile('personal', $index); fileInputDocCat.value = ''; $event.stopPropagation()" title="Remove Uploaded File" class="shrink-0 z-20">
                               <md-icon class="text-slate-500 hover:text-red-500">close</md-icon>
                             </md-icon-button>
                           }
@@ -746,8 +749,8 @@
 
                         <!-- Delete Button -->
                         <div class="col-span-1 flex justify-end max-md:w-full">
-                          @if (personalDocs().length > 1) {
-                            <md-icon-button type="button" (click)="deletePersonalDoc($index)" title="Delete Document">
+                          @if (true) {
+                            <md-icon-button type="button" [disabled]="documentControlsLoading()" [attr.aria-label]="'Delete document row: ' + (doc.type || 'unselected document')" (click)="deletePersonalDoc($index)" title="Delete Document">
                               <md-icon class="text-red-500">delete</md-icon>
                             </md-icon-button>
                           }
@@ -756,10 +759,11 @@
                     }
                     
                     <div class="flex justify-start mt-2">
-                      <md-filled-tonal-button type="button" (click)="addPersonalDoc()">
+                      <md-filled-tonal-button type="button" [disabled]="!canAddDocument('personal')" (click)="addPersonalDoc()">
                         <md-icon slot="icon">note_add</md-icon>
                         Add Personal Document
                       </md-filled-tonal-button>
+                        @if (allDocumentTypesAdded('personal')) {<p role="status">All document types have been added. Delete a document row to add that type again.</p>}
                     </div>
                   </div>
                 </sky-card>
@@ -810,53 +814,42 @@
                 <sky-card class="p-6 block">
                   <div class="flex flex-col gap-5">
                     <fieldset class="flex flex-col gap-3">
-                      <legend class="text-base font-semibold">Registration Fee</legend>
+                      <legend class="text-base font-semibold">{{ feePolicyLabel() }}</legend>
+                      @if(expectedRegistrationFeePaise() > 0) {
                       <div class="flex flex-wrap gap-6">
-                        <label class="flex items-center gap-2 min-h-12 cursor-pointer"><md-radio name="registration-fee" value="Paid" [checked]="inputRegistrationFeeStatus() === 'Paid'" (change)="selectRegistrationFee('Paid', $event)"></md-radio>Paid</label>
-                        <label class="flex items-center gap-2 min-h-12 cursor-pointer"><md-radio name="registration-fee" value="Unpaid" [checked]="inputRegistrationFeeStatus() === 'Unpaid'" (change)="selectRegistrationFee('Unpaid', $event)"></md-radio>Unpaid</label>
+                        @if(!['Waived','No fee required'].includes(actualFeeStatus())){<label class="flex items-center gap-2 min-h-12 cursor-pointer"><md-radio name="registration-fee" value="Paid" [disabled]="actualFeeStatus() !== 'Paid' && (!auth.can('payments.overview','edit') || !auth.can('payments.overview','create'))" [checked]="inputRegistrationFeeStatus() === 'Paid'" (change)="selectRegistrationFee('Paid', $event)"></md-radio>Paid</label>}
+                        <label class="flex items-center gap-2 min-h-12 cursor-pointer"><md-radio name="registration-fee" value="Unpaid" [disabled]="actualFeeStatus() === 'Paid'" [checked]="inputRegistrationFeeStatus() === 'Unpaid'" (change)="selectRegistrationFee('Unpaid', $event)"></md-radio>Unpaid</label>
                       </div>
-                      <p class="text-sm text-slate-600">{{ feePolicyLabel() }}</p>
-                      <p class="text-sm">Recorded payment status: <strong>{{ actualFeeStatus() }}</strong></p>
                       @if (inputRegistrationFeeStatus() === 'Paid') {
                         <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1 w-full items-start">
-                          <md-outlined-select label="Payment Mode" [value]="inputPreferredPaymentMode()" (change)="onInputChange('preferredPaymentMode', $event)">
+                          <md-outlined-select label="Payment Mode" [disabled]="actualFeeStatus()==='Paid'" [value]="inputPreferredPaymentMode()" (change)="onInputChange('preferredPaymentMode', $event)">
                             @if(inputPreferredPaymentMode() && !registrationPaymentModes().includes(inputPreferredPaymentMode())){<md-select-option [value]="inputPreferredPaymentMode()" disabled><div slot="headline">{{inputPreferredPaymentMode()}} (saved historical mode)</div></md-select-option>}
-                            @for (opt of registrationPaymentModes(); track opt) {<md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>}
+                            @for (opt of registrationPaymentModes(); track opt) {@if(['Cash','NEFT','RTGS','UPI','Bank Transfer'].includes(opt)){<md-select-option [value]="opt"><div slot="headline">{{ opt }}</div></md-select-option>}}
                           </md-outlined-select>
-                          <md-outlined-text-field label="Amount (INR)" [value]="inputAmount()" (input)="onInputChange('amount', $event)" placeholder="Enter actual receipt amount"></md-outlined-text-field>
-                          <md-outlined-text-field type="date" label="Payment Receipt Date" [value]="inputPaymentReceiptDate()" (input)="onInputChange('paymentReceiptDate', $event)"></md-outlined-text-field>
+                          <md-outlined-text-field [label]="actualFeeStatus()==='Paid'?'Last confirmed receipt (INR)':'Amount remaining (INR)'" readonly [value]="inputAmount()"></md-outlined-text-field>
+                          <md-outlined-text-field type="date" label="Receipt date" [readOnly]="actualFeeStatus()==='Paid'" [value]="inputPaymentReceiptDate()" (input)="onInputChange('paymentReceiptDate', $event)"></md-outlined-text-field>
                           <div class="flex items-center gap-2 relative cursor-pointer">
                             <input type="file" aria-label="Payment receipt upload" accept="image/png,image/jpeg,image/webp,application/pdf" (change)="onRegistrationReceiptFileChange($event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10">
                             <md-outlined-text-field class="flex-1 min-w-0 cursor-pointer" label="Payment Receipt (Optional)" readonly [value]="inputRegistrationReceiptFile() || 'No file chosen'"><md-icon slot="leading-icon">upload_file</md-icon></md-outlined-text-field>
                             @if (inputRegistrationReceiptFile()) {<md-icon-button type="button" (click)="clearRegistrationReceiptFile(); $event.stopPropagation()" title="Remove selected receipt" class="shrink-0 z-20"><md-icon>close</md-icon></md-icon-button>}
                           </div>
                         </div>
-                        <p class="text-sm text-slate-600">Save records these details only. Selecting Paid or uploading a receipt does not confirm collection. Online payments require verified Razorpay capture through the existing payment flow.</p>
-                        @if (auth.can('payments.overview','edit') && inputPreferredPaymentMode() === 'Cash' && actualFeeStatus() !== 'Paid') {
-                          <div class="rounded-lg border border-slate-200 p-4 flex flex-col gap-3">
-                            <p class="font-medium">Audited cash collection</p>
-                            <div class="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-                              <md-outlined-text-field label="Collection transaction reference" [value]="collectionReference()" (input)="collectionReference.set($any($event.target).value)"></md-outlined-text-field>
-                              <md-outlined-text-field label="Collection audit reason" [value]="collectionReason()" (input)="collectionReason.set($any($event.target).value)"></md-outlined-text-field>
-                            </div>
-                            <label class="flex items-center gap-2 min-h-12"><md-checkbox [checked]="cashConfirmed()" (change)="cashConfirmed.set($any($event.target).checked)"></md-checkbox>I confirm the actual cash has been received</label>
-                            <md-outlined-button [disabled]="savingStep() || confirmingCollection()" (click)="confirmCashCollection()">{{ confirmingCollection() ? 'Confirming collection...' : 'Confirm cash collection' }}</md-outlined-button>
-                          </div>
+                        @if(actualFeeStatus() === 'Paid' && collectionReference()){<p class="text-sm">Receipt / reference: {{collectionReference()}}</p>}
+                        @if(actualFeeStatus() !== 'Paid') {
+                          <md-outlined-text-field label="Receipt / reference (optional)" [value]="collectionReference()" (input)="collectionReference.set($any($event.target).value)"></md-outlined-text-field>
+                          <md-outlined-text-field label="Receipt reason" [value]="collectionReason()" (input)="collectionReason.set($any($event.target).value)"></md-outlined-text-field>
+                          @if(auth.can('payments.overview','edit') && auth.can('payments.overview','create')) {<label class="flex items-center gap-2 min-h-12"><md-checkbox aria-label="Confirm payment received" [checked]="cashConfirmed()" (change)="cashConfirmed.set($any($event.target).checked)"></md-checkbox>I confirm this offline payment has been received</label>}
+                          <p class="text-sm">Paid is a form selection until you save the confirmed receipt. Gateway payments must be verified through the existing payment flow in Accounts.</p>
                         }
                       } @else {
-                        <p class="text-sm text-slate-600">No payment details or receipt are required. Saving Unpaid does not create, delete or reverse a payment.</p>
+                        <p class="text-sm text-slate-600">Status: {{actualFeeStatus()}}</p>
                       }
+                      } @else { <p>Status: {{actualFeeStatus()==='Waived'?'Waived · no balance due':'No fee required'}}</p> }
                       @if(auth.can('payments.overview','view')){<a class="text-sm underline" routerLink="/account/accounts/registration-fees">Open Accounts Registration Fees for verified payments, policy and audited corrections</a>}
                     </fieldset>
                     <div class="border-t border-slate-200 pt-5 flex flex-col gap-3">
-                      <md-outlined-select label="Driver Status" [value]="inputDriverStatusMasterId() || ''" [disabled]="!auth.can('drivers','status_change') || masterLoading()" (change)="inputDriverStatusMasterId.set($any($event.target).value || null)">
-                        <md-select-option value=""><div slot="headline">Not selected</div></md-select-option>
-                        @for(option of driverStatusOptions();track option.id){<md-select-option [value]="option.id" [disabled]="option.status !== 'Active'"><div slot="headline">{{ option.name }}{{ option.status !== 'Active' ? ' (inactive saved value)' : '' }}</div></md-select-option>}
-                      </md-outlined-select>
-                      @if(editingDriverId() && inputDriverStatusMasterId() !== originalDriverStatusMasterId()) {<md-outlined-text-field label="Driver status change reason" [value]="statusReason()" (input)="statusReason.set($any($event.target).value)"></md-outlined-text-field>}
-                      @if(!masterLoading() && !driverStatusOptions().length){<p class="text-sm">No active Driver Status Master options configured.</p>}
-                      <p class="text-sm text-slate-600">Administrative Master status only. Login/account state, KYC approval and trip eligibility remain separate.</p>
-                      <p class="text-sm">KYC status: {{ inputStatus() || 'Non-Verified' }}. Saving this form does not perform final approval.</p>
+                      <p class="text-sm">KYC Status: <strong>{{ inputStatus() === 'Non-Verified' ? 'Pending' : inputStatus() }}</strong></p>
+                      @if(editingDriverId() && auth.can('kyc-assignments','view')) {<a class="underline" routerLink="/account/kyc-assignments" [queryParams]="{review:editingDriverId()}">Open KYC Review</a>}
                     </div>
                   </div>
                 </sky-card>
@@ -870,7 +863,7 @@
               <p class="text-sm text-red-600" role="alert">{{ stepError() }}</p>
             }
             <div class="flex flex-wrap justify-between items-center gap-3 max-sm:flex-col max-sm:items-stretch">
-              <div class="flex flex-wrap gap-3"><md-outlined-button [disabled]="savingStep()" (click)="closeAddDriverForm()">Cancel</md-outlined-button><md-outlined-button [disabled]="savingStep()" (click)="saveDraft()">Save draft</md-outlined-button></div>
+              <div class="flex flex-wrap gap-3"><md-outlined-button [disabled]="savingStep()" (click)="closeAddDriverForm()">Cancel</md-outlined-button>@if(activeFormTab() !== 3 || activeSubSection() !== 1){<md-outlined-button [disabled]="savingStep()" (click)="saveDraft()">Save draft</md-outlined-button>}</div>
 
               <div class="flex flex-wrap justify-end items-center gap-3">
                 @if (activeFormTab() > 0 || activeSubSection() > 0) {
@@ -883,7 +876,7 @@
                 @if (isLastStep()) {
                   <md-filled-button [disabled]="savingStep()" (click)="addDriver()">
                     <md-icon slot="icon">how_to_reg</md-icon>
-                    {{ savingStep() ? 'Saving…' : (editingDriverId() !== null ? 'Save Changes' : 'Save & Register Driver') }}
+                    {{ savingStep() ? 'Saving…' : (activeFormTab()===3 && activeSubSection()===1 && inputRegistrationFeeStatus()==='Paid' && actualFeeStatus()!=='Paid' ? 'Record Fee Receipt' : (editingDriverId() !== null ? 'Save Changes' : 'Save & Register Driver')) }}
                   </md-filled-button>
                 } @else {
                   <md-filled-button [disabled]="savingStep()" (click)="onSaveAndNext()">

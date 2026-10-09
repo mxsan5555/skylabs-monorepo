@@ -73,8 +73,8 @@ export class Customers implements OnInit {
   ]);
 
   readonly tableActions = computed(()=>JSON.stringify([
-    { icon: 'edit', label: 'Edit', event: 'edit_option' },
-    { icon: 'delete', label: 'Delete', event: 'delete_option', variant: 'danger' },
+    ...(this.auth.can('customers','edit')?[{icon:'edit',label:'Edit',event:'edit_option'}]:[]),
+    ...(this.auth.can('customers','delete')?[{icon:'delete',label:'Delete',event:'delete_option',variant:'danger'}]:[]),
     ...(this.auth.can('customers','edit')?[{icon:'toggle_on',label:'Activate / Deactivate',event:'toggle_status'}]:[])
   ]));
 
@@ -96,6 +96,7 @@ export class Customers implements OnInit {
 
   toggleStatus(row:Customer){if(!this.auth.can('customers','edit'))return;const next=row.account_status==='Active'?'Inactive':'Active';const impact=`${row.active_booking_count??0} active bookings remain unchanged. Inactive customers cannot login or create bookings; staff can continue existing trips.`;const reason=prompt(`${next} customer: ${row.first_name}. ${impact} Enter an audit reason:`);if(!reason?.trim())return;this.api.update(row.customer_uid,{first_name:row.first_name,mobile_number:row.mobile_number,account_status:next,statusReason:reason.trim(),acknowledgeActiveBookings:true}).subscribe({next:()=>this.reload(),error:async error=>this.error.set(await httpErrorMessage(error))});}
   startAdd(): void {
+    if (!this.auth.can('customers','create')) return;
     this.editingId.set('new');
     this.inputFirstName.set('');
     this.inputLastName.set('');
@@ -119,6 +120,7 @@ export class Customers implements OnInit {
   }
 
   startEdit(option: Customer): void {
+    if (!this.auth.can('customers','edit')) return;
     this.editingId.set(option.customer_uid);
     this.inputFirstName.set(option.first_name);
     this.inputLastName.set(option.last_name || '');
@@ -142,6 +144,7 @@ export class Customers implements OnInit {
   }
 
   saveOption(): void {
+    if (!this.auth.can('customers', this.editingId() === 'new' ? 'create' : 'edit')) return;
     const firstName = this.inputFirstName().trim();
     const mobile = this.inputMobileNumber().trim();
 
@@ -214,6 +217,7 @@ export class Customers implements OnInit {
   }
 
   deleteOption(option: Customer): void {
+    if (!this.auth.can('customers','delete')) return;
     if (confirm(`Are you sure you want to delete customer "${option.first_name} ${option.last_name || ''}"?`)) {
       this.api.delete(option.customer_uid).subscribe({
         next: () => this.reload(),

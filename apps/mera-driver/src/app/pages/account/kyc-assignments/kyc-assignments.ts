@@ -105,6 +105,7 @@ export class KycAssignments implements OnInit {
   });
 
   ngOnInit(): void {
+    const state=this.route.snapshot.queryParamMap.get('state');if(state&&this.queueStates.includes(state))this.queueState.set(state);
     const requested=this.route.snapshot.queryParamMap.get('review');if(requested)this.openDetail(requested);
     this.reload();
   }
@@ -157,6 +158,7 @@ export class KycAssignments implements OnInit {
   }
 
   setCategory(category: ChecklistCategory, status: ChecklistStatus): void {
+    if (!this.auth.can('kyc-assignments','edit')) return;
     const driver = this.selectedDriver();
     if (!driver?.id) return;
     this.savingCategory.set(category);

@@ -3,25 +3,8 @@ import { allPermissionKeysForMenu } from '@skylabs-monorepo/shared-permissions';
 import { prisma } from '../lib/prisma';
 import { HttpError } from '../middleware/errorHandler';
 
-/**
- * Resolves the flat set of `${menuKey}:${action}` permission keys granted across a set of
- * role keys, by joining Role -> RolePermission -> Permission in the DB.
- *
- * There is deliberately no hardcoded role-name shortcut anywhere in this file (or anywhere
- * else in the app) — every grant decision is data-driven from the RolePermission table. The
- * only role field with baked-in meaning is `Role.isSuperAdmin`: the seed script uses it to
- * auto-grant every Permission, the impersonation route uses it to decide who may "Login As"
- * another user, and — as of the SuperAdmin-protection fix below — this resolver uses it to
- * always return every permission key derivable from the live `shared-menu` tree for such a
- * role, regardless of what's actually stored in `RolePermission`. That keeps SuperAdmin's
- * access independent of the permission matrix UI: unchecking/saving boxes for that role (or a
- * brand-new menu node never having been seeded/granted) can never reduce or lag behind its
- * access. Still never a `role.key === 'super_admin'` string check — only the boolean flag.
- *
- * Results are cached in-memory, keyed by the sorted role-key set, for a short TTL. This is a
- * v1 cache: no invalidation machinery. A role/permission edit is visible to already-cached
- * callers for at most CACHE_TTL_MS.
- */
+/** Role-only catalogue resolution is cached. Protected requests always resolve live
+ * membership, saved actions and explicit overrides, independently of this cache. */
 
 import { isPortalRole } from './portal-context';
 
@@ -81,47 +64,27 @@ export function invalidatePermissionCache(): void {
   cache.clear();
 }
 
-/**
- * Layers a user's `UserPermissionOverride` rows on top of their role-derived permission set:
- * every 'revoke' removes a permission the roles would otherwise grant, every 'grant' adds one
- * they wouldn't otherwise have. Never applied to a SuperAdmin-flagged role holder — that access
- * is a hard guarantee that a per-user override row could otherwise accidentally (or maliciously)
- * weaken, so overrides are skipped entirely once `resolvePermissionsForRoles` reports SuperAdmin.
- *
- * This is the function `requirePermission` and `buildBootstrapResponse` call — role-only
- * resolution above is unchanged and still independently cached/tested.
- */
-export async function resolveEffectivePermissionsForUser(userId: string, roleKeys: readonly string[]): Promise<string[]> {
-  roleKeys = roleKeys.filter(key => !isPortalRole(key));
-  let basePermissions = await resolvePermissionsForRoles(roleKeys);
-  if (roleKeys.length === 0) return basePermissions;
-
-  const roles = (await prisma.role.findMany({
-    where: { key: { in: [...roleKeys] }, isActive: true, users: { some: { userId, user: { status: 'active', deletedAt: null } } } },
-    select: { isSuperAdmin: true },
-  })) ?? [];
-  if (roles.some((r) => r.isSuperAdmin)) return basePermissions;
-  // JWT roles bound the session context; live DB membership bounds grants even for old tokens.
-  const currentLinks = (await prisma.rolePermission.findMany({where: {role: {
-    key: {in: [...roleKeys]}, isActive: true,
-    users: {some: {userId, user: {status: 'active', deletedAt: null}}},
-  }}, select: {permission: {select: {key: true}}}})) ?? [];
-  const current = new Set(currentLinks.map(link => link.permission.key));
-  basePermissions = basePermissions.filter(key => current.has(key));
-  if (roles.length === 0) return basePermissions;
-
-  const overrides = (await prisma.userPermissionOverride.findMany({
-    where: { userId },
-    include: { permission: { select: { key: true } } },
-  })) ?? [];
-  if (overrides.length === 0) return basePermissions;
-
-  const revokes = new Set(overrides.filter((o) => o.effect === 'revoke').map((o) => o.permission.key));
-  const grants = new Set(overrides.filter((o) => o.effect === 'grant').map((o) => o.permission.key));
-
-  const effective = new Set(basePermissions.filter((p) => !revokes.has(p)));
-  for (const g of grants) effective.add(g);
-  return [...effective];
+/** Live role grants plus explicit user grants/revokes. Super Admin remains protected. */
+export async function resolveEffectivePermissionsForUser(userId: string, roleKeys: readonly string[], onCurrentRoles?: (keys: string[]) => void): Promise<string[]> {
+  // Portal sessions never inherit staff management authority. Staff membership is live,
+  // so old access tokens observe both grants and revocations on the next request.
+  if (roleKeys.length && !roleKeys.some(key => !isPortalRole(key))) return [];
+  const membership = { isActive: true, key: { notIn: ['driver', 'customer'] },
+    users: { some: { userId, user: { status: 'active' as const, deletedAt: null } } } };
+  const roles = (await prisma.role.findMany({ where: membership, select: { isSuperAdmin: true, key: true } })) ?? [];
+  onCurrentRoles?.(roles.map(role => role.key));
+  if (roles.some(role => role.isSuperAdmin)) return allPermissionKeysForMenu(getMenuForApp('mera-driver'));
+  // Do not read the role-set cache here: it cannot cover another API worker's commits.
+  const links = (await prisma.rolePermission.findMany({ where: { role: {...membership, key: { ...membership.key, in: roles.map(role => role.key) }} },
+    select: { permission: { select: { key: true } } } })) ?? [];
+  const overrides = (await prisma.userPermissionOverride.findMany({ where: { userId },
+    include: { permission: { select: { key: true } } } })) ?? [];
+  const revokes = new Set(overrides.filter(o => o.effect === 'revoke').map(o => o.permission.key));
+  // Existing direct allows are legitimate effective grants. Surface conflicts to admins
+  // through bootstrap/user inspection instead of silently discarding historical rows.
+  const permissions = new Set([...links.map(link => link.permission.key),
+    ...overrides.filter(o => o.effect === 'grant' && roles.length > 0).map(o => o.permission.key)]);
+  return [...permissions].filter(key => !revokes.has(key));
 }
 
 /** Resolves a user's roles, then their effective (role + override) permission set. */
@@ -141,36 +104,11 @@ export async function getUserPermissionOverrides(userId: string): Promise<{ gran
   };
 }
 
-/** Replaces a user's full override set. A permissionId in both lists is rejected — that's
- *  a contradictory request, not something to silently resolve one way or the other. */
+/** Historical records remain readable for audit; all new per-user overrides are retired. */
 export async function setUserPermissionOverrides(
-  userId: string,
-  grants: string[],
-  revokes: string[],
+  _userId: string,
+  _grants: string[],
+  _revokes: string[],
 ): Promise<{ grants: string[]; revokes: string[] }> {
-  const overlap = grants.filter((id) => revokes.includes(id));
-  if (overlap.length > 0) {
-    throw new HttpError(422, 'VALIDATION_ERROR', 'A permission cannot be both granted and revoked for the same user');
-  }
-
-  const permissionIds = [...grants, ...revokes];
-  if (permissionIds.length > 0) {
-    const validCount = await prisma.permission.count({ where: { id: { in: permissionIds } } });
-    if (validCount !== new Set(permissionIds).size) {
-      throw new HttpError(422, 'VALIDATION_ERROR', 'One or more permissionIds do not exist');
-    }
-  }
-
-  await prisma.$transaction([
-    prisma.userPermissionOverride.deleteMany({ where: { userId } }),
-    prisma.userPermissionOverride.createMany({
-      data: [
-        ...grants.map((permissionId) => ({ userId, permissionId, effect: 'grant' })),
-        ...revokes.map((permissionId) => ({ userId, permissionId, effect: 'revoke' })),
-      ],
-    }),
-  ]);
-
-  invalidatePermissionCache();
-  return getUserPermissionOverrides(userId);
+  throw new HttpError(410,'ROLE_ONLY_ACCESS','Per-user permission overrides are retired. Use authorized role assignments. Historical restrictions remain until reviewed.');
 }

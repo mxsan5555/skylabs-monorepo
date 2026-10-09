@@ -1,0 +1,20 @@
+{
+  "readOnly": true,
+  "activeDocuments": 10,
+  "historicalVersions": 2,
+  "legacyDuplicateGroups": 0,
+  "legacyDuplicateRows": 0,
+  "sections": [
+    "personal",
+    "health",
+    "education",
+    "police"
+  ],
+  "masterCounts": {
+    "personal-docs": 5,
+    "health-docs": 4,
+    "police-docs": 3,
+    "education": 8
+  },
+  "migration": "No schema migration or existing-file changes. Legacy labels are resolved to existing master IDs or canonical education keys; unmatched historical values remain readable."
+}

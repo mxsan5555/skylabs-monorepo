@@ -1,28 +1,22 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, computed, inject, signal } from '@angular/core';
 import type { DashboardWidget, Role } from '@skylabs-monorepo/shared-types';
-import { HasPermissionDirective } from '@skylabs-monorepo/shared-auth/angular';
+import { AuthService, HasPermissionDirective } from '@skylabs-monorepo/shared-auth/angular';
 import { AdminPage } from '../../../../admin/admin-page/admin-page';
 import { RbacApiService, type PermissionCatalogAction, type PermissionCatalogNode } from '../../../../core/rbac/rbac-api.service';
 
 interface CatalogGroup {
   menuKey: string;
   title: string;
+  groupTitle?: string;
   entries: PermissionCatalogAction[];
 }
 
-/**
- * Role Management (`/account/administration/roles`): role list -> select ->
- * permission matrix + dashboard-widget assignment.
- *
- * `GET /rbac/permissions/catalog` returns a `PermissionCatalogNode[]` — one
- * node per menu item, each carrying every grantable action and, per action, a
- * real `Permission.id` (or `null` if no Permission row exists yet for that
- * pair — see `RbacApiService`'s doc). The matrix only renders actions with a
- * non-null id, since there's nothing to submit for the rest. Selecting a role
- * pre-checks the matrix from `GET /rbac/roles/:id/permissions` (the role's
- * current grants) rather than starting empty. Widget assignment has no such
- * gap (`DashboardWidget.id` is always real) and saves normally.
- */
+interface MatrixSection {
+  title: string;
+  groups: CatalogGroup[];
+}
+
+/** Staff role details and permissions are saved independently through the existing RBAC API. */
 @Component({
   selector: 'md-administration-roles',
   imports: [AdminPage, HasPermissionDirective],
@@ -31,45 +25,118 @@ interface CatalogGroup {
 })
 export class AdministrationRoles {
   private readonly rbac = inject(RbacApiService);
+  protected readonly auth = inject(AuthService);
+
+  protected readonly matrixActions = ['view', 'create', 'edit', 'delete'] as const;
+  protected readonly permissionLoadFailed = signal(false);
+  private readonly savedPermissionIds = signal<string[]>([]);
+  private requestSequence = 0;
+
+  protected actionFor(group: CatalogGroup, action: string): PermissionCatalogAction | undefined {
+    return group.entries.find((e) => e.action === action);
+  }
+
+  /** Read-only summary of what a role's record scope is — permission grants alone don't
+   *  convey ownership/assignment restrictions, so this is shown alongside the matrix. */
+  protected scopeSummary(): string {
+    const key = this.selectedRole()?.key;
+    return (
+      ({
+        super_admin: 'All records; protected system access.',
+        admin: 'All business records; cannot bypass Super Admin protection.',
+        vendor: 'Own linked or created drivers and their assigned bookings.',
+        marketing: 'Marketing data (promotions, promo usage, FAQs, aggregated reports).',
+        sales: 'Own created or assigned leads and their bookings.',
+        company: 'Own company records.',
+        data_operator: 'Own created or assigned drivers.',
+        support: 'Assigned support work.',
+        kyc_verification: 'Assigned KYC cases only.',
+      }) as Record<string, string>
+    )[key ?? ''] ?? 'Own created business records; assignment restrictions also apply.';
+  }
+
+  protected canEditPermissions(): boolean {
+    return this.auth.can('rbac.roles', 'edit') && !this.selectedRole()?.isSuperAdmin;
+  }
+
+  protected readonly roleFormOpen = signal(false);
+  protected readonly editingRoleId = signal<string | null>(null);
+  protected readonly savingRole = signal(false);
+  protected readonly roleFormError = signal<string | null>(null);
+  protected readonly roleFormSuccess = signal<string | null>(null);
+  protected roleName = '';
+  protected roleKey = '';
+  protected roleDescription = '';
+
+  protected openRoleForm(edit = false): void {
+    if (this.savingPermissions() || this.savingRole()) return;
+    const role = edit ? this.selectedRole() : undefined;
+    if (!this.auth.can('rbac.roles', edit ? 'edit' : 'create') || (edit && !role)) return;
+    this.editingRoleId.set(role?.id ?? null);
+    this.roleName = role?.name ?? '';
+    this.roleKey = role?.key ?? '';
+    this.roleDescription = role?.description ?? '';
+    this.roleFormError.set(null);
+    this.roleFormSuccess.set(null);
+    this.roleFormOpen.set(true);
+  }
+
+  protected saveRole(): void {
+    const id = this.editingRoleId();
+    if (this.savingRole() || !this.auth.can('rbac.roles', id ? 'edit' : 'create')) return;
+    const name = this.roleName.trim(), key = this.roleKey.trim();
+    if (!name || (!id && !/^[a-z][a-z0-9_]+$/.test(key))) {
+      this.roleFormError.set('Name and a valid snake_case key of at least two characters are required.'); return;
+    }
+    if (this.roles().some(r => r.id !== id && (r.name.toLowerCase() === name.toLowerCase() || (!id && r.key === key)))) {
+      this.roleFormError.set('A role with this name or key already exists.'); return;
+    }
+    if (!id && (this.hasUnsavedChanges() || this.hasUnsavedWidgetChanges()) && !confirm('Discard unsaved role settings?')) return;
+    this.savingRole.set(true); this.roleFormError.set(null);
+    const details = { name, description: this.roleDescription.trim() };
+    const request = id ? this.rbac.updateRole(id, details) : this.rbac.createRole({ ...details, key });
+    request.subscribe({
+      next: role => {
+        this.roles.update(list => id ? list.map(r => r.id === id ? role : r) : [...list, role]);
+        this.savingRole.set(false); this.roleFormOpen.set(false);
+        this.roleFormSuccess.set(id ? 'Role details saved.' : 'Role created. Configure its permissions below.');
+        if (!id) this.selectRole(role, true);
+        void this.rbac.refreshAuthorization();
+      },
+      error: err => {
+        this.savingRole.set(false);
+        this.roleFormError.set(err.error?.error?.message || err.message || 'Failed to save role.');
+      },
+    });
+  }
+
+  private applySavedPermissions(): void {
+    const granted = new Set(this.savedPermissionIds());
+    const keys = new Set<string>();
+    for (const action of this.catalogActionsByKey().values()) {
+      if (action.permissionId && granted.has(action.permissionId)) keys.add(action.key);
+    }
+    this.selectedPermissionKeys.set(keys);
+    this.grantedSectionTitles.set(new Set(this.allSections().filter(s => s.groups.some(g => g.entries.some(e => keys.has(e.key)))).map(s => s.title)));
+  }
 
   // Role list ------------------------------------------------------------
   protected readonly roles = signal<Role[]>([]);
   protected readonly rolesLoading = signal(true);
   protected readonly rolesError = signal<string | null>(null);
-  protected readonly isPortalRole = computed(() => ['customer','driver'].includes(this.selectedRole()?.key ?? ''));
   protected readonly selectedRoleId = signal<string | null>(null);
-  protected readonly selectedRole = computed(() =>
-    this.roles().find((r) => r.id === this.selectedRoleId()),
-  );
-
-  // Create role ------------------------------------------------------------
-  protected newRoleKey = '';
-  protected newRoleName = '';
-  protected newRoleDescription = '';
-  protected readonly creatingRole = signal(false);
-  protected readonly createRoleError = signal<string | null>(null);
-
-  // Clone role ------------------------------------------------------------
-  protected readonly cloningRoleId = signal<string | null>(null);
-  protected cloneKey = '';
-  protected cloneName = '';
-  protected readonly cloneError = signal<string | null>(null);
-  protected readonly cloneBusy = signal(false);
-
-  protected readonly roleActionError = signal<string | null>(null);
+  protected readonly selectedRole = computed(() => this.roles().find((r) => r.id === this.selectedRoleId()));
 
   // Permission catalog ------------------------------------------------------------
   protected readonly catalog = signal<PermissionCatalogNode[]>([]);
   protected readonly catalogLoading = signal(true);
   protected readonly catalogError = signal<string | null>(null);
 
-  /** Flat lookup of every catalog action, keyed by its canonical `key` — used to
-   *  resolve a selected checkbox back to its real `permissionId` on save. */
+  /** Flat lookup of every catalog action, keyed by its canonical `key` — used to resolve a
+   *  selected checkbox back to its real `permissionId` on save. */
   private readonly catalogActionsByKey = computed(() => {
     const map = new Map<string, PermissionCatalogAction>();
-    for (const node of this.catalog()) {
-      for (const action of node.actions) map.set(action.key, action);
-    }
+    for (const node of this.catalog()) for (const action of node.actions) map.set(action.key, action);
     return map;
   });
 
@@ -79,23 +146,56 @@ export class AdministrationRoles {
       .map((node) => ({
         menuKey: node.menuKey,
         title: node.title,
+        groupTitle: node.groupTitle ?? node.title,
         entries: node.actions.filter((a) => a.permissionId !== null),
       }))
       .filter((group) => group.entries.length > 0),
   );
+
+  private readonly allSections = computed<MatrixSection[]>(() => {
+    const sections = new Map<string, CatalogGroup[]>();
+    for (const group of this.catalogGroups()) {
+      const title = group.groupTitle ?? group.title;
+      sections.set(title, [...(sections.get(title) ?? []), group]);
+    }
+    return [...sections].map(([title, groups]) => ({ title, groups }));
+  });
+
+  /** Snapshot of which section titles had at least one granted permission, taken when the
+   *  role's saved permissions finish loading — deliberately NOT recomputed from the live
+   *  (still-being-edited) selection, so a section never jumps between "granted" and
+   *  "Additional modules" mid-edit while the caller is checking/unchecking boxes. */
+  private readonly grantedSectionTitles = signal<Set<string>>(new Set());
+
+  /** Groups with assigned access render first (each its own open-by-default accordion
+   *  item); everything else collapses into one "Additional modules" item. */
+  protected readonly grantedSections = computed(() => this.allSections().filter((s) => this.grantedSectionTitles().has(s.title)));
+  protected readonly additionalModules = computed(() => this.allSections().filter((s) => !this.grantedSectionTitles().has(s.title)).flatMap((s) => s.groups));
 
   protected readonly selectedPermissionKeys = signal<Set<string>>(new Set());
   protected readonly permissionsLoading = signal(false);
   protected readonly savingPermissions = signal(false);
   protected readonly savePermissionsError = signal<string | null>(null);
   protected readonly savePermissionsSuccess = signal(false);
+  protected readonly hasUnsavedChanges = computed(() => {
+    const catalogIds = new Set([...this.catalogActionsByKey().values()].map(a => a.permissionId));
+    const saved = new Set(this.savedPermissionIds().filter(id => catalogIds.has(id)));
+    const current = new Set([...this.selectedPermissionKeys()].map((key) => this.catalogActionsByKey().get(key)?.permissionId).filter((id): id is string => !!id));
+    return saved.size !== current.size || [...current].some((id) => !saved.has(id));
+  });
 
   // Dashboard widgets ------------------------------------------------------------
   protected readonly widgets = signal<DashboardWidget[]>([]);
   protected readonly widgetsLoading = signal(true);
   protected readonly widgetsError = signal<string | null>(null);
   protected readonly selectedWidgetOrders = signal<Map<string, number>>(new Map());
+  private readonly savedWidgetOrders = signal<Map<string, number>>(new Map());
+  protected readonly hasUnsavedWidgetChanges = computed(() => {
+    const current = this.selectedWidgetOrders(), saved = this.savedWidgetOrders();
+    return current.size !== saved.size || [...current].some(([id, order]) => saved.get(id) !== order);
+  });
   protected readonly savingWidgets = signal(false);
+  protected readonly roleWidgetsLoading = signal(false);
   protected readonly saveWidgetsError = signal<string | null>(null);
   protected readonly saveWidgetsSuccess = signal(false);
 
@@ -110,7 +210,9 @@ export class AdministrationRoles {
     this.rolesError.set(null);
     this.rbac.listRoles().subscribe({
       next: (roles) => {
-        this.roles.set(roles);
+        this.roles.set(roles.filter(r => !['driver', 'customer'].includes(r.key)));
+        const initial = this.roles().find(r => r.isSuperAdmin);
+        if (initial && !this.selectedRoleId()) this.selectRole(initial);
         this.rolesLoading.set(false);
       },
       error: () => {
@@ -127,6 +229,7 @@ export class AdministrationRoles {
       next: (catalog) => {
         this.catalog.set(catalog);
         this.catalogLoading.set(false);
+        this.applySavedPermissions();
       },
       error: () => {
         this.catalogLoading.set(false);
@@ -150,12 +253,17 @@ export class AdministrationRoles {
     });
   }
 
-  protected selectRole(role: Role): void {
+  protected selectRole(role: Role, discard = false): void {
+    if (!discard && this.selectedRoleId() !== role.id && (this.hasUnsavedChanges() || this.hasUnsavedWidgetChanges()) && !confirm('Discard unsaved role settings?')) return;
+    if (this.savingWidgets() || this.savingPermissions() || this.savingRole()) return;
+    const sequence = ++this.requestSequence;
+    this.permissionLoadFailed.set(false);
+    this.savedPermissionIds.set([]);
     this.selectedRoleId.set(role.id);
-    // No endpoint returns a role's currently-assigned dashboard widgets yet, so that
-    // half still starts empty — but permissions are pre-checked from the server below.
     this.selectedPermissionKeys.set(new Set());
+    this.grantedSectionTitles.set(new Set());
     this.selectedWidgetOrders.set(new Map());
+    this.savedWidgetOrders.set(new Map());
     this.savePermissionsError.set(null);
     this.savePermissionsSuccess.set(false);
     this.saveWidgetsError.set(null);
@@ -164,17 +272,32 @@ export class AdministrationRoles {
     this.permissionsLoading.set(true);
     this.rbac.rolePermissionIds(role.id).subscribe({
       next: (permissionIds) => {
-        const granted = new Set(permissionIds);
-        const keys = new Set<string>();
-        for (const action of this.catalogActionsByKey().values()) {
-          if (action.permissionId && granted.has(action.permissionId)) keys.add(action.key);
-        }
-        this.selectedPermissionKeys.set(keys);
+        if (sequence !== this.requestSequence) return;
+        this.savedPermissionIds.set(permissionIds);
+        this.applySavedPermissions();
         this.permissionsLoading.set(false);
       },
       error: () => {
+        if (sequence !== this.requestSequence) return;
         this.permissionsLoading.set(false);
+        this.permissionLoadFailed.set(true);
         this.savePermissionsError.set("Could not load this role's current permissions.");
+      },
+    });
+    this.roleWidgetsLoading.set(true);
+    this.rbac.roleWidgets(role.id).subscribe({
+      next: (links) => {
+        if (sequence !== this.requestSequence) return;
+        const orders = new Map(links.map((link) => [link.widgetId, link.order]));
+        this.savedWidgetOrders.set(orders);
+        this.selectedWidgetOrders.set(new Map(orders));
+        this.roleWidgetsLoading.set(false);
+      },
+      error: () => {
+        if (sequence === this.requestSequence) {
+          this.roleWidgetsLoading.set(false);
+          this.saveWidgetsError.set('Could not load saved dashboard widgets.');
+        }
       },
     });
   }
@@ -201,37 +324,42 @@ export class AdministrationRoles {
     return this.selectedWidgetOrders().has(widgetId);
   }
 
-  protected setWidgetOrder(widgetId: string, order: number): void {
-    const current = this.selectedWidgetOrders();
-    if (!current.has(widgetId)) return;
-    this.selectedWidgetOrders.set(new Map(current).set(widgetId, order));
+  /** Cancel — discard the in-progress draft and restore the role's last-saved permissions. */
+  protected cancelChanges(): void {
+    const role = this.selectedRole();
+    if (role) this.selectRole(role, true);
   }
 
-  protected savePermissions(): void {
+  /** Save Changes — one atomic `PUT /rbac/roles/:id/permissions` call. */
+  protected saveChanges(): void {
     const role = this.selectedRole();
-    if (!role) return;
+    if (this.savingPermissions() || this.savingRole() || !role || !this.canEditPermissions() || this.permissionsLoading() || this.catalogLoading() || this.permissionLoadFailed() || this.catalogError()) return;
 
     const byKey = this.catalogActionsByKey();
-    const ids = [...this.selectedPermissionKeys()]
-      .map((key) => byKey.get(key)?.permissionId)
-      .filter((id): id is string => !!id);
+    const catalogIds = new Set([...byKey.values()].map(a => a.permissionId));
+    const ids = [...this.savedPermissionIds().filter(id => !catalogIds.has(id)), ...[...this.selectedPermissionKeys()].map(key => byKey.get(key)?.permissionId).filter((id): id is string => !!id)];
 
+    const sequence = this.requestSequence;
     this.savingPermissions.set(true);
     this.savePermissionsError.set(null);
     this.savePermissionsSuccess.set(false);
     this.rbac.setRolePermissions(role.id, ids).subscribe({
       next: () => {
         this.savingPermissions.set(false);
+        if (sequence !== this.requestSequence) return;
+        this.savedPermissionIds.set(ids);
         this.savePermissionsSuccess.set(true);
+        void this.rbac.refreshAuthorization();
       },
-      error: (err: Error) => {
+      error: (err: { error?: { error?: { message?: string } }; message?: string }) => {
         this.savingPermissions.set(false);
-        this.savePermissionsError.set(err.message || 'Failed to save permissions.');
+        if (sequence === this.requestSequence) this.savePermissionsError.set(err.error?.error?.message || err.message || 'Failed to save permissions.');
       },
     });
   }
 
   protected saveWidgets(): void {
+    if (!this.auth.can('rbac.roles','edit') || this.savingRole() || this.savingWidgets() || this.roleWidgetsLoading() || this.saveWidgetsError()) return;
     const role = this.selectedRole();
     if (!role) return;
 
@@ -242,97 +370,14 @@ export class AdministrationRoles {
     this.rbac.setRoleWidgets(role.id, widgets).subscribe({
       next: () => {
         this.savingWidgets.set(false);
+        this.savedWidgetOrders.set(new Map(this.selectedWidgetOrders()));
         this.saveWidgetsSuccess.set(true);
+        void this.rbac.refreshAuthorization();
       },
       error: (err: Error) => {
         this.savingWidgets.set(false);
         this.saveWidgetsError.set(err.message || 'Failed to save widget assignment.');
       },
-    });
-  }
-
-  protected createRole(): void {
-    const key = this.newRoleKey.trim();
-    const name = this.newRoleName.trim();
-    if (!/^[a-z][a-z0-9_]*$/.test(key)) {
-      this.createRoleError.set('Key must be snake_case, starting with a letter (e.g. fleet_manager).');
-      return;
-    }
-    if (!name) {
-      this.createRoleError.set('Name is required.');
-      return;
-    }
-
-    this.creatingRole.set(true);
-    this.createRoleError.set(null);
-    this.rbac.createRole({ key, name, description: this.newRoleDescription.trim() || undefined }).subscribe({
-      next: (role) => {
-        this.creatingRole.set(false);
-        this.roles.update((rs) => [...rs, role]);
-        this.newRoleKey = '';
-        this.newRoleName = '';
-        this.newRoleDescription = '';
-      },
-      error: (err: Error) => {
-        this.creatingRole.set(false);
-        this.createRoleError.set(err.message || 'Failed to create role.');
-      },
-    });
-  }
-
-  protected startClone(role: Role): void {
-    this.cloningRoleId.set(role.id);
-    this.cloneKey = `${role.key}_copy`;
-    this.cloneName = `${role.name} (copy)`;
-    this.cloneError.set(null);
-  }
-
-  protected cancelClone(): void {
-    this.cloningRoleId.set(null);
-  }
-
-  protected confirmClone(): void {
-    const sourceId = this.cloningRoleId();
-    if (!sourceId) return;
-    const key = this.cloneKey.trim();
-    const name = this.cloneName.trim();
-    if (!/^[a-z][a-z0-9_]*$/.test(key) || !name) {
-      this.cloneError.set('Provide a valid snake_case key and a name.');
-      return;
-    }
-
-    this.cloneBusy.set(true);
-    this.rbac.cloneRole(sourceId, { key, name }).subscribe({
-      next: (role) => {
-        this.cloneBusy.set(false);
-        this.roles.update((rs) => [...rs, role]);
-        this.cloningRoleId.set(null);
-      },
-      error: (err: Error) => {
-        this.cloneBusy.set(false);
-        this.cloneError.set(err.message || 'Failed to clone role.');
-      },
-    });
-  }
-
-  protected toggleStatus(role: Role): void {
-    this.roleActionError.set(null);
-    this.rbac.setRoleStatus(role.id, !role.isActive).subscribe({
-      next: (updated) => {
-        this.roles.update((rs) => rs.map((r) => (r.id === updated.id ? updated : r)));
-      },
-      error: (err: Error) => this.roleActionError.set(err.message || 'Failed to update role status.'),
-    });
-  }
-
-  protected deleteRole(role: Role): void {
-    this.roleActionError.set(null);
-    this.rbac.deleteRole(role.id).subscribe({
-      next: () => {
-        this.roles.update((rs) => rs.filter((r) => r.id !== role.id));
-        if (this.selectedRoleId() === role.id) this.selectedRoleId.set(null);
-      },
-      error: (err: Error) => this.roleActionError.set(err.message || 'Failed to delete role.'),
     });
   }
 }

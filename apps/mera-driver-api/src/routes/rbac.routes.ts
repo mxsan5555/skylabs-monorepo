@@ -10,6 +10,7 @@ import {
   getUserPermissionOverrides,
   setUserPermissionOverrides,
   getEffectivePermissionsForUserId,
+  resolveEffectivePermissionsForUser,
 } from '../services/permission.service';
 import { impersonateUser } from '../services/impersonation.service';
 import { buildBootstrapResponse } from '../services/bootstrap.service';
@@ -24,6 +25,7 @@ import {
   CreateDashboardWidgetSchema,
   CreateUserSchema,
   UpdateUserSchema,
+  AdminUpdateUserSchema,
   SetUserStatusSchema,
   ImpersonateSchema,
   SetUserPermissionOverridesSchema,
@@ -52,15 +54,7 @@ router.get('/roles', requirePermission('rbac.roles', 'view'), async (_req, res, 
 
 router.post('/roles', requirePermission('rbac.roles', 'create'), validateBody(CreateRoleSchema), async (req, res, next) => {
   try {
-    const role = await roleService.createRole(req.body);
-    await auditService.writeAuditLog({
-      actorUserId: req.user!.sub,
-      action: 'role.create',
-      targetType: 'Role',
-      targetId: role.id,
-      after: role,
-      ...requestMeta(req),
-    });
+    const role = await roleService.createRole(req.body, await resolveEffectivePermissionsForUser(req.user!.sub, req.user!.roles),{actorUserId:req.user!.sub,...requestMeta(req)});
     res.status(201).json({ data: role, error: null });
   } catch (err) {
     next(err);
@@ -69,17 +63,8 @@ router.post('/roles', requirePermission('rbac.roles', 'create'), validateBody(Cr
 
 router.patch('/roles/:id', requirePermission('rbac.roles', 'edit'), validateBody(UpdateRoleSchema), async (req, res, next) => {
   try {
-    const before = await roleService.getRoleById(req.params.id);
-    const role = await roleService.updateRole(req.params.id, req.body);
-    await auditService.writeAuditLog({
-      actorUserId: req.user!.sub,
-      action: 'role.update',
-      targetType: 'Role',
-      targetId: role.id,
-      before,
-      after: role,
-      ...requestMeta(req),
-    });
+    if (req.body.isActive !== undefined && !(await resolveEffectivePermissionsForUser(req.user!.sub, req.user!.roles)).includes('rbac.roles:status_change')) throw new HttpError(403,'FORBIDDEN','Role status change is not permitted');
+    const role = await roleService.updateRole(req.params.id, req.body, await resolveEffectivePermissionsForUser(req.user!.sub, req.user!.roles),{actorUserId:req.user!.sub,...requestMeta(req)});
     res.json({ data: role, error: null });
   } catch (err) {
     next(err);
@@ -106,7 +91,7 @@ router.delete('/roles/:id', requirePermission('rbac.roles', 'delete'), async (re
 
 router.post('/roles/:id/clone', requirePermission('rbac.roles', 'create'), validateBody(CloneRoleSchema), async (req, res, next) => {
   try {
-    const clone = await roleService.cloneRole(req.params.id, req.body.key, req.body.name);
+    const clone = await roleService.cloneRole(req.params.id, req.body.key, req.body.name, await resolveEffectivePermissionsForUser(req.user!.sub,req.user!.roles));
     await auditService.writeAuditLog({
       actorUserId: req.user!.sub,
       action: 'role.clone',
@@ -169,21 +154,18 @@ router.put(
   validateBody(SetRolePermissionsSchema),
   async (req, res, next) => {
     try {
-      const links = await roleService.setRolePermissions(req.params.id, req.body.permissionIds);
-      await auditService.writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'role.permissions.set',
-        targetType: 'Role',
-        targetId: req.params.id,
-        after: { permissionIds: req.body.permissionIds },
-        ...requestMeta(req),
-      });
+      const links = await roleService.setRolePermissions(req.params.id, req.body.permissionIds,
+        await resolveEffectivePermissionsForUser(req.user!.sub, req.user!.roles), {actorUserId:req.user!.sub,...requestMeta(req)});
       res.json({ data: links, error: null });
     } catch (err) {
       next(err);
     }
   },
 );
+
+router.get('/roles/:id/widgets',requirePermission('rbac.roles','view'),async(req,res,next)=>{
+  try{res.json({data:await roleService.getRoleWidgets(req.params.id),error:null});}catch(error){next(error);}
+});
 
 router.put(
   '/roles/:id/widgets',
@@ -230,11 +212,25 @@ router.post(
 // Users
 // ---------------------------------------------------------------------------
 
+router.get('/users/assignable-roles', requirePermission('rbac.users','view'), async (req,res,next) => {
+  try {
+    const permissions = await resolveEffectivePermissionsForUser(req.user!.sub, req.user!.roles);
+    const candidates = (await roleService.listRoles()).filter(role => role.isActive && !['customer','driver'].includes(role.key));
+    const assignable = [];
+    for (const role of candidates) {
+      try { await roleService.assertRoleDelegation(role.id, req.user!.sub, permissions); assignable.push(role); }
+      catch (error) { if (!(error instanceof HttpError) || error.code !== 'DELEGATION_DENIED') throw error; }
+    }
+    res.json({data:assignable,error:null});
+  } catch(error) { next(error); }
+});
+
 router.get('/users', requirePermission('rbac.users', 'view'), async (req, res, next) => {
   try {
     const page = req.query.page ? Number(req.query.page) : undefined;
     const pageSize = req.query.pageSize ? Number(req.query.pageSize) : undefined;
-    const { rows, total } = await userService.listUsers({ page, pageSize });
+    const status = ['active','inactive','blocked'].includes(String(req.query.status)) ? req.query.status as 'active'|'inactive'|'blocked' : undefined;
+    const { rows, total } = await userService.listUsers({ page, pageSize, status, search: typeof req.query.search === 'string' ? req.query.search.slice(0,150) : undefined, roleId: typeof req.query.roleId === 'string' ? req.query.roleId : undefined,sort:typeof req.query.sort === 'string' ? req.query.sort : undefined,direction:req.query.direction === 'asc' ? 'asc' : 'desc' });
     res.json({ data: rows, error: null, meta: { total, page: page ?? 1, pageSize: pageSize ?? 25 } });
   } catch (err) {
     next(err);
@@ -243,6 +239,12 @@ router.get('/users', requirePermission('rbac.users', 'view'), async (req, res, n
 
 router.post('/users', requirePermission('rbac.users', 'create'), validateBody(CreateUserSchema), async (req, res, next) => {
   try {
+    if(req.body.status&&req.body.status!=='active' && !(await resolveEffectivePermissionsForUser(req.user!.sub,req.user!.roles)).includes('rbac.users:status_change')) throw new HttpError(403,'FORBIDDEN','Account status change is not permitted');
+    if(req.body.roleIds?.length) {
+      const permissions=await resolveEffectivePermissionsForUser(req.user!.sub,req.user!.roles);
+      if(!permissions.includes('rbac.users:assign')) throw new HttpError(403,'FORBIDDEN','Role assignment is not permitted');
+      for(const roleId of req.body.roleIds) await roleService.assertRoleDelegation(roleId,req.user!.sub,permissions);
+    }
     const user = await userService.createUser(req.body);
     await auditService.writeAuditLog({
       actorUserId: req.user!.sub,
@@ -295,17 +297,16 @@ router.patch('/users/me', validateBody(UpdateUserSchema), async (req, res, next)
   }
 });
 
-router.patch('/users/:id', requirePermission('rbac.users', 'edit'), validateBody(UpdateUserSchema), async (req, res, next) => {
+router.patch('/users/:id', requirePermission('rbac.users', 'edit'), validateBody(AdminUpdateUserSchema), async (req, res, next) => {
   try {
-    const user = await userService.updateUser(req.params.id, req.body);
-    await auditService.writeAuditLog({
-      actorUserId: req.user!.sub,
-      action: 'user.update',
-      targetType: 'User',
-      targetId: user.id,
-      after: user,
-      ...requestMeta(req),
-    });
+    const permissions=await resolveEffectivePermissionsForUser(req.user!.sub,req.user!.roles);
+    if(req.body.status!==undefined&&!permissions.includes('rbac.users:status_change')) throw new HttpError(403,'FORBIDDEN','Account status change is not permitted');
+    if(req.body.roleIds!==undefined) {
+      if(!permissions.includes('rbac.users:assign')) throw new HttpError(403,'FORBIDDEN','Role assignment is not permitted');
+      const current=await userService.getUserById(req.params.id);const existing=new Set(current.roles.map(link=>link.role.id));
+      for(const roleId of req.body.roleIds) if(!existing.has(roleId)) await roleService.assertRoleDelegation(roleId,req.user!.sub,permissions);
+    }
+    const user = await userService.updateAdminUser(req.params.id, req.body, {actorUserId:req.user!.sub,...requestMeta(req)});
     res.json({ data: user, error: null });
   } catch (err) {
     next(err);
@@ -330,6 +331,7 @@ router.delete('/users/:id', requirePermission('rbac.users', 'delete'), async (re
 
 router.post('/users/:id/roles/:roleId', requirePermission('rbac.users', 'assign'), async (req, res, next) => {
   try {
+    await roleService.assertRoleDelegation(req.params.roleId,req.user!.sub,await resolveEffectivePermissionsForUser(req.user!.sub,req.user!.roles));
     const user = await userService.assignRoleToUser(req.params.id, req.params.roleId);
     await auditService.writeAuditLog({
       actorUserId: req.user!.sub,

@@ -1,4 +1,5 @@
-import { HttpClient } from '@angular/common/http';
+import {DocumentRow} from './document-type-selection';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import type { ApiEnvelope } from '@skylabs-monorepo/shared-types';
@@ -38,6 +39,8 @@ export interface Driver {
   feeStatus?: string;
   registrationFeeRequired?: boolean;
   registrationFeePaise?: number;
+  registrationNetReceivedPaise?: number;
+  registrationRemainingPaise?: number;
   driverStatusMasterId?: string | null;
   driverStatusName?: string | null;
   driverStatusChangeReason?: string;
@@ -64,6 +67,7 @@ export interface Driver {
   policeDocsNotes?: string;
   sourceType?: string;
   avatar?: string;
+  profilePhoto?:string|null;
   education?: string;
   trainingStatus?: string;
   trainingCertificate?: string;
@@ -88,6 +92,7 @@ export interface Driver {
   preferredPaymentMode?: string;
   registrationFeeStatus?: string;
   registrationReceiptFile?: string;
+  registrationPaymentReference?:string;
   amount?: string;
   paymentReceiptDate?: string;
   accountPaymentMethod?: string;
@@ -96,10 +101,10 @@ export interface Driver {
   ifscCode?: string;
   branchName?: string;
   upiIdOrChequeNo?: string;
-  personalDocs?: Array<{ type: string; regNo: string; file: string }>;
-  healthDocs?: Array<{ type: string; regNo: string; file: string }>;
-  educationDocs?: Array<{ type: string; regNo: string; file: string }>;
-  policeDocs?: Array<{ type: string; regNo: string; file: string }>;
+  personalDocs?: DocumentRow[];
+  healthDocs?: DocumentRow[];
+  educationDocs?: DocumentRow[];
+  policeDocs?: DocumentRow[];
   /** The User account linked to this driver's self-service portal, if any. */
   linkedUser?: { id: string; name: string; email: string | null; phone: string | null } | null;
   /** Multi-step onboarding-form progress — set server-side, never trust/derive from the
@@ -126,6 +131,7 @@ interface DriverDocumentDto {
 }
 
 interface DriverDto {
+  profilePhoto?:string|null;
   id: string;
   firstName: string;
   lastName: string | null;
@@ -155,6 +161,8 @@ interface DriverDto {
   feeStatus?: string;
   registrationFeeRequired?: boolean;
   registrationFeePaise?: number;
+  registrationNetReceivedPaise?: number;
+  registrationRemainingPaise?: number;
   driverStatusMasterId?: string | null;
   driverStatusName?: string | null;
   driverStatusChangeReason?: string;
@@ -195,6 +203,7 @@ interface DriverDto {
   experience: string | null;
   currentSalary: string | null;
   expectedSalary: string | null;
+  registrationPaymentReference?:string;
   preferredPaymentMode: string | null;
   amount: string | null;
   paymentReceiptDate: string | null;
@@ -216,8 +225,8 @@ interface DriverDto {
 
 function docsByCategory(docs: DriverDocumentDto[], category: DriverDocumentDto['category']) {
   return docs
-    .filter((d) => d.category === category)
-    .map((d) => ({ type: d.type, regNo: d.regNo ?? '', file: d.fileName ?? '' }));
+    .filter((d) => d.category === category && !d.archivedAt)
+    .map((d) => ({ id:d.id, type: d.type, regNo: d.regNo ?? '', file: d.fileName ?? '', savedFile:d.fileName??'' }));
 }
 
 function fromDto(dto: DriverDto): Driver {
@@ -225,6 +234,7 @@ function fromDto(dto: DriverDto): Driver {
   const lastName = dto.lastName ?? '';
   return {
     id: dto.id,
+    profilePhoto:dto.profilePhoto,
     name: `${firstName} ${lastName}`.trim(),
     phone: dto.phone ?? '',
     vehicle: dto.vehicle ?? '',
@@ -252,8 +262,9 @@ function fromDto(dto: DriverDto): Driver {
     driverType: dto.driverType ?? undefined,
     status: dto.status,
     accountStatus: dto.accountStatus,
+    registrationPaymentReference:dto.registrationPaymentReference,
     registrationReceiptFile:dto.documents?.find(doc=>doc.type==='Registration Fee Receipt'&&!doc.archivedAt)?.fileName??undefined,
-    feeStatus: dto.feeStatus, registrationFeeRequired:dto.registrationFeeRequired,registrationFeePaise:dto.registrationFeePaise,driverStatusMasterId:dto.driverStatusMasterId,driverStatusName:dto.driverStatusName, licenceStatus: dto.licenceStatus, dlApiStatus:dto.dlApiStatus, readyForTrips: dto.readyForTrips, blockingReasons: dto.blockingReasons,
+    feeStatus: dto.feeStatus, registrationFeeRequired:dto.registrationFeeRequired,registrationFeePaise:dto.registrationFeePaise,registrationNetReceivedPaise:dto.registrationNetReceivedPaise,registrationRemainingPaise:dto.registrationRemainingPaise,driverStatusMasterId:dto.driverStatusMasterId,driverStatusName:dto.driverStatusName, licenceStatus: dto.licenceStatus, dlApiStatus:dto.dlApiStatus, readyForTrips: dto.readyForTrips, blockingReasons: dto.blockingReasons,
     queueState:dto.queueState,
     assignedVerifierId:dto.assignedVerifierId,
     assignedVerifier: dto.assignedVerifier,
@@ -382,6 +393,13 @@ export class DriversApiService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiUrl}/drivers`;
 
+  get(id: string): Observable<Driver> {
+    return this.http.get<ApiEnvelope<DriverDto>>(`${this.base}/${id}/assignment`).pipe(map(res => fromDto(unwrap(res))));
+  }
+  eligibleVerifiers(): Observable<{id:string;name:string;email:string|null;phone:string|null}[]> {
+    return this.http.get<ApiEnvelope<{id:string;name:string;email:string|null;phone:string|null}[]>>(`${this.base}/eligible-verifiers`).pipe(map(unwrap));
+  }
+
   list(): Observable<Driver[]> {
     return this.http.get<ApiEnvelope<DriverDto[]>>(this.base).pipe(map((res) => unwrap(res).map(fromDto)));
   }
@@ -394,9 +412,9 @@ export class DriversApiService {
    *  mark that exact nested onboarding sub-step done server-side (see `driver.service.ts`'s
    *  `deriveOnboardingFields`) — omit both for a plain full-form save (e.g. editing an
    *  already-completed driver) to leave onboarding progress alone. */
-  create(input: Driver, stepCompleted?: number, subStepCompleted?: number, completeStep?: boolean): Observable<Driver> {
+  create(input: Driver, stepCompleted?: number, subStepCompleted?: number, completeStep?: boolean, creationRequestId?:string): Observable<Driver> {
     return this.http
-      .post<ApiEnvelope<DriverDto>>(this.base, toPayload(input, stepCompleted, subStepCompleted, completeStep))
+      .post<ApiEnvelope<DriverDto>>(this.base, toPayload(input, stepCompleted, subStepCompleted, completeStep), creationRequestId?{headers:new HttpHeaders({'Idempotency-Key':creationRequestId})}:{})
       .pipe(map((res) => fromDto(unwrap(res))));
   }
 
@@ -440,14 +458,15 @@ export class DriversApiService {
   /** Assigns (or, with `verifierId: null`, clears) the staff User responsible for this
    *  driver's KYC review. Independent of `linkToUser` — that grants the driver their own
    *  portal login, this assigns a staff reviewer to check the driver's submitted KYC. */
-  assignVerifier(driverId: string, verifierId: string | null, reason?: string): Observable<Driver> {
+  assignVerifier(driverId: string, verifierId: string | null, reason?: string, expectedVerifierId?: string | null): Observable<Driver> {
     return this.http
-      .patch<ApiEnvelope<DriverDto>>(`${this.base}/${driverId}/assign-verifier`, { verifierId, reason })
+      .patch<ApiEnvelope<DriverDto>>(`${this.base}/${driverId}/assign-verifier`, { verifierId, reason, expectedVerifierId })
       .pipe(map((res) => fromDto(unwrap(res))));
   }
 
   /** The calling KYC verifier's own assigned-driver queue. */
-  registrationState(driverId:string){return this.http.get<ApiEnvelope<{fee:string}>>(`${environment.apiUrl}/workflow/drivers/${driverId}/overview`).pipe(map(unwrap));}
+  registrationState(driverId:string){return this.http.get<ApiEnvelope<{fee:string;remainingPaise:number;netReceivedPaise:number}>>(`${environment.apiUrl}/workflow/accounts/drivers/${driverId}/fee`).pipe(map(unwrap));}
+  recordRegistrationPayment(driverId:string,amountPaise:number,reference:string,method:'cash'|'bank_transfer'|'upi',reason:string){return this.http.post<ApiEnvelope<unknown>>(`${environment.apiUrl}/workflow/accounts/movements`,{driverId,kind:'registration_payment',amountPaise,method,reference,reason,confirmed:true}).pipe(map(unwrap));}
   confirmRegistrationCash(driverId:string,amountPaise:number,reference:string,reason:string){return this.http.post<ApiEnvelope<unknown>>(`${environment.apiUrl}/workflow/accounts/movements`,{driverId,kind:'registration_payment',amountPaise,method:'cash',reference,reason,confirmed:true}).pipe(map(unwrap));}
   formOptions():Observable<Record<string,{id:string;name:string;status:string;code?:string}[]>>{return this.http.get<ApiEnvelope<Record<string,{id:string;name:string;status:string;code?:string}[]>>>(`${environment.apiUrl}/masters/onboarding-options`).pipe(map(unwrap));}
   listAssignedToMe(): Observable<Driver[]> {return this.assignmentQueue({}).pipe(map(result=>result.rows));}
@@ -483,6 +502,9 @@ export class DriversApiService {
       .pipe(map((res) => fromDto(unwrap(res))));
   }
 
+  deleteDocument(driverId:string,docId:string):Observable<unknown>{return this.http.delete(`${this.base}/${driverId}/documents/${docId}`);}
+  listDocuments(driverId:string):Observable<DriverDocumentDto[]>{return this.http.get<ApiEnvelope<DriverDocumentDto[]>>(`${this.base}/${driverId}/documents`).pipe(map(unwrap));}
+
   /** Uploads one KYC document for a driver (multipart/form-data). Returns the stored filename. */
   uploadDocument(
     driverId: string,
@@ -490,10 +512,13 @@ export class DriversApiService {
     type: string,
     regNo: string,
     file: File,
-  ): Observable<{ type: string; regNo: string; file: string; filePath: string | null }> {
+    typeKey?:string, replaceDocumentId?:string,
+  ): Observable<{ id:string; type: string; regNo: string; file: string; filePath: string | null }> {
     const form = new FormData();
     form.append('category', category);
     form.append('type', type);
+    if(typeKey)form.append('typeKey',typeKey);
+    if(replaceDocumentId)form.append('replaceDocumentId',replaceDocumentId);
     if (regNo) form.append('regNo', regNo);
     form.append('file', file);
     return this.http
@@ -501,7 +526,7 @@ export class DriversApiService {
       .pipe(
         map((res) => {
           const doc = unwrap(res);
-          return { type: doc.type, regNo: doc.regNo ?? '', file: doc.fileName ?? '', filePath:doc.filePath };
+          return { id:doc.id, type: doc.type, regNo: doc.regNo ?? '', file: doc.fileName ?? '', filePath:doc.filePath };
         }),
       );
   }

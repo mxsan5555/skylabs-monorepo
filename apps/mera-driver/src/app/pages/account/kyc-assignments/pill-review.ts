@@ -41,7 +41,7 @@ export class PillReviewComponent implements OnDestroy {
   dlLabel(){const dl=this.review()?.dl;return dl?dlPresentation({...dl,providerCalled:dl.providerCalled??false,inputs:dl.inputs??{dlNo:null,dob:null},checkedAt:dl.checkedAt??null,validFrom:dl.validFrom??null,validTo:dl.validTo??null,history:[]}).label:'Not checked';}
   dlIcon(){const dl=this.review()?.dl;return dl?dlPresentation({...dl,providerCalled:dl.providerCalled??false,inputs:dl.inputs??{dlNo:null,dob:null},checkedAt:dl.checkedAt??null,validFrom:dl.validFrom??null,validTo:dl.validTo??null,history:[]}).icon:'pending';}
   readonly checkingDl=signal(false);
-  verifyDl(retry=false){if(this.checkingDl()||this.own()||(this.staff()&&!this.administrativeDl()))return;const id=this.driverId(),version=this.reviewGeneration;this.checkingDl.set(true);this.error.set(null);this.api.verifyDl(id,retry).subscribe({next:r=>{if(this.driverId()===id&&version===this.reviewGeneration){this.review.set(r);this.checkingDl.set(false);}},error:e=>{if(this.driverId()===id&&version===this.reviewGeneration){this.error.set(e?.error?.error?.message??'Verification unavailable. Retry deliberately.');this.checkingDl.set(false);}}});}
+  verifyDl(retry=false){if(!this.auth.can('kyc-assignments','edit')||this.checkingDl()||this.own()||(this.staff()&&!this.administrativeDl()))return;const id=this.driverId(),version=this.reviewGeneration;this.checkingDl.set(true);this.error.set(null);this.api.verifyDl(id,retry).subscribe({next:r=>{if(this.driverId()===id&&version===this.reviewGeneration){this.review.set(r);this.checkingDl.set(false);}},error:e=>{if(this.driverId()===id&&version===this.reviewGeneration){this.error.set(e?.error?.error?.message??'Verification unavailable. Retry deliberately.');this.checkingDl.set(false);}}});}
   readonly tabs = [
     { id: 1, label: 'Personal Details' }, { id: 2, label: 'Education & Health Details' },
     { id: 3, label: 'Documents Details' }, { id: 4, label: 'Payment Details' },
@@ -87,6 +87,7 @@ export class PillReviewComponent implements OnDestroy {
   }
   setReason(key: string, value: string) { this.reasons.update(r => ({ ...r, [key]: value })); }
   save(item: ReviewItem, status: 'Pass' | 'Issue') {
+    if (!this.auth.can('kyc-assignments','edit')) return;
     const reason = (this.reasons()[item.key] ?? item.reason ?? '').trim();
     if (status === 'Issue' && !reason) { this.error.set('Enter a specific correction reason before choosing Issue.'); return; }
     const version=this.reviewGeneration;this.saving.set(true); this.error.set(null);
@@ -117,7 +118,10 @@ export class PillReviewComponent implements OnDestroy {
   raiseIssue(item:ReviewItem){this.issueKey.set(item.key);this.error.set(null);}
   @HostListener('window:focus')
   refreshReview(){const id=this.driverId(),version=this.reviewGeneration;(this.own()?this.api.getOwn():this.staff()?this.api.getStaff(id):this.api.getAssigned(id)).subscribe({next:r=>{if(version===this.reviewGeneration)this.review.set(r);},error:err=>{void httpErrorMessage(err).then(m=>this.error.set(m));}});}
-  async loadPhoto(photo:string|null){const version=this.reviewGeneration;this.photoFailed.set(false);if(!photo)return;if(photo.startsWith('data:image/')){this.photoUrl.set(photo);return;}if(!photo.startsWith('/uploads/drivers/')){this.photoFailed.set(true);return;}try{const blob=await firstValueFrom(this.api.preview(photo.slice('/uploads/'.length)));if(version!==this.reviewGeneration)return;this.photoUrl.set(URL.createObjectURL(blob));}catch{if(version===this.reviewGeneration)this.photoFailed.set(true);}}
+  async loadPhoto(photo:string|null){const version=this.reviewGeneration;this.photoFailed.set(false);if(!photo)return;if(photo.startsWith('data:image/')){this.photoUrl.set(photo);return;}if(!photo.startsWith('/uploads/drivers/')){this.photoFailed.set(true);return;}try{
+    // `photo` is already percent-encoded by the backend (`driverProfilePhoto()`); `preview()`
+    // encodes its input itself, so decode first or a space ("%20") becomes "%2520" and 404s.
+    const blob=await firstValueFrom(this.api.preview(decodeURIComponent(photo.slice('/uploads/'.length))));if(version!==this.reviewGeneration)return;this.photoUrl.set(URL.createObjectURL(blob));}catch{if(version===this.reviewGeneration)this.photoFailed.set(true);}}
   async loadDocuments(docs:ReviewDocument[]){let next=0;await Promise.all(Array.from({length:Math.min(3,docs.length)},async()=>{while(next<docs.length)await this.loadDocument(docs[next++]);}));}
   async loadDocument(doc:ReviewDocument){if(this.documentViews()[doc.id])return;const version=this.reviewGeneration;this.documentViews.update(v=>({...v,[doc.id]:{loading:true}}));try{if(!doc.filePath)throw new Error('Original file is missing');const blob=await firstValueFrom(this.api.preview(doc.filePath));const header=new Uint8Array(await blob.slice(0,8).arrayBuffer());const pdf=new TextDecoder().decode(header).startsWith('%PDF-');const image=header[0]===137&&header[1]===80||header[0]===255&&header[1]===216||new TextDecoder().decode(header).startsWith('RIFF');if(version!==this.reviewGeneration)return;const url=URL.createObjectURL(blob);this.documentViews.update(v=>({...v,[doc.id]:{url,pdf,safe:this.sanitizer.bypassSecurityTrustResourceUrl(url),...(!pdf&&!image?{error:'File is damaged or its preview format is unsupported'}:{})}}));}catch(err){if(version===this.reviewGeneration)this.documentViews.update(v=>({...v,[doc.id]:{error:err instanceof Error&&!('status' in err)?err.message:'Original file is unavailable or access was denied'}}));}}
   documentError(id:string){this.documentViews.update(v=>({...v,[id]:{...v[id],error:'Image is damaged or unavailable'}}));}

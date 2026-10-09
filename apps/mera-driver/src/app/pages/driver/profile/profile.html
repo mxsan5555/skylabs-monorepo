@@ -1,90 +1,214 @@
 <md-admin-page title="My Profile" subtitle="Keep your details up to date. Verification status can only be changed by staff.">
-  <a routerLink="/driver/resume">My Resume</a>
   @if (loading()) {
     <p class="otp-muted">Loading…</p>
-  } @else {
+  } @else if (driver(); as d) {
     <section class="account-card">
-      <h2>Onboarding · {{ driver()?.completionPercentage ?? 0 }}%</h2>
-      <div class="flex flex-wrap gap-2" role="tablist">
-        @for (tab of tabs; track tab; let index = $index) {
-          <md-filter-chip [label]="tab" [selected]="activeTab() === index + 1" (click)="selectTab(index + 1)"></md-filter-chip>
-        }
-      </div>
-      <div class="flex flex-wrap gap-2 mt-3">
-        @for (p of pills()?.pills ?? []; track p.tab * 10 + p.pill) {
-          @if (p.tab === activeTab()) {
-            <md-filter-chip [label]="p.label + (isDone(p.tab, p.pill) ? ' ✓' : '')" [selected]="activePill() === p.pill" (click)="activePill.set(p.pill)"></md-filter-chip>
+      <div class="account-card__head" style="align-items:center;gap:16px;">
+        <div style="display:flex;align-items:center;gap:16px;">
+          @if (photoUrl() && !photoFailed()) {
+            <img [src]="photoUrl()" alt="" style="width:72px;height:72px;border-radius:999px;object-fit:cover;flex:none;" />
+          } @else {
+            <span style="width:72px;height:72px;border-radius:999px;display:grid;place-items:center;background-color:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);font-weight:700;font-size:1.3rem;flex:none;">{{ initials() }}</span>
           }
-        }
+          <div>
+            <h2 style="margin:0;">{{ d.firstName }} {{ d.lastName }}</h2>
+            <p class="otp-muted" style="margin:2px 0 0;">Driver ID: {{ d.id.slice(0, 8).toUpperCase() }}</p>
+          </div>
+        </div>
+        <input #photoInput type="file" accept="image/png,image/jpeg,image/webp" style="display:none;" (change)="onPhotoSelected($event)" />
+        <md-outlined-button [disabled]="uploadingPhoto()" (click)="photoInput.click()">
+          {{ uploadingPhoto() ? 'Uploading…' : 'Update photo' }}
+        </md-outlined-button>
       </div>
-    </section>
-
-    <section class="account-card">
-      <div class="account-card__head">
-        <h2>{{ selectedPill()?.label }}</h2>
-        @if (saved()) {
-          <span class="otp-muted" role="status">Saved</span>
-        }
-      </div>
+      <p>
+        Profile completion: <strong>{{ completion()?.percentage ?? 0 }}%</strong>
+        · Onboarding: <strong>{{ d.completionPercentage }}%</strong>
+      </p>
       @if (error()) {
         <p class="otp-muted" role="alert">{{ error() }}</p>
       }
-      @for (item of selectedPill()?.items ?? []; track item.key) {
-        @if (item.status === 'Issue') { <p role="alert">{{ item.field }}: {{ item.reason }}</p> }
-      }
-      @for (item of readOnlyItems(); track item.key) {
-        <p><strong>{{ item.field }}</strong>: {{ formatValue(item.value) }} · Read-only</p>
-      }
-      @if (activeTab() === 2 || activeTab() === 3) { <a routerLink="/driver/documents">Upload or replace documents</a> }
-      <div class="address-form">
-        @for (f of fields(); track f.key) {
-          <div [class.span-2]="f.span2" class="min-w-0 max-sm:col-span-2">
-          <md-outlined-text-field
-            class="w-full"
-            [label]="f.label"
-            [type]="f.type ?? 'text'"
-            [value]="draft()[f.key] ?? ''"
-            (input)="setField(f.key, $any($event.target).value)"
-
-          ></md-outlined-text-field>
-          @if(f.key==='dlNo'){<md-inline-dl [driverId]="driver()?.id??null" [own]="true" [savedRevision]="(driver()?.dlNo??'')+'|'+(driver()?.dob??'')" [dlNo]="draft().dlNo??''" [dob]="draft().dob??''" [issueDate]="draft().dlIssueDate??''" [expiryDate]="draft().dlExpiryDate??''"></md-inline-dl>}
-          </div>
-        }
+      <div>
+        <md-outlined-button (click)="go('/driver/resume')">Download Resume</md-outlined-button>
       </div>
     </section>
 
-    @if (activeTab() === 1 && activePill() === 0) {
-    <section class="account-card">
-      <div class="account-card__head">
-        <h2>Languages</h2>
-      </div>
-      @if (languageOptions().length === 0) {
-        <p class="otp-muted">No languages configured yet.</p>
-      } @else {
-        <div class="driver-languages">
-          @for (opt of languageOptions(); track opt.id) {
-            <button
-              type="button"
-              class="driver-lang-chip"
-              [class.selected]="selectedLanguages().includes(opt.name)"
-              [attr.aria-pressed]="selectedLanguages().includes(opt.name)"
-              (click)="toggleLanguage(opt.name)"
-            >
-              {{ opt.name }}
-            </button>
+    <sky-accordion aria-label="Profile sections">
+      <!-- Personal & Contact -->
+      <sky-accordion-item header="Personal & Contact" [level]="2" [open]="true" variant="outlined">
+        @for (item of issueFor(PILLS.personal); track item.key) { <p role="alert">{{ item.field }}: {{ item.reason }}</p> }
+        <div class="address-form">
+          @for (f of fieldsFor(PILLS.personal); track f.key) {
+            <div [class.span-2]="f.span2" class="min-w-0 max-sm:col-span-2">
+              <md-outlined-text-field class="w-full" [label]="f.label" [type]="f.type ?? 'text'" [value]="draft()[f.key] ?? ''" (input)="setField(f.key, $any($event.target).value)"></md-outlined-text-field>
+            </div>
+          }
+          @for (f of fieldsFor(PILLS.contact); track f.key) {
+            @if (f.key === 'phone' || f.key === 'email') {
+              <div class="min-w-0 max-sm:col-span-2">
+                <md-outlined-text-field class="w-full" [label]="f.label" [type]="f.type ?? 'text'" [value]="draft()[f.key] ?? ''" (input)="setField(f.key, $any($event.target).value)"></md-outlined-text-field>
+              </div>
+            }
           }
         </div>
-      }
-    </section>
+        <div>
+          <h3 style="margin-top:16px;">Languages</h3>
+          @if (languageOptions().length === 0) {
+            <p class="otp-muted">No languages configured yet.</p>
+          } @else {
+            <div class="driver-languages">
+              @for (opt of languageOptions(); track opt.id) {
+                <button type="button" class="driver-lang-chip" [class.selected]="selectedLanguages().includes(opt.name)" [attr.aria-pressed]="selectedLanguages().includes(opt.name)" (click)="toggleLanguage(opt.name)">{{ opt.name }}</button>
+              }
+            </div>
+          }
+        </div>
+        <div class="pt-3">
+          <md-filled-button [disabled]="savingKey() === '1-0'" (click)="save(PILLS.personal)">{{ savingKey() === '1-0' ? 'Saving…' : 'Save' }}</md-filled-button>
+          @if (savedKey() === '1-0') { <span class="otp-muted" role="status">Saved</span> }
+        </div>
+      </sky-accordion-item>
 
-    }
-    @if (!(activeTab() === 4 && activePill() === 1)) {
-    <div class="pb-8">
-      <md-filled-button [disabled]="saving()" (click)="save()">
-        {{ saving() ? 'Saving…' : 'Save changes' }}
-      </md-filled-button>
-      <md-outlined-button [disabled]="saving()" (click)="save(true)">Save &amp; Next</md-outlined-button>
-    </div>
-    }
+      <!-- Address -->
+      <sky-accordion-item header="Address" [level]="2" variant="outlined">
+        @for (item of issueFor(PILLS.contact); track item.key) { <p role="alert">{{ item.field }}: {{ item.reason }}</p> }
+        <div class="address-form">
+          @for (f of fieldsFor(PILLS.contact); track f.key) {
+            @if (f.key !== 'phone' && f.key !== 'email' && f.key !== 'emergencyNumber') {
+              <div [class.span-2]="f.span2" class="min-w-0 max-sm:col-span-2">
+                <md-outlined-text-field class="w-full" [label]="f.label" [type]="f.type ?? 'text'" [value]="draft()[f.key] ?? ''" (input)="setField(f.key, $any($event.target).value)"></md-outlined-text-field>
+              </div>
+            }
+          }
+        </div>
+        <a routerLink="/driver/documents" [queryParams]="{ category: 'personal' }">View or upload address-proof documents</a>
+        <div class="pt-3">
+          <md-filled-button [disabled]="savingKey() === '1-1'" (click)="save(PILLS.contact)">{{ savingKey() === '1-1' ? 'Saving…' : 'Save' }}</md-filled-button>
+          @if (savedKey() === '1-1') { <span class="otp-muted" role="status">Saved</span> }
+        </div>
+      </sky-accordion-item>
+
+      <!-- Driving Licence -->
+      <sky-accordion-item header="Driving Licence" [level]="2" variant="outlined">
+        @for (item of issueFor(PILLS.licence); track item.key) { <p role="alert">{{ item.field }}: {{ item.reason }}</p> }
+        @if (dl(); as dlState) {
+          <p><strong>Verification status:</strong> {{ dlState.status }} @if (dlState.reason) { — {{ dlState.reason }} }</p>
+        }
+        <div class="address-form">
+          @for (f of fieldsFor(PILLS.licence); track f.key) {
+            @if (f.key !== 'vehicleType') {
+              <div [class.span-2]="f.span2" class="min-w-0 max-sm:col-span-2">
+                <md-outlined-text-field class="w-full" [label]="f.label" [type]="f.type ?? 'text'" [value]="draft()[f.key] ?? ''" (input)="setField(f.key, $any($event.target).value)"></md-outlined-text-field>
+                @if (f.key === 'dlNo') {
+                }
+              </div>
+            }
+          }
+        </div>
+        <div class="pt-3">
+          <md-filled-button [disabled]="savingKey() === '3-0'" (click)="save(PILLS.licence)">{{ savingKey() === '3-0' ? 'Saving…' : 'Save' }}</md-filled-button>
+          @if (savedKey() === '3-0') { <span class="otp-muted" role="status">Saved</span> }
+        </div>
+      </sky-accordion-item>
+
+      <!-- Education & Training -->
+      <sky-accordion-item header="Education & Training" [level]="2" variant="outlined">
+        @for (item of issueFor(PILLS.education); track item.key) { <p role="alert">{{ item.field }}: {{ item.reason }}</p> }
+        <div class="address-form">
+          @for (f of fieldsFor(PILLS.education); track f.key) {
+            <div [class.span-2]="f.span2" class="min-w-0 max-sm:col-span-2">
+              <md-outlined-text-field class="w-full" [label]="f.label" [type]="f.type ?? 'text'" [value]="draft()[f.key] ?? ''" (input)="setField(f.key, $any($event.target).value)"></md-outlined-text-field>
+            </div>
+          }
+        </div>
+        <a routerLink="/driver/documents" [queryParams]="{ category: 'education' }">View or upload education certificates</a>
+        <div class="pt-3">
+          <md-filled-button [disabled]="savingKey() === '2-0'" (click)="save(PILLS.education)">{{ savingKey() === '2-0' ? 'Saving…' : 'Save' }}</md-filled-button>
+          @if (savedKey() === '2-0') { <span class="otp-muted" role="status">Saved</span> }
+        </div>
+      </sky-accordion-item>
+
+      <!-- Health & Medical -->
+      <sky-accordion-item header="Health & Medical" [level]="2" variant="outlined">
+        @for (item of issueFor(PILLS.health); track item.key) { <p role="alert">{{ item.field }}: {{ item.reason }}</p> }
+        <div class="address-form">
+          @for (f of fieldsFor(PILLS.health); track f.key) {
+            <div [class.span-2]="f.span2" class="min-w-0 max-sm:col-span-2">
+              <md-outlined-text-field class="w-full" [label]="f.label" [type]="f.type ?? 'text'" [value]="draft()[f.key] ?? ''" (input)="setField(f.key, $any($event.target).value)"></md-outlined-text-field>
+            </div>
+          }
+        </div>
+        <a routerLink="/driver/documents" [queryParams]="{ category: 'health' }">View or upload medical documents</a>
+        <div class="pt-3">
+          <md-filled-button [disabled]="savingKey() === '2-1'" (click)="save(PILLS.health)">{{ savingKey() === '2-1' ? 'Saving…' : 'Save' }}</md-filled-button>
+          @if (savedKey() === '2-1') { <span class="otp-muted" role="status">Saved</span> }
+        </div>
+      </sky-accordion-item>
+
+      <!-- Experience & Skills -->
+      <sky-accordion-item header="Experience & Skills" [level]="2" variant="outlined">
+        <p class="otp-muted">Driver type and experience are set by our recruitment team and shown here read-only.</p>
+        <dl class="driver-resume-fields">
+          <dt>Driver type</dt><dd>{{ fieldValue(PILLS.accountLead, 'driverType') }}</dd>
+          <dt>Experience</dt><dd>{{ fieldValue(PILLS.accountLead, 'experience') }}</dd>
+        </dl>
+        <div class="address-form">
+          @for (f of fieldsFor(PILLS.licence); track f.key) {
+            @if (f.key === 'vehicleType') {
+              <div class="min-w-0 max-sm:col-span-2">
+                <md-outlined-text-field class="w-full" [label]="'Vehicle preference'" [value]="draft()[f.key] ?? ''" (input)="setField(f.key, $any($event.target).value)"></md-outlined-text-field>
+              </div>
+            }
+          }
+        </div>
+        <div class="pt-3">
+          <md-filled-button [disabled]="savingKey() === '3-0'" (click)="save(PILLS.licence)">{{ savingKey() === '3-0' ? 'Saving…' : 'Save' }}</md-filled-button>
+          @if (savedKey() === '3-0') { <span class="otp-muted" role="status">Saved</span> }
+        </div>
+      </sky-accordion-item>
+
+      <!-- Job Preferences -->
+      <sky-accordion-item header="Job Preferences" [level]="2" variant="outlined">
+        <p class="otp-muted">Job type and work-location preferences are set by our recruitment team and shown here read-only.</p>
+        <dl class="driver-resume-fields">
+          <dt>Job type</dt><dd>{{ fieldValue(PILLS.accountLead, 'jobType') }}</dd>
+          <dt>Job choices</dt><dd>{{ fieldValue(PILLS.accountLead, 'jobChoices') }}</dd>
+          <dt>Work location</dt><dd>{{ fieldValue(PILLS.accountLead, 'workLocation') }}</dd>
+          <dt>Other-state preference</dt><dd>{{ fieldValue(PILLS.accountLead, 'workStates') }}</dd>
+        </dl>
+      </sky-accordion-item>
+
+      <!-- Emergency Contact -->
+      <sky-accordion-item header="Emergency Contact" [level]="2" variant="outlined">
+        <div class="address-form">
+          @for (f of fieldsFor(PILLS.contact); track f.key) {
+            @if (f.key === 'emergencyNumber') {
+              <div class="min-w-0 max-sm:col-span-2">
+                <md-outlined-text-field class="w-full" [label]="f.label" [type]="f.type ?? 'text'" [value]="draft()[f.key] ?? ''" (input)="setField(f.key, $any($event.target).value)"></md-outlined-text-field>
+              </div>
+            }
+          }
+        </div>
+        <div class="pt-3">
+          <md-filled-button [disabled]="savingKey() === '1-1'" (click)="save(PILLS.contact)">{{ savingKey() === '1-1' ? 'Saving…' : 'Save' }}</md-filled-button>
+          @if (savedKey() === '1-1') { <span class="otp-muted" role="status">Saved</span> }
+        </div>
+      </sky-accordion-item>
+
+      <!-- Bank & Payout -->
+      <sky-accordion-item header="Bank & Payout" [level]="2" variant="outlined">
+        @for (item of issueFor(PILLS.bank); track item.key) { <p role="alert">{{ item.field }}: {{ item.reason }}</p> }
+        <div class="address-form">
+          @for (f of fieldsFor(PILLS.bank); track f.key) {
+            <div [class.span-2]="f.span2" class="min-w-0 max-sm:col-span-2">
+              <md-outlined-text-field class="w-full" [label]="f.label" [type]="f.type ?? 'text'" [value]="draft()[f.key] ?? ''" (input)="setField(f.key, $any($event.target).value)"></md-outlined-text-field>
+            </div>
+          }
+        </div>
+        <div class="pt-3">
+          <md-filled-button [disabled]="savingKey() === '4-0'" (click)="save(PILLS.bank)">{{ savingKey() === '4-0' ? 'Saving…' : 'Save' }}</md-filled-button>
+          @if (savedKey() === '4-0') { <span class="otp-muted" role="status">Saved</span> }
+        </div>
+      </sky-accordion-item>
+    </sky-accordion>
   }
 </md-admin-page>

@@ -1,7 +1,8 @@
-<md-admin-page title="Welcome" subtitle="Your account at a glance.">
+<md-admin-page title="Dashboard" [subtitle]="userName() ? 'Welcome back, ' + userName() + '.' : 'Your account activity.'">
+  <md-outlined-button page-actions (click)="reload()" [disabled]="loading()">Refresh</md-outlined-button>
   @if (loading()) {
     <p class="otp-muted">Loading…</p>
-  } @else if (customer(); as c) {
+  } @else if(error()) {<p role="alert">{{error()}}</p><md-outlined-button (click)="reload()">Retry</md-outlined-button>} @else if (customer(); as c) {
     <section class="account-card">
       <div class="account-card__head">
         <h2>{{ c.firstName }} {{ c.lastName }}</h2>
@@ -10,28 +11,12 @@
       <p class="otp-muted">{{ c.mobileNumber }} @if (c.email) { · {{ c.email }} }</p>
     </section>
 
-    <div class="driver-dash-grid">
-      <button type="button" class="driver-dash-card" (click)="go('/customer/profile')">
-        <md-icon aria-hidden="true">person</md-icon>
-        <span class="driver-dash-card__label">My Profile</span>
-        <span class="driver-dash-card__hint">Edit your details</span>
-      </button>
-      <button type="button" class="driver-dash-card" (click)="go('/customer/bookings')">
-        <md-icon aria-hidden="true">book_online</md-icon>
-        <span class="driver-dash-card__label">My Bookings</span>
-        <span class="driver-dash-card__hint">View your trips</span>
-      </button>
-      <button type="button" class="driver-dash-card" (click)="go('/customer/notifications')">
-        <md-icon aria-hidden="true">notifications</md-icon>
-        <span class="driver-dash-card__label">Notifications</span>
-        <span class="driver-dash-card__hint">Read your updates</span>
-      </button>
-      <button type="button" class="driver-dash-card" (click)="go('/customer/support')">
-        <md-icon aria-hidden="true">support_agent</md-icon>
-        <span class="driver-dash-card__label">Support</span>
-        <span class="driver-dash-card__hint">Get help</span>
-      </button>
-    </div>
+    @if(summary();as data){<div class="driver-dash-grid">
+      <button type="button" class="driver-dash-card" (click)="go('/customer/bookings')"><span>All Bookings</span><strong>{{data.total}}</strong></button>
+      <button type="button" class="driver-dash-card" (click)="go('/customer/bookings?view=Upcoming&timing=upcoming')"><span>Upcoming Trips</span><strong>{{data.upcoming}}</strong></button>
+      <button type="button" class="driver-dash-card" (click)="go('/customer/bookings?view=Completed')"><span>Completed Trips</span><strong>{{data.completed}}</strong></button>
+      <button type="button" class="driver-dash-card" (click)="go('/customer/payments')"><span>Pending Payment</span><strong>{{money(data.pendingPaise)}}</strong></button>
+    </div><section class="account-card"><h2>Needs Attention</h2><p>{{data.pendingPaise>0?'You have an outstanding booking payment.':'No outstanding booking payment.'}}</p><div class="flex gap-3 flex-wrap"><md-filled-button (click)="go('/customer/book')">Book a Driver</md-filled-button><md-outlined-button (click)="go('/customer/bookings')">View Bookings</md-outlined-button><md-outlined-button (click)="go('/customer/payments')">Payments</md-outlined-button></div></section>}
   }
-  <md-workflow embedded="customerSummary" />
+  @if(!loading()&&!error()){<md-workflow embedded="customerSummary" (changed)="reload()" />}
 </md-admin-page>

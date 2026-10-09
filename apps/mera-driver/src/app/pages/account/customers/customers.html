@@ -18,14 +18,14 @@
             caption="Customers Management Database"
           >
             <!-- Projected Add button -->
-            <md-icon-button
+            @if(auth.can('customers','create')){<md-icon-button
               slot="toolbar-actions"
               aria-label="Add Customer"
               title="Add Customer"
               (click)="startAdd()"
             >
               <md-icon>add</md-icon>
-            </md-icon-button>
+            </md-icon-button>}
           </sky-data-table>
         </sky-card>
       </div>
@@ -280,7 +280,7 @@
           <!-- Form Actions -->
           <div class="flex gap-2 mt-6 justify-end border-t border-slate-100 pt-4">
             <md-outlined-button (click)="cancelEdit()">Cancel</md-outlined-button>
-            <md-filled-button (click)="saveOption()" style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;">
+            <md-filled-button [disabled]="!auth.can('customers',editingId() === 'new' ? 'create' : 'edit')" (click)="saveOption()" style="--md-filled-button-container-color: #2e7d32; --md-filled-button-label-text-color: white;">
               <md-icon slot="icon">save</md-icon> Save
             </md-filled-button>
           </div>

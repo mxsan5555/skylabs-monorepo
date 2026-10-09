@@ -1,7 +1,10 @@
+import { validateLicenceInput } from './licence-input';
+import educationDocumentTypes from '../../../mera-driver/src/app/core/drivers/document-taxonomy.json';
 import type { Prisma } from '../generated/prisma-client';
 import { prisma } from '../lib/prisma';
 import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 import { HttpError } from '../middleware/errorHandler';
+import { writeAuditLog, type WriteAuditLogInput } from './audit.service';
 import { validateDriverPreferences } from './driver-preferences.service';
 import { currentLicence } from './licence-policy.service';
 
@@ -124,6 +127,13 @@ export async function getDriverById(id: string, client: Prisma.TransactionClient
   return { ...driver, driverStatusName: driver.driverStatusMaster?.name ?? null };
 }
 
+/** Driver's own device reporting its current position — ownership comes from the caller's
+ *  already-resolved `driverId` (never a param), so there's no route shape that could update
+ *  another driver's location. */
+export async function updateOwnLocation(driverId: string, lat: number, lng: number) {
+  return prisma.driver.update({ where: { id: driverId }, data: { currentLat: lat, currentLng: lng, locationUpdatedAt: new Date() } });
+}
+
 /**
  * `stepCompleted`/`subStepCompleted` are stripped off before hitting Prisma — neither is a
  * Driver column, they're the signal that drives `deriveOnboardingFields`. Omitting both (the
@@ -132,7 +142,7 @@ export async function getDriverById(id: string, client: Prisma.TransactionClient
  * create, no step info at all means a plain one-shot add with a fully-filled form, so it's
  * treated as fully onboarded (there's no wizard session to resume).
  */
-export interface DriverSaveContext { explicitApproval?:boolean; actorId?: string; canChangeStatus?: boolean }
+export interface DriverSaveContext { explicitApproval?:boolean; actorId?: string; canChangeStatus?: boolean; ownerUserId?: string | null }
 const FEE_FIELDS = ['preferredPaymentMode','amount','paymentReceiptDate'];
 async function validateBusinessStatus(input: Record<string,unknown>, existing: Record<string,unknown>, context: DriverSaveContext) {
   if (input.driverStatusMasterId === undefined || input.driverStatusMasterId === (existing.driverStatusMasterId ?? null)) return;
@@ -145,23 +155,28 @@ async function validateBusinessStatus(input: Record<string,unknown>, existing: R
 }
 
 export async function createDriver(input: Record<string, unknown>, context: DriverSaveContext = {}, client: Prisma.TransactionClient = prisma) {
+  validateLicenceInput(input);
   await validateBusinessStatus(input, {}, context);
   const feeChoice = input.registrationFeeEntryChoice;
   if (feeChoice === 'Unpaid') for (const key of FEE_FIELDS) delete input[key];
   await validateDriverPreferences(input);
   if (input.status === 'Verified' && input.stepCompleted == null) throw new HttpError(422, 'KYC_REVIEW_REQUIRED', 'Create and review the driver before final approval');
-  const { stepCompleted, subStepCompleted, completeStep, age: _clientAge, registrationFeeEntryChoice, driverStatusChangeReason, ...data } = input as Record<string, unknown> & {
+  // `createdByUserId` is destructured off and discarded here so it can never arrive from
+  // client input — it is set below only from `context.ownerUserId`, which the route layer
+  // derives solely from `req.user.sub` (see `driverOwnerScope`).
+  const { stepCompleted, subStepCompleted, completeStep, age: _clientAge, registrationFeeEntryChoice, driverStatusChangeReason, createdByUserId: _clientOwnerId, ...data } = input as Record<string, unknown> & {
     stepCompleted?: number;
     subStepCompleted?: number;
     completeStep?: boolean;
     age?: unknown;
+    createdByUserId?: unknown;
   };
   // An onboarding form cannot perform a staff KYC decision, even with a stale status.
   if (stepCompleted != null) delete data.status;
   const onboarding = deriveOnboardingFields(completeStep === false ? [] : resolveNewlyCompletedKeys(stepCompleted, subStepCompleted));
   const derivedAge = deriveAge(data.dob as string | undefined);
   const driver = await client.driver.create({
-    data: { ...data, ...onboarding, ...(derivedAge !== undefined ? { age: derivedAge } : {}) } as never,
+    data: { ...data, ...onboarding, ...(derivedAge !== undefined ? { age: derivedAge } : {}), createdByUserId: context.ownerUserId ?? null } as never,
   });
   return getDriverById(driver.id, client);
 }
@@ -171,6 +186,7 @@ export async function updateDriver(id: string, input: Record<string, unknown>, c
   await tx.$queryRaw`SELECT "id" FROM "Driver" WHERE "id" = ${id} FOR UPDATE`;
   const existing = await tx.driver.findUnique({ where: { id }, include: { documents: true } });
   if (!existing) throw new HttpError(404, 'NOT_FOUND', 'Driver not found');
+  validateLicenceInput(input, existing.dlNo);
   const { stepCompleted, subStepCompleted, completeStep, age: _clientAge, registrationFeeEntryChoice, driverStatusChangeReason, ...data } = input as Record<string, unknown> & {
     stepCompleted?: number;
     subStepCompleted?: number;
@@ -218,7 +234,7 @@ export async function updateDriver(id: string, input: Record<string, unknown>, c
 
 export async function deleteDriver(id: string) {
   await getDriverById(id);
-  await prisma.driver.delete({ where: { id } });
+  throw new HttpError(422,'DRIVER_ARCHIVE_UNAVAILABLE','Driver deletion is unavailable: this installation has no soft-delete/archive workflow. Driver, booking, payment, KYC and document history must be preserved.');
 }
 
 export interface AddDriverDocumentInput {
@@ -231,20 +247,37 @@ export interface AddDriverDocumentInput {
   mimeType?: string;
   sizeBytes?: number;
   expiresAt?: string;
+  typeKey?: string;
+  replaceDocumentId?: string;
 }
 
-export async function addDriverDocument(input: AddDriverDocumentInput) {
+export async function addDriverDocument(input: AddDriverDocumentInput, audit?: Omit<WriteAuditLogInput,'targetType'|'targetId'|'after'>) {
   await getDriverById(input.driverId);
-  const profilePhoto = input.category === 'personal' && input.type === 'Profile Photo';
+  return prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT "id" FROM "Driver" WHERE "id" = ${input.driverId} FOR UPDATE`;
+    const choices = input.category === 'education' ? educationDocumentTypes : await tx.masterListItem.findMany({where:{category:input.category+'-docs'}});
+    const keyOf=(type:string)=>choices.find(choice=>choice.id===type||choice.name.trim().toLowerCase()===type.trim().toLowerCase())?.id ?? 'legacy:'+type.trim().toLowerCase();
+    const selected=input.typeKey?choices.find(choice=>choice.id===input.typeKey):choices.find(choice=>keyOf(input.type)===choice.id);
+    if(((input.typeKey&&!selected)||(selected&&selected.status!=='Active'))&&!input.replaceDocumentId)throw new HttpError(422,'VALIDATION_ERROR','Choose an active document type',{fieldErrors:{type:['Choose an active document type']}});
+    const type=selected?.name??input.type.trim();
+  const profilePhoto = input.category === 'personal' && type === 'Profile Photo';
   if (profilePhoto && (!input.filePath?.startsWith(`drivers/${input.driverId}/`) || input.filePath.split('/').length!==3 || input.filePath.includes('..') || !['image/png','image/jpeg','image/webp'].includes(input.mimeType ?? ''))) {
     throw new HttpError(422, 'PROFILE_PHOTO_INVALID', 'Upload a PNG, JPEG or WebP profile photo');
   }
-  return prisma.$transaction(async tx => {
-    await tx.$queryRaw`SELECT "id" FROM "Driver" WHERE "id" = ${input.driverId} FOR UPDATE`;
-    const previous = await tx.driverDocument.findFirst({ where: { driverId: input.driverId, category: input.category, type: input.type }, orderBy: { version: 'desc' } });
-    await tx.driverDocument.updateMany({ where: { driverId: input.driverId, category: input.category, type: input.type, archivedAt: null }, data: { archivedAt: new Date() } });
-    const document = await tx.driverDocument.create({ data: { ...input, expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined, version: (previous?.version ?? 0) + 1 } });
-    if(input.type !== 'Registration Fee Receipt') await tx.driver.update({ where: { id: input.driverId }, data: { status: 'Non-Verified', ...(profilePhoto ? { avatar: document.filePath } : {}) } });
+
+    const documents=await tx.driverDocument.findMany({where:{driverId:input.driverId,category:input.category},orderBy:{version:'desc'}});
+    const same=documents.filter(doc=>keyOf(doc.type)===keyOf(type));
+    const active=same.filter(doc=>!doc.archivedAt);
+    // Fixed photo/receipt fields already represent replacement, rather than an Add Document row.
+    const singleton=input.category==='personal'&&['Profile Photo','Registration Fee Receipt'].includes(type);
+    const replacement=input.replaceDocumentId?documents.find(doc=>doc.id===input.replaceDocumentId):singleton&&active.length===1?active[0]:undefined;
+    if(input.replaceDocumentId&&(!replacement||replacement.archivedAt||keyOf(replacement.type)!==keyOf(type)))throw new HttpError(409,'DOCUMENT_REPLACEMENT_STALE','The current document changed. Reload before replacing its file.');
+    if(!replacement&&active.length)throw new HttpError(422,'DOCUMENT_TYPE_DUPLICATE','This document type has already been added. Update the existing document or delete its row first.',{fieldErrors:{type:['This document type has already been added. Update the existing document or delete its row first.']}});
+    if(replacement)await tx.driverDocument.update({where:{id:replacement.id},data:{archivedAt:new Date()}});
+    const {typeKey,replaceDocumentId,...metadata}=input;
+    const document = await tx.driverDocument.create({ data: { ...metadata, type, expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined, version: Math.max(0,...same.map(doc=>doc.version))+1 } });
+    if(type !== 'Registration Fee Receipt') await tx.driver.update({ where: { id: input.driverId }, data: { status: 'Non-Verified', ...(profilePhoto ? { avatar: document.filePath } : {}) } });
+    if(audit)await writeAuditLog({...audit,targetType:'Driver',targetId:input.driverId,after:document},tx);
     return document;
   });
 }
@@ -254,15 +287,17 @@ export async function listDriverDocuments(driverId: string) {
   return prisma.driverDocument.findMany({ where: { driverId }, orderBy: { createdAt: 'desc' } });
 }
 
-export async function deleteDriverDocument(driverId: string, docId: string) {
-  const doc = await prisma.driverDocument.findFirst({ where: { id: docId, driverId } });
-  if (!doc) throw new HttpError(404, 'NOT_FOUND', 'Document not found');
-  await prisma.$transaction(async tx => {
+export async function deleteDriverDocument(driverId: string, docId: string, audit?:Omit<WriteAuditLogInput,'targetType'|'targetId'|'before'>) {
+  return prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "Driver" WHERE "id" = ${driverId} FOR UPDATE`;
+    const doc = await tx.driverDocument.findFirst({ where: { id: docId, driverId } });
+    if (!doc) throw new HttpError(404, 'NOT_FOUND', 'Document not found');
+    if(doc.archivedAt)throw new HttpError(409,'DOCUMENT_ALREADY_ARCHIVED','This document was replaced or withdrawn. Reload before deleting its current row.');
     await tx.driverDocument.update({ where: { id: docId }, data: { archivedAt: new Date() } });
     if(doc.type !== 'Registration Fee Receipt') await tx.driver.update({ where: { id: driverId }, data: { status: 'Non-Verified' } });
+    if(audit)await writeAuditLog({...audit,targetType:'Driver',targetId:driverId,before:doc},tx);
+    return doc;
   });
-  return doc;
 }
 
 /**
@@ -364,15 +399,29 @@ export async function createAndLinkDriverUser(driverId: string) {
  * KYC review. Ownership-scoped `GET /drivers/assigned-to-me*` and `PATCH /drivers/:id/kyc-
  * checklist` are keyed off this field — see those routes and `getAssignedDriverById` below.
  */
-export async function assignVerifier(driverId: string, verifierId: string | null) {
-  await getDriverById(driverId);
+/** Same permission eligibility as assignment validation, independent of display names. */
+export async function eligibleVerifiers() {
+  const users = await prisma.user.findMany({where:{status:'active',deletedAt:null,OR:[
+    {roles:{some:{role:{isActive:true,isSuperAdmin:true}}}},
+    {roles:{some:{role:{isActive:true,permissions:{some:{permission:{key:'kyc-assignments:view'}}}}}},permissionOverrides:{none:{effect:'revoke',permission:{key:'kyc-assignments:view'}}}},
+  ]},select:{id:true,name:true,email:true,phone:true},orderBy:{name:'asc'}});
+  return users;
+}
+
+export async function assignVerifier(driverId: string, verifierId: string | null, expectedVerifierId?: string | null, audit?: Pick<WriteAuditLogInput,'actorUserId'|'ip'|'userAgent'> & {reason?:string}) {
+  const current=await getDriverById(driverId);
+  if(expectedVerifierId !== undefined && (current.assignedVerifierId ?? null) !== expectedVerifierId) throw new HttpError(409,'ASSIGNMENT_CHANGED','This assignment changed. Reload the current verifier before saving.');
   if (verifierId) {
     const verifier = await prisma.user.findFirst({ where: { id: verifierId, deletedAt: null,status:'active' },include:{roles:{include:{role:true}}} });
     if (!verifier) throw new HttpError(404, 'NOT_FOUND', 'Verifier user not found');
     const permissions=await import('./permission.service').then(m=>m.resolveEffectivePermissionsForUser(verifierId,verifier.roles.map(link=>link.role.key)));
     if(!permissions.includes('kyc-assignments:view'))throw new HttpError(422,'VERIFIER_PERMISSION_REQUIRED','Choose an active staff user with KYC review permission');
   }
-  await prisma.driver.update({ where: { id: driverId }, data: { assignedVerifierId: verifierId } });
+  await prisma.$transaction(async tx=>{
+    const updated=await tx.driver.updateMany({where:{id:driverId,assignedVerifierId:expectedVerifierId ?? current.assignedVerifierId ?? null},data:{assignedVerifierId:verifierId}});
+    if(updated.count!==1) throw new HttpError(409,'ASSIGNMENT_CHANGED','This assignment changed. Reload the current verifier before saving.');
+    if(audit) await writeAuditLog({actorUserId:audit.actorUserId,ip:audit.ip,userAgent:audit.userAgent,action:'driver.kyc.assign',targetType:'Driver',targetId:driverId,before:{assignedVerifierId:current.assignedVerifierId??null},after:{assignedVerifierId:verifierId,reason:audit.reason??null}},tx);
+  });
   return getDriverById(driverId);
 }
 

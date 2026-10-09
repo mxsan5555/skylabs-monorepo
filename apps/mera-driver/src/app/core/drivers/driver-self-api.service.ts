@@ -10,6 +10,7 @@ export interface DriverSelfDocument {
   type: string;
   regNo: string | null;
   fileName: string | null;
+  filePath?: string | null;
   version?: number;
   archivedAt?: string | null;
   expiresAt?: string | null;
@@ -99,10 +100,13 @@ export class DriverSelfApiService {
     regNo: string,
     file: File,
     expiresAt?: string,
+    typeKey?:string,replaceDocumentId?:string,
   ): Observable<DriverSelfDocument> {
     const form = new FormData();
     form.append('category', category);
     form.append('type', type);
+    if(typeKey)form.append('typeKey',typeKey);
+    if(replaceDocumentId)form.append('replaceDocumentId',replaceDocumentId);
     if (regNo) form.append('regNo', regNo);
     if (expiresAt) form.append('expiresAt', expiresAt);
     form.append('file', file);
@@ -111,6 +115,10 @@ export class DriverSelfApiService {
 
   deleteDocument(docId: string): Observable<{ id: string }> {
     return this.http.delete<ApiEnvelope<{ id: string }>>(`${this.base}/documents/${docId}`).pipe(map(unwrap));
+  }
+
+  updateLocation(lat: number, lng: number): Observable<{ lat: number; lng: number; updatedAt: string }> {
+    return this.http.patch<ApiEnvelope<{ lat: number; lng: number; updatedAt: string }>>(`${this.base}/location`, { lat, lng }).pipe(map(unwrap));
   }
 }
 

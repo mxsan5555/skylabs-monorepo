@@ -14,6 +14,7 @@
     "mera-driver-api:prisma:migrate": "dotenv -e apps/mera-driver-api/.env.local -- prisma migrate dev --schema=apps/mera-driver-api/prisma/schema.prisma",
     "mera-driver-api:prisma:studio": "dotenv -e apps/mera-driver-api/.env.local -- prisma studio --schema=apps/mera-driver-api/prisma/schema.prisma",
     "mera-driver-api:prisma:seed": "dotenv -e apps/mera-driver-api/.env.local -- tsx --tsconfig tsconfig.base.json apps/mera-driver-api/prisma/seed.ts",
+    "mera-driver-api:prisma:seed-demo": "dotenv -e apps/mera-driver-api/.env.local -- tsx --tsconfig tsconfig.base.json apps/mera-driver-api/prisma/seed-demo.ts",
     "dev": "tsx watch src/main.ts",
     "build": "webpack-cli build --node-env=production"
   },

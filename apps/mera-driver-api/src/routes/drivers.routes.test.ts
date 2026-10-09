@@ -11,6 +11,7 @@ import { invalidatePermissionCache } from '../services/permission.service';
 const USER_2_ID = '22222222-2222-2222-8222-222222222222';
 
 function adminToken() {
+  mockPrisma.role.findMany.mockResolvedValue([{key:'admin',isSuperAdmin:false}]);
   return signAccessToken({ sub: 'admin-1', roles: ['admin'], app: 'mera-driver' });
 }
 
@@ -27,7 +28,7 @@ beforeEach(() => {
 describe('read-only Driver Details and resume authorization',()=>{
   it.each(['/drivers/driver-1/details','/drivers/driver-1/resume.pdf'])('denies anonymous requests: %s',async(url)=>{expect((await request(app).get(url)).status).toBe(401);});
   it.each(['driver','customer','kyc_verification'])('does not grant general staff details/export to a portal or verifier role: %s',async(role)=>{
-    grant('kyc-assignments:view');const token=signAccessToken({sub:'portal-1',roles:[role],app:'mera-driver'});
+    grant('kyc-assignments:view', 'kyc-assignments:edit');const token=signAccessToken({sub:'portal-1',roles:[role],app:'mera-driver'});
     for(const suffix of ['details','resume.pdf'])expect((await request(app).get(`/drivers/driver-1/${suffix}`).set('Authorization',`Bearer ${token}`)).status).toBe(403);
   });
   it('requires export independently of drivers:view',async()=>{grant('drivers:view');expect((await request(app).get('/drivers/driver-1/resume.pdf').set('Authorization',`Bearer ${adminToken()}`)).status).toBe(403);});
@@ -35,8 +36,8 @@ describe('read-only Driver Details and resume authorization',()=>{
 
 describe('explicit final KYC approval',()=>{
   it('does not give customer/driver roles staff inline DL check or history access',async()=>{for(const role of ['customer','driver']){const token=signAccessToken({sub:'portal',roles:[role],app:'mera-driver'});expect((await request(app).get('/drivers/other/dl-verification').set('Authorization',`Bearer ${token}`)).status).toBe(403);expect((await request(app).post('/drivers/other/dl-verification').set('Authorization',`Bearer ${token}`).send({dlNo:'UP5320260001705',dob:'2004-04-24'})).status).toBe(403);}});
-  it('denies a verifier without drivers:edit',async()=>{grant('kyc-assignments:view');const res=await request(app).post('/drivers/driver-1/kyc-approval').set('Authorization',`Bearer ${adminToken()}`).send({});expect(res.status).toBe(403);expect(mockPrisma.driver.update).not.toHaveBeenCalled();});
-  it('keeps premature approval guarded independently of onboarding saves',async()=>{grant('drivers:edit');mockPrisma.driver.findUnique.mockResolvedValue({id:'driver-1',status:'Non-Verified',completedSubSteps:[],documents:[]});mockPrisma.driverKycCheck.findMany.mockResolvedValue([]);const res=await request(app).post('/drivers/driver-1/kyc-approval').set('Authorization',`Bearer ${adminToken()}`).send({});expect(res.status).toBe(422);expect(res.body.error.code).toBe('KYC_REVIEW_REQUIRED');expect(mockPrisma.driver.update).not.toHaveBeenCalled();});
+  it('denies a verifier without drivers:edit',async()=>{grant('kyc-assignments:view', 'kyc-assignments:edit');const res=await request(app).post('/drivers/driver-1/kyc-approval').set('Authorization',`Bearer ${adminToken()}`).send({});expect(res.status).toBe(403);expect(mockPrisma.driver.update).not.toHaveBeenCalled();});
+  it('keeps premature approval guarded independently of onboarding saves',async()=>{grant('drivers:edit','drivers:assign');mockPrisma.driver.findUnique.mockResolvedValue({id:'driver-1',status:'Non-Verified',completedSubSteps:[],documents:[]});mockPrisma.driverKycCheck.findMany.mockResolvedValue([]);const res=await request(app).post('/drivers/driver-1/kyc-approval').set('Authorization',`Bearer ${adminToken()}`).send({});expect(res.status).toBe(422);expect(res.body.error.code).toBe('KYC_REVIEW_REQUIRED');expect(mockPrisma.driver.update).not.toHaveBeenCalled();});
 });
 
 describe('PATCH /drivers/:id/link-user', () => {
@@ -249,6 +250,7 @@ describe('POST /drivers/:id/create-user', () => {
 });
 
 function verifierToken(sub: string) {
+  mockPrisma.role.findMany.mockResolvedValue([{key:'kyc_verification',isSuperAdmin:false}]);
   return signAccessToken({ sub, roles: ['kyc_verification'], app: 'mera-driver' });
 }
 
@@ -283,8 +285,9 @@ describe('PATCH /drivers/:id/assign-verifier', () => {
   });
 
   it('assigns a verifier and audit-logs it', async () => {
-    grant('drivers:assign','kyc-assignments:view');
-    mockPrisma.driver.findUnique.mockResolvedValue({ id: 'driver-1', assignedVerifierId: USER_2_ID, documents: [] });
+    grant('drivers:assign','kyc-assignments:view', 'kyc-assignments:edit');
+    mockPrisma.driver.findUnique.mockResolvedValueOnce({ id: 'driver-1', assignedVerifierId: null, documents: [] }).mockResolvedValueOnce({ id: 'driver-1', assignedVerifierId: null, documents: [] }).mockResolvedValue({ id: 'driver-1', assignedVerifierId: USER_2_ID, documents: [] });
+    mockPrisma.driver.updateMany.mockResolvedValue({count:1});
     mockPrisma.user.findFirst.mockResolvedValue({ id: USER_2_ID, deletedAt: null,roles:[{role:{key:'kyc_verification'}}] });
     mockPrisma.driver.update.mockResolvedValue({});
     mockPrisma.auditLog.create.mockResolvedValue({});
@@ -295,7 +298,7 @@ describe('PATCH /drivers/:id/assign-verifier', () => {
       .send({ verifierId: USER_2_ID });
 
     expect(res.status).toBe(200);
-    expect(mockPrisma.driver.update).toHaveBeenCalledWith({ where: { id: 'driver-1' }, data: { assignedVerifierId: USER_2_ID } });
+    expect(mockPrisma.driver.updateMany).toHaveBeenCalledWith({ where: { id: 'driver-1',assignedVerifierId:null }, data: { assignedVerifierId: USER_2_ID } });
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: 'driver.kyc.assign' }) }),
     );
@@ -323,7 +326,7 @@ describe('GET /drivers/assigned-to-me', () => {
   });
 
   it("scopes the query to the caller's own userId", async () => {
-    grant('kyc-assignments:view');
+    grant('kyc-assignments:view', 'kyc-assignments:edit');
     mockPrisma.driver.findMany.mockResolvedValue([{ id: 'driver-1' }]);
 
     const res = await request(app).get('/drivers/assigned-to-me').set('Authorization', `Bearer ${verifierToken('verifier-1')}`);
@@ -336,7 +339,7 @@ describe('GET /drivers/assigned-to-me', () => {
 });
 
 describe('GET /drivers/assigned-to-me/:id — permission plus assignment', () => {
-  beforeEach(() => grant('kyc-assignments:view'));
+  beforeEach(() => grant('kyc-assignments:view', 'kyc-assignments:edit'));
 
   it('returns the driver when assigned to the caller', async () => {
     mockPrisma.driver.findFirst.mockResolvedValue({ id: 'driver-1', assignedVerifierId: 'verifier-1' });
@@ -364,7 +367,7 @@ describe('GET /drivers/assigned-to-me/:id — permission plus assignment', () =>
 });
 
 describe('PATCH /drivers/:id/kyc-checklist — permission plus assignment', () => {
-  beforeEach(() => grant('kyc-assignments:view'));
+  beforeEach(() => grant('kyc-assignments:view', 'kyc-assignments:edit'));
 
   it('updates a checklist category for the assigned verifier', async () => {
     mockPrisma.driver.findFirst.mockResolvedValue({ id: 'driver-1', assignedVerifierId: 'verifier-1' });
@@ -413,16 +416,113 @@ describe('PATCH /drivers/:id/kyc-checklist — permission plus assignment', () =
 
 describe('professional resume permissions',()=>{
   it('allows a staff preview without requiring internal-report export',async()=>{grant('drivers:view');mockPrisma.driver.findUnique.mockResolvedValue({id:'driver-1',firstName:'Saved',documents:[]});const response=await request(app).get('/drivers/driver-1/resume').set('Authorization',`Bearer ${adminToken()}`);expect(response.status).toBe(200);expect(response.body.data.filename).toBe('Saved_Driver_Resume.pdf');});
-  it('denies resume edits to view-only staff and KYC verifiers',async()=>{grant('drivers:view','kyc-assignments:view');const response=await request(app).patch('/drivers/driver-1/resume').set('Authorization',`Bearer ${adminToken()}`).send({});expect(response.status).toBe(403);expect(mockPrisma.driver.update).not.toHaveBeenCalled();});
+  it('denies resume edits to view-only staff and KYC verifiers',async()=>{grant('drivers:view','kyc-assignments:view', 'kyc-assignments:edit');const response=await request(app).patch('/drivers/driver-1/resume').set('Authorization',`Bearer ${adminToken()}`).send({});expect(response.status).toBe(403);expect(mockPrisma.driver.update).not.toHaveBeenCalled();});
 });
 
 describe('administrative KYC assignment queue',()=>{
- it('grants full paginated queue through drivers:assign while maintaining the state/search predicates',async()=>{grant('kyc-assignments:view','drivers:assign');mockPrisma.driver.findMany.mockResolvedValue([{id:'unassigned',assignedVerifierId:null}]);mockPrisma.driver.count.mockResolvedValue(1);const res=await request(app).get('/drivers/assigned-to-me?page=2&state=Unassigned&search=Ravi').set('Authorization',`Bearer ${adminToken()}`);expect(res.status).toBe(200);expect(res.body.meta).toMatchObject({page:2,total:1});const query=mockPrisma.driver.findMany.mock.calls[0][0];expect(query.skip).toBe(25);expect(query.where.AND[0]).toEqual({});expect(query.where.AND[2].assignedVerifierId).toBeNull();});
+ it('grants full paginated queue through drivers:assign while maintaining the state/search predicates',async()=>{grant('kyc-assignments:view','drivers:assign', 'kyc-assignments:edit');mockPrisma.driver.findMany.mockResolvedValue([{id:'unassigned',assignedVerifierId:null}]);mockPrisma.driver.count.mockResolvedValue(1);const res=await request(app).get('/drivers/assigned-to-me?page=2&state=Unassigned&search=Ravi').set('Authorization',`Bearer ${adminToken()}`);expect(res.status).toBe(200);expect(res.body.meta).toMatchObject({page:2,total:1});const query=mockPrisma.driver.findMany.mock.calls[0][0];expect(query.skip).toBe(25);expect(query.where.AND[0]).toEqual({});expect(query.where.AND[2].assignedVerifierId).toBeNull();});
  it('requires a reason before changing an existing assignment',async()=>{grant('drivers:assign');mockPrisma.driver.findUnique.mockResolvedValue({id:'driver-1',assignedVerifierId:'previous',documents:[]});const res=await request(app).patch('/drivers/driver-1/assign-verifier').set('Authorization',`Bearer ${adminToken()}`).send({verifierId:USER_2_ID});expect(res.status).toBe(422);expect(mockPrisma.driver.update).not.toHaveBeenCalled();});
 });
 
 describe('assigned review DL execution',()=>{
  it('denies ordinary profile editors from using the retired form action',async()=>{grant('drivers:edit');const r=await request(app).post('/drivers/driver-1/dl-verification').set('Authorization',`Bearer ${adminToken()}`).send({});expect(r.status).toBe(403);expect(r.body.error.code).toBe('DL_REVIEW_REQUIRED');expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();});
- it('requires the reviewer assignment rather than browser DL/DOB or driver identity',async()=>{grant('kyc-assignments:view');mockPrisma.driver.findFirst.mockResolvedValue(null);const r=await request(app).post('/drivers/driver-1/dl-verification/preflight').set('Authorization',`Bearer ${adminToken()}`).send({});expect(r.status).toBe(404);expect(mockPrisma.driver.findFirst).toHaveBeenCalledWith({where:{id:'driver-1',assignedVerifierId:'admin-1'}});expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();});
- it('uses the existing explicit administrative policy without inventing role privileges',async()=>{grant('kyc-assignments:view','drivers:assign');mockPrisma.driver.findFirst.mockResolvedValue(null);const r=await request(app).post('/drivers/driver-1/dl-verification/preflight').set('Authorization',`Bearer ${adminToken()}`).send({});expect(r.status).toBe(404);expect(mockPrisma.driver.findFirst).toHaveBeenCalledWith({where:{id:'driver-1'}});});
+ it('requires the reviewer assignment rather than browser DL/DOB or driver identity',async()=>{grant('kyc-assignments:view', 'kyc-assignments:edit');mockPrisma.driver.findFirst.mockResolvedValue(null);const r=await request(app).post('/drivers/driver-1/dl-verification/preflight').set('Authorization',`Bearer ${adminToken()}`).send({});expect(r.status).toBe(404);expect(mockPrisma.driver.findFirst).toHaveBeenCalledWith({where:{id:'driver-1',assignedVerifierId:'admin-1'}});expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();});
+ it('uses the existing explicit administrative policy without inventing role privileges',async()=>{grant('kyc-assignments:view','drivers:assign', 'kyc-assignments:edit');mockPrisma.driver.findFirst.mockResolvedValue(null);const r=await request(app).post('/drivers/driver-1/dl-verification/preflight').set('Authorization',`Bearer ${adminToken()}`).send({});expect(r.status).toBe(404);expect(mockPrisma.driver.findFirst).toHaveBeenCalledWith({where:{id:'driver-1'}});});
+});
+
+describe('assignment and archive safeguards',()=>{
+  it('does not mutate an unchanged assignment or add duplicate history',async()=>{
+    grant('drivers:assign');mockPrisma.driver.findUnique.mockResolvedValue({id:'driver-1',assignedVerifierId:USER_2_ID});
+    const response=await request(app).patch('/drivers/driver-1/assign-verifier').set('Authorization',`Bearer ${adminToken()}`).send({verifierId:USER_2_ID,expectedVerifierId:USER_2_ID});
+    expect(response.status).toBe(200);expect(mockPrisma.driver.updateMany).not.toHaveBeenCalled();expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+  });
+  it('rejects a stale current-verifier snapshot before modifying the record',async()=>{
+    grant('drivers:assign');mockPrisma.driver.findUnique.mockResolvedValue({id:'driver-1',assignedVerifierId:USER_2_ID});
+    const response=await request(app).patch('/drivers/driver-1/assign-verifier').set('Authorization',`Bearer ${adminToken()}`).send({verifierId:null,expectedVerifierId:null});
+    expect(response.status).toBe(409);expect(mockPrisma.driver.updateMany).not.toHaveBeenCalled();
+  });
+  it('cannot permanently delete driver history through the existing delete URL',async()=>{
+    grant('drivers:delete');mockPrisma.driver.findUnique.mockResolvedValue({id:'driver-1'});
+    const response=await request(app).delete('/drivers/driver-1').set('Authorization',`Bearer ${adminToken()}`);
+    expect(response.status).toBe(422);expect(response.body.error.code).toBe('DRIVER_ARCHIVE_UNAVAILABLE');expect(mockPrisma.driver.delete).not.toHaveBeenCalled();
+  });
+  it('generic Edit alone cannot approve human KYC',async()=>{
+    grant('drivers:edit');const response=await request(app).post('/drivers/driver-1/kyc-approval').set('Authorization',`Bearer ${adminToken()}`).send({});expect(response.status).toBe(403);
+  });
+});
+
+describe('Vendor/Sales/Data Operator creator-ownership scoping', () => {
+  it('POST /drivers sets createdByUserId from the caller when they are not full-queue (Vendor)', async () => {
+    grant('drivers:view', 'drivers:create', 'drivers:edit');
+    mockPrisma.driver.create.mockResolvedValue({ id: 'new-driver' });
+    mockPrisma.driver.findUnique.mockResolvedValue({ id: 'new-driver', documents: [] });
+
+    const res = await request(app).post('/drivers').set('Authorization', `Bearer ${adminToken()}`).send({ firstName: 'New', gender: 'Male' });
+
+    expect(res.status).toBe(201);
+    expect(mockPrisma.driver.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ createdByUserId: null }) }),
+    );
+  });
+
+  it('POST /drivers leaves createdByUserId null for a full-queue caller (Admin/Super Admin)', async () => {
+    grant('drivers:view', 'drivers:create', 'drivers:assign');
+    mockPrisma.driver.create.mockResolvedValue({ id: 'new-driver' });
+    mockPrisma.driver.findUnique.mockResolvedValue({ id: 'new-driver', documents: [] });
+
+    const res = await request(app).post('/drivers').set('Authorization', `Bearer ${adminToken()}`).send({ firstName: 'New', gender: 'Male' });
+
+    expect(res.status).toBe(201);
+    expect(mockPrisma.driver.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ createdByUserId: null }) }),
+    );
+  });
+
+  it('a client-supplied createdByUserId in the request body is never trusted — Zod strips it before it reaches the service', async () => {
+    grant('drivers:view', 'drivers:create');
+    mockPrisma.driver.create.mockResolvedValue({ id: 'new-driver' });
+    mockPrisma.driver.findUnique.mockResolvedValue({ id: 'new-driver', documents: [] });
+
+    await request(app).post('/drivers').set('Authorization', `Bearer ${adminToken()}`).send({ firstName: 'New', gender: 'Male', createdByUserId: 'attacker-id' });
+
+    expect(mockPrisma.driver.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ createdByUserId: null }) }),
+    );
+  });
+
+  it('GET /drivers/:id/details 404s a custom role reading a driver they do not own', async () => {
+    grant('drivers:view', 'drivers:create');
+    mockPrisma.driver.findUnique.mockResolvedValue({ createdByUserId: 'someone-else' });
+
+    mockPrisma.role.findMany.mockResolvedValue([{key:'custom',isSuperAdmin:false}]);
+    const customToken=signAccessToken({sub:'admin-1',roles:['custom'],app:'mera-driver'});
+    const res = await request(app).get('/drivers/driver-1/details').set('Authorization', `Bearer ${customToken}`);
+
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /drivers/:id/details is unscoped for a full-queue caller even when createdByUserId differs', async () => {
+    grant('drivers:view', 'drivers:assign');
+    mockPrisma.driver.findUnique.mockResolvedValue({ id: 'driver-1', firstName: 'X', lastName: 'Y', documents: [] });
+
+    const res = await request(app).get('/drivers/driver-1/details').set('Authorization', `Bearer ${adminToken()}`);
+
+    expect(res.status).not.toBe(404);
+  });
+});
+
+it('KYC View never grants checklist editing, review mutation or licence checks',async()=>{
+ mockPrisma.role.findMany.mockResolvedValue([{key:'kyc_verification',isSuperAdmin:false}]);mockPrisma.rolePermission.findMany.mockResolvedValue([{permission:{key:'kyc-assignments:view'}}]);
+ const token=signAccessToken({sub:'reviewer',roles:['kyc_verification'],app:'mera-driver'});
+ for(const endpoint of ['kyc-checklist','pill-review'])expect((await request(app).patch('/drivers/driver-1/'+endpoint).set('Authorization','Bearer '+token).send({})).status).toBe(403);
+ expect((await request(app).post('/drivers/driver-1/dl-verification/preflight').set('Authorization','Bearer '+token).send({retry:false})).status).toBe(403);
+ expect(mockPrisma.driver.update).not.toHaveBeenCalled();expect(mockPrisma.driverKycCheck.upsert).not.toHaveBeenCalled();
+});
+
+it('returns the existing owned driver when a create request is retried with its idempotency key',async()=>{
+ mockPrisma.role.findMany.mockResolvedValue([{key:'vendor',isSuperAdmin:false}]);mockPrisma.rolePermission.findMany.mockResolvedValue([{permission:{key:'drivers:create'}}]);
+ const creationRequestId='11111111-1111-4111-8111-111111111111',existing={id:'driver-fixture',createdByUserId:'vendor-user',firstName:'Retry',gender:'Female',documents:[]};mockPrisma.driver.findUnique.mockResolvedValue(existing);
+ const token=signAccessToken({sub:'vendor-user',roles:['vendor'],app:'mera-driver'});
+ const response=await request(app).post('/drivers').set('Authorization','Bearer '+token).set('Idempotency-Key',creationRequestId).send({firstName:'Retry',gender:'Female'});
+ expect(response.status).toBe(200);expect(response.body.data.id).toBe(existing.id);expect(mockPrisma.driver.create).not.toHaveBeenCalled();expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
 });

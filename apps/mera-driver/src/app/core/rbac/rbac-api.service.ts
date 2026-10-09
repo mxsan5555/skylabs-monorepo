@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
+import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
 import { Observable, map } from 'rxjs';
 import type {
   ApiEnvelope,
@@ -37,6 +38,7 @@ export interface PermissionCatalogAction {
 export interface PermissionCatalogNode {
   menuKey: string;
   title: string;
+  groupTitle?: string;
   actions: PermissionCatalogAction[];
 }
 
@@ -51,14 +53,19 @@ export interface CreateRoleInput {
   key: string;
   name: string;
   description?: string;
+  isActive?: boolean;
+  permissionIds?: string[];
 }
 
 export interface UpdateRoleInput {
   name?: string;
   description?: string;
+  isActive?: boolean;
+  permissionIds?: string[];
 }
 
 export interface CreateUserInput {
+  status?:UserStatus;
   name: string;
   email?: string;
   phone?: string;
@@ -66,6 +73,8 @@ export interface CreateUserInput {
 }
 
 export interface UpdateUserInput {
+  status?:UserStatus;
+  roleIds?:string[];
   name?: string;
   email?: string;
   phone?: string;
@@ -87,11 +96,27 @@ export interface Page<T> {
 @Injectable({ providedIn: 'root' })
 export class RbacApiService {
   private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthService);
+  private authorizationRefresh: Promise<void> | null = null;
+
+  /** Reuse backend bootstrap and the existing session lifecycle; credentials never decide grants. */
+  refreshAuthorization(): Promise<void> {
+    if (!this.authorizationRefresh) this.authorizationRefresh = (async()=>{
+      if (!await this.auth.ensureValidToken()) return;
+      await this.auth.refreshBootstrap();
+    })().finally(()=>{this.authorizationRefresh=null;});
+    return this.authorizationRefresh;
+  }
+
   private readonly base = `${environment.apiUrl}/rbac`;
 
   // ---------------------------------------------------------------------
   // Roles
   // ---------------------------------------------------------------------
+
+  assignableRoles(): Observable<Role[]> {
+    return this.http.get<ApiEnvelope<Role[]>>(`${this.base}/users/assignable-roles`).pipe(map(unwrap));
+  }
 
   listRoles(): Observable<Role[]> {
     return this.http.get<ApiEnvelope<Role[]>>(`${this.base}/roles`).pipe(map(unwrap));
@@ -148,6 +173,10 @@ export class RbacApiService {
       .pipe(map(unwrap));
   }
 
+  roleWidgets(roleId:string): Observable<RoleWidgetLink[]> {
+    return this.http.get<ApiEnvelope<RoleWidgetLink[]>>(`${this.base}/roles/${roleId}/widgets`).pipe(map(unwrap));
+  }
+
   setRoleWidgets(roleId: string, widgets: { widgetId: string; order: number }[]): Observable<RoleWidgetLink[]> {
     return this.http
       .put<ApiEnvelope<RoleWidgetLink[]>>(`${this.base}/roles/${roleId}/widgets`, { widgets })
@@ -158,11 +187,11 @@ export class RbacApiService {
   // Users
   // ---------------------------------------------------------------------
 
-  listUsers(page = 1, pageSize = 25): Observable<Page<User & { roles: { role: Role }[] }>> {
+  listUsers(page = 1, pageSize = 25, filters: {search?:string;roleId?:string;status?:string;sort?:string;direction?:string} = {}): Observable<Page<User & { roles: { role: Role }[] }>> {
     return this.http
       .get<ApiEnvelope<(User & { roles: { role: Role }[] })[]> & { meta?: { total?: number; page?: number; pageSize?: number } }>(
         `${this.base}/users`,
-        { params: { page, pageSize } },
+        { params: { page, pageSize, ...filters } },
       )
       .pipe(
         map((res) => ({

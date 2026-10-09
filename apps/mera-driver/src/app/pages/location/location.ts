@@ -651,12 +651,7 @@ export class Location implements OnInit {
               <md-icon class="[--md-icon-size:16px] text-slate-500">person</md-icon>
               <span>${driver.vehicle}</span>
             </div>
-            
-            <div class="flex items-center gap-1.5 mb-1 text-xs text-slate-600">
-              <md-icon class="[--md-icon-size:16px] text-slate-500">phone</md-icon>
-              <span>${driver.phone}</span>
-            </div>
-            
+
             <div class="flex items-center gap-1.5 mb-1 text-[10px] text-slate-500 uppercase font-medium">
               <md-icon class="[--md-icon-size:14px] text-slate-400">location_on</md-icon>
               <span>Active in ${driver.city}</span>

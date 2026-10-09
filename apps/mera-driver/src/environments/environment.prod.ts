@@ -6,4 +6,8 @@
 export const environment = {
   production: true,
   apiUrl: 'https://api.mera-driver.example.com',
+  // Set via the production `fileReplacements` build — a production Google Cloud project's
+  // own HTTP-referrer-restricted key, never the dev key above. Empty disables the map/
+  // autocomplete/route features gracefully (see google-maps-loader.service.ts).
+  googleMapsApiKey: '',
 };

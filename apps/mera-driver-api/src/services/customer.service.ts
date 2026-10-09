@@ -12,11 +12,12 @@ export async function listCustomers() {
   });
 }
 
-export async function searchCustomers(query:{page:number;pageSize:number;search?:string;status?:string;sort?:string;direction?:'asc'|'desc'}){
+export async function searchCustomers(query:{page:number;pageSize:number;search?:string;status?:string;sort?:string;direction?:'asc'|'desc'}, ownerUserId: string | null = null){
   const search=query.search?{OR:[{id:{contains:query.search,mode:'insensitive' as const}},{firstName:{contains:query.search,mode:'insensitive' as const}},{lastName:{contains:query.search,mode:'insensitive' as const}},{mobileNumber:{contains:query.search}},{email:{contains:query.search,mode:'insensitive' as const}}]}:{};
-  const where={...search,...(query.status?{accountStatus:query.status}:{})};
+  const owner = ownerUserId ? { createdByUserId: ownerUserId } : {};
+  const where={...owner,...search,...(query.status?{accountStatus:query.status}:{})};
   const sort=['firstName','lastName','mobileNumber','email','customerType','verificationStatus','accountStatus','createdAt'].includes(query.sort??'')?query.sort!:'createdAt';
-  const [rows,total,counts]=await Promise.all([prisma.customer.findMany({where,orderBy:[{[sort]:query.direction??'desc'},{id:'asc'}],take:query.pageSize,skip:(query.page-1)*query.pageSize,include:{user:{select:LINKED_USER_SELECT},_count:{select:{bookings:{where:{status:{in:['requested','confirmed','on_the_way','arrived','in_progress']}}}}}}}),prisma.customer.count({where}),Promise.all(['Active','Inactive','Blocked'].map(async status=>[status,await prisma.customer.count({where:{...search,accountStatus:status}})]))]);return{rows,meta:{total,page:query.page,pageSize:query.pageSize,counts:Object.fromEntries(counts)}};
+  const [rows,total,counts]=await Promise.all([prisma.customer.findMany({where,orderBy:[{[sort]:query.direction??'desc'},{id:'asc'}],take:query.pageSize,skip:(query.page-1)*query.pageSize,include:{user:{select:LINKED_USER_SELECT},_count:{select:{bookings:{where:{status:{in:['requested','confirmed','on_the_way','arrived','in_progress']}}}}}}}),prisma.customer.count({where}),Promise.all(['Active','Inactive','Blocked'].map(async status=>[status,await prisma.customer.count({where:{...owner,...search,accountStatus:status}})]))]);return{rows,meta:{total,page:query.page,pageSize:query.pageSize,counts:Object.fromEntries(counts)}};
 }
 export async function getCustomerById(id: string) {
   const customer = await prisma.customer.findUnique({

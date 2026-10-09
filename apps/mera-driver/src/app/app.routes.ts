@@ -188,7 +188,7 @@ export const appRoutes: Routes = [
       },
 
       { path: 'dispatch', canActivate: [permissionGuard], data: { permission: { menuKey: 'trips.bookings', action: 'view' }, mode: 'dispatch', title: 'Admin Dispatch' }, loadComponent: () => import('./pages/workflow/workflow').then(m => m.Workflow) },
-      ...['overview','booking-payments','commissions','driver-payouts','registration-fees','refunds-adjustments','reports'].map(path => ({ path: `accounts/${path}`, canActivate: [permissionGuard], data: { permission: { menuKey: 'payments.overview', action: 'view' }, mode: 'accounts', title: 'Accounts', section: ({'overview':'Overview','booking-payments':'Booking Payments','commissions':'Commissions','driver-payouts':'Driver Payouts','registration-fees':'Registration Fees','refunds-adjustments':'Refunds & Adjustments','reports':'Reports'} as Record<string,string>)[path] }, loadComponent: () => import('./pages/workflow/workflow').then(m => m.Workflow) })),
+      ...['overview','booking-payments','commissions','driver-payouts','registration-fees','refunds-adjustments','reports'].map(path => ({ path: `accounts/${path}`, canActivate: [permissionGuard], data: { permission: { menuKey: 'payments.overview', action: 'view' }, mode: 'accounts', title: 'Accounts', section: ({'overview':'Overview','booking-payments':'Booking Payments','commissions':'Commissions','driver-payouts':'Driver Payouts','registration-fees':'Registration Fees','refunds-adjustments':'Refunds & Adjustments','reports':'Reports'} as Record<string,string>)[path] }, loadComponent: () => import('./pages/workflow/accounts/accounts').then(m => m.Accounts) })),
       { path: 'accounts', pathMatch: 'full', redirectTo: 'accounts/overview' },
       // Payments Section
       {
@@ -411,11 +411,13 @@ export const appRoutes: Routes = [
       },
       {
         path: 'drivers',
-        pathMatch: 'full', redirectTo: 'payment',
+        title: 'Choose a driver · mera-driver',
+        loadComponent: () =>
+          import('./pages/ride/drivers/drivers').then((m) => m.RideDrivers),
       },
       {
         path: 'verify',
-        pathMatch: 'full', redirectTo: '/customer/bookings',
+        pathMatch: 'full', redirectTo: 'payment',
       },
       {
         path: 'payment',
@@ -436,7 +438,10 @@ export const appRoutes: Routes = [
     canActivate: [authGuard, driverPortalGuard],
     children: [
       { path: 'resume', loadComponent:()=>import('./pages/account/drivers/resume-preview').then(m=>m.ResumePreview) },
-      ...['fee','availability','requests','earnings'].map(path => ({ path, data: { mode: path }, loadComponent: () => import('./pages/workflow/workflow').then(m => m.Workflow) })),
+      { path: 'fee', title: 'Registration Fee · Driver Portal', loadComponent: () => import('./pages/driver/fee/fee').then(m => m.DriverFee) },
+      { path: 'availability', title: 'Availability · Driver Portal', loadComponent: () => import('./pages/driver/availability/availability').then(m => m.DriverAvailability) },
+      { path: 'requests', title: 'Trip Requests · Driver Portal', loadComponent: () => import('./pages/driver/requests/requests').then(m => m.DriverRequests) },
+      { path: 'earnings', title: 'Earnings · Driver Portal', loadComponent: () => import('./pages/driver/earnings/earnings').then(m => m.DriverEarnings) },
       {
         path: '',
         title: 'Dashboard · Driver Portal',
@@ -471,23 +476,20 @@ export const appRoutes: Routes = [
       {
         path: 'trips',
         title: 'My Trips · Driver Portal',
-        data: { title: 'My Trips', mode: 'trips' },
         loadComponent: () =>
-          import('./pages/workflow/workflow').then((m) => m.Workflow),
+          import('./pages/driver/trips/trips').then((m) => m.DriverTrips),
       },
       {
         path: 'notifications',
         title: 'Notifications · Driver Portal',
-        data: { title: 'Notifications', mode: 'notifications' },
         loadComponent: () =>
-          import('./pages/workflow/workflow').then((m) => m.Workflow),
+          import('./pages/driver/notifications/notifications').then((m) => m.DriverNotifications),
       },
       {
         path: 'support',
-        title: 'Support · Driver Portal',
-        data: { mode: 'support' },
+        title: 'Help & Support · Driver Portal',
         loadComponent: () =>
-          import('./pages/workflow/workflow').then((m) => m.Workflow),
+          import('./pages/driver/support/support').then((m) => m.DriverSupport),
       },
     ],
   },

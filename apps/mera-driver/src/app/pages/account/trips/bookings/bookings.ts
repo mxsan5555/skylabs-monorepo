@@ -1,3 +1,7 @@
+import { httpErrorMessage } from '../../../../core/http-error';
+import { AuthService } from '@skylabs-monorepo/shared-auth/angular';
+import { ActivatedRoute } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal, computed, inject, OnInit } from '@angular/core';
 import { AdminPage } from '../../../../admin/admin-page/admin-page';
 import { BookingsApiService, type Booking } from '../../../../core/trips/bookings-api.service';
@@ -11,9 +15,14 @@ import { BookingsApiService, type Booking } from '../../../../core/trips/booking
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class Bookings implements OnInit {
+  readonly auth=inject(AuthService);
   private readonly api = inject(BookingsApiService);
-  readonly list = signal<Booking[]>([]);
-  readonly loading = signal(false);
+  private readonly route=inject(ActivatedRoute);
+  readonly tripsOnly=signal(false);
+  constructor(){this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params=>{this.tripsOnly.set(params.get('view')==='trips');this.search.set(params.get('search')??'');this.page.set(1);this.reload();if(params.get('add')==='1'&&this.auth.can('trips.bookings','create'))this.startAdd();});}
+  readonly list = signal<Booking[]>([]);readonly total=signal(0);readonly page=signal(1);readonly pageSize=signal(25);readonly sort=signal('createdAt');readonly direction=signal<'asc'|'desc'>('desc');readonly search=signal('');
+  private requestSequence=0;
+  readonly loading = signal(false);readonly error=signal('');
   readonly showAddForm = signal(false);
   readonly editingId = signal<string | 'new' | null>(null);
 
@@ -63,26 +72,27 @@ export class Bookings implements OnInit {
     { key: 'payment_status', label: 'Payment', sortable: true },
     { key: 'final_fare', label: 'Fare (₹)', sortable: true },
   ]);
-  readonly tableActions = JSON.stringify([
-    { icon: 'edit', label: 'Edit', event: 'edit_option' },
-    { icon: 'delete', label: 'Delete', event: 'delete_option', variant: 'danger' },
-  ]);
+  get tableActions(){return JSON.stringify([
+    ...(this.auth.can('trips.bookings','edit')?[{icon:'edit',label:'Edit',event:'edit_option'}]:[]),
+    ...(this.auth.can('trips.bookings','delete')?[{icon:'delete',label:'Delete',event:'delete_option',variant:'danger'}]:[]),
+  ]);}
   readonly tableRowsString = computed(() => JSON.stringify(this.list().map(b=>({...b,payment_method:b.payment_mode==='cash'?'Cash on Delivery (COD)':b.payment_mode==='razorpay'?'Razorpay':b.payment_mode}))));
 
   ngOnInit(): void {
-    this.reload();
+    // Initial and direct-URL list loading is handled by the existing query-param subscription.
   }
 
+  retry(){this.reload();}
+  tableParams(event:Event){const d=(event as CustomEvent).detail;this.page.set(d.page??1);this.pageSize.set(d.pageSize??25);this.search.set(d.search??'');const columns:Record<string,string>={booking_code:'bookingCode',customer_name:'customerName',driver_name:'driverName',trip_type_name:'tripTypeName',status:'status',payment_method:'paymentMode',payment_status:'paymentStatus',final_fare:'finalFare'};this.sort.set(columns[d.sortKey]??'createdAt');this.direction.set(d.sortDir==='asc'?'asc':'desc');this.reload();}
   private reload(): void {
-    this.loading.set(true);
-    this.api.list().subscribe({
+    const sequence=++this.requestSequence;this.loading.set(true);this.error.set('');
+    this.api.search(this.tripsOnly(),{...Object.fromEntries(['status','assignment','timing','payment'].flatMap(key=>{const value=this.route.snapshot.queryParamMap.get(key);return value?[[key,value]]:[]})),search:this.search(),page:this.page(),pageSize:this.pageSize(),sort:this.sort(),direction:this.direction()}).subscribe({
       next: (data) => {
-        this.list.set(data);
+        if(sequence!==this.requestSequence)return;this.list.set(data.rows);this.total.set(data.meta.total);
         this.loading.set(false);
       },
-      error: (err) => {
-        console.error('Failed to load bookings', err);
-        this.loading.set(false);
+      error: async (err) => {
+        const message=await httpErrorMessage(err);if(sequence!==this.requestSequence)return;this.error.set(message);this.loading.set(false);
       },
     });
   }

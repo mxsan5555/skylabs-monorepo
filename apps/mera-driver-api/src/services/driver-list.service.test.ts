@@ -30,6 +30,19 @@ describe('Driver record and login views', () => {
     mockPrisma.$queryRaw.mockResolvedValueOnce([{totalDrivers:100000,driverUsers:20000,kycPending:1000,readyForTrips:2,feeUnpaid:9}]).mockResolvedValueOnce([]);
     const result=await searchDrivers({page:2000,pageSize:50,sort:'firstName',direction:'asc'});const sql=mockPrisma.$queryRaw.mock.calls[1][0];expect(sql.sql).toContain('d."firstName" ASC,d.id ASC');expect(sql.values.slice(-2)).toEqual([50,99950]);expect(result.meta.total).toBe(100000);expect(result.rows).toEqual([]);
   });
+  it('scopes the list to the caller-owned createdByUserId when an owner scope is given (Vendor/Sales/Data Operator)',async()=>{
+    mockPrisma.$queryRaw.mockResolvedValueOnce([{totalDrivers:1,driverUsers:0,kycPending:0,readyForTrips:0,feeUnpaid:0}]).mockResolvedValueOnce([]);
+    await searchDrivers({},{ownerUserId:'vendor-1'});
+    const sql=mockPrisma.$queryRaw.mock.calls[0][0];
+    expect(sql.sql).toContain('d."createdByUserId"');
+    expect(sql.values).toContain('vendor-1');
+  });
+  it('does not add an ownership filter when ownerUserId is null (Admin/Super Admin, full queue)',async()=>{
+    mockPrisma.$queryRaw.mockResolvedValueOnce([{totalDrivers:1,driverUsers:0,kycPending:0,readyForTrips:0,feeUnpaid:0}]).mockResolvedValueOnce([]);
+    await searchDrivers({},{ownerUserId:null});
+    const sql=mockPrisma.$queryRaw.mock.calls[0][0];
+    expect(sql.sql).not.toContain('d."createdByUserId"');
+  });
 });
 
 it('summary facets retain search, city, KYC and availability independently of the selected view',async()=>{
@@ -43,4 +56,14 @@ it('ready view never bypasses fee filters or availability',async()=>{
 });
 it('searches a full name across first and last name while retaining phone/ID/email/DL search',()=>{
   const where=driverListWhere(DriverListQuery.parse({search:'Ravi Kumar'}));expect(where.OR).toHaveLength(7);expect(where.OR?.[6]).toEqual({AND:[{OR:[{firstName:{contains:'Ravi',mode:'insensitive'}},{lastName:{contains:'Ravi',mode:'insensitive'}}]},{OR:[{firstName:{contains:'Kumar',mode:'insensitive'}},{lastName:{contains:'Kumar',mode:'insensitive'}}]}]});
+});
+
+it('ignores availability even in old URLs instead of restricting the registry',()=>{
+ const query=DriverListQuery.parse({availability:'offline'});expect(query).not.toHaveProperty('availability');expect(driverListWhere(query)).not.toHaveProperty('online');
+});
+it('prefills Paid details from the confirmed movement instead of stale form fields',async()=>{
+ mockPrisma.$queryRaw.mockResolvedValueOnce([{totalDrivers:1,driverUsers:0,kycPending:0,readyForTrips:0,feeUnpaid:0}]).mockResolvedValueOnce([{id:'driver',feeStatus:'Paid'}]);
+ mockPrisma.driver.findMany.mockResolvedValue([{id:'driver',firstName:'Ravi',documents:[],completedSubSteps:[],accountStatus:'Active',dlNo:null,dob:null,preferredPaymentMode:'Cash',amount:'999',paymentReceiptDate:'1990-01-01',financialMovements:[{reference:'razorpay:fixture',method:'razorpay:upi',amountPaise:50000,createdAt:new Date('2026-10-06T10:00:00Z'),reason:'Captured provider payment verified on backend'}]}]);
+ mockPrisma.auditLog.findMany.mockResolvedValue([]);
+ const result=await searchDrivers({});expect(result.rows[0]).toMatchObject({feeStatus:'Paid',amount:'500',preferredPaymentMode:'Online',paymentReceiptDate:'2026-10-06',registrationPaymentReference:'razorpay:fixture'});expect(result.rows[0]).not.toHaveProperty('financialMovements');
 });

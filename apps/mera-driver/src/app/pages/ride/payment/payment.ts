@@ -19,7 +19,8 @@ import { Workflow } from '../../workflow/workflow';
 export class RidePayment {
   protected readonly booking = inject(BookingService);
   private readonly router = inject(Router);
-  readonly preset = { fareId:this.booking.ride()?.id,pickupAddress:this.booking.pickup()?.address,dropAddress:this.booking.drop()?.address,startsAt:this.localSchedule(this.booking.schedule()) };
+  readonly preset = { fareId:this.booking.ride()?.id,pickupAddress:this.booking.pickup()?.address,dropAddress:this.booking.drop()?.address,startsAt:this.localSchedule(this.booking.schedule()),preferredDriverId:this.booking.driver()?.id,
+    pickupLat:this.booking.pickup()?.coord.lat,pickupLng:this.booking.pickup()?.coord.lng,dropLat:this.booking.drop()?.coord.lat,dropLng:this.booking.drop()?.coord.lng };
   private localSchedule(schedule:string){const date=new Date(schedule);return Number.isNaN(date.getTime())?'':new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);}
 
   protected select(method: PaymentMethod): void {

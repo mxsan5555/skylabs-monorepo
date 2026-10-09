@@ -18,11 +18,12 @@ import {
   KycChecklistSchema,
 } from '../schemas/business.schema';
 import { requestMeta } from '../lib/requestMeta';
+import { prisma } from '../lib/prisma';
 import { diskStorageFor } from '../lib/upload';
 import { searchDrivers } from '../services/driver-list.service';
 import { z } from 'zod';
 import {resolveEffectivePermissionsForUser} from '../services/permission.service';
-async function administrativeQueue(req:import('express').Request){return (await resolveEffectivePermissionsForUser(req.user!.sub,req.user!.roles)).includes('drivers:assign');}
+async function administrativeQueue(req:import('express').Request){return (await resolveEffectivePermissionsForUser(req.user!.sub,req.user!.roles)).includes('drivers:assign') && await driverOwnerScope(req) === null;}
 import { getPillReview, savePillCheck } from '../services/driver-pill.service';
 import { driverReportHtml } from '../services/driver-report.service';
 import { driverDetails } from '../services/driver-details.service';
@@ -30,6 +31,8 @@ import { driverResumePdf, getDriverResume, updateDriverResume, resumeContentDisp
 import { UpdateResumeSchema } from '../schemas/driver-resume.schema';
 import { driverPdf } from '../services/driver-pdf.service';
 import { dlVerificationPreflight, dlReviewState } from '../services/driver-dl.service';
+import { driverOwnerScope } from '../lib/ownerScope';
+import { requireDriverOwnership } from '../middleware/requireDriverOwnership';
 
 const router = Router();
 const upload = multer({ storage: diskStorageFor((req) => `drivers/${req.params.id}`), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -37,39 +40,46 @@ const upload = multer({ storage: diskStorageFor((req) => `drivers/${req.params.i
 router.get('/application-options',publicRateLimit(30),async(_req,res,next)=>{try{res.json({data:await driverApplicationOptions(),error:null});}catch(error){next(error);}});
 router.post('/applications',publicRateLimit(),validateBody(DriverApplicationSchema),async(req,res,next)=>{try{res.status(201).json({data:await submitDriverApplication(req.body),error:null});}catch(error){next(error);}});
 router.use(authenticate);
-router.get('/:id/dl-verification',requirePermission('drivers','view'),async(req,res,next)=>{try{const driver=await driverService.getDriverById(req.params.id);res.setHeader('Cache-Control','private, no-store');res.json({data:await dlReviewState(driver.id,driver),error:null});}catch(error){next(error);}});
+router.get('/:id/dl-verification',requirePermission('drivers','view'),requireDriverOwnership,async(req,res,next)=>{try{const driver=await driverService.getDriverById(req.params.id);res.setHeader('Cache-Control','private, no-store');res.json({data:await dlReviewState(driver.id,driver),error:null});}catch(error){next(error);}});
 router.post('/:id/dl-verification',requirePermission('drivers','edit'),(_req,_res,next)=>next(new HttpError(403,'DL_REVIEW_REQUIRED','Use the assigned KYC review to verify the saved licence')));
-router.post('/:id/dl-verification/preflight',requirePermission('kyc-assignments','view'),publicRateLimit(10),validateBody(z.object({retry:z.boolean().default(false)}).strict()),async(req,res,next)=>{try{const administrative=await administrativeQueue(req);await dlVerificationPreflight(req.params.id,req.user!.sub,req.body.retry,{administrative});res.json({data:await getPillReview(req.params.id,administrative?undefined:req.user!.sub),error:null});}catch(error){next(error);}});
+router.post('/:id/dl-verification/preflight',requirePermission('kyc-assignments','edit'),publicRateLimit(10),validateBody(z.object({retry:z.boolean().default(false)}).strict()),async(req,res,next)=>{try{const administrative=await administrativeQueue(req);await dlVerificationPreflight(req.params.id,req.user!.sub,req.body.retry,{administrative});res.json({data:await getPillReview(req.params.id,administrative?undefined:req.user!.sub),error:null});}catch(error){next(error);}});
 
 router.get('/assigned-to-me/:id/pill-review', requirePermission('kyc-assignments', 'view'), async (req, res, next) => {
   try { res.json({ data: await getPillReview(req.params.id,await administrativeQueue(req)?undefined:req.user!.sub), error: null }); } catch (error) { next(error); }
 });
-router.patch('/:id/pill-review', requirePermission('kyc-assignments', 'view'), validateBody(z.object({
+router.patch('/:id/pill-review', requirePermission('kyc-assignments', 'edit'), validateBody(z.object({
   key: z.string().min(1), status: z.enum(['Pass', 'Issue']), reason: z.string().max(2000).optional(), hash: z.string().length(64),
 })), async (req, res, next) => {
   try { res.json({ data: await savePillCheck(req.params.id, req.user!.sub, req.body), error: null }); } catch (error) { next(error); }
 });
 
+router.get('/eligible-verifiers', requirePermission('drivers', 'assign'), async (_req, res, next) => {
+  try { res.json({data: await driverService.eligibleVerifiers(), error:null}); } catch (error) { next(error); }
+});
+router.get('/:id/assignment', requirePermission('drivers', 'assign'), requireDriverOwnership, async (req, res, next) => {
+  try { res.setHeader('Cache-Control','private, no-store'); const driver=await driverService.getDriverById(req.params.id);res.json({data:{id:driver.id,firstName:driver.firstName,lastName:driver.lastName,phone:driver.phone,assignedVerifierId:driver.assignedVerifierId,assignedVerifier:driver.assignedVerifier,documents:[]},error:null}); } catch (error) { next(error); }
+});
+
 router.get('/search', requirePermission('drivers', 'view'), async (req, res, next) => {
   try {
-    const result = await searchDrivers(req.query);
+    const result = await searchDrivers(req.query, { ownerUserId: await driverOwnerScope(req) });
     res.json({ data: result.rows, error: null, meta: result.meta });
   } catch (error) { next(error); }
 });
 
-router.get('/:id/details', requirePermission('drivers', 'view'), async (req,res,next)=>{try{res.setHeader('Cache-Control','private, no-store');res.json({data:await driverDetails(req.params.id),error:null});}catch(error){next(error);}});
-router.post('/:id/kyc-approval', requirePermission('drivers','edit'), validateBody(z.object({}).strict()), async(req,res,next)=>{
+router.get('/:id/details', requirePermission('drivers', 'view'), requireDriverOwnership, async (req,res,next)=>{try{res.setHeader('Cache-Control','private, no-store');res.json({data:await driverDetails(req.params.id),error:null});}catch(error){next(error);}});
+router.post('/:id/kyc-approval', requirePermission('drivers','edit'), requirePermission('drivers','assign'), requireDriverOwnership, validateBody(z.object({}).strict()), async(req,res,next)=>{
   try {
     const driver=await driverService.updateDriver(req.params.id,{status:'Verified'},{explicitApproval:true});
     await auditService.writeAuditLog({actorUserId:req.user!.sub,action:'driver.kyc.final_approval',targetType:'Driver',targetId:driver.id,after:{status:driver.status},...requestMeta(req)});
     res.json({data:driver,error:null});
   }catch(error){next(error);}
 });
-router.get('/:id/resume', requirePermission('drivers', 'view'), async (req,res,next)=>{try{res.setHeader('Cache-Control','private, no-store');res.json({data:await getDriverResume(req.params.id),error:null});}catch(error){next(error);}});
-router.patch('/:id/resume', requirePermission('drivers', 'edit'), validateBody(UpdateResumeSchema), async(req,res,next)=>{try{res.setHeader('Cache-Control','private, no-store');res.json({data:await updateDriverResume(req.params.id,req.user!.sub,req.body.profile,req.body.revision,req.body.reason),error:null});}catch(error){next(error);}});
-router.get('/:id/resume.pdf', requirePermission('drivers', 'export'), async (req,res,next)=>{try{const revision=z.string().length(64).optional().parse(req.query.revision);const resume=await getDriverResume(req.params.id);const pdf=await driverResumePdf(req.params.id,revision);res.setHeader('Cache-Control','private, no-store');res.setHeader('Content-Disposition',resumeContentDisposition(resume.filename));res.type('application/pdf').send(pdf);}catch(error){next(error);}});
+router.get('/:id/resume', requirePermission('drivers', 'view'), requireDriverOwnership, async (req,res,next)=>{try{res.setHeader('Cache-Control','private, no-store');res.json({data:await getDriverResume(req.params.id),error:null});}catch(error){next(error);}});
+router.patch('/:id/resume', requirePermission('drivers', 'edit'), requireDriverOwnership, validateBody(UpdateResumeSchema), async(req,res,next)=>{try{res.setHeader('Cache-Control','private, no-store');res.json({data:await updateDriverResume(req.params.id,req.user!.sub,req.body.profile,req.body.revision,req.body.reason),error:null});}catch(error){next(error);}});
+router.get('/:id/resume.pdf', requirePermission('drivers', 'export'), requireDriverOwnership, async (req,res,next)=>{try{const revision=z.string().length(64).optional().parse(req.query.revision);const resume=await getDriverResume(req.params.id);const pdf=await driverResumePdf(req.params.id,revision);res.setHeader('Cache-Control','private, no-store');res.setHeader('Content-Disposition',resumeContentDisposition(resume.filename));res.type('application/pdf').send(pdf);}catch(error){next(error);}});
 
-router.get('/:id/profile.pdf', requirePermission('drivers', 'export'), async (req, res, next) => {
+router.get('/:id/profile.pdf', requirePermission('drivers', 'export'), requireDriverOwnership, async (req, res, next) => {
   try {
     const pdf = await driverPdf(req.params.id);
     res.setHeader('Cache-Control', 'private, no-store');
@@ -78,19 +88,19 @@ router.get('/:id/profile.pdf', requirePermission('drivers', 'export'), async (re
   } catch (error) { next(error); }
 });
 
-router.get('/:id/profile-report', requirePermission('drivers', 'export'), async (req, res, next) => {
+router.get('/:id/profile-report', requirePermission('drivers', 'export'), requireDriverOwnership, async (req, res, next) => {
   try {
     res.setHeader('Cache-Control', 'private, no-store');
     res.type('html').send(await driverReportHtml(req.params.id));
   } catch (error) { next(error); }
 });
 
-router.get('/:id/pill-review', requirePermission('drivers', 'view'), async (req, res, next) => {
+router.get('/:id/pill-review', requirePermission('drivers', 'view'), requireDriverOwnership, async (req, res, next) => {
   try { res.json({ data: await getPillReview(req.params.id), error: null }); } catch (error) { next(error); }
 });
 
 // Retained legacy list contract; use the same bounded query as /search.
-router.get('/',requirePermission('drivers','view'),async(req,res,next)=>{try{const result=await searchDrivers(req.query);res.json({data:result.rows,error:null,meta:result.meta});}catch(error){next(error);}});
+router.get('/',requirePermission('drivers','view'),async(req,res,next)=>{try{const result=await searchDrivers(req.query, { ownerUserId: await driverOwnerScope(req) });res.json({data:result.rows,error:null,meta:result.meta});}catch(error){next(error);}});
 
 // Customer-facing booking prerequisite — a safe, minimal driver projection (never
 // email/phone/bank/documents). See `driver.service.ts`'s `listAvailableDrivers`.
@@ -105,7 +115,10 @@ router.get('/available', requirePermission('trips.bookings', 'view'), async (_re
 
 router.post('/', requirePermission('drivers', 'create'), validateBody(CreateDriverSchema), async (req, res, next) => {
   try {
-    const driver = await driverService.createDriver(req.body, {actorId:req.user!.sub,canChangeStatus:req.body.driverStatusMasterId === undefined ? false : (await resolveEffectivePermissionsForUser(req.user!.sub,req.user!.roles)).includes('drivers:status_change')});
+    const ownerUserId=await driverOwnerScope(req),requestId=req.get('Idempotency-Key');
+    if(requestId&&!z.string().uuid().safeParse(requestId).success)throw new HttpError(422,'IDEMPOTENCY_KEY_INVALID','Use a UUID Idempotency-Key for a new Driver save');
+    if(requestId){const existing=await prisma.driver.findUnique({where:{creationRequestId:requestId},select:{id:true,createdByUserId:true}});if(existing&&(!ownerUserId||existing.createdByUserId===ownerUserId)){res.status(200).json({data:await driverService.getDriverById(existing.id),error:null});return;}}
+    const driver = await driverService.createDriver({...req.body,...(requestId?{creationRequestId:requestId}:{})}, {actorId:req.user!.sub,canChangeStatus:req.body.driverStatusMasterId === undefined ? false : (await resolveEffectivePermissionsForUser(req.user!.sub,req.user!.roles)).includes('drivers:status_change'),ownerUserId});
     await auditService.writeAuditLog({
       actorUserId: req.user!.sub,
       action: 'driver.create',
@@ -116,14 +129,20 @@ router.post('/', requirePermission('drivers', 'create'), validateBody(CreateDriv
     });
     res.status(201).json({ data: driver, error: null });
   } catch (err) {
+    const requestId=req.get('Idempotency-Key');
+    if(requestId&&(err as {code?:string})?.code==='P2002')try{const ownerUserId=await driverOwnerScope(req),existing=await prisma.driver.findUnique({where:{creationRequestId:requestId},select:{id:true,createdByUserId:true}});if(existing&&(!ownerUserId||existing.createdByUserId===ownerUserId)){res.status(200).json({data:await driverService.getDriverById(existing.id),error:null});return;}}catch(lookupError){next(lookupError);return;}
     next(err);
   }
 });
 
 // Manual-review KYC: `status` only ever changes here, by whoever holds `drivers:edit` —
 // no automatic verification logic and no third-party call sets this field.
-router.patch('/:id', requirePermission('drivers', 'edit'), validateBody(UpdateDriverSchema), async (req, res, next) => {
+router.patch('/:id', requirePermission('drivers', 'edit'), requireDriverOwnership, validateBody(UpdateDriverSchema), async (req, res, next) => {
   try {
+    if (req.body.status === 'Verified') {
+      const existing = await driverService.getDriverById(req.params.id);
+      if (existing.status !== 'Verified' && !(await administrativeQueue(req))) throw new HttpError(403,'KYC_APPROVAL_FORBIDDEN','Final KYC approval requires administrative review authority');
+    }
     const driver = await driverService.updateDriver(req.params.id, req.body, {actorId:req.user!.sub,canChangeStatus:req.body.driverStatusMasterId === undefined ? false : (await resolveEffectivePermissionsForUser(req.user!.sub,req.user!.roles)).includes('drivers:status_change')});
     await auditService.writeAuditLog({
       actorUserId: req.user!.sub,
@@ -145,6 +164,7 @@ router.patch('/:id', requirePermission('drivers', 'edit'), validateBody(UpdateDr
 router.patch(
   '/:id/status',
   requirePermission('drivers', 'status_change'),
+  requireDriverOwnership,
   validateBody(SetDriverStatusSchema),
   async (req, res, next) => {
     try {
@@ -184,7 +204,7 @@ router.delete('/:id', requirePermission('drivers', 'delete'), async (req, res, n
 // KYC documents — local disk storage, metadata only (no verification call).
 // ---------------------------------------------------------------------------
 
-router.get('/:id/documents', requirePermission('drivers', 'view'), async (req, res, next) => {
+router.get('/:id/documents', requirePermission('drivers', 'view'), requireDriverOwnership, async (req, res, next) => {
   try {
     const docs = await driverService.listDriverDocuments(req.params.id);
     res.json({ data: docs, error: null });
@@ -196,6 +216,7 @@ router.get('/:id/documents', requirePermission('drivers', 'view'), async (req, r
 router.post(
   '/:id/documents',
   requirePermission('drivers', 'edit'),
+  requireDriverOwnership,
   upload.single('file'),
   async (req, res, next) => {
     try {
@@ -208,21 +229,16 @@ router.post(
         driverId: req.params.id,
         category: parsed.data.category,
         type: parsed.data.type,
+        typeKey: parsed.data.typeKey,
+        replaceDocumentId: parsed.data.replaceDocumentId,
       regNo: parsed.data.regNo,
       expiresAt: parsed.data.expiresAt,
         fileName: file?.originalname,
         filePath: file ? `drivers/${req.params.id}/${file.filename}` : undefined,
         mimeType: file?.mimetype,
         sizeBytes: file?.size,
-      });
-      await auditService.writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'driver.document.upload',
-        targetType: 'Driver',
-        targetId: req.params.id,
-        after: doc,
-        ...requestMeta(req),
-      });
+      }, {actorUserId:req.user!.sub,action:'driver.document.upload',...requestMeta(req)});
+
       res.status(201).json({ data: doc, error: null });
     } catch (err) {
       next(err);
@@ -230,17 +246,9 @@ router.post(
   },
 );
 
-router.delete('/:id/documents/:docId', requirePermission('drivers', 'edit'), async (req, res, next) => {
+router.delete('/:id/documents/:docId', requirePermission('drivers', 'edit'), requireDriverOwnership, async (req, res, next) => {
   try {
-    const doc = await driverService.deleteDriverDocument(req.params.id, req.params.docId);
-    await auditService.writeAuditLog({
-      actorUserId: req.user!.sub,
-      action: 'driver.document.delete',
-      targetType: 'Driver',
-      targetId: req.params.id,
-      before: doc,
-      ...requestMeta(req),
-    });
+    const doc = await driverService.deleteDriverDocument(req.params.id, req.params.docId, {actorUserId:req.user!.sub,action:'driver.document.delete',...requestMeta(req)});
     res.json({ data: { id: req.params.docId }, error: null });
   } catch (err) {
     next(err);
@@ -254,6 +262,7 @@ router.delete('/:id/documents/:docId', requirePermission('drivers', 'edit'), asy
 router.patch(
   '/:id/link-user',
   requirePermission('drivers', 'assign'),
+  requireDriverOwnership,
   validateBody(LinkDriverToUserSchema),
   async (req, res, next) => {
     try {
@@ -273,7 +282,7 @@ router.patch(
   },
 );
 
-router.patch('/:id/unlink-user', requirePermission('drivers', 'assign'), async (req, res, next) => {
+router.patch('/:id/unlink-user', requirePermission('drivers', 'assign'), requireDriverOwnership, async (req, res, next) => {
   try {
     const driver = await driverService.unlinkDriverFromUser(req.params.id);
     await auditService.writeAuditLog({
@@ -292,7 +301,7 @@ router.patch('/:id/unlink-user', requirePermission('drivers', 'assign'), async (
 // One-click Driver User creation: creates the User, assigns the `driver` role, and links
 // it, all server-side — no existing-user picker. This is the only path that grants a
 // driver a portal login; see `createAndLinkDriverUser`.
-router.post('/:id/create-user', requirePermission('drivers', 'assign'), async (req, res, next) => {
+router.post('/:id/create-user', requirePermission('drivers', 'assign'), requireDriverOwnership, async (req, res, next) => {
   try {
     const driver = await driverService.createAndLinkDriverUser(req.params.id);
     await auditService.writeAuditLog({
@@ -319,20 +328,15 @@ router.post('/:id/create-user', requirePermission('drivers', 'assign'), async (r
 router.patch(
   '/:id/assign-verifier',
   requirePermission('drivers', 'assign'),
+  requireDriverOwnership,
   validateBody(AssignVerifierSchema),
   async (req, res, next) => {
     try {
       const previous=await driverService.getDriverById(req.params.id);
+      if(req.body.expectedVerifierId!==undefined && (previous.assignedVerifierId??null)!==req.body.expectedVerifierId) throw new HttpError(409,'ASSIGNMENT_CHANGED','This assignment changed. Reload the current verifier before saving.');
       if(previous.assignedVerifierId&&previous.assignedVerifierId!==req.body.verifierId&&!req.body.reason?.trim())throw new HttpError(422,'REASON_REQUIRED','A reassignment reason is required');
-      const driver = await driverService.assignVerifier(req.params.id, req.body.verifierId);
-      await auditService.writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'driver.kyc.assign',
-        targetType: 'Driver',
-        targetId: driver.id,
-        before:{assignedVerifierId:previous.assignedVerifierId},after: { assignedVerifierId: req.body.verifierId,reason:req.body.reason??null },
-        ...requestMeta(req),
-      });
+      if ((previous.assignedVerifierId ?? null) === req.body.verifierId) { res.json({data:previous,error:null}); return; }
+      const driver = await driverService.assignVerifier(req.params.id, req.body.verifierId, req.body.expectedVerifierId !== undefined ? req.body.expectedVerifierId : previous.assignedVerifierId ?? null,{actorUserId:req.user!.sub,reason:req.body.reason,...requestMeta(req)});
       res.json({ data: driver, error: null });
     } catch (err) {
       next(err);
@@ -364,7 +368,7 @@ router.get('/assigned-to-me/:id', requirePermission('kyc-assignments', 'view'), 
   }
 });
 
-router.patch('/:id/kyc-checklist', requirePermission('kyc-assignments', 'view'), validateBody(KycChecklistSchema), async (req, res, next) => {
+router.patch('/:id/kyc-checklist', requirePermission('kyc-assignments', 'edit'), validateBody(KycChecklistSchema), async (req, res, next) => {
   try {
     const driver = await driverService.setKycChecklistItem(
       req.params.id,
