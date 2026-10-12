@@ -1,7 +1,12 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+﻿import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ToastProvider } from '../../../../toast/toast-context';
-import type { DashboardWidgetRecord, PermissionCatalogRow, Role, RoleWidgetRow } from '../../../../api/rbac/roles';
+import type {
+  DashboardWidgetRecord,
+  PermissionCatalogRow,
+  Role,
+  RoleWidgetRow,
+} from '../../../../api/rbac/roles';
 
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   useAuth: () => ({
@@ -12,7 +17,7 @@ vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
 
 const listRolesMock = vi.fn();
 const getPermissionCatalogMock = vi.fn();
-const getRolePermissionIdsMock = vi.fn();
+const getRolePermissionsMock = vi.fn();
 const getRoleWidgetsMock = vi.fn();
 const listDashboardWidgetsCatalogMock = vi.fn();
 const setRolePermissionsMock = vi.fn();
@@ -24,7 +29,7 @@ vi.mock('../../../../api/rbac/roles', async () => {
     ...actual,
     listRoles: (...args: unknown[]) => listRolesMock(...args),
     getPermissionCatalog: (...args: unknown[]) => getPermissionCatalogMock(...args),
-    getRolePermissionIds: (...args: unknown[]) => getRolePermissionIdsMock(...args),
+    getRolePermissions: (...args: unknown[]) => getRolePermissionsMock(...args),
     getRoleWidgets: (...args: unknown[]) => getRoleWidgetsMock(...args),
     listDashboardWidgetsCatalog: (...args: unknown[]) => listDashboardWidgetsCatalogMock(...args),
     setRolePermissions: (...args: unknown[]) => setRolePermissionsMock(...args),
@@ -33,17 +38,6 @@ vi.mock('../../../../api/rbac/roles', async () => {
 });
 
 import { RoleManagement } from './roles';
-
-/**
- * Regression suite for the real bug: the "Dashboard widgets" checkboxes correctly toggled and
- * even correctly reflected the just-saved state right after clicking Save, but a role switch or
- * a page reload always rendered every widget unchecked — because `roles.tsx` had no way to fetch
- * a role's actually-saved widget grants (only `PUT .../widgets`, write-only, existed) and simply
- * reset the selection to empty on every role (re)selection instead. `RoleDashboardWidget` itself
- * was never the problem — the grants were always correctly persisted; this was purely a missing
- * read path. These tests exercise the fixed `getRoleWidgets`-backed reload, mirroring how the
- * (already-correct) permission matrix reload is tested.
- */
 
 const VENDOR_ROLE: Role = {
   id: 'role-vendor',
@@ -75,7 +69,9 @@ const CATALOG: PermissionCatalogRow[] = [
     id: 'menu-dashboard',
     menuKey: 'dashboard',
     title: 'Dashboard',
-    actions: [{ action: 'view', key: 'dashboard:view', permissionId: DASHBOARD_PERMISSION_ID, label: 'Dashboard — view' }],
+    actions: [
+      { action: 'view', key: 'dashboard:view', permissionId: DASHBOARD_PERMISSION_ID, label: 'Dashboard — view' },
+    ],
   },
 ];
 
@@ -93,9 +89,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   listRolesMock.mockResolvedValue({ data: [VENDOR_ROLE, SALES_ROLE] });
   getPermissionCatalogMock.mockResolvedValue({ data: CATALOG });
+  getRolePermissionsMock.mockResolvedValue({ data: [] });
   listDashboardWidgetsCatalogMock.mockResolvedValue({ data: WIDGETS_CATALOG });
-  getRolePermissionIdsMock.mockResolvedValue({ data: { permissionIds: [] } });
   getRoleWidgetsMock.mockResolvedValue({ data: [] });
+  setRolePermissionsMock.mockResolvedValue({ data: [] });
+  setRoleWidgetsMock.mockResolvedValue({ data: [] });
 });
 
 function renderRoles() {
@@ -112,24 +110,23 @@ function widgetCheckbox(title: string): HTMLInputElement {
   return label.querySelector('input[type="checkbox"]') as HTMLInputElement;
 }
 
-// `md-filled-button` is a custom element — `getByRole('button', ...)` doesn't reliably resolve
-// it in this jsdom test environment (same documented gap `vendor-branches.test.tsx`'s own
-// `findSaveButton()` works around), so query by tag + text content directly instead.
+function permissionSelect(title: string): HTMLSelectElement {
+  return screen.getByRole('combobox', { name: title }) as HTMLSelectElement;
+}
+
 function findButton(text: string): HTMLElement {
-  const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.trim() === text);
+  const button = Array.from(document.querySelectorAll('md-filled-button')).find(
+    (el) => el.textContent?.trim() === text,
+  );
   if (!button) throw new Error(`Button "${text}" not found`);
   return button as HTMLElement;
 }
 
-/** Waits for every one of the four initial data fetches (roles, permission catalog, this role's
- *  permissions, this role's widgets) to have resolved and both loading sections to have left
- *  their "Loading…" state, before any test interacts with the page — avoids a flaky race where
- *  an interaction lands between two of these promises settling. */
 async function waitForFullySettled(): Promise<void> {
   await waitFor(() => {
     expect(listRolesMock).toHaveBeenCalled();
     expect(getPermissionCatalogMock).toHaveBeenCalled();
-    expect(getRolePermissionIdsMock).toHaveBeenCalled();
+    expect(getRolePermissionsMock).toHaveBeenCalled();
     expect(getRoleWidgetsMock).toHaveBeenCalled();
   });
   await waitFor(() => expect(screen.getByText('Total Orders')).toBeTruthy());
@@ -137,7 +134,7 @@ async function waitForFullySettled(): Promise<void> {
 }
 
 describe('RoleManagement — Dashboard widgets persistence (Vendor role)', () => {
-  it('loads the Vendor role\'s previously-saved widget grants via getRoleWidgets and shows them pre-checked', async () => {
+  it("loads the Vendor role's previously-saved widget grants via getRoleWidgets and shows them pre-checked", async () => {
     getRoleWidgetsMock.mockResolvedValue({ data: [widgetRow(VENDOR_ROLE.id, 'widget-vendor', 0)] });
     renderRoles();
 
@@ -173,7 +170,6 @@ describe('RoleManagement — Dashboard widgets persistence across a role switch 
 
     await waitFor(() => expect(getRoleWidgetsMock).toHaveBeenCalledWith('test-token', SALES_ROLE.id));
     await waitFor(() => expect(widgetCheckbox('Total Orders').checked).toBe(true));
-    // Vendor's own grant never leaks into Sales's checkbox state.
     expect(widgetCheckbox('My Business').checked).toBe(false);
   });
 
@@ -196,22 +192,20 @@ describe('RoleManagement — Dashboard widgets persistence across a role switch 
 describe('RoleManagement — widget and permission selection stay independent', () => {
   it('toggling a Dashboard widget checkbox never checks/unchecks the Permission Matrix, and vice versa', async () => {
     getRoleWidgetsMock.mockResolvedValue({ data: [] });
-    getRolePermissionIdsMock.mockResolvedValue({ data: { permissionIds: [] } });
+    getRolePermissionsMock.mockResolvedValue({ data: [] });
     renderRoles();
     await waitForFullySettled();
 
-    const dashboardViewCheckbox = screen.getByRole('checkbox', { name: 'Dashboard — view' }) as HTMLInputElement;
-    expect(dashboardViewCheckbox.checked).toBe(false);
+    const dashboardViewSelect = permissionSelect('Dashboard — view');
+    expect(dashboardViewSelect.value).toBe('');
 
     const totalOrdersCheckbox = widgetCheckbox('Total Orders');
     fireEvent.click(totalOrdersCheckbox);
     expect(totalOrdersCheckbox.checked).toBe(true);
-    // The unrelated Dashboard permission checkbox is untouched by a widget toggle.
-    expect(dashboardViewCheckbox.checked).toBe(false);
+    expect(dashboardViewSelect.value).toBe('');
 
-    fireEvent.click(dashboardViewCheckbox);
-    expect(dashboardViewCheckbox.checked).toBe(true);
-    // Toggling the permission likewise never touches the widget selection.
+    fireEvent.change(dashboardViewSelect, { target: { value: 'ALL' } });
+    expect(dashboardViewSelect.value).toBe('ALL');
     expect(totalOrdersCheckbox.checked).toBe(true);
     expect(widgetCheckbox('My Business').checked).toBe(false);
   });
@@ -227,7 +221,11 @@ describe('RoleManagement — widget and permission selection stay independent', 
     expect(totalOrdersCheckbox.checked).toBe(true);
     fireEvent.click(findButton('Save widgets'));
 
-    await waitFor(() => expect(setRoleWidgetsMock).toHaveBeenCalledWith('test-token', VENDOR_ROLE.id, [{ widgetId: 'widget-orders', order: 0 }]));
+    await waitFor(() =>
+      expect(setRoleWidgetsMock).toHaveBeenCalledWith('test-token', VENDOR_ROLE.id, [
+        { widgetId: 'widget-orders', order: 0 },
+      ]),
+    );
     expect(setRolePermissionsMock).not.toHaveBeenCalled();
   });
 

@@ -29,12 +29,6 @@ function AdminShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { bootstrap, isPreviewing, returnToSuperAdmin } = useAuth();
-  console.log('PREVIEW BOOTSTRAP:', {
-  isPreviewing,
-  roles: bootstrap?.roles,
-  permissions: bootstrap?.permissions,
-  menu: bootstrap?.menu,
-});
   const current = findMenuNodeByRoute(bootstrap?.menu ?? [], location.pathname);
   const trail = useBreadcrumbTrail();
 

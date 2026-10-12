@@ -303,7 +303,7 @@ export async function assertBranchHasSubcategoryAccess(branchId: string, categor
 
 export async function createCategory(input: CategoryCreateInput) {
   await assertSlugAvailable(input.slug);
-  await assertValidParent(input.parentId);
+  await assertValidParent(input.parentId);  
   // App-layer pre-check above is a racy read, not an atomic guarantee — Category.slug's
   // DB-level @unique is the hard backstop, same discipline as vendor.service.ts#createDeal.
   try {

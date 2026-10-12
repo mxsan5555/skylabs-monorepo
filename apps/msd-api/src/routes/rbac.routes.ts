@@ -183,16 +183,21 @@ router.get('/permissions/catalog', requirePermission('rbac.roles', 'view'), asyn
 router.get(
   '/roles/:id/permissions',
   requirePermission('rbac.roles', 'view'),
-  validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {
-      const permissionIds = await roleService.getRolePermissionIds(req.params.id);
-      sendData(res, { permissionIds });
+      const data =
+        await roleService.getRolePermissions(
+          req.params.id,
+        );
+
+      sendData(res, data);
     } catch (err) {
       next(err);
     }
   },
 );
+
+
 
 router.put(
   '/roles/:id/permissions',
@@ -201,21 +206,25 @@ router.put(
   validateBody(RolePermissionsUpdateSchema),
   async (req, res, next) => {
     try {
-      const result = await roleService.setRolePermissions(req.params.id, req.body.permissionIds);
+      const { permissions } = req.body;
+      const result = await roleService.setRolePermissions(req.params.id, permissions);
+
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'role.permissions.set',
         targetType: 'Role',
         targetId: req.params.id,
-        after: { permissionIds: req.body.permissionIds },
+        after: { permissions },
         ...requestMeta(req),
       });
+
       sendData(res, result);
-    } catch (err) {
-      next(err);
+    } catch (error) {
+      next(error);
     }
   },
 );
+
 
 router.get(
   '/roles/:id/widgets',
