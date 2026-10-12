@@ -715,6 +715,8 @@
       "off": "OFF",
       "originalPrice": "Original price",
       "location": "Location",
+      "hours": "Hours",
+      "getDirections": "Get directions",
       "service": "Deal",
       "product": "Product",
       "durationSuffix": "min"
@@ -1177,6 +1179,9 @@
       "linkCopied": "Link copied!",
       "offSuffix": "OFF",
       "originalPrice": "Original price",
+      "soldBy": "Sold by",
+      "shippingHeading": "Shipping",
+      "detailsHeading": "Product details",
       "relatedProducts": "You May Also Like",
       "gallery": {
         "thumbnailsLabel": "Gallery thumbnails",
