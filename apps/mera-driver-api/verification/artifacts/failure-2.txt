@@ -1,0 +1,26 @@
+menu
+Mera Driver
+logout
+My Bookings
+Upcoming
+Ongoing
+Completed
+Cancelled
+VERIFY-be76cae0-2580-40ba-8686-1af1bf8fb267
+Finding a driver
+
+· Verification pickup → Verification drop
+
+· ₹1,000.00 · Cash on Delivery (COD) · Payment: pending
+
+Finding a driver
+
+View booking
+home
+Home
+person
+Profile
+book_online
+Bookings
+support_agent
+Support

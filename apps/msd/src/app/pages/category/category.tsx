@@ -1,5 +1,5 @@
 import { useParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { useEffect, useState,  useMemo, createElement, type ReactNode } from 'react';
+import { useEffect, useState, useMemo, createElement, type ReactNode } from 'react';
 import {
   Icon,
   Tabs,
@@ -389,10 +389,10 @@ export function Category() {
   const [cityPickerOpen, setCityPickerOpen] = useState(false);
   const priceBounds = facets?.price
     ? {
-        min: Math.floor(facets.price.min / t.filters.step) * t.filters.step,
-        max: Math.ceil(facets.price.max / t.filters.step) * t.filters.step,
-        step: t.filters.step,
-      }
+      min: Math.floor(facets.price.min / t.filters.step) * t.filters.step,
+      max: Math.ceil(facets.price.max / t.filters.step) * t.filters.step,
+      step: t.filters.step,
+    }
     : { min: t.filters.min, max: t.filters.max, step: t.filters.step };
   const onRadius = (km: number | undefined) => setListParams({ radius: km != null ? String(km) : undefined });
   const onPrice = ({ min, max }: PriceRange) =>
@@ -437,20 +437,20 @@ export function Category() {
 
   const filtersToggle = !isTherapyCategory
     ? createElement(
-        'md-text-button',
-        {
-          'aria-expanded': String(filtersOpen),
-          onClick: () => setPanelOpen(!filtersOpen),
-        },
-        createElement('md-icon', { slot: 'icon', 'aria-hidden': 'true' }, 'tune'),
-        desktop
-          ? filtersOpen
-            ? t.toolbar.hideFilters
-            : t.toolbar.showFilters
-          : activeFilters
-            ? t.toolbar.filtersActive.replace('{count}', String(activeFilters))
-            : t.toolbar.filters,
-      )
+      'md-text-button',
+      {
+        'aria-expanded': String(filtersOpen),
+        onClick: () => setPanelOpen(!filtersOpen),
+      },
+      createElement('md-icon', { slot: 'icon', 'aria-hidden': 'true' }, 'tune'),
+      desktop
+        ? filtersOpen
+          ? t.toolbar.hideFilters
+          : t.toolbar.showFilters
+        : activeFilters
+          ? t.toolbar.filtersActive.replace('{count}', String(activeFilters))
+          : t.toolbar.filters,
+    )
     : null;
 
   const count = list.total;
@@ -478,101 +478,101 @@ export function Category() {
   const cardLayout = view === 'list' ? 'horizontal' : undefined;
   const cards = isTherapyCategory
     ? therapists.map((therapist) => {
-        const price = therapistFromPrice(therapist);
-        return (
-          <SkyProductCardWC
-            key={therapist.id}
-            image={primaryImage(resolveTherapistMedia(therapist))}
-            eyebrow={therapist.personName}
-            eyebrowHref={therapist.vendor?.slug ? `/vendor/${therapist.vendor.slug}` : undefined}
-            heading={therapist.therapistType}
-            location={therapist.branch?.city ?? undefined}
-            distance={therapist.distanceKm != null ? `${Math.round(therapist.distanceKm * 10) / 10} km` : undefined}
-            tag={therapist.popularTags?.[0]?.name}
-            pricePrefix={price != null ? t.therapistPricePrefix : undefined}
-            price={price != null ? formatINR(price) : undefined}
-            href={`/therapist/${therapist.id}`}
-            layout={cardLayout}
-          />
-        );
-      })
+      const price = therapistFromPrice(therapist);
+      return (
+        <SkyProductCardWC
+          key={therapist.id}
+          image={primaryImage(resolveTherapistMedia(therapist))}
+          eyebrow={therapist.personName}
+          eyebrowHref={therapist.vendor?.slug ? `/vendor/${therapist.vendor.slug}` : undefined}
+          heading={therapist.therapistType}
+          location={therapist.branch?.city ?? undefined}
+          distance={therapist.distanceKm != null ? `${Math.round(therapist.distanceKm * 10) / 10} km` : undefined}
+          tag={therapist.popularTags?.[0]?.name}
+          pricePrefix={price != null ? t.therapistPricePrefix : undefined}
+          price={price != null ? formatINR(price) : undefined}
+          href={`/therapist/${therapist.id}`}
+          layout={cardLayout}
+        />
+      );
+    })
     : isProductCategory
       ? products.map((product) => (
-          <DealCard
-            key={product.id}
-            deal={{
-              id: product.id,
-              title: product.name,
-              image: primaryImage(resolveProductMedia(product)) ?? '',
-              imageAlt: product.imageAlt ?? '',
-              gallery: resolveProductMedia(product).images,
-              badge: t.offeringLabels.product,
-              providerName: product.vendor?.businessName ?? '',
-              price: Number(product.price),
-              originalPrice:
-                product.originalPrice && Number(product.originalPrice) !== Number(product.price)
-                  ? Number(product.originalPrice)
-                  : undefined,
-              discount: product.discount ?? undefined,
-              tag: product.popularTags?.[0]?.name,
-            }}
-            href={`/products/${product.id}`}
-            eyebrowHref={product.vendor?.slug ? `/vendor/${product.vendor.slug}` : undefined}
-            favoriteActive={false}
-            onFavorite={() => {}}
-            layout={cardLayout}
-            actions={
-              <FilledButton onClick={() => addProductToCart(product)}>
-                <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-                {t.actions.addToCart}
-              </FilledButton>
-            }
-          />
-        ))
+        <DealCard
+          key={product.id}
+          deal={{
+            id: product.id,
+            title: product.name,
+            image: primaryImage(resolveProductMedia(product)) ?? '',
+            imageAlt: product.imageAlt ?? '',
+            gallery: resolveProductMedia(product).images,
+            badge: t.offeringLabels.product,
+            providerName: product.vendor?.businessName ?? '',
+            price: Number(product.price),
+            originalPrice:
+              product.originalPrice && Number(product.originalPrice) !== Number(product.price)
+                ? Number(product.originalPrice)
+                : undefined,
+            discount: product.discount ?? undefined,
+            tag: product.popularTags?.[0]?.name,
+          }}
+          href={`/products/${product.id}`}
+          eyebrowHref={product.vendor?.slug ? `/vendor/${product.vendor.slug}` : undefined}
+          favoriteActive={false}
+          onFavorite={() => { }}
+          layout={cardLayout}
+          actions={
+            <FilledButton onClick={() => addProductToCart(product)}>
+              <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+              {t.actions.addToCart}
+            </FilledButton>
+          }
+        />
+      ))
       : deals.map((deal) => (
-          <DealCard
-            key={deal.id}
-            deal={{
-              id: deal.id,
-              title: deal.title,
-              image: primaryImage(resolveDealMedia(deal)) ?? '',
-              imageAlt: '',
-              gallery: resolveDealMedia(deal).images,
-              badge: t.offeringLabels.service,
-              providerName: [deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · '),
-              location: deal.branch?.city ?? undefined,
-              distance: deal.distanceKm != null ? Math.round(deal.distanceKm * 10) / 10 : undefined,
-              price: Number(deal.salePrice),
-              originalPrice:
-                deal.originalPrice && Number(deal.originalPrice) !== Number(deal.salePrice)
-                  ? Number(deal.originalPrice)
-                  : undefined,
-              discount: deal.discountPercent ? Number(deal.discountPercent) : undefined,
-              priceNote: deal.durationMinutes ? `${deal.durationMinutes} ${t.durationSuffix}` : undefined,
-              tag: deal.popularTags?.[0]?.name,
-            }}
-            eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
-            favoriteActive={signedIn && isWishlisted(deal.id)}
-            onFavorite={() => toggleFavorite(deal)}
-            layout={cardLayout}
-            actions={
-              <DealAddToCartDialog
-                deal={deal}
-                onAdded={(label) => setActionMessage(t.messages.addToCartSuccess.replace('{item}', label))}
-                renderTrigger={(open) => (
-                  <OutlinedButton
-                    onClick={() => {
-                      if (requireAuthOrRedirect()) open();
-                    }}
-                  >
-                    <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-                    {t.actions.addToCart}
-                  </OutlinedButton>
-                )}
-              />
-            }
-          />
-        ));
+        <DealCard
+          key={deal.id}
+          deal={{
+            id: deal.id,
+            title: deal.title,
+            image: primaryImage(resolveDealMedia(deal)) ?? '',
+            imageAlt: '',
+            gallery: resolveDealMedia(deal).images,
+            badge: t.offeringLabels.service,
+            providerName: [deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · '),
+            location: deal.branch?.city ?? undefined,
+            distance: deal.distanceKm != null ? Math.round(deal.distanceKm * 10) / 10 : undefined,
+            price: Number(deal.salePrice),
+            originalPrice:
+              deal.originalPrice && Number(deal.originalPrice) !== Number(deal.salePrice)
+                ? Number(deal.originalPrice)
+                : undefined,
+            discount: deal.discountPercent ? Number(deal.discountPercent) : undefined,
+            priceNote: deal.durationMinutes ? `${deal.durationMinutes} ${t.durationSuffix}` : undefined,
+            tag: deal.popularTags?.[0]?.name,
+          }}
+          eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
+          favoriteActive={signedIn && isWishlisted(deal.id)}
+          onFavorite={() => toggleFavorite(deal)}
+          layout={cardLayout}
+          actions={
+            <DealAddToCartDialog
+              deal={deal}
+              onAdded={(label) => setActionMessage(t.messages.addToCartSuccess.replace('{item}', label))}
+              renderTrigger={(open) => (
+                <OutlinedButton
+                  onClick={() => {
+                    if (requireAuthOrRedirect()) open();
+                  }}
+                >
+                  <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
+                  {t.actions.addToCart}
+                </OutlinedButton>
+              )}
+            />
+          }
+        />
+      ));
 
   return (
     <>

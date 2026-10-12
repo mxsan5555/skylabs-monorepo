@@ -128,6 +128,15 @@ input[type='checkbox'] {
   align-items: start;
 }
 
+/* Member summary tab (vendor-detail-page.tsx): 70/30 split — setup-progress cards left,
+   the member's profile summary card right. Structural only, same pattern as `.two-pane` above. */
+.summary-layout {
+  display: grid;
+  grid-template-columns: 7fr 3fr;
+  gap: 20px;
+  align-items: start;
+}
+
 .panel {
   border-radius: 16px;
   background-color: var(--md-sys-color-surface-container, #eef1f6);
@@ -731,7 +740,8 @@ input[type='checkbox'] {
   }
 }
 @media (max-width: 900px) {
-  .two-pane {
+  .two-pane,
+  .summary-layout {
     grid-template-columns: 1fr;
   }
 

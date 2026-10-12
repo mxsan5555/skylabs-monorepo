@@ -18,4 +18,12 @@ if (process.env.NODE_ENV !== 'production') {
   ];
   const envFile = candidates.find((p) => fs.existsSync(p));
   if (envFile) dotenv.config({ path: envFile });
+  // The backend .env contains optional provider placeholders; .env.local and host
+  // environment values retain precedence. Never read Angular environment files.
+  const providerFiles = [
+    path.join(process.cwd(), 'apps/mera-driver-api/.env'),
+    path.join(__dirname, '../../.env'),
+  ];
+  const providerFile = providerFiles.find((p) => fs.existsSync(p));
+  if (providerFile) dotenv.config({ path: providerFile });
 }

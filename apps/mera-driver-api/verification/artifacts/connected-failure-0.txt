@@ -1,0 +1,14 @@
+arrow_back
+Confirm your booking
+Book a Driver
+Available fare rule
+Choose city, service & vehicle
+Delhi NCR · One Way · Sedan
+Connected-e52e023c-5af4-447d-a584-7a5729ef7265 · Hourly · Car
+Pickup
+Drop
+Pickup time
+Duration (minutes)
+Distance (km)
+Required driver skill
+Calculate price

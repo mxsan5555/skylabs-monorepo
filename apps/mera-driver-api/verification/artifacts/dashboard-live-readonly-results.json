@@ -1,0 +1,63 @@
+{
+  "readOnly": true,
+  "providerCalls": 0,
+  "results": [
+    {
+      "role": "super_admin",
+      "cards": 6,
+      "sqlAndDestinationConsistency": true
+    },
+    {
+      "role": "vendor",
+      "cards": 4,
+      "sqlAndDestinationConsistency": true
+    },
+    {
+      "role": "marketing",
+      "cards": 0,
+      "sqlAndDestinationConsistency": true
+    },
+    {
+      "role": "sales",
+      "cards": 4,
+      "sqlAndDestinationConsistency": true
+    },
+    {
+      "role": "data_operator",
+      "cards": 4,
+      "sqlAndDestinationConsistency": true
+    },
+    {
+      "role": "kyc_verification",
+      "cards": 4,
+      "sqlAndDestinationConsistency": true
+    },
+    {
+      "role": "kyc_verification",
+      "cards": 4,
+      "sqlAndDestinationConsistency": true
+    },
+    {
+      "role": "driver",
+      "ownDashboard": true
+    },
+    {
+      "role": "driver",
+      "ownDashboard": true
+    },
+    {
+      "role": "customer",
+      "ownDashboard": true
+    },
+    {
+      "role": "customer",
+      "ownDashboard": true
+    }
+  ],
+  "gaps": [
+    "admin: no existing active account; covered with mocked API/browser fixtures",
+    "vendor: 1 existing active accounts; two-account live comparison unavailable",
+    "company: 0 existing active accounts; two-account live comparison unavailable",
+    "support: no existing active account; covered with mocked API/browser fixtures"
+  ]
+}

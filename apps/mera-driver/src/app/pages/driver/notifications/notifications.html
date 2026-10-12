@@ -1,0 +1,24 @@
+<md-admin-page title="Notifications" subtitle="Profile, KYC, payment and trip updates.">
+  @if (loading()) {
+    <p class="otp-muted">Loading…</p>
+  } @else if (notifications().length === 0) {
+    <section class="account-card">
+      <p class="otp-muted">No notifications yet.</p>
+    </section>
+  } @else {
+    <ul class="driver-doc-list">
+      @for (m of notifications(); track m.id) {
+        <li class="driver-doc-card">
+          <div>
+            <div>{{ m.subject }}</div>
+            <div class="driver-doc-card__meta">{{ m.body }}</div>
+            <div class="driver-doc-card__meta">{{ m.createdAt | date: 'medium' }}</div>
+          </div>
+          @if (relatedPath(m); as path) {
+            <a [routerLink]="path">Open</a>
+          }
+        </li>
+      }
+    </ul>
+  }
+</md-admin-page>

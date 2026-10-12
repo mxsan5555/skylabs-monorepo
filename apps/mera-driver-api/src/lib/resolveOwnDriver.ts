@@ -18,10 +18,14 @@ export async function resolveOwnDriver(req: Request, res: Response, next: NextFu
     return;
   }
 
+  if (req.user.portalContext === 'customer') {
+    res.status(403).json({data:null,error:{code:'PORTAL_ACCESS_DENIED',message:'Switch to the appropriate authorized portal to access this record.'}});
+    return;
+  }
   try {
     const driver = await prisma.driver.findUnique({
       where: { userId: req.user.sub },
-      select: { id: true, accountStatus: true },
+      select: { id: true, accountStatus: true, user: { select: { status:true, deletedAt:true } } },
     });
     if (!driver) {
       res.status(404).json({
@@ -34,12 +38,15 @@ export async function resolveOwnDriver(req: Request, res: Response, next: NextFu
     // the per-request re-check that revokes their portal access immediately rather than
     // waiting out the token's remaining lifetime. Same restriction enforced at login time
     // (`assertDriverAccountActive`) for the not-yet-authenticated case.
-    if (driver.accountStatus === 'Inactive') {
+    if (['Inactive','Suspended'].includes(driver.accountStatus)) {
       res.status(403).json({
         data: null,
         error: { code: 'DRIVER_DEACTIVATED', message: 'Your driver account has been deactivated. Please contact your administrator.' },
       });
       return;
+    }
+    if(driver.user===null || (driver.user && (driver.user.status!=='active'||driver.user.deletedAt))){
+      res.status(403).json({data:null,error:{code:'ACCOUNT_INACTIVE',message:'Your login account is inactive. Contact support.'}});return;
     }
     req.driver = { id: driver.id };
     next();

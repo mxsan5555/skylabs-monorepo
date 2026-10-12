@@ -415,6 +415,12 @@ const DealFieldsSchema = z.object({
   availableBookings: z.number().int().min(0).optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
+  /** The therapist(s) who perform this deal — many-to-many (DealTherapist), each must already
+   *  belong to this deal's own branch (validated in vendor.service.ts#assertTherapistsBelongToBranch).
+   *  On create: omit or `[]` for a deal with no therapist assigned yet. On update: omit entirely
+   *  to leave the existing links untouched; present (including `[]`) replaces the full set —
+   *  same convention as `packages` above. */
+  therapistIds: z.array(z.string().uuid()).optional(),
 });
 
 /** A service Deal's own duration/price menu — mirrors TherapistPackageFieldsSchema exactly (see

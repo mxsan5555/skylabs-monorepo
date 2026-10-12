@@ -384,6 +384,124 @@ describe('sky-data-table', () => {
       const overlay = el.shadowRoot?.querySelector('.overlay') as HTMLElement;
       expect(overlay?.hidden).toBe(true);
     });
+
+    it('traps Tab/Shift+Tab inside the open drawer so focus cannot escape to the page behind it', async () => {
+      const el = createElement();
+      el.columns = COLS;
+      el.rows = ROWS;
+      el.total = 2;
+      el.actions = JSON.stringify([{ icon: 'visibility', label: 'View', event: '__view_detail__' }]);
+      await el.updateComplete;
+
+      (el.shadowRoot?.querySelector('td.col-act md-icon-button') as HTMLElement).click();
+      await el.updateComplete;
+
+      const closeBtn = el.shadowRoot?.querySelector('.close-btn-el') as HTMLElement;
+      expect(closeBtn).toBeTruthy();
+
+      // jsdom doesn't implement focus delegation for Material's custom elements, so
+      // shadowRoot.activeElement never reflects a real .focus() call on an md-icon-button —
+      // stub it to "the close button has focus" (the real-browser state right after open,
+      // since it's the drawer's only focusable element) to exercise the trap's own branch logic.
+      Object.defineProperty(el.shadowRoot, 'activeElement', { configurable: true, get: () => closeBtn });
+      const focusSpy = vi.spyOn(closeBtn, 'focus');
+
+      // The close button is the only focusable element in the drawer today, so both Tab and
+      // Shift+Tab must keep the trap closed on it rather than letting focus move elsewhere.
+      const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+      document.dispatchEvent(tab);
+      expect(tab.defaultPrevented).toBe(true);
+      expect(focusSpy).toHaveBeenCalled();
+
+      focusSpy.mockClear();
+      const shiftTab = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true });
+      document.dispatchEvent(shiftTab);
+      expect(shiftTab.defaultPrevented).toBe(true);
+      expect(focusSpy).toHaveBeenCalled();
+    });
+
+    it('does not intercept Tab when the drawer is closed', async () => {
+      const el = createElement();
+      el.columns = COLS;
+      el.rows = ROWS;
+      el.total = 2;
+      await el.updateComplete;
+
+      const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+      document.dispatchEvent(tab);
+      expect(tab.defaultPrevented).toBe(false);
+    });
+  });
+
+  describe('column selector', () => {
+    it('fires sky-dt-column-error (never a blocking alert()) when hiding the last visible column, and reverts the checkbox', async () => {
+      const el = createElement();
+      el.searchable = true; // the toolbar — and the column-selector button inside it — only renders when non-empty
+      el.columns = COLS;
+      el.rows = ROWS;
+      el.total = 2;
+      await el.updateComplete;
+
+      (el.shadowRoot?.querySelector('.col-selector-wrap md-icon-button') as HTMLElement).click();
+      await el.updateComplete;
+
+      const checkboxes = Array.from(
+        el.shadowRoot?.querySelectorAll('.col-selector-menu md-checkbox') ?? [],
+      ) as (HTMLElement & { checked: boolean })[];
+      expect(checkboxes.length).toBe(2);
+
+      const events: CustomEvent[] = [];
+      el.addEventListener('sky-dt-column-error', (e) => events.push(e as CustomEvent));
+
+      // Hiding the first column still leaves one visible — should succeed quietly.
+      checkboxes[0].checked = false;
+      checkboxes[0].dispatchEvent(new Event('change', { bubbles: true }));
+      await el.updateComplete;
+      expect(events.length).toBe(0);
+
+      // Hiding the only remaining visible column is rejected.
+      checkboxes[1].checked = false;
+      checkboxes[1].dispatchEvent(new Event('change', { bubbles: true }));
+      await el.updateComplete;
+
+      expect(events.length).toBe(1);
+      expect(events[0].detail).toEqual({ message: 'At least one column must remain visible.' });
+      expect(checkboxes[1].checked).toBe(true);
+
+      // Every consumer gets feedback even if nothing listens for the event — the menu shows
+      // its own announced message.
+      const errorEl = el.shadowRoot?.querySelector('.col-selector-menu .col-error');
+      expect(errorEl?.getAttribute('role')).toBe('alert');
+      expect(errorEl?.textContent).toBe('At least one column must remain visible.');
+    });
+
+    it('clears the inline error once a column is successfully toggled', async () => {
+      const el = createElement();
+      el.searchable = true;
+      el.columns = COLS;
+      el.rows = ROWS;
+      el.total = 2;
+      await el.updateComplete;
+
+      (el.shadowRoot?.querySelector('.col-selector-wrap md-icon-button') as HTMLElement).click();
+      await el.updateComplete;
+      const checkboxes = Array.from(
+        el.shadowRoot?.querySelectorAll('.col-selector-menu md-checkbox') ?? [],
+      ) as (HTMLElement & { checked: boolean })[];
+
+      checkboxes[0].checked = false;
+      checkboxes[0].dispatchEvent(new Event('change', { bubbles: true }));
+      checkboxes[1].checked = false;
+      checkboxes[1].dispatchEvent(new Event('change', { bubbles: true }));
+      await el.updateComplete;
+      expect(el.shadowRoot?.querySelector('.col-error')).toBeTruthy();
+
+      // Re-showing the first column is a successful toggle — the error should clear.
+      checkboxes[0].checked = true;
+      checkboxes[0].dispatchEvent(new Event('change', { bubbles: true }));
+      await el.updateComplete;
+      expect(el.shadowRoot?.querySelector('.col-error')).toBeNull();
+    });
   });
 
   describe('actions', () => {

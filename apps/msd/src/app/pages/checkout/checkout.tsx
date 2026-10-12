@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FilledButton, OutlinedButton, Icon, Divider, OutlinedTextField, Radio,} from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedButton, Icon, Divider, OutlinedTextField, Radio, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 
 import {
@@ -78,7 +78,7 @@ export function Checkout() {
     }
     prefilledRef.current = true;
     setContactName(bootstrap.user.name ?? '');
-    setContactPhone( (bootstrap.user.phone ?? '').replace(/^\+91/, ''),);
+    setContactPhone((bootstrap.user.phone ?? '').replace(/^\+91/, ''),);
     setContactEmail(bootstrap.user.email ?? '');
   }, [bootstrap]);
   useEffect(() => {
@@ -99,8 +99,9 @@ export function Checkout() {
 
         setOrder(currentOrder);
       } catch (err) {
-        setError( err instanceof ApiRequestError ? err.message : 'Could not start checkout.', );
-      } finally { setLoading(false);
+        setError(err instanceof ApiRequestError ? err.message : 'Could not start checkout.',);
+      } finally {
+        setLoading(false);
       }
     })();
   }, []);
@@ -121,7 +122,7 @@ export function Checkout() {
 
         setPaymentIntent(intent);
       } catch (err) {
-        setError( err instanceof ApiRequestError ? err.message : 'Could not prepare payment.',  );
+        setError(err instanceof ApiRequestError ? err.message : 'Could not prepare payment.',);
       }
     })();
 
@@ -134,18 +135,18 @@ export function Checkout() {
 
   function validateDetails(): boolean {
     const errors: FieldErrors = {};
-    if (!contactName.trim()) {  errors.contactName = 'Name is required.'; }
+    if (!contactName.trim()) { errors.contactName = 'Name is required.'; }
     if (!/^[6-9]\d{9}$/.test(contactPhone.trim())) {
       errors.contactPhone = 'Enter a valid 10-digit mobile number.';
     }
-    if (  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-        contactEmail.trim(),
-      )
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+      contactEmail.trim(),
+    )
     ) {
       errors.contactEmail = 'Enter a valid email address.';
     }
     if (!shippingAddress.trim()) {
-      errors.shippingAddress ='Address is required.';
+      errors.shippingAddress = 'Address is required.';
     }
     if (!shippingCity.trim()) {
       errors.shippingCity = 'City is required.';
@@ -185,13 +186,13 @@ export function Checkout() {
       setOrder(newOrder);
       setStep('payment');
     } catch (err) {
-      setError(  err instanceof ApiRequestError  ? err.message : 'Could not start checkout.', );
+      setError(err instanceof ApiRequestError ? err.message : 'Could not start checkout.',);
     } finally {
       submittingDetailsRef.current = false;
       setDetailsSubmitting(false);
     }
   };
-const openRazorpay = async () => {
+  const openRazorpay = async () => {
     if (payingRef.current) return;
     if (!order || !paymentIntent) {
       return;
@@ -202,7 +203,7 @@ const openRazorpay = async () => {
     try {
       await loadRazorpayScript();
       if (!window.Razorpay) {
-        throw new Error( 'Payment gateway unavailable.',
+        throw new Error('Payment gateway unavailable.',
         );
       }
 
@@ -264,7 +265,8 @@ const openRazorpay = async () => {
       setPaying(false);
     }
   };
- const placeCodOrder = async () => {
+  
+  const placeCodOrder = async () => {
     if (payingRef.current) return;
     if (!order) {
       return;
@@ -336,8 +338,8 @@ const openRazorpay = async () => {
   return (
     <div className="checkout-page">
       <title> {content.meta.checkout.title} </title>
-      <meta name="description" content={content.meta.checkout.description }/>
-      <meta name="robots" content="noindex"/>
+      <meta name="description" content={content.meta.checkout.description} />
+      <meta name="robots" content="noindex" />
       <div className="checkout-page__inner">
         <header className="checkout-header">
           <div className="checkout-header__top">
@@ -351,16 +353,16 @@ const openRazorpay = async () => {
             </div>
           </div>
           {!isRetryPayment && (
-            <ol  className="checkout-steps"  aria-label="Checkout steps" >
-              <li className={`checkout-steps__step${ step === 'payment' ? ' checkout-steps__step--done'  : '' }`} >
+            <ol className="checkout-steps" aria-label="Checkout steps" >
+              <li className={`checkout-steps__step${step === 'payment' ? ' checkout-steps__step--done' : ''}`} >
                 <span className="checkout-steps__num" aria-hidden="true">
                   {step === 'payment' ? (
                     <Icon>check</Icon>
-                  ) : ( 1 )}
+                  ) : (1)}
                 </span>
                 <span className="checkout-steps__label">{checkoutContent.steps[0]} </span>
               </li>
-              <li className={`checkout-steps__step${ step === 'payment' ? ' checkout-steps__step--active' : '' }`}>
+              <li className={`checkout-steps__step${step === 'payment' ? ' checkout-steps__step--active' : ''}`}>
                 <span className="checkout-steps__num" aria-hidden="true" > 2</span>
                 <span className="checkout-steps__label"> {checkoutContent.steps[2]} </span>
               </li>
@@ -394,7 +396,7 @@ const openRazorpay = async () => {
                         onInput={(e) =>
                           setContactName(
                             (
-                              e.target as unknown as {  value: string;  }
+                              e.target as unknown as { value: string; }
                             ).value,
                           )
                         }
@@ -423,7 +425,7 @@ const openRazorpay = async () => {
                         }
                       />
                       {fieldErrors.contactPhone && (
-                        <p  className="checkout-form__error" role="alert" > {fieldErrors.contactPhone} </p>
+                        <p className="checkout-form__error" role="alert" > {fieldErrors.contactPhone} </p>
                       )}
                     </div>
                   </div>
@@ -474,7 +476,7 @@ const openRazorpay = async () => {
                         onInput={(e) =>
                           setShippingCity(
                             (
-                              e.target as unknown as {  value: string;}
+                              e.target as unknown as { value: string; }
                             ).value,
                           )
                         }
@@ -492,7 +494,7 @@ const openRazorpay = async () => {
                         onInput={(e) =>
                           setShippingState(
                             (
-                              e.target as unknown as { value: string;}
+                              e.target as unknown as { value: string; }
                             ).value,
                           )
                         }
@@ -504,9 +506,9 @@ const openRazorpay = async () => {
                     <div className="checkout-form__field-wrapper">
                       <OutlinedTextField
                         label={checkoutContent.fields.pincode}
-                         type="text"
+                        type="text"
                         inputMode="numeric"
-                          pattern="[0-9]*"
+                        pattern="[0-9]*"
                         autocomplete="postal-code"
                         maxLength={6}
                         required
@@ -514,7 +516,7 @@ const openRazorpay = async () => {
                         onInput={(e) =>
                           setShippingPincode(
                             (
-                              e.target as unknown as { value: string;}
+                              e.target as unknown as { value: string; }
                             ).value
                               .replace(/\D/g, '')
                               .slice(0, 6),
@@ -522,7 +524,7 @@ const openRazorpay = async () => {
                         }
                       />
                       {fieldErrors.shippingPincode && (
-                        <p  className="checkout-form__error" role="alert" > {fieldErrors.shippingPincode} </p>
+                        <p className="checkout-form__error" role="alert" > {fieldErrors.shippingPincode} </p>
                       )}
                     </div>
                   </div>
@@ -573,7 +575,7 @@ const openRazorpay = async () => {
             </aside>
           </div>
         ) : !order ? null : (
-  <div className="checkout-page__layout">
+          <div className="checkout-page__layout">
             <main className="checkout-page__form">
               <section
                 aria-labelledby="step-pay-heading"
@@ -584,7 +586,7 @@ const openRazorpay = async () => {
                     <Icon> credit_card </Icon>
                   </div>
                   <div>
-                    <h2  id="step-pay-heading" className="checkout-form__heading" > {checkoutContent.stepHeadings[2]} </h2>
+                    <h2 id="step-pay-heading" className="checkout-form__heading" > {checkoutContent.stepHeadings[2]} </h2>
                     <p className="checkout-form__subheading">
                       Choose your preferred payment
                       method to complete your order.
@@ -600,7 +602,7 @@ const openRazorpay = async () => {
                   </div>
                 ) : (
                   <>
-                <div className="checkout-form__group">
+                    <div className="checkout-form__group">
                       <p className="checkout-form__group-label"> Payment Method </p>
                       <div
                         role="radiogroup"
@@ -608,14 +610,13 @@ const openRazorpay = async () => {
                         className="checkout-payment-methods"
                       >
                         <label
-                          className={`checkout-payment-methods__opt${
-                            paymentMethod === 'online' ? ' checkout-payment-methods__opt--selected' : ''}`}
+                          className={`checkout-payment-methods__opt${paymentMethod === 'online' ? ' checkout-payment-methods__opt--selected' : ''}`}
                         >
                           <Radio
                             name="payment-method"
-                            checked={ paymentMethod ==='online' }
+                            checked={paymentMethod === 'online'}
                             onChange={() =>
-                              setPaymentMethod( 'online',
+                              setPaymentMethod('online',
                               )
                             }
                           />
@@ -630,11 +631,10 @@ const openRazorpay = async () => {
                           </span>
                         </label>
                         <label
-                          className={`checkout-payment-methods__opt${
-                            paymentMethod === 'cod'
-                              ? ' checkout-payment-methods__opt--selected'
-                              : ''
-                          }`}
+                          className={`checkout-payment-methods__opt${paymentMethod === 'cod'
+                            ? ' checkout-payment-methods__opt--selected'
+                            : ''
+                            }`}
                         >
 
                           <Radio
@@ -705,18 +705,18 @@ const openRazorpay = async () => {
                           </>
                         ) : (
                           `across ${vendorGroups.length} vendors in one payment.`
-                          )}
+                        )}
                       </p>
                     </div>
                     {paymentMethod ===
-                    'online' ? (
+                      'online' ? (
                       <div className="checkout-payment-action">
                         <FilledButton
                           className="checkout-form__next-btn"
                           onClick={openRazorpay}
-                          disabled={paying ||!paymentIntent}
+                          disabled={paying || !paymentIntent}
                         >
-                          {paying? 'Opening payment…': `Pay ${formatINR(combinedTotal,)}`}
+                          {paying ? 'Opening payment…' : `Pay ${formatINR(combinedTotal,)}`}
                           <Icon slot="trailing-icon" aria-hidden="true"
                           > arrow_forward</Icon>
                         </FilledButton>
@@ -733,7 +733,7 @@ const openRazorpay = async () => {
                       <div className="checkout-payment-action">
                         <FilledButton
                           className="checkout-form__next-btn"
-                          onClick={ placeCodOrder }
+                          onClick={placeCodOrder}
                           disabled={paying}
                         >
                           {paying ? 'Placing order…' : checkoutContent.placeOrderLabel}
@@ -744,11 +744,11 @@ const openRazorpay = async () => {
                   </>
                 )}
                 {error && (
-                  <p className="error-state"  role="alert" >  {error} </p>
+                  <p className="error-state" role="alert" >  {error} </p>
                 )}
               </section>
             </main>
-<aside className="checkout-page__summary"  aria-label="Order summary">
+            <aside className="checkout-page__summary" aria-label="Order summary">
               <div className="checkout-summary-card">
                 <div className="checkout-summary">
                   <div className="checkout-summary__header">
@@ -771,12 +771,12 @@ const openRazorpay = async () => {
                       <ul className="checkout-summary__items">
                         {group.items.map(
                           (item) => (
-                            <li key={item.id}  className="checkout-summary__item">
+                            <li key={item.id} className="checkout-summary__item">
                               <div className="checkout-summary__item-main">
                                 <p className="checkout-summary__item-title">{item.itemName} </p>
                                 <p className="checkout-summary__item-qty">  × {item.quantity} {item.durationMinutes && ` · ${item.durationMinutes} min`} </p>
                               </div>
-                              <p className="checkout-summary__item-price">{formatINR( Number( item.lineTotal, ), )} </p>
+                              <p className="checkout-summary__item-price">{formatINR(Number(item.lineTotal,),)} </p>
                             </li>
                           ),
                         )}
@@ -786,7 +786,7 @@ const openRazorpay = async () => {
                   <Divider />
                   <div className="checkout-summary__total">
                     <span> {content.cart.total} </span>
-                    <strong>{formatINR( combinedTotal, )} </strong>
+                    <strong>{formatINR(combinedTotal,)} </strong>
                   </div>
                   {order.shippingAddress && (
                     <>
@@ -824,7 +824,7 @@ const openRazorpay = async () => {
               </div>
               {!isRetryPayment && (
                 <OutlinedButton className="checkout-summary__back" onClick={() => setStep('details')} >
-                  <Icon slot="icon"  aria-hidden="true"> arrow_back </Icon>
+                  <Icon slot="icon" aria-hidden="true"> arrow_back </Icon>
                   {checkoutContent.backLabel}
                 </OutlinedButton>
               )}

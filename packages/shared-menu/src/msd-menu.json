@@ -102,70 +102,69 @@
       }
     ]
   },
-
-      {
-        "id": "business-profile",
-        "title": "Business Profile",
-         "icon": "storefront",
-        "route": "/account/vendor-profile",
-        "permissionKey": "vendor-portal.profile",
-        "parent": "business",
-        "order": 1
-      },
-      {
-        "id": "business-branch",
-        "title": "Branch",
-         "icon": "storefront",
-        "route": "/account/vendor-branches-deals",
-        "permissionKey": "vendor-portal.branches",
-        "parent": "business",
-        "order": 2
-      },
-      {
-        "id": "business-deal",
-        "title": "Deal",
-         "icon": "storefront",
-        "route": "/account/vendor-deals",
-        "permissionKey": "vendor-portal.deals",
-        "parent": "business",
-        "order": 3
-      },
-      {
-        "id": "business-product",
-        "title": "Product",
-         "icon": "storefront",
-        "route": "/account/vendor-products",
-        "permissionKey": "vendor-portal.products",
-        "parent": "business",
-        "order": 4
-      },
-      {
-        "id": "business-therapist",
-        "title": "Therapist",
-         "icon": "storefront",
-        "route": "/account/vendor-therapists",
-        "permissionKey": "vendor-portal.therapists",
-        "parent": "business",
-        "order": 5
-      },
-      {
-        "id": "business-customer",
-        "title": "Customer",
-         "icon": "storefront",
-        "route": "/account/vendor-customers",
-        "permissionKey": "vendor-portal.customers",
-        "parent": "business",
-        "order": 6
-      },
-      {
-        "id": "business-order",
-        "title": "Order",
-         "icon": "shopping_cart",
-        "route": "/account/vendor-orders",
-        "permissionKey": "vendor-portal.orders",
-        "parent": "business",
-        "order": 7
-      },
+  {
+    "id": "business-profile",
+    "title": "Business Profile",
+    "icon": "business_center",
+    "route": "/account/vendor-profile",
+    "permissionKey": "vendor-portal.profile",
+    "parent": "business",
+    "order": 1
+  },
+  {
+    "id": "business-branch",
+    "title": "Branch",
+    "icon": "account_tree",
+    "route": "/account/vendor-branches-deals",
+    "permissionKey": "vendor-portal.branches",
+    "parent": "business",
+    "order": 2
+  },
+  {
+    "id": "business-deal",
+    "title": "Deal",
+    "icon": "local_offer",
+    "route": "/account/vendor-deals",
+    "permissionKey": "vendor-portal.deals",
+    "parent": "business",
+    "order": 3
+  },
+  {
+    "id": "business-product",
+    "title": "Product",
+    "icon": "inventory_2",
+    "route": "/account/vendor-products",
+    "permissionKey": "vendor-portal.products",
+    "parent": "business",
+    "order": 4
+  },
+  {
+    "id": "business-therapist",
+    "title": "Therapist",
+    "icon": "spa",
+    "route": "/account/vendor-therapists",
+    "permissionKey": "vendor-portal.therapists",
+    "parent": "business",
+    "order": 5
+  },
+  {
+    "id": "business-customer",
+    "title": "Customer",
+    "icon": "group",
+    "route": "/account/vendor-customers",
+    "permissionKey": "vendor-portal.customers",
+    "parent": "business",
+    "order": 6
+  },
+  {
+    "id": "business-order",
+    "title": "Order",
+    "icon": "shopping_cart",
+    "route": "/account/vendor-orders",
+    "permissionKey": "vendor-portal.orders",
+    "parent": "business",
+    "order": 7
+  },
   {
     "id": "customers",
     "title": "Customers",
@@ -404,7 +403,6 @@
         "parent": "settings",
         "order": 1
       }
-     
     ]
   }
 ]

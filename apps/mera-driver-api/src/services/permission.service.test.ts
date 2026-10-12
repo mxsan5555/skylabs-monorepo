@@ -7,6 +7,7 @@ import {
   resolvePermissionsForRoles,
   invalidatePermissionCache,
   resolveEffectivePermissionsForUser,
+  setUserPermissionOverrides,
 } from './permission.service';
 
 beforeEach(() => {
@@ -59,7 +60,7 @@ describe('resolveEffectivePermissionsForUser', () => {
     expect(result).toEqual(['drivers:view']);
   });
 
-  it('adds a grant override the role set does not carry', async () => {
+  it('honours explicit direct grants while retaining their records', async () => {
     mockPrisma.role.findMany.mockResolvedValue([{ isSuperAdmin: false }]);
     mockPrisma.rolePermission.findMany.mockResolvedValue([{ permission: { key: 'drivers:view' } }]);
     mockPrisma.userPermissionOverride.findMany.mockResolvedValue([
@@ -68,7 +69,8 @@ describe('resolveEffectivePermissionsForUser', () => {
 
     const result = await resolveEffectivePermissionsForUser('user-1', ['data_operator']);
 
-    expect(result).toEqual(expect.arrayContaining(['drivers:view', 'drivers:delete']));
+    expect(result).toEqual(['drivers:view', 'drivers:delete']);
+    expect(mockPrisma.userPermissionOverride.deleteMany).not.toHaveBeenCalled();
   });
 
   it('removes a revoke override from a permission the role would otherwise grant', async () => {
@@ -95,5 +97,37 @@ describe('resolveEffectivePermissionsForUser', () => {
     // Full menu-derived access, and the override table is never even queried.
     expect(result.length).toBeGreaterThan(1);
     expect(mockPrisma.userPermissionOverride.findMany).not.toHaveBeenCalled();
+  });
+});
+
+it('rejects both new per-user allows and denies without deleting audit records',async()=>{
+  await expect(setUserPermissionOverrides('u',['grant'],[])).rejects.toMatchObject({status:410,code:'ROLE_ONLY_ACCESS'});
+  await expect(setUserPermissionOverrides('u',[],['deny'])).rejects.toMatchObject({status:410,code:'ROLE_ONLY_ACCESS'});
+  expect(mockPrisma.userPermissionOverride.deleteMany).not.toHaveBeenCalled();expect(mockPrisma.userPermissionOverride.createMany).not.toHaveBeenCalled();
+});
+
+
+describe('live independent action resolution', () => {
+  it('observes grants and revocations with the same old role token and no cache reset', async () => {
+    mockPrisma.role.findMany.mockResolvedValue([{key:'custom_role',isSuperAdmin:false}]);
+    mockPrisma.userPermissionOverride.findMany.mockResolvedValue([]);
+    mockPrisma.rolePermission.findMany.mockResolvedValue([{permission:{key:'customers:view'}}]);
+    expect(await resolveEffectivePermissionsForUser('u',['sales'])).toEqual(['customers:view']);
+    mockPrisma.rolePermission.findMany.mockResolvedValue([{permission:{key:'customers:view'}},{permission:{key:'customers:edit'}}]);
+    expect(await resolveEffectivePermissionsForUser('u',['sales'])).toEqual(['customers:view','customers:edit']);
+    mockPrisma.rolePermission.findMany.mockResolvedValue([{permission:{key:'customers:edit'}}]);
+    expect(await resolveEffectivePermissionsForUser('u',['sales'])).toEqual(['customers:edit']);
+    expect(mockPrisma.rolePermission.findMany.mock.calls[0][0].where.role.key.in).toEqual(['custom_role']);
+  });
+  it('uses live membership to replace token roles used by ownership restrictions', async () => {
+    mockPrisma.role.findMany.mockResolvedValue([{key:'sales',isSuperAdmin:false}]);
+    mockPrisma.rolePermission.findMany.mockResolvedValue([{permission:{key:'customers:view'}}]);
+    const current=vi.fn();await resolveEffectivePermissionsForUser('u',['admin'],current);
+    expect(current).toHaveBeenCalledWith(['sales']);
+  });
+  it('does not use a historical direct grant without an active staff membership', async () => {
+    mockPrisma.role.findMany.mockResolvedValue([]);mockPrisma.rolePermission.findMany.mockResolvedValue([]);
+    mockPrisma.userPermissionOverride.findMany.mockResolvedValue([{effect:'grant',permission:{key:'customers:delete'}}]);
+    expect(await resolveEffectivePermissionsForUser('u',['admin'])).toEqual([]);
   });
 });

@@ -87,56 +87,58 @@ export function VendorUserPicker({ value, onChange, disabled }: VendorUserPicker
   }, [firstName, lastName, email, mobile, emailValid, mobileValid, checking, blocked]);
 
   return (
-    <fieldset>
-      <legend>Vendor User</legend>
-      <div className="form-grid">
-        <OutlinedTextField
-          label="First name"
-          value={firstName}
-          disabled={disabled}
-          onInput={(e: Event) => setFirstName((e.target as HTMLInputElement).value)}
-        />
-        <OutlinedTextField
-          label="Last name"
-          value={lastName}
-          disabled={disabled}
-          onInput={(e: Event) => setLastName((e.target as HTMLInputElement).value)}
-        />
-        <OutlinedTextField
-          label="Email"
-          type="email"
-          value={email}
-          disabled={disabled}
-          onInput={(e: Event) => setEmail((e.target as HTMLInputElement).value)}
-          error={!emailValid}
-        />
-        {!emailValid && <p className="error-state" role="alert">Enter a valid email address.</p>}
-        <OutlinedTextField
-          label="Mobile"
-          type="tel"
-          inputMode="numeric"
-          maxLength={10}
-          value={mobile}
-          disabled={disabled}
-          onInput={(e: Event) => setMobile((e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 10))}
-          error={!mobileValid}
-        />
-        {!mobileValid && <p className="error-state" role="alert">Enter a valid 10-digit mobile number.</p>}
-        <p className="field-hint">
-          Provide at least an email or a mobile number for the new Vendor owner's login. A fresh account is always
-          created — if either already belongs to an existing user, choose different details.
-        </p>
-
-        {checking && <p className="loading-state">Checking availability…</p>}
-        {checkError && <p className="error-state" role="alert">{checkError}</p>}
-        {availability && !availability.available && (
-          <p className="error-state" role="alert">
-            A user with this {availability.conflicts.join(' and ')} already exists. Please use a different
-            email/phone to create this Vendor.
+    <section aria-labelledby="vendor-user-title">
+      <h2 id="vendor-user-title" className="section-title">Vendor User</h2>
+      <sky-card>
+        <div className="form-grid">
+          <OutlinedTextField
+            label="First name"
+            value={firstName}
+            disabled={disabled}
+            onInput={(e: Event) => setFirstName((e.target as HTMLInputElement).value)}
+          />
+          <OutlinedTextField
+            label="Last name"
+            value={lastName}
+            disabled={disabled}
+            onInput={(e: Event) => setLastName((e.target as HTMLInputElement).value)}
+          />
+          <OutlinedTextField
+            label="Email"
+            type="email"
+            value={email}
+            disabled={disabled}
+            onInput={(e: Event) => setEmail((e.target as HTMLInputElement).value)}
+            error={!emailValid}
+          />
+          {!emailValid && <p className="error-state" role="alert">Enter a valid email address.</p>}
+          <OutlinedTextField
+            label="Mobile"
+            type="tel"
+            inputMode="numeric"
+            maxLength={10}
+            value={mobile}
+            disabled={disabled}
+            onInput={(e: Event) => setMobile((e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 10))}
+            error={!mobileValid}
+          />
+          {!mobileValid && <p className="error-state" role="alert">Enter a valid 10-digit mobile number.</p>}
+          <p className="field-hint">
+            Provide at least an email or a mobile number for the new Vendor owner's login. A fresh account is always
+            created — if either already belongs to an existing user, choose different details.
           </p>
-        )}
-      </div>
-    </fieldset>
+
+          {checking && <p className="loading-state">Checking availability…</p>}
+          {checkError && <p className="error-state" role="alert">{checkError}</p>}
+          {availability && !availability.available && (
+            <p className="error-state" role="alert">
+              A user with this {availability.conflicts.join(' and ')} already exists. Please use a different
+              email/phone to create this Vendor.
+            </p>
+          )}
+        </div>
+      </sky-card>
+    </section>
   );
 }
 

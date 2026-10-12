@@ -1,5 +1,5 @@
 const { NxAppWebpackPlugin } = require('@nx/webpack/app-plugin');
-const { join } = require('path');
+const { join, resolve } = require('path');
 
 // Keep the generated Prisma client (and its native query-engine `.node` binary) OUT of the webpack
 // bundle. Webpack can't bundle the native engine, and Prisma locates that engine relative to the
@@ -27,7 +27,9 @@ class ExternalizePrismaClientPlugin {
 
 module.exports = {
   output: {
-    path: join(__dirname, '../../dist/apps/mera-driver-api'),
+    path: process.env.MERA_DRIVER_API_OUTPUT_PATH
+      ? resolve(__dirname, process.env.MERA_DRIVER_API_OUTPUT_PATH)
+      : join(__dirname, '../../dist/apps/mera-driver-api'),
     clean: true,
     ...(process.env.NODE_ENV !== 'production' && {
       devtoolModuleFilenameTemplate: '[absolute-resource-path]',

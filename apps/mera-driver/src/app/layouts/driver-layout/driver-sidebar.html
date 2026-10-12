@@ -1,0 +1,38 @@
+<aside class="admin-sidebar" [class.is-open]="open()" [attr.aria-hidden]="open() ? null : 'true'" [attr.inert]="open() ? null : ''">
+  <md-icon-button class="md-sidebar-mobile-close" aria-label="Close navigation" title="Close navigation" (click)="close.emit()"><md-icon aria-hidden="true">close</md-icon></md-icon-button>
+  <div class="admin-sidebar__brand">
+    <span class="admin-sidebar__logo">
+      <md-icon aria-hidden="true">directions_car</md-icon>
+    </span>
+    <span>
+      <div class="admin-sidebar__brand-name">Mera Driver</div>
+      <div class="admin-sidebar__brand-sub">Driver portal</div>
+    </span>
+  </div>
+
+  <nav class="admin-sidebar__nav" aria-label="Driver portal">
+    @for (item of navItems; track item.path) {
+      <a
+        class="admin-nav-item"
+        [routerLink]="item.path"
+        [class.active]="isActive(item.path)"
+        [attr.aria-current]="isActive(item.path) ? 'page' : null"
+      >
+        <md-icon aria-hidden="true">{{ item.icon }}</md-icon>{{ item.label }}
+      </a>
+    }
+  </nav>
+
+  <div class="admin-sidebar__user">
+    <span class="admin-sidebar__avatar">{{ initial() }}</span>
+    <span class="admin-sidebar__user-info">
+      <div class="admin-sidebar__user-name" [title]="driverName()">{{ driverName() }}</div>
+      <div class="admin-sidebar__user-mail">Driver ID: {{ driverIdShort() }}</div>
+    </span>
+    <div class="sidebar-user-actions">
+      <md-icon-button aria-label="Log out" title="Log out" (click)="signOut()">
+        <md-icon aria-hidden="true">logout</md-icon>
+      </md-icon-button>
+    </div>
+  </div>
+</aside>

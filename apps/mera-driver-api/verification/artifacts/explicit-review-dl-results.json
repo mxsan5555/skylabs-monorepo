@@ -1,0 +1,25 @@
+{
+  "status": "passed",
+  "applicationThreeFieldsNoLoginNoProvider": true,
+  "noLoginNoConsentReviewerAction": true,
+  "outcomes": [
+    "API verified",
+    "Invalid / no record found",
+    "Expired",
+    "Mismatch/Invalid",
+    "Provider failed",
+    "Manual review required"
+  ],
+  "reloadPersistence": true,
+  "unassignedAndPortalDenied": true,
+  "missingSavedInputsDenied": true,
+  "concurrentChecksOneProviderRequest": true,
+  "inFlightInputChangeInvalidatesOldResult": true,
+  "optionalLoginCreation": true,
+  "onboardingNoProviderCalls": true,
+  "humanKycUnchanged": true,
+  "fixtureProviderRequests": 8,
+  "realIdspayRequests": 0,
+  "realSmsRequests": 0,
+  "fixturesCleaned": true
+}

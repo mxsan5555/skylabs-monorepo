@@ -33,9 +33,14 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
 
   if (isAuthEndpoint(req.url)) return next(req);
+  const session = auth as AuthService & {readonly sessionVersion?: number};
+  const requestSession = session.sessionVersion;
+  const sessionChanged = () => requestSession !== undefined && requestSession !== session.sessionVersion;
+  const changedError = () => new Error('Your session changed. Retry this action in the current account.');
 
   return from(auth.ensureValidToken()).pipe(
     switchMap((token) => {
+      if (sessionChanged()) return throwError(changedError);
       const authedReq = token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
       return next(authedReq).pipe(
     catchError((err: unknown) => {
@@ -45,6 +50,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
       return from(auth.ensureValidToken({ force: true })).pipe(
         switchMap((freshToken) => {
+          if (sessionChanged()) return throwError(changedError);
           if (!freshToken) {
             // The refresh token is genuinely invalid/expired/revoked — a real end of session.
             // `ensureValidToken` already cleared local state; send the user to sign-in with a

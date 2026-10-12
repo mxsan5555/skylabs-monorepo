@@ -1,25 +1,25 @@
 <md-admin-page
-  [title]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit Booking' : 'Add Booking') : 'Bookings'"
+  [title]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit Booking' : 'Add Booking') : (tripsOnly() ? 'Trips' : 'Bookings')"
   [subtitle]="showAddForm() ? (editingId() !== null && editingId() !== 'new' ? 'Edit booking details' : 'Add a new booking') : 'Core trip/booking record from customer request to completion.'"
 >
   <div class="relative w-full">
     @if (!showAddForm()) {
       <div class="w-full mt-4">
         <sky-card class="p-6 block">
-          <sky-data-table
+          @if(error()){<p role="alert">{{error()}}</p><md-outlined-button (click)="retry()">Retry</md-outlined-button>} @else {<sky-data-table [_search]="search()"
             [columns]="tableColumns"
             [rows]="tableRowsString()"
-            [total]="list().length"
+            [total]="total()" [page]="page()" [pageSize]="pageSize()" (sky-dt-params-change)="tableParams($event)"
             [loading]="loading()"
             selectable exportable searchable
             [actions]="tableActions"
             (sky-dt-row-action)="onRowAction($event)"
             caption="Bookings Database"
           >
-            <md-icon-button slot="toolbar-actions" aria-label="Add Booking" title="Add Booking" (click)="startAdd()">
+            @if(auth.can('trips.bookings','create')){<md-icon-button slot="toolbar-actions" aria-label="Add Booking" title="Add Booking" (click)="startAdd()">
               <md-icon>add</md-icon>
-            </md-icon-button>
-          </sky-data-table>
+            </md-icon-button>}
+          </sky-data-table>}
         </sky-card>
       </div>
     } @else {

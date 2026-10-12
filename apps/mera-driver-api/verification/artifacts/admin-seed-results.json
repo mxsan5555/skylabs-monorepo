@@ -1,0 +1,17 @@
+{
+  "repeatable": true,
+  "customRolesGrantsAssignmentsAndHistoryUnchanged": true,
+  "models": [
+    "role",
+    "rolePermission",
+    "userRole",
+    "userPermissionOverride",
+    "driver",
+    "driverDocument",
+    "driverKycCheck",
+    "driverKycDecision",
+    "booking",
+    "moneyMovement",
+    "customer"
+  ]
+}

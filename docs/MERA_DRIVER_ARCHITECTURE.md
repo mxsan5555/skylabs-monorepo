@@ -34,11 +34,11 @@ This document inventories everything that exists field-by-field, then proposes (
 | `apps/mera-driver` | Angular 21 standalone + Tailwind | 4400 |
 | `apps/mera-driver-api` | Express + TypeScript + Prisma + PostgreSQL (`mera_driver` DB) | 3334, routes mounted at root (no `/api/v1` prefix) |
 
-Shared packages consumed: `shared-ui` (Material 3 web components), `shared-types` (RBAC types), `shared-permissions` (`can()`, `filterMenuByPermissions()`), `shared-menu` (static menu JSON — the *only* non-DB-driven piece of the RBAC model), `shared-auth` (`AuthProvider`/`AuthService`, guards).
+Shared packages consumed: `shared-ui` (Material 3 web components; app-neutral, so mera-driver's own layout pieces stay in `apps/mera-driver`, and msd-driven options such as `sky-product-card` `layout="horizontal"` are opt-in and leave mera-driver's rendering unchanged), `shared-types` (RBAC types), `shared-permissions` (`can()`, `filterMenuByPermissions()`), `shared-menu` (static menu JSON — the *only* non-DB-driven piece of the RBAC model), `shared-auth` (`AuthProvider`/`AuthService`, guards).
 
 ### 2.2 What "RBAC is real, business logic is stubbed" (per CLAUDE.md) actually means today
 
-That line in `CLAUDE.md` is **partially out of date** — several business modules have since become real (Driver, Vehicle, Booking, TripType, Attendance, Customer, Master Data). What remains genuinely stubbed is **Payments** and **Reports** only. See §20 for the authoritative existing/stubbed/missing table.
+That line in `CLAUDE.md` was **out of date** and was corrected on 2026-09-26 — several business modules have since become real (Driver, Vehicle, Booking, TripType, Attendance, Customer, Master Data). What remains genuinely stubbed is **Payments** and **Reports** only. See §20 for the authoritative existing/stubbed/missing table.
 
 ### 2.3 High-level current architecture (as built today)
 

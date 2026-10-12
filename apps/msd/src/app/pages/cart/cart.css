@@ -181,7 +181,15 @@
 .cart-summary__continue-btn {
   width: 100%;
 }
-
+.cart-summary__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+.cart-summary__actions > * {
+  width: 100%;
+}
 @media (max-width: 768px) {
   .cart-page__layout {
     grid-template-columns: 1fr;

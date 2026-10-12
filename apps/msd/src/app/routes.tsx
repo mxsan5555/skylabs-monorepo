@@ -22,6 +22,11 @@ import { UserManagement } from './pages/account/users/users';
 import { AuditLogs } from './pages/account/audit-logs/audit-logs';
 import { VendorManagement } from './pages/account/vendors/vendors';
 import { VendorNewPage } from './pages/account/vendors/vendor-new-page';
+import { VendorDetailPage } from './pages/account/vendors/vendor-detail-page';
+import { BranchFormPage } from './pages/account/vendors/branch-form-page';
+import { DealFormPage } from './pages/account/vendors/deal-form-page';
+import { TherapistFormPage } from './pages/account/vendors/therapist-form-page';
+import { ProductFormPage } from './pages/account/vendors/product-form-page';
 import { CustomerManagement } from './pages/account/customers/customers';
 import { BranchList } from './pages/account/vendors/branch-list';
 import { DealList } from './pages/account/vendors/deal-list';
@@ -64,7 +69,7 @@ import { Orders } from './pages/orders/orders';
 import { OrderDetail } from './pages/orders/order-detail';
 import { Invoice } from './pages/invoice/invoice';
 import DealDetail from './pages/deal-detail/deal-detail';
-import {Cart} from './pages/cart/cart';
+import { Cart } from './pages/cart/cart';
 import Wishlist from './pages/wishlist/wishlist';
 import Checkout from './pages/checkout/checkout';
 import ProductListing from './pages/products/products';
@@ -75,7 +80,8 @@ import TherapistDetail from './pages/therapist-detail/therapist-detail';
 import { MyAccountLayout } from './pages/my-account/my-account-layout';
 import { MyAccountProfile } from './pages/my-account/profile';
 import { MyAccountPayments } from './pages/my-account/payments';
-
+import { ScrollToTop } from './components/ScrollToTop';
+import CustomerDashboard from './pages/customer-dashboard/customer-dashboard';
 /**
  * `/account/vendors` serves three audiences under different permission keys: admins hold
  * `vendors:view`, vendor-role users hold `vendors:custom` (never `view` — that would also
@@ -94,59 +100,81 @@ function VendorsRouteGuard({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function BranchFormPageRoute() {
+  const { token } = useAuth();
+  return <BranchFormPage token={token} />;
+}
+
+function DealFormPageRoute() {
+  const { token } = useAuth();
+  return <DealFormPage token={token} />;
+}
+
+function TherapistFormPageRoute() {
+  const { token } = useAuth();
+  return <TherapistFormPage token={token} />;
+}
+
+function ProductFormPageRoute() {
+  const { token } = useAuth();
+  return <ProductFormPage token={token} />;
+}
+
 export function AppRoutes() {
   useShadowLinkNavigation();
   return (
-    <Routes>
-      <Route element={<PublicLayout />}>
-        {/* ── Consumer storefront ── */}
-        <Route path="/" element={<Home />} />
-        <Route path="/explore" element={<Search />} />
-        {/* Customer catalogue — Category → Sub-category → Service/Product → Deal — backed by
+    <>
+      <ScrollToTop />
+      <Routes>
+        <Route element={<PublicLayout />}>
+          {/* ── Consumer storefront ── */}
+          <Route path="/" element={<Home />} />
+          <Route path="/explore" element={<Search />} />
+          {/* Customer catalogue — Category → Sub-category → Service/Product → Deal — backed by
             `GET /catalog/*`. `/categories` is the "browse all categories" entry point (formerly
             the marketplace route namespace, retired once this page absorbed its real-API data
             source). */}
-        <Route path="/categories" element={<CategoriesIndex />} />
-        <Route path="/category/:slug" element={<Category />} />
-        <Route path="/category/:slug/:city" element={<Category />} />
-        <Route path="/deal/:id" element={<DealDetail />} />
-        <Route path="/products" element={<ProductListing />} />
-        <Route path="/products/:id" element={<ProductDetail />} />
-        <Route path="/vendor/:slug" element={<VendorPage />} />
-        {/* Therapist as an independent, directly browsable/purchasable entity — never reachable
+          <Route path="/categories" element={<CategoriesIndex />} />
+          <Route path="/category/:slug" element={<Category />} />
+          <Route path="/category/:slug/:city" element={<Category />} />
+          <Route path="/deal/:id" element={<DealDetail />} />
+          <Route path="/products" element={<ProductListing />} />
+          <Route path="/products/:id" element={<ProductDetail />} />
+          <Route path="/vendor/:slug" element={<VendorPage />} />
+          {/* Therapist as an independent, directly browsable/purchasable entity — never reachable
             only via a Deal's page (see msd-api's Therapist schema doc comment). */}
-        <Route path="/therapists" element={<Therapists />} />
-        <Route path="/therapist/:id" element={<TherapistDetail />} />
-        {/* Cart / Wishlist / Checkout — plain PublicLayout children (Header+Footer, no sidebar),
+          <Route path="/therapists" element={<Therapists />} />
+          <Route path="/therapist/:id" element={<TherapistDetail />} />
+          {/* Cart / Wishlist / Checkout — plain PublicLayout children (Header+Footer, no sidebar),
             exactly as they worked before the Customer Sidebar fix. These are NOT part of the
             Customer Sidebar — they stay reachable from the existing Header cart/wishlist icons,
             same route, same page, same layout as always. */}
-        <Route
-          path="/cart"
-          element={
-            <RequireAuth>
-              <Cart />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/wishlist"
-          element={
-            <RequireAuth>
-              <Wishlist />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/checkout"
-          element={
-            <RequireAuth>
-              <Checkout />
-            </RequireAuth>
-          }
-        />
+          <Route
+            path="/cart"
+            element={
+              <RequireAuth>
+                <Cart />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/wishlist"
+            element={
+              <RequireAuth>
+                <Wishlist />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/checkout"
+            element={
+              <RequireAuth>
+                <Checkout />
+              </RequireAuth>
+            }
+          />
 
-        {/* Customer account pages (Orders/Order Detail) — nested INSIDE PublicLayout so
+          {/* Customer account pages (Orders/Order Detail) — nested INSIDE PublicLayout so
             the site Header/Footer stay mounted around them, reusing the SAME existing
             `MyAccountLayout` (full sidebar: Profile & Addresses/Orders/Wishlist/Cart/
             Payment History/Invoices/Settings — see my-account-layout.tsx's NAV_ITEMS) that
@@ -158,256 +186,376 @@ export function AppRoutes() {
             deliberately stay OUTSIDE this block (see above) even though the sidebar's own
             NAV_ITEMS still links to them — clicking those links just navigates to the
             sidebar-less Cart/Wishlist routes above, same as clicking the Header icons. */}
-       <Route
-  element={
-    <RequireAuth>
-      <MyAccountLayout />
-    </RequireAuth>
-  }
->
-  <Route path="/my-account" element={<MyAccountProfile />} />
-  <Route path="/my-account/profile" element={<MyAccountProfile />} />
-  <Route path="/my-account/payments" element={<MyAccountPayments />} />
-  <Route
-    path="/my-account/invoices"
-    element={
-      <AdminPage
-        title="Invoices"
-        subtitle="Module coming soon."
-      />
-    }
-  />
-  <Route
-    path="/my-account/settings"
-    element={
-      <AdminPage
-        title="Settings"
-        subtitle="Module coming soon."
-      />
-    }
-  />
+          {/* Customer account pages WITH sidebar */}
+          <Route
+            element={
+              <RequireAuth>
+                <MyAccountLayout />
+              </RequireAuth>
+            }
+          >
+            <Route path="/my-dashboard" element={<CustomerDashboard />} />
+            <Route path="/my-account" element={<MyAccountProfile />} />
+            <Route path="/my-account/profile" element={<MyAccountProfile />} />
+            <Route path="/my-account/payments" element={<MyAccountPayments />} />
 
-  <Route path="/orders" element={<Orders />} />
-  <Route path="/orders/:id" element={<OrderDetail />} />
-  <Route path="/orders/:id/invoice" element={<Invoice />} />
-</Route>
+            <Route
+              path="/my-account/invoices"
+              element={
+                <AdminPage
+                  title="Invoices"
+                  subtitle="Module coming soon."
+                />
+              }
+            />
 
-        {/* ── Content pages ── */}
-        <Route path="/blog" element={<Blog />} />
-        <Route path="/blog/:slug" element={<BlogDetail />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/careers" element={<Careers />} />
-        {/* Public, unauthenticated Vendor self-registration ("Become a Vendor") — the storefront
+            <Route
+              path="/my-account/settings"
+              element={
+                <AdminPage
+                  title="Settings"
+                  subtitle="Module coming soon."
+                />
+              }
+            />
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/my-account/cart" element={<Cart />} />
+            <Route path="/my-account/wishlist" element={<Wishlist />} />
+          </Route>
+
+          {/* =====================================================
+              ORDER DETAIL — standalone storefront page
+              NO MyAccountLayout / NO account sidebar
+             ===================================================== */}
+          <Route
+            path="/orders/:id"
+            element={
+              <RequireAuth>
+                <OrderDetail />
+              </RequireAuth>
+            }
+          />
+
+          {/* Invoice — standalone storefront page */}
+          <Route
+            path="/orders/:id/invoice"
+            element={
+              <RequireAuth>
+                <Invoice />
+              </RequireAuth>
+            }
+          />
+
+          {/* ── Content pages ── */}
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/:slug" element={<BlogDetail />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/careers" element={<Careers />} />
+          {/* Public, unauthenticated Vendor self-registration ("Become a Vendor") — the storefront
             counterpart of the admin "Add Vendor" wizard, see become-vendor.tsx's own doc
             comment. Linked from the footer's "Partner With Us" entry (content.json). */}
-        <Route path="/become-member" element={<BecomeVendor />} />
-        <Route path="/how-it-works" element={<HowItWorks />} />
-        {/* WebsitePage is one reusable component parameterized by `slug` — wired to all 4 fixed
+          <Route path="/become-member" element={<BecomeVendor />} />
+          <Route path="/how-it-works" element={<HowItWorks />} />
+          {/* WebsitePage is one reusable component parameterized by `slug` — wired to all 4 fixed
             `WebsitePage` rows (see website-page.tsx's own doc comment), not 4 separate files. */}
-        <Route path="/privacy" element={<WebsitePage slug="privacy" />} />
-        <Route path="/terms" element={<WebsitePage slug="terms" />} />
-        <Route path="/accessibility" element={<WebsitePage slug="accessibility" />} />
-        <Route path="/cookies" element={<WebsitePage slug="cookies" />} />
-        <Route path="/products/:slug" element={<ProductDetail />} />
-        <Route path="/showcase" element={<Showcase />} />
-        {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}
-        <Route path="*" element={<NotFound />} />
-      </Route>
+          <Route path="/privacy" element={<WebsitePage slug="privacy" />} />
+          <Route path="/terms" element={<WebsitePage slug="terms" />} />
+          <Route path="/accessibility" element={<WebsitePage slug="accessibility" />} />
+          <Route path="/cookies" element={<WebsitePage slug="cookies" />} />
+          <Route path="/products/:slug" element={<ProductDetail />} />
+          <Route path="/showcase" element={<Showcase />} />
+          {/* ── Catch-all 404, inside the shell so it keeps header/footer. ── */}
+          <Route path="*" element={<NotFound />} />
+        </Route>
 
-      {/* ── "My Account" (Profile/Payments/Invoices/Settings) — MyAccountLayout used bare, on its
+        {/* ── "My Account" (Profile/Payments/Invoices/Settings) — MyAccountLayout used bare, on its
           own, exactly as before (no PublicLayout wrapper, no header/footer — see
           MyAccountLayout's own doc comment for why). This is the ORIGINAL, unmodified placement;
           the Orders block above just nests the same layout a second time, inside
           PublicLayout, for its own routes. ── */}
-    
-      {/* Auth screens use a minimal centered shell (no header/footer). */}
-      <Route element={<AuthLayout />}>
-        <Route path="/sign-in" element={<SignIn />} />
-        <Route path="/otp" element={<Otp />} />
-        <Route
-          path="/choose-experience"
-          element={
-            <RequireAuth>
-              <ChooseExperience />
-            </RequireAuth>
-          }
-        />
-      </Route>
 
-      {/* Authenticated console (after login / "My account"). Every leaf below
+        {/* Auth screens use a minimal centered shell (no header/footer). */}
+        <Route element={<AuthLayout />}>
+          <Route path="/sign-in" element={<SignIn />} />
+          <Route path="/otp" element={<Otp />} />
+          <Route
+            path="/choose-experience"
+            element={
+              <RequireAuth>
+                <ChooseExperience />
+              </RequireAuth>
+            }
+          />
+        </Route>
+
+        {/* Authenticated console (after login / "My account"). Every leaf below
           `/account/dashboard` and `/account/profile` is additionally gated by
           the exact `${menuKey}:view` permission the server already filtered
           `bootstrap.menu` by — belt-and-suspenders, since msd-api re-checks on
           every request. A user lacking a permission is bounced to
           `/account/profile` (RequirePermission's default fallback). */}
-      <Route
-        element={
-          <RequireAuth>
-            <AdminLayout />
-          </RequireAuth>
-        }
-      >
-        <Route path="/account" element={<Navigate to="/account/profile" replace />} />
         <Route
-          path="/account/dashboard"
           element={
-            <RequirePermission menuKey="dashboard">
-              <Dashboard />
-            </RequirePermission>
+            <RequireAuth>
+              <AdminLayout />
+            </RequireAuth>
           }
-        />
-        <Route path="/account/profile" element={<Profile />} />
+        >
+          <Route path="/account" element={<Navigate to="/account/profile" replace />} />
+          <Route
+            path="/account/dashboard"
+            element={
+              <RequirePermission menuKey="dashboard">
+                <Dashboard />
+              </RequirePermission>
+            }
+          />
+          <Route path="/account/profile" element={<Profile />} />
 
-        <Route
-          path="/account/customers"
-          element={
-            <RequirePermission menuKey="customers">
-              <CustomerManagement />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/vendors"
-          element={
-            <VendorsRouteGuard>
-              <VendorManagement />
-            </VendorsRouteGuard>
-          }
-        />
-        {/* Dedicated "Add New Vendor" page — see vendor-new-page.tsx's doc comment for why this
+          <Route
+            path="/account/customers"
+            element={
+              <RequirePermission menuKey="customers">
+                <CustomerManagement />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/vendors"
+            element={
+              <VendorsRouteGuard>
+                <VendorManagement />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* Dedicated "Add New Vendor" page — see vendor-new-page.tsx's doc comment for why this
             is a real route rather than the old inline-on-the-list-page wizard. Reuses the same
             route guard as /account/vendors; VendorNewPage itself checks the finer-grained
             `vendors:create` action and shows an empty state if the caller only holds
             `vendors:view`/`vendors:custom` (the backend route is the real enforcement either
             way). */}
-        <Route
-          path="/account/vendors/new"
-          element={
-            <VendorsRouteGuard>
-              <VendorNewPage />
-            </VendorsRouteGuard>
-          }
-        />
-        {/* Self-service split of the old combined "My Business" page — "Business Profile" and
+          <Route
+            path="/account/vendors/new"
+            element={
+              <VendorsRouteGuard>
+                <VendorNewPage />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* One member's own page: an Overview of cards (Branches/Deals/Therapists/Products +
+            the profile summary), each card's Add/Edit button navigating to that section's own
+            URL below — no tab strip, real routes instead, so the breadcrumb and back button
+            always match what's on screen. Admin only: VendorDetailPage checks `vendors:view`
+            itself, and every API call it makes is permission-gated server-side. The static `new`
+            route above wins over this dynamic segment. */}
+          <Route
+            path="/account/vendors/:vendorId"
+            element={
+              <VendorsRouteGuard>
+                <VendorDetailPage />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/vendors/:vendorId/:section"
+            element={
+              <VendorsRouteGuard>
+                <VendorDetailPage />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* Branch add/edit — real pages, never a popup (see the branch-management design spec).
+            The static `new` segment wins over the dynamic `:branchId` below it. */}
+          <Route
+            path="/account/vendors/:vendorId/branches/new"
+            element={
+              <VendorsRouteGuard>
+                <BranchFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/vendors/:vendorId/branches/:branchId"
+            element={
+              <VendorsRouteGuard>
+                <BranchFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* Deal add/edit — same real-page pattern as Branch above, never a popup. The static
+            `new` segment wins over the dynamic `:dealId` below it. */}
+          <Route
+            path="/account/vendors/:vendorId/deals/new"
+            element={
+              <VendorsRouteGuard>
+                <DealFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/vendors/:vendorId/deals/:dealId"
+            element={
+              <VendorsRouteGuard>
+                <DealFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* Therapist add/edit — same real-page pattern as Branch/Deal above, never a popup.
+            The static `new` segment wins over the dynamic `:therapistId` below it. */}
+          <Route
+            path="/account/vendors/:vendorId/therapists/new"
+            element={
+              <VendorsRouteGuard>
+                <TherapistFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/vendors/:vendorId/therapists/:therapistId"
+            element={
+              <VendorsRouteGuard>
+                <TherapistFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* Product add/edit — same real-page pattern as Branch/Deal/Therapist above, never a
+            popup. The static `new` segment wins over the dynamic `:productId` below it. */}
+          <Route
+            path="/account/vendors/:vendorId/products/new"
+            element={
+              <VendorsRouteGuard>
+                <ProductFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          <Route
+            path="/account/vendors/:vendorId/products/:productId"
+            element={
+              <VendorsRouteGuard>
+                <ProductFormPageRoute />
+              </VendorsRouteGuard>
+            }
+          />
+          {/* Self-service split of the old combined "My Business" page — "Business Profile" and
             "Branches & Deals" as two distinct nav items, both gated by `vendor-portal:view`
             (the same narrow permission that used to gate the single combined page, granted
             only to the `vendor` role — see vendors.tsx's `VendorsRouteGuard` doc comment). */}
-        <Route
-          path="/account/vendor-profile"
-          element={
-            <RequirePermission menuKey="vendor-portal.profile">
-              <VendorBusinessProfile />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/vendor-branches-deals"
-          element={
-            <RequirePermission menuKey="vendor-portal.branches">
-              <VendorBranchesDeals />
-            </RequirePermission>
-          }
-        />
-        {/* Vendor-facing flat "Deals / Packages" — same `vendor-portal:view` permission, same
+          <Route
+            path="/account/vendor-profile"
+            element={
+              <RequirePermission menuKey="vendor-portal.profile">
+                <VendorBusinessProfile />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/vendor-branches-deals"
+            element={
+              <RequirePermission menuKey="vendor-portal.branches">
+                <VendorBranchesDeals />
+              </RequirePermission>
+            }
+          />
+          {/* Vendor-facing flat "Deals / Packages" — same `vendor-portal:view` permission, same
             underlying deals data as "Branches" above, just merged across all of the vendor's
             branches into one table instead of one-branch-at-a-time. */}
-        <Route
-          path="/account/vendor-deals"
-          element={
-            <RequirePermission menuKey="vendor-portal.deals">
-              <VendorDeals />
-            </RequirePermission>
-          }
-        />
-        {/* Vendor-facing Customers list — reuses `vendor-portal:view` too, so it's visible with
+          <Route
+            path="/account/vendor-deals"
+            element={
+              <RequirePermission menuKey="vendor-portal.deals">
+                <VendorDeals />
+              </RequirePermission>
+            }
+          />
+          {/* Vendor-facing Customers list — reuses `vendor-portal:view` too, so it's visible with
             zero seed.ts/permission changes (same one-permissionKey-many-nodes pattern as
             orders above). Data itself is scoped `vendors:custom` server-side. */}
-        <Route
-          path="/account/vendor-customers"
-          element={
-            <RequirePermission menuKey="vendor-portal.customers">
-              <VendorCustomers />
-            </RequirePermission>
-          }
-        />
-        {/* Vendor-facing Therapists CRUD — reuses `vendor-portal:view` too (same one-permissionKey-
+          <Route
+            path="/account/vendor-customers"
+            element={
+              <RequirePermission menuKey="vendor-portal.customers">
+                <VendorCustomers />
+              </RequirePermission>
+            }
+          />
+          {/* Vendor-facing Therapists CRUD — reuses `vendor-portal:view` too (same one-permissionKey-
             many-nodes pattern as Customers above). Data itself is scoped `vendors:custom` server-side. */}
-        <Route
-          path="/account/vendor-therapists"
-          element={
-            <RequirePermission menuKey="vendor-portal.therapists">
-              <VendorTherapists />
-            </RequirePermission>
-          }
-        />
-        {/* Vendor-facing "Product" — same self-service /vendors/me/products* routes
+          <Route
+            path="/account/vendor-therapists"
+            element={
+              <RequirePermission menuKey="vendor-portal.therapists">
+                <VendorTherapists />
+              </RequirePermission>
+            }
+          />
+          {/* Vendor-facing "Product" — same self-service /vendors/me/products* routes
             (`vendors:custom`) the onboarding wizard's admin-on-behalf Products step already
             uses, just the ongoing-management surface. Never the read-only admin oversight
             `/account/products` page below. */}
-        <Route
-          path="/account/vendor-products"
-          element={
-            <RequirePermission menuKey="vendor-portal.products">
-              <VendorProducts />
-            </RequirePermission>
-          }
-        />
-        {/* Vendor-facing "Order" — reuses the exact same <OrderManagement/> component as the
+          <Route
+            path="/account/vendor-products"
+            element={
+              <RequirePermission menuKey="vendor-portal.products">
+                <VendorProducts />
+              </RequirePermission>
+            }
+          />
+          {/* Vendor-facing "Order" — reuses the exact same <OrderManagement/> component as the
             admin `/account/orders` route below (its GET/PATCH calls already force-scope a vendor
             caller to its own vendorId server-side, see order.service.ts#listOrders) — just a
             second route/nav entry gated `vendor-portal` instead of `orders`, so a vendor never
             needs the admin-wide `orders:view` permission that would otherwise leak the top-level
             "Orders" sidebar node (see msd-menu.json). */}
-        <Route
-          path="/account/vendor-orders"
-          element={
-            <RequirePermission menuKey="vendor-portal.orders">
-              <OrderManagement />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/branches"
-          element={
-            <RequirePermission menuKey="vendors.branches">
-              <BranchList />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/deals"
-          element={
-            <RequirePermission menuKey="vendors.deals">
-              <DealList />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/therapists"
-          element={
-            <RequirePermission menuKey="vendors.therapists">
-              <TherapistList />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/orders"
-          element={
-            <RequirePermission menuKey="orders">
-              <OrderManagement />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/products"
-          element={
-            <RequirePermission menuKey="products">
-              <ProductManagement />
-            </RequirePermission>
-          }
-        />
-        {/* <Route
+          <Route
+            path="/account/vendor-orders"
+            element={
+              <RequirePermission menuKey="vendor-portal.orders">
+                <OrderManagement />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/branches"
+            element={
+              <RequirePermission menuKey="vendors.branches">
+                <BranchList />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/deals"
+            element={
+              <RequirePermission menuKey="vendors.deals">
+                <DealList />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/therapists"
+            element={
+              <RequirePermission menuKey="vendors.therapists">
+                <TherapistList />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/orders"
+            element={
+              <RequirePermission menuKey="orders">
+                <OrderManagement />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/products"
+            element={
+              <RequirePermission menuKey="products">
+                <ProductManagement />
+              </RequirePermission>
+            }
+          />
+          {/* <Route
           path="/account/inventory"
           element={
             <RequirePermission menuKey="inventory">
@@ -415,190 +563,191 @@ export function AppRoutes() {
             </RequirePermission>
           }
         /> */}
-        <Route
-          path="/account/reports"
-          element={
-            <RequirePermission menuKey="reports">
-              <Reports />
-            </RequirePermission>
-          }
-        />
-        {/* No RequirePermission wrapper — every authenticated console user (Vendor or Superadmin
+          <Route
+            path="/account/reports"
+            element={
+              <RequirePermission menuKey="reports">
+                <Reports />
+              </RequirePermission>
+            }
+          />
+          {/* No RequirePermission wrapper — every authenticated console user (Vendor or Superadmin
             alike) is entitled to their own notification inbox regardless of RBAC permissions;
             deliberately not in shared-menu's sidebar either, reachable only via the header
             bell's "View all notifications" link (see notification-bell.tsx). */}
-        <Route path="/account/notifications" element={<NotificationsPage />} />
-        <Route
-          path="/account/masters/categories"
-          element={
-            <RequirePermission menuKey="masters.categories">
-              <CategoryManagement scope="top" />
-            </RequirePermission>
-          }
-        />
+          <Route path="/account/notifications" element={<NotificationsPage />} />
+          <Route
+            path="/account/masters/categories"
+            element={
+              <RequirePermission menuKey="masters.categories">
+                <CategoryManagement scope="top" />
+              </RequirePermission>
+            }
+          />
 
-        <Route
-          path="/account/masters/sub-categories"
-          element={
-            <RequirePermission menuKey="masters.sub-categories">
-              <CategoryManagement scope="sub" />
-            </RequirePermission>
-          }
-        />
+          <Route
+            path="/account/masters/sub-categories"
+            element={
+              <RequirePermission menuKey="masters.sub-categories">
+                <CategoryManagement scope="sub" />
+              </RequirePermission>
+            }
+          />
 
-         <Route
-          path="/account/masters/deals"
-          element={
-            <RequirePermission menuKey="masters.deals">
-              <AdminPage title="Deals" subtitle="Module coming soon." />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/masters/tags"
-          element={
-            <RequirePermission menuKey="masters.tags">
-              <PopularTagManagement />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/masters/popular-treatments"
-          element={
-            <RequirePermission menuKey="masters.popular-treatments">
-              <PopularTreatmentManagement />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/masters/promotions"
-          element={
-            <RequirePermission menuKey="masters.promotions">
-              <PromotionManagement />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/masters/home-hero"
-          element={
-            <RequirePermission menuKey="masters.home-hero">
-              <HomeHeroManagement />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/cms/blog"
-          element={
-            <RequirePermission menuKey="cms.blog.pages">
-              <BlogList />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/cms/blog/:id"
-          element={
-            <RequirePermission menuKey="cms.blog.pages">
-              <BlogDetailAdmin />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/cms/about-us"
-          element={
-            <RequirePermission menuKey="cms.about-us">
-              <AboutUsPage />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/cms/contact-us"
-          element={
-            <RequirePermission menuKey="cms.contact-us">
-              <ContactUsPage />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/cms/faq"
-          element={
-            <RequirePermission menuKey="cms.faq">
-              <FaqList />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/cms/blog-categories"
-          element={
-            <RequirePermission menuKey="cms.blog-category">
-              <BlogCategoriesList />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/cms/how-it-works"
-          element={
-            <RequirePermission menuKey="cms.how-it-works">
-              <HowItWorksPage />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/cms/careers"
-          element={
-            <RequirePermission menuKey="cms.careers">
-              <CareersPage />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/cms/legal-pages"
-          element={
-            <RequirePermission menuKey="cms.website-pages">
-              <LegalPagesList />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/cms/social-media"
-          element={
-            <RequirePermission menuKey="cms.social-media">
-              <SocialMediaList />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/administration/roles"
-          element={
-            <RequirePermission menuKey="rbac.roles">
-              <RoleManagement />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/administration/users"
-          element={
-            <RequirePermission menuKey="rbac.users">
-              <UserManagement />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/administration/audit-logs"
-          element={
-            <RequirePermission menuKey="rbac.audit-logs">
-              <AuditLogs />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/account/settings"
-          element={
-            <RequirePermission menuKey="settings">
-              <MyProfileSettings />
-            </RequirePermission>
-          }
-        />
-      </Route>
-    </Routes>
+          <Route
+            path="/account/masters/deals"
+            element={
+              <RequirePermission menuKey="masters.deals">
+                <AdminPage title="Deals" subtitle="Module coming soon." />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/masters/tags"
+            element={
+              <RequirePermission menuKey="masters.tags">
+                <PopularTagManagement />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/masters/popular-treatments"
+            element={
+              <RequirePermission menuKey="masters.popular-treatments">
+                <PopularTreatmentManagement />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/masters/promotions"
+            element={
+              <RequirePermission menuKey="masters.promotions">
+                <PromotionManagement />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/masters/home-hero"
+            element={
+              <RequirePermission menuKey="masters.home-hero">
+                <HomeHeroManagement />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/cms/blog"
+            element={
+              <RequirePermission menuKey="cms.blog.pages">
+                <BlogList />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/cms/blog/:id"
+            element={
+              <RequirePermission menuKey="cms.blog.pages">
+                <BlogDetailAdmin />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/cms/about-us"
+            element={
+              <RequirePermission menuKey="cms.about-us">
+                <AboutUsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/cms/contact-us"
+            element={
+              <RequirePermission menuKey="cms.contact-us">
+                <ContactUsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/cms/faq"
+            element={
+              <RequirePermission menuKey="cms.faq">
+                <FaqList />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/cms/blog-categories"
+            element={
+              <RequirePermission menuKey="cms.blog-category">
+                <BlogCategoriesList />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/cms/how-it-works"
+            element={
+              <RequirePermission menuKey="cms.how-it-works">
+                <HowItWorksPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/cms/careers"
+            element={
+              <RequirePermission menuKey="cms.careers">
+                <CareersPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/cms/legal-pages"
+            element={
+              <RequirePermission menuKey="cms.website-pages">
+                <LegalPagesList />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/cms/social-media"
+            element={
+              <RequirePermission menuKey="cms.social-media">
+                <SocialMediaList />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/administration/roles"
+            element={
+              <RequirePermission menuKey="rbac.roles">
+                <RoleManagement />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/administration/users"
+            element={
+              <RequirePermission menuKey="rbac.users">
+                <UserManagement />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/administration/audit-logs"
+            element={
+              <RequirePermission menuKey="rbac.audit-logs">
+                <AuditLogs />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/settings"
+            element={
+              <RequirePermission menuKey="settings">
+                <MyProfileSettings />
+              </RequirePermission>
+            }
+          />
+        </Route>
+      </Routes>
+    </>
   );
 }

@@ -9,6 +9,30 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 
 ## In progress
 
+### msd admin — member (vendor) console redesign (plan: one screen, one job, no popups)
+Original plan file: `~/.claude/plans/our-backend-admin-layout-snug-sloth.md`. Each step ships alone.
+- [x] **1. Member page + summary** — `/account/vendors/:vendorId` (summary checklist, Actions menu with
+      inline confirm instead of `window.prompt`, breadcrumb via `admin/breadcrumb-context`), list rows
+      open it, list shows Branches/Deals/Therapists/Products as "live of total" (API adds `liveCounts` +
+      therapist count) — 2026-09-28. Reworked mid-step into a no-tab, card-driven Overview (real routes
+      per section, `sky-tile-card` warning-tone setup cards, `setupHint`) — see
+      `docs/superpowers/specs/2026-09-28-vendor-branch-management-design.md` for the "why".
+- [ ] 2. Profile page (replaces the "Profile & setup" tab and the six-step pill wizard)
+- [x] **3a. Branches list + add/edit** — `branches-list-page.tsx` (card grid, outlined/no-fill
+      `sky-feature-card`, Edit/Deactivate — branches have no hard delete), `branch-form-page.tsx`
+      (state-gated `sky-accordion`: Location → Opening Hours → Category Access) at
+      `/account/vendors/:id/branches`, `/branches/new`, `/branches/:branchId` — 2026-09-28. Design:
+      `docs/superpowers/specs/2026-09-28-vendor-branch-management-design.md`. Plan:
+      `docs/superpowers/plans/2026-09-28-vendor-branches-crud-plan.md`.
+- [ ] 3b. Deals inside a branch — `/branches/:branchId/deals` (list + add/edit), own plan, next.
+- [ ] 3c. Therapists inside a branch — `/branches/:branchId/therapists`, own plan, after 3b. Also drops
+      the Overview's standalone Therapists tab (`TherapistsTab`/`toTherapistRow`) once it ships — that
+      tab still exists today as the only way to see a vendor's therapists.
+- [ ] 4. Products page (still vendor-level, not branch-scoped — reached via the Overview's "Products"
+      card into the profile wizard until it gets its own page)
+- [ ] 5. Remove the pill wizard + dialogs, dedupe the admin/self-service forms
+- [ ] Open: confirm "live" definition (active branch/product/therapist, ACTIVE + APPROVED deal)
+
 ### Deployment (Vercel) — pipeline live, hardening pending
 - [ ] Attach the bought custom domain to each project's Production (`main`) deploy
 - [ ] Add env vars in Vercel (msd: `VITE_API_URL`, `VITE_GOOGLE_MAPS_API_KEY`)
@@ -55,6 +79,13 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 - [x] msd shell plan 2: SiteFooter, Seo component, JSON-LD, city landing pages — 2026-09-23
 - [x] msd shell plan 3: home page (10 fixed sections, CardRail, SectionHead, Seo + ItemList/FAQPage JSON-LD, location-aware catalog fetch) — 2026-09-23
 - [x] msd shell plan 4: build-time prerender (`/`, every `/category/:slug`, deal-category `/category/:slug/:city`) with `__MSD_DATA__` payload hydration, `spa.html` SPA rewrite, timed-out/unreachable-API fallback, sitemap.xml/robots.txt/llms.txt — 2026-09-24
+- [x] msd home 60/30/10 colour pass on M3 roles (tinted bands, secondary-container tiles/steps/gift card, primary for actions only; "How it works" as a numbered sequence) — 2026-09-24
+- [x] msd storefront building blocks `PageSection`, `CardGrid`, `SectionHead as="h1"`; home moved onto `PageSection`; category page rebuilt with no page CSS — 2026-09-24
+- [x] msd category toolbar: subcategory pills, clamped description, sort menu, 12-per-page lazy loading (`usePagedList` + `LoadMore`, prerendered first page + total) — 2026-09-25
+- [x] msd `DealMap`: Leaflet + OpenStreetMap by default, Google behind `VITE_MAP_PROVIDER`; category map view; explore map fixed (was blocked by a missing Google key and a placeholder overlay) — 2026-09-25
+- [x] msd category filter side panel (Your location, Distance, Price, Business, Branches, Clear all; phone side sheet with focus trap), sorts Relevance / Price / Distance, List-Grid-Map switch, `sky-product-card` `layout="horizontal"` — 2026-09-25
+- [x] msd-api catalog: deal sorts `relevance|price_asc|price_desc|distance`, `vendorIds` / `branchIds` / `radiusKm` filters, `GET /catalog/deals/facets`, product price sorts — 2026-09-25
+- [x] Docs aligned with the storefront work and current API status (CLAUDE, ARCHITECTURE, DEPLOYMENT, DEVELOPER_PROCESS §19–21, docs/README, api-schema as-built notes) — 2026-09-26
 
 ### Content pages — both apps (`pages/` + route)
 - [ ] Contact page~
@@ -138,6 +169,32 @@ off under _Completed_ with the date. Add new work to _Backlog_. Keep this file c
 ---
 
 ## Completed
+
+### Mera Driver — Role Management / User Management RBAC overhaul — 2026-10-07
+- [x] One-time versioned baseline reconciliation (`SystemFlag`-guarded, `prisma/seed.ts`'s
+      `applyRoleBaselineOnce`) — reduced to exactly 9 staff roles (Super Admin, Admin, Vendor,
+      Marketing, Sales, Company, Data Operator, Support, KYC Verification) + Driver/Customer
+      portal roles preserved; `contributor`/`sales_marketing` deleted (verified zero linked
+      users/audit history first); applied once to the dev DB, confirmed idempotent on re-seed
+- [x] Real backend ownership scoping (not just menu visibility): `Driver.createdByUserId`
+      (Vendor/Sales/Data Operator — own created drivers) and `Booking.createdByUserId`
+      (Company/Sales direct; Vendor transitively via owned drivers) — `src/lib/ownerScope.ts`,
+      `requireDriverOwnership` middleware, wired through `drivers.routes.ts`/`bookings.routes.ts`
+- [x] Single-staff-role guard (`assertSingleStaffRoleIntent` in `user.service.ts`) — rejects
+      assigning >1 staff role going forward while still allowing an existing multi-role user to
+      be explicitly reconciled down to one
+- [x] Role Management (`administration/roles`) rebuilt to the simple two-pane layout: compact
+      9-role list, read-only name/description/scope, granted-groups-first accordion with a
+      collapsed "Additional modules" section, Save Changes/Cancel footer — no role
+      create/clone/status-toggle UI (roles are now fixed)
+- [x] User Management (`administration/users`) — role checkbox checklist replaced with a single
+      Role dropdown (Add + Edit forms) + read-only access summary; legacy multi-role users show
+      existing assignments and require an explicit final-role pick, never silently collapsed
+- [x] Verified: full `mera-driver-api`/`mera-driver` test suites green, both production builds
+      green, live Playwright screenshots of Role Management and User Management against the
+      real dev DB (9 roles present, `Contributor` absent, Vendor's saved permissions/record
+      scope rendering correctly, User Management single-role dropdown pre-selected + access
+      summary showing)
 
 ### Foundation & design system
 - [x] Nx monorepo with `msd` (React 19 + Vite) and `mera-driver` (Angular 21) — 2026-06

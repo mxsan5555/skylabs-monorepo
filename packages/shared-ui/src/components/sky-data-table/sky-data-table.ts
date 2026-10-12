@@ -78,6 +78,9 @@ export interface SkyDataTableParamsDetail {
  * @fires sky-dt-row-action    — action button clicked; detail: { action, row, rowIndex }
  * @fires sky-dt-row-select    — selection changed; detail: { selected: row[] }
  * @fires sky-dt-export-pdf    — PDF export triggered
+ * @fires sky-dt-column-error  — tried to hide the last visible column; detail: { message }. The
+ *   column-selector menu already shows this as an inline role="alert" message on its own — this
+ *   event is only for consumers who want to react further (e.g. also show a toast).
  *
  * @example
  * <sky-data-table
@@ -118,6 +121,7 @@ export class SkyDataTable extends LitElement {
     _detailOpen:       { state: true },
     _hiddenCols:       { state: true },
     _showColSelector:  { state: true },
+    _columnError:      { state: true },
   };
 
   declare columns: string;
@@ -145,6 +149,7 @@ export class SkyDataTable extends LitElement {
   private declare _lastFocus: Element | null;
   private declare _hiddenCols: Set<string>;
   private declare _showColSelector: boolean;
+  private declare _columnError: string;
 
   private readonly _pageSizeOptions = [10, 25, 50, 100];
 
@@ -181,6 +186,7 @@ export class SkyDataTable extends LitElement {
     this._detailOpen       = false;
     this._hiddenCols       = new Set();
     this._showColSelector  = false;
+    this._columnError      = '';
     this._lastFocus        = null;
   }
 
@@ -307,6 +313,7 @@ export class SkyDataTable extends LitElement {
   private _toggleColSelector(e: Event) {
     e.stopPropagation();
     this._showColSelector = !this._showColSelector;
+    this._columnError = '';
   }
 
   private _onColToggle(key: string, e: Event) {
@@ -314,10 +321,15 @@ export class SkyDataTable extends LitElement {
     const next = new Set(this._hiddenCols);
     if (checked) {
       next.delete(key);
+      this._columnError = '';
     } else {
       if (next.size >= this._allCols.length - 1 && !this._hiddenCols.has(key)) {
-        alert("At least one column must remain visible!");
         (e.target as HTMLInputElement).checked = true;
+        // A blocking alert() would interrupt the page and can't be themed. The menu shows its
+        // own inline role="alert" message (below) so every consumer gets feedback for free —
+        // sky-dt-column-error is also emitted for apps that want to react further (e.g. a toast).
+        this._columnError = 'At least one column must remain visible.';
+        this._emit('sky-dt-column-error', { message: this._columnError });
         return;
       }
       next.add(key);
@@ -334,8 +346,40 @@ export class SkyDataTable extends LitElement {
     }
   };
 
+  /** Focusable elements inside the open detail drawer, in DOM order — for the Tab trap below. */
+  private _drawerFocusable(): HTMLElement[] {
+    const drawer = this.shadowRoot?.querySelector('.drawer');
+    if (!drawer) return [];
+    return Array.from(
+      drawer.querySelectorAll<HTMLElement>(
+        'a[href], button, md-icon-button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter(el => !el.hasAttribute('disabled'));
+  }
+
   private readonly _onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && this._detailOpen) this._closeDetail();
+    if (!this._detailOpen) return;
+    if (e.key === 'Escape') {
+      this._closeDetail();
+      return;
+    }
+    // Trap Tab/Shift+Tab inside the open modal drawer (WAI-ARIA dialog pattern) — without
+    // this, tabbing past the last (or before the first) focusable element lands keyboard
+    // focus on the page content behind the scrim, which is still visually obscured.
+    if (e.key === 'Tab') {
+      const focusable = this._drawerFocusable();
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = this.shadowRoot?.activeElement;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
   };
 
   override connectedCallback(): void {
@@ -566,6 +610,10 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
       color: var(--md-sys-color-on-surface);
       cursor: pointer;
       user-select: none;
+    }
+    .col-error {
+      margin: 4px 0 0;
+      color: var(--md-sys-color-error);
     }
 
     /* ── Progress bar ────────────────────────────────────────────────────── */
@@ -1047,6 +1095,9 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
                       ${col.label}
                     </label>
                   `)}
+                  ${this._columnError
+                    ? html`<p class="col-error label-medium" role="alert">${this._columnError}</p>`
+                    : nothing}
                 </div>
               ` : nothing}
             </div>

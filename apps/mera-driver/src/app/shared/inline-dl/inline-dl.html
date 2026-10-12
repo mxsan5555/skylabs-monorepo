@@ -1,0 +1,14 @@
+<div class="flex flex-col gap-2" aria-live="polite" aria-label="Driving licence verification">
+    <div class="flex items-center gap-2"><md-icon [style.color]="presentation().variant==='success'?'#2e7d32':presentation().variant==='error'?'var(--md-sys-color-error)':'var(--md-sys-color-secondary)'" aria-hidden="true">{{presentation().icon}}</md-icon><sky-badge [variant]="presentation().variant==='success'?'tertiary':presentation().variant==='error'?'error':'secondary'" size="large"><span>{{presentation().label}}</span></sky-badge></div>
+    @if(currentState(); as s) {
+      @if(presentation().label==='DL Verified'){<p>Verified through IDSPay · Valid till {{s.validTo}}</p>}
+      @else if(presentation().label==='Licence expired'){<p>Confirmed expiry: {{s.validTo || 'Unavailable'}}</p>}
+      <p class="otp-muted">{{s.reason}}</p>
+      @if(s.checkedAt){<p class="otp-muted">Last {{s.providerCalled?'provider check':'preflight (provider not called)'}}: {{s.checkedAt}}</p>}
+    }
+  @if(message()){<p role="alert" class="otp-muted">{{message()}}</p>}
+  @if(discrepancy()){<p role="alert">{{discrepancy()}} Entered dates have been preserved.</p>}
+  <p class="otp-muted">Verification is performed by an authorized reviewer in the assigned KYC review.</p>
+  <p class="otp-muted">Licence verification is separate from document review and final KYC approval.</p>
+  @if(state()?.history?.length){<details><summary>Verification history</summary>@for(h of state()?.history;track h.id){<p>{{h.createdAt}} · {{h.action==='driver.dl.consent'?'Historical consent recorded':h.action==='driver.dl.consent_challenge'?'Historical consent challenge issued':h.summary.status||'Not checked'}} @if(h.summary.reason){ · {{h.summary.reason}} }</p>}</details>}
+</div>

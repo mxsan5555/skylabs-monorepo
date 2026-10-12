@@ -1,0 +1,13 @@
+{
+  "consoleErrors": [],
+  "googleMapsLoaded": true,
+  "screenshots": [
+    "website-ride-home.png",
+    "website-ride-autocomplete.png",
+    "website-customer-bookings.png",
+    "website-customer-book.png",
+    "website-ride-mobile.png"
+  ],
+  "pickupSuggestionCount": 0,
+  "bookingCardCount": 0
+}

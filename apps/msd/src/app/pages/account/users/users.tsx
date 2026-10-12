@@ -3,18 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FilledButton, OutlinedButton, OutlinedTextField, OutlinedSelect, SelectOption, Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import type { UserStatus, LoginHistoryEntry, DeviceSession } from '@skylabs-monorepo/shared-types';
-import {
-  assignRole,
-  getLoginHistory,
-  getSessions,
-  listUsers,
-  resetOtp,
-  revokeAllSessions,
-  setUserStatus,
-  unassignRole,
-  updateUser,
-  type UserRecord,
-} from '../../../../api/rbac/users';
+import { assignRole, getLoginHistory, getSessions, listUsers, resetOtp, revokeAllSessions, setUserStatus, unassignRole, updateUser, type UserRecord, } from '../../../../api/rbac/users';
 import { listRoles, type Role } from '../../../../api/rbac/roles';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { UserList } from './user-list';
@@ -23,7 +12,8 @@ import { LoginHistoryPanel } from './login-history-panel';
 import { SessionsPanel } from './sessions-panel';
 import { CreateUserDialog } from './create-user-dialog';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
-
+import content from '../../../../content.json';
+import { validateEmail, validatePhone } from '../../../../utils/validation';
 const PAGE_SIZE = 20;
 
 export function UserManagement() {
@@ -132,23 +122,47 @@ export function UserManagement() {
 
   const saveDetails = async () => {
     if (!selectedUser) return;
-    setSavingDetails(true);
+
     setActionError('');
+    setActionMessage('');
+
+    const email = detailForm.email.trim();
+    const phone = detailForm.phone.trim();
+
+    if (email && !validateEmail(email)) {
+      setActionError(content.validation.email.invalid);
+      return;
+    }
+
+    if (phone && !validatePhone(phone)) {
+      setActionError(content.validation.phone.invalid);
+      return;
+    }
+
+    setSavingDetails(true);
+
     try {
       const { data } = await updateUser(token, selectedUser.id, {
         name: detailForm.name,
-        email: detailForm.email || undefined,
-        phone: detailForm.phone || undefined,
+        email: email || undefined,
+        phone: phone || undefined,
       });
-      setUsers((prev) => prev.map((u) => (u.id === data.id ? data : u)));
+
+      setUsers((prev) =>
+        prev.map((u) => (u.id === data.id ? data : u))
+      );
+
       setActionMessage('User details saved.');
     } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : 'Could not save user details.');
+      setActionError(
+        err instanceof ApiRequestError
+          ? err.message
+          : 'Could not save user details.'
+      );
     } finally {
       setSavingDetails(false);
     }
   };
-
   const changeStatus = async (status: UserStatus) => {
     if (!selectedUser) return;
     try {

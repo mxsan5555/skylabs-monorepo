@@ -1,17 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FilledButton, Icon, OutlinedButton, OutlinedTextField } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import {
-  getContactUs,
-  updateContactUs,
-  type ContactUsContent,
-  type ContactUsInput,
-  type SocialLink,
-} from '../../../../api/rbac/site-content';
+import { getContactUs, updateContactUs, type ContactUsContent, type ContactUsInput, type SocialLink, } from '../../../../api/rbac/site-content';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useToast } from '../../../../toast/toast-context';
 import { extractSiteContentFieldErrors } from './field-errors';
-
+import content from '../../../../content.json';
+import { validateEmail, validatePhone } from '../../../../utils/validation';
 type ContactUsFieldKey = keyof ContactUsInput;
 
 const EMPTY_FORM: ContactUsInput = {
@@ -84,7 +79,7 @@ export function ContactUsPage() {
   const { token, can } = useAuth();
   const canEdit = can('cms.contact-us', 'edit');
   const { showToast } = useToast();
-
+  const validation = content.validation;
   const [loaded, setLoaded] = useState<ContactUsContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -121,13 +116,43 @@ export function ContactUsPage() {
 
   const submit = async () => {
     if (submittingRef.current) return;
-    submittingRef.current = true;
-    setSaving(true);
+
     setError('');
     setFieldErrors(null);
+
+    const email = form.email?.trim() ?? '';
+    const phone = form.phone?.trim() ?? '';
+
+    const errors: Partial<Record<ContactUsFieldKey, string>> = {};
+
+    if (!email) {
+      errors.email = validation.email.empty;
+    } else if (!validateEmail(email)) {
+      errors.email = validation.email.invalid;
+    }
+
+    if (!phone) {
+      errors.phone = validation.phone.empty;
+    } else if (!validatePhone(phone)) {
+      errors.phone = validation.phone.invalid;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError('Fix the highlighted fields and try again.');
+      return;
+    }
+
+    submittingRef.current = true;
+    setSaving(true);
+
     const payload: ContactUsInput = {
       ...form,
-      socialLinks: (form.socialLinks ?? []).filter((l) => l.platform.trim() && l.url.trim()),
+      email,
+      phone,
+      socialLinks: (form.socialLinks ?? []).filter(
+        (l) => l.platform.trim() && l.url.trim()
+      ),
       metaTitle: form.metaTitle?.trim() || undefined,
       metaDescription: form.metaDescription?.trim() || undefined,
     };
@@ -188,6 +213,7 @@ export function ContactUsPage() {
 
         <OutlinedTextField
           label="Phone"
+          type="tel"
           value={form.phone ?? ''}
           disabled={!canEdit}
           onInput={(e: Event) => setForm((f) => ({ ...f, phone: (e.target as HTMLInputElement).value }))}
