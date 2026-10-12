@@ -283,7 +283,7 @@ Business validations (service layer, 409 or 422): status transitions per section
 - Money-moving routes (refund approve, payout release) require `Idempotency-Key`, run in a transaction, and return the original result on replay.
 
 **Repo hygiene**
-- `apps/msd-api/.env.example` line 10 holds what looks like a real Neon connection string. Remove it and rotate that credential.
+- `apps/msd-api/.env.example` line 7 is a commented Neon connection string (real host and user). Confirm the password in it is a placeholder; if it was ever real, remove it and rotate that credential.
 - CSV export: prefix cells starting with `=`, `+`, `-`, `@` to block formula injection.
 
 ---
