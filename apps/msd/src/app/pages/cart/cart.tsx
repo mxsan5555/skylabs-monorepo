@@ -105,12 +105,6 @@ export function Cart() {
       <title>{content.meta.cart.title}</title>
       <meta name="robots" content="noindex" />
       <div className="cart-page__inner">
-          <Breadcrumb
-    items={[
-      { label: 'Home', to: '/' },
-      { label: 'Cart' },
-    ]}
-  />
         {/* <h1 className="cart-page__title">
           {content.cart.title}
           {totalItems > 0 && <span className="cart-page__count">({totalItems} {pluralize(totalItems, 'item')})</span>}

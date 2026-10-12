@@ -1,14 +1,67 @@
+
 .my-account-shell {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  column-gap: 32px;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 32px 20px;
+  padding: 15px 25px;
   align-items: start;
 }
 
-/* Sidebar */
+.my-account-shell__breadcrumb {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.my-account-nav {
+  grid-column: 1;
+  grid-row: 2;
+  position: sticky;
+  top: 88px;
+  align-self: start;
+  height: fit-content;
+}
+
+.my-account-shell__content {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .my-account-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+    gap: 16px;
+    padding: 20px 12px 96px;
+  }
+
+  .my-account-shell__breadcrumb {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .my-account-nav {
+    grid-column: 1;
+    grid-row: 2;
+    position: static;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .my-account-shell__content {
+    grid-column: 1;
+    grid-row: 3;
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+
 .my-account-nav {
   position: sticky;
   top: 88px;
@@ -60,6 +113,21 @@
 }
 .my-account__breadcrumb{
   margin-bottom: 10px;
+}
+.my-account-shell__breadcrumb {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.my-account-nav {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.my-account-shell__content {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
 }
 @media (max-width: 768px) {
   .my-account-shell {

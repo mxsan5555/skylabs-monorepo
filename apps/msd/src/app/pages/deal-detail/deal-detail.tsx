@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
 import { Divider, FilledButton, Icon, OutlinedIconButton } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
+import type { SkySnackbar } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import { addCartItem } from '../../../api/cart';
@@ -36,7 +37,7 @@ export function DealDetail() {
   const [copied, setCopied] = useState(false);
   const [related, setRelated] = useState<CatalogDeal[]>([]);
   const [activeImg, setActiveImg] = useState(0);
-  const [actionMessage, setActionMessage] = useState('');
+  const snackbarRef = useRef<SkySnackbar>(null);
   const [actionError, setActionError] = useState('');
   const [quantity, setQuantity] = useState(1);
   useEffect(() => {
@@ -131,22 +132,45 @@ export function DealDetail() {
       setActionError(
         purchaseSelection.missingSelection ?? 'Please select a package.'
       );
-      setActionMessage('');
       return;
     }
     setActionError('');
-    setActionMessage('');
+
+
     try {
       await addCartItem(token, {
         dealId: deal.id,
         dealPackageId: activePackage.id,
         quantity,
       });
-      setActionMessage(`Added "${deal.title}" to your cart.`);
+
+const el = snackbarRef.current;
+
+if (el) {
+  el.variant = 'info';
+  el.closable = false;
+  el.actionLabel = 'View Cart';
+  el.duration = 4000;
+  el.show(`Added "${deal.title}" to your cart.`);
+}
     } catch (err) {
-      const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
+      const message =
+        err instanceof ApiRequestError
+          ? err.message
+          : 'Unable to add item to cart.';
+
       setActionError(message);
+
+      const el = snackbarRef.current;
+      if (!el) return;
+
+      el.variant = 'error';
+      el.closable = true;
+      el.actionLabel = undefined;
+      el.duration = 4000;
+      el.show(message);
     }
+
   }
   async function copyLink() {
     try {
@@ -159,6 +183,16 @@ export function DealDetail() {
   }
   return (
     <div className="deal-detail">
+     
+<sky-snackbar
+  ref={snackbarRef as React.RefObject<HTMLElement>}
+  duration={4000}
+  onsky-action={() => navigate('/cart')}
+  onsky-closed={(e) => {
+    console.log('Snackbar closed:', e.detail.reason);
+  }}
+/>
+
       <title>{`${name} – ${deal.vendor?.businessName ?? 'MSD'} | MSD`}</title>
       <meta
         name="description"
@@ -313,9 +347,6 @@ export function DealDetail() {
               </div>
             </div>
           </div>
-          {actionMessage && (
-            <p className="field-hint" role="status"> {actionMessage} </p>
-          )}
           {actionError && (
             <p className="error-state" role="alert">{actionError} </p>
           )}

@@ -25,13 +25,18 @@ export function Orders() {
   const { orders: ordersContent } = content;
   const [searchParams] = useSearchParams();
   const typeFilter = searchParams.get('type');
-  const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
-      const matchesStatus = selectedStatus === 'ALL' || order.status === selectedStatus;
-      const matchesType = !typeFilter || order.type === typeFilter;
-      return matchesStatus && matchesType;
-    });
-  }, [orders, selectedStatus, typeFilter]);
+
+const filteredOrders = useMemo(() => {
+  return orders.filter((order) => {
+    if (selectedStatus === 'CANCELLED') {
+      return order.status === 'CANCELLED';
+    }
+
+    // All tab: hide orders awaiting payment
+    return order.status !== 'PENDING_PAYMENT';
+  });
+}, [orders, selectedStatus]);
+
   const load = useCallback(() => {
     setLoading(true);
     setError('');
@@ -45,15 +50,6 @@ export function Orders() {
     <div className="category-page">
       <title>{ordersContent.metaTitle}</title>
       <meta name="robots" content="noindex" />
-      <Breadcrumb
-        items={[{ label: 'Home', to: '/' }, { label: 'Orders' },]}
-      />
-      {/* <div className="customer-orders-filters">
-        <Tabs>
-          <SecondaryTab onClick={() => setSelectedStatus('ALL')}>All</SecondaryTab>
-          <SecondaryTab onClick={() => setSelectedStatus('CANCELLED')}>Cancelled</SecondaryTab>
-        </Tabs>
-      </div> */}
       <div className="customer-orders-filters">
         <ChipSet className="chip-nav" aria-label="Order status filters">
           < FilterChip selected={selectedStatus === 'ALL'} onClick={() => setSelectedStatus('ALL')}  >All</ FilterChip>

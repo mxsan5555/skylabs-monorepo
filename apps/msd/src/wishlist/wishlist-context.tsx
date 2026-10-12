@@ -264,6 +264,13 @@ export function WishlistProvider({
     async (
       dealId: string,
     ): Promise<boolean> => {
+      console.log('Deal wishlist clicked:', {
+  dealId,
+  isAuthenticated,
+  hasToken: Boolean(token),
+  alreadyPending:
+    pendingRef.current.has(dealId),
+});
       if (
         !isAuthenticated ||
         !token ||
@@ -383,9 +390,17 @@ export function WishlistProvider({
    * Toggle Product wishlist.
    */
   const toggleProduct = useCallback(
+    
     async (
       productId: string,
     ): Promise<boolean> => {
+      console.log('Product wishlist clicked:', {
+  productId,
+  isAuthenticated,
+  hasToken: Boolean(token),
+  alreadyPending:
+    productPendingRef.current.has(productId),
+});
       if (
         !isAuthenticated ||
         !token ||

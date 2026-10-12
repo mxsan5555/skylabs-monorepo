@@ -35,6 +35,9 @@
   gap: 20px;
   padding: 60px 0;
 }
+.wishlist-grid__add-btn {
+  width: 100%;
+}
 
 .wishlist-grid {
   list-style: none;
@@ -42,19 +45,33 @@
   padding: 0;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-auto-rows: 1fr;
   gap: 24px;
+  align-items: stretch;
 }
 
 .wishlist-grid__item {
-   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: flex;
+  min-width: 0;
+  height: 100%;
 }
-.wishlist-grid__item > *:first-child {
+
+.wishlist-grid__item > .deal-card {
+  display: flex;
   flex: 1;
+  min-width: 0;
+  height: 100%;
 }
-.wishlist-grid__add-btn {
-  width: 100%;
+
+.wishlist-grid__item .deal-card > .sky-product-card-wc {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.wishlist-grid__item .sky-product-card-wc > sky-product-card {
+  flex: 1;
+  min-width: 0;
 }
 
 @media (max-width: 480px) {
@@ -63,8 +80,7 @@
   }
 
   .wishlist-grid {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
 }
-

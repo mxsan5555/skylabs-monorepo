@@ -75,13 +75,7 @@ export function CustomerDashboard() {
     return (
         <div className="customer-dashboard">
             <title>My Dashboard</title>
-             <Breadcrumb
-        items={[
-            { label: 'Home', to: '/' },
-            { label: 'Dashboard' },
-        ]}
-    />
-
+           
             {error && (
                 <sky-card className="customer-dashboard__error">
                     <div className="customer-dashboard__error-content">
@@ -95,17 +89,16 @@ export function CustomerDashboard() {
                     icon="spa"
                     headline="Deals"
                     text={`${stats.deals} booked deals`}
-                    variant="elevated"
-                    align="center"
+                    variant="outlined"
+                    iconStyle="plain"
                     href="/orders?type=SERVICE"
                 />
-
                 <sky-tile-card
                     icon="inventory_2"
                     headline="Products"
                     text={`${stats.products} purchased products`}
-                    variant="elevated"
-                    align="center"
+                    iconStyle="plain"
+                    variant="outlined"
                     href="/orders?type=PRODUCT"
                 />
 
@@ -113,8 +106,8 @@ export function CustomerDashboard() {
                     icon="shopping_cart"
                     headline="Cart"
                     text={`${stats.cart} items in cart`}
-                    variant="elevated"
-                    align="center"
+                    variant="outlined"
+                    iconStyle="plain"
                     href="/cart"
                 />
 
@@ -122,12 +115,50 @@ export function CustomerDashboard() {
                     icon="favorite"
                     headline="Wishlist"
                     text={`${stats.wishlist} saved items`}
-                    variant="elevated"
-                    align="center"
+                    variant="outlined"
+                    iconStyle="plain"
                     href="/wishlist"
                 />
             </div>
             <div className="customer-dashboard__quick-actions">
+                <sky-info-card
+                    icon="receipt_long"
+                    heading="Your orders"
+                    subheading="Track booked deals and purchased products."
+                >
+                    <OutlinedButton onClick={() => navigate('/orders')}>
+                        View Orders
+                        <Icon slot="icon" aria-hidden="true">
+                            arrow_forward
+                        </Icon>
+                    </OutlinedButton>
+                </sky-info-card>
+                <sky-info-card
+                    icon="person"
+                    heading="Manage your profile"
+                    subheading="View and update your personal account information."
+                >
+                    <OutlinedButton onClick={() => navigate('/my-account')}>
+                        View Profile
+                        <Icon slot="icon" aria-hidden="true">
+                            arrow_forward
+                        </Icon>
+                    </OutlinedButton>
+                </sky-info-card>
+                <sky-info-card
+                    icon="logout"
+                    heading="Sign out"
+                    subheading="Sign out from your MySpaDeal account."
+                >
+                    <FilledButton onClick={logout}>
+                        Logout
+                        <Icon slot="icon" aria-hidden="true">
+                            logout
+                        </Icon>
+                    </FilledButton>
+                </sky-info-card>
+            </div>
+            {/* <div className="customer-dashboard__quick-actions">
                 <sky-card className="customer-dashboard__quick-action">
                     <div className="customer-dashboard__quick-action-content">
                         <Icon aria-hidden="true">person</Icon>
@@ -159,7 +190,7 @@ export function CustomerDashboard() {
                         </FilledButton>
                     </div>
                 </sky-card>
-            </div>
+            </div> */}
             {/* <sky-card className="customer-dashboard__profile">
                 <div className="customer-dashboard__section-content">
                     <div>

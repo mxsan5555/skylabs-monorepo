@@ -34,12 +34,7 @@ export function Support() {
     };
     return (
         <div className="support-page">
-            <Breadcrumb
-                items={[
-                    { label: 'Home', to: '/' },
-                    { label: 'Support' },
-                ]}
-            />
+          
             <sky-tile-card className="support-page__card">
 
                 <div className="support-page__form">

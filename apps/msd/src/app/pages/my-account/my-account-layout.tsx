@@ -1,11 +1,11 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Divider, Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { AccountProvider } from '../../../account/account-context';
 import { isDualRoleUser, setExperienceMode } from '../../../auth/role-routing';
 import './my-account.css';
 import { useToast } from '../../../toast/toast-context';
-
+import { Breadcrumb } from '../../components/breadcrumb';
 interface NavItem {
   to: string;
   label: string;
@@ -35,6 +35,18 @@ const NAV_ITEMS: NavItem[] = [
  */
 export function MyAccountLayout() {
   const { bootstrap, signOut } = useAuth();
+  const location = useLocation();
+
+const breadcrumbLabels: Record<string, string> = {
+  '/my-dashboard': 'Dashboard',
+  '/my-account': 'Profile',
+  '/orders': 'Orders',
+  '/my-account/wishlist': 'Wishlist',
+  '/my-account/cart': 'Cart',
+  '/my-account/support': 'Support',
+};
+
+const currentPage = breadcrumbLabels[location.pathname] ?? 'My Account';
   const dualRole = bootstrap ? isDualRoleUser(bootstrap) : false;
   const switchToVendor = () => {
     setExperienceMode('vendor');
@@ -51,7 +63,14 @@ export function MyAccountLayout() {
     <AccountProvider>
       <div className="my-account-shell">
         <meta name="robots" content="noindex" />
-
+<div className="my-account-shell__breadcrumb">
+  <Breadcrumb
+    items={[
+      { label: 'Home', to: '/' },
+      { label: currentPage },
+    ]}
+  />
+</div>
         <nav className="my-account-nav" aria-label="My account">
           <ul className="entity-list">
 

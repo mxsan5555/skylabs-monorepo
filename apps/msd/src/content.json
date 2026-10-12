@@ -643,8 +643,9 @@
       "product": "Product"
     },
     "actions": {
-      "addToCart": "Add to Cart"
-    },
+  "addToCart": "Add to Cart",
+  "bookNow": "Book Now"
+},
     "messages": {
       "addToCartSuccess": "Added \"{item}\" to your cart.",
       "bookingSuccess": "Booked \"{item}\" for {date} at {time}."
@@ -821,7 +822,7 @@
     "savedDealsLabel": "Saved deals",
     "serviceLabel": "Deal",
     "productLabel": "Product",
-    "bookLabel": "Book",
+    "bookLabel": "Book Now",
     "addingLabel": "Adding…",
     "addToCartError": "Could not add to cart.",
     "itemSingular": "item",

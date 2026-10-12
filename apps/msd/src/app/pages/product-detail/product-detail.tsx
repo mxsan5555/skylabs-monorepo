@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { SkySnackbar } from '@skylabs-monorepo/shared-ui';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Divider, FilledButton, Icon, OutlinedIconButton, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
@@ -34,7 +35,7 @@ export function ProductDetail() {
   const [related, setRelated] = useState<CatalogProduct[]>([]);
   const [activeImg, setActiveImg] = useState(0);
   const [qty, setQty] = useState(1);
-  const [addedToCart, setAddedToCart] = useState(false);
+  const snackbarRef = useRef<SkySnackbar>(null);
   const [addError, setAddError] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -155,17 +156,31 @@ export function ProductDetail() {
     try {
       await addCartItem(token, { productId, quantity: qty });
 
-      setAddedToCart(true);
+      const el = snackbarRef.current;
 
-      setTimeout(() => {
-        setAddedToCart(false);
-      }, 2000);
+      if (el) {
+        el.variant = 'info';
+        el.closable = false;
+        el.actionLabel = 'View Cart';
+        el.duration = 4000;
+        el.show(`Added "${product?.name ?? 'Product'}" to your cart.`);
+      }
     } catch (err: unknown) {
-      setAddError(
+      const message =
         err instanceof ApiRequestError
           ? err.message
-          : products.detail.errors.addToCart,
-      );
+          : products.detail.errors.addToCart;
+
+      setAddError(message);
+
+      const el = snackbarRef.current;
+      if (!el) return;
+
+      el.variant = 'error';
+      el.closable = true;
+      el.actionLabel = undefined;
+      el.duration = 4000;
+      el.show(message);
     }
   }
 
@@ -199,6 +214,11 @@ export function ProductDetail() {
 
   return (
     <div className="product-detail">
+      <sky-snackbar
+        ref={snackbarRef as React.RefObject<HTMLElement>}
+        duration={4000}
+        onsky-action={() => navigate('/cart')}
+      />
       <title>{`${seoName} | MSD`}</title>
 
       <meta
@@ -530,12 +550,10 @@ export function ProductDetail() {
                 onClick={handleAddToCart}
               >
                 <Icon slot="icon" aria-hidden="true">
-                  {addedToCart ? 'check' : 'shopping_bag'}
+                  shopping_bag
                 </Icon>
 
-                {addedToCart
-                  ? products.detail.addedToCart
-                  : products.detail.addToCart}
+                {products.detail.addToCart}
               </FilledButton>
 
               <OutlinedIconButton

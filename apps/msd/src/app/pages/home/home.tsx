@@ -39,6 +39,8 @@ import './home.css';
 import { useCatalogShell } from '../../../catalog/catalog-shell';
 import { useVisitorLocation } from '../../../location/location-context';
 import type { CatalogDeal } from '../../../api/catalog';
+import { ProductCardGallery } from '../../components/product-card-gallery';
+import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 const { home } = content;
 
 export function Home() {
@@ -97,53 +99,98 @@ export function Home() {
   };
   const renderDeal = (deal: CatalogDeal) => {
     const media = resolveDealMedia(deal);
- console.log(
-    'DEAL GALLERY:',
-    deal.title,
-    media.images.length,
-    media.images,
-  );
-    return (
-      <swiper-slide key={deal.id} className="card-rail__slide">
-        <SkyProductCardWC
-          image={media.images[0]}
-          gallery={media.images}
-          imageAlt={deal.title}
-          favorite
-          favoriteActive={signedIn && has(deal.id)}
-          eyebrow={deal.vendor?.businessName ?? undefined}
-          eyebrowHref={
-            deal.vendor?.slug
-              ? `/vendor/${deal.vendor.slug}`
-              : undefined
-          }
-          heading={deal.title}
-          location={
-            deal.branch?.city ??
-            deal.vendor?.city ??
-            undefined
-          }
-          distance={
-            deal.distanceKm != null
-              ? `${Math.round(deal.distanceKm * 10) / 10} km`
-              : undefined
-          }
-          price={formatINR(Number(deal.salePrice))}
-          originalPrice={
-            deal.originalPrice != null
-              ? formatINR(Number(deal.originalPrice))
-              : undefined
-          }
-          discount={
-            deal.discountPercent != null
-              ? `${deal.discountPercent}% OFF`
-              : undefined
-          }
-          href={`/deal/${deal.id}`}
-          onFavorite={() => handleDealFavorite(deal.id)}
+    console.log('Deal:', deal.title, {
+  images: media.images,
+});
+   
+return (
+  <swiper-slide key={deal.id} className="card-rail__slide">
+    <SkyProductCardWC
+      // variant="outlined"
+      image={undefined}
+      imageAlt={deal.title}
+      favorite
+      favoriteActive={signedIn && has(deal.id)}
+      badge="Service"
+      eyebrow={
+        [deal.vendor?.businessName, deal.branch?.name]
+          .filter(Boolean)
+          .join(' · ') || undefined
+      }
+      eyebrowHref={
+        deal.vendor?.slug
+          ? `/vendor/${deal.vendor.slug}`
+          : undefined
+      }
+      heading={deal.title}
+      location={deal.branch?.city ?? deal.vendor?.city ?? undefined}
+      distance={
+        deal.distanceKm != null
+          ? `${Math.round(deal.distanceKm * 10) / 10} km`
+          : undefined
+      }
+      price={formatINR(Number(deal.salePrice))}
+      originalPrice={
+        deal.originalPrice != null &&
+        Number(deal.originalPrice) !== Number(deal.salePrice)
+          ? formatINR(Number(deal.originalPrice))
+          : undefined
+      }
+      discount={
+        deal.discountPercent != null
+          ? `-${Number(deal.discountPercent)}%`
+          : undefined
+      }
+      priceNote={
+        deal.durationMinutes
+          ? `${deal.durationMinutes} min`
+          : undefined
+      }
+      tag={deal.popularTags?.[0]?.name}
+      href={`/deal/${deal.id}`}
+      // layout={cardLayout}
+      onFavorite={() => handleDealFavorite(deal.id)}
+    >
+      <div slot="media" className="product-card-media">
+        <ProductCardGallery
+          images={media.images}
+          alt={deal.title}
+          // layout={cardLayout}
         />
-      </swiper-slide>
-    );
+      </div>
+
+      {/* <div onClick={(event) => event.stopPropagation()}>
+        <DealAddToCartDialog
+          deal={deal}
+          onAdded={() => {
+            // Category page ke existing success handler ko yahan reuse karo.
+          }}
+          renderTrigger={(open) => (
+            <FilledButton
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (!isAuthenticated) {
+                  navigate(signInPathWithReturnTo(location));
+                  return;
+                }
+
+                open();
+              }}
+            >
+              <Icon slot="icon" aria-hidden="true">
+                shopping_bag
+              </Icon>
+              Book now
+            </FilledButton>
+          )}
+        />
+      </div> */}
+    </SkyProductCardWC>
+  </swiper-slide>
+);
+
   };
   return (
     <div className="home">
@@ -204,14 +251,17 @@ export function Home() {
           >
             {catalog.products.map((product) => {
               const media = resolveProductMedia(product);
-
+console.log('Product:', product.name, {
+  images: media.images,
+});
               return (
                 <swiper-slide
                   key={product.id}
                   className="card-rail__slide"
                 >
                   <SkyProductCardWC
-                    image={media.images[0] ?? undefined}
+                  // variant='outlined'
+                    image={undefined}
                     gallery={media.images}
                     imageAlt={product.imageAlt ?? product.name}
                     favorite

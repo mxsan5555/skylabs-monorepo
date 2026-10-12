@@ -10,14 +10,7 @@ import { Breadcrumb } from '../../components/breadcrumb';
 export function MyAccountProfile() {
   return (
     <>
-      <Breadcrumb className="my-account__breadcrumb"
-        items={[
-          { label: 'Home', to: '/' },
-          { label: 'Profile' },
-        ]}
-      />
-
-      <AdminPage
+    <AdminPage
         title="Profile Details"
         subtitle="Manage your contact details and saved addresses."
       >

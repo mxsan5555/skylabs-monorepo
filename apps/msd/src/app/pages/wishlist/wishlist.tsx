@@ -1,5 +1,5 @@
 ﻿import { useNavigate } from 'react-router-dom';
-
+import { ProductCardGallery } from '../../components/product-card-gallery';
 import {
   FilledButton,
   OutlinedButton,
@@ -59,7 +59,7 @@ function toDealCardDeal(
         : undefined,
 
     video: media.video,
-
+    badge: 'Service',
     providerName:
       deal.vendor?.businessName ??
       undefined,
@@ -72,7 +72,7 @@ function toDealCardDeal(
 
     originalPrice:
       originalPrice &&
-      originalPrice !== salePrice
+        originalPrice !== salePrice
         ? originalPrice
         : undefined,
 
@@ -136,7 +136,7 @@ function toProductCardDeal(
 
     originalPrice:
       originalPrice !== undefined &&
-      originalPrice !== price
+        originalPrice !== price
         ? originalPrice
         : undefined,
 
@@ -178,14 +178,14 @@ export function Wishlist() {
       />
 
       <div className="wishlist-page__inner">
-  <Breadcrumb
+        {/* <Breadcrumb
     items={[
       { label: 'Home', to: '/' },
       { label: 'Wishlist' },
     ]}
-  />
+  /> */}
 
-  <h1 className="wishlist-page__title">
+        {/* <h1 className="wishlist-page__title">
           {wishlistContent.title}
 
           {itemCount > 0 && (
@@ -197,7 +197,7 @@ export function Wishlist() {
               )
             </span>
           )}
-        </h1>
+        </h1> */}
 
         {loading ? (
           <p className="loading-state">
@@ -253,42 +253,28 @@ export function Wishlist() {
                     key={item.id}
                     className="wishlist-grid__item"
                   >
+
                     <DealCard
-                      deal={toDealCardDeal(
-                        deal,
-                      )}
+                      deal={toDealCardDeal(deal)}
                       favoriteActive={true}
-                      onFavorite={() =>
-                        void remove(
-                          item.dealId!,
-                        )
-                      }
+                      onFavorite={() => void remove(item.dealId!)}
                       eyebrowHref={
                         deal.vendor?.slug
                           ? `/vendor/${deal.vendor.slug}`
                           : undefined
                       }
+                      actions={
+                        <FilledButton
+                          onClick={() => navigate(`/deal/${deal.id}`)}
+                        >
+                          <Icon slot="icon" aria-hidden="true">
+                            event_available
+                          </Icon>
+                          {wishlistContent.bookLabel}
+                        </FilledButton>
+                      }
                     />
 
-                    <OutlinedButton
-                      className="wishlist-grid__add-btn"
-                      onClick={() =>
-                        navigate(
-                          `/deal/${deal.id}`,
-                        )
-                      }
-                    >
-                      <Icon
-                        slot="icon"
-                        aria-hidden="true"
-                      >
-                        event_available
-                      </Icon>
-
-                      {
-                        wishlistContent.bookLabel
-                      }
-                    </OutlinedButton>
                   </li>
                 );
               }
@@ -308,35 +294,24 @@ export function Wishlist() {
                     key={item.id}
                     className="wishlist-grid__item"
                   >
-                    <DealCard
-                      deal={toProductCardDeal(
-                        product,
-                      )}
-                      favoriteActive={true}
-                      onFavorite={() =>
-                        void removeProduct(
-                          item.productId!,
-                        )
-                      }
-                    />
 
-                    <OutlinedButton
-                      className="wishlist-grid__add-btn"
-                      onClick={() =>
-                        navigate(
-                          `/products/${product.id}`,
-                        )
-                      }
-                    >
-                      <Icon
-                        slot="icon"
-                        aria-hidden="true"
-                      >
-                        shopping_bag
-                      </Icon>
+<DealCard
+  deal={toProductCardDeal(product)}
+  favoriteActive={true}
+  onFavorite={() => void removeProduct(item.productId!)}
+  href={`/products/${product.id}`}
+  actions={
+    <FilledButton
+      onClick={() => navigate(`/products/${product.id}`)}
+    >
+      <Icon slot="icon" aria-hidden="true">
+        shopping_bag
+      </Icon>
+      Add to cart
+    </FilledButton>
+  }
+/>
 
-                      View Product
-                    </OutlinedButton>
                   </li>
                 );
               }

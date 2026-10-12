@@ -53,29 +53,12 @@ export function SkyProductCardWC({
 }: SkyProductCardProps) {
   const ref = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    const el = ref.current;
-
-    if (!el || !onFavorite) {
-      return;
-    }
-
-    const handleFavorite = () => {
-      onFavorite();
-    };
-
-    el.addEventListener('favorite', handleFavorite);
-
-    return () => {
-      el.removeEventListener('favorite', handleFavorite);
-    };
-  }, [onFavorite]);
 
   useEffect(() => {
     const el = ref.current as
       | (HTMLElement & {
-          gallery?: string[];
-        })
+        gallery?: string[];
+      })
       | null;
 
     if (el && gallery) {
@@ -86,9 +69,9 @@ export function SkyProductCardWC({
   useEffect(() => {
     const el = ref.current as
       | (HTMLElement & {
-          favorite?: boolean;
-          favoriteActive?: boolean;
-        })
+        favorite?: boolean;
+        favoriteActive?: boolean;
+      })
       | null;
 
     if (!el) {
@@ -98,7 +81,24 @@ export function SkyProductCardWC({
     el.favorite = Boolean(favorite);
     el.favoriteActive = Boolean(favoriteActive);
   }, [favorite, favoriteActive]);
+  useEffect(() => {
+    const el = ref.current;
 
+    if (!el || !onFavorite) {
+      return;
+    }
+
+    const handleFavorite = () => {
+      console.log('Favorite event received in React wrapper');
+      onFavorite();
+    };
+
+    el.addEventListener('favorite', handleFavorite);
+
+    return () => {
+      el.removeEventListener('favorite', handleFavorite);
+    };
+  }, [onFavorite]);
   const attrs: Record<string, string | number> = {};
 
   Object.entries(props).forEach(([key, value]) => {
@@ -111,22 +111,21 @@ export function SkyProductCardWC({
 
     attrs[attributeName] = value;
   });
-return (
-  <div className="sky-product-card-wc">
-    <sky-product-card
-      ref={ref as any}
-      {...(attrs as any)}
-    >
-      {children}
-    </sky-product-card>
 
-  {gallery && gallery.length > 0 && (
-  <ProductCardGallery
-    images={gallery}
-    alt={props.imageAlt ?? ''}
-    layout={props.layout}
-  />
-)}
-  </div>
-);
+  return (
+    <div className="sky-product-card-wc">
+      <sky-product-card ref={ref as any} {...(attrs as any)}>
+        {gallery && gallery.length > 0 && (
+          <ProductCardGallery
+            slot="media"
+            images={gallery}
+            alt={props.imageAlt ?? ''}
+            layout={props.layout}
+          />
+        )}
+        {children}
+      </sky-product-card>
+    </div>
+  );
+
 }
