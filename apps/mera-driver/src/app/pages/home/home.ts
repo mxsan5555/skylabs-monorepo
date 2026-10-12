@@ -2,14 +2,17 @@ import {
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
   OnInit,
+  effect,
   inject,
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { toDataURL } from 'qrcode';
 import { BookingService } from '../../core/booking/booking.service';
+import { LocationService } from '../../core/location/location.service';
 import { RideMap } from '../../shared/ride-map/ride-map';
-import type { RideCategoryId, TripType } from '../../models';
+import { LocationPicker } from '../../shared/location-picker/location-picker';
+import type { Place, RideCategoryId, TripType } from '../../models';
 
 interface ServiceCard {
   title: string;
@@ -48,17 +51,17 @@ const SERVICE_CARDS: ServiceCard[] = [
 /**
  * Marketing landing page. Hero "find drivers" form (trip type + now/schedule +
  * pickup/drop) that feeds the booking flow, a services grid, customer + driver
- * sign-up CTAs, a Safety & Trust band, and app-download QR cards. Built from
- * shared-ui; themed by mera-driver's blue palette.
+ * sign-up CTAs, a Safety & Trust band, and app-download QR cards.
  */
 @Component({
   selector: 'md-home',
-  imports: [RideMap],
+  imports: [RideMap, LocationPicker],
   templateUrl: './home.html',
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class Home implements OnInit {
   protected readonly booking = inject(BookingService);
+  protected readonly locationService = inject(LocationService);
   private readonly router = inject(Router);
 
   protected readonly serviceCards = SERVICE_CARDS;
@@ -67,13 +70,28 @@ export class Home implements OnInit {
   protected readonly tripType = signal<TripType>('one-way');
   protected readonly timing = signal<'now' | 'later'>('now');
   protected pickupText = this.booking.pickup()?.label ?? '';
-  protected dropoffText = '';
+  protected dropoffText = this.booking.drop()?.label ?? '';
   protected scheduleDate = '';
   protected scheduleTime = '';
 
   // Generated download QR codes (data URLs).
   protected readonly customerQr = signal<string>('');
   protected readonly driverQr = signal<string>('');
+
+  constructor() {
+    effect(() => {
+      const p = this.booking.pickup();
+      if (p) {
+        this.pickupText = p.label;
+      }
+    });
+    effect(() => {
+      const d = this.booking.drop();
+      if (d) {
+        this.dropoffText = d.label;
+      }
+    });
+  }
 
   async ngOnInit(): Promise<void> {
     const opts = { margin: 1, width: 220, color: { dark: '#101418', light: '#ffffff' } };
@@ -95,30 +113,64 @@ export class Home implements OnInit {
     this.timing.set(value);
   }
 
+  protected readonly errorMessage = signal<string | null>(null);
+
+  protected onPickupSelected(place: Place): void {
+    this.errorMessage.set(null);
+    this.pickupText = place.label;
+    this.booking.setPickup(place);
+    if (place.coord) {
+      this.locationService.updateFromCoordinates(place.coord, place.label);
+    }
+  }
+
+  protected onDropSelected(place: Place): void {
+    this.errorMessage.set(null);
+    this.dropoffText = place.label;
+    this.booking.setDrop(place);
+  }
+
+  protected onPickupTextChange(text: string): void {
+    this.pickupText = text;
+    this.errorMessage.set(null);
+    const current = this.booking.pickup();
+    if (current && current.label !== text) {
+      this.booking.setPickup(null);
+    }
+  }
+
+  protected onDropTextChange(text: string): void {
+    this.dropoffText = text;
+    this.errorMessage.set(null);
+    const current = this.booking.drop();
+    if (current && current.label !== text) {
+      this.booking.setDrop(null);
+    }
+  }
+
   /** Push the hero selections into the booking flow and open "Choose a ride". */
   protected seePrices(): void {
+    this.errorMessage.set(null);
+
+    const pickup = this.booking.pickup();
+    const drop = this.booking.drop();
+
+    if (!this.pickupText.trim() || !pickup || !pickup.coord) {
+      this.errorMessage.set('Please select a valid pickup location from the suggestions or GPS.');
+      return;
+    }
+
+    if (!this.dropoffText.trim() || !drop || !drop.coord) {
+      this.errorMessage.set('Please select a valid dropoff destination from the suggestions.');
+      return;
+    }
+
     this.booking.setTripType(this.tripType());
     this.booking.setSchedule(
       this.timing() === 'later' && this.scheduleDate
         ? `${this.scheduleDate}T${this.scheduleTime || '09:00'}`
         : 'now',
     );
-
-    // Reuse the current pickup; derive a drop from the typed destination so the
-    // flow has an endpoint (mock coord until geocoding exists).
-    const pickup = this.booking.pickup();
-    if (pickup && this.pickupText.trim()) {
-      this.booking.setPickup({ ...pickup, label: this.pickupText.trim() });
-    }
-    const dest = this.dropoffText.trim() || 'Destination';
-    const recent = this.booking.recentPlaces[0];
-    this.booking.setDrop({
-      id: 'hero-drop',
-      label: dest,
-      address: dest,
-      coord: recent.coord,
-      kind: 'recent',
-    });
 
     this.router.navigate(['/ride/options']);
   }

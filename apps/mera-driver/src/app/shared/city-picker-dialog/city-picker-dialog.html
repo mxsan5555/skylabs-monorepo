@@ -1,0 +1,31 @@
+@if (isOpen) {
+  <md-dialog open (close)="onClose()">
+    <span slot="headline">Choose your city</span>
+    <div slot="content" class="flex flex-col gap-4 py-2 min-w-[280px]">
+      <md-filled-tonal-button class="w-full" (click)="useCurrentLocation()">
+        <md-icon slot="icon" aria-hidden="true">my_location</md-icon>
+        Use my current location
+      </md-filled-tonal-button>
+
+      <ul class="flex flex-col gap-1 list-none p-0 m-0 max-h-[50vh] overflow-y-auto" aria-label="Available cities">
+        @for (loc of locationService.cities; track loc.id) {
+          <li>
+            <button
+              type="button"
+              class="w-full flex items-center justify-between min-h-[48px] px-3 py-2 rounded-lg border-0 bg-transparent text-left cursor-pointer transition-colors hover:bg-[var(--md-sys-color-surface-container-high)] text-[var(--md-sys-color-on-surface)]"
+              [class.bg-[var(--md-sys-color-secondary-container)]]="loc.id === locationService.city().id"
+              [class.text-[var(--md-sys-color-on-secondary-container)]]="loc.id === locationService.city().id"
+              (click)="selectCity(loc)"
+            >
+              <span class="font-medium text-base">{{ loc.name }}</span>
+              <span class="text-sm text-[var(--md-sys-color-on-surface-variant)]">{{ loc.state }}</span>
+            </button>
+          </li>
+        }
+      </ul>
+    </div>
+    <div slot="actions">
+      <md-text-button (click)="onClose()">Close</md-text-button>
+    </div>
+  </md-dialog>
+}

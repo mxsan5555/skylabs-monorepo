@@ -1,7 +1,6 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { BookingService } from '../../../core/booking/booking.service';
-import { DEFAULT_PICKUP } from '../../../core/booking/mock-data';
+import { LocationService } from '../../../core/location/location.service';
 
 /**
  * "Enable location" prompt (reference Image #3). Asks for the browser geolocation
@@ -16,29 +15,15 @@ import { DEFAULT_PICKUP } from '../../../core/booking/mock-data';
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class RideLocation {
-  private readonly booking = inject(BookingService);
+  private readonly locationService = inject(LocationService);
   private readonly router = inject(Router);
 
   protected readonly busy = signal(false);
 
-  protected allow(): void {
+  protected async allow(): Promise<void> {
     this.busy.set(true);
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      this.finish();
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        this.booking.setPickup({
-          ...DEFAULT_PICKUP,
-          label: 'Current location',
-          coord: { lat: pos.coords.latitude, lng: pos.coords.longitude },
-        });
-        this.finish();
-      },
-      () => this.finish(),
-      { enableHighAccuracy: true, timeout: 8000 },
-    );
+    await this.locationService.requestBrowser();
+    this.finish();
   }
 
   protected skip(): void {
