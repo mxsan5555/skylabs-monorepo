@@ -15,97 +15,46 @@
     <div class="rider-sheet__handle" aria-hidden="true"></div>
     <h1 id="home-title" class="rider-sheet__title">Plan your ride</h1>
 
-    <div class="rider-route">
+    <div class="rider-route relative">
       <div class="rider-route__rail" aria-hidden="true">
         <span class="rider-route__dot"></span>
         <span class="rider-route__line"></span>
         <span class="rider-route__dot rider-route__dot--square"></span>
       </div>
-      <div>
-        <input
-          class="rider-route__field"
-          type="text"
-          aria-label="Pickup location"
-          autocomplete="off"
-          [value]="pickupQuery()"
-          (input)="onPickupInput($any($event.target).value)"
-          (focus)="activeField.set('pickup')"
+      <div class="w-full flex flex-col gap-1">
+        <md-location-picker
+          type="pickup"
           placeholder="Enter pickup"
-        />
-        @if (activeField() === 'pickup' && pickupSuggestions().length) {
-          <ul class="rider-list rider-suggestions">
-            @for (s of pickupSuggestions(); track s.placeId) {
-              <li><button type="button" class="rider-row" (click)="selectPickup(s)">
-                <span class="rider-row__body">
-                  <span class="rider-row__title">{{ s.name }}</span>
-                  <span class="rider-row__sub">{{ s.address }}</span>
-                </span>
-              </button></li>
-            }
-          </ul>
-        }
-        <input
-          class="rider-route__field"
-          type="text"
-          aria-label="Destination"
-          autocomplete="off"
-          [value]="dropQuery()"
-          (input)="onDropInput($any($event.target).value)"
-          (focus)="activeField.set('drop')"
+          [value]="booking.pickup()?.label ?? ''"
+          (placeSelected)="onPickupSelected($event)"
+        ></md-location-picker>
+
+        <md-location-picker
+          type="drop"
           placeholder="Where to?"
-        />
-        @if (activeField() === 'drop' && dropSuggestions().length) {
-          <ul class="rider-list rider-suggestions">
-            @for (s of dropSuggestions(); track s.placeId) {
-              <li><button type="button" class="rider-row" (click)="selectDropSuggestion(s)">
-                <span class="rider-row__body">
-                  <span class="rider-row__title">{{ s.name }}</span>
-                  <span class="rider-row__sub">{{ s.address }}</span>
-                </span>
-              </button></li>
-            }
-          </ul>
-        }
-        @if (placesError()) {
-          <p class="rider-eyebrow" role="alert">{{ placesError() }}</p>
-        }
+          [value]="booking.drop()?.label ?? ''"
+          (placeSelected)="onDropSelected($event)"
+        ></md-location-picker>
       </div>
     </div>
 
-    <h2 class="rider-eyebrow">Saved places</h2>
-    <ul class="rider-list">
-      @for (place of booking.savedPlaces; track place.id) {
-        <li>
-          <button type="button" class="rider-row" (click)="chooseDrop(place)">
-            <span class="rider-row__icon">
-              <md-icon aria-hidden="true">{{
-                place.id === 'work' ? 'work' : 'home'
-              }}</md-icon>
-            </span>
-            <span class="rider-row__body">
-              <span class="rider-row__title">{{ place.label }}</span>
-              <span class="rider-row__sub">{{ place.address }}</span>
-            </span>
-          </button>
-        </li>
-      }
-    </ul>
-
-    <h2 class="rider-eyebrow">Recent</h2>
-    <ul class="rider-list">
-      @for (place of booking.recentPlaces; track place.id) {
-        <li>
-          <button type="button" class="rider-row" (click)="chooseDrop(place)">
-            <span class="rider-row__icon">
-              <md-icon aria-hidden="true">location_on</md-icon>
-            </span>
-            <span class="rider-row__body">
-              <span class="rider-row__title">{{ place.label }}</span>
-              <span class="rider-row__sub">{{ place.address }}</span>
-            </span>
-          </button>
-        </li>
-      }
-    </ul>
+    @if (booking.recentPlaces.length > 0) {
+      <h2 class="rider-eyebrow">Recent destinations</h2>
+      <ul class="rider-list">
+        @for (place of booking.recentPlaces; track place.id) {
+          <li>
+            <button type="button" class="rider-row" (click)="chooseDrop(place)">
+              <span class="rider-row__icon">
+                <md-icon aria-hidden="true">location_on</md-icon>
+              </span>
+              <span class="rider-row__body">
+                <span class="rider-row__title">{{ place.label }}</span>
+                <span class="rider-row__sub">{{ place.address }}</span>
+              </span>
+            </button>
+          </li>
+        }
+      </ul>
+    }
   </div>
 </section>

@@ -20,6 +20,8 @@ import type { LatLng } from '../../models';
  * Degrades to a plain placeholder (no crash, no fake map) if no API key is configured or
  * the script fails to load — never silently shows a blank/broken map.
  */
+import { LocationService } from '../../core/location/location.service';
+
 @Component({
   selector: 'md-ride-map',
   template: `
@@ -57,6 +59,7 @@ import type { LatLng } from '../../models';
 })
 export class RideMap implements AfterViewInit, OnChanges, OnDestroy {
   @ViewChild('map', { static: true }) private mapEl!: ElementRef<HTMLElement>;
+  private readonly locationService = inject(LocationService, { optional: true });
 
   readonly pickup = input<LatLng | null>(null);
   readonly drop = input<LatLng | null>(null);
@@ -77,7 +80,8 @@ export class RideMap implements AfterViewInit, OnChanges, OnDestroy {
     try {
       const google = await this.loader.load();
       if (this.destroyed) return;
-      const start = this.pickup() ?? { lat: 12.9716, lng: 77.5946 };
+      const cityCoord = this.locationService?.coords();
+      const start = this.pickup() ?? (cityCoord ? { lat: cityCoord.lat, lng: cityCoord.lng } : { lat: 28.6139, lng: 77.2090 });
       this.map = new google.maps.Map(this.mapEl.nativeElement, {
         center: start,
         zoom: 13,

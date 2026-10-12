@@ -4,7 +4,8 @@
     <div class="hero__form">
       <p class="hero__city">
         <md-icon aria-hidden="true">location_on</md-icon>
-        Bengaluru, IN <a routerLink="/ride">Change city</a>
+        <span>{{ locationService.cityName() }}, {{ locationService.stateName() }}</span>
+        <span class="ml-2 underline font-medium opacity-80 cursor-default">Change city</span>
       </p>
       <h1 id="hero-title" class="hero__title">Book a trusted driver, your way</h1>
 
@@ -47,33 +48,38 @@
         </div>
       }
 
-      <div class="rider-route hero__route">
+      <div class="rider-route hero__route relative">
         <div class="rider-route__rail" aria-hidden="true">
           <span class="rider-route__dot"></span>
           <span class="rider-route__line"></span>
           <span class="rider-route__dot rider-route__dot--square"></span>
         </div>
-        <div>
-          <input
-            class="rider-route__field"
-            type="text"
-            aria-label="Pickup location"
-            autocomplete="off"
-            [value]="pickupText"
-            (input)="pickupText = $any($event.target).value"
+        <div class="w-full flex flex-col gap-2">
+          <!-- Pickup Location Picker -->
+          <md-location-picker
+            type="pickup"
             placeholder="Pickup location"
-          />
-          <input
-            class="rider-route__field"
-            type="text"
-            aria-label="Dropoff location"
-            autocomplete="off"
-            [value]="dropoffText"
-            (input)="dropoffText = $any($event.target).value"
+            [value]="pickupText"
+            (placeSelected)="onPickupSelected($event)"
+            (valueChange)="onPickupTextChange($event)"
+          ></md-location-picker>
+
+          <!-- Dropoff Location Picker -->
+          <md-location-picker
+            type="drop"
             placeholder="Dropoff location"
-          />
+            [value]="dropoffText"
+            (placeSelected)="onDropSelected($event)"
+            (valueChange)="onDropTextChange($event)"
+          ></md-location-picker>
         </div>
       </div>
+
+      @if (errorMessage()) {
+        <p class="text-xs text-red-500 font-medium px-2 -mt-2" role="alert">
+          {{ errorMessage() }}
+        </p>
+      }
 
       <div class="hero__actions">
         <md-filled-button (click)="seePrices()">See prices</md-filled-button>

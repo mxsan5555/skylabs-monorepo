@@ -24,12 +24,6 @@ import { adminAreaGuard } from './core/auth/admin-area.guard';
  */
 export const appRoutes: Routes = [
   {
-    path: 'location',
-    title: 'Select Location · mera-driver',
-    loadComponent: () =>
-      import('./pages/location/location').then((m) => m.Location),
-  },
-  {
     path: 'sign-in',
     component: AuthLayout,
     children: [

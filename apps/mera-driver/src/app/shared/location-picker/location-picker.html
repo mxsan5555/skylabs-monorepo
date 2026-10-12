@@ -1,0 +1,63 @@
+<div class="relative w-full">
+  <input
+    class="rider-route__field w-full"
+    type="text"
+    [attr.aria-label]="placeholder"
+    autocomplete="off"
+    [value]="searchQuery()"
+    (focus)="onInputFocus()"
+    (input)="onInputChange($event)"
+    [placeholder]="placeholder"
+  />
+
+  @if (showSuggestions()) {
+    <div
+      class="absolute left-0 right-0 top-full mt-2 z-30 bg-[var(--md-sys-color-surface-container)] border border-[var(--md-sys-color-outline-variant)] rounded-xl shadow-xl overflow-hidden max-h-[300px] overflow-y-auto"
+    >
+      <!-- 1. Use Current Location GPS Button (ONLY for Pickup) -->
+      @if (type === 'pickup') {
+        <button
+          type="button"
+          class="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--md-sys-color-surface-container-high)] text-left cursor-pointer transition-colors"
+          (click)="useCurrentLocation()"
+        >
+          <md-icon class="text-[var(--md-sys-color-primary)]">my_location</md-icon>
+          <div>
+            <div class="font-medium text-[var(--md-sys-color-on-surface)]">
+              @if (isLocating()) { Detecting GPS location... } @else { Use current location }
+            </div>
+            <div class="text-xs text-[var(--md-sys-color-on-surface-variant)]">
+              Using device GPS location
+            </div>
+          </div>
+        </button>
+
+        <div class="border-t border-[var(--md-sys-color-outline-variant)]"></div>
+      }
+
+      <!-- 2. Google Places Search Results (When typing) -->
+      @if (isSearching()) {
+        <div
+          class="px-4 py-3 text-sm text-[var(--md-sys-color-on-surface-variant)] flex items-center gap-2"
+        >
+          <md-icon class="animate-spin text-sm">sync</md-icon>
+          Searching Google Places...
+        </div>
+      } @else {
+        @for (p of googlePredictions(); track p.placeId) {
+          <button
+            type="button"
+            class="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--md-sys-color-surface-container-high)] text-left cursor-pointer transition-colors border-b border-[var(--md-sys-color-outline-variant)] last:border-b-0"
+            (click)="selectGooglePlace(p)"
+          >
+            <md-icon class="text-[var(--md-sys-color-on-surface-variant)]">location_on</md-icon>
+            <div class="min-w-0 flex-1">
+              <div class="font-medium text-sm text-[var(--md-sys-color-on-surface)] truncate">{{ p.name }}</div>
+              <div class="text-xs text-[var(--md-sys-color-on-surface-variant)] truncate">{{ p.address }}</div>
+            </div>
+          </button>
+        }
+      }
+    </div>
+  }
+</div>
