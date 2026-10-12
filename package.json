@@ -127,6 +127,7 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "qrcode": "^1.5.4",
+    "quill": "^2.0.3",
     "razorpay": "^2.9.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

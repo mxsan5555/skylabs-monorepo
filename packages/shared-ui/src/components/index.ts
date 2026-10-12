@@ -13,3 +13,4 @@ export type { SkyColor, SkyVariant, SkyShape, SkyIconStyle } from './m3-surface.
 export * from './sky-image/sky-image.js';
 export * from './sky-tile-card/sky-tile-card.js';
 export * from './sky-feature-card/sky-feature-card.js';
+export * from './sky-snackbar/sky-snackbar.js';
