@@ -1,6 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
 import type { WebsitePage } from '../../../../api/rbac/website-pages';
 
 let grantedPermissions: Set<string>;
@@ -40,9 +39,7 @@ const PAGE: WebsitePage = {
 
 function renderList() {
   return render(
-    <ToastProvider>
-      <LegalPagesList />
-    </ToastProvider>,
+    <LegalPagesList />
   );
 }
 

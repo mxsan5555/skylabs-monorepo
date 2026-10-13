@@ -9,7 +9,7 @@ import {
   type VendorCategoryAccessRow,
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 
 interface VendorProductCategoryAccessProps {
   token: string | null;
@@ -38,7 +38,6 @@ interface VendorProductCategoryAccessProps {
  * backing every branch's own category mapping.
  */
 export function VendorProductCategoryAccess({ token, vendorId, isSelf, vendor, access, onSaved }: VendorProductCategoryAccessProps) {
-  const { showToast } = useToast();
   const [offersProduct, setOffersProduct] = useState(vendor.offersProduct);
   // Every currently-granted category id, of EVERY type (Service/Therapy included) — only the
   // PRODUCT-type ones are ever rendered/toggled below; the rest ride along untouched in the
@@ -100,7 +99,7 @@ export function VendorProductCategoryAccess({ token, vendorId, isSelf, vendor, a
       const { data } = isSelf
         ? await setMyVendorModulesAndCategoryAccess(token, input)
         : await setVendorModulesAndCategoryAccess(token, vendorId, input);
-      showToast('Product categories saved successfully');
+      showSnackbar('Product categories saved successfully', { variant: 'success' });
       onSaved({ ...vendor, offersProduct }, data);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not save product categories.');

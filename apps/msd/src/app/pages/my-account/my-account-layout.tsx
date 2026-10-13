@@ -4,7 +4,7 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { AccountProvider } from '../../../account/account-context';
 import { isDualRoleUser, setExperienceMode } from '../../../auth/role-routing';
 import './my-account.css';
-import { useToast } from '../../../toast/toast-context';
+import { showSnackbar } from '../../../snackbar/snackbar';
 import { Breadcrumb } from '../../components/breadcrumb';
 interface NavItem {
   to: string;
@@ -52,11 +52,10 @@ const currentPage = breadcrumbLabels[location.pathname] ?? 'My Account';
     setExperienceMode('vendor');
   };
 
-  const { showToast } = useToast();
 
   const handleLogout = () => {
     signOut();
-    showToast('You have been logged out successfully.', 'success');
+    showSnackbar('You have been logged out successfully.', { variant: 'success' });
   };
 
   return (

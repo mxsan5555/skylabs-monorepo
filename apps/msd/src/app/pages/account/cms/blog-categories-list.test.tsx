@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 import type { BlogCategory } from '../../../../api/rbac/blog-categories';
 
 let grantedPermissions: Set<string>;
@@ -43,9 +43,10 @@ const CATEGORY: BlogCategory = {
 
 function renderList() {
   return render(
-    <ToastProvider>
+    <>
       <BlogCategoriesList />
-    </ToastProvider>,
+      <SnackbarHost />
+    </>,
   );
 }
 

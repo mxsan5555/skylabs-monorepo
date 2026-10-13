@@ -7,6 +7,7 @@ import { ApiRequestError } from '../../../api/rbac/client';
 import { listMyOrders } from '../../../api/orders';
 import type { Order } from '../../../api/orders';
 import { validateEmail } from '../../../utils/validation';
+import { showSnackbar } from '../../../snackbar/snackbar';
 import content from '../../../content.json';
 
 type AddressDraft = {
@@ -41,7 +42,6 @@ export function ProfileForm() {
   const [originalAddress, setOriginalAddress] = useState<AddressDraft>(EMPTY_ADDRESS);
   const dialogRef = useRef<HTMLElement & { show: () => void; close: () => void }>(null);
   const addressDialogRef = useRef<HTMLElement & { show: () => void; close: () => void }>(null)
-  const snackbarRef = useRef<HTMLElement & { show: (message: string) => void }>(null);
   useEffect(() => {
     let cancelled = false;
     async function loadProfile() {
@@ -151,7 +151,7 @@ export function ProfileForm() {
       setOriginalName(updatedName);
       setOriginalEmail(updatedEmail);
       dialogRef.current?.close();
-      snackbarRef.current?.show('Your profile was updated successfully.',);
+      showSnackbar('Your profile was updated successfully.', { variant: 'success' });
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not save your profile.',);
     } finally { setSaving(false); }
@@ -175,7 +175,7 @@ export function ProfileForm() {
       setOriginalAddress(updatedAddress);
       setShippingOrder((previous) => previous ? { ...previous, ...updatedAddress } : previous,);
       addressDialogRef.current?.close();
-      snackbarRef.current?.show('Address updated successfully.',);
+      showSnackbar('Address updated successfully.', { variant: 'success' });
     } finally { setAddressSaving(false); }
   };
   return (
@@ -278,12 +278,6 @@ export function ProfileForm() {
               </TextButton>
             </div>
           </Dialog>
-          <sky-snackbar ref={snackbarRef as React.RefObject<HTMLElement>}
-            duration={4000}
-            variant="success"
-            role="status"
-            aria-live="polite"
-          />
         </>
       )}
     </>

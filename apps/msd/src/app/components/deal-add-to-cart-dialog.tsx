@@ -9,7 +9,7 @@ import { useDealPurchaseSelection } from '../../hooks/use-deal-purchase-selectio
 import { DurationPackageSelector } from './duration-package-selector';
 import './duration-package-selector.css';
 import { formatINR } from '../../utils/format';
-import type { SkySnackbar } from '@skylabs-monorepo/shared-ui';
+import { showSnackbar } from '../../snackbar/snackbar';
 /**
  * THE canonical "Add to Cart" dialog for a service Deal — used by every purchase entry point
  * that shows a compact modal instead of a full page (deal detail, category browse, search).
@@ -28,7 +28,6 @@ export function DealAddToCartDialog({ deal, renderTrigger, onAdded, }: {
 }) {
   const { token, isAuthenticated } = useAuth();
   const dialogRef = useRef<MdDialog>(null);
-  const snackbarRef = useRef<SkySnackbar>(null);
   const [qty] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -60,13 +59,7 @@ const submit = async () => {
 
     const label = `${deal.title} — ${activePackage.durationMinutes} Minutes`;
 
-    if (snackbarRef.current) {
-      snackbarRef.current.variant = 'success';
-      snackbarRef.current.closable = false;
-      snackbarRef.current.actionLabel = undefined;
-      snackbarRef.current.duration = 4000;
-      snackbarRef.current.show(`Added to cart: ${label}`);
-    }
+    showSnackbar(`Added to cart: ${label}`, { variant: 'success' });
 
     onAdded?.(label);
   } catch (err) {
@@ -77,13 +70,7 @@ const submit = async () => {
 
     setError(message);
 
-    if (snackbarRef.current) {
-      snackbarRef.current.variant = 'error';
-      snackbarRef.current.closable = true;
-      snackbarRef.current.actionLabel = undefined;
-      snackbarRef.current.duration = 4000;
-      snackbarRef.current.show(message);
-    }
+    showSnackbar(message, { variant: 'error' });
   } finally {
     setSubmitting(false);
   }
@@ -92,12 +79,6 @@ const submit = async () => {
   return (
     <>
       {renderTrigger(open)}
-      <sky-snackbar
-        ref={snackbarRef}
-        duration={4000}
-        role="status"
-        aria-live="polite"
-      />
       <Dialog ref={dialogRef}>
         <div slot="headline">{name}</div>
         <div slot="content" className="form-grid">

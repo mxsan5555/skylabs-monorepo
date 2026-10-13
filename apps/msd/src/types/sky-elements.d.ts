@@ -214,6 +214,7 @@ declare module 'react' {
         /** Attribute form of `actionLabel`; survives server rendering / prerendering. */
         'action-label'?: string;
         closable?: boolean;
+        'close-label'?: string;
         duration?: number;
         icon?: string;
         open?: boolean;

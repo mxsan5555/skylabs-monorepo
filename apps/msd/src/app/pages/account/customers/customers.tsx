@@ -4,13 +4,13 @@ import { Tabs, PrimaryTab } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listCustomers, getCustomer, setCustomerStatus, type Customer, type CustomerStatus } from '../../../../api/rbac/customers';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { CustomerList, customerStatusLabel } from './customer-list';
 import { CustomerDetailOrders } from './customer-detail-orders';
 
-/** Confirm-dialog + success-toast copy per status-change target — mirrors `blog-list.tsx`'s
- *  `toggleStatus`/`remove` pattern (themed confirm dialog, then showToast on resolve). */
+/** Confirm-dialog + success-snackbar copy per status-change target — mirrors `blog-list.tsx`'s
+ *  `toggleStatus`/`remove` pattern (themed confirm dialog, then showSnackbar on resolve). */
 const STATUS_CONFIRM_COPY: Record<CustomerStatus, string> = {
   active: 'Are you sure you want to activate this customer?',
   inactive: 'Are you sure you want to deactivate this customer?',
@@ -45,7 +45,6 @@ const CUSTOMER_DETAIL_TABS = ['Overview', 'Orders'] as const;
 export function CustomerManagement() {
   const { token, can } = useAuth();
   const canChangeStatus = can('customers', 'status_change');
-  const { showToast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const [searchParams] = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -121,14 +120,14 @@ export function CustomerManagement() {
         const { data } = await setCustomerStatus(token, id, status);
         setCustomers((prev) => prev.map((c) => (c.id === data.id ? data : c)));
         setSelectedCustomer((prev) => (prev && prev.id === data.id ? data : prev));
-        showToast(STATUS_SUCCESS_COPY[status]);
+        showSnackbar(STATUS_SUCCESS_COPY[status], { variant: 'success' });
       } catch (err) {
         const msg = err instanceof ApiRequestError ? err.message : 'Could not change customer status.';
         setStatusError(msg);
-        showToast(msg, 'error');
+        showSnackbar(msg, { variant: 'error' });
       }
     },
-    [token, showToast, confirm],
+    [token, confirm],
   );
 
   const memoParams = useMemo(() => params, [params]);

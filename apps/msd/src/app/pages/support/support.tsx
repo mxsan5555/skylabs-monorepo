@@ -1,6 +1,6 @@
 import { OutlinedButton, Icon, OutlinedTextField, } from '@skylabs-monorepo/shared-ui/react';
 import './support.css';
-import { useToast } from '../../../toast/toast-context';
+import { showSnackbar } from '../../../snackbar/snackbar';
 import { useState } from 'react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { ApiRequestError } from '../../../api/rbac/client';
@@ -8,7 +8,6 @@ import { createCustomerSupport } from '../../../api/support';
 import { Breadcrumb } from '../../components/breadcrumb';
 export function Support() {
     const { token } = useAuth();
-    const { showToast } = useToast();
     const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
@@ -17,7 +16,7 @@ export function Support() {
     const handleSubmit = async () => {
         setErrorMessage('');
         if (!subject.trim() || !message.trim()) {
-            showToast('Please enter both subject and message.', 'error');
+            showSnackbar('Please enter both subject and message.', { variant: 'error' });
             return;
         }
         setLoading(true);
@@ -27,9 +26,9 @@ export function Support() {
             });
             setSubject('');
             setMessage('');
-            showToast('Your support request has been submitted successfully.', 'success',);
+            showSnackbar('Your support request has been submitted successfully.', { variant: 'success' });
         } catch (error: unknown) {
-            showToast(error instanceof ApiRequestError ? error.message : 'Unable to submit your support request. Please try again.', 'error',);
+            showSnackbar(error instanceof ApiRequestError ? error.message : 'Unable to submit your support request. Please try again.', { variant: 'error' });
         } finally { setLoading(false); }
     };
     return (

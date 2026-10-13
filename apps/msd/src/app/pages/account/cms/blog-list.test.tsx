@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 import type { BlogPost } from '../../../../api/rbac/blog-posts';
 
 let grantedPermissions: Set<string>;
@@ -81,11 +81,12 @@ const POST: BlogPost = {
 
 function renderList() {
   return render(
-    <ToastProvider>
+    <>
       <MemoryRouter>
         <BlogList />
       </MemoryRouter>
-    </ToastProvider>,
+      <SnackbarHost />
+    </>,
   );
 }
 

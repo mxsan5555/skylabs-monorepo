@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
 import { FilledButton, Icon, OutlinedButton, OutlinedIconButton } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import type { SkySnackbar } from '@skylabs-monorepo/shared-ui';
+import { showSnackbar } from '../../../snackbar/snackbar';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import { addCartItem } from '../../../api/cart';
@@ -58,7 +58,6 @@ export function DealDetail() {
   const [copied, setCopied] = useState(false);
   const [related, setRelated] = useState<CatalogDeal[]>([]);
   const [activeImg, setActiveImg] = useState(0);
-  const snackbarRef = useRef<SkySnackbar>(null);
   const [actionError, setActionError] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [vendorBranch, setVendorBranch] = useState<CatalogVendorBranch | null>(null);
@@ -194,15 +193,11 @@ export function DealDetail() {
         quantity,
       });
 
-const el = snackbarRef.current;
-
-if (el) {
-  el.variant = 'info';
-  el.closable = false;
-  el.actionLabel = 'View Cart';
-  el.duration = 4000;
-  el.show(`Added "${deal.title}" to your cart.`);
-}
+showSnackbar(`Added "${deal.title}" to your cart.`, {
+        variant: 'info',
+        actionLabel: 'View Cart',
+        onAction: () => navigate('/cart'),
+      });
     } catch (err) {
       const message =
         err instanceof ApiRequestError
@@ -211,14 +206,7 @@ if (el) {
 
       setActionError(message);
 
-      const el = snackbarRef.current;
-      if (!el) return;
-
-      el.variant = 'error';
-      el.closable = true;
-      el.actionLabel = undefined;
-      el.duration = 4000;
-      el.show(message);
+      showSnackbar(message, { variant: 'error' });
     }
 
   }
@@ -233,15 +221,6 @@ if (el) {
   }
   return (
     <div className="deal-detail">
-     
-<sky-snackbar
-  ref={snackbarRef as React.RefObject<HTMLElement>}
-  duration={4000}
-  onsky-action={() => navigate('/cart')}
-  onsky-closed={(e) => {
-    console.log('Snackbar closed:', e.detail.reason);
-  }}
-/>
 
       <title>{`${name} – ${deal.vendor?.businessName ?? 'MSD'} | MSD`}</title>
       <meta

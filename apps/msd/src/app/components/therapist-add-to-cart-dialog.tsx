@@ -9,7 +9,7 @@ import { useTherapistPurchaseSelection } from '../../hooks/use-therapist-purchas
 import { TherapistPackageSelector } from './therapist-package-selector';
 import './duration-package-selector.css';
 import { formatINR } from '../../utils/format';
-import { useToast } from '../../toast/toast-context';
+import { showSnackbar } from '../../snackbar/snackbar';
 
 /**
  * THE canonical "Add to Cart" dialog for a Therapist purchased directly — no Deal involved at
@@ -29,7 +29,6 @@ export function TherapistAddToCartDialog({
 }) {
   const { token, isAuthenticated } = useAuth();
   const dialogRef = useRef<MdDialog>(null);
-  const { showToast } = useToast();
 
   const [qty] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -60,12 +59,12 @@ export function TherapistAddToCartDialog({
       dialogRef.current?.close();
       // Only fires after the API call above has actually resolved — never claims success early.
       const label = `${therapist.therapistType} — ${therapist.personName} — ${activePackage.durationMinutes} Minutes`;
-      showToast(`Added to cart\n${label}`);
+      showSnackbar(`Added to cart: ${label}`, { variant: 'success' });
       onAdded?.(label);
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setError(message);
-      showToast(message, 'error');
+      showSnackbar(message, { variant: 'error' });
     } finally {
       setSubmitting(false);
     }

@@ -1,6 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
 import type { DashboardWidgetRecord, PermissionCatalogRow, Role, RoleWidgetRow } from '../../../../api/rbac/roles';
 
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
@@ -100,9 +99,7 @@ beforeEach(() => {
 
 function renderRoles() {
   return render(
-    <ToastProvider>
-      <RoleManagement />
-    </ToastProvider>,
+    <RoleManagement />
   );
 }
 

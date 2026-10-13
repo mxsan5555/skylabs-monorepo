@@ -43,7 +43,7 @@ import {
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { MediaUploader } from '../../../components/media-uploader';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { STATES, citiesForState } from '../../../../data/india-locations';
 
 interface VendorBranchesProps {
@@ -572,7 +572,6 @@ export function BranchDialog({
 }) {
   const internalDialogRef = useRef<MdDialog>(null);
   const dialogRef = externalDialogRef ?? internalDialogRef;
-  const { showToast } = useToast();
   const [form, setForm] = useState({
     name: branch?.name ?? '',
     address: branch?.address ?? '',
@@ -708,12 +707,12 @@ export function BranchDialog({
           const message = categoryErr instanceof ApiRequestError ? categoryErr.message : 'Could not save categories.';
           const combined = `Branch saved, but categories could not be saved: ${message}`;
           setError(combined);
-          showToast(combined, 'error');
+          showSnackbar(combined, { variant: 'error' });
           return; // keep the dialog open so the admin can retry the category save
         }
       }
 
-      showToast(branch ? 'Branch updated successfully.' : 'Branch created successfully.');
+      showSnackbar(branch ? 'Branch updated successfully.' : 'Branch created successfully.', { variant: 'success' });
       dialogRef.current?.close();
     } catch (err) {
       if (err instanceof ApiRequestError && err.code === 'VALIDATION_ERROR') {
@@ -947,7 +946,6 @@ export function DealDialog({
 }) {
   const internalDialogRef = useRef<MdDialog>(null);
   const dialogRef = externalDialogRef ?? internalDialogRef;
-  const { showToast } = useToast();
   // Checked/set synchronously at the very top of submit(), before any await — a `submitting`
   // state guard alone can't stop a second click/tap/Enter that fires before React commits the
   // disabling re-render (same gap already fixed this session for TherapistFormDialog/
@@ -1126,7 +1124,7 @@ export function DealDialog({
       // never for a failed request (see the catch block below, which shows an inline error
       // instead); `submittingRef`/`saveButtonRef` above already guard against a double-submit
       // firing this twice.
-      showToast(`Deal ${deal ? 'updated' : 'created'} successfully`);
+      showSnackbar(`Deal ${deal ? 'updated' : 'created'} successfully`, { variant: 'success' });
       if (!deal && result) {
         // A fresh create — keep the dialog open so MediaUploader can flush any staged photos/
         // video against the new id; an edit's dialog closes immediately as before, since

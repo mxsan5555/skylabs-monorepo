@@ -2,7 +2,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { CatalogCategoryWithChildren, CatalogDeal, CatalogLocation } from '../../../api/catalog';
-import { ToastProvider } from '../../../toast/toast-context';
 
 const listCatalogCategoriesMock = vi.fn();
 const listCatalogDealsMock = vi.fn();
@@ -70,21 +69,19 @@ function LocationBar() {
 
 function renderSearch(initialEntries: string[] = ['/explore']) {
   return render(
-    <ToastProvider>
-      <MemoryRouter initialEntries={initialEntries}>
-        <Routes>
-          <Route
-            path="/explore"
-            element={
-              <>
-                <LocationBar />
-                <Search />
-              </>
-            }
-          />
-        </Routes>
-      </MemoryRouter>
-    </ToastProvider>,
+    <MemoryRouter initialEntries={initialEntries}>
+      <Routes>
+        <Route
+          path="/explore"
+          element={
+            <>
+              <LocationBar />
+              <Search />
+            </>
+          }
+        />
+      </Routes>
+    </MemoryRouter>
   );
 }
 
@@ -201,22 +198,20 @@ describe('Search — location filter URL sync', () => {
       );
     }
     render(
-      <ToastProvider>
-        <MemoryRouter initialEntries={['/explore?state=Maharashtra&city=Mumbai']}>
-          <Routes>
-            <Route
-              path="/explore"
-              element={
-                <>
-                  <LocationBar />
-                  <Search />
-                  <NavBackHelper />
-                </>
-              }
-            />
-          </Routes>
-        </MemoryRouter>
-      </ToastProvider>,
+      <MemoryRouter initialEntries={['/explore?state=Maharashtra&city=Mumbai']}>
+        <Routes>
+          <Route
+            path="/explore"
+            element={
+              <>
+                <LocationBar />
+                <Search />
+                <NavBackHelper />
+              </>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
     );
     await waitFor(() =>
       expect(listCatalogDealsMock).toHaveBeenCalledWith(expect.objectContaining({ state: 'Maharashtra', city: 'Mumbai' })),
@@ -243,14 +238,12 @@ describe('Search — location filter URL sync', () => {
 describe('Search — Add to Cart while logged out preserves the return destination', () => {
   function renderSearchWithSignInRoute(initialEntries: string[]) {
     return render(
-      <ToastProvider>
-        <MemoryRouter initialEntries={initialEntries}>
-          <Routes>
-            <Route path="/explore" element={<><LocationBar /><Search /></>} />
-            <Route path="/sign-in" element={<LocationBar />} />
-          </Routes>
-        </MemoryRouter>
-      </ToastProvider>,
+      <MemoryRouter initialEntries={initialEntries}>
+        <Routes>
+          <Route path="/explore" element={<><LocationBar /><Search /></>} />
+          <Route path="/sign-in" element={<LocationBar />} />
+        </Routes>
+      </MemoryRouter>
     );
   }
 

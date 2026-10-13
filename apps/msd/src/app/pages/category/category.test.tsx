@@ -6,7 +6,6 @@ import type { CatalogShellValue } from '../../../catalog/catalog-shell';
 import content from '../../../content.json';
 import { Category } from './category';
 import { PrerenderDataProvider, categoryDataKey, type PrerenderPayload } from '../../../prerender-data/prerender-data';
-import { ToastProvider } from '../../../toast/toast-context';
 import { ApiRequestError } from '../../../api/rbac/client';
 
 const {
@@ -109,14 +108,12 @@ function LocationBar() {
 
 const renderAt = (path: string) =>
   render(
-    <ToastProvider>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/category/:slug" element={<><Category /><LocationBar /></>} />
-          <Route path="/category/:slug/:city" element={<><Category /><LocationBar /></>} />
-        </Routes>
-      </MemoryRouter>
-    </ToastProvider>,
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/category/:slug" element={<><Category /><LocationBar /></>} />
+        <Route path="/category/:slug/:city" element={<><Category /><LocationBar /></>} />
+      </Routes>
+    </MemoryRouter>
   );
 
 const canonical = () => document.head.querySelector('link[rel="canonical"]')?.getAttribute('href');
@@ -328,14 +325,12 @@ describe('Category page with prerendered data', () => {
   const renderWith = (path: string, payload: PrerenderPayload) =>
     render(
       <PrerenderDataProvider payload={payload}>
-        <ToastProvider>
-          <MemoryRouter initialEntries={[path]}>
-            <Routes>
-              <Route path="/category/:slug" element={<Category />} />
-              <Route path="/category/:slug/:city" element={<Category />} />
-            </Routes>
-          </MemoryRouter>
-        </ToastProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path="/category/:slug" element={<Category />} />
+            <Route path="/category/:slug/:city" element={<Category />} />
+          </Routes>
+        </MemoryRouter>
       </PrerenderDataProvider>,
     );
   const countText = () =>

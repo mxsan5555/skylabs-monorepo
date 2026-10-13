@@ -4,7 +4,7 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getAboutUs, updateAboutUs, type AboutUsContent, type AboutUsInput } from '../../../../api/rbac/site-content';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { MediaUploader } from '../../../components/media-uploader';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { BlogBlockEditor, sanitizeBlogBlocks } from './blog-block-editor';
 import { extractSiteContentFieldErrors } from './field-errors';
 
@@ -24,12 +24,11 @@ const EMPTY_FORM: AboutUsInput = {
  * `updateAboutUs` upserts server-side). Reuses `BlogBlockEditor` for the `body` field (same
  * `BlogBlock[]` shape as a Blog Post's body) and `MediaUploader entityType="about-us"` for the
  * hero image. Mirrors `categories.tsx`'s `submittingRef` double-submit guard and
- * `useToast()`/per-field-error conventions established across this CMS module.
+ * `showSnackbar()`/per-field-error conventions established across this CMS module.
  */
 export function AboutUsPage() {
   const { token, can } = useAuth();
   const canEdit = can('cms.about-us', 'edit');
-  const { showToast } = useToast();
 
   const [aboutUs, setAboutUs] = useState<AboutUsContent | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,7 +78,7 @@ export function AboutUsPage() {
     try {
       const { data } = await updateAboutUs(token, payload);
       setAboutUs(data);
-      showToast('About Us content saved.');
+      showSnackbar('About Us content saved.', { variant: 'success' });
     } catch (err) {
       const fields = extractSiteContentFieldErrors<AboutUsFieldKey>(err);
       if (fields) {
@@ -88,7 +87,7 @@ export function AboutUsPage() {
       } else {
         const msg = err instanceof ApiRequestError ? err.message : 'Could not save About Us content.';
         setError(msg);
-        showToast(msg, 'error');
+        showSnackbar(msg, { variant: 'error' });
       }
     } finally {
       submittingRef.current = false;

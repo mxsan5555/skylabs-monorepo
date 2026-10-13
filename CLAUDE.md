@@ -174,6 +174,7 @@ coordinates the deal list is ranked in memory (`services/deal-ranking.ts`).
 - **Pages live in each app**, never as shared web components. Reuse happens at the component level (`shared-ui`) and as app-local logic. Compose pages from `shared-ui` pieces.
 - **shared-ui stays app-neutral.** Add only components both apps could use; app layout components (bands, grids, toolbars, filter panels) go in that app's `components/`. A new option on a shared component must leave its default rendering unchanged.
 - **No page CSS on storefront pages**: compose `PageSection`, `SectionHead`, `CardGrid` and friends (see "msd storefront"). Colour through M3 roles only, following the 60/30/10 split.
+- **Notifications (msd)**: one `<sky-snackbar>` mounted in `app.tsx` (`SnackbarHost`); screens call `showSnackbar(message, { variant })` from `apps/msd/src/snackbar/snackbar.tsx` after the action resolved. No React toast, no per-page snackbar element. Unit tests that assert snackbar copy render `<SnackbarHost />` next to the page.
 - Each app owns its **routing, layouts, auth, api client, and models** (logic is app-local, not shared between apps).
 - **Accessibility** (WCAG 2.2 AA): semantic landmarks (`<main>`, `<header>`, `<nav>`), labelled controls, `aria-hidden` on decorative icons, `autocomplete` hints on inputs, keyboard-navigable.
 - **SEO**: per-route `<title>` (React 19 hoists `<title>`/`<meta>`; Angular uses the route `title`), default `<meta name="description">` in each `index.html`, `noindex` on auth pages.

@@ -300,7 +300,7 @@ interface VendorProfileFormProps {
   /** Set by the parent after a failed save whose 422 response carried per-field messages (see
    *  `extractVendorFieldErrors`) — merged into this form's own `errors` state so a field the
    *  frontend's own `FIELD_VALIDATORS` missed still gets a correct inline error instead of only
-   *  a generic top-level toast. */
+   *  a generic top-level snackbar. */
   serverFieldErrors?: VendorFieldErrors | null;
 
   /** Self-service (`/vendors/me/kyc-documents/...`) vs. admin-on-behalf

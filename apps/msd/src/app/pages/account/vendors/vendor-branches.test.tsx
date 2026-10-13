@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 import type { BranchCategoryAccessRow, Category, Deal, Branch } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 
@@ -50,7 +50,7 @@ import { DealDialog, BranchDialog } from './vendor-branches';
  * NOTE: like `categories.test.tsx`'s suite, live select-interaction can't be simulated under this
  * jsdom + `@lit/react` + React 19 combination (documented in `search.test.tsx`), so this suite
  * verifies via each dialog's already-resolved initial state rather than driving a live pick or a
- * full submit — the toast wording change (`Deal created/updated successfully`) is a one-line
+ * full submit — the snackbar wording change (`Deal created/updated successfully`) is a one-line
  * string change verified by direct code review + manual/live testing, not re-asserted here.
  */
 
@@ -128,9 +128,10 @@ beforeEach(() => {
 
 function renderDialog(deal?: Deal) {
   return render(
-    <ToastProvider>
+    <>
       <DealDialog categories={CATEGORIES} products={[]} token="tok" vendorId="vendor-1" fixedBranchId="branch-1" deal={deal} onSave={async () => undefined} />
-    </ToastProvider>,
+      <SnackbarHost />
+    </>,
   );
 }
 
@@ -196,9 +197,10 @@ describe('DealDialog — Deal is a pure service offering (no Product concept)', 
 
   it('self-service (isSelf) fetches the branch mapping via getMyBranchCategoryAccess, never the admin-scoped function', async () => {
     render(
-      <ToastProvider>
+      <>
         <DealDialog categories={CATEGORIES} products={[]} token="tok" vendorId="vendor-1" isSelf fixedBranchId="branch-1" onSave={async () => undefined} />
-      </ToastProvider>,
+        <SnackbarHost />
+      </>,
     );
     await waitFor(() => expect(getMyBranchCategoryAccessMock).toHaveBeenCalledWith('tok', 'branch-1'));
     expect(getBranchCategoryAccessMock).not.toHaveBeenCalled();
@@ -214,9 +216,10 @@ describe('DealDialog — Deal is a pure service offering (no Product concept)', 
     getBranchCategoryAccessMock.mockClear();
 
     rerender(
-      <ToastProvider>
+      <>
         <DealDialog categories={CATEGORIES} products={[]} token="tok" vendorId="vendor-1" fixedBranchId="branch-2" onSave={async () => undefined} />
-      </ToastProvider>,
+        <SnackbarHost />
+      </>,
     );
     await waitFor(() => expect(getBranchCategoryAccessMock).toHaveBeenCalledWith('tok', 'vendor-1', 'branch-2'));
   });
@@ -257,9 +260,10 @@ const BRANCH_WITH_LOCATION: Branch = {
 
 function renderBranchDialog(props: Partial<React.ComponentProps<typeof BranchDialog>> = {}) {
   return render(
-    <ToastProvider>
+    <>
       <BranchDialog token="tok" vendorId="vendor-1" onSave={vi.fn().mockResolvedValue(BRANCH_WITH_LOCATION)} {...props} />
-    </ToastProvider>,
+      <SnackbarHost />
+    </>,
   );
 }
 
@@ -640,9 +644,9 @@ describe('BranchDialog — Categories & Subcategories', () => {
     fireEvent.click(findSaveButton());
 
     await waitFor(() => expect(onSave).toHaveBeenCalled());
-    // Both the inline `role="alert"` banner AND a toast fire with the same combined message (same
+    // Both the inline `role="alert"` banner AND a snackbar fire with the same combined message (same
     // dual convention as this dialog's own mapLocationUrl error handling) — assert via the alert
-    // role specifically, since the message text also appears a second time inside the toast.
+    // role specifically, since the message text also appears a second time inside the snackbar.
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Branch saved, but categories could not be saved: Category is not a Service or Therapy category',
     );
@@ -668,7 +672,7 @@ describe('BranchDialog — Categories & Subcategories', () => {
     function Harness() {
       const dialogRef = useRef<MdDialog>(null);
       return (
-        <ToastProvider>
+        <>
           <BranchDialog
             branch={BRANCH_WITH_LOCATION}
             token="tok"
@@ -677,7 +681,8 @@ describe('BranchDialog — Categories & Subcategories', () => {
             dialogRef={dialogRef}
             hideTrigger
           />
-        </ToastProvider>
+          <SnackbarHost />
+        </>
       );
     }
     render(<Harness />);

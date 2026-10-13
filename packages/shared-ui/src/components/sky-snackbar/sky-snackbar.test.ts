@@ -1,6 +1,6 @@
 import { installMaterialJsdomPolyfills } from '../../testing/index.js';
 import './sky-snackbar.js';
-import { SkySnackbar, type SkySnackbarVariant } from './sky-snackbar.js';
+import { SkySnackbar, SKY_SNACKBAR_DEFAULT_DURATION, type SkySnackbarVariant } from './sky-snackbar.js';
 
 installMaterialJsdomPolyfills();
 
@@ -23,8 +23,14 @@ describe('sky-snackbar', () => {
     const el = await create();
     expect(el.variant).toBe('neutral');
     expect(el.open).toBe(false);
-    expect(el.duration).toBe(4000);
+    expect(el.duration).toBe(SKY_SNACKBAR_DEFAULT_DURATION);
     expect(el.closable).toBe(false);
+  });
+
+  it('labels the close button from closeLabel', async () => {
+    const el = await create({ closable: true, closeLabel: 'Close message' });
+    const btn = el.shadowRoot?.querySelector('.close');
+    expect(btn?.getAttribute('aria-label')).toBe('Close message');
   });
 
   it('show() opens it and hide() closes it, reflecting the open attribute', async () => {

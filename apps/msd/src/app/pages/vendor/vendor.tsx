@@ -16,7 +16,7 @@ import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selec
 import { useTherapistPurchaseSelection } from '../../../hooks/use-therapist-purchase-selection';
 import { formatINR, pluralize, formatTime12h } from '../../../utils/format';
 import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
-import { useToast } from '../../../toast/toast-context';
+import { showSnackbar } from '../../../snackbar/snackbar';
 import './vendor.css';
 import content from '../../../content.json';
 
@@ -148,7 +148,6 @@ export function VendorPage() {
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   const { has: isWishlisted, toggle: toggleWishlist, isPending: wishlistPending } = useWishlist();
-  const { showToast } = useToast();
 
   const { coords } = useCurrentLocation();
 
@@ -287,11 +286,11 @@ export function VendorPage() {
     try {
       await addCartItem(token, { productId: product.id, quantity: 1 });
       setProductActionMessage(`Added "${product.name}" to your cart.`);
-      showToast(`Added to cart\n${product.name}`);
+      showSnackbar(`Added to cart: ${product.name}`, { variant: 'success' });
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setProductActionError(message);
-      showToast(message, 'error');
+      showSnackbar(message, { variant: 'error' });
     }
   };
 
@@ -740,7 +739,6 @@ function DealSelectionPanel({
   requireAuthOrRedirect: () => boolean;
 }) {
   const { token } = useAuth();
-  const { showToast } = useToast();
   const selection = useDealPurchaseSelection(group.deal);
   const { activePackage, unitPrice, missingSelection } = selection;
 
@@ -770,11 +768,11 @@ function DealSelectionPanel({
       const durationLabel = ` — ${activePackage.durationMinutes} Minutes`;
       setActionMessage(`Added "${group.name}" to your cart.`);
       // Only fires after the API call above has actually resolved — never claims success early.
-      showToast(`Added to cart\n${group.name}${durationLabel}`);
+      showSnackbar(`Added to cart: ${group.name}${durationLabel}`, { variant: 'success' });
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setActionError(message);
-      showToast(message, 'error');
+      showSnackbar(message, { variant: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -886,7 +884,6 @@ function TherapistSelectionPanel({
   requireAuthOrRedirect: () => boolean;
 }) {
   const { token } = useAuth();
-  const { showToast } = useToast();
   const selection = useTherapistPurchaseSelection(therapist.packages);
   const { activePackage, unitPrice, missingSelection } = selection;
 
@@ -917,11 +914,11 @@ function TherapistSelectionPanel({
       setActionMessage(`Added "${displayName}" to your cart.`);
       // Only fires after the API call above has actually resolved — never claims success early.
       const label = `${therapist.personName} — ${activePackage.durationMinutes} Minutes`;
-      showToast(`Added to cart\n${label}`);
+      showSnackbar(`Added to cart: ${label}`, { variant: 'success' });
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setActionError(message);
-      showToast(message, 'error');
+      showSnackbar(message, { variant: 'error' });
     } finally {
       setSubmitting(false);
     }

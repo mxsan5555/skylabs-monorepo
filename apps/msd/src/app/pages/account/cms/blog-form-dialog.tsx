@@ -6,7 +6,7 @@ import { ApiRequestError } from '../../../../api/rbac/client';
 import type { BlogPost, BlogPostInput } from '../../../../api/rbac/blog-posts';
 import type { BlogCategory } from '../../../../api/rbac/blog-categories';
 import { MediaUploader } from '../../../components/media-uploader';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { BlogBlockEditor, sanitizeBlogBlocks } from './blog-block-editor';
 import { extractBlogPostFieldErrors, type BlogPostFieldKey } from './field-errors';
 
@@ -35,7 +35,6 @@ export function BlogFormDialog({
   onSave: (input: BlogPostInput) => Promise<BlogPost | void>;
   onClose?: () => void;
 }) {
-  const { showToast } = useToast();
   const [form, setForm] = useState<BlogPostInput>({
     title: post?.title ?? '',
     slug: post?.slug ?? '',
@@ -88,7 +87,7 @@ export function BlogFormDialog({
     };
     try {
       const result = await onSave(payload);
-      showToast(post ? 'Blog post updated.' : 'Blog post created.');
+      showSnackbar(post ? 'Blog post updated.' : 'Blog post created.', { variant: 'success' });
       if (!post && result) {
         // A fresh create — keep the dialog open so MediaUploader can flush any staged cover
         // photo against the new id (same pattern as CategoryFormDialog's `savedCategory`).
@@ -104,7 +103,7 @@ export function BlogFormDialog({
       } else {
         const msg = err instanceof ApiRequestError ? err.message : 'Could not save blog post.';
         setError(msg);
-        showToast(msg, 'error');
+        showSnackbar(msg, { variant: 'error' });
       }
     } finally {
       submittingRef.current = false;

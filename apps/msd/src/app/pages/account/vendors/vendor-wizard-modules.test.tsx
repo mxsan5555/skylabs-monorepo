@@ -1,6 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
 import type { Category, Vendor, VendorCategoryAccessRow } from '../../../../api/rbac/vendors';
 
 const listCategoriesMock = vi.fn();
@@ -63,9 +62,7 @@ function baseVendor(overrides: Partial<Vendor> = {}): Vendor {
 function renderModules(vendor: Vendor, access: VendorCategoryAccessRow[] = []) {
   const onSaved = vi.fn();
   render(
-    <ToastProvider>
-      <VendorProductCategoryAccess token="tok" vendorId={vendor.id} isSelf={false} vendor={vendor} access={access} onSaved={onSaved} />
-    </ToastProvider>,
+    <VendorProductCategoryAccess token="tok" vendorId={vendor.id} isSelf={false} vendor={vendor} access={access} onSaved={onSaved} />
   );
   return { onSaved };
 }
@@ -195,9 +192,7 @@ describe('VendorProductCategoryAccess — Product-only scope', () => {
     setMyVendorModulesAndCategoryAccessMock.mockResolvedValue({ data: [] });
     const vendor = baseVendor({ offersProduct: true });
     render(
-      <ToastProvider>
-        <VendorProductCategoryAccess token="tok" vendorId={vendor.id} isSelf vendor={vendor} access={[]} onSaved={vi.fn()} />
-      </ToastProvider>,
+      <VendorProductCategoryAccess token="tok" vendorId={vendor.id} isSelf vendor={vendor} access={[]} onSaved={vi.fn()} />
     );
     await waitFor(() => expect(screen.getByText('Oils')).toBeTruthy());
     fireEvent.click(findSaveButton());

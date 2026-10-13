@@ -3,7 +3,7 @@ import { FilledButton, Icon, OutlinedButton, OutlinedTextField } from '@skylabs-
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { getContactUs, updateContactUs, type ContactUsContent, type ContactUsInput, type SocialLink, } from '../../../../api/rbac/site-content';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { extractSiteContentFieldErrors } from './field-errors';
 import content from '../../../../content.json';
 import { validateEmail, validatePhone } from '../../../../utils/validation';
@@ -71,14 +71,13 @@ function SocialLinksEditor({
 }
 
 /**
- * Contact Us singleton form — same GET-on-mount/PATCH-on-save/toast/field-error shape as
+ * Contact Us singleton form — same GET-on-mount/PATCH-on-save/snackbar/field-error shape as
  * `about-us.tsx`. No `MediaUploader` (`ContactUsContent` has no media relation, see
  * msd-api's schema doc comment).
  */
 export function ContactUsPage() {
   const { token, can } = useAuth();
   const canEdit = can('cms.contact-us', 'edit');
-  const { showToast } = useToast();
   const validation = content.validation;
   const [loaded, setLoaded] = useState<ContactUsContent | null>(null);
   const [loading, setLoading] = useState(true);
@@ -159,7 +158,7 @@ export function ContactUsPage() {
     try {
       const { data } = await updateContactUs(token, payload);
       setLoaded(data);
-      showToast('Contact Us content saved.');
+      showSnackbar('Contact Us content saved.', { variant: 'success' });
     } catch (err) {
       const fields = extractSiteContentFieldErrors<ContactUsFieldKey>(err);
       if (fields) {
@@ -168,7 +167,7 @@ export function ContactUsPage() {
       } else {
         const msg = err instanceof ApiRequestError ? err.message : 'Could not save Contact Us content.';
         setError(msg);
-        showToast(msg, 'error');
+        showSnackbar(msg, { variant: 'error' });
       }
     } finally {
       submittingRef.current = false;

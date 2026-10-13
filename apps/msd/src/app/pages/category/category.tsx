@@ -1,7 +1,7 @@
 import { useParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { useEffect, useState, useRef, useMemo, createElement, type ReactNode } from 'react';
+import { useEffect, useState, useMemo, createElement, type ReactNode } from 'react';
 import { ProductCardGallery } from '../../components/product-card-gallery';
-import type { SkySnackbar } from '@skylabs-monorepo/shared-ui';
+import { showSnackbar } from '../../../snackbar/snackbar';
 import {
   Icon,
   Tabs,
@@ -133,7 +133,6 @@ export function Category() {
     toggleProduct,
     isProductPending,
   } = useWishlist();
-  const snackbarRef = useRef<SkySnackbar>(null);
   const { coords, city: visitorCity } = useVisitorLocation();
   const { locationsStatus, locations } = useCatalogShell();
   const cityLocation = citySlugParam ? locations.find((l) => citySlug(l.city) === citySlugParam) : undefined;
@@ -247,34 +246,24 @@ export function Category() {
      console.log('ADD TO CART FUNCTION CALLED', product.name);
     if (!requireAuthOrRedirect()) return;
 
-    const snackbar = snackbarRef.current;
-
     try {
       await addCartItem(token, {
         productId: product.id,
         quantity: 1,
       });
 
-      if (snackbar) {
-        snackbar.variant = 'info';
-        snackbar.closable = false;
-        snackbar.actionLabel = 'View Cart';
-        snackbar.duration = 4000;
-        snackbar.show(`Added "${product.name}" to your cart.`);
-      }
+      showSnackbar(`Added "${product.name}" to your cart.`, {
+        variant: 'info',
+        actionLabel: 'View Cart',
+        onAction: () => navigate('/cart'),
+      });
     } catch (err) {
       const message =
         err instanceof ApiRequestError
           ? err.message
           : content.category.errors.addToCart;
 
-      if (snackbar) {
-        snackbar.variant = 'error';
-        snackbar.closable = true;
-        snackbar.actionLabel = undefined;
-        snackbar.duration = 4000;
-        snackbar.show(message);
-      }
+      showSnackbar(message, { variant: 'error' });
     }
   };
 const toggleFavorite = (deal: CatalogDeal) => {
@@ -294,15 +283,7 @@ const toggleFavorite = (deal: CatalogDeal) => {
     const success = await toggleProduct(productId);
 
     if (!success) {
-      const snackbar = snackbarRef.current;
-
-      if (snackbar) {
-        snackbar.variant = 'error';
-        snackbar.closable = true;
-        snackbar.actionLabel = undefined;
-        snackbar.duration = 4000;
-        snackbar.show('Unable to update product wishlist. Please try again.');
-      }
+      showSnackbar('Unable to update product wishlist. Please try again.', { variant: 'error' });
     }
   };
   const isTherapyCategory = category?.type === 'THERAPY';
@@ -706,16 +687,13 @@ const toggleFavorite = (deal: CatalogDeal) => {
               <DealAddToCartDialog
                 deal={deal}
                 onAdded={(label) => {
-                  const snackbar = snackbarRef.current;
-
-                  if (!snackbar) return;
-
-                  snackbar.variant = 'info';
-                  snackbar.closable = false;
-                  snackbar.actionLabel = 'View Cart';
-                  snackbar.duration = 4000;
-                  snackbar.show(
+                  showSnackbar(
                     t.messages.addToCartSuccess.replace('{item}', label),
+                    {
+                      variant: 'info',
+                      actionLabel: 'View Cart',
+                      onAction: () => navigate('/cart'),
+                    },
                   );
                 }}
                 renderTrigger={(open) => (
@@ -742,11 +720,6 @@ const toggleFavorite = (deal: CatalogDeal) => {
       });
   return (
     <>
-     <sky-snackbar
-          ref={snackbarRef as React.RefObject<HTMLElement>}
-          duration={4000}
-          onsky-action={() => navigate('/cart')}
-        />
       <Seo
         title={`${displayName}${t.metaTitleSuffix}`}
         description={description}

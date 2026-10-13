@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 import type { SocialMediaLink } from '../../../../api/rbac/social-media';
 
 let grantedPermissions: Set<string>;
@@ -43,9 +43,10 @@ const LINK: SocialMediaLink = {
 
 function renderList() {
   return render(
-    <ToastProvider>
+    <>
       <SocialMediaList />
-    </ToastProvider>,
+      <SnackbarHost />
+    </>,
   );
 }
 

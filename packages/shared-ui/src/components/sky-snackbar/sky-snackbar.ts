@@ -6,6 +6,9 @@ import '@material/web/button/text-button.js';
 export type SkySnackbarVariant = 'neutral' | 'success' | 'warning' | 'error' | 'info';
 export type SkySnackbarCloseReason = 'timeout' | 'action' | 'close' | 'manual';
 
+/** Auto-dismiss delay (ms) when `duration` is not set; apps reuse it to reset between calls. */
+export const SKY_SNACKBAR_DEFAULT_DURATION = 4000;
+
 const DEFAULT_ICON: Record<SkySnackbarVariant, string> = {
   neutral: '',
   success: 'check_circle',
@@ -37,7 +40,8 @@ const DEFAULT_ICON: Record<SkySnackbarVariant, string> = {
  * @prop {SkySnackbarVariant} variant     — 'neutral' | 'success' | 'warning' | 'error' | 'info' (default 'neutral').
  * @prop {string}  actionLabel            — Optional text action button (attribute: action-label).
  * @prop {boolean} closable               — Shows a close icon button.
- * @prop {number}  duration               — Auto-dismiss delay in ms (default 4000). 0 disables auto-dismiss.
+ * @prop {string}  closeLabel             — Accessible name of the close icon (attribute: close-label, default 'Dismiss notification').
+ * @prop {number}  duration               — Auto-dismiss delay in ms (default 4000, SKY_SNACKBAR_DEFAULT_DURATION). 0 disables auto-dismiss.
  * @prop {string}  icon                   — Leading icon override. Defaults per variant; set to "" to force no icon.
  * @prop {boolean} open                   — Current visibility (reflected attribute).
  *
@@ -58,6 +62,7 @@ export class SkySnackbar extends LitElement {
     variant: { type: String, reflect: true },
     actionLabel: { type: String, attribute: 'action-label' },
     closable: { type: Boolean, reflect: true },
+    closeLabel: { type: String, attribute: 'close-label' },
     duration: { type: Number },
     icon: { type: String },
     open: { type: Boolean, reflect: true },
@@ -66,6 +71,7 @@ export class SkySnackbar extends LitElement {
   declare variant: SkySnackbarVariant;
   declare actionLabel?: string;
   declare closable: boolean;
+  declare closeLabel: string;
   declare duration: number;
   declare icon?: string;
   declare open: boolean;
@@ -78,7 +84,8 @@ export class SkySnackbar extends LitElement {
     super();
     this.variant = 'neutral';
     this.closable = false;
-    this.duration = 4000;
+    this.closeLabel = 'Dismiss notification';
+    this.duration = SKY_SNACKBAR_DEFAULT_DURATION;
     this.open = false;
   }
 
@@ -288,7 +295,7 @@ export class SkySnackbar extends LitElement {
           : nothing}
         ${this.closable
           ? html`
-              <md-icon-button class="close" aria-label="Dismiss notification" @click=${this._onClose}>
+              <md-icon-button class="close" aria-label=${this.closeLabel} @click=${this._onClose}>
                 <md-icon aria-hidden="true">close</md-icon>
               </md-icon-button>
             `

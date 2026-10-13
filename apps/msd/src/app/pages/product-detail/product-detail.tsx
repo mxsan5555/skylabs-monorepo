@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import type { SkySnackbar } from '@skylabs-monorepo/shared-ui';
+import { useEffect, useState } from 'react';
+import { showSnackbar } from '../../../snackbar/snackbar';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { FilledButton, Icon, OutlinedIconButton, } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
@@ -38,7 +38,6 @@ export function ProductDetail() {
   const [related, setRelated] = useState<CatalogProduct[]>([]);
   const [activeImg, setActiveImg] = useState(0);
   const [qty, setQty] = useState(1);
-  const snackbarRef = useRef<SkySnackbar>(null);
   const [addError, setAddError] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -167,15 +166,11 @@ export function ProductDetail() {
     try {
       await addCartItem(token, { productId, quantity: qty });
 
-      const el = snackbarRef.current;
-
-      if (el) {
-        el.variant = 'info';
-        el.closable = false;
-        el.actionLabel = 'View Cart';
-        el.duration = 4000;
-        el.show(`Added "${product?.name ?? 'Product'}" to your cart.`);
-      }
+      showSnackbar(`Added "${product?.name ?? 'Product'}" to your cart.`, {
+        variant: 'info',
+        actionLabel: 'View Cart',
+        onAction: () => navigate('/cart'),
+      });
     } catch (err: unknown) {
       const message =
         err instanceof ApiRequestError
@@ -184,14 +179,7 @@ export function ProductDetail() {
 
       setAddError(message);
 
-      const el = snackbarRef.current;
-      if (!el) return;
-
-      el.variant = 'error';
-      el.closable = true;
-      el.actionLabel = undefined;
-      el.duration = 4000;
-      el.show(message);
+      showSnackbar(message, { variant: 'error' });
     }
   }
 
@@ -225,11 +213,6 @@ export function ProductDetail() {
 
   return (
     <div className="product-detail">
-      <sky-snackbar
-        ref={snackbarRef as React.RefObject<HTMLElement>}
-        duration={4000}
-        onsky-action={() => navigate('/cart')}
-      />
       <title>{`${seoName} | MSD`}</title>
 
       <meta

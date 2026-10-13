@@ -1,9 +1,9 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
 import type { Customer } from '../../../../api/rbac/customers';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 
 let grantedPermissions: Set<string>;
 
@@ -42,11 +42,12 @@ const CUSTOMER: Customer = {
 
 function renderPage() {
   return render(
-    <ToastProvider>
+    <>
       <MemoryRouter>
         <CustomerManagement />
       </MemoryRouter>
-    </ToastProvider>,
+      <SnackbarHost />
+    </>
   );
 }
 
@@ -82,17 +83,17 @@ afterEach(() => {
 });
 
 /**
- * Feature: Customer Management — status-change confirm/API/toast flow
+ * Feature: Customer Management — status-change confirm/API/snackbar flow
  * Scenario: `doStatusChange` confirms via the themed `useConfirmDialog` (M3 Dialog, matching the
  * Showcase's `/showcase#dialog` component — see `confirm-dialog.tsx`), calls `setCustomerStatus`,
- * updates local state only on success (never optimistically), and shows a success/error toast —
+ * updates local state only on success (never optimistically), and shows a success/error snackbar —
  * same `blog-list.tsx#toggleStatus` pattern this codebase already uses elsewhere.
  *
  * Given: a SuperAdmin/staff viewing the Customer directory with `customers:status_change`
  * When: a status-change row action fires
  * Then: the confirm dialog gates the call; confirming it updates the table/detail and shows a
- *       success toast; cancelling it never calls the API; a failed API call shows an error
- *       toast and leaves the displayed status unchanged
+ *       success snackbar; cancelling it never calls the API; a failed API call shows an error
+ *       snackbar and leaves the displayed status unchanged
  *
  * Edge cases:
  * - a caller without `customers:status_change` sees no status-change actions (covered by
@@ -115,7 +116,7 @@ describe('CustomerManagement — status change', () => {
     expect(actions.map((a) => a.event)).toEqual(['select']);
   });
 
-  it('confirms via the themed dialog, then calls setCustomerStatus and shows a success toast', async () => {
+  it('confirms via the themed dialog, then calls setCustomerStatus and shows a success snackbar', async () => {
     setCustomerStatusMock.mockResolvedValue({ data: { ...CUSTOMER, status: 'blocked' } });
     renderPage();
     await waitForTableLoaded(1);
@@ -142,7 +143,7 @@ describe('CustomerManagement — status change', () => {
     expect(setCustomerStatusMock).not.toHaveBeenCalled();
   });
 
-  it('a failed status-change call shows an error toast and never changes the displayed status', async () => {
+  it('a failed status-change call shows an error snackbar and never changes the displayed status', async () => {
     setCustomerStatusMock.mockRejectedValue(new ApiRequestError('CONFLICT', 'Could not change status.', 409));
     renderPage();
     await waitForTableLoaded(1);

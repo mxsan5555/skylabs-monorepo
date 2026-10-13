@@ -4,7 +4,7 @@ import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listWebsitePages, updateWebsitePage, type WebsitePage, type WebsitePageInput } from '../../../../api/rbac/website-pages';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { formatDate } from '../../../../blog/blog';
 import { LegalPageFormDialog } from './legal-page-form-dialog';
 
@@ -32,7 +32,6 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
  */
 export function LegalPagesList() {
   const { token, can } = useAuth();
-  const { showToast } = useToast();
   const canEdit = can('cms.website-pages', 'edit');
 
   const [pages, setPages] = useState<WebsitePage[]>([]);
@@ -70,7 +69,7 @@ export function LegalPagesList() {
   const save = async (input: WebsitePageInput, existing: WebsitePage) => {
     const { data } = await updateWebsitePage(token, existing.id, input);
     setPages((prev) => prev.map((p) => (p.id === data.id ? data : p)));
-    showToast('Legal page updated.');
+    showSnackbar('Legal page updated.', { variant: 'success' });
     return data;
   };
 
