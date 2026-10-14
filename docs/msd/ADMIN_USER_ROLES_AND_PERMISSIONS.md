@@ -30,7 +30,7 @@ V = view, C = create, E = edit, D = delete. "own" = only the user's own records 
 | Therapists | VCED | VCE | V | VCE | own: VCE | V |
 | Products | VCED | VCE | V | VCE | own: VCE | V |
 | Orders | V | V | – | V | own: V | V |
-| Customers | V | V | – | V | – | V |
+| Customers | V | V | – | V | own: V (customers who ordered from them) | V |
 | Content | VCED | VCE | VCE | V | – | V |
 | Payments & Payouts | V | V | – | – | own: V | – |
 | Reports | V (overall) | V (overall) | – | – | own: V | – |
@@ -75,7 +75,7 @@ Super Admin and Admin see overall figures. A Member sees only their own.
 | Active | Default when the member is created. A welcome message is sent by SMS or email. |
 | Inactive | Business pause. The member can log in but can only view, not create or edit. Their deals, branches and therapists are hidden from the storefront. Existing purchases are honored. |
 | Suspended | Admin action, reason required. The member cannot log in (sessions revoked). Their profile, branches, deals and therapists disappear from the website. Customers who already paid are honored or refunded, case by case (default: honor; Admin can refund). |
-| Deleted | Super Admin only. Allowed only if the member never had an order. Otherwise the member is archived (hidden everywhere, records kept). |
+| Deleted | Super Admin only, and only from Suspended (the journey is Inactive, then Suspended, then Delete). Allowed only if the member never had an order. Otherwise the member is archived (hidden everywhere, records kept). |
 
 - Status can be changed at any time, even if the member has no branches or deals.
 - Branches, deals and therapists keep their own status. The storefront shows an item only if the member, the branch and the deal are all active, so reactivating a member restores everything exactly as it was.

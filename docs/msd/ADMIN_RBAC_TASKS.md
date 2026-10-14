@@ -1,6 +1,6 @@
 # Admin RBAC: Implementation Task List
 
-Source specs: `docs/msd/ADMIN_USER_ROLES_AND_PERMISSIONS.md` (business rules) and `docs/msd/ADMIN_RBAC_BACKEND_SPEC.md` (technical design).
+Source specs: `docs/msd/ADMIN_USER_ROLES_AND_PERMISSIONS.md` (business rules) and `docs/msd/ADMIN_RBAC_MASTER_PLAN.md` (technical design; its section 13 lists corrections to this list).
 Created: 2026-10-12. Status: not started.
 
 ## How to use this list
