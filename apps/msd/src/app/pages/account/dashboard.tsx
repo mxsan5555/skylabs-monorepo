@@ -87,7 +87,6 @@ export function Dashboard() {
     };
   }, [token]);
 
-  console.log("the data in the stats is", stats);
 
   if (loading) {
     return (

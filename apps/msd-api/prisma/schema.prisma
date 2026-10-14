@@ -11,6 +11,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum PermissionScope {
+  ALL
+  OWN
+}
+
 model User {
   id                     String                 @id @default(uuid())
   email                  String?                @unique
@@ -90,13 +95,16 @@ model Permission {
 model RolePermission {
   roleId       String
   permissionId String
-  createdAt    DateTime   @default(now())
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  scope        PermissionScope @default(ALL)
+  createdAt    DateTime        @default(now())
+
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
   @@index([roleId])
   @@index([permissionId])
+  @@index([scope])
 }
 
 model UserRole {

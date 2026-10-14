@@ -1,13 +1,17 @@
 import '../config/env';
+
 import { PrismaClient } from '../generated/prisma-client';
 
-// Singleton client (per skylabs-api.md). Custom import path because this schema's
-// generator writes to apps/msd-api/src/generated/prisma-client instead of the default
-// node_modules/@prisma/client — see the comment atop prisma/schema.prisma for why.
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+const globalForPrisma = globalThis as typeof globalThis & {
+  __msdApiPrisma?: PrismaClient;
+};
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient();
+export const prisma =
+  globalForPrisma.__msdApiPrisma ??
+  new PrismaClient({
+    datasourceUrl: process.env.DATABASE_URL,
+  });
 
 if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
+  globalForPrisma.__msdApiPrisma = prisma;
 }

@@ -1,5 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
+
 import {
   FilledButton,
   OutlinedButton,
@@ -9,14 +17,16 @@ import {
   Dialog,
   Icon,
 } from '@skylabs-monorepo/shared-ui/react';
+
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
+
 import {
   cloneRole,
   createRole,
   deleteRole,
   getPermissionCatalog,
-  getRolePermissionIds,
+  getRolePermissions,
   getRoleWidgets,
   listDashboardWidgetsCatalog,
   listRoles,
@@ -25,27 +35,16 @@ import {
   setRoleWidgets,
   type DashboardWidgetRecord,
   type PermissionCatalogRow,
+  type PermissionScope,
   type Role,
+  updateRole,
 } from '../../../../api/rbac/roles';
+
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { RoleList } from './role-list';
 import { PermissionMatrix } from './permission-matrix';
 import { WidgetAssignments } from './widget-assignments';
 
-/**
- * Role Management — list + select a role, edit its name/description/status,
- * and assign its permission matrix + dashboard widgets.
- *
- * Both the permission matrix and the widget assignments are preloaded on role
- * selection (`GET /rbac/roles/:id/permissions`, `GET /rbac/roles/:id/widgets`),
- * so both reflect the role's actual saved grants — not just immediately after
- * a Save on the same page load. The widget GET used to be missing entirely
- * (only `PUT /rbac/roles/:id/widgets`, write + return new state, existed), so
- * this screen had no way to learn what was actually saved after a role switch
- * or a page reload and always rendered every widget unchecked regardless of
- * its real state — the checkboxes looked like they'd "lost" the selection
- * even though `RoleDashboardWidget` still held it correctly the whole time.
- */
 export function RoleManagement() {
   const { token, can } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
@@ -58,20 +57,37 @@ export function RoleManagement() {
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState('');
 
-  const [widgetsCatalog, setWidgetsCatalog] = useState<DashboardWidgetRecord[]>([]);
+  const [widgetsCatalog, setWidgetsCatalog] = useState<
+    DashboardWidgetRecord[]
+  >([]);
   const [widgetsCatalogLoading, setWidgetsCatalogLoading] = useState(true);
   const [widgetsCatalogError, setWidgetsCatalogError] = useState('');
 
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
-  const [selectedPermissionIds, setSelectedPermissionIds] = useState<Set<string>>(new Set());
-  const [selectedWidgets, setSelectedWidgets] = useState<Map<string, number>>(new Map());
 
-  const [detailForm, setDetailForm] = useState({ name: '', description: '' });
+  // Permissions are maintained separately for every role.
+  // Map<Role ID, Map<Permission ID, Scope>>
+  const [permissionsByRole, setPermissionsByRole] = useState<
+    Map<string, Map<string, PermissionScope>>
+  >(new Map());
+
+  const [dirtyRoleIds, setDirtyRoleIds] = useState<Set<string>>(new Set());
+
+  const [selectedWidgets, setSelectedWidgets] = useState<
+    Map<string, number>
+  >(new Map());
+
+  const [detailForm, setDetailForm] = useState({
+    name: '',
+    description: '',
+  });
+
   const [permissionsLoading, setPermissionsLoading] = useState(false);
   const [widgetsLoading, setWidgetsLoading] = useState(false);
   const [savingDetails, setSavingDetails] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [savingWidgets, setSavingWidgets] = useState(false);
+
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
 
@@ -80,180 +96,493 @@ export function RoleManagement() {
   const canDelete = can('rbac.roles', 'delete');
   const canChangeStatus = can('rbac.roles', 'status_change');
 
-  const selectedRole = useMemo(() => roles.find((r) => r.id === selectedRoleId) ?? null, [roles, selectedRoleId]);
+  const selectedRole = useMemo(
+    () => roles.find((role) => role.id === selectedRoleId) ?? null,
+    [roles, selectedRoleId],
+  );
+
+  // Keep every role available in the matrix, including custom roles.
+  const matrixRoles = roles;
+
+  console.log("Can Edit Roles:", can('rbac.roles', 'edit'));
+console.log("Can Create Roles:", can('rbac.roles', 'create'));
+console.log("Can Delete Roles:", can('rbac.roles', 'delete'));
+console.log("Can Change Status:", can('rbac.roles', 'status_change'));
 
   const loadRoles = useCallback(async () => {
     setRolesLoading(true);
     setRolesError('');
+
     try {
       const { data } = await listRoles(token);
+      console.log("Fetched roles:", data);
       setRoles(data);
-      setSelectedRoleId((current) => current ?? data[0]?.id ?? null);
-    } catch (err) {
-      setRolesError(err instanceof ApiRequestError ? err.message : 'Could not load roles.');
+
+      setSelectedRoleId((current) => {
+        if (current && data.some((role) => role.id === current)) {
+          return current;
+        }
+
+        return data[0]?.id ?? null;
+      });
+    } catch (error) {
+      setRolesError(
+        error instanceof ApiRequestError
+          ? error.message
+          : 'Could not load roles.',
+      );
     } finally {
       setRolesLoading(false);
     }
   }, [token]);
 
   useEffect(() => {
-    loadRoles();
+    void loadRoles();
   }, [loadRoles]);
 
+  // Load the permission catalog.
   useEffect(() => {
     let cancelled = false;
+
     setCatalogLoading(true);
+    setCatalogError('');
+
     getPermissionCatalog(token)
-      .then(({ data }) => !cancelled && setCatalog(data))
-      .catch((err) => !cancelled && setCatalogError(err instanceof ApiRequestError ? err.message : 'Could not load the permission catalog.'))
-      .finally(() => !cancelled && setCatalogLoading(false));
+      .then(({ data }) => {
+        console.log("Permission Catalog Data:", data);
+        if (!cancelled) {
+          setCatalog(data);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setCatalogError(
+            error instanceof ApiRequestError
+              ? error.message
+              : 'Could not load the permission catalog.',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCatalogLoading(false);
+        }
+      });
+
     return () => {
       cancelled = true;
     };
   }, [token]);
 
+  // Load the dashboard widget catalog.
   useEffect(() => {
     let cancelled = false;
+
     setWidgetsCatalogLoading(true);
     setWidgetsCatalogError('');
+
     listDashboardWidgetsCatalog(token)
-      .then(({ data }) => !cancelled && setWidgetsCatalog(data))
-      .catch((err) => !cancelled && setWidgetsCatalogError(err instanceof ApiRequestError ? err.message : 'Could not load the widget catalog.'))
-      .finally(() => !cancelled && setWidgetsCatalogLoading(false));
+      .then(({ data }) => {
+        console.log("the dashboard widget catalog data:", data);
+        if (!cancelled) {
+          setWidgetsCatalog(data);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setWidgetsCatalogError(
+            error instanceof ApiRequestError
+              ? error.message
+              : 'Could not load the dashboard widget catalog.',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setWidgetsCatalogLoading(false);
+        }
+      });
+
     return () => {
       cancelled = true;
     };
   }, [token]);
 
-  // Selecting a different role reloads both the permission matrix and the widget assignments
-  // from the role's actual saved grants (getRolePermissionIds / getRoleWidgets) — neither is
-  // ever left to just reset to empty and stay that way, or a role's real grants would appear
-  // to have vanished on every switch/reload even though they're still saved server-side.
+  // Load saved permissions for all six fixed roles.
   useEffect(() => {
     let cancelled = false;
-    setSelectedPermissionIds(new Set());
-    setSelectedWidgets(new Map());
-    setActionMessage('');
-    setActionError('');
-    if (selectedRole) {
-      setDetailForm({ name: selectedRole.name, description: selectedRole.description ?? '' });
-      setPermissionsLoading(true);
-      getRolePermissionIds(token, selectedRole.id)
-        .then(({ data }) => {
-          if (!cancelled) setSelectedPermissionIds(new Set(data.permissionIds));
-        })
-        .catch((err) => {
-          if (!cancelled) setActionError(err instanceof ApiRequestError ? err.message : "Could not load this role's saved permissions.");
-        })
-        .finally(() => {
-          if (!cancelled) setPermissionsLoading(false);
-        });
 
-      setWidgetsLoading(true);
-      getRoleWidgets(token, selectedRole.id)
-        .then(({ data }) => {
-          if (!cancelled) setSelectedWidgets(new Map(data.map((row) => [row.widgetId, row.order])));
-        })
-        .catch((err) => {
-          if (!cancelled) setActionError(err instanceof ApiRequestError ? err.message : "Could not load this role's saved dashboard widgets.");
-        })
-        .finally(() => {
-          if (!cancelled) setWidgetsLoading(false);
-        });
+    if (matrixRoles.length === 0) {
+      setPermissionsByRole(new Map());
+      setDirtyRoleIds(new Set());
+      setPermissionsLoading(false);
+      return;
     }
+
+    setPermissionsLoading(true);
+    setActionError('');
+
+    Promise.all(
+      matrixRoles.map(async (role) => {
+        const { data } = await getRolePermissions(token, role.id);
+        console.log("the role permissions data:", data);
+
+        const permissions = new Map<string, PermissionScope>();
+
+        for (const item of data) {
+          permissions.set(item.permissionId, item.scope);
+        }
+
+        return [role.id, permissions] as const;
+      }),
+    )
+      .then((entries) => {
+        if (cancelled) return;
+
+        setPermissionsByRole(new Map(entries));
+        setDirtyRoleIds(new Set());
+      })
+      .catch((error) => {
+        if (cancelled) return;
+
+        setActionError(
+          error instanceof ApiRequestError
+            ? error.message
+            : 'Could not load permissions for all roles.',
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPermissionsLoading(false);
+        }
+      });
+
     return () => {
       cancelled = true;
     };
-  }, [selectedRoleId, selectedRole, token]);
+  }, [token, matrixRoles]);
 
-  const togglePermission = (permissionId: string) => {
-    setSelectedPermissionIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(permissionId)) next.delete(permissionId);
-      else next.add(permissionId);
+  // Selecting a role loads its details and dashboard widgets.
+  // Permissions for the full matrix are loaded by the effect above.
+  useEffect(() => {
+    let cancelled = false;
+
+    setSelectedWidgets(new Map());
+
+    if (!selectedRole) {
+      setDetailForm({ name: '', description: '' });
+      setWidgetsLoading(false);
+      return;
+    }
+
+    setDetailForm({
+      name: selectedRole.name,
+      description: selectedRole.description ?? '',
+    });
+
+    setWidgetsLoading(true);
+
+    getRoleWidgets(token, selectedRole.id)
+      .then(({ data }) => {
+        console.log("Fetched roles widget:", data);
+        if (!cancelled) {
+          setSelectedWidgets(
+            new Map(data.map((item) => [item.widgetId, item.order])),
+          );
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setActionError(
+            error instanceof ApiRequestError
+              ? error.message
+              : "Could not load this role's dashboard widgets.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setWidgetsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRole, token]);
+
+  // Toggle an individual V, C, E, or D permission.
+  const toggleRolePermission = (
+    roleId: string,
+    permissionId: string,
+    checked: boolean,
+    scope: PermissionScope,
+  ) => {
+    const role = matrixRoles.find((item) => item.id === roleId);
+
+    if (!canEdit || !role) {
+      return;
+    }
+
+    setPermissionsByRole((previous) => {
+      const next = new Map(previous);
+      const rolePermissions = new Map(
+        previous.get(roleId) ?? new Map<string, PermissionScope>(),
+      );
+
+      if (checked) {
+        rolePermissions.set(permissionId, scope);
+      } else {
+        rolePermissions.delete(permissionId);
+      }
+
+      next.set(roleId, rolePermissions);
       return next;
     });
+
+    setDirtyRoleIds((previous) => {
+      const next = new Set(previous);
+      next.add(roleId);
+      return next;
+    });
+
+    setActionMessage('');
+    setActionError('');
   };
 
   const toggleWidget = (widgetId: string) => {
-    setSelectedWidgets((prev) => {
-      const next = new Map(prev);
-      if (next.has(widgetId)) next.delete(widgetId);
-      else next.set(widgetId, next.size);
+    setSelectedWidgets((previous) => {
+      const next = new Map(previous);
+
+      if (next.has(widgetId)) {
+        next.delete(widgetId);
+      } else {
+        next.set(widgetId, next.size);
+      }
+
       return next;
     });
   };
 
   const setWidgetOrder = (widgetId: string, order: number) => {
-    setSelectedWidgets((prev) => new Map(prev).set(widgetId, order));
+    setSelectedWidgets((previous) =>
+      new Map(previous).set(widgetId, order),
+    );
   };
 
   const saveDetails = async () => {
-    if (!selectedRole) return;
+    if (!selectedRole || !canEdit) return;
+
     setSavingDetails(true);
     setActionError('');
+    setActionMessage('');
+
     try {
       const { data } = await updateRole(token, selectedRole.id, {
         name: detailForm.name,
         description: detailForm.description || undefined,
       });
-      setRoles((prev) => prev.map((r) => (r.id === data.id ? data : r)));
+
+      setRoles((previous) =>
+        previous.map((role) => (role.id === data.id ? data : role)),
+      );
+
       setActionMessage('Role details saved.');
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : 'Could not save role details.');
+    } catch (error) {
+      setActionError(
+        error instanceof ApiRequestError
+          ? error.message
+          : 'Could not save role details.',
+      );
     } finally {
       setSavingDetails(false);
     }
   };
 
   const toggleStatus = async () => {
-    if (!selectedRole) return;
+    if (!selectedRole || !canChangeStatus) return;
+
+    setActionError('');
+    setActionMessage('');
+
     try {
-      const { data } = await setRoleStatus(token, selectedRole.id, !selectedRole.isActive);
-      setRoles((prev) => prev.map((r) => (r.id === data.id ? data : r)));
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : 'Could not change role status.');
+      const { data } = await setRoleStatus(
+        token,
+        selectedRole.id,
+        !selectedRole.isActive,
+      );
+
+      setRoles((previous) =>
+        previous.map((role) => (role.id === data.id ? data : role)),
+      );
+
+      setActionMessage('Role status updated.');
+    } catch (error) {
+      setActionError(
+        error instanceof ApiRequestError
+          ? error.message
+          : 'Could not change role status.',
+      );
     }
   };
 
   const removeRole = async () => {
-    if (!selectedRole) return;
-    if (!(await confirm(`Delete role "${selectedRole.name}"? This cannot be undone.`))) return;
+    if (!selectedRole || !canDelete) return;
+
+    if (
+      !(await confirm(
+        `Delete role "${selectedRole.name}"? This cannot be undone.`,
+      ))
+    ) {
+      return;
+    }
+
     try {
       await deleteRole(token, selectedRole.id);
-      setRoles((prev) => prev.filter((r) => r.id !== selectedRole.id));
+
+      setRoles((previous) =>
+        previous.filter((role) => role.id !== selectedRole.id),
+      );
+
       setSelectedRoleId(null);
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : 'Could not delete role — it may still be assigned to users.');
+
+      setPermissionsByRole((previous) => {
+        const next = new Map(previous);
+        next.delete(selectedRole.id);
+        return next;
+      });
+
+      setDirtyRoleIds((previous) => {
+        const next = new Set(previous);
+        next.delete(selectedRole.id);
+        return next;
+      });
+
+      setActionMessage('Role deleted.');
+      setActionError('');
+    } catch (error) {
+      setActionError(
+        error instanceof ApiRequestError
+          ? error.message
+          : 'Could not delete role. It may still be assigned to users.',
+      );
     }
   };
 
+  // Save changed roles. Successful roles are marked clean individually.
   const savePermissions = async () => {
-    if (!selectedRole) return;
+    if (!canEdit || savingPermissions) return;
+
+    const rolesToSave = matrixRoles.filter((role) =>
+      dirtyRoleIds.has(role.id),
+    );
+
+    if (rolesToSave.length === 0) {
+      setActionMessage('There are no permission changes to save.');
+      return;
+    }
+
     setSavingPermissions(true);
     setActionError('');
+    setActionMessage('');
+
+    let savedCount = 0;
+    const errors: string[] = [];
+
     try {
-      const { data } = await setRolePermissions(token, selectedRole.id, Array.from(selectedPermissionIds));
-      setSelectedPermissionIds(new Set(data.map((row) => row.permissionId)));
-      setActionMessage('Permissions saved.');
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : 'Could not save permissions.');
+      for (const role of rolesToSave) {
+        const rolePermissions =
+          permissionsByRole.get(role.id) ??
+          new Map<string, PermissionScope>();
+
+        const permissions = Array.from(rolePermissions.entries()).map(
+          ([permissionId, scope]) => ({
+            permissionId,
+            scope,
+          }),
+        );
+
+        try {
+          const { data } = await setRolePermissions(
+            token,
+            role.id,
+            permissions,
+          );
+
+          const savedPermissions = new Map<string, PermissionScope>();
+
+          for (const item of data) {
+            savedPermissions.set(item.permissionId, item.scope);
+          }
+
+          setPermissionsByRole((previous) => {
+            const next = new Map(previous);
+            next.set(role.id, savedPermissions);
+            return next;
+          });
+
+          setDirtyRoleIds((previous) => {
+            const next = new Set(previous);
+            next.delete(role.id);
+            return next;
+          });
+
+          savedCount += 1;
+        } catch (error) {
+          errors.push(
+            `${role.name}: ${
+              error instanceof ApiRequestError
+                ? error.message
+                : 'Could not save permissions.'
+            }`,
+          );
+        }
+      }
+
+      if (errors.length > 0) {
+        setActionError(
+          `${errors.join(' ')} ${savedCount} role(s) saved successfully. ` +
+            'Changes for the failed roles remain pending.',
+        );
+      } else {
+        setActionMessage(
+          `Permissions saved successfully for ${savedCount} role(s).`,
+        );
+      }
     } finally {
       setSavingPermissions(false);
     }
   };
 
   const saveWidgets = async () => {
-    if (!selectedRole) return;
+    if (!selectedRole || !canEdit) return;
+
     setSavingWidgets(true);
     setActionError('');
+    setActionMessage('');
+
     try {
-      const widgets = Array.from(selectedWidgets.entries()).map(([widgetId, order]) => ({ widgetId, order }));
-      const { data } = await setRoleWidgets(token, selectedRole.id, widgets);
-      setSelectedWidgets(new Map(data.map((row) => [row.widgetId, row.order])));
+      const widgets = Array.from(selectedWidgets.entries()).map(
+        ([widgetId, order]) => ({ widgetId, order }),
+      );
+
+      const { data } = await setRoleWidgets(
+        token,
+        selectedRole.id,
+        widgets,
+      );
+
+      setSelectedWidgets(
+        new Map(data.map((item) => [item.widgetId, item.order])),
+      );
+
       setActionMessage('Dashboard widgets saved.');
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : 'Could not save dashboard widgets.');
+    } catch (error) {
+      setActionError(
+        error instanceof ApiRequestError
+          ? error.message
+          : 'Could not save dashboard widgets.',
+      );
     } finally {
       setSavingWidgets(false);
     }
@@ -262,174 +591,294 @@ export function RoleManagement() {
   return (
     <div className="admin-page admin-page--wide">
       <title>Role Management · MSD</title>
+
       <header className="page-head">
         <div>
           <h1>Role Management</h1>
-          <p>Define roles and control exactly what each one can see and do.</p>
+          <p>
+            Define roles and control exactly what each one can see and do.
+          </p>
         </div>
+
         <div className="page-head__actions">
-          {canCreate && <CreateRoleButton onCreated={(role) => { setRoles((prev) => [...prev, role]); setSelectedRoleId(role.id); }} />}
+          {canCreate && (
+            <CreateRoleButton
+              onCreated={(role) => {
+                setRoles((previous) => [...previous, role]);
+                setSelectedRoleId(role.id);
+              }}
+            />
+          )}
         </div>
       </header>
+
+      {actionMessage && (
+        <p className="field-hint" role="status">
+          {actionMessage}
+        </p>
+      )}
+
+      {actionError && (
+        <p className="error-state" role="alert">
+          {actionError}
+        </p>
+      )}
 
       <div className="two-pane">
         <section className="panel" aria-label="Roles">
           <h2>Roles</h2>
+
           {rolesLoading ? (
             <p className="loading-state">Loading roles…</p>
           ) : rolesError ? (
             <p className="error-state">{rolesError}</p>
           ) : (
-            <RoleList roles={roles} selectedId={selectedRoleId} onSelect={setSelectedRoleId} />
+            <RoleList
+              roles={roles}
+              selectedId={selectedRoleId}
+              onSelect={setSelectedRoleId}
+            />
           )}
         </section>
 
         <section className="panel" aria-label="Role details">
           {!selectedRole ? (
-            <p className="empty-state">Select a role to view and edit its permissions.</p>
+            <p className="empty-state">
+              Select a role to view its details and dashboard widgets.
+            </p>
           ) : (
             <>
               <div className="page-head">
                 <div>
                   <h2>{selectedRole.name}</h2>
-                  <p className="field-hint">{selectedRole.isSystem ? 'System role — status and delete are locked.' : 'Custom role'}</p>
+                  <p className="field-hint">
+                    {selectedRole.isSystem
+                      ? 'System role — status and delete are locked.'
+                      : 'Custom role'}
+                  </p>
                 </div>
+
                 <div className="page-head__actions">
                   {canCreate && (
                     <CloneRoleButton
                       role={selectedRole}
-                      onCloned={(role) => { setRoles((prev) => [...prev, role]); setSelectedRoleId(role.id); }}
+                      onCloned={(role) => {
+                        setRoles((previous) => [...previous, role]);
+                        setSelectedRoleId(role.id);
+                      }}
                     />
                   )}
+
                   {canChangeStatus && (
                     <label className="widget-assign-row__label">
                       <Switch
                         selected={selectedRole.isActive}
-                        disabled={selectedRole.isSystem && selectedRole.isActive}
+                        disabled={
+                          selectedRole.isSystem && selectedRole.isActive
+                        }
                         onChange={toggleStatus}
                       />
                       {selectedRole.isActive ? 'Active' : 'Inactive'}
                     </label>
                   )}
+
                   {canDelete && (
-                    <OutlinedButton onClick={removeRole} disabled={selectedRole.isSystem}>
-                      <Icon slot="icon" aria-hidden="true">delete</Icon>
+                    <OutlinedButton
+                      onClick={removeRole}
+                      disabled={selectedRole.isSystem}
+                    >
+                      <Icon slot="icon" aria-hidden="true">
+                        delete
+                      </Icon>
                       Delete
                     </OutlinedButton>
                   )}
                 </div>
               </div>
 
-              {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
-              {actionError && <p className="error-state" role="alert">{actionError}</p>}
-
               <div className="form-grid">
                 <OutlinedTextField
                   label="Name"
                   value={detailForm.name}
                   disabled={!canEdit}
-                  onInput={(e: Event) => setDetailForm((f) => ({ ...f, name: (e.target as HTMLInputElement).value }))}
+                  onInput={(event: Event) =>
+                    setDetailForm((form) => ({
+                      ...form,
+                      name: (event.target as HTMLInputElement).value,
+                    }))
+                  }
                 />
+
                 <OutlinedTextField
                   label="Description"
                   value={detailForm.description}
                   disabled={!canEdit}
-                  onInput={(e: Event) => setDetailForm((f) => ({ ...f, description: (e.target as HTMLInputElement).value }))}
+                  onInput={(event: Event) =>
+                    setDetailForm((form) => ({
+                      ...form,
+                      description: (event.target as HTMLInputElement).value,
+                    }))
+                  }
                 />
+
                 {canEdit && (
                   <div className="form-actions">
-                    <FilledButton onClick={saveDetails} disabled={savingDetails}>
+                    <FilledButton
+                      onClick={saveDetails}
+                      disabled={savingDetails}
+                    >
                       {savingDetails ? 'Saving…' : 'Save details'}
                     </FilledButton>
                   </div>
                 )}
               </div>
-
-              <h2 className="section-title">Permissions</h2>
-              <p className="field-hint">
-                {selectedRole.isSuperAdmin
-                  ? 'SuperAdmin always has every current and future permission — this matrix is read-only and cannot restrict it.'
-                  : "Checkboxes reflect this role's currently saved grants. Check or uncheck as needed, then Save (Save replaces the role's entire permission set)."}
-              </p>
-              {catalogLoading || permissionsLoading ? (
-                <p className="loading-state">Loading permission catalog…</p>
-              ) : catalogError ? (
-                <p className="error-state">{catalogError}</p>
-              ) : (
-                <>
-                  <PermissionMatrix
-                    catalog={catalog}
-                    selectedPermissionIds={selectedPermissionIds}
-                    onToggle={togglePermission}
-                    disabled={!canEdit || selectedRole.isSuperAdmin}
-                  />
-                  {canEdit && !selectedRole.isSuperAdmin && (
-                    <div className="form-actions">
-                      <FilledButton onClick={savePermissions} disabled={savingPermissions}>
-                        {savingPermissions ? 'Saving…' : 'Save permissions'}
-                      </FilledButton>
-                    </div>
-                  )}
-                </>
-              )}
-
-              <h2 className="section-title">Dashboard widgets</h2>
-              {widgetsCatalogLoading || widgetsLoading ? (
-                <p className="loading-state">Loading dashboard widgets…</p>
-              ) : widgetsCatalogError ? (
-                <p className="error-state">{widgetsCatalogError}</p>
-              ) : (
-                <>
-                  <WidgetAssignments
-                    catalog={widgetsCatalog}
-                    selected={selectedWidgets}
-                    onToggle={toggleWidget}
-                    onOrderChange={setWidgetOrder}
-                    disabled={!canEdit}
-                  />
-                  {canEdit && (
-                    <div className="form-actions">
-                      <FilledButton onClick={saveWidgets} disabled={savingWidgets}>
-                        {savingWidgets ? 'Saving…' : 'Save widgets'}
-                      </FilledButton>
-                    </div>
-                  )}
-                </>
-              )}
             </>
           )}
         </section>
       </div>
+
+      {/* The matrix follows the role selected in the Roles panel. */}
+      <section className="panel" aria-label="Permission matrix">
+        <h2 className="section-title">Permission Matrix</h2>
+
+        <p className="field-hint">
+          Select a checkbox to grant an action and clear it to remove that
+          action. V = View, C = Create, E = Edit, D = Delete. Own records
+          means the user can access only their own records. Changes are
+          saved when you click Save permissions.
+        </p>
+
+        {catalogLoading || permissionsLoading || rolesLoading ? (
+          <p className="loading-state">Loading permission matrix…</p>
+        ) : catalogError ? (
+          <p className="error-state">{catalogError}</p>
+        ) : rolesError ? (
+          <p className="error-state">{rolesError}</p>
+        ) : (
+          <>
+            <PermissionMatrix
+              catalog={catalog}
+              role={selectedRole}
+              permissions={
+                selectedRoleId
+                  ? permissionsByRole.get(selectedRoleId) ?? new Map<string, PermissionScope>()
+                  : new Map<string, PermissionScope>()
+              }
+              onPermissionToggle={toggleRolePermission}
+              disabled={!canEdit || savingPermissions}
+            />
+
+            {canEdit && (
+              <div className="form-actions">
+                <FilledButton
+                  onClick={savePermissions}
+                  disabled={
+                    savingPermissions ||
+                    permissionsLoading ||
+                    dirtyRoleIds.size === 0
+                  }
+                >
+                  {savingPermissions
+                    ? 'Saving permissions…'
+                    : `Save permissions${
+                        dirtyRoleIds.size > 0
+                          ? ` (${dirtyRoleIds.size} role${
+                              dirtyRoleIds.size === 1 ? '' : 's'
+                            })`
+                          : ''
+                      }`}
+                </FilledButton>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      {selectedRole && (
+        <section className="panel" aria-label="Dashboard widgets">
+          <h2 className="section-title">Dashboard widgets</h2>
+
+          {widgetsCatalogLoading || widgetsLoading ? (
+            <p className="loading-state">Loading dashboard widgets…</p>
+          ) : widgetsCatalogError ? (
+            <p className="error-state">{widgetsCatalogError}</p>
+          ) : (
+            <>
+              <WidgetAssignments
+                catalog={widgetsCatalog}
+                selected={selectedWidgets}
+                onToggle={toggleWidget}
+                onOrderChange={setWidgetOrder}
+                disabled={!canEdit}
+              />
+
+              {canEdit && (
+                <div className="form-actions">
+                  <FilledButton
+                    onClick={saveWidgets}
+                    disabled={savingWidgets}
+                  >
+                    {savingWidgets ? 'Saving…' : 'Save widgets'}
+                  </FilledButton>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
       {ConfirmDialog}
     </div>
   );
 }
 
-function CreateRoleButton({ onCreated }: { onCreated: (role: Role) => void }) {
+function CreateRoleButton({
+  onCreated,
+}: {
+  onCreated: (role: Role) => void;
+}) {
   const { token } = useAuth();
   const dialogRef = useRef<MdDialog>(null);
-  const [form, setForm] = useState({ key: '', name: '', description: '' });
+
+  const [form, setForm] = useState({
+    key: '',
+    name: '',
+    description: '',
+  });
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const submit = async () => {
     setError('');
+
     if (!/^[a-z][a-z0-9_]*$/.test(form.key)) {
       setError('Key must be lower_snake_case, e.g. "regional_manager".');
       return;
     }
+
     if (!form.name.trim()) {
       setError('Name is required.');
       return;
     }
+
     setSubmitting(true);
+
     try {
-      const { data } = await createRole(token, { ...form, isActive: true });
+      const { data } = await createRole(token, {
+        ...form,
+        isActive: true,
+      });
+
       onCreated(data);
       setForm({ key: '', name: '', description: '' });
       dialogRef.current?.close();
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not create role.');
+    } catch (error) {
+      setError(
+        error instanceof ApiRequestError
+          ? error.message
+          : 'Could not create role.',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -438,31 +887,61 @@ function CreateRoleButton({ onCreated }: { onCreated: (role: Role) => void }) {
   return (
     <>
       <FilledButton onClick={() => dialogRef.current?.show()}>
-        <Icon slot="icon" aria-hidden="true">add</Icon>
+        <Icon slot="icon" aria-hidden="true">
+          add
+        </Icon>
         New role
       </FilledButton>
+
       <Dialog ref={dialogRef}>
         <div slot="headline">Create role</div>
+
         <div slot="content" className="form-grid">
           <OutlinedTextField
             label="Key (lower_snake_case)"
             value={form.key}
-            onInput={(e: Event) => setForm((f) => ({ ...f, key: (e.target as HTMLInputElement).value }))}
+            onInput={(event: Event) =>
+              setForm((current) => ({
+                ...current,
+                key: (event.target as HTMLInputElement).value,
+              }))
+            }
           />
+
           <OutlinedTextField
             label="Name"
             value={form.name}
-            onInput={(e: Event) => setForm((f) => ({ ...f, name: (e.target as HTMLInputElement).value }))}
+            onInput={(event: Event) =>
+              setForm((current) => ({
+                ...current,
+                name: (event.target as HTMLInputElement).value,
+              }))
+            }
           />
+
           <OutlinedTextField
             label="Description"
             value={form.description}
-            onInput={(e: Event) => setForm((f) => ({ ...f, description: (e.target as HTMLInputElement).value }))}
+            onInput={(event: Event) =>
+              setForm((current) => ({
+                ...current,
+                description: (event.target as HTMLInputElement).value,
+              }))
+            }
           />
-          {error && <p className="error-state" role="alert">{error}</p>}
+
+          {error && (
+            <p className="error-state" role="alert">
+              {error}
+            </p>
+          )}
         </div>
+
         <div slot="actions">
-          <TextButton onClick={() => dialogRef.current?.close()}>Cancel</TextButton>
+          <TextButton onClick={() => dialogRef.current?.close()}>
+            Cancel
+          </TextButton>
+
           <FilledButton onClick={submit} disabled={submitting}>
             {submitting ? 'Creating…' : 'Create'}
           </FilledButton>
@@ -472,26 +951,55 @@ function CreateRoleButton({ onCreated }: { onCreated: (role: Role) => void }) {
   );
 }
 
-function CloneRoleButton({ role, onCloned }: { role: Role; onCloned: (role: Role) => void }) {
+function CloneRoleButton({
+  role,
+  onCloned,
+}: {
+  role: Role;
+  onCloned: (role: Role) => void;
+}) {
   const { token } = useAuth();
   const dialogRef = useRef<MdDialog>(null);
-  const [form, setForm] = useState({ key: '', name: `${role.name} copy` });
+
+  const [form, setForm] = useState({
+    key: '',
+    name: `${role.name} copy`,
+  });
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const submit = async () => {
     setError('');
+
     if (!/^[a-z][a-z0-9_]*$/.test(form.key)) {
       setError('Key must be lower_snake_case, e.g. "regional_manager".');
       return;
     }
+
+    if (!form.name.trim()) {
+      setError('Name is required.');
+      return;
+    }
+
     setSubmitting(true);
+
     try {
-      const { data } = await cloneRole(token, role.id, form.key, form.name);
+      const { data } = await cloneRole(
+        token,
+        role.id,
+        form.key,
+        form.name,
+      );
+
       onCloned(data);
       dialogRef.current?.close();
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'Could not clone role.');
+    } catch (error) {
+      setError(
+        error instanceof ApiRequestError
+          ? error.message
+          : 'Could not clone role.',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -500,27 +1008,55 @@ function CloneRoleButton({ role, onCloned }: { role: Role; onCloned: (role: Role
   return (
     <>
       <OutlinedButton onClick={() => dialogRef.current?.show()}>
-        <Icon slot="icon" aria-hidden="true">content_copy</Icon>
+        <Icon slot="icon" aria-hidden="true">
+          content_copy
+        </Icon>
         Clone
       </OutlinedButton>
+
       <Dialog ref={dialogRef}>
         <div slot="headline">Clone "{role.name}"</div>
+
         <div slot="content" className="form-grid">
-          <p className="field-hint">Copies this role's permissions and dashboard widgets onto a new role.</p>
+          <p className="field-hint">
+            Copies this role's permissions and dashboard widgets onto a new
+            role.
+          </p>
+
           <OutlinedTextField
             label="New key (lower_snake_case)"
             value={form.key}
-            onInput={(e: Event) => setForm((f) => ({ ...f, key: (e.target as HTMLInputElement).value }))}
+            onInput={(event: Event) =>
+              setForm((current) => ({
+                ...current,
+                key: (event.target as HTMLInputElement).value,
+              }))
+            }
           />
+
           <OutlinedTextField
             label="New name"
             value={form.name}
-            onInput={(e: Event) => setForm((f) => ({ ...f, name: (e.target as HTMLInputElement).value }))}
+            onInput={(event: Event) =>
+              setForm((current) => ({
+                ...current,
+                name: (event.target as HTMLInputElement).value,
+              }))
+            }
           />
-          {error && <p className="error-state" role="alert">{error}</p>}
+
+          {error && (
+            <p className="error-state" role="alert">
+              {error}
+            </p>
+          )}
         </div>
+
         <div slot="actions">
-          <TextButton onClick={() => dialogRef.current?.close()}>Cancel</TextButton>
+          <TextButton onClick={() => dialogRef.current?.close()}>
+            Cancel
+          </TextButton>
+
           <FilledButton onClick={submit} disabled={submitting}>
             {submitting ? 'Cloning…' : 'Clone'}
           </FilledButton>
