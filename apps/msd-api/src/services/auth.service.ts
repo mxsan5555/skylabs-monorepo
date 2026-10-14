@@ -42,6 +42,7 @@ export async function loginWithIdentifier(identifier: string, meta: SessionMeta 
   const existing = await prisma.user.findUnique({ where: kind === 'email' ? { email: identifier } : { phone: identifier } });
   if (existing) await assertUserMayLogIn(existing, meta, method);
 
+  
   const user = await prisma.user.upsert({
     where: kind === 'email' ? { email: identifier } : { phone: identifier },
     update: { lastLoginAt: new Date() },
