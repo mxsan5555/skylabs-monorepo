@@ -54,6 +54,13 @@ export const env = {
 
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+  /** Shown to a suspended member so they know how to get their account back. */
+  supportEmail: process.env.SUPPORT_EMAIL ?? '',
+  supportPhone: process.env.SUPPORT_PHONE ?? '',
+  /** 32 bytes, base64. Encrypts full Aadhaar and PAN numbers at rest. Optional in development. */
+  fieldEncryptionKey: process.env.FIELD_ENCRYPTION_KEY ?? '',
+  /** Secret mixed into the document number hash used for the duplicate check. */
+  docHashPepper: process.env.DOC_HASH_PEPPER ?? '',
   googleCallbackUrl:
     process.env.GOOGLE_CALLBACK_URL ?? 'http://localhost:3333/api/v1/auth/google/callback',
 
