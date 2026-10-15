@@ -23,14 +23,14 @@ Created: 2026-10-12. Status: not started.
 
 ## Progress summary
 
-Total: **181 tasks**. Update the Done column as work lands.
+Total: **183 tasks**. Update the Done column as work lands.
 
 | Phase | Scope | Tasks | Done | % |
 |---|---|---|---|---|
 | P0 | Decisions and setup | 10 | 0 | 0 |
-| P1 | Roles, scope, seed, menu | 10 | 0 | 0 |
+| P1 | Roles, scope, seed, menu | 10 | 1 | 10 |
 | P2 | Authorization core and hardening | 17 | 0 | 0 |
-| P3 | Member rename and lifecycle | 18 | 0 | 0 |
+| P3 | Member rename and lifecycle | 20 | 0 | 0 |
 | P4 | Own-scope retrofit | 12 | 0 | 0 |
 | P5 | Member documents | 13 | 0 | 0 |
 | P6 | Reminders and scheduler | 7 | 0 | 0 |
@@ -40,12 +40,19 @@ Total: **181 tasks**. Update the Done column as work lands.
 | P10 | Frontend | 42 | 0 | 0 |
 | P11 | Security and QA | 13 | 0 | 0 |
 | P12 | Release, ops, docs | 10 | 0 | 0 |
-| **Total** | | **181** | **0** | **0** |
+| **Total** | | **183** | **1** | **1** |
 
-By area: BE 75, FE 35, SEC 20, QA 16, DB 14, OPS 10, SH 4, BIZ 4, DOC 3.
-By size: S 52, M 111, L 18.
+By area: BE 77, FE 35, SEC 20, QA 16, DB 14, OPS 10, SH 4, BIZ 4, DOC 3.
+By size: S 54, M 111, L 18.
 
 Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then P3 to P8 (backend), with P10 frontend tasks starting as each backend phase lands. P9 runs alongside P4 to P8. P11 and P12 close the release.
+
+### Current slice: staff member management (spec `docs/superpowers/specs/2026-10-15-staff-member-management-design.md`)
+
+- In slice: P1-02, P1-03, P1-05 (members key only), P1-06 (members only), P1-07 (members row and roles), P2-03, P2-04, P3-01 to P3-13, P3-17 to P3-21, P5-01, P5-02, P5-05, P5-07, P5-09, P5-11, P6-03 (minimal), P10-02, P10-05, P10-07, P10-11 to P10-18, P10-39.
+- Partly in: P5-06 and P5-08 (existing storage, no private bucket), P10-03 and P10-04 (member error codes and banners), P10-19 (badge only).
+- Deferred: P3-15, P3-16, P5-03, P5-04, P5-10, P5-12, P5-13, P6-01, P6-02, P6-04 to P6-07, all of P4, P7 and P8.
+- Removed: P3-14 (superseded by the FK 409 guard and branch delete C-08).
 
 ---
 
@@ -53,7 +60,7 @@ Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then 
 
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
-| [ ] | P0-01 | BIZ | Owner answers the 7 open decisions in spec section 9 | S | - | Answers recorded in the spec |
+| [ ] | P0-01 | BIZ | Owner answers the open decisions in master plan section 11 (D4, D5, D14 to D16) | S | - | Answers recorded in the master plan |
 | [ ] | P0-02 | BIZ | Define payout commission rule and payout cadence | M | - | Written rule with example calculation |
 | [ ] | P0-03 | BIZ | Legal review of Aadhaar/PAN handling (Aadhaar Act, DPDP Act): what may be collected, stored, retained, and how long | M | - | Written approval or required changes |
 | [ ] | P0-04 | OPS | Create working branch off `develop` | S | - | Branch exists, clean tree |
@@ -68,7 +75,7 @@ Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then 
 
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
-| [ ] | P1-01 | DB | Migration: `PermissionScope` enum and `RolePermission.scope` (default ALL) | S | P0-05 | Migrates up and down on the copy |
+| [x] | P1-01 | DB | Migration: `PermissionScope` enum and `RolePermission.scope` (default ALL) | S | P0-05 | Merged: migration `20261008104219_add_permission_scope` |
 | [ ] | P1-02 | DB | Migration: rename role key `vendor` to `member`, insert `support`, update `UserRole` links | S | P1-01 | Row counts equal before and after |
 | [ ] | P1-03 | BE | Create `lib/role-keys.ts`; replace hardcoded `'vendor'`, `'customer'` in vendor, auth, customer, dashboard services | S | P1-02 | No string literal role key left (grep) |
 | [ ] | P1-04 | BE | Permission resolver returns `{key, scope}`; highest scope wins across roles | M | P1-01 | Unit tests: ALL beats OWN, multi-role |
@@ -118,11 +125,13 @@ Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then 
 | [ ] | P3-11 | BE | Welcome SMS/email on member create via a template service | M | P6-03 | Message logged once, no duplicate on retry |
 | [ ] | P3-12 | BE | `/members` routes; `/vendors*` kept as aliases with `Deprecation` header and usage log | M | P3-05 | Both paths work |
 | [ ] | P3-13 | BE | `GET /members/:id/status-history` and `/activity` | S | P3-03 | Scoped test |
-| [ ] | P3-14 | DB | `deletedAt` on Branch, Deal, Therapist, Product with delete guard when OrderItem exists | M | P0-01 | 409 test |
 | [ ] | P3-15 | BE | Remove deal approval gate if decision 2 says so (migration plus code) | M | P0-01 | Deals publish without approval |
 | [ ] | P3-16 | DB | Contract migration: drop `kycStatus`, `kycRejectionReason`, legacy GST/PAN/`kycDocuments` | M | P5-02, P12-03 | Done only after one release without readers |
 | [ ] | P3-17 | BE | On suspend: send email and SMS to the member with the reason, support contact and steps to return to active; send "active again" message on reactivation | M | P3-07, P6-03 | Message sent once per change; provider failure recorded and retried, suspension kept |
 | [ ] | P3-18 | BE | Suspended member login and OTP request return 403 `MEMBER_SUSPENDED` with reason and steps; no OTP sent | S | P2-03 | Test: suspended phone gets the message, no OTP row created |
+| [ ] | P3-19 | DB | Status backfill report: counts per old `VendorStatus` and per new `MemberStatus`, reviewed before the migration runs | S | P3-01 | Report saved, owner signs off on the REJECTED to SUSPENDED count |
+| [ ] | P3-20 | BE | `SystemSetting` keys `support.email` and `support.phone` seeded and read by the suspension notice | S | P8-02 | Notice shows the configured contact |
+| [ ] | P3-21 | BE | Remove `POST /vendors/me` and `POST /vendors/me/submit` and the vendor approve and reject routes (master plan C-11) | M | P3-12 | Routes return 404, OpenAPI updated |
 
 ## Phase 4: Own-scope retrofit
 
