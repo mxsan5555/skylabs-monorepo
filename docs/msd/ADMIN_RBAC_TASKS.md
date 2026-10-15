@@ -23,14 +23,14 @@ Created: 2026-10-12. Status: not started.
 
 ## Progress summary
 
-Total: **179 tasks**. Update the Done column as work lands.
+Total: **181 tasks**. Update the Done column as work lands.
 
 | Phase | Scope | Tasks | Done | % |
 |---|---|---|---|---|
 | P0 | Decisions and setup | 10 | 0 | 0 |
 | P1 | Roles, scope, seed, menu | 10 | 0 | 0 |
 | P2 | Authorization core and hardening | 17 | 0 | 0 |
-| P3 | Member rename and lifecycle | 16 | 0 | 0 |
+| P3 | Member rename and lifecycle | 18 | 0 | 0 |
 | P4 | Own-scope retrofit | 12 | 0 | 0 |
 | P5 | Member documents | 13 | 0 | 0 |
 | P6 | Reminders and scheduler | 7 | 0 | 0 |
@@ -40,10 +40,10 @@ Total: **179 tasks**. Update the Done column as work lands.
 | P10 | Frontend | 42 | 0 | 0 |
 | P11 | Security and QA | 13 | 0 | 0 |
 | P12 | Release, ops, docs | 10 | 0 | 0 |
-| **Total** | | **179** | **0** | **0** |
+| **Total** | | **181** | **0** | **0** |
 
-By area: BE 73, FE 35, SEC 20, QA 16, DB 14, OPS 10, SH 4, BIZ 4, DOC 3.
-By size: S 51, M 110, L 18.
+By area: BE 75, FE 35, SEC 20, QA 16, DB 14, OPS 10, SH 4, BIZ 4, DOC 3.
+By size: S 52, M 111, L 18.
 
 Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then P3 to P8 (backend), with P10 frontend tasks starting as each backend phase lands. P9 runs alongside P4 to P8. P11 and P12 close the release.
 
@@ -86,7 +86,7 @@ Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then 
 | [ ] | P2-01 | BE | `requirePermission` sets `req.access = {scope, memberId}` | S | P1-04 | Unit test |
 | [ ] | P2-02 | BE | `lib/scope.ts` with `scopedWhere(req, resource)` per resource | M | P2-01 | Unit test per resource |
 | [ ] | P2-03 | BE | `authenticate`: load `Member.status`; SUSPENDED/ARCHIVED gives 403 `MEMBER_SUSPENDED`; INACTIVE sets `req.readOnly` | M | P3-01 | Tests for each status |
-| [ ] | P2-04 | BE | `blockWhenReadOnly` middleware on non-GET routes, with `/me` and logout exceptions | S | P2-03 | Inactive member write returns 403 |
+| [ ] | P2-04 | BE | `blockWhenReadOnly` middleware on non-GET routes, logout and token refresh the only exceptions (no `/me`, no document or media upload) | S | P2-03 | Inactive member write returns 403 `MEMBER_INACTIVE_READ_ONLY`; GET orders, customers and catalog still 200 |
 | [ ] | P2-05 | BE | Read roles from DB (30 s cache) not the token; clear cache on role, permission and user-role change | M | P2-01 | Role change effective within one request after cache clear |
 | [ ] | P2-06 | BE | `denyPreview` middleware for payout, delete, status, refund, staff routes; block impersonating super_admin | S | P2-01 | Preview token gets 403 on listed routes |
 | [ ] | P2-07 | SEC | Add `helmet`, `trust proxy`, JSON and urlencoded body limit 100 kb | S | - | Response headers verified, oversize gets 413 |
@@ -121,6 +121,8 @@ Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then 
 | [ ] | P3-14 | DB | `deletedAt` on Branch, Deal, Therapist, Product with delete guard when OrderItem exists | M | P0-01 | 409 test |
 | [ ] | P3-15 | BE | Remove deal approval gate if decision 2 says so (migration plus code) | M | P0-01 | Deals publish without approval |
 | [ ] | P3-16 | DB | Contract migration: drop `kycStatus`, `kycRejectionReason`, legacy GST/PAN/`kycDocuments` | M | P5-02, P12-03 | Done only after one release without readers |
+| [ ] | P3-17 | BE | On suspend: send email and SMS to the member with the reason, support contact and steps to return to active; send "active again" message on reactivation | M | P3-07, P6-03 | Message sent once per change; provider failure recorded and retried, suspension kept |
+| [ ] | P3-18 | BE | Suspended member login and OTP request return 403 `MEMBER_SUSPENDED` with reason and steps; no OTP sent | S | P2-03 | Test: suspended phone gets the message, no OTP row created |
 
 ## Phase 4: Own-scope retrofit
 
@@ -255,7 +257,7 @@ Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then 
 |---|---|---|---|---|---|---|
 | [ ] | P10-20 | FE | My profile and business profile (own view/edit) | M | P8-06 | Tests |
 | [ ] | P10-21 | FE | Own documents: upload, state, reasons, "documents due in N days" banner | M | P10-17 | Tests |
-| [ ] | P10-22 | FE | Own branches, deals, therapists, products: no delete control, pause/unpublish toggle, inactive read-only mode | L | P4-02 to P4-05, P10-04 | Tests |
+| [ ] | P10-22 | FE | Own branches, deals, therapists, products: no delete control, pause/unpublish toggle; inactive member sees everything view only, with no edit, add or toggle controls | L | P4-02 to P4-05, P10-04 | Tests |
 | [ ] | P10-23 | FE | Deal form: branch required, therapist picker filtered to branch, validation messages | M | P4-03 | Tests |
 | [ ] | P10-24 | FE | Own orders, payments, payouts, reports | M | P7-08, P7-10 | Tests |
 

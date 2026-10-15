@@ -65,6 +65,7 @@ Not re-verified (check when each task starts): order-item vendor filtering, KYC 
 | D17 | Payout commission | 1% | See D2 row. |
 | D19 | Member "my customers" view | Yes to the recommendation | Name, city, order count, last order date; no phone or email unless an order is open (C-16). |
 | D20 | Rich text scope | Yes to the recommendation | Title, brand, badge, `shortDescription`, `summary`, benefits and howToUse items stay plain text; every long field is rich text (C-15). |
+| D21 | Inactive and suspended behaviour (2026-10-15) | Inactive: member logs in and views orders, customers and own catalog, but cannot edit anything existing or add anything new. Suspended: no login, everything disappears from the website, and the member gets an email and SMS at the moment of suspension with the reason and how to return to active | Section 5 (status machine, `readOnly`, notification), tasks P2-04, P3-17, P3-18. |
 
 ### 2.2 Rules this plan sets
 
@@ -276,7 +277,7 @@ erDiagram
 1. `requirePermission(menuKey, action)` resolves `{key, scope}` over all roles and sets `req.access = { scope: 'ALL'|'OWN', memberId? }` (`memberId` loaded from `Vendor.ownerUserId`).
 2. `lib/scope.ts` `scopedWhere(req, resource)` is the only place that builds the ownership filter. Mapping: `vendorId` for branches, deals, therapists, products; `OrderItem.vendorId` for orders and payments; `ownerUserId` for members; `userId` for logs and profile.
 3. `authenticate` loads member status for member-role users: `SUSPENDED` or `ARCHIVED` gives 403 `MEMBER_SUSPENDED`; `INACTIVE` sets `req.readOnly`. Staff and customers keep the current `User.status` rule.
-4. `blockWhenReadOnly` on every non-GET except `PATCH /me`, `PATCH /members/me` and logout.
+4. `blockWhenReadOnly` on every non-GET except logout and token refresh (D21). `PATCH /me`, `PATCH /members/me`, document upload, media upload and every status toggle are blocked for an inactive member. GET routes stay open, so the member still sees orders, customers and own catalog. Error: 403 `MEMBER_INACTIVE_READ_ONLY`.
 5. Roles are re-read from the database (30 s cache, cleared on role, grant, user-role and member-status change). Token `roles` is informational.
 6. Suspend revokes all `RefreshSession` rows of the owner in the same transaction.
 7. `GET /rbac/bootstrap` adds `scopes`; `shared-types` gets `PermissionScope` and `scopes`, `shared-permissions` gets `scopeFor()`.
@@ -286,11 +287,13 @@ erDiagram
 
 | From | To | Who | Reason | Side effects |
 |---|---|---|---|---|
-| ACTIVE | INACTIVE | super_admin, admin | 10 to 500 chars | hidden from storefront, writes blocked |
-| ACTIVE, INACTIVE | SUSPENDED | super_admin, admin | 10 to 500 chars | revoke sessions, hidden, notify (normal path is inactive, then suspended) |
-| INACTIVE, SUSPENDED | ACTIVE | super_admin, admin | 10 to 500 chars | restore as before |
+| ACTIVE | INACTIVE | super_admin, admin | 10 to 500 chars | hidden from storefront, all writes blocked, login and reads allowed (D21) |
+| ACTIVE, INACTIVE | SUSPENDED | super_admin, admin | 10 to 500 chars | revoke sessions, login refused, hidden, send email and SMS in the same request (normal path is inactive, then suspended) |
+| INACTIVE, SUSPENDED | ACTIVE | super_admin, admin | 10 to 500 chars | restore as before, send "account active again" email and SMS |
 | SUSPENDED | ARCHIVED | system, when a delete is requested and orders exist | n/a | hidden everywhere, rows kept |
 | SUSPENDED | hard delete | super_admin only | 10 to 500 chars | only with zero `OrderItem` rows, else ARCHIVED. Delete from ACTIVE or INACTIVE returns 409 `MEMBER_NOT_SUSPENDED`. |
+
+Suspension notice (D21): sent through the notification template service (P6-03) to the owner's email and phone, whichever exist, with `NotificationType.MEMBER_SUSPENDED`. It carries the suspension reason, the support email and phone, and the steps to return to active. Support contact values come from `SystemSetting` keys `support.email` and `support.phone`. A failed send is recorded and retried, and never rolls back the suspension. A login or OTP request by a suspended member returns 403 `MEMBER_SUSPENDED` with the same reason and steps, and no OTP is sent.
 
 ---
 
@@ -636,6 +639,7 @@ Insert path: write a seed script that calls the service layer in that order insi
 7. P0-01: answers recorded in 2.1; remaining questions are section 11.
 8. P0-03: legal review becomes advisory (D3), not a blocker.
 9. Recompute the progress table.
+10. D21: add P3-17 (suspension email and SMS) and P3-18 (suspended login message); tighten P2-04 (no `/me` exception) and P10-22 (inactive view-only).
 
 ### Build order
 
