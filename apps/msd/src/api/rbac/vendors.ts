@@ -1,14 +1,8 @@
 import { apiGet, apiPatch, apiPost, apiPut, apiDelete, apiPostForm } from './client';
 import type { MediaImage, MediaVideo } from '../media';
 
-export type VendorStatus =
-  | 'PROFILE_INCOMPLETE'
-  | 'PENDING_VERIFICATION'
-  | 'APPROVED'
-  | 'REJECTED'
-  | 'ACTIVE'
-  | 'INACTIVE'
-  | 'SUSPENDED';
+export type VendorStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'ARCHIVED';
+export type MemberStatus = VendorStatus;
 
 export type KycStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 export type DealStatus = 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'EXPIRED';
@@ -131,6 +125,16 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
   /** Real uploaded KYC documents (GST/PAN/Aadhaar) — see `VendorDocument`'s own doc comment.
    *  `kycDocuments` above is the deprecated pasted-URL shape, kept only for old rows. */
   documents?: VendorDocument[];
+  statusChangedAt?: string | null;
+  documentsDueAt?: string | null;
+  reviewFlaggedAt?: string | null;
+  documentsSummary?: {
+    complete: boolean;
+    missing: VendorDocumentType[];
+    rejected: VendorDocumentType[];
+    dueAt: string | null;
+    overdue: boolean;
+  };
 }
 
 export type VendorCreateInput = VendorFields & { ownerUserId?: string };
@@ -439,38 +443,6 @@ export function updateVendor(token: string | null, id: string, input: VendorUpda
   return apiPatch<Vendor>(`/vendors/${id}`, token, input);
 }
 
-export function approveVendor(token: string | null, id: string) {
-  return apiPatch<Vendor>(`/vendors/${id}/approve`, token);
-}
-
-export function rejectVendor(token: string | null, id: string, reason: string) {
-  return apiPatch<Vendor>(`/vendors/${id}/reject`, token, { reason });
-}
-
-export function setVendorStatus(
-  token: string | null,
-  id: string,
-  status: Extract<VendorStatus, 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'>,
-  reason?: string,
-) {
-  return apiPatch<Vendor>(`/vendors/${id}/status`, token, { status, reason });
-}
-
-export function reviewVendorKyc(
-  token: string | null,
-  id: string,
-  kycStatus: Extract<KycStatus, 'VERIFIED' | 'REJECTED'>,
-  rejectionReason?: string,
-) {
-  return apiPatch<Vendor>(`/vendors/${id}/kyc-review`, token, { kycStatus, rejectionReason });
-}
-
-/** Hard delete — blocked (409) if the vendor has real order history; use `setVendorStatus` to
- *  deactivate/suspend instead in that case. */
-export function deleteVendor(token: string | null, id: string) {
-  return apiDelete<null>(`/vendors/${id}`, token);
-}
-
 export function listBranches(token: string | null, vendorId: string) {
   return apiGet<Branch[]>(`/vendors/${vendorId}/branches`, token);
 }
@@ -582,16 +554,8 @@ export function getMyVendor(token: string | null) {
   return apiGet<Vendor>('/vendors/me', token);
 }
 
-export function createMyVendor(token: string | null, input: VendorSelfInput) {
-  return apiPost<Vendor>('/vendors/me', token, input);
-}
-
 export function updateMyVendor(token: string | null, input: VendorSelfUpdateInput) {
   return apiPatch<Vendor>('/vendors/me', token, input);
-}
-
-export function submitMyVendor(token: string | null) {
-  return apiPost<Vendor>('/vendors/me/submit', token);
 }
 
 export function listMyBranches(token: string | null) {

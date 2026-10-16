@@ -49,7 +49,7 @@ export function NotificationsPage() {
     }
     if (notification.entityType === 'DEAL') {
       const meta = notification.metadata as { vendorId?: string; branchId?: string } | null;
-      navigate(`/account/vendors?vendorId=${meta?.vendorId ?? ''}&branchId=${meta?.branchId ?? ''}&dealId=${notification.entityId ?? ''}`);
+      navigate(`/account/members?vendorId=${meta?.vendorId ?? ''}&branchId=${meta?.branchId ?? ''}&dealId=${notification.entityId ?? ''}`);
     } else if (notification.entityType === 'ORDER') {
       navigate(`/account/orders?orderId=${notification.entityId ?? ''}`);
     }

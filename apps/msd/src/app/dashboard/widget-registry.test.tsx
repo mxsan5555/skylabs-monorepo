@@ -109,9 +109,9 @@ describe('WIDGET_REGISTRY', () => {
     expect(screen.getByText('33')).toBeTruthy();
   });
 
-  it('renders the component for a known widget key ("vendor-profile"), linking to /account/vendors', () => {
+  it('renders the component for a known widget key ("vendor-profile"), linking to /account/members', () => {
     render(<MemoryRouter>{renderFromRegistry('vendor-profile')}</MemoryRouter>);
-    expect(screen.getByRole('link', { name: /My Business/ })).toHaveProperty('pathname', '/account/vendors');
+    expect(screen.getByRole('link', { name: /My Business/ })).toHaveProperty('pathname', '/account/members');
   });
 
   // Edge cases

@@ -109,6 +109,9 @@ export function apiPut<T>(path: string, token: string | null, body?: unknown): P
   });
 }
 
-export function apiDelete<T>(path: string, token: string | null): Promise<ApiResult<T>> {
-  return request<T>(path, token, { method: 'DELETE' });
+export function apiDelete<T>(path: string, token: string | null, body?: unknown): Promise<ApiResult<T>> {
+  return request<T>(path, token, {
+    method: 'DELETE',
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
 }

@@ -134,7 +134,7 @@ describe('NotificationBell', () => {
 
     await waitFor(() => expect(markNotificationReadMock).toHaveBeenCalledWith('test-token', 'notif-1'));
     await waitFor(() =>
-      expect(navigateMock).toHaveBeenCalledWith('/account/vendors?vendorId=vendor-1&branchId=branch-1&dealId=deal-1'),
+      expect(navigateMock).toHaveBeenCalledWith('/account/members?vendorId=vendor-1&branchId=branch-1&dealId=deal-1'),
     );
   });
 
@@ -161,7 +161,7 @@ describe('NotificationBell', () => {
     fireEvent.click(screen.getByText('Vendor Profile Pending Approval'));
 
     await waitFor(() => expect(markNotificationReadMock).toHaveBeenCalledWith('test-token', 'notif-3'));
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/vendors?vendorId=vendor-1'));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/members?vendorId=vendor-1'));
   });
 
   it('"Mark all read" calls markAllNotificationsRead and refetches', async () => {
