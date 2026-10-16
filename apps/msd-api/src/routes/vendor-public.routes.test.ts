@@ -47,8 +47,8 @@ beforeEach(() => {
   prismaMock.role.findUnique.mockResolvedValue(VENDOR_ROLE);
   prismaMock.userRole.upsert.mockResolvedValue({});
   prismaMock.auditLog.create.mockResolvedValue({});
-  prismaMock.vendor.findUnique.mockResolvedValue(null); // no slug/owner conflict by default
-  prismaMock.vendor.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+  prismaMock.member.findUnique.mockResolvedValue(null); // no slug/owner conflict by default
+  prismaMock.member.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
     Promise.resolve({ id: 'vendor-1', owner: { id: NEW_USER_ID, name: 'Asha Rao', roles: [] }, ...data }),
   );
 });
@@ -107,7 +107,7 @@ describe('POST /api/v1/vendors/public/register', () => {
       .post('/api/v1/vendors/public/register')
       .send(uniqueBody({ createdByUserId: 'admin-1', ownerUserId: 'admin-1', status: 'ACTIVE', role: 'admin' }));
 
-    const createCall = prismaMock.vendor.create.mock.calls[0][0];
+    const createCall = prismaMock.member.create.mock.calls[0][0];
     expect(createCall.data.createdByUserId).toBeNull();
     expect(createCall.data.status).toBe('PENDING_VERIFICATION');
     // ownerUserId on the Vendor row is the SERVER-resolved id, never whatever the body tried to send.
@@ -122,7 +122,7 @@ describe('POST /api/v1/vendors/public/register', () => {
     expect(res.status).toBe(409);
     expect(res.body.error.message).toMatch(/already exists/);
     expect(prismaMock.user.create).not.toHaveBeenCalled();
-    expect(prismaMock.vendor.create).not.toHaveBeenCalled();
+    expect(prismaMock.member.create).not.toHaveBeenCalled();
     expect(prismaMock.userRole.upsert).not.toHaveBeenCalled();
   });
 
@@ -134,7 +134,7 @@ describe('POST /api/v1/vendors/public/register', () => {
     const res = await request(app).post('/api/v1/vendors/public/register').send(uniqueBody());
 
     expect(res.status).toBe(409);
-    expect(prismaMock.vendor.create).not.toHaveBeenCalled();
+    expect(prismaMock.member.create).not.toHaveBeenCalled();
   });
 
   it('rejects a body missing the required businessName (422, VendorSelfCreateSchema requires it unlike the admin schema)', async () => {
@@ -145,7 +145,7 @@ describe('POST /api/v1/vendors/public/register', () => {
     delete (body as Record<string, unknown>).businessName;
     const res = await request(app).post('/api/v1/vendors/public/register').send(body);
     expect(res.status).toBe(422);
-    expect(prismaMock.vendor.create).not.toHaveBeenCalled();
+    expect(prismaMock.member.create).not.toHaveBeenCalled();
   });
 
   it('rejects a body with neither ownerEmail nor ownerMobile (createVendorOwner requires at least one)', async () => {
@@ -154,7 +154,7 @@ describe('POST /api/v1/vendors/public/register', () => {
     delete (body as Record<string, unknown>).ownerMobile;
     const res = await request(app).post('/api/v1/vendors/public/register').send(body);
     expect(res.status).toBe(422);
-    expect(prismaMock.vendor.create).not.toHaveBeenCalled();
+    expect(prismaMock.member.create).not.toHaveBeenCalled();
   });
 
   it('writes an audit log entry (vendor.public_register) attributed to the resolved owner', async () => {

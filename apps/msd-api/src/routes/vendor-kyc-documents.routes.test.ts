@@ -55,15 +55,15 @@ beforeEach(() => {
 describe('POST /api/v1/vendors/me/kyc-documents/:documentType', () => {
   it('uploads a valid PDF and writes an audit log entry', async () => {
     resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.vendorDocument.findUnique.mockResolvedValue(null);
-    prismaMock.vendorDocument.upsert.mockResolvedValue(documentFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.memberDocument.findUnique.mockResolvedValue(null);
+    prismaMock.memberDocument.upsert.mockResolvedValue(documentFixture);
     const res = await request(app)
       .post('/api/v1/vendors/me/kyc-documents/GST')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
       .attach('file', validPdf(), 'gst.pdf');
     expect(res.status).toBe(201);
-    expect(prismaMock.vendorDocument.upsert).toHaveBeenCalledWith(
+    expect(prismaMock.memberDocument.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ where: { vendorId_documentType: { vendorId: VENDOR_A_ID, documentType: 'GST' } } }),
     );
     expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
@@ -80,20 +80,20 @@ describe('POST /api/v1/vendors/me/kyc-documents/:documentType', () => {
 
   it('422s a file that is not a real PDF/JPG/PNG', async () => {
     resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     const res = await request(app)
       .post('/api/v1/vendors/me/kyc-documents/GST')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
       .attach('file', invalidFile(), 'fake.pdf');
     expect(res.status).toBe(422);
-    expect(prismaMock.vendorDocument.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.memberDocument.upsert).not.toHaveBeenCalled();
   });
 
   it('replacing an existing document deletes the old file after the new one is committed', async () => {
     resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.vendorDocument.findUnique.mockResolvedValue({ ...documentFixture, storageKey: 'vendor-documents/x/old.pdf' });
-    prismaMock.vendorDocument.upsert.mockResolvedValue(documentFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.memberDocument.findUnique.mockResolvedValue({ ...documentFixture, storageKey: 'vendor-documents/x/old.pdf' });
+    prismaMock.memberDocument.upsert.mockResolvedValue(documentFixture);
     const res = await request(app)
       .post('/api/v1/vendors/me/kyc-documents/GST')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
@@ -107,9 +107,9 @@ describe('POST /api/v1/vendors/me/kyc-documents/:documentType', () => {
 describe('DELETE /api/v1/vendors/me/kyc-documents/:documentType', () => {
   it('deletes the document and writes an audit log entry', async () => {
     resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.vendorDocument.findUnique.mockResolvedValue(documentFixture);
-    prismaMock.vendorDocument.delete.mockResolvedValue(documentFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.memberDocument.findUnique.mockResolvedValue(documentFixture);
+    prismaMock.memberDocument.delete.mockResolvedValue(documentFixture);
     const res = await request(app)
       .delete('/api/v1/vendors/me/kyc-documents/GST')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
@@ -119,8 +119,8 @@ describe('DELETE /api/v1/vendors/me/kyc-documents/:documentType', () => {
 
   it('404s when no document of that type exists', async () => {
     resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.vendorDocument.findUnique.mockResolvedValue(null);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.memberDocument.findUnique.mockResolvedValue(null);
     const res = await request(app)
       .delete('/api/v1/vendors/me/kyc-documents/PAN')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
@@ -157,11 +157,11 @@ describe('POST /api/v1/vendors/me/submit', () => {
 
   it('succeeds when every REQUIRED_FOR_SUBMISSION field is set and a real VendorDocument exists — no gstNumber/panNumber scalar required', async () => {
     resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(completeVendor);
-    prismaMock.vendorDocument.count.mockResolvedValue(1);
+    prismaMock.member.findUnique.mockResolvedValue(completeVendor);
+    prismaMock.memberDocument.count.mockResolvedValue(1);
     prismaMock.branch.findMany.mockResolvedValue([{ state: 'Uttar Pradesh' }]);
     prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([{ category: { type: 'SERVICE' } }]);
-    prismaMock.vendor.update.mockResolvedValue({ ...completeVendor, status: 'PENDING_VERIFICATION' });
+    prismaMock.member.update.mockResolvedValue({ ...completeVendor, status: 'PENDING_VERIFICATION' });
     prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
     const res = await request(app)
       .post('/api/v1/vendors/me/submit')
@@ -179,11 +179,11 @@ describe('POST /api/v1/vendors/me/submit', () => {
    */
   it('creates one VENDOR_PENDING_APPROVAL notification per Superadmin, inside the same transaction as the status update', async () => {
     resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(completeVendor);
-    prismaMock.vendorDocument.count.mockResolvedValue(1);
+    prismaMock.member.findUnique.mockResolvedValue(completeVendor);
+    prismaMock.memberDocument.count.mockResolvedValue(1);
     prismaMock.branch.findMany.mockResolvedValue([{ state: 'Uttar Pradesh' }]);
     prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([{ category: { type: 'SERVICE' } }]);
-    prismaMock.vendor.update.mockResolvedValue({ ...completeVendor, status: 'PENDING_VERIFICATION' });
+    prismaMock.member.update.mockResolvedValue({ ...completeVendor, status: 'PENDING_VERIFICATION' });
     prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }, { id: 'superadmin-2' }]);
     prismaMock.notification.create.mockResolvedValue({});
 
@@ -208,7 +208,7 @@ describe('POST /api/v1/vendors/me/submit', () => {
 
   it('does not create a duplicate notification when re-submitting an already-pending vendor — blocked by the existing status precondition', async () => {
     resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue({ ...completeVendor, status: 'PENDING_VERIFICATION' });
+    prismaMock.member.findUnique.mockResolvedValue({ ...completeVendor, status: 'PENDING_VERIFICATION' });
     const res = await request(app)
       .post('/api/v1/vendors/me/submit')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
@@ -218,8 +218,8 @@ describe('POST /api/v1/vendors/me/submit', () => {
 
   it('rejects when no KYC document exists at all (neither real nor legacy)', async () => {
     resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(completeVendor);
-    prismaMock.vendorDocument.count.mockResolvedValue(0);
+    prismaMock.member.findUnique.mockResolvedValue(completeVendor);
+    prismaMock.memberDocument.count.mockResolvedValue(0);
     prismaMock.branch.findMany.mockResolvedValue([{ state: 'Uttar Pradesh' }]);
     prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([{ category: { type: 'SERVICE' } }]);
     const res = await request(app)
@@ -231,14 +231,14 @@ describe('POST /api/v1/vendors/me/submit', () => {
 
   it('still succeeds via the legacy kycDocuments JSON fallback when no real VendorDocument exists (backward compatibility)', async () => {
     resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue({
+    prismaMock.member.findUnique.mockResolvedValue({
       ...completeVendor,
       kycDocuments: [{ type: 'GST', url: 'https://old-storage.example.com/gst.pdf' }],
     });
-    prismaMock.vendorDocument.count.mockResolvedValue(0);
+    prismaMock.memberDocument.count.mockResolvedValue(0);
     prismaMock.branch.findMany.mockResolvedValue([{ state: 'Uttar Pradesh' }]);
     prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([{ category: { type: 'SERVICE' } }]);
-    prismaMock.vendor.update.mockResolvedValue({ ...completeVendor, status: 'PENDING_VERIFICATION' });
+    prismaMock.member.update.mockResolvedValue({ ...completeVendor, status: 'PENDING_VERIFICATION' });
     prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
     const res = await request(app)
       .post('/api/v1/vendors/me/submit')
@@ -259,14 +259,14 @@ describe('POST /api/v1/vendors/:id/kyc-documents/:documentType (admin-on-behalf)
 
   it('uploads on behalf of a vendor', async () => {
     resolveMock.mockResolvedValue(['vendors:edit']);
-    prismaMock.vendorDocument.findUnique.mockResolvedValue(null);
-    prismaMock.vendorDocument.upsert.mockResolvedValue({ ...documentFixture, documentType: 'PAN' });
+    prismaMock.memberDocument.findUnique.mockResolvedValue(null);
+    prismaMock.memberDocument.upsert.mockResolvedValue({ ...documentFixture, documentType: 'PAN' });
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/kyc-documents/PAN`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
       .attach('file', validPdf(), 'pan.pdf');
     expect(res.status).toBe(201);
-    expect(prismaMock.vendorDocument.upsert).toHaveBeenCalledWith(
+    expect(prismaMock.memberDocument.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ where: { vendorId_documentType: { vendorId: VENDOR_A_ID, documentType: 'PAN' } } }),
     );
   });

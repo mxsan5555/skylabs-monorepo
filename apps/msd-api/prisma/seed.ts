@@ -600,12 +600,12 @@ async function seedCategoryTaxonomy(): Promise<Map<string, string>> {
  * fallback logic; now there's one implementation.
  */
 async function backfillVendorSlugs(): Promise<number> {
-  const vendorsMissingSlug = await prisma.vendor.findMany({ where: { slug: null } });
+  const vendorsMissingSlug = await prisma.member.findMany({ where: { slug: null } });
   for (const v of vendorsMissingSlug) {
     const slug = await ensureUniqueSlug(v.businessName ?? v.id, v.id, (candidate) =>
-      prisma.vendor.findUnique({ where: { slug: candidate } }).then(Boolean),
+      prisma.member.findUnique({ where: { slug: candidate } }).then(Boolean),
     );
-    await prisma.vendor.update({ where: { id: v.id }, data: { slug } });
+    await prisma.member.update({ where: { id: v.id }, data: { slug } });
   }
   return vendorsMissingSlug.length;
 }
@@ -844,8 +844,8 @@ async function seedVendorsAndBranches(
 
     // Find-or-create: businessName/address/kycStatus/status/etc. are admin- and vendor-editable
     // (KYC approval, profile edits) — never overwrite them on a re-run.
-    const vendor = (await prisma.vendor.findUnique({ where: { ownerUserId: ownerUser.id } }))
-      ?? (await prisma.vendor.create({ data: { ...vendorData, ownerUserId: ownerUser.id } }));
+    const vendor = (await prisma.member.findUnique({ where: { ownerUserId: ownerUser.id } }))
+      ?? (await prisma.member.create({ data: { ...vendorData, ownerUserId: ownerUser.id } }));
     vendorIdByKey.set(v.key, vendor.id);
 
     for (const b of v.branches) {
@@ -976,7 +976,7 @@ async function seedVendorModulesAndCategoryAccess(
 ):Promise<void>{
   const grant=async(vendorKey:string,opts:{offersService?:boolean;offersProduct?:boolean;offersTherapy?:boolean},categorySlugs:string[])=>{
     const vendorId=vendorIdByKey.get(vendorKey); if(!vendorId)return;
-    await prisma.vendor.update({where:{id:vendorId},data:{offersService:opts.offersService??false,offersProduct:opts.offersProduct??false,offersTherapy:opts.offersTherapy??false}});
+    await prisma.member.update({where:{id:vendorId},data:{offersService:opts.offersService??false,offersProduct:opts.offersProduct??false,offersTherapy:opts.offersTherapy??false}});
     for(const slug of categorySlugs){const categoryId=categoryIdBySlug.get(slug); if(!categoryId)continue; await prisma.vendorCategoryAccess.upsert({where:{vendorId_categoryId:{vendorId,categoryId}},update:{},create:{vendorId,categoryId}});}
   };
   await grant('glow',{offersService:true},['massage','skin-beauty']);
@@ -1515,7 +1515,7 @@ async function main() {
     prisma.category.count(),
     prisma.category.count({ where: { parentId: { not: null } } }),
     prisma.product.count(),
-    prisma.vendor.count(),
+    prisma.member.count(),
     prisma.branch.count(),
     prisma.deal.count(),
     prisma.cartItem.count({ where: { cart: { customerId: demoCustomerId } } }),

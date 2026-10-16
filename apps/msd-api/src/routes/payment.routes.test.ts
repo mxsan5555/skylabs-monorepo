@@ -209,7 +209,7 @@ describe('POST /api/v1/orders/me/:id/pay-cod', () => {
       prismaMock.payment.create.mockResolvedValue({ ...paymentFixture, provider: 'COD', status: 'CREATED' });
       prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
       prismaMock.orderItem.findMany.mockResolvedValue([{ vendorId: 'vendor-1' }]);
-      prismaMock.vendor.findUnique.mockResolvedValue({ ownerUserId: 'vendor-1-owner' });
+      prismaMock.member.findUnique.mockResolvedValue({ ownerUserId: 'vendor-1-owner' });
       prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
 
       const res = await request(app)
@@ -234,7 +234,7 @@ describe('POST /api/v1/orders/me/:id/pay-cod', () => {
       prismaMock.payment.create.mockResolvedValue({ ...paymentFixture, provider: 'COD', status: 'CREATED' });
       prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
       prismaMock.orderItem.findMany.mockResolvedValue([{ vendorId: 'vendor-A' }, { vendorId: 'vendor-A' }, { vendorId: 'vendor-B' }]);
-      prismaMock.vendor.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
+      prismaMock.member.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
         Promise.resolve({ ownerUserId: where.id === 'vendor-A' ? 'owner-A' : 'owner-B' }),
       );
       prismaMock.user.findMany.mockResolvedValue([]);
@@ -584,7 +584,7 @@ describe('POST /api/v1/payments/webhook/razorpay', () => {
     prismaMock.order.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.order.findMany.mockResolvedValue([orderFixture]);
     prismaMock.orderItem.findMany.mockResolvedValue([{ vendorId: 'vendor-1' }]);
-    prismaMock.vendor.findUnique.mockResolvedValue({ ownerUserId: 'vendor-1-owner' });
+    prismaMock.member.findUnique.mockResolvedValue({ ownerUserId: 'vendor-1-owner' });
     prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
     const signature = signWebhook(capturedEvent);
     const res = await request(app).post('/api/v1/payments/webhook/razorpay').set('x-razorpay-signature', signature).send(capturedEvent);

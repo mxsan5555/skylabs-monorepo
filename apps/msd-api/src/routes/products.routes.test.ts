@@ -121,7 +121,7 @@ describe('GET /api/v1/products/:id (superadmin oversight)', () => {
 describe('GET /api/v1/products — Vendor isolation (CRITICAL)', () => {
   it('a Vendor caller (no vendorId query param) sees ONLY their own vendor\'s products, never every vendor\'s', async () => {
     resolveMock.mockResolvedValue(['products:view']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.product.findMany.mockResolvedValue([productFixture]);
     prismaMock.product.count.mockResolvedValue(1);
     const res = await request(app)
@@ -135,7 +135,7 @@ describe('GET /api/v1/products — Vendor isolation (CRITICAL)', () => {
 
   it('a Vendor caller cannot see another vendor\'s products by spoofing ?vendorId= — the query param is ignored, not trusted', async () => {
     resolveMock.mockResolvedValue(['products:view']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.product.findMany.mockResolvedValue([]);
     prismaMock.product.count.mockResolvedValue(0);
     await request(app)
@@ -152,7 +152,7 @@ describe('GET /api/v1/products — Vendor isolation (CRITICAL)', () => {
 
   it('Superadmin/admin (no Vendor profile) still sees every vendor\'s products, unaffected by the fix', async () => {
     resolveMock.mockResolvedValue(['products:view']);
-    prismaMock.vendor.findUnique.mockResolvedValue(null); // admin/staff caller owns no Vendor profile
+    prismaMock.member.findUnique.mockResolvedValue(null); // admin/staff caller owns no Vendor profile
     prismaMock.product.findMany.mockResolvedValue([productFixture]);
     prismaMock.product.count.mockResolvedValue(1);
     const res = await request(app)
@@ -169,7 +169,7 @@ describe('GET /api/v1/products — Vendor isolation (CRITICAL)', () => {
 describe('GET /api/v1/products/:id — Vendor isolation (CRITICAL, ID-tampering)', () => {
   it('a Vendor caller can open their OWN product by id', async () => {
     resolveMock.mockResolvedValue(['products:view']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.product.findUnique.mockResolvedValue(productFixture); // vendorId === VENDOR_ID, the caller's own
     const res = await request(app)
       .get(`/api/v1/products/${PRODUCT_ID}`)
@@ -180,7 +180,7 @@ describe('GET /api/v1/products/:id — Vendor isolation (CRITICAL, ID-tampering)
 
   it('a Vendor caller CANNOT open another vendor\'s product by guessing/tampering its id — blocked, not just hidden from the list', async () => {
     resolveMock.mockResolvedValue(['products:view']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.product.findUnique.mockResolvedValue({ ...productFixture, vendorId: VENDOR_B_ID }); // belongs to a different vendor
     const res = await request(app)
       .get(`/api/v1/products/${PRODUCT_ID}`)
@@ -190,7 +190,7 @@ describe('GET /api/v1/products/:id — Vendor isolation (CRITICAL, ID-tampering)
 
   it('Superadmin/admin can still open any vendor\'s product by id, unaffected by the fix', async () => {
     resolveMock.mockResolvedValue(['products:view']);
-    prismaMock.vendor.findUnique.mockResolvedValue(null);
+    prismaMock.member.findUnique.mockResolvedValue(null);
     prismaMock.product.findUnique.mockResolvedValue(productFixture);
     const res = await request(app)
       .get(`/api/v1/products/${PRODUCT_ID}`)

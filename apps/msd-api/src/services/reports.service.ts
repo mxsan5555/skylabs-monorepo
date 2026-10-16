@@ -148,7 +148,7 @@ async function vendorRevenueRows(filters: ReportFilters): Promise<VendorReportRo
   }
 
   const vendorIds = [...new Set(grouped.map((g) => g.vendorId))];
-  const vendors = await prisma.vendor.findMany({ where: { id: { in: vendorIds } }, select: { id: true, businessName: true } });
+  const vendors = await prisma.member.findMany({ where: { id: { in: vendorIds } }, select: { id: true, businessName: true } });
   const vendorNameById = new Map(vendors.map((v) => [v.id, v.businessName ?? 'Vendor']));
 
   const byVendor = new Map<string, VendorReportRow>();

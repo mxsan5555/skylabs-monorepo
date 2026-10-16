@@ -56,7 +56,7 @@ export async function notifySuperAdmins(tx: Prisma.TransactionClient, input: Not
 /** No-ops (does not throw) when the vendor has no `ownerUserId` yet (an admin-created, not-yet-
  *  claimed vendor) — a notification failure must never break the deal/order flow that triggered it. */
 export async function notifyVendorOwner(tx: Prisma.TransactionClient, vendorId: string, input: NotificationInput) {
-  const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { ownerUserId: true } });
+  const vendor = await tx.member.findUnique({ where: { id: vendorId }, select: { ownerUserId: true } });
   if (!vendor?.ownerUserId) {
     console.warn({ context: 'notifyVendorOwner: vendor has no owner yet, skipping', vendorId });
     return;

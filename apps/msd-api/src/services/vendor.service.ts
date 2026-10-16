@@ -17,7 +17,7 @@ import { getProductScopedOrThrow } from './product.service';
 import * as mediaService from './media.service';
 import type { MediaFile } from './media.service';
 import * as notificationService from './notification.service';
-import { Prisma, type CategoryType, type VendorStatus, type KycStatus, type DealStatus, type DealApprovalStatus } from '../generated/prisma-client';
+import { Prisma, type CategoryType, type MemberStatus, type KycStatus, type DealStatus, type DealApprovalStatus } from '../generated/prisma-client';
 import type {
   VendorCreateSchema,
   VendorUpdateSchema,
@@ -150,8 +150,8 @@ export async function attachLiveCounts<T extends { id: string }>(vendors: T[]): 
   }));
 }
 
-function heuristicInitialStatus(input: { gstNumber?: string; panNumber?: string }): VendorStatus {
-  return input.gstNumber && input.panNumber ? 'PENDING_VERIFICATION' : 'PROFILE_INCOMPLETE';
+function heuristicInitialStatus(_input: { gstNumber?: string; panNumber?: string }): MemberStatus {
+  return 'ACTIVE';
 }
 
 interface RawOwner {
@@ -179,7 +179,7 @@ export async function listVendors(opts: {
   page: number;
   pageSize: number;
   search?: string;
-  status?: VendorStatus;
+  status?: MemberStatus;
 }) {
   const where = {
     ...(opts.status ? { status: opts.status } : {}),
@@ -193,20 +193,20 @@ export async function listVendors(opts: {
       : {}),
   };
   const [items, total] = await Promise.all([
-    prisma.vendor.findMany({
+    prisma.member.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       skip: (opts.page - 1) * opts.pageSize,
       take: opts.pageSize,
       include: OWNER_INCLUDE,
     }),
-    prisma.vendor.count({ where }),
+    prisma.member.count({ where }),
   ]);
   return { items: items.map(serializeVendor), total };
 }
 
 export async function getVendorOrThrow(id: string) {
-  const vendor = await prisma.vendor.findUnique({ where: { id }, include: OWNER_INCLUDE });
+  const vendor = await prisma.member.findUnique({ where: { id }, include: OWNER_INCLUDE });
   if (!vendor) throw new ApiError('NOT_FOUND', 'Vendor not found');
   return serializeVendor(vendor);
 }
@@ -224,7 +224,7 @@ async function assertOwnerUserAvailable(ownerUserId: string | undefined, exclude
   if (user.status !== 'active') {
     throw new ApiError('VALIDATION_ERROR', 'Selected user is not eligible to become a vendor (inactive or blocked)');
   }
-  const existing = await prisma.vendor.findUnique({ where: { ownerUserId } });
+  const existing = await prisma.member.findUnique({ where: { ownerUserId } });
   if (existing && existing.id !== excludeVendorId) {
     throw new ApiError('CONFLICT', 'This user is already associated with a vendor');
   }
@@ -351,14 +351,14 @@ async function buildAndInsertVendor(
   input: VendorCreateInput | VendorSelfCreateInput,
   ownerUserId: string | undefined,
   createdByUserId: string | null,
-  status: VendorStatus,
+  status: MemberStatus,
 ) {
   const id = randomUUID();
   const slug = await ensureUniqueSlug(input.businessName || id, id, (candidate) =>
-    prisma.vendor.findUnique({ where: { slug: candidate } }).then(Boolean),
+    prisma.member.findUnique({ where: { slug: candidate } }).then(Boolean),
   );
   const mapLocation = await resolveMapLocationForCreate(input.mapLocationUrl);
-  const vendor = await prisma.vendor.create({
+  const vendor = await prisma.member.create({
     data: {
       ...input,
       ...mapLocation,
@@ -367,7 +367,7 @@ async function buildAndInsertVendor(
       ownerUserId,
       status,
       createdByUserId,
-    } as Prisma.VendorUncheckedCreateInput,
+    } as Prisma.MemberUncheckedCreateInput,
     include: OWNER_INCLUDE,
   });
   return serializeVendor(vendor);
@@ -393,7 +393,7 @@ export async function createVendor(input: VendorCreateInput, createdByUserId: st
   // mobile) was silently discarded and the FIRST vendor was returned instead, before
   // `createVendorOwner`'s own conflict check ever ran. So a duplicate-owner submission never
   // surfaced its intended 409 — it just silently handed back an unrelated vendor.
-  const recentDuplicate = await prisma.vendor.findFirst({
+  const recentDuplicate = await prisma.member.findFirst({
     where: {
       createdByUserId,
       businessName: input.businessName ?? null,
@@ -442,7 +442,7 @@ export async function registerPublicVendor(input: VendorSelfCreateInput) {
     [input.ownerFirstName, input.ownerLastName].filter(Boolean).join(' ').trim() || input.contactPerson,
   );
   await ensureVendorRoleAssigned(ownerUserId);
-  return buildAndInsertVendor(input, ownerUserId, null, 'PENDING_VERIFICATION');
+  return buildAndInsertVendor(input, ownerUserId, null, 'ACTIVE');
 }
 
 export async function updateVendor(id: string, input: VendorUpdateInput) {
@@ -454,14 +454,14 @@ export async function updateVendor(id: string, input: VendorUpdateInput) {
   // time a real businessName arrives via update, upgrade the slug to reflect it — but never
   // again after that, so a vendor's public `/vendor/:slug` URL never unexpectedly changes once
   // it's been derived from a real name.
-  const data: Prisma.VendorUncheckedUpdateInput = { ...input } as Prisma.VendorUncheckedUpdateInput;
+  const data: Prisma.MemberUncheckedUpdateInput = { ...input } as Prisma.MemberUncheckedUpdateInput;
   if (!existing.businessName && input.businessName) {
     data.slug = await ensureUniqueSlug(input.businessName, id, (candidate) =>
-      prisma.vendor.findUnique({ where: { slug: candidate } }).then((v) => Boolean(v) && v!.id !== id),
+      prisma.member.findUnique({ where: { slug: candidate } }).then((v) => Boolean(v) && v!.id !== id),
     );
   }
   Object.assign(data, await resolveMapLocationForUpdate(input, existing.mapLocationUrl));
-  const vendor = await prisma.vendor.update({
+  const vendor = await prisma.member.update({
     where: { id },
     data,
     include: OWNER_INCLUDE,
@@ -472,26 +472,26 @@ export async function updateVendor(id: string, input: VendorUpdateInput) {
 /** Approve jumps straight to ACTIVE — no pointless extra "approved but not active" click. */
 export async function approveVendor(id: string) {
   await getVendorOrThrow(id);
-  const vendor = await prisma.vendor.update({ where: { id }, data: { status: 'ACTIVE', statusReason: null }, include: OWNER_INCLUDE });
+  const vendor = await prisma.member.update({ where: { id }, data: { status: 'ACTIVE', statusReason: null }, include: OWNER_INCLUDE });
   return serializeVendor(vendor);
 }
 
 export async function rejectVendor(id: string, reason: string) {
   await getVendorOrThrow(id);
-  const vendor = await prisma.vendor.update({ where: { id }, data: { status: 'REJECTED', statusReason: reason }, include: OWNER_INCLUDE });
+  const vendor = await prisma.member.update({ where: { id }, data: { status: 'SUSPENDED', statusReason: reason }, include: OWNER_INCLUDE });
   return serializeVendor(vendor);
 }
 
 /** Generic activate/deactivate/suspend for an already-approved vendor (not the initial approve/reject transition). */
 export async function setVendorStatus(id: string, status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED', reason?: string) {
   await getVendorOrThrow(id);
-  const vendor = await prisma.vendor.update({ where: { id }, data: { status, statusReason: reason ?? null }, include: OWNER_INCLUDE });
+  const vendor = await prisma.member.update({ where: { id }, data: { status, statusReason: reason ?? null }, include: OWNER_INCLUDE });
   return serializeVendor(vendor);
 }
 
 export async function reviewKyc(id: string, kycStatus: Extract<KycStatus, 'VERIFIED' | 'REJECTED'>, rejectionReason?: string) {
   await getVendorOrThrow(id);
-  const vendor = await prisma.vendor.update({
+  const vendor = await prisma.member.update({
     where: { id },
     data: { kycStatus, kycRejectionReason: kycStatus === 'REJECTED' ? rejectionReason : null },
     include: OWNER_INCLUDE,
@@ -509,7 +509,7 @@ export async function reviewKyc(id: string, kycStatus: Extract<KycStatus, 'VERIF
 export async function deleteVendor(id: string) {
   await getVendorOrThrow(id);
   try {
-    await prisma.vendor.delete({ where: { id } });
+    await prisma.member.delete({ where: { id } });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
       throw new ApiError('CONFLICT', 'Cannot delete this vendor because it has existing orders or other records referencing it. Deactivate it instead.');
@@ -522,7 +522,7 @@ export async function deleteVendor(id: string) {
 
 /** Never throws — callers decide whether "no vendor yet" means 404 or "show onboarding." */
 export async function getVendorByOwnerUserId(ownerUserId: string) {
-  return prisma.vendor.findUnique({
+  return prisma.member.findUnique({
     where: { ownerUserId },
     include: { _count: { select: { branches: true } }, ...VENDOR_MEDIA_INCLUDE },
   });
@@ -535,14 +535,14 @@ export async function getMyVendorOrThrow(ownerUserId: string) {
 }
 
 export async function createSelfVendor(ownerUserId: string, input: VendorSelfCreateInput) {
-  const existing = await prisma.vendor.findUnique({ where: { ownerUserId } });
+  const existing = await prisma.member.findUnique({ where: { ownerUserId } });
   if (existing) throw new ApiError('CONFLICT', 'You already have a vendor profile');
   const id = randomUUID();
   const slug = await ensureUniqueSlug(input.businessName, id, (candidate) =>
-    prisma.vendor.findUnique({ where: { slug: candidate } }).then(Boolean),
+    prisma.member.findUnique({ where: { slug: candidate } }).then(Boolean),
   );
   const mapLocation = await resolveMapLocationForCreate(input.mapLocationUrl);
-  return prisma.vendor.create({
+  return prisma.member.create({
     data: {
       ...input,
       ...mapLocation,
@@ -550,7 +550,7 @@ export async function createSelfVendor(ownerUserId: string, input: VendorSelfCre
       slug,
       ownerUserId,
       status: heuristicInitialStatus(input),
-    } as Prisma.VendorUncheckedCreateInput,
+    } as Prisma.MemberUncheckedCreateInput,
     include: VENDOR_MEDIA_INCLUDE,
   });
 }
@@ -564,9 +564,9 @@ export async function updateSelfVendor(ownerUserId: string, input: VendorSelfUpd
     data.kycRejectionReason = null;
   }
   Object.assign(data, await resolveMapLocationForUpdate(input, vendor.mapLocationUrl));
-  return prisma.vendor.update({
+  return prisma.member.update({
     where: { id: vendor.id },
-    data: data as Prisma.VendorUncheckedUpdateInput,
+    data: data as Prisma.MemberUncheckedUpdateInput,
     include: VENDOR_MEDIA_INCLUDE,
   });
 }
@@ -593,7 +593,7 @@ const REQUIRED_FOR_SUBMISSION: { key: keyof Awaited<ReturnType<typeof getMyVendo
  *  The onboarding wizard's Step 1 gate moves this same check up client-side (disables
  *  "Continue"/"Create Vendor" until satisfied); this is the server-side confirmation. */
 async function hasMinimumKycDocument(vendorId: string, legacyKycDocuments: unknown): Promise<boolean> {
-  const realDocumentCount = await prisma.vendorDocument.count({ where: { vendorId } });
+  const realDocumentCount = await prisma.memberDocument.count({ where: { vendorId } });
   if (realDocumentCount > 0) return true;
   if (!Array.isArray(legacyKycDocuments)) return false;
   return legacyKycDocuments.some(
@@ -611,7 +611,7 @@ async function hasMinimumKycDocument(vendorId: string, legacyKycDocuments: unkno
  */
 export async function submitForVerification(ownerUserId: string) {
   const vendor = await getMyVendorOrThrow(ownerUserId);
-  if (vendor.status !== 'PROFILE_INCOMPLETE' && vendor.status !== 'REJECTED') {
+  if ((vendor.status as string) !== 'PROFILE_INCOMPLETE' && (vendor.status as string) !== 'REJECTED') {
     throw new ApiError('CONFLICT', `Cannot submit a vendor with status ${vendor.status}`);
   }
   const missing = REQUIRED_FOR_SUBMISSION.filter((f) => !vendor[f.key]).map((f) => f.label);
@@ -657,9 +657,9 @@ export async function submitForVerification(ownerUserId: string) {
   // duplicate-prevention — a vendor editing/saving again while PENDING_VERIFICATION never reaches
   // this code path again.
   return prisma.$transaction(async (tx) => {
-    const updated = await tx.vendor.update({
+    const updated = await tx.member.update({
       where: { id: vendor.id },
-      data: { status: 'PENDING_VERIFICATION', statusReason: null },
+      data: { status: 'ACTIVE', statusReason: null },
     });
     await notificationService.notifySuperAdmins(tx, {
       type: 'VENDOR_PENDING_APPROVAL',
@@ -900,11 +900,11 @@ export async function setBranchCategoryAccess(vendorId: string, branchId: string
         data: toGrant.map((c) => ({ vendorId, categoryId: c.id })),
         skipDuplicates: true,
       });
-      const flags: Prisma.VendorUpdateInput = {};
+      const flags: Prisma.MemberUpdateInput = {};
       if (toGrant.some((c) => c.type === 'SERVICE')) flags.offersService = true;
       if (toGrant.some((c) => c.type === 'THERAPY')) flags.offersTherapy = true;
       if (Object.keys(flags).length > 0) {
-        await tx.vendor.update({ where: { id: vendorId }, data: flags });
+        await tx.member.update({ where: { id: vendorId }, data: flags });
       }
     }
 
@@ -1291,7 +1291,7 @@ export async function setVendorModulesAndCategoryAccess(
   }
 
   await prisma.$transaction([
-    prisma.vendor.update({
+    prisma.member.update({
       where: { id: vendorId },
       data: { offersService: input.offersService, offersProduct: input.offersProduct, offersTherapy: input.offersTherapy },
     }),
@@ -1485,7 +1485,7 @@ export async function createDeal(
       // — see the `approvalStatus` gate above. Runs inside this same transaction so a rolled-back
       // deal creation (e.g. the P2002 slug race below) can never leave a stray notification behind.
       if (!actorIsAdmin) {
-        const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { businessName: true } });
+        const vendor = await tx.member.findUnique({ where: { id: vendorId }, select: { businessName: true } });
         await notificationService.notifySuperAdmins(tx, {
           type: 'DEAL_PENDING_APPROVAL',
           title: 'New Deal Pending Approval',

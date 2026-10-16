@@ -7,7 +7,7 @@ extendZodWithOpenApi(z);
 
 export const VendorListQuerySchema = PaginationQuerySchema.extend({
   search: z.string().max(200).optional(),
-  status: z.enum(['PROFILE_INCOMPLETE', 'PENDING_VERIFICATION', 'APPROVED', 'REJECTED', 'ACTIVE', 'INACTIVE', 'SUSPENDED']).optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED', 'ARCHIVED']).optional(),
 });
 
 /** Query for the "select an existing User to link as this Vendor's owner" search box. */

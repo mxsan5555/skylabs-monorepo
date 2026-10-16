@@ -139,12 +139,12 @@ describe('createVendor — double-submit guard scoping (regression: two differen
     prismaMock.user.create.mockResolvedValue({ id: newUserId } as never);
     prismaMock.role.findUnique.mockResolvedValue(ROLE_FIXTURE as never);
     prismaMock.userRole.upsert.mockResolvedValue({} as never);
-    prismaMock.vendor.findUnique.mockResolvedValue(null as never); // slug uniqueness check
-    prismaMock.vendor.create.mockResolvedValue({ ...vendorRow, owner: null } as never);
+    prismaMock.member.findUnique.mockResolvedValue(null as never); // slug uniqueness check
+    prismaMock.member.create.mockResolvedValue({ ...vendorRow, owner: null } as never);
   }
 
   it("the guard query is scoped by the submitted owner's email/mobile, not businessName alone", async () => {
-    prismaMock.vendor.findFirst.mockResolvedValue(null); // no recent duplicate
+    prismaMock.member.findFirst.mockResolvedValue(null); // no recent duplicate
     armDownstreamSuccess(NEW_USER_ID, { id: 'vendor-a' });
 
     await createVendor(
@@ -152,7 +152,7 @@ describe('createVendor — double-submit guard scoping (regression: two differen
       ADMIN_ID,
     );
 
-    expect(prismaMock.vendor.findFirst).toHaveBeenCalledWith(
+    expect(prismaMock.member.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           createdByUserId: ADMIN_ID,
@@ -177,7 +177,7 @@ describe('createVendor — double-submit guard scoping (regression: two differen
     // A regardless of who owner B actually was); a field present in `where` must match vendor A's
     // own value to count as a hit. This is what makes the mock fail the same way the real Prisma
     // query did before the fix, and pass once the guard's `where` actually includes owner identity.
-    prismaMock.vendor.findFirst.mockImplementation(async (args: unknown) => {
+    prismaMock.member.findFirst.mockImplementation(async (args: unknown) => {
       const where = (args as { where?: Record<string, unknown> })?.where ?? {};
       if (where.createdByUserId !== ADMIN_ID) return null;
       if (where.businessName !== null) return null;

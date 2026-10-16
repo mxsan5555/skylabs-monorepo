@@ -660,7 +660,7 @@ export async function getPublicProductOrThrow(id: string) {
  * per "reuse existing APIs first."
  */
 export async function getPublicVendorBySlugOrThrow(slug: string, opts: { state?: string; city?: string } = {}) {
-  const vendor = await prisma.vendor.findFirst({
+  const vendor = await prisma.member.findFirst({
     where: { slug, status: 'ACTIVE' },
     select: {
       ...PUBLIC_VENDOR_DETAIL_SELECT,

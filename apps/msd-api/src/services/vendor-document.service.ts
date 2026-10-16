@@ -14,19 +14,19 @@ const STORAGE_SUBDIR = 'vendor-documents';
  * multi-per-entity concept, just one active file per type, upserted on re-upload ("Replace").
  */
 export async function listVendorDocuments(vendorId: string) {
-  return prisma.vendorDocument.findMany({ where: { vendorId }, orderBy: { documentType: 'asc' } });
+  return prisma.memberDocument.findMany({ where: { vendorId }, orderBy: { documentType: 'asc' } });
 }
 
 export async function uploadVendorDocument(vendorId: string, documentType: VendorDocumentType, file: MediaFile) {
   const validated = validateMediaFile(file.buffer, 'document');
-  const existing = await prisma.vendorDocument.findUnique({
+  const existing = await prisma.memberDocument.findUnique({
     where: { vendorId_documentType: { vendorId, documentType } },
   });
   const { storageKey, sizeBytes } = await writeMediaFile(STORAGE_SUBDIR, vendorId, file.buffer, validated.extension);
 
   let upserted;
   try {
-    upserted = await prisma.vendorDocument.upsert({
+    upserted = await prisma.memberDocument.upsert({
       where: { vendorId_documentType: { vendorId, documentType } },
       create: {
         vendorId,
@@ -65,10 +65,10 @@ export async function uploadVendorDocument(vendorId: string, documentType: Vendo
 }
 
 export async function deleteVendorDocument(vendorId: string, documentType: VendorDocumentType) {
-  const existing = await prisma.vendorDocument.findUnique({
+  const existing = await prisma.memberDocument.findUnique({
     where: { vendorId_documentType: { vendorId, documentType } },
   });
   if (!existing) throw new ApiError('NOT_FOUND', 'Document not found');
-  await prisma.vendorDocument.delete({ where: { id: existing.id } });
+  await prisma.memberDocument.delete({ where: { id: existing.id } });
   await deleteMediaFile(existing.storageKey);
 }
