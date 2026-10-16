@@ -31,7 +31,7 @@ type DrivenChangeEvent = ChangeEvent<HTMLElement & { value: string }>;
  *  convention as `PriceRangeField`/`CheckboxFacet` (see those files' own doc comments: the
  *  shared-ui React wrappers set element state via an imperative property effect that does not
  *  run under Vitest's `@lit/react` resolution). */
-/** Same convention as `VendorDetailPage`'s `name` derivation: business name first, owner name as
+/** Same convention as `MemberDetailPage`'s `name` derivation: business name first, owner name as
  *  a fallback, `null` (not a literal) when neither is known yet — the breadcrumb itself supplies
  *  the transient/failure fallback label. */
 function vendorDisplayName(vendor: Vendor): string | null {

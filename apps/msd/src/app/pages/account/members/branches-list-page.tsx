@@ -32,7 +32,7 @@ function toRow(branch: Branch): Record<string, string | number> {
 }
 
 /** Branches — data table, same presentation as Deals/Therapists/Products. Plugged into
- *  `VendorDetailPage`'s `section="branches"`. Add/Edit are full pages (`/branches/new`,
+ *  `MemberDetailPage`'s `section="branches"`. Add/Edit are full pages (`/branches/new`,
  *  `/branches/:branchId`), never a popup; branches have no hard delete (they cascade to
  *  deals/therapists/orders), so the only destructive-adjacent action is the status toggle,
  *  confirmed on deactivate the same way as every other destructive action in this console. */

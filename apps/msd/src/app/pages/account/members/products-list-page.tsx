@@ -12,7 +12,7 @@ interface ProductsListPageProps {
   /** Gates "Add product" and each row's Edit/Toggle-status action — same coarse `vendors:edit`
    *  prop `BranchesListPage`/`DealsListPage`/`TherapistsListPage` already take. */
   canEdit: boolean;
-  /** Gates the Delete row action — mirrors `vendor-detail-page.tsx`'s own `canDelete`. */
+  /** Gates the Delete row action — mirrors `member-detail-page.tsx`'s own `canDelete`. */
   canDelete: boolean;
 }
 
@@ -43,7 +43,7 @@ function toRow(p: VendorProduct): Record<string, string | number> {
 }
 
 /** Products — data table, vendor-level (Product has no branch, see msd-api's Product schema doc
- *  comment). Plugged into `VendorDetailPage`'s `section="products"`. Add/Edit are full pages
+ *  comment). Plugged into `MemberDetailPage`'s `section="products"`. Add/Edit are full pages
  *  (`/products/new`, `/products/:productId`), mirroring Deals/Therapists' own list+form pattern.
  *  Unlike those two (vendor-wide, unpaginated reads), Product's admin list is server-paginated
  *  and searchable (`listVendorProducts` takes `page`/`pageSize`/`search`), so this page owns

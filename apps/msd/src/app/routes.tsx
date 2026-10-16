@@ -22,7 +22,7 @@ import { UserManagement } from './pages/account/users/users';
 import { AuditLogs } from './pages/account/audit-logs/audit-logs';
 import { MemberManagement } from './pages/account/members/members';
 import { MemberNewPage } from './pages/account/members/member-new-page';
-import { VendorDetailPage } from './pages/account/members/vendor-detail-page';
+import { MemberDetailPage } from './pages/account/members/member-detail-page';
 import { BranchFormPage } from './pages/account/members/branch-form-page';
 import { DealFormPage } from './pages/account/members/deal-form-page';
 import { TherapistFormPage } from './pages/account/members/therapist-form-page';
@@ -349,25 +349,24 @@ export function AppRoutes() {
               </VendorsRouteGuard>
             }
           />
-          {/* One member's own page: an Overview of cards (Branches/Deals/Therapists/Products +
-            the profile summary), each card's Add/Edit button navigating to that section's own
-            URL below — no tab strip, real routes instead, so the breadcrumb and back button
-            always match what's on screen. Admin only: VendorDetailPage checks `members:view`
-            itself, and every API call it makes is permission-gated server-side. The static `new`
-            route above wins over this dynamic segment. */}
+          {/* One member's own page: status actions in the header and seven tabs, each tab its
+            own URL (`:section`) so the back button and shared links land on the same tab.
+            Admin only: MemberDetailPage checks `members:view` itself, and every API call it
+            makes is permission-gated server-side. The static `new` route above wins over this
+            dynamic segment. */}
           <Route
-            path="/account/members/:vendorId"
+            path="/account/members/:memberId"
             element={
               <VendorsRouteGuard>
-                <VendorDetailPage />
+                <MemberDetailPage />
               </VendorsRouteGuard>
             }
           />
           <Route
-            path="/account/members/:vendorId/:section"
+            path="/account/members/:memberId/:section"
             element={
               <VendorsRouteGuard>
-                <VendorDetailPage />
+                <MemberDetailPage />
               </VendorsRouteGuard>
             }
           />

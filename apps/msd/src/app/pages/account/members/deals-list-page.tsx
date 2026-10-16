@@ -12,7 +12,7 @@ interface DealsListPageProps {
    *  prop `BranchesListPage`/`TherapistsTab` already take (the backend's nested
    *  `vendors.deals:*` permissions are the real enforcement either way). */
   canEdit: boolean;
-  /** Gates the Delete row action — mirrors `vendor-detail-page.tsx`'s own `canDelete`. */
+  /** Gates the Delete row action — mirrors `member-detail-page.tsx`'s own `canDelete`. */
   canDelete: boolean;
 }
 
@@ -42,7 +42,7 @@ function toRow(d: AdminDeal): Record<string, string | number> {
   };
 }
 
-/** Deals — data table, vendor-wide (every branch). Plugged into `VendorDetailPage`'s
+/** Deals — data table, vendor-wide (every branch). Plugged into `MemberDetailPage`'s
  *  `section="deals"`. Add/Edit are full pages (`/deals/new`, `/deals/:dealId`), mirroring
  *  Branches' own list+form pattern; a deal's Delete is a real hard delete (blocked server-side,
  *  409, if it has order/cart history — use the status toggle instead in that case). */

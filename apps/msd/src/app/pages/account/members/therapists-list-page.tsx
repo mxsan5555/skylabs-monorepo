@@ -11,7 +11,7 @@ interface TherapistsListPageProps {
   /** Gates "Add therapist" and each row's Edit/Toggle-status action — same coarse `vendors:edit`
    *  prop `BranchesListPage`/`DealsListPage` already take. */
   canEdit: boolean;
-  /** Gates the Delete row action — mirrors `vendor-detail-page.tsx`'s own `canDelete`. */
+  /** Gates the Delete row action — mirrors `member-detail-page.tsx`'s own `canDelete`. */
   canDelete: boolean;
 }
 
@@ -35,7 +35,7 @@ function toRow(t: AdminTherapist): Record<string, string | number> {
   };
 }
 
-/** Therapists — data table, vendor-wide (every branch). Plugged into `VendorDetailPage`'s
+/** Therapists — data table, vendor-wide (every branch). Plugged into `MemberDetailPage`'s
  *  `section="therapists"`, replacing the old inline `TherapistsTab`. Add/Edit are full pages
  *  (`/therapists/new`, `/therapists/:therapistId`), mirroring Deals' own list+form pattern; a
  *  therapist's Delete is a real hard delete (blocked server-side, 409, if it has order/cart
