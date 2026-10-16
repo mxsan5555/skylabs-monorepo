@@ -559,7 +559,7 @@ export async function getPublicDealFacets(
 export async function listPublicLocations() {
   const rows = await prisma.branch.groupBy({
     by: ['state', 'city'],
-    where: { isActive: true, state: { not: null }, city: { not: null } },
+    where: { isActive: true, vendor: { status: 'ACTIVE' }, state: { not: null }, city: { not: null } },
     _avg: { latitude: true, longitude: true },
     orderBy: [{ state: 'asc' }, { city: 'asc' }],
   });

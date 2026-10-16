@@ -22,6 +22,9 @@ import {
 } from '../schemas/rbac.schema';
 import { ErrorObjectSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
+  MemberCreateSchema,
+  MemberListQuerySchema,
+  MemberDocumentReviewSchema,
   VendorCreateSchema,
   VendorUpdateSchema,
   VendorSelfUpdateSchema,
@@ -795,6 +798,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors',
+    deprecated: true,
     summary: 'List vendors (admin)',
     tags: ['Vendors - Admin'],
     security: bearer,
@@ -804,6 +808,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'post',
     path: '/vendors',
+    deprecated: true,
     summary: 'Create a vendor (admin)',
     tags: ['Vendors - Admin'],
     security: bearer,
@@ -814,6 +819,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors/{id}',
+    deprecated: true,
     summary: 'Get any vendor by id (admin)',
     tags: ['Vendors - Admin'],
     security: bearer,
@@ -824,6 +830,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'patch',
     path: '/vendors/{id}',
+    deprecated: true,
     summary: 'Update any vendor (admin)',
     tags: ['Vendors - Admin'],
     security: bearer,
@@ -837,6 +844,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'patch',
     path: '/vendors/{id}/status',
+    deprecated: true,
     summary: 'Change a member status to ACTIVE, INACTIVE or SUSPENDED with a reason (old alias)',
     tags: ['Vendors - Admin'],
     security: bearer,
@@ -850,6 +858,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'delete',
     path: '/vendors/{id}',
+    deprecated: true,
     summary: 'Delete a SUSPENDED member, or archive it when order history exists (old alias, Super Admin only)',
     tags: ['Vendors - Admin'],
     security: bearer,
@@ -858,6 +867,131 @@ export function buildOpenApiDocument() {
       body: { content: { 'application/json': { schema: MemberDeleteSchema } } },
     },
     responses: { 200: { description: 'Deleted or archived' }, 403: errorResponse, 404: errorResponse, 409: errorResponse, 422: errorResponse },
+  });
+
+  // Members (replaces the /vendors admin aliases above, which stay for one release)
+  registry.registerPath({
+    method: 'get',
+    path: '/members',
+    summary: 'List members. Filters: status, documents=incomplete, reviewFlag=true.',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: { query: MemberListQuerySchema },
+    responses: { 200: { description: 'Members' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/members',
+    summary: 'Create a member (short form). Status starts ACTIVE.',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: MemberCreateSchema } } } },
+    responses: { 201: { description: 'Created' }, 403: errorResponse, 409: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/members/{id}',
+    summary: 'Get a member by id',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Member' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/members/{id}',
+    summary: 'Update a member profile',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: VendorUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/members/{id}/status',
+    summary: 'Make a member Inactive, Suspended or Active again. Reason 10 to 500 characters.',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: MemberStatusChangeSchema } } },
+    },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse, 409: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/members/{id}',
+    summary: 'Delete a suspended member (Super Admin). Archives when orders exist.',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: MemberDeleteSchema } } },
+    },
+    responses: { 200: { description: 'DELETED or ARCHIVED' }, 403: errorResponse, 404: errorResponse, 409: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/members/{id}/status-history',
+    summary: 'Status changes with who and why',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'History' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/members/{id}/activity',
+    summary: 'Merged status and document activity, newest first',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Activity' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/members/{id}/documents',
+    summary: 'Document checklist. File keys only for roles that can edit or approve.',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Documents' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/members/{id}/documents/{documentType}',
+    summary: 'Upload a document on behalf of the member (multipart: file, optional number)',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid(), documentType: z.enum(['GST', 'PAN', 'AADHAAR']) }),
+    },
+    responses: { 201: { description: 'Uploaded' }, 403: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/members/{id}/documents/{documentType}/review',
+    summary: 'Approve or reject a submitted document',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid(), documentType: z.enum(['GST', 'PAN', 'AADHAAR']) }),
+      body: { content: { 'application/json': { schema: MemberDocumentReviewSchema } } },
+    },
+    responses: { 200: { description: 'Reviewed' }, 403: errorResponse, 409: errorResponse },
   });
 
   registry.registerPath({
