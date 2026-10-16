@@ -269,5 +269,48 @@ describe('POST /api/v1/vendors/:id/kyc-documents/:documentType (admin-on-behalf)
     expect(prismaMock.memberDocument.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ where: { vendorId_documentType: { vendorId: VENDOR_A_ID, documentType: 'PAN' } } }),
     );
+    const arg = prismaMock.memberDocument.upsert.mock.calls[0][0];
+    expect(arg.create).toMatchObject({ uploadedByUserId: 'admin-1', uploadedOnBehalf: true });
+  });
+
+  it('never returns the number hash or ciphertext', async () => {
+    resolveMock.mockResolvedValue(['members:edit']);
+    prismaMock.memberDocument.findUnique.mockResolvedValue(null);
+    prismaMock.memberDocument.upsert.mockResolvedValue({ ...documentFixture, documentType: 'PAN', numberHash: 'h', numberEncrypted: 'c' });
+    const res = await request(app)
+      .post(`/api/v1/vendors/${VENDOR_A_ID}/kyc-documents/PAN`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .attach('file', validPdf(), 'pan.pdf');
+    expect(res.status).toBe(201);
+    expect(res.body.data).not.toHaveProperty('numberHash');
+    expect(res.body.data).not.toHaveProperty('numberEncrypted');
+  });
+});
+
+describe('GET /api/v1/vendors/:id/kyc-documents (admin)', () => {
+  const row = { ...documentFixture, status: 'SUBMITTED', numberMasked: 'ABXXXXX34F', numberHash: 'h', numberEncrypted: 'c' };
+
+  it('shows type, masked number and status only to members:view', async () => {
+    resolveMock.mockResolvedValue(['members:view']);
+    prismaMock.memberDocument.findMany.mockResolvedValue([row]);
+    const res = await request(app)
+      .get(`/api/v1/vendors/${VENDOR_A_ID}/kyc-documents`)
+      .set('Authorization', bearerFor({ sub: 'support-1', roles: ['support'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0]).toMatchObject({ documentType: 'GST', status: 'SUBMITTED', numberMasked: 'ABXXXXX34F' });
+    expect(res.body.data[0]).not.toHaveProperty('storageKey');
+    expect(res.body.data[0]).not.toHaveProperty('numberHash');
+    expect(res.body.data[0]).not.toHaveProperty('numberEncrypted');
+  });
+
+  it('includes file fields for members:edit', async () => {
+    resolveMock.mockResolvedValue(['members:view', 'members:edit']);
+    prismaMock.memberDocument.findMany.mockResolvedValue([row]);
+    const res = await request(app)
+      .get(`/api/v1/vendors/${VENDOR_A_ID}/kyc-documents`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].storageKey).toBe(documentFixture.storageKey);
+    expect(res.body.data[0]).not.toHaveProperty('numberHash');
   });
 });

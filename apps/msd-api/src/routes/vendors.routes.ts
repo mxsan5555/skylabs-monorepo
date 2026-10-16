@@ -48,7 +48,7 @@ import { MediaReorderSchema } from '../schemas/media.schema';
 import { imageUpload, videoUpload, documentUpload } from '../lib/media-upload.middleware';
 import type { VendorDocumentType } from '../generated/prisma-client';
 import * as vendorService from '../services/vendor.service';
-import * as vendorDocumentService from '../services/vendor-document.service';
+import * as memberDocumentService from '../services/member-document.service';
 import * as productService from '../services/product.service';
 import { writeAuditLog } from '../services/audit.service';
 import { sendData, ApiError } from '../lib/http';
@@ -316,7 +316,7 @@ router.patch('/me/images/:imageId/primary', requirePermission('members', 'custom
 router.get('/me/kyc-documents', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-    sendData(res, await vendorDocumentService.listVendorDocuments(vendor.id));
+    sendData(res, await memberDocumentService.listVendorDocuments(vendor.id));
   } catch (err) {
     next(err);
   }
@@ -331,9 +331,13 @@ router.post(
     try {
       if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
       const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      const document = await vendorDocumentService.uploadVendorDocument(vendor.id, req.params.documentType as VendorDocumentType, {
-        buffer: req.file.buffer,
-        originalname: req.file.originalname,
+      const document = await memberDocumentService.uploadMemberDocument({
+        memberId: vendor.id,
+        documentType: req.params.documentType as VendorDocumentType,
+        file: { buffer: req.file.buffer, originalname: req.file.originalname },
+        number: typeof req.body?.number === 'string' ? req.body.number : undefined,
+        actorUserId: req.user!.sub,
+        onBehalf: false,
       });
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -356,7 +360,7 @@ router.delete(
   async (req, res, next) => {
     try {
       const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      await vendorDocumentService.deleteVendorDocument(vendor.id, req.params.documentType as VendorDocumentType);
+      await memberDocumentService.deleteVendorDocument(vendor.id, req.params.documentType as VendorDocumentType);
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'vendor_document.delete',
@@ -1475,7 +1479,10 @@ router.delete(
 
 router.get('/:id/kyc-documents', requirePermission('members', 'view'), validateParams(UuidParamSchema), async (req, res, next) => {
   try {
-    sendData(res, await vendorDocumentService.listVendorDocuments(req.params.id));
+    // File keys only for viewers who may open files; members:view alone sees type, masked number and status.
+    const granted = await resolveGrantedPermissionKeys(req.user!.roles);
+    const includeFiles = can(granted, 'members', 'edit') || can(granted, 'members', 'approve');
+    sendData(res, await memberDocumentService.listMemberDocuments(req.params.id, { includeFiles }));
   } catch (err) {
     next(err);
   }
@@ -1489,9 +1496,13 @@ router.post(
   async (req, res, next) => {
     try {
       if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
-      const document = await vendorDocumentService.uploadVendorDocument(req.params.id, req.params.documentType as VendorDocumentType, {
-        buffer: req.file.buffer,
-        originalname: req.file.originalname,
+      const document = await memberDocumentService.uploadMemberDocument({
+        memberId: req.params.id,
+        documentType: req.params.documentType as VendorDocumentType,
+        file: { buffer: req.file.buffer, originalname: req.file.originalname },
+        number: typeof req.body?.number === 'string' ? req.body.number : undefined,
+        actorUserId: req.user!.sub,
+        onBehalf: true,
       });
       await writeAuditLog({
         actorUserId: req.user!.sub,
@@ -1513,7 +1524,7 @@ router.delete(
   validateParams(VendorDocumentAdminParamSchema),
   async (req, res, next) => {
     try {
-      await vendorDocumentService.deleteVendorDocument(req.params.id, req.params.documentType as VendorDocumentType);
+      await memberDocumentService.deleteMemberDocument(req.params.id, req.params.documentType as VendorDocumentType);
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'vendor_document.delete',
