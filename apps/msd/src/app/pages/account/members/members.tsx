@@ -50,6 +50,17 @@ function filterToQuery(filter: ListFilter): Pick<MemberListFilter, 'status' | 'd
   return {};
 }
 
+function legacyMemberLink(params: URLSearchParams): string | null {
+  const vendorId = params.get('vendorId');
+  if (!vendorId) return null;
+  const base = `/account/members/${encodeURIComponent(vendorId)}`;
+  const dealId = params.get('dealId');
+  if (dealId) return `${base}/deals/${encodeURIComponent(dealId)}`;
+  const branchId = params.get('branchId');
+  if (branchId) return `${base}/branches/${encodeURIComponent(branchId)}`;
+  return base;
+}
+
 const DEFAULT_PARAMS: MemberTableParams = { page: 1, pageSize: 10, search: '' };
 
 function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
@@ -88,9 +99,10 @@ function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
     load();
   }, [load]);
 
-  // Old links used `/account/members?vendorId=<id>`; each member now has its own page.
-  const legacyVendorId = searchParams.get('vendorId');
-  if (legacyVendorId) return <Navigate to={`/account/members/${legacyVendorId}`} replace />;
+  // Old links used `/account/members?vendorId=<id>[&branchId=<id>][&dealId=<id>]`; each member,
+  // branch and deal now has its own page.
+  const legacyLink = legacyMemberLink(searchParams);
+  if (legacyLink) return <Navigate to={legacyLink} replace />;
 
   return (
     <div className="admin-page admin-page--wide">
@@ -202,7 +214,10 @@ export function useMyVendor(token: string | null): UseMyVendorResult {
 }
 
 function SelfVendorManagement({ token }: { token: string | null }) {
+  const { bootstrap } = useAuth();
   const { vendor, notFound, loading, saving, message, error, fieldErrors, save } = useMyVendor(token);
+  // An inactive member may look but not change anything; admin-layout shows the view-only banner.
+  const canEdit = bootstrap?.member?.status !== 'INACTIVE';
   const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
@@ -245,7 +260,7 @@ function SelfVendorManagement({ token }: { token: string | null }) {
       {!notFound && (
       <VendorProfileForm
         vendor={vendor}
-        canEdit
+        canEdit={canEdit}
         saving={saving}
         token={token}
         selfService

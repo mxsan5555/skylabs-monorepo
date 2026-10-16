@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react';
-import { OutlinedTextField, OutlinedSelect, SelectOption, FilledButton, Icon } from '@skylabs-monorepo/shared-ui/react';
+import { createElement, useId, useState, type FormEvent } from 'react';
+import { OutlinedTextField, OutlinedSelect, SelectOption, Icon } from '@skylabs-monorepo/shared-ui/react';
 import { registerPublicVendor, type VendorSelfInput } from '../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../api/rbac/client';
 import { extractBecomeVendorFieldErrors, type BecomeVendorFieldKey } from '../account/cms/field-errors';
@@ -48,9 +48,9 @@ type FormErrors = Partial<Record<BecomeVendorFieldKey, string>>;
  * no fields for any of that, so there is nothing privileged this form could even send; the admin
  * fills in the rest via the existing onboarding pipeline once the application is approved.
  *
- * Always lands as `PENDING_VERIFICATION` — never auto-approved, never auto-logged-in. The
- * applicant is never authenticated by this page: no token is sent with the request, and success
- * shows an inline confirmation instead of any redirect into the admin console.
+ * Registration is closed: staff create every member, so the server answers every submit with 403
+ * and a "contact our team" message. The page says so at the top and keeps the submit button off.
+ * No token is ever sent with the request.
  */
 export function BecomeVendor() {
   const [form, setForm] = useState<BecomeVendorForm>(EMPTY_FORM);
@@ -58,6 +58,7 @@ export function BecomeVendor() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const noticeId = useId();
 
   const set = <K extends keyof BecomeVendorForm>(key: K, value: string) => {
     setForm((f) => ({ ...f, [key]: value, ...(key === 'state' ? { city: '' } : {}) }));
@@ -155,6 +156,10 @@ export function BecomeVendor() {
         <p>Tell us about your business — our team will review your application and follow up to complete onboarding.</p>
       </header>
 
+      <p id={noticeId} className="field-hint" role="status">
+        Member accounts are created by our team. Please <a href="/contact">contact us</a> and we will set up your account.
+      </p>
+
       <form className="form-grid" onSubmit={submit} noValidate>
         <h2 className="section-title">Business details</h2>
         <OutlinedTextField
@@ -246,9 +251,8 @@ export function BecomeVendor() {
         {submitError && <p className="error-state" role="alert">{submitError}</p>}
 
         <div className="form-actions">
-          <FilledButton type="submit" disabled={submitting}>
-            {submitting ? 'Submitting…' : 'Submit application'}
-          </FilledButton>
+          {/* Off for now: registration always ends in the contact-us answer shown above. */}
+          {createElement('md-filled-button', { type: 'submit', disabled: true, 'aria-describedby': noticeId }, 'Submit application')}
         </div>
       </form>
     </main>

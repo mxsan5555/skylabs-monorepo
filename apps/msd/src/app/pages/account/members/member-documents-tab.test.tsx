@@ -19,12 +19,13 @@ const ROWS = [
   { id: 'd2', documentType: 'GST', status: 'REJECTED', numberMasked: '27ABCDE1234F1Z5', rejectionReason: 'Scan is blurry', uploadedOnBehalf: false },
 ];
 
-// Support (members:view only) gets type and status, no number, no file name.
-const SUPPORT_ROWS = [{ id: 'd1', documentType: 'PAN', status: 'SUBMITTED', numberMasked: null, rejectionReason: null, uploadedOnBehalf: false }];
+// Support (members:view only) gets type and status: the API leaves out the number and file fields.
+const SUPPORT_ROWS = [{ id: 'd1', documentType: 'PAN', status: 'SUBMITTED', rejectionReason: null, uploadedOnBehalf: false }];
 
-function button(text: string): HTMLElement | undefined {
+// Matches by accessible name (aria-label) first, then by visible text.
+function button(name: string): HTMLElement | undefined {
   return Array.from(document.querySelectorAll<HTMLElement>('md-filled-button, md-outlined-button, md-text-button')).find(
-    (el) => el.textContent?.trim() === text,
+    (el) => el.getAttribute('aria-label') === name || (!el.hasAttribute('aria-label') && el.textContent?.trim() === name),
   );
 }
 
@@ -95,23 +96,36 @@ describe('MemberDocumentsTab', () => {
     await waitFor(() => expect(screen.getByText('PAN card')).toBeTruthy());
     expect(document.querySelector('input[type="file"]')).toBeNull();
     expect(document.querySelector('md-outlined-text-field')).toBeNull();
-    expect(button('Approve')).toBeUndefined();
-    expect(button('Reject')).toBeUndefined();
-    expect(button('Remove')).toBeUndefined();
+    expect(button('Approve PAN card')).toBeUndefined();
+    expect(button('Reject PAN card')).toBeUndefined();
+    expect(button('Remove PAN card')).toBeUndefined();
     expect(screen.queryByText('pan.pdf')).toBeNull();
+    const text = document.body.textContent ?? '';
+    expect(text).not.toMatch(/undefined|null|\(\s*\)/);
+  });
+
+  it('names every action after its document so screen reader users know which row it acts on', async () => {
+    renderTab();
+    await waitFor(() => expect(screen.getByText('PAN card')).toBeTruthy());
+    expect(button('Approve PAN card')).toBeTruthy();
+    expect(button('Reject PAN card')).toBeTruthy();
+    expect(button('Remove PAN card')).toBeTruthy();
+    expect(button('Remove GST registration')).toBeTruthy();
+    expect(screen.getByLabelText('Replace PAN card file')).toBeTruthy();
+    expect(screen.getByLabelText('Upload Aadhaar card file')).toBeTruthy();
   });
 
   it('offers review only on submitted documents', async () => {
     renderTab();
     await waitFor(() => expect(screen.getByText('PAN card')).toBeTruthy());
     expect(document.querySelectorAll('md-filled-button')).toHaveLength(1);
-    expect(button('Approve')).toBeTruthy();
+    expect(button('Approve PAN card')).toBeTruthy();
   });
 
   it('approves a document, reloads and tells the parent', async () => {
     const { onChanged } = renderTab();
-    await waitFor(() => expect(button('Approve')).toBeTruthy());
-    fireEvent.click(mustButton('Approve'));
+    await waitFor(() => expect(button('Approve PAN card')).toBeTruthy());
+    fireEvent.click(mustButton('Approve PAN card'));
     expect(await screen.findByText('Document approved.')).toBeTruthy();
     expect(reviewMock).toHaveBeenCalledWith('t', 'm1', 'PAN', { decision: 'APPROVED' });
     expect(listMock).toHaveBeenCalledTimes(2);
@@ -120,8 +134,8 @@ describe('MemberDocumentsTab', () => {
 
   it('rejects a document only with a 10 character reason', async () => {
     renderTab();
-    await waitFor(() => expect(button('Reject')).toBeTruthy());
-    fireEvent.click(mustButton('Reject'));
+    await waitFor(() => expect(button('Reject PAN card')).toBeTruthy());
+    fireEvent.click(mustButton('Reject PAN card'));
     const reason = field('Rejection reason (10 to 500 characters)');
     await waitFor(() => expect(document.activeElement).toBe(reason));
     expect(mustButton('Confirm reject').disabled).toBe(true);
@@ -146,7 +160,7 @@ describe('MemberDocumentsTab', () => {
   it('removes a document that is not approved', async () => {
     renderTab();
     await waitFor(() => expect(screen.getByText('PAN card')).toBeTruthy());
-    fireEvent.click(mustButton('Remove'));
+    fireEvent.click(mustButton('Remove PAN card'));
     expect(await screen.findByText('Document removed.')).toBeTruthy();
     expect(deleteMock).toHaveBeenCalledWith('t', 'm1', 'PAN');
   });
@@ -154,8 +168,8 @@ describe('MemberDocumentsTab', () => {
   it('shows the server message as an alert when an action fails', async () => {
     reviewMock.mockRejectedValue(new ApiRequestError('FORBIDDEN', 'You cannot review this document.', 403));
     renderTab();
-    await waitFor(() => expect(button('Approve')).toBeTruthy());
-    fireEvent.click(mustButton('Approve'));
+    await waitFor(() => expect(button('Approve PAN card')).toBeTruthy());
+    fireEvent.click(mustButton('Approve PAN card'));
     expect((await screen.findByRole('alert')).textContent).toMatch(/cannot review/i);
   });
 

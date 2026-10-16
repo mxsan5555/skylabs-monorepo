@@ -90,7 +90,7 @@ export function MemberDetailPage() {
   }, [canView, load]);
 
   const name = member ? member.businessName || member.owner?.name || 'New member' : 'Member';
-  useSetBreadcrumbs([{ label: 'Members' }, { label: 'All Member', to: '/account/members' }, { label: name }]);
+  useSetBreadcrumbs([{ label: 'Members' }, { label: 'All members', to: '/account/members' }, { label: name }]);
 
   if (!canView) return <p className="empty-state">You do not have access to Member Management.</p>;
   if (loading) {

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconButton, Icon, Menu, MenuItem, TextButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listNotifications, markNotificationRead, markAllNotificationsRead, type Notification } from '../../api/notifications';
 import { formatRelativeTime } from '../../utils/format';
+import { notificationLink } from './notification-link';
 import './notification-bell.css';
 
 const POLL_INTERVAL_MS = 30_000;
@@ -60,15 +61,8 @@ export function NotificationBell() {
       }
       await load();
     }
-    if (notification.entityType === 'DEAL') {
-      const meta = notification.metadata as { vendorId?: string; branchId?: string } | null;
-      navigate(`/account/members?vendorId=${meta?.vendorId ?? ''}&branchId=${meta?.branchId ?? ''}&dealId=${notification.entityId ?? ''}`);
-    } else if (notification.entityType === 'ORDER') {
-      navigate(`/account/orders?orderId=${notification.entityId ?? ''}`);
-    } else if (notification.entityType === 'VENDOR') {
-      const meta = notification.metadata as { vendorId?: string } | null;
-      navigate(`/account/members?vendorId=${meta?.vendorId ?? notification.entityId ?? ''}`);
-    }
+    const link = notificationLink(notification);
+    if (link) navigate(link);
   }
 
   return (

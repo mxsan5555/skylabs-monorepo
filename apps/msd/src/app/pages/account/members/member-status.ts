@@ -1,4 +1,4 @@
-import type { MemberStatus, Vendor } from '../../../../api/rbac/vendors';
+import type { MemberStatus, Vendor, VendorDocumentType } from '../../../../api/rbac/vendors';
 
 export const MEMBER_STATUS_LABEL: Record<MemberStatus, string> = {
   ACTIVE: 'Active',
@@ -6,6 +6,39 @@ export const MEMBER_STATUS_LABEL: Record<MemberStatus, string> = {
   SUSPENDED: 'Suspended',
   ARCHIVED: 'Archived',
 };
+
+export const MEMBER_DOCUMENT_LABEL: Record<VendorDocumentType, string> = {
+  AADHAAR: 'Aadhaar card',
+  PAN: 'PAN card',
+  GST: 'GST number',
+};
+
+const STATUS_SUMMARY = /^Status changed from ([A-Z_]+) to ([A-Z_]+)(.*)$/;
+const DOCUMENT_SUMMARY = /^([A-Z_]+) document (.*)$/;
+
+const isStatus = (value: string): value is MemberStatus => value in MEMBER_STATUS_LABEL;
+const isDocumentType = (value: string): value is VendorDocumentType => value in MEMBER_DOCUMENT_LABEL;
+
+/**
+ * Makes an activity summary readable. msd-api (`member-activity.service.ts`) writes two fixed
+ * templates with raw enums: "Status changed from ACTIVE to SUSPENDED[ by Name]" and
+ * "AADHAAR document uploaded[ by staff for the member]" / "... approved" / "... rejected". Only a
+ * known enum at the start of one of those templates is swapped for its label; anything else,
+ * including the rest of the sentence, stays exactly as the server sent it.
+ */
+export function readableActivitySummary(summary: string): string {
+  const status = STATUS_SUMMARY.exec(summary);
+  if (status) {
+    const [, from, to, rest] = status;
+    return isStatus(from) && isStatus(to) ? `Status changed from ${MEMBER_STATUS_LABEL[from]} to ${MEMBER_STATUS_LABEL[to]}${rest}` : summary;
+  }
+  const document = DOCUMENT_SUMMARY.exec(summary);
+  if (document) {
+    const [, type, rest] = document;
+    return isDocumentType(type) ? `${MEMBER_DOCUMENT_LABEL[type]} ${rest}` : summary;
+  }
+  return summary;
+}
 
 export type BadgeVariant = 'primary' | 'secondary' | 'tertiary' | 'error';
 

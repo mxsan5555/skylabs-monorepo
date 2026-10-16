@@ -119,7 +119,7 @@ describe('MemberDetailPage', () => {
   it('shows the status chip, the documents chip and the due date in the header', async () => {
     renderAt('/account/members/m1');
     await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Vitality Wellness' })).toBeTruthy());
-    const badges = [...document.querySelectorAll('sky-badge')].map((b) => b.textContent);
+    const badges = Array.from(document.querySelectorAll('sky-badge')).map((b) => b.textContent);
     expect(badges).toContain('Active');
     expect(badges).toContain('Documents incomplete');
     expect(screen.getByText(/Due 20 Oct 2026/)).toBeTruthy();
@@ -149,7 +149,7 @@ describe('MemberDetailPage', () => {
   it('puts an h2 between the page h1 and the documents tab h3', async () => {
     renderAt('/account/members/m1/documents');
     await waitFor(() => expect(screen.getByText('documents-tab')).toBeTruthy());
-    const levels = [...document.querySelectorAll('h1, h2, h3')].map((h) => Number(h.tagName[1]));
+    const levels = Array.from(document.querySelectorAll('h1, h2, h3')).map((h) => Number(h.tagName[1]));
     expect(levels).toEqual([1, 2, 3]);
     expect(screen.getByRole('heading', { level: 2, name: 'Documents' })).toBeTruthy();
   });
@@ -205,7 +205,7 @@ describe('MemberDetailPage', () => {
     expect(changeStatusMock).toHaveBeenCalledWith('t', 'm1', 'INACTIVE', 'Owner asked for a pause');
     expect(document.querySelector('sky-snackbar')?.textContent).toContain('Member is inactive and view only.');
     expect(getMemberMock).toHaveBeenCalledTimes(2);
-    await waitFor(() => expect([...document.querySelectorAll('sky-badge')].map((b) => b.textContent)).toContain('Inactive'));
+    await waitFor(() => expect(Array.from(document.querySelectorAll('sky-badge')).map((b) => b.textContent)).toContain('Inactive'));
   });
 
   it('goes back to the member list after a delete', async () => {

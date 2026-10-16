@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MdFilledButton } from '@material/web/button/filled-button.js';
-import { FilledButton, OutlinedTextField, Icon } from '@skylabs-monorepo/shared-ui/react';
-import type { Vendor, VendorFields, VendorDocument, VendorDocumentType } from '../../../../api/rbac/vendors';
+import { FilledButton, OutlinedTextField } from '@skylabs-monorepo/shared-ui/react';
+import {
+  listMyKycDocuments,
+  listVendorKycDocuments,
+  type Vendor,
+  type VendorFields,
+  type VendorDocument,
+  type VendorDocumentType,
+} from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { MEMBER_STATUS_LABEL } from './member-status';
 import { VendorDocumentUpload } from '../../../components/vendor-document-upload';
@@ -327,12 +334,32 @@ export function VendorProfileForm({
     AADHAAR: false,
   });
 
-  const [documents, setDocuments] = useState<VendorDocument[]>(
-    vendor?.documents ?? [],
-  );
+  // Member responses carry only each document's type and status, so the file details shown in
+  // the KYC slots come from the documents endpoint.
+  const [documents, setDocuments] = useState<VendorDocument[]>([]);
 
   const show = (section: VendorFormSection) =>
     sections.includes(section);
+
+  const showKyc = show('kyc');
+  const vendorId = vendor?.id ?? null;
+
+  useEffect(() => {
+    setDocuments([]);
+    if (!showKyc || !vendorId) return;
+    let live = true;
+    const request = selfService ? listMyKycDocuments(token) : listVendorKycDocuments(token, vendorId);
+    request
+      .then(({ data }) => {
+        if (live) setDocuments(data);
+      })
+      .catch(() => {
+        // The slots stay empty and the member can still upload; the save itself is unaffected.
+      });
+    return () => {
+      live = false;
+    };
+  }, [showKyc, vendorId, selfService, token]);
 
   // Same double-submit guard used by every other create flow in this app (DealDialog,
   // ProductFormDialog, TherapistFormDialog, categories.tsx) — the `saving` prop alone is a React
@@ -350,7 +377,6 @@ export function VendorProfileForm({
 
   useEffect(() => {
     setForm(toFormFields(vendor));
-    setDocuments(vendor?.documents ?? []);
     setErrors({});
   }, [vendor]);
 
@@ -742,9 +768,11 @@ export function VendorProfileForm({
           color="none"
         >
           <div className="vendor-section-content">
-            <p className="field-hint">
-              Upload any ONE of the following documents.
-            </p>
+            {canEdit && (
+              <p className="field-hint">
+                Upload any ONE of the following documents.
+              </p>
+            )}
 
             <div className="kyc-document-list">
               {KYC_DOCUMENT_TYPES.map(({ type, label }) => (
@@ -758,6 +786,7 @@ export function VendorProfileForm({
                     (d) => d.documentType === type
                   )}
                   token={token}
+                  readOnly={!canEdit}
                   onUploaded={(doc) =>
                     {
                       setDocuments((prev) => [

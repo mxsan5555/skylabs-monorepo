@@ -18,6 +18,16 @@ export interface KycDocument {
 
 export type VendorDocumentType = 'GST' | 'PAN' | 'AADHAAR';
 
+export type MemberDocumentStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+
+/** What a member response carries for each document: type and status only. The file fields and
+ *  the masked number come from the documents endpoints, and only for viewers allowed to see them. */
+export interface MemberDocumentSummary {
+  id: string;
+  documentType: VendorDocumentType;
+  status: MemberDocumentStatus;
+}
+
 /** A real uploaded KYC document — one per `documentType`, replacing the deprecated
  *  `KycDocument`/pasted-URL shape (see msd-api's `VendorDocument` model doc comment). */
 export interface VendorDocument {
@@ -102,8 +112,7 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
   createdAt: string;
   updatedAt: string;
   /** Business modules — bound to the onboarding wizard's Step 2 checkboxes; each `true` module
-   *  must be backed by at least one `VendorCategoryAccess` grant of the matching `type` before
-   *  the vendor can be submitted for verification (see msd-api's `submitForVerification`). */
+   *  must be backed by at least one `VendorCategoryAccess` grant of the matching `type`. */
   offersService: boolean;
   offersProduct: boolean;
   offersTherapy: boolean;
@@ -122,9 +131,9 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
    *  rows that predate this table (see `resolveVendorMedia` in `utils/media.ts`). */
   mediaImages?: MediaImage[];
   mediaVideo?: MediaVideo | null;
-  /** Real uploaded KYC documents (GST/PAN/Aadhaar) — see `VendorDocument`'s own doc comment.
-   *  `kycDocuments` above is the deprecated pasted-URL shape, kept only for old rows. */
-  documents?: VendorDocument[];
+  /** Type and status of each uploaded document. Load files with `listMyKycDocuments` or
+   *  `listVendorKycDocuments`. `kycDocuments` above is the deprecated pasted-URL shape. */
+  documents?: MemberDocumentSummary[];
   statusChangedAt?: string | null;
   documentsDueAt?: string | null;
   reviewFlaggedAt?: string | null;
@@ -405,12 +414,10 @@ export function createVendor(token: string | null, input: VendorCreateInput) {
   return apiPost<Vendor>('/vendors', token, input);
 }
 
-/** Genuinely public, unauthenticated "Become a Vendor" registration (`POST
- *  /vendors/public/register`) — no token is ever sent (mirrors `api/catalog.ts`'s public reads,
- *  which likewise call `apiGet(path, null)`). Same `VendorSelfInput` shape as `createMyVendor`
- *  below; the backend resolves/creates the owner from `ownerEmail`/`ownerMobile` itself and
- *  always lands the result as `PENDING_VERIFICATION` with `createdByUserId: null`. Rate-limited
- *  server-side — a 429 surfaces as an ordinary `ApiRequestError` with code `RATE_LIMITED`. */
+/** Public, unauthenticated "Become a Vendor" registration (`POST /vendors/public/register`). No
+ *  token is sent. Registration is closed: staff create every member, so the server always answers
+ *  403 with a "contact our team" message and creates nothing. Rate limited server-side; a 429
+ *  surfaces as an ordinary `ApiRequestError` with code `RATE_LIMITED`. */
 export function registerPublicVendor(input: VendorSelfInput) {
   return apiPost<Vendor>('/vendors/public/register', null, input);
 }

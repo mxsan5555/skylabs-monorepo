@@ -1,8 +1,7 @@
 import { apiGet, apiPatch, apiPost, apiDelete, apiPostForm } from './client';
-import type { Vendor, VendorDocumentType, MemberStatus } from './vendors';
+import type { Vendor, VendorDocumentType, MemberStatus, MemberDocumentStatus } from './vendors';
 
-export type { MemberStatus };
-export type MemberDocumentStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+export type { MemberStatus, MemberDocumentStatus };
 
 export interface MemberCreateInput {
   businessName: string;
@@ -25,7 +24,8 @@ export interface MemberDocumentRow {
   id: string;
   documentType: VendorDocumentType;
   status: MemberDocumentStatus;
-  numberMasked: string | null;
+  /** Present only for viewers holding members:edit or members:approve. */
+  numberMasked?: string | null;
   rejectionReason: string | null;
   reviewedAt: string | null;
   uploadedOnBehalf: boolean;
@@ -35,15 +35,6 @@ export interface MemberDocumentRow {
   /** Present only for roles that may open files. */
   storageKey?: string;
   originalFilename?: string | null;
-}
-
-export interface StatusHistoryItem {
-  id: string;
-  fromStatus: MemberStatus;
-  toStatus: MemberStatus;
-  reason: string | null;
-  actorName: string | null;
-  createdAt: string;
 }
 
 export interface ActivityItem {
@@ -80,10 +71,6 @@ export function changeMemberStatus(token: string | null, id: string, status: 'AC
 
 export function deleteMember(token: string | null, id: string, reason: string) {
   return apiDelete<{ outcome: 'DELETED' | 'ARCHIVED' }>(`/members/${id}`, token, { reason });
-}
-
-export function getMemberStatusHistory(token: string | null, id: string) {
-  return apiGet<StatusHistoryItem[]>(`/members/${id}/status-history`, token);
 }
 
 export function getMemberActivity(token: string | null, id: string) {

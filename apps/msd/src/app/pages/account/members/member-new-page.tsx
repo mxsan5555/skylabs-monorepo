@@ -1,6 +1,6 @@
-import { createElement, useEffect, useRef, useState } from 'react';
+import { createElement, useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
+import '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { createMember, type MemberCreateInput } from '../../../../api/rbac/members';
 import { ApiRequestError } from '../../../../api/rbac/client';
@@ -20,6 +20,23 @@ const MAX_EMAIL = 254;
 const EMAIL_RE = /^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9-]*\.)+[A-Za-z]{2,}$/;
 // The server normalises a 10-digit number to +91 and requires the first digit to be 6 to 9.
 const MOBILE_RE = /^[6-9]\d{9}$/;
+
+/** First message per field from a Zod `flatten()` (`details.fieldErrors`), limited to this form's fields. */
+function zodFieldErrors(details: unknown): FieldErrors | null {
+  const fieldErrors = (details as { fieldErrors?: Record<string, string[] | undefined> } | undefined)?.fieldErrors;
+  if (!fieldErrors) return null;
+  const found: FieldErrors = {};
+  for (const key of FIELD_ORDER) {
+    const first = fieldErrors[key]?.[0];
+    if (first) found[key] = first;
+  }
+  return Object.keys(found).length > 0 ? found : null;
+}
+
+function zodFormError(details: unknown): string | null {
+  const formErrors = (details as { formErrors?: string[] } | undefined)?.formErrors;
+  return formErrors?.[0] ?? null;
+}
 
 export function validateMember(input: MemberCreateInput): FieldErrors {
   const errors: FieldErrors = {};
@@ -49,7 +66,10 @@ export function MemberNewPage() {
   const fieldRefs = useRef<Partial<Record<FieldKey, HTMLElement | null>>>({});
   const [focusRequest, setFocusRequest] = useState(0);
 
-  useSetBreadcrumbs([{ label: 'Members' }, { label: 'All Member', to: '/account/members' }, { label: 'Add member' }]);
+  const idBase = useId();
+  const errorId = (key: FieldKey) => `${idBase}-${key}-error`;
+
+  useSetBreadcrumbs([{ label: 'Members' }, { label: 'All members', to: '/account/members' }, { label: 'Add member' }]);
 
   // Move focus to the first invalid field after a failed submit.
   useEffect(() => {
@@ -67,7 +87,9 @@ export function MemberNewPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const submit = async () => {
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (saving) return;
     const found = validateMember(form);
     setErrors(found);
     setFormError('');
@@ -87,12 +109,13 @@ export function MemberNewPage() {
       navigate(`/account/members/${data.id}`, { replace: true });
     } catch (err) {
       if (err instanceof ApiRequestError) {
-        const fields = (err.details as { fields?: FieldErrors } | undefined)?.fields;
+        // A conflict sends `details.fields`; a 400 or 422 sends Zod's `fieldErrors` / `formErrors`.
+        const fields = (err.details as { fields?: FieldErrors } | undefined)?.fields ?? zodFieldErrors(err.details);
         if (fields) {
           setErrors(fields);
           setFocusRequest((n) => n + 1);
         } else {
-          setFormError(err.message);
+          setFormError(zodFormError(err.details) ?? err.message);
         }
       } else {
         setFormError('Could not create the member. Try again.');
@@ -100,6 +123,22 @@ export function MemberNewPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // The M3 text field keeps its input in shadow DOM, so the browser's implicit submission on Enter
+  // never reaches this form. Submit it ourselves.
+  const submitOnEnter = (e: KeyboardEvent<HTMLFormElement>) => {
+    const target = e.target as HTMLElement;
+    if (e.key !== 'Enter' || target.tagName !== 'MD-OUTLINED-TEXT-FIELD') return;
+    e.preventDefault();
+    e.currentTarget.requestSubmit();
+  };
+
+  // md-filled-button submits its form a task after the click unless the click was prevented. Submit
+  // straight away instead, which also works where form-associated elements are missing (jsdom).
+  const submitFromButton = (e: MouseEvent<HTMLElement>) => {
+    e.preventDefault();
+    e.currentTarget.closest('form')?.requestSubmit();
   };
 
   // Raw M3 element: the @lit/react wrapper does not bind input events or labels under jsdom, so
@@ -114,11 +153,15 @@ export function MemberNewPage() {
         value: form[key],
         required: true,
         error: Boolean(errors[key]),
+        // M3 shows error-text as the field's supporting text and links it to the inner input.
+        'error-text': errors[key] ?? '',
+        ...(errors[key] ? { 'aria-describedby': errorId(key) } : {}),
         onInput: set(key),
         ...extra,
       })}
+      {/* Announced once for screen readers; the field shows the same text visibly as error-text. */}
       {errors[key] && (
-        <p className="error-state" role="alert">
+        <p id={errorId(key)} className="error-state sr-only" role="alert">
           {errors[key]}
         </p>
       )}
@@ -141,16 +184,14 @@ export function MemberNewPage() {
         </p>
       )}
 
-      <section className="panel" aria-label="Member details">
+      <form className="panel" aria-label="Member details" noValidate onSubmit={submit} onKeyDown={submitOnEnter}>
         {field('businessName', 'Business name', { maxlength: MAX_BUSINESS_NAME })}
         {field('ownerFirstName', 'Owner first name', { autocomplete: 'given-name', maxlength: MAX_PERSON_NAME })}
         {field('ownerLastName', 'Owner last name', { autocomplete: 'family-name', maxlength: MAX_PERSON_NAME })}
         {field('ownerEmail', 'Owner email', { type: 'email', autocomplete: 'email', maxlength: MAX_EMAIL })}
         {field('ownerMobile', 'Owner mobile number', { type: 'tel', inputmode: 'numeric', maxlength: 10, autocomplete: 'tel-national' })}
-        <FilledButton disabled={saving} onClick={submit}>
-          Create member
-        </FilledButton>
-      </section>
+        {createElement('md-filled-button', { type: 'submit', disabled: saving, onClick: submitFromButton }, 'Create member')}
+      </form>
     </div>
   );
 }

@@ -68,6 +68,7 @@ export function MemberHeaderActions({ status, canStatusChange, canDelete, reason
   const lastTrigger = useRef<StatusAction | null>(null);
   const wasOpen = useRef(false);
   const panelId = useId();
+  const titleId = useId();
 
   // Focus the reason field on open; return focus to the trigger (or the first action left) on close.
   useEffect(() => {
@@ -145,29 +146,35 @@ export function MemberHeaderActions({ status, canStatusChange, canDelete, reason
       </div>
 
       {copy && pending && (
-        <div id={panelId} className="member-actions__confirm" onKeyDown={onKeyDown}>
-          <sky-feature-card color="surface-high" variant="outlined" icon="info" icon-style="surface" headline={copy.title} text={copy.body}>
-            {createElement('md-outlined-text-field', {
-              ref: (el: HTMLElement | null) => {
-                reasonRef.current = el;
-              },
-              'data-testid': 'status-reason',
-              label: `Reason (${MIN} to ${MAX} characters)`,
-              type: 'textarea',
-              rows: 3,
-              required: true,
-              maxlength: MAX,
-              value: reason,
-              onInput: (e: { currentTarget: { value: string } }) => setReason(e.currentTarget.value),
-            })}
-            {error && (
-              <p className="error-state" role="alert">
-                {error}
-              </p>
-            )}
-            {createElement('md-filled-button', { slot: 'actions', disabled: busy || !valid, onClick: confirm }, copy.confirm)}
-            {createElement('md-text-button', { slot: 'actions', disabled: busy, onClick: close }, 'Cancel')}
-          </sky-feature-card>
+        // A labelled group with its own h2: it sits right under the page h1, so an h3 here (what a
+        // sky-feature-card headline renders) would skip a level.
+        <div id={panelId} role="group" aria-labelledby={titleId} className="member-actions__confirm" onKeyDown={onKeyDown}>
+          <h2 id={titleId} className="member-actions__title title-medium">
+            {copy.title}
+          </h2>
+          <p className="member-actions__body">{copy.body}</p>
+          {createElement('md-outlined-text-field', {
+            ref: (el: HTMLElement | null) => {
+              reasonRef.current = el;
+            },
+            'data-testid': 'status-reason',
+            label: `Reason (${MIN} to ${MAX} characters)`,
+            type: 'textarea',
+            rows: 3,
+            required: true,
+            maxlength: MAX,
+            value: reason,
+            onInput: (e: { currentTarget: { value: string } }) => setReason(e.currentTarget.value),
+          })}
+          {error && (
+            <p className="error-state" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="member-actions__buttons">
+            {createElement('md-filled-button', { disabled: busy || !valid, onClick: confirm }, copy.confirm)}
+            {createElement('md-text-button', { disabled: busy, onClick: close }, 'Cancel')}
+          </div>
         </div>
       )}
     </div>

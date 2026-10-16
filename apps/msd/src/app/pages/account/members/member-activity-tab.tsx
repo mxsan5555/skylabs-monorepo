@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getMemberActivity, type ActivityItem } from '../../../../api/rbac/members';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { readableActivitySummary } from './member-status';
 
 export interface MemberActivityTabProps {
   token: string | null;
@@ -44,7 +45,7 @@ export function MemberActivityTab({ token, memberId, refreshKey }: MemberActivit
     <ol className="activity-list" aria-label="Activity">
       {items.map((item, index) => (
         <li key={`${item.at}-${index}`} className="activity-list__item">
-          <p>{item.summary}</p>
+          <p>{readableActivitySummary(item.summary)}</p>
           {item.detail && <p className="field-hint">Reason: {item.detail}</p>}
           <p className="field-hint">
             <time dateTime={item.at}>{new Date(item.at).toLocaleString('en-GB')}</time>

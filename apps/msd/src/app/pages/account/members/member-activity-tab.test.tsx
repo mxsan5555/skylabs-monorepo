@@ -35,6 +35,25 @@ describe('MemberActivityTab', () => {
     expect(activityMock).toHaveBeenCalledWith('t', 'm1');
   });
 
+  it('turns the server enums into readable text', async () => {
+    activityMock.mockResolvedValue({
+      data: [
+        { kind: 'status', at: '2026-10-14T10:00:00.000Z', summary: 'Status changed from ACTIVE to SUSPENDED by Priya', detail: null },
+        { kind: 'document', at: '2026-10-13T09:00:00.000Z', summary: 'AADHAAR document uploaded by staff for the member', detail: null },
+        { kind: 'document', at: '2026-10-12T09:00:00.000Z', summary: 'GST document rejected', detail: 'Blurry' },
+        { kind: 'document', at: '2026-10-11T09:00:00.000Z', summary: 'PAN document approved', detail: null },
+        { kind: 'status', at: '2026-10-10T09:00:00.000Z', summary: 'Status changed from ACTIVE to SOMETHING_NEW', detail: null },
+      ],
+    });
+    render(<MemberActivityTab token="t" memberId="m1" refreshKey={0} />);
+    expect(await screen.findByText('Status changed from Active to Suspended by Priya')).toBeTruthy();
+    expect(screen.getByText('Aadhaar card uploaded by staff for the member')).toBeTruthy();
+    expect(screen.getByText('GST number rejected')).toBeTruthy();
+    expect(screen.getByText('PAN card approved')).toBeTruthy();
+    // Anything the map does not know stays as the server sent it.
+    expect(screen.getByText('Status changed from ACTIVE to SOMETHING_NEW')).toBeTruthy();
+  });
+
   it('shows an empty state', async () => {
     activityMock.mockResolvedValue({ data: [] });
     render(<MemberActivityTab token="t" memberId="m1" refreshKey={0} />);

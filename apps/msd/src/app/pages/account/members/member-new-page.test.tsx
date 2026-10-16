@@ -12,11 +12,11 @@ vi.mock('../../../../api/rbac/members', () => ({ createMember: (...a: unknown[])
 
 function fieldFor(label: string): HTMLInputElement {
   // `label` is a declared property on the Material Web element, so it is set as a property, not an attribute.
-  const el = Array.from(document.querySelectorAll('md-outlined-text-field')).find(
+  const el = Array.from(document.querySelectorAll<HTMLElement>('md-outlined-text-field')).find(
     (field) => (field as unknown as { label?: string }).label === label,
   );
   if (!el) throw new Error(`Field "${label}" not found`);
-  return el as HTMLInputElement;
+  return el as unknown as HTMLInputElement;
 }
 
 function type(label: string, value: string) {
@@ -118,6 +118,65 @@ describe('MemberNewPage', () => {
     fillValid();
     clickCreate();
     expect(await screen.findByText(/email already belongs/i)).toBeTruthy();
+  });
+
+  it('submits the form on Enter (a native submit) and prevents the page reload', async () => {
+    createMemberMock.mockResolvedValue({ data: { id: 'm1' } });
+    renderPage();
+    fillValid();
+    const form = document.querySelector('form');
+    if (!form) throw new Error('form not found');
+    const notCancelled = fireEvent.submit(form);
+    expect(notCancelled).toBe(false);
+    await waitFor(() => expect(createMemberMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByText('detail-page')).toBeTruthy());
+  });
+
+  it('submits when the user presses Enter in a field', async () => {
+    createMemberMock.mockResolvedValue({ data: { id: 'm1' } });
+    renderPage();
+    fillValid();
+    fireEvent.keyDown(fieldFor('Owner mobile number'), { key: 'Enter' });
+    await waitFor(() => expect(createMemberMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('ties each error message to its field', async () => {
+    renderPage();
+    clickCreate();
+    const message = await screen.findByText(/enter the business name/i);
+    const field = fieldFor('Business name');
+    expect(message.id).toBeTruthy();
+    expect(field.getAttribute('aria-describedby')).toBe(message.id);
+    expect((field as unknown as { errorText?: string }).errorText).toBe('Enter the business name.');
+    expect((field as unknown as { error?: boolean }).error).toBe(true);
+    expect(fieldFor('Owner email').hasAttribute('aria-describedby')).toBe(true);
+  });
+
+  it('puts Zod field errors from a 422 on their fields', async () => {
+    createMemberMock.mockRejectedValue(
+      new ApiRequestError('VALIDATION_ERROR', 'Invalid request body', 422, {
+        fieldErrors: { ownerMobile: ['Mobile number is not valid.'], businessName: ['Name is taken.', 'second'] },
+        formErrors: [],
+      }),
+    );
+    renderPage();
+    fillValid();
+    clickCreate();
+    const mobile = await screen.findByText('Mobile number is not valid.');
+    expect(fieldFor('Owner mobile number').getAttribute('aria-describedby')).toBe(mobile.id);
+    expect(screen.getByText('Name is taken.')).toBeTruthy();
+    expect(screen.queryByText('second')).toBeNull();
+    expect(screen.queryByText('Invalid request body')).toBeNull();
+  });
+
+  it('shows Zod form errors from a 400 as the form message', async () => {
+    createMemberMock.mockRejectedValue(
+      new ApiRequestError('VALIDATION_ERROR', 'Invalid request body', 400, { fieldErrors: {}, formErrors: ['Send the owner email or mobile.'] }),
+    );
+    renderPage();
+    fillValid();
+    clickCreate();
+    expect(await screen.findByText('Send the owner email or mobile.')).toBeTruthy();
   });
 
   it('shows the server message when the error has no field details', async () => {

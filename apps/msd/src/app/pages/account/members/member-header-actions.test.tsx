@@ -124,6 +124,16 @@ describe('MemberHeaderActions', () => {
     await waitFor(() => expect(document.activeElement).toBe(button('Suspend')));
   });
 
+  it('labels the confirm panel as a group named by an h2, with no h3 or feature card inside', () => {
+    renderActions();
+    fireEvent.click(mustButton('Suspend'));
+    const group = screen.getByRole('group', { name: 'Suspend this member' });
+    expect(group.querySelector('h2')?.textContent).toBe('Suspend this member');
+    expect(group.querySelector('h3, sky-feature-card')).toBeNull();
+    expect(group.textContent).toMatch(/cannot log in/);
+    expect(group.contains(reasonField())).toBe(true);
+  });
+
   it('closes on Escape', () => {
     renderActions();
     fireEvent.click(mustButton('Suspend'));

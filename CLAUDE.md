@@ -259,7 +259,8 @@ requires a code change.
   /roles/:id/permissions`, `PUT /roles/:id/widgets`, users CRUD/status/
   role-assign/session-revoke/OTP-reset/login-history/device-sessions, `GET
   /audit-logs`, `POST /impersonate`, `GET /bootstrap`.
-- `prisma/seed.ts` — seeds the 6 default roles + a starter permission set
+- `prisma/seed.ts` — seeds the default roles (7 in msd-api: super_admin, admin,
+  marketing, sales, member, support, customer; 13 in mera-driver-api) + a starter permission set
   walked from that app's `shared-menu` JSON, auto-granting everything to
   the `isSuperAdmin`-flagged role.
 

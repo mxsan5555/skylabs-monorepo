@@ -2,8 +2,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import type { Vendor } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { listMyKycDocuments, listVendorKycDocuments } from '../../../../api/rbac/vendors';
+import { VendorProfileForm, extractVendorFieldErrors } from './vendor-profile-form';
 
-// `vi.mock` calls are hoisted above all imports — this runs before `VendorDocumentUpload`'s own
+// `vi.mock` calls are hoisted above all imports, so this runs before `VendorDocumentUpload`'s own
 // `../../api/rbac/vendors` import resolves (same convention as media-uploader.test.tsx).
 vi.mock('../../../../api/rbac/vendors', async () => {
   const actual = await vi.importActual<typeof import('../../../../api/rbac/vendors')>('../../../../api/rbac/vendors');
@@ -13,10 +15,21 @@ vi.mock('../../../../api/rbac/vendors', async () => {
     deleteMyKycDocument: vi.fn(),
     uploadVendorKycDocument: vi.fn(),
     deleteVendorKycDocument: vi.fn(),
+    listMyKycDocuments: vi.fn().mockResolvedValue({ data: [] }),
+    listVendorKycDocuments: vi.fn().mockResolvedValue({ data: [] }),
   };
 });
 
-import { VendorProfileForm, extractVendorFieldErrors } from './vendor-profile-form';
+
+const GST_FILE = {
+  id: 'doc-1',
+  documentType: 'GST' as const,
+  storageKey: 'kyc/vendor-1/gst.pdf',
+  originalFilename: 'gst.pdf',
+  mimeType: 'application/pdf',
+  sizeBytes: 1024,
+  createdAt: '2026-01-01T00:00:00Z',
+};
 
 const BASE_VENDOR: Vendor = {
   id: 'vendor-1',
@@ -166,8 +179,10 @@ describe('VendorProfileForm — Create Vendor button gating', () => {
       mapLocationUrl: 'https://maps.app.goo.gl/abc123',
       latitude: 26.76,
       longitude: 83.37,
-      documents: [{ id: 'doc-1', documentType: 'GST', originalFilename: 'gst.pdf', mimeType: 'application/pdf', sizeBytes: 1024, createdAt: '2026-01-01T00:00:00Z' }],
+      // Member responses carry only id, type and status; the file comes from the documents endpoint.
+      documents: [{ id: 'doc-1', documentType: 'GST', status: 'SUBMITTED' }],
     };
+    vi.mocked(listMyKycDocuments).mockResolvedValueOnce({ data: [GST_FILE] });
     render(
       <VendorProfileForm
         vendor={completeVendor}
@@ -186,6 +201,42 @@ describe('VendorProfileForm — Create Vendor button gating', () => {
       return button as HTMLElement & { disabled?: boolean };
     });
     expect(saveButton.disabled).toBe(false);
+    expect(await screen.findByText('gst.pdf')).toBeTruthy();
+    expect(listMyKycDocuments).toHaveBeenCalledWith('tok');
+  });
+
+  it('loads the KYC files for staff from the member documents endpoint, never from the member response', async () => {
+    vi.mocked(listVendorKycDocuments).mockResolvedValueOnce({ data: [GST_FILE] });
+    render(
+      <VendorProfileForm
+        vendor={{ ...BASE_VENDOR, documents: [{ id: 'doc-1', documentType: 'GST', status: 'SUBMITTED' }] }}
+        canEdit
+        saving={false}
+        token="tok"
+        sections={['kyc']}
+        onSave={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText('gst.pdf')).toBeTruthy();
+    expect(listVendorKycDocuments).toHaveBeenCalledWith('tok', 'vendor-1');
+    expect(screen.queryByText(/undefined/)).toBeNull();
+  });
+
+  it('a read only form shows the KYC files but offers no upload, replace or remove', async () => {
+    vi.mocked(listMyKycDocuments).mockResolvedValueOnce({ data: [GST_FILE] });
+    render(<VendorProfileForm vendor={BASE_VENDOR} canEdit={false} saving={false} token="tok" selfService sections={['kyc']} onSave={vi.fn()} />);
+    expect(await screen.findByText('gst.pdf')).toBeTruthy();
+    expect(screen.queryByText(/^Upload (GST|PAN|Aadhaar)/)).toBeNull();
+    expect(screen.queryByText(/Upload any ONE/)).toBeNull();
+    expect(document.querySelector('[aria-label="Replace document"], [aria-label="Remove document"]')).toBeNull();
+  });
+
+  it('does not call the documents endpoint when the KYC section is hidden', () => {
+    vi.mocked(listVendorKycDocuments).mockClear();
+    vi.mocked(listMyKycDocuments).mockClear();
+    render(<VendorProfileForm vendor={BASE_VENDOR} canEdit saving={false} token="tok" sections={['business']} onSave={vi.fn()} />);
+    expect(listVendorKycDocuments).not.toHaveBeenCalled();
+    expect(listMyKycDocuments).not.toHaveBeenCalled();
   });
 
   it('shows a plain member status line with no approval or completion wording', () => {

@@ -60,7 +60,8 @@ function message(err: unknown, fallback: string): string {
 
 /**
  * Required documents (Aadhaar, PAN, GST) for one member. The API decides what each viewer sees:
- * Support gets type and status only, so the number and file name simply stay empty.
+ * Support gets type and status only, so the number and file name are absent and simply not shown.
+ * Every action button carries the document label in its accessible name (WCAG 2.4.6).
  * Raw M3 elements so tests can drive them (see member-new-page.tsx).
  */
 export function MemberDocumentsTab({ token, memberId, canEdit, canApprove, canReject, onChanged }: MemberDocumentsTabProps) {
@@ -182,6 +183,7 @@ export function MemberDocumentsTab({ token, memberId, canEdit, canApprove, canRe
                       setNumbers((n) => ({ ...n, [type]: value }));
                     },
                   })}
+                  {/* The label text names the document, so the file input's accessible name does too. */}
                   <label className="document-row__file">
                     {`${row ? 'Replace' : 'Upload'} ${label} file`}
                     <input
@@ -198,7 +200,11 @@ export function MemberDocumentsTab({ token, memberId, canEdit, canApprove, canRe
                     row.status !== 'APPROVED' &&
                     createElement(
                       'md-text-button',
-                      { disabled: busy, onClick: () => run('Document removed.', () => deleteMemberDocument(token, memberId, type)) },
+                      {
+                        'aria-label': `Remove ${label}`,
+                        disabled: busy,
+                        onClick: () => run('Document removed.', () => deleteMemberDocument(token, memberId, type)),
+                      },
                       'Remove',
                     )}
                 </div>
@@ -209,7 +215,11 @@ export function MemberDocumentsTab({ token, memberId, canEdit, canApprove, canRe
                   {canApprove &&
                     createElement(
                       'md-filled-button',
-                      { disabled: busy, onClick: () => run('Document approved.', () => reviewMemberDocument(token, memberId, type, { decision: 'APPROVED' })) },
+                      {
+                        'aria-label': `Approve ${label}`,
+                        disabled: busy,
+                        onClick: () => run('Document approved.', () => reviewMemberDocument(token, memberId, type, { decision: 'APPROVED' })),
+                      },
                       'Approve',
                     )}
                   {canReject &&
@@ -219,6 +229,7 @@ export function MemberDocumentsTab({ token, memberId, canEdit, canApprove, canRe
                         ref: (el: HTMLElement | null) => {
                           rejectTriggerRefs.current[type] = el;
                         },
+                        'aria-label': `Reject ${label}`,
                         disabled: busy,
                         'aria-expanded': rejecting === type ? 'true' : 'false',
                         onClick: () => {
