@@ -175,6 +175,81 @@ input[type='checkbox'] {
   padding-top: 4px;
 }
 
+/* Member detail (member-header-actions.tsx, member-documents-tab.tsx, member-activity-tab.tsx). */
+.member-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.member-actions__confirm md-outlined-text-field,
+.document-row__reject md-outlined-text-field {
+  width: 100%;
+}
+
+.document-list,
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.document-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--md-sys-color-surface-container);
+}
+
+.document-row__info {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.document-row__info h3,
+.document-row__info p,
+.activity-list p {
+  margin: 0;
+}
+
+.document-row__upload,
+.document-row__review,
+.document-row__reject {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.document-row__reject {
+  flex-basis: 100%;
+}
+
+.document-row__file {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.document-row__file input {
+  min-height: 44px;
+}
+
+.activity-list__item {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background-color: var(--md-sys-color-surface-container);
+}
+
 .entity-list {
   list-style: none;
   margin: 0;
