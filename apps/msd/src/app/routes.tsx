@@ -20,7 +20,7 @@ import Dashboard from './pages/account/dashboard';
 import { RoleManagement } from './pages/account/roles/roles';
 import { UserManagement } from './pages/account/users/users';
 import { AuditLogs } from './pages/account/audit-logs/audit-logs';
-import { VendorManagement } from './pages/account/members/vendors';
+import { MemberManagement } from './pages/account/members/members';
 import { VendorNewPage } from './pages/account/members/vendor-new-page';
 import { VendorDetailPage } from './pages/account/members/vendor-detail-page';
 import { BranchFormPage } from './pages/account/members/branch-form-page';
@@ -334,7 +334,7 @@ export function AppRoutes() {
             path="/account/members"
             element={
               <VendorsRouteGuard>
-                <VendorManagement />
+                <MemberManagement />
               </VendorsRouteGuard>
             }
           />

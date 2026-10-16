@@ -1,7 +1,7 @@
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { VendorProfileForm } from './vendor-profile-form';
 import { VendorProfileTabs } from './vendor-profile-tabs';
-import { useMyVendor } from './vendors';
+import { useMyVendor } from './members';
 
 /**
  * Split-out half of the old combined "My Business" page: just the Business/Owner/Address/

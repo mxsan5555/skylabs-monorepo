@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listCategories, type Category } from '../../../../api/rbac/vendors';
 import { VendorBranches } from './vendor-branches';
-import { useMyVendor } from './vendors';
+import { useMyVendor } from './members';
 
 /**
  * Split-out half of the old combined "My Business" page: just the Branches/Deals two-pane,

@@ -63,7 +63,7 @@
       {
         "id": "member-list",
         "title": "All Member",
-        "route": "/account/vendors",
+        "route": "/account/members",
         "permissionKey": "members",
         "parent": "vendors",
         "order": 1

@@ -5,85 +5,87 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
   getMyVendor,
   listCategories,
-  listVendors,
   updateMyVendor,
   type Category,
   type Vendor,
   type VendorFields,
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { VendorList } from './vendor-list';
+import { listMembers, type MemberListFilter } from '../../../../api/rbac/members';
+import { ChipNav } from '../../../components/chip-nav/chip-nav';
+import { MemberList, type MemberTableParams } from './member-list';
 import { VendorProfileForm, extractVendorFieldErrors, type VendorFieldErrors } from './vendor-profile-form';
 import { VendorBranches } from './vendor-branches';
 
 /**
- * Vendor Management. Two audiences share this one page/route (`/account/members`):
- *  - Admin/SuperAdmin (`members:view`): the member list. Each row opens that member's own page
- *    (`/account/members/:vendorId`, see vendor-detail-page.tsx).
- *  - Vendor (`members:custom` only, never `members:view` — see roles.tsx's SuperAdmin
- *    note on why a role never gets a permission wider than it needs): "my business"
- *    self-service — complete/edit own profile, submit for verification, manage own
- *    branches/deals. Ownership is always resolved server-side from the caller's JWT,
- *    never from a client-supplied vendorId.
+ * Member Management. Two audiences share this one page/route (`/account/members`):
+ *  - Staff (`members:view`): the member list with lifecycle filters. Each row opens that
+ *    member's own page (`/account/members/:vendorId`).
+ *  - Member (`members:custom` only, never `members:view`): "my business" self-service.
+ *    The server resolves ownership from the caller's JWT, never from a client-supplied id.
  */
-export function VendorManagement() {
+export function MemberManagement() {
   const { token, can } = useAuth();
-  const canView = can('members', 'view');
-  const canCustom = can('members', 'custom');
-  const canCreate = can('members', 'create');
-
-  if (canView) {
-    return <AdminVendorManagement canCreate={canCreate} />;
-  }
-
-  if (canCustom) {
-    return <SelfVendorManagement token={token} />;
-  }
-
+  if (can('members', 'view')) return <AdminMemberManagement canCreate={can('members', 'create')} />;
+  if (can('members', 'custom')) return <SelfVendorManagement token={token} />;
   return <p className="empty-state">You do not have access to Member Management.</p>;
 }
 
-interface VendorTableParams {
-  page: number;
-  pageSize: number;
-  search: string;
+type ListFilter = 'all' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'documents' | 'review';
+
+const FILTER_ITEMS = [
+  { value: 'all', label: 'All' },
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'INACTIVE', label: 'Inactive' },
+  { value: 'SUSPENDED', label: 'Suspended' },
+  { value: 'documents', label: 'Documents incomplete' },
+  { value: 'review', label: 'Ready for suspension review' },
+];
+
+function filterToQuery(filter: ListFilter): Pick<MemberListFilter, 'status' | 'documents' | 'reviewFlag'> {
+  if (filter === 'ACTIVE' || filter === 'INACTIVE' || filter === 'SUSPENDED') return { status: filter };
+  if (filter === 'documents') return { documents: 'incomplete' };
+  if (filter === 'review') return { reviewFlag: 'true' };
+  return {};
 }
 
-const DEFAULT_VENDOR_PARAMS: VendorTableParams = { page: 1, pageSize: 10, search: '' };
+const DEFAULT_PARAMS: MemberTableParams = { page: 1, pageSize: 10, search: '' };
 
-function AdminVendorManagement({ canCreate }: { canCreate: boolean }) {
+function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
   const navigate = useNavigate();
   const { token } = useAuth();
   const [searchParams] = useSearchParams();
-  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [members, setMembers] = useState<Vendor[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState('');
-  const [params, setParams] = useState<VendorTableParams>(DEFAULT_VENDOR_PARAMS);
+  const [params, setParams] = useState<MemberTableParams>(DEFAULT_PARAMS);
+  const [filter, setFilter] = useState<ListFilter>('all');
 
   const openMember = useCallback((id: string) => navigate(`/account/members/${id}`), [navigate]);
 
-  const loadVendors = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setListError('');
     try {
-      const { data, meta } = await listVendors(token, {
+      const { data, meta } = await listMembers(token, {
         page: params.page,
         pageSize: params.pageSize,
         search: params.search || undefined,
+        ...filterToQuery(filter),
       });
-      setVendors(data);
+      setMembers(data);
       setTotal(meta?.total ?? data.length);
     } catch (err) {
       setListError(err instanceof ApiRequestError ? err.message : 'Could not load members.');
     } finally {
       setLoading(false);
     }
-  }, [token, params]);
+  }, [token, params, filter]);
 
   useEffect(() => {
-    loadVendors();
-  }, [loadVendors]);
+    load();
+  }, [load]);
 
   // Old links used `/account/members?vendorId=<id>`; each member now has its own page.
   const legacyVendorId = searchParams.get('vendorId');
@@ -95,7 +97,7 @@ function AdminVendorManagement({ canCreate }: { canCreate: boolean }) {
       <header className="page-head">
         <div>
           <h1>Member Management</h1>
-          <p>Open a member to review their profile, branches and deals.</p>
+          <p>Open a member to review their profile, documents and catalog.</p>
         </div>
         <div className="page-head__actions">
           {canCreate && (
@@ -108,10 +110,19 @@ function AdminVendorManagement({ canCreate }: { canCreate: boolean }) {
       </header>
 
       <section className="panel" aria-label="Members">
-        <h2>Member ({total})</h2>
+        <h2>Members ({total})</h2>
+        <ChipNav
+          items={FILTER_ITEMS}
+          value={filter}
+          onSelect={(value) => {
+            setFilter(value as ListFilter);
+            setParams((p) => ({ ...p, page: 1 }));
+          }}
+          ariaLabel="Filter members"
+        />
         {listError && <p className="error-state" role="alert">{listError}</p>}
-        <VendorList
-          vendors={vendors}
+        <MemberList
+          members={members}
           onSelect={openMember}
           total={total}
           page={params.page}
@@ -260,4 +271,4 @@ function SelfVendorManagement({ token }: { token: string | null }) {
   );
 }
 
-export default VendorManagement;
+export default MemberManagement;
