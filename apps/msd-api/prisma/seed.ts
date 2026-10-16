@@ -863,11 +863,12 @@ async function seedVendorsAndBranches(
       panNumber: `DEMOPAN${v.key.toUpperCase()}`,
       businessRegistrationNumber: `DEMOREG${v.key.toUpperCase()}2024`,
       logoUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(v.businessName)}&size=600&background=0D8ABC&color=fff&bold=true`,
-      kycStatus: 'VERIFIED' as const,
       status: 'ACTIVE' as const,
+      statusChangedAt: new Date(),
+      documentsDueAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
     };
 
-    // Find-or-create: businessName/address/kycStatus/status/etc. are admin- and vendor-editable
+    // Find-or-create: businessName/address/status/etc. are admin- and vendor-editable
     // (KYC approval, profile edits) — never overwrite them on a re-run.
     const vendor = (await prisma.member.findUnique({ where: { ownerUserId: ownerUser.id } }))
       ?? (await prisma.member.create({ data: { ...vendorData, ownerUserId: ownerUser.id } }));
