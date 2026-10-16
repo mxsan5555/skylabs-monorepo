@@ -51,7 +51,6 @@ vi.mock('./vendor-user-picker', () => ({
 }));
 
 import { VendorPipeline } from './vendor-pipeline';
-import { VendorNewPage } from './vendor-new-page';
 
 function findButtonByText(text: string): HTMLElement {
   const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.trim() === text);
@@ -107,17 +106,6 @@ beforeEach(() => {
  * `disabled={!pendingOwner || saving}` prop plus this repo's Playwright E2E suite.
  */
 describe('VendorPipeline#saveUser — owner is always a brand-new identity', () => {
-  it('redirects back to the vendor list immediately after a fresh vendor is created', async () => {
-    createVendorMock.mockResolvedValue({ data: CREATED_VENDOR });
-    render(<VendorNewPage />);
-
-    fireEvent.click(screen.getByText('pick-identity'));
-    fireEvent.click(findButtonByText('Create Vendor'));
-
-    await waitFor(() => expect(createVendorMock).toHaveBeenCalledOnce());
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith(`/account/members/${CREATED_VENDOR.id}/profile`, { replace: true }));
-  });
-
   it('submitting sends ownerFirstName/ownerLastName/ownerEmail/ownerMobile, never ownerUserId', async () => {
     createVendorMock.mockResolvedValue({ data: CREATED_VENDOR });
     const onVendorChange = vi.fn();

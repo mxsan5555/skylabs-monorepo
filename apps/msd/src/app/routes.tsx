@@ -21,7 +21,7 @@ import { RoleManagement } from './pages/account/roles/roles';
 import { UserManagement } from './pages/account/users/users';
 import { AuditLogs } from './pages/account/audit-logs/audit-logs';
 import { MemberManagement } from './pages/account/members/members';
-import { VendorNewPage } from './pages/account/members/vendor-new-page';
+import { MemberNewPage } from './pages/account/members/member-new-page';
 import { VendorDetailPage } from './pages/account/members/vendor-detail-page';
 import { BranchFormPage } from './pages/account/members/branch-form-page';
 import { DealFormPage } from './pages/account/members/deal-form-page';
@@ -338,17 +338,14 @@ export function AppRoutes() {
               </VendorsRouteGuard>
             }
           />
-          {/* Dedicated "Add New Vendor" page — see vendor-new-page.tsx's doc comment for why this
-            is a real route rather than the old inline-on-the-list-page wizard. Reuses the same
-            route guard as /account/members; VendorNewPage itself checks the finer-grained
-            `members:create` action and shows an empty state if the caller only holds
-            `members:view`/`members:custom` (the backend route is the real enforcement either
-            way). */}
+          {/* Add member: the short form. Same route guard as /account/members; MemberNewPage itself
+            checks the finer-grained `members:create` action and shows an empty state otherwise
+            (the backend route is the real enforcement either way). */}
           <Route
             path="/account/members/new"
             element={
               <VendorsRouteGuard>
-                <VendorNewPage />
+                <MemberNewPage />
               </VendorsRouteGuard>
             }
           />
