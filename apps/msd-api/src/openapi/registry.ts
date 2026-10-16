@@ -24,11 +24,9 @@ import { ErrorObjectSchema, PaginationQuerySchema } from '../schemas/common.sche
 import {
   VendorCreateSchema,
   VendorUpdateSchema,
-  VendorSelfCreateSchema,
   VendorSelfUpdateSchema,
-  VendorRejectSchema,
-  VendorStatusUpdateSchema,
-  VendorKycReviewSchema,
+  MemberStatusChangeSchema,
+  MemberDeleteSchema,
   BranchCreateSchema,
   BranchUpdateSchema,
   BranchStatusUpdateSchema,
@@ -534,10 +532,9 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'post',
     path: '/vendors/public/register',
-    summary: 'Public "Become a Vendor" registration — unauthenticated, always creates PENDING_VERIFICATION',
+    summary: 'Closed: staff create every member, so this always refuses with 403 and a contact-our-team message',
     tags: ['Vendors - Public'],
-    request: { body: { content: { 'application/json': { schema: VendorSelfCreateSchema } } } },
-    responses: { 201: { description: 'Vendor application created' }, 409: errorResponse, 422: errorResponse, 429: errorResponse },
+    responses: { 403: errorResponse, 429: errorResponse },
   });
 
   registry.registerPath({
@@ -550,16 +547,6 @@ export function buildOpenApiDocument() {
   });
 
   registry.registerPath({
-    method: 'post',
-    path: '/vendors/me',
-    summary: 'Self-register a vendor profile for the caller',
-    tags: ['Vendors - Self-service'],
-    security: bearer,
-    request: { body: { content: { 'application/json': { schema: VendorSelfCreateSchema } } } },
-    responses: { 201: { description: 'Created' }, 409: errorResponse },
-  });
-
-  registry.registerPath({
     method: 'patch',
     path: '/vendors/me',
     summary: "Update the caller's own vendor profile",
@@ -567,15 +554,6 @@ export function buildOpenApiDocument() {
     security: bearer,
     request: { body: { content: { 'application/json': { schema: VendorSelfUpdateSchema } } } },
     responses: { 200: { description: 'Updated' } },
-  });
-
-  registry.registerPath({
-    method: 'post',
-    path: '/vendors/me/submit',
-    summary: 'Submit the completed profile for admin verification',
-    tags: ['Vendors - Self-service'],
-    security: bearer,
-    responses: { 200: { description: 'Submitted' }, 422: errorResponse },
   });
 
   registry.registerPath({
@@ -858,61 +836,28 @@ export function buildOpenApiDocument() {
 
   registry.registerPath({
     method: 'patch',
-    path: '/vendors/{id}/approve',
-    summary: 'Approve a vendor — jumps straight to ACTIVE',
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: { params: z.object({ id: z.string().uuid() }) },
-    responses: { 200: { description: 'Approved' }, 403: errorResponse },
-  });
-
-  registry.registerPath({
-    method: 'patch',
-    path: '/vendors/{id}/reject',
-    summary: 'Reject a vendor with a mandatory reason',
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: {
-      params: z.object({ id: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: VendorRejectSchema } } },
-    },
-    responses: { 200: { description: 'Rejected' } },
-  });
-
-  registry.registerPath({
-    method: 'patch',
     path: '/vendors/{id}/status',
-    summary: 'Activate / deactivate / suspend an already-approved vendor',
+    summary: 'Change a member status to ACTIVE, INACTIVE or SUSPENDED with a reason (old alias)',
     tags: ['Vendors - Admin'],
     security: bearer,
     request: {
       params: z.object({ id: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: VendorStatusUpdateSchema } } },
+      body: { content: { 'application/json': { schema: MemberStatusChangeSchema } } },
     },
-    responses: { 200: { description: 'Updated' } },
-  });
-
-  registry.registerPath({
-    method: 'patch',
-    path: '/vendors/{id}/kyc-review',
-    summary: "Verify or reject a vendor's KYC",
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: {
-      params: z.object({ id: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: VendorKycReviewSchema } } },
-    },
-    responses: { 200: { description: 'Updated' } },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse, 409: errorResponse, 422: errorResponse },
   });
 
   registry.registerPath({
     method: 'delete',
     path: '/vendors/{id}',
-    summary: 'Hard-delete a vendor (blocked if it has real order history)',
+    summary: 'Delete a SUSPENDED member, or archive it when order history exists (old alias, Super Admin only)',
     tags: ['Vendors - Admin'],
     security: bearer,
-    request: { params: z.object({ id: z.string().uuid() }) },
-    responses: { 200: { description: 'Deleted' }, 409: errorResponse },
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: MemberDeleteSchema } } },
+    },
+    responses: { 200: { description: 'Deleted or archived' }, 403: errorResponse, 404: errorResponse, 409: errorResponse, 422: errorResponse },
   });
 
   registry.registerPath({

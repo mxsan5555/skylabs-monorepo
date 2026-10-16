@@ -165,42 +165,6 @@ describe('GET /api/v1/vendors/me', () => {
   });
 });
 
-describe('POST /api/v1/vendors/me', () => {
-  it('returns 422 for a missing businessName', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
-    const res = await request(app)
-      .post('/api/v1/vendors/me')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({});
-    expect(res.status).toBe(422);
-  });
-
-  it('creates a self-registered vendor owned by the caller', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
-    prismaMock.member.findUnique.mockResolvedValue(null);
-    prismaMock.member.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: VENDOR_A_ID, ...data }),
-    );
-    const res = await request(app)
-      .post('/api/v1/vendors/me')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ businessName: 'Vendor A Spa' });
-    expect(res.status).toBe(201);
-    expect(res.body.data.ownerUserId).toBe(USER_A_ID);
-    expect(res.body.data.status).toBe('ACTIVE');
-  });
-
-  it('returns 409 when the caller already has a vendor profile', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
-    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-    const res = await request(app)
-      .post('/api/v1/vendors/me')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ businessName: 'Vendor A Spa' });
-    expect(res.status).toBe(409);
-  });
-});
-
 describe('Security: vendor cross-tenant isolation', () => {
   it("403s when Vendor A's token tries to touch Vendor B's branch via /vendors/me/branches/:branchId", async () => {
     resolveMock.mockResolvedValue(['members:custom']);
@@ -830,25 +794,6 @@ describe('mapLocationUrl — update-time resolve/skip semantics + resolver-rejec
     expect(resolveMapLocationMock).not.toHaveBeenCalled();
   });
 
-  it('self-service POST /vendors/me resolves a mapLocationUrl and persists it on the new self-registered vendor', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
-    prismaMock.member.findUnique.mockResolvedValue(null);
-    resolveMapLocationMock.mockResolvedValue({ latitude: 26.7606, longitude: 83.3732 });
-    prismaMock.member.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: VENDOR_A_ID, ...data }),
-    );
-
-    const res = await request(app)
-      .post('/api/v1/vendors/me')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ businessName: 'My Spa', mapLocationUrl: 'https://maps.app.goo.gl/o3WNRifqzdctDuiF9' });
-
-    expect(res.status).toBe(201);
-    expect(resolveMapLocationMock).toHaveBeenCalledWith('https://maps.app.goo.gl/o3WNRifqzdctDuiF9');
-    expect(res.body.data.latitude).toBe(26.7606);
-    expect(res.body.data.longitude).toBe(83.3732);
-  });
-
   it('self-service PATCH /vendors/me with a changed mapLocationUrl re-resolves and updates latitude/longitude', async () => {
     resolveMock.mockResolvedValue(['members:custom']);
     const existing = { ...vendorAFixture, mapLocationUrl: 'https://maps.app.goo.gl/old', latitude: 1, longitude: 2, kycStatus: 'VERIFIED' };
@@ -1082,14 +1027,6 @@ describe('Admin onboarding pipeline — per-step saves', () => {
     expect(userSection.complete).toBe(true);
   });
 
-  it('self-registration still requires businessName (unlike the admin pipeline)', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
-    const res = await request(app)
-      .post('/api/v1/vendors/me')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({});
-    expect(res.status).toBe(422);
-  });
 });
 
 describe('Cross-vendor Branches/Deals sidebar lists', () => {
@@ -1168,121 +1105,179 @@ describe('Cross-vendor Branches/Deals sidebar lists', () => {
   });
 });
 
-describe('PATCH /api/v1/vendors/:id/approve + /reject', () => {
-  it('approve jumps the vendor straight to ACTIVE', async () => {
-    resolveMock.mockResolvedValue(['members:approve']);
-    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.member.update.mockResolvedValue({ ...vendorAFixture, status: 'ACTIVE' });
+/**
+ * Feature: approval is gone. Members start ACTIVE, so the self-service create and submit routes
+ * and the admin approve, reject and KYC review routes no longer exist.
+ */
+describe('Removed approval and self-create routes', () => {
+  it.each([
+    ['post', '/api/v1/vendors/me'],
+    ['post', '/api/v1/vendors/me/submit'],
+    ['patch', `/api/v1/vendors/${VENDOR_A_ID}/approve`],
+    ['patch', `/api/v1/vendors/${VENDOR_A_ID}/reject`],
+    ['patch', `/api/v1/vendors/${VENDOR_A_ID}/kyc-review`],
+  ] as const)('%s %s is not routed and creates or updates nothing', async (method, path) => {
+    resolveMock.mockResolvedValue(['members:custom', 'members:approve', 'members:reject']);
     const res = await request(app)
-      .patch(`/api/v1/vendors/${VENDOR_A_ID}/approve`)
+      [method](path)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['admin'] }))
+      .send({ businessName: 'Vendor A Spa', reason: 'not needed any more', kycStatus: 'VERIFIED' });
+    expect(res.status).toBe(404);
+    expect(prismaMock.member.create).not.toHaveBeenCalled();
+    expect(prismaMock.member.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/v1/vendors (member list filters)', () => {
+  it('passes documents, reviewFlag and status through to the query and adds documentsSummary', async () => {
+    resolveMock.mockResolvedValue(['members:view']);
+    prismaMock.member.findMany.mockResolvedValue([{ ...vendorAFixture, documents: [], documentsDueAt: null }]);
+    prismaMock.member.count.mockResolvedValue(1);
+    const res = await request(app)
+      .get('/api/v1/vendors?status=ACTIVE&documents=incomplete&reviewFlag=true')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('ACTIVE');
+    const where = prismaMock.member.findMany.mock.calls[0][0].where;
+    expect(where).toMatchObject({ status: 'ACTIVE', reviewFlaggedAt: { not: null } });
+    expect(where.OR).toHaveLength(3);
+    expect(res.body.data[0].documentsSummary).toMatchObject({ complete: false, missing: ['AADHAAR', 'PAN', 'GST'] });
   });
 
-  it('reject requires a reason', async () => {
-    resolveMock.mockResolvedValue(['members:reject']);
+  it('422s an unknown documents filter value', async () => {
+    resolveMock.mockResolvedValue(['members:view']);
     const res = await request(app)
-      .patch(`/api/v1/vendors/${VENDOR_A_ID}/reject`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({});
+      .get('/api/v1/vendors?documents=complete')
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
     expect(res.status).toBe(422);
   });
+});
 
-  it('a vendor cannot approve or reject its own vendor profile', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
-    const approveRes = await request(app)
-      .patch(`/api/v1/vendors/${VENDOR_A_ID}/approve`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
-    expect(approveRes.status).toBe(403);
+/** The `/vendors/:id/status` alias runs the member status service (history, audit, notices). */
+describe('PATCH /api/v1/vendors/:id/status (member status alias)', () => {
+  it('moves an ACTIVE member to INACTIVE with a reason and writes history', async () => {
+    resolveMock.mockResolvedValue(['members:status_change']);
+    prismaMock.member.findUnique.mockResolvedValue({ ...vendorAFixture, owner: null });
+    prismaMock.member.update.mockResolvedValue({});
+    prismaMock.memberStatusHistory.create.mockResolvedValue({});
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}/status`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ status: 'INACTIVE', reason: 'Owner asked for a pause' });
+    expect(res.status).toBe(200);
+    expect(prismaMock.memberStatusHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ memberId: VENDOR_A_ID, fromStatus: 'ACTIVE', toStatus: 'INACTIVE', actorUserId: 'admin-1' }),
+    });
+  });
 
-    const rejectRes = await request(app)
-      .patch(`/api/v1/vendors/${VENDOR_A_ID}/reject`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ reason: 'nope' });
-    expect(rejectRes.status).toBe(403);
+  it('422s a reason shorter than 10 characters', async () => {
+    resolveMock.mockResolvedValue(['members:status_change']);
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}/status`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ status: 'SUSPENDED', reason: 'short' });
+    expect(res.status).toBe(422);
+    expect(prismaMock.member.update).not.toHaveBeenCalled();
+  });
+
+  it('403s without members:status_change', async () => {
+    resolveMock.mockResolvedValue(['members:view']);
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}/status`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ status: 'INACTIVE', reason: 'Owner asked for a pause' });
+    expect(res.status).toBe(403);
   });
 });
 
 /**
- * Feature: Superadmin hard-delete for Vendor (Vendor Validation/Delete audit, Phase 4).
- * `Order`/`OrderItem`'s `vendor` relation has no `onDelete` (Postgres default = restrict), so a
- * vendor with any real order history can never be hard-deleted — Postgres blocks it with a clean
- * P2003, translated to CONFLICT (use `/status` to deactivate/suspend instead).
+ * Feature: the `/vendors/:id` DELETE alias runs the member delete. Super Admin only (only that
+ * role holds members:delete), the member must be SUSPENDED first, a reason is required, and a
+ * member whose delete is blocked by order rows is archived instead.
  */
-describe('DELETE /api/v1/vendors/:id', () => {
-  it('deletes a vendor and writes an audit log entry', async () => {
+describe('DELETE /api/v1/vendors/:id (member delete alias)', () => {
+  const REASON = { reason: 'Closed the business for good' };
+
+  it('hard deletes a SUSPENDED member with no order lines', async () => {
     resolveMock.mockResolvedValue(['members:delete']);
-    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue({ ...vendorAFixture, status: 'SUSPENDED', owner: null });
+    prismaMock.orderItem.count.mockResolvedValue(0);
     prismaMock.member.delete.mockResolvedValue(vendorAFixture);
+    prismaMock.user.update.mockResolvedValue({});
+    prismaMock.refreshSession.updateMany.mockResolvedValue({ count: 0 });
     const res = await request(app)
       .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['super_admin'] }))
+      .send(REASON);
     expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ outcome: 'DELETED' });
     expect(prismaMock.member.delete).toHaveBeenCalledWith({ where: { id: VENDOR_A_ID } });
-    expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
   });
 
-  it('404s (not 500) when the vendor does not exist', async () => {
+  it('409s MEMBER_NOT_SUSPENDED for an ACTIVE member', async () => {
+    resolveMock.mockResolvedValue(['members:delete']);
+    prismaMock.member.findUnique.mockResolvedValue({ ...vendorAFixture, owner: null });
+    const res = await request(app)
+      .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['super_admin'] }))
+      .send(REASON);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('MEMBER_NOT_SUSPENDED');
+    expect(prismaMock.member.delete).not.toHaveBeenCalled();
+  });
+
+  it('archives instead of deleting when Postgres blocks the delete (P2003)', async () => {
+    resolveMock.mockResolvedValue(['members:delete']);
+    prismaMock.member.findUnique.mockResolvedValue({ ...vendorAFixture, status: 'SUSPENDED', owner: null });
+    prismaMock.orderItem.count.mockResolvedValue(0);
+    const { Prisma } = await import('../generated/prisma-client');
+    prismaMock.member.delete.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Foreign key constraint failed', { code: 'P2003', clientVersion: 'test' }),
+    );
+    prismaMock.member.update.mockResolvedValue({});
+    prismaMock.memberStatusHistory.create.mockResolvedValue({});
+    const res = await request(app)
+      .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['super_admin'] }))
+      .send(REASON);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ outcome: 'ARCHIVED' });
+  });
+
+  it('404s (not 500) when the member does not exist', async () => {
     resolveMock.mockResolvedValue(['members:delete']);
     prismaMock.member.findUnique.mockResolvedValue(null);
     const res = await request(app)
       .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['super_admin'] }))
+      .send(REASON);
     expect(res.status).toBe(404);
     expect(prismaMock.member.delete).not.toHaveBeenCalled();
   });
 
-  it('returns a clean 409 (not a raw 500) when the vendor has real order history blocking the delete', async () => {
+  it('422s without a reason', async () => {
     resolveMock.mockResolvedValue(['members:delete']);
-    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-    const { Prisma } = await import('../generated/prisma-client');
-    prismaMock.member.delete.mockRejectedValue(
-      new Prisma.PrismaClientKnownRequestError('Foreign key constraint failed', { code: 'P2003', clientVersion: 'test' }),
-    );
     const res = await request(app)
       .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-    expect(res.status).toBe(409);
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['super_admin'] }));
+    expect(res.status).toBe(422);
   });
 
   it('403s without members:delete', async () => {
     resolveMock.mockResolvedValue(['members:view']);
     const res = await request(app)
       .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send(REASON);
     expect(res.status).toBe(403);
   });
 
-  it('a vendor cannot delete its own vendor profile', async () => {
+  it('a member cannot delete its own member profile', async () => {
     resolveMock.mockResolvedValue(['members:custom']);
     const res = await request(app)
       .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+      .send(REASON);
     expect(res.status).toBe(403);
-  });
-});
-
-describe('PATCH /api/v1/vendors/:id/kyc-review', () => {
-  it('requires rejectionReason when rejecting KYC', async () => {
-    resolveMock.mockResolvedValue(['members:approve']);
-    const res = await request(app)
-      .patch(`/api/v1/vendors/${VENDOR_A_ID}/kyc-review`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ kycStatus: 'REJECTED' });
-    expect(res.status).toBe(422);
-  });
-
-  it('verifies KYC without requiring a reason', async () => {
-    resolveMock.mockResolvedValue(['members:approve']);
-    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.member.update.mockResolvedValue({ ...vendorAFixture, kycStatus: 'VERIFIED' });
-    const res = await request(app)
-      .patch(`/api/v1/vendors/${VENDOR_A_ID}/kyc-review`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ kycStatus: 'VERIFIED' });
-    expect(res.status).toBe(200);
-    expect(res.body.data.kycStatus).toBe('VERIFIED');
   });
 });
 

@@ -12,12 +12,10 @@ import { UuidParamSchema, PaginationQuerySchema } from '../schemas/common.schema
 import {
   VendorCreateSchema,
   VendorUpdateSchema,
-  VendorSelfCreateSchema,
   VendorSelfUpdateSchema,
-  VendorRejectSchema,
-  VendorStatusUpdateSchema,
-  VendorKycReviewSchema,
-  VendorListQuerySchema,
+  MemberListQuerySchema,
+  MemberStatusChangeSchema,
+  MemberDeleteSchema,
   VendorUserSearchQuerySchema,
   VendorOwnerLookupQuerySchema,
   CrossVendorListQuerySchema,
@@ -49,6 +47,7 @@ import { imageUpload, videoUpload, documentUpload } from '../lib/media-upload.mi
 import type { VendorDocumentType } from '../generated/prisma-client';
 import * as vendorService from '../services/vendor.service';
 import * as memberDocumentService from '../services/member-document.service';
+import * as memberStatusService from '../services/member-status.service';
 import * as productService from '../services/product.service';
 import { writeAuditLog } from '../services/audit.service';
 import { sendData, ApiError } from '../lib/http';
@@ -195,28 +194,6 @@ router.get('/me', requirePermission('members', 'custom'), async (req, res, next)
     next(err);
   }
 });
-
-router.post(
-  '/me',
-  requirePermission('members', 'custom'),
-  validateBody(VendorSelfCreateSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.createSelfVendor(req.user!.sub, req.body);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.self_register',
-        targetType: 'Vendor',
-        targetId: vendor.id,
-        after: vendor,
-        ...requestMeta(req),
-      });
-      sendData(res, vendor, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
 
 router.patch(
   '/me',
@@ -413,23 +390,6 @@ router.delete('/me/video', requirePermission('members', 'custom'), async (req, r
       ...requestMeta(req),
     });
     sendData(res, { deleted: true });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/me/submit', requirePermission('members', 'custom'), async (req, res, next) => {
-  try {
-    const vendor = await vendorService.submitForVerification(req.user!.sub);
-    await writeAuditLog({
-      actorUserId: req.user!.sub,
-      action: 'vendor.submit_for_verification',
-      targetType: 'Vendor',
-      targetId: vendor.id,
-      after: { status: vendor.status },
-      ...requestMeta(req),
-    });
-    sendData(res, vendor);
   } catch (err) {
     next(err);
   }
@@ -1290,10 +1250,10 @@ router.delete('/me/products/:productId/video', requirePermission('members', 'cus
 
 // ─── Admin/SuperAdmin surface ─────────────────────────────────────────────────
 
-router.get('/', requirePermission('members', 'view'), validateQuery(VendorListQuerySchema), async (req, res, next) => {
+router.get('/', requirePermission('members', 'view'), validateQuery(MemberListQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, search, status } = req.validatedQuery as ReturnType<typeof VendorListQuerySchema.parse>;
-    const { items, total } = await vendorService.listVendors({ page, pageSize, search, status });
+    const { page, pageSize, search, status, documents, reviewFlag } = req.validatedQuery as ReturnType<typeof MemberListQuerySchema.parse>;
+    const { items, total } = await vendorService.listVendors({ page, pageSize, search, status, documents, reviewFlag });
     sendData(res, await vendorService.attachLiveCounts(items), { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);
@@ -1539,109 +1499,40 @@ router.delete(
   },
 );
 
-router.patch(
-  '/:id/approve',
-  requirePermission('members', 'approve'),
-  validateParams(UuidParamSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.approveVendor(req.params.id);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.approve',
-        targetType: 'Vendor',
-        targetId: vendor.id,
-        after: { status: vendor.status },
-        ...requestMeta(req),
-      });
-      sendData(res, vendor);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.patch(
-  '/:id/reject',
-  requirePermission('members', 'reject'),
-  validateParams(UuidParamSchema),
-  validateBody(VendorRejectSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.rejectVendor(req.params.id, req.body.reason);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.reject',
-        targetType: 'Vendor',
-        targetId: vendor.id,
-        after: { status: vendor.status, reason: req.body.reason },
-        ...requestMeta(req),
-      });
-      sendData(res, vendor);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
+/** Old alias of the member status change. Validation, history, audit and notices live in
+ *  `member-status.service.ts`. */
 router.patch(
   '/:id/status',
   requirePermission('members', 'status_change'),
   validateParams(UuidParamSchema),
-  validateBody(VendorStatusUpdateSchema),
+  validateBody(MemberStatusChangeSchema),
   async (req, res, next) => {
     try {
-      const vendor = await vendorService.setVendorStatus(req.params.id, req.body.status, req.body.reason);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.status_change',
-        targetType: 'Vendor',
-        targetId: vendor.id,
-        after: { status: vendor.status },
+      await memberStatusService.changeMemberStatus(req.params.id, req.body.status, req.body.reason, {
+        userId: req.user!.sub,
         ...requestMeta(req),
       });
-      sendData(res, vendor);
+      sendData(res, await vendorService.getVendorOrThrow(req.params.id));
     } catch (err) {
       next(err);
     }
   },
 );
 
-router.delete('/:id', requirePermission('members', 'delete'), validateParams(UuidParamSchema), async (req, res, next) => {
-  try {
-    const before = await vendorService.getVendorOrThrow(req.params.id);
-    await vendorService.deleteVendor(req.params.id);
-    await writeAuditLog({
-      actorUserId: req.user!.sub,
-      action: 'vendor.delete',
-      targetType: 'Vendor',
-      targetId: req.params.id,
-      before,
-      ...requestMeta(req),
-    });
-    sendData(res, null);
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.patch(
-  '/:id/kyc-review',
-  requirePermission('members', 'approve'),
+/** Old alias of the member delete: Super Admin only, SUSPENDED members only, archives instead
+ *  when order history exists. `member-status.service.ts` writes the audit row. */
+router.delete(
+  '/:id',
+  requirePermission('members', 'delete'),
   validateParams(UuidParamSchema),
-  validateBody(VendorKycReviewSchema),
+  validateBody(MemberDeleteSchema),
   async (req, res, next) => {
     try {
-      const vendor = await vendorService.reviewKyc(req.params.id, req.body.kycStatus, req.body.rejectionReason);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.kyc_review',
-        targetType: 'Vendor',
-        targetId: vendor.id,
-        after: { kycStatus: vendor.kycStatus, rejectionReason: vendor.kycRejectionReason },
+      const result = await memberStatusService.deleteMember(req.params.id, req.body.reason, {
+        userId: req.user!.sub,
         ...requestMeta(req),
       });
-      sendData(res, vendor);
+      sendData(res, result);
     } catch (err) {
       next(err);
     }

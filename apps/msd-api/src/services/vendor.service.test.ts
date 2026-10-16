@@ -6,7 +6,15 @@ vi.mock('../lib/prisma', async () => {
 });
 
 import { prisma } from '../lib/prisma';
-import { createVendorOwner, checkVendorOwnerAvailability, createTherapist, createDeal, updateDeal } from './vendor.service';
+import {
+  createVendor,
+  createVendorOwner,
+  checkVendorOwnerAvailability,
+  createTherapist,
+  createDeal,
+  updateDeal,
+  listVendors,
+} from './vendor.service';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -372,5 +380,50 @@ describe('createDeal / updateDeal — therapist linking', () => {
     expect(prismaMock.therapist.findMany).not.toHaveBeenCalled();
     expect(prismaMock.dealTherapist.deleteMany).not.toHaveBeenCalled();
     expect(prismaMock.dealTherapist.createMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Feature: the staff member list filters by status, missing documents, review flag and search,
+ * and every row carries a documents summary.
+ */
+describe('listVendors — member list filters', () => {
+  beforeEach(() => {
+    prismaMock.member.findMany.mockResolvedValue([
+      { id: VENDOR_ID, owner: null, documents: [{ documentType: 'PAN', status: 'APPROVED' }], documentsDueAt: null },
+    ] as never);
+    prismaMock.member.count.mockResolvedValue(1);
+  });
+
+  it('documents=incomplete matches members missing any provided AADHAAR, PAN or GST document', async () => {
+    await listVendors({ page: 1, pageSize: 20, documents: 'incomplete' });
+    const where = prismaMock.member.findMany.mock.calls[0][0].where;
+    expect(where.OR).toEqual(
+      ['AADHAAR', 'PAN', 'GST'].map((documentType) => ({
+        documents: { none: { documentType, status: { in: ['SUBMITTED', 'APPROVED'] } } },
+      })),
+    );
+    expect(prismaMock.member.count).toHaveBeenCalledWith({ where });
+  });
+
+  it('reviewFlag=true matches flagged members only', async () => {
+    await listVendors({ page: 1, pageSize: 20, reviewFlag: 'true', status: 'INACTIVE' });
+    const where = prismaMock.member.findMany.mock.calls[0][0].where;
+    expect(where).toMatchObject({ status: 'INACTIVE', reviewFlaggedAt: { not: null } });
+  });
+
+  it('search covers business name, business email and owner mobile, and combines with the documents filter', async () => {
+    await listVendors({ page: 1, pageSize: 20, search: '98765', documents: 'incomplete' });
+    const where = prismaMock.member.findMany.mock.calls[0][0].where;
+    expect(where.OR).toHaveLength(3);
+    expect(where.AND[0].OR).toEqual(
+      expect.arrayContaining([{ ownerMobile: { contains: '98765' } }, expect.objectContaining({ businessName: expect.anything() })]),
+    );
+  });
+
+  it('adds a documents summary to every row', async () => {
+    const { items, total } = await listVendors({ page: 1, pageSize: 20 });
+    expect(total).toBe(1);
+    expect(items[0].documentsSummary).toMatchObject({ complete: false, missing: ['AADHAAR', 'GST'] });
   });
 });

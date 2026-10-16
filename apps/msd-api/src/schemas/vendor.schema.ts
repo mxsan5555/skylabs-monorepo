@@ -5,9 +5,11 @@ import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 
 extendZodWithOpenApi(z);
 
-export const VendorListQuerySchema = PaginationQuerySchema.extend({
+export const MemberListQuerySchema = PaginationQuerySchema.extend({
   search: z.string().max(200).optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED', 'ARCHIVED']).optional(),
+  documents: z.enum(['incomplete']).optional(),
+  reviewFlag: z.enum(['true']).optional(),
 });
 
 /** Query for the "select an existing User to link as this Vendor's owner" search box. */
@@ -202,39 +204,44 @@ export const VendorOwnerLookupQuerySchema = z
   })
   .refine((v) => Boolean(v.email) || Boolean(v.mobile), { message: 'Provide an email or mobile number' });
 
-// Self-registration has no "Step 1 only" concept (unlike the admin pipeline) — re-require
-// businessName here even though the base VendorFieldsSchema relaxed it to optional.
-export const VendorSelfCreateSchema = VendorFieldsSchema.extend({
-  businessName: z.string().min(1).max(200),
-}).openapi('VendorSelfCreate');
-
 export const VendorSelfUpdateSchema = VendorFieldsSchema.partial().openapi('VendorSelfUpdate');
 
-export const VendorRejectSchema = z
-  .object({ reason: z.string().min(1).max(1000) })
-  .openapi('VendorReject');
+/** The short Add member form. Everything else is completed later on the Profile tab. */
+export const MemberCreateSchema = z
+  .object({
+    businessName: z.string().trim().min(1).max(200),
+    ownerFirstName: z.string().trim().min(1).max(75),
+    ownerLastName: z.string().trim().min(1).max(75),
+    ownerEmail: z.string().trim().email().max(254),
+    ownerMobile: z
+      .string()
+      .max(30)
+      .transform((v) => normalizeIdentifier(v))
+      .refine((v) => INDIA_MOBILE_REGEX.test(v), { message: 'Enter a valid 10-digit mobile number' }),
+  })
+  .strict()
+  .openapi('MemberCreate');
 
-export const VendorStatusUpdateSchema = z
+export const MemberStatusChangeSchema = z
   .object({
     status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
-    reason: z.string().max(1000).optional(),
+    reason: z.string().trim().min(10).max(500),
   })
-  .refine((v) => v.status === 'ACTIVE' || Boolean(v.reason), {
-    message: 'reason is required when deactivating or suspending a vendor',
-    path: ['reason'],
-  })
-  .openapi('VendorStatusUpdate');
+  .strict()
+  .openapi('MemberStatusChange');
 
-export const VendorKycReviewSchema = z
+export const MemberDeleteSchema = z
+  .object({ reason: z.string().trim().min(10).max(500) })
+  .strict()
+  .openapi('MemberDelete');
+
+export const MemberDocumentReviewSchema = z
   .object({
-    kycStatus: z.enum(['VERIFIED', 'REJECTED']),
-    rejectionReason: z.string().max(1000).optional(),
+    decision: z.enum(['APPROVED', 'REJECTED']),
+    reason: z.string().trim().max(500).optional(),
   })
-  .refine((v) => v.kycStatus === 'VERIFIED' || Boolean(v.rejectionReason), {
-    message: 'rejectionReason is required when rejecting KYC',
-    path: ['rejectionReason'],
-  })
-  .openapi('VendorKycReview');
+  .strict()
+  .openapi('MemberDocumentReview');
 
 /**
  * Onboarding wizard Step 2's "Business Modules + Category Access" save — replace-the-full-set
