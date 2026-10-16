@@ -111,7 +111,7 @@ describe('GET /api/v1/products/:id (superadmin oversight)', () => {
 });
 
 /**
- * CRITICAL: `products:view` (unlike the admin-only `vendors:view` gating Branches/Deals/
+ * CRITICAL: `products:view` (unlike the admin-only `members:view` gating Branches/Deals/
  * Therapists' equivalent cross-vendor routes) is also held by the `vendor` role itself — see
  * seed.ts's `grant('vendor', [...'products:view'...])` — so this router previously trusted a
  * caller-supplied `?vendorId=` (or returned every vendor's products when it was omitted) instead

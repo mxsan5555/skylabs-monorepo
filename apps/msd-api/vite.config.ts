@@ -14,7 +14,7 @@ export default defineConfig(() => ({
     watch: false,
     globals: true,
     environment: 'node',
-    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}'],
+    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}', 'prisma/**/*.test.ts'],
     reporters: ['default'],
     coverage: {
       reportsDirectory: '../../coverage/apps/msd-api',

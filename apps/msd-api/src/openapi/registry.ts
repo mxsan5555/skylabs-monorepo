@@ -496,7 +496,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors/branches',
-    summary: 'Cross-vendor branch list for the sidebar Branches page (admin, gated on vendors:view)',
+    summary: 'Cross-vendor branch list for the sidebar Branches page (admin, gated on members:view)',
     tags: ['Vendors - Admin'],
     security: bearer,
     responses: { 200: { description: 'Branches' }, 403: errorResponse },
@@ -505,7 +505,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors/deals',
-    summary: 'Cross-vendor deal list for the sidebar Deals page (admin, gated on vendors:view)',
+    summary: 'Cross-vendor deal list for the sidebar Deals page (admin, gated on members:view)',
     tags: ['Vendors - Admin'],
     security: bearer,
     responses: { 200: { description: 'Deals' }, 403: errorResponse },
@@ -514,7 +514,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors/users/search',
-    summary: "Existing-user typeahead for linking a Vendor's owner (admin, gated on vendors:create)",
+    summary: "Existing-user typeahead for linking a Vendor's owner (admin, gated on members:create)",
     tags: ['Vendors - Admin'],
     security: bearer,
     request: { query: z.object({ q: z.string().optional(), page: z.coerce.number().optional(), pageSize: z.coerce.number().optional() }) },
@@ -524,7 +524,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors/users/lookup',
-    summary: 'Owner-identity preview for "Add Vendor" (admin, gated on vendors:create) — UX only',
+    summary: 'Owner-identity preview for "Add Vendor" (admin, gated on members:create) — UX only',
     tags: ['Vendors - Admin'],
     security: bearer,
     request: { query: z.object({ email: z.string().optional(), mobile: z.string().optional() }) },

@@ -123,7 +123,7 @@ describe('createVendorOwner', () => {
  * it only ever treats a call as "the same submission" when the owner identity matches too.
  */
 describe('createVendor — double-submit guard scoping (regression: two different owners created seconds apart used to collapse into one vendor)', () => {
-  const ROLE_FIXTURE = { id: VENDOR_ROLE_ID, key: 'vendor' };
+  const ROLE_FIXTURE = { id: VENDOR_ROLE_ID, key: 'member' };
 
   /** Arms every downstream call `createVendor` makes once its own double-submit guard clears —
    *  `createVendorOwner`'s email/phone availability check, the new User insert, `assignRole`'s

@@ -54,7 +54,7 @@ beforeEach(() => {
  */
 describe('POST /api/v1/vendors/me/kyc-documents/:documentType', () => {
   it('uploads a valid PDF and writes an audit log entry', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+    resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.memberDocument.findUnique.mockResolvedValue(null);
     prismaMock.memberDocument.upsert.mockResolvedValue(documentFixture);
@@ -70,7 +70,7 @@ describe('POST /api/v1/vendors/me/kyc-documents/:documentType', () => {
   });
 
   it('422s an invalid document type in the URL', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+    resolveMock.mockResolvedValue(['members:custom']);
     const res = await request(app)
       .post('/api/v1/vendors/me/kyc-documents/PASSPORT')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
@@ -79,7 +79,7 @@ describe('POST /api/v1/vendors/me/kyc-documents/:documentType', () => {
   });
 
   it('422s a file that is not a real PDF/JPG/PNG', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+    resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     const res = await request(app)
       .post('/api/v1/vendors/me/kyc-documents/GST')
@@ -90,7 +90,7 @@ describe('POST /api/v1/vendors/me/kyc-documents/:documentType', () => {
   });
 
   it('replacing an existing document deletes the old file after the new one is committed', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+    resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.memberDocument.findUnique.mockResolvedValue({ ...documentFixture, storageKey: 'vendor-documents/x/old.pdf' });
     prismaMock.memberDocument.upsert.mockResolvedValue(documentFixture);
@@ -106,7 +106,7 @@ describe('POST /api/v1/vendors/me/kyc-documents/:documentType', () => {
 
 describe('DELETE /api/v1/vendors/me/kyc-documents/:documentType', () => {
   it('deletes the document and writes an audit log entry', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+    resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.memberDocument.findUnique.mockResolvedValue(documentFixture);
     prismaMock.memberDocument.delete.mockResolvedValue(documentFixture);
@@ -118,7 +118,7 @@ describe('DELETE /api/v1/vendors/me/kyc-documents/:documentType', () => {
   });
 
   it('404s when no document of that type exists', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+    resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.memberDocument.findUnique.mockResolvedValue(null);
     const res = await request(app)
@@ -156,7 +156,7 @@ describe('POST /api/v1/vendors/me/submit', () => {
   };
 
   it('succeeds when every REQUIRED_FOR_SUBMISSION field is set and a real VendorDocument exists — no gstNumber/panNumber scalar required', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+    resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue(completeVendor);
     prismaMock.memberDocument.count.mockResolvedValue(1);
     prismaMock.branch.findMany.mockResolvedValue([{ state: 'Uttar Pradesh' }]);
@@ -178,7 +178,7 @@ describe('POST /api/v1/vendors/me/submit', () => {
    * can never create a second notification for the same submission.
    */
   it('creates one VENDOR_PENDING_APPROVAL notification per Superadmin, inside the same transaction as the status update', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+    resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue(completeVendor);
     prismaMock.memberDocument.count.mockResolvedValue(1);
     prismaMock.branch.findMany.mockResolvedValue([{ state: 'Uttar Pradesh' }]);
@@ -207,7 +207,7 @@ describe('POST /api/v1/vendors/me/submit', () => {
   });
 
   it('does not create a duplicate notification when re-submitting an already-pending vendor — blocked by the existing status precondition', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+    resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue({ ...completeVendor, status: 'PENDING_VERIFICATION' });
     const res = await request(app)
       .post('/api/v1/vendors/me/submit')
@@ -217,7 +217,7 @@ describe('POST /api/v1/vendors/me/submit', () => {
   });
 
   it('rejects when no KYC document exists at all (neither real nor legacy)', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+    resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue(completeVendor);
     prismaMock.memberDocument.count.mockResolvedValue(0);
     prismaMock.branch.findMany.mockResolvedValue([{ state: 'Uttar Pradesh' }]);
@@ -230,7 +230,7 @@ describe('POST /api/v1/vendors/me/submit', () => {
   });
 
   it('still succeeds via the legacy kycDocuments JSON fallback when no real VendorDocument exists (backward compatibility)', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+    resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue({
       ...completeVendor,
       kycDocuments: [{ type: 'GST', url: 'https://old-storage.example.com/gst.pdf' }],
@@ -248,8 +248,8 @@ describe('POST /api/v1/vendors/me/submit', () => {
 });
 
 describe('POST /api/v1/vendors/:id/kyc-documents/:documentType (admin-on-behalf)', () => {
-  it('403s without vendors:edit', async () => {
-    resolveMock.mockResolvedValue(['vendors:view']);
+  it('403s without members:edit', async () => {
+    resolveMock.mockResolvedValue(['members:view']);
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/kyc-documents/PAN`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
@@ -258,7 +258,7 @@ describe('POST /api/v1/vendors/:id/kyc-documents/:documentType (admin-on-behalf)
   });
 
   it('uploads on behalf of a vendor', async () => {
-    resolveMock.mockResolvedValue(['vendors:edit']);
+    resolveMock.mockResolvedValue(['members:edit']);
     prismaMock.memberDocument.findUnique.mockResolvedValue(null);
     prismaMock.memberDocument.upsert.mockResolvedValue({ ...documentFixture, documentType: 'PAN' });
     const res = await request(app)

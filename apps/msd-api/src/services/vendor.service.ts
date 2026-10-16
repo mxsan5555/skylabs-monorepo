@@ -17,6 +17,7 @@ import { getProductScopedOrThrow } from './product.service';
 import * as mediaService from './media.service';
 import type { MediaFile } from './media.service';
 import * as notificationService from './notification.service';
+import { ROLE_KEYS } from '../lib/role-keys';
 import { Prisma, type CategoryType, type MemberStatus, type KycStatus, type DealStatus, type DealApprovalStatus } from '../generated/prisma-client';
 import type {
   VendorCreateSchema,
@@ -233,7 +234,7 @@ async function assertOwnerUserAvailable(ownerUserId: string | undefined, exclude
 /** Grants the existing `vendor` role to a newly-linked owner, preserving whatever roles they
  *  already had — idempotent (upsert), and the only way a User gains vendor-portal access. */
 async function ensureVendorRoleAssigned(userId: string) {
-  const vendorRole = await prisma.role.findUnique({ where: { key: 'vendor' } });
+  const vendorRole = await prisma.role.findUnique({ where: { key: ROLE_KEYS.member } });
   if (!vendorRole) return; // defensive — seed.ts always creates the six system roles
   await assignRole(userId, vendorRole.id);
 }
@@ -948,7 +949,7 @@ export async function listTherapists(vendorId: string, branchId: string) {
 /**
  * All therapists for a vendor (active AND inactive — unlike the self-service/public reads,
  * admin should see the full picture), across every branch, for the admin vendor detail page.
- * No ownership-resolution needed: the `vendors:view` permission check on the route is the gate.
+ * No ownership-resolution needed: the `members:view` permission check on the route is the gate.
  */
 export async function listVendorTherapistsForAdmin(vendorId: string) {
   return prisma.therapist.findMany({
