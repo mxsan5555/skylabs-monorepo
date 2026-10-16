@@ -30,3 +30,24 @@ export function requirePermission(menuKey: string, action: PermissionAction = 'v
     }
   };
 }
+
+/** Passes when the caller holds ANY of the given actions on `menuKey`. Same 401/403 shapes as
+ *  `requirePermission`. */
+export function requireAnyPermission(menuKey: string, actions: PermissionAction[]) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (!req.user) {
+      sendError(res, 'UNAUTHORIZED', 'Authentication required');
+      return;
+    }
+    try {
+      const granted = await resolveGrantedPermissionKeys(req.user.roles);
+      if (!actions.some((action) => can(granted, menuKey, action))) {
+        sendError(res, 'FORBIDDEN', `Missing permission ${menuKey}:${actions.join('|')}`);
+        return;
+      }
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+}

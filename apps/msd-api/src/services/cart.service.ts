@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import type { Prisma } from '../generated/prisma-client';
 import type { CartAddItemSchema } from '../schemas/cart.schema';
+import { VISIBLE_DEAL_WHERE, VISIBLE_THERAPIST_WHERE } from './catalog-visibility';
 
 type CartAddItemInput = z.infer<typeof CartAddItemSchema>;
 
@@ -96,7 +97,8 @@ async function assertProduct(productId: string) {
  *  package's own live `sellingPrice` is authoritative, re-checked again at checkout
  *  (order.service.ts#createOrderFromCart) since CartItem.unitPrice is only provisional. */
 async function assertServiceDeal(dealId: string, dealPackageId: string) {
-  const deal = await prisma.deal.findUnique({ where: { id: dealId } });
+  // A deal the storefront hides (draft, unapproved, member not ACTIVE, branch off) 404s like a missing one.
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, ...VISIBLE_DEAL_WHERE } });
   if (!deal) throw new ApiError('NOT_FOUND', 'Deal not found');
   const pkg = await prisma.dealPackage.findUnique({ where: { id: dealPackageId } });
   if (!pkg || pkg.dealId !== deal.id) throw new ApiError('NOT_FOUND', 'Deal package not found');
@@ -108,9 +110,9 @@ async function assertServiceDeal(dealId: string, dealPackageId: string) {
  *  Therapist's own schema doc comment — a Deal and a Therapist are always separate cart lines,
  *  never coupled together on one CartItem). */
 async function assertTherapist(therapistId: string, therapistPackageId: string) {
-  const therapist = await prisma.therapist.findUnique({ where: { id: therapistId } });
+  // A therapist the storefront hides (inactive, member not ACTIVE, branch off) 404s like a missing one.
+  const therapist = await prisma.therapist.findFirst({ where: { id: therapistId, ...VISIBLE_THERAPIST_WHERE } });
   if (!therapist) throw new ApiError('NOT_FOUND', 'Therapist not found');
-  if (!therapist.isActive) throw new ApiError('VALIDATION_ERROR', 'Selected therapist is not currently available');
   const pkg = await prisma.therapistPackage.findUnique({ where: { id: therapistPackageId } });
   if (!pkg || pkg.therapistId !== therapist.id) throw new ApiError('NOT_FOUND', 'Therapist package not found');
   if (!pkg.isActive) throw new ApiError('VALIDATION_ERROR', 'Selected package is not currently available');

@@ -119,7 +119,11 @@ const VENDOR_IMAGE_ORDER_BY: Prisma.VendorImageOrderByWithRelationInput[] = [
  *  exactly the kind of per-endpoint drift that silently left a media include out of one read
  *  path in an earlier round of this same work (see `listDeals`'s equivalent gap) — one shared
  *  const here instead. */
-const VENDOR_MEDIA_INCLUDE = { mediaImages: { orderBy: VENDOR_IMAGE_ORDER_BY }, mediaVideo: true, documents: true } as const;
+/** Documents carry only what `documentsSummary` and `computeProfileCompletion` read. Hash,
+ *  ciphertext, masked number, storage key and filename never ride along on a member response;
+ *  the documents endpoints serve those to viewers allowed to see them. */
+const SAFE_DOCUMENT_SELECT = { select: { id: true, documentType: true, status: true } } as const;
+const VENDOR_MEDIA_INCLUDE = { mediaImages: { orderBy: VENDOR_IMAGE_ORDER_BY }, mediaVideo: true, documents: SAFE_DOCUMENT_SELECT } as const;
 
 /** Standard `include` for any Vendor read/write that should carry its linked-owner summary + branch count. */
 const OWNER_INCLUDE = { _count: { select: { branches: true, deals: true, products: true, therapists: true } }, owner: OWNER_SUMMARY_SELECT, ...VENDOR_MEDIA_INCLUDE } as const;
@@ -176,11 +180,18 @@ interface RawOwner {
 /** Flattens `owner.roles` from Prisma's join shape (`[{ role: {...} }]`) to `[{...}]` —
  *  matches the shape `userService.listUsers`/`serializeUser` already returns, so the
  *  frontend's "Vendor Account" display and "select existing user" search share one type. */
-function serializeVendor<
-  T extends { owner: RawOwner | null; documents?: { documentType: string; status: string }[]; documentsDueAt?: Date | null },
->(vendor: T) {
+type SafeDocument = { id: string; documentType: string; status: string };
+
+/** Rebuilds `documents` from picked fields, so a row that carries more than the select (a
+ *  future include change, a test double) still never leaks a secret column. */
+function withSafeDocuments<T extends { documents?: SafeDocument[] }>(vendor: T): T {
+  if (!vendor.documents) return vendor;
+  return { ...vendor, documents: vendor.documents.map((d) => ({ id: d.id, documentType: d.documentType, status: d.status })) };
+}
+
+function serializeVendor<T extends { owner: RawOwner | null; documents?: SafeDocument[]; documentsDueAt?: Date | null }>(vendor: T) {
   return {
-    ...vendor,
+    ...withSafeDocuments(vendor),
     owner: vendor.owner ? { ...vendor.owner, roles: vendor.owner.roles.map((r) => r.role) } : null,
     documentsSummary: documentsSummary(vendor.documents ?? [], vendor.documentsDueAt ?? null),
   };
@@ -238,25 +249,6 @@ export async function getVendorOrThrow(id: string) {
   const vendor = await prisma.member.findUnique({ where: { id }, include: OWNER_INCLUDE });
   if (!vendor) throw new ApiError('NOT_FOUND', 'Vendor not found');
   return serializeVendor(vendor);
-}
-
-/**
- * Validates a User is a legitimate link target for a Vendor: exists (and isn't soft-deleted),
- * is active, and doesn't already own a different vendor profile. `excludeVendorId` lets
- * `updateVendor` re-save a vendor's own existing `ownerUserId` without tripping the
- * already-owns-a-vendor check against itself.
- */
-async function assertOwnerUserAvailable(ownerUserId: string | undefined, excludeVendorId?: string) {
-  if (!ownerUserId) return;
-  const user = await prisma.user.findFirst({ where: { id: ownerUserId, deletedAt: null } });
-  if (!user) throw new ApiError('VALIDATION_ERROR', 'Selected user does not exist');
-  if (user.status !== 'active') {
-    throw new ApiError('VALIDATION_ERROR', 'Selected user is not eligible to become a vendor (inactive or blocked)');
-  }
-  const existing = await prisma.member.findUnique({ where: { ownerUserId } });
-  if (existing && existing.id !== excludeVendorId) {
-    throw new ApiError('CONFLICT', 'This user is already associated with a vendor');
-  }
 }
 
 /** Grants the existing `vendor` role to a newly-linked owner, preserving whatever roles they
@@ -409,10 +401,8 @@ async function buildAndInsertVendor(
 /**
  * Vendor creation ALWAYS creates a brand-new owner User — there is no "pick an existing user"
  * path here at all (see `createVendorOwner`'s own doc comment for why). A client-supplied
- * `input.ownerUserId` is deliberately never read/honored by this function — `VendorCreateSchema`
- * still declares the field only because `VendorUpdateSchema` (`VendorCreateSchema.partial()`)
- * needs it for `updateVendor`'s own, separate, pre-existing re-link-on-edit capability, which
- * this correction doesn't touch.
+ * `input.ownerUserId` is deliberately never read/honored by this function, and the admin update
+ * schema rejects it, so an owner is never re-linked.
  */
 export async function createVendor(input: VendorCreateInput, createdByUserId: string) {
   // Double-submit guard — only short-circuits a genuine resubmission of the SAME payload within
@@ -536,8 +526,6 @@ export async function createMember(input: MemberCreateInput, createdByUserId: st
 
 export async function updateVendor(id: string, input: VendorUpdateInput) {
   const existing = await getVendorOrThrow(id);
-  if ('ownerUserId' in input) await assertOwnerUserAvailable(input.ownerUserId, id);
-  if (input.ownerUserId) await ensureVendorRoleAssigned(input.ownerUserId);
   // The admin-create pipeline's Step 1 persists a Vendor before any businessName is known (see
   // createVendor above), so its slug starts out id-derived rather than name-derived. The FIRST
   // time a real businessName arrives via update, upgrade the slug to reflect it — but never
@@ -562,10 +550,11 @@ export async function updateVendor(id: string, input: VendorUpdateInput) {
 
 /** Never throws — callers decide whether "no vendor yet" means 404 or "show onboarding." */
 export async function getVendorByOwnerUserId(ownerUserId: string) {
-  return prisma.member.findUnique({
+  const vendor = await prisma.member.findUnique({
     where: { ownerUserId },
     include: { _count: { select: { branches: true } }, ...VENDOR_MEDIA_INCLUDE },
   });
+  return vendor ? withSafeDocuments(vendor) : null;
 }
 
 export async function getMyVendorOrThrow(ownerUserId: string) {
@@ -583,11 +572,12 @@ export async function updateSelfVendor(ownerUserId: string, input: VendorSelfUpd
     data.kycRejectionReason = null;
   }
   Object.assign(data, await resolveMapLocationForUpdate(input, vendor.mapLocationUrl));
-  return prisma.member.update({
+  const updated = await prisma.member.update({
     where: { id: vendor.id },
     data: data as Prisma.MemberUncheckedUpdateInput,
     include: VENDOR_MEDIA_INCLUDE,
   });
+  return withSafeDocuments(updated);
 }
 
 /**

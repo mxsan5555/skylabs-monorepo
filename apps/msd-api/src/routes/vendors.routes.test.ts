@@ -317,25 +317,17 @@ describe('POST /api/v1/vendors (admin create alias)', () => {
   });
 });
 
-describe('Vendor <-> existing User linking (PATCH/edit only — POST/create never accepts ownerUserId, see below)', () => {
-  const vendorRoleFixture = { id: 'vendor-role-id', key: 'vendor' };
-
-  it("editing a vendor's own unchanged ownerUserId doesn't false-positive as a conflict", async () => {
+describe('PATCH /api/v1/vendors/:id never re-links an owner', () => {
+  it('rejects ownerUserId with 422 and writes nothing', async () => {
     resolveMock.mockResolvedValue(['members:edit']);
-    prismaMock.member.findUnique
-      .mockResolvedValueOnce(vendorAFixture) // getVendorOrThrow at the top of updateVendor
-      .mockResolvedValueOnce(vendorAFixture); // assertOwnerUserAvailable's own-vendor lookup, excluded via excludeVendorId
-    prismaMock.user.findFirst.mockResolvedValue({ id: USER_A_ID, status: 'active', deletedAt: null });
-    prismaMock.member.update.mockResolvedValue(vendorAFixture);
-    prismaMock.role.findUnique.mockResolvedValue(vendorRoleFixture);
-    prismaMock.userRole.upsert.mockResolvedValue({});
-
     const res = await request(app)
       .patch(`/api/v1/vendors/${VENDOR_A_ID}`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
       .send({ ownerUserId: USER_A_ID });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(422);
+    expect(prismaMock.member.update).not.toHaveBeenCalled();
+    expect(prismaMock.userRole.upsert).not.toHaveBeenCalled();
   });
 });
 
@@ -1094,7 +1086,7 @@ describe('PATCH /api/v1/vendors/:id/status (member status alias)', () => {
   it('moves an ACTIVE member to INACTIVE with a reason and writes history', async () => {
     resolveMock.mockResolvedValue(['members:status_change']);
     prismaMock.member.findUnique.mockResolvedValue({ ...vendorAFixture, owner: null });
-    prismaMock.member.update.mockResolvedValue({});
+    prismaMock.member.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.memberStatusHistory.create.mockResolvedValue({});
     const res = await request(app)
       .patch(`/api/v1/vendors/${VENDOR_A_ID}/status`)
@@ -1113,7 +1105,7 @@ describe('PATCH /api/v1/vendors/:id/status (member status alias)', () => {
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
       .send({ status: 'SUSPENDED', reason: 'short' });
     expect(res.status).toBe(422);
-    expect(prismaMock.member.update).not.toHaveBeenCalled();
+    expect(prismaMock.member.updateMany).not.toHaveBeenCalled();
   });
 
   it('403s without members:status_change', async () => {
@@ -1138,7 +1130,10 @@ describe('DELETE /api/v1/vendors/:id (member delete alias)', () => {
     resolveMock.mockResolvedValue(['members:delete']);
     prismaMock.member.findUnique.mockResolvedValue({ ...vendorAFixture, status: 'SUSPENDED', owner: null });
     prismaMock.orderItem.count.mockResolvedValue(0);
-    prismaMock.member.delete.mockResolvedValue(vendorAFixture);
+    prismaMock.member.deleteMany.mockResolvedValue({ count: 1 });
+    prismaMock.memberDocument.findMany.mockResolvedValue([]);
+    prismaMock.vendorImage.findMany.mockResolvedValue([]);
+    prismaMock.vendorVideo.findUnique.mockResolvedValue(null);
     prismaMock.user.update.mockResolvedValue({});
     prismaMock.refreshSession.updateMany.mockResolvedValue({ count: 0 });
     const res = await request(app)
@@ -1147,7 +1142,7 @@ describe('DELETE /api/v1/vendors/:id (member delete alias)', () => {
       .send(REASON);
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual({ outcome: 'DELETED' });
-    expect(prismaMock.member.delete).toHaveBeenCalledWith({ where: { id: VENDOR_A_ID } });
+    expect(prismaMock.member.deleteMany).toHaveBeenCalledWith({ where: { id: VENDOR_A_ID, status: 'SUSPENDED' } });
   });
 
   it('409s MEMBER_NOT_SUSPENDED for an ACTIVE member', async () => {
@@ -1159,7 +1154,7 @@ describe('DELETE /api/v1/vendors/:id (member delete alias)', () => {
       .send(REASON);
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('MEMBER_NOT_SUSPENDED');
-    expect(prismaMock.member.delete).not.toHaveBeenCalled();
+    expect(prismaMock.member.deleteMany).not.toHaveBeenCalled();
   });
 
   it('archives instead of deleting when Postgres blocks the delete (P2003)', async () => {
@@ -1167,10 +1162,13 @@ describe('DELETE /api/v1/vendors/:id (member delete alias)', () => {
     prismaMock.member.findUnique.mockResolvedValue({ ...vendorAFixture, status: 'SUSPENDED', owner: null });
     prismaMock.orderItem.count.mockResolvedValue(0);
     const { Prisma } = await import('../generated/prisma-client');
-    prismaMock.member.delete.mockRejectedValueOnce(
+    prismaMock.memberDocument.findMany.mockResolvedValue([]);
+    prismaMock.vendorImage.findMany.mockResolvedValue([]);
+    prismaMock.vendorVideo.findUnique.mockResolvedValue(null);
+    prismaMock.member.deleteMany.mockRejectedValueOnce(
       new Prisma.PrismaClientKnownRequestError('Foreign key constraint failed', { code: 'P2003', clientVersion: 'test' }),
     );
-    prismaMock.member.update.mockResolvedValue({});
+    prismaMock.member.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.memberStatusHistory.create.mockResolvedValue({});
     const res = await request(app)
       .delete(`/api/v1/vendors/${VENDOR_A_ID}`)

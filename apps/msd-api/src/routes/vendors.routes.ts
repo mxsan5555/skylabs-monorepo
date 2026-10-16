@@ -1,13 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import type { Request, Response, NextFunction } from 'express';
-import type { PermissionAction } from '@skylabs-monorepo/shared-types';
-import { can } from '@skylabs-monorepo/shared-permissions';
+import type { Request } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { buildMemberAdminRoutes } from './member-admin.routes';
-import { requirePermission } from '../middleware/requirePermission';
-import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
-import { sendError } from '../lib/http';
+import { requireAnyPermission, requirePermission } from '../middleware/requirePermission';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
@@ -57,33 +53,6 @@ function requestMeta(req: Request) {
  *  admin onboarding pipeline and self-service profile screen both read step-lock state from. */
 function withCompletion<T extends Record<string, unknown>>(vendor: T) {
   return { ...vendor, profileCompletion: vendorService.computeProfileCompletion(vendor) };
-}
-
-/**
- * Same shape/behavior as `requirePermission`, but passes if the caller holds ANY of the given
- * actions rather than exactly one. Used only for `/users/search`, which is a legitimate step
- * of both the "Add Vendor" (`members:create`) and "Edit Vendor → re-link owner" (`members:edit`)
- * flows — gating it on `create` alone would 403 an edit-only admin reaching Step 1 while
- * resuming a draft vendor, which would look like "search is broken" even though nothing is
- * actually disabled client-side.
- */
-function requireAnyPermission(menuKey: string, actions: PermissionAction[]) {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    if (!req.user) {
-      sendError(res, 'UNAUTHORIZED', 'Authentication required');
-      return;
-    }
-    try {
-      const granted = await resolveGrantedPermissionKeys(req.user.roles);
-      if (!actions.some((action) => can(granted, menuKey, action))) {
-        sendError(res, 'FORBIDDEN', `Missing permission ${menuKey}:${actions.join('|')}`);
-        return;
-      }
-      next();
-    } catch (err) {
-      next(err);
-    }
-  };
 }
 
 // ─── Reference lookups ───────────────────────────────────────────────────────
@@ -201,7 +170,8 @@ router.patch(
         action: 'vendor.self_update',
         targetType: 'Vendor',
         targetId: vendor.id,
-        after: vendor,
+        // The validated body only, never the stored entity.
+        after: req.body,
         ...requestMeta(req),
       });
       sendData(res, vendor);

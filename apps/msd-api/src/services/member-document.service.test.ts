@@ -78,13 +78,14 @@ describe('listMemberDocuments', () => {
     expect(row).not.toHaveProperty('numberEncrypted');
     expect(row).not.toHaveProperty('storageKey');
     expect(row).not.toHaveProperty('originalFilename');
-    expect(row.numberMasked).toBe('ABXXXXX34F');
+    expect(row).not.toHaveProperty('numberMasked');
   });
 
-  it('includes the file key for viewers who can open files', async () => {
+  it('includes the file key and masked number for viewers who can open files', async () => {
     prismaMock.memberDocument.findMany.mockResolvedValue([ROW]);
     const [row] = await listMemberDocuments('m1', { includeFiles: true });
     expect(row.storageKey).toBe('k');
+    expect(row.numberMasked).toBe('ABXXXXX34F');
     expect(row).not.toHaveProperty('numberHash');
     expect(row).not.toHaveProperty('numberEncrypted');
   });
@@ -145,6 +146,17 @@ describe('uploadMemberDocument', () => {
     expect(err).toMatchObject({ code: 'DOCUMENT_NUMBER_IN_USE' });
     expect(JSON.stringify(err.details ?? null)).not.toContain('m2');
     expect(vi.mocked(deleteMediaFile)).toHaveBeenCalledWith('vendor-documents/m1/file.pdf');
+  });
+
+  it('a re-upload without a number clears the old masked number, hash and ciphertext', async () => {
+    prismaMock.memberDocument.findUnique.mockResolvedValue({
+      id: 'd1', storageKey: 'vendor-documents/m1/old.pdf', numberMasked: 'ABXXXXX34F', numberHash: 'h', numberEncrypted: 'c', status: 'APPROVED',
+    });
+    prismaMock.memberDocument.upsert.mockResolvedValue({ id: 'd1' });
+    await uploadMemberDocument({ memberId: 'm1', documentType: 'PAN', file: FILE, actorUserId: 'admin-1', onBehalf: true });
+    const arg = prismaMock.memberDocument.upsert.mock.calls[0][0];
+    expect(arg.update).toMatchObject({ numberMasked: null, numberHash: null, numberEncrypted: null, status: 'SUBMITTED' });
+    expect(arg.create).toMatchObject({ numberMasked: null, numberHash: null, numberEncrypted: null });
   });
 });
 

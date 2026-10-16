@@ -167,9 +167,8 @@ const VendorFieldsSchema = z.object({
   /** A pasted Google Maps share URL (e.g. `https://maps.app.goo.gl/...`) — replaces manual
    *  latitude/longitude entry. Resolved server-side into `latitude`/`longitude` (see
    *  vendor.service.ts + providers/maps/googleMapsUrlResolver.provider.ts); this schema no
-   *  longer accepts raw lat/lng from the client at all — `latitude`/`longitude` are stripped
-   *  from any request body that still sends them (default Zod `z.object()` "strip unknown
-   *  keys" behavior, not `.strict()`, so this is a silent ignore, not a 422). */
+   *  longer accepts raw lat/lng from the client at all. The self-service schema strips them
+   *  silently; the strict admin `VendorUpdateSchema` rejects them with 422. */
   mapLocationUrl: z.string().url().optional(),
 
   gstNumber: gstNumberSchema,
@@ -185,14 +184,14 @@ const VendorFieldsSchema = z.object({
 });
 
 export const VendorCreateSchema = VendorFieldsSchema.extend({
-  /** NOT read by `createVendor` (see that function's own doc comment — a Vendor's owner is
-   *  always a brand-new User, never an existing one). Declared here only because
-   *  `VendorUpdateSchema` below is `VendorCreateSchema.partial()` and `updateVendor` still has
-   *  its own separate, pre-existing re-link-on-edit capability that reads this field. */
+  /** NOT read by `createVendor` (see that function's own doc comment: a Vendor's owner is
+   *  always a brand-new User, never an existing one). Kept only for the deprecated create doc. */
   ownerUserId: z.string().uuid().optional(),
 }).openapi('VendorCreate');
 
-export const VendorUpdateSchema = VendorCreateSchema.partial().openapi('VendorUpdate');
+/** The admin Profile tab body. Strict allowlist (spec section 6): an unknown key, `ownerUserId`
+ *  (owners are never re-linked) or the legacy `kycDocuments` list returns 422. */
+export const VendorUpdateSchema = VendorFieldsSchema.omit({ kycDocuments: true }).partial().strict().openapi('VendorUpdate');
 
 /** Query for the "Add Vendor" owner-identity AVAILABILITY preview — UX-only (see
  *  `vendorService.checkVendorOwnerAvailability`'s own doc comment); at least one of

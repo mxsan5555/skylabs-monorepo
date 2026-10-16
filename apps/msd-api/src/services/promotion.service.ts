@@ -6,6 +6,7 @@ import * as mediaService from './media.service';
 import type { MediaFile } from './media.service';
 import type { PromotionCreateSchema, PromotionUpdateSchema } from '../schemas/promotion.schema';
 import { PROMOTION_ROUTE_ALLOW_LIST } from '../schemas/promotion.schema';
+import { VISIBLE_DEAL_WHERE } from './catalog-visibility';
 
 type CreateInput = z.infer<typeof PromotionCreateSchema>;
 type UpdateInput = z.infer<typeof PromotionUpdateSchema>;
@@ -152,6 +153,8 @@ export async function getPublicPromotions() {
   const promotions = await prisma.promotion.findMany({
     where: {
       isActive: true,
+      // A DEAL promotion whose deal the storefront hides is left out, like a home hero slide.
+      OR: [{ destinationType: { not: 'DEAL' } }, { deal: { is: VISIBLE_DEAL_WHERE } }],
       AND: [
         { OR: [{ startDate: null }, { startDate: { lte: now } }] },
         { OR: [{ endDate: null }, { endDate: { gte: now } }] },
@@ -172,7 +175,8 @@ export async function getPublicPromotions() {
     destinationType: p.destinationType,
     destinationRoute: p.destinationRoute,
     category: p.category,
-    deal: p.deal,
+    // Only a DEAL promotion links to its deal, and the filter above has already checked it is visible.
+    deal: p.destinationType === 'DEAL' ? p.deal : null,
     image: p.mediaImages.find((img) => img.isPrimary)?.storageKey ?? p.mediaImages[0]?.storageKey ?? null,
   }));
 }

@@ -44,15 +44,14 @@ type DocumentRow = Partial<Prisma.MemberDocumentGetPayload<Record<string, never>
 /**
  * The API shape. Hash and ciphertext never leave the server: this picks fields by name, so a
  * new column stays private until someone adds it here. File keys are returned only when
- * `includeFiles` is true (viewers with members:edit or members:approve, or the member itself);
- * Support and Marketing see the type, the masked number and the status only.
+ * `includeFiles` is true (viewers with members:edit or members:approve, or the member itself),
+ * and so is the masked number. Support and Marketing see the type and the status only.
  */
 export function toDocumentView(row: DocumentRow, opts: { includeFiles: boolean }) {
   return {
     id: row.id,
     documentType: row.documentType,
     status: row.status,
-    numberMasked: row.numberMasked,
     rejectionReason: row.rejectionReason,
     reviewedAt: row.reviewedAt,
     uploadedOnBehalf: row.uploadedOnBehalf,
@@ -61,7 +60,7 @@ export function toDocumentView(row: DocumentRow, opts: { includeFiles: boolean }
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     ...(opts.includeFiles
-      ? { storageKey: row.storageKey, originalFilename: row.originalFilename, mimeType: row.mimeType, sizeBytes: row.sizeBytes }
+      ? { numberMasked: row.numberMasked, storageKey: row.storageKey, originalFilename: row.originalFilename, mimeType: row.mimeType, sizeBytes: row.sizeBytes }
       : {}),
   };
 }
@@ -95,7 +94,12 @@ function isNumberHashConflict(err: unknown): boolean {
 export async function uploadMemberDocument(input: UploadInput) {
   const { memberId, documentType } = input;
 
-  let numberFields: { numberMasked: string; numberHash: string | null; numberEncrypted: string | null } | null = null;
+  // No number on this upload: clear any number the previous file carried, so it never outlives its file.
+  let numberFields: { numberMasked: string | null; numberHash: string | null; numberEncrypted: string | null } = {
+    numberMasked: null,
+    numberHash: null,
+    numberEncrypted: null,
+  };
   if (input.number && input.number.trim()) {
     const normalized = normalizeDocumentNumber(documentType, input.number);
     if (!isValidDocumentNumber(documentType, normalized)) {
@@ -139,8 +143,8 @@ export async function uploadMemberDocument(input: UploadInput) {
   try {
     upserted = await prisma.memberDocument.upsert({
       where: { vendorId_documentType: { vendorId: memberId, documentType } },
-      create: { vendorId: memberId, documentType, ...fileFields, ...provenance, ...reset, ...(numberFields ?? {}) },
-      update: { ...fileFields, ...provenance, ...reset, ...(numberFields ?? {}) },
+      create: { vendorId: memberId, documentType, ...fileFields, ...provenance, ...reset, ...numberFields },
+      update: { ...fileFields, ...provenance, ...reset, ...numberFields },
     });
   } catch (err) {
     // The DB never got the new storageKey, so the just-written file is orphaned and safe to remove.

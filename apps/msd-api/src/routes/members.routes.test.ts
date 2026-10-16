@@ -148,12 +148,12 @@ describe('PATCH /api/v1/members/:id/status', () => {
       .set('Authorization', ADMIN)
       .send({ status: 'SUSPENDED', reason: 'short' });
     expect(res.status).toBe(422);
-    expect(prismaMock.member.update).not.toHaveBeenCalled();
+    expect(prismaMock.member.updateMany).not.toHaveBeenCalled();
   });
 
   it('200 and a history row for an admin', async () => {
     grants.mockResolvedValue(['members:status_change', 'members:view']);
-    prismaMock.member.update.mockResolvedValue({});
+    prismaMock.member.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.memberStatusHistory.create.mockResolvedValue({});
     prismaMock.refreshSession.updateMany.mockResolvedValue({ count: 0 });
     prismaMock.member.findUnique
@@ -226,7 +226,8 @@ describe('GET /api/v1/members/:id/documents', () => {
       .get(`/api/v1/members/${MEMBER_ID}/documents`)
       .set('Authorization', bearerFor({ sub: 'support-1', roles: ['support'] }));
     expect(res.status).toBe(200);
-    expect(res.body.data[0]).toMatchObject({ documentType: 'PAN', status: 'SUBMITTED', numberMasked: 'ABXXXXX34F' });
+    expect(res.body.data[0]).toMatchObject({ documentType: 'PAN', status: 'SUBMITTED' });
+    expect(res.body.data[0]).not.toHaveProperty('numberMasked');
     expect(res.body.data[0]).not.toHaveProperty('storageKey');
     expect(res.body.data[0]).not.toHaveProperty('numberHash');
   });
@@ -238,6 +239,174 @@ describe('GET /api/v1/members/:id/documents', () => {
     expect(res.status).toBe(200);
     expect(res.body.data[0].storageKey).toBe(row.storageKey);
     expect(res.body.data[0]).not.toHaveProperty('numberEncrypted');
+  });
+});
+
+/** Full MemberDocument rows, as a careless `documents: true` include would return them. */
+const FULL_DOCS = [
+  {
+    id: 'doc-1',
+    vendorId: MEMBER_ID,
+    documentType: 'PAN',
+    status: 'SUBMITTED',
+    numberMasked: 'ABXXXXX34F',
+    numberHash: 'secret-hash',
+    numberEncrypted: 'secret-cipher',
+    storageKey: 'vendor-documents/secret/pan.pdf',
+    originalFilename: 'my-pan.pdf',
+  },
+];
+const LEAKY_ROW = { ...MEMBER_ROW, documents: FULL_DOCS };
+const SENSITIVE = ['numberHash', 'numberEncrypted', 'storageKey', 'originalFilename', 'secret-hash', 'secret-cipher', 'my-pan.pdf', 'ABXXXXX34F'];
+
+function expectNoDocumentSecrets(body: unknown) {
+  const json = JSON.stringify(body);
+  for (const needle of SENSITIVE) expect(json).not.toContain(needle);
+}
+
+describe('member responses never carry document secrets', () => {
+  it('GET /members selects only safe document fields and leaks none', async () => {
+    grants.mockResolvedValue(['members:view']);
+    prismaMock.member.findMany.mockResolvedValue([LEAKY_ROW]);
+    prismaMock.member.count.mockResolvedValue(1);
+    const res = await request(app).get('/api/v1/members').set('Authorization', ADMIN);
+    expect(res.status).toBe(200);
+    expectNoDocumentSecrets(res.body);
+    expect(res.body.data[0].documentsSummary).toBeDefined();
+    const include = prismaMock.member.findMany.mock.calls[0][0].include;
+    expect(include.documents).toEqual({ select: { id: true, documentType: true, status: true } });
+  });
+
+  it('GET /members/:id leaks nothing to a members:view only viewer', async () => {
+    grants.mockResolvedValue(['members:view']);
+    prismaMock.member.findUnique.mockResolvedValue(LEAKY_ROW);
+    const res = await request(app)
+      .get(`/api/v1/members/${MEMBER_ID}`)
+      .set('Authorization', bearerFor({ sub: 'support-1', roles: ['support'] }));
+    expect(res.status).toBe(200);
+    expectNoDocumentSecrets(res.body);
+    expect(res.body.data.documents).toEqual([{ id: 'doc-1', documentType: 'PAN', status: 'SUBMITTED' }]);
+    expect(res.body.data.profileCompletion.sections.find((s: { key: string }) => s.key === 'kyc').complete).toBe(true);
+  });
+
+  it('PATCH /members/:id leaks nothing', async () => {
+    grants.mockResolvedValue(['members:edit']);
+    prismaMock.member.findUnique.mockResolvedValue(LEAKY_ROW);
+    prismaMock.member.update.mockResolvedValue({ ...LEAKY_ROW, businessName: 'New name' });
+    const res = await request(app)
+      .patch(`/api/v1/members/${MEMBER_ID}`)
+      .set('Authorization', ADMIN)
+      .send({ businessName: 'New name' });
+    expect(res.status).toBe(200);
+    expectNoDocumentSecrets(res.body);
+  });
+
+  it('GET /vendors/me leaks nothing', async () => {
+    grants.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(LEAKY_ROW);
+    const res = await request(app)
+      .get('/api/v1/vendors/me')
+      .set('Authorization', bearerFor({ sub: OWNER_ID, roles: ['member'] }));
+    expect(res.status).toBe(200);
+    expectNoDocumentSecrets(res.body);
+  });
+});
+
+describe('member update audit rows record the changed input only', () => {
+  it('PATCH /members/:id audits exactly the validated body', async () => {
+    grants.mockResolvedValue(['members:edit']);
+    prismaMock.member.findUnique.mockResolvedValue(LEAKY_ROW);
+    prismaMock.member.update.mockResolvedValue({ ...LEAKY_ROW, businessName: 'New name' });
+    const body = { businessName: 'New name', city: 'Pune' };
+    await request(app).patch(`/api/v1/members/${MEMBER_ID}`).set('Authorization', ADMIN).send(body);
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: 'member.updated', after: body }),
+    });
+    expectNoDocumentSecrets(prismaMock.auditLog.create.mock.calls[0][0]);
+  });
+
+  it('PATCH /vendors/me audits exactly the validated body', async () => {
+    grants.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(LEAKY_ROW);
+    prismaMock.member.update.mockResolvedValue({ ...LEAKY_ROW, city: 'Pune' });
+    const body = { city: 'Pune' };
+    const res = await request(app)
+      .patch('/api/v1/vendors/me')
+      .set('Authorization', bearerFor({ sub: OWNER_ID, roles: ['member'] }))
+      .send(body);
+    expect(res.status).toBe(200);
+    expectNoDocumentSecrets(res.body);
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: 'vendor.self_update', after: body }),
+    });
+  });
+});
+
+describe('PATCH /api/v1/members/:id accepts only allowlisted fields', () => {
+  it.each([
+    ['ownerUserId', { ownerUserId: OWNER_ID }],
+    ['kycDocuments', { kycDocuments: [] }],
+    ['an unknown key', { businessName: 'X', status: 'SUSPENDED' }],
+  ])('422 for %s', async (_label, body) => {
+    grants.mockResolvedValue(['members:edit']);
+    const res = await request(app).patch(`/api/v1/members/${MEMBER_ID}`).set('Authorization', ADMIN).send(body);
+    expect(res.status).toBe(422);
+    expect(prismaMock.member.update).not.toHaveBeenCalled();
+  });
+
+  it('422 for an unknown key on the status change and review bodies', async () => {
+    grants.mockResolvedValue(['members:status_change', 'members:approve', 'members:reject']);
+    const status = await request(app)
+      .patch(`/api/v1/members/${MEMBER_ID}/status`)
+      .set('Authorization', ADMIN)
+      .send({ status: 'SUSPENDED', reason: REASON, extra: 1 });
+    expect(status.status).toBe(422);
+    const review = await request(app)
+      .patch(`/api/v1/members/${MEMBER_ID}/documents/PAN/review`)
+      .set('Authorization', ADMIN)
+      .send({ decision: 'APPROVED', extra: 1 });
+    expect(review.status).toBe(422);
+  });
+});
+
+describe('PATCH /api/v1/members/:id/documents/:type/review gate order', () => {
+  it('403, not 422, for a caller without approve or reject sending an invalid body', async () => {
+    grants.mockResolvedValue(['members:view']);
+    const res = await request(app)
+      .patch(`/api/v1/members/${MEMBER_ID}/documents/PAN/review`)
+      .set('Authorization', ADMIN)
+      .send({ decision: 'MAYBE' });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FORBIDDEN');
+  });
+
+  it('422 for an invalid body from a caller holding members:reject only', async () => {
+    grants.mockResolvedValue(['members:reject']);
+    const res = await request(app)
+      .patch(`/api/v1/members/${MEMBER_ID}/documents/PAN/review`)
+      .set('Authorization', ADMIN)
+      .send({ decision: 'MAYBE' });
+    expect(res.status).toBe(422);
+  });
+});
+
+describe('GET /api/v1/members/:id/documents number masking', () => {
+  it('a members:view only viewer gets type and status but no masked number', async () => {
+    grants.mockResolvedValue(['members:view']);
+    prismaMock.memberDocument.findMany.mockResolvedValue(FULL_DOCS);
+    const res = await request(app)
+      .get(`/api/v1/members/${MEMBER_ID}/documents`)
+      .set('Authorization', bearerFor({ sub: 'support-1', roles: ['support'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0]).toMatchObject({ documentType: 'PAN', status: 'SUBMITTED' });
+    expect(res.body.data[0]).not.toHaveProperty('numberMasked');
+  });
+
+  it('members:edit sees the masked number', async () => {
+    grants.mockResolvedValue(['members:view', 'members:edit']);
+    prismaMock.memberDocument.findMany.mockResolvedValue(FULL_DOCS);
+    const res = await request(app).get(`/api/v1/members/${MEMBER_ID}/documents`).set('Authorization', ADMIN);
+    expect(res.body.data[0].numberMasked).toBe('ABXXXXX34F');
   });
 });
 

@@ -1,6 +1,6 @@
 import { Router, type Request, type RequestHandler } from 'express';
 import { can } from '@skylabs-monorepo/shared-permissions';
-import { requirePermission } from '../middleware/requirePermission';
+import { requireAnyPermission, requirePermission } from '../middleware/requirePermission';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema } from '../schemas/common.schema';
 import {
@@ -102,7 +102,8 @@ export function buildMemberAdminRoutes(opts: { deprecated: boolean }): Router {
           action: 'member.updated',
           targetType: 'Member',
           targetId: after.id,
-          after,
+          // The validated body only: the full entity would copy bank and document data into the log.
+          after: req.body,
           ...meta(req),
         });
         sendData(res, withCompletion(after));
@@ -235,9 +236,11 @@ export function buildMemberAdminRoutes(opts: { deprecated: boolean }): Router {
   router.patch(
     '/:id/documents/:documentType/review',
     mark,
+    // A caller holding neither approve nor reject gets 403 before the body is validated.
+    requireAnyPermission('members', ['approve', 'reject']),
     validateParams(VendorDocumentAdminParamSchema),
     validateBody(MemberDocumentReviewSchema),
-    // Approve and reject are separate permissions, so the gate depends on the decision.
+    // Approve and reject are separate permissions, so the final gate depends on the decision.
     (req, res, next) => (req.body.decision === 'APPROVED' ? approveGate : rejectGate)(req, res, next),
     async (req, res, next) => {
       try {
