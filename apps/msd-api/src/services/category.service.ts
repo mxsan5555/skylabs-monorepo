@@ -244,6 +244,19 @@ export async function assertVendorHasCategoryAccess(vendorId: string, categoryId
 }
 
 /**
+ * D10: categories are created by staff and open to every member, so this checks only that the
+ * category (or the top-level category above a subcategory) has the required module `type`. No
+ * `VendorCategoryAccess` grant is read. Used by product create/update; deals and therapists
+ * still use the grant check until task P4-15.
+ */
+export async function assertCategoryOfType(categoryId: string, requiredType: CategoryType) {
+  const topLevel = await resolveTopLevelCategory(categoryId);
+  if (topLevel.type !== requiredType) {
+    throw new ApiError('VALIDATION_ERROR', `This category is not a ${requiredType.toLowerCase()} category`);
+  }
+}
+
+/**
  * The branch-level counterpart to `assertVendorHasCategoryAccess` — a `BranchCategoryAccess`
  * grant only ever narrows what the vendor already holds (see
  * `vendor.service.ts#setBranchCategoryAccess`), so this only needs to resolve `categoryId` to

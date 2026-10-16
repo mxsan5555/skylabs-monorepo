@@ -23,7 +23,7 @@ Created: 2026-10-12. Status: in progress (staff member management slice built 20
 
 ## Progress summary
 
-Total: **196 tasks**. Update the Done column as work lands.
+Total: **201 tasks**. Update the Done column as work lands.
 
 | Phase | Scope | Tasks | Done | % |
 |---|---|---|---|---|
@@ -31,19 +31,19 @@ Total: **196 tasks**. Update the Done column as work lands.
 | P1 | Roles, scope, seed, menu | 10 | 1 | 10 |
 | P2 | Authorization core and hardening | 17 | 2 | 12 |
 | P3 | Member rename and lifecycle | 24 | 12 | 50 |
-| P4 | Own-scope retrofit | 13 | 0 | 0 |
+| P4 | Own-scope retrofit | 16 | 1 | 6 |
 | P5 | Member documents | 15 | 3 | 20 |
 | P6 | Reminders and scheduler | 8 | 0 | 0 |
 | P7 | Orders, refunds, payments, payouts, reports | 13 | 0 | 0 |
 | P8 | Staff, settings, logs, profile, content | 8 | 0 | 0 |
 | P9 | OpenAPI and contract | 8 | 0 | 0 |
-| P10 | Frontend | 47 | 4 | 9 |
+| P10 | Frontend | 49 | 5 | 10 |
 | P11 | Security and QA | 13 | 0 | 0 |
 | P12 | Release, ops, docs | 10 | 0 | 0 |
-| **Total** | | **196** | **22** | **11** |
+| **Total** | | **201** | **24** | **12** |
 
-By area: BE 84, FE 37, SEC 20, QA 17, DB 14, OPS 13, SH 4, BIZ 4, DOC 3.
-By size: S 63, M 115, L 18.
+By area: BE 87, FE 39, SEC 20, QA 17, DB 14, OPS 13, SH 4, BIZ 4, DOC 3.
+By size: S 67, M 116, L 18.
 
 Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then P3 to P8 (backend), with P10 frontend tasks starting as each backend phase lands. P9 runs alongside P4 to P8. P11 and P12 close the release.
 
@@ -151,13 +151,16 @@ Status: built 2026-10-15, plan `docs/superpowers/plans/2026-10-15-staff-member-m
 | [ ] | P4-04 | BE | Therapists: scope and branch checks | M | P4-02 | IDOR test |
 | [ ] | P4-05 | BE | Products: scope; remove duplicate unscoped list | M | P4-01 | IDOR test |
 | [ ] | P4-06 | BE | Orders: scope on `OrderItem.vendorId`; strip other members' items | M | P2-02 | Mixed-vendor order test |
-| [ ] | P4-07 | BE | Customers: support and sales view-only, member no access | S | P1-07 | Matrix test |
+| [ ] | P4-07 | BE | Customers: support and sales view-only, member view own (D9, matrix 3.4) | S | P1-07 | Matrix test |
 | [ ] | P4-08 | BE | Dashboard widgets and counts respect scope | M | P2-02 | Member sees own counts only |
 | [ ] | P4-09 | BE | Notifications: recipient type `MEMBER`/`ADMIN`; new types | S | P3-04 | Migration and test |
 | [ ] | P4-10 | BE | Logs and profile scoped to own for non-super-admin | S | P2-02 | Test |
 | [ ] | P4-11 | BE | Cross-resource ownership validators (branch to member, therapist to branch, category access) in one shared service | M | P4-02 | Unit tests |
 | [ ] | P4-12 | QA | Route inventory test: every route has `requirePermission` or is on a documented public allowlist | M | P4-01 | CI fails on an unguarded route |
 | [ ] | P4-13 | BE | Grant `members:view` and `members:edit` with own scope to role `member`, then retire `members:custom` | M | P4-01 | Member reads and edits only their own record; `members:custom` gone from the seed |
+| [x] | P4-14 | BE | Product category without per-member grants (D10, C-07, C-12 for products): `createProduct` and `updateProduct` check only active `PRODUCT` type and subcategory parentage | S | - | Member with no `VendorCategoryAccess` row creates a product; a `SERVICE` category is rejected; tests |
+| [ ] | P4-15 | BE | Finish C-12 for deals and therapists: drop vendor and branch category grant checks, retire the `PUT .../category-access` routes and the onboarding grant step | M | P4-14 | Deal and therapist create work with no grants; grant routes return 404; tests |
+| [ ] | P4-16 | BE | Member customers view (C-16, D9, D19): `GET /customers` own scope, customers with an order item from the member, name, city, order count, last order date | S | P4-01 | Member sees only own customers; no phone or email unless an order is open |
 
 ## Phase 5: Member documents
 
@@ -319,6 +322,8 @@ Status: built 2026-10-15, plan `docs/superpowers/plans/2026-10-15-staff-member-m
 | [ ] | P10-45 | OPS | Run `prisma/member-status-report.ts` and get owner sign-off before applying the `member_lifecycle` migration; rehearse migration up and down on a Neon copy | M | P0-05 | Report saved, sign-off recorded, rehearsal log with row counts |
 | [ ] | P10-46 | QA | Fix pre-existing lint and test drift: eslint ignore error in shared-* packages and 31 msd lint errors; 26 msd tests in 15 files (permission-matrix, roles, widget-registry, settings, home, wishlist, become-vendor, india-locations, deal-card, sky-product-card-wc, media-uploader, site-footer, contact-us, app.spec, entry-server); msd-api `rbac.routes` and orders image tests; shared-menu `index.test.ts` | M | - | `nx run-many -t lint test` green for msd, msd-api and shared-* |
 | [ ] | P10-47 | FE | Rename "All Member" to "All members" in the sidebar title (`packages/shared-menu/src/msd-menu.json`) and the breadcrumbs of the branch, deal, product and therapist form pages | S | - | grep finds no "All Member" in `apps/msd/src` or `packages/shared-menu`; tests updated |
+| [x] | P10-48 | FE | Product form (member detail Products and member self-service): Category (required), Subcategory and Type (optional) list all active `PRODUCT` categories, not per-member grants; "New" and "Featured" checkboxes stay on the form | S | P4-14 | Member with no grants sees the category list; both checkboxes save `isNew` and `isFeatured`; tests |
+| [ ] | P10-49 | FE | Member detail page shows total customers and total orders (counts linking to the filtered lists) | S | P4-16 | Counts match the lists; support sees counts only |
 
 ## Phase 11: Security and quality assurance
 

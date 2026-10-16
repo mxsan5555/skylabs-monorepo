@@ -86,7 +86,7 @@ export function VendorProducts() {
     getMyVendor(token)
       .then(({ data: vendor }) => {
         setVendorId(vendor.id);
-        return listCategories(token, { type: 'PRODUCT', vendorId: vendor.id });
+        return listCategories(token, { type: 'PRODUCT' });
       })
       .then(({ data }) => setCategories(data))
       .catch(() => setCategories([]));
@@ -195,7 +195,7 @@ export function VendorProducts() {
       {error && <p className="error-state" role="alert">{error}</p>}
 
       {!loading && categories.length === 0 ? (
-        <p className="empty-state">Your business has not been granted a Product category yet — contact an admin.</p>
+        <p className="empty-state">No Product categories exist yet. Contact an admin.</p>
       ) : (
         <sky-data-table
           ref={tableRef as RefObject<HTMLElement>}

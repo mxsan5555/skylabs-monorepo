@@ -96,8 +96,8 @@ const EMPTY_FORM = {
 /** Add/Edit product — `/account/members/:vendorId/products/new` and `.../products/:productId`.
  *  Product is vendor-level, never branch-scoped (see msd-api's Product schema doc comment), so
  *  unlike `DealFormPage`/`TherapistFormPage` there is no branch step at all — the Category picker
- *  is scoped to the vendor's own granted PRODUCT categories (`listCategories({type:'PRODUCT',
- *  vendorId})`), with the same Category → Subcategory → (optional) Type cascade the self-service
+ *  lists every active PRODUCT category (`listCategories({type:'PRODUCT'})`, D10: no per-member
+ *  grants), with the same Category → Subcategory → (optional) Type cascade the self-service
  *  `ProductFormDialog` in `vendor-products.tsx` already uses, via the shared `resolveCategoryTiers`
  *  helper (reused here rather than re-derived).
  *
@@ -133,7 +133,7 @@ export function ProductFormPage({ token }: ProductFormPageProps) {
   useEffect(() => {
     if (!vendorId) return;
     setCategoriesLoading(true);
-    listCategories(token, { type: 'PRODUCT', vendorId })
+    listCategories(token, { type: 'PRODUCT' })
       .then(({ data }) => setCategories(data))
       .catch(() => setCategories([]))
       .finally(() => setCategoriesLoading(false));
@@ -259,7 +259,7 @@ export function ProductFormPage({ token }: ProductFormPageProps) {
         {categoriesLoading ? (
           <p className="loading-state">Loading categories…</p>
         ) : parentCategories.length === 0 ? (
-          <p className="empty-state">This business has not been granted a Product category yet — grant one under Business Modules &amp; Category Access first.</p>
+          <p className="empty-state">No Product categories exist yet. Ask staff to add one under Masters &gt; Categories first.</p>
         ) : (
           renderSelect({
             label: 'Category',

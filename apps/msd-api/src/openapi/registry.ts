@@ -873,7 +873,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/members',
-    summary: 'List members. Filters: status, documents=incomplete, reviewFlag=true.',
+    summary: 'List members. Filters: status, documents=incomplete, reviewFlag=true. Sort: sort=businessName|status|documentsDueAt, dir=asc|desc.',
     tags: ['Members - Admin'],
     security: bearer,
     request: { query: MemberListQuerySchema },

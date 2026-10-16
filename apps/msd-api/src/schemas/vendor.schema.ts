@@ -10,6 +10,9 @@ export const MemberListQuerySchema = PaginationQuerySchema.extend({
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED', 'ARCHIVED']).optional(),
   documents: z.enum(['incomplete']).optional(),
   reviewFlag: z.enum(['true']).optional(),
+  /** Allowlist only; anything else is a 422. Default order is newest first. */
+  sort: z.enum(['businessName', 'status', 'documentsDueAt']).optional(),
+  dir: z.enum(['asc', 'desc']).default('asc'),
 });
 
 /** Query for the "select an existing User to link as this Vendor's owner" search box. */

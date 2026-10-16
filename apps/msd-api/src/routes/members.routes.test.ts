@@ -130,6 +130,23 @@ describe('POST /api/v1/members', () => {
     expect(prismaMock.member.create).not.toHaveBeenCalled();
   });
 
+  it('sorts the list by an allowlisted field with a stable tie-break', async () => {
+    grants.mockResolvedValue(['members:view']);
+    prismaMock.member.findMany.mockResolvedValue([]);
+    prismaMock.member.count.mockResolvedValue(0);
+    const res = await request(app).get('/api/v1/members?sort=businessName&dir=desc').set('Authorization', ADMIN);
+    expect(res.status).toBe(200);
+    expect(prismaMock.member.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: [{ businessName: 'desc' }, { id: 'asc' }] }),
+    );
+  });
+
+  it('422 for a sort field outside the allowlist', async () => {
+    grants.mockResolvedValue(['members:view']);
+    const res = await request(app).get('/api/v1/members?sort=ownerMobile').set('Authorization', ADMIN);
+    expect(res.status).toBe(422);
+  });
+
   it('422 for a field outside the allowlist', async () => {
     grants.mockResolvedValue(['members:create']);
     const res = await request(app)

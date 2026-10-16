@@ -2536,10 +2536,26 @@ describe('Product (vendor-scoped self-service + admin-on-behalf)', () => {
     expect(res.body.data.vendorId).toBe(VENDOR_A_ID); // always server-derived
   });
 
-  it('rejects creating a product when the vendor lacks PRODUCT category access', async () => {
+  it('creates a product with no category grant and saves isNew and isFeatured (D10)', async () => {
     resolveMock.mockResolvedValue(['products:create', 'members:custom']);
     prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(null);
+    prismaMock.product.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: PRODUCT_ID, ...data }),
+    );
+    const res = await request(app)
+      .post('/api/v1/vendors/me/products')
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+      .send({ ...productBody, isNew: true, isFeatured: true });
+    expect(res.status).toBe(201);
+    expect(res.body.data.isNew).toBe(true);
+    expect(res.body.data.isFeatured).toBe(true);
+  });
+
+  it('rejects creating a product in a non-PRODUCT category', async () => {
+    resolveMock.mockResolvedValue(['products:create', 'members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.category.findUnique.mockResolvedValue({ ...productCategoryFixture, type: 'SERVICE' });
     const res = await request(app)
       .post('/api/v1/vendors/me/products')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))

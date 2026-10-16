@@ -268,7 +268,8 @@ erDiagram
 - Every therapist on a deal shares the deal's branch and member (`assertTherapistsBelongToBranch`, exists).
 - Deal category: an active top-level `SERVICE` category; the subcategory, when given, is an active child of it. No per-member or per-branch grant (D10).
 - Therapist `specializationCategoryId`: an active `THERAPY` category or one of its children.
-- Product category: an active top-level `PRODUCT` category; subcategory is its active child (check in `product.service.createProduct`, task C-07).
+- Product category: an active top-level `PRODUCT` category; subcategory is its active child. No per-member grant (D10). Checked in `product.service.createProduct` and `updateProduct` (tasks C-07, C-12, P4-14).
+- Member detail page (admin side) also shows total customers and total orders for the member as counts linking to the filtered lists (D9, task P10-49).
 - One member, one owner user. Duplicate document number across members returns 409 `DOCUMENT_NUMBER_IN_USE`.
 
 ---
@@ -320,7 +321,7 @@ This section replaces `raj/member-branch-deal-therapist-product.md`, checked fie
 | 2 | Branch | `name` required; **`state` required (NEW, see 6.4)** | schema |
 | 3 | Therapist | Branch exists; `specializationCategoryId` (optional) is a `THERAPY` category or its child | exists, grant check removed |
 | 4 | Deal | Branch exists; category is `SERVICE`; at least one package; therapists (optional) share the branch | exists, grant checks removed |
-| 5 | Product | Category is `PRODUCT` type | verify type check (C-07) |
+| 5 | Product | Category is an active `PRODUCT` category (any, D10); optional subcategory, `isNew`, `isFeatured` | exists, grant check removed (P4-14) |
 
 Inline therapist creation inside the deal request (Raj draft `inline_new_therapists`) is **not built and not planned**. The UI creates the therapist first (step 3) and then sends `therapistIds`. One transaction per object stays simple and keeps the existing `assertTherapistsBelongToBranch` check.
 
@@ -390,8 +391,10 @@ Product (`ProductCreate`, table `Product`)
 | badge | string | max 50 |
 | price, originalPrice | decimal string | 2 places |
 | discount | int | 0 to 100 (server-computed, 6.5) |
-| isNew, isFeatured | boolean | |
+| isNew, isFeatured | boolean | Two checkboxes on the product form ("New", "Featured"), both default false |
 | isActive | boolean | `PATCH .../status` |
+
+Product form (member self-service and admin-on-behalf, same fields): the member picks Category (required, any active `PRODUCT` category, D10), then Subcategory and Type (optional children of the chosen category), and ticks "New" and "Featured" if they apply. The category list never depends on per-member grants: every active member can pick a category and subcategory by default, with no extra permission (owner confirmed 2026-10-16). Inactive members stay read-only (D21). Task P10-48.
 
 Media for deal, therapist, product and member: images (`POST .../images`, delete, reorder, set primary) and one optional video, all under the same permission as edit.
 
@@ -405,7 +408,7 @@ Media for deal, therapist, product and member: images (`POST .../images`, delete
 | C-04 | `slug` required from the client, globally unique | Make optional; generate from title with `lib/slug.ts` and a numeric suffix on conflict; keep 409 for explicit duplicates | S |
 | C-05 | `discountPercent` and `discount` accepted from client | Compute from `originalPrice` and `salePrice`; ignore the client value | S |
 | C-06 | Cross-resource permission model | Replace `vendors:custom` and `vendors.*` with `<resource>:<action>` plus scope (section 5) | L |
-| C-07 | Product category access check | Confirm `createProduct` calls `assertVendorHasCategoryAccess(..., 'PRODUCT')`; add it if missing | S |
+| C-07 | Product category check | Superseded by D10 and C-12. `createProduct` and `updateProduct` check only that the category is an active `PRODUCT` category and that the subcategory is its child; no per-member grant (done 2026-10-16, task P4-14) | S |
 | C-08 | No branch delete | Add `DELETE /branches/:id`, `branches:delete`, super_admin only, 409 on FK conflict | S |
 | C-09 | Canonical flat routes | Add `/branches`, `/deals`, `/therapists`, `/products` (6.5) over the existing services; nested routes become aliases | L |
 | C-10 | (retired) | Package label not added (D13); `DealPackage` stays duration plus price | n/a |
