@@ -725,55 +725,8 @@ input[type='checkbox'] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   width: 100%;
-}/* ── KYC Review ─────────────────────────────────────────────────────── */
-
-.kyc-review {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: 100%;
-  box-sizing: border-box;
-  margin: 4px 0 0;
-  padding: 16px;
-  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
-  border-radius: 12px;
-  background: var(--md-sys-color-surface-container-low, #f7f8fa);
 }
 
-.kyc-review legend {
-  padding: 0 8px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--md-sys-color-on-surface);
-}
-
-.kyc-review-status {
-  margin-left: 8px;
-  color: var(--md-sys-color-on-surface-variant);
-  font-weight: 400;
-}
-
-/* Rejection reason on first row */
-.kyc-review-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: 100%;
-}
-
-.kyc-review-actions md-outlined-text-field {
-  width: 100%;
-  min-width: 0;
-}
-
-/* Buttons on second row */
-.kyc-review-buttons {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
 .vendor-kyc-document-card {
   width: 100%;
   margin-top: 4px;
@@ -790,28 +743,8 @@ input[type='checkbox'] {
     grid-template-columns: 1fr;
     row-gap: 20px;
   }
-  .kyc-review-actions {
+  .vendor-kyc-document-card .kyc-document-list {
     grid-template-columns: 1fr;
-  }
-
-  .kyc-review-actions md-outlined-text-field {
-    width: 100%;
-  }
-    .vendor-kyc-document-card .kyc-document-list {
-    grid-template-columns: 1fr;
-  }
-    .kyc-review {
-    padding: 14px;
-  }
-
-  .kyc-review-buttons {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .kyc-review-buttons md-filled-button,
-  .kyc-review-buttons md-outlined-button {
-    width: 100%;
   }
 }
 @media (max-width: 900px) {

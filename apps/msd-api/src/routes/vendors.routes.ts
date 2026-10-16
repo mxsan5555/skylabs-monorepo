@@ -312,7 +312,7 @@ router.post(
       });
       await writeAuditLog({
         actorUserId: req.user!.sub,
-        action: 'vendor_document.upload',
+        action: 'member_document.upload',
         targetType: 'VendorDocument',
         targetId: document.id,
         ...requestMeta(req),
@@ -334,7 +334,7 @@ router.delete(
       await memberDocumentService.deleteVendorDocument(vendor.id, req.params.documentType as VendorDocumentType);
       await writeAuditLog({
         actorUserId: req.user!.sub,
-        action: 'vendor_document.delete',
+        action: 'member_document.delete',
         targetType: 'VendorDocument',
         targetId: req.params.documentType,
         ...requestMeta(req),

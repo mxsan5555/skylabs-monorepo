@@ -67,6 +67,9 @@ describe('POST /api/v1/vendors/me/kyc-documents/:documentType', () => {
       expect.objectContaining({ where: { vendorId_documentType: { vendorId: VENDOR_A_ID, documentType: 'GST' } } }),
     );
     expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: 'member_document.upload' }),
+    });
   });
 
   it('422s an invalid document type in the URL', async () => {
@@ -115,6 +118,9 @@ describe('DELETE /api/v1/vendors/me/kyc-documents/:documentType', () => {
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
     expect(res.status).toBe(200);
     expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: 'member_document.delete' }),
+    });
   });
 
   it('404s when no document of that type exists', async () => {
