@@ -124,6 +124,18 @@ Original plan file: `~/.claude/plans/our-backend-admin-layout-snug-sloth.md`. Ea
 - [ ] msd: before traffic grows, move VITE_MAP_TILE_URL off tile.openstreetmap.org to a free-tier tile provider (OSM tile policy: no heavy commercial use)
 - [ ] mera-driver: 12 pre-existing failing specs (app.routes RBAC wiring, users "Login As", drivers page: rbac.permissionsCatalog is not a function)
 
+### msd admin: member management follow-ups (IDs from `docs/msd/ADMIN_RBAC_TASKS.md`)
+- [ ] Before production: register DLT-approved SMS templates for the welcome, suspension and reactivation texts in `apps/msd-api/src/lib/member-messages.ts` (P10-43)
+- [ ] Before production: set `SUPPORT_EMAIL`, `SUPPORT_PHONE`, `FIELD_ENCRYPTION_KEY` and `DOC_HASH_PEPPER` on Railway (P10-44)
+- [ ] Before production: run `apps/msd-api/prisma/member-status-report.ts`, get owner sign-off, then rehearse the `member_lifecycle` migration up and down on a Neon copy (P10-45)
+- [ ] msd-api: rename `vendor.service.ts`, `vendors.routes.ts` and the `Vendor*` Zod schemas to member names (P3-22)
+- [ ] msd: move the member detail page and self-service calls from `/vendors/:id` to `/members/:id` before the alias is removed (P3-23)
+- [ ] msd-api: grant `members:view` and `members:edit` with own scope to role `member`, then retire `members:custom` (P4-13)
+- [ ] msd-api: signed URL download for member documents, replacing the returned `storageKey` (P5-14)
+- [ ] msd-api + msd: documents list returns the uploader name so the row shows "uploaded by <name> for member" (P5-15)
+- [ ] msd-api: durable retry for failed member notices (P6-08)
+- [ ] msd, msd-api, shared-*: fix pre-existing lint config (eslint ignore error in shared-* packages, 31 msd lint errors) and test drift (26 msd tests in 15 files, 5 msd-api, 5 shared-menu) (P10-46)
+
 #### Plan 4 prerender prerequisites
 - [x] (e) decided: gift/member `sky-feature-card` copy stays in shadow DOM. It is promotional, not a search landing target; the crawlable content on home is the h1, tiles, deals JSON-LD, How it works, directory and FAQ. See spec section 8.1.
 
@@ -169,6 +181,9 @@ Original plan file: `~/.claude/plans/our-backend-admin-layout-snug-sloth.md`. Ea
 ---
 
 ## Completed
+
+### MSD: staff member management
+- [x] Member lifecycle slice: `Vendor` model renamed to `Member`, statuses ACTIVE / INACTIVE / SUSPENDED / ARCHIVED with history, suspended and inactive enforcement, document checklist and review, `/members` API with `/vendors` aliases, 7 seeded roles, All members list, short Add member form and tabbed member detail page, done 2026-10-15. Plan: `docs/superpowers/plans/2026-10-15-staff-member-management.md`. Spec: `docs/superpowers/specs/2026-10-15-staff-member-management-design.md`. Task status: `docs/msd/ADMIN_RBAC_TASKS.md`.
 
 ### MSD — wishlist product counts
 - [x] Count saved deals and products together in the wishlist heading, desktop badge, and mobile badge; use item-based wishlist copy — 2026-10-07

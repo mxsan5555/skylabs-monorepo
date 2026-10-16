@@ -1,7 +1,7 @@
 # Admin RBAC: Implementation Task List
 
 Source specs: `docs/msd/ADMIN_USER_ROLES_AND_PERMISSIONS.md` (business rules) and `docs/msd/ADMIN_RBAC_MASTER_PLAN.md` (technical design; its section 13 lists corrections to this list).
-Created: 2026-10-12. Status: not started.
+Created: 2026-10-12. Status: in progress (staff member management slice built 2026-10-15).
 
 ## How to use this list
 
@@ -23,34 +23,38 @@ Created: 2026-10-12. Status: not started.
 
 ## Progress summary
 
-Total: **183 tasks**. Update the Done column as work lands.
+Total: **193 tasks**. Update the Done column as work lands.
 
 | Phase | Scope | Tasks | Done | % |
 |---|---|---|---|---|
 | P0 | Decisions and setup | 10 | 0 | 0 |
 | P1 | Roles, scope, seed, menu | 10 | 1 | 10 |
-| P2 | Authorization core and hardening | 17 | 0 | 0 |
-| P3 | Member rename and lifecycle | 20 | 0 | 0 |
-| P4 | Own-scope retrofit | 12 | 0 | 0 |
-| P5 | Member documents | 13 | 0 | 0 |
-| P6 | Reminders and scheduler | 7 | 0 | 0 |
+| P2 | Authorization core and hardening | 17 | 2 | 12 |
+| P3 | Member rename and lifecycle | 22 | 12 | 55 |
+| P4 | Own-scope retrofit | 13 | 0 | 0 |
+| P5 | Member documents | 15 | 3 | 20 |
+| P6 | Reminders and scheduler | 8 | 0 | 0 |
 | P7 | Orders, refunds, payments, payouts, reports | 13 | 0 | 0 |
 | P8 | Staff, settings, logs, profile, content | 8 | 0 | 0 |
 | P9 | OpenAPI and contract | 8 | 0 | 0 |
-| P10 | Frontend | 42 | 0 | 0 |
+| P10 | Frontend | 46 | 4 | 9 |
 | P11 | Security and QA | 13 | 0 | 0 |
 | P12 | Release, ops, docs | 10 | 0 | 0 |
-| **Total** | | **183** | **1** | **1** |
+| **Total** | | **193** | **22** | **11** |
 
-By area: BE 77, FE 35, SEC 20, QA 16, DB 14, OPS 10, SH 4, BIZ 4, DOC 3.
-By size: S 54, M 111, L 18.
+By area: BE 82, FE 36, SEC 20, QA 17, DB 14, OPS 13, SH 4, BIZ 4, DOC 3.
+By size: S 60, M 115, L 18.
 
 Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then P3 to P8 (backend), with P10 frontend tasks starting as each backend phase lands. P9 runs alongside P4 to P8. P11 and P12 close the release.
 
 ### Current slice: staff member management (spec `docs/superpowers/specs/2026-10-15-staff-member-management-design.md`)
 
-- In slice: P1-02, P1-03, P1-05 (members key only), P1-06 (members only), P1-07 (members row and roles), P2-03, P2-04, P3-01 to P3-13, P3-17 to P3-21, P5-01, P5-02, P5-05, P5-07, P5-09, P5-11, P6-03 (minimal), P10-02, P10-05, P10-07, P10-11 to P10-18, P10-39.
-- Partly in: P5-06 and P5-08 (existing storage, no private bucket), P10-03 and P10-04 (member error codes and banners), P10-19 (badge only).
+Status: built 2026-10-15, plan `docs/superpowers/plans/2026-10-15-staff-member-management.md`.
+
+- Done (21): P2-03, P2-04, P3-04, P3-06 to P3-11, P3-13, P3-17, P3-18, P3-20, P3-21, P5-05, P5-07, P5-11, P10-13 to P10-16.
+- Partly done (24, each "Done when" says what is left): P1-02, P1-03, P1-05, P1-06, P1-07, P3-01, P3-02, P3-03, P3-12, P3-19, P5-01, P5-02, P5-06, P5-08, P5-09, P6-03, P10-03, P10-04, P10-05, P10-11, P10-12, P10-17, P10-18, P10-19.
+- Not done (4): P3-05 (service files keep `vendor` names, see P3-22), P10-02 (validators stay local to the form), P10-07 (no separate design spec), P10-39 (member copy is inline, not in `content.json`).
+- Follow-ups added (10): P3-22, P3-23, P4-13, P5-14, P5-15, P6-08, P10-43 to P10-46. Before production: P10-43, P10-44, P10-45.
 - Deferred: P3-15, P3-16, P5-03, P5-04, P5-10, P5-12, P5-13, P6-01, P6-02, P6-04 to P6-07, all of P4, P7 and P8.
 - Removed: P3-14 (superseded by the FK 409 guard and branch delete C-08).
 
@@ -76,12 +80,12 @@ Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then 
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
 | [x] | P1-01 | DB | Migration: `PermissionScope` enum and `RolePermission.scope` (default ALL) | S | P0-05 | Merged: migration `20261008104219_add_permission_scope` |
-| [ ] | P1-02 | DB | Migration: rename role key `vendor` to `member`, insert `support`, update `UserRole` links | S | P1-01 | Row counts equal before and after |
-| [ ] | P1-03 | BE | Create `lib/role-keys.ts`; replace hardcoded `'vendor'`, `'customer'` in vendor, auth, customer, dashboard services | S | P1-02 | No string literal role key left (grep) |
+| [ ] | P1-02 | DB | Migration: rename role key `vendor` to `member`, insert `support`, update `UserRole` links | S | P1-01 | Row counts equal before and after; partly: role rename written in migration `20261015100000_member_lifecycle`, `support` added by the seed; row counts not checked yet (P10-45) |
+| [ ] | P1-03 | BE | Create `lib/role-keys.ts`; replace hardcoded `'vendor'`, `'customer'` in vendor, auth, customer, dashboard services | S | P1-02 | No string literal role key left (grep); partly: `lib/role-keys.ts` added and used for member checks; `'customer'` literals remain in auth, customer and dashboard services |
 | [ ] | P1-04 | BE | Permission resolver returns `{key, scope}`; highest scope wins across roles | M | P1-01 | Unit tests: ALL beats OWN, multi-role |
-| [ ] | P1-05 | SH | Restructure `msd-menu.json` to the 14 keys plus masters and dashboard; add `payments`, `logs`, `profile` nodes; remove `business` parent mismatch | M | P0-09 | Menu test passes, no orphan parent |
-| [ ] | P1-06 | BE | Extend `permission-migration.service` to map old keys to new keys on existing `RolePermission` rows | M | P1-05 | Old custom grants preserved in rehearsal |
-| [ ] | P1-07 | BE | Rewrite `prisma/seed.ts` from spec matrix 2.3 including scope and extra actions; drop `vendor-portal.*` special case | M | P1-05, P1-04 | Seed idempotent, runs twice cleanly |
+| [ ] | P1-05 | SH | Restructure `msd-menu.json` to the 14 keys plus masters and dashboard; add `payments`, `logs`, `profile` nodes; remove `business` parent mismatch | M | P0-09 | Menu test passes, no orphan parent; partly: `vendors` key renamed to `members` only |
+| [ ] | P1-06 | BE | Extend `permission-migration.service` to map old keys to new keys on existing `RolePermission` rows | M | P1-05 | Old custom grants preserved in rehearsal; partly: the migration SQL copies `vendors:*` grants to `members:*`; other key moves still open |
+| [ ] | P1-07 | BE | Rewrite `prisma/seed.ts` from spec matrix 2.3 including scope and extra actions; drop `vendor-portal.*` special case | M | P1-05, P1-04 | Seed idempotent, runs twice cleanly; partly: 7 roles and the `members` row seeded; other rows still open |
 | [ ] | P1-08 | QA | Matrix snapshot test: 7 roles x 14 resources x actions x scope equals spec | M | P1-07 | Test fails on any drift |
 | [ ] | P1-09 | SH | `shared-types`: `PermissionScope`, `Bootstrap.scopes`, role key union. `shared-permissions`: `can()` plus `scopeFor()` | M | P1-04 | Package tests green |
 | [ ] | P1-10 | BE | Guard: role permission edit cannot give `members`/`orders` scope ALL to member role; super-admin-only actions enforced in code | M | P1-04 | Negative tests return 403 |
@@ -92,8 +96,8 @@ Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then 
 |---|---|---|---|---|---|---|
 | [ ] | P2-01 | BE | `requirePermission` sets `req.access = {scope, memberId}` | S | P1-04 | Unit test |
 | [ ] | P2-02 | BE | `lib/scope.ts` with `scopedWhere(req, resource)` per resource | M | P2-01 | Unit test per resource |
-| [ ] | P2-03 | BE | `authenticate`: load `Member.status`; SUSPENDED/ARCHIVED gives 403 `MEMBER_SUSPENDED`; INACTIVE sets `req.readOnly` | M | P3-01 | Tests for each status |
-| [ ] | P2-04 | BE | `blockWhenReadOnly` middleware on non-GET routes, logout and token refresh the only exceptions (no `/me`, no document or media upload) | S | P2-03 | Inactive member write returns 403 `MEMBER_INACTIVE_READ_ONLY`; GET orders, customers and catalog still 200 |
+| [x] | P2-03 | BE | `authenticate`: load `Member.status`; SUSPENDED/ARCHIVED gives 403 `MEMBER_SUSPENDED`; INACTIVE sets `req.readOnly` | M | P3-01 | Tests for each status |
+| [x] | P2-04 | BE | `blockWhenReadOnly` middleware on non-GET routes, logout and token refresh the only exceptions (no `/me`, no document or media upload) | S | P2-03 | Inactive member write returns 403 `MEMBER_INACTIVE_READ_ONLY`; GET orders, customers and catalog still 200 |
 | [ ] | P2-05 | BE | Read roles from DB (30 s cache) not the token; clear cache on role, permission and user-role change | M | P2-01 | Role change effective within one request after cache clear |
 | [ ] | P2-06 | BE | `denyPreview` middleware for payout, delete, status, refund, staff routes; block impersonating super_admin | S | P2-01 | Preview token gets 403 on listed routes |
 | [ ] | P2-07 | SEC | Add `helmet`, `trust proxy`, JSON and urlencoded body limit 100 kb | S | - | Response headers verified, oversize gets 413 |
@@ -112,26 +116,28 @@ Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then 
 
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
-| [ ] | P3-01 | DB | Migration (expand): `MemberStatus` enum, new status columns, `documentsDueAt`, `reviewFlaggedAt`, `welcomeSentAt` | M | P0-01 | Up and down tested |
-| [ ] | P3-02 | DB | Backfill status mapping and `documentsDueAt` for existing members | S | P3-01 | Counts per status match mapping table |
-| [ ] | P3-03 | DB | `MemberStatusHistory` table and indexes | S | P3-01 | Migration tested |
-| [ ] | P3-04 | BE | Rename Prisma model `Vendor` to `Member` with `@@map("Vendor")`; regenerate client; fix types | L | P3-01 | `nx build msd-api` green |
+| [ ] | P3-01 | DB | Migration (expand): `MemberStatus` enum, new status columns, `documentsDueAt`, `reviewFlaggedAt`, `welcomeSentAt` | M | P0-01 | Up and down tested; partly: migration and `down.sql` written; up and down rehearsal open (P10-45) |
+| [ ] | P3-02 | DB | Backfill status mapping and `documentsDueAt` for existing members | S | P3-01 | Counts per status match mapping table; partly: backfill SQL written; counts not checked on real data yet (P10-45) |
+| [ ] | P3-03 | DB | `MemberStatusHistory` table and indexes | S | P3-01 | Migration tested; partly: table and index in the migration; rehearsal open (P10-45) |
+| [x] | P3-04 | BE | Rename Prisma model `Vendor` to `Member` with `@@map("Vendor")`; regenerate client; fix types | L | P3-01 | `nx build msd-api` green |
 | [ ] | P3-05 | BE | Rename `vendor.service`, schemas and routes internally to member; keep behaviour | L | P3-04 | Existing tests green |
-| [ ] | P3-06 | BE | Member status state machine service (transitions, reason rules, side effects in one transaction) | M | P3-03 | Table-driven tests for all transitions |
-| [ ] | P3-07 | BE | `PATCH /members/:id/status` with history, audit, notification | M | P3-06, P2-11 | Integration test |
-| [ ] | P3-08 | BE | On suspend: revoke all `RefreshSession`, clear permission cache | S | P3-07 | Refresh after suspend returns 401/403 |
-| [ ] | P3-09 | BE | `DELETE /members/:id`: hard delete if zero orders, else ARCHIVED; super_admin only; reason required | M | P3-06 | Both outcomes tested |
-| [ ] | P3-10 | BE | `publicVisibleWhere()` in `catalog-visibility.ts`; apply to every `/catalog` query | M | P3-04 | Suspend hides, reactivate restores (test) |
-| [ ] | P3-11 | BE | Welcome SMS/email on member create via a template service | M | P6-03 | Message logged once, no duplicate on retry |
-| [ ] | P3-12 | BE | `/members` routes; `/vendors*` kept as aliases with `Deprecation` header and usage log | M | P3-05 | Both paths work |
-| [ ] | P3-13 | BE | `GET /members/:id/status-history` and `/activity` | S | P3-03 | Scoped test |
+| [x] | P3-06 | BE | Member status state machine service (transitions, reason rules, side effects in one transaction) | M | P3-03 | Table-driven tests for all transitions |
+| [x] | P3-07 | BE | `PATCH /members/:id/status` with history, audit, notification | M | P3-06, P2-11 | Integration test |
+| [x] | P3-08 | BE | On suspend: revoke all `RefreshSession`, clear permission cache | S | P3-07 | Refresh after suspend returns 401/403 |
+| [x] | P3-09 | BE | `DELETE /members/:id`: hard delete if zero orders, else ARCHIVED; super_admin only; reason required | M | P3-06 | Both outcomes tested |
+| [x] | P3-10 | BE | `publicVisibleWhere()` in `catalog-visibility.ts`; apply to every `/catalog` query | M | P3-04 | Suspend hides, reactivate restores (test) |
+| [x] | P3-11 | BE | Welcome SMS/email on member create via a template service | M | P6-03 | Message logged once, no duplicate on retry |
+| [ ] | P3-12 | BE | `/members` routes; `/vendors*` kept as aliases with `Deprecation` header and usage log | M | P3-05 | Both paths work; partly: `/members` routes and `/vendors` aliases with `Deprecation` and `Link` headers work; no alias usage log yet |
+| [x] | P3-13 | BE | `GET /members/:id/status-history` and `/activity` | S | P3-03 | Scoped test |
 | [ ] | P3-15 | BE | Remove deal approval gate if decision 2 says so (migration plus code) | M | P0-01 | Deals publish without approval |
 | [ ] | P3-16 | DB | Contract migration: drop `kycStatus`, `kycRejectionReason`, legacy GST/PAN/`kycDocuments` | M | P5-02, P12-03 | Done only after one release without readers |
-| [ ] | P3-17 | BE | On suspend: send email and SMS to the member with the reason, support contact and steps to return to active; send "active again" message on reactivation | M | P3-07, P6-03 | Message sent once per change; provider failure recorded and retried, suspension kept |
-| [ ] | P3-18 | BE | Suspended member login and OTP request return 403 `MEMBER_SUSPENDED` with reason and steps; no OTP sent | S | P2-03 | Test: suspended phone gets the message, no OTP row created |
-| [ ] | P3-19 | DB | Status backfill report: counts per old `VendorStatus` and per new `MemberStatus`, reviewed before the migration runs | S | P3-01 | Report saved, owner signs off on the REJECTED to SUSPENDED count |
-| [ ] | P3-20 | BE | `SystemSetting` keys `support.email` and `support.phone` seeded and read by the suspension notice | S | P8-02 | Notice shows the configured contact |
-| [ ] | P3-21 | BE | Remove `POST /vendors/me` and `POST /vendors/me/submit` and the vendor approve and reject routes (master plan C-11) | M | P3-12 | Routes return 404, OpenAPI updated |
+| [x] | P3-17 | BE | On suspend: send email and SMS to the member with the reason, support contact and steps to return to active; send "active again" message on reactivation | M | P3-07, P6-03 | Message sent once per change; provider failure recorded and retried, suspension kept |
+| [x] | P3-18 | BE | Suspended member login and OTP request return 403 `MEMBER_SUSPENDED` with reason and steps; no OTP sent | S | P2-03 | Test: suspended phone gets the message, no OTP row created |
+| [ ] | P3-19 | DB | Status backfill report: counts per old `VendorStatus` and per new `MemberStatus`, reviewed before the migration runs | S | P3-01 | Report saved, owner signs off on the REJECTED to SUSPENDED count; partly: `prisma/member-status-report.ts` written; report run and owner sign-off open (P10-45) |
+| [x] | P3-20 | BE | Support contact for the suspension notice from env vars `SUPPORT_EMAIL` and `SUPPORT_PHONE` (`SystemSetting` keys wait for P8-02) | S | - | Notice shows the configured contact |
+| [x] | P3-21 | BE | Remove `POST /vendors/me` and `POST /vendors/me/submit` and the vendor approve and reject routes (master plan C-11) | M | P3-12 | Routes return 404, OpenAPI updated |
+| [ ] | P3-22 | BE | Rename `vendor.service.ts`, `vendors.routes.ts` and the `Vendor*` Zod schemas to member names | S | P3-12 | No `vendor` in those file or schema names; existing tests green |
+| [ ] | P3-23 | FE | Move the member detail page and self-service calls in msd from `/vendors/:id` and `/vendors/me` to `/members/*` before the alias is removed | S | P3-12 | No `/vendors` request left in `apps/msd/src/api` (grep) |
 
 ## Phase 4: Own-scope retrofit
 
@@ -149,24 +155,27 @@ Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then 
 | [ ] | P4-10 | BE | Logs and profile scoped to own for non-super-admin | S | P2-02 | Test |
 | [ ] | P4-11 | BE | Cross-resource ownership validators (branch to member, therapist to branch, category access) in one shared service | M | P4-02 | Unit tests |
 | [ ] | P4-12 | QA | Route inventory test: every route has `requirePermission` or is on a documented public allowlist | M | P4-01 | CI fails on an unguarded route |
+| [ ] | P4-13 | BE | Grant `members:view` and `members:edit` with own scope to role `member`, then retire `members:custom` | M | P4-01 | Member reads and edits only their own record; `members:custom` gone from the seed |
 
 ## Phase 5: Member documents
 
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
-| [ ] | P5-01 | DB | `MemberDocument` migration: status, masked number, hash, reviewer, expiry, uploader fields | M | P3-01 | Up and down tested |
-| [ ] | P5-02 | DB | Copy legacy GST, PAN and `kycDocuments` into `MemberDocument`; verify counts | M | P5-01 | Count and checksum report |
+| [ ] | P5-01 | DB | `MemberDocument` migration: status, masked number, hash, reviewer, expiry, uploader fields | M | P3-01 | Up and down tested; partly: columns in the migration; up and down rehearsal open (P10-45) |
+| [ ] | P5-02 | DB | Copy legacy GST, PAN and `kycDocuments` into `MemberDocument`; verify counts | M | P5-01 | Count and checksum report; partly: existing `VendorDocument` rows become SUBMITTED; legacy GST, PAN and `kycDocuments` columns not copied yet |
 | [ ] | P5-03 | BE | Private R2 bucket client, presigned GET (5 min), `.pdf` ContentType fix | M | P2-09 | Presigned link expires (test) |
 | [ ] | P5-04 | OPS | Script to move existing files from public to private bucket, verify checksums, then remove public copies | M | P5-03 | Run on staging, public URLs return 403/404 |
-| [ ] | P5-05 | BE | Validators: PAN, GST with state code, Aadhaar with Verhoeff; masking functions | M | P2-14 | Table tests with valid and invalid samples |
-| [ ] | P5-06 | BE | Upload endpoint: magic bytes, 5 MB, duplicate-number check by hash, store masked, `uploadedOnBehalf` | L | P5-03, P5-05 | Upload tests incl. polyglot and wrong type |
-| [ ] | P5-07 | BE | Checklist endpoint; support gets type and status only | S | P5-01 | Support response has no file key |
-| [ ] | P5-08 | BE | `download-url` endpoint with audit and rate limit; blocked for support | S | P5-03 | Test per role |
-| [ ] | P5-09 | BE | Review endpoint approve/reject; reason required on reject; notify member | M | P5-01 | State tests |
+| [x] | P5-05 | BE | Validators: PAN, GST with state code, Aadhaar with Verhoeff; masking functions | M | P2-14 | Table tests with valid and invalid samples |
+| [ ] | P5-06 | BE | Upload endpoint: magic bytes, 5 MB, duplicate-number check by hash, store masked, `uploadedOnBehalf` | L | P5-03, P5-05 | Upload tests incl. polyglot and wrong type; partly: type sniffing, duplicate check by hash, masked and encrypted number and `uploadedOnBehalf` on existing storage; private bucket open (P5-03) |
+| [x] | P5-07 | BE | Checklist endpoint; support gets type and status only | S | P5-01 | Support response has no file key |
+| [ ] | P5-08 | BE | `download-url` endpoint with audit and rate limit; blocked for support | S | P5-03 | Test per role; partly: approvers get the file key on the list, support gets none; no `download-url` endpoint, audit or rate limit (P5-14) |
+| [ ] | P5-09 | BE | Review endpoint approve/reject; reason required on reject; notify member | M | P5-01 | State tests; partly: approve and reject with a 10 to 500 character reason, state tests pass; member notification open |
 | [ ] | P5-10 | BE | Expiry job sets EXPIRED when `expiresAt` passed | S | P6-04 | Time-travel test |
-| [ ] | P5-11 | BE | Derive "Documents complete / incomplete" and due date for list and detail | S | P5-01 | Unit test |
+| [x] | P5-11 | BE | Derive "Documents complete / incomplete" and due date for list and detail | S | P5-01 | Unit test |
 | [ ] | P5-12 | SEC | Decide and add malware scanning for uploads (provider or ClamAV) | M | P5-06 | Infected sample rejected |
 | [ ] | P5-13 | BE | Encrypt and mask bank account number at rest | M | P2-13 | Raw DB value is ciphertext |
+| [ ] | P5-14 | BE | Signed URL download for member documents, replacing the `storageKey` in list responses | M | P5-03 | List has no file key; link expires (test) |
+| [ ] | P5-15 | BE | Documents list returns the uploader name, and the row shows "uploaded by <name> for member" | S | P5-07 | Test shows the name |
 
 ## Phase 6: Reminders and scheduler
 
@@ -174,11 +183,12 @@ Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then 
 |---|---|---|---|---|---|---|
 | [ ] | P6-01 | DB | `MemberDocumentReminder` table with unique (member, sequence, channel) | S | P3-01 | Migration tested |
 | [ ] | P6-02 | BE | Reminder schedule service (due +0, +7, +14 days, listing exact missing documents) | M | P6-01 | Unit tests with fake clock |
-| [ ] | P6-03 | BE | Notification template service for SMS and email (generic, replaces OTP-only sender) | M | - | Provider failure recorded, no crash |
+| [ ] | P6-03 | BE | Notification template service for SMS and email (generic, replaces OTP-only sender) | M | - | Provider failure recorded, no crash; partly: minimal: welcome, suspension and reactivation notices by email and SMS with one inline retry; OTP sender not replaced |
 | [ ] | P6-04 | BE | Secured cron endpoint (`x-cron-secret`, timing-safe), run lock, idempotent | M | P6-02, P2-09 | Double run sends once |
 | [ ] | P6-05 | BE | Set `reviewFlaggedAt` after final warning; never auto-suspend | S | P6-02 | Test confirms status unchanged |
 | [ ] | P6-06 | BE | Manual remind endpoint | S | P6-03 | Audit entry written |
 | [ ] | P6-07 | OPS | Railway cron schedule and failure alert | S | P6-04 | Alert fires on forced failure |
+| [ ] | P6-08 | BE | Durable retry for failed member notices (welcome, suspension, reactivation) | S | P6-04 | Failed notice retried by the job until sent; test |
 
 ## Phase 7: Orders, refunds, payments, payouts, reports
 
@@ -232,9 +242,9 @@ Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then 
 |---|---|---|---|---|---|---|
 | [ ] | P10-01 | SH | `shared-auth/react`: expose `scopeFor()`, scope-aware `can()` and `PermissionButton`; refetch bootstrap after role change | M | P1-09, P8-08 | Component tests |
 | [ ] | P10-02 | SH | Pure validators (PAN, GST, Aadhaar, IFSC, phone, reason) in `shared-utils`, reused by forms and tests; server stays authoritative | M | P5-05 | Same fixtures as backend pass |
-| [ ] | P10-03 | FE | API client error mapping: `MEMBER_SUSPENDED`, `ROLE_MANAGEMENT_LOCKED`, 422 field errors, 429 retry-after | M | P9-08 | Unit tests |
-| [ ] | P10-04 | FE | Global states: suspended screen, read-only banner for inactive, session-expired, 403 and 404 pages, preview banner disables sensitive actions | M | P10-03 | Component tests |
-| [ ] | P10-05 | FE | Rename Vendor to Member in UI copy (`content.json`), menu, and routes `/account/members/*` with redirects from `/account/vendors/*` | M | P1-05 | Old URLs redirect |
+| [ ] | P10-03 | FE | API client error mapping: `MEMBER_SUSPENDED`, `ROLE_MANAGEMENT_LOCKED`, 422 field errors, 429 retry-after | M | P9-08 | Unit tests; partly: 409 and 422 field errors mapped on the add member form; no `MEMBER_SUSPENDED`, `ROLE_MANAGEMENT_LOCKED` or 429 mapping |
+| [ ] | P10-04 | FE | Global states: suspended screen, read-only banner for inactive, session-expired, 403 and 404 pages, preview banner disables sensitive actions | M | P10-03 | Component tests; partly: inactive read-only banner in the admin layout and suspended note on the detail page; other global states open |
+| [ ] | P10-05 | FE | Rename Vendor to Member in UI copy (`content.json`), menu, and routes `/account/members/*` with redirects from `/account/vendors/*` | M | P1-05 | Old URLs redirect; partly: routes `/account/members/*`, menu and redirects from `/account/vendors/*` done; role chooser copy in `content.json` still says Vendor |
 | [ ] | P10-06 | FE | Sidebar renders the new menu per role; test each of 7 roles | M | P1-05 | Snapshot per role |
 | [ ] | P10-07 | FE | Design spec for member detail, documents and review screens (60/30/10, M3 tokens) via skylabs-neha | M | - | Spec approved |
 
@@ -250,15 +260,15 @@ Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then 
 
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
-| [ ] | P10-11 | FE | Members list: status filter, documents chip, review-flag filter, due date, server paging and sort | M | P3-12, P10-05 | Tests |
-| [ ] | P10-12 | FE | Create member form with shared validators and duplicate phone/email handling | M | P10-02 | Tests |
-| [ ] | P10-13 | FE | Member detail header: name, status, documents chip, due date, only the actions the viewer may use | M | P10-07 | Tests per role |
-| [ ] | P10-14 | FE | Tabs: Profile, Documents, Branches/Deals/Therapists, Activity | M | P10-13 | Keyboard and ARIA tab pattern |
-| [ ] | P10-15 | FE | Status change with inline confirm and reason (10 to 500 chars), history list | M | P3-07 | Tests |
-| [ ] | P10-16 | FE | Delete member (super admin only) with inline confirm; message for the ARCHIVED outcome | S | P3-09 | Tests |
-| [ ] | P10-17 | FE | Documents tab: per-document status chips, masked number input, upload, approve, reject with reason, "uploaded by X for member", view via signed URL in new tab | L | P5-06, P5-09 | Tests; support sees status only |
-| [ ] | P10-18 | FE | Activity tab: reminders, warnings, status timeline | M | P3-13, P6-01 | Tests |
-| [ ] | P10-19 | FE | "Ready for suspension review" badge with reason prefilled "Documents not completed" | S | P6-05, P10-15 | Test |
+| [ ] | P10-11 | FE | Members list: status filter, documents chip, review-flag filter, due date, server paging and sort | M | P3-12, P10-05 | Tests; partly: status, documents and review-flag filters, documents chip, due date and server paging done; no sort |
+| [ ] | P10-12 | FE | Create member form with shared validators and duplicate phone/email handling | M | P10-02 | Tests; partly: short form with duplicate phone and email errors on the field; validators are local copies of the server schema until P10-02 |
+| [x] | P10-13 | FE | Member detail header: name, status, documents chip, due date, only the actions the viewer may use | M | P10-07 | Tests per role |
+| [x] | P10-14 | FE | Tabs: Profile, Documents, Branches/Deals/Therapists, Activity | M | P10-13 | Keyboard and ARIA tab pattern |
+| [x] | P10-15 | FE | Status change with inline confirm and reason (10 to 500 chars), history list | M | P3-07 | Tests |
+| [x] | P10-16 | FE | Delete member (super admin only) with inline confirm; message for the ARCHIVED outcome | S | P3-09 | Tests |
+| [ ] | P10-17 | FE | Documents tab: per-document status chips, masked number input, upload, approve, reject with reason, "uploaded by X for member", view via signed URL in new tab | L | P5-06, P5-09 | Tests; support sees status only; partly: status chips, masked number, upload on behalf, approve and reject done; uploader name (P5-15) and signed URL view (P5-14) open |
+| [ ] | P10-18 | FE | Activity tab: reminders, warnings, status timeline | M | P3-13, P6-01 | Tests; partly: status timeline and document events done; reminders and warnings wait for P6-01 |
+| [ ] | P10-19 | FE | "Ready for suspension review" badge with reason prefilled "Documents not completed" | S | P6-05, P10-15 | Test; partly: badge and prefilled reason only; the flag is set by the deferred reminder job |
 
 ### 10d. Member self-service (own scope)
 
@@ -297,6 +307,15 @@ Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then 
 | [ ] | P10-40 | FE | `noindex` on all `/account/*`; 301 redirects for renamed public vendor routes decided with SEO owner | S | P10-05 | Meta test |
 | [ ] | P10-41 | QA | Accessibility audit WCAG 2.2 AA on every new page (keyboard, focus, contrast, target size) via sahaj | L | P10-30 | Report with 0 blockers |
 | [ ] | P10-42 | QA | Playwright e2e per role (7 roles): login, allowed action works, forbidden action hidden and server-rejected | L | P10-33 | Suite green in CI |
+
+### 10g. Follow-ups from the staff member management slice
+
+| Done | ID | Area | Task | Size | Depends | Done when |
+|---|---|---|---|---|---|---|
+| [ ] | P10-43 | OPS | Register DLT-approved SMS templates for the welcome, suspension and reactivation texts in `apps/msd-api/src/lib/member-messages.ts` before production | S | - | Template IDs approved and recorded |
+| [ ] | P10-44 | OPS | Set `SUPPORT_EMAIL`, `SUPPORT_PHONE`, `FIELD_ENCRYPTION_KEY` and `DOC_HASH_PEPPER` on Railway before this slice ships | S | - | Staging and production boot with all 4 set |
+| [ ] | P10-45 | OPS | Run `prisma/member-status-report.ts` and get owner sign-off before applying the `member_lifecycle` migration; rehearse migration up and down on a Neon copy | M | P0-05 | Report saved, sign-off recorded, rehearsal log with row counts |
+| [ ] | P10-46 | QA | Fix pre-existing lint and test drift: eslint ignore error in shared-* packages and 31 msd lint errors; 26 msd tests in 15 files (permission-matrix, roles, widget-registry, settings, home, wishlist, become-vendor, india-locations, deal-card, sky-product-card-wc, media-uploader, site-footer, contact-us, app.spec, entry-server); msd-api `rbac.routes` and orders image tests; shared-menu `index.test.ts` | M | - | `nx run-many -t lint test` green for msd, msd-api and shared-* |
 
 ## Phase 11: Security and quality assurance
 

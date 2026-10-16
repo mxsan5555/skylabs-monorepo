@@ -66,6 +66,7 @@ Not re-verified (check when each task starts): order-item vendor filtering, KYC 
 | D19 | Member "my customers" view | Yes to the recommendation | Name, city, order count, last order date; no phone or email unless an order is open (C-16). |
 | D20 | Rich text scope | Yes to the recommendation | Title, brand, badge, `shortDescription`, `summary`, benefits and howToUse items stay plain text; every long field is rich text (C-15). |
 | D21 | Inactive and suspended behaviour (2026-10-15) | Inactive: member logs in and views orders, customers and own catalog, but cannot edit anything existing or add anything new. Suspended: no login, everything disappears from the website, and the member gets an email and SMS at the moment of suspension with the reason and how to return to active | Section 5 (status machine, `readOnly`, notification), tasks P2-04, P3-17, P3-18. |
+| D22 | Support contact in member notices (2026-10-15) | Support contact is env vars until SystemSetting exists | `SUPPORT_EMAIL` and `SUPPORT_PHONE` in `apps/msd-api/src/config/env.ts`; task P3-20. Moves to `SystemSetting` keys with P8-02. |
 
 ### 2.2 Rules this plan sets
 
@@ -213,8 +214,8 @@ Physical table names are kept (`@@map`). Every item is one reversible migration,
 | S1 | `Role` data | `vendor` to `member`, insert `support`; `lib/role-keys.ts` constants replace literals | Keep `UserRole` links. Seed twice must be a no-op. |
 | S2 | `Permission` data | 14 keys plus kept keys; extend `permission-migration.service` to map old keys to new on existing grants | Old rows removed one release later |
 | S3 | `RolePermission` backfill | Set `scope=OWN` for the member role on all member-owned resources | Default ALL would widen access once scope is enforced. Run before enforcement. |
-| S4 | `Vendor` to `Member` | `enum MemberStatus`, columns `statusChangedAt, statusChangedByUserId, archivedAt, documentsDueAt, reviewFlaggedAt, welcomeSentAt`. `statusReason` exists. | **needs Postgres** to apply |
-| S5 | `VendorDocument` to `MemberDocument` | add `status {SUBMITTED, APPROVED, REJECTED, EXPIRED}` (Missing = no row), `documentNumber` (encrypted, see 2.3), `numberMasked`, `numberHash`, `rejectionReason, reviewedByUserId, reviewedAt, expiresAt, uploadedByUserId, uploadedOnBehalf`; index `(status, expiresAt)` | Migrated rows start SUBMITTED, never auto-approved |
+| S4 | `Vendor` to `Member` | `enum MemberStatus`, columns `statusChangedAt, statusChangedByUserId, archivedAt, documentsDueAt, reviewFlaggedAt, welcomeSentAt`. `statusReason` exists. | **Done** (2026-10-15): migration `20261015100000_member_lifecycle`; apply after the backfill report sign-off (P10-45) |
+| S5 | `VendorDocument` to `MemberDocument` | add `status {SUBMITTED, APPROVED, REJECTED, EXPIRED}` (Missing = no row), `documentNumber` (encrypted, see 2.3), `numberMasked`, `numberHash`, `rejectionReason, reviewedByUserId, reviewedAt, expiresAt, uploadedByUserId, uploadedOnBehalf`; index `(status, expiresAt)` | **Done** (2026-10-15): same migration; the encrypted number column is `numberEncrypted`. Migrated rows start SUBMITTED, never auto-approved |
 | S6 | `MemberStatusHistory` | `id, memberId, fromStatus, toStatus, reason, actorUserId, createdAt`; index `(memberId, createdAt)` | Same transaction as the change |
 | S7 | `MemberDocumentReminder` | `id, memberId, sequence 1..3, channel, missingTypes[], sentAt, status, providerRef`; unique `(memberId, sequence, channel)` | Makes cron idempotent |
 | S8 | `RefundRequest` | `id, orderId, requestedByUserId, reason, amount Decimal(12,2), status REQUESTED\|APPROVED\|REJECTED\|REFUNDED\|FAILED, decidedByUserId, decidedAt, decisionNote, providerRefundId` | Cap computed under row lock |

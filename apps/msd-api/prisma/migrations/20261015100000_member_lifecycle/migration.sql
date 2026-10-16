@@ -73,4 +73,22 @@ ALTER TYPE "NotificationType" ADD VALUE 'DOCUMENT_APPROVED';
 ALTER TYPE "NotificationType" ADD VALUE 'DOCUMENT_REJECTED';
 
 -- Role rename keeps every UserRole link, because UserRole points at the role id.
-UPDATE "Role" SET "key" = 'member', "name" = 'Member' WHERE "key" = 'vendor';
+-- Skipped when a `member` role already exists, so the unique key on "Role"."key" cannot fail.
+UPDATE "Role" SET "key" = 'member', "name" = 'Member'
+WHERE "key" = 'vendor'
+  AND NOT EXISTS (SELECT 1 FROM "Role" WHERE "key" = 'member');
+
+-- Permission key rename `vendors:<action>` -> `members:<action>`. Existing grants move with it, so
+-- no role loses member access between `migrate deploy` and the next seed run. Idempotent.
+INSERT INTO "Permission" ("id", "menuKey", "action", "key", "label", "createdAt", "updatedAt")
+SELECT gen_random_uuid()::text, 'members', p."action", 'members:' || p."action"::text, p."label", NOW(), NOW()
+FROM "Permission" p
+WHERE p."menuKey" = 'vendors'
+ON CONFLICT ("key") DO NOTHING;
+
+INSERT INTO "RolePermission" ("roleId", "permissionId", "scope", "createdAt")
+SELECT rp."roleId", np."id", rp."scope", NOW()
+FROM "RolePermission" rp
+JOIN "Permission" op ON op."id" = rp."permissionId" AND op."menuKey" = 'vendors'
+JOIN "Permission" np ON np."key" = 'members:' || op."action"::text
+ON CONFLICT ("roleId", "permissionId") DO NOTHING;

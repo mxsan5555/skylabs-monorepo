@@ -1,6 +1,6 @@
 # Staff Member Management: Design
 
-Date: 2026-10-15. Status: approved in brainstorming, awaiting written-spec review.
+Date: 2026-10-15. Status: implemented.
 Business rules: `docs/msd/ADMIN_USER_ROLES_AND_PERMISSIONS.md`. Technical plan: `docs/msd/ADMIN_RBAC_MASTER_PLAN.md`. Tracker: `docs/msd/ADMIN_RBAC_TASKS.md`.
 
 ## 1. Goal
@@ -23,6 +23,22 @@ Out of scope (later slices): member self-service screens, own-scope enforcement 
 | B4 | Documents: checklist, status, approve and reject, header chip and due date, on today's storage. |
 | B5 | Rename permission key `vendors` to `members`, role `vendor` to `member`, add role `support`, seed the members matrix row with extra actions. |
 | B6 | Build backend first, then screens, then contract migration one release later. |
+
+### Deviations during planning and build
+
+Plan: `docs/superpowers/plans/2026-10-15-staff-member-management.md`.
+
+Planning:
+1. The support contact in the suspension notice comes from the env vars `SUPPORT_EMAIL` and `SUPPORT_PHONE` until the `SystemSetting` table exists (P8-02).
+2. A failed notice is retried once inline. A durable retry queue is deferred (P6-08).
+3. Role `member` keeps `members:custom` plus the `vendor-portal.*` keys. The own-scope grant of `members:view` and `members:edit` is deferred (P4-13).
+4. Public registration (`POST /vendors/public/register`) returns 403 with a "contact our team" message. Staff create all members.
+
+Build:
+5. The migration copies every `vendors:*` permission grant to `members:*` in SQL, so no role loses access between `migrate deploy` and the next seed run. The role rename from `vendor` to `member` runs only when no `member` role exists (`NOT EXISTS` guard).
+6. The admin `POST /vendors` alias also goes through `createMember`, so both paths create an ACTIVE member with the documents timer and the welcome notice.
+7. Document responses return a safe view without `numberHash` or `numberEncrypted`. Deleting an APPROVED document returns 409.
+8. The detail page uses `md-tabs` with ARIA wiring: each tab controls one labelled tab panel.
 
 ## 4. Current state vs target
 

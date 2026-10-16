@@ -1,5 +1,6 @@
 -- Manual rollback. Cannot restore REJECTED (they stay SUSPENDED) and cannot remove
 -- NotificationType values (Postgres has no DROP VALUE); the extra values are harmless.
+-- The copied `members:*` Permission and RolePermission rows stay in place; the old `vendors:*` rows were never removed.
 UPDATE "Role" SET "key" = 'vendor', "name" = 'Vendor' WHERE "key" = 'member';
 
 DROP TABLE "MemberStatusHistory";
