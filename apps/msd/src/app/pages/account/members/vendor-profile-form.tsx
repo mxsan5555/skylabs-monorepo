@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MdFilledButton } from '@material/web/button/filled-button.js';
-import { FilledButton, OutlinedButton, OutlinedTextField, Icon } from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedTextField, Icon } from '@skylabs-monorepo/shared-ui/react';
 import type { Vendor, VendorFields, VendorDocument, VendorDocumentType } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
+import { MEMBER_STATUS_LABEL } from './member-status';
 import { VendorDocumentUpload } from '../../../components/vendor-document-upload';
 
 const EMPTY_FORM: VendorFields = {
@@ -144,23 +145,6 @@ const REQUIRED_FIELDS: Record<VendorFormSection, (keyof VendorFields)[]> = {
   bank: [],
 };
 
-/** 100% Profile Completion and Approval Status are deliberately separate concepts (see
- *  `VendorStatus` on the backend) — a fully-filled-out profile only reaches
- *  `PENDING_VERIFICATION` once submitted, and stays there until a Superadmin actually reviews
- *  it. Rendered as its own labelled section, never folded into the completion percentage, so a
- *  vendor/Superadmin can never mistake "100% complete" for "approved". */
-const VENDOR_STATUS_LABELS: Record<string, string> = {
-  // Legacy labels stay until Task 20 replaces this form; the API now only sends the four below.
-  PROFILE_INCOMPLETE: 'Profile Incomplete',
-  PENDING_VERIFICATION: 'Pending Approval',
-  APPROVED: 'Approved',
-  REJECTED: 'Rejected',
-  ACTIVE: 'Active',
-  INACTIVE: 'Inactive',
-  SUSPENDED: 'Suspended',
-  ARCHIVED: 'Archived',
-};
-
 const KYC_DOCUMENT_TYPES: {
   type: VendorDocumentType;
   label: string;
@@ -276,21 +260,13 @@ export type VendorFieldErrors = Partial<
 interface VendorProfileFormProps {
   vendor: Vendor | null;
   canEdit: boolean;
-  canReviewKyc: boolean;
   saving: boolean;
 
   /** Needed for the KYC document upload/delete calls (see `VendorDocumentUpload`) — every other
-   *  save in this form goes through the parent's own `onSave`/`onKycReview` callbacks instead. */
+   *  save in this form goes through the parent's own `onSave` callback instead. */
   token: string | null;
 
   onSave: (input: VendorFields) => void;
-
-  onKycReview?: (
-    kycStatus: 'VERIFIED' | 'REJECTED',
-    rejectionReason?: string,
-  ) => void;
-
-  onSubmitForVerification?: () => void;
 
   /** Which field groups to render — defaults to all (the existing self-service single-page
    *  usage). The admin onboarding pipeline passes a single section per step. */
@@ -328,12 +304,9 @@ interface VendorProfileFormProps {
 export function VendorProfileForm({
   vendor,
   canEdit,
-  canReviewKyc,
   saving,
   token,
   onSave,
-  onKycReview,
-  onSubmitForVerification,
   sections = ALL_SECTIONS,
   saveLabel,
   serverFieldErrors,
@@ -341,7 +314,6 @@ export function VendorProfileForm({
   onKycDocumentChanged,
 }: VendorProfileFormProps) {
   const [form, setForm] = useState<VendorFields>(() => toFormFields(vendor));
-  const [kycRejectReason, setKycRejectReason] = useState('');
   const [errors, setErrors] = useState<VendorFieldErrors>({});
 
   // Whether each of the 3 KYC slots currently has a file — staged (pre-creation) or really
@@ -471,10 +443,6 @@ export function VendorProfileForm({
     return Object.keys(nextErrors).length === 0;
   };
 
-  // Members no longer submit for verification (staff create them active), so the old button
-  // stays hidden until Task 20 removes it.
-  const canSubmitForVerification = false;
-
   /** Required-field-non-empty AND no active inline error, across every currently-shown
    *  section — plus, when `show('kyc')`, at least one of the 3 KYC slots has a file (uploaded or
    *  staged pre-creation). This is what actually gates the Save/Create-Vendor button now,
@@ -546,32 +514,7 @@ export function VendorProfileForm({
 
   return (
     <div className="form-grid">
-      {vendor && (
-        <section aria-label="Approval status">
-          <h3 className="section-title">
-            Approval Status:{' '}
-            {VENDOR_STATUS_LABELS[vendor.status] ??
-              vendor.status}
-          </h3>
-        </section>
-      )}
-
-      {vendor?.profileCompletion && (
-        <section aria-label="Profile completion">
-          <h3 className="section-title">
-            Profile Completion:{' '}
-            {vendor.profileCompletion.percent}%
-          </h3>
-
-          <ul className="entity-list">
-            {vendor.profileCompletion.sections.map((s) => (
-              <li key={s.key}>
-                {s.complete ? '✓' : '✗'} {s.label}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {vendor && <p className="field-hint">Status: {MEMBER_STATUS_LABEL[vendor.status]}</p>}
 
       {vendor?.kycStatus === 'REJECTED' &&
         vendor.kycRejectionReason && (
@@ -842,44 +785,6 @@ export function VendorProfileForm({
               ))}
             </div>
 
-
-            {canReviewKyc && onKycReview && (
-              <fieldset className="kyc-review">
-                <legend>
-                  Review KYC
-                  <span className="kyc-review-status">
-                    Current: {vendor?.kycStatus ?? 'PENDING'}
-                  </span>
-                </legend>
-
-                <div className="kyc-review-actions">
-                  <OutlinedTextField
-                    label="Rejection reason"
-                    value={kycRejectReason}
-                    onInput={(e: Event) =>
-                      setKycRejectReason(
-                        (e.target as HTMLInputElement).value
-                      )
-                    }
-                  />
-
-                  <div className="kyc-review-buttons">
-                    <FilledButton onClick={() => onKycReview('VERIFIED')}>
-                      Verify KYC
-                    </FilledButton>
-
-                    <OutlinedButton
-                      onClick={() =>
-                        onKycReview('REJECTED', kycRejectReason)
-                      }
-                      disabled={!kycRejectReason.trim()}
-                    >
-                      Reject KYC
-                    </OutlinedButton>
-                  </div>
-                </div>
-              </fieldset>
-            )}
           </div>
         </sky-tile-card>
       )}
@@ -953,14 +858,6 @@ export function VendorProfileForm({
                   ? 'Save profile'
                   : 'Create vendor'))}
           </FilledButton>
-
-          {canSubmitForVerification && (
-            <OutlinedButton
-              onClick={onSubmitForVerification}
-            >
-              Submit for verification
-            </OutlinedButton>
-          )}
         </div>
       )}
     </div>

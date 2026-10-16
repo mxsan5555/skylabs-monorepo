@@ -39,22 +39,16 @@ export function VendorProfileTabs({
   token,
   selfService,
   canEdit,
-  canReviewKyc,
   saving,
   onSave,
-  onKycReview,
-  onSubmitForVerification,
   serverFieldErrors,
 }: {
   vendor: Vendor;
   token: string | null;
   selfService: boolean;
   canEdit: boolean;
-  canReviewKyc?: boolean;
   saving: boolean;
   onSave: (input: VendorFields) => void;
-  onKycReview?: (kycStatus: 'VERIFIED' | 'REJECTED', rejectionReason?: string) => void;
-  onSubmitForVerification?: () => void;
   /** See `VendorProfileForm`'s own doc comment on this same prop. */
   serverFieldErrors?: VendorFieldErrors | null;
 }) {
@@ -88,15 +82,12 @@ export function VendorProfileTabs({
         <VendorProfileForm
           vendor={vendor}
           canEdit={canEdit}
-          canReviewKyc={activeTab === 'kyc' && Boolean(canReviewKyc)}
           saving={saving}
           token={token}
           selfService={selfService}
           sections={[activeTab]}
           saveLabel="Save"
           onSave={onSave}
-          onKycReview={onKycReview}
-          onSubmitForVerification={onSubmitForVerification}
           serverFieldErrors={serverFieldErrors}
         />
       )}

@@ -41,7 +41,7 @@ export function MemberActivityTab({ token, memberId, refreshKey }: MemberActivit
   if (items.length === 0) return <p className="empty-state">No activity yet.</p>;
 
   return (
-    <ol className="admin-tab-panel activity-list" aria-label="Activity">
+    <ol className="activity-list" aria-label="Activity">
       {items.map((item, index) => (
         <li key={`${item.at}-${index}`} className="activity-list__item">
           <p>{item.summary}</p>

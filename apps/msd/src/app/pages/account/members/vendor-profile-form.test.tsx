@@ -25,7 +25,7 @@ const BASE_VENDOR: Vendor = {
   ownerUserId: 'user-1',
   kycStatus: 'PENDING',
   kycRejectionReason: null,
-  status: 'PROFILE_INCOMPLETE',
+  status: 'ACTIVE',
   statusReason: null,
   createdByUserId: null,
   createdAt: '2026-01-01T00:00:00Z',
@@ -70,7 +70,6 @@ describe('VendorProfileForm — scoped save (Part 2 root-cause fix)', () => {
       <VendorProfileForm
         vendor={BASE_VENDOR}
         canEdit
-        canReviewKyc={false}
         saving={false}
         token="tok"
         sections={['business']}
@@ -100,7 +99,6 @@ describe('VendorProfileForm — scoped save (Part 2 root-cause fix)', () => {
       <VendorProfileForm
         vendor={BASE_VENDOR}
         canEdit
-        canReviewKyc={false}
         saving={false}
         token="tok"
         sections={['bank']}
@@ -135,7 +133,6 @@ describe('VendorProfileForm — Create Vendor button gating', () => {
       <VendorProfileForm
         vendor={null}
         canEdit
-        canReviewKyc={false}
         saving={false}
         token="tok"
         selfService
@@ -175,7 +172,6 @@ describe('VendorProfileForm — Create Vendor button gating', () => {
       <VendorProfileForm
         vendor={completeVendor}
         canEdit
-        canReviewKyc={false}
         saving={false}
         token="tok"
         selfService
@@ -192,28 +188,21 @@ describe('VendorProfileForm — Create Vendor button gating', () => {
     expect(saveButton.disabled).toBe(false);
   });
 
-  it('shows Approval Status as a distinct label from Profile Completion — 100% complete is never conflated with approved', () => {
-    const pendingVendor: Vendor = {
-      ...BASE_VENDOR,
-      status: 'PENDING_VERIFICATION',
-      profileCompletion: {
-        percent: 100,
-        sections: [{ key: 'business', label: 'Business Details', complete: true }],
-      },
-    };
+  it('shows a plain member status line with no approval or completion wording', () => {
     render(
       <VendorProfileForm
-        vendor={pendingVendor}
+        vendor={{ ...BASE_VENDOR, status: 'INACTIVE' }}
         canEdit
-        canReviewKyc={false}
         saving={false}
         token="tok"
         sections={['business']}
         onSave={vi.fn()}
       />,
     );
-    expect(screen.getByText('Approval Status: Pending Approval')).toBeTruthy();
-    expect(screen.getByText('Profile Completion: 100%')).toBeTruthy();
+    expect(screen.getByText('Status: Inactive')).toBeTruthy();
+    expect(screen.queryByText(/approval/i)).toBeNull();
+    expect(screen.queryByText(/profile completion/i)).toBeNull();
+    expect(screen.queryByText(/submit for verification/i)).toBeNull();
   });
 
   it('never renders Legal Name / Business Type / GST / PAN text fields — KYC is file upload only', () => {
@@ -221,7 +210,6 @@ describe('VendorProfileForm — Create Vendor button gating', () => {
       <VendorProfileForm
         vendor={BASE_VENDOR}
         canEdit
-        canReviewKyc={false}
         saving={false}
         token="tok"
         sections={['business', 'kyc']}
@@ -255,7 +243,6 @@ describe('VendorProfileForm — a stale other-section error never blocks the cur
       <VendorProfileForm
         vendor={BASE_VENDOR}
         canEdit
-        canReviewKyc={false}
         saving={false}
         token="tok"
         sections={['owner']}
@@ -271,7 +258,6 @@ describe('VendorProfileForm — a stale other-section error never blocks the cur
       <VendorProfileForm
         vendor={BASE_VENDOR}
         canEdit
-        canReviewKyc={false}
         saving={false}
         token="tok"
         sections={['business']}
@@ -317,7 +303,6 @@ describe('VendorProfileForm — Map Location URL', () => {
       <VendorProfileForm
         vendor={vendorWithLocation}
         canEdit
-        canReviewKyc={false}
         saving={false}
         token="tok"
         sections={['address']}
@@ -345,7 +330,6 @@ describe('VendorProfileForm — Map Location URL', () => {
       <VendorProfileForm
         vendor={BASE_VENDOR}
         canEdit
-        canReviewKyc={false}
         saving={false}
         token="tok"
         sections={['address']}

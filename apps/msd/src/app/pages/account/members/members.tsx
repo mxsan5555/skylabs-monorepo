@@ -15,6 +15,7 @@ import { listMembers, type MemberListFilter } from '../../../../api/rbac/members
 import { ChipNav } from '../../../components/chip-nav/chip-nav';
 import { MemberList, type MemberTableParams } from './member-list';
 import { VendorProfileForm, extractVendorFieldErrors, type VendorFieldErrors } from './vendor-profile-form';
+import { MEMBER_STATUS_LABEL } from './member-status';
 import { VendorBranches } from './vendor-branches';
 
 /**
@@ -144,10 +145,9 @@ export interface UseMyVendorResult {
   error: string;
   fieldErrors: VendorFieldErrors | null;
   save: (input: VendorFields) => Promise<void>;
-  submit: () => Promise<void>;
 }
 
-/** The logged-in vendor's own profile: fetch/save/submit-for-verification. Single source of
+/** The logged-in vendor's own profile: fetch and save. Single source of
  *  truth for `GET /vendors/me`, shared by the combined "My Business" page below and the split
  *  "Business Profile" / "Branches & Deals" self-service pages — kept here (rather than
  *  duplicated in each page) so there's exactly one `getMyVendor` fetch implementation to
@@ -187,14 +187,9 @@ export function useMyVendor(token: string | null): UseMyVendorResult {
     setError('');
     setFieldErrors(null);
     try {
-      // Bridge until Task 18: staff create every member, so a missing profile cannot be created here.
-      if (notFound) {
-        setError('Our team sets up your business profile. Contact support to get started.');
-      } else {
-        const { data } = await updateMyVendor(token, input);
-        setVendor(data);
-        setMessage('Profile saved.');
-      }
+      const { data } = await updateMyVendor(token, input);
+      setVendor(data);
+      setMessage('Profile saved.');
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not save your profile.');
       setFieldErrors(extractVendorFieldErrors(err));
@@ -203,17 +198,11 @@ export function useMyVendor(token: string | null): UseMyVendorResult {
     }
   };
 
-  const submit = async () => {
-    setError('');
-    // Bridge until Task 18: members no longer submit for verification, so saving is enough.
-    setMessage('Your profile is saved. No verification step is needed.');
-  };
-
-  return { vendor, notFound, loading, saving, message, error, fieldErrors, save, submit };
+  return { vendor, notFound, loading, saving, message, error, fieldErrors, save };
 }
 
 function SelfVendorManagement({ token }: { token: string | null }) {
-  const { vendor, notFound, loading, saving, message, error, fieldErrors, save, submit } = useMyVendor(token);
+  const { vendor, notFound, loading, saving, message, error, fieldErrors, save } = useMyVendor(token);
   const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
@@ -238,28 +227,33 @@ function SelfVendorManagement({ token }: { token: string | null }) {
       <header className="page-head">
         <div>
           <h1>My Business</h1>
-          <p>{notFound ? 'Complete your business profile to get started.' : `Status: ${vendor?.status}`}</p>
+          {vendor && <p>{`Status: ${MEMBER_STATUS_LABEL[vendor.status]}`}</p>}
         </div>
       </header>
 
       {message && <p className="field-hint" role="status">{message}</p>}
       {error && <p className="error-state" role="alert">{error}</p>}
+      {notFound && (
+        <p className="error-state" role="alert">
+          Your member profile was not found. Please contact support.
+        </p>
+      )}
 
       {/* Same field set as Superadmin's Create/Edit Vendor form (vendor-pipeline.tsx Step 1) —
           this app's "no duplicate vendor profile form" rule means every section is present here
           too, not a trimmed-down subset. */}
+      {!notFound && (
       <VendorProfileForm
         vendor={vendor}
         canEdit
-        canReviewKyc={false}
         saving={saving}
         token={token}
         selfService
         sections={['business', 'owner', 'address', 'kyc', 'bank']}
         onSave={save}
-        onSubmitForVerification={submit}
         serverFieldErrors={fieldErrors}
       />
+      )}
 
       {vendor && vendor.status === 'ACTIVE' && (
         <>

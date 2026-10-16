@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Vendor } from '../../../../api/rbac/vendors';
 import { BreadcrumbProvider } from '../../../admin/breadcrumb-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 import { MemberDetailPage } from './member-detail-page';
 
 const getMemberMock = vi.fn();
@@ -91,6 +92,7 @@ function renderAt(path: string) {
         </Routes>
         <Where />
       </MemoryRouter>
+      <SnackbarHost />
     </BreadcrumbProvider>,
   );
 }
@@ -201,6 +203,7 @@ describe('MemberDetailPage', () => {
     fireEvent.click(screen.getByText('stub-change'));
     await waitFor(() => expect(screen.getByText('activity-tab 1')).toBeTruthy());
     expect(changeStatusMock).toHaveBeenCalledWith('t', 'm1', 'INACTIVE', 'Owner asked for a pause');
+    expect(document.querySelector('sky-snackbar')?.textContent).toContain('Member is inactive and view only.');
     expect(getMemberMock).toHaveBeenCalledTimes(2);
     await waitFor(() => expect([...document.querySelectorAll('sky-badge')].map((b) => b.textContent)).toContain('Inactive'));
   });

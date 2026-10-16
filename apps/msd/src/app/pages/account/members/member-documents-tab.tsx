@@ -144,7 +144,7 @@ export function MemberDocumentsTab({ token, memberId, canEdit, canApprove, canRe
   const reasonValid = reasonText.length >= REASON_MIN && reasonText.length <= REASON_MAX;
 
   return (
-    <section className="admin-tab-panel" aria-label="Documents">
+    <section aria-label="Documents">
       {notice && (
         <p className="field-hint" role="status">
           {notice}

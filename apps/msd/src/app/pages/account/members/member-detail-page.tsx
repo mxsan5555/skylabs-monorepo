@@ -63,7 +63,6 @@ export function MemberDetailPage() {
   const [member, setMember] = useState<Vendor | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<VendorFieldErrors | null>(null);
@@ -113,7 +112,7 @@ export function MemberDetailPage() {
   }
 
   const refreshed = async (done: string) => {
-    setMessage(done);
+    showSnackbar(done, { variant: 'success' });
     setError('');
     setActivityKey((k) => k + 1);
     await load(true);
@@ -139,7 +138,6 @@ export function MemberDetailPage() {
       await updateVendor(token, member.id, input);
       await refreshed('Profile saved.');
     } catch (err) {
-      setMessage('');
       setError(err instanceof ApiRequestError ? err.message : 'Could not save the profile.');
       setFieldErrors(extractVendorFieldErrors(err));
     } finally {
@@ -194,11 +192,6 @@ export function MemberDetailPage() {
           website hides their items.
         </p>
       )}
-      {message && (
-        <p className="field-hint" role="status">
-          {message}
-        </p>
-      )}
       {error && (
         <p className="error-state" role="alert">
           {error}
@@ -234,7 +227,6 @@ export function MemberDetailPage() {
           <VendorProfileForm
             vendor={member}
             canEdit={canEdit}
-            canReviewKyc={false}
             saving={saving}
             token={token}
             sections={['business', 'owner', 'address', 'bank']}
