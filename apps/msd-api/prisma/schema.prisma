@@ -36,7 +36,7 @@ model User {
   orders                 Order[]
   refreshSessions        RefreshSession[]
   roles                  UserRole[]
-  vendorProfile          Vendor?                @relation("VendorOwner")
+  vendorProfile          Member?                @relation("VendorOwner")
   wishlistItems          WishlistItem[]
   supportRequests        SupportRequest[]
 
@@ -250,7 +250,7 @@ model ImpersonationSession {
   @@index([targetUserId])
 }
 
-model Vendor {
+model Member {
   id                         String                 @id @default(uuid())
   /// The User who logs in and manages this business. Null until an admin-created
   /// vendor is claimed, or set immediately on self-registration (== req.user.sub).
@@ -298,9 +298,18 @@ model Vendor {
   bankAccountNumber          String?
   bankIfsc                   String?
   upiId                      String?
-  status                     VendorStatus           @default(PROFILE_INCOMPLETE)
-  /// Reason recorded on reject/suspend — never on approve/activate.
+  status                     MemberStatus           @default(ACTIVE)
+  /// Reason recorded on inactive, suspend and archive. Cleared when the member becomes ACTIVE.
   statusReason               String?
+  statusChangedAt            DateTime?
+  statusChangedByUserId      String?
+  archivedAt                 DateTime?
+  /// Documents are a follow-up, never a gate: due 14 days after the member is created.
+  documentsDueAt             DateTime?
+  /// Set by the reminder job after the final warning. Never suspends on its own.
+  reviewFlaggedAt            DateTime?
+  welcomeSentAt              DateTime?
+  statusHistory              MemberStatusHistory[]
   /// Admin who created this vendor profile, if admin-created (self-registration leaves this null).
   createdByUserId            String?
   createdAt                  DateTime               @default(now())
@@ -327,12 +336,13 @@ model Vendor {
   therapists                 Therapist[]
   owner                      User?                  @relation("VendorOwner", fields: [ownerUserId], references: [id])
   categoryAccess             VendorCategoryAccess[]
-  documents                  VendorDocument[]
+  documents                  MemberDocument[]
   mediaImages                VendorImage[]
   mediaVideo                 VendorVideo?
 
   @@index([status])
   @@index([ownerUserId])
+  @@map("Vendor")
 }
 
 /// A real uploaded KYC document (GST/PAN/Aadhaar) — one row per `documentType`, replacing the
@@ -341,20 +351,49 @@ model Vendor {
 /// schema's established convention (see `DealImage`'s doc comment) — and one row per type (not
 /// many-with-ordering like `VendorImage`) since exactly one active file per document type is the
 /// whole model: re-uploading the same type replaces it via the `@@unique` below.
-model VendorDocument {
-  id               String             @id @default(uuid())
+model MemberDocument {
+  id               String               @id @default(uuid())
   vendorId         String
   documentType     VendorDocumentType
   storageKey       String
   originalFilename String?
   mimeType         String
   sizeBytes        Int
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  vendor           Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  status           MemberDocumentStatus @default(SUBMITTED)
+  /// `XXXX XXXX 1234` for Aadhaar, `ABXXXXX34F` for PAN, the number itself for GST.
+  numberMasked     String?
+  /// HMAC of type + number. Enforces one number per member, never returned by the API.
+  numberHash       String?
+  /// AES-256-GCM of the full number. Never returned by the API.
+  numberEncrypted  String?
+  rejectionReason  String?
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  expiresAt        DateTime?
+  uploadedByUserId String?
+  uploadedOnBehalf Boolean              @default(false)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  vendor           Member               @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@unique([vendorId, documentType])
+  @@unique([documentType, numberHash])
   @@index([vendorId])
+  @@index([status, expiresAt])
+  @@map("VendorDocument")
+}
+
+model MemberStatusHistory {
+  id          String       @id @default(uuid())
+  memberId    String
+  fromStatus  MemberStatus
+  toStatus    MemberStatus
+  reason      String?
+  actorUserId String?
+  createdAt   DateTime     @default(now())
+  member      Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId, createdAt])
 }
 
 /// One uploaded image for a Vendor's public profile — part of the shared Deal/Product/
@@ -373,7 +412,7 @@ model VendorImage {
   isPrimary        Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-  vendor           Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor           Member   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@index([vendorId])
 }
@@ -388,7 +427,7 @@ model VendorVideo {
   sizeBytes        Int
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-  vendor           Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor           Member   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 }
 
 model Branch {
@@ -414,7 +453,7 @@ model Branch {
   /// no-upload-pipeline-style Json field as Vendor.kycDocuments/Deal.images. Nullable: existing
   /// seeded branches predate this column.
   openingHours   Json?
-  vendor         Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor         Member      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   deals          Deal[]
   orders         Order[]
   orderItems     OrderItem[]
@@ -462,7 +501,7 @@ model Therapist {
   popularTagLinks          PopularTagTherapist[]
   branch                   Branch                @relation(fields: [branchId], references: [id], onDelete: Cascade)
   specializationCategory   Category?             @relation("TherapistSpecialization", fields: [specializationCategoryId], references: [id])
-  vendor                   Vendor                @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor                   Member                @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   mediaImages              TherapistImage[]
   packages                 TherapistPackage[]
   mediaVideo               TherapistVideo?
@@ -852,7 +891,7 @@ model VendorCategoryAccess {
   categoryId String
   createdAt  DateTime @default(now())
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  vendor     Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor     Member   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@unique([vendorId, categoryId])
   @@index([vendorId])
@@ -1136,7 +1175,7 @@ model Deal {
   branch                  Branch             @relation(fields: [branchId], references: [id], onDelete: Cascade)
   category                Category           @relation("DealCategory", fields: [categoryId], references: [id])
   subcategory             Category?          @relation("DealSubcategory", fields: [subcategoryId], references: [id])
-  vendor                  Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor                  Member             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   mediaImages             DealImage[]
   packages                DealPackage[]
   mediaVideo              DealVideo?
@@ -1278,7 +1317,7 @@ model Product {
   popularTagLinks PopularTagProduct[]
   category        Category            @relation("ProductCategory", fields: [categoryId], references: [id])
   subcategory     Category?           @relation("ProductSubcategory", fields: [subcategoryId], references: [id])
-  vendor          Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor          Member              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   mediaImages     ProductImage[]
   wishlistItems   WishlistItem[]
   mediaVideo      ProductVideo?
@@ -1477,7 +1516,7 @@ model Order {
   pendingForCart     Cart?
   branch             Branch?     @relation(fields: [branchId], references: [id])
   customer           User        @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  vendor             Vendor      @relation(fields: [vendorId], references: [id])
+  vendor             Member      @relation(fields: [vendorId], references: [id])
   items              OrderItem[]
   payments           Payment[]
 
@@ -1539,7 +1578,7 @@ model OrderItem {
   order              Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
   therapist          Therapist?        @relation(fields: [therapistId], references: [id])
   therapistPackage   TherapistPackage? @relation(fields: [therapistPackageId], references: [id])
-  vendor             Vendor            @relation(fields: [vendorId], references: [id])
+  vendor             Member            @relation(fields: [vendorId], references: [id])
   product            Product?          @relation(fields: [productId], references: [id])
 
   @@index([orderId])
@@ -1626,14 +1665,18 @@ enum LoginMethod {
   google
 }
 
-enum VendorStatus {
-  PROFILE_INCOMPLETE
-  PENDING_VERIFICATION
-  APPROVED
-  REJECTED
+enum MemberStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
+  ARCHIVED
+}
+
+enum MemberDocumentStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  EXPIRED
 }
 
 enum KycStatus {
@@ -1716,6 +1759,9 @@ enum NotificationType {
   DEAL_PENDING_APPROVAL
   ORDER_RECEIVED
   VENDOR_PENDING_APPROVAL
+  MEMBER_SUSPENDED
+  DOCUMENT_APPROVED
+  DOCUMENT_REJECTED
 }
 
 enum VendorDocumentType {
