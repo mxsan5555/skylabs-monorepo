@@ -6,6 +6,8 @@ import { ApiError } from '../lib/http';
 import type { OtpPurpose } from '../schemas/auth.schema';
 import { sendOtp as sendSmsOtp } from '../providers/sms/connectExpress.provider';
 import { sendOtpEmail } from '../providers/email/smtp.provider';
+import { suspendedMessage } from '../lib/member-messages';
+import { readMemberAccessState } from './member-access.service';
 
 const OTP_HASH_ROUNDS = 10;
 
@@ -14,7 +16,26 @@ function isPhoneIdentifier(identifier: string): boolean {
   return !identifier.includes('@');
 }
 
+/**
+ * A suspended or archived member gets no OTP: no challenge row, no SMS, no email. This tells
+ * anyone who knows the identifier that it belongs to a suspended member, which the spec accepts;
+ * `otpRequestRateLimiter` limits probing.
+ */
+async function assertMemberMayRequestOtp(identifier: string): Promise<void> {
+  const owner = await prisma.user.findFirst({
+    where: isPhoneIdentifier(identifier) ? { phone: identifier, deletedAt: null } : { email: identifier, deletedAt: null },
+    select: { id: true },
+  });
+  if (!owner) return;
+  const access = await readMemberAccessState(owner.id);
+  if (access.kind === 'blocked') {
+    throw new ApiError('MEMBER_SUSPENDED', suspendedMessage(access.reason));
+  }
+}
+
 export async function requestOtp(identifier: string, purpose: OtpPurpose): Promise<void> {
+  await assertMemberMayRequestOtp(identifier);
+
   const otp = crypto.randomInt(100000, 999999).toString();
   
   const hashedOtp = await bcrypt.hash(otp, OTP_HASH_ROUNDS);
