@@ -34,6 +34,7 @@ import { useWishlist } from '../../../wishlist/wishlist-context';
 import { useHydrated } from '../../../hooks/use-hydrated';
 import { useMediaQuery } from '../../../hooks/use-media-query';
 import { Breadcrumb } from '../../components/breadcrumb';
+import { TherapistAddToCartDialog } from '../../components/therapist-add-to-cart-dialog';
 import { CardGrid } from '../../components/card-grid/card-grid';
 import { PageSection } from '../../components/page-section/page-section';
 import { SectionHead } from '../../components/section-head/section-head';
@@ -145,6 +146,7 @@ export function Category() {
   const [categoryError, setCategoryError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const cityUnresolved = !!citySlugParam && !cityLocation;
+  const [selectedTherapist, setSelectedTherapist] = useState<CatalogTherapist | null>(null);
   // Locations arrive with the catalog shell; until then a city URL can't be resolved.
   const cityPending = cityUnresolved && locationsStatus === 'loading';
   // Only a successful locations fetch can prove a city doesn't exist. If it failed, the page
@@ -243,7 +245,7 @@ export function Category() {
     return false;
   };
   const addProductToCart = async (product: CatalogProduct) => {
-     console.log('ADD TO CART FUNCTION CALLED', product.name);
+    console.log('ADD TO CART FUNCTION CALLED', product.name);
     if (!requireAuthOrRedirect()) return;
 
     try {
@@ -266,17 +268,17 @@ export function Category() {
       showSnackbar(message, { variant: 'error' });
     }
   };
-const toggleFavorite = (deal: CatalogDeal) => {
-  console.log('Deal favorite clicked:', deal.id);
+  const toggleFavorite = (deal: CatalogDeal) => {
+    console.log('Deal favorite clicked:', deal.id);
 
-  if (!requireAuthOrRedirect()) {
-    console.log('User is not authenticated');
-    return;
-  }
+    if (!requireAuthOrRedirect()) {
+      console.log('User is not authenticated');
+      return;
+    }
 
-  console.log('Calling toggleWishlist');
-  void toggleWishlist(deal.id);
-};  
+    console.log('Calling toggleWishlist');
+    void toggleWishlist(deal.id);
+  };
   const toggleProductFavorite = async (productId: string) => {
     if (!requireAuthOrRedirect()) return;
 
@@ -309,6 +311,12 @@ const toggleFavorite = (deal: CatalogDeal) => {
     radius,
     vendorIds.join(),
     branchIds.join(),
+  ]);
+  const therapistListKey = JSON.stringify([
+    category?.id,
+    activeSubcategory?.id,
+    lat,
+    lng,
   ]);
   // The prerendered first page only describes the default ("All", unsorted, no location) view.
   const isDefaultView =
@@ -356,14 +364,74 @@ const toggleFavorite = (deal: CatalogDeal) => {
     },
   );
   const therapistList = usePagedList<CatalogTherapist>(
-    (page) => listCatalogTherapists({ ...common, page, latitude: lat, longitude: lng }),
-    listKey,
-    { enabled: category?.type === 'THERAPY', errorMessage: loadError },
+    (page) =>
+      listCatalogTherapists({
+        ...common,
+        page,
+        latitude: lat,
+        longitude: lng,
+      }),
+    therapistListKey,
+    {
+      enabled: category?.type === 'THERAPY',
+      errorMessage: loadError,
+    },
   );
   const list = isTherapyCategory ? therapistList : isProductCategory ? productList : dealList;
   const deals = dealList.items;
   const products = productList.items;
   const therapists = therapistList.items;
+
+  const sortedTherapists = useMemo(() => {
+    const items = [...therapistList.items];
+
+    if (!sort || sort === 'relevance') {
+      return items;
+    }
+
+    const getDistance = (therapist: CatalogTherapist) =>
+      therapist.distanceKm != null
+        ? Number(therapist.distanceKm)
+        : null;
+
+    const compareNullable = (
+      a: number | null,
+      b: number | null,
+      direction: 1 | -1,
+    ) => {
+      // Missing values always remain at the end.
+      if (a == null && b == null) return 0;
+      if (a == null) return 1;
+      if (b == null) return -1;
+
+      return (a - b) * direction;
+    };
+
+    return items
+      .map((therapist, index) => ({ therapist, index }))
+      .sort((a, b) => {
+        let result = 0;
+
+        if (sort === 'price_asc' || sort === 'price_desc') {
+          result = compareNullable(
+            therapistFromPrice(a.therapist),
+            therapistFromPrice(b.therapist),
+            sort === 'price_asc' ? 1 : -1,
+          );
+        } else if (sort === 'distance') {
+          result = compareNullable(
+            getDistance(a.therapist),
+            getDistance(b.therapist),
+            1,
+          );
+        }
+
+        // Preserve the existing API order when values are equal.
+        return result || a.index - b.index;
+      })
+      .map(({ therapist }) => therapist);
+  }, [therapistList.items, sort]);
+
   const mapPoints = useMemo<DealMapPoint[]>(
     () =>
       deals.flatMap((d) =>
@@ -513,13 +581,18 @@ const toggleFavorite = (deal: CatalogDeal) => {
   const cardLayout = view === 'list' ? 'horizontal' : undefined;
 
   const cards = isTherapyCategory
-    ? therapists.map((therapist) => {
+    ? sortedTherapists.map((therapist) => {
       const price = therapistFromPrice(therapist);
+      const media = resolveTherapistMedia(therapist);
+      const images = media.images ?? [];
 
       return (
         <SkyProductCardWC
+          variant='outlined'
           key={therapist.id}
-          image={primaryImage(resolveTherapistMedia(therapist))}
+          image={undefined}
+          imageAlt={therapist.personName ?? therapist.therapistType}
+          gallery={images}
           eyebrow={therapist.personName}
           eyebrowHref={
             therapist.vendor?.slug
@@ -534,14 +607,28 @@ const toggleFavorite = (deal: CatalogDeal) => {
               : undefined
           }
           tag={therapist.popularTags?.[0]?.name}
-          pricePrefix={
-            price != null ? t.therapistPricePrefix : undefined
-          }
+          pricePrefix={price != null ? t.therapistPricePrefix : undefined}
           price={price != null ? formatINR(price) : undefined}
           href={`/therapist/${therapist.id}`}
           layout={cardLayout}
-        />
+        >
+          <TherapistAddToCartDialog
+            therapist={therapist}
+            renderTrigger={(open) => (
+              <FilledButton
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  open();
+                }}
+              >
+                {t.actions.viewPackages}
+              </FilledButton>
+            )}
+          />
+        </SkyProductCardWC>
       );
+
     })
     : isProductCategory
       ? products.map((product) => {
@@ -762,17 +849,17 @@ const toggleFavorite = (deal: CatalogDeal) => {
                 value={view}
                 onChange={(v) => setParam('view', v === 'grid' ? undefined : v)}
               />
-              {!isTherapyCategory && (
-                <ChoiceMenu
-                  trigger="text"
-                  icon="swap_vert"
-                  label={t.toolbar.sort.replace('{label}', sortOption.label)}
-                  menuLabel={t.toolbar.sortMenu}
-                  options={sortMenuOptions}
-                  value={sortOption.value}
-                  onChange={(value) => setParam('sort', value === 'relevance' ? undefined : value)}
-                />
-              )}
+
+              <ChoiceMenu
+                trigger="text"
+                icon="swap_vert"
+                label={t.toolbar.sort.replace('{label}', sortOption.label)}
+                menuLabel={t.toolbar.sortMenu}
+                options={sortMenuOptions}
+                value={sortOption.value}
+                onChange={(value) => setParam('sort', value === 'relevance' ? undefined : value)}
+              />
+
             </>
           }
         />

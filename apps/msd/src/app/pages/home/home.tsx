@@ -23,7 +23,7 @@ import { faqPageJsonLd, itemListJsonLd, type JsonLdObject } from '../../seo/json
 import { SITE_URL } from '../../seo/site-url';
 import { CategoryTiles } from './category-tiles';
 import { DealsNearYou } from './deals-near-you';
-import { HomeFaq } from './home-faq';
+// import { HomeFaq } from './home-faq';
 import { HomeHero } from './home-hero';
 import { HomeOffers } from './home-offers';
 import { HowItWorks } from './how-it-works';
@@ -296,7 +296,7 @@ console.log('Product:', product.name, {
         </PageSection>
       )}
       <TreatmentDirectory groups={catalog.popularTreatments} />
-      {ready && <HomeFaq faqs={catalog.faqs} />}
+      {/* {ready && <HomeFaq faqs={catalog.faqs} />} */}
       <PageSection flush aria-labelledby="partner-heading">
         {/* Heading and body are slotted light DOM so the section has a real h2. */}
         <sky-cta-banner

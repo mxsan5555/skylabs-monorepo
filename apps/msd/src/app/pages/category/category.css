@@ -103,9 +103,8 @@
 }
 
 .category-page__grid-wrap {
-  padding: 32px 0 48px;
+  padding: 20px 0 32px;
 }
-
 .category-page__grid-inner {
   width: min(1200px, 100% - 48px);
   margin: 0 auto;
@@ -122,7 +121,17 @@
   justify-content: center;
   padding: 40px 0;
 }
+/* Compact therapist cards in list view */
+.category-page .sky-product-card-wc {
+  min-height: 0;
+  height: auto;
+  align-self: start;
+}
 
+.category-page sky-product-card {
+  min-height: 0;
+  height: auto;
+}
 @media (max-width: 768px) {
   .category-page__hero {
     padding: 28px 16px;

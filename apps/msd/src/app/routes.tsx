@@ -60,6 +60,7 @@ import Search from './pages/search/search';
 import Category from './pages/category/category';
 import { CategoriesIndex } from './pages/categories/categories';
 import About from './pages/about/about';
+import HelpCenter from './pages/help-center/help-center';
 import Contact from './pages/contact/contact';
 import Careers from './pages/careers/careers';
 import { BecomeVendor } from './pages/become-vendor/become-vendor';
@@ -251,6 +252,7 @@ export function AppRoutes() {
           <Route path="/blog" element={<Blog />} />
           <Route path="/blog/:slug" element={<BlogDetail />} />
           <Route path="/about" element={<About />} />
+           <Route path="/help-center" element={<HelpCenter />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/careers" element={<Careers />} />
           {/* Public, unauthenticated Vendor self-registration ("Become a Vendor") — the storefront

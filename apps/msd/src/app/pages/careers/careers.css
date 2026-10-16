@@ -1,96 +1,252 @@
-.careers {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 24px 16px 72px;
+
+/* ========================================
+   Careers Page
+======================================== */
+
+.careers-page {
+  width: 100%;
 }
 
-.careers__hero {
+.careers-container {
+  width: min(1180px, calc(100% - 48px));
+  margin-inline: auto;
+}
+
+.careers-eyebrow {
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1.6;
+  text-transform: uppercase;
+}
+
+/* ========================================
+   Section Headings
+======================================== */
+
+.careers-section-heading h2,
+.careers-roadmap-heading h2,
+.careers-enquiry-copy h2 {
+  margin: 0;
+  font-size: clamp(1.65rem, 3vw, 2.3rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.3;
+}
+
+/* ========================================
+   Careers Roadmap
+======================================== */
+
+.careers-roadmap {
+  padding-block: clamp(30px, 5vw, 30px);
+}
+
+.careers-roadmap-heading {
+  margin-bottom: 28px;
+  text-align: center;
+}
+
+.careers-roadmap-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.careers-roadmap-grid > sky-feature-card {
+  display: block;
+  min-width: 0;
+}
+
+/* ========================================
+   Current Openings
+======================================== */
+
+.careers-openings {
+  padding-block: clamp(30px, 5vw, 30px);
+  scroll-margin-top: 28px;
+}
+
+.careers-section-heading {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  margin: 8px 0 32px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
 }
 
-.careers__hero h1 {
-  margin: 0;
-  font-size: clamp(1.9rem, 5vw, 2.6rem);
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-  color: var(--md-sys-color-on-surface, #1a1c19);
-}
-
-.careers__subtitle {
-  margin: 0;
-  font-size: 1.075rem;
-  color: var(--md-sys-color-on-surface-variant, #424940);
-}
-
-.careers__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
+.careers-static-job-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
-.job-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 20px;
+.careers-static-job-grid > sky-cta-banner {
+  display: block;
+  width: 100%;
+  min-width: 0;
 }
 
-.job-card__title {
-  margin: 0;
-  font-size: 1.25rem;
-  color: var(--md-sys-color-on-surface, #1a1c19);
-}
-
-.job-card__meta {
+.careers-job-actions {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 16px;
-  margin: 0;
-  color: var(--md-sys-color-on-surface-variant, #424940);
-  font-size: 0.9rem;
+  width: 100%;
 }
 
-.job-card__meta-item {
-  display: inline-flex;
+.careers-job-info {
+  display: flex;
   align-items: center;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
 }
 
-.job-card__description {
-  margin: 4px 0 0;
-  color: var(--md-sys-color-on-surface-variant, #424940);
-  line-height: 1.6;
+/* ========================================
+   Enquiry Section
+======================================== */
+
+.careers-enquiry {
+  padding-block: clamp(32px, 5vw, 32px);
+  scroll-margin-top: 80px;
 }
 
-.job-card__apply {
-  display: inline-flex;
+.careers-enquiry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  min-height: 44px;
-  padding: 0 16px;
-  margin-top: 8px;
-  border-radius: 999px;
-  background-color: var(--md-sys-color-primary, #3a693c);
-  color: var(--md-sys-color-on-primary, #ffffff);
-  text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 500;
+  gap: clamp(28px, 5vw, 64px);
 }
 
-.job-card__apply:hover {
-  opacity: 0.9;
+.careers-enquiry-copy h2 {
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  line-height: 1.25;
 }
 
-.job-card__apply-instructions {
-  margin: 8px 0 0;
-  color: var(--md-sys-color-on-surface-variant, #424940);
-  font-size: 0.9rem;
+.careers-enquiry-copy h2 span {
+  display: block;
+  color: var(--md-sys-color-primary, #386b40);
+}
+
+.careers-enquiry-copy > p:last-child {
+  max-width: 440px;
+  margin: 20px 0 0;
+  line-height: 1.8;
+}
+
+/* Shared tile card used as the form container */
+
+.careers-enquiry-grid > sky-tile-card {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Form layout only; shared components style the fields and button */
+
+.careers-enquiry-form {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  width: 100%;
+}
+
+.careers-enquiry-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+
+.careers-enquiry-fields > *,
+.careers-enquiry-form > * {
+  min-width: 0;
+}
+
+/* ========================================
+   Smooth Scrolling
+======================================== */
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ========================================
+   Tablet
+======================================== */
+
+@media (max-width: 900px) {
+  .careers-roadmap-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .careers-container {
+    width: calc(100% - 40px);
+  }
+
+  .careers-enquiry-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ========================================
+   Mobile
+======================================== */
+
+@media (max-width: 600px) {
+  .careers-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+
+  .careers-roadmap-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .careers-job-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 520px) {
+  .careers-container {
+    width: calc(100% - 32px);
+  }
+
+  .careers-roadmap-heading {
+    margin-bottom: 22px;
+  }
+
+  .careers-enquiry-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ========================================
+   Reduced Motion Accessibility
+======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .careers-page *,
+  .careers-page *::before,
+  .careers-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
