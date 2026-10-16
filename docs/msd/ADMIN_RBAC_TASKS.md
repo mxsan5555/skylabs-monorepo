@@ -23,27 +23,27 @@ Created: 2026-10-12. Status: in progress (staff member management slice built 20
 
 ## Progress summary
 
-Total: **193 tasks**. Update the Done column as work lands.
+Total: **196 tasks**. Update the Done column as work lands.
 
 | Phase | Scope | Tasks | Done | % |
 |---|---|---|---|---|
 | P0 | Decisions and setup | 10 | 0 | 0 |
 | P1 | Roles, scope, seed, menu | 10 | 1 | 10 |
 | P2 | Authorization core and hardening | 17 | 2 | 12 |
-| P3 | Member rename and lifecycle | 22 | 12 | 55 |
+| P3 | Member rename and lifecycle | 24 | 12 | 50 |
 | P4 | Own-scope retrofit | 13 | 0 | 0 |
 | P5 | Member documents | 15 | 3 | 20 |
 | P6 | Reminders and scheduler | 8 | 0 | 0 |
 | P7 | Orders, refunds, payments, payouts, reports | 13 | 0 | 0 |
 | P8 | Staff, settings, logs, profile, content | 8 | 0 | 0 |
 | P9 | OpenAPI and contract | 8 | 0 | 0 |
-| P10 | Frontend | 46 | 4 | 9 |
+| P10 | Frontend | 47 | 4 | 9 |
 | P11 | Security and QA | 13 | 0 | 0 |
 | P12 | Release, ops, docs | 10 | 0 | 0 |
-| **Total** | | **193** | **22** | **11** |
+| **Total** | | **196** | **22** | **11** |
 
-By area: BE 82, FE 36, SEC 20, QA 17, DB 14, OPS 13, SH 4, BIZ 4, DOC 3.
-By size: S 60, M 115, L 18.
+By area: BE 84, FE 37, SEC 20, QA 17, DB 14, OPS 13, SH 4, BIZ 4, DOC 3.
+By size: S 63, M 115, L 18.
 
 Suggested order: P0, then P1 and P2 in parallel with P10-07 (design spec), then P3 to P8 (backend), with P10 frontend tasks starting as each backend phase lands. P9 runs alongside P4 to P8. P11 and P12 close the release.
 
@@ -54,7 +54,7 @@ Status: built 2026-10-15, plan `docs/superpowers/plans/2026-10-15-staff-member-m
 - Done (21): P2-03, P2-04, P3-04, P3-06 to P3-11, P3-13, P3-17, P3-18, P3-20, P3-21, P5-05, P5-07, P5-11, P10-13 to P10-16.
 - Partly done (24, each "Done when" says what is left): P1-02, P1-03, P1-05, P1-06, P1-07, P3-01, P3-02, P3-03, P3-12, P3-19, P5-01, P5-02, P5-06, P5-08, P5-09, P6-03, P10-03, P10-04, P10-05, P10-11, P10-12, P10-17, P10-18, P10-19.
 - Not done (4): P3-05 (service files keep `vendor` names, see P3-22), P10-02 (validators stay local to the form), P10-07 (no separate design spec), P10-39 (member copy is inline, not in `content.json`).
-- Follow-ups added (10): P3-22, P3-23, P4-13, P5-14, P5-15, P6-08, P10-43 to P10-46. Before production: P10-43, P10-44, P10-45.
+- Follow-ups added (13): P3-22 to P3-25, P4-13, P5-14, P5-15, P6-08, P10-43 to P10-47. Before production: P10-43, P10-44, P10-45.
 - Deferred: P3-15, P3-16, P5-03, P5-04, P5-10, P5-12, P5-13, P6-01, P6-02, P6-04 to P6-07, all of P4, P7 and P8.
 - Removed: P3-14 (superseded by the FK 409 guard and branch delete C-08).
 
@@ -138,6 +138,8 @@ Status: built 2026-10-15, plan `docs/superpowers/plans/2026-10-15-staff-member-m
 | [x] | P3-21 | BE | Remove `POST /vendors/me` and `POST /vendors/me/submit` and the vendor approve and reject routes (master plan C-11) | M | P3-12 | Routes return 404, OpenAPI updated |
 | [ ] | P3-22 | BE | Rename `vendor.service.ts`, `vendors.routes.ts` and the `Vendor*` Zod schemas to member names | S | P3-12 | No `vendor` in those file or schema names; existing tests green |
 | [ ] | P3-23 | FE | Move the member detail page and self-service calls in msd from `/vendors/:id` and `/vendors/me` to `/members/*` before the alias is removed | S | P3-12 | No `/vendors` request left in `apps/msd/src/api` (grep) |
+| [ ] | P3-24 | BE | Return structured fields (from status, to status, document type, actor id) from the member activity API so the client stops parsing summary sentences | S | P3-13 | Activity items carry the fields; `readableActivitySummary` removed from `apps/msd`; tests |
+| [ ] | P3-25 | BE | Hard delete of a member also removes the media files of its deals, products and therapists from R2, not only its own documents, images and video | S | P3-09 | Test: every storage key of the cascaded rows is deleted after commit; archive keeps all files |
 
 ## Phase 4: Own-scope retrofit
 
@@ -316,6 +318,7 @@ Status: built 2026-10-15, plan `docs/superpowers/plans/2026-10-15-staff-member-m
 | [ ] | P10-44 | OPS | Set `SUPPORT_EMAIL`, `SUPPORT_PHONE`, `FIELD_ENCRYPTION_KEY` and `DOC_HASH_PEPPER` on Railway before this slice ships | S | - | Staging and production boot with all 4 set |
 | [ ] | P10-45 | OPS | Run `prisma/member-status-report.ts` and get owner sign-off before applying the `member_lifecycle` migration; rehearse migration up and down on a Neon copy | M | P0-05 | Report saved, sign-off recorded, rehearsal log with row counts |
 | [ ] | P10-46 | QA | Fix pre-existing lint and test drift: eslint ignore error in shared-* packages and 31 msd lint errors; 26 msd tests in 15 files (permission-matrix, roles, widget-registry, settings, home, wishlist, become-vendor, india-locations, deal-card, sky-product-card-wc, media-uploader, site-footer, contact-us, app.spec, entry-server); msd-api `rbac.routes` and orders image tests; shared-menu `index.test.ts` | M | - | `nx run-many -t lint test` green for msd, msd-api and shared-* |
+| [ ] | P10-47 | FE | Rename "All Member" to "All members" in the sidebar title (`packages/shared-menu/src/msd-menu.json`) and the breadcrumbs of the branch, deal, product and therapist form pages | S | - | grep finds no "All Member" in `apps/msd/src` or `packages/shared-menu`; tests updated |
 
 ## Phase 11: Security and quality assurance
 
