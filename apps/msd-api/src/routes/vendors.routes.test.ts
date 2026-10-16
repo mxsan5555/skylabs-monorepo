@@ -13,6 +13,11 @@ vi.mock('../services/permission-resolver.service', () => ({
   resolveGrantedPermissionKeys: vi.fn(),
 }));
 
+// POST /vendors now runs createMember, which sends a welcome notice: never reach a real SMTP or SMS provider.
+vi.mock('../services/member-notice.service', () => ({
+  sendMemberNotice: vi.fn().mockResolvedValue({ email: true, sms: true }),
+}));
+
 // Same mock shape as vendor-kyc-documents.routes.test.ts / media.routes.test.ts / categories.
 // routes.test.ts — without this, the image/video upload routes tested below would write real
 // files under the real uploads directory on every test run.
@@ -250,72 +255,65 @@ describe('GET /api/v1/vendors (admin)', () => {
   });
 });
 
-describe('POST /api/v1/vendors (admin create)', () => {
-  it('creates a vendor and writes an audit log entry', async () => {
+/** POST /vendors is the deprecated alias of POST /members: it runs createMember with the short Add member form. */
+describe('POST /api/v1/vendors (admin create alias)', () => {
+  const FULL_BODY = {
+    businessName: 'Urban Wellness Spa',
+    ownerFirstName: 'Asha',
+    ownerLastName: 'Rao',
+    ownerEmail: 'asha@urban.test',
+    ownerMobile: '9222222222',
+  };
+
+  beforeEach(() => {
     resolveMock.mockResolvedValue(['members:create']);
+    prismaMock.user.create.mockResolvedValue({ id: USER_B_ID });
+    prismaMock.role.findUnique.mockResolvedValue({ id: 'member-role-id', key: 'member' });
+    prismaMock.userRole.upsert.mockResolvedValue({});
+    prismaMock.member.update.mockResolvedValue({});
     prismaMock.member.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: VENDOR_A_ID, ...data }),
     );
+  });
+
+  it('creates an ACTIVE member, writes an audit log entry and marks the response deprecated', async () => {
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Admin-created Vendor', gstNumber: '27AAAAA0000A1Z5', panNumber: 'AAAAA0000A' });
+      .send(FULL_BODY);
     expect(res.status).toBe(201);
     expect(res.body.data.status).toBe('ACTIVE');
+    expect(res.headers.deprecation).toBe('true');
     expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
   });
 
-  it('generates a non-null, businessName-derived slug — never leaves it null', async () => {
-    resolveMock.mockResolvedValue(['members:create']);
-    prismaMock.member.findUnique.mockResolvedValue(null); // no existing vendor owns this slug
-    prismaMock.member.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: VENDOR_A_ID, ...data }),
-    );
+  it('generates a non-null, businessName-derived slug', async () => {
+    prismaMock.member.findUnique.mockResolvedValue(null); // no existing member owns this slug
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Urban Wellness Spa' });
+      .send(FULL_BODY);
     expect(res.status).toBe(201);
     expect(res.body.data.slug).toBe('urban-wellness-spa');
   });
 
-  it('disambiguates the slug when the plain businessName-derived slug is already taken', async () => {
-    resolveMock.mockResolvedValue(['members:create']);
-    prismaMock.member.findUnique.mockResolvedValueOnce({ id: 'other-vendor', slug: 'urban-wellness-spa' });
-    prismaMock.member.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: VENDOR_A_ID, ...data }),
-    );
+  it('422s the old businessName-only draft body and creates nothing', async () => {
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Urban Wellness Spa' });
-    expect(res.status).toBe(201);
-    expect(res.body.data.slug).toMatch(/^urban-wellness-spa-[a-f0-9]{6}$/);
+      .send({ businessName: 'No Owner Info' });
+    expect(res.status).toBe(422);
+    expect(prismaMock.member.create).not.toHaveBeenCalled();
+    expect(prismaMock.user.create).not.toHaveBeenCalled();
   });
 
-  it('returns the existing row instead of creating a duplicate when the same admin submitted the same businessName in the last 10s (rapid double-click, no ownerUserId set)', async () => {
-    resolveMock.mockResolvedValue(['members:create']);
-    const recentVendor = { id: VENDOR_A_ID, businessName: 'Urban Wellness Spa', createdByUserId: 'admin-1', createdAt: new Date() };
-    // .mockResolvedValueOnce (not a persistent .mockResolvedValue) — this mock must not leak
-    // into later tests in this file via the outer `vi.clearAllMocks()`, which clears call
-    // history but not a still-configured resolved value.
-    prismaMock.member.findFirst.mockResolvedValueOnce(recentVendor);
+  it('422s a field outside the Add member allowlist', async () => {
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Urban Wellness Spa' });
-    expect(res.status).toBe(201);
-    expect(res.body.data.id).toBe(VENDOR_A_ID);
+      .send({ ...FULL_BODY, gstNumber: '27AAAAA0000A1Z5' });
+    expect(res.status).toBe(422);
     expect(prismaMock.member.create).not.toHaveBeenCalled();
-    expect(prismaMock.member.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          createdByUserId: 'admin-1',
-          businessName: 'Urban Wellness Spa',
-          createdAt: expect.objectContaining({ gte: expect.any(Date) }),
-        }),
-      }),
-    );
   });
 });
 
@@ -396,7 +394,7 @@ describe('POST /api/v1/vendors — owner is always a brand-new User (no existing
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Taken Email Vendor', ownerEmail: 'taken@example.com', ownerMobile: '9999999999' });
+      .send({ businessName: 'Taken Email Vendor', ownerFirstName: 'Asha', ownerLastName: 'Rao', ownerEmail: 'taken@example.com', ownerMobile: '9999999999' });
 
     expect(res.status).toBe(409);
     expect(res.body.error.message).toMatch(/already exists/);
@@ -411,7 +409,7 @@ describe('POST /api/v1/vendors — owner is always a brand-new User (no existing
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Taken Phone Vendor', ownerEmail: 'fresh@example.com', ownerMobile: '9888888888' });
+      .send({ businessName: 'Taken Phone Vendor', ownerFirstName: 'Asha', ownerLastName: 'Rao', ownerEmail: 'fresh@example.com', ownerMobile: '9888888888' });
 
     expect(res.status).toBe(409);
     expect(prismaMock.user.create).not.toHaveBeenCalled();
@@ -424,7 +422,7 @@ describe('POST /api/v1/vendors — owner is always a brand-new User (no existing
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Existing Customer Vendor', ownerEmail: 'vinay@example.com', ownerMobile: '9889259224' });
+      .send({ businessName: 'Existing Customer Vendor', ownerFirstName: 'Asha', ownerLastName: 'Rao', ownerEmail: 'vinay@example.com', ownerMobile: '9889259224' });
 
     expect(res.status).toBe(409);
     expect(prismaMock.user.create).not.toHaveBeenCalled();
@@ -439,26 +437,10 @@ describe('POST /api/v1/vendors — owner is always a brand-new User (no existing
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Mismatched Owner Vendor', ownerEmail: 'a@example.com', ownerMobile: '9876543210' });
+      .send({ businessName: 'Mismatched Owner Vendor', ownerFirstName: 'Asha', ownerLastName: 'Rao', ownerEmail: 'a@example.com', ownerMobile: '9876543210' });
 
     expect(res.status).toBe(409);
     expect(prismaMock.member.create).not.toHaveBeenCalled();
-  });
-
-  it('businessName given with neither ownerEmail nor ownerMobile creates an owner-less draft (Step 1 businessName-only) — createVendorOwner is never called', async () => {
-    prismaMock.member.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: VENDOR_A_ID, ...data }),
-    );
-
-    const res = await request(app)
-      .post('/api/v1/vendors')
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'No Owner Info' });
-
-    expect(res.status).toBe(201);
-    expect(res.body.data.ownerUserId).toBeUndefined();
-    expect(prismaMock.user.create).not.toHaveBeenCalled();
-    expect(prismaMock.userRole.upsert).not.toHaveBeenCalled();
   });
 });
 
@@ -761,24 +743,6 @@ describe('mapLocationUrl — update-time resolve/skip semantics + resolver-rejec
     expect(prismaMock.branch.update).not.toHaveBeenCalled();
   });
 
-  it('admin POST /vendors resolves a mapLocationUrl and persists the resolved latitude/longitude on the Vendor itself (not just Branch)', async () => {
-    resolveMock.mockResolvedValue(['members:create']);
-    resolveMapLocationMock.mockResolvedValue({ latitude: 26.7606, longitude: 83.3732 });
-    prismaMock.member.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: VENDOR_A_ID, ...data }),
-    );
-
-    const res = await request(app)
-      .post('/api/v1/vendors')
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Golghar Spa', mapLocationUrl: 'https://maps.app.goo.gl/o3WNRifqzdctDuiF9' });
-
-    expect(res.status).toBe(201);
-    expect(resolveMapLocationMock).toHaveBeenCalledWith('https://maps.app.goo.gl/o3WNRifqzdctDuiF9');
-    expect(res.body.data.latitude).toBe(26.7606);
-    expect(res.body.data.longitude).toBe(83.3732);
-  });
-
   it('admin PATCH /vendors/:id with an unchanged mapLocationUrl does not re-resolve', async () => {
     resolveMock.mockResolvedValue(['members:edit']);
     const existing = { ...vendorAFixture, mapLocationUrl: 'https://maps.app.goo.gl/existing', latitude: 1, longitude: 2 };
@@ -988,33 +952,6 @@ describe('GET /api/v1/vendors/users/search', () => {
 });
 
 describe('Admin onboarding pipeline — per-step saves', () => {
-  // Superseded by the "owner is always a brand-new User" correction — Step 1 no longer accepts
-  // a pre-picked `ownerUserId` at all (see `createVendor`'s own doc comment); it now always
-  // creates a fresh owner from `ownerEmail`/`ownerMobile`, still with no `businessName` yet.
-  it('Step 1 alone (ownerEmail/ownerMobile only, no businessName) creates a draft vendor with a brand-new owner', async () => {
-    resolveMock.mockResolvedValue(['members:create']);
-    prismaMock.user.findFirst
-      .mockResolvedValueOnce(null) // createVendorOwner: byEmail — no match
-      .mockResolvedValueOnce(null) // createVendorOwner: byPhone — no match
-      .mockResolvedValue({ id: USER_B_ID, roles: [] }); // ensureVendorRoleAssigned -> assignRole's getUserOrThrow
-    prismaMock.user.create.mockResolvedValue({ id: USER_B_ID });
-    prismaMock.role.findUnique.mockResolvedValue({ id: 'vendor-role-id', key: 'vendor' });
-    prismaMock.userRole.upsert.mockResolvedValue({});
-    prismaMock.member.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: VENDOR_A_ID, status: 'ACTIVE', ...data }),
-    );
-
-    const res = await request(app)
-      .post('/api/v1/vendors')
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ownerEmail: 'draft-owner@example.com', ownerMobile: '9333333333' });
-
-    expect(res.status).toBe(201);
-    expect(res.body.data.businessName).toBeUndefined();
-    expect(res.body.data.ownerUserId).toBe(USER_B_ID);
-    expect(prismaMock.user.create).toHaveBeenCalledOnce();
-  });
-
   it("every admin Vendor response carries profileCompletion with a 'user' section reflecting ownerUserId", async () => {
     resolveMock.mockResolvedValue(['members:view']);
     prismaMock.member.findUnique.mockResolvedValue(vendorAFixture); // has ownerUserId set

@@ -4,18 +4,14 @@ import type { Request, Response, NextFunction } from 'express';
 import type { PermissionAction } from '@skylabs-monorepo/shared-types';
 import { can } from '@skylabs-monorepo/shared-permissions';
 import { authenticate } from '../middleware/authenticate';
+import { buildMemberAdminRoutes } from './member-admin.routes';
 import { requirePermission } from '../middleware/requirePermission';
 import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
 import { sendError } from '../lib/http';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
-  VendorCreateSchema,
-  VendorUpdateSchema,
   VendorSelfUpdateSchema,
-  MemberListQuerySchema,
-  MemberStatusChangeSchema,
-  MemberDeleteSchema,
   VendorUserSearchQuerySchema,
   VendorOwnerLookupQuerySchema,
   CrossVendorListQuerySchema,
@@ -37,7 +33,6 @@ import {
   VendorModulesAndCategoryAccessSchema,
   VendorIdParamSchema,
   VendorDocumentTypeParamSchema,
-  VendorDocumentAdminParamSchema,
   VendorImageIdParamSchema,
   VendorProductIdParamSchema,
 } from '../schemas/vendor.schema';
@@ -47,7 +42,6 @@ import { imageUpload, videoUpload, documentUpload } from '../lib/media-upload.mi
 import type { VendorDocumentType } from '../generated/prisma-client';
 import * as vendorService from '../services/vendor.service';
 import * as memberDocumentService from '../services/member-document.service';
-import * as memberStatusService from '../services/member-status.service';
 import * as productService from '../services/product.service';
 import { writeAuditLog } from '../services/audit.service';
 import { sendData, ApiError } from '../lib/http';
@@ -1248,67 +1242,8 @@ router.delete('/me/products/:productId/video', requirePermission('members', 'cus
   }
 });
 
-// ─── Admin/SuperAdmin surface ─────────────────────────────────────────────────
-
-router.get('/', requirePermission('members', 'view'), validateQuery(MemberListQuerySchema), async (req, res, next) => {
-  try {
-    const { page, pageSize, search, status, documents, reviewFlag } = req.validatedQuery as ReturnType<typeof MemberListQuerySchema.parse>;
-    const { items, total } = await vendorService.listVendors({ page, pageSize, search, status, documents, reviewFlag });
-    sendData(res, await vendorService.attachLiveCounts(items), { meta: { total, page, pageSize } });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/', requirePermission('members', 'create'), validateBody(VendorCreateSchema), async (req, res, next) => {
-  try {
-    const vendor = await vendorService.createVendor(req.body, req.user!.sub);
-    await writeAuditLog({
-      actorUserId: req.user!.sub,
-      action: 'vendor.create',
-      targetType: 'Vendor',
-      targetId: vendor.id,
-      after: vendor,
-      ...requestMeta(req),
-    });
-    sendData(res, withCompletion(vendor), { status: 201 });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.get('/:id', requirePermission('members', 'view'), validateParams(UuidParamSchema), async (req, res, next) => {
-  try {
-    const vendor = await vendorService.getVendorOrThrow(req.params.id);
-    const [withCounts] = await vendorService.attachLiveCounts([vendor]);
-    sendData(res, withCompletion(withCounts));
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.patch(
-  '/:id',
-  requirePermission('members', 'edit'),
-  validateParams(UuidParamSchema),
-  validateBody(VendorUpdateSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.updateVendor(req.params.id, req.body);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.update',
-        targetType: 'Vendor',
-        targetId: vendor.id,
-        after: vendor,
-        ...requestMeta(req),
-      });
-      sendData(res, withCompletion(vendor));
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+// Deprecated alias for one release: the canonical admin member routes live at /members.
+router.use(buildMemberAdminRoutes({ deprecated: true }));
 
 // ─── Vendor media, admin (shared upload system — see media.service.ts's doc comment) ─────────
 
@@ -1429,110 +1364,6 @@ router.delete(
         ...requestMeta(req),
       });
       sendData(res, { deleted: true });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-// ─── Vendor KYC documents, admin-on-behalf (real file upload) ───────────────────────────────
-
-router.get('/:id/kyc-documents', requirePermission('members', 'view'), validateParams(UuidParamSchema), async (req, res, next) => {
-  try {
-    // File keys only for viewers who may open files; members:view alone sees type, masked number and status.
-    const granted = await resolveGrantedPermissionKeys(req.user!.roles);
-    const includeFiles = can(granted, 'members', 'edit') || can(granted, 'members', 'approve');
-    sendData(res, await memberDocumentService.listMemberDocuments(req.params.id, { includeFiles }));
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post(
-  '/:id/kyc-documents/:documentType',
-  requirePermission('members', 'edit'),
-  validateParams(VendorDocumentAdminParamSchema),
-  documentUpload.single('file'),
-  async (req, res, next) => {
-    try {
-      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
-      const document = await memberDocumentService.uploadMemberDocument({
-        memberId: req.params.id,
-        documentType: req.params.documentType as VendorDocumentType,
-        file: { buffer: req.file.buffer, originalname: req.file.originalname },
-        number: typeof req.body?.number === 'string' ? req.body.number : undefined,
-        actorUserId: req.user!.sub,
-        onBehalf: true,
-      });
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor_document.upload',
-        targetType: 'VendorDocument',
-        targetId: document.id,
-        ...requestMeta(req),
-      });
-      sendData(res, document, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.delete(
-  '/:id/kyc-documents/:documentType',
-  requirePermission('members', 'edit'),
-  validateParams(VendorDocumentAdminParamSchema),
-  async (req, res, next) => {
-    try {
-      await memberDocumentService.deleteMemberDocument(req.params.id, req.params.documentType as VendorDocumentType);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor_document.delete',
-        targetType: 'VendorDocument',
-        targetId: req.params.documentType,
-        ...requestMeta(req),
-      });
-      sendData(res, { deleted: true });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-/** Old alias of the member status change. Validation, history, audit and notices live in
- *  `member-status.service.ts`. */
-router.patch(
-  '/:id/status',
-  requirePermission('members', 'status_change'),
-  validateParams(UuidParamSchema),
-  validateBody(MemberStatusChangeSchema),
-  async (req, res, next) => {
-    try {
-      await memberStatusService.changeMemberStatus(req.params.id, req.body.status, req.body.reason, {
-        userId: req.user!.sub,
-        ...requestMeta(req),
-      });
-      sendData(res, await vendorService.getVendorOrThrow(req.params.id));
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-/** Old alias of the member delete: Super Admin only, SUSPENDED members only, archives instead
- *  when order history exists. `member-status.service.ts` writes the audit row. */
-router.delete(
-  '/:id',
-  requirePermission('members', 'delete'),
-  validateParams(UuidParamSchema),
-  validateBody(MemberDeleteSchema),
-  async (req, res, next) => {
-    try {
-      const result = await memberStatusService.deleteMember(req.params.id, req.body.reason, {
-        userId: req.user!.sub,
-        ...requestMeta(req),
-      });
-      sendData(res, result);
     } catch (err) {
       next(err);
     }
