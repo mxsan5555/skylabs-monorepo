@@ -16,7 +16,7 @@ import { env } from '../config/env';
  * (see apps/msd/src/api/media.ts's `resolveMediaUrl`).
  *
  * Railway's container filesystem is ephemeral (wiped on every redeploy), which is why media lives
- * in R2 and not on local disk — see DEPLOYMENT.md.
+ * in R2 and not on local disk — see docs/DEPLOYMENT.md §6.
  */
 
 // Content type per extension the validator accepts (media-validation.service.ts). Kept here so

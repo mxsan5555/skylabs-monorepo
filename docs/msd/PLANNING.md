@@ -1,159 +1,341 @@
-# PLANNING
+# msd planning: scope, roles and business rules
 
-Project scope, vision, stack, and roadmap for the **skylabs-monorepo**.
-For structural detail (folders, where code goes) see `ARCHITECTURE.md`.
-For live task status see `TASK.md`.
+Business source of truth for msd (MySpaDeal, massage and wellness deals). When this file and
+another doc disagree on who can do what, this file wins. Technical design: `ARCHITECTURE.md`;
+data: `DATABASE.md`; endpoints: `API.md`; work: `TASKS.md`.
 
-## Vision
+## 0. Scope
 
-Run two separate products from one monorepo while sharing a single Material 3
-design system, so both look on-brand-yet-distinct and the team ships fast
-without rebuilding UI per app.
+- **Product:** a marketplace where members (spas, salons, therapists) list deals, therapists and
+  products by branch, and customers find, buy and book them. One admin console under
+  `/account/*` serves every staff persona; what each sees comes from their permissions.
+- **Stack:** React 19 + Vite storefront and console (`apps/msd`, green M3 theme), Express +
+  Prisma + PostgreSQL API (`apps/msd-api`), shared M3 components (`packages/shared-ui`).
+- **Principles:** WCAG 2.2 AA and SEO are baseline, not extras; no fabricated data (no ratings
+  until reviews exist); copy lives in `apps/msd/src/content.json`; M3 colour roles only
+  (60 surface / 30 container / 10 primary for actions); free tiers before paid services.
+- **Module order** (same in every msd doc): 1 Admin and staff, 2 Members, 3 Customers and orders,
+  4 Storefront, 5 Static content, 6 CTA banners, 7 Home slider, 8 Masters, 9 Payments, payouts and
+  reports, 10 Analytics, 11 Social media, 12 Platform, security and release.
 
-## Products
+## 1. Admin and staff
 
-| App | Tech | Port | Business | Brand theme |
-| --- | --- | --- | --- | --- |
-| `apps/msd` | React 19 + Vite | 4200 | **Massage deals** | Green (`#007C2B`) |
-| `apps/mera-driver` | Angular 21 + Tailwind | 4400 | **Booking drivers** | Blue (`#1175BC`) |
+### 1.1 Roles
 
-They are **different businesses** (different domains, data, users), so they
-share UI but **not** backends, databases, or business logic.
+Seven fixed system roles; none can be deleted. Custom roles are not needed now, so role create,
+clone and delete are locked (R1).
 
-## What is shared vs per-app
+| Key | Role | What they do |
+|---|---|---|
+| `super_admin` | Super Admin | Full access: create, edit, delete, everything (`isSuperAdmin`) |
+| `admin` | Admin | Same as Super Admin, but cannot delete anything |
+| `marketing` | Marketing | View members, branches, deals, therapists, products; manages website content |
+| `sales` | Sales | Creates members and their branches, deals, therapists and products |
+| `member` (was `vendor`) | Member | The deal company: logs in, updates own profile, uploads documents, creates own branches, deals, therapists and products |
+| `support` | Support | Contacts customers or members about issues; view only; can raise a refund request, never issue it |
+| `customer` | Customer | Storefront buyer; not part of the console matrix |
 
-- **Shared** (`packages/shared-ui`): Material 3 web components (Material Web + LIT),
-  custom components (`sky-badge`, `sky-card`), theme engine (`applyTheme`), fonts,
-  app-shell/auth layout CSS, test helpers. Presentational only.
-- **Per-app**: pages, routing, layouts, auth flow, API client, domain models,
-  state, theme tokens, and (planned) backend + database.
+### 1.2 Permission matrix
 
-## Stack
+V view, C create, E edit, D delete; scope A = all records, O = own records only (a member sees only
+their own). The 14 permission keys replace the old ~40 overlapping rows.
 
-- **Frontend**: React 19 + Vite (msd) · Angular 21 standalone + Tailwind (mera-driver) ·
-  TypeScript · Material 3 (`@material/web` + `lit`, themed per app).
-- **Component consumption**: typed `@lit/react` wrappers in React; raw `<md-*>` +
-  `CUSTOM_ELEMENTS_SCHEMA` in Angular. Same components underneath.
-- **Backend (planned, one per app)**: Express + TypeScript · PostgreSQL (in-house) ·
-  Prisma ORM · Zod + `zod-to-openapi` (validation → OpenAPI spec) · `swagger-ui-express`.
-  Chosen because the team knows Express and is learning OpenAPI; no Supabase (cost).
-- **Auth (in-house)**: JWT · phone/email OTP (SMS/email provider) · Google OAuth.
-- **Tooling**: Nx 22.7.5 (npm) · ESLint · Vitest / Angular unit-test · GitHub Actions.
-- **Deployment**: two frontends → two independent **Vercel** projects, self-selecting
-  per push via `nx-ignore`; branch flow `feature→develop→release→main`; `nx release`
-  for version tags. APIs host **off Vercel on Railway** (always-on servers) reusing the
-  **Neon** Postgres DB, with media on **Cloudflare R2**. Full detail (incl. a
-  step-by-step msd-api deploy guide): `DEPLOYMENT.md`.
+| Resource (key) | Super Admin | Admin | Marketing | Sales | Member | Support |
+|---|---|---|---|---|---|---|
+| Members (`members`) | VCED A | VCE A | V A | VCE A | VE O | V A |
+| Branches (`branches`) | VCED A | VCE A | V A | VCE A | VCE O | V A |
+| Deals (`deals`) | VCED A | VCE A | V A | VCE A | VCE O | V A |
+| Therapists (`therapists`) | VCED A | VCE A | V A | VCE A | VCE O | V A |
+| Products (`products`) | VCED A | VCE A | V A | VCE A | VCE O | V A |
+| Orders (`orders`) | V A | V A | - | V A | V O | V A |
+| Customers (`customers`) | V A | V A | - | V A | V O (customers who ordered from them) | V A |
+| Content (`content`) | VCED A | VCE A | VCE A | V A | - | V A |
+| Payments and payouts (`payments`) | V A | V A | - | - | V O | - |
+| Reports (`reports`) | V A (overall) | V A (overall) | - | - | V O | - |
+| Staff users (`staff-users`) | VCED A | V A | - | - | - | - |
+| System settings (`settings`) | VE A | V A | - | - | - | - |
+| Logs (`logs`, login history) | V A | V O | V O | V O | V O | V O |
+| My profile (`profile`) | VE O | VE O | VE O | VE O | VE O | VE O |
+| Masters (`masters.*`) and dashboard | VCED / dashboard | VCE / dashboard | V / dashboard | dashboard | dashboard | dashboard |
 
-## Access control (RBAC)
+Extra actions (granted on top of the matrix, never beyond):
 
-> **Note:** the role/menu tables below describe the *original* static-role design.
-> The shipped system is **dynamic RBAC** (database-driven roles/permissions/menus,
-> resolved per user via `GET /rbac/bootstrap`) — see `CLAUDE.md` → "Auth & roles
-> (Dynamic RBAC)" and `DEVELOPER_PROCESS.md` for the current source of truth.
+| Action | Permission | Who |
+|---|---|---|
+| Member status (activate, make inactive, suspend) | `members:status_change` | Super Admin, Admin |
+| Member document approve / reject | `members:approve` / `members:reject` | Super Admin, Admin |
+| Remind a member now about documents | `members:status_change` | Super Admin, Admin |
+| Member delete | `members:delete` | Super Admin only |
+| Order cancel | `orders:status_change` | Super Admin, Admin |
+| Raise a refund request | `orders:custom` | Support, Admin, Super Admin |
+| Approve or reject a refund | `orders:approve` | Super Admin, Admin |
+| Customer block / unblock | `customers:status_change` | Super Admin, Admin |
+| Payout release to members | `payments:approve` | Super Admin only |
+| Report export | `reports:export` | Super Admin, Admin |
 
-One account/admin console (shown after login) serves every persona; **roles**
-decide what each sees and can open.
+Sales gets no status change, approve, reject, export or delete.
 
-### Roles per app
+### 1.3 Rules that apply everywhere
 
-| App | Roles | Type definition |
-|-----|-------|----------------|
-| msd | `user`, `admin`, `marketing`, `sales` | `apps/msd/src/types/index.ts` |
-| mera-driver | `customer`, `driver`, `admin`, `marketing`, `sales` | `apps/mera-driver/src/app/models/index.ts` |
+1. Members never delete. "Edit" includes pausing or unpublishing their own branch, deal,
+   therapist or product.
+2. Orders, payments and customers are never hard-deleted; use Cancel, Refund and Block.
+3. Super-admin-only actions (`members:delete`, `payments:approve`, `staff-users:delete`,
+   `settings:edit`, every delete on branches, deals, therapists, products) cannot be granted to
+   another role.
+4. "Own" scope is enforced on the server for every route; a foreign record returns 404.
+5. A preview ("Login As") session is read-only for payouts, deletes, status changes, refunds,
+   staff users and role grants. A Super Admin cannot be impersonated.
 
-### What each role sees (sidebar menu)
+### 1.4 Staff users, settings, logs, profile
 
-| Menu item | msd roles | mera-driver roles |
-|-----------|-----------|-------------------|
-| Dashboard | all | all |
-| My Account | all | all |
-| Deals | `admin` | — |
-| Bookings | — | `admin` |
-| Promotions | `marketing` | `marketing` |
-| Sales | `sales` | `sales` |
+- Staff users are created only with the roles super_admin, admin, marketing, sales, support; the
+  last active Super Admin cannot be deactivated or deleted.
+- System settings are a key allowlist (no secrets). The support contact used in member notices is
+  `SUPPORT_EMAIL` / `SUPPORT_PHONE` until the settings table exists (D22).
+- Login history: Super Admin sees all, everyone else sees their own.
+- My profile: name, phone, email, avatar; phone and email changes go through OTP.
 
-Menu config: `apps/<app>/src/app/admin/menu.ts` — add `{ label, icon, to, roles: [...] }` to `ADMIN_MENU`.
+## 2. Members
 
-### Auth file map
+### 2.1 Lifecycle
 
-| Concern | msd | mera-driver |
-|---------|-----|-------------|
-| Auth state + roles | `auth/auth-context.tsx` (React Context) | `core/auth/auth.service.ts` (signals) |
-| Auth route guard | `auth/require-auth.tsx` | `core/auth/auth.guard.ts` |
-| Role route guard | `auth/require-role.tsx` | `core/auth/role.guard.ts` |
-| HTTP token injection | _(planned with API)_ | `core/auth/auth.interceptor.ts` |
+| State | Meaning |
+|---|---|
+| Active | Default at creation. A welcome message goes out by SMS and email. |
+| Inactive | Business pause. The member logs in and sees everything (orders, customers, own catalog) but cannot change anything existing or add anything new, and sees a view-only banner on every screen. Their items are hidden from the website. Admin can return them to Active at any time; everything comes back as it was. |
+| Suspended | Admin action, reason required (10 to 500 characters). The member cannot log in (open sessions end at once), everything they own and their profile disappear from the website, and they get an email and SMS with the reason, the support contact and the steps to return. A suspended member who tries to log in sees the same message. Customers who already paid are honoured by default; Admin can refund. |
+| Archived | Set by the system when a suspended member with order history is deleted: hidden everywhere, records kept. |
+| Deleted | Super Admin only, only from Suspended (journey Inactive → Suspended → Delete), only when the member never had an order. |
 
-### How access is controlled
+- Status can change at any time, even with no branches or deals.
+- Branches, deals and therapists keep their own status. The storefront shows an item only when the
+  member, the branch and the deal are all active, so reactivation restores everything.
+- Every status change is written to the status history and audit log with who and why.
 
-- **Visibility**: the sidebar is built from one role-aware menu config — items list
-  the roles allowed to see them, and the sidebar filters by the user's roles.
-- **Access**: routes are guarded to the same roles (`RequireRole` / `roleGuard`);
-  lacking the role redirects to the profile.
-- **Boundary**: guards are UX only — each API must re-check the role from the JWT on
-  every request once backends exist. See `CLAUDE.md` → "Auth & roles (RBAC)" for full detail.
+### 2.2 Onboarding
 
-## AI Dev Team
+Staff (Sales or Admin) create every member with a short form (owner first and last name, mobile,
+email, business name) and share the login details (D9). There is no public self-registration. The
+member then completes the profile, branches, deals, therapists and products, and sees their order
+history and customers.
 
-The project ships with 6 project-scoped AI agents, 8 skill reference docs, and 5 command pipelines — all under `.claude/`. They are loaded automatically in Claude Code sessions.
+### 2.3 Documents
 
-### Agents
+A member is trusted from creation. Documents are a compliance follow-up, never a gate: a member
+with incomplete documents can still publish.
 
-| Agent | Specialty |
-|-------|-----------|
-| `skylabs-abhi` | Express APIs, Prisma schemas, JWT auth, OTP, Google OAuth |
-| `skylabs-ravi` | React 19 (msd) + Angular 21 (mera-driver) frontend |
-| `skylabs-neha` | UI/UX design — 60/30/10 rule, M3 tokens, accessibility specs |
-| `skylabs-dev` | QA — Vitest, Angular unit tests, Playwright e2e |
-| `skylabs-udaya` | SEO/GEO/AEO, GA4/GTM, social media copy |
-| `skylabs-reena` | Content — `content.json`, blog posts, marketing copy |
+- Required: Aadhaar card, PAN card, GST number. States: Missing, Submitted, Approved, Rejected
+  (with reason), Expired. "Complete" means all three are Submitted or Approved.
+- The member page shows "Documents complete" or "Documents incomplete" and the due date.
+- Support sees only which document types are uploaded and their status, never the files.
+- Files are private and opened with expiring links. Aadhaar and PAN show masked; the full number
+  is stored encrypted, never in plain text, never in a response or log (D3). GST format is
+  validated on entry. Uploads by staff on a member's behalf show "uploaded by <user> for member".
 
-### Commands
+### 2.4 Document reminders and the suspension review flag (decided 2026-10-17)
 
-| Command | Triggers |
-|---------|---------|
-| `/msd-feature` | Full pipeline: neha → abhi → ravi → dev → udaya → reena |
-| `/mera-driver-feature` | Same pipeline scoped to mera-driver |
-| `/new-endpoint` | abhi builds endpoint + dev writes integration tests |
-| `/new-shared-component` | neha spec → ravi LIT + React wrapper → dev unit test |
-| `/skylabs-audit` | Code + test + SEO + content + design audit across all agents |
+| Day (from creation) | Event |
+|---|---|
+| 14 | Documents due. Reminder 1 of 3 by email and SMS, listing the exact documents still needed |
+| 21 | Reminder 2 of 3 |
+| 28 | Reminder 3 of 3, the final one: "If they are not received, an admin may suspend your account" |
+| 35 | Flagged **Ready for suspension review** (D4: one week after the final reminder) |
+| any later day | Super Admin or Admin decides, with the reason prefilled "Documents not completed". The system never suspends on its own. |
 
-Full agent file map: `.claude/agents/` · Full skill file map: `.claude/skills/` · See `ARCHITECTURE.md → .claude/` for the directory layout.
+- Only Active and Inactive members get reminders. A missed day sends only the next reminder, and
+  reminders stay at least 7 days apart.
+- When the member is flagged, everyone whose roles grant `members:status_change` gets a bell
+  notification.
+- The flag clears automatically once documents are complete, and on reactivation.
+- **Remind now:** staff with `members:status_change` can send one extra reminder per member per
+  24 hours, outside the schedule. It does not move the schedule.
+- The job runs daily at 10:00 IST (D14: Railway cron calling a secured endpoint).
 
-## Conventions (summary)
+### 2.5 Member detail page
 
-- Pages are framework-native and app-local; reuse at the component level only.
-- WCAG 2.2 AA accessibility and basic SEO (per-route titles, meta description,
-  noindex on auth) are baseline requirements, not afterthoughts.
-- One source of truth for repeated UI (shared `layout.css`, config-driven menus and
-  forms); no abstraction before real duplication appears.
-- Keep it simple: no shared backend, no premium services where a free/in-house
-  option works.
-- Use the AI agent team (above) for all new features — never build outside the
-  defined pipeline or bypass a step (e.g. shipping without skylabs-dev tests or
-  skylabs-udaya SEO on public pages).
-- Branch flow `feature/* → develop → release → main`: branch new work off
-  `develop` (never `main`), and **back-merge `main` into `develop` after every
-  release** so `develop` never trails production. Full detail: `DEPLOYMENT.md`.
+Header: name, status, documents chip, due date, review flag badge, and only the actions the viewer
+may use (Make inactive, Suspend, Reactivate, Delete, Remind now). Tabs: Profile, Documents,
+Branches, Deals, Therapists, Products, Activity (status history, document events, reminders,
+review flag). The All members list filters by status, documents incomplete and ready for review in
+one grouped Filter menu, with distinct tonal colours per status.
 
-## Roadmap
+### 2.6 Catalog flow
 
-1. **Foundation** — M3 design system + theming + app scaffolding ✅
-2. **Auth screens** — sign-in, OTP (both apps) ✅
-3. **Account/admin console** — role-based admin layout + My Account (profile + address CRUD) + role gating ✅
-4. **Content pages** — home ✅, category page (filters, sorts, list/grid/map, lazy loading) ✅,
-   then contact, blog, blog-detail, blog-category 🔜
-5. **Account extras** — logout from console, admin/marketing/sales feature pages 🔜
-6. **Backends** — `apps/msd-api` (Express + Postgres + Prisma + OpenAPI) **built**:
-   dynamic RBAC + business modules (Customers/Vendors/Orders/Products/Reports/Cart/
-   Payments/CMS + public storefront catalog; Inventory still a stub), auth (OTP/Google/JWT),
-   media uploads, 35+ Prisma migrations. ✅
-   `apps/mera-driver-api` built on the same pattern (Payments and Reports still stubs) ✅
-7. **Auth integration** — OTP/Google + dynamic RBAC wired to msd-api via
-   `GET /rbac/bootstrap` (see `CLAUDE.md` → "Auth & roles" and `DEVELOPER_PROCESS.md`) ✅ (msd)
-8. **Deployment** — frontends live on Vercel; **msd-api deploys to Railway** (Neon DB
-   + Cloudflare R2 media). Step-by-step: `DEPLOYMENT.md → Deploying msd-api`. ⏳ in progress
-9. **Hardening** — e2e tests, error tracking (Sentry) 🔜
+1. A member creates, edits, pauses or unpublishes own branches, deals, therapists and products;
+   never deletes.
+2. A deal belongs to exactly one branch. A therapist belongs to exactly one branch and may be on
+   several deals of that branch.
+3. A product belongs to the member, not a branch.
+4. Sales and Admin create the same objects on a member's behalf; only Super Admin deletes.
+5. Creation order: member → (staff-made categories) → branch (name and state required) →
+   therapists → deals (at least one package; therapists from the same branch) → products.
+6. Categories and subcategories are created by staff and open to every member (D10). Type rules
+   stay: deals need a `SERVICE` category, products `PRODUCT`, therapist specialization `THERAPY`.
+7. One deal holds duration and price options only (`DealPackage`); options that differ by service
+   become separate deals (D13).
+8. Deals publish without an approval step (D6, task P3-15).
+9. All long text is written in the rich text editor and stored as sanitized HTML; titles, brand,
+   badge, short description, summary, benefits and how-to-use items stay plain text (D18, D20).
 
-Current focus: **deploy msd-api** (Railway + Neon + R2) and wire the live Vercel
-frontend to it — see `TASK.md`.
+## 3. Customers and orders
+
+- Customers sign in with OTP or Google and use cart, wishlist, checkout (Razorpay or COD), order
+  history, payments and support requests. They have no console grants (R8).
+- Staff block or unblock a customer with a reason (`customers:status_change`); customers are never
+  deleted.
+- **Refunds (D11):** Support raises a refund request; Admin or Super Admin approves or rejects
+  (reject needs a reason). Partial refunds are allowed up to paid minus already refunded; payment
+  must be `PAID` or `PARTIALLY_REFUNDED`.
+- **Support access (D12):** Support sees name, phone, email and order lines, never payment gateway
+  ids.
+- **Member's own customers (D19):** name, city, order count, last order date; no phone or email
+  unless an order is open.
+
+## 4. Storefront
+
+- **Shell:** desktop two-row header (logo, city chip, search, wishlist, cart, account; then
+  category links and an "All categories" panel); phone header plus a bottom tab bar (Home,
+  Categories, Wishlist, Cart, Account), no hamburger. Footer: trust strip, newsletter band (UI
+  only until task ST-28), link columns, popular searches ("{Category} in {City}"), legal bar,
+  theme switch.
+- **Trust claims:** verified spas and therapists, secure payments via Razorpay, instant booking
+  confirmation. No rating badge until reviews exist (task ST-22).
+- **Location:** saved choice, then browser location (only if already granted or on user action),
+  then Vercel IP, then none. Coordinates map to the nearest partner city within 75 km.
+- **Home:** hero with search, shop by category, deals near you (category tabs, distance sorted),
+  how it works, therapists, offers, products, popular treatments, FAQ, partner banner.
+- **Category page** (`/category/:slug`, `/category/:slug/:city`): h1 and total, clamped
+  description, subcategory pills, Filters, List/Grid/Map, sort (Relevance, Price low to high, high
+  to low, Distance when the visitor has coordinates), filter panel (Your location, Distance,
+  Price, Business, Branches, Clear all), 12 cards per page with infinite scroll. All view state is
+  in the URL.
+- **SEO, GEO, AEO:** public routes are prerendered at build time with JSON-LD (Organization,
+  WebSite search, ItemList, FAQPage, BreadcrumbList); `sitemap.xml`, `robots.txt`, `llms.txt`;
+  `noindex` on account, cart, checkout and auth pages.
+- **Maps:** Leaflet + OpenStreetMap by default (free, attribution visible); Google Maps behind a
+  switch.
+- Open questions: ST-03 (staff "Account" on phones), ST-13 (index product and therapy category
+  pages or redirect).
+
+## 5. Static content
+
+Website content managed in the console under the `content` permission (today the `cms.*` keys,
+task P8-07): blog (posts, categories, block editor), FAQs, legal and static pages (terms and
+others), About us, Contact us, How it works, Careers (page and job listings). Marketing creates
+and edits; Admin cannot delete (P10-31). Public pages read it from the catalog API. Rich text is
+sanitized on write and on render (D18).
+
+## 6. CTA banners
+
+Promotions shown on the storefront: title, description, button label, destination (a route, a
+category or a deal), image, sort order, active flag and optional start and end dates. Managed under
+Masters → Promotions (super_admin VCED, admin VCE, marketing V, D8). Rules for placements and who
+edits: to be written (task CT-01).
+
+## 7. Home slider
+
+Home hero slides managed under Masters → Home hero, read by the storefront at
+`/catalog/home-hero`. Rules for slide count, schedule, image sizes and alt text: to be written
+(task SL-01).
+
+## 8. Masters
+
+Categories and subcategories (types `SERVICE`, `PRODUCT`, `THERAPY`), popular tags and popular
+treatment groups. Super Admin VCED, Admin VCE, Marketing V only (D8).
+
+Recommended category tree for India (SEO-led, task MA-01 to confirm and load):
+
+| Group | Subcategories |
+|---|---|
+| Massage | Full body, Ayurvedic, Deep tissue, Swedish, Head (champi), Couples, Foot reflexology, Prenatal, Hot stone |
+| Spa and wellness | Body scrub and polishing, Body wraps, Steam and sauna, Aromatherapy, Detox, Bridal spa package |
+| Hair | Women's haircut, Men's haircut, Colouring and highlights, Keratin and smoothening, Hair spa, Bridal hair, Extensions |
+| Skin and beauty | Facials and cleanup, De-tan, Chemical peels, Body polishing, Laser hair removal, Anti-ageing, Body contouring and slimming, Bleaching |
+| Nails and lashes | Manicure, Pedicure, Nail art, Gel and acrylic nails, Eyelash extensions, Lash lift and lamination |
+| Therapy | Physiotherapy, Acupuncture, Chiropractic care, Naturopathy, Yoga and meditation |
+
+Removed as not mainstream in India: float therapy, cold plunges, cryotherapy, IV therapy, vitamin
+injections, dip powder nails.
+
+## 9. Payments, payouts and reports
+
+- **Payouts (D2, D17):** monthly, for the previous calendar month; eligible orders `CONFIRMED` or
+  `COMPLETED` with payment `PAID`, minus approved refunds; commission 1% of the member's gross
+  (`payout.commissionPercent`), rounded to 2 places half-up. Release is Super Admin only.
+- **Reports:** Super Admin and Admin see overall figures, a member sees only their own: overall
+  revenue, online payment waiting, payments transferred to members, deals ordered / cancelled /
+  refunded, therapists ordered / cancelled / refunded, products ordered / cancelled / refunded.
+  Date range up to 366 days; export for Super Admin and Admin.
+
+## 10. Analytics
+
+Not started. Plan: one GA4 property and GTM container for msd only, Google Consent Mode v2 with
+analytics denied until consent, and `dataLayer` events with ids only (no names, emails or phones):
+`view_deal`, `add_to_cart`, `begin_checkout`, `purchase`, `search`, `view_category`. Tasks AN-01
+to AN-03.
+
+## 11. Social media
+
+Social links (label, URL, target) managed in the console and shown in the footer and in the
+Organization JSON-LD `sameAs`. Further scope (share buttons, Open Graph images, post copy): to be
+written (task SO-01).
+
+## 12. Platform, security and release
+
+Non-negotiables: no secrets in git; RLS-equivalent ownership checks on the server for every route;
+input validation on every endpoint; HTTPS only; audit rows for status, document, refund, payout,
+delete and role-grant changes in the same transaction (R4); Aadhaar Act / DPDP Act review of
+document handling (P0-03, advisory).
+
+## 13. Decisions
+
+### 13.1 Owner decisions
+
+| # | Topic | Decision |
+|---|---|---|
+| D1 | Old `REJECTED` vendors | Migrate to Suspended with reason "Migrated from rejected"; other old states become Active |
+| D2 | Payout rule | As section 9 |
+| D3 | Aadhaar and PAN storage | Full number encrypted at rest (AES-256-GCM), masked in responses, hash for duplicates; a switch to stop storing the full number later (task P5-16) |
+| D4 | Review flag day | Day 35, one week after the final reminder (decided 2026-10-17) |
+| D6 | Deal approval gate | Remove it |
+| D7 | Member delete | Super Admin only, only from Suspended; zero orders = delete, otherwise archive |
+| D8 | Masters and dashboard | Super Admin VCED, Admin VCE, Marketing V only; dashboard for all console roles with scoped data |
+| D9 | Onboarding | Staff create members and share logins; member gets own-scope customers view |
+| D10 | Category access | Categories open to every member; no per-member grants |
+| D11 | Refund policy | Section 3 |
+| D12 | Support access to customer data | Section 3 |
+| D13 | Package label | Keep `DealPackage` as duration plus price |
+| D14 | Scheduler | Railway cron calling a secured endpoint, daily 10:00 IST (decided 2026-10-17) |
+| D17 | Payout commission | 1% |
+| D18 | Content authoring | Rich text editor for all long text, stored as sanitized HTML |
+| D19 | Member's own customers | Section 3 |
+| D20 | Rich text scope | Long fields only; labels and lists stay plain text |
+| D21 | Inactive and suspended behaviour | Section 2.1 |
+| D22 | Support contact in notices | Env vars until the settings table exists |
+| B2 | Vendor rename | Prisma `Vendor` → `Member`, `VendorDocument` → `MemberDocument` with `@@map`; FK columns stay `vendorId` |
+| B5 | Permission key | `vendors` → `members`; role `vendor` → `member`; role `support` added |
+| N1 | Reminder decisions (2026-10-17) | Clear the flag when documents complete; bell alert to `members:status_change` holders; Remind now in this release |
+
+### 13.2 Rules this plan sets
+
+| # | Rule |
+|---|---|
+| R1 | Fixed roles: role create, clone and delete return 403 `ROLE_MANAGEMENT_LOCKED`; Super Admin still edits grants |
+| R3 | New and changed routes use `.strict()` schemas now; existing routes switch one by one |
+| R4 | Mandatory audit rows are written in the same transaction and fail the request if the write fails |
+| R5 | Customer block maps to the existing `UserStatus` `active` / `blocked`, plus reason columns |
+| R6 | Refunds reuse `orders`: `orders:custom` raises, `orders:approve` decides |
+| R7 | Canonical flat paths (`/members`, `/branches`, `/deals`, `/therapists`, `/products`); `/vendors/...` stays as a deprecated alias for one release |
+| R8 | Customers get no console grants; self-service routes stay authenticated-only |
+| R9 | Support's only extra is `orders:custom`; documents show type and status only |
+| R10 | One member, one owner user |
+| R11 | Bootstrap scopes use the DB values `ALL` and `OWN` |
+
+### 13.3 Open decisions
+
+| # | Decision | Recommendation |
+|---|---|---|
+| D5 | Migrated document rows | Start as Submitted; a re-upload resets Approved or Rejected to Submitted |
+| D15 | Avatar | Reuse the existing media upload |
+| D16 | Alias window for `/vendors/...` | One release, removed after 14 days of zero traffic |

@@ -1,8 +1,7 @@
 import type { MemberStatus } from '../generated/prisma-client';
 
 /**
- * The member documents timeline, in one place (spec `docs/msd/ADMIN_USER_ROLES_AND_PERMISSIONS.md`
- * section 4, decisions in `docs/superpowers/specs/2026-10-17-member-document-reminders-design.md`):
+ * The member documents timeline, in one place (rules and decisions in `docs/msd/PLANNING.md` §2.4):
  * documents are due 14 days after the member is created, then 3 warnings one week apart, then the
  * member is flagged "Ready for suspension review" one week after the final warning (day 35).
  * Everything here is pure, so the timeline is tested with a fake clock.

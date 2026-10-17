@@ -27,7 +27,7 @@ import {
 } from './member-reminder-policy';
 
 /**
- * Documents reminders (spec section 5 of `docs/superpowers/specs/2026-10-17-member-document-reminders-design.md`).
+ * Documents reminders (rules: `docs/msd/PLANNING.md` §2.4; design: `docs/msd/ARCHITECTURE.md` §2.3).
  * The daily job sends scheduled warnings 1 to 3, retries failed channels, flags members for
  * suspension review and clears the flag once documents are complete. Admins send manual
  * reminders. The system never changes a member's status.

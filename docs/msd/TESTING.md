@@ -1,10 +1,173 @@
-# Content Testing Data: 10 Deals + 5 Products
+# msd testing
 
-**Status:** Draft, pending TL approval. Do NOT insert into the database until approved.
-**Currency:** USD ($) for all deals and products.
-**Deal source:** All 10 deals are taken from real Groupon listings (source URL under each deal). Titles are shortened, merchant names are removed from the content, and prices are the Groupon listing price and strike-through price (before any promo code).
+How to test msd and what "works" means per module. Rules being tested: `PLANNING.md`; endpoints:
+`API.md`.
 
-## Index
+## 1. Run the tests
+
+```bash
+npx nx run msd:test                 # Vitest + Testing Library (jsdom)
+npx nx run msd-api:test             # Vitest + Supertest, Prisma mocked, no Postgres
+npx nx run shared-ui:test           # also run mera-driver tests when shared-ui changes
+npx nx run-many -t lint test build --projects=msd,msd-api,shared-ui,shared-types,shared-permissions,shared-menu,shared-auth,shared-utils
+npx vitest run <path> --config apps/msd/vite.config.mts     # one folder or file (msd)
+npx vitest run <path> --config apps/msd-api/vite.config.ts  # one folder or file (msd-api)
+```
+
+Needs Postgres (local, never Neon production): `prisma migrate dev`, seed twice, the role × resource
+× action × own/other matrix test, IDOR tests, migration row-count rehearsal.
+
+## 2. Testing rules and gotchas
+
+- `@lit/react` resolves to its SSR build under Vitest, so shared-ui React wrappers (`Menu`,
+  `Slider`, `TextButton`, ...) do not set element properties in tests. Components that tests must
+  drive render raw `createElement('md-...')` elements; assert behaviour, attributes, URLs and API
+  calls, not shadow DOM.
+- M3 buttons keep their native `<button>` in shadow DOM; find them by tag and text. A button with
+  an icon also contains the icon ligature text, so match on "contains", not equality.
+- Prerendered pages must hydrate cleanly: never pass `prop={undefined}` to a custom element; gate
+  client-only state behind effects or `useHydrated`. `src/hydration.test.tsx` guards this.
+- ESLint rejects empty functions, including in tests: use `vi.fn()`.
+- Tests that assert snackbar copy render `<SnackbarHost />` next to the page.
+- API route tests: 401 without a token, 403 without the permission, 200 with it; 422 for invalid
+  input; 404 for a foreign record under own scope.
+- Prove a test catches the bug: break the code on purpose, watch the test fail, restore (done for
+  the review flag on 2026-10-17).
+
+## 3. Baseline and known failures
+
+Known failures at 2026-10-17; they must not grow. Anything else failing is a regression.
+
+| Project | Failing | Where |
+|---|---|---|
+| msd | 26 tests in 15 files | `permission-matrix` 9, `india-locations` 3, `home` 2, `contact-us` 2, and 1 each in `app.spec`, `widget-registry`, `deal-card`, `media-uploader`, `sky-product-card-wc`, `site-footer`, `become-vendor`, `wishlist`, `roles`, `settings`; `entry-server.test.tsx` fails to load |
+| msd-api | 5 | `rbac.routes` 4, `orders.routes` image 1 (confirmed 2026-10-17; the other 1,163 pass) |
+| shared-menu | 5 | `index.test.ts` |
+
+Lint and type drift: 31 msd lint errors, an ESLint ignore error in the shared packages, and
+`apps/msd-api/src/routes/members.routes.test.ts` type errors in its setup code (P10-46). ESLint
+ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list-page.test.tsx`
+"toggle-status flips a non-ACTIVE deal" (passes alone).
+
+## 4. Acceptance per module
+
+### 4.1 Admin and staff
+
+- Matrix snapshot test: 7 roles × 14 resources × actions × scope equals `PLANNING.md` §1.2 (P1-08).
+- Every route has `requirePermission` or is on a documented public allowlist (P4-12).
+- Preview token refused on payout, delete, status, refund, staff and role-grant routes; a Super
+  Admin cannot be impersonated.
+- Permission revoked while a token is active: the API refuses on the next request after the cache
+  clears.
+
+### 4.2 Members
+
+- Status machine: every allowed transition, every refused one returns 409; reason 10 to 500.
+- Suspend: refresh sessions revoked; login and OTP request return 403 `MEMBER_SUSPENDED` with
+  reason and steps, no OTP row; storefront hides everything; reactivation restores it and sends
+  the notice.
+- Inactive: any non-GET returns 403 `MEMBER_INACTIVE_READ_ONLY` (logout and refresh excepted);
+  GET orders, customers and catalog return 200; banner on every console screen.
+- Delete: only from Suspended and only for Super Admin; zero orders deletes, otherwise archives;
+  media files removed after commit (P3-25 for cascaded rows).
+- Documents: Support sees type and status only (no file key); masked numbers only; duplicate
+  number 409; approve, reject with reason; deleting an Approved document 409.
+- Reminders (all covered by unit tests): nothing before day 14; reminder 1 on the due date; 7-day
+  spacing; after missed runs only the next reminder; final reminder carries the suspension
+  sentence; documents asked for = missing + rejected; a second run sends nothing; a run that loses
+  the claim sends nothing; a failed channel is retried alone, up to 5 attempts; flag on day 35 and
+  not before; bell to `members:status_change` holders; flag never changes status; flag cleared on
+  completion; one member's error does not stop the pass; batching by 200.
+- Job route: 401 without or with a wrong `x-cron-secret`, 503 while `CRON_SECRET` is unset, 200
+  summary; not in `/docs`.
+- Remind now: 403 without `members:status_change`; 201 with per-channel result and audit row; 429
+  within 24 hours; 409 for suspended, complete, or no contact; button hidden in those cases.
+- Members list: the Filter menu sends exactly one filter per option; status and documents columns
+  use their tonal colours.
+- Own scope (after P4): member A reading member B's branch, deal, therapist or product gets 404.
+
+### 4.3 Customers and orders
+
+- A customer never reads or changes another customer's cart, wishlist or order by changing an id.
+- Payment state changes only through provider verification (Razorpay signature, webhook HMAC).
+- Refunds (after P7): Support can raise, cannot approve; a double click refunds once; amount
+  capped at paid minus refunded.
+
+### 4.4 Storefront
+
+- One `<h1>` per page; prerendered `/` contains the hero `<h1>`, category links and JSON-LD; no
+  hydration warnings; `sitemap.xml`, `robots.txt`, `llms.txt` written when `VITE_SITE_URL` is set.
+- Category page: pills set `?sub=`; sort and filters send the right API params; count shows
+  `meta.total`; page 2 requested on scroll; map hidden for products and therapists.
+- axe (WCAG 2.2 AA) clean on `/` in light, dark and high-contrast; no horizontal scroll at 320,
+  390, 768 and 1280 px; full keyboard path (skip link, header, panels, tab bar, footer); Lighthouse
+  SEO and Accessibility 100 and LCP under 2.5 s on mobile for `/`.
+- Suspended member's deals, branches and therapists absent; their deal URL returns the not-found
+  page; prerender and sitemap exclude them (P10-33).
+
+### 4.5 Static content to 4.11 Social media
+
+- Content routes enforce `content:<action>` (after P8-07); Admin sees no delete (P10-31).
+- Rich text: an XSS payload is stripped on write and on render (P10-36).
+- CTA banners, home slider, masters, social links: CRUD screens covered by their component tests;
+  public catalog endpoints return active rows only.
+- Analytics (after AN-02): no analytics cookie or GA request before consent; events carry ids only.
+
+### 4.12 Platform
+
+IDOR suite across all 14 resources, mass-assignment suite (extra keys → 422), upload abuse
+(polyglot, wrong magic bytes, oversize, path traversal), PII scan of logs and responses for full
+Aadhaar or PAN, concurrency (double refund, double payout, parallel status changes), migration and
+rollback rehearsal (P11).
+
+## 5. Security checklist (before each release)
+
+- [ ] Public vs signed-in access matches `API.md` for every route.
+- [ ] Ownership tested with another user's id (member, customer, order, branch): IDOR / BOLA.
+- [ ] A normal user calling an admin endpoint directly gets 403.
+- [ ] `/rbac/impersonate` restricted, short-lived, audited.
+- [ ] OTP request and verify rate-limited.
+- [ ] No client can mark an order paid without provider verification.
+- [ ] Uploads: type, size, content and ownership checked.
+- [ ] No OTP, secret, token or unneeded private field in any response.
+- [ ] Public catalog: only intended records and fields; maximum page size enforced; validated input.
+- [ ] Errors expose no stack traces or database details.
+- [ ] Sensitive admin actions are audited.
+
+API docs prove that a route is registered, not that its runtime checks are right; this checklist
+is the runtime check.
+
+## 6. UAT by role
+
+Log in as each console role (Super Admin, Admin, Marketing, Sales, Member, Support) and call one
+route per resource. The result must match `PLANNING.md` §1.2: 200 where the role has the action,
+403 where it does not, 404 for another member's record under own scope. Then repeat the main
+journeys: Sales creates a member; the member completes profile, branch, therapist, deal, product;
+Admin reviews documents; reminders arrive; Admin suspends and reactivates; a customer buys a deal.
+Sign-off sheet: task P12-08.
+
+## 7. Test data: 10 deals and 5 products
+
+Status: draft, pending TL approval; do not insert until the blockers below are fixed.
+
+Mapping to the API: category and subcategory resolve by name through `GET /vendors/categories`
+(never hardcode ids); long text becomes sanitized HTML; packages map to
+`{durationMinutes, sellingPrice, originalPrice}`; therapist type and name map to `therapistType`,
+`personName` ("Not listed" becomes a neutral name such as "Team therapist"); discount is computed
+on the server.
+
+Blockers:
+1. **Currency:** the content is USD; the app is INR and has no currency column. Convert first.
+2. **Category type:** deals need a `SERVICE` category; deals 1 and 10 use "Therapy" (a `THERAPY`
+   type). Move them or change the category.
+3. **Same-duration packages:** deal 2 has two 60-minute options (body, foot); split into two deals
+   (D13).
+4. **Provenance:** copied from Groupon listings; rewrite as original copy and remove marketplace
+   wording before any production insert.
+5. **Ownership:** every therapist on a deal must belong to the deal's branch. Seed order: member,
+   branch, therapists, deals (packages, therapist links), products, in a transaction per deal.
+
+#### Index
 
 | # | Deal | Category | Sub Category |
 |---|------|----------|--------------|
@@ -21,11 +184,11 @@
 
 ---
 
-# PART 1: DEALS
+### PART 1: DEALS
 
 ---
 
-## Deal 1
+#### Deal 1
 
 **Category:** Therapy > Physical Therapy
 
@@ -74,7 +237,7 @@ Appointment required. Merchant's standard cancellation policy applies (any fees 
 
 ---
 
-## Deal 2
+#### Deal 2
 
 **Category:** Massage > Body Massage
 
@@ -124,7 +287,7 @@ No-shows will result in automatic redemption of your code. Only one coupon may b
 
 ---
 
-## Deal 3
+#### Deal 3
 
 **Category:** Massage > Prenatal Massage
 
@@ -169,7 +332,7 @@ Prenatal massage can help ease discomfort, reduce stress and prepare you for chi
 
 ---
 
-## Deal 4
+#### Deal 4
 
 **Category:** Massage > Foot Massage
 
@@ -216,7 +379,7 @@ Appointment required. Merchant contact information is available after purchase i
 
 ---
 
-## Deal 5
+#### Deal 5
 
 **Category:** Spa & Wellness > Steam & Sauna
 
@@ -260,7 +423,7 @@ Fully refundable within 3 days after purchase. After that, the merchant's standa
 
 ---
 
-## Deal 6
+#### Deal 6
 
 **Category:** Hair > Hair Treatments
 
@@ -303,7 +466,7 @@ Appointment required. May be repurchased every 30 days.
 
 ---
 
-## Deal 7
+#### Deal 7
 
 **Category:** Skin & Beauty > Facial
 
@@ -348,7 +511,7 @@ Fully refundable within 3 days after purchase. Merchant's standard cancellation 
 
 ---
 
-## Deal 8
+#### Deal 8
 
 **Category:** Skin & Beauty > Hair Removal
 
@@ -397,7 +560,7 @@ All sales final, no refunds. Appointment required: call the clinic and provide y
 
 ---
 
-## Deal 9
+#### Deal 9
 
 **Category:** Nails & Lashes > Eyelash Services
 
@@ -443,7 +606,7 @@ Enhance your look with a full set of eyelash extensions, choosing from classic, 
 
 ---
 
-## Deal 10
+#### Deal 10
 
 **Category:** Therapy > Mental Wellness
 
@@ -488,13 +651,13 @@ Merchant's standard cancellation policy applies (any fees not to exceed the Grou
 
 ---
 
-# PART 2: PRODUCTS
+### PART 2: PRODUCTS
 
 (Unchanged from the previous draft, as approved.)
 
 ---
 
-## Product 1
+#### Product 1
 
 **Name:** Lavender and Sweet Almond Massage Oil, 100 ml
 
@@ -523,7 +686,7 @@ Unopened and unused items can be returned within 30 days of delivery for a full 
 
 ---
 
-## Product 2
+#### Product 2
 
 **Name:** Argan and Rosemary Scalp and Hair Oil, 100 ml
 
@@ -552,7 +715,7 @@ Unopened items can be returned within 30 days of delivery for a full refund. Ope
 
 ---
 
-## Product 3
+#### Product 3
 
 **Name:** Vitamin C and Hyaluronic Acid Brightening Face Serum, 30 ml
 
@@ -581,7 +744,7 @@ Unopened and sealed products can be returned within 30 days for a full refund. O
 
 ---
 
-## Product 4
+#### Product 4
 
 **Name:** Cuticle Oil and Nail Strengthener Duo
 
@@ -611,7 +774,7 @@ Unopened sets can be returned within 30 days of delivery for a full refund. Open
 
 ---
 
-## Product 5
+#### Product 5
 
 **Name:** Peppermint and Eucalyptus Foot Cream, 150 ml
 
@@ -640,7 +803,7 @@ Unopened items can be returned within 30 days of delivery for a full refund. Ope
 
 ---
 
-# Summary
+### Summary
 
 | Item | Count |
 |------|-------|

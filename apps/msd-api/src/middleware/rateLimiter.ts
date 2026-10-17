@@ -2,7 +2,7 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { env } from '../config/env';
 import { sendError } from '../lib/http';
 
-/** 5 req/10 min per identifier+IP (per skylabs-api.md / docs/api-schema/msd/00-conventions.md). */
+/** 5 req/10 min per identifier+IP (per skylabs-api.md / docs/msd/API.md §0). */
 export const otpRequestRateLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   limit: env.otpRequestRateLimitPer10Min,

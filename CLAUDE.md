@@ -2,9 +2,14 @@
 
 Guidance for Claude Code when working in this repository.
 
-> Companion docs: **`PLANNING.md`** (scope, stack, conventions), **`ARCHITECTURE.md`**
-> (detailed layout + where things go), **`TASK.md`** (what's done / in progress / backlog).
-> Read `PLANNING.md` at the start of a session; update `TASK.md` as work completes.
+> Docs: start at **`docs/README.md`**. Each app has the same eight files in `docs/<app>/`
+> (`README`, `PLANNING`, `ARCHITECTURE`, `DATABASE`, `API`, `TASKS`, `TESTING`, `DEPLOYMENT`), with
+> the same module sections in each. Read the app's `README.md` and `PLANNING.md` at the start of a
+> session; tick `TASKS.md` and update the module's sections in `PLANNING`/`DATABASE`/`API`/`TESTING`
+> in the same commit as the work. Never add a new Markdown file: write designs into the module's
+> section of `PLANNING.md`. For every feature, change or bug fix, follow the step-by-step workflow in
+> `docs/README.md` ("How to work on a feature"): rules in `PLANNING.md` first, stop for review before
+> any schema or API change, test cases in `TESTING.md` before code, tick `TASKS.md` last.
 
 ## Repo State
 
@@ -14,7 +19,7 @@ shared packages.
 - **`apps/msd`** — React 19 + Vite, port **4200**. Business: **massage deals** (public storefront + the full RBAC admin console under `/account/*`). Theme: green (`#007C2B`).
 - **`apps/mera-driver`** — Angular 21 (standalone) + Tailwind, port **4400**. Business: **driver booking** (same public + admin-console split as msd). Theme: blue (`#1175BC`).
 - **`apps/msd-api`** — Express + TypeScript + Prisma + PostgreSQL (db `msd`), port **3333**, all routes under `/api/v1`. MSD's own RBAC + business modules: Customers, Members (+ KYC documents, branches, therapists), Products, Deals, Orders, Cart, Wishlist, Payments (Razorpay), Reports, Notifications, CMS (blog, FAQs, pages, site content) and the public storefront catalog are real; only **Inventory** is still a permission-gated stub.
-- **`apps/mera-driver-api`** — Express + TypeScript + Prisma + PostgreSQL (db `mera_driver`), port **3334**, routes mounted at root (no `/api/v1` prefix). MeraDriver's own RBAC + business modules: Drivers, Vehicles, Bookings, Trip types, Attendance, Customers and master data are real; **Payments** and **Reports** are still permission-gated stubs (see `docs/MERA_DRIVER_ARCHITECTURE.md` §20).
+- **`apps/mera-driver-api`** — Express + TypeScript + Prisma + PostgreSQL (db `mera_driver`), port **3334**, routes mounted at root (no `/api/v1` prefix). MeraDriver's own RBAC + business modules: Drivers, Vehicles, Bookings, Trip types, Attendance, Customers and master data are real; **Payments** and **Reports** are still permission-gated stubs (see `docs/mera-driver/ARCHITECTURE.md`).
 - **`packages/shared-ui`** (`@skylabs-monorepo/shared-ui`) — Material 3 web components (Material Web + LIT), theme, React wrappers, test helpers. Presentational only and **app-neutral**: mera-driver consumes it with a different design and purpose, so only common components live here. App layout pieces (page bands, grids, filter panels) live in each app.
 - **`packages/shared-types`** — cross-app RBAC domain types (`Role`, `Permission`, `MenuNode`, `BootstrapResponse`, `ApiEnvelope<T>`, …). Types only, no runtime code, no business data.
 - **`packages/shared-permissions`** — pure functions `can()`, `filterMenuByPermissions()`, `permissionKeyFor()`.
@@ -26,7 +31,7 @@ The two apps are **different businesses** with **fully independent** backends �
 own routes/controllers/services/Prisma schema/database/env per API, never a
 shared table or shared identity DB. RBAC is duplicated **by pattern** (same
 Prisma schema template, same `shared-auth`/`shared-permissions` packages),
-never by shared data. See `ARCHITECTURE.md`.
+never by shared data. See `docs/ARCHITECTURE.md`.
 
 ## Commands
 
@@ -110,7 +115,7 @@ Public pages (home, category, explore, ...) are **composition only**: shared-ui 
 msd building blocks below. No page-specific CSS files with hardcoded colours, sizes or copy;
 copy lives in `apps/msd/src/content.json`. Page-level CSS that still exists (`home.css` for
 hero/steps/offers, `category.css` for `/categories`, therapists, orders, invoices, payments) is
-legacy and is being migrated (see `TASK.md`).
+legacy and is being migrated (task ST-21 in `docs/msd/TASKS.md`).
 
 **Colour split (60/30/10, M3 roles only):** 60 = `surface` (page base); 30 = `surface-container`
 bands (`PageSection tone="tint"`) + `secondary-container` fills (category tiles, step markers,
@@ -309,7 +314,8 @@ stores uploaded media on **Cloudflare R2** (Railway's disk is wiped on redeploy)
 `release → main`, **back-merge into `develop`** (`git checkout develop && git pull
 && git pull origin main --no-edit && git push`) so the release's version bump +
 changelog don't leave `develop` behind. Full detail (Vercel `vercel.json` per app,
-dashboard settings, domains, env vars, back-merge): see **`DEPLOYMENT.md`**.
+dashboard settings, domains, env vars, back-merge): see **`docs/DEPLOYMENT.md`** and each app's
+`docs/<app>/DEPLOYMENT.md`.
 
 ## AI Dev Team
 
@@ -381,12 +387,8 @@ msd map vars: `VITE_MAP_PROVIDER` (`leaflet` default or `google`), optional `VIT
   `git stash`, `git reset`, `git checkout -- <file>`, `git restore`, `git clean`, `git apply`,
   `git worktree`, or delete directories to "compare with an old version". Read old files with
   `git show <rev>:<path> > <temp file>` instead. Stage only the files a task names.
-- Known pre-existing test failures (not caused by storefront work): msd 26 tests in 15 files
-  (`permission-matrix` 9, `india-locations` 3, `home` 2, `contact-us` 2, 1 each in `app.spec`,
-  `widget-registry`, `deal-card`, `media-uploader`, `sky-product-card-wc`, `site-footer`,
-  `become-vendor`, `wishlist`, `roles`, `settings`, plus `entry-server.test.tsx` failing to load);
-  msd-api 5 (`rbac.routes` 4, `orders.routes` image 1); shared-menu `index.test.ts` 5;
-  mera-driver RBAC route / users "Login As" / drivers specs (12). Tracked in `TASK.md`.
+- Known pre-existing test failures: listed once in `docs/msd/TESTING.md` §3 (msd, msd-api,
+  shared-menu) and `docs/mera-driver/TESTING.md` §3 (12 specs). They must not grow.
 
 - `nx.json` `defaultBase` is `"main"` (matches the active branch) — `nx affected`
-  in CI and `nx-ignore` on Vercel both compare against it. See `DEPLOYMENT.md`.
+  in CI and `nx-ignore` on Vercel both compare against it. See `docs/DEPLOYMENT.md`.
