@@ -127,7 +127,6 @@ Permission string stays `${menuKey}:${action}`. Every key needs a node in `msd-m
 | `settings` | `settings`, `settings.group` |
 | `logs` | `rbac.audit-logs`, login history |
 | `profile` | `vendor-portal.profile` |
-
 Kept outside the 14: `dashboard`, `masters.*` (categories, sub-categories, tags, popular-treatments, promotions, home-hero), `rbac.roles`. Masters are seeded as super_admin VCED, admin VCE, marketing V only, others none (owner decision D8). The role doc does not list them, so add them to its matrix when it is next edited.
 
 ### 3.3 Actions (no new kinds, existing 16)
