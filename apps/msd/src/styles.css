@@ -175,6 +175,107 @@ input[type='checkbox'] {
   padding-top: 4px;
 }
 
+/* Member detail (member-header-actions.tsx, member-documents-tab.tsx, member-activity-tab.tsx). */
+.member-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.member-actions__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 16px;
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+}
+
+.member-actions__title,
+.member-actions__body {
+  margin: 0;
+}
+
+.member-actions__body {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.member-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.member-actions__confirm md-outlined-text-field,
+.document-row__reject md-outlined-text-field {
+  width: 100%;
+}
+
+.document-list,
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.document-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--md-sys-color-surface-container);
+}
+
+.document-row__info {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.document-row__info h3,
+.document-row__info p,
+.activity-list p {
+  margin: 0;
+}
+
+.document-row__upload,
+.document-row__review,
+.document-row__reject {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.document-row__reject {
+  flex-basis: 100%;
+}
+
+.document-row__file {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.document-row__file input {
+  min-height: 44px;
+}
+
+.activity-list__item {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background-color: var(--md-sys-color-surface-container);
+}
+
 .entity-list {
   list-style: none;
   margin: 0;
@@ -623,10 +724,6 @@ input[type='checkbox'] {
   width: 100%;
   box-sizing: border-box;
 }
-
-.form-grid > sky-tile-card .vendor-fields-grid {
-  margin-top: 16px;
-}
 .vendor-section-content {
   display: flex;
   flex-direction: column;
@@ -650,55 +747,8 @@ input[type='checkbox'] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   width: 100%;
-}/* ── KYC Review ─────────────────────────────────────────────────────── */
-
-.kyc-review {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: 100%;
-  box-sizing: border-box;
-  margin: 4px 0 0;
-  padding: 16px;
-  border: 1px solid var(--md-sys-color-outline-variant, #c4c7c5);
-  border-radius: 12px;
-  background: var(--md-sys-color-surface-container-low, #f7f8fa);
 }
 
-.kyc-review legend {
-  padding: 0 8px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--md-sys-color-on-surface);
-}
-
-.kyc-review-status {
-  margin-left: 8px;
-  color: var(--md-sys-color-on-surface-variant);
-  font-weight: 400;
-}
-
-/* Rejection reason on first row */
-.kyc-review-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: 100%;
-}
-
-.kyc-review-actions md-outlined-text-field {
-  width: 100%;
-  min-width: 0;
-}
-
-/* Buttons on second row */
-.kyc-review-buttons {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
 .vendor-kyc-document-card {
   width: 100%;
   margin-top: 4px;
@@ -715,28 +765,8 @@ input[type='checkbox'] {
     grid-template-columns: 1fr;
     row-gap: 20px;
   }
-  .kyc-review-actions {
+  .vendor-kyc-document-card .kyc-document-list {
     grid-template-columns: 1fr;
-  }
-
-  .kyc-review-actions md-outlined-text-field {
-    width: 100%;
-  }
-    .vendor-kyc-document-card .kyc-document-list {
-    grid-template-columns: 1fr;
-  }
-    .kyc-review {
-    padding: 14px;
-  }
-
-  .kyc-review-buttons {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .kyc-review-buttons md-filled-button,
-  .kyc-review-buttons md-outlined-button {
-    width: 100%;
   }
 }
 @media (max-width: 900px) {

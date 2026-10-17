@@ -13,6 +13,11 @@ vi.mock('../services/permission-resolver.service', () => ({
   resolveGrantedPermissionKeys: vi.fn(),
 }));
 
+// POST /vendors now runs createMember, which sends a welcome notice: never reach a real SMTP or SMS provider.
+vi.mock('../services/member-notice.service', () => ({
+  sendMemberNotice: vi.fn().mockResolvedValue({ email: true, sms: true }),
+}));
+
 // Same mock shape as vendor-kyc-documents.routes.test.ts / media.routes.test.ts / categories.
 // routes.test.ts — without this, the image/video upload routes tested below would write real
 // files under the real uploads directory on every test run.
@@ -137,7 +142,7 @@ describe('GET /api/v1/vendors/me', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 403 when the caller lacks vendors:custom', async () => {
+  it('returns 403 when the caller lacks members:custom', async () => {
     resolveMock.mockResolvedValue([]);
     const res = await request(app)
       .get('/api/v1/vendors/me')
@@ -145,9 +150,9 @@ describe('GET /api/v1/vendors/me', () => {
     expect(res.status).toBe(403);
   });
 
-  it('returns 404 when the caller has vendors:custom but no vendor profile yet', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(null);
+  it('returns 404 when the caller has members:custom but no vendor profile yet', async () => {
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(null);
     const res = await request(app)
       .get('/api/v1/vendors/me')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
@@ -155,8 +160,8 @@ describe('GET /api/v1/vendors/me', () => {
   });
 
   it("returns 200 with the caller's own vendor", async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     const res = await request(app)
       .get('/api/v1/vendors/me')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
@@ -165,46 +170,10 @@ describe('GET /api/v1/vendors/me', () => {
   });
 });
 
-describe('POST /api/v1/vendors/me', () => {
-  it('returns 422 for a missing businessName', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    const res = await request(app)
-      .post('/api/v1/vendors/me')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({});
-    expect(res.status).toBe(422);
-  });
-
-  it('creates a self-registered vendor owned by the caller', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(null);
-    prismaMock.vendor.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: VENDOR_A_ID, ...data }),
-    );
-    const res = await request(app)
-      .post('/api/v1/vendors/me')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ businessName: 'Vendor A Spa' });
-    expect(res.status).toBe(201);
-    expect(res.body.data.ownerUserId).toBe(USER_A_ID);
-    expect(res.body.data.status).toBe('PROFILE_INCOMPLETE');
-  });
-
-  it('returns 409 when the caller already has a vendor profile', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
-    const res = await request(app)
-      .post('/api/v1/vendors/me')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ businessName: 'Vendor A Spa' });
-    expect(res.status).toBe(409);
-  });
-});
-
 describe('Security: vendor cross-tenant isolation', () => {
   it("403s when Vendor A's token tries to touch Vendor B's branch via /vendors/me/branches/:branchId", async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture); // getMyVendorOrThrow -> vendor A
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture); // getMyVendorOrThrow -> vendor A
     prismaMock.branch.findUnique.mockResolvedValue(branchBFixture); // branch actually belongs to vendor B
     const res = await request(app)
       .patch(`/api/v1/vendors/me/branches/${BRANCH_B_ID}`)
@@ -214,8 +183,8 @@ describe('Security: vendor cross-tenant isolation', () => {
   });
 
   it("403s when Vendor A's token tries to touch Vendor B's deal via /vendors/me/branches/:branchId/deals/:dealId", async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.findUnique.mockResolvedValue(branchBFixture);
     const res = await request(app)
       .patch(`/api/v1/vendors/me/branches/${BRANCH_B_ID}/deals/${DEAL_A_ID}`)
@@ -225,8 +194,8 @@ describe('Security: vendor cross-tenant isolation', () => {
   });
 
   it('a vendor cannot activate its own deal before admin approval', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
     prismaMock.deal.findUnique.mockResolvedValue(dealAFixture); // approvalStatus: PENDING
     const res = await request(app)
@@ -238,7 +207,7 @@ describe('Security: vendor cross-tenant isolation', () => {
 });
 
 describe('GET /api/v1/vendors (admin)', () => {
-  it('returns 403 without vendors:view', async () => {
+  it('returns 403 without members:view', async () => {
     resolveMock.mockResolvedValue([]);
     const res = await request(app)
       .get('/api/v1/vendors')
@@ -247,9 +216,9 @@ describe('GET /api/v1/vendors (admin)', () => {
   });
 
   it('returns 200 with the vendor list for an admin', async () => {
-    resolveMock.mockResolvedValue(['vendors:view']);
-    prismaMock.vendor.findMany.mockResolvedValue([vendorAFixture]);
-    prismaMock.vendor.count.mockResolvedValue(1);
+    resolveMock.mockResolvedValue(['members:view']);
+    prismaMock.member.findMany.mockResolvedValue([vendorAFixture]);
+    prismaMock.member.count.mockResolvedValue(1);
     const res = await request(app)
       .get('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
@@ -259,9 +228,9 @@ describe('GET /api/v1/vendors (admin)', () => {
   });
 
   it('adds liveCounts per vendor (0 where a vendor has no live rows) and asks only for live rows', async () => {
-    resolveMock.mockResolvedValue(['vendors:view']);
-    prismaMock.vendor.findMany.mockResolvedValue([vendorAFixture]);
-    prismaMock.vendor.count.mockResolvedValue(1);
+    resolveMock.mockResolvedValue(['members:view']);
+    prismaMock.member.findMany.mockResolvedValue([vendorAFixture]);
+    prismaMock.member.count.mockResolvedValue(1);
     prismaMock.deal.groupBy.mockResolvedValue([{ vendorId: vendorAFixture.id, _count: { _all: 5 } }]);
     prismaMock.therapist.groupBy.mockResolvedValue([{ vendorId: vendorAFixture.id, _count: { _all: 2 } }]);
     const res = await request(app)
@@ -277,8 +246,8 @@ describe('GET /api/v1/vendors (admin)', () => {
     );
   });
 
-  it('a vendor-role token (vendors:custom only, no vendors:view) cannot list all vendors', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+  it('a vendor-role token (members:custom only, no members:view) cannot list all vendors', async () => {
+    resolveMock.mockResolvedValue(['members:custom']);
     const res = await request(app)
       .get('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
@@ -286,94 +255,79 @@ describe('GET /api/v1/vendors (admin)', () => {
   });
 });
 
-describe('POST /api/v1/vendors (admin create)', () => {
-  it('creates a vendor and writes an audit log entry', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
-    prismaMock.vendor.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+/** POST /vendors is the deprecated alias of POST /members: it runs createMember with the short Add member form. */
+describe('POST /api/v1/vendors (admin create alias)', () => {
+  const FULL_BODY = {
+    businessName: 'Urban Wellness Spa',
+    ownerFirstName: 'Asha',
+    ownerLastName: 'Rao',
+    ownerEmail: 'asha@urban.test',
+    ownerMobile: '9222222222',
+  };
+
+  beforeEach(() => {
+    resolveMock.mockResolvedValue(['members:create']);
+    prismaMock.user.create.mockResolvedValue({ id: USER_B_ID });
+    prismaMock.role.findUnique.mockResolvedValue({ id: 'member-role-id', key: 'member' });
+    prismaMock.userRole.upsert.mockResolvedValue({});
+    prismaMock.member.update.mockResolvedValue({});
+    prismaMock.member.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: VENDOR_A_ID, ...data }),
     );
+  });
+
+  it('creates an ACTIVE member, writes an audit log entry and marks the response deprecated', async () => {
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Admin-created Vendor', gstNumber: '27AAAAA0000A1Z5', panNumber: 'AAAAA0000A' });
+      .send(FULL_BODY);
     expect(res.status).toBe(201);
-    expect(res.body.data.status).toBe('PENDING_VERIFICATION'); // gst+pan present -> skip PROFILE_INCOMPLETE
+    expect(res.body.data.status).toBe('ACTIVE');
+    expect(res.headers.deprecation).toBe('true');
     expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
   });
 
-  it('generates a non-null, businessName-derived slug — never leaves it null', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
-    prismaMock.vendor.findUnique.mockResolvedValue(null); // no existing vendor owns this slug
-    prismaMock.vendor.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: VENDOR_A_ID, ...data }),
-    );
+  it('generates a non-null, businessName-derived slug', async () => {
+    prismaMock.member.findUnique.mockResolvedValue(null); // no existing member owns this slug
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Urban Wellness Spa' });
+      .send(FULL_BODY);
     expect(res.status).toBe(201);
     expect(res.body.data.slug).toBe('urban-wellness-spa');
   });
 
-  it('disambiguates the slug when the plain businessName-derived slug is already taken', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
-    prismaMock.vendor.findUnique.mockResolvedValueOnce({ id: 'other-vendor', slug: 'urban-wellness-spa' });
-    prismaMock.vendor.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: VENDOR_A_ID, ...data }),
-    );
+  it('422s the old businessName-only draft body and creates nothing', async () => {
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Urban Wellness Spa' });
-    expect(res.status).toBe(201);
-    expect(res.body.data.slug).toMatch(/^urban-wellness-spa-[a-f0-9]{6}$/);
+      .send({ businessName: 'No Owner Info' });
+    expect(res.status).toBe(422);
+    expect(prismaMock.member.create).not.toHaveBeenCalled();
+    expect(prismaMock.user.create).not.toHaveBeenCalled();
   });
 
-  it('returns the existing row instead of creating a duplicate when the same admin submitted the same businessName in the last 10s (rapid double-click, no ownerUserId set)', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
-    const recentVendor = { id: VENDOR_A_ID, businessName: 'Urban Wellness Spa', createdByUserId: 'admin-1', createdAt: new Date() };
-    // .mockResolvedValueOnce (not a persistent .mockResolvedValue) — this mock must not leak
-    // into later tests in this file via the outer `vi.clearAllMocks()`, which clears call
-    // history but not a still-configured resolved value.
-    prismaMock.vendor.findFirst.mockResolvedValueOnce(recentVendor);
+  it('422s a field outside the Add member allowlist', async () => {
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Urban Wellness Spa' });
-    expect(res.status).toBe(201);
-    expect(res.body.data.id).toBe(VENDOR_A_ID);
-    expect(prismaMock.vendor.create).not.toHaveBeenCalled();
-    expect(prismaMock.vendor.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          createdByUserId: 'admin-1',
-          businessName: 'Urban Wellness Spa',
-          createdAt: expect.objectContaining({ gte: expect.any(Date) }),
-        }),
-      }),
-    );
+      .send({ ...FULL_BODY, gstNumber: '27AAAAA0000A1Z5' });
+    expect(res.status).toBe(422);
+    expect(prismaMock.member.create).not.toHaveBeenCalled();
   });
 });
 
-describe('Vendor <-> existing User linking (PATCH/edit only — POST/create never accepts ownerUserId, see below)', () => {
-  const vendorRoleFixture = { id: 'vendor-role-id', key: 'vendor' };
-
-  it("editing a vendor's own unchanged ownerUserId doesn't false-positive as a conflict", async () => {
-    resolveMock.mockResolvedValue(['vendors:edit']);
-    prismaMock.vendor.findUnique
-      .mockResolvedValueOnce(vendorAFixture) // getVendorOrThrow at the top of updateVendor
-      .mockResolvedValueOnce(vendorAFixture); // assertOwnerUserAvailable's own-vendor lookup, excluded via excludeVendorId
-    prismaMock.user.findFirst.mockResolvedValue({ id: USER_A_ID, status: 'active', deletedAt: null });
-    prismaMock.vendor.update.mockResolvedValue(vendorAFixture);
-    prismaMock.role.findUnique.mockResolvedValue(vendorRoleFixture);
-    prismaMock.userRole.upsert.mockResolvedValue({});
-
+describe('PATCH /api/v1/vendors/:id never re-links an owner', () => {
+  it('rejects ownerUserId with 422 and writes nothing', async () => {
+    resolveMock.mockResolvedValue(['members:edit']);
     const res = await request(app)
       .patch(`/api/v1/vendors/${VENDOR_A_ID}`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
       .send({ ownerUserId: USER_A_ID });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(422);
+    expect(prismaMock.member.update).not.toHaveBeenCalled();
+    expect(prismaMock.userRole.upsert).not.toHaveBeenCalled();
   });
 });
 
@@ -388,10 +342,10 @@ describe('POST /api/v1/vendors — owner is always a brand-new User (no existing
   const vendorRoleFixture = { id: 'vendor-role-id', key: 'vendor' };
 
   beforeEach(() => {
-    resolveMock.mockResolvedValue(['vendors:create']);
+    resolveMock.mockResolvedValue(['members:create']);
     prismaMock.role.findUnique.mockResolvedValue(vendorRoleFixture);
     prismaMock.userRole.upsert.mockResolvedValue({});
-    prismaMock.vendor.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+    prismaMock.member.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: VENDOR_A_ID, ...data }),
     );
   });
@@ -432,12 +386,12 @@ describe('POST /api/v1/vendors — owner is always a brand-new User (no existing
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Taken Email Vendor', ownerEmail: 'taken@example.com', ownerMobile: '9999999999' });
+      .send({ businessName: 'Taken Email Vendor', ownerFirstName: 'Asha', ownerLastName: 'Rao', ownerEmail: 'taken@example.com', ownerMobile: '9999999999' });
 
     expect(res.status).toBe(409);
     expect(res.body.error.message).toMatch(/already exists/);
     expect(prismaMock.user.create).not.toHaveBeenCalled();
-    expect(prismaMock.vendor.create).not.toHaveBeenCalled();
+    expect(prismaMock.member.create).not.toHaveBeenCalled();
     expect(prismaMock.userRole.upsert).not.toHaveBeenCalled();
   });
 
@@ -447,11 +401,11 @@ describe('POST /api/v1/vendors — owner is always a brand-new User (no existing
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Taken Phone Vendor', ownerEmail: 'fresh@example.com', ownerMobile: '9888888888' });
+      .send({ businessName: 'Taken Phone Vendor', ownerFirstName: 'Asha', ownerLastName: 'Rao', ownerEmail: 'fresh@example.com', ownerMobile: '9888888888' });
 
     expect(res.status).toBe(409);
     expect(prismaMock.user.create).not.toHaveBeenCalled();
-    expect(prismaMock.vendor.create).not.toHaveBeenCalled();
+    expect(prismaMock.member.create).not.toHaveBeenCalled();
   });
 
   it('rejects with 409 when BOTH email and phone belong to the SAME existing User — an existing Customer supplying their own details is never converted/reused', async () => {
@@ -460,11 +414,11 @@ describe('POST /api/v1/vendors — owner is always a brand-new User (no existing
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Existing Customer Vendor', ownerEmail: 'vinay@example.com', ownerMobile: '9889259224' });
+      .send({ businessName: 'Existing Customer Vendor', ownerFirstName: 'Asha', ownerLastName: 'Rao', ownerEmail: 'vinay@example.com', ownerMobile: '9889259224' });
 
     expect(res.status).toBe(409);
     expect(prismaMock.user.create).not.toHaveBeenCalled();
-    expect(prismaMock.vendor.create).not.toHaveBeenCalled();
+    expect(prismaMock.member.create).not.toHaveBeenCalled();
     // Confirms the existing User never gets the `vendor` role added, either — a full no-op.
     expect(prismaMock.userRole.upsert).not.toHaveBeenCalled();
   });
@@ -475,26 +429,10 @@ describe('POST /api/v1/vendors — owner is always a brand-new User (no existing
     const res = await request(app)
       .post('/api/v1/vendors')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Mismatched Owner Vendor', ownerEmail: 'a@example.com', ownerMobile: '9876543210' });
+      .send({ businessName: 'Mismatched Owner Vendor', ownerFirstName: 'Asha', ownerLastName: 'Rao', ownerEmail: 'a@example.com', ownerMobile: '9876543210' });
 
     expect(res.status).toBe(409);
-    expect(prismaMock.vendor.create).not.toHaveBeenCalled();
-  });
-
-  it('businessName given with neither ownerEmail nor ownerMobile creates an owner-less draft (Step 1 businessName-only) — createVendorOwner is never called', async () => {
-    prismaMock.vendor.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: VENDOR_A_ID, ...data }),
-    );
-
-    const res = await request(app)
-      .post('/api/v1/vendors')
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'No Owner Info' });
-
-    expect(res.status).toBe(201);
-    expect(res.body.data.ownerUserId).toBeUndefined();
-    expect(prismaMock.user.create).not.toHaveBeenCalled();
-    expect(prismaMock.userRole.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.member.create).not.toHaveBeenCalled();
   });
 });
 
@@ -506,7 +444,7 @@ describe('POST /api/v1/vendors — owner is always a brand-new User (no existing
  * admin fills in the rest of the form.
  *
  * Edge cases:
- * - 403 without vendors:create or vendors:edit
+ * - 403 without members:create or members:edit
  */
 describe('GET /api/v1/vendors/users/lookup — owner-identity availability check', () => {
   it('returns 401 with no token', async () => {
@@ -514,8 +452,8 @@ describe('GET /api/v1/vendors/users/lookup — owner-identity availability check
     expect(res.status).toBe(401);
   });
 
-  it('returns 403 without vendors:create or vendors:edit', async () => {
-    resolveMock.mockResolvedValue(['vendors:view']);
+  it('returns 403 without members:create or members:edit', async () => {
+    resolveMock.mockResolvedValue(['members:view']);
     const res = await request(app)
       .get('/api/v1/vendors/users/lookup?email=a@example.com')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
@@ -523,7 +461,7 @@ describe('GET /api/v1/vendors/users/lookup — owner-identity availability check
   });
 
   it('returns available:true with no conflicts when neither identifier matches anything', async () => {
-    resolveMock.mockResolvedValue(['vendors:edit']);
+    resolveMock.mockResolvedValue(['members:edit']);
     prismaMock.user.findFirst.mockResolvedValue(null);
 
     const res = await request(app)
@@ -535,7 +473,7 @@ describe('GET /api/v1/vendors/users/lookup — owner-identity availability check
   });
 
   it('returns available:false with conflicts:["email"] when only the email is already taken', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
+    resolveMock.mockResolvedValue(['members:create']);
     prismaMock.user.findFirst.mockResolvedValueOnce({ id: USER_A_ID }).mockResolvedValueOnce(null);
 
     const res = await request(app)
@@ -547,7 +485,7 @@ describe('GET /api/v1/vendors/users/lookup — owner-identity availability check
   });
 
   it('returns available:false with conflicts:["phone"] when only the phone is already taken', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
+    resolveMock.mockResolvedValue(['members:create']);
     prismaMock.user.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: USER_A_ID });
 
     const res = await request(app)
@@ -559,7 +497,7 @@ describe('GET /api/v1/vendors/users/lookup — owner-identity availability check
   });
 
   it('returns available:false with conflicts:["email","phone"] when both are taken, even by the same existing User', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
+    resolveMock.mockResolvedValue(['members:create']);
     prismaMock.user.findFirst.mockResolvedValue({ id: USER_A_ID });
 
     const res = await request(app)
@@ -571,7 +509,7 @@ describe('GET /api/v1/vendors/users/lookup — owner-identity availability check
   });
 
   it('returns 422 when neither email nor mobile is given', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
+    resolveMock.mockResolvedValue(['members:create']);
     const res = await request(app)
       .get('/api/v1/vendors/users/lookup')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
@@ -586,8 +524,8 @@ describe('Vendor mobile phone validation (canonical /^[6-9]\\d{9}$/ rule)', () =
     ['12345678901', '11 digits'],
     ['5876543210', 'first digit not 6-9'],
   ])('rejects "%s" (%s)', async (badPhone) => {
-    resolveMock.mockResolvedValue(['vendors:edit']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:edit']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
 
     const res = await request(app)
       .patch(`/api/v1/vendors/${VENDOR_A_ID}`)
@@ -595,13 +533,13 @@ describe('Vendor mobile phone validation (canonical /^[6-9]\\d{9}$/ rule)', () =
       .send({ businessPhone: badPhone });
 
     expect(res.status).toBe(422);
-    expect(prismaMock.vendor.update).not.toHaveBeenCalled();
+    expect(prismaMock.member.update).not.toHaveBeenCalled();
   });
 
   it('accepts a bare 10-digit number starting 6-9 and stores it +91-normalized', async () => {
-    resolveMock.mockResolvedValue(['vendors:edit']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.vendor.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+    resolveMock.mockResolvedValue(['members:edit']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ ...vendorAFixture, ...data }),
     );
 
@@ -611,7 +549,7 @@ describe('Vendor mobile phone validation (canonical /^[6-9]\\d{9}$/ rule)', () =
       .send({ businessPhone: '9876543210' });
 
     expect(res.status).toBe(200);
-    expect(prismaMock.vendor.update).toHaveBeenCalledWith(
+    expect(prismaMock.member.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ businessPhone: '+919876543210' }) }),
     );
   });
@@ -620,7 +558,7 @@ describe('Vendor mobile phone validation (canonical /^[6-9]\\d{9}$/ rule)', () =
 describe('POST /api/v1/vendors/:vendorId/branches — mapLocationUrl/pincode validation', () => {
   it('resolves a mapLocationUrl server-side and persists the resolved latitude/longitude', async () => {
     resolveMock.mockResolvedValue(['vendors.branches:create']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: BRANCH_A_ID, ...data }),
     );
@@ -640,7 +578,7 @@ describe('POST /api/v1/vendors/:vendorId/branches — mapLocationUrl/pincode val
 
   it('silently strips legacy client-sent latitude/longitude instead of persisting them (mapLocationUrl is the only accepted input now)', async () => {
     resolveMock.mockResolvedValue(['vendors.branches:create']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: BRANCH_A_ID, ...data }),
     );
@@ -661,7 +599,7 @@ describe('POST /api/v1/vendors/:vendorId/branches — mapLocationUrl/pincode val
 
   it('rejects a malformed mapLocationUrl before ever calling the resolver', async () => {
     resolveMock.mockResolvedValue(['vendors.branches:create']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
 
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
@@ -678,7 +616,7 @@ describe('POST /api/v1/vendors/:vendorId/branches — mapLocationUrl/pincode val
     [{ pincode: 'abcdef' }, 'a non-numeric pincode'],
   ])('rejects %s (%s)', async (badField) => {
     resolveMock.mockResolvedValue(['vendors.branches:create']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
 
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
@@ -771,7 +709,7 @@ describe('mapLocationUrl — update-time resolve/skip semantics + resolver-rejec
 
   it('a resolver rejection on branch create surfaces as a 422, not a 500', async () => {
     resolveMock.mockResolvedValue(['vendors.branches:create']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     resolveMapLocationMock.mockRejectedValue(new ApiError('VALIDATION_ERROR', "We couldn't resolve this Google Maps link. Please check the link and try again."));
 
     const res = await request(app)
@@ -797,29 +735,11 @@ describe('mapLocationUrl — update-time resolve/skip semantics + resolver-rejec
     expect(prismaMock.branch.update).not.toHaveBeenCalled();
   });
 
-  it('admin POST /vendors resolves a mapLocationUrl and persists the resolved latitude/longitude on the Vendor itself (not just Branch)', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
-    resolveMapLocationMock.mockResolvedValue({ latitude: 26.7606, longitude: 83.3732 });
-    prismaMock.vendor.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: VENDOR_A_ID, ...data }),
-    );
-
-    const res = await request(app)
-      .post('/api/v1/vendors')
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ businessName: 'Golghar Spa', mapLocationUrl: 'https://maps.app.goo.gl/o3WNRifqzdctDuiF9' });
-
-    expect(res.status).toBe(201);
-    expect(resolveMapLocationMock).toHaveBeenCalledWith('https://maps.app.goo.gl/o3WNRifqzdctDuiF9');
-    expect(res.body.data.latitude).toBe(26.7606);
-    expect(res.body.data.longitude).toBe(83.3732);
-  });
-
   it('admin PATCH /vendors/:id with an unchanged mapLocationUrl does not re-resolve', async () => {
-    resolveMock.mockResolvedValue(['vendors:edit']);
+    resolveMock.mockResolvedValue(['members:edit']);
     const existing = { ...vendorAFixture, mapLocationUrl: 'https://maps.app.goo.gl/existing', latitude: 1, longitude: 2 };
-    prismaMock.vendor.findUnique.mockResolvedValue(existing);
-    prismaMock.vendor.update.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ ...existing, ...data }));
+    prismaMock.member.findUnique.mockResolvedValue(existing);
+    prismaMock.member.update.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ ...existing, ...data }));
 
     const res = await request(app)
       .patch(`/api/v1/vendors/${VENDOR_A_ID}`)
@@ -830,31 +750,12 @@ describe('mapLocationUrl — update-time resolve/skip semantics + resolver-rejec
     expect(resolveMapLocationMock).not.toHaveBeenCalled();
   });
 
-  it('self-service POST /vendors/me resolves a mapLocationUrl and persists it on the new self-registered vendor', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(null);
-    resolveMapLocationMock.mockResolvedValue({ latitude: 26.7606, longitude: 83.3732 });
-    prismaMock.vendor.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: VENDOR_A_ID, ...data }),
-    );
-
-    const res = await request(app)
-      .post('/api/v1/vendors/me')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ businessName: 'My Spa', mapLocationUrl: 'https://maps.app.goo.gl/o3WNRifqzdctDuiF9' });
-
-    expect(res.status).toBe(201);
-    expect(resolveMapLocationMock).toHaveBeenCalledWith('https://maps.app.goo.gl/o3WNRifqzdctDuiF9');
-    expect(res.body.data.latitude).toBe(26.7606);
-    expect(res.body.data.longitude).toBe(83.3732);
-  });
-
   it('self-service PATCH /vendors/me with a changed mapLocationUrl re-resolves and updates latitude/longitude', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+    resolveMock.mockResolvedValue(['members:custom']);
     const existing = { ...vendorAFixture, mapLocationUrl: 'https://maps.app.goo.gl/old', latitude: 1, longitude: 2, kycStatus: 'VERIFIED' };
-    prismaMock.vendor.findUnique.mockResolvedValue(existing);
+    prismaMock.member.findUnique.mockResolvedValue(existing);
     resolveMapLocationMock.mockResolvedValue({ latitude: 26.7606, longitude: 83.3732 });
-    prismaMock.vendor.update.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ ...existing, ...data }));
+    prismaMock.member.update.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ ...existing, ...data }));
 
     const res = await request(app)
       .patch('/api/v1/vendors/me')
@@ -868,10 +769,10 @@ describe('mapLocationUrl — update-time resolve/skip semantics + resolver-rejec
   });
 
   it('self-service PATCH /vendors/me with mapLocationUrl absent leaves the existing value untouched', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+    resolveMock.mockResolvedValue(['members:custom']);
     const existing = { ...vendorAFixture, mapLocationUrl: 'https://maps.app.goo.gl/old', latitude: 1, longitude: 2, kycStatus: 'VERIFIED' };
-    prismaMock.vendor.findUnique.mockResolvedValue(existing);
-    prismaMock.vendor.update.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ ...existing, ...data }));
+    prismaMock.member.findUnique.mockResolvedValue(existing);
+    prismaMock.member.update.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ ...existing, ...data }));
 
     const res = await request(app)
       .patch('/api/v1/vendors/me')
@@ -885,8 +786,8 @@ describe('mapLocationUrl — update-time resolve/skip semantics + resolver-rejec
   });
 
   it('a resolver rejection on self-service vendor update surfaces as a 422, not a 500', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     resolveMapLocationMock.mockRejectedValue(new ApiError('VALIDATION_ERROR', 'That is not a supported Google Maps URL. Please paste a link from Google Maps (e.g. maps.app.goo.gl or google.com/maps).'));
 
     const res = await request(app)
@@ -895,7 +796,7 @@ describe('mapLocationUrl — update-time resolve/skip semantics + resolver-rejec
       .send({ mapLocationUrl: 'https://evil.com/not-maps' });
 
     expect(res.status).toBe(422);
-    expect(prismaMock.vendor.update).not.toHaveBeenCalled();
+    expect(prismaMock.member.update).not.toHaveBeenCalled();
   });
 
   it('GET returns a pre-migration branch row (latitude/longitude set, mapLocationUrl null) unchanged — never broken by the new resolve logic', async () => {
@@ -917,8 +818,8 @@ describe('mapLocationUrl — update-time resolve/skip semantics + resolver-rejec
   });
 
   it('GET returns a pre-migration vendor row (latitude/longitude set, mapLocationUrl null) unchanged', async () => {
-    resolveMock.mockResolvedValue(['vendors:view']);
-    prismaMock.vendor.findUnique.mockResolvedValue({ ...vendorAFixture, latitude: 26.7606, longitude: 83.3732, mapLocationUrl: null });
+    resolveMock.mockResolvedValue(['members:view']);
+    prismaMock.member.findUnique.mockResolvedValue({ ...vendorAFixture, latitude: 26.7606, longitude: 83.3732, mapLocationUrl: null });
 
     const res = await request(app)
       .get(`/api/v1/vendors/${VENDOR_A_ID}`)
@@ -947,7 +848,7 @@ describe('POST/PATCH /api/v1/vendors/:vendorId/branches — openingHours persist
 
   it('POST persists openingHours instead of silently stripping it', async () => {
     resolveMock.mockResolvedValue(['vendors.branches:create']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: BRANCH_A_ID, ...data }),
     );
@@ -978,7 +879,7 @@ describe('POST/PATCH /api/v1/vendors/:vendorId/branches — openingHours persist
 
   it('rejects a malformed time string (not 24-hour HH:MM) with a 422, not a silent strip', async () => {
     resolveMock.mockResolvedValue(['vendors.branches:create']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
@@ -989,7 +890,7 @@ describe('POST/PATCH /api/v1/vendors/:vendorId/branches — openingHours persist
 });
 
 describe('GET /api/v1/vendors/users/search', () => {
-  it('returns 403 without vendors:create', async () => {
+  it('returns 403 without members:create', async () => {
     resolveMock.mockResolvedValue([]);
     const res = await request(app)
       .get('/api/v1/vendors/users/search?q=vinay')
@@ -997,8 +898,8 @@ describe('GET /api/v1/vendors/users/search', () => {
     expect(res.status).toBe(403);
   });
 
-  it('returns matching users for an admin with vendors:create', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
+  it('returns matching users for an admin with members:create', async () => {
+    resolveMock.mockResolvedValue(['members:create']);
     prismaMock.user.findMany.mockResolvedValue([
       { id: USER_B_ID, name: 'Vinay Jaiswal', email: 'vinay@example.com', phone: '9999999999', status: 'active', roles: [] },
     ]);
@@ -1013,8 +914,8 @@ describe('GET /api/v1/vendors/users/search', () => {
     expect(res.body.data[0].name).toBe('Vinay Jaiswal');
   });
 
-  it('also allows search for an admin who only holds vendors:edit (not create) — reachable while resuming a draft vendor in Step 1', async () => {
-    resolveMock.mockResolvedValue(['vendors:edit']);
+  it('also allows search for an admin who only holds members:edit (not create) — reachable while resuming a draft vendor in Step 1', async () => {
+    resolveMock.mockResolvedValue(['members:edit']);
     prismaMock.user.findMany.mockResolvedValue([]);
     prismaMock.user.count.mockResolvedValue(0);
 
@@ -1026,7 +927,7 @@ describe('GET /api/v1/vendors/users/search', () => {
   });
 
   it('filters server-side to active, not-already-linked users only — never trusts the frontend to exclude them', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
+    resolveMock.mockResolvedValue(['members:create']);
     prismaMock.user.findMany.mockResolvedValue([]);
     prismaMock.user.count.mockResolvedValue(0);
 
@@ -1043,36 +944,9 @@ describe('GET /api/v1/vendors/users/search', () => {
 });
 
 describe('Admin onboarding pipeline — per-step saves', () => {
-  // Superseded by the "owner is always a brand-new User" correction — Step 1 no longer accepts
-  // a pre-picked `ownerUserId` at all (see `createVendor`'s own doc comment); it now always
-  // creates a fresh owner from `ownerEmail`/`ownerMobile`, still with no `businessName` yet.
-  it('Step 1 alone (ownerEmail/ownerMobile only, no businessName) creates a draft vendor with a brand-new owner', async () => {
-    resolveMock.mockResolvedValue(['vendors:create']);
-    prismaMock.user.findFirst
-      .mockResolvedValueOnce(null) // createVendorOwner: byEmail — no match
-      .mockResolvedValueOnce(null) // createVendorOwner: byPhone — no match
-      .mockResolvedValue({ id: USER_B_ID, roles: [] }); // ensureVendorRoleAssigned -> assignRole's getUserOrThrow
-    prismaMock.user.create.mockResolvedValue({ id: USER_B_ID });
-    prismaMock.role.findUnique.mockResolvedValue({ id: 'vendor-role-id', key: 'vendor' });
-    prismaMock.userRole.upsert.mockResolvedValue({});
-    prismaMock.vendor.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: VENDOR_A_ID, status: 'PROFILE_INCOMPLETE', ...data }),
-    );
-
-    const res = await request(app)
-      .post('/api/v1/vendors')
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ ownerEmail: 'draft-owner@example.com', ownerMobile: '9333333333' });
-
-    expect(res.status).toBe(201);
-    expect(res.body.data.businessName).toBeUndefined();
-    expect(res.body.data.ownerUserId).toBe(USER_B_ID);
-    expect(prismaMock.user.create).toHaveBeenCalledOnce();
-  });
-
   it("every admin Vendor response carries profileCompletion with a 'user' section reflecting ownerUserId", async () => {
-    resolveMock.mockResolvedValue(['vendors:view']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture); // has ownerUserId set
+    resolveMock.mockResolvedValue(['members:view']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture); // has ownerUserId set
     const res = await request(app)
       .get(`/api/v1/vendors/${VENDOR_A_ID}`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
@@ -1082,19 +956,11 @@ describe('Admin onboarding pipeline — per-step saves', () => {
     expect(userSection.complete).toBe(true);
   });
 
-  it('self-registration still requires businessName (unlike the admin pipeline)', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    const res = await request(app)
-      .post('/api/v1/vendors/me')
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({});
-    expect(res.status).toBe(422);
-  });
 });
 
 describe('Cross-vendor Branches/Deals sidebar lists', () => {
-  it('GET /vendors/branches returns 403 for a vendor-role token (vendors:custom only)', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+  it('GET /vendors/branches returns 403 for a vendor-role token (members:custom only)', async () => {
+    resolveMock.mockResolvedValue(['members:custom']);
     const res = await request(app)
       .get('/api/v1/vendors/branches')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
@@ -1113,7 +979,7 @@ describe('Cross-vendor Branches/Deals sidebar lists', () => {
   });
 
   it('GET /vendors/deals returns 403 for a vendor-role token', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+    resolveMock.mockResolvedValue(['members:custom']);
     const res = await request(app)
       .get('/api/v1/vendors/deals')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
@@ -1135,7 +1001,7 @@ describe('Cross-vendor Branches/Deals sidebar lists', () => {
   });
 
   it('GET /vendors/therapists returns 403 for a vendor-role token', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+    resolveMock.mockResolvedValue(['members:custom']);
     const res = await request(app)
       .get('/api/v1/vendors/therapists')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
@@ -1168,121 +1034,185 @@ describe('Cross-vendor Branches/Deals sidebar lists', () => {
   });
 });
 
-describe('PATCH /api/v1/vendors/:id/approve + /reject', () => {
-  it('approve jumps the vendor straight to ACTIVE', async () => {
-    resolveMock.mockResolvedValue(['vendors:approve']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.vendor.update.mockResolvedValue({ ...vendorAFixture, status: 'ACTIVE' });
+/**
+ * Feature: approval is gone. Members start ACTIVE, so the self-service create and submit routes
+ * and the admin approve, reject and KYC review routes no longer exist.
+ */
+describe('Removed approval and self-create routes', () => {
+  it.each([
+    ['post', '/api/v1/vendors/me'],
+    ['post', '/api/v1/vendors/me/submit'],
+    ['patch', `/api/v1/vendors/${VENDOR_A_ID}/approve`],
+    ['patch', `/api/v1/vendors/${VENDOR_A_ID}/reject`],
+    ['patch', `/api/v1/vendors/${VENDOR_A_ID}/kyc-review`],
+  ] as const)('%s %s is not routed and creates or updates nothing', async (method, path) => {
+    resolveMock.mockResolvedValue(['members:custom', 'members:approve', 'members:reject']);
     const res = await request(app)
-      .patch(`/api/v1/vendors/${VENDOR_A_ID}/approve`)
+      [method](path)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['admin'] }))
+      .send({ businessName: 'Vendor A Spa', reason: 'not needed any more', kycStatus: 'VERIFIED' });
+    expect(res.status).toBe(404);
+    expect(prismaMock.member.create).not.toHaveBeenCalled();
+    expect(prismaMock.member.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/v1/vendors (member list filters)', () => {
+  it('passes documents, reviewFlag and status through to the query and adds documentsSummary', async () => {
+    resolveMock.mockResolvedValue(['members:view']);
+    prismaMock.member.findMany.mockResolvedValue([{ ...vendorAFixture, documents: [], documentsDueAt: null }]);
+    prismaMock.member.count.mockResolvedValue(1);
+    const res = await request(app)
+      .get('/api/v1/vendors?status=ACTIVE&documents=incomplete&reviewFlag=true')
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('ACTIVE');
+    const where = prismaMock.member.findMany.mock.calls[0][0].where;
+    expect(where).toMatchObject({ status: 'ACTIVE', reviewFlaggedAt: { not: null } });
+    expect(where.OR).toHaveLength(3);
+    expect(res.body.data[0].documentsSummary).toMatchObject({ complete: false, missing: ['AADHAAR', 'PAN', 'GST'] });
   });
 
-  it('reject requires a reason', async () => {
-    resolveMock.mockResolvedValue(['vendors:reject']);
+  it('422s an unknown documents filter value', async () => {
+    resolveMock.mockResolvedValue(['members:view']);
     const res = await request(app)
-      .patch(`/api/v1/vendors/${VENDOR_A_ID}/reject`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({});
+      .get('/api/v1/vendors?documents=complete')
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
     expect(res.status).toBe(422);
   });
+});
 
-  it('a vendor cannot approve or reject its own vendor profile', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    const approveRes = await request(app)
-      .patch(`/api/v1/vendors/${VENDOR_A_ID}/approve`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
-    expect(approveRes.status).toBe(403);
+/** The `/vendors/:id/status` alias runs the member status service (history, audit, notices). */
+describe('PATCH /api/v1/vendors/:id/status (member status alias)', () => {
+  it('moves an ACTIVE member to INACTIVE with a reason and writes history', async () => {
+    resolveMock.mockResolvedValue(['members:status_change']);
+    prismaMock.member.findUnique.mockResolvedValue({ ...vendorAFixture, owner: null });
+    prismaMock.member.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.memberStatusHistory.create.mockResolvedValue({});
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}/status`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ status: 'INACTIVE', reason: 'Owner asked for a pause' });
+    expect(res.status).toBe(200);
+    expect(prismaMock.memberStatusHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ memberId: VENDOR_A_ID, fromStatus: 'ACTIVE', toStatus: 'INACTIVE', actorUserId: 'admin-1' }),
+    });
+  });
 
-    const rejectRes = await request(app)
-      .patch(`/api/v1/vendors/${VENDOR_A_ID}/reject`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
-      .send({ reason: 'nope' });
-    expect(rejectRes.status).toBe(403);
+  it('422s a reason shorter than 10 characters', async () => {
+    resolveMock.mockResolvedValue(['members:status_change']);
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}/status`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ status: 'SUSPENDED', reason: 'short' });
+    expect(res.status).toBe(422);
+    expect(prismaMock.member.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('403s without members:status_change', async () => {
+    resolveMock.mockResolvedValue(['members:view']);
+    const res = await request(app)
+      .patch(`/api/v1/vendors/${VENDOR_A_ID}/status`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
+      .send({ status: 'INACTIVE', reason: 'Owner asked for a pause' });
+    expect(res.status).toBe(403);
   });
 });
 
 /**
- * Feature: Superadmin hard-delete for Vendor (Vendor Validation/Delete audit, Phase 4).
- * `Order`/`OrderItem`'s `vendor` relation has no `onDelete` (Postgres default = restrict), so a
- * vendor with any real order history can never be hard-deleted — Postgres blocks it with a clean
- * P2003, translated to CONFLICT (use `/status` to deactivate/suspend instead).
+ * Feature: the `/vendors/:id` DELETE alias runs the member delete. Super Admin only (only that
+ * role holds members:delete), the member must be SUSPENDED first, a reason is required, and a
+ * member whose delete is blocked by order rows is archived instead.
  */
-describe('DELETE /api/v1/vendors/:id', () => {
-  it('deletes a vendor and writes an audit log entry', async () => {
-    resolveMock.mockResolvedValue(['vendors:delete']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.vendor.delete.mockResolvedValue(vendorAFixture);
+describe('DELETE /api/v1/vendors/:id (member delete alias)', () => {
+  const REASON = { reason: 'Closed the business for good' };
+
+  it('hard deletes a SUSPENDED member with no order lines', async () => {
+    resolveMock.mockResolvedValue(['members:delete']);
+    prismaMock.member.findUnique.mockResolvedValue({ ...vendorAFixture, status: 'SUSPENDED', owner: null });
+    prismaMock.orderItem.count.mockResolvedValue(0);
+    prismaMock.member.deleteMany.mockResolvedValue({ count: 1 });
+    prismaMock.memberDocument.findMany.mockResolvedValue([]);
+    prismaMock.vendorImage.findMany.mockResolvedValue([]);
+    prismaMock.vendorVideo.findUnique.mockResolvedValue(null);
+    prismaMock.user.update.mockResolvedValue({});
+    prismaMock.refreshSession.updateMany.mockResolvedValue({ count: 0 });
     const res = await request(app)
       .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['super_admin'] }))
+      .send(REASON);
     expect(res.status).toBe(200);
-    expect(prismaMock.vendor.delete).toHaveBeenCalledWith({ where: { id: VENDOR_A_ID } });
-    expect(prismaMock.auditLog.create).toHaveBeenCalledOnce();
+    expect(res.body.data).toEqual({ outcome: 'DELETED' });
+    expect(prismaMock.member.deleteMany).toHaveBeenCalledWith({ where: { id: VENDOR_A_ID, status: 'SUSPENDED' } });
   });
 
-  it('404s (not 500) when the vendor does not exist', async () => {
-    resolveMock.mockResolvedValue(['vendors:delete']);
-    prismaMock.vendor.findUnique.mockResolvedValue(null);
+  it('409s MEMBER_NOT_SUSPENDED for an ACTIVE member', async () => {
+    resolveMock.mockResolvedValue(['members:delete']);
+    prismaMock.member.findUnique.mockResolvedValue({ ...vendorAFixture, owner: null });
     const res = await request(app)
       .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-    expect(res.status).toBe(404);
-    expect(prismaMock.vendor.delete).not.toHaveBeenCalled();
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['super_admin'] }))
+      .send(REASON);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('MEMBER_NOT_SUSPENDED');
+    expect(prismaMock.member.deleteMany).not.toHaveBeenCalled();
   });
 
-  it('returns a clean 409 (not a raw 500) when the vendor has real order history blocking the delete', async () => {
-    resolveMock.mockResolvedValue(['vendors:delete']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+  it('archives instead of deleting when Postgres blocks the delete (P2003)', async () => {
+    resolveMock.mockResolvedValue(['members:delete']);
+    prismaMock.member.findUnique.mockResolvedValue({ ...vendorAFixture, status: 'SUSPENDED', owner: null });
+    prismaMock.orderItem.count.mockResolvedValue(0);
     const { Prisma } = await import('../generated/prisma-client');
-    prismaMock.vendor.delete.mockRejectedValue(
+    prismaMock.memberDocument.findMany.mockResolvedValue([]);
+    prismaMock.vendorImage.findMany.mockResolvedValue([]);
+    prismaMock.vendorVideo.findUnique.mockResolvedValue(null);
+    prismaMock.member.deleteMany.mockRejectedValueOnce(
       new Prisma.PrismaClientKnownRequestError('Foreign key constraint failed', { code: 'P2003', clientVersion: 'test' }),
     );
+    prismaMock.member.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.memberStatusHistory.create.mockResolvedValue({});
     const res = await request(app)
       .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-    expect(res.status).toBe(409);
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['super_admin'] }))
+      .send(REASON);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ outcome: 'ARCHIVED' });
   });
 
-  it('403s without vendors:delete', async () => {
-    resolveMock.mockResolvedValue(['vendors:view']);
+  it('404s (not 500) when the member does not exist', async () => {
+    resolveMock.mockResolvedValue(['members:delete']);
+    prismaMock.member.findUnique.mockResolvedValue(null);
     const res = await request(app)
       .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
-    expect(res.status).toBe(403);
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['super_admin'] }))
+      .send(REASON);
+    expect(res.status).toBe(404);
+    expect(prismaMock.member.delete).not.toHaveBeenCalled();
   });
 
-  it('a vendor cannot delete its own vendor profile', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
+  it('422s without a reason', async () => {
+    resolveMock.mockResolvedValue(['members:delete']);
     const res = await request(app)
       .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
-      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }));
-    expect(res.status).toBe(403);
-  });
-});
-
-describe('PATCH /api/v1/vendors/:id/kyc-review', () => {
-  it('requires rejectionReason when rejecting KYC', async () => {
-    resolveMock.mockResolvedValue(['vendors:approve']);
-    const res = await request(app)
-      .patch(`/api/v1/vendors/${VENDOR_A_ID}/kyc-review`)
-      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ kycStatus: 'REJECTED' });
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['super_admin'] }));
     expect(res.status).toBe(422);
   });
 
-  it('verifies KYC without requiring a reason', async () => {
-    resolveMock.mockResolvedValue(['vendors:approve']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
-    prismaMock.vendor.update.mockResolvedValue({ ...vendorAFixture, kycStatus: 'VERIFIED' });
+  it('403s without members:delete', async () => {
+    resolveMock.mockResolvedValue(['members:view']);
     const res = await request(app)
-      .patch(`/api/v1/vendors/${VENDOR_A_ID}/kyc-review`)
+      .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }))
-      .send({ kycStatus: 'VERIFIED' });
-    expect(res.status).toBe(200);
-    expect(res.body.data.kycStatus).toBe('VERIFIED');
+      .send(REASON);
+    expect(res.status).toBe(403);
+  });
+
+  it('a member cannot delete its own member profile', async () => {
+    resolveMock.mockResolvedValue(['members:custom']);
+    const res = await request(app)
+      .delete(`/api/v1/vendors/${VENDOR_A_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+      .send(REASON);
+    expect(res.status).toBe(403);
   });
 });
 
@@ -1299,8 +1229,8 @@ describe('Self-service vendor image removal (Vendor login)', () => {
   const IMAGE_ID = 'bbbbbbbb-0000-4000-8000-000000000088';
 
   it('a vendor can remove their own profile image', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.vendorImage.findUnique.mockResolvedValue({ id: IMAGE_ID, vendorId: VENDOR_A_ID, isPrimary: false, storageKey: 'vendors/x/a.jpg' });
     prismaMock.vendorImage.delete.mockResolvedValue({ id: IMAGE_ID });
     const res = await request(app)
@@ -1311,8 +1241,8 @@ describe('Self-service vendor image removal (Vendor login)', () => {
   });
 
   it('succeeds even when the physical file is already missing from disk (ENOENT swallowed, DB update still commits)', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.vendorImage.findUnique.mockResolvedValue({ id: IMAGE_ID, vendorId: VENDOR_A_ID, isPrimary: false, storageKey: 'vendors/x/already-gone.jpg' });
     prismaMock.vendorImage.delete.mockResolvedValue({ id: IMAGE_ID });
     const { deleteMediaFile } = await import('../lib/media-storage');
@@ -1325,8 +1255,8 @@ describe('Self-service vendor image removal (Vendor login)', () => {
   });
 
   it('404s (not 500) removing an image id that does not exist', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.vendorImage.findUnique.mockResolvedValue(null);
     const res = await request(app)
       .delete(`/api/v1/vendors/me/images/${IMAGE_ID}`)
@@ -1335,8 +1265,8 @@ describe('Self-service vendor image removal (Vendor login)', () => {
   });
 
   it('403s (not 500) removing an image that belongs to a different vendor', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.vendorImage.findUnique.mockResolvedValue({ id: IMAGE_ID, vendorId: VENDOR_B_ID, isPrimary: false, storageKey: 'vendors/y/a.jpg' });
     const res = await request(app)
       .delete(`/api/v1/vendors/me/images/${IMAGE_ID}`)
@@ -1357,8 +1287,8 @@ describe('Admin vendor image routes — imageId param regression', () => {
   const IMAGE_ID = 'aaaaaaaa-0000-4000-8000-000000000099';
 
   it('DELETE /:id/images/:imageId reaches the service with the real imageId, not undefined', async () => {
-    resolveMock.mockResolvedValue(['vendors:edit']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:edit']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.vendorImage.findUnique.mockResolvedValue({ id: IMAGE_ID, vendorId: VENDOR_A_ID, isPrimary: false, storageKey: 'vendors/x/a.jpg' });
     prismaMock.vendorImage.delete.mockResolvedValue({ id: IMAGE_ID });
     const res = await request(app)
@@ -1370,8 +1300,8 @@ describe('Admin vendor image routes — imageId param regression', () => {
   });
 
   it('PATCH /:id/images/:imageId/primary reaches the service with the real imageId, not undefined', async () => {
-    resolveMock.mockResolvedValue(['vendors:edit']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:edit']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.vendorImage.findUnique.mockResolvedValue({ id: IMAGE_ID, vendorId: VENDOR_A_ID, isPrimary: false });
     const res = await request(app)
       .patch(`/api/v1/vendors/${VENDOR_A_ID}/images/${IMAGE_ID}/primary`)
@@ -1381,7 +1311,7 @@ describe('Admin vendor image routes — imageId param regression', () => {
   });
 
   it('422s (not a 500) for a malformed imageId instead of silently stripping it', async () => {
-    resolveMock.mockResolvedValue(['vendors:edit']);
+    resolveMock.mockResolvedValue(['members:edit']);
     const res = await request(app)
       .delete(`/api/v1/vendors/${VENDOR_A_ID}/images/not-a-uuid`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
@@ -1487,8 +1417,8 @@ describe('GET .../branches/:branchId/deals — includes packages (regression)', 
   ];
 
   it('self-service GET /me/branches/:branchId/deals includes each deal\'s packages', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
     prismaMock.deal.findMany.mockResolvedValue([{ ...dealAFixture, packages: packagesFixture }]);
     const res = await request(app)
@@ -1623,8 +1553,8 @@ describe('Admin nested branch/deal approval', () => {
       expect(res.status).toBe(409);
     });
 
-    it('403s without vendors:delete', async () => {
-      resolveMock.mockResolvedValue(['vendors:view']);
+    it('403s without members:delete', async () => {
+      resolveMock.mockResolvedValue(['members:view']);
       const res = await request(app)
         .delete(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals/${DEAL_A_ID}`)
         .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
@@ -1689,8 +1619,8 @@ describe('Deal offering integration (direct category access)', () => {
   });
 
   it('7. a vendor can create a deal for its own branch (self-service)', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture); // getMyVendorOrThrow -> vendor A
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture); // getMyVendorOrThrow -> vendor A
     prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
     prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(serviceGrantFixture);
     prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchServiceGrantFixture);
@@ -1708,8 +1638,8 @@ describe('Deal offering integration (direct category access)', () => {
   });
 
   it("8. a vendor cannot create a deal for another vendor's branch (self-service)", async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.findUnique.mockResolvedValue(branchBFixture); // branch actually belongs to vendor B
     const res = await request(app)
       .post(`/api/v1/vendors/me/branches/${BRANCH_B_ID}/deals`)
@@ -1719,7 +1649,7 @@ describe('Deal offering integration (direct category access)', () => {
     expect(prismaMock.deal.create).not.toHaveBeenCalled();
   });
 
-  it('9. admin can create a deal per existing vendors:create permission; a caller without it cannot', async () => {
+  it('9. admin can create a deal per existing members:create permission; a caller without it cannot', async () => {
     resolveMock.mockResolvedValue([]);
     const res = await request(app)
       .post(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/deals`)
@@ -1877,8 +1807,8 @@ describe('Deal offering integration (direct category access)', () => {
 
   describe('Superadmin notification on vendor deal submission', () => {
     it('a vendor (non-admin) creating a deal notifies every Superadmin — DEAL_PENDING_APPROVAL, PENDING approvalStatus', async () => {
-      resolveMock.mockResolvedValue(['vendors:custom']);
-      prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture); // both getMyVendorOrThrow AND the notification's own businessName lookup
+      resolveMock.mockResolvedValue(['members:custom']);
+      prismaMock.member.findUnique.mockResolvedValue(vendorAFixture); // both getMyVendorOrThrow AND the notification's own businessName lookup
       prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
       prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(serviceGrantFixture);
       prismaMock.branchCategoryAccess.findUnique.mockResolvedValue(branchServiceGrantFixture);
@@ -1931,8 +1861,8 @@ describe('Deal offering integration (direct category access)', () => {
     });
 
     it('a deal creation that fails validation (no category access) creates zero notifications — never a stray row on a rolled-back deal', async () => {
-      resolveMock.mockResolvedValue(['vendors:custom']);
-      prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+      resolveMock.mockResolvedValue(['members:custom']);
+      prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
       prismaMock.category.findUnique.mockResolvedValue(serviceCategoryFixture);
       prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(null); // no grant -> rejected before the transaction even opens
 
@@ -2082,8 +2012,8 @@ describe('POST /api/v1/vendors/me/branches/:branchId/therapists — duplicate-su
   const therapistBody = { therapistType: 'Legs Therapist', personName: 'Ramesh Kumar' };
 
   it('creates a therapist normally when no recent identical row exists', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
     prismaMock.therapist.findFirst.mockResolvedValue(null);
     prismaMock.therapist.create.mockResolvedValue({ id: 'therapist-1', ...therapistBody, vendorId: VENDOR_A_ID, branchId: BRANCH_A_ID });
@@ -2098,8 +2028,8 @@ describe('POST /api/v1/vendors/me/branches/:branchId/therapists — duplicate-su
   });
 
   it('returns the existing row instead of creating a duplicate when an identical request landed in the last 10s (rapid double-click)', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
     const recentRow = { id: 'therapist-1', ...therapistBody, vendorId: VENDOR_A_ID, branchId: BRANCH_A_ID, createdAt: new Date() };
     prismaMock.therapist.findFirst.mockResolvedValue(recentRow);
@@ -2115,8 +2045,8 @@ describe('POST /api/v1/vendors/me/branches/:branchId/therapists — duplicate-su
   });
 
   it('the near-duplicate lookup is scoped by vendorId/branchId/therapistType/personName and a short createdAt window', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
     prismaMock.therapist.findFirst.mockResolvedValue(null);
     prismaMock.therapist.create.mockResolvedValue({ id: 'therapist-2', ...therapistBody, vendorId: VENDOR_A_ID, branchId: BRANCH_A_ID });
@@ -2142,8 +2072,8 @@ describe('POST /api/v1/vendors/me/branches/:branchId/therapists — duplicate-su
 
 describe('PUT /api/v1/vendors/me/category-access (business modules + category access)', () => {
   it('replaces the full set: grants two categories, then a follow-up call with one id revokes the other', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.category.findMany.mockResolvedValue([serviceCategoryFixture, productCategoryFixture]);
     prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([
       { id: 'g1', vendorId: VENDOR_A_ID, categoryId: CATEGORY_ID, category: serviceCategoryFixture },
@@ -2156,7 +2086,7 @@ describe('PUT /api/v1/vendors/me/category-access (business modules + category ac
       .send({ offersService: true, offersProduct: true, offersTherapy: false, categoryIds: [CATEGORY_ID, PRODUCT_CATEGORY_ID] });
 
     expect(res.status).toBe(200);
-    expect(prismaMock.vendor.update).toHaveBeenCalledWith(
+    expect(prismaMock.member.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { offersService: true, offersProduct: true, offersTherapy: false } }),
     );
     expect(prismaMock.vendorCategoryAccess.deleteMany).toHaveBeenCalledWith({ where: { vendorId: VENDOR_A_ID } });
@@ -2166,8 +2096,8 @@ describe('PUT /api/v1/vendors/me/category-access (business modules + category ac
   });
 
   it('revoking down to a single category deletes-then-recreates exactly that one row (replace-the-full-set, not a diff)', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.category.findMany.mockResolvedValue([serviceCategoryFixture]);
     prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([
       { id: 'g1', vendorId: VENDOR_A_ID, categoryId: CATEGORY_ID, category: serviceCategoryFixture },
@@ -2186,8 +2116,8 @@ describe('PUT /api/v1/vendors/me/category-access (business modules + category ac
   });
 
   it('rejects granting a category whose type does not match any enabled module', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.category.findMany.mockResolvedValue([productCategoryFixture]);
 
     const res = await request(app)
@@ -2200,8 +2130,8 @@ describe('PUT /api/v1/vendors/me/category-access (business modules + category ac
   });
 
   it('rejects granting a subcategory instead of its top-level parent', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     const SUB_ID = 'b6b6b6b6-0000-4000-8000-00000000000f';
     prismaMock.category.findMany.mockResolvedValue([{ ...serviceCategoryFixture, id: SUB_ID, parentId: CATEGORY_ID }]);
 
@@ -2250,7 +2180,7 @@ describe('Branch category access (GET/PUT /:vendorId/branches/:branchId/category
       expect(res.body.data[0].subcategories[0].subcategoryId).toBe(SUB_MASSAGE_ID);
     });
 
-    it('403s without vendors:view', async () => {
+    it('403s without members:view', async () => {
       resolveMock.mockResolvedValue([]);
       const res = await request(app)
         .get(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
@@ -2353,7 +2283,7 @@ describe('Branch category access (GET/PUT /:vendorId/branches/:branchId/category
       resolveMock.mockResolvedValue(['vendors.branches:edit']);
       mockCategoryLookup({ [CATEGORY_ID]: serviceCategoryFixture });
       prismaMock.vendorCategoryAccess.findMany.mockResolvedValue([]); // vendor never granted this category yet
-      prismaMock.vendor.update.mockResolvedValue(vendorAFixture);
+      prismaMock.member.update.mockResolvedValue(vendorAFixture);
       prismaMock.branchCategoryAccess.create.mockResolvedValue({});
       prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
         { id: 'bca-1', branchId: BRANCH_A_ID, categoryId: CATEGORY_ID, category: serviceCategoryFixture, subcategories: [] },
@@ -2369,7 +2299,7 @@ describe('Branch category access (GET/PUT /:vendorId/branches/:branchId/category
         data: [{ vendorId: VENDOR_A_ID, categoryId: CATEGORY_ID }],
         skipDuplicates: true,
       });
-      expect(prismaMock.vendor.update).toHaveBeenCalledWith({ where: { id: VENDOR_A_ID }, data: { offersService: true } });
+      expect(prismaMock.member.update).toHaveBeenCalledWith({ where: { id: VENDOR_A_ID }, data: { offersService: true } });
       expect(prismaMock.branchCategoryAccess.deleteMany).toHaveBeenCalledWith({ where: { branchId: BRANCH_A_ID } });
       expect(prismaMock.branchCategoryAccess.create).toHaveBeenCalledWith({
         data: { branchId: BRANCH_A_ID, categoryId: CATEGORY_ID, subcategories: { create: [] } },
@@ -2392,7 +2322,7 @@ describe('Branch category access (GET/PUT /:vendorId/branches/:branchId/category
 
       expect(res.status).toBe(200);
       expect(prismaMock.vendorCategoryAccess.createMany).not.toHaveBeenCalled();
-      expect(prismaMock.vendor.update).not.toHaveBeenCalled();
+      expect(prismaMock.member.update).not.toHaveBeenCalled();
     });
 
     it('rejects a category whose type is PRODUCT — Product never flows through branch-level access (it stays on the standalone Product Categories grant)', async () => {
@@ -2449,7 +2379,7 @@ describe('Branch category access (GET/PUT /:vendorId/branches/:branchId/category
       expect(prismaMock.branchCategoryAccess.deleteMany).not.toHaveBeenCalled();
     });
 
-    it('403s without vendors:edit', async () => {
+    it('403s without members:edit', async () => {
       resolveMock.mockResolvedValue(['vendors.branches:view']);
       const res = await request(app)
         .put(`/api/v1/vendors/${VENDOR_A_ID}/branches/${BRANCH_A_ID}/category-access`)
@@ -2537,8 +2467,8 @@ describe('Branch category access (GET/PUT /:vendorId/branches/:branchId/category
 
   describe('GET /me/branches/:branchId/category-access (self-service mirror)', () => {
     it("returns the caller's own branch mapping", async () => {
-      resolveMock.mockResolvedValue(['vendors:custom']);
-      prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+      resolveMock.mockResolvedValue(['members:custom']);
+      prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
       prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
       prismaMock.branchCategoryAccess.findMany.mockResolvedValue([
         { id: 'bca-1', branchId: BRANCH_A_ID, categoryId: CATEGORY_ID, category: serviceCategoryFixture, subcategories: [] },
@@ -2554,8 +2484,8 @@ describe('Branch category access (GET/PUT /:vendorId/branches/:branchId/category
     // actual implementation instead of assumed — same `getBranchScopedOrThrow` contract as the
     // admin route above, so this is 403 (branch exists, wrong vendor), not 404.
     it("403s (not 404) when a vendor tries to read another vendor's branch via this route", async () => {
-      resolveMock.mockResolvedValue(['vendors:custom']);
-      prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+      resolveMock.mockResolvedValue(['members:custom']);
+      prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
       prismaMock.branch.findUnique.mockResolvedValue(branchBFixture); // belongs to VENDOR_B
       const res = await request(app)
         .get(`/api/v1/vendors/me/branches/${BRANCH_B_ID}/category-access`)
@@ -2564,8 +2494,8 @@ describe('Branch category access (GET/PUT /:vendorId/branches/:branchId/category
     });
 
     it('404s when the branch does not exist at all', async () => {
-      resolveMock.mockResolvedValue(['vendors:custom']);
-      prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+      resolveMock.mockResolvedValue(['members:custom']);
+      prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
       prismaMock.branch.findUnique.mockResolvedValue(null);
       const res = await request(app)
         .get(`/api/v1/vendors/me/branches/${BRANCH_B_ID}/category-access`)
@@ -2573,7 +2503,7 @@ describe('Branch category access (GET/PUT /:vendorId/branches/:branchId/category
       expect(res.status).toBe(404);
     });
 
-    it('returns 403 with no vendors:custom permission', async () => {
+    it('returns 403 with no members:custom permission', async () => {
       resolveMock.mockResolvedValue([]);
       const res = await request(app)
         .get(`/api/v1/vendors/me/branches/${BRANCH_A_ID}/category-access`)
@@ -2593,8 +2523,8 @@ describe('Product (vendor-scoped self-service + admin-on-behalf)', () => {
   const productBody = { name: 'Hair Serum', slug: 'hair-serum-2', categoryId: PRODUCT_CATEGORY_ID, price: '499.00' };
 
   it('a vendor can create its own product when it holds PRODUCT category access', async () => {
-    resolveMock.mockResolvedValue(['products:create', 'vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['products:create', 'members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.product.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: PRODUCT_ID, ...data }),
     );
@@ -2606,10 +2536,26 @@ describe('Product (vendor-scoped self-service + admin-on-behalf)', () => {
     expect(res.body.data.vendorId).toBe(VENDOR_A_ID); // always server-derived
   });
 
-  it('rejects creating a product when the vendor lacks PRODUCT category access', async () => {
-    resolveMock.mockResolvedValue(['products:create', 'vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+  it('creates a product with no category grant and saves isNew and isFeatured (D10)', async () => {
+    resolveMock.mockResolvedValue(['products:create', 'members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(null);
+    prismaMock.product.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: PRODUCT_ID, ...data }),
+    );
+    const res = await request(app)
+      .post('/api/v1/vendors/me/products')
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
+      .send({ ...productBody, isNew: true, isFeatured: true });
+    expect(res.status).toBe(201);
+    expect(res.body.data.isNew).toBe(true);
+    expect(res.body.data.isFeatured).toBe(true);
+  });
+
+  it('rejects creating a product in a non-PRODUCT category', async () => {
+    resolveMock.mockResolvedValue(['products:create', 'members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.category.findUnique.mockResolvedValue({ ...productCategoryFixture, type: 'SERVICE' });
     const res = await request(app)
       .post('/api/v1/vendors/me/products')
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
@@ -2619,8 +2565,8 @@ describe('Product (vendor-scoped self-service + admin-on-behalf)', () => {
   });
 
   it("a vendor cannot update another vendor's product", async () => {
-    resolveMock.mockResolvedValue(['products:edit', 'vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['products:edit', 'members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.product.findUnique.mockResolvedValue({ ...productFixture, vendorId: VENDOR_B_ID });
     const res = await request(app)
       .patch(`/api/v1/vendors/me/products/${PRODUCT_ID}`)
@@ -2633,14 +2579,14 @@ describe('Product (vendor-scoped self-service + admin-on-behalf)', () => {
   /**
    * Regression for the cross-vendor Product write hole: the admin-on-behalf `/:vendorId/products*`
    * routes used to gate on plain `products:edit/create/delete` — the SAME permission key a vendor
-   * needs for its own self-service `/vendors/me/products*` — instead of `vendors:edit/create/
+   * needs for its own self-service `/vendors/me/products*` — instead of `members:edit/create/
    * delete` like Branch/Deal/Therapist's admin-on-behalf routes already do. A vendor holding only
    * `products:*` (never `vendors:*`) could therefore call `/vendors/{OTHER_VENDOR_ID}/products/...`
    * directly and write another vendor's catalog. Now gated on `vendors:*`, which the `vendor` role
-   * never holds (see seed.ts) — only `vendors:custom` for its own scoped self-service routes.
+   * never holds (see seed.ts) — only `members:custom` for its own scoped self-service routes.
    */
-  it("a vendor holding only 'products:edit' (no 'vendors:edit') cannot reach the admin-on-behalf route to hijack another vendor's product", async () => {
-    resolveMock.mockResolvedValue(['products:edit', 'products:create', 'products:delete', 'vendors:custom']);
+  it("a vendor holding only 'products:edit' (no 'members:edit') cannot reach the admin-on-behalf route to hijack another vendor's product", async () => {
+    resolveMock.mockResolvedValue(['products:edit', 'products:create', 'products:delete', 'members:custom']);
     const res = await request(app)
       .patch(`/api/v1/vendors/${VENDOR_B_ID}/products/${PRODUCT_ID}`)
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
@@ -2650,7 +2596,7 @@ describe('Product (vendor-scoped self-service + admin-on-behalf)', () => {
   });
 
   it("...and is likewise blocked from creating or deleting another vendor's product via the admin-on-behalf route", async () => {
-    resolveMock.mockResolvedValue(['products:edit', 'products:create', 'products:delete', 'vendors:custom']);
+    resolveMock.mockResolvedValue(['products:edit', 'products:create', 'products:delete', 'members:custom']);
     const createRes = await request(app)
       .post(`/api/v1/vendors/${VENDOR_B_ID}/products`)
       .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['vendor'] }))
@@ -2666,8 +2612,8 @@ describe('Product (vendor-scoped self-service + admin-on-behalf)', () => {
   });
 
   it('returns a clean 409 (not a raw 500) when a double-submit races past the app-layer slug check and hits the DB unique constraint', async () => {
-    resolveMock.mockResolvedValue(['products:create', 'vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['products:create', 'members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     const { Prisma } = await import('../generated/prisma-client');
     prismaMock.product.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' }),
@@ -2694,8 +2640,8 @@ describe('Product (vendor-scoped self-service + admin-on-behalf)', () => {
   });
 
   it('a vendor can delete its own product', async () => {
-    resolveMock.mockResolvedValue(['products:delete', 'vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['products:delete', 'members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.product.findUnique.mockResolvedValue(productFixture);
     prismaMock.product.delete.mockResolvedValue(productFixture);
     const res = await request(app)
@@ -2709,8 +2655,8 @@ describe('Product (vendor-scoped self-service + admin-on-behalf)', () => {
   // gate to Product create/update. Same vendor-level-only validation, no new required fields, no
   // new rejection path.
   it('regression: Product create/update never queries BranchCategoryAccess/BranchSubcategoryAccess at all — only the vendor-level PRODUCT grant applies, unchanged', async () => {
-    resolveMock.mockResolvedValue(['products:create', 'vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['products:create', 'members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.product.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: PRODUCT_ID, ...data }),
     );
@@ -2722,7 +2668,7 @@ describe('Product (vendor-scoped self-service + admin-on-behalf)', () => {
     expect(prismaMock.branchCategoryAccess.findUnique).not.toHaveBeenCalled();
     expect(prismaMock.branchSubcategoryAccess.findUnique).not.toHaveBeenCalled();
 
-    resolveMock.mockResolvedValue(['products:edit', 'vendors:custom']);
+    resolveMock.mockResolvedValue(['products:edit', 'members:custom']);
     prismaMock.product.findUnique.mockResolvedValue(productFixture);
     prismaMock.product.update.mockResolvedValue({ ...productFixture, name: 'Renamed Serum' });
     const updateRes = await request(app)
@@ -2743,8 +2689,8 @@ describe('Therapist specializationCategoryId (category-access gate)', () => {
   const branchTherapyGrantFixture = { id: 'branch-grant-therapy', branchId: BRANCH_A_ID, categoryId: THERAPY_CATEGORY_ID };
 
   it('creates a therapist with a granted THERAPY specializationCategoryId', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
     prismaMock.category.findUnique.mockResolvedValue(therapyCategoryFixture);
     prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(therapyGrantFixture);
@@ -2761,8 +2707,8 @@ describe('Therapist specializationCategoryId (category-access gate)', () => {
   });
 
   it('rejects a therapist specializationCategoryId the vendor was not granted', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
     prismaMock.category.findUnique.mockResolvedValue(therapyCategoryFixture);
     prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(null);
@@ -2780,8 +2726,8 @@ describe('Therapist specializationCategoryId (category-access gate)', () => {
   // Branch-level counterpart of the two tests above — the vendor holds a vendor-wide grant, but
   // the BRANCH itself has no BranchCategoryAccess mapping for it at all.
   it('rejects a therapist specializationCategoryId the vendor holds but this branch has never been mapped to', async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
     prismaMock.category.findUnique.mockResolvedValue(therapyCategoryFixture);
     prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(therapyGrantFixture);
@@ -2817,8 +2763,8 @@ describe('Therapist specializationCategoryId (category-access gate)', () => {
     }
 
     beforeEach(() => {
-      resolveMock.mockResolvedValue(['vendors:custom']);
-      prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+      resolveMock.mockResolvedValue(['members:custom']);
+      prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
       prismaMock.branch.findUnique.mockResolvedValue(branchAFixture);
       prismaMock.vendorCategoryAccess.findUnique.mockResolvedValue(therapyGrantFixture);
       prismaMock.therapist.findFirst.mockResolvedValue(null);
@@ -3044,7 +2990,7 @@ describe('Therapist (admin-on-behalf — mirrors Branch/Deal exact admin split)'
       expect(res.status).toBe(404);
     });
 
-    it('403s without vendors:edit', async () => {
+    it('403s without members:edit', async () => {
       resolveMock.mockResolvedValue(['vendors.therapists:view']);
       const res = await request(app)
         .post(`/api/v1/vendors/${VENDOR_A_ID}/therapists/${THERAPIST_A_ID}/images`)
@@ -3096,7 +3042,7 @@ describe('Therapist (admin-on-behalf — mirrors Branch/Deal exact admin split)'
       expect(res.status).toBe(409);
     });
 
-    it('403s without vendors:delete', async () => {
+    it('403s without members:delete', async () => {
       resolveMock.mockResolvedValue(['vendors.therapists:view']);
       const res = await request(app)
         .delete(`/api/v1/vendors/${VENDOR_A_ID}/therapists/${THERAPIST_A_ID}`)
@@ -3129,8 +3075,8 @@ describe('TherapistPackage (self-service /me/therapists/:therapistId/packages)',
   const packageBody = { durationMinutes: 60, sellingPrice: 999, originalPrice: 1299 };
 
   beforeEach(() => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture); // getMyVendorOrThrow -> vendor A
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture); // getMyVendorOrThrow -> vendor A
   });
 
   it('lists a therapist\'s packages, ordered by sortOrder then durationMinutes', async () => {

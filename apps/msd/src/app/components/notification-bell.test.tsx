@@ -123,7 +123,7 @@ describe('NotificationBell', () => {
     await waitFor(() => expect(screen.getByText('No notifications yet')).toBeTruthy());
   });
 
-  it('clicking a DEAL notification marks it read and navigates to the vendor/branch/deal deep link', async () => {
+  it('clicking a DEAL notification marks it read and opens that deal', async () => {
     listNotificationsMock.mockResolvedValue({ data: [DEAL_NOTIFICATION], meta: { total: 1, unreadCount: 1 } });
     render(<NotificationBell />);
     await waitFor(() => expect(listNotificationsMock).toHaveBeenCalled());
@@ -134,7 +134,7 @@ describe('NotificationBell', () => {
 
     await waitFor(() => expect(markNotificationReadMock).toHaveBeenCalledWith('test-token', 'notif-1'));
     await waitFor(() =>
-      expect(navigateMock).toHaveBeenCalledWith('/account/vendors?vendorId=vendor-1&branchId=branch-1&dealId=deal-1'),
+      expect(navigateMock).toHaveBeenCalledWith('/account/members/vendor-1/deals/deal-1'),
     );
   });
 
@@ -161,7 +161,7 @@ describe('NotificationBell', () => {
     fireEvent.click(screen.getByText('Vendor Profile Pending Approval'));
 
     await waitFor(() => expect(markNotificationReadMock).toHaveBeenCalledWith('test-token', 'notif-3'));
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/vendors?vendorId=vendor-1'));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/account/members/vendor-1'));
   });
 
   it('"Mark all read" calls markAllNotificationsRead and refetches', async () => {

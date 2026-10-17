@@ -562,24 +562,24 @@ describe('GET /api/v1/catalog/vendors/:slug', () => {
   const vendorFixture = { id: 'vendor-1', slug: 'abc-salon', businessName: 'ABC Salon', branches: [] };
 
   it('404s for an unknown or non-ACTIVE vendor', async () => {
-    prismaMock.vendor.findFirst.mockResolvedValue(null);
+    prismaMock.member.findFirst.mockResolvedValue(null);
     const res = await request(app).get('/api/v1/catalog/vendors/abc-salon');
     expect(res.status).toBe(404);
   });
 
   it('narrows nested branches by state/city when given, merging into the active-branch filter', async () => {
-    prismaMock.vendor.findFirst.mockResolvedValue(vendorFixture);
+    prismaMock.member.findFirst.mockResolvedValue(vendorFixture);
     const res = await request(app).get('/api/v1/catalog/vendors/abc-salon?state=Uttar%20Pradesh&city=Gorakhpur');
     expect(res.status).toBe(200);
-    const call = prismaMock.vendor.findFirst.mock.calls[0][0];
+    const call = prismaMock.member.findFirst.mock.calls[0][0];
     expect(call.select.branches.where).toEqual({ isActive: true, state: 'Uttar Pradesh', city: 'Gorakhpur' });
   });
 
   it('omitting state/city leaves the plain active-branch filter unchanged (backward-compat regression guard)', async () => {
-    prismaMock.vendor.findFirst.mockResolvedValue(vendorFixture);
+    prismaMock.member.findFirst.mockResolvedValue(vendorFixture);
     const res = await request(app).get('/api/v1/catalog/vendors/abc-salon');
     expect(res.status).toBe(200);
-    const call = prismaMock.vendor.findFirst.mock.calls[0][0];
+    const call = prismaMock.member.findFirst.mock.calls[0][0];
     expect(call.select.branches.where).toEqual({ isActive: true });
   });
 });

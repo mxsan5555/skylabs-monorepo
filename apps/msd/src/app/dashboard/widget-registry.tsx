@@ -74,7 +74,7 @@ function RevenueSummaryWidget({ title, stats, statsLoading, statsError }: Widget
   );
 }
 
-/** The vendor role's entry point to `/account/vendors` — that sidebar item itself is
+/** The vendor role's entry point to `/account/members` — that sidebar item itself is
  *  admin-only (gated on `vendors:view`), so this widget is how a vendor user reaches
  *  their own business profile/branches/deals instead. */
 function VendorProfileWidget({ title }: WidgetProps) {
@@ -82,7 +82,7 @@ function VendorProfileWidget({ title }: WidgetProps) {
     <article className="stat-card">
       <h2 className="stat-card__title">{title}</h2>
       <p>Manage your business profile, branches, and deals.</p>
-      <Link to="/account/vendors">Go to My Business →</Link>
+      <Link to="/account/members">Go to My Business →</Link>
     </article>
   );
 }

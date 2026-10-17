@@ -6,7 +6,15 @@ vi.mock('../lib/prisma', async () => {
 });
 
 import { prisma } from '../lib/prisma';
-import { createVendorOwner, checkVendorOwnerAvailability, createTherapist, createDeal, updateDeal } from './vendor.service';
+import {
+  createVendor,
+  createVendorOwner,
+  checkVendorOwnerAvailability,
+  createTherapist,
+  createDeal,
+  updateDeal,
+  listVendors,
+} from './vendor.service';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -123,7 +131,7 @@ describe('createVendorOwner', () => {
  * it only ever treats a call as "the same submission" when the owner identity matches too.
  */
 describe('createVendor — double-submit guard scoping (regression: two different owners created seconds apart used to collapse into one vendor)', () => {
-  const ROLE_FIXTURE = { id: VENDOR_ROLE_ID, key: 'vendor' };
+  const ROLE_FIXTURE = { id: VENDOR_ROLE_ID, key: 'member' };
 
   /** Arms every downstream call `createVendor` makes once its own double-submit guard clears —
    *  `createVendorOwner`'s email/phone availability check, the new User insert, `assignRole`'s
@@ -139,12 +147,12 @@ describe('createVendor — double-submit guard scoping (regression: two differen
     prismaMock.user.create.mockResolvedValue({ id: newUserId } as never);
     prismaMock.role.findUnique.mockResolvedValue(ROLE_FIXTURE as never);
     prismaMock.userRole.upsert.mockResolvedValue({} as never);
-    prismaMock.vendor.findUnique.mockResolvedValue(null as never); // slug uniqueness check
-    prismaMock.vendor.create.mockResolvedValue({ ...vendorRow, owner: null } as never);
+    prismaMock.member.findUnique.mockResolvedValue(null as never); // slug uniqueness check
+    prismaMock.member.create.mockResolvedValue({ ...vendorRow, owner: null } as never);
   }
 
   it("the guard query is scoped by the submitted owner's email/mobile, not businessName alone", async () => {
-    prismaMock.vendor.findFirst.mockResolvedValue(null); // no recent duplicate
+    prismaMock.member.findFirst.mockResolvedValue(null); // no recent duplicate
     armDownstreamSuccess(NEW_USER_ID, { id: 'vendor-a' });
 
     await createVendor(
@@ -152,7 +160,7 @@ describe('createVendor — double-submit guard scoping (regression: two differen
       ADMIN_ID,
     );
 
-    expect(prismaMock.vendor.findFirst).toHaveBeenCalledWith(
+    expect(prismaMock.member.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           createdByUserId: ADMIN_ID,
@@ -177,7 +185,7 @@ describe('createVendor — double-submit guard scoping (regression: two differen
     // A regardless of who owner B actually was); a field present in `where` must match vendor A's
     // own value to count as a hit. This is what makes the mock fail the same way the real Prisma
     // query did before the fix, and pass once the guard's `where` actually includes owner identity.
-    prismaMock.vendor.findFirst.mockImplementation(async (args: unknown) => {
+    prismaMock.member.findFirst.mockImplementation(async (args: unknown) => {
       const where = (args as { where?: Record<string, unknown> })?.where ?? {};
       if (where.createdByUserId !== ADMIN_ID) return null;
       if (where.businessName !== null) return null;
@@ -372,5 +380,50 @@ describe('createDeal / updateDeal — therapist linking', () => {
     expect(prismaMock.therapist.findMany).not.toHaveBeenCalled();
     expect(prismaMock.dealTherapist.deleteMany).not.toHaveBeenCalled();
     expect(prismaMock.dealTherapist.createMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Feature: the staff member list filters by status, missing documents, review flag and search,
+ * and every row carries a documents summary.
+ */
+describe('listVendors — member list filters', () => {
+  beforeEach(() => {
+    prismaMock.member.findMany.mockResolvedValue([
+      { id: VENDOR_ID, owner: null, documents: [{ documentType: 'PAN', status: 'APPROVED' }], documentsDueAt: null },
+    ] as never);
+    prismaMock.member.count.mockResolvedValue(1);
+  });
+
+  it('documents=incomplete matches members missing any provided AADHAAR, PAN or GST document', async () => {
+    await listVendors({ page: 1, pageSize: 20, documents: 'incomplete' });
+    const where = prismaMock.member.findMany.mock.calls[0][0].where;
+    expect(where.OR).toEqual(
+      ['AADHAAR', 'PAN', 'GST'].map((documentType) => ({
+        documents: { none: { documentType, status: { in: ['SUBMITTED', 'APPROVED'] } } },
+      })),
+    );
+    expect(prismaMock.member.count).toHaveBeenCalledWith({ where });
+  });
+
+  it('reviewFlag=true matches flagged members only', async () => {
+    await listVendors({ page: 1, pageSize: 20, reviewFlag: 'true', status: 'INACTIVE' });
+    const where = prismaMock.member.findMany.mock.calls[0][0].where;
+    expect(where).toMatchObject({ status: 'INACTIVE', reviewFlaggedAt: { not: null } });
+  });
+
+  it('search covers business name, business email and owner mobile, and combines with the documents filter', async () => {
+    await listVendors({ page: 1, pageSize: 20, search: '98765', documents: 'incomplete' });
+    const where = prismaMock.member.findMany.mock.calls[0][0].where;
+    expect(where.OR).toHaveLength(3);
+    expect(where.AND[0].OR).toEqual(
+      expect.arrayContaining([{ ownerMobile: { contains: '98765' } }, expect.objectContaining({ businessName: expect.anything() })]),
+    );
+  });
+
+  it('adds a documents summary to every row', async () => {
+    const { items, total } = await listVendors({ page: 1, pageSize: 20 });
+    expect(total).toBe(1);
+    expect(items[0].documentsSummary).toMatchObject({ complete: false, missing: ['AADHAAR', 'GST'] });
   });
 });

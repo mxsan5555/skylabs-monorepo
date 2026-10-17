@@ -142,7 +142,7 @@ describe('GET /api/v1/orders/me — item images', () => {
 describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
   it('1. creates a PRODUCT order from the cart', async () => {
     prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.product.findFirst.mockResolvedValue(productFixture);
     prismaMock.order.create.mockResolvedValue(orderFixture);
     const res = await request(app)
@@ -154,7 +154,7 @@ describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
 
   it('8/9. snapshots vendor name at creation time; branch stays null — Product has no branch', async () => {
     prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.product.findFirst.mockResolvedValue(productFixture);
     prismaMock.order.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: ORDER_ID, ...data }));
     const res = await request(app)
@@ -168,7 +168,7 @@ describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
 
   it('19. recalculates price server-side from the LIVE product price, never the stale CartItem.unitPrice', async () => {
     prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem); // cart item unitPrice snapshot: 150.00 (stale)
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.product.findFirst.mockResolvedValue(productFixture); // live price: 199.00
     prismaMock.order.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: ORDER_ID, ...data }));
     await request(app).post('/api/v1/orders/checkout').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
@@ -229,7 +229,7 @@ describe('POST /api/v1/orders/checkout — Product Cart -> Order', () => {
 
   it('stores the checkout "Customer Details" step contact/shipping fields on the order', async () => {
     prismaMock.cart.findUnique.mockResolvedValue(cartWithOneItem);
-    prismaMock.vendor.findUnique.mockResolvedValue(vendorAFixture);
+    prismaMock.member.findUnique.mockResolvedValue(vendorAFixture);
     prismaMock.product.findFirst.mockResolvedValue(productFixture);
     prismaMock.order.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: ORDER_ID, ...data }));
     const res = await request(app)
@@ -381,7 +381,7 @@ describe('GET /api/v1/orders — admin / vendor scoping', () => {
 
   it('4/17. force-scopes a vendor caller to its own vendorId, ignoring any vendorId query param', async () => {
     resolveMock.mockResolvedValue(['orders:view']);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
     prismaMock.order.findMany.mockResolvedValue([]);
     prismaMock.order.count.mockResolvedValue(0);
     await request(app)
@@ -392,12 +392,12 @@ describe('GET /api/v1/orders — admin / vendor scoping', () => {
     );
   });
 
-  it("a vendor caller holding only 'vendors:custom' (never 'orders:view') can still list its own orders", async () => {
-    // Vendor role no longer holds orders:view directly (see seed.ts) — 'vendors:custom' is the
+  it("a vendor caller holding only 'members:custom' (never 'orders:view') can still list its own orders", async () => {
+    // Vendor role no longer holds orders:view directly (see seed.ts) — 'members:custom' is the
     // sole gate for its own order access, same self-service permission every other /vendors/me/*
     // route already runs on (see requireOrdersOrVendorSelf's doc comment in orders.routes.ts).
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
     prismaMock.order.findMany.mockResolvedValue([]);
     prismaMock.order.count.mockResolvedValue(0);
     const res = await request(app)
@@ -406,7 +406,7 @@ describe('GET /api/v1/orders — admin / vendor scoping', () => {
     expect(res.status).toBe(200);
   });
 
-  it("returns 403 for a caller with neither 'orders:view' nor 'vendors:custom'", async () => {
+  it("returns 403 for a caller with neither 'orders:view' nor 'members:custom'", async () => {
     resolveMock.mockResolvedValue(['dashboard:view']);
     const res = await request(app).get('/api/v1/orders').set('Authorization', bearerFor({ sub: 'vendor-user-1', roles: ['vendor'] }));
     expect(res.status).toBe(403);
@@ -414,7 +414,7 @@ describe('GET /api/v1/orders — admin / vendor scoping', () => {
 
   it('admin (no vendor profile) can filter by an explicit vendorId', async () => {
     resolveMock.mockResolvedValue(['orders:view']);
-    prismaMock.vendor.findUnique.mockResolvedValue(null); // caller owns no vendor profile
+    prismaMock.member.findUnique.mockResolvedValue(null); // caller owns no vendor profile
     prismaMock.order.findMany.mockResolvedValue([]);
     prismaMock.order.count.mockResolvedValue(0);
     await request(app)
@@ -427,7 +427,7 @@ describe('GET /api/v1/orders — admin / vendor scoping', () => {
 
   it("filters a vendor caller's returned items to only their own vendor within a multi-vendor order", async () => {
     resolveMock.mockResolvedValue(['orders:view']);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
     const multiVendorOrder = {
       ...orderFixture,
       items: [
@@ -449,7 +449,7 @@ describe('GET /api/v1/orders — admin / vendor scoping', () => {
 describe('GET /api/v1/orders/:id — vendor isolation', () => {
   it("4/17. 404s when a vendor requests another vendor's order (never confirms existence)", async () => {
     resolveMock.mockResolvedValue(['orders:view']);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_B_ID, ownerUserId: 'vendor-user-2' });
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_B_ID, ownerUserId: 'vendor-user-2' });
     prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, vendorId: VENDOR_A_ID });
     const res = await request(app)
       .get(`/api/v1/orders/${ORDER_ID}`)
@@ -465,7 +465,7 @@ describe('PATCH /api/v1/orders/:id/status — admin', () => {
   // `vendor.findUnique` resolved to a vendor fixture, which would otherwise leak into these
   // admin-context tests and make `setOrderStatus` treat 'admin-1' as a vendor caller.
   beforeEach(() => {
-    prismaMock.vendor.findUnique.mockResolvedValue(null);
+    prismaMock.member.findUnique.mockResolvedValue(null);
   });
 
   it('18. returns 403 without orders:status_change', async () => {
@@ -500,9 +500,9 @@ describe('PATCH /api/v1/orders/:id/status — admin', () => {
     expect(prismaMock.order.update).not.toHaveBeenCalled();
   });
 
-  it("a vendor caller holding only 'vendors:custom' can confirm/complete its own single-vendor order", async () => {
-    resolveMock.mockResolvedValue(['vendors:custom']);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
+  it("a vendor caller holding only 'members:custom' can confirm/complete its own single-vendor order", async () => {
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
     prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
     prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'COMPLETED' });
     const res = await request(app)
@@ -515,7 +515,7 @@ describe('PATCH /api/v1/orders/:id/status — admin', () => {
 
   it('a vendor caller cannot change status on a multi-vendor order — only admin may', async () => {
     resolveMock.mockResolvedValue(['orders:status_change']);
-    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
+    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
     prismaMock.order.findUnique.mockResolvedValue({
       ...orderFixture,
       status: 'CONFIRMED',

@@ -96,15 +96,21 @@ export function createPrismaMock() {
     impersonationSession: {
       create: vi.fn(),
     },
-    vendor: {
+    member: {
       findFirst: vi.fn(),
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn(),
       count: vi.fn(),
+    },
+    memberStatusHistory: {
+      create: vi.fn(),
+      findMany: vi.fn(),
     },
     branch: {
       findUnique: vi.fn(),
@@ -196,9 +202,11 @@ export function createPrismaMock() {
       upsert: vi.fn(),
       delete: vi.fn(),
     },
-    vendorDocument: {
+    memberDocument: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
+      update: vi.fn(),
       count: vi.fn(),
       upsert: vi.fn(),
       delete: vi.fn(),
@@ -378,6 +386,7 @@ export function createPrismaMock() {
     },
     orderItem: {
       findMany: vi.fn(),
+      count: vi.fn(),
       create: vi.fn(),
       aggregate: vi.fn(),
       groupBy: vi.fn(),

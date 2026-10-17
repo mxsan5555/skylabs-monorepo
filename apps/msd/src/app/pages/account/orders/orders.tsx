@@ -113,7 +113,7 @@ export function OrderManagement() {
   // Mirrors the backend's OR-check (see orders.routes.ts's `requireOrdersOrVendorSelf`) — a
   // vendor holds `vendors:custom`, never `orders:status_change` directly (that key alone would
   // also grant the admin-wide top-level "Orders" sidebar node — see msd-menu.json).
-  const canChangeStatus = can('orders', 'status_change') || can('vendors', 'custom');
+  const canChangeStatus = can('orders', 'status_change') || can('members', 'custom');
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [total, setTotal] = useState(0);

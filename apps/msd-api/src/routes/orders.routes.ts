@@ -23,7 +23,7 @@ import { sendData, sendError } from '../lib/http';
  * one Order via `/orders/checkout`, never a separate Booking flow. Two access surfaces on one
  * router: `/orders/checkout`, `/orders/me*` are customer self-service (`authenticate` only, no
  * RBAC — mirrors `cart.routes.ts` exactly). `/orders` (list/get) and `/orders/:id/status` are
- * gated on the existing `orders` permission key (admin/sales) OR `vendors:custom` (the same
+ * gated on the existing `orders` permission key (admin/sales) OR `members:custom` (the same
  * vendor self-service gate every other `/vendors/me/*` route already uses) — never `orders:view`
  * alone, which would also grant the `vendor` role the admin-wide top-level "Orders" sidebar node
  * (see msd-menu.json) even though `orderService.listOrders`/`getOrderOrThrow`/`setOrderStatus`
@@ -32,7 +32,7 @@ import { sendData, sendError } from '../lib/http';
 const router = Router();
 router.use(authenticate);
 
-/** Passes if the caller holds `orders:{action}` (admin/sales) OR `vendors:custom` (vendor
+/** Passes if the caller holds `orders:{action}` (admin/sales) OR `members:custom` (vendor
  *  self-service — see this file's own doc comment for why `orders:view`/`status_change` are
  *  deliberately never granted to the `vendor` role directly). */
 function requireOrdersOrVendorSelf(action: PermissionAction) {
@@ -43,7 +43,7 @@ function requireOrdersOrVendorSelf(action: PermissionAction) {
     }
     try {
       const granted = await resolveGrantedPermissionKeys(req.user.roles);
-      if (!can(granted, 'orders', action) && !can(granted, 'vendors', 'custom')) {
+      if (!can(granted, 'orders', action) && !can(granted, 'members', 'custom')) {
         sendError(res, 'FORBIDDEN', `Missing permission orders:${action}`);
         return;
       }

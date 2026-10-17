@@ -4,8 +4,7 @@ import type { MenuNode } from '@skylabs-monorepo/shared-types';
 import { Icon, IconButton, TextButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { isDualRoleUser, setExperienceMode } from '../../auth/role-routing';
-import logo from '../../assets/logo.jpg';
-import logo2 from '../../assets/logo2.jpg';
+import { LOGO_SRC as logo, LOGO_COMPACT_SRC as logo2 } from '../../brand';
 /**
  * Console navigation, built directly from `bootstrap.menu` — the server has
  * already pruned it down to what the caller's permissions allow, so this
@@ -26,11 +25,6 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const { bootstrap, isPreviewing, signOut } = useAuth();
   const navigate = useNavigate();
   const menu = bootstrap?.menu ?? [];
-  console.log('SIDEBAR MENU:', menu);
-  console.log(
-    'CUSTOMER MENU:',
-    menu.find((node) => node.id === 'customers')
-  );
   const visibleMenu = isPreviewing ? menu.filter((node) => node.id !== 'administration') : menu;
   const initial = (bootstrap?.user.name ?? '?').charAt(0).toUpperCase();
   const dualRole = bootstrap ? isDualRoleUser(bootstrap) : false;

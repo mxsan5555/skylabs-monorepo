@@ -5,6 +5,7 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listNotifications, markNotificationRead, markAllNotificationsRead, type Notification } from '../../../../api/notifications';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { formatRelativeTime } from '../../../../utils/format';
+import { notificationLink } from '../../../components/notification-link';
 
 const PAGE_SIZE = 50;
 
@@ -47,12 +48,8 @@ export function NotificationsPage() {
       await markNotificationRead(token, notification.id);
       await load();
     }
-    if (notification.entityType === 'DEAL') {
-      const meta = notification.metadata as { vendorId?: string; branchId?: string } | null;
-      navigate(`/account/vendors?vendorId=${meta?.vendorId ?? ''}&branchId=${meta?.branchId ?? ''}&dealId=${notification.entityId ?? ''}`);
-    } else if (notification.entityType === 'ORDER') {
-      navigate(`/account/orders?orderId=${notification.entityId ?? ''}`);
-    }
+    const link = notificationLink(notification);
+    if (link) navigate(link);
   }
 
   async function handleMarkAllRead() {

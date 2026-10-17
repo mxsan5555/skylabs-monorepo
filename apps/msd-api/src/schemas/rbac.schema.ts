@@ -9,6 +9,10 @@ export const PermissionActionSchema = z
   .enum(PERMISSION_ACTIONS as [PermissionAction, ...PermissionAction[]])
   .openapi('PermissionAction');
 
+
+export const PermissionScopeSchema = z
+  .enum(['ALL', 'OWN'])
+  .openapi('PermissionScope');
 // ─── Roles ───────────────────────────────────────────────────────────────────
 
 export const RoleCreateSchema = z
@@ -43,17 +47,24 @@ export const RoleCloneSchema = z
   })
   .openapi('RoleClone');
 
-export const RolePermissionsUpdateSchema = z
-  .object({
-    permissionIds: z.array(z.string().uuid()),
-  })
-  .openapi('RolePermissionsUpdate');
 
-export const RolePermissionsResponseSchema = z
-  .object({
-    permissionIds: z.array(z.string().uuid()),
-  })
-  .openapi('RolePermissionsResponse');
+export const RolePermissionAssignmentSchema = z.object({
+  permissionId: z.string().uuid(),
+  scope: PermissionScopeSchema,
+}).openapi('RolePermissionAssignment');
+
+
+export const RolePermissionsUpdateSchema = z.object({
+  permissions: z.array(RolePermissionAssignmentSchema),
+}).openapi('RolePermissionsUpdate');
+
+
+
+export const RolePermissionsResponseSchema = z.object({
+  permissionId: z.string().uuid(),
+  scope: PermissionScopeSchema,
+}).array().openapi('RolePermissionsResponse');
+
 
 export const RoleWidgetsUpdateSchema = z
   .object({

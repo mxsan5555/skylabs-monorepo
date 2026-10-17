@@ -20,8 +20,8 @@ beforeEach(() => {
 
 /**
  * Feature: Public "Become a Vendor" application page
- * Scenario: an anonymous, unauthenticated visitor applies to list their business — always lands
- * PENDING_VERIFICATION server-side, never auto-approved or auto-logged-in.
+ * Scenario: an anonymous visitor wants to list their business. Public registration is closed (staff
+ * create every member), so the page says so up front and the server answers 403 to any submit.
  *
  * Given: a visitor on `/become-vendor`
  * When: they view the page or submit the form
@@ -68,6 +68,23 @@ describe('BecomeVendor', () => {
 
     await waitFor(() => expect(screen.getByText('Business name is required.')).toBeTruthy());
     expect(registerPublicVendorMock).not.toHaveBeenCalled();
+  });
+
+  it('tells the visitor at the top of the page that our team creates member accounts', () => {
+    render(<BecomeVendor />);
+    const notice = screen.getByRole('status');
+    expect(notice.textContent).toMatch(/created by our team/i);
+    const form = document.querySelector('form');
+    if (!form) throw new Error('form not found');
+    // The notice comes before the form in reading order.
+    expect(notice.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(notice.querySelector('a')?.getAttribute('href')).toBe('/contact');
+  });
+
+  it('turns off the submit button, since registration always ends in a contact-us answer', () => {
+    render(<BecomeVendor />);
+    const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.includes('Submit application'));
+    expect(button?.hasAttribute('disabled') || (button as unknown as { disabled?: boolean })?.disabled).toBe(true);
   });
 
   it('does not show the "Application received" success screen before any submission', () => {

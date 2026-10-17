@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import type { Prisma } from '../generated/prisma-client';
 import { rankDeals, computeDealFacets, type DealSort } from './deal-ranking';
+import { VISIBLE_DEAL_WHERE, VISIBLE_PRODUCT_WHERE, VISIBLE_THERAPIST_WHERE } from './catalog-visibility';
 import { listActiveCategories, getActiveCategoryBySlugOrThrow } from './category.service';
 import { getActiveTagNamesFor } from './popular-tag.service';
 import { getPublicTreatmentDirectory } from './popular-treatment.service';
@@ -286,32 +287,8 @@ export const PUBLIC_DEAL_SELECT = {
   mediaVideo: { select: PUBLIC_MEDIA_VIDEO_SELECT },
 } as const;
 
-/**
- * The one definition of "is this deal visible to a customer / still purchasable": active +
- * approved, its vendor active, its branch active (Deal has no master catalog row to check — see
- * Deal's own schema doc comment). Reused by both the list and single-deal lookup below (so a
- * customer can never reach an otherwise-hidden deal just by guessing its id) and by
- * `order.service.ts`'s checkout revalidation (a Deal must still pass this same bar to be
- * order-able, not just a looser "does it exist" check).
- */
-export const VISIBLE_DEAL_WHERE = {
-  status: 'ACTIVE' as const,
-  approvalStatus: 'APPROVED' as const,
-  vendor: { status: 'ACTIVE' as const },
-  branch: { isActive: true },
-};
-
-/**
- * The equivalent "is this product visible to a customer / still purchasable" bar for the fully
- * independent Product catalog entity — same discipline as VISIBLE_DEAL_WHERE, minus the
- * branch/approval concepts Product doesn't have (Product has no branchId and no vendor-approval
- * workflow of its own). Reused by the public list/single-product lookups below and by
- * `cart.service.ts`/`order.service.ts`'s add-to-cart/checkout revalidation.
- */
-export const VISIBLE_PRODUCT_WHERE = {
-  isActive: true as const,
-  vendor: { status: 'ACTIVE' as const },
-};
+/** The visibility bars live in catalog-visibility.ts (no service imports, so no cycles). */
+export { VISIBLE_DEAL_WHERE, VISIBLE_PRODUCT_WHERE, VISIBLE_THERAPIST_WHERE } from './catalog-visibility';
 
 /** Shared by both public tree builders below — a category row's own list of active children,
  *  filtered against the ALREADY-FETCHED flat list `all` (no extra query per level: every row in
@@ -559,7 +536,7 @@ export async function getPublicDealFacets(
 export async function listPublicLocations() {
   const rows = await prisma.branch.groupBy({
     by: ['state', 'city'],
-    where: { isActive: true, state: { not: null }, city: { not: null } },
+    where: { isActive: true, vendor: { status: 'ACTIVE' }, state: { not: null }, city: { not: null } },
     _avg: { latitude: true, longitude: true },
     orderBy: [{ state: 'asc' }, { city: 'asc' }],
   });
@@ -660,7 +637,7 @@ export async function getPublicProductOrThrow(id: string) {
  * per "reuse existing APIs first."
  */
 export async function getPublicVendorBySlugOrThrow(slug: string, opts: { state?: string; city?: string } = {}) {
-  const vendor = await prisma.vendor.findFirst({
+  const vendor = await prisma.member.findFirst({
     where: { slug, status: 'ACTIVE' },
     select: {
       ...PUBLIC_VENDOR_DETAIL_SELECT,
@@ -682,16 +659,8 @@ export async function getPublicVendorBySlugOrThrow(slug: string, opts: { state?:
  * Independently-browsable Therapist catalogue (`GET /catalog/therapists`) — mirrors
  * `listPublicDeals` exactly: a customer can browse/select a Therapist directly, never having
  * picked a Deal or even a vendor first (see Therapist's own schema doc comment). Only active
- * Therapists at an active Vendor/Branch, same "active gating" convention as VISIBLE_DEAL_WHERE.
- * Exported for `order.service.ts`'s checkout revalidation, same reuse convention as
- * VISIBLE_DEAL_WHERE.
+ * Therapists at an active Vendor/Branch (VISIBLE_THERAPIST_WHERE).
  */
-export const VISIBLE_THERAPIST_WHERE = {
-  isActive: true,
-  vendor: { status: 'ACTIVE' as const },
-  branch: { isActive: true },
-};
-
 export async function listPublicTherapists(opts: {
   page: number;
   pageSize: number;

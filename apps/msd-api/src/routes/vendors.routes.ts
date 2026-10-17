@@ -1,23 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import type { Request, Response, NextFunction } from 'express';
-import type { PermissionAction } from '@skylabs-monorepo/shared-types';
-import { can } from '@skylabs-monorepo/shared-permissions';
+import type { Request } from 'express';
 import { authenticate } from '../middleware/authenticate';
-import { requirePermission } from '../middleware/requirePermission';
-import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
-import { sendError } from '../lib/http';
+import { buildMemberAdminRoutes } from './member-admin.routes';
+import { requireAnyPermission, requirePermission } from '../middleware/requirePermission';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
-  VendorCreateSchema,
-  VendorUpdateSchema,
-  VendorSelfCreateSchema,
   VendorSelfUpdateSchema,
-  VendorRejectSchema,
-  VendorStatusUpdateSchema,
-  VendorKycReviewSchema,
-  VendorListQuerySchema,
   VendorUserSearchQuerySchema,
   VendorOwnerLookupQuerySchema,
   CrossVendorListQuerySchema,
@@ -39,7 +29,6 @@ import {
   VendorModulesAndCategoryAccessSchema,
   VendorIdParamSchema,
   VendorDocumentTypeParamSchema,
-  VendorDocumentAdminParamSchema,
   VendorImageIdParamSchema,
   VendorProductIdParamSchema,
 } from '../schemas/vendor.schema';
@@ -48,7 +37,7 @@ import { MediaReorderSchema } from '../schemas/media.schema';
 import { imageUpload, videoUpload, documentUpload } from '../lib/media-upload.middleware';
 import type { VendorDocumentType } from '../generated/prisma-client';
 import * as vendorService from '../services/vendor.service';
-import * as vendorDocumentService from '../services/vendor-document.service';
+import * as memberDocumentService from '../services/member-document.service';
 import * as productService from '../services/product.service';
 import { writeAuditLog } from '../services/audit.service';
 import { sendData, ApiError } from '../lib/http';
@@ -64,33 +53,6 @@ function requestMeta(req: Request) {
  *  admin onboarding pipeline and self-service profile screen both read step-lock state from. */
 function withCompletion<T extends Record<string, unknown>>(vendor: T) {
   return { ...vendor, profileCompletion: vendorService.computeProfileCompletion(vendor) };
-}
-
-/**
- * Same shape/behavior as `requirePermission`, but passes if the caller holds ANY of the given
- * actions rather than exactly one. Used only for `/users/search`, which is a legitimate step
- * of both the "Add Vendor" (`vendors:create`) and "Edit Vendor → re-link owner" (`vendors:edit`)
- * flows — gating it on `create` alone would 403 an edit-only admin reaching Step 1 while
- * resuming a draft vendor, which would look like "search is broken" even though nothing is
- * actually disabled client-side.
- */
-function requireAnyPermission(menuKey: string, actions: PermissionAction[]) {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    if (!req.user) {
-      sendError(res, 'UNAUTHORIZED', 'Authentication required');
-      return;
-    }
-    try {
-      const granted = await resolveGrantedPermissionKeys(req.user.roles);
-      if (!actions.some((action) => can(granted, menuKey, action))) {
-        sendError(res, 'FORBIDDEN', `Missing permission ${menuKey}:${actions.join('|')}`);
-        return;
-      }
-      next();
-    } catch (err) {
-      next(err);
-    }
-  };
 }
 
 // ─── Reference lookups ───────────────────────────────────────────────────────
@@ -111,14 +73,14 @@ router.get('/categories', validateQuery(VendorCategoriesQuerySchema), async (req
 
 /**
  * Existing-user typeahead for the "Add Vendor → Select Existing User" step. Deliberately
- * gated on `vendors:create`/`vendors:edit` (not `rbac.users:view`) — this is a narrow lookup
+ * gated on `members:create`/`members:edit` (not `rbac.users:view`) — this is a narrow lookup
  * for linking a vendor owner, not a grant of the full User Management console. `edit` is
  * included alongside `create` because Step 1 of the pipeline is also reachable while resuming
  * an existing draft vendor. Only eligible users are returned (active, not already linked to a
  * vendor) — filtered server-side in `searchEligibleOwnerCandidates`, never left to the
  * frontend to exclude.
  */
-router.get('/users/search', requireAnyPermission('vendors', ['create', 'edit']), validateQuery(VendorUserSearchQuerySchema), async (req, res, next) => {
+router.get('/users/search', requireAnyPermission('members', ['create', 'edit']), validateQuery(VendorUserSearchQuerySchema), async (req, res, next) => {
   try {
     const { page, pageSize, q } = req.validatedQuery as ReturnType<typeof VendorUserSearchQuerySchema.parse>;
     const { items, total } = await vendorService.searchEligibleOwnerCandidates(q, page, pageSize);
@@ -138,7 +100,7 @@ router.get('/users/search', requireAnyPermission('vendors', ['create', 'edit']),
  */
 router.get(
   '/users/lookup',
-  requireAnyPermission('vendors', ['create', 'edit']),
+  requireAnyPermission('members', ['create', 'edit']),
   validateQuery(VendorOwnerLookupQuerySchema),
   async (req, res, next) => {
     try {
@@ -152,7 +114,7 @@ router.get(
 
 /**
  * Cross-vendor listings for the sidebar's standalone "Branches"/"Deals" admin pages — gated on
- * the existing `vendors:view` (the same permission the "Vendors" sidebar item already uses, so
+ * the existing `members:view` (the same permission the "Vendors" sidebar item already uses, so
  * no new permission key or seed grant is needed; the `vendor` role still never holds this).
  */
 router.get('/branches', requirePermission('vendors.branches', 'view'), validateQuery(CrossVendorListQuerySchema), async (req, res, next) => {
@@ -187,7 +149,7 @@ router.get('/therapists', requirePermission('vendors.therapists', 'view'), valid
 
 // ─── Self-service — vendorId is ALWAYS derived from req.user.sub, never a param/body value ──
 
-router.get('/me', requirePermission('vendors', 'custom'), async (req, res, next) => {
+router.get('/me', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     sendData(res, withCompletion(vendor));
@@ -196,31 +158,9 @@ router.get('/me', requirePermission('vendors', 'custom'), async (req, res, next)
   }
 });
 
-router.post(
-  '/me',
-  requirePermission('vendors', 'custom'),
-  validateBody(VendorSelfCreateSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.createSelfVendor(req.user!.sub, req.body);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.self_register',
-        targetType: 'Vendor',
-        targetId: vendor.id,
-        after: vendor,
-        ...requestMeta(req),
-      });
-      sendData(res, vendor, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
 router.patch(
   '/me',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(VendorSelfUpdateSchema),
   async (req, res, next) => {
     try {
@@ -230,7 +170,8 @@ router.patch(
         action: 'vendor.self_update',
         targetType: 'Vendor',
         targetId: vendor.id,
-        after: vendor,
+        // The validated body only, never the stored entity.
+        after: req.body,
         ...requestMeta(req),
       });
       sendData(res, vendor);
@@ -244,7 +185,7 @@ router.patch(
 
 router.post(
   '/me/images',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   imageUpload.single('file'),
   async (req, res, next) => {
     try {
@@ -268,7 +209,7 @@ router.post(
   },
 );
 
-router.delete('/me/images/:imageId', requirePermission('vendors', 'custom'), async (req, res, next) => {
+router.delete('/me/images/:imageId', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     await vendorService.deleteVendorImage(vendor.id, req.params.imageId);
@@ -287,7 +228,7 @@ router.delete('/me/images/:imageId', requirePermission('vendors', 'custom'), asy
 
 router.patch(
   '/me/images/reorder',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(MediaReorderSchema),
   async (req, res, next) => {
     try {
@@ -300,7 +241,7 @@ router.patch(
   },
 );
 
-router.patch('/me/images/:imageId/primary', requirePermission('vendors', 'custom'), async (req, res, next) => {
+router.patch('/me/images/:imageId/primary', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     await vendorService.setVendorPrimaryImage(vendor.id, req.params.imageId);
@@ -313,10 +254,10 @@ router.patch('/me/images/:imageId/primary', requirePermission('vendors', 'custom
 // ─── Vendor KYC documents, self-service (real file upload — GST/PAN/Aadhaar, one active file
 // per type; replaces the deprecated `kycDocuments` pasted-URL list) ──────────────────────────
 
-router.get('/me/kyc-documents', requirePermission('vendors', 'custom'), async (req, res, next) => {
+router.get('/me/kyc-documents', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-    sendData(res, await vendorDocumentService.listVendorDocuments(vendor.id));
+    sendData(res, await memberDocumentService.listVendorDocuments(vendor.id));
   } catch (err) {
     next(err);
   }
@@ -324,20 +265,24 @@ router.get('/me/kyc-documents', requirePermission('vendors', 'custom'), async (r
 
 router.post(
   '/me/kyc-documents/:documentType',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateParams(VendorDocumentTypeParamSchema),
   documentUpload.single('file'),
   async (req, res, next) => {
     try {
       if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
       const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      const document = await vendorDocumentService.uploadVendorDocument(vendor.id, req.params.documentType as VendorDocumentType, {
-        buffer: req.file.buffer,
-        originalname: req.file.originalname,
+      const document = await memberDocumentService.uploadMemberDocument({
+        memberId: vendor.id,
+        documentType: req.params.documentType as VendorDocumentType,
+        file: { buffer: req.file.buffer, originalname: req.file.originalname },
+        number: typeof req.body?.number === 'string' ? req.body.number : undefined,
+        actorUserId: req.user!.sub,
+        onBehalf: false,
       });
       await writeAuditLog({
         actorUserId: req.user!.sub,
-        action: 'vendor_document.upload',
+        action: 'member_document.upload',
         targetType: 'VendorDocument',
         targetId: document.id,
         ...requestMeta(req),
@@ -351,15 +296,15 @@ router.post(
 
 router.delete(
   '/me/kyc-documents/:documentType',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateParams(VendorDocumentTypeParamSchema),
   async (req, res, next) => {
     try {
       const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      await vendorDocumentService.deleteVendorDocument(vendor.id, req.params.documentType as VendorDocumentType);
+      await memberDocumentService.deleteVendorDocument(vendor.id, req.params.documentType as VendorDocumentType);
       await writeAuditLog({
         actorUserId: req.user!.sub,
-        action: 'vendor_document.delete',
+        action: 'member_document.delete',
         targetType: 'VendorDocument',
         targetId: req.params.documentType,
         ...requestMeta(req),
@@ -373,7 +318,7 @@ router.delete(
 
 router.post(
   '/me/video',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   videoUpload.single('file'),
   async (req, res, next) => {
     try {
@@ -397,7 +342,7 @@ router.post(
   },
 );
 
-router.delete('/me/video', requirePermission('vendors', 'custom'), async (req, res, next) => {
+router.delete('/me/video', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     await vendorService.deleteVendorVideo(vendor.id);
@@ -414,24 +359,7 @@ router.delete('/me/video', requirePermission('vendors', 'custom'), async (req, r
   }
 });
 
-router.post('/me/submit', requirePermission('vendors', 'custom'), async (req, res, next) => {
-  try {
-    const vendor = await vendorService.submitForVerification(req.user!.sub);
-    await writeAuditLog({
-      actorUserId: req.user!.sub,
-      action: 'vendor.submit_for_verification',
-      targetType: 'Vendor',
-      targetId: vendor.id,
-      after: { status: vendor.status },
-      ...requestMeta(req),
-    });
-    sendData(res, vendor);
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.get('/me/branches', requirePermission('vendors', 'custom'), async (req, res, next) => {
+router.get('/me/branches', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     sendData(res, await vendorService.listBranches(vendor.id));
@@ -443,7 +371,7 @@ router.get('/me/branches', requirePermission('vendors', 'custom'), async (req, r
 // ─── Business modules + Category access (onboarding wizard Step 2) ──────────────────────────
 // Replace-the-full-set pattern, same shape as rbac.routes.ts's PUT /roles/:id/permissions.
 
-router.get('/me/category-access', requirePermission('vendors', 'custom'), async (req, res, next) => {
+router.get('/me/category-access', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     sendData(res, await vendorService.getVendorCategoryAccess(vendor.id));
@@ -454,7 +382,7 @@ router.get('/me/category-access', requirePermission('vendors', 'custom'), async 
 
 router.put(
   '/me/category-access',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(VendorModulesAndCategoryAccessSchema),
   async (req, res, next) => {
     try {
@@ -484,7 +412,7 @@ router.put(
  * `getBranchCategoryAccess` already calls `getBranchScopedOrThrow`, so a vendor can't reach
  * another vendor's branch here even by guessing a `branchId`.
  */
-router.get('/me/branches/:branchId/category-access', requirePermission('vendors', 'custom'), async (req, res, next) => {
+router.get('/me/branches/:branchId/category-access', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     sendData(res, await vendorService.getBranchCategoryAccess(vendor.id, req.params.branchId));
@@ -498,7 +426,7 @@ router.get('/me/branches/:branchId/category-access', requirePermission('vendors'
  * "Customers" screen. Derived entirely from existing Order rows (no new table); paginates the
  * distinct-customer list, not the raw Order rows.
  */
-router.get('/me/customers', requirePermission('vendors', 'custom'), validateQuery(PaginationQuerySchema), async (req, res, next) => {
+router.get('/me/customers', requirePermission('members', 'custom'), validateQuery(PaginationQuerySchema), async (req, res, next) => {
   try {
     const { page, pageSize } = req.validatedQuery as ReturnType<typeof PaginationQuerySchema.parse>;
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
@@ -511,7 +439,7 @@ router.get('/me/customers', requirePermission('vendors', 'custom'), validateQuer
 
 router.post(
   '/me/branches',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(BranchCreateSchema),
   async (req, res, next) => {
     try {
@@ -534,7 +462,7 @@ router.post(
 
 router.patch(
   '/me/branches/:branchId',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(BranchUpdateSchema),
   async (req, res, next) => {
     try {
@@ -557,7 +485,7 @@ router.patch(
 
 router.patch(
   '/me/branches/:branchId/status',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(BranchStatusUpdateSchema),
   async (req, res, next) => {
     try {
@@ -578,7 +506,7 @@ router.patch(
   },
 );
 
-router.get('/me/branches/:branchId/deals', requirePermission('vendors', 'custom'), async (req, res, next) => {
+router.get('/me/branches/:branchId/deals', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     sendData(res, await vendorService.listDeals(vendor.id, req.params.branchId));
@@ -589,7 +517,7 @@ router.get('/me/branches/:branchId/deals', requirePermission('vendors', 'custom'
 
 router.post(
   '/me/branches/:branchId/deals',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(DealCreateSchema),
   async (req, res, next) => {
     try {
@@ -612,7 +540,7 @@ router.post(
 
 router.patch(
   '/me/branches/:branchId/deals/:dealId',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(DealUpdateSchema),
   async (req, res, next) => {
     try {
@@ -635,7 +563,7 @@ router.patch(
 
 router.patch(
   '/me/branches/:branchId/deals/:dealId/status',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(DealStatusUpdateSchema),
   async (req, res, next) => {
     try {
@@ -660,7 +588,7 @@ router.patch(
 
 router.post(
   '/me/branches/:branchId/deals/:dealId/images',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   imageUpload.single('file'),
   async (req, res, next) => {
     try {
@@ -686,7 +614,7 @@ router.post(
 
 router.delete(
   '/me/branches/:branchId/deals/:dealId/images/:imageId',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   async (req, res, next) => {
     try {
       const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
@@ -707,7 +635,7 @@ router.delete(
 
 router.patch(
   '/me/branches/:branchId/deals/:dealId/images/reorder',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(MediaReorderSchema),
   async (req, res, next) => {
     try {
@@ -722,7 +650,7 @@ router.patch(
 
 router.patch(
   '/me/branches/:branchId/deals/:dealId/images/:imageId/primary',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   async (req, res, next) => {
     try {
       const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
@@ -736,7 +664,7 @@ router.patch(
 
 router.post(
   '/me/branches/:branchId/deals/:dealId/video',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   videoUpload.single('file'),
   async (req, res, next) => {
     try {
@@ -762,7 +690,7 @@ router.post(
 
 router.delete(
   '/me/branches/:branchId/deals/:dealId/video',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   async (req, res, next) => {
     try {
       const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
@@ -783,7 +711,7 @@ router.delete(
 
 // ─── Therapist (self-service — mirrors Branch's exact pattern) ──────────────
 
-router.get('/me/branches/:branchId/therapists', requirePermission('vendors', 'custom'), async (req, res, next) => {
+router.get('/me/branches/:branchId/therapists', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     sendData(res, await vendorService.listTherapists(vendor.id, req.params.branchId));
@@ -794,7 +722,7 @@ router.get('/me/branches/:branchId/therapists', requirePermission('vendors', 'cu
 
 router.post(
   '/me/branches/:branchId/therapists',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(TherapistCreateSchema),
   async (req, res, next) => {
     try {
@@ -817,7 +745,7 @@ router.post(
 
 router.patch(
   '/me/therapists/:therapistId',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(TherapistUpdateSchema),
   async (req, res, next) => {
     try {
@@ -840,7 +768,7 @@ router.patch(
 
 router.patch(
   '/me/therapists/:therapistId/status',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(TherapistStatusUpdateSchema),
   async (req, res, next) => {
     try {
@@ -863,7 +791,7 @@ router.patch(
 
 // ─── TherapistPackage (per-therapist price for one specific service Deal) ────
 
-router.get('/me/therapists/:therapistId/packages', requirePermission('vendors', 'custom'), async (req, res, next) => {
+router.get('/me/therapists/:therapistId/packages', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     sendData(res, await vendorService.listTherapistPackages(vendor.id, req.params.therapistId));
@@ -874,7 +802,7 @@ router.get('/me/therapists/:therapistId/packages', requirePermission('vendors', 
 
 router.post(
   '/me/therapists/:therapistId/packages',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(TherapistPackageCreateSchema),
   async (req, res, next) => {
     try {
@@ -897,7 +825,7 @@ router.post(
 
 router.patch(
   '/me/therapists/:therapistId/packages/:packageId',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(TherapistPackageUpdateSchema),
   async (req, res, next) => {
     try {
@@ -920,7 +848,7 @@ router.patch(
 
 router.delete(
   '/me/therapists/:therapistId/packages/:packageId',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   async (req, res, next) => {
     try {
       const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
@@ -943,7 +871,7 @@ router.delete(
 
 router.post(
   '/me/therapists/:therapistId/images',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   imageUpload.single('file'),
   async (req, res, next) => {
     try {
@@ -969,7 +897,7 @@ router.post(
 
 router.delete(
   '/me/therapists/:therapistId/images/:imageId',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   async (req, res, next) => {
     try {
       const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
@@ -990,7 +918,7 @@ router.delete(
 
 router.patch(
   '/me/therapists/:therapistId/images/reorder',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(MediaReorderSchema),
   async (req, res, next) => {
     try {
@@ -1005,7 +933,7 @@ router.patch(
 
 router.patch(
   '/me/therapists/:therapistId/images/:imageId/primary',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   async (req, res, next) => {
     try {
       const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
@@ -1019,7 +947,7 @@ router.patch(
 
 router.post(
   '/me/therapists/:therapistId/video',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   videoUpload.single('file'),
   async (req, res, next) => {
     try {
@@ -1045,7 +973,7 @@ router.post(
 
 router.delete(
   '/me/therapists/:therapistId/video',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   async (req, res, next) => {
     try {
       const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
@@ -1066,7 +994,7 @@ router.delete(
 
 // ─── Product (self-service — vendor-owned catalog, mirrors Branch/Therapist's exact split) ──
 
-router.get('/me/products', requirePermission('vendors', 'custom'), validateQuery(ProductListQuerySchema), async (req, res, next) => {
+router.get('/me/products', requirePermission('members', 'custom'), validateQuery(ProductListQuerySchema), async (req, res, next) => {
   try {
     const { page, pageSize, search, categoryId, subcategoryId, status } = req.validatedQuery as ReturnType<typeof ProductListQuerySchema.parse>;
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
@@ -1079,7 +1007,7 @@ router.get('/me/products', requirePermission('vendors', 'custom'), validateQuery
 
 router.post(
   '/me/products',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(ProductCreateSchema),
   async (req, res, next) => {
     try {
@@ -1102,7 +1030,7 @@ router.post(
 
 router.patch(
   '/me/products/:productId',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(ProductUpdateSchema),
   async (req, res, next) => {
     try {
@@ -1125,7 +1053,7 @@ router.patch(
 
 router.patch(
   '/me/products/:productId/status',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(ProductStatusUpdateSchema),
   async (req, res, next) => {
     try {
@@ -1146,7 +1074,7 @@ router.patch(
   },
 );
 
-router.delete('/me/products/:productId', requirePermission('vendors', 'custom'), async (req, res, next) => {
+router.delete('/me/products/:productId', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     const before = await productService.getProductScopedOrThrow(vendor.id, req.params.productId);
@@ -1169,7 +1097,7 @@ router.delete('/me/products/:productId', requirePermission('vendors', 'custom'),
 
 router.post(
   '/me/products/:productId/images',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   imageUpload.single('file'),
   async (req, res, next) => {
     try {
@@ -1194,7 +1122,7 @@ router.post(
   },
 );
 
-router.delete('/me/products/:productId/images/:imageId', requirePermission('vendors', 'custom'), async (req, res, next) => {
+router.delete('/me/products/:productId/images/:imageId', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     await productService.getProductScopedOrThrow(vendor.id, req.params.productId);
@@ -1214,7 +1142,7 @@ router.delete('/me/products/:productId/images/:imageId', requirePermission('vend
 
 router.patch(
   '/me/products/:productId/images/reorder',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   validateBody(MediaReorderSchema),
   async (req, res, next) => {
     try {
@@ -1228,7 +1156,7 @@ router.patch(
   },
 );
 
-router.patch('/me/products/:productId/images/:imageId/primary', requirePermission('vendors', 'custom'), async (req, res, next) => {
+router.patch('/me/products/:productId/images/:imageId/primary', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     await productService.getProductScopedOrThrow(vendor.id, req.params.productId);
@@ -1241,7 +1169,7 @@ router.patch('/me/products/:productId/images/:imageId/primary', requirePermissio
 
 router.post(
   '/me/products/:productId/video',
-  requirePermission('vendors', 'custom'),
+  requirePermission('members', 'custom'),
   videoUpload.single('file'),
   async (req, res, next) => {
     try {
@@ -1266,7 +1194,7 @@ router.post(
   },
 );
 
-router.delete('/me/products/:productId/video', requirePermission('vendors', 'custom'), async (req, res, next) => {
+router.delete('/me/products/:productId/video', requirePermission('members', 'custom'), async (req, res, next) => {
   try {
     const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
     await productService.getProductScopedOrThrow(vendor.id, req.params.productId);
@@ -1284,73 +1212,14 @@ router.delete('/me/products/:productId/video', requirePermission('vendors', 'cus
   }
 });
 
-// ─── Admin/SuperAdmin surface ─────────────────────────────────────────────────
-
-router.get('/', requirePermission('vendors', 'view'), validateQuery(VendorListQuerySchema), async (req, res, next) => {
-  try {
-    const { page, pageSize, search, status } = req.validatedQuery as ReturnType<typeof VendorListQuerySchema.parse>;
-    const { items, total } = await vendorService.listVendors({ page, pageSize, search, status });
-    sendData(res, await vendorService.attachLiveCounts(items), { meta: { total, page, pageSize } });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/', requirePermission('vendors', 'create'), validateBody(VendorCreateSchema), async (req, res, next) => {
-  try {
-    const vendor = await vendorService.createVendor(req.body, req.user!.sub);
-    await writeAuditLog({
-      actorUserId: req.user!.sub,
-      action: 'vendor.create',
-      targetType: 'Vendor',
-      targetId: vendor.id,
-      after: vendor,
-      ...requestMeta(req),
-    });
-    sendData(res, withCompletion(vendor), { status: 201 });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.get('/:id', requirePermission('vendors', 'view'), validateParams(UuidParamSchema), async (req, res, next) => {
-  try {
-    const vendor = await vendorService.getVendorOrThrow(req.params.id);
-    const [withCounts] = await vendorService.attachLiveCounts([vendor]);
-    sendData(res, withCompletion(withCounts));
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.patch(
-  '/:id',
-  requirePermission('vendors', 'edit'),
-  validateParams(UuidParamSchema),
-  validateBody(VendorUpdateSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.updateVendor(req.params.id, req.body);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.update',
-        targetType: 'Vendor',
-        targetId: vendor.id,
-        after: vendor,
-        ...requestMeta(req),
-      });
-      sendData(res, withCompletion(vendor));
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+// Deprecated alias for one release: the canonical admin member routes live at /members.
+router.use(buildMemberAdminRoutes({ deprecated: true }));
 
 // ─── Vendor media, admin (shared upload system — see media.service.ts's doc comment) ─────────
 
 router.post(
   '/:id/images',
-  requirePermission('vendors', 'edit'),
+  requirePermission('members', 'edit'),
   validateParams(UuidParamSchema),
   imageUpload.single('file'),
   async (req, res, next) => {
@@ -1376,7 +1245,7 @@ router.post(
 
 router.delete(
   '/:id/images/:imageId',
-  requirePermission('vendors', 'edit'),
+  requirePermission('members', 'edit'),
   validateParams(VendorImageIdParamSchema),
   async (req, res, next) => {
     try {
@@ -1397,7 +1266,7 @@ router.delete(
 
 router.patch(
   '/:id/images/reorder',
-  requirePermission('vendors', 'edit'),
+  requirePermission('members', 'edit'),
   validateParams(UuidParamSchema),
   validateBody(MediaReorderSchema),
   async (req, res, next) => {
@@ -1412,7 +1281,7 @@ router.patch(
 
 router.patch(
   '/:id/images/:imageId/primary',
-  requirePermission('vendors', 'edit'),
+  requirePermission('members', 'edit'),
   validateParams(VendorImageIdParamSchema),
   async (req, res, next) => {
     try {
@@ -1426,7 +1295,7 @@ router.patch(
 
 router.post(
   '/:id/video',
-  requirePermission('vendors', 'edit'),
+  requirePermission('members', 'edit'),
   validateParams(UuidParamSchema),
   videoUpload.single('file'),
   async (req, res, next) => {
@@ -1452,7 +1321,7 @@ router.post(
 
 router.delete(
   '/:id/video',
-  requirePermission('vendors', 'edit'),
+  requirePermission('members', 'edit'),
   validateParams(UuidParamSchema),
   async (req, res, next) => {
     try {
@@ -1471,172 +1340,6 @@ router.delete(
   },
 );
 
-// ─── Vendor KYC documents, admin-on-behalf (real file upload) ───────────────────────────────
-
-router.get('/:id/kyc-documents', requirePermission('vendors', 'view'), validateParams(UuidParamSchema), async (req, res, next) => {
-  try {
-    sendData(res, await vendorDocumentService.listVendorDocuments(req.params.id));
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post(
-  '/:id/kyc-documents/:documentType',
-  requirePermission('vendors', 'edit'),
-  validateParams(VendorDocumentAdminParamSchema),
-  documentUpload.single('file'),
-  async (req, res, next) => {
-    try {
-      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
-      const document = await vendorDocumentService.uploadVendorDocument(req.params.id, req.params.documentType as VendorDocumentType, {
-        buffer: req.file.buffer,
-        originalname: req.file.originalname,
-      });
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor_document.upload',
-        targetType: 'VendorDocument',
-        targetId: document.id,
-        ...requestMeta(req),
-      });
-      sendData(res, document, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.delete(
-  '/:id/kyc-documents/:documentType',
-  requirePermission('vendors', 'edit'),
-  validateParams(VendorDocumentAdminParamSchema),
-  async (req, res, next) => {
-    try {
-      await vendorDocumentService.deleteVendorDocument(req.params.id, req.params.documentType as VendorDocumentType);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor_document.delete',
-        targetType: 'VendorDocument',
-        targetId: req.params.documentType,
-        ...requestMeta(req),
-      });
-      sendData(res, { deleted: true });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.patch(
-  '/:id/approve',
-  requirePermission('vendors', 'approve'),
-  validateParams(UuidParamSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.approveVendor(req.params.id);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.approve',
-        targetType: 'Vendor',
-        targetId: vendor.id,
-        after: { status: vendor.status },
-        ...requestMeta(req),
-      });
-      sendData(res, vendor);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.patch(
-  '/:id/reject',
-  requirePermission('vendors', 'reject'),
-  validateParams(UuidParamSchema),
-  validateBody(VendorRejectSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.rejectVendor(req.params.id, req.body.reason);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.reject',
-        targetType: 'Vendor',
-        targetId: vendor.id,
-        after: { status: vendor.status, reason: req.body.reason },
-        ...requestMeta(req),
-      });
-      sendData(res, vendor);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.patch(
-  '/:id/status',
-  requirePermission('vendors', 'status_change'),
-  validateParams(UuidParamSchema),
-  validateBody(VendorStatusUpdateSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.setVendorStatus(req.params.id, req.body.status, req.body.reason);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.status_change',
-        targetType: 'Vendor',
-        targetId: vendor.id,
-        after: { status: vendor.status },
-        ...requestMeta(req),
-      });
-      sendData(res, vendor);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.delete('/:id', requirePermission('vendors', 'delete'), validateParams(UuidParamSchema), async (req, res, next) => {
-  try {
-    const before = await vendorService.getVendorOrThrow(req.params.id);
-    await vendorService.deleteVendor(req.params.id);
-    await writeAuditLog({
-      actorUserId: req.user!.sub,
-      action: 'vendor.delete',
-      targetType: 'Vendor',
-      targetId: req.params.id,
-      before,
-      ...requestMeta(req),
-    });
-    sendData(res, null);
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.patch(
-  '/:id/kyc-review',
-  requirePermission('vendors', 'approve'),
-  validateParams(UuidParamSchema),
-  validateBody(VendorKycReviewSchema),
-  async (req, res, next) => {
-    try {
-      const vendor = await vendorService.reviewKyc(req.params.id, req.body.kycStatus, req.body.rejectionReason);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor.kyc_review',
-        targetType: 'Vendor',
-        targetId: vendor.id,
-        after: { kycStatus: vendor.kycStatus, rejectionReason: vendor.kycRejectionReason },
-        ...requestMeta(req),
-      });
-      sendData(res, vendor);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
 router.get('/:vendorId/branches', requirePermission('vendors.branches', 'view'), async (req, res, next) => {
   try {
     sendData(res, await vendorService.listBranches(req.params.vendorId));
@@ -1647,7 +1350,7 @@ router.get('/:vendorId/branches', requirePermission('vendors.branches', 'view'),
 
 router.get(
   '/:vendorId/category-access',
-  requirePermission('vendors', 'view'),
+  requirePermission('members', 'view'),
   validateParams(VendorIdParamSchema),
   async (req, res, next) => {
     try {
@@ -1660,7 +1363,7 @@ router.get(
 
 router.put(
   '/:vendorId/category-access',
-  requirePermission('vendors', 'edit'),
+  requirePermission('members', 'edit'),
   validateParams(VendorIdParamSchema),
   validateBody(VendorModulesAndCategoryAccessSchema),
   async (req, res, next) => {
@@ -1769,11 +1472,11 @@ router.get(
  * function takes `vendorId` as a plain parameter and does no ownership resolution internally
  * (ownership is only relevant to the self-service route's `getMyVendorOrThrow` lookup), so no new
  * service logic is needed here. Deliberately read-only, same as `/:vendorId/therapists`, and
- * gated on the same `vendors:view` every other purely-admin vendor read in this file already uses.
+ * gated on the same `members:view` every other purely-admin vendor read in this file already uses.
  */
 router.get(
   '/:vendorId/customers',
-  requirePermission('vendors', 'view'),
+  requirePermission('members', 'view'),
   validateParams(VendorIdParamSchema),
   validateQuery(PaginationQuerySchema),
   async (req, res, next) => {

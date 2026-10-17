@@ -13,7 +13,7 @@ shared packages.
 
 - **`apps/msd`** — React 19 + Vite, port **4200**. Business: **massage deals** (public storefront + the full RBAC admin console under `/account/*`). Theme: green (`#007C2B`).
 - **`apps/mera-driver`** — Angular 21 (standalone) + Tailwind, port **4400**. Business: **driver booking** (same public + admin-console split as msd). Theme: blue (`#1175BC`).
-- **`apps/msd-api`** — Express + TypeScript + Prisma + PostgreSQL (db `msd`), port **3333**, all routes under `/api/v1`. MSD's own RBAC + business modules: Customers, Vendors (+ KYC, branches, therapists), Products, Deals, Orders, Cart, Wishlist, Payments (Razorpay), Reports, Notifications, CMS (blog, FAQs, pages, site content) and the public storefront catalog are real; only **Inventory** is still a permission-gated stub.
+- **`apps/msd-api`** — Express + TypeScript + Prisma + PostgreSQL (db `msd`), port **3333**, all routes under `/api/v1`. MSD's own RBAC + business modules: Customers, Members (+ KYC documents, branches, therapists), Products, Deals, Orders, Cart, Wishlist, Payments (Razorpay), Reports, Notifications, CMS (blog, FAQs, pages, site content) and the public storefront catalog are real; only **Inventory** is still a permission-gated stub.
 - **`apps/mera-driver-api`** — Express + TypeScript + Prisma + PostgreSQL (db `mera_driver`), port **3334**, routes mounted at root (no `/api/v1` prefix). MeraDriver's own RBAC + business modules: Drivers, Vehicles, Bookings, Trip types, Attendance, Customers and master data are real; **Payments** and **Reports** are still permission-gated stubs (see `docs/MERA_DRIVER_ARCHITECTURE.md` §20).
 - **`packages/shared-ui`** (`@skylabs-monorepo/shared-ui`) — Material 3 web components (Material Web + LIT), theme, React wrappers, test helpers. Presentational only and **app-neutral**: mera-driver consumes it with a different design and purpose, so only common components live here. App layout pieces (page bands, grids, filter panels) live in each app.
 - **`packages/shared-types`** — cross-app RBAC domain types (`Role`, `Permission`, `MenuNode`, `BootstrapResponse`, `ApiEnvelope<T>`, …). Types only, no runtime code, no business data.
@@ -191,15 +191,15 @@ not from a fixed role→page mapping in the frontend.
 ### Default roles (seeded, both apps' DBs independently)
 
 `super_admin` (flagged `isSuperAdmin`, auto-granted every permission),
-`admin`, `customer`, `vendor`, `marketing`, `sales` — all `isSystem: true`
+`admin`, `customer`, `member` (msd; mera-driver keeps `vendor`), `marketing`, `sales`, `support` — all `isSystem: true`
 (undeletable). SuperAdmin can create unlimited additional custom roles
 (HR, Dispatcher, Warehouse, …) at runtime; nothing about a custom role
 requires a code change.
 
 ### The permission model
 
-- A **permission** is a `${menuKey}:${action}` pair, e.g. `orders:create`,
-  `rbac.roles:view`. `action` is one of 16 fixed kinds (`view create edit
+- A **permission** is a `${menuKey}:${action}` pair, e.g. `members:create`,
+  `members:status_change`. `action` is one of 16 fixed kinds (`view create edit
   delete export import approve reject upload download print assign restore
   permanent_delete status_change custom` — see `PermissionAction` in
   `packages/shared-types`).
@@ -259,7 +259,8 @@ requires a code change.
   /roles/:id/permissions`, `PUT /roles/:id/widgets`, users CRUD/status/
   role-assign/session-revoke/OTP-reset/login-history/device-sessions, `GET
   /audit-logs`, `POST /impersonate`, `GET /bootstrap`.
-- `prisma/seed.ts` — seeds the 6 default roles + a starter permission set
+- `prisma/seed.ts` — seeds the default roles (7 in msd-api: super_admin, admin,
+  marketing, sales, member, support, customer; 13 in mera-driver-api) + a starter permission set
   walked from that app's `shared-menu` JSON, auto-granting everything to
   the `isSuperAdmin`-flagged role.
 
@@ -380,8 +381,12 @@ msd map vars: `VITE_MAP_PROVIDER` (`leaflet` default or `google`), optional `VIT
   `git stash`, `git reset`, `git checkout -- <file>`, `git restore`, `git clean`, `git apply`,
   `git worktree`, or delete directories to "compare with an old version". Read old files with
   `git show <rev>:<path> > <temp file>` instead. Stage only the files a task names.
-- Known pre-existing test failures (not caused by storefront work): msd `app.spec.tsx` (1) and
-  `otp.test.tsx` (2); mera-driver RBAC route / users "Login As" / drivers specs (12). Tracked in `TASK.md`.
+- Known pre-existing test failures (not caused by storefront work): msd 26 tests in 15 files
+  (`permission-matrix` 9, `india-locations` 3, `home` 2, `contact-us` 2, 1 each in `app.spec`,
+  `widget-registry`, `deal-card`, `media-uploader`, `sky-product-card-wc`, `site-footer`,
+  `become-vendor`, `wishlist`, `roles`, `settings`, plus `entry-server.test.tsx` failing to load);
+  msd-api 5 (`rbac.routes` 4, `orders.routes` image 1); shared-menu `index.test.ts` 5;
+  mera-driver RBAC route / users "Login As" / drivers specs (12). Tracked in `TASK.md`.
 
 - `nx.json` `defaultBase` is `"main"` (matches the active branch) — `nx affected`
   in CI and `nx-ignore` on Vercel both compare against it. See `DEPLOYMENT.md`.

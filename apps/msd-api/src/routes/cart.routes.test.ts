@@ -54,7 +54,7 @@ describe('GET /api/v1/cart', () => {
 
 describe('POST /api/v1/cart/items — Product line (productId only)', () => {
   it('rejects a bare dealId with no dealPackageId (every Deal is a service deal now)', async () => {
-    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
+    prismaMock.deal.findFirst.mockResolvedValue(serviceDealFixture);
     const res = await request(app)
       .post('/api/v1/cart/items')
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
@@ -137,7 +137,7 @@ describe('POST /api/v1/cart/items — Service-Deal line (dealId + dealPackageId)
   });
 
   it('404s when the package does not belong to the deal', async () => {
-    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
+    prismaMock.deal.findFirst.mockResolvedValue(serviceDealFixture);
     prismaMock.dealPackage.findUnique.mockResolvedValue({ ...dealPackageFixture, dealId: 'some-other-deal' });
     const res = await request(app)
       .post('/api/v1/cart/items')
@@ -148,7 +148,7 @@ describe('POST /api/v1/cart/items — Service-Deal line (dealId + dealPackageId)
   });
 
   it('adds a service deal with its selected package, priced from the package (never Deal.salePrice)', async () => {
-    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
+    prismaMock.deal.findFirst.mockResolvedValue(serviceDealFixture);
     prismaMock.dealPackage.findUnique.mockResolvedValue(dealPackageFixture);
     prismaMock.cart.upsert.mockResolvedValue(emptyCart);
     prismaMock.cartItem.findFirst.mockResolvedValue(null);
@@ -166,18 +166,18 @@ describe('POST /api/v1/cart/items — Service-Deal line (dealId + dealPackageId)
 });
 
 describe('POST /api/v1/cart/items — Therapist line (therapistId + therapistPackageId)', () => {
-  it('rejects an inactive therapist', async () => {
-    prismaMock.therapist.findUnique.mockResolvedValue({ ...therapistFixture, isActive: false });
+  it('404s an inactive therapist like a missing one (the visibility filter hides it)', async () => {
+    prismaMock.therapist.findFirst.mockResolvedValue(null);
     const res = await request(app)
       .post('/api/v1/cart/items')
       .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
       .send({ therapistId: THERAPIST_ID, therapistPackageId: THERAPIST_PACKAGE_ID, quantity: 1 });
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(404);
     expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
   });
 
   it('404s when the package does not belong to the therapist', async () => {
-    prismaMock.therapist.findUnique.mockResolvedValue(therapistFixture);
+    prismaMock.therapist.findFirst.mockResolvedValue(therapistFixture);
     prismaMock.therapistPackage.findUnique.mockResolvedValue({ ...therapistPackageFixture, therapistId: 'some-other-therapist' });
     const res = await request(app)
       .post('/api/v1/cart/items')
@@ -188,7 +188,7 @@ describe('POST /api/v1/cart/items — Therapist line (therapistId + therapistPac
   });
 
   it('adds a therapist with its selected package — entirely independent of any Deal', async () => {
-    prismaMock.therapist.findUnique.mockResolvedValue(therapistFixture);
+    prismaMock.therapist.findFirst.mockResolvedValue(therapistFixture);
     prismaMock.therapistPackage.findUnique.mockResolvedValue(therapistPackageFixture);
     prismaMock.cart.upsert.mockResolvedValue(emptyCart);
     prismaMock.cartItem.findFirst.mockResolvedValue(null);
@@ -253,5 +253,38 @@ describe('DELETE /api/v1/cart', () => {
     const res = await request(app).delete('/api/v1/cart').set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }));
     expect(res.status).toBe(200);
     expect(prismaMock.cartItem.deleteMany).toHaveBeenCalledWith({ where: { cartId: CART_ID } });
+  });
+});
+
+/** A filtering double: returns the row only when the query demands what the row satisfies. */
+function visibleOnly<T>(row: T, memberStatus: string) {
+  return async ({ where }: { where: { vendor?: { status?: string } } }) =>
+    where.vendor?.status === 'ACTIVE' && memberStatus !== 'ACTIVE' ? null : row;
+}
+
+describe('POST /api/v1/cart/items hides items of a member that is not ACTIVE', () => {
+  it.each(['SUSPENDED', 'INACTIVE'])('404s a deal of a %s member', async (memberStatus) => {
+    prismaMock.deal.findFirst.mockImplementation(visibleOnly(serviceDealFixture, memberStatus) as never);
+    // An unfiltered lookup would find the row: only the visibility filter may hide it.
+    prismaMock.deal.findUnique.mockResolvedValue(serviceDealFixture);
+    prismaMock.dealPackage.findUnique.mockResolvedValue(dealPackageFixture);
+    const res = await request(app)
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ dealId: SERVICE_DEAL_ID, dealPackageId: DEAL_PACKAGE_ID, quantity: 1 });
+    expect(res.status).toBe(404);
+    expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
+  });
+
+  it.each(['SUSPENDED', 'INACTIVE'])('404s a therapist of a %s member', async (memberStatus) => {
+    prismaMock.therapist.findFirst.mockImplementation(visibleOnly(therapistFixture, memberStatus) as never);
+    prismaMock.therapist.findUnique.mockResolvedValue(therapistFixture);
+    prismaMock.therapistPackage.findUnique.mockResolvedValue(therapistPackageFixture);
+    const res = await request(app)
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearerFor({ sub: CUSTOMER_ID, roles: ['customer'] }))
+      .send({ therapistId: THERAPIST_ID, therapistPackageId: THERAPIST_PACKAGE_ID, quantity: 1 });
+    expect(res.status).toBe(404);
+    expect(prismaMock.cartItem.create).not.toHaveBeenCalled();
   });
 });

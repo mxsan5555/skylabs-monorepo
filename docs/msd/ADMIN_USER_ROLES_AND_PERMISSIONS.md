@@ -30,7 +30,7 @@ V = view, C = create, E = edit, D = delete. "own" = only the user's own records 
 | Therapists | VCED | VCE | V | VCE | own: VCE | V |
 | Products | VCED | VCE | V | VCE | own: VCE | V |
 | Orders | V | V | – | V | own: V | V |
-| Customers | V | V | – | V | – | V |
+| Customers | V | V | – | V | own: V (customers who ordered from them) | V |
 | Content | VCED | VCE | VCE | V | – | V |
 | Payments & Payouts | V | V | – | – | own: V | – |
 | Reports | V (overall) | V (overall) | – | – | own: V | – |
@@ -73,9 +73,35 @@ Super Admin and Admin see overall figures. A Member sees only their own.
 | State | Meaning |
 |---|---|
 | Active | Default when the member is created. A welcome message is sent by SMS or email. |
-| Inactive | Business pause. The member can log in but can only view, not create or edit. Their deals, branches and therapists are hidden from the storefront. Existing purchases are honored. |
-| Suspended | Admin action, reason required. The member cannot log in (sessions revoked). Their profile, branches, deals and therapists disappear from the website. Customers who already paid are honored or refunded, case by case (default: honor; Admin can refund). |
-| Deleted | Super Admin only. Allowed only if the member never had an order. Otherwise the member is archived (hidden everywhere, records kept). |
+| Inactive | Business pause. The member can log in and look at everything, but cannot change anything. See "Inactive in plain English" below. |
+| Suspended | Admin action, reason required. The member cannot log in. Everything they own disappears from the website, and they get an email and an SMS. See "Suspended in plain English" below. |
+| Deleted | Super Admin only, and only from Suspended (the journey is Inactive, then Suspended, then Delete). Allowed only if the member never had an order. Otherwise the member is archived (hidden everywhere, records kept). |
+
+### Inactive in plain English
+
+When an Admin makes a member Inactive:
+
+- The member can still log in.
+- The member can see everything they already have: their orders, their customers, and their existing branches, deals, therapists and products.
+- The member cannot edit any existing detail. That includes their profile, branches, deals, therapists and products, and also pausing or unpublishing them.
+- The member cannot add anything new: no new branch, deal, therapist or product.
+- The member sees a clear banner on every screen saying the account is inactive and view only.
+- Their deals, branches, therapists and products are hidden from the website while the member is inactive.
+- Customers who already ordered keep their purchases. The member still sees those orders.
+- An Admin can return the member to Active at any time. Everything comes back exactly as it was.
+
+### Suspended in plain English
+
+When an Admin suspends a member:
+
+- The member cannot log in. Any open session is signed out right away.
+- All of their branches, deals, therapists and products disappear from the website at once. Their profile page disappears too.
+- The moment the Admin suspends the account, the member gets an email and an SMS (whichever contact details exist; both when both exist).
+- The message tells the member three things: the account is suspended, the reason the Admin entered, and how to come back to Active.
+- How to come back: the member contacts support using the email address and phone number in the message, resolves the reason given (for example, uploads the missing documents), and an Admin or Super Admin then sets the account back to Active. Only an Admin or Super Admin can reactivate. The member cannot do it alone.
+- If a suspended member tries to log in, they see the same suspension message and the same steps instead of a generic error.
+- Customers who already paid are honored or refunded, case by case (default: honor; Admin can refund).
+- When the Admin reactivates the member, everything on the website comes back exactly as it was, and the member gets an email and SMS saying the account is active again.
 
 - Status can be changed at any time, even if the member has no branches or deals.
 - Branches, deals and therapists keep their own status. The storefront shows an item only if the member, the branch and the deal are all active, so reactivating a member restores everything exactly as it was.

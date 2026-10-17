@@ -56,15 +56,15 @@
     "id": "vendors",
     "title": "Members",
     "icon": "storefront",
-    "permissionKey": "vendors.group",
+    "permissionKey": "members.group",
     "parent": null,
     "order": 3,
     "children": [
       {
-        "id": "vendor-list",
+        "id": "member-list",
         "title": "All Member",
-        "route": "/account/vendors",
-        "permissionKey": "vendors",
+        "route": "/account/members",
+        "permissionKey": "members",
         "parent": "vendors",
         "order": 1
       },

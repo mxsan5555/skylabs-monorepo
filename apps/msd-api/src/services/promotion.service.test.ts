@@ -11,6 +11,7 @@ import {
   updatePromotion,
   getPublicPromotions,
 } from './promotion.service';
+import { VISIBLE_DEAL_WHERE } from './catalog-visibility';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -125,6 +126,35 @@ describe('Promotion — public visibility (getPublicPromotions)', () => {
     ]);
     const result = await getPublicPromotions();
     expect(result[0].image).toBe('promotions/x/0.jpg');
+  });
+
+  it('omits a DEAL promotion whose deal the storefront hides (member not ACTIVE, draft, branch off)', async () => {
+    const hiddenDealPromo = {
+      ...basePromotion,
+      id: 'promo-hidden',
+      destinationType: 'DEAL' as const,
+      destinationRoute: null,
+      dealId: DEAL_ID,
+      deal: { id: DEAL_ID, title: 'Suspended spa deal', slug: 'suspended-spa-deal' },
+    };
+    // A filtering double: the hidden deal survives only a query that does not demand visibility.
+    prismaMock.promotion.findMany.mockImplementation((async (args: { where: { OR?: unknown[] } }) => {
+      const demandsVisibleDeal = JSON.stringify(args.where.OR ?? []).includes('"vendor":{"status":"ACTIVE"}');
+      return demandsVisibleDeal ? [basePromotion] : [basePromotion, hiddenDealPromo];
+    }) as never);
+    const result = await getPublicPromotions();
+    expect(result.map((p) => p.id)).toEqual([PROMOTION_ID]);
+    expect(JSON.stringify(result)).not.toContain('Suspended spa deal');
+    const where = prismaMock.promotion.findMany.mock.calls[0][0].where;
+    expect(where.OR).toEqual([{ destinationType: { not: 'DEAL' } }, { deal: { is: VISIBLE_DEAL_WHERE } }]);
+  });
+
+  it('never embeds a deal on a promotion that does not link to a deal', async () => {
+    prismaMock.promotion.findMany.mockResolvedValue([
+      { ...basePromotion, dealId: DEAL_ID, deal: { id: DEAL_ID, title: 'Stale deal', slug: 'stale' } },
+    ]);
+    const [promo] = await getPublicPromotions();
+    expect(promo.deal).toBeNull();
   });
 
   it('returns null image when a promotion has no uploaded images yet', async () => {

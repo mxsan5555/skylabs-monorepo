@@ -1,6 +1,6 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './showcase.css';
-import logo from '../../../assets/logo.jpg';
+import { LOGO_SRC as logo } from '../../../brand';
 // Opt-in: registers <swiper-container> / <swiper-slide> for the carousel demos.
 import '@skylabs-monorepo/shared-ui/carousel';
 // Opt-in: registers <sky-rich-text-editor> (Quill-backed) for the editor demo.
