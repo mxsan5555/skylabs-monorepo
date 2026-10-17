@@ -7,16 +7,7 @@ import { renderBlock } from '../blog-detail/blog-detail';
 import { Breadcrumb } from '../../components/breadcrumb';
 import './about.css';
 import content from '../../../content.json';
-
-type AboutTileColor =
-  | 'surface-high'
-  | 'secondary'
-  | 'tertiary'
-  | 'none'
-  | 'surface'
-  | 'primary'
-  | 'inverse';
-
+type AboutTileColor =| 'surface-high'| 'secondary'| 'tertiary'| 'none'| 'surface'| 'primary'| 'inverse';
 export function About() {
   const [aboutUs, setAboutUs] = useState<CatalogAboutUs | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,14 +22,9 @@ export function About() {
         const { data } = await getCatalogAboutUs();
         if (!cancelled) { setAboutUs(data); }
       } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof ApiRequestError ? err.message : 'Could not load this page.',);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
+        if (!cancelled) {setError(err instanceof ApiRequestError ? err.message : 'Could not load this page.',);}
+      } 
+      finally {if (!cancelled) {setLoading(false);}}
     }
     void loadAboutUs(); return () => { cancelled = true; };
   }, []);
@@ -100,8 +86,7 @@ export function About() {
             {aboutUs.heroSubtitle && (<p className="about__subtitle">{aboutUs.heroSubtitle}</p>)}
             <div className="about__chips">
               <ChipSet>
-                {aboutContent.chips.map((label) => (
-                  <AssistChip key={label} label={label} />
+                {aboutContent.chips.map((label) => (<AssistChip key={label} label={label} />
                 ))}
               </ChipSet>
             </div>
@@ -178,10 +163,7 @@ export function About() {
             </sky-card>
           </section>
         )}
-        <section
-          className="about__cta"
-          aria-label={aboutContent.cta.ariaLabel}
-        >
+        <section className="about__cta" aria-label={aboutContent.cta.ariaLabel}>
           <sky-cta-banner
             color="primary"
             icon={aboutContent.cta.icon}
@@ -197,5 +179,4 @@ export function About() {
     </main>
   );
 }
-
 export default About;
