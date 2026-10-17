@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
-import { assertCategoryChildOf, assertVendorHasCategoryAccess } from './category.service';
+import { assertCategoryChildOf, assertCategoryOfType } from './category.service';
 import * as mediaService from './media.service';
 import type { MediaFile } from './media.service';
 import { Prisma } from '../generated/prisma-client';
@@ -99,7 +99,7 @@ async function assertSlugAvailable(slug: string, excludeId?: string) {
 export async function createProduct(vendorId: string, input: ProductCreateInput) {
   await assertSlugAvailable(input.slug);
   await assertCategoryChildOf(input.categoryId, input.subcategoryId);
-  await assertVendorHasCategoryAccess(vendorId, input.categoryId, 'PRODUCT');
+  await assertCategoryOfType(input.categoryId, 'PRODUCT');
   // App-layer pre-check above is a racy read, not an atomic guarantee (two near-simultaneous
   // double-submits of the same form could both pass it before either commits) — Product.slug's
   // DB-level @unique is the hard backstop, same discipline as vendor.service.ts#createDeal.
@@ -123,7 +123,7 @@ export async function updateProduct(vendorId: string, productId: string, input: 
     );
   }
   if (input.categoryId) {
-    await assertVendorHasCategoryAccess(vendorId, input.categoryId, 'PRODUCT');
+    await assertCategoryOfType(input.categoryId, 'PRODUCT');
   }
   return prisma.product.update({ where: { id: productId }, data: input, include: CATEGORY_INCLUDE });
 }

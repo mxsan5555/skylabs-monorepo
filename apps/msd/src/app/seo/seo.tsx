@@ -2,6 +2,7 @@ import { JsonLd } from './json-ld';
 import type { JsonLdObject } from './jsonld';
 import { absoluteUrl } from './site-url';
 import content from '../../content.json';
+import { OG_IMAGE_SRC } from '../../brand';
 
 export interface SeoProps {
   title: string;
@@ -17,6 +18,8 @@ export interface SeoProps {
 /** Per-page head tags. React 19 hoists <title>, <meta> and <link> into <head>. */
 export function Seo({ title, description, path, image, noindex, jsonLd }: SeoProps) {
   const url = absoluteUrl(path);
+  // Pages without their own image share the brand card, so links never preview blank.
+  const shareImage = image ?? absoluteUrl(OG_IMAGE_SRC);
   return (
     <>
       <title>{title}</title>
@@ -28,8 +31,9 @@ export function Seo({ title, description, path, image, noindex, jsonLd }: SeoPro
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description} />
       {url && <meta property="og:url" content={url} />}
-      {image && <meta property="og:image" content={image} />}
-      <meta name="twitter:card" content={image ? 'summary_large_image' : 'summary'} />
+      {shareImage && <meta property="og:image" content={shareImage} />}
+      {shareImage && <meta name="twitter:image" content={shareImage} />}
+      <meta name="twitter:card" content={shareImage ? 'summary_large_image' : 'summary'} />
       {jsonLd && <JsonLd data={jsonLd} />}
     </>
   );

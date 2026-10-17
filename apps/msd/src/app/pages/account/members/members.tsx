@@ -12,7 +12,6 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { listMembers, type MemberListFilter } from '../../../../api/rbac/members';
-import { ChipNav } from '../../../components/chip-nav/chip-nav';
 import { MemberList, type MemberTableParams } from './member-list';
 import { VendorProfileForm, extractVendorFieldErrors, type VendorFieldErrors } from './vendor-profile-form';
 import { MEMBER_STATUS_LABEL } from './member-status';
@@ -32,18 +31,8 @@ export function MemberManagement() {
   return <p className="empty-state">You do not have access to Member Management.</p>;
 }
 
-type ListFilter = 'all' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'documents' | 'review';
-
-const FILTER_ITEMS = [
-  { value: 'all', label: 'All' },
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'INACTIVE', label: 'Inactive' },
-  { value: 'SUSPENDED', label: 'Suspended' },
-  { value: 'documents', label: 'Documents incomplete' },
-  { value: 'review', label: 'Ready for suspension review' },
-];
-
-function filterToQuery(filter: ListFilter): Pick<MemberListFilter, 'status' | 'documents' | 'reviewFlag'> {
+/** Maps the table's filter select value ('' = All) to the list query. */
+function filterToQuery(filter: string): Pick<MemberListFilter, 'status' | 'documents' | 'reviewFlag'> {
   if (filter === 'ACTIVE' || filter === 'INACTIVE' || filter === 'SUSPENDED') return { status: filter };
   if (filter === 'documents') return { documents: 'incomplete' };
   if (filter === 'review') return { reviewFlag: 'true' };
@@ -61,7 +50,7 @@ function legacyMemberLink(params: URLSearchParams): string | null {
   return base;
 }
 
-const DEFAULT_PARAMS: MemberTableParams = { page: 1, pageSize: 10, search: '' };
+const DEFAULT_PARAMS: MemberTableParams = { page: 1, pageSize: 10, search: '', filter: '', dir: 'asc' };
 
 function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
   const navigate = useNavigate();
@@ -72,7 +61,6 @@ function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState('');
   const [params, setParams] = useState<MemberTableParams>(DEFAULT_PARAMS);
-  const [filter, setFilter] = useState<ListFilter>('all');
 
   const openMember = useCallback((id: string) => navigate(`/account/members/${id}`), [navigate]);
 
@@ -84,7 +72,9 @@ function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
         page: params.page,
         pageSize: params.pageSize,
         search: params.search || undefined,
-        ...filterToQuery(filter),
+        ...filterToQuery(params.filter),
+        sort: params.sort,
+        dir: params.sort ? params.dir : undefined,
       });
       setMembers(data);
       setTotal(meta?.total ?? data.length);
@@ -93,7 +83,7 @@ function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
     } finally {
       setLoading(false);
     }
-  }, [token, params, filter]);
+  }, [token, params]);
 
   useEffect(() => {
     load();
@@ -122,17 +112,7 @@ function AdminMemberManagement({ canCreate }: { canCreate: boolean }) {
         </div>
       </header>
 
-      <section className="panel" aria-label="Members">
-        <h2>Members ({total})</h2>
-        <ChipNav
-          items={FILTER_ITEMS}
-          value={filter}
-          onSelect={(value) => {
-            setFilter(value as ListFilter);
-            setParams((p) => ({ ...p, page: 1 }));
-          }}
-          ariaLabel="Filter members"
-        />
+      <section className="" aria-label="Members">
         {listError && <p className="error-state" role="alert">{listError}</p>}
         <MemberList
           members={members}

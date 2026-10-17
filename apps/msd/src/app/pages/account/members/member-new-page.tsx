@@ -5,6 +5,12 @@ import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { createMember, type MemberCreateInput } from '../../../../api/rbac/members';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
+import { useConfirmDialog } from '../../../components/confirm-dialog';
+
+// sky-feature-card shrink-wraps slotted content; it is a size container with 24px padding, so this fills it.
+const FILL_CARD = { inlineSize: 'calc(100cqw - 48px)' } as const;
+
+const SECTION_HEADING = { margin: '0 0 16px', color: 'var(--md-sys-color-on-surface)' } as const;
 
 type FieldKey = keyof MemberCreateInput;
 type FieldErrors = Partial<Record<FieldKey, string>>;
@@ -65,6 +71,7 @@ export function MemberNewPage() {
   const [saving, setSaving] = useState(false);
   const fieldRefs = useRef<Partial<Record<FieldKey, HTMLElement | null>>>({});
   const [focusRequest, setFocusRequest] = useState(0);
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const idBase = useId();
   const errorId = (key: FieldKey) => `${idBase}-${key}-error`;
@@ -87,6 +94,8 @@ export function MemberNewPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const cancel = () => navigate('/account/members');
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (saving) return;
@@ -95,6 +104,17 @@ export function MemberNewPage() {
     setFormError('');
     if (Object.keys(found).length > 0) {
       setFocusRequest((n) => n + 1);
+      return;
+    }
+    // Valid form: ask before creating. Discard (or Escape) throws the entry away and leaves the page.
+    const create = await confirm({
+      title: 'Create this member?',
+      message: `Create "${form.businessName.trim()}" as a new member? They are active straight away and get a welcome message.`,
+      confirmLabel: 'Create member',
+      cancelLabel: 'Discard',
+    });
+    if (!create) {
+      cancel();
       return;
     }
     setSaving(true);
@@ -143,8 +163,8 @@ export function MemberNewPage() {
 
   // Raw M3 element: the @lit/react wrapper does not bind input events or labels under jsdom, so
   // tests could not drive it. Same convention as therapist-form-page.tsx.
-  const field = (key: FieldKey, label: string, extra: Record<string, unknown> = {}) => (
-    <div className="vendor-field">
+  const field = (key: FieldKey, label: string, extra: Record<string, unknown> = {}, full = false) => (
+    <div className="vendor-field" style={full ? { gridColumn: '1 / -1' } : undefined}>
       {createElement('md-outlined-text-field', {
         ref: (el: HTMLElement | null) => {
           fieldRefs.current[key] = el;
@@ -184,14 +204,32 @@ export function MemberNewPage() {
         </p>
       )}
 
-      <form className="panel" aria-label="Member details" noValidate onSubmit={submit} onKeyDown={submitOnEnter}>
-        {field('businessName', 'Business name', { maxlength: MAX_BUSINESS_NAME })}
-        {field('ownerFirstName', 'Owner first name', { autocomplete: 'given-name', maxlength: MAX_PERSON_NAME })}
-        {field('ownerLastName', 'Owner last name', { autocomplete: 'family-name', maxlength: MAX_PERSON_NAME })}
-        {field('ownerEmail', 'Owner email', { type: 'email', autocomplete: 'email', maxlength: MAX_EMAIL })}
-        {field('ownerMobile', 'Owner mobile number', { type: 'tel', inputmode: 'numeric', maxlength: 10, autocomplete: 'tel-national' })}
-        {createElement('md-filled-button', { type: 'submit', disabled: saving, onClick: submitFromButton }, 'Create member')}
+      <form aria-label="Member details" noValidate onSubmit={submit} onKeyDown={submitOnEnter}>
+        <sky-feature-card color="surface" variant="filled" shape="medium">
+          <section aria-labelledby={`${idBase}-business`} style={{ ...FILL_CARD, marginBlockEnd: 24 }}>
+            <h2 id={`${idBase}-business`} className="title-medium" style={SECTION_HEADING}>
+              Business details
+            </h2>
+            <div className="vendor-fields-grid">{field('businessName', 'Business name', { maxlength: MAX_BUSINESS_NAME }, true)}</div>
+          </section>
+          <section aria-labelledby={`${idBase}-owner`} style={{ ...FILL_CARD, marginBlockEnd: 24 }}>
+            <h2 id={`${idBase}-owner`} className="title-medium" style={SECTION_HEADING}>
+              Owner details
+            </h2>
+            <div className="vendor-fields-grid">
+              {field('ownerFirstName', 'Owner first name', { autocomplete: 'given-name', maxlength: MAX_PERSON_NAME })}
+              {field('ownerLastName', 'Owner last name', { autocomplete: 'family-name', maxlength: MAX_PERSON_NAME })}
+              {field('ownerEmail', 'Owner email', { type: 'email', autocomplete: 'email', maxlength: MAX_EMAIL })}
+              {field('ownerMobile', 'Owner mobile number', { type: 'tel', inputmode: 'numeric', maxlength: 10, autocomplete: 'tel-national' })}
+            </div>
+          </section>
+          <div slot="actions" className="page-head__actions" style={{ ...FILL_CARD, justifyContent: 'flex-end' }}>
+            {createElement('md-text-button', { type: 'button', disabled: saving, onClick: cancel }, 'Cancel')}
+            {createElement('md-filled-button', { type: 'submit', disabled: saving, onClick: submitFromButton }, 'Create member')}
+          </div>
+        </sky-feature-card>
       </form>
+      {ConfirmDialog}
     </div>
   );
 }

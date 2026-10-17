@@ -50,10 +50,10 @@ export function buildMemberAdminRoutes(opts: { deprecated: boolean }): Router {
 
   router.get('/', mark, requirePermission('members', 'view'), validateQuery(MemberListQuerySchema), async (req, res, next) => {
     try {
-      const { page, pageSize, search, status, documents, reviewFlag } = req.validatedQuery as ReturnType<
+      const { page, pageSize, search, status, documents, reviewFlag, sort, dir } = req.validatedQuery as ReturnType<
         typeof MemberListQuerySchema.parse
       >;
-      const { items, total } = await vendorService.listVendors({ page, pageSize, search, status, documents, reviewFlag });
+      const { items, total } = await vendorService.listVendors({ page, pageSize, search, status, documents, reviewFlag, sort, dir });
       sendData(res, await vendorService.attachLiveCounts(items), { meta: { total, page, pageSize } });
     } catch (err) {
       next(err);

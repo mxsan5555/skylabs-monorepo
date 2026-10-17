@@ -206,6 +206,8 @@ export async function listVendors(opts: {
   status?: MemberStatus;
   documents?: 'incomplete';
   reviewFlag?: 'true';
+  sort?: 'businessName' | 'status' | 'documentsDueAt';
+  dir?: 'asc' | 'desc';
 }) {
   const providedStatuses: MemberDocumentStatus[] = ['SUBMITTED', 'APPROVED'];
   const where: Prisma.MemberWhereInput = {
@@ -232,10 +234,14 @@ export async function listVendors(opts: {
         }
       : {}),
   };
+  // `id` breaks ties so paging stays stable when many rows share a status or due date.
+  const orderBy: Prisma.MemberOrderByWithRelationInput[] = opts.sort
+    ? [{ [opts.sort]: opts.dir ?? 'asc' }, { id: 'asc' }]
+    : [{ createdAt: 'desc' }];
   const [items, total] = await Promise.all([
     prisma.member.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy,
       skip: (opts.page - 1) * opts.pageSize,
       take: opts.pageSize,
       include: OWNER_INCLUDE,

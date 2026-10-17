@@ -57,7 +57,7 @@
   border-radius: var(--md-sys-shape-corner-small);
 }
 .site-header__logo {
-  block-size: 40px;
+  block-size: 60px;
   inline-size: auto;
 }
 .site-header__search-wrap {
@@ -121,7 +121,7 @@
     margin-block-end: var(--site-header-strip-size);
   }
   .site-header__logo {
-    block-size: 48px;
+    block-size: 55px;
   }
   .site-header__search-wrap {
     max-inline-size: 640px;

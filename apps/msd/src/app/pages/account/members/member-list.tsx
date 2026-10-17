@@ -3,11 +3,34 @@ import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import type { Vendor } from '../../../../api/rbac/vendors';
 import { MEMBER_STATUS_LABEL, documentsChipLabel, dueDateLabel } from './member-status';
 
+export type MemberSortField = 'businessName' | 'status' | 'documentsDueAt';
+
 export interface MemberTableParams {
   page: number;
   pageSize: number;
   search: string;
+  /** Value of the table's filter select; '' means All. See FILTER_OPTIONS. */
+  filter: string;
+  sort?: MemberSortField;
+  dir: 'asc' | 'desc';
 }
+
+/** Table column key to the API sort field. Columns not listed here are not sortable. */
+const SORT_FIELD_BY_COLUMN: Record<string, MemberSortField> = {
+  'Business Name': 'businessName',
+  Status: 'status',
+  Due: 'documentsDueAt',
+};
+
+/** The table's single filter select. Each value maps to one list query in members.tsx. */
+export const FILTER_OPTIONS = [
+  { label: 'Active', value: 'ACTIVE' },
+  { label: 'Inactive', value: 'INACTIVE' },
+  { label: 'Suspended', value: 'SUSPENDED' },
+  { label: 'Documents incomplete', value: 'documents' },
+  { label: 'Ready for suspension review', value: 'review' },
+];
+const FILTER_OPTIONS_JSON = JSON.stringify(FILTER_OPTIONS);
 
 interface MemberListProps {
   members: Vendor[];
@@ -40,11 +63,11 @@ const DOCUMENTS_MAP: Record<string, 'success' | 'warning' | 'error'> = {
 };
 
 const COLUMNS = JSON.stringify([
-  { key: 'Business Name', label: 'Business' },
+  { key: 'Business Name', label: 'Business', sortable: true },
   { key: 'Owner', label: 'Owner' },
-  { key: 'Status', label: 'Status', type: 'status', statusMap: STATUS_MAP },
+  { key: 'Status', label: 'Status', type: 'status', statusMap: STATUS_MAP, sortable: true },
   { key: 'Documents', label: 'Documents', type: 'status', statusMap: DOCUMENTS_MAP },
-  { key: 'Due', label: 'Due' },
+  { key: 'Due', label: 'Due', sortable: true },
   { key: 'Branch Count', label: 'Branches' },
   { key: 'Deal Count', label: 'Deals' },
   { key: 'Therapist Count', label: 'Therapists' },
@@ -81,7 +104,14 @@ export function MemberList({ members, onSelect, total, page, pageSize, loading, 
     if (!el) return;
     const onParams = (e: Event) => {
       const detail = (e as CustomEvent<SkyDataTableParamsDetail>).detail;
-      onParamsChange({ page: detail.page, pageSize: detail.pageSize, search: detail.search });
+      onParamsChange({
+        page: detail.page,
+        pageSize: detail.pageSize,
+        search: detail.search,
+        filter: detail.filter,
+        sort: SORT_FIELD_BY_COLUMN[detail.sortKey],
+        dir: detail.sortDir === 'desc' ? 'desc' : 'asc',
+      });
     };
     const onRowAction = (e: Event) => {
       const detail = (e as CustomEvent<{ action: string; row: Record<string, unknown> }>).detail;
@@ -100,7 +130,7 @@ export function MemberList({ members, onSelect, total, page, pageSize, loading, 
   return (
     <sky-data-table
       ref={tableRef as RefObject<HTMLElement>}
-      caption="Members"
+      caption={`Members (${total})`}
       columns={COLUMNS}
       rows={rows}
       total={total}
@@ -109,6 +139,8 @@ export function MemberList({ members, onSelect, total, page, pageSize, loading, 
       loading={loading}
       searchable
       search-placeholder="Search members…"
+      filter-label="Filter by status"
+      filter-options={FILTER_OPTIONS_JSON}
       actions={ACTIONS}
     />
   );

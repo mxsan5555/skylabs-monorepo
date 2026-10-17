@@ -18,6 +18,8 @@ export interface MemberListFilter {
   status?: MemberStatus;
   documents?: 'incomplete';
   reviewFlag?: 'true';
+  sort?: 'businessName' | 'status' | 'documentsDueAt';
+  dir?: 'asc' | 'desc';
 }
 
 export interface MemberDocumentRow {

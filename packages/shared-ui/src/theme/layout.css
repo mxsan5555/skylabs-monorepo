@@ -106,7 +106,7 @@
 .auth-brand__logo-image--desktop {
   display: block;
   width: auto;
-  height: 64px;
+  height: 80px;
 }
 
 .auth-brand__logo-image--mobile {
@@ -230,7 +230,7 @@
   width: 100%;
   max-width: 100%;
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr);
+  grid-template-columns: 300px minmax(0, 1fr);
   overflow-x: hidden;
   background-color: var(--md-sys-color-surface-container-lowest);
 }
@@ -247,12 +247,12 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
   min-width: 0;
   overflow: hidden;
-  padding: 12px;
+  padding: 20px;
   border-right: 1px solid var(--md-sys-color-outline-variant);
-  background-color: var(--md-sys-color-surface);
+  /* background-color: var(--md-sys-color-surface); */
 }
 
 .admin-sidebar__brand {
@@ -445,7 +445,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 20px;
+  padding: 10px 50px;
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
 }
 
@@ -494,7 +494,7 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  padding: 32px 20px 64px;
+  padding: 50px;
   overflow-y: auto;
   overflow-x: hidden;
 }
