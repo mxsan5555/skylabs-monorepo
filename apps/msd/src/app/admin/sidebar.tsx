@@ -5,6 +5,7 @@ import { Icon, IconButton, TextButton } from '@skylabs-monorepo/shared-ui/react'
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { isDualRoleUser, setExperienceMode } from '../../auth/role-routing';
 import { LOGO_SRC as logo, LOGO_COMPACT_SRC as logo2 } from '../../brand';
+import { menuContainsRoute } from './menu-utils';
 /**
  * Console navigation, built directly from `bootstrap.menu` — the server has
  * already pruned it down to what the caller's permissions allow, so this
@@ -64,13 +65,21 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
       </div>
 
       <nav className="admin-sidebar__nav" aria-label="Console">
-        {visibleMenu.map((node) => <MenuNodeItem key={node.id} node={node} onLogout={doSignOut} />)}
-        {dualRole && (
-          <NavLink to="/" onClick={switchToCustomer} className="admin-nav-item">
-            <Icon aria-hidden="true">storefront</Icon>
-            Switch to Customer view
-          </NavLink>
-        )}
+        <ul className="admin-nav-list">
+          {visibleMenu.map((node) => (
+            <li key={node.id}>
+              <MenuNodeItem node={node} />
+            </li>
+          ))}
+          {dualRole && (
+            <li>
+              <NavLink to="/" onClick={switchToCustomer} className="admin-nav-item">
+                <Icon aria-hidden="true">storefront</Icon>
+                Switch to Customer view
+              </NavLink>
+            </li>
+          )}
+        </ul>
       </nav>
 
       <div className="admin-sidebar__user">
@@ -87,96 +96,60 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
     </aside>
   );
 }
-function MenuNodeItem({
-  node,
-  onLogout,
-  isChild = false,
-}: {
-  node: MenuNode;
-  onLogout: () => void;
-  isChild?: boolean;
-}) {
-  const location = useLocation();
-  const hasChildren = Boolean(node.children?.length);
+/** Icon + label shared by every nav row (link or group trigger). */
+function NavItemLabel({ node }: { node: MenuNode }) {
+  return (
+    <>
+      {node.icon && <Icon aria-hidden="true">{node.icon}</Icon>}
+      <span>{node.title}</span>
+    </>
+  );
+}
 
-  const childIsActive =
-    hasChildren &&
-    node.children?.some((child) =>
-      child.route ? location.pathname.startsWith(child.route) : false
-    );
-
-  const [open, setOpen] = useState(Boolean(childIsActive));
+function MenuNodeItem({ node }: { node: MenuNode }) {
+  const { pathname } = useLocation();
+  const children = node.children ?? [];
+  const childIsActive = children.some((child) => menuContainsRoute(child, pathname));
+  const [open, setOpen] = useState(childIsActive);
 
   useEffect(() => {
-    if (childIsActive) {
-      setOpen(true);
-    }
+    if (childIsActive) setOpen(true);
   }, [childIsActive]);
 
-  if (hasChildren) {
+  if (children.length) {
+    // Disclosure navigation (WAI-ARIA APG): the whole row is one button that
+    // shows/hides the list of links. The list stays in the DOM (`hidden`) so
+    // `aria-controls` always points at a real element.
+    const listId = `admin-nav-${node.id}`;
     return (
-      <div className={`admin-nav-group${open ? ' open' : ''}`}>
-        <div className="admin-nav-group__header">
-          <div className="admin-nav-group__title">
-            <Icon aria-hidden="true">{node.icon}</Icon>
-            <span>{node.title}</span>
-          </div>
+      <>
+        <button
+          type="button"
+          className={`admin-nav-item admin-nav-group__trigger${childIsActive ? ' has-active' : ''}`}
+          aria-expanded={open}
+          aria-controls={listId}
+          onClick={() => setOpen((current) => !current)}
+        >
+          <NavItemLabel node={node} />
+          <Icon aria-hidden="true" className="admin-nav-group__chevron">expand_more</Icon>
+        </button>
 
-          <IconButton
-            className="admin-nav-group__toggle"
-            aria-label={`${open ? 'Collapse' : 'Expand'} ${node.title}`}
-            onClick={() => setOpen((current) => !current)}
-          >
-            <Icon aria-hidden="true">
-              {open ? 'keyboard_arrow_up' : 'keyboard_arrow_down'}
-            </Icon>
-          </IconButton>
-        </div>
-
-        {open && (
-          <div className="admin-nav-group__children">
-            {node.children!.map((child) => (
-              <MenuNodeItem
-                key={child.id}
-                node={child}
-                onLogout={onLogout}
-                isChild
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (node.id === 'settings-logout') {
-    return (
-      <button
-        type="button"
-        className="admin-nav-item"
-        onClick={onLogout}
-      >
-        {!isChild && node.icon && (
-          <Icon aria-hidden="true">{node.icon}</Icon>
-        )}
-        <span>{node.title}</span>
-      </button>
+        <ul id={listId} className="admin-nav-group__children" hidden={!open}>
+          {children.map((child) => (
+            <li key={child.id}>
+              <MenuNodeItem node={child} />
+            </li>
+          ))}
+        </ul>
+      </>
     );
   }
 
   if (!node.route) return null;
 
   return (
-    <NavLink
-      to={node.route}
-      className={({ isActive }) =>
-        `admin-nav-item${isActive ? ' active' : ''}`
-      }
-    >
-      {node.icon && (
-        <Icon aria-hidden="true">{node.icon}</Icon>
-      )}
-      <span>{node.title}</span>
+    <NavLink to={node.route} className={({ isActive }) => `admin-nav-item${isActive ? ' active' : ''}`}>
+      <NavItemLabel node={node} />
     </NavLink>
   );
 }
