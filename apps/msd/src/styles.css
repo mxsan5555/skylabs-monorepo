@@ -724,10 +724,6 @@ input[type='checkbox'] {
   width: 100%;
   box-sizing: border-box;
 }
-
-.form-grid > sky-tile-card .vendor-fields-grid {
-  margin-top: 16px;
-}
 .vendor-section-content {
   display: flex;
   flex-direction: column;
