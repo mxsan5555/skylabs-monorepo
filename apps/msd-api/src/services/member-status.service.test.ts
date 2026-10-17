@@ -5,7 +5,10 @@ vi.mock('../lib/prisma', async () => {
   return { prisma: createPrismaMock() };
 });
 const sendMemberNotice = vi.fn().mockResolvedValue({ email: true, sms: true });
-vi.mock('./member-notice.service', () => ({ sendMemberNotice: (...a: unknown[]) => sendMemberNotice(...a) }));
+vi.mock('./member-notice.service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./member-notice.service')>()),
+  sendMemberNotice: (...a: unknown[]) => sendMemberNotice(...a),
+}));
 const clearMemberAccessCache = vi.fn();
 vi.mock('./member-access.service', () => ({ clearMemberAccessCache: (...a: unknown[]) => clearMemberAccessCache(...a) }));
 const deleteMediaFile = vi.fn().mockResolvedValue(undefined);
@@ -84,6 +87,24 @@ describe('changeMemberStatus', () => {
       expect.objectContaining({ data: expect.objectContaining({ status: 'ACTIVE', statusReason: null, reviewFlaggedAt: null }) }),
     );
     expect(sendMemberNotice).toHaveBeenCalledWith('REACTIVATED', expect.anything(), undefined);
+  });
+
+  it.each([
+    ['ACTIVE', 'INACTIVE'],
+    ['ACTIVE', 'SUSPENDED'],
+    ['INACTIVE', 'SUSPENDED'],
+  ] as const)('%s to %s keeps the review flag for the admin who decides next', async (from, to) => {
+    prismaMock.member.findUnique.mockResolvedValue({ ...MEMBER, status: from } as never);
+    await changeMemberStatus('m1', to, 'Documents not completed', ACTOR);
+    const { data } = prismaMock.member.updateMany.mock.lastCall?.[0] as { data: Record<string, unknown> };
+    expect(data).not.toHaveProperty('reviewFlaggedAt');
+  });
+
+  it('reactivating from inactive also clears the review flag', async () => {
+    prismaMock.member.findUnique.mockResolvedValue({ ...MEMBER, status: 'INACTIVE' } as never);
+    await changeMemberStatus('m1', 'ACTIVE', 'Back from the long holiday', ACTOR);
+    const { data } = prismaMock.member.updateMany.mock.lastCall?.[0] as { data: Record<string, unknown> };
+    expect(data.reviewFlaggedAt).toBeNull();
   });
 
   it('a failing notice never throws into the caller', async () => {

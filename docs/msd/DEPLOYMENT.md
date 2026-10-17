@@ -239,6 +239,23 @@ Two things make this work — both are already wired in the repo:
 | Local port | 3333 | 3334 |
 | Google callback | `<domain>/api/v1/auth/google/callback` | `<domain>/auth/google/callback` |
 
+### Scheduled job: member document reminders (msd-api)
+
+Once a day at **10:00 IST (04:30 UTC)** a Railway cron service calls the API, which sends due
+document warnings, retries failed channels and sets "Ready for suspension review". Rules:
+`docs/superpowers/specs/2026-10-17-member-document-reminders-design.md`.
+
+1. Set `CRON_SECRET` on the `msd-api` service (§8.3).
+2. New Railway service in the same project, **Settings → Cron Schedule** `30 4 * * *`
+   (Railway cron runs in UTC), with variables `CRON_SECRET` (same value) and
+   `API_URL` (`https://<msd-api-railway-domain>`).
+3. **Start command:**
+   `curl -fsS -X POST -H "x-cron-secret: $CRON_SECRET" "$API_URL/api/v1/internal/jobs/document-reminders"`
+   `-f` makes a non-2xx response exit non-zero, so Railway marks the run failed (turn on
+   failure notifications for that service).
+4. Running it twice is safe: each warning is one database row, claimed before sending.
+5. Before production, the 3 warning texts need DLT-approved SMS templates (task P10-43).
+
 ---
 
 ## 6. Image storage → Cloudflare R2 (`msd-media` only, for now)
@@ -359,6 +376,7 @@ to — see §5. 🔒 = secret (Railway Variables / local `.env.local` only, neve
 | `R2_ACCESS_KEY_ID` | R2 token access key | 🔒 |
 | `R2_SECRET_ACCESS_KEY` | R2 token secret | 🔒 |
 | `R2_BUCKET` | `msd-media` | |
+| `CRON_SECRET` | fresh 64-char hex (`openssl rand -hex 32`); the same value goes on the cron service | 🔒 |
 
 SMTP/SMS/Razorpay/R2 are validated on first use, so the service still boots if a
 group is blank — but that feature (email/SMS OTP, payments, upload) won't work

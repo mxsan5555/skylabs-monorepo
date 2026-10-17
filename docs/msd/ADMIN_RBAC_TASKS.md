@@ -33,14 +33,14 @@ Total: **201 tasks**. Update the Done column as work lands.
 | P3 | Member rename and lifecycle | 24 | 12 | 50 |
 | P4 | Own-scope retrofit | 16 | 1 | 6 |
 | P5 | Member documents | 15 | 3 | 20 |
-| P6 | Reminders and scheduler | 8 | 0 | 0 |
+| P6 | Reminders and scheduler | 8 | 5 | 62 |
 | P7 | Orders, refunds, payments, payouts, reports | 13 | 0 | 0 |
 | P8 | Staff, settings, logs, profile, content | 8 | 0 | 0 |
 | P9 | OpenAPI and contract | 8 | 0 | 0 |
-| P10 | Frontend | 49 | 5 | 10 |
+| P10 | Frontend | 49 | 7 | 14 |
 | P11 | Security and QA | 13 | 0 | 0 |
 | P12 | Release, ops, docs | 10 | 0 | 0 |
-| **Total** | | **201** | **24** | **12** |
+| **Total** | | **201** | **31** | **15** |
 
 By area: BE 87, FE 39, SEC 20, QA 17, DB 14, OPS 13, SH 4, BIZ 4, DOC 3.
 By size: S 67, M 116, L 18.
@@ -55,8 +55,9 @@ Status: built 2026-10-15, plan `docs/superpowers/plans/2026-10-15-staff-member-m
 - Partly done (24, each "Done when" says what is left): P1-02, P1-03, P1-05, P1-06, P1-07, P3-01, P3-02, P3-03, P3-12, P3-19, P5-01, P5-02, P5-06, P5-08, P5-09, P6-03, P10-03, P10-04, P10-05, P10-11, P10-12, P10-17, P10-18, P10-19.
 - Not done (4): P3-05 (service files keep `vendor` names, see P3-22), P10-02 (validators stay local to the form), P10-07 (no separate design spec), P10-39 (member copy is inline, not in `content.json`).
 - Follow-ups added (13): P3-22 to P3-25, P4-13, P5-14, P5-15, P6-08, P10-43 to P10-47. Before production: P10-43, P10-44, P10-45.
-- Deferred: P3-15, P3-16, P5-03, P5-04, P5-10, P5-12, P5-13, P6-01, P6-02, P6-04 to P6-07, all of P4, P7 and P8.
+- Deferred: P3-15, P3-16, P5-03, P5-04, P5-10, P5-12, P5-13, P6-07 (Railway setup), all of P4, P7 and P8.
 - Removed: P3-14 (superseded by the FK 409 guard and branch delete C-08).
+- Reminders slice (2026-10-17, spec `docs/superpowers/specs/2026-10-17-member-document-reminders-design.md`): done P6-01, P6-02, P6-04, P6-05, P6-06, P10-18, P10-19; partly P6-07, P6-08.
 
 ---
 
@@ -186,14 +187,14 @@ Status: built 2026-10-15, plan `docs/superpowers/plans/2026-10-15-staff-member-m
 
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
-| [ ] | P6-01 | DB | `MemberDocumentReminder` table with unique (member, sequence, channel) | S | P3-01 | Migration tested |
-| [ ] | P6-02 | BE | Reminder schedule service (due +0, +7, +14 days, listing exact missing documents) | M | P6-01 | Unit tests with fake clock |
+| [x] | P6-01 | DB | `MemberDocumentReminder` table with unique (member, sequence, channel) | S | P3-01 | Merged: migration `20261017100000_member_document_reminders` (one row per reminder with per-channel status; unique member + sequence) |
+| [x] | P6-02 | BE | Reminder schedule service (due +0, +7, +14 days, listing exact missing documents) | M | P6-01 | Merged: `member-reminder-policy.ts` with fake-clock tests; missing list stored per reminder |
 | [ ] | P6-03 | BE | Notification template service for SMS and email (generic, replaces OTP-only sender) | M | - | Provider failure recorded, no crash; partly: minimal: welcome, suspension and reactivation notices by email and SMS with one inline retry; OTP sender not replaced |
-| [ ] | P6-04 | BE | Secured cron endpoint (`x-cron-secret`, timing-safe), run lock, idempotent | M | P6-02, P2-09 | Double run sends once |
-| [ ] | P6-05 | BE | Set `reviewFlaggedAt` after final warning; never auto-suspend | S | P6-02 | Test confirms status unchanged |
-| [ ] | P6-06 | BE | Manual remind endpoint | S | P6-03 | Audit entry written |
-| [ ] | P6-07 | OPS | Railway cron schedule and failure alert | S | P6-04 | Alert fires on forced failure |
-| [ ] | P6-08 | BE | Durable retry for failed member notices (welcome, suspension, reactivation) | S | P6-04 | Failed notice retried by the job until sent; test |
+| [x] | P6-04 | BE | Secured cron endpoint (`x-cron-secret`, timing-safe), run lock, idempotent | M | P6-02, P2-09 | Merged: `POST /internal/jobs/document-reminders`, timing-safe `x-cron-secret`, conditional claim instead of a lock; double run sends once (test) |
+| [x] | P6-05 | BE | Set `reviewFlaggedAt` after final warning; never auto-suspend | S | P6-02 | Merged: flag one week after warning 3 (D4 = day 35), bell to `members:status_change` holders, flag cleared when documents complete; status never changes (test) |
+| [x] | P6-06 | BE | Manual remind endpoint | S | P6-03 | Merged: `POST /members/:id/documents/reminders` and the header "Remind now" button; once per 24 hours; audit `member.reminder.sent` |
+| [ ] | P6-07 | OPS | Railway cron schedule and failure alert | S | P6-04 | Steps written in `docs/msd/DEPLOYMENT.md`; Railway cron service and failure alert not created yet |
+| [ ] | P6-08 | BE | Durable retry for failed member notices (welcome, suspension, reactivation) | S | P6-04 | Partly: reminders retry failed channels on later runs (5 attempts); welcome, suspension and reactivation notices still retry inline only |
 
 ## Phase 7: Orders, refunds, payments, payouts, reports
 
@@ -272,8 +273,8 @@ Status: built 2026-10-15, plan `docs/superpowers/plans/2026-10-15-staff-member-m
 | [x] | P10-15 | FE | Status change with inline confirm and reason (10 to 500 chars), history list | M | P3-07 | Tests |
 | [x] | P10-16 | FE | Delete member (super admin only) with inline confirm; message for the ARCHIVED outcome | S | P3-09 | Tests |
 | [ ] | P10-17 | FE | Documents tab: per-document status chips, masked number input, upload, approve, reject with reason, "uploaded by X for member", view via signed URL in new tab | L | P5-06, P5-09 | Tests; support sees status only; partly: status chips, masked number, upload on behalf, approve and reject done; uploader name (P5-15) and signed URL view (P5-14) open |
-| [ ] | P10-18 | FE | Activity tab: reminders, warnings, status timeline | M | P3-13, P6-01 | Tests; partly: status timeline and document events done; reminders and warnings wait for P6-01 |
-| [ ] | P10-19 | FE | "Ready for suspension review" badge with reason prefilled "Documents not completed" | S | P6-05, P10-15 | Test; partly: badge and prefilled reason only; the flag is set by the deferred reminder job |
+| [x] | P10-18 | FE | Activity tab: reminders, warnings, status timeline | M | P3-13, P6-01 | Merged: reminders, manual reminders and the review flag in the Activity tab |
+| [x] | P10-19 | FE | "Ready for suspension review" badge with reason prefilled "Documents not completed" | S | P6-05, P10-15 | Merged: the flag is now set by the reminder job; badge, filter and prefilled reason read it |
 
 ### 10d. Member self-service (own scope)
 

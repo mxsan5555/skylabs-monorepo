@@ -310,6 +310,7 @@ model Member {
   reviewFlaggedAt            DateTime?
   welcomeSentAt              DateTime?
   statusHistory              MemberStatusHistory[]
+  documentReminders          MemberDocumentReminder[]
   /// Admin who created this vendor profile, if admin-created (self-registration leaves this null).
   createdByUserId            String?
   createdAt                  DateTime               @default(now())
@@ -393,6 +394,32 @@ model MemberStatusHistory {
   createdAt   DateTime     @default(now())
   member      Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
+  @@index([memberId, createdAt])
+}
+
+/// One documents reminder to a member: a scheduled warning (`sequence` 1 to 3, sent by the daily
+/// job) or a manual "Remind now" from an admin (`sequence` null, `sentByUserId` set). One row
+/// covers both channels; a null channel status means the member has no email or phone on record.
+/// Timeline rules live in `services/member-reminder-policy.ts`.
+model MemberDocumentReminder {
+  id           String               @id @default(uuid())
+  memberId     String
+  sequence     Int?
+  /// Documents still missing, rejected or expired when the reminder was sent.
+  missingTypes VendorDocumentType[]
+  emailStatus  ReminderDelivery?
+  smsStatus    ReminderDelivery?
+  /// Send attempts so far. Claimed with a conditional update, so two runs never send one row twice.
+  attempts     Int                  @default(0)
+  /// First time at least one channel was delivered. Null while nothing has gone out.
+  sentAt       DateTime?
+  sentByUserId String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  member       Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  /// One row per scheduled warning. Postgres treats null as distinct, so manual rows never collide.
+  @@unique([memberId, sequence])
   @@index([memberId, createdAt])
 }
 
@@ -1762,6 +1789,13 @@ enum NotificationType {
   MEMBER_SUSPENDED
   DOCUMENT_APPROVED
   DOCUMENT_REJECTED
+  MEMBER_REVIEW_FLAGGED
+}
+
+enum ReminderDelivery {
+  PENDING
+  SENT
+  FAILED
 }
 
 enum VendorDocumentType {

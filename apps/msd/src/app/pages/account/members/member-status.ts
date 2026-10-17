@@ -1,4 +1,6 @@
+import type { SkyStatusTone } from '@skylabs-monorepo/shared-ui';
 import type { MemberStatus, Vendor, VendorDocumentType } from '../../../../api/rbac/vendors';
+import type { ActivityItem, ReminderResult } from '../../../../api/rbac/members';
 
 export const MEMBER_STATUS_LABEL: Record<MemberStatus, string> = {
   ACTIVE: 'Active',
@@ -40,19 +42,66 @@ export function readableActivitySummary(summary: string): string {
   return summary;
 }
 
-export type BadgeVariant = 'primary' | 'secondary' | 'tertiary' | 'error';
+/** Colour meaning of each lifecycle state (`sky-badge status`): live, paused, blocked, gone. */
+export const MEMBER_STATUS_TONE: Record<MemberStatus, SkyStatusTone> = {
+  ACTIVE: 'success',
+  INACTIVE: 'neutral',
+  SUSPENDED: 'error',
+  ARCHIVED: 'neutral',
+};
 
-export function statusBadgeVariant(status: MemberStatus): BadgeVariant {
-  if (status === 'ACTIVE') return 'primary';
-  if (status === 'INACTIVE') return 'tertiary';
-  if (status === 'SUSPENDED') return 'error';
-  return 'secondary';
-}
+export const DOCUMENTS_LABEL = { complete: 'Documents complete', incomplete: 'Documents incomplete' } as const;
+
+/** Incomplete documents are a compliance follow-up, not a block, so they read as a warning. */
+export const DOCUMENTS_TONE: Record<keyof typeof DOCUMENTS_LABEL, SkyStatusTone> = {
+  complete: 'success',
+  incomplete: 'warning',
+};
+
+/** Set after the final documents warning (reminder job, P6-05); an admin then decides. */
+export const REVIEW_FLAG_LABEL = 'Ready for suspension review';
+export const REVIEW_FLAG_TONE: SkyStatusTone = 'error';
+/** Suspend reason prefilled for a flagged member (spec section 4). */
+export const REVIEW_FLAG_REASON = 'Documents not completed';
 
 type Summary = NonNullable<Vendor['documentsSummary']>;
 
+/** Mirrors msd-api `REMINDABLE_STATUSES`: suspended and archived members cannot log in. */
+const REMINDABLE_STATUSES: readonly MemberStatus[] = ['ACTIVE', 'INACTIVE'];
+
+/** "Remind now" makes sense only while documents are missing and the member can act on it. */
+export function canBeReminded(status: MemberStatus, summary: Summary | undefined): boolean {
+  return REMINDABLE_STATUSES.includes(status) && !summary?.complete;
+}
+
+export const REMIND_NOW_LABEL = 'Remind now';
+
+const CHANNEL_LABEL = { email: 'email', sms: 'SMS' } as const;
+
+/** Snackbar text for a "Remind now" result. */
+export function reminderOutcome(result: ReminderResult): string {
+  const channels = [result.emailStatus === 'SENT' && CHANNEL_LABEL.email, result.smsStatus === 'SENT' && CHANNEL_LABEL.sms].filter(Boolean);
+  return channels.length > 0
+    ? `Reminder sent by ${channels.join(' and ')}.`
+    : 'The reminder could not be delivered. Check the email and phone on the profile.';
+}
+
+/** Label in front of an activity item's `detail`. */
+export const ACTIVITY_DETAIL_LABEL: Record<ActivityItem['kind'], string> = {
+  status: 'Reason',
+  document: 'Reason',
+  reminder: 'Documents asked for',
+  review: 'Reason',
+};
+
+const documentsState = (summary: Summary | undefined) => (summary?.complete ? 'complete' : 'incomplete');
+
 export function documentsChipLabel(summary: Summary | undefined): string {
-  return summary?.complete ? 'Documents complete' : 'Documents incomplete';
+  return DOCUMENTS_LABEL[documentsState(summary)];
+}
+
+export function documentsChipTone(summary: Summary | undefined): SkyStatusTone {
+  return DOCUMENTS_TONE[documentsState(summary)];
 }
 
 function formatDate(iso: string): string {

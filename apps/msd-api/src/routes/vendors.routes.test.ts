@@ -14,8 +14,10 @@ vi.mock('../services/permission-resolver.service', () => ({
 }));
 
 // POST /vendors now runs createMember, which sends a welcome notice: never reach a real SMTP or SMS provider.
-vi.mock('../services/member-notice.service', () => ({
+vi.mock('../services/member-notice.service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/member-notice.service')>()),
   sendMemberNotice: vi.fn().mockResolvedValue({ email: true, sms: true }),
+  sendOnChannel: vi.fn().mockResolvedValue(true),
 }));
 
 // Same mock shape as vendor-kyc-documents.routes.test.ts / media.routes.test.ts / categories.

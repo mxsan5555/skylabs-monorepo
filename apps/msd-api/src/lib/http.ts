@@ -8,6 +8,7 @@ export type ErrorCode =
   | 'VALIDATION_ERROR'
   | 'RATE_LIMITED'
   | 'SERVER_ERROR'
+  | 'SERVICE_UNAVAILABLE'
   | 'CONFLICT'
   | 'BAD_REQUEST'
   | 'MEMBER_SUSPENDED'
@@ -28,6 +29,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   VALIDATION_ERROR: 422,
   RATE_LIMITED: 429,
   SERVER_ERROR: 500,
+  SERVICE_UNAVAILABLE: 503,
 };
 
 /** Thrown from services/routes; caught by middleware/errorHandler.ts and translated to the envelope. */

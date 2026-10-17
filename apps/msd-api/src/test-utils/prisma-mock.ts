@@ -108,6 +108,13 @@ export function createPrismaMock() {
       deleteMany: vi.fn(),
       count: vi.fn(),
     },
+    memberDocumentReminder: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+    },
     memberStatusHistory: {
       create: vi.fn(),
       findMany: vi.fn(),

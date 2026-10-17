@@ -49,6 +49,8 @@ declare module 'react' {
       'sky-badge': SkyEl<{
         variant?: 'primary' | 'secondary' | 'tertiary' | 'error' | string;
         size?: 'small' | 'medium' | 'large' | string;
+        /** Tonal status chip; replaces `variant`. */
+        status?: 'success' | 'warning' | 'error' | 'info' | 'neutral';
       }>;
 
       // ── sky-card ───────────────────────────────────────────────────────────

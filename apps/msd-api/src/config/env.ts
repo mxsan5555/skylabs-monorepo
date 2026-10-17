@@ -59,6 +59,8 @@ export const env = {
   supportPhone: process.env.SUPPORT_PHONE ?? '',
   /** 32 bytes, base64. Encrypts full Aadhaar and PAN numbers at rest. Optional in development. */
   fieldEncryptionKey: process.env.FIELD_ENCRYPTION_KEY ?? '',
+  /** Shared with the Railway cron service; guards `/internal/jobs/*`. Unset disables the jobs (503). */
+  cronSecret: process.env.CRON_SECRET ?? '',
   /** Secret mixed into the document number hash used for the duplicate check. */
   docHashPepper: process.env.DOC_HASH_PEPPER ?? '',
   googleCallbackUrl:

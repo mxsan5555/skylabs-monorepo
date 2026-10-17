@@ -952,11 +952,27 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/members/{id}/activity',
-    summary: 'Merged status and document activity, newest first',
+    summary: 'Merged status, document, reminder and review-flag activity, newest first',
     tags: ['Members - Admin'],
     security: bearer,
     request: { params: z.object({ id: z.string().uuid() }) },
     responses: { 200: { description: 'Activity' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/members/{id}/documents/reminders',
+    summary: 'Remind now: email and SMS the member the documents still needed. Once per 24 hours per member.',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: {
+      201: { description: 'Delivery result per channel: emailStatus, smsStatus (SENT, FAILED or null), sentAt' },
+      403: errorResponse,
+      404: errorResponse,
+      409: { ...errorResponse, description: 'Member not active or inactive, documents complete, or no contact on record' },
+      429: { ...errorResponse, description: 'A manual reminder already went out in the last 24 hours' },
+    },
   });
 
   registry.registerPath({

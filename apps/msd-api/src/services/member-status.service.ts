@@ -5,7 +5,7 @@ import { Prisma } from '../generated/prisma-client';
 import { auditLogData } from './audit.service';
 import { revokeAllRefreshTokens } from './token.service';
 import { clearMemberAccessCache } from './member-access.service';
-import { sendMemberNotice, type MemberNoticeKind, type MemberNoticeTarget } from './member-notice.service';
+import { NOTICE_OWNER_SELECT, noticeTargetOf, sendMemberNotice, type MemberNoticeKind, type MemberNoticeTarget } from './member-notice.service';
 import {
   assertTransition,
   REASON_MAX,
@@ -25,7 +25,7 @@ const MEMBER_SELECT = {
   status: true,
   ownerUserId: true,
   businessName: true,
-  owner: { select: { name: true, email: true, phone: true } },
+  owner: NOTICE_OWNER_SELECT,
 } as const;
 
 function validReason(raw: string | undefined): string {
@@ -131,7 +131,7 @@ export async function changeMemberStatus(
 
   if (member.ownerUserId) clearMemberAccessCache(member.ownerUserId);
 
-  const target = { name: member.owner?.name, email: member.owner?.email, phone: member.owner?.phone };
+  const target = noticeTargetOf(member.owner);
   if (to === 'SUSPENDED') {
     await notify('SUSPENDED', target, reason);
   } else if (to === 'ACTIVE' && from !== 'ACTIVE') {
