@@ -385,12 +385,20 @@ function scopeOrderItemsToVendor<T extends { items: { vendorId: string }[] }>(or
  * results additionally have every returned order's `items[]` filtered down to their own items
  * only — never another vendor's line items/pricing, even for an order they're scoped to see.
  */
-export async function listOrders(callerUserId: string, opts: OrderListFilters) {
+/** ALL = the caller holds orders:{action}; OWN = member self-service, own business only. */
+export type OrderScope = 'ALL' | 'OWN';
+
+export async function listOrders(callerUserId: string, scope: OrderScope, opts: OrderListFilters) {
   const vendor = await getVendorByOwnerUserId(callerUserId);
+  if (scope === 'OWN' && !vendor) return { items: [], total: 0 };
   const scopedVendorId = vendor ? vendor.id : opts.vendorId;
+  // One `items` filter: a branchId must narrow the caller's own business, never replace it.
+  const itemFilter = {
+    ...(scopedVendorId ? { vendorId: scopedVendorId } : {}),
+    ...(opts.branchId ? { branchId: opts.branchId } : {}),
+  };
   const where = {
-    ...(scopedVendorId ? { items: { some: { vendorId: scopedVendorId } } } : {}),
-    ...(opts.branchId ? { items: { some: { branchId: opts.branchId } } } : {}),
+    ...(Object.keys(itemFilter).length ? { items: { some: itemFilter } } : {}),
     ...(opts.customerId ? { customerId: opts.customerId } : {}),
     ...(opts.status ? { status: opts.status } : {}),
     // Order has no single "payment status" column of its own (Order 1 -> Payment[]) — this
@@ -427,8 +435,9 @@ export async function listOrders(callerUserId: string, opts: OrderListFilters) {
 /** Same vendor-scoping rule as listOrders — a vendor requesting an order none of its own deals
  *  are part of 404s (never confirms existence), and the returned order's items[] are filtered
  *  to the caller's own vendor only. */
-export async function getOrderOrThrow(callerUserId: string, id: string) {
+export async function getOrderOrThrow(callerUserId: string, scope: OrderScope, id: string) {
   const vendor = await getVendorByOwnerUserId(callerUserId);
+  if (scope === 'OWN' && !vendor) throw new ApiError('NOT_FOUND', 'Order not found');
   const order = await prisma.order.findUnique({ where: { id }, include: ORDER_INCLUDE });
   if (!order) throw new ApiError('NOT_FOUND', 'Order not found');
   if (!vendor) return order;
@@ -478,8 +487,9 @@ export async function finalizeCartForOrder(tx: Prisma.TransactionClient, orderId
  * can only have its status changed by admin, since one vendor completing/cancelling would
  * otherwise silently affect every other vendor's items in the same order too.
  */
-export async function setOrderStatus(callerUserId: string, id: string, status: OrderStatus, reason?: string) {
+export async function setOrderStatus(callerUserId: string, scope: OrderScope, id: string, status: OrderStatus, reason?: string) {
   const vendor = await getVendorByOwnerUserId(callerUserId);
+  if (scope === 'OWN' && !vendor) throw new ApiError('NOT_FOUND', 'Order not found');
   const order = await prisma.order.findUnique({ where: { id }, include: { items: { select: { vendorId: true } } } });
   if (!order) throw new ApiError('NOT_FOUND', 'Order not found');
 

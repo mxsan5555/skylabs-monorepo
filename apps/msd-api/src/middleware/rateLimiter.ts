@@ -31,3 +31,16 @@ export const vendorPublicRegisterRateLimiter = rateLimit({
     sendError(res, 'RATE_LIMITED', 'Too many registration attempts, please try again later');
   },
 });
+
+/** Second OTP limit keyed on the identifier alone, so rotating IPs cannot buy fresh codes
+ *  for one phone or email: `OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR` sends per hour (default 10). */
+export const otpIdentifierRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: env.otpIdentifierRateLimitPerHour,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `otp-id:${String(req.body?.identifier ?? '').trim().toLowerCase()}`,
+  handler: (req, res) => {
+    sendError(res, 'RATE_LIMITED', 'Too many OTP requests for this account, please try again later');
+  },
+});

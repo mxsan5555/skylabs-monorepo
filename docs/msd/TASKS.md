@@ -37,10 +37,10 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 
 | # | Module | Done | Total | % |
 |---|---|---|---|---|
-| 1 | Admin and staff | 1 | 30 | 3 |
-| 2 | Members | 30 | 87 | 34 |
-| 3 | Customers and orders | 0 | 10 | 0 |
-| 4 | Storefront | 0 | 29 | 0 |
+| 1 | Admin and staff | 2 | 31 | 6 |
+| 2 | Members | 32 | 87 | 37 |
+| 3 | Customers and orders | 1 | 11 | 9 |
+| 4 | Storefront | 1 | 30 | 3 |
 | 5 | Static content | 0 | 5 | 0 |
 | 6 | CTA banners | 0 | 1 | 0 |
 | 7 | Home slider | 0 | 1 | 0 |
@@ -48,8 +48,8 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 | 9 | Payments, payouts and reports | 0 | 11 | 0 |
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
-| 12 | Platform, security and release | 1 | 65 | 2 |
-| | **Total** | **32** | **244** | **13** |
+| 12 | Platform, security and release | 7 | 69 | 10 |
+| | **Total** | **43** | **251** | **17** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -73,13 +73,14 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P1-07 | BE | Rewrite `prisma/seed.ts` from the PLANNING.md §1.2 matrix including scope and extra actions; drop `vendor-portal.*` special case | M | P1-05, P1-04 | Seed idempotent, runs twice cleanly; partly: 7 roles and the `members` row seeded; other rows still open |
 | [ ] | P1-08 | QA | Matrix snapshot test: 7 roles x 14 resources x actions x scope equals spec | M | P1-07 | Test fails on any drift |
 | [ ] | P1-09 | SH | `shared-types`: `PermissionScope`, `Bootstrap.scopes`, role key union. `shared-permissions`: `can()` plus `scopeFor()` | M | P1-04 | Package tests green |
-| [ ] | P1-10 | BE | Guard: role permission edit cannot give `members`/`orders` scope ALL to member role; super-admin-only actions enforced in code | M | P1-04 | Negative tests return 403 |
+| [ ] | P1-10 | BE | Guard: role permission edit cannot give `members`/`orders` scope ALL to member role; super-admin-only actions enforced in code | M | P1-04 | Negative tests return 403; partly: Super Admin role and accounts protected (P1-11); the §1.3 rule 3 action lock is open |
+| [x] | P1-11 | SEC | Super Admin protection on `/rbac`: only a Super Admin manages a Super Admin account or gives/removes the role; no editing a role you hold; last active Super Admin cannot lose the role, be blocked or deleted; a Super Admin cannot be impersonated | M | - | Merged: `services/super-admin-guard.service.ts`, 7 tests in `rbac.routes.test.ts` |
 | [ ] | P2-05 | BE | Read roles from DB (30 s cache) not the token; clear cache on role, permission and user-role change | M | P2-01 | Role change effective within one request after cache clear |
-| [ ] | P2-06 | BE | `denyPreview` middleware for payout, delete, status, refund, staff routes; block impersonating super_admin | S | P2-01 | Preview token gets 403 on listed routes |
+| [ ] | P2-06 | BE | `denyPreview` middleware for payout, delete, status, refund, staff routes; block impersonating super_admin | S | P2-01 | Preview token gets 403 on listed routes; partly: impersonating a Super Admin returns 403 (P1-11); `denyPreview` open |
 | [ ] | P2-15 | BE | `ROLE_MANAGEMENT_LOCKED` on role create, clone and delete | S | - | Test |
 | [ ] | P4-09 | BE | Notifications: recipient type `MEMBER`/`ADMIN`; new types | S | P3-04 | Migration and test |
 | [ ] | P4-10 | BE | Logs and profile scoped to own for non-super-admin | S | P2-02 | Test |
-| [ ] | P8-01 | BE | `/staff-users` routes with role allowlist and last-super-admin guard | M | P1-07 | Negative tests |
+| [ ] | P8-01 | BE | `/staff-users` routes with role allowlist and last-super-admin guard | M | P1-07 | Negative tests; partly: last-active-Super-Admin guard on the current `/rbac/users` routes (P1-11) |
 | [ ] | P8-02 | DB | `SystemSetting` table | S | - | Migration tested |
 | [ ] | P8-03 | BE | `/settings` routes with per-key Zod schema allowlist | M | P8-02 | Unknown key returns 422 |
 | [ ] | P8-04 | BE | `/logs/login-history` across users with scope; index | M | P2-02 | Scope test |
@@ -137,10 +138,10 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P4-16 | BE | Member customers view (C-16, D9, D19): `GET /customers` own scope, customers with an order item from the member, name, city, order count, last order date | S | P4-01 | Member sees only own customers; no phone or email unless an order is open |
 | [ ] | P5-01 | DB | `MemberDocument` migration: status, masked number, hash, reviewer, expiry, uploader fields | M | P3-01 | Up and down tested; partly: columns in the migration; up and down rehearsal open (P10-45) |
 | [ ] | P5-02 | DB | Copy legacy GST, PAN and `kycDocuments` into `MemberDocument`; verify counts | M | P5-01 | Count and checksum report; partly: existing `VendorDocument` rows become SUBMITTED; legacy GST, PAN and `kycDocuments` columns not copied yet |
-| [ ] | P5-03 | BE | Private R2 bucket client, presigned GET (5 min), `.pdf` ContentType fix | M | P2-09 | Presigned link expires (test) |
+| [x] | P5-03 | BE | Private R2 bucket client, presigned GET (5 min), `.pdf` ContentType fix | M | P2-09 | Merged: `R2_PRIVATE_BUCKET`, `signedFileUrl` (300 s), `.pdf` content type; no fallback to the public bucket |
 | [ ] | P5-04 | OPS | Script to move existing files from public to private bucket, verify checksums, then remove public copies | M | P5-03 | Run on staging, public URLs return 403/404 |
 | [x] | P5-05 | BE | Validators: PAN, GST with state code, Aadhaar with Verhoeff; masking functions | M | P2-14 | Table tests with valid and invalid samples |
-| [ ] | P5-06 | BE | Upload endpoint: magic bytes, 5 MB, duplicate-number check by hash, store masked, `uploadedOnBehalf` | L | P5-03, P5-05 | Upload tests incl. polyglot and wrong type; partly: type sniffing, duplicate check by hash, masked and encrypted number and `uploadedOnBehalf` on existing storage; private bucket open (P5-03) |
+| [ ] | P5-06 | BE | Upload endpoint: magic bytes, 5 MB, duplicate-number check by hash, store masked, `uploadedOnBehalf` | L | P5-03, P5-05 | Upload tests incl. polyglot and wrong type; partly: type sniffing, duplicate check by hash, masked and encrypted number and `uploadedOnBehalf`; stored in the private bucket since P5-03 |
 | [x] | P5-07 | BE | Checklist endpoint; support gets type and status only | S | P5-01 | Support response has no file key |
 | [ ] | P5-08 | BE | `download-url` endpoint with audit and rate limit; blocked for support | S | P5-03 | Test per role; partly: approvers get the file key on the list, support gets none; no `download-url` endpoint, audit or rate limit (P5-14) |
 | [ ] | P5-09 | BE | Review endpoint approve/reject; reason required on reject; notify member | M | P5-01 | State tests; partly: approve and reject with a 10 to 500 character reason, state tests pass; member notification open |
@@ -148,7 +149,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | P5-11 | BE | Derive "Documents complete / incomplete" and due date for list and detail | S | P5-01 | Unit test |
 | [ ] | P5-12 | SEC | Decide and add malware scanning for uploads (provider or ClamAV) | M | P5-06 | Infected sample rejected |
 | [ ] | P5-13 | BE | Encrypt and mask bank account number at rest | M | P2-13 | Raw DB value is ciphertext |
-| [ ] | P5-14 | BE | Signed URL download for member documents, replacing the `storageKey` in list responses | M | P5-03 | List has no file key; link expires (test) |
+| [x] | P5-14 | BE | Signed URL download for member documents, replacing the `storageKey` in list responses | M | P5-03 | Merged: `fileUrl` replaces `storageKey`; tests assert no key in responses |
 | [ ] | P5-15 | BE | Documents list returns the uploader name, and the row shows "uploaded by <name> for member" | S | P5-07 | Test shows the name |
 | [x] | P6-01 | DB | `MemberDocumentReminder` table with unique (member, sequence, channel) | S | P3-01 | Merged: migration `20261017100000_member_document_reminders` (one row per reminder with per-channel status; unique member + sequence) |
 | [x] | P6-02 | BE | Reminder schedule service (due +0, +7, +14 days, listing exact missing documents) | M | P6-01 | Merged: `member-reminder-policy.ts` with fake-clock tests; missing list stored per reminder |
@@ -169,7 +170,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | P10-14 | FE | Tabs: Profile, Documents, Branches/Deals/Therapists, Activity | M | P10-13 | Keyboard and ARIA tab pattern |
 | [x] | P10-15 | FE | Status change with inline confirm and reason (10 to 500 chars), history list | M | P3-07 | Tests |
 | [x] | P10-16 | FE | Delete member (super admin only) with inline confirm; message for the ARCHIVED outcome | S | P3-09 | Tests |
-| [ ] | P10-17 | FE | Documents tab: per-document status chips, masked number input, upload, approve, reject with reason, "uploaded by X for member", view via signed URL in new tab | L | P5-06, P5-09 | Tests; support sees status only; partly: status chips, masked number, upload on behalf, approve and reject done; uploader name (P5-15) and signed URL view (P5-14) open |
+| [ ] | P10-17 | FE | Documents tab: per-document status chips, masked number input, upload, approve, reject with reason, "uploaded by X for member", view via signed URL in new tab | L | P5-06, P5-09 | Tests; support sees status only; partly: status chips, masked number, upload on behalf, approve and reject done; uploader name (P5-15) open; signed URL view done (P5-14) |
 | [x] | P10-18 | FE | Activity tab: reminders, warnings, status timeline | M | P3-13, P6-01 | Merged: reminders, manual reminders and the review flag in the Activity tab |
 | [x] | P10-19 | FE | "Ready for suspension review" badge with reason prefilled "Documents not completed" | S | P6-05, P10-15 | Merged: the flag is now set by the reminder job; badge, filter and prefilled reason read it |
 | [ ] | P10-20 | FE | My profile and business profile (own view/edit) | M | P8-06 | Tests |
@@ -191,7 +192,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
-| [ ] | P4-06 | BE | Orders: scope on `OrderItem.vendorId`; strip other members' items | M | P2-02 | Mixed-vendor order test |
+| [ ] | P4-06 | BE | Orders: scope on `OrderItem.vendorId`; strip other members' items | M | P2-02 | Mixed-vendor order test; partly: member scope fixed in P4-17 |
 | [ ] | P4-07 | BE | Customers: support and sales view-only, member view own (D9, PLANNING.md §1.2 matrix) | S | P1-07 | Matrix test |
 | [ ] | P7-01 | DB | `RefundRequest` table; `REFUNDED`, `PARTIALLY_REFUNDED` payment statuses | M | P0-01 | Migration tested |
 | [ ] | P7-02 | BE | `POST /orders/:id/cancel` with reason, state rules, notifications | M | P4-06 | Invalid state returns 409 |
@@ -201,6 +202,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P7-13 | SEC | Razorpay webhook: raw-body HMAC, timing-safe compare, event id replay table | M | - | Replay ignored |
 | [ ] | P10-25 | FE | Orders: cancel with inline confirm; support raises refund request; admin refund queue approve/reject | L | P7-02 to P7-05 | Tests per role |
 | [ ] | P10-26 | FE | Customers: view, block/unblock with reason; support view only | M | P4-07 | Tests |
+| [x] | P4-17 | SEC | Member order scope: a member with no business record gets an empty Orders and Customers list (was: every order); a `branchId` filter narrows the member's own orders, never replaces the scope | S | - | Merged: 4 tests in `orders.routes.test.ts`, 1 in `vendors.routes.test.ts` |
 
 ## 4. Storefront
 
@@ -212,7 +214,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | ST-03 | BIZ | Decide where staff land when they open "Account" on a phone (console has no bottom nav) | S | - | Decision recorded in PLANNING.md §4 |
 | [ ] | ST-04 | FE | 10 public pages render their own `<main>` inside the layout `<main>` (about, become-vendor, blog, blog-detail, careers, checkout, contact, how-it-works, showcase, website-page): change page roots to `div`/`article` | S | - | One `<main>` per page (test) |
 | [ ] | ST-05 | FE | Tell the visitor when "Use my current location" fails or is more than 75 km from any partner city | S | - | Message shown, test |
-| [ ] | ST-06 | QA | Header and tab bar tests: search submit, signed-in account menu, `useAccountLinks` role branches | S | - | Tests green |
+| [ ] | ST-06 | QA | Header and tab bar tests: search submit, signed-in account menu, `useAccountLinks` role branches | S | - | Tests green; partly: account menu Profile link and `/my-dashboard` redirect per role done (staff to `/account/dashboard`, customers to `/my-dashboard`) |
 | [ ] | ST-07 | FE | `/help` and `/gifting` footer links have no routes (404) | S | - | Routes exist or links removed |
 | [ ] | ST-08 | FE | Public pages without a meta description (cart, sign-in, otp, orders, invoice, choose-experience) move to `Seo` | S | - | Every public route has a description |
 | [ ] | ST-09 | BIZ | Owner supplies footer brand contact details (phone, email) | S | - | Copy in `content.json` |
@@ -235,6 +237,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | ST-26 | FE | Deal page single-location map using `DealMap` | S | - | Map shows the branch |
 | [ ] | ST-27 | OPS | Before traffic grows, move `VITE_MAP_TILE_URL` off `tile.openstreetmap.org` to a free-tier tile provider (OSM tile policy) | S | - | Env changed on Vercel |
 | [ ] | ST-28 | BE | Newsletter backend (msd-api table and endpoint) for the footer signup, which is UI only today | M | - | Signup stored; footer copy updated |
+| [x] | ST-29 | SEC | JSON-LD on deal, product, products and member pages goes through `<JsonLd>` (escapes `</script>`); a member-supplied name could run script before | S | - | Merged: guard test `seo/json-ld-usage.test.ts` fails on any raw `application/ld+json` |
 
 ## 5. Static content
 
@@ -256,7 +259,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
-| [ ] | SL-01 | BIZ | Write the home slider rules in PLANNING.md §7 (slide count, schedule, image sizes, alt text) and review the existing Home Hero screen against them | S | - | Rules approved; gaps added here as tasks |
+| [ ] | SL-01 | BIZ | Write the home slider rules in PLANNING.md §7 (slide count, schedule, image sizes, alt text) and review the existing Home Hero screen against them | S | - | Rules approved; gaps added here as tasks; partly: built behaviour written in PLANNING.md §7 (state picker, deal slides, 5-slide rule, Global fallback); own banner image, schedule and image rules open |
 
 ## 8. Masters
 
@@ -310,7 +313,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [x] | P0-10 | DOC | Add a pointer to this list in `TASK.md` | S | - | Superseded 2026-10-17: `TASK.md` and `ADMIN_RBAC_TASKS.md` merged into this file, linked from `docs/msd/README.md` |
 | [ ] | P2-01 | BE | `requirePermission` sets `req.access = {scope, memberId}` | S | P1-04 | Unit test |
 | [ ] | P2-02 | BE | `lib/scope.ts` with `scopedWhere(req, resource)` per resource | M | P2-01 | Unit test per resource |
-| [ ] | P2-07 | SEC | Add `helmet`, `trust proxy`, JSON and urlencoded body limit 100 kb | S | - | Response headers verified, oversize gets 413 |
+| [x] | P2-07 | SEC | Add `helmet`, `trust proxy`, JSON and urlencoded body limit 100 kb | S | - | Merged: `helmet` 8, `TRUST_PROXY_HOPS`, JSON limit 100 kb with 413 `PAYLOAD_TOO_LARGE`; no urlencoded parser is mounted; `app.security.test.ts` |
 | [ ] | P2-08 | SEC | Global rate limit plus limiters for upload, status change, payout, refund, export, document download | M | P2-07 | Limit tests return 429 with `RATE_LIMITED` |
 | [ ] | P2-09 | SEC | `env.ts`: production fails on JWT secret under 32 chars, `*` in CORS, missing `R2_PRIVATE_BUCKET`, `DOC_HASH_PEPPER`, `FIELD_ENCRYPTION_KEY`, `CRON_SECRET` | S | - | Boot test fails fast |
 | [ ] | P2-10 | SEC | Request logger with request id and PII redaction (`documentNumber`, `bankAccountNumber`, `otp`, `authorization`); no stack traces in production responses | M | - | Log snapshot test has no PII |
@@ -320,6 +323,10 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P2-14 | BE | Shared Zod primitives: pagination, sort allowlist, reason, date range, money, phone, email; lint rule or test that every body schema is `.strict()` | M | - | Test scans schemas |
 | [ ] | P2-16 | SEC | Confirm token transport (bearer only or cookie); if any cookie is used set `HttpOnly`, `Secure`, `SameSite` and add CSRF protection; document decision | S | - | Written note in spec |
 | [ ] | P2-17 | SEC | `npm audit` gate and Dependabot for api and shared packages | S | - | CI step exists |
+| [x] | P2-18 | SEC | OTP request limit per identifier from any IP (`OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR`, default 10), on top of the per IP + identifier limit | S | - | Merged: `otpIdentifierRateLimiter` |
+| [x] | P2-19 | SEC | Access tokens verified with `algorithms: ['HS256']` only | S | - | Merged: test refuses an HS512 token |
+| [x] | P2-21 | BE | Storage layout: one folder per owner (`members/<id>/{profile,deals,therapists,products,documents}`, `customers/`, `home-slider/`, `cta-banners/`, `static-content/`, `masters/`), `bucketForKey`; ARCHITECTURE.md §12.3 | M | P5-03 | Merged: `lib/storage-layout.ts` tests, media service folder tests |
+| [x] | P2-20 | SEC | `vendors` routes reject a non-UUID id with 422 (`router.param` hook `uuidParam`); role-assign routes validate both ids | S | - | Merged: test returns 422 with the field name |
 | [ ] | P4-12 | QA | Route inventory test: every route has `requirePermission` or is on a documented public allowlist | M | P4-01 | CI fails on an unguarded route |
 | [ ] | P9-01 | BE | Split `registry.ts` into `openapi/paths/<domain>.ts` | M | - | Output document identical |
 | [ ] | P9-02 | BE | `envelope(schema)` helper; fix error response docs | M | P9-01 | All paths use it |
@@ -327,7 +334,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P9-04 | BE | Single route metadata source drives `requirePermission`, `x-required-permission`, `x-scope` | L | P9-01, P4-12 | No drift possible (test) |
 | [ ] | P9-05 | BE | Document all new and changed routes including missing KYC routes | L | P9-04 | Coverage script passes |
 | [ ] | P9-06 | QA | CI script: router stack vs registry | M | P9-05 | Fails on undocumented route |
-| [ ] | P9-07 | SEC | `/docs` hidden or basic-auth in production | S | - | Prod returns 404 or 401 |
+| [x] | P9-07 | SEC | `/docs` hidden or basic-auth in production | S | - | Merged: off in production unless `API_DOCS=true` (then 404) |
 | [ ] | P9-08 | FE | Generate typed API client from OpenAPI for msd | M | P9-05 | Build uses generated types |
 | [ ] | P10-34 | FE | Form UX: inline errors with `aria-describedby`, 422 mapped to fields, focus first error, live region for status | M | P10-03 | Axe has 0 violations |
 | [ ] | P10-35 | SEC | No PII in console, URLs, localStorage or error reports; masked values only; Sentry scrubbing rules | M | - | Test and manual review |

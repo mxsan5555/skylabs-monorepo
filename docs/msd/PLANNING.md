@@ -235,9 +235,20 @@ edits: to be written (task CT-01).
 
 ## 7. Home slider
 
-Home hero slides managed under Masters → Home hero, read by the storefront at
-`/catalog/home-hero`. Rules for slide count, schedule, image sizes and alt text: to be written
-(task SL-01).
+Home hero slides managed under Masters → Home hero (`/account/masters/home-hero`), read by the
+storefront at `/catalog/home-hero`. Built and working (2026-10-17):
+
+1. **Choose the state first.** The State picker at the top lists every state that has an active
+   branch, plus Global/Default. Slides you add are saved to the chosen state.
+2. **Each slide is a deal.** It shows the deal's current title, price and image; editing the deal
+   updates the slide. Order by sort order; a slide can be paused.
+3. **Visitors see their state's slider** (from their location). A state's slider goes live only
+   with at least 5 eligible slides (slide, deal, branch and member all active); until then, and
+   for visitors with no location, the Global/Default slider shows. The console shows "n/5 eligible".
+
+Still to decide (task SL-01): whether a slide may also carry its own banner image (then it is stored
+under `home-slider/<state>/`, ARCHITECTURE.md §12.3), a schedule (start and end dates), and the
+image size and alt text rules.
 
 ## 8. Masters
 
@@ -286,7 +297,9 @@ written (task SO-01).
 Non-negotiables: no secrets in git; RLS-equivalent ownership checks on the server for every route;
 input validation on every endpoint; HTTPS only; audit rows for status, document, refund, payout,
 delete and role-grant changes in the same transaction (R4); Aadhaar Act / DPDP Act review of
-document handling (P0-03, advisory).
+document handling (P0-03, advisory). Files: one folder per owner (member, customer, home slider,
+CTA banner, static content); identity documents only in a private bucket, opened with links that
+expire after 5 minutes (ARCHITECTURE.md §12.3).
 
 ## 13. Decisions
 

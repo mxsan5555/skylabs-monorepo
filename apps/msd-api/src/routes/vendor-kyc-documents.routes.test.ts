@@ -11,11 +11,12 @@ vi.mock('../services/permission-resolver.service', () => ({
 }));
 
 vi.mock('../lib/media-storage', () => ({
-  writeMediaFile: vi.fn(async (subdir: string, parentId: string, buffer: Buffer) => ({
-    storageKey: `${subdir}/${parentId}/fake.pdf`,
+  writeMediaFile: vi.fn(async (folder: string, buffer: Buffer) => ({
+    storageKey: `${folder}/fake.pdf`,
     sizeBytes: buffer.length,
   })),
   deleteMediaFile: vi.fn(async () => undefined),
+  signedFileUrl: vi.fn(async (key: string) => `https://signed.example/${key}`),
 }));
 
 import app from '../app';
@@ -103,7 +104,7 @@ describe('POST /api/v1/vendors/me/kyc-documents/:documentType', () => {
       .attach('file', validPdf(), 'gst-new.pdf');
     expect(res.status).toBe(201);
     const { deleteMediaFile } = await import('../lib/media-storage');
-    expect(vi.mocked(deleteMediaFile)).toHaveBeenCalledWith('vendor-documents/x/old.pdf');
+    expect(vi.mocked(deleteMediaFile)).toHaveBeenCalledWith('vendor-documents/x/old.pdf', 'public');
   });
 });
 
@@ -198,7 +199,8 @@ describe('GET /api/v1/vendors/:id/kyc-documents (admin)', () => {
       .get(`/api/v1/vendors/${VENDOR_A_ID}/kyc-documents`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
     expect(res.status).toBe(200);
-    expect(res.body.data[0].storageKey).toBe(documentFixture.storageKey);
+    expect(res.body.data[0].fileUrl).toBe(`https://signed.example/${documentFixture.storageKey}`);
+    expect(res.body.data[0]).not.toHaveProperty('storageKey');
     expect(res.body.data[0]).not.toHaveProperty('numberHash');
   });
 });

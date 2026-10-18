@@ -24,11 +24,12 @@ vi.mock('../services/member-notice.service', async (importOriginal) => ({
 // routes.test.ts — without this, the image/video upload routes tested below would write real
 // files under the real uploads directory on every test run.
 vi.mock('../lib/media-storage', () => ({
-  writeMediaFile: vi.fn(async (subdir: string, parentId: string, buffer: Buffer) => ({
-    storageKey: `${subdir}/${parentId}/fake.jpg`,
+  writeMediaFile: vi.fn(async (folder: string, buffer: Buffer) => ({
+    storageKey: `${folder}/fake.jpg`,
     sizeBytes: buffer.length,
   })),
   deleteMediaFile: vi.fn(async () => undefined),
+  signedFileUrl: vi.fn(async (key: string) => `https://signed.example/${key}`),
 }));
 
 // The real resolver makes a live network call (redirect-following against Google Maps) — mocked
@@ -1387,10 +1388,10 @@ describe('Admin-on-behalf product media routes (previously missing entirely)', (
   it('DELETE /:vendorId/products/:productId/images/:imageId deletes successfully', async () => {
     resolveMock.mockResolvedValue(['vendors.products:edit']);
     prismaMock.product.findUnique.mockResolvedValue(productFixture);
-    prismaMock.productImage.findUnique.mockResolvedValue({ id: 'img-1', productId: PRODUCT_ID, isPrimary: false, storageKey: 'products/x/a.jpg' });
-    prismaMock.productImage.delete.mockResolvedValue({ id: 'img-1' });
+    prismaMock.productImage.findUnique.mockResolvedValue({ id: '1a1a1a1a-0000-4000-8000-0000000000a1', productId: PRODUCT_ID, isPrimary: false, storageKey: 'products/x/a.jpg' });
+    prismaMock.productImage.delete.mockResolvedValue({ id: '1a1a1a1a-0000-4000-8000-0000000000a1' });
     const res = await request(app)
-      .delete(`/api/v1/vendors/${VENDOR_A_ID}/products/${PRODUCT_ID}/images/img-1`)
+      .delete(`/api/v1/vendors/${VENDOR_A_ID}/products/${PRODUCT_ID}/images/1a1a1a1a-0000-4000-8000-0000000000a1`)
       .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
     expect(res.status).toBe(200);
   });
@@ -2963,10 +2964,10 @@ describe('Therapist (admin-on-behalf — mirrors Branch/Deal exact admin split)'
     it('DELETE /:vendorId/therapists/:therapistId/images/:imageId deletes successfully', async () => {
       resolveMock.mockResolvedValue(['vendors.therapists:edit']);
       prismaMock.therapist.findUnique.mockResolvedValue(therapistAFixture);
-      prismaMock.therapistImage.findUnique.mockResolvedValue({ id: 'timg-1', therapistId: THERAPIST_A_ID, isPrimary: false, storageKey: 'therapists/x/a.jpg' });
-      prismaMock.therapistImage.delete.mockResolvedValue({ id: 'timg-1' });
+      prismaMock.therapistImage.findUnique.mockResolvedValue({ id: '1b1b1b1b-0000-4000-8000-0000000000b1', therapistId: THERAPIST_A_ID, isPrimary: false, storageKey: 'therapists/x/a.jpg' });
+      prismaMock.therapistImage.delete.mockResolvedValue({ id: '1b1b1b1b-0000-4000-8000-0000000000b1' });
       const res = await request(app)
-        .delete(`/api/v1/vendors/${VENDOR_A_ID}/therapists/${THERAPIST_A_ID}/images/timg-1`)
+        .delete(`/api/v1/vendors/${VENDOR_A_ID}/therapists/${THERAPIST_A_ID}/images/1b1b1b1b-0000-4000-8000-0000000000b1`)
         .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
       expect(res.status).toBe(200);
     });
@@ -3259,5 +3260,30 @@ describe('TherapistPackage (self-service /me/therapists/:therapistId/packages)',
       request(app).delete(`/api/v1/vendors/me/therapists/${THERAPIST_A_ID}/packages/${PACKAGE_A_ID}`),
     ]);
     noAuth.forEach((res) => expect(res.status).toBe(401));
+  });
+});
+
+describe('GET /api/v1/vendors/me/customers — member with no business record', () => {
+  it('returns an empty list instead of an error', async () => {
+    resolveMock.mockResolvedValue(['members:custom']);
+    prismaMock.member.findUnique.mockResolvedValue(null);
+    const res = await request(app)
+      .get('/api/v1/vendors/me/customers')
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['member'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.meta.total).toBe(0);
+  });
+});
+
+describe('vendors routes — malformed ids', () => {
+  it('returns 422 for a non-uuid id instead of reaching the database', async () => {
+    resolveMock.mockResolvedValue(['members:custom']);
+    const res = await request(app)
+      .patch('/api/v1/vendors/me/branches/not-a-uuid')
+      .set('Authorization', bearerFor({ sub: USER_A_ID, roles: ['member'] }))
+      .send({ name: 'x' });
+    expect(res.status).toBe(422);
+    expect(res.body.error.details.fieldErrors.branchId).toBeDefined();
   });
 });

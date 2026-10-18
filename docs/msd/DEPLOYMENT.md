@@ -35,6 +35,9 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 | `JWT_SECRET` | fresh 64-char hex (`openssl rand -hex 32`), distinct per environment | 🔒 |
 | `JWT_ACCESS_TTL_MINUTES` / `JWT_REFRESH_TTL_DAYS` | `15` / `30` | |
 | `OTP_EXPIRY_MINUTES` / `OTP_MAX_ATTEMPTS` / `OTP_REQUEST_RATE_LIMIT_PER_10_MIN` | `10` / `5` / `5` | |
+| `OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR` | `10` (OTP sends per phone or email per hour, any IP) | |
+| `TRUST_PROXY_HOPS` | `1` on Railway (one proxy); leave unset locally | |
+| `API_DOCS` | unset (Swagger `/docs` off in production); `true` only to open it temporarily | |
 | `CORS_ORIGIN` | exact Vercel origins, comma-separated | |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth client id / secret | 🔒 (secret) |
 | `GOOGLE_CALLBACK_URL` | `https://<msd-api-railway-domain>/api/v1/auth/google/callback` | |
@@ -48,6 +51,7 @@ silently ships the bare SPA); preview and local builds fall back to the SPA. Red
 | `R2_ACCOUNT_ID` / `R2_BUCKET` | Cloudflare account id / `msd-media` | |
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | R2 token | 🔒 |
 | `R2_PUBLIC_URL` | optional public URL of the bucket | |
+| `R2_PRIVATE_BUCKET` | `msd-private` (public access off); member documents. Uploads return 503 until set | |
 | `SUPPORT_EMAIL` / `SUPPORT_PHONE` | support contact printed in member notices | |
 | `FIELD_ENCRYPTION_KEY` | 32 random bytes, base64; encrypts full Aadhaar and PAN numbers | 🔒 |
 | `DOC_HASH_PEPPER` | secret for the document number duplicate hash | 🔒 |

@@ -172,6 +172,15 @@ storefront renders deal and product text as plain text.
 
 `HomeHeroSlide`; console `pages/account/masters/home-hero.tsx`; public `GET /catalog/home-hero`.
 
+- A slide is a live reference to a deal (`dealId`): title, price and image always come from the deal,
+  so the slider has no images of its own.
+- `state` on each slide: a state name (from `GET /catalog/locations`) or empty for the
+  Global/Default slider. The console's **State** picker chooses which slider you see and edit; new
+  slides are saved to that state.
+- The storefront sends the visitor's state (`useVisitorLocation`). A state's slider is served once
+  it has 5 eligible slides (active slide, active deal, branch and member); otherwise the
+  Global/Default slider is served (`home-hero.service.ts`, `MIN_ELIGIBLE_SLIDES`).
+
 ## 8. Masters
 
 Categories (`Category`, `CategoryImage`, types `SERVICE | PRODUCT | THERAPY`), popular tags and
@@ -223,3 +232,34 @@ production boot fails on a short `JWT_SECRET`, `*` in CORS, or missing `R2_PRIVA
 `DOC_HASH_PEPPER`, `FIELD_ENCRYPTION_KEY`, `CRON_SECRET`; request logger with request id and PII
 redaction; idempotency keys for money; transactional audit; private R2 bucket with 5-minute signed
 downloads for documents; malware scan decision; gitleaks and `npm audit` in CI.
+
+### 12.3 File storage (decided 2026-10-17)
+
+Two Cloudflare R2 buckets per environment, one folder per owner. Layout in
+`apps/msd-api/src/lib/storage-layout.ts` (`storageFolder`); file names are random UUIDs.
+
+| Bucket | Access | Folder | Holds |
+|---|---|---|---|
+| `msd-media` | public (`VITE_MEDIA_BASE_URL`) | `members/<memberId>/profile/` | member logo, gallery, video |
+| | | `members/<memberId>/deals/<dealId>/` | deal images and video |
+| | | `members/<memberId>/therapists/<therapistId>/` | therapist images and video |
+| | | `members/<memberId>/products/<productId>/` | product images and video |
+| | | `customers/<customerId>/profile/` | customer avatar (reserved, D15) |
+| | | `home-slider/<state-slug or global>/<slideId>/` | reserved: slides use deal images today |
+| | | `cta-banners/<promotionId>/` | CTA banner (Promotion) images |
+| | | `static-content/{blog,about-us,pages}/<id>/` | blog, About us and page images |
+| | | `masters/categories/<categoryId>/` | category images |
+| `msd-private` | private, no public URL | `members/<memberId>/documents/` | Aadhaar, PAN, GST files |
+
+- **Private files** are never returned as keys. Document responses carry `fileUrl`, a signed GET
+  link that expires after 5 minutes (`signedFileUrl`, `SIGNED_URL_TTL_SECONDS`). Without
+  `R2_PRIVATE_BUCKET` a document upload fails with 503; it never falls back to the public bucket.
+- **Bucket per key:** `bucketForKey` sends `members/<id>/documents/...` to the private bucket and
+  everything else to the public one, for reads, replaces and member deletion.
+- **Existing files** keep their old flat keys (`deals/<id>/...`, `vendors/<id>/...`,
+  `vendor-documents/<id>/...`); the DB stores the full key, so they keep working. Old documents stay
+  in the public bucket until the P5-04 script moves them; old media can move later with the same
+  script (copy, update `storageKey`, delete).
+- **Local development** uses its own two R2 buckets (`msd-media-dev`, `msd-private-dev`) with the
+  same layout, not the local disk: the same code path runs everywhere, and the free tier (10 GB)
+  covers it. Never point local development at the production buckets.

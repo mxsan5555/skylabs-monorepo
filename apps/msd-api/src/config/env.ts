@@ -51,6 +51,12 @@ export const env = {
   otpExpiryMinutes: optionalInt('OTP_EXPIRY_MINUTES', 10),
   otpMaxAttempts: optionalInt('OTP_MAX_ATTEMPTS', 5),
   otpRequestRateLimitPer10Min: optionalInt('OTP_REQUEST_RATE_LIMIT_PER_10_MIN', 5),
+  /** OTP sends per identifier per hour, from any IP (stops IP rotation buying fresh codes). */
+  otpIdentifierRateLimitPerHour: optionalInt('OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR', 10),
+  /** Proxies in front of the API (Railway: 1). 0 locally, so a client cannot fake its IP. */
+  trustProxyHops: optionalInt('TRUST_PROXY_HOPS', 0),
+  /** Swagger UI at /docs: on outside production, off in production unless API_DOCS=true. */
+  apiDocsEnabled: process.env.API_DOCS === 'true' || process.env.NODE_ENV !== 'production',
 
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
@@ -101,5 +107,7 @@ export const env = {
   r2AccessKeyId: process.env.R2_ACCESS_KEY_ID ?? '',
   r2SecretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? '',
   r2Bucket: process.env.R2_BUCKET ?? '',
+  /** Private bucket for member KYC documents (no public access). Uploads fail until it is set. */
+  r2PrivateBucket: process.env.R2_PRIVATE_BUCKET ?? '',
   r2PublicUrl: process.env.R2_PUBLIC_URL ?? '',
 };

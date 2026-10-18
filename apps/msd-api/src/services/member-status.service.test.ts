@@ -216,7 +216,7 @@ describe('hard delete removes the member files from storage', () => {
     prismaMock.member.findUnique.mockResolvedValue({ ...MEMBER, status: 'SUSPENDED' } as never);
     prismaMock.orderItem.count.mockResolvedValue(0 as never);
     prismaMock.user.update.mockResolvedValue({} as never);
-    prismaMock.memberDocument.findMany.mockResolvedValue([{ storageKey: 'vendor-documents/m1/a.pdf' }] as never);
+    prismaMock.memberDocument.findMany.mockResolvedValue([{ storageKey: 'vendor-documents/m1/a.pdf' }, { storageKey: 'members/m1/documents/b.pdf' }] as never);
     prismaMock.vendorImage.findMany.mockResolvedValue([
       { storageKey: 'vendors/m1/1.jpg' },
       { storageKey: 'vendors/m1/2.jpg' },
@@ -226,10 +226,12 @@ describe('hard delete removes the member files from storage', () => {
 
   it('deletes every key once, after the transaction commits', async () => {
     await deleteMember('m1', 'Cleanup after suspension', ACTOR);
-    expect(deleteMediaFile).toHaveBeenCalledTimes(4);
+    expect(deleteMediaFile).toHaveBeenCalledTimes(5);
     for (const key of ['vendor-documents/m1/a.pdf', 'vendors/m1/1.jpg', 'vendors/m1/2.jpg', 'vendors/m1/v.mp4']) {
-      expect(deleteMediaFile).toHaveBeenCalledWith(key);
+      expect(deleteMediaFile).toHaveBeenCalledWith(key, 'public');
     }
+    // Documents uploaded since the private bucket are removed from the private bucket.
+    expect(deleteMediaFile).toHaveBeenCalledWith('members/m1/documents/b.pdf', 'private');
     const committedAt = prismaMock.$transaction.mock.invocationCallOrder[0];
     expect(deleteMediaFile.mock.invocationCallOrder.every((order) => order > committedAt)).toBe(true);
   });
@@ -253,10 +255,11 @@ describe('hard delete removes the member files from storage', () => {
     deleteMediaFile.mockRejectedValue(new Error('r2 down'));
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(vi.fn());
     await expect(deleteMember('m1', 'Cleanup after suspension', ACTOR)).resolves.toEqual({ outcome: 'DELETED' });
-    expect(deleteMediaFile).toHaveBeenCalledTimes(4);
+    expect(deleteMediaFile).toHaveBeenCalledTimes(5);
     const logged = JSON.stringify(errorSpy.mock.calls.map((c) => c.map((a) => (a instanceof Error ? a.message : a))));
     expect(logged).not.toContain('vendors/m1');
     expect(logged).not.toContain('vendor-documents');
+    expect(logged).not.toContain('members/m1');
     errorSpy.mockRestore();
   });
 });

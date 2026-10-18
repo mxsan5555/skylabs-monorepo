@@ -1,3 +1,4 @@
+import { JsonLd } from '../../seo/json-ld';
 import { useEffect, useState } from 'react';
 import { showSnackbar } from '../../../snackbar/snackbar';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -274,10 +275,8 @@ export function ProductDetail() {
         />
       )}
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+      <JsonLd
+        data={{
             '@context': 'https://schema.org',
             '@type': 'Product',
             name,
@@ -304,14 +303,11 @@ export function ProductDetail() {
                   'MySpaDeal',
               },
             },
-          }),
-        }}
+          }}
       />
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+      <JsonLd
+        data={{
             '@context': 'https://schema.org',
             '@type': 'BreadcrumbList',
             itemListElement: [
@@ -334,8 +330,7 @@ export function ProductDetail() {
                 item: canonicalUrl,
               },
             ],
-          }),
-        }}
+          }}
       />
 
       {/* Breadcrumb */}

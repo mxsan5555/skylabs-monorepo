@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { deleteMediaFile } from '../lib/media-storage';
+import { bucketForKey } from '../lib/storage-layout';
 import { ApiError } from '../lib/http';
 import { Prisma } from '../generated/prisma-client';
 import { auditLogData } from './audit.service';
@@ -57,7 +58,7 @@ async function memberStorageKeys(memberId: string): Promise<string[]> {
 
 /** Best effort, after commit. Logs a count only, never a key. */
 async function removeStoredFiles(memberId: string, keys: string[]): Promise<void> {
-  const results = await Promise.allSettled(keys.map((key) => deleteMediaFile(key)));
+  const results = await Promise.allSettled(keys.map((key) => deleteMediaFile(key, bucketForKey(key))));
   const failed = results.filter((r) => r.status === 'rejected').length;
   if (failed > 0) {
     console.error({ context: 'deleteMember: stored files left behind', memberId, failed, total: keys.length });

@@ -16,17 +16,21 @@
   Lists return `meta: { total, page, pageSize }`.
 - **Error codes** (`lib/http.ts`): `BAD_REQUEST` 400, `UNAUTHORIZED` 401, `FORBIDDEN` 403,
   `MEMBER_SUSPENDED` 403, `MEMBER_INACTIVE_READ_ONLY` 403, `NOT_FOUND` 404, `CONFLICT` 409,
-  `MEMBER_NOT_SUSPENDED` 409, `DOCUMENT_NUMBER_IN_USE` 409, `VALIDATION_ERROR` 422 (field errors in
+  `MEMBER_NOT_SUSPENDED` 409, `DOCUMENT_NUMBER_IN_USE` 409, `PAYLOAD_TOO_LARGE` 413 (JSON body
+  over 100 kb), `VALIDATION_ERROR` 422 (field errors in
   `details.fields`), `RATE_LIMITED` 429, `SERVER_ERROR` 500, `SERVICE_UNAVAILABLE` 503. A 500 never
   leaks internals.
 - **Auth:** `Authorization: Bearer <access token>` (15 min); `POST /auth/refresh` rotates the
-  30-day refresh token. Every protected route re-checks the permission on the server.
+  30-day refresh token. Every protected route re-checks the permission on the server. Tokens are
+  HS256 only.
+- **Ids:** route ids are UUIDs; a malformed id is 422, never a database error.
 - **Own records:** a foreign record returns 404, not 403. A caller-supplied member id is ignored
   under own scope (planned with P2-02).
 - **Paging:** `page >= 1`, `pageSize` 1 to 100, default 20. Sort fields come from a per-resource
   allowlist.
 - **Rate limits:** OTP request and the public member registration endpoint, per identifier and
-  IP, `OTP_REQUEST_RATE_LIMIT_PER_10_MIN` per 10 minutes (default 5, `middleware/rateLimiter.ts`).
+  IP, `OTP_REQUEST_RATE_LIMIT_PER_10_MIN` per 10 minutes (default 5, `middleware/rateLimiter.ts`);
+  OTP request also per identifier alone, `OTP_IDENTIFIER_RATE_LIMIT_PER_HOUR` per hour (default 10).
   Global and per-action limiters are planned (P2-08).
 - **Schemas:** `<Entity><Action>Schema` (for example `MemberCreateSchema`,
   `MemberListQuerySchema`); new and changed bodies are `.strict()` (R3).
@@ -287,7 +291,12 @@ Product (`ProductCreate`): `name` 1 to 200; `slug`; `brand`; `categoryId` (`PROD
 `isFeatured`; status via `PATCH .../status`.
 
 Media for deals, therapists, products and members: image upload, delete, reorder, set primary, and
-one optional video, under the same permission as edit.
+one optional video, under the same permission as edit. Stored keys follow ARCHITECTURE.md §12.3.
+
+Documents (`/members/:id/documents`, `/vendors/me/kyc-documents`): viewers who may open files
+(`members:edit`, `members:approve`, or the member) get `fileUrl`, a signed link that expires after
+5 minutes, plus `numberMasked`, `originalFilename`, `mimeType`, `sizeBytes`. The object key is
+never returned. Upload without `R2_PRIVATE_BUCKET` configured returns 503.
 
 ### 2.2 Planned endpoints
 
@@ -528,6 +537,10 @@ No API (GA4 in the browser).
 | DELETE | `/api/v1/social-media/:id` | `cms.social-media:delete` |
 
 ## 12. Platform
+
+- `/docs` (Swagger UI) is served outside production only, or in production with `API_DOCS=true`.
+- Responses carry `helmet` security headers; `TRUST_PROXY_HOPS` sets how many proxies to trust
+  for the client IP used by rate limits.
 
 Security requirements and the hardening plan: `ARCHITECTURE.md` §12.2. Adding an endpoint:
 `docs/ARCHITECTURE.md` §3.4 (permission, seed, route, OpenAPI entry, tests for 401, 403 and 200).

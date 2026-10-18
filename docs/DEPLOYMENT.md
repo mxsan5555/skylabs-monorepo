@@ -135,6 +135,15 @@ Railway's disk is wiped on every redeploy, so uploads live in R2. The DB stores 
 5. Railway (msd-api): `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
    `R2_BUCKET=msd-media`. Vercel (msd): `VITE_MEDIA_BASE_URL`, then redeploy.
 
+6. Create a second bucket `msd-private` and leave **public access off** (no r2.dev URL, no
+   custom domain). Give the same API token Object Read & Write on it (or a second token), and set
+   `R2_PRIVATE_BUCKET=msd-private` on Railway. Member documents go here and open only through
+   5-minute signed links.
+7. Local development: create `msd-media-dev` (public dev URL on) and `msd-private-dev` (public off)
+   and put them in `apps/msd-api/.env.local` as `R2_BUCKET` / `R2_PRIVATE_BUCKET`, with the dev
+   bucket's URL as `VITE_MEDIA_BASE_URL` in `apps/msd/.env.local`. Same folder layout as
+   production (`docs/msd/ARCHITECTURE.md` §12.3); never the production buckets.
+
 Uploads go through the API, so the bucket needs no CORS config. mera-driver-api has no media
 variables yet; create a `mera-driver-media` bucket only when it adds uploads.
 

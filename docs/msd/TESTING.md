@@ -57,6 +57,9 @@ ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list
 - Every route has `requirePermission` or is on a documented public allowlist (P4-12).
 - Preview token refused on payout, delete, status, refund, staff and role-grant routes; a Super
   Admin cannot be impersonated.
+- Super Admin protection (P1-11): without the Super Admin role, nobody edits, blocks, deletes or
+  re-roles a Super Admin account, gives or removes the Super Admin role, or edits a role they hold
+  (403); the last active Super Admin cannot lose the role, be blocked or be deleted (409).
 - Permission revoked while a token is active: the API refuses on the next request after the cache
   clears.
 
@@ -89,6 +92,8 @@ ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list
 ### 4.3 Customers and orders
 
 - A customer never reads or changes another customer's cart, wishlist or order by changing an id.
+- A member with no business record gets empty Orders and Customers lists and 404 on any order;
+  a `branchId` filter never widens a member past their own orders (P4-17).
 - Payment state changes only through provider verification (Razorpay signature, webhook HMAC).
 - Refunds (after P7): Support can raise, cannot approve; a double click refunds once; amount
   capped at paid minus refunded.
@@ -102,8 +107,14 @@ ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list
 - axe (WCAG 2.2 AA) clean on `/` in light, dark and high-contrast; no horizontal scroll at 320,
   390, 768 and 1280 px; full keyboard path (skip link, header, panels, tab bar, footer); Lighthouse
   SEO and Accessibility 100 and LCP under 2.5 s on mobile for `/`.
+- JSON-LD is written only by `<JsonLd>`: a name containing `</script>` stays inside the script
+  tag (ST-29, `seo/json-ld-usage.test.ts`).
 - Suspended member's deals, branches and therapists absent; their deal URL returns the not-found
   page; prerender and sitemap exclude them (P10-33).
+- Header account menu "Profile" and the tab bar "Account" use `useAccountLinks`: staff and
+  members without the customer role go to `/account/dashboard`, customers to `/my-dashboard`. Staff who open a
+  customer account URL directly (`/my-dashboard`, `/my-account/*`, `/orders`) land on
+  `/account/dashboard`; customer + member users keep the customer layout.
 
 ### 4.5 Static content to 4.11 Social media
 
@@ -126,7 +137,10 @@ rollback rehearsal (P11).
 - [ ] Ownership tested with another user's id (member, customer, order, branch): IDOR / BOLA.
 - [ ] A normal user calling an admin endpoint directly gets 403.
 - [ ] `/rbac/impersonate` restricted, short-lived, audited.
-- [ ] OTP request and verify rate-limited.
+- [ ] OTP request and verify rate-limited, per IP + identifier and per identifier alone.
+- [ ] Security headers present (`helmet`), `X-Powered-By` absent, body over 100 kb gets 413,
+      `/docs` returns 404 in production, a token signed with another algorithm gets 401.
+- [ ] Every name a member can set renders as text: no raw `dangerouslySetInnerHTML` with user data.
 - [ ] No client can mark an order paid without provider verification.
 - [ ] Uploads: type, size, content and ownership checked.
 - [ ] No OTP, secret, token or unneeded private field in any response.

@@ -47,6 +47,8 @@ function requireOrdersOrVendorSelf(action: PermissionAction) {
         sendError(res, 'FORBIDDEN', `Missing permission orders:${action}`);
         return;
       }
+      // Without orders:{action} the caller may only ever reach their own business's orders.
+      res.locals.orderScope = can(granted, 'orders', action) ? 'ALL' : 'OWN';
       next();
     } catch (err) {
       next(err);
@@ -223,7 +225,7 @@ router.post('/pay-batch/verify', validateBody(VerifyBatchPaymentSchema), async (
 router.get('/', requireOrdersOrVendorSelf('view'), validateQuery(OrderListQuerySchema), async (req, res, next) => {
   try {
     const { page, pageSize, status, vendorId, branchId, customerId, paymentStatus, createdFrom, createdTo, search } = req.validatedQuery as ReturnType<typeof OrderListQuerySchema.parse>;
-    const { items, total } = await orderService.listOrders(req.user!.sub, {
+    const { items, total } = await orderService.listOrders(req.user!.sub, res.locals.orderScope, {
       page,
       pageSize,
       status,
@@ -243,7 +245,7 @@ router.get('/', requireOrdersOrVendorSelf('view'), validateQuery(OrderListQueryS
 
 router.get('/:id', requireOrdersOrVendorSelf('view'), validateParams(UuidParamSchema), async (req, res, next) => {
   try {
-    sendData(res, await orderService.getOrderOrThrow(req.user!.sub, req.params.id));
+    sendData(res, await orderService.getOrderOrThrow(req.user!.sub, res.locals.orderScope, req.params.id));
   } catch (err) {
     next(err);
   }
@@ -256,7 +258,7 @@ router.patch(
   validateBody(OrderStatusUpdateSchema),
   async (req, res, next) => {
     try {
-      const order = await orderService.setOrderStatus(req.user!.sub, req.params.id, req.body.status, req.body.cancellationReason);
+      const order = await orderService.setOrderStatus(req.user!.sub, res.locals.orderScope, req.params.id, req.body.status, req.body.cancellationReason);
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'order.status_change',

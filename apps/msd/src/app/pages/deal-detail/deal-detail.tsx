@@ -1,3 +1,4 @@
+import { JsonLd } from '../../seo/json-ld';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
@@ -227,10 +228,8 @@ showSnackbar(`Added "${deal.title}" to your cart.`, {
         name="description"
         content={`${description || `Book ${name} at MSD.`} ${formatINR(salePrice)}${deal.branch?.city ? ` in ${deal.branch.city}` : ''}.`}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+      <JsonLd
+        data={{
             '@context': 'https://schema.org', '@type': 'Service',
             name,
             description,
@@ -241,8 +240,7 @@ showSnackbar(`Added "${deal.title}" to your cart.`, {
               priceCurrency: 'INR',
               availability: 'https://schema.org/InStock',
             },
-          }),
-        }}
+          }}
       />
       <Breadcrumb
         className="deal-detail__breadcrumb"

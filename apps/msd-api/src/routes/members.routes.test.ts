@@ -6,6 +6,11 @@ vi.mock('../lib/prisma', async () => {
   return { prisma: createPrismaMock() };
 });
 vi.mock('../services/permission-resolver.service', () => ({ resolveGrantedPermissionKeys: vi.fn() }));
+// Signed links need no R2 credentials in tests.
+vi.mock('../lib/media-storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/media-storage')>()),
+  signedFileUrl: vi.fn(async (key: string) => `https://signed.example/${key}`),
+}));
 vi.mock('../services/member-notice.service', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../services/member-notice.service')>()),
   sendMemberNotice: vi.fn().mockResolvedValue({ email: true, sms: true }),
@@ -281,7 +286,9 @@ describe('GET /api/v1/members/:id/documents', () => {
     prismaMock.memberDocument.findMany.mockResolvedValue([row]);
     const res = await request(app).get(`/api/v1/members/${MEMBER_ID}/documents`).set('Authorization', ADMIN);
     expect(res.status).toBe(200);
-    expect(res.body.data[0].storageKey).toBe(row.storageKey);
+    // An expiring signed link, never the object key (P5-14).
+    expect(res.body.data[0].fileUrl).toBe(`https://signed.example/${row.storageKey}`);
+    expect(res.body.data[0]).not.toHaveProperty('storageKey');
     expect(res.body.data[0]).not.toHaveProperty('numberEncrypted');
   });
 });

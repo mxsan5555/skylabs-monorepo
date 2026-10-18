@@ -1,8 +1,8 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Divider, Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { AccountProvider } from '../../../account/account-context';
-import { isDualRoleUser, setExperienceMode } from '../../../auth/role-routing';
+import { isCustomerAccountUser, isDualRoleUser, setExperienceMode } from '../../../auth/role-routing';
 import './my-account.css';
 import { showSnackbar } from '../../../snackbar/snackbar';
 import { Breadcrumb } from '../../components/breadcrumb';
@@ -57,6 +57,11 @@ const currentPage = breadcrumbLabels[location.pathname] ?? 'My Account';
     signOut();
     showSnackbar('You have been logged out successfully.', { variant: 'success' });
   };
+
+  // Staff use the admin console; a pasted /my-dashboard (or any customer account URL) goes there.
+  if (bootstrap && !isCustomerAccountUser(bootstrap)) {
+    return <Navigate to="/account/dashboard" replace />;
+  }
 
   return (
     <AccountProvider>

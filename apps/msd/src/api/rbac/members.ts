@@ -34,8 +34,8 @@ export interface MemberDocumentRow {
   uploadedByUserId: string | null;
   createdAt: string;
   updatedAt: string;
-  /** Present only for roles that may open files. */
-  storageKey?: string;
+  /** Present only for roles that may open files: a signed link that expires after 5 minutes. */
+  fileUrl?: string | null;
   originalFilename?: string | null;
 }
 
