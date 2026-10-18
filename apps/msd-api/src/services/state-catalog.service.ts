@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import { Prisma } from '../generated/prisma-client';
+import { VISIBLE_DEAL_WHERE, VISIBLE_PRODUCT_WHERE } from './catalog-visibility';
 
 /**
  * "Items in a state" for the home slider and CTA banner consoles (docs/msd/PLANNING.md §6, §7).
@@ -40,6 +41,8 @@ export async function searchStateItems(opts: {
   q: string;
   type: StateItemType | 'all';
   pageSize: number;
+  /** Only items customers can see right now (the storefront bar). */
+  eligibleOnly?: boolean;
 }): Promise<StateItem[]> {
   const q = opts.q.trim();
   const contains = (value: string) => ({ contains: value, mode: 'insensitive' as const });
@@ -50,6 +53,7 @@ export async function searchStateItems(opts: {
       : await prisma.deal.findMany({
           where: {
             ...dealInStateWhere(opts.state),
+            ...(opts.eligibleOnly ? VISIBLE_DEAL_WHERE : {}),
             ...(q
               ? { OR: [{ title: contains(q) }, { vendor: { businessName: contains(q) } }, { branch: { name: contains(q) } }] }
               : {}),
@@ -74,6 +78,7 @@ export async function searchStateItems(opts: {
       : await prisma.product.findMany({
           where: {
             ...productInStateWhere(opts.state),
+            ...(opts.eligibleOnly ? VISIBLE_PRODUCT_WHERE : {}),
             ...(q ? { OR: [{ name: contains(q) }, { brand: contains(q) }, { vendor: { businessName: contains(q) } }] } : {}),
           },
           orderBy: { createdAt: 'desc' },

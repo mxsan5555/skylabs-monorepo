@@ -95,3 +95,11 @@ describe('assertItemInState', () => {
     await expect(assertItemInState('product', 'missing', null)).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
   });
 });
+
+describe('searchStateItems — only visible to customers', () => {
+  it('adds the storefront bar to both queries', async () => {
+    await searchStateItems({ state: 'Delhi', q: '', type: 'all', pageSize: 8, eligibleOnly: true });
+    expect(prismaMock.deal.findMany.mock.calls[0][0]!.where).toMatchObject({ status: 'ACTIVE', approvalStatus: 'APPROVED' });
+    expect(prismaMock.product.findMany.mock.calls[0][0]!.where).toMatchObject({ isActive: true });
+  });
+});

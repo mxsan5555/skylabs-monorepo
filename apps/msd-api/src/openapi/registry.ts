@@ -84,7 +84,13 @@ import { VerifyPaymentSchema, OrderBatchSchema, VerifyBatchPaymentSchema } from 
 import { NotificationListQuerySchema } from '../schemas/notification.schema';
 import { DashboardStatsResponseSchema } from '../schemas/dashboard.schema';
 import { MediaReorderSchema } from '../schemas/media.schema';
-import { HomeHeroSlideCreateSchema, HomeHeroSlideUpdateSchema, PublicHomeHeroQuerySchema, StateItemSearchQuerySchema } from '../schemas/home-hero.schema';
+import {
+  HomeHeroReorderSchema,
+  HomeHeroSlideCreateSchema,
+  HomeHeroSlideUpdateSchema,
+  PublicHomeHeroQuerySchema,
+  StateItemSearchQuerySchema,
+} from '../schemas/home-hero.schema';
 import { PromotionCreateSchema, PromotionUpdateSchema, PublicBannerQuerySchema } from '../schemas/promotion.schema';
 import { ReportFiltersQuerySchema, TopListQuerySchema, TopVendorsQuerySchema } from '../schemas/reports.schema';
 
@@ -1643,6 +1649,25 @@ export function buildOpenApiDocument() {
     security: bearer,
     request: { body: { content: { 'application/json': { schema: HomeHeroSlideCreateSchema } } } },
     responses: { 201: { description: 'Slide' }, 409: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/home-hero/overview',
+    summary: 'One row per slider (Global first, then each state): status, eligible count, deals, products, last change',
+    tags: ['Masters'],
+    security: bearer,
+    responses: { 200: { description: 'Sliders' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'put',
+    path: '/home-hero/slides/order',
+    summary: "Save a slider's whole order; slideIds must be exactly that slider's slides (masters.home-hero:edit)",
+    tags: ['Masters'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: HomeHeroReorderSchema } } } },
+    responses: { 200: { description: 'Saved' }, 422: errorResponse },
   });
 
   registry.registerPath({

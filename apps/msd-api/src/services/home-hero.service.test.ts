@@ -6,7 +6,15 @@ vi.mock('../lib/prisma', async () => {
 });
 
 import { prisma } from '../lib/prisma';
-import { getPublicHomeHero, countEligibleSlides, createSlide, MIN_ELIGIBLE_SLIDES } from './home-hero.service';
+import {
+  getPublicHomeHero,
+  countEligibleSlides,
+  createSlide,
+  ineligibleReason,
+  listSliderOverview,
+  reorderSlides,
+  MIN_ELIGIBLE_SLIDES,
+} from './home-hero.service';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -137,5 +145,70 @@ describe('createSlide (PLANNING §7)', () => {
     prismaMock.homeHeroSlide.findFirst.mockResolvedValue({ id: 'existing' } as never);
     await expect(createSlide({ itemType: 'deal', itemId: PRODUCT_ID, state: null, sortOrder: 0 })).rejects.toMatchObject({ code: 'CONFLICT' });
     expect(prismaMock.homeHeroSlide.findFirst.mock.calls[0][0]!.where).toEqual({ state: null, dealId: PRODUCT_ID });
+  });
+});
+
+describe('listSliderOverview (D28)', () => {
+  const at = new Date('2026-10-18T10:00:00Z');
+  const deal = (ok: boolean) => ({
+    status: ok ? 'ACTIVE' : 'INACTIVE',
+    approvalStatus: 'APPROVED',
+    vendor: { status: 'ACTIVE' },
+    branch: { isActive: true },
+  });
+  const product = { isActive: true, vendor: { status: 'ACTIVE' } };
+
+  it('lists Global first, then each state, with status, progress and counts', async () => {
+    prismaMock.homeHeroSlide.findMany.mockResolvedValue([
+      ...Array.from({ length: 5 }, (_, i) => ({ state: null, isActive: true, updatedAt: at, deal: deal(true), product: null, id: `g${i}` })),
+      { state: 'Delhi', isActive: true, updatedAt: at, deal: deal(true), product: null, id: 'd1' },
+      { state: 'Delhi', isActive: true, updatedAt: at, deal: null, product, id: 'd2' },
+      { state: 'Delhi', isActive: true, updatedAt: at, deal: deal(false), product: null, id: 'd3' },
+    ] as never);
+    const rows = await listSliderOverview();
+    expect(rows).toEqual([
+      { state: null, status: 'LIVE', eligibleCount: 5, minimumRequired: 5, deals: 5, products: 0, updatedAt: at },
+      { state: 'Delhi', status: 'DRAFT', eligibleCount: 2, minimumRequired: 5, deals: 2, products: 1, updatedAt: at },
+    ]);
+  });
+
+  it('always lists Global, even with no slides', async () => {
+    prismaMock.homeHeroSlide.findMany.mockResolvedValue([]);
+    expect(await listSliderOverview()).toEqual([
+      { state: null, status: 'EMPTY', eligibleCount: 0, minimumRequired: 5, deals: 0, products: 0, updatedAt: null },
+    ]);
+  });
+});
+
+describe('reorderSlides', () => {
+  const ID = (n: number) => `a1a1a1a1-0000-4000-8000-00000000000${n}`;
+
+  it('saves the new order in one transaction', async () => {
+    prismaMock.homeHeroSlide.findMany.mockResolvedValue([{ id: ID(1) }, { id: ID(2) }, { id: ID(3) }] as never);
+    prismaMock.homeHeroSlide.update.mockImplementation(((args: unknown) => args) as never);
+    prismaMock.$transaction.mockResolvedValue([] as never);
+    await reorderSlides('Delhi', [ID(3), ID(1), ID(2)]);
+    expect(prismaMock.homeHeroSlide.findMany.mock.calls[0][0]!.where).toEqual({ state: 'Delhi' });
+    expect(prismaMock.homeHeroSlide.update.mock.calls.map((c) => c[0])).toEqual([
+      { where: { id: ID(3) }, data: { sortOrder: 0 } },
+      { where: { id: ID(1) }, data: { sortOrder: 1 } },
+      { where: { id: ID(2) }, data: { sortOrder: 2 } },
+    ]);
+  });
+
+  it('refuses an order that is not exactly this slider’s slides', async () => {
+    prismaMock.homeHeroSlide.findMany.mockResolvedValue([{ id: ID(1) }, { id: ID(2) }] as never);
+    await expect(reorderSlides(null, [ID(1)])).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    await expect(reorderSlides(null, [ID(1), ID(9)])).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+  });
+});
+
+describe('admin slide rows', () => {
+  it('say why an item is hidden from customers', () => {
+    expect(ineligibleReason({ deal: { status: 'ACTIVE', approvalStatus: 'APPROVED', vendor: { status: 'ACTIVE' }, branch: { isActive: false } }, product: null })).toBe('Branch paused');
+    expect(ineligibleReason({ deal: { status: 'DRAFT', approvalStatus: 'APPROVED', vendor: { status: 'ACTIVE' }, branch: { isActive: true } }, product: null })).toBe('Deal is draft');
+    expect(ineligibleReason({ deal: null, product: { isActive: true, vendor: { status: 'SUSPENDED' } } })).toBe('Member is suspended');
+    expect(ineligibleReason({ deal: null, product: { isActive: false, vendor: { status: 'ACTIVE' } } })).toBe('Product is paused');
+    expect(ineligibleReason({ deal: null, product: { isActive: true, vendor: { status: 'ACTIVE' } } })).toBeNull();
   });
 });

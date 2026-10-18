@@ -108,6 +108,10 @@ ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list
 - axe (WCAG 2.2 AA) clean on `/` in light, dark and high-contrast; no horizontal scroll at 320,
   390, 768 and 1280 px; full keyboard path (skip link, header, panels, tab bar, footer); Lighthouse
   SEO and Accessibility 100 and LCP under 2.5 s on mobile for `/`.
+- Home slider console (D28): the overview lists Global first with each slider's status and progress;
+  a row opens its builder; New state slider offers only states without one; the builder lists the
+  state's visible items without typing, Add turns into Added, reorder saves the whole order and
+  reverts on failure, remove offers Undo, a hidden item says why.
 - Home slider: nothing can be added before a state is chosen; the search lists only that state's
   deals and products (a product through any active branch of its member); an item outside the
   state is 422 and a duplicate 409; a state with 5 eligible slides serves them, otherwise Global;

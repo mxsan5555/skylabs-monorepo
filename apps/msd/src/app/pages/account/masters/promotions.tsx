@@ -620,6 +620,8 @@ function BannerFormDialog({
               base="/promotions"
               state={state}
               pickLabel="Select"
+              pickedLabel="Selected"
+              excludeIds={form.item ? [form.item.id] : []}
               onPick={(item: StateItem) => set('item', { type: item.type, id: item.id, title: item.title })}
             />
             {(fieldErrors?.dealId || fieldErrors?.productId) && (

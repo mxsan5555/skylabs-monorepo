@@ -10,6 +10,7 @@ import {
   HomeHeroSlideStatusUpdateSchema,
   HomeHeroSlideListQuerySchema,
   StateItemSearchQuerySchema,
+  HomeHeroReorderSchema,
 } from '../schemas/home-hero.schema';
 import * as homeHeroService from '../services/home-hero.service';
 import { searchStateItems } from '../services/state-catalog.service';
@@ -44,8 +45,34 @@ router.get('/slides', requirePermission('masters.home-hero', 'view'), validateQu
 
 router.get('/search-items', requirePermission('masters.home-hero', 'view'), validateQuery(StateItemSearchQuerySchema), async (req, res, next) => {
   try {
-    const { state, q, type, pageSize } = req.validatedQuery as ReturnType<typeof StateItemSearchQuerySchema.parse>;
-    sendData(res, await searchStateItems({ state: state || null, q: q ?? '', type, pageSize }));
+    const { state, q, type, pageSize, eligibleOnly } = req.validatedQuery as ReturnType<typeof StateItemSearchQuerySchema.parse>;
+    sendData(res, await searchStateItems({ state: state || null, q: q ?? '', type, pageSize, eligibleOnly }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** One row per slider for the overview table (D28). */
+router.get('/overview', requirePermission('masters.home-hero', 'view'), async (_req, res, next) => {
+  try {
+    sendData(res, await homeHeroService.listSliderOverview());
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/slides/order', requirePermission('masters.home-hero', 'edit'), validateBody(HomeHeroReorderSchema), async (req, res, next) => {
+  try {
+    await homeHeroService.reorderSlides(req.body.state, req.body.slideIds);
+    await writeAuditLog({
+      actorUserId: req.user!.sub,
+      action: 'home_hero_slide.reorder',
+      targetType: 'HomeHeroSlider',
+      targetId: req.body.state ?? 'global',
+      after: { slideIds: req.body.slideIds },
+      ...requestMeta(req),
+    });
+    sendData(res, { reordered: true });
   } catch (err) {
     next(err);
   }

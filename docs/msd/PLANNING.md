@@ -253,16 +253,24 @@ VCED, admin VCE, marketing V, D8). Decided 2026-10-18:
 Home hero slider, managed under Masters → Home hero (`/account/masters/home-hero`). Decided
 2026-10-18:
 
-1. **Choose the state first** (or Global/Default). Nothing can be added before a state is chosen.
-2. **Search and add:** a search box lists that state's deals and products together (filter Deals,
-   Products or All) by title, member or branch; pick one to add it as a slide. A deal belongs to its
+1. **Overview first (D28).** The Home hero page is a table of every slider: Global / Default
+   (always first) and each state that has one, with its status (Live, Draft, Empty), progress to
+   live (eligible items out of 5), deal and product counts and last change. **New state slider**
+   lists the states with an active branch that have no slider yet. Edit opens that slider's
+   builder.
+2. **Builder, no dialogs.** One page per slider: the ordered slides on the left, the **Add** panel
+   on the right (tabs on phones). The Add panel lists that state's deals and products at once,
+   newest first, with All / Deals / Products, a search by title, member or branch, and "Only
+   visible to customers" on by default. **Add** turns into **Added** in place. A deal belongs to its
    branch's state; a product belongs to every state where its member has an active branch (D23).
    The same item cannot be added twice to one slider.
 3. **Each slide is a live item:** it shows the deal's or product's current title, price and image;
-   slides have a sort order and can be paused.
+   slides are ordered by dragging (or the move up / move down buttons) and can be switched off. A
+   slide whose item customers cannot see says why (for example "branch paused").
 4. **Visitors see their state's slider** (from their location) once it has at least 5 eligible
    slides (slide, item, branch and member all active); until then, and for visitors with no
-   location, the Global/Default slider shows. The console shows "n/5 eligible".
+   location, the Global/Default slider shows. The console shows progress ("3 of 5 to go live") as a
+   draft, not an error.
 5. **Storefront hero (D26):** the h1 and search stay on the left; the right side becomes a carousel
    of larger cards (image, title, member, price, Book or Buy button) mixing deals and products.
 
@@ -348,6 +356,7 @@ expire after 5 minutes (ARCHITECTURE.md §12.3).
 | D24 | Banner colours | Theme colour roles only, no free colours (2026-10-18) |
 | D25 | Banner placement | Named slots, several per banner (2026-10-18) |
 | D26 | Home hero layout | Keep h1 and search on the left; larger mixed deal and product card carousel on the right (2026-10-18) |
+| D28 | Home slider console | Overview table of every state slider, then a two-pane builder with no dialogs (2026-10-18) |
 | D27 | Member order changes | None: members view own orders only (2026-10-18) |
 | B2 | Vendor rename | Prisma `Vendor` → `Member`, `VendorDocument` → `MemberDocument` with `@@map`; FK columns stay `vendorId` |
 | B5 | Permission key | `vendors` → `members`; role `vendor` → `member`; role `support` added |

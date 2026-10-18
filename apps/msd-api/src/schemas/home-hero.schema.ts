@@ -35,9 +35,19 @@ export const StateItemSearchQuerySchema = z
     state: z.string().max(100).optional(),
     q: z.string().max(200).optional(),
     type: z.enum(['deal', 'product', 'all']).default('all'),
-    pageSize: z.coerce.number().int().min(1).max(20).default(8),
+    pageSize: z.coerce.number().int().min(1).max(48).default(12),
+    eligibleOnly: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
   })
   .strict();
+
+/** Save a slider's order: `state` null = Global / Default; every slide id exactly once. */
+export const HomeHeroReorderSchema = z
+  .object({
+    state: z.string().trim().min(1).max(100).nullable(),
+    slideIds: z.array(z.string().uuid()).min(1).max(100),
+  })
+  .strict()
+  .openapi('HomeHeroReorder');
 
 export const PublicHomeHeroQuerySchema = z.object({
   state: z.string().max(100).optional(),

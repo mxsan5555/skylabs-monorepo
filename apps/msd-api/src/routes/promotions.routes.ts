@@ -44,8 +44,8 @@ router.get('/', requirePermission('masters.promotions', 'view'), validateQuery(P
 
 router.get('/search-items', requirePermission('masters.promotions', 'view'), validateQuery(StateItemSearchQuerySchema), async (req, res, next) => {
   try {
-    const { state, q, type, pageSize } = req.validatedQuery as ReturnType<typeof StateItemSearchQuerySchema.parse>;
-    sendData(res, await searchStateItems({ state: state || null, q: q ?? '', type, pageSize }));
+    const { state, q, type, pageSize, eligibleOnly } = req.validatedQuery as ReturnType<typeof StateItemSearchQuerySchema.parse>;
+    sendData(res, await searchStateItems({ state: state || null, q: q ?? '', type, pageSize, eligibleOnly }));
   } catch (err) {
     next(err);
   }

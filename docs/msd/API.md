@@ -470,19 +470,27 @@ Planned: every content route moves from the `cms.*` keys to `content:<action>` (
 |---|---|---|
 | GET | `/api/v1/catalog/home-hero` | public |
 | GET | `/api/v1/home-hero/eligible-count` | `masters.home-hero:view` |
+| GET | `/api/v1/home-hero/overview` | `masters.home-hero:view` |
 | GET | `/api/v1/home-hero/search-items` | `masters.home-hero:view` |
 | GET | `/api/v1/home-hero/slides` | `masters.home-hero:view` |
 | POST | `/api/v1/home-hero/slides` | `masters.home-hero:create` |
+| PUT | `/api/v1/home-hero/slides/order` | `masters.home-hero:edit` |
 | GET | `/api/v1/home-hero/slides/:id` | `masters.home-hero:view` |
 | PATCH | `/api/v1/home-hero/slides/:id` | `masters.home-hero:edit` |
 | DELETE | `/api/v1/home-hero/slides/:id` | `masters.home-hero:delete` |
 | PATCH | `/api/v1/home-hero/slides/:id/status` | `masters.home-hero:edit` |
 | GET | `/api/v1/home-hero/states` | `masters.home-hero:view` |
 
-- `GET /home-hero/search-items?state=&q=&type=deal|product|all&pageSize=` (same on
+- `GET /home-hero/search-items?state=&q=&type=deal|product|all&pageSize=&eligibleOnly=true|false` (same on
   `/promotions/search-items`): items of that state (deal: branch state; product: any active branch
   of its member in the state); empty `state` searches every state. Each row: `type`, `id`, `title`,
-  `memberName`, `branchName` (deals), `price`, `image`, `eligible`.
+  `memberName`, `branchName` (deals), `price`, `image`, `eligible`. Empty `q` lists the newest items
+  (browse); `pageSize` 1 to 48, default 12; `eligibleOnly=true` keeps only items customers can see.
+- `GET /home-hero/overview`: one row per slider, Global first then states by name: `state`, `status`
+  (`LIVE | DRAFT | EMPTY`), `eligibleCount`, `minimumRequired`, `deals`, `products`, `updatedAt`.
+- `PUT /home-hero/slides/order` `{ state, slideIds }`: saves the whole order of one slider;
+  `slideIds` must be exactly that slider's slides (422 otherwise). Audited as `home_hero_slide.reorder`.
+- Admin slide rows also carry `image`, `price` and `ineligibleReason` ("Branch paused", ...).
 - Slide create body: `itemType` `deal | product`, `itemId`, `state` (null = Global), `sortOrder`.
   Item outside the state is 422; the same item twice in one slider is 409. Update accepts `sortOrder`
   only.

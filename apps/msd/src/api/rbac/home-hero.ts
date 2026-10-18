@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from './client';
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from './client';
 
 export const MIN_ELIGIBLE_SLIDES = 5;
 
@@ -16,6 +16,11 @@ export interface HomeHeroSlide {
   itemType: StateItemType;
   /** Customers can see the slide's deal or product right now. */
   itemEligible: boolean;
+  /** Why they cannot ("Branch paused"), or null. */
+  ineligibleReason: string | null;
+  /** Primary image storage key and current price of the item. */
+  image: string | null;
+  price: string | null;
   deal: {
     id: string;
     title: string;
@@ -40,6 +45,25 @@ export interface HomeHeroSlideInput {
   state: string | null;
   sortOrder?: number;
 }
+
+export type SliderStatus = 'LIVE' | 'DRAFT' | 'EMPTY';
+
+/** One row of the overview table (D28); `state: null` is Global / Default. */
+export interface SliderOverviewRow {
+  state: string | null;
+  status: SliderStatus;
+  eligibleCount: number;
+  minimumRequired: number;
+  deals: number;
+  products: number;
+  updatedAt: string | null;
+}
+
+/** Builder URL segment for a slider: `global` for Global / Default, else the state name. */
+export const GLOBAL_SLUG = 'global';
+export const sliderPath = (state: string | null) =>
+  `/account/masters/home-hero/${state === null ? GLOBAL_SLUG : encodeURIComponent(state)}`;
+export const stateFromSlug = (slug: string): string | null => (slug === GLOBAL_SLUG ? null : slug);
 
 export interface EligibleCount {
   state: string | null;
@@ -101,12 +125,27 @@ export function getHomeHeroEligibleCount(token: string | null, state: string | n
 export function searchStateItems(
   token: string | null,
   base: '/home-hero' | '/promotions',
-  opts: { state: string | null; q: string; type: StateItemType | 'all'; pageSize?: number },
+  opts: { state: string | null; q: string; type: StateItemType | 'all'; pageSize?: number; eligibleOnly?: boolean },
 ) {
   return apiGet<StateItem[]>(
-    `${base}/search-items${toQuery({ state: opts.state ?? undefined, q: opts.q, type: opts.type, pageSize: opts.pageSize })}`,
+    `${base}/search-items${toQuery({
+      state: opts.state ?? undefined,
+      q: opts.q,
+      type: opts.type,
+      pageSize: opts.pageSize,
+      eligibleOnly: opts.eligibleOnly ? 'true' : undefined,
+    })}`,
     token,
   );
+}
+
+export function listHomeHeroOverview(token: string | null) {
+  return apiGet<SliderOverviewRow[]>('/home-hero/overview', token);
+}
+
+/** Saves the whole order of one slider at once. */
+export function reorderHomeHeroSlides(token: string | null, state: string | null, slideIds: string[]) {
+  return apiPut<{ reordered: boolean }>('/home-hero/slides/order', token, { state, slideIds });
 }
 
 export function createHomeHeroSlide(token: string | null, input: HomeHeroSlideInput) {

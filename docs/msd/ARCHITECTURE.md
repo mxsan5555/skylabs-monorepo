@@ -182,8 +182,13 @@ category page, explore, deal detail and product detail.
 - **State search** (`services/state-catalog.service.ts`, `searchStateItems`): shared by the home
   hero and CTA banner consoles. Deals match on `branch.state`; products on any active branch of
   their member in the state. Eligibility reuses `VISIBLE_DEAL_WHERE` / `VISIBLE_PRODUCT_WHERE`.
-- **Console:** State picker first; the add dialog uses `StateItemPicker`
-  (`pages/account/masters/state-item-picker.tsx`: Deals / Products / All, search, Add).
+- **Console (D28):** `pages/account/masters/home-hero.tsx` is the overview table (`GET
+  /home-hero/overview`, New state slider menu); `home-hero-builder.tsx` at
+  `/account/masters/home-hero/:state` (`global` = Global / Default) is the builder: ordered slide
+  cards (drag or move buttons, saved with `PUT /home-hero/slides/order`; on/off switch; remove with
+  Undo in the snackbar) beside `StateItemPicker` (`state-item-picker.tsx`: browses the state at once,
+  All / Deals / Products, search, "Only visible to customers", Show more, Add then Added). Panes sit
+  side by side from 1024px, tabs below. The CTA banner form uses the same picker.
 - **Publish rule:** a state's slider is served once it has 5 eligible slides
   (`MIN_ELIGIBLE_SLIDES`), else the Global/Default slider, else the single-deal spotlight fallback.
 - **Storefront** (`pages/home/home-hero.tsx`): h1 and search left; right side a Swiper carousel of
