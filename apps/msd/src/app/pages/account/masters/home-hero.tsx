@@ -1,16 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
 import type { MdFilledButton } from '@material/web/button/filled-button.js';
-import {
-  Dialog,
-  FilledButton,
-  OutlinedButton,
-  OutlinedTextField,
-  OutlinedSelect,
-  SelectOption,
-  TextButton,
-  Icon,
-} from '@skylabs-monorepo/shared-ui/react';
+import { Dialog, FilledButton, OutlinedButton, OutlinedTextField, TextButton, Icon } from '@skylabs-monorepo/shared-ui/react';
 import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import {
@@ -20,23 +11,23 @@ import {
   listHomeHeroSlides,
   MIN_ELIGIBLE_SLIDES,
   setHomeHeroSlideStatus,
+  slideTitle,
   updateHomeHeroSlide,
   type EligibleCount,
   type HomeHeroSlide,
-  type HomeHeroSlideInput,
+  type StateItem,
 } from '../../../../api/rbac/home-hero';
-import { listCatalogLocations } from '../../../../api/catalog';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
-import { DealPicker } from './promotions';
-
-const GLOBAL_LABEL = 'Global / Default';
+import { StateItemPicker } from './state-item-picker';
+import { GLOBAL_LABEL, StatePicker, useBranchStates, type ChosenState } from './state-picker';
 
 const STATUS_COLUMN = { key: 'Status', label: 'Status', type: 'status', statusMap: { Active: 'success', Inactive: 'error' } };
 
 const COLUMNS = JSON.stringify([
-  { key: 'Deal', label: 'Deal' },
-  { key: 'Vendor', label: 'Vendor' },
+  { key: 'Type', label: 'Type' },
+  { key: 'Item', label: 'Item' },
+  { key: 'Member', label: 'Member' },
   { key: 'Branch', label: 'Branch' },
   { key: 'Sort Order', label: 'Sort Order' },
   { key: 'Eligible', label: 'Eligible', type: 'status', statusMap: { Yes: 'success', No: 'error' } },
@@ -51,12 +42,10 @@ interface TableParams {
 const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 20 };
 
 /**
- * Home page "Home Hero" (state-wise Deal slider) admin CRUD (`masters.home-hero`) — an admin
- * picks a State (or the Global/Default slider), then manages that slider's ordered slide list,
- * each slide always a live reference to an existing Deal (never a duplicated one — see
- * `HomeHeroSlide`'s schema doc comment). A state's slider only ever goes public once it has
- * `MIN_ELIGIBLE_SLIDES` (5) currently-eligible slides — the "X/5 eligible" indicator here makes
- * that requirement visible before the admin thinks it's live.
+ * Home hero slider console (`masters.home-hero`; docs/msd/PLANNING.md §7). Choose a state (or
+ * Global/Default) first, then search that state's deals and products and add them. A slider goes
+ * public once it has `MIN_ELIGIBLE_SLIDES` (5) eligible slides; the "n/5 eligible" line says how
+ * far along it is.
  */
 export function HomeHeroManagement() {
   const { token, can } = useAuth();
@@ -65,11 +54,12 @@ export function HomeHeroManagement() {
   const canEdit = can('masters.home-hero', 'edit');
   const canDelete = can('masters.home-hero', 'delete');
 
-  const [states, setStates] = useState<string[]>([]);
-  const [selectedState, setSelectedState] = useState<string | null>(null); // null = Global/Default
+  const states = useBranchStates();
+  /** `undefined` until the admin chooses; `null` = Global/Default. */
+  const [selectedState, setSelectedState] = useState<ChosenState>(undefined);
   const [slides, setSlides] = useState<HomeHeroSlide[]>([]);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [params, setParams] = useState<TableParams>(DEFAULT_PARAMS);
   const [eligible, setEligible] = useState<EligibleCount | null>(null);
   const [message, setMessage] = useState('');
@@ -80,13 +70,11 @@ export function HomeHeroManagement() {
   const editDialogRef = useRef<MdDialog>(null);
   const tableRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    listCatalogLocations()
-      .then(({ data }) => setStates([...new Set((data ?? []).map((l) => l.state))].sort()))
-      .catch(() => setStates([]));
-  }, []);
+  const stateChosen = selectedState !== undefined;
+  const stateLabel = selectedState ?? GLOBAL_LABEL;
 
   const load = useCallback(async () => {
+    if (selectedState === undefined) return;
     setLoading(true);
     setError('');
     try {
@@ -108,20 +96,24 @@ export function HomeHeroManagement() {
     load();
   }, [load]);
 
-  const save = async (input: HomeHeroSlideInput, existing?: HomeHeroSlide) => {
-    const withState = { ...input, state: selectedState };
-    if (existing) {
-      const { data } = await updateHomeHeroSlide(token, existing.id, withState);
-      setSlides((prev) => prev.map((s) => (s.id === data.id ? data : s)));
-      setMessage('Saved.');
-      return data;
+  const addItem = async (item: StateItem) => {
+    if (selectedState === undefined) return;
+    setError('');
+    try {
+      const nextSort = slides.reduce((max, s) => Math.max(max, s.sortOrder + 1), 0);
+      await createHomeHeroSlide(token, { itemType: item.type, itemId: item.id, state: selectedState, sortOrder: nextSort });
+      setMessage(`Added "${item.title}" to ${stateLabel}.`);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'Could not add this item.');
     }
-    const { data } = await createHomeHeroSlide(token, withState);
-    setSlides((prev) => [...prev, data]);
-    setTotal((t) => t + 1);
+  };
+
+  const saveSortOrder = async (slide: HomeHeroSlide, sortOrder: number) => {
+    const { data } = await updateHomeHeroSlide(token, slide.id, { sortOrder });
+    setSlides((prev) => prev.map((s) => (s.id === data.id ? data : s)));
     setMessage('Saved.');
     load();
-    return data;
   };
 
   const toggleStatus = async (slide: HomeHeroSlide) => {
@@ -136,7 +128,7 @@ export function HomeHeroManagement() {
   };
 
   const remove = async (slide: HomeHeroSlide) => {
-    if (!(await confirm(`Remove "${slide.deal.title}" from this slider? This cannot be undone.`))) return;
+    if (!(await confirm(`Remove "${slideTitle(slide)}" from this slider? This cannot be undone.`))) return;
     setError('');
     try {
       await deleteHomeHeroSlide(token, slide.id);
@@ -152,11 +144,12 @@ export function HomeHeroManagement() {
     () =>
       JSON.stringify(
         slides.map((slide) => ({
-          Deal: slide.deal.title,
-          Vendor: slide.deal.vendor.businessName,
-          Branch: slide.deal.branch.name,
+          Type: slide.itemType === 'deal' ? 'Deal' : 'Product',
+          Item: slideTitle(slide),
+          Member: slide.deal?.vendor.businessName ?? slide.product?.vendor.businessName ?? '',
+          Branch: slide.deal?.branch.name ?? '—',
           'Sort Order': slide.sortOrder,
-          Eligible: slide.dealEligible ? 'Yes' : 'No',
+          Eligible: slide.itemEligible ? 'Yes' : 'No',
           Status: slide.isActive ? 'Active' : 'Inactive',
         })),
       ),
@@ -202,7 +195,7 @@ export function HomeHeroManagement() {
       el.removeEventListener('sky-dt-row-action', onRowAction);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slides]);
+  }, [slides, stateChosen]);
 
   const eligibleCount = eligible?.eligibleCount ?? 0;
   const publishable = eligibleCount >= MIN_ELIGIBLE_SLIDES;
@@ -213,69 +206,86 @@ export function HomeHeroManagement() {
       <header className="page-head">
         <div>
           <h1>Home Hero</h1>
-          <p>State-wise Home page hero Deal slider. A slider only goes public once it has {MIN_ELIGIBLE_SLIDES}+ eligible Deals.</p>
+          <p>
+            Choose a state, then add its deals and products. A slider goes public once it has {MIN_ELIGIBLE_SLIDES} eligible
+            items; until then visitors see the Global / Default slider.
+          </p>
         </div>
         <div className="page-head__actions">
-          {canCreate && (
+          {canCreate && stateChosen && (
             <OutlinedButton onClick={() => addDialogRef.current?.show()}>
               <Icon slot="icon" aria-hidden="true">add</Icon>
-              Add slide
+              Add items
             </OutlinedButton>
           )}
         </div>
       </header>
 
-      <OutlinedSelect
-        label="State"
-        value={selectedState ?? ''}
-        onChange={(e: Event) => {
-          const value = (e.target as HTMLSelectElement).value;
-          setSelectedState(value || null);
+      <StatePicker
+        states={states}
+        value={selectedState}
+        onChange={(state) => {
+          setSelectedState(state);
           setParams(DEFAULT_PARAMS);
+          setMessage('');
+          if (state === undefined) setSlides([]);
         }}
-      >
-        <SelectOption value=""><div slot="headline">{GLOBAL_LABEL}</div></SelectOption>
-        {states.map((state) => (
-          <SelectOption key={state} value={state}>
-            <div slot="headline">{state}</div>
-          </SelectOption>
-        ))}
-      </OutlinedSelect>
-
-      <p className={publishable ? 'field-hint' : 'error-state'} role="status">
-        {eligibleCount}/{MIN_ELIGIBLE_SLIDES} eligible Deals for {selectedState ?? GLOBAL_LABEL}.{' '}
-        {publishable
-          ? 'This slider is publishable.'
-          : `Add ${MIN_ELIGIBLE_SLIDES - eligibleCount} more eligible Deal(s) before this slider can go public${selectedState ? ' — the Global/Default slider will show instead until then' : ''}.`}
-      </p>
-
-      {message && <p className="field-hint" role="status">{message}</p>}
-      {error && <p className="error-state" role="alert">{error}</p>}
-
-      <sky-data-table
-        ref={tableRef as RefObject<HTMLElement>}
-        caption={`${selectedState ?? GLOBAL_LABEL} slides`}
-        columns={COLUMNS}
-        rows={rows}
-        total={total}
-        page={params.page}
-        page-size={params.pageSize}
-        loading={loading}
-        actions={actions}
       />
 
-      {canCreate && (
-        <SlideFormDialog dialogRef={addDialogRef} token={token} state={selectedState} onSave={(input) => save(input)} />
+      {!stateChosen && <p className="field-hint">Choose a state (or Global / Default) to see and build its slider.</p>}
+
+      {stateChosen && (
+        <>
+          <p className={publishable ? 'field-hint' : 'error-state'} role="status">
+            {eligibleCount}/{MIN_ELIGIBLE_SLIDES} eligible items for {stateLabel}.{' '}
+            {publishable
+              ? 'This slider is live.'
+              : `Add ${MIN_ELIGIBLE_SLIDES - eligibleCount} more eligible item(s) before this slider can go public${selectedState ? ' — the Global / Default slider shows instead until then' : ''}.`}
+          </p>
+
+          {message && <p className="field-hint" role="status">{message}</p>}
+          {error && <p className="error-state" role="alert">{error}</p>}
+
+          <sky-data-table
+            ref={tableRef as RefObject<HTMLElement>}
+            caption={`${stateLabel} slides`}
+            columns={COLUMNS}
+            rows={rows}
+            total={total}
+            page={params.page}
+            page-size={params.pageSize}
+            loading={loading}
+            actions={actions}
+          />
+        </>
+      )}
+
+      {canCreate && stateChosen && (
+        <Dialog ref={addDialogRef}>
+          <div slot="headline">Add items — {stateLabel}</div>
+          <div slot="content">
+            <StateItemPicker
+              token={token}
+              base="/home-hero"
+              state={selectedState}
+              excludeIds={slides.map((s) => s.dealId ?? s.productId ?? '')}
+              onPick={addItem}
+            />
+            {message && <p className="field-hint" role="status">{message}</p>}
+            {error && <p className="error-state" role="alert">{error}</p>}
+          </div>
+          <div slot="actions">
+            <TextButton onClick={() => addDialogRef.current?.close()}>Done</TextButton>
+          </div>
+        </Dialog>
       )}
 
       {canEdit && (
-        <SlideFormDialog
+        <SortOrderDialog
           key={editingSlide?.id ?? 'edit-empty'}
           dialogRef={editDialogRef}
           slide={editingSlide ?? undefined}
-          token={token}
-          state={selectedState}
-          onSave={(input) => save(input, editingSlide ?? undefined)}
+          onSave={(sortOrder) => (editingSlide ? saveSortOrder(editingSlide, sortOrder) : Promise.resolve())}
           onClose={() => setEditingSlide(null)}
         />
       )}
@@ -284,75 +294,49 @@ export function HomeHeroManagement() {
   );
 }
 
-function SlideFormDialog({
+/** Only the order changes; to show another item, remove the slide and add a new one. */
+function SortOrderDialog({
   dialogRef,
   slide,
-  token,
-  state,
   onSave,
   onClose,
 }: {
   dialogRef: RefObject<MdDialog | null>;
   slide?: HomeHeroSlide;
-  token: string | null;
-  state: string | null;
-  onSave: (input: HomeHeroSlideInput) => Promise<HomeHeroSlide | void>;
+  onSave: (sortOrder: number) => Promise<void>;
   onClose?: () => void;
 }) {
-  const [dealId, setDealId] = useState(slide?.dealId ?? '');
-  const [dealTitle, setDealTitle] = useState(slide?.deal?.title ?? '');
   const [sortOrder, setSortOrder] = useState(slide?.sortOrder ?? 0);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const submittingRef = useRef(false);
   const saveButtonRef = useRef<MdFilledButton>(null);
 
   const submit = async () => {
-    if (submittingRef.current) return;
-    if (!dealId) {
-      setError('Select a Deal.');
-      return;
-    }
-    submittingRef.current = true;
-    if (saveButtonRef.current) saveButtonRef.current.disabled = true;
+    if (submitting) return;
     setSubmitting(true);
     setError('');
     try {
-      await onSave({ dealId, sortOrder, state });
+      await onSave(sortOrder);
       dialogRef.current?.close();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not save this slide.');
     } finally {
-      submittingRef.current = false;
-      if (saveButtonRef.current) saveButtonRef.current.disabled = false;
       setSubmitting(false);
     }
   };
 
   return (
     <Dialog ref={dialogRef} onClose={onClose}>
-      <div slot="headline">{slide ? 'Edit slide' : 'Add slide'} — {state ?? GLOBAL_LABEL}</div>
+      <div slot="headline">Sort order</div>
       <div slot="content" className="form-grid">
-        {!slide && (
-          <DealPicker
-            token={token}
-            value={dealId || null}
-            state={state ?? undefined}
-            onChange={(id, title) => {
-              setDealId(id);
-              setDealTitle(title);
-            }}
-          />
-        )}
-        {slide && <p className="field-hint">Deal: {dealTitle || dealId} (cannot be changed — remove and add a new slide instead)</p>}
-
+        {slide && <p className="field-hint">{slideTitle(slide)} (to show another item, remove this slide and add a new one)</p>}
         <OutlinedTextField
           label="Sort order"
           type="number"
+          min="0"
           value={String(sortOrder)}
           onInput={(e: Event) => setSortOrder(Number((e.target as HTMLInputElement).value) || 0)}
         />
-
         {error && <p className="error-state" role="alert">{error}</p>}
       </div>
       <div slot="actions">

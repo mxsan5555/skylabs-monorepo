@@ -324,7 +324,7 @@ never returned. Upload without `R2_PRIVATE_BUCKET` configured returns 503.
 | PATCH | `/api/v1/customers/:id/status` | `customers:status_change` |
 | GET | `/api/v1/orders` | signed in (own records, or checked in the handler) |
 | GET | `/api/v1/orders/:id` | signed in (own records, or checked in the handler) |
-| PATCH | `/api/v1/orders/:id/status` | signed in (own records, or checked in the handler) |
+| PATCH | `/api/v1/orders/:id/status` | `orders:status_change` (members get 403, D27) |
 | POST | `/api/v1/orders/checkout` | signed in (own records, or checked in the handler) |
 | GET | `/api/v1/orders/me` | signed in (own records, or checked in the handler) |
 | GET | `/api/v1/orders/me/:id` | signed in (own records, or checked in the handler) |
@@ -438,8 +438,10 @@ Planned: every content route moves from the `cms.*` keys to `content:<action>` (
 
 | Method | Path | Guard |
 |---|---|---|
-| GET | `/api/v1/catalog/promotions` | public |
+| GET | `/api/v1/catalog/banners` | public |
+| GET | `/api/v1/catalog/promotions` | public (deprecated alias of `slot=HOME_AFTER_DEALS`) |
 | GET | `/api/v1/promotions` | `masters.promotions:view` |
+| GET | `/api/v1/promotions/search-items` | `masters.promotions:view` |
 | POST | `/api/v1/promotions` | `masters.promotions:create` |
 | GET | `/api/v1/promotions/:id` | `masters.promotions:view` |
 | PATCH | `/api/v1/promotions/:id` | `masters.promotions:edit` |
@@ -450,12 +452,25 @@ Planned: every content route moves from the `cms.*` keys to `content:<action>` (
 | PATCH | `/api/v1/promotions/:id/images/reorder` | `masters.promotions:edit` |
 | PATCH | `/api/v1/promotions/:id/status` | `masters.promotions:edit` |
 
+- `GET /promotions?state=`: omit for every banner, `state=` (empty) for Global, a name for that state.
+- Create and update body: `title` 1 to 120, `description` up to 300, `buttonLabel` 1 to 40,
+  `state` (null = Global), `backgroundRole` (`BannerColorRole`), `buttonRole` (`PRIMARY | SECONDARY |
+  TERTIARY | INVERSE`), `placements`
+  (1 to 6 distinct `BannerSlot`), `destinationType` `ROUTE | CATEGORY | DEAL | PRODUCT` with the
+  matching `destinationRoute` / `categoryId` / `dealId` / `productId`, `sortOrder`, `startDate`,
+  `endDate` (end after start). A deal or product outside the banner's state is 422.
+- A second image upload is 422 (one image per banner).
+- `GET /catalog/banners?slot=&state=`: active banners inside their date window for that slot and
+  state, by `sortOrder`; when the state has none, the Global ones. Each banner: `id`, `title`,
+  `description`, `buttonLabel`, `backgroundRole`, `buttonRole`, `href`, `image`.
+
 ## 7. Home slider
 
 | Method | Path | Guard |
 |---|---|---|
 | GET | `/api/v1/catalog/home-hero` | public |
 | GET | `/api/v1/home-hero/eligible-count` | `masters.home-hero:view` |
+| GET | `/api/v1/home-hero/search-items` | `masters.home-hero:view` |
 | GET | `/api/v1/home-hero/slides` | `masters.home-hero:view` |
 | POST | `/api/v1/home-hero/slides` | `masters.home-hero:create` |
 | GET | `/api/v1/home-hero/slides/:id` | `masters.home-hero:view` |
@@ -463,6 +478,16 @@ Planned: every content route moves from the `cms.*` keys to `content:<action>` (
 | DELETE | `/api/v1/home-hero/slides/:id` | `masters.home-hero:delete` |
 | PATCH | `/api/v1/home-hero/slides/:id/status` | `masters.home-hero:edit` |
 | GET | `/api/v1/home-hero/states` | `masters.home-hero:view` |
+
+- `GET /home-hero/search-items?state=&q=&type=deal|product|all&pageSize=` (same on
+  `/promotions/search-items`): items of that state (deal: branch state; product: any active branch
+  of its member in the state); empty `state` searches every state. Each row: `type`, `id`, `title`,
+  `memberName`, `branchName` (deals), `price`, `image`, `eligible`.
+- Slide create body: `itemType` `deal | product`, `itemId`, `state` (null = Global), `sortOrder`.
+  Item outside the state is 422; the same item twice in one slider is 409. Update accepts `sortOrder`
+  only.
+- `GET /catalog/home-hero?state=`: `{ state, slides: [{ id, type, deal?, product? }] }`; a state's
+  slider with 5 or more eligible slides, else the Global one, else an empty list.
 
 ## 8. Masters
 

@@ -39,6 +39,13 @@ type SkyFeatureProps = SkySurface &
     'cta-href'?: string;
     'cta-icon'?: string;
     layout?: 'vertical' | 'horizontal';
+    /** Button role (CTA banners); default is the card's accent. */
+    ctaColor?: 'primary' | 'secondary' | 'tertiary' | 'inverse';
+    'cta-color'?: 'primary' | 'secondary' | 'tertiary' | 'inverse';
+    /** Leading media; without alt text the image is decorative. */
+    image?: string;
+    imageAlt?: string;
+    'image-alt'?: string;
   };
 
 declare module 'react' {

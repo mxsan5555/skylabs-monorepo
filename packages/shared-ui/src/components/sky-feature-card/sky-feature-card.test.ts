@@ -69,3 +69,29 @@ describe('sky-cta-banner', () => {
     expect(el.getAttribute('shape')).toBe('large');
   });
 });
+
+describe('sky-feature-card image and cta-color (CTA banners)', () => {
+  it('renders no media block by default', async () => {
+    const el = await create<SkyFeatureCard>('sky-feature-card', { headline: 'Plain' });
+    expect(el.shadowRoot?.querySelector('.media')).toBeNull();
+    expect(el.hasAttribute('cta-color')).toBe(false);
+  });
+
+  it('renders the image with its alt text, lazily', async () => {
+    const el = await create<SkyFeatureCard>('sky-feature-card', { image: '/banner.jpg', imageAlt: 'Spa room' });
+    const img = el.shadowRoot?.querySelector('.media img') as HTMLImageElement;
+    expect(img.getAttribute('src')).toBe('/banner.jpg');
+    expect(img.getAttribute('alt')).toBe('Spa room');
+    expect(img.getAttribute('loading')).toBe('lazy');
+  });
+
+  it('treats an image without alt text as decorative', async () => {
+    const el = await create<SkyFeatureCard>('sky-feature-card', { image: '/banner.jpg' });
+    expect(el.shadowRoot?.querySelector('.media img')?.getAttribute('alt')).toBe('');
+  });
+
+  it('reflects cta-color so the button can use its own M3 role', async () => {
+    const el = await create<SkyCtaBanner>('sky-cta-banner', { color: 'surface', ctaColor: 'tertiary', ctaLabel: 'Book' });
+    expect(el.getAttribute('cta-color')).toBe('tertiary');
+  });
+});

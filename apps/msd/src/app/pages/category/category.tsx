@@ -60,6 +60,7 @@ import { Seo } from '../../seo/seo';
 import { breadcrumbJsonLd } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
 import content from '../../../content.json';
+import { BannerSlot } from '../../components/banner-slot/banner-slot';
 
 const t = content.category;
 
@@ -750,6 +751,7 @@ const toggleFavorite = (deal: CatalogDeal) => {
         />
         {pills}
       </PageSection>
+      <BannerSlot slot="CATEGORY_TOP" />
       <PageSection tone="tint" stack aria-label={`${category.name} ${t.dealsAriaLabelSuffix}`}>
         <ListingToolbar
           ariaLabel={t.toolbar.label}

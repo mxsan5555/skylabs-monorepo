@@ -25,7 +25,7 @@ import { CategoryTiles } from './category-tiles';
 import { DealsNearYou } from './deals-near-you';
 import { HomeFaq } from './home-faq';
 import { HomeHero } from './home-hero';
-import { HomeOffers } from './home-offers';
+import { BannerSlot } from '../../components/banner-slot/banner-slot';
 import { HowItWorks } from './how-it-works';
 import { TreatmentDirectory } from './treatment-directory';
 import {
@@ -240,7 +240,7 @@ return (
           </CardRail>
         </PageSection>
       )}
-      <HomeOffers isAuthenticated={signedIn} />
+      <BannerSlot slot="HOME_AFTER_DEALS" />
       {ready && catalog.products.length > 0 && (
         <PageSection tone="tint" aria-labelledby="products-heading">
           <CardRail
@@ -295,6 +295,7 @@ console.log('Product:', product.name, {
           </CardRail>
         </PageSection>
       )}
+      <BannerSlot slot="HOME_AFTER_PRODUCTS" />
       <TreatmentDirectory groups={catalog.popularTreatments} />
       {ready && <HomeFaq faqs={catalog.faqs} />}
       <PageSection flush aria-labelledby="partner-heading">

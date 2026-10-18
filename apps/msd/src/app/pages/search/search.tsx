@@ -41,6 +41,7 @@ import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import content from '../../../content.json';
 import './search.css';
 import { DealMap } from '../../components/deal-map/deal-map';
+import { BannerSlot } from '../../components/banner-slot/banner-slot';
 
 const { search: searchContent } = content;
 
@@ -407,6 +408,7 @@ export function Search() {
           )}
         </div>
       </div>
+      <BannerSlot slot="EXPLORE_TOP" />
       {/* ── Results header ─────────────────────────────────────────────── */}
       <div className="search-page__content">
         <p

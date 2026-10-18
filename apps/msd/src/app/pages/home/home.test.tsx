@@ -26,7 +26,7 @@ vi.mock('../../../api/catalog', async (importOriginal) => ({
   listCatalogTherapists: (...a: unknown[]) => m.therapists(...a),
   listCatalogFaqs: (...a: unknown[]) => m.faqs(...a),
   listCatalogPopularTreatments: (...a: unknown[]) => m.popularTreatments(...a),
-  listCatalogPromotions: (...a: unknown[]) => m.promotions(...a),
+  listCatalogBanners: (...a: unknown[]) => m.promotions(...a),
   getCatalogHomeHero: (...a: unknown[]) => m.homeHero(...a),
 }));
 vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
@@ -162,10 +162,9 @@ beforeEach(() => {
         title: 'Welcome Offer',
         description: 'Introductory pricing on your first booking.',
         buttonLabel: 'Browse deals',
-        destinationType: 'ROUTE',
-        destinationRoute: '/explore',
-        category: null,
-        deal: null,
+        backgroundRole: 'SECONDARY',
+        buttonRole: 'PRIMARY',
+        href: '/explore',
         image: null,
       },
     ],
@@ -315,24 +314,57 @@ describe('Home', () => {
     expect((await screen.findByTestId('location')).textContent).toBe('/explore');
   });
 
-  it('renders Admin-managed promotions (from GET /catalog/promotions) with a light-DOM CTA link, not hardcoded content.json copy', async () => {
+  it("renders the visitor's CTA banners in both home slots (PLANNING §6)", async () => {
+    m.location.state = 'Delhi';
     renderHome();
-    const cta = await screen.findByRole('link', { name: 'Browse deals' });
-    expect(cta.getAttribute('href')).toBe('/explore');
-    expect(screen.getByText('Welcome Offer')).toBeTruthy();
+    await waitFor(() => expect(m.promotions).toHaveBeenCalledWith('HOME_AFTER_DEALS', 'Delhi'));
+    expect(m.promotions).toHaveBeenCalledWith('HOME_AFTER_PRODUCTS', 'Delhi');
+    const banner = await waitFor(() => {
+      const el = document.querySelector('sky-cta-banner[headline="Welcome Offer"]');
+      if (!el) throw new Error('no banner yet');
+      return el;
+    });
+    expect(banner.getAttribute('cta-href')).toBe('/explore');
+    expect(banner.getAttribute('color')).toBe('secondary');
+    m.location.state = null;
   });
 
-  it('omits the Offers section entirely when there are no active promotions and the visitor is signed in', async () => {
+  it('renders no offer banner when no banner is active for the slot', async () => {
     m.promotions.mockResolvedValue({ data: [] });
-    m.auth = { isAuthenticated: true, token: 't' };
     renderHome();
     await screen.findByRole('heading', { level: 2, name: content.home.sections.dealsNearYou.heading });
-    expect(screen.queryByText('Welcome Offer')).toBeNull();
+    expect(document.querySelector('sky-cta-banner[headline]')).toBeNull();
+  });
+
+  it('shows deal and product slides from the visitor’s state in the hero (PLANNING §7)', async () => {
+    const deals = (await m.deals()).data;
+    const products = [{ id: 'prod-1', name: 'Massage Oil', price: '499.00', originalPrice: null, discount: null, image: null, imageAlt: null, vendor: null }];
+    m.homeHero.mockResolvedValue({
+      data: {
+        state: null,
+        slides: [
+          { id: 's1', type: 'deal', deal: deals[0] },
+          { id: 's2', type: 'product', product: products[0] },
+        ],
+      },
+    });
+    renderHome();
+    // md-filled-button renders its <a> in shadow DOM; read the element itself.
+    const button = (label: string) =>
+      document.querySelector(`md-filled-button[aria-label="${label}"]`) as (HTMLElement & { href?: string }) | null;
+    const book = await waitFor(() => {
+      const el = button(content.home.hero.bookAria.replace('{title}', deals[0].title));
+      if (!el) throw new Error('no hero slider yet');
+      return el;
+    });
+    expect(book.href || book.getAttribute('href')).toBe(`/deal/${deals[0].id}`);
+    const buy = button(content.home.hero.buyAria.replace('{title}', products[0].name));
+    expect(buy?.href || buy?.getAttribute('href')).toBe(`/products/${products[0].id}`);
   });
 
   it('passes banner options as kebab-case attributes (survive server rendering)', () => {
     renderHome();
-    const partner = document.querySelector('sky-cta-banner') as Element;
+    const partner = document.querySelector(`sky-cta-banner[cta-href="${content.home.partnerBanner.href}"]`) as Element;
     expect(partner.getAttribute('cta-label')).toBe(content.home.partnerBanner.cta);
     expect(partner.getAttribute('cta-href')).toBe(content.home.partnerBanner.href);
     expect(partner.getAttribute('cta-icon')).toBe('arrow_forward');

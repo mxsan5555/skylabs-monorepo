@@ -92,6 +92,7 @@ ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list
 ### 4.3 Customers and orders
 
 - A customer never reads or changes another customer's cart, wishlist or order by changing an id.
+- A member never changes an order's status (403), for a deal or a product order (D27).
 - A member with no business record gets empty Orders and Customers lists and 404 on any order;
   a `branchId` filter never widens a member past their own orders (P4-17).
 - Payment state changes only through provider verification (Razorpay signature, webhook HMAC).
@@ -107,6 +108,13 @@ ignores every file under `apps/msd-api/src` today. Flaky under load: `deals-list
 - axe (WCAG 2.2 AA) clean on `/` in light, dark and high-contrast; no horizontal scroll at 320,
   390, 768 and 1280 px; full keyboard path (skip link, header, panels, tab bar, footer); Lighthouse
   SEO and Accessibility 100 and LCP under 2.5 s on mobile for `/`.
+- Home slider: nothing can be added before a state is chosen; the search lists only that state's
+  deals and products (a product through any active branch of its member); an item outside the
+  state is 422 and a duplicate 409; a state with 5 eligible slides serves them, otherwise Global;
+  the hero shows deal and product cards.
+- CTA banners: a banner saves state, colour roles, image (one only) and slots; each slot shows the
+  visitor's state's active in-date banners, else Global, else nothing; contrast holds for every
+  colour role (axe); `<BannerSlot>` hydrates without warnings.
 - JSON-LD is written only by `<JsonLd>`: a name containing `</script>` stays inside the script
   tag (ST-29, `seo/json-ld-usage.test.ts`).
 - Suspended member's deals, branches and therapists absent; their deal URL returns the not-found

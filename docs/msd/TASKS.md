@@ -39,17 +39,17 @@ the open msd items of the root `TASK.md` (new IDs `ST-`, `CO-`, `CT-`, `SL-`, `M
 |---|---|---|---|---|
 | 1 | Admin and staff | 2 | 31 | 6 |
 | 2 | Members | 32 | 87 | 37 |
-| 3 | Customers and orders | 1 | 11 | 9 |
+| 3 | Customers and orders | 2 | 12 | 17 |
 | 4 | Storefront | 1 | 30 | 3 |
 | 5 | Static content | 0 | 5 | 0 |
-| 6 | CTA banners | 0 | 1 | 0 |
-| 7 | Home slider | 0 | 1 | 0 |
+| 6 | CTA banners | 4 | 5 | 80 |
+| 7 | Home slider | 5 | 6 | 83 |
 | 8 | Masters | 0 | 1 | 0 |
 | 9 | Payments, payouts and reports | 0 | 11 | 0 |
 | 10 | Analytics | 0 | 3 | 0 |
 | 11 | Social media | 0 | 1 | 0 |
 | 12 | Platform, security and release | 7 | 69 | 10 |
-| | **Total** | **43** | **251** | **17** |
+| | **Total** | **53** | **261** | **20** |
 
 Pending before production (member release): P10-43 (DLT SMS templates), P10-44 (Railway env
 vars), P10-45 (status report sign-off and migration rehearsal), P6-07 (Railway cron service).
@@ -202,6 +202,7 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 | [ ] | P7-13 | SEC | Razorpay webhook: raw-body HMAC, timing-safe compare, event id replay table | M | - | Replay ignored |
 | [ ] | P10-25 | FE | Orders: cancel with inline confirm; support raises refund request; admin refund queue approve/reject | L | P7-02 to P7-05 | Tests per role |
 | [ ] | P10-26 | FE | Customers: view, block/unblock with reason; support view only | M | P4-07 | Tests |
+| [x] | P4-18 | SEC | Members never change order status: `PATCH /orders/:id/status` needs `orders:status_change`; status actions hidden for members (D27) | S | - | Merged: route and screen tests |
 | [x] | P4-17 | SEC | Member order scope: a member with no business record gets an empty Orders and Customers list (was: every order); a `branchId` filter narrows the member's own orders, never replaces the scope | S | - | Merged: 4 tests in `orders.routes.test.ts`, 1 in `vendors.routes.test.ts` |
 
 ## 4. Storefront
@@ -253,12 +254,21 @@ role switcher removal and auth wiring (dynamic RBAC), Playwright and Sentry (P10
 
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
+| [x] | CT-02 | DB | Migration: Promotion `state`, colour roles, `productId`, `PRODUCT` destination; `PromotionPlacement` and `BannerSlot` | S | - | Merged: migration `20261018100000_state_sliders_banners` + `down.sql` |
+| [x] | CT-03 | BE | Banner create/update with state, roles, slots and in-state destination; one image; public `GET /catalog/banners` with Global fallback | M | CT-02, SL-02 | Merged: `promotion.service.ts`, 13 tests in `promotion.service.test.ts` |
+| [x] | CT-04 | FE | CTA banner console: State first, form with colour roles, live preview, picker, slots | M | CT-03 | Merged: `masters/promotions.tsx`, `promotions.test.tsx` |
+| [x] | CT-05 | FE | `<BannerSlot>` on home, category, explore, deal and product pages; remove `home-offers` | M | CT-03 | Merged: `components/banner-slot`, home, category, explore, deal and product pages; `home-offers` removed |
 | [ ] | CT-01 | BIZ | Write the CTA banner rules in PLANNING.md §6 (placements, scheduling, who edits) and review the existing Promotions screen against them | S | - | Rules approved; gaps added here as tasks |
 
 ## 7. Home slider
 
 | Done | ID | Area | Task | Size | Depends | Done when |
 |---|---|---|---|---|---|---|
+| [x] | SL-02 | BE | `searchStateItems` (deals by branch state, products by member branch state) and `/search-items` routes | M | - | Merged: `state-catalog.service.ts`, 7 tests |
+| [x] | SL-03 | DB | Migration: `HomeHeroSlide.productId`, nullable `dealId`, one-item CHECK | S | - | Merged: same migration as CT-02 |
+| [x] | SL-04 | BE | Slides for deals and products: in-state check, duplicate 409, eligibility and public read for both | M | SL-02, SL-03 | Merged: `home-hero.service.ts`, 13 tests |
+| [x] | SL-05 | FE | Home hero console: State first, `StateItemPicker`, Type column | M | SL-04 | Merged: `masters/home-hero.tsx`, `state-picker.tsx`, `state-item-picker.tsx` with tests |
+| [x] | SL-06 | FE | Storefront hero: mixed deal and product card carousel, split layout kept | M | SL-04 | Merged: `pages/home/home-hero.tsx`, hero test in `home.test.tsx` |
 | [ ] | SL-01 | BIZ | Write the home slider rules in PLANNING.md §7 (slide count, schedule, image sizes, alt text) and review the existing Home Hero screen against them | S | - | Rules approved; gaps added here as tasks; partly: built behaviour written in PLANNING.md §7 (state picker, deal slides, 5-slide rule, Global fallback); own banner image, schedule and image rules open |
 
 ## 8. Masters

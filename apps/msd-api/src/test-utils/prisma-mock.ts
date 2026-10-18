@@ -317,6 +317,11 @@ export function createPrismaMock() {
       delete: vi.fn(),
       count: vi.fn(),
     },
+    promotionPlacement: {
+      findMany: vi.fn(),
+      createMany: vi.fn(),
+      deleteMany: vi.fn(),
+    },
     promotion: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
@@ -335,6 +340,7 @@ export function createPrismaMock() {
       delete: vi.fn(),
     },
     homeHeroSlide: {
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),

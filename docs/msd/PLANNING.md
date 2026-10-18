@@ -73,7 +73,8 @@ Extra actions (granted on top of the matrix, never beyond):
 | Payout release to members | `payments:approve` | Super Admin only |
 | Report export | `reports:export` | Super Admin, Admin |
 
-Sales gets no status change, approve, reject, export or delete.
+Sales gets no status change, approve, reject, export or delete. Members view their own orders
+only and never change an order's status, for deals or products (D27).
 
 ### 1.3 Rules that apply everywhere
 
@@ -228,27 +229,44 @@ sanitized on write and on render (D18).
 
 ## 6. CTA banners
 
-Promotions shown on the storefront: title, description, button label, destination (a route, a
-category or a deal), image, sort order, active flag and optional start and end dates. Managed under
-Masters → Promotions (super_admin VCED, admin VCE, marketing V, D8). Rules for placements and who
-edits: to be written (task CT-01).
+Call-to-action banners, managed under Masters → Promotions (`/account/masters/promotions`; super_admin
+VCED, admin VCE, marketing V, D8). Decided 2026-10-18:
+
+1. **Choose the state first** (or Global/Default), then create as many banners for it as needed.
+2. **A banner holds:** background colour, one image, headline (1 to 120 characters), subheadline (up
+   to 300), button label (1 to 40) and button colour, a destination, start and end dates, sort order
+   and an active flag.
+3. **Colours are theme roles, not free colours (D24):** background Primary, Secondary, Tertiary,
+   Surface, Surface high or Inverse; button Primary, Secondary, Tertiary or Inverse (a strong fill,
+   so the button keeps 3:1 against any background). Each role brings its own text colour, so every
+   banner keeps WCAG contrast and the brand palette.
+4. **Destination:** a page route, a category, or a deal or product found by searching the chosen
+   state (same search as the home slider). The item must belong to that state.
+5. **Placement (D25):** each banner goes into one or more named slots: Home after deals, Home
+   after products, Category page top, Explore top, Deal page bottom, Product page bottom.
+6. **Who sees what:** a visitor sees the active, in-date banners of their state for that slot; if
+   their state has none for the slot, or their location is unknown, the Global/Default banners show.
+   A slot with no banner shows nothing.
 
 ## 7. Home slider
 
-Home hero slides managed under Masters → Home hero (`/account/masters/home-hero`), read by the
-storefront at `/catalog/home-hero`. Built and working (2026-10-17):
+Home hero slider, managed under Masters → Home hero (`/account/masters/home-hero`). Decided
+2026-10-18:
 
-1. **Choose the state first.** The State picker at the top lists every state that has an active
-   branch, plus Global/Default. Slides you add are saved to the chosen state.
-2. **Each slide is a deal.** It shows the deal's current title, price and image; editing the deal
-   updates the slide. Order by sort order; a slide can be paused.
-3. **Visitors see their state's slider** (from their location). A state's slider goes live only
-   with at least 5 eligible slides (slide, deal, branch and member all active); until then, and
-   for visitors with no location, the Global/Default slider shows. The console shows "n/5 eligible".
+1. **Choose the state first** (or Global/Default). Nothing can be added before a state is chosen.
+2. **Search and add:** a search box lists that state's deals and products together (filter Deals,
+   Products or All) by title, member or branch; pick one to add it as a slide. A deal belongs to its
+   branch's state; a product belongs to every state where its member has an active branch (D23).
+   The same item cannot be added twice to one slider.
+3. **Each slide is a live item:** it shows the deal's or product's current title, price and image;
+   slides have a sort order and can be paused.
+4. **Visitors see their state's slider** (from their location) once it has at least 5 eligible
+   slides (slide, item, branch and member all active); until then, and for visitors with no
+   location, the Global/Default slider shows. The console shows "n/5 eligible".
+5. **Storefront hero (D26):** the h1 and search stay on the left; the right side becomes a carousel
+   of larger cards (image, title, member, price, Book or Buy button) mixing deals and products.
 
-Still to decide (task SL-01): whether a slide may also carry its own banner image (then it is stored
-under `home-slider/<state>/`, ARCHITECTURE.md §12.3), a schedule (start and end dates), and the
-image size and alt text rules.
+Still open (SL-01): slide schedule (start and end dates) and image size and alt text rules.
 
 ## 8. Masters
 
@@ -326,6 +344,11 @@ expire after 5 minutes (ARCHITECTURE.md §12.3).
 | D20 | Rich text scope | Long fields only; labels and lists stay plain text |
 | D21 | Inactive and suspended behaviour | Section 2.1 |
 | D22 | Support contact in notices | Env vars until the settings table exists |
+| D23 | Product state | A product counts in every state where its member has an active branch (2026-10-18) |
+| D24 | Banner colours | Theme colour roles only, no free colours (2026-10-18) |
+| D25 | Banner placement | Named slots, several per banner (2026-10-18) |
+| D26 | Home hero layout | Keep h1 and search on the left; larger mixed deal and product card carousel on the right (2026-10-18) |
+| D27 | Member order changes | None: members view own orders only (2026-10-18) |
 | B2 | Vendor rename | Prisma `Vendor` → `Member`, `VendorDocument` → `MemberDocument` with `@@map`; FK columns stay `vendorId` |
 | B5 | Permission key | `vendors` → `members`; role `vendor` → `member`; role `support` added |
 | N1 | Reminder decisions (2026-10-17) | Clear the flag when documents complete; bell alert to `members:status_change` holders; Remind now in this release |

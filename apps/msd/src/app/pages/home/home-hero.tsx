@@ -1,13 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { createElement, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import type { CatalogDeal } from '../../../api/catalog';
+import type { CatalogDeal, CatalogHomeHeroSlide } from '../../../api/catalog';
 import { getCatalogHomeHero } from '../../../api/catalog';
 import { useCustomEvent } from '../../../hooks/use-custom-event';
 import { useVisitorLocation } from '../../../location/location-context';
 import { formatINR } from '../../../utils/format';
-import { imageSrcSet, toDealCardDeal } from './home-data';
+import { imageSrcSet, toDealCardDeal, toProductCardDeal } from './home-data';
+import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { PageSection } from '../../components/page-section/page-section';
 import content from '../../../content.json';
 import type { DealCardDeal } from '../../components/deal-card';
@@ -62,31 +63,54 @@ function SpotlightCard({ dealId, card }: { dealId: string; card: DealCardDeal })
   );
 }
 
+/** One hero slide: the shared product card plus its own Book / Buy button. The button sits
+ *  outside the card because the card is already one stretched link (no nested interactives). */
+function HeroSlide({ slide }: { slide: CatalogHomeHeroSlide }) {
+  const isDeal = slide.type === 'deal';
+  const card = isDeal ? toDealCardDeal(slide.deal) : toProductCardDeal(slide.product);
+  const href = isDeal ? `/deal/${slide.deal.id}` : `/products/${slide.product.id}`;
+  return (
+    <div className="home-hero__slide">
+      <SkyProductCardWC
+        variant="outlined"
+        gallery={card.gallery ?? (card.image ? [card.image] : undefined)}
+        imageAlt={card.imageAlt}
+        eyebrow={card.providerName}
+        heading={card.title}
+        location={card.location}
+        price={formatINR(card.price)}
+        originalPrice={card.originalPrice ? formatINR(card.originalPrice) : undefined}
+        discount={card.discount ? `${card.discount}% OFF` : undefined}
+        priceNote={card.priceNote}
+        href={href}
+      />
+      {createElement(
+        'md-filled-button',
+        { href, 'aria-label': (isDeal ? home.hero.bookAria : home.hero.buyAria).replace('{title}', card.title) },
+        isDeal ? home.hero.bookLabel : home.hero.buyLabel,
+      )}
+    </div>
+  );
+}
+
 /**
- * Hero: the page's only h1, site search, and a live Deal spotlight over the photo — headline,
- * subheading, search bar, and background image are untouched (no redesign).
- *
- * The spotlight overlay is Admin-managed via `/account/masters/home-hero`: a location-aware
- * slider of the visitor's State's configured Deals (falling back to the Global/Default slider
- * when the State has no publishable slider of its own, or geolocation is denied/unavailable —
- * both handled server-side by `GET /catalog/home-hero`, see `home-hero.service.ts`'s own doc
- * comment). If the Home Hero module has no publishable slider configured at all yet (a fresh
- * install, or an admin still building one out), this falls back to the pre-existing single
- * highest-discount-deal `spotlight` prop — the exact behavior this page always had — so nothing
- * regresses and the hero is never empty just because the new module isn't configured yet.
+ * Hero (docs/msd/PLANNING.md §7, D26): the page's only h1 and site search on the left; on the
+ * right, the visitor's state's slider of deals and products (`GET /catalog/home-hero`, Global /
+ * Default when the state has no live slider or the location is unknown). Before the slider loads,
+ * or when no slider is live, the photo with the single best-discount deal spotlight shows.
  */
 export function HomeHero({ spotlight }: { spotlight?: CatalogDeal }) {
   const navigate = useNavigate();
   const fieldRef = useRef<HTMLElement>(null);
   const { status: locationStatus, state: locationState } = useVisitorLocation();
-  const [heroSlides, setHeroSlides] = useState<CatalogDeal[] | null>(null);
+  const [heroSlides, setHeroSlides] = useState<CatalogHomeHeroSlide[] | null>(null);
 
   useEffect(() => {
     if (locationStatus === 'locating') return;
     let cancelled = false;
     getCatalogHomeHero(locationState ?? undefined)
       .then(({ data }) => {
-        if (!cancelled) setHeroSlides((data?.slides ?? []).map((s) => s.deal));
+        if (!cancelled) setHeroSlides(data?.slides ?? []);
       })
       .catch(() => {
         if (!cancelled) setHeroSlides([]);
@@ -101,7 +125,8 @@ export function HomeHero({ spotlight }: { spotlight?: CatalogDeal }) {
     navigate(q ? `/explore?q=${encodeURIComponent(q)}` : '/explore');
   });
 
-  const usingAdminSlider = Boolean(heroSlides && heroSlides.length > 0);
+  const slides = heroSlides ?? [];
+  const usingSlider = slides.length > 0;
   const fallbackCard = spotlight ? toDealCardDeal(spotlight) : null;
 
   return (
@@ -123,36 +148,39 @@ export function HomeHero({ spotlight }: { spotlight?: CatalogDeal }) {
           />
         </div>
 
-        <div className="home-hero__visual">
-          <img
-            className="home-hero__img"
-            src={home.hero.image}
-            srcSet={heroSrcSet}
-            sizes="(min-width: 840px) 52vw, 100vw"
-            alt={home.hero.imageAlt}
-            width={1400}
-            height={1050}
-            fetchPriority="high"
-          />
-          {usingAdminSlider && heroSlides && (
+        {usingSlider ? (
+          <div className="home-hero__visual" role="region" aria-roledescription="carousel" aria-label={home.hero.sliderLabel}>
             <swiper-container
-              className="home-spotlight__carousel"
               slides-per-view="1"
-              loop={heroSlides.length > 1}
+              space-between="16"
+              loop={slides.length > 1}
               autoplay-delay="5000"
-              pagination={heroSlides.length > 1}
+              autoplay-pause-on-mouse-enter="true"
+              pagination={slides.length > 1}
+              pagination-clickable="true"
             >
-              {heroSlides.map((deal) => (
-                <swiper-slide key={deal.id}>
-                  <SpotlightCard dealId={deal.id} card={toDealCardDeal(deal)} />
+              {slides.map((slide) => (
+                <swiper-slide key={slide.id}>
+                  <HeroSlide slide={slide} />
                 </swiper-slide>
               ))}
             </swiper-container>
-          )}
-          {!usingAdminSlider && spotlight && fallbackCard && (
-            <SpotlightCard dealId={spotlight.id} card={fallbackCard} />
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="home-hero__visual">
+            <img
+              className="home-hero__img"
+              src={home.hero.image}
+              srcSet={heroSrcSet}
+              sizes="(min-width: 840px) 52vw, 100vw"
+              alt={home.hero.imageAlt}
+              width={1400}
+              height={1050}
+              fetchPriority="high"
+            />
+            {spotlight && fallbackCard && <SpotlightCard dealId={spotlight.id} card={fallbackCard} />}
+          </div>
+        )}
       </div>
     </PageSection>
   );

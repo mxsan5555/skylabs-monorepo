@@ -457,12 +457,6 @@ const ADMIN_ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
  *  ONLY path from PENDING_PAYMENT to CONFIRMED is verified payment (payment.service.ts), never
  *  a manual status change — so "payment failure must never accidentally confirm/complete an
  *  order" holds structurally here, not just by convention. */
-const VENDOR_ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  PENDING_PAYMENT: [],
-  CONFIRMED: ['COMPLETED', 'CANCELLED'],
-  COMPLETED: [],
-  CANCELLED: [],
-};
 
 /**
  * Sibling helper reused by `payment.service.ts` — finalizes a cart-linked order's `CartItem` rows
@@ -479,30 +473,15 @@ export async function finalizeCartForOrder(tx: Prisma.TransactionClient, orderId
 }
 
 /**
- * Admin (no linked Vendor profile) may drive the full ADMIN_ALLOWED_TRANSITIONS matrix on any
- * order. A vendor caller is force-scoped to orders it has at least one line item in (404 for an
- * order it isn't part of at all — never confirms existence) and restricted to
- * VENDOR_ALLOWED_TRANSITIONS. Order.status is order-wide, not per-item, so a vendor caller may
- * only change status on an order that is entirely its own (single vendor) — a multi-vendor order
- * can only have its status changed by admin, since one vendor completing/cancelling would
- * otherwise silently affect every other vendor's items in the same order too.
+ * Staff with `orders:status_change` (Super Admin, Admin) move an order through
+ * ADMIN_ALLOWED_TRANSITIONS. Members never change an order, deal or product (D27); the route's
+ * permission check refuses them before this runs.
  */
-export async function setOrderStatus(callerUserId: string, scope: OrderScope, id: string, status: OrderStatus, reason?: string) {
-  const vendor = await getVendorByOwnerUserId(callerUserId);
-  if (scope === 'OWN' && !vendor) throw new ApiError('NOT_FOUND', 'Order not found');
-  const order = await prisma.order.findUnique({ where: { id }, include: { items: { select: { vendorId: true } } } });
+export async function setOrderStatus(id: string, status: OrderStatus, reason?: string) {
+  const order = await prisma.order.findUnique({ where: { id } });
   if (!order) throw new ApiError('NOT_FOUND', 'Order not found');
 
-  if (vendor) {
-    const distinctVendorIds = new Set(order.items.map((item) => item.vendorId));
-    if (!distinctVendorIds.has(vendor.id)) throw new ApiError('NOT_FOUND', 'Order not found');
-    if (distinctVendorIds.size > 1) {
-      throw new ApiError('FORBIDDEN', 'This order includes other vendors’ items — only an admin can change its status');
-    }
-  }
-
-  const allowed = vendor ? VENDOR_ALLOWED_TRANSITIONS : ADMIN_ALLOWED_TRANSITIONS;
-  if (!allowed[order.status].includes(status)) {
+  if (!ADMIN_ALLOWED_TRANSITIONS[order.status].includes(status)) {
     throw new ApiError('CONFLICT', `Cannot change status from ${order.status} to ${status}`);
   }
 

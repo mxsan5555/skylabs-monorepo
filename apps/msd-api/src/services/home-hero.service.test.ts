@@ -6,7 +6,7 @@ vi.mock('../lib/prisma', async () => {
 });
 
 import { prisma } from '../lib/prisma';
-import { getPublicHomeHero, countEligibleSlides, MIN_ELIGIBLE_SLIDES } from './home-hero.service';
+import { getPublicHomeHero, countEligibleSlides, createSlide, MIN_ELIGIBLE_SLIDES } from './home-hero.service';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -71,13 +71,25 @@ describe('getPublicHomeHero — publish gate + fallback', () => {
     expect(prismaMock.homeHeroSlide.findMany).toHaveBeenCalledTimes(1);
   });
 
-  it('every query includes the eligibility filter (isActive + VISIBLE_DEAL_WHERE on the linked deal) — never trusts a caller override', async () => {
+  it('every query includes the eligibility filter (an active deal or an active product) — never trusts a caller override', async () => {
     prismaMock.homeHeroSlide.findMany.mockResolvedValueOnce(slideRows(5, 'up'));
     await getPublicHomeHero('Uttar Pradesh');
     const call = prismaMock.homeHeroSlide.findMany.mock.calls[0][0];
     expect(call.where.isActive).toBe(true);
-    expect(call.where.deal.is.status).toBe('ACTIVE');
-    expect(call.where.deal.is.approvalStatus).toBe('APPROVED');
+    const [dealBranch, productBranch] = call.where.OR;
+    expect(dealBranch.deal.is.status).toBe('ACTIVE');
+    expect(dealBranch.deal.is.approvalStatus).toBe('APPROVED');
+    expect(productBranch.product.is.isActive).toBe(true);
+  });
+
+  it('returns deal and product slides with their type', async () => {
+    prismaMock.homeHeroSlide.findMany.mockResolvedValueOnce([
+      ...slideRows(4, 'd').map((s) => ({ ...s, product: null })),
+      { id: 'p0', sortOrder: 9, deal: null, product: { id: 'prod-1', name: 'Massage Oil' } },
+    ]);
+    const result = await getPublicHomeHero('Uttar Pradesh');
+    expect(result.slides.map((s) => s.type)).toEqual(['deal', 'deal', 'deal', 'deal', 'product']);
+    expect(result.slides[4]).toEqual({ id: 'p0', type: 'product', product: { id: 'prod-1', name: 'Massage Oil' } });
   });
 });
 
@@ -96,5 +108,34 @@ describe('countEligibleSlides', () => {
     await countEligibleSlides(null);
     const call = prismaMock.homeHeroSlide.findMany.mock.calls[0][0];
     expect(call.where.state).toBeNull();
+  });
+});
+
+describe('createSlide (PLANNING §7)', () => {
+  const PRODUCT_ID = 'a1a1a1a1-0000-4000-8000-000000000001';
+
+  it('adds a product slide when the product belongs to the state', async () => {
+    prismaMock.product.findFirst.mockResolvedValue({ id: PRODUCT_ID } as never);
+    prismaMock.homeHeroSlide.findFirst.mockResolvedValue(null);
+    prismaMock.homeHeroSlide.create.mockResolvedValue({ id: 's1', productId: PRODUCT_ID, deal: null, product: { isActive: true, vendor: { status: 'ACTIVE' } } } as never);
+    await createSlide({ itemType: 'product', itemId: PRODUCT_ID, state: 'Uttar Pradesh', sortOrder: 0 });
+    expect(prismaMock.product.findFirst.mock.calls[0][0]!.where).toMatchObject({
+      id: PRODUCT_ID,
+      vendor: { is: { branches: { some: { state: 'Uttar Pradesh', isActive: true } } } },
+    });
+    expect(prismaMock.homeHeroSlide.create.mock.calls[0][0].data).toMatchObject({ productId: PRODUCT_ID, dealId: null, state: 'Uttar Pradesh' });
+  });
+
+  it('refuses an item from another state with 422', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue(null);
+    await expect(createSlide({ itemType: 'deal', itemId: PRODUCT_ID, state: 'Delhi', sortOrder: 0 })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect(prismaMock.homeHeroSlide.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses the same item twice in one slider with 409', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue({ id: PRODUCT_ID } as never);
+    prismaMock.homeHeroSlide.findFirst.mockResolvedValue({ id: 'existing' } as never);
+    await expect(createSlide({ itemType: 'deal', itemId: PRODUCT_ID, state: null, sortOrder: 0 })).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(prismaMock.homeHeroSlide.findFirst.mock.calls[0][0]!.where).toEqual({ state: null, dealId: PRODUCT_ID });
   });
 });

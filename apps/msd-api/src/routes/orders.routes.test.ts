@@ -500,30 +500,17 @@ describe('PATCH /api/v1/orders/:id/status — admin', () => {
     expect(prismaMock.order.update).not.toHaveBeenCalled();
   });
 
-  it("a vendor caller holding only 'members:custom' can confirm/complete its own single-vendor order", async () => {
+  // D27: members view their own orders only; they never change a deal or product order.
+  it.each([
+    ['deal', { type: 'SERVICE' }],
+    ['product', { type: 'PRODUCT' }],
+  ])("a member holding only 'members:custom' gets 403 changing a %s order", async (_kind, orderType) => {
     resolveMock.mockResolvedValue(['members:custom']);
     prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
-    prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
-    prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'COMPLETED' });
+    prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, ...orderType, status: 'CONFIRMED' });
     const res = await request(app)
       .patch(`/api/v1/orders/${ORDER_ID}/status`)
-      .set('Authorization', bearerFor({ sub: 'vendor-user-1', roles: ['vendor'] }))
-      .send({ status: 'COMPLETED' });
-    expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('COMPLETED');
-  });
-
-  it('a vendor caller cannot change status on a multi-vendor order — only admin may', async () => {
-    resolveMock.mockResolvedValue(['orders:status_change']);
-    prismaMock.member.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
-    prismaMock.order.findUnique.mockResolvedValue({
-      ...orderFixture,
-      status: 'CONFIRMED',
-      items: [orderFixture.items[0], { ...orderFixture.items[0], id: 'oi-2', vendorId: VENDOR_B_ID }],
-    });
-    const res = await request(app)
-      .patch(`/api/v1/orders/${ORDER_ID}/status`)
-      .set('Authorization', bearerFor({ sub: 'vendor-user-1', roles: ['vendor'] }))
+      .set('Authorization', bearerFor({ sub: 'vendor-user-1', roles: ['member'] }))
       .send({ status: 'COMPLETED' });
     expect(res.status).toBe(403);
     expect(prismaMock.order.update).not.toHaveBeenCalled();
@@ -555,18 +542,6 @@ describe('/api/v1/orders — member scope (members:custom only)', () => {
       .get(`/api/v1/orders/${ORDER_ID}`)
       .set('Authorization', bearerFor({ sub: 'member-user-1', roles: ['member'] }));
     expect(res.status).toBe(404);
-  });
-
-  it('a member with no business record cannot change any order status', async () => {
-    resolveMock.mockResolvedValue(['members:custom']);
-    prismaMock.member.findUnique.mockResolvedValue(null);
-    prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, status: 'PENDING_PAYMENT', items: [{ vendorId: VENDOR_A_ID }] });
-    const res = await request(app)
-      .patch(`/api/v1/orders/${ORDER_ID}/status`)
-      .set('Authorization', bearerFor({ sub: 'member-user-1', roles: ['member'] }))
-      .send({ status: 'CANCELLED', cancellationReason: 'Customer asked' });
-    expect(res.status).toBe(404);
-    expect(prismaMock.order.update).not.toHaveBeenCalled();
   });
 
   it('a branchId filter never widens a member past their own business', async () => {

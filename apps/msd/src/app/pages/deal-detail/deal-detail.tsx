@@ -25,6 +25,7 @@ import { formatINR, formatTime12h } from '../../../utils/format';
 import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
 import './deal-detail.css';
+import { BannerSlot } from '../../components/banner-slot/banner-slot';
 
 const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 
@@ -520,6 +521,7 @@ showSnackbar(`Added "${deal.title}" to your cart.`, {
           </div>
         </section>
       )}
+      <BannerSlot slot="DEAL_BOTTOM" />
     </div>
   );
 }

@@ -165,21 +165,29 @@ storefront renders deal and product text as plain text.
 
 ## 6. CTA banners
 
-`Promotion` + `PromotionImage`; console `pages/account/masters/promotions.tsx`; public
-`GET /catalog/promotions`. Destination types `ROUTE`, `CATEGORY`, `DEAL`.
+`Promotion` + `PromotionImage` + `PromotionPlacement`; service `promotion.service.ts`; console
+`pages/account/masters/promotions.tsx` (State picker, then the banner form with a live
+`sky-cta-banner` preview and the shared `StateItemPicker` for deal and product destinations).
+Storefront: `app/components/banner-slot/banner-slot.tsx` (`<BannerSlot slot="..." />`) reads
+`GET /catalog/banners` for the visitor's state (`useVisitorLocation`) and renders `sky-cta-banner`
+with `color` from `backgroundRole`, `cta-color` from `buttonRole` and the banner `image` (options
+added to shared-ui `sky-feature-card`, which `sky-cta-banner` extends). Slots live in `home.tsx` (after deals, after products), the
+category page, explore, deal detail and product detail.
 
 ## 7. Home slider
 
-`HomeHeroSlide`; console `pages/account/masters/home-hero.tsx`; public `GET /catalog/home-hero`.
+`HomeHeroSlide` (deal or product); service `home-hero.service.ts`; console
+`pages/account/masters/home-hero.tsx`; public `GET /catalog/home-hero`.
 
-- A slide is a live reference to a deal (`dealId`): title, price and image always come from the deal,
-  so the slider has no images of its own.
-- `state` on each slide: a state name (from `GET /catalog/locations`) or empty for the
-  Global/Default slider. The console's **State** picker chooses which slider you see and edit; new
-  slides are saved to that state.
-- The storefront sends the visitor's state (`useVisitorLocation`). A state's slider is served once
-  it has 5 eligible slides (active slide, active deal, branch and member); otherwise the
-  Global/Default slider is served (`home-hero.service.ts`, `MIN_ELIGIBLE_SLIDES`).
+- **State search** (`services/state-catalog.service.ts`, `searchStateItems`): shared by the home
+  hero and CTA banner consoles. Deals match on `branch.state`; products on any active branch of
+  their member in the state. Eligibility reuses `VISIBLE_DEAL_WHERE` / `VISIBLE_PRODUCT_WHERE`.
+- **Console:** State picker first; the add dialog uses `StateItemPicker`
+  (`pages/account/masters/state-item-picker.tsx`: Deals / Products / All, search, Add).
+- **Publish rule:** a state's slider is served once it has 5 eligible slides
+  (`MIN_ELIGIBLE_SLIDES`), else the Global/Default slider, else the single-deal spotlight fallback.
+- **Storefront** (`pages/home/home-hero.tsx`): h1 and search left; right side a Swiper carousel of
+  `HeroItemCard` (deal or product) for the visitor's state.
 
 ## 8. Masters
 

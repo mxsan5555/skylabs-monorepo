@@ -9,14 +9,16 @@ import {
   HomeHeroSlideUpdateSchema,
   HomeHeroSlideStatusUpdateSchema,
   HomeHeroSlideListQuerySchema,
+  StateItemSearchQuerySchema,
 } from '../schemas/home-hero.schema';
 import * as homeHeroService from '../services/home-hero.service';
+import { searchStateItems } from '../services/state-catalog.service';
 import { writeAuditLog } from '../services/audit.service';
 import { sendData } from '../lib/http';
 
-/** Home page "Home Hero" (state-wise Deal slider) admin CRUD — gated on `masters.home-hero`,
+/** Home page "Home Hero" (state-wise deal and product slider) admin CRUD — gated on `masters.home-hero`,
  *  mirroring `promotions.routes.ts`'s exact shape. No media sub-routes — a slide's image is
- *  always its linked Deal's own image, never a separately uploaded one (see `HomeHeroSlide`'s
+ *  always its linked deal's or product's own image, never a separately uploaded one (see `HomeHeroSlide`'s
  *  schema doc comment). */
 const router = Router();
 router.use(authenticate);
@@ -35,6 +37,15 @@ router.get('/slides', requirePermission('masters.home-hero', 'view'), validateQu
     const stateFilter = state === undefined ? undefined : state === '__global__' ? null : state;
     const { items, total } = await homeHeroService.listSlides({ page, pageSize, state: stateFilter });
     sendData(res, items, { meta: { total, page, pageSize } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/search-items', requirePermission('masters.home-hero', 'view'), validateQuery(StateItemSearchQuerySchema), async (req, res, next) => {
+  try {
+    const { state, q, type, pageSize } = req.validatedQuery as ReturnType<typeof StateItemSearchQuerySchema.parse>;
+    sendData(res, await searchStateItems({ state: state || null, q: q ?? '', type, pageSize }));
   } catch (err) {
     next(err);
   }

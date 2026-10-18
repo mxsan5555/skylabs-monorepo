@@ -28,6 +28,8 @@ import {
  *   icon-shape  none | small | medium | large | full
  *   layout      vertical | horizontal   (horizontal stacks below 600px of its own width)
  *   cta-label / cta-href / cta-icon     (omit `cta-href` to handle the click yourself)
+ *   cta-color   primary | secondary | tertiary | inverse   (button role; default: the card's accent)
+ *   image / image-alt   leading media (left in horizontal layout, top in vertical); no alt = decorative
  *
  * @example
  * <sky-feature-card color="primary" icon="card_giftcard" icon-style="surface"
@@ -48,6 +50,9 @@ export class SkyFeatureCard extends LitElement {
     iconStyle: { type: String, reflect: true, attribute: 'icon-style' },
     iconShape: { type: String, reflect: true, attribute: 'icon-shape' },
     layout: { type: String, reflect: true },
+    ctaColor: { type: String, reflect: true, attribute: 'cta-color' },
+    image: { type: String },
+    imageAlt: { type: String, attribute: 'image-alt' },
     slottedActions: { state: true },
   };
 
@@ -63,6 +68,9 @@ export class SkyFeatureCard extends LitElement {
   declare iconStyle: SkyIconStyle;
   declare iconShape: SkyShape;
   declare layout: 'vertical' | 'horizontal';
+  declare ctaColor?: 'primary' | 'secondary' | 'tertiary' | 'inverse';
+  declare image?: string;
+  declare imageAlt?: string;
   declare slottedActions: boolean;
 
   constructor() {
@@ -87,6 +95,39 @@ export class SkyFeatureCard extends LitElement {
     :host {
       block-size: 100%;
       container-type: inline-size;
+    }
+    /* cta-color: the button takes its own role; every pair is an M3 fill + its on-colour. */
+    :host([cta-color='primary']) {
+      --_accent: var(--md-sys-color-primary);
+      --_on-accent: var(--md-sys-color-on-primary);
+    }
+    :host([cta-color='secondary']) {
+      --_accent: var(--md-sys-color-secondary);
+      --_on-accent: var(--md-sys-color-on-secondary);
+    }
+    :host([cta-color='tertiary']) {
+      --_accent: var(--md-sys-color-tertiary);
+      --_on-accent: var(--md-sys-color-on-tertiary);
+    }
+    :host([cta-color='inverse']) {
+      --_accent: var(--md-sys-color-inverse-surface);
+      --_on-accent: var(--md-sys-color-inverse-on-surface);
+    }
+    .media {
+      align-self: stretch;
+      overflow: hidden;
+      border-radius: var(--md-sys-shape-corner-medium);
+      aspect-ratio: 16 / 9;
+    }
+    .media img {
+      display: block;
+      inline-size: 100%;
+      block-size: 100%;
+      object-fit: cover;
+    }
+    :host([layout='horizontal']) .media {
+      flex: 0 0 min(40%, 320px);
+      aspect-ratio: 4 / 3;
     }
     .surface {
       display: flex;
@@ -129,12 +170,20 @@ export class SkyFeatureCard extends LitElement {
         align-items: flex-start;
         gap: 16px;
       }
+      :host([layout='horizontal']) .media {
+        flex-basis: auto;
+        inline-size: 100%;
+        aspect-ratio: 16 / 9;
+      }
     }
   `;
 
   protected override render() {
     return html`
       <article class="surface">
+        ${this.image
+          ? html`<div class="media"><img src=${this.image} alt=${this.imageAlt ?? ''} loading="lazy" decoding="async" /></div>`
+          : nothing}
         ${this.icon ? html`<span class="icon"><md-icon aria-hidden="true">${this.icon}</md-icon></span>` : nothing}
         <div class="copy">
           ${this.headline ? html`<h3 class="title-large">${this.headline}</h3>` : nothing}

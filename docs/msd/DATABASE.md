@@ -148,14 +148,33 @@ through `publicVisibleWhere()`.
 
 | Model (table) | Columns | Relations | Unique / indexes |
 |---|---|---|---|
-| Promotion | 14 | category -> Category; deal -> Deal; mediaImages -> PromotionImage[] | index(sortOrder); index(categoryId); index(dealId) |
+| Promotion | 19 | category -> Category; deal -> Deal; product -> Product; mediaImages -> PromotionImage[]; placements -> PromotionPlacement[] | index(sortOrder); index(categoryId); index(dealId); index(productId); index(state) |
 | PromotionImage | 10 | promotion -> Promotion | index(promotionId) |
+| PromotionPlacement | 3 | promotion -> Promotion (cascade) | unique(promotionId, slot); index(slot) |
+
+Migration `20261018100000_state_sliders_banners` (with `down.sql`):
+
+- `Promotion`: `state` text null (null = Global/Default); `backgroundRole`, `buttonRole`
+  `BannerColorRole` not null default `PRIMARY`; `productId` FK -> Product, set null on delete.
+  `title` is the headline, `description` the subheadline, `buttonLabel` the button text.
+- Enum `BannerColorRole`: `PRIMARY`, `SECONDARY`, `TERTIARY`, `SURFACE`, `SURFACE_HIGH`, `INVERSE`
+  (maps to the `sky-cta-banner` `color` attribute).
+- Enum `PromotionDestination` gains `PRODUCT`.
+- `PromotionPlacement`: `promotionId`, `slot` `BannerSlot`, `createdAt`.
+- Enum `BannerSlot`: `HOME_AFTER_DEALS`, `HOME_AFTER_PRODUCTS`, `CATEGORY_TOP`, `EXPLORE_TOP`,
+  `DEAL_BOTTOM`, `PRODUCT_BOTTOM`.
+- Data: every existing promotion gets slot `HOME_AFTER_DEALS`, state null, roles `PRIMARY`.
+- One image per banner is enforced by the upload route, not the schema.
 
 ## 7. Home slider
 
 | Model (table) | Columns | Relations | Unique / indexes |
 |---|---|---|---|
-| HomeHeroSlide | 7 | deal -> Deal | index(state); index(dealId); index(sortOrder) |
+| HomeHeroSlide | 8 | deal -> Deal (cascade); product -> Product (cascade) | index(state); index(dealId); index(productId); index(sortOrder) |
+
+Same migration: `dealId` becomes nullable; `productId` text null FK -> Product (cascade); CHECK
+`home_hero_slide_one_item`: exactly one of `dealId`, `productId` is set. Duplicate items in one
+slider are refused by the service (409), not a unique index, because `state` is nullable.
 
 ## 8. Masters
 

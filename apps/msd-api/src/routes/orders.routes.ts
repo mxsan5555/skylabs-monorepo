@@ -3,6 +3,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { PermissionAction } from '@skylabs-monorepo/shared-types';
 import { can } from '@skylabs-monorepo/shared-permissions';
 import { authenticate } from '../middleware/authenticate';
+import { requirePermission } from '../middleware/requirePermission';
 import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema } from '../schemas/common.schema';
@@ -253,12 +254,13 @@ router.get('/:id', requireOrdersOrVendorSelf('view'), validateParams(UuidParamSc
 
 router.patch(
   '/:id/status',
-  requireOrdersOrVendorSelf('status_change'),
+  // D27: members view their own orders only; only orders:status_change (Super Admin, Admin) changes one.
+  requirePermission('orders', 'status_change'),
   validateParams(UuidParamSchema),
   validateBody(OrderStatusUpdateSchema),
   async (req, res, next) => {
     try {
-      const order = await orderService.setOrderStatus(req.user!.sub, res.locals.orderScope, req.params.id, req.body.status, req.body.cancellationReason);
+      const order = await orderService.setOrderStatus(req.params.id, req.body.status, req.body.cancellationReason);
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'order.status_change',

@@ -255,100 +255,6 @@
   background-color: var(--md-sys-color-outline-variant);
 }
 
-/* Offers bento. Phones: one column; 600px: welcome full width over gift + member;
-   840px: welcome spans both rows on the left. */
-.home-offers {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-}
-
-.home-offer {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 24px;
-  border-radius: var(--md-sys-shape-corner-extra-large);
-  overflow: hidden;
-}
-
-.home-offer--welcome {
-  justify-content: flex-end;
-  min-block-size: 360px;
-  color: var(--sky-color-on-scrim);
-  background-color: var(--md-sys-color-scrim);
-}
-
-.home-offer__bg {
-  position: absolute;
-  inset: 0;
-  inline-size: 100%;
-  block-size: 100%;
-  object-fit: cover;
-}
-
-.home-offer__content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  max-inline-size: 420px;
-}
-
-.home-offer__title {
-  margin: 0;
-  font-size: clamp(var(--md-sys-typescale-headline-large-size), 1.5rem + 2vw, var(--md-sys-typescale-display-medium-size));
-  line-height: 1.1;
-  font-weight: 700;
-}
-
-.home-offer__subtitle {
-  margin: 0;
-  font-size: var(--md-sys-typescale-title-large-size);
-  line-height: var(--md-sys-typescale-title-large-line-height);
-  font-weight: var(--md-sys-typescale-title-medium-weight);
-}
-
-.home-offer__text {
-  margin: 0 0 8px;
-  max-inline-size: 44ch;
-  font-size: var(--md-sys-typescale-body-large-size);
-  line-height: var(--md-sys-typescale-body-large-line-height);
-}
-
-.home-offer--welcome .home-offer__text {
-  margin-block-end: 12px;
-}
-
-/* M3 filled button look on a light-DOM link (crawlable in prerendered HTML). */
-.home-offer__cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-block-size: 40px;
-  padding-inline: 24px;
-  border-radius: var(--md-sys-shape-corner-full);
-  background-color: var(--md-sys-color-primary);
-  color: var(--md-sys-color-on-primary);
-  text-decoration: none;
-  transition: background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
-}
-
-.home-offer__cta:hover {
-  background-color: color-mix(in srgb,
-      var(--md-sys-color-on-primary) calc(var(--md-sys-state-hover-state-layer-opacity) * 100%),
-      var(--md-sys-color-primary));
-}
-
-.home-offer__cta:focus-visible {
-  outline: 3px solid var(--md-sys-color-primary);
-  outline-offset: 2px;
-}
-
 /* Treatment directory */
 .home-directory {
   display: grid;
@@ -421,19 +327,6 @@
     border: 0;
     box-shadow: var(--sky-elevation-2);
   }
-
-  .home-offers {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .home-offer {
-    padding: 32px;
-  }
-
-  .home-offer--welcome,
-  .home-offers--member .home-offer--gift {
-    grid-column: 1 / -1;
-  }
 }
 
 @media (min-width: 840px) {
@@ -441,26 +334,6 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
     gap: 48px;
   }
-
-  .home-offers {
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-    grid-template-rows: auto auto;
-    gap: 20px;
-  }
-
-  .home-offer--welcome {
-    grid-column: auto;
-    grid-row: span 2;
-    min-block-size: 420px;
-  }
-
-  .home-offers--member .home-offer--gift {
-    grid-column: auto;
-    grid-row: span 2;
-  }
-
-  /* The copy column is at most 32px padding + 420px wide, so the scrim stays at 70% or more
-     up to 460px (or 80% of a narrower card) and only fades beyond the text. */
 
   .home-steps {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -496,4 +369,11 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr);
     gap: 48px;
   }
+}
+
+/* Hero slider (PLANNING §7): card plus its own Book / Buy button. */
+.home-hero__slide {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
 }
