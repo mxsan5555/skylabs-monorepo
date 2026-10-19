@@ -1006,6 +1006,26 @@
       "message": "Cancel this order?",
       "cancel": "Keep order",
       "confirm": "Cancel order"
+    },
+    "verification": {
+      "heading": "Purchase verification",
+      "voucherLabel": "Voucher code",
+      "statusLabel": "Status",
+      "raiseIssue": {
+        "cta": "Raise Issue",
+        "dialogTitle": "Raise an issue",
+        "reasonLabel": "Reason",
+        "descriptionLabel": "Tell us more (optional)",
+        "submit": "Submit",
+        "cancel": "Cancel",
+        "success": "Your issue has been raised.",
+        "error": "Could not raise this issue."
+      },
+      "disputeStatus": {
+        "OPEN": "Issue raised — pending review",
+        "UNDER_REVIEW": "Issue under review",
+        "RESOLVED": "Issue resolved"
+      }
     }
   },
   "meta": {

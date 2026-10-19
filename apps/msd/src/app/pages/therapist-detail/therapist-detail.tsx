@@ -9,18 +9,25 @@ import { Breadcrumb } from '../../components/breadcrumb';
 import { TherapistAddToCartDialog } from '../../components/therapist-add-to-cart-dialog';
 import { pluralize } from '../../../utils/format';
 import { resolveTherapistMedia } from '../../../utils/media';
+import { therapistPath } from '../../seo/public-urls';
+import { absoluteUrl } from '../../seo/site-url';
 import './therapist-detail.css';
 /**
- * Therapist Detail — GET /catalog/therapists/:id. The customer-facing purchase entry point for
- * adding a Therapist to cart directly: Therapist Listing → here → select a package → Add to
- * Cart, entirely independent of Deal (never requires selecting a Deal first — see msd-api's
- * Therapist schema doc comment). A Therapist is a normal purchasable OrderItem exactly like a
- * Deal or Product — there is no Book Now path. Reuses `deal-detail.css`'s layout classes for
- * visual consistency with the Deal detail page, without pulling in any Deal-specific logic
- * (siblings, wishlist — none of those concepts apply to a Therapist purchased directly).
+ * Therapist Detail — GET /catalog/therapists/:slug (also accepts a legacy UUID, see msd-api's
+ * `getPublicTherapistOrThrow`). The customer-facing purchase entry point for adding a Therapist
+ * to cart directly: Therapist Listing → here → select a package → Add to Cart, entirely
+ * independent of Deal (never requires selecting a Deal first — see msd-api's Therapist schema
+ * doc comment). A Therapist is a normal purchasable OrderItem exactly like a Deal or Product —
+ * there is no Book Now path. Reuses `deal-detail.css`'s layout classes for visual consistency
+ * with the Deal detail page, without pulling in any Deal-specific logic (siblings, wishlist —
+ * none of those concepts apply to a Therapist purchased directly).
+ *
+ * A legacy UUID resolves to the same therapist, then this page client-navigates to the
+ * canonical `/therapist/:slug` path (`replace`) — see DealDetail's own doc comment on why this
+ * isn't a true HTTP 301/308.
  */
 export function TherapistDetail() {
-  const { id = '' } = useParams<{ id: string }>();
+  const { slug: id = '' } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
@@ -32,6 +39,10 @@ export function TherapistDetail() {
   const [activeImg, setActiveImg] = useState(0);
 
   useEffect(() => {
+    // Guards against a slower, now-stale request landing after a newer one and overwriting
+    // fresh state with old data (see ProductDetail's/DealDetail's identical comment).
+    let cancelled = false;
+
     if (!id) {
       setTherapist(null);
       setError('Invalid therapist.');
@@ -41,16 +52,26 @@ export function TherapistDetail() {
     setLoading(true);
     setError('');
     getCatalogTherapist(id)
-      .then(({ data }) => setTherapist(data))
+      .then(({ data }) => { if (!cancelled) setTherapist(data); })
       .catch((err: unknown) => {
+        if (cancelled) return;
         if (err instanceof ApiRequestError && err.status === 404) {
           setTherapist(null);
           return;
         }
         setError(err instanceof ApiRequestError ? err.message : 'Could not load this therapist.');
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
+  useEffect(() => {
+    if (!therapist) return;
+    const canonical = therapistPath(therapist);
+    if (canonical !== location.pathname) navigate(canonical, { replace: true });
+  }, [therapist, location.pathname, navigate]);
   if (loading) {
     return <p className="loading-state">Loading therapist…</p>;
   }
@@ -77,6 +98,8 @@ export function TherapistDetail() {
         name="description"
         content={`Book ${therapist.therapistType} ${therapist.personName}${therapist.vendor?.businessName ? ` at ${therapist.vendor.businessName}` : ''}.`}
       />
+      {absoluteUrl(therapistPath(therapist)) && <link rel="canonical" href={absoluteUrl(therapistPath(therapist))} />}
+      {absoluteUrl(therapistPath(therapist)) && <meta property="og:url" content={absoluteUrl(therapistPath(therapist))} />}
       <Breadcrumb
         className="therapist-detail__breadcrumb"
         items={[
@@ -136,7 +159,9 @@ export function TherapistDetail() {
             </p>
           )}
           {therapist.specialization && <p>{therapist.specialization}</p>}
-          {therapist.bio && <p>{therapist.bio}</p>}
+          {/* `bio` is sanitized HTML from msd-api's `sanitizeRichText` allow-list — see
+            api/catalog.ts's own doc comment on CatalogTherapist. */}
+          {therapist.bio && <div dangerouslySetInnerHTML={{ __html: therapist.bio }} />}
           <Divider />
           {fromPrice != null && (
             <div className="therapist-detail__price-row">

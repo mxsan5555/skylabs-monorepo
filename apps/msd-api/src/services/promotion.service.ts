@@ -147,6 +147,18 @@ export async function setPromotionPrimaryImage(promotionId: string, imageId: str
 /** Public Home page read — only currently-active promotions inside their (optional) visibility
  *  window. Never trusts a caller-supplied status/visibility override — same hard-coded
  *  server-side filter discipline as `VISIBLE_DEAL_WHERE`/`blog-post.service.ts`'s public reads. */
+/** Mirrors `catalog.service.ts`'s `VISIBLE_DEAL_WHERE` bar exactly (active + approved deal, at
+ *  an active vendor and active branch) — duplicated rather than imported because
+ *  `catalog.service.ts` already imports `getPublicPromotions` FROM this file (see that file's
+ *  own doc comment on the home-hero circular-import precedent this follows), so importing back
+ *  would be circular. Applied as a post-fetch check (not a `where` on the `deal` include) so a
+ *  promotion whose linked Deal has since become unavailable (deal deactivated, OR its vendor
+ *  suspended) degrades to `deal: null` instead of disappearing the whole promotion or, worse,
+ *  still linking to a now-hidden Deal. */
+function dealStillVisible(deal: { status: string; approvalStatus: string; vendor: { status: string } | null; branch: { isActive: boolean } | null }): boolean {
+  return deal.status === 'ACTIVE' && deal.approvalStatus === 'APPROVED' && deal.vendor?.status === 'ACTIVE' && deal.branch?.isActive === true;
+}
+
 export async function getPublicPromotions() {
   const now = new Date();
   const promotions = await prisma.promotion.findMany({
@@ -160,7 +172,17 @@ export async function getPublicPromotions() {
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
     include: {
       category: { select: { id: true, name: true, slug: true } },
-      deal: { select: { id: true, title: true, slug: true } },
+      deal: {
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          status: true,
+          approvalStatus: true,
+          vendor: { select: { status: true } },
+          branch: { select: { isActive: true } },
+        },
+      },
       mediaImages: { orderBy: { sortOrder: 'asc' as const } },
     },
   });
@@ -172,7 +194,7 @@ export async function getPublicPromotions() {
     destinationType: p.destinationType,
     destinationRoute: p.destinationRoute,
     category: p.category,
-    deal: p.deal,
+    deal: p.deal && dealStillVisible(p.deal) ? { id: p.deal.id, title: p.deal.title, slug: p.deal.slug } : null,
     image: p.mediaImages.find((img) => img.isPrimary)?.storageKey ?? p.mediaImages[0]?.storageKey ?? null,
   }));
 }

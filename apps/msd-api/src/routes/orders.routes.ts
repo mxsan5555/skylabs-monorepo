@@ -11,6 +11,7 @@ import {
   OrderCustomerCancelSchema,
   OrderStatusUpdateSchema,
   OrderListQuerySchema,
+  OrderCountsQuerySchema,
 } from '../schemas/order.schema';
 import { VerifyPaymentSchema, OrderBatchSchema, VerifyBatchPaymentSchema } from '../schemas/payment.schema';
 import * as orderService from '../services/order.service';
@@ -222,7 +223,7 @@ router.post('/pay-batch/verify', validateBody(VerifyBatchPaymentSchema), async (
 
 router.get('/', requireOrdersOrVendorSelf('view'), validateQuery(OrderListQuerySchema), async (req, res, next) => {
   try {
-    const { page, pageSize, status, vendorId, branchId, customerId, paymentStatus, createdFrom, createdTo, search } = req.validatedQuery as ReturnType<typeof OrderListQuerySchema.parse>;
+    const { page, pageSize, status, vendorId, branchId, customerId, excludeOrderId, paymentStatus, createdFrom, createdTo, search } = req.validatedQuery as ReturnType<typeof OrderListQuerySchema.parse>;
     const { items, total } = await orderService.listOrders(req.user!.sub, {
       page,
       pageSize,
@@ -230,6 +231,7 @@ router.get('/', requireOrdersOrVendorSelf('view'), validateQuery(OrderListQueryS
       vendorId,
       branchId,
       customerId,
+      excludeOrderId,
       paymentStatus,
       createdFrom,
       createdTo,
@@ -241,9 +243,30 @@ router.get('/', requireOrdersOrVendorSelf('view'), validateQuery(OrderListQueryS
   }
 });
 
+router.get('/counts', requireOrdersOrVendorSelf('view'), validateQuery(OrderCountsQuerySchema), async (req, res, next) => {
+  try {
+    const { vendorId, branchId, customerId, excludeOrderId, createdFrom, createdTo, search } = req.validatedQuery as ReturnType<typeof OrderCountsQuerySchema.parse>;
+    const counts = await orderService.getOrderCounts(req.user!.sub, { vendorId, branchId, customerId, excludeOrderId, createdFrom, createdTo, search });
+    sendData(res, counts);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/:id', requireOrdersOrVendorSelf('view'), validateParams(UuidParamSchema), async (req, res, next) => {
   try {
     sendData(res, await orderService.getOrderOrThrow(req.user!.sub, req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Same guard as GET /:id — the order-activity timeline is visible to whoever can already see the
+// order itself (never the narrower rbac.audit-logs:view, which is a different admin-only grant —
+// see getOrderActivityHistory's own doc comment).
+router.get('/:id/activity', requireOrdersOrVendorSelf('view'), validateParams(UuidParamSchema), async (req, res, next) => {
+  try {
+    sendData(res, await orderService.getOrderActivityHistory(req.user!.sub, req.params.id));
   } catch (err) {
     next(err);
   }

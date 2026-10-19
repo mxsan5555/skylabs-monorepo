@@ -1,6 +1,7 @@
-import { createElement, useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { createElement, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import '@skylabs-monorepo/shared-ui';
+import '@skylabs-monorepo/shared-ui/editor';
 import { FilledButton, OutlinedButton, Icon } from '@skylabs-monorepo/shared-ui/react';
 import {
   createDeal,
@@ -21,6 +22,7 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
+import { MediaUploader } from '../../../components/media-uploader';
 
 interface DealFormPageProps {
   token: string | null;
@@ -90,6 +92,32 @@ function renderTextField({
     rows,
     onInput: (e: DrivenChangeEvent) => onInput(e.currentTarget.value),
   });
+}
+
+/** Raw `<sky-rich-text-editor>` (Quill-backed, see `@skylabs-monorepo/shared-ui/editor`'s own
+ *  doc comment) — same raw-element convention as `renderSelect`/`renderTextField` above, for the
+ *  same jsdom/`@lit/react` testability reason. A real React *component* (not a plain
+ *  element-returning function like `renderTextField`) because its `sky-change` event is a
+ *  custom DOM event — React's `onX` prop convention only auto-wires known synthetic DOM events,
+ *  so `onsky-change={...}` silently does nothing on a custom element (confirmed live: typed
+ *  content never reached form state). `addEventListener` via a ref is the actual fix, same
+ *  pattern this codebase already uses for `sky-dt-row-action` etc. Value is HTML; the backend
+ *  sanitizes it server-side (`sanitizeRichText` in vendor.service.ts) before persisting — this
+ *  is UX only. */
+function RichTextField({ label, value, onChange }: { label: string; value: string; onChange: (html: string) => void }) {
+  const ref = useRef<HTMLElement>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const handler = (e: Event) => onChangeRef.current((e as CustomEvent<{ html: string; text: string }>).detail.html);
+    el.addEventListener('sky-change', handler);
+    return () => el.removeEventListener('sky-change', handler);
+  }, []);
+
+  return createElement('sky-rich-text-editor', { ref, label, value });
 }
 
 /** Same convention as `BranchFormPage`'s own `vendorDisplayName`. */
@@ -430,10 +458,27 @@ export function DealFormPage({ token }: DealFormPageProps) {
             {renderTextField({ label: 'Slug', required: true, value: form.slug, error: Boolean(errors.slug), onInput: (value) => set('slug', value) })}
             {errors.slug && <p className="error-state" role="alert">{errors.slug}</p>}
             {renderTextField({ label: 'Short description', value: form.shortDescription, onInput: (value) => set('shortDescription', value) })}
-            {renderTextField({ label: 'Description', type: 'textarea', rows: 4, value: form.description, onInput: (value) => set('description', value) })}
-            {renderTextField({ label: 'Notes', type: 'textarea', rows: 3, value: form.notes, onInput: (value) => set('notes', value) })}
-            {renderTextField({ label: 'Policy', type: 'textarea', rows: 3, value: form.policy, onInput: (value) => set('policy', value) })}
-            {renderTextField({ label: 'Terms & Conditions', type: 'textarea', rows: 3, value: form.termsAndConditions, onInput: (value) => set('termsAndConditions', value) })}
+            <p className="field-hint">Short description stays plain text — it also feeds the public page's meta description, which can&apos;t contain formatting.</p>
+          </div>
+
+          <div className="form-grid">
+            <p className="field-hint">Description — shown on the deal's public page.</p>
+            <RichTextField label="Description" value={form.description} onChange={(html) => set('description', html)} />
+          </div>
+
+          <div className="form-grid">
+            <p className="field-hint">Notes — internal only, never shown to customers.</p>
+            <RichTextField label="Notes" value={form.notes} onChange={(html) => set('notes', html)} />
+          </div>
+
+          <div className="form-grid">
+            <p className="field-hint">Policy — shown on the deal's public page.</p>
+            <RichTextField label="Policy" value={form.policy} onChange={(html) => set('policy', html)} />
+          </div>
+
+          <div className="form-grid">
+            <p className="field-hint">Terms &amp; Conditions — shown on the deal's public page.</p>
+            <RichTextField label="Terms & Conditions" value={form.termsAndConditions} onChange={(html) => set('termsAndConditions', html)} />
           </div>
         </sky-accordion-item>
 
@@ -471,6 +516,21 @@ export function DealFormPage({ token }: DealFormPageProps) {
               <Icon slot="icon" aria-hidden="true">add</Icon>
               Add package
             </OutlinedButton>
+          </div>
+        </sky-accordion-item>
+
+        <sky-accordion-item header="Media (Images &amp; Video)" disabled={!branchChosen}>
+          <div className="form-grid">
+            <p className="field-hint">The deal's photos and an optional short video — shown on its public page.</p>
+            <MediaUploader
+              entityType="deal"
+              entityId={deal?.id ?? null}
+              branchId={form.branchId}
+              vendorId={vendorId}
+              existingImages={deal?.mediaImages ?? []}
+              existingVideo={deal?.mediaVideo ?? null}
+              token={token}
+            />
           </div>
         </sky-accordion-item>
 

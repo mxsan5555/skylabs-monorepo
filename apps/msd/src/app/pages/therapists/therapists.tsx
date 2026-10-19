@@ -7,6 +7,7 @@ import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { formatINR } from '../../../utils/format';
 import { resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
+import { therapistPath } from '../../seo/public-urls';
 import '../category/category.css';
 
 /** Lowest active package price, for the listing card's "From ₹X" line — null when this
@@ -89,7 +90,7 @@ export function Therapists() {
                       tag={t.popularTags?.[0]?.name}
                       pricePrefix={price != null ? 'From' : undefined}
                       price={price != null ? formatINR(price) : undefined}
-                      href={`/therapist/${t.id}`}
+                      href={therapistPath(t)}
                     />
                   </li>
                 );

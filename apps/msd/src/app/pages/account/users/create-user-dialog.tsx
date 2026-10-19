@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
-import { Dialog, FilledButton, OutlinedTextField, TextButton, Icon } from '@skylabs-monorepo/shared-ui/react';
+import { Dialog, FilledButton, OutlinedTextField, OutlinedSelect, SelectOption, TextButton, Icon } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { createUser, type UserRecord } from '../../../../api/rbac/users';
 import { ApiRequestError } from '../../../../api/rbac/client';
@@ -8,25 +8,25 @@ import type { Role } from '../../../../api/rbac/roles';
 import { extractFieldErrors } from '../../../../utils/field-errors';
 import content from '../../../../content.json';
 import { validateEmail, validatePhone } from '../../../../utils/validation';
-type CreateUserFieldKey = 'name' | 'email' | 'phone';
+type CreateUserFieldKey = 'name' | 'email' | 'phone' | 'roleId';
+
+/** Eligible internal staff roles — Member ("vendor") is excluded here even though `roles` (from
+ *  `GET /rbac/roles`) already excludes Customer server-side, since Member must never be an
+ *  option in staff Add/Edit even though it's still shown in Role Management itself. */
+export function eligibleStaffRoles(roles: Role[]): Role[] {
+  return roles.filter((r) => r.key !== 'vendor');
+}
 
 export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreated: (user: UserRecord) => void }) {
   const { token } = useAuth();
   const dialogRef = useRef<MdDialog>(null);
   const [form, setForm] = useState({ name: '', email: '', phone: '' });
-  const [roleIds, setRoleIds] = useState<Set<string>>(new Set());
+  const [roleId, setRoleId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<CreateUserFieldKey, string>> | null>(null);
 
-  const toggleRole = (roleId: string) => {
-    setRoleIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(roleId)) next.delete(roleId);
-      else next.add(roleId);
-      return next;
-    });
-  };
+  const staffRoles = eligibleStaffRoles(roles);
 
   const submit = async () => {
     setError('');
@@ -56,6 +56,11 @@ export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreate
       errors.phone = content.validation.phone.invalid;
     }
 
+    if (!roleId) {
+      setError('Select one role.');
+      return;
+    }
+
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       setError('Fix the highlighted fields and try again.');
@@ -69,12 +74,12 @@ export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreate
         name,
         email: email || undefined,
         phone: phone || undefined,
-        roleIds: Array.from(roleIds),
+        roleId,
       });
 
       onCreated(data);
       setForm({ name: '', email: '', phone: '' });
-      setRoleIds(new Set());
+      setRoleId('');
       dialogRef.current?.close();
     } catch (err) {
       const fields = extractFieldErrors<CreateUserFieldKey>(err);
@@ -126,15 +131,18 @@ export function CreateUserDialog({ roles, onCreated }: { roles: Role[]; onCreate
             error={Boolean(fieldErrors?.phone)}
           />
           {fieldErrors?.phone && <p className="error-state" role="alert">{fieldErrors.phone}</p>}
-          <fieldset>
-            <legend>Roles</legend>
-            {roles.map((role) => (
-              <label key={role.id} className="widget-assign-row__label">
-                <input type="checkbox" checked={roleIds.has(role.id)} onChange={() => toggleRole(role.id)} />
-                {role.name}
-              </label>
+          <OutlinedSelect
+            label="Role"
+            required
+            value={roleId}
+            onChange={(e: Event) => setRoleId((e.target as HTMLSelectElement).value)}
+          >
+            {staffRoles.map((role) => (
+              <SelectOption key={role.id} value={role.id}>
+                <div slot="headline">{role.name}</div>
+              </SelectOption>
             ))}
-          </fieldset>
+          </OutlinedSelect>
           {error && <p className="error-state" role="alert">{error}</p>}
         </div>
         <div slot="actions">

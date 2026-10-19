@@ -1,69 +1,50 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { PendingVendorOwner } from './vendor-user-picker';
 import type { Vendor } from '../../../../api/rbac/vendors';
-import { ApiRequestError } from '../../../../api/rbac/client';
 
-const navigateMock = vi.fn();
-
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
-  return {
-    ...actual,
-    useNavigate: () => navigateMock,
-  };
-});
-
-const createVendorMock = vi.fn();
 const updateVendorMock = vi.fn();
-
-vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
-  useAuth: () => ({ token: 'tok', can: () => true }),
-}));
+const listBranchesMock = vi.fn();
+const getVendorCategoryAccessMock = vi.fn();
 
 vi.mock('../../../../api/rbac/vendors', async () => {
   const actual = await vi.importActual<typeof import('../../../../api/rbac/vendors')>('../../../../api/rbac/vendors');
   return {
     ...actual,
-    createVendor: (...args: unknown[]) => createVendorMock(...args),
     updateVendor: (...args: unknown[]) => updateVendorMock(...args),
+    listBranches: (...args: unknown[]) => listBranchesMock(...args),
+    getVendorCategoryAccess: (...args: unknown[]) => getVendorCategoryAccessMock(...args),
+    getVendor: vi.fn().mockResolvedValue({ data: {} }),
   };
 });
 
-// VendorUserPicker itself can't be driven via simulated typing under this repo's documented
-// jsdom + @lit/react gap (see vendor-branches.test.tsx's own doc comment on md-outlined-* onInput/
-// onChange never firing) — stubbed here with a button that calls `onChange` with a fixed
-// `PendingVendorOwner` payload, so this suite can test `saveUser`'s own logic (what
-// `vendor-pipeline.tsx` actually owns) in isolation from that unrelated gap.
-vi.mock('./vendor-user-picker', () => ({
-  VendorUserPicker: ({ onChange }: { onChange: (v: PendingVendorOwner | null) => void }) => (
-    <div>
-      <button
-        type="button"
-        onClick={() =>
-          onChange({ ownerFirstName: 'New', ownerLastName: 'Owner', ownerEmail: 'new@example.com', ownerMobile: '9876543210' })
-        }
-      >
-        pick-identity
-      </button>
-    </div>
+// Driving the real VendorProfileForm's md-outlined-text-field inputs hits this repo's documented
+// jsdom + @lit/react gap (see vendor-branches.test.tsx) — stubbed to a button that calls onSave
+// with a fixed payload, so this suite can test VendorPipeline's OWN step-navigation/finish logic
+// in isolation.
+vi.mock('./vendor-profile-form', () => ({
+  VendorProfileForm: ({ saveLabel, onSave }: { saveLabel?: string; onSave: (input: unknown) => void }) => (
+    <button type="button" onClick={() => onSave({ businessName: 'Saved Co' })}>
+      {saveLabel ?? 'Save'}
+    </button>
   ),
+  extractVendorFieldErrors: () => null,
+}));
+
+vi.mock('./vendor-wizard-modules', () => ({
+  VendorProductCategoryAccess: () => <div>product-category-access</div>,
+}));
+
+vi.mock('./vendor-wizard-branches', () => ({
+  VendorBranchListStep: () => <div>branch-list-step</div>,
 }));
 
 import { VendorPipeline } from './vendor-pipeline';
-import { VendorNewPage } from './vendor-new-page';
 
-function findButtonByText(text: string): HTMLElement {
-  const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.trim() === text);
-  if (!button) throw new Error(`Button "${text}" not found`);
-  return button as HTMLElement;
-}
-
-const CREATED_VENDOR: Vendor = {
+const VENDOR: Vendor = {
   id: 'vendor-1',
   businessName: null,
   slug: null,
-  ownerUserId: 'new-user-1',
+  ownerUserId: 'owner-1',
   kycStatus: 'PENDING',
   kycRejectionReason: null,
   status: 'PROFILE_INCOMPLETE',
@@ -74,137 +55,91 @@ const CREATED_VENDOR: Vendor = {
   offersService: false,
   offersProduct: false,
   offersTherapy: false,
-  owner: null,
+  owner: { id: 'owner-1', name: 'Ramesh Kumar', status: 'active', roles: [] },
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  navigateMock.mockReset();
+  listBranchesMock.mockResolvedValue({ data: [] });
+  getVendorCategoryAccessMock.mockResolvedValue({ data: [] });
+  updateVendorMock.mockResolvedValue({ data: VENDOR });
 });
 
 /**
- * Feature: VendorPipeline#saveUser — owner is always a brand-new identity, never an existing User
- * Scenario: the picker only ever supplies typed name/email/mobile fields — there is no
- * "existing user" mode anymore (see `PendingVendorOwner`'s own shape). `saveUser` sends exactly
- * those identity fields, never `ownerUserId`; the backend independently creates the User (or
- * rejects if the email/mobile is already taken).
- *
- * Given: no vendor yet (fresh "Add Vendor")
- * When: the admin types an owner identity and clicks "Create Vendor"
- * Then: createVendor is called with the identity fields only
- *
- * Edge cases:
- * - a failed create (e.g. the backend rejects because the email/phone is already taken) surfaces
- *   its message and does not advance past the picker
- *
- * NOTE: "Create Vendor" being disabled until an owner is picked (`disabled={!pendingOwner ||
- * saving}` on a `createComponent`-wrapped `FilledButton`) is NOT re-verified here — this repo's
- * installed `@lit/react@1.0.8` reflects property bindings (not just event bindings, per
- * `vendor-branches.test.tsx`'s own doc comment) onto the underlying custom element via a
- * `useLayoutEffect` that never fires under this jsdom + React 19 combination, so neither the
- * `.disabled` property nor a `disabled` attribute is ever observable in this test environment
- * regardless of the real (correct) source. Covered instead by direct code review of the
- * `disabled={!pendingOwner || saving}` prop plus this repo's Playwright E2E suite.
+ * Feature: VendorPipeline — all 4 steps (Member User → Business Details → KYC Documents →
+ * Branch & Access)
+ * Scenario: Member User is now a real, always-visible pill (not a separate pre-creation screen) —
+ * editing it goes through the same `VendorProfileForm`/`updateVendor` save path as every other
+ * section, just scoped to `sections={['owner']}`. Default landing step stays Business Details
+ * (the "Complete Profile" button's existing continuation semantics), but all 4 pills are visible
+ * and clickable from the start. One consistent footer per step: Back (+ "Back to Member Details"
+ * on Step 1, which is Cancel in effect) and the step's own Save button — no separate "Save Draft
+ * & Exit" duplicating it.
  */
-describe('VendorPipeline#saveUser — owner is always a brand-new identity', () => {
-  it('redirects back to the vendor list immediately after a fresh vendor is created', async () => {
-    createVendorMock.mockResolvedValue({ data: CREATED_VENDOR });
-    render(<VendorNewPage />);
-
-    fireEvent.click(screen.getByText('pick-identity'));
-    fireEvent.click(findButtonByText('Create Vendor'));
-
-    await waitFor(() => expect(createVendorMock).toHaveBeenCalledOnce());
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith(`/account/vendors/${CREATED_VENDOR.id}/profile`, { replace: true }));
+describe('VendorPipeline — all 4 steps', () => {
+  it('shows all 4 pills (Member User/Business Details/KYC Documents/Branch & Access), defaulting to Business Details', () => {
+    render(<VendorPipeline token="tok" vendor={VENDOR} onVendorChange={vi.fn()} onFinish={vi.fn()} />);
+    expect(screen.getByText('Member User')).toBeTruthy();
+    expect(screen.getByText('Business Details')).toBeTruthy();
+    expect(screen.getByText('KYC Documents')).toBeTruthy();
+    expect(screen.getByText('Branch & Access')).toBeTruthy();
+    expect(screen.getByText('Step 2 of 4: Business Details')).toBeTruthy();
+    expect(screen.queryByText(/Deals/)).toBeNull();
+    expect(screen.queryByText(/Review & Submit/)).toBeNull();
   });
 
-  it('submitting sends ownerFirstName/ownerLastName/ownerEmail/ownerMobile, never ownerUserId', async () => {
-    createVendorMock.mockResolvedValue({ data: CREATED_VENDOR });
-    const onVendorChange = vi.fn();
-    render(<VendorPipeline token="tok" initialVendor={null} onVendorChange={onVendorChange} />);
-
-    fireEvent.click(screen.getByText('pick-identity'));
-    fireEvent.click(findButtonByText('Create Vendor'));
-
-    await waitFor(() => expect(createVendorMock).toHaveBeenCalledOnce());
-    const [token, input] = createVendorMock.mock.calls[0];
-    expect(token).toBe('tok');
-    expect(input).toEqual({
-      ownerFirstName: 'New',
-      ownerLastName: 'Owner',
-      ownerEmail: 'new@example.com',
-      ownerMobile: '9876543210',
-    });
-    expect(input).not.toHaveProperty('ownerUserId');
-    expect(onVendorChange).toHaveBeenCalledWith(CREATED_VENDOR);
+  it('Member User pill is clickable and opens Step 1, even for an already-created member', () => {
+    render(<VendorPipeline token="tok" vendor={VENDOR} onVendorChange={vi.fn()} onFinish={vi.fn()} />);
+    fireEvent.click(screen.getByText('Member User'));
+    expect(screen.getByText('Step 1 of 4: Member User')).toBeTruthy();
   });
 
-  it('a failed create (e.g. email/phone already taken) shows the error and does not call onVendorChange (stays on the picker)', async () => {
-    createVendorMock.mockRejectedValue(
-      new ApiRequestError('CONFLICT', 'A user with this email or phone already exists. Please use a different email/phone to create this Vendor.', 409),
-    );
+  it('"Save & Continue" on Business Details saves the section and advances to KYC Documents', async () => {
     const onVendorChange = vi.fn();
-    render(<VendorPipeline token="tok" initialVendor={null} onVendorChange={onVendorChange} />);
+    render(<VendorPipeline token="tok" vendor={VENDOR} onVendorChange={onVendorChange} onFinish={vi.fn()} />);
 
-    fireEvent.click(screen.getByText('pick-identity'));
-    fireEvent.click(findButtonByText('Create Vendor'));
+    fireEvent.click(screen.getByText('Save & Continue'));
 
-    await waitFor(() =>
-      expect(
-        screen.getByText('A user with this email or phone already exists. Please use a different email/phone to create this Vendor.'),
-      ).toBeTruthy(),
-    );
-    expect(onVendorChange).not.toHaveBeenCalled();
-    expect(screen.getByText('pick-identity')).toBeTruthy(); // still on the picker, not advanced
+    await waitFor(() => expect(updateVendorMock).toHaveBeenCalledWith('tok', 'vendor-1', { businessName: 'Saved Co' }));
+    await waitFor(() => expect(screen.getByText('Step 3 of 4: KYC Documents')).toBeTruthy());
+    expect(onVendorChange).toHaveBeenCalledWith(VENDOR);
   });
-});
 
-/**
- * Feature: VendorPipeline — Rules of Hooks across the vendor-creation transition
- * Scenario: regression test for the real "/account/vendors/new opens straight into the
- * ErrorBoundary" bug (confirmed via a live captured stack trace).
- *
- * Root cause: `refreshVendorAfterKycChange` (a `useCallback`) used to be declared AFTER the
- * `if (!vendor) return ...` early-return guard, further down this same component. On the very
- * first render — no vendor yet, `VendorNewPage` always mounts `VendorPipeline` with
- * `initialVendor={null}` — that early return fires and the hook is never called, so React
- * records one fewer hook for this fiber. The moment `saveUser()` resolves and `vendor` flips
- * from null to the newly-created row on this SAME mounted instance, the component renders past
- * the early return and calls one more hook than the previous render. React detects the mismatch
- * and throws "Rendered more hooks than during the previous render", which the app's top-level
- * ErrorBoundary catches and renders as "Something went wrong" — exactly the point where Step 1
- * (Profile & KYC) should have appeared.
- *
- * The fix moves that `useCallback` above the early return so it's called unconditionally on
- * every render, matching every other hook in this component (Rules of Hooks: same hooks, same
- * order, every render). This suite must `waitFor` all the way to the post-creation Step 1
- * render — asserting only on the `createVendor` call site (as the suite above already does)
- * lets a hook-order exception fire on a later microtask/render commit without ever failing the
- * specific test (confirmed: with the bug reintroduced, vitest logs an "Unhandled Error" but
- * still exits 0 — this suite is what actually turns that into a failing test).
- */
-describe('VendorPipeline — direct /account/vendors/new navigation, initial wizard render (regression: hook-order crash after Create Vendor)', () => {
-  it('never throws when transitioning from no-vendor (fresh "Add Vendor") to a just-created vendor, and Step 1 renders', async () => {
-    createVendorMock.mockResolvedValue({ data: CREATED_VENDOR });
-    const onVendorChange = vi.fn();
+  it('"Save & Continue" on KYC Documents advances to Branch & Access without re-saving Business fields', async () => {
+    render(<VendorPipeline token="tok" vendor={VENDOR} onVendorChange={vi.fn()} onFinish={vi.fn()} />);
+    fireEvent.click(screen.getByText('Save & Continue')); // Business Details -> KYC
+    await waitFor(() => expect(screen.getByText('Step 3 of 4: KYC Documents')).toBeTruthy());
 
-    // Matches the real /account/vendors/new route exactly: VendorNewPage always mounts
-    // VendorPipeline with `initialVendor={null}` (see vendor-new-page.tsx) — the owner-picker
-    // screen is the actual initial wizard render for a direct navigation to that route.
-    render(<VendorPipeline token="tok" initialVendor={null} onVendorChange={onVendorChange} />);
-    expect(screen.getByText('pick-identity')).toBeTruthy();
+    fireEvent.click(screen.getByText('Save & Continue')); // KYC -> Branch & Access
+    await waitFor(() => expect(screen.getByText('Step 4 of 4: Branch & Access')).toBeTruthy());
+  });
 
-    fireEvent.click(screen.getByText('pick-identity'));
-    fireEvent.click(findButtonByText('Create Vendor'));
+  it('"Back to Member Details" on Step 1 calls onFinish without requiring later steps to be complete', () => {
+    const onFinish = vi.fn();
+    render(<VendorPipeline token="tok" vendor={VENDOR} onVendorChange={vi.fn()} onFinish={onFinish} />);
+    fireEvent.click(screen.getByText('Member User'));
+    fireEvent.click(screen.getByText('Back to Member Details'));
+    expect(onFinish).toHaveBeenCalled();
+  });
 
-    // The exact transition that crashed: vendor flips from null to CREATED_VENDOR on the same
-    // mounted VendorPipeline instance. Waiting for Step 1's own heading forces this test through
-    // the render where the hook-order mismatch used to throw, instead of stopping at the
-    // `createVendor` call site.
-    await waitFor(() => expect(screen.getByText('Step 1: Profile & KYC')).toBeTruthy());
-    expect(onVendorChange).toHaveBeenCalledWith(CREATED_VENDOR);
-    // The picker is gone — this is a real step-1 render, not the ErrorBoundary's fallback.
-    expect(screen.queryByText('pick-identity')).toBeNull();
-    expect(screen.queryByText('Something went wrong')).toBeNull();
+  it('Step 4\'s only bottom actions are Back and "Save & Finish" — no separate "Save Draft & Exit" duplicating it', async () => {
+    const onFinish = vi.fn();
+    render(<VendorPipeline token="tok" vendor={VENDOR} onVendorChange={vi.fn()} onFinish={onFinish} />);
+    fireEvent.click(screen.getByText('Save & Continue'));
+    await waitFor(() => screen.getByText('Step 3 of 4: KYC Documents'));
+    fireEvent.click(screen.getByText('Save & Continue'));
+    await waitFor(() => screen.getByText('Step 4 of 4: Branch & Access'));
+
+    expect(screen.queryByText('Save Draft & Exit')).toBeNull();
+    fireEvent.click(screen.getByText('Save & Finish'));
+    expect(onFinish).toHaveBeenCalled();
+  });
+
+  it('"Back" returns to the previous step without losing the member', async () => {
+    render(<VendorPipeline token="tok" vendor={VENDOR} onVendorChange={vi.fn()} onFinish={vi.fn()} />);
+    fireEvent.click(screen.getByText('Save & Continue'));
+    await waitFor(() => screen.getByText('Step 3 of 4: KYC Documents'));
+    fireEvent.click(screen.getByText('Back'));
+    expect(screen.getByText('Step 2 of 4: Business Details')).toBeTruthy();
   });
 });

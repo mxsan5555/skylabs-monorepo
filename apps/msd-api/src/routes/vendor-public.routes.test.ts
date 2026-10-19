@@ -45,7 +45,9 @@ function uniqueBody(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.role.findUnique.mockResolvedValue(VENDOR_ROLE);
-  prismaMock.userRole.upsert.mockResolvedValue({});
+  prismaMock.userRole.deleteMany.mockResolvedValue({});
+  prismaMock.userRole.create.mockResolvedValue({});
+  prismaMock.user.update.mockResolvedValue({});
   prismaMock.auditLog.create.mockResolvedValue({});
   prismaMock.vendor.findUnique.mockResolvedValue(null); // no slug/owner conflict by default
   prismaMock.vendor.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
@@ -123,7 +125,7 @@ describe('POST /api/v1/vendors/public/register', () => {
     expect(res.body.error.message).toMatch(/already exists/);
     expect(prismaMock.user.create).not.toHaveBeenCalled();
     expect(prismaMock.vendor.create).not.toHaveBeenCalled();
-    expect(prismaMock.userRole.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.userRole.create).not.toHaveBeenCalled();
   });
 
   it('rejects with 409 when ownerEmail belongs to User A and ownerMobile belongs to a different User B', async () => {

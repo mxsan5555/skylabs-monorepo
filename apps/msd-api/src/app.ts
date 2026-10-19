@@ -12,7 +12,7 @@ import customersRoutes from './routes/customers.routes';
 import vendorsRoutes from './routes/vendors.routes';
 import vendorPublicRoutes from './routes/vendor-public.routes';
 import categoriesRoutes from './routes/categories.routes';
-import blogPostsRoutes from './routes/blog-posts.routes';
+import blogPostsRoutes, { createBlogPostsRouter } from './routes/blog-posts.routes';
 import blogCategoriesRoutes from './routes/blog-categories.routes';
 import faqsRoutes from './routes/faqs.routes';
 import siteContentRoutes from './routes/site-content.routes';
@@ -36,6 +36,11 @@ import dashboardRoutes from './routes/dashboard.routes';
 import notificationsRoutes from './routes/notifications.routes';
 import customerRoutes from './routes/customersummary.routes';
 import supportRoutes from './routes/support.routes';
+import accountsRoutes from './routes/accounts.routes';
+import settlementsRoutes from './routes/settlements.routes';
+import vouchersRoutes from './routes/vouchers.routes';
+import disputesRoutes from './routes/disputes.routes';
+import refundsRoutes from './routes/refunds.routes';
 /**
  * The Express app, wired up but not listening. Split out of main.ts so Supertest can
  * `import app from '../app'` and drive requests in-process without opening a real port
@@ -89,6 +94,7 @@ export function createApp(): express.Express {
   api.use('/vendors', vendorsRoutes);
   api.use('/categories', categoriesRoutes);
   api.use('/blog-posts', blogPostsRoutes);
+  api.use('/blog-articles', createBlogPostsRouter('cms.blog.articles'));
   api.use('/blog-categories', blogCategoriesRoutes);
   api.use('/faqs', faqsRoutes);
   // site-content.routes.ts declares its own full paths (`/about-us`, `/contact-us`) rather than
@@ -113,6 +119,11 @@ export function createApp(): express.Express {
   api.use('/reports', reportsRoutes);
   api.use('/dashboard', dashboardRoutes);
   api.use('/notifications', notificationsRoutes);
+  api.use('/accounts', accountsRoutes);
+  api.use('/settlements', settlementsRoutes);
+  api.use('/vouchers', vouchersRoutes);
+  api.use('/disputes', disputesRoutes);
+  api.use('/refunds', refundsRoutes);
 
   app.use('/api/v1', api);
 

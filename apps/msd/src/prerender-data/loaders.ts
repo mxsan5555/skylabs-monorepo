@@ -123,6 +123,26 @@ export async function loadHomeData(): Promise<HomeData> {
   };
 }
 
+/** Every currently-visible Deal/Product/Therapist slug, for the sitemap — reuses the same
+ *  public catalog endpoints the storefront itself calls, so a suspended/inactive vendor's items
+ *  (already excluded by `VISIBLE_DEAL_WHERE`/`VISIBLE_PRODUCT_WHERE`/`VISIBLE_THERAPIST_WHERE`
+ *  server-side) are never listed here either — no separate "is this public" check needed.
+ *  Capped at `SITEMAP_PAGE_SIZE` per catalog (a single page) — fine at this catalog's current
+ *  scale; a catalog that outgrows one page needs this to paginate, flagged here rather than
+ *  silently truncated forever. A failing list yields [] for that catalog, same "non-critical"
+ *  tolerance as `loadShellData`. */
+const SITEMAP_PAGE_SIZE = 500;
+export async function loadSitemapSlugs(): Promise<{ deals: string[]; products: string[]; therapists: string[] }> {
+  const [deals, products, therapists] = await Promise.allSettled([
+    listCatalogDeals({ pageSize: SITEMAP_PAGE_SIZE }),
+    listCatalogProducts({ pageSize: SITEMAP_PAGE_SIZE }),
+    listCatalogTherapists({ pageSize: SITEMAP_PAGE_SIZE }),
+  ]);
+  const slugsOf = (r: typeof deals | typeof products | typeof therapists) =>
+    valueOr(r as PromiseSettledResult<{ data: { id: string; slug?: string | null }[] | null | undefined }>).map((row) => row.slug || row.id);
+  return { deals: slugsOf(deals), products: slugsOf(products), therapists: slugsOf(therapists) };
+}
+
 /** A category and its unfiltered ("All" tab) deals, optionally for one city. A 404 slug returns
  *  `{ category: null, deals: [] }`; any other failure rejects. */
 export async function loadCategoryData(slug: string, city?: string, state?: string): Promise<CategoryData> {

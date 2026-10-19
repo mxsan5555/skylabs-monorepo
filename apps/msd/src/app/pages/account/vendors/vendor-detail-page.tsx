@@ -16,6 +16,7 @@ import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
 import { ChoiceMenu, type ChoiceOption } from '../../../components/choice-menu/choice-menu';
 import { CardGrid } from '../../../components/card-grid/card-grid';
 import { ChipNav } from '../../../components/chip-nav/chip-nav';
+import { resolveVendorMedia, primaryImage } from '../../../../utils/media';
 import { BranchesListPage } from './branches-list-page';
 import { DealsListPage } from './deals-list-page';
 import { TherapistsListPage } from './therapists-list-page';
@@ -23,12 +24,65 @@ import { ProductsListPage } from './products-list-page';
 import { VendorDetailCustomers } from './vendor-detail-customers';
 import { VendorDetailOrders } from './vendor-detail-orders';
 import { VendorPipeline } from './vendor-pipeline';
-import { getMissingPoints, getSetupSteps, setupHint, type SetupStep, type SetupStepKey } from './vendor-setup';
+import { getMissingPoints, getSetupSteps, isSetupComplete, setupHint, type SetupStep, type SetupStepKey } from './vendor-setup';
+
+/** Render order for the setup-progress grid — Branches, Deals, Products, Therapists (the Member
+ *  List's own column order) — distinct from `getSetupSteps`' own internal unlock-order array,
+ *  which stays profile/branches/deals/therapists/products so its tested contract is untouched. */
+const CARD_ORDER: SetupStepKey[] = ['branches', 'deals', 'products', 'therapists'];
+
+interface NextAction {
+  label: string;
+  hint: string;
+  href?: string;
+  onClick?: () => void;
+}
+
+/** One highlighted next action, derived entirely from data `getSetupSteps`/`vendor` already
+ *  carry — no new eligibility rule. Priority mirrors the existing unlock order (profile →
+ *  branches → …), then KYC review, then activation, both gated on the same `canApprove`
+ *  permission the page's own Actions menu already uses. */
+function getNextAction(vendor: Vendor, steps: SetupStep[], canApprove: boolean, onActivate: () => void): NextAction | null {
+  const profile = steps.find((s) => s.key === 'profile');
+  const branches = steps.find((s) => s.key === 'branches');
+
+  if (profile && !profile.done) {
+    const onlyKycMissing = profile.missing.length === 1 && profile.missing[0].startsWith('One KYC document');
+    return {
+      label: onlyKycMissing ? 'Upload/Correct KYC Document' : 'Complete Business Profile',
+      hint: onlyKycMissing ? 'Upload a KYC document to continue this member’s setup.' : `Missing: ${profile.missing.join(', ')}`,
+      href: `/account/vendors/${vendor.id}/profile`,
+    };
+  }
+  if (branches && !branches.done) {
+    return {
+      label: 'Add First Branch',
+      hint: 'Add at least one branch to unlock Deals and Therapists.',
+      href: `/account/vendors/${vendor.id}/branches`,
+    };
+  }
+  if ((vendor.kycStatus === 'PENDING' || vendor.kycStatus === 'REJECTED') && canApprove) {
+    return {
+      label: 'Review KYC',
+      hint: 'Verify or reject this member’s uploaded KYC document.',
+      href: `/account/vendors/${vendor.id}/profile`,
+    };
+  }
+  if (isSetupComplete(steps) && vendor.status !== 'ACTIVE' && canApprove) {
+    return {
+      label: 'Activate Member',
+      hint: 'Setup is complete — activate this member to make them visible on the website.',
+      onClick: onActivate,
+    };
+  }
+  return null;
+}
 
 /** No tab strip — the Overview's cards (setup-progress + records) are the navigation, each
  *  Add/Edit/View button sending the admin to that section's own URL, `/account/vendors/:id/:section`.
- *  `profile` still hosts the old six-step wizard and is replaced by the Profile page in a later
- *  step of the plan. */
+ *  `profile` hosts the "Complete Profile" continuation (Steps 2-4 of 4: Business Details, KYC
+ *  Documents, Branch & Access — see `vendor-pipeline.tsx`); Step 1 (Owner & Login) already
+ *  happened on `/account/vendors/new` before this page is ever reached for a given member. */
 const SECTIONS = [
   { key: 'profile', label: 'Profile & setup' },
   { key: 'branches', label: 'Branches' },
@@ -322,16 +376,26 @@ export function VendorDetailPage() {
   }
 
   const copy = pending ? ACTION_COPY[pending] : null;
+  const nextAction = getNextAction(vendor, steps, canApprove, doApprove);
 
   return (
     <div className="admin-page admin-page--wide">
       <title>{`${name} · ${section ? SECTION_LABEL[section] : 'Overview'} · MSD`}</title>
       <header className="page-head">
+        <sky-image
+          src={primaryImage(resolveVendorMedia(vendor)) ?? vendor.logoUrl ?? undefined}
+          alt=""
+          ratio="1 / 1"
+          shape="full"
+          className="member-avatar"
+        />
         <div>
           <h1>{name}</h1>
           <p>
             <sky-badge variant={statusBadgeVariant(vendor.status)}>{STATUS_LABEL[vendor.status] ?? vendor.status}</sky-badge>
           </p>
+          <p className="field-hint">{vendor.owner?.name ?? 'No owner linked yet'} · {vendor.businessPhone || vendor.ownerMobile || 'No contact number'}</p>
+          <p className="field-hint member-created-by">Created by {vendor.createdByName ?? 'Not recorded'} · {new Date(vendor.createdAt).toLocaleDateString()}</p>
         </div>
         <div className="page-head__actions">
           {actionOptions.length > 0 && (
@@ -376,12 +440,26 @@ export function VendorDetailPage() {
       {!section && (
         <div className="admin-tab-panel summary-layout" aria-label="Overview">
           <div>
+            {nextAction && (
+              <sky-feature-card
+                color="primary"
+                variant="filled"
+                icon="arrow_forward"
+                headline={nextAction.label}
+                text={nextAction.hint}
+              >
+                <FilledButton slot="actions" onClick={nextAction.onClick ?? (() => navigate(nextAction.href as string))}>
+                  {nextAction.label}
+                </FilledButton>
+              </sky-feature-card>
+            )}
+
             <section aria-labelledby="setup-progress-title">
               <h2 id="setup-progress-title" className="section-title">Setup progress</h2>
               <p className="field-hint">{setupHint(steps)}</p>
               <CardGrid layout="compact">
-                {steps
-                  .filter((step) => step.key !== 'profile')
+                {CARD_ORDER.map((key) => stepByKey(key))
+                  .filter((step): step is SetupStep => Boolean(step))
                   .map((step) => (
                     <SetupCard key={step.key} step={step} href={step.locked ? undefined : `/account/vendors/${vendorId}/${STEP_SECTION[step.key]}`} />
                   ))}
@@ -424,14 +502,11 @@ export function VendorDetailPage() {
         <div className="admin-tab-panel" aria-label="Profile and setup">
           <VendorPipeline
             token={token}
-            initialVendor={vendor}
+            vendor={vendor}
             onVendorChange={handlePipelineChange}
+            onFinish={() => goToSection(undefined)}
             canReviewKyc={canApprove}
             onKycReview={doKycReview}
-            canApprove={canApprove && vendor.status !== 'ACTIVE'}
-            canReject={canReject && vendor.status !== 'REJECTED'}
-            onApprove={doApprove}
-            onReject={() => runAction('reject')}
           />
         </div>
       )}
@@ -557,6 +632,11 @@ function MemberSummaryCard({
           <Icon slot="start" aria-hidden="true">verified_user</Icon>
           <div slot="headline">{KYC_LABEL[vendor.kycStatus] ?? vendor.kycStatus}</div>
           <div slot="supporting-text">Identity check (KYC)</div>
+        </ListItem>
+        <ListItem>
+          <Icon slot="start" aria-hidden="true">history_edu</Icon>
+          <div slot="headline">{vendor.createdByName ?? 'Not recorded'}</div>
+          <div slot="supporting-text">Created by · {new Date(vendor.createdAt).toLocaleDateString()}</div>
         </ListItem>
       </List>
 

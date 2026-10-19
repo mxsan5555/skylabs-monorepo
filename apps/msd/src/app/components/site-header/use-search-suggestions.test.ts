@@ -133,7 +133,7 @@ describe('useSearchSuggestions', () => {
       expect.objectContaining({ search: 'massage', latitude: 18.5, longitude: 73.8 }),
     );
     const dealsGroup = result.current.groups.find((g) => g.key === 'deals');
-    expect(dealsGroup?.items).toEqual([{ id: 'd1', label: 'Hot Stone Massage', sublabel: undefined, href: '/deal/d1' }]);
+    expect(dealsGroup?.items).toEqual([{ id: 'd1', label: 'Hot Stone Massage', sublabel: undefined, href: '/deal/full-body-massage' }]);
   });
 
   it('collapses rapid keystrokes into a single fetch for the latest query only', async () => {
@@ -188,7 +188,7 @@ describe('useSearchSuggestions', () => {
     });
 
     expect(result.current.groups.find((g) => g.key === 'products')?.items).toEqual([
-      { id: 'p1', label: 'Massage Oil', sublabel: 'AromaCo', href: '/products/p1' },
+      { id: 'p1', label: 'Massage Oil', sublabel: 'AromaCo', href: '/products/massage-oil' },
     ]);
     expect(result.current.groups.find((g) => g.key === 'therapists')?.items).toEqual([
       { id: 't1', label: 'Asha Kumar', sublabel: 'Legs Therapist', href: '/therapist/t1' },

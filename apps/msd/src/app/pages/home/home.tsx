@@ -21,6 +21,7 @@ import { PageSection } from '../../components/page-section/page-section';
 import { Seo } from '../../seo/seo';
 import { faqPageJsonLd, itemListJsonLd, type JsonLdObject } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
+import { dealPath, productPath, therapistPath } from '../../seo/public-urls';
 import { CategoryTiles } from './category-tiles';
 import { DealsNearYou } from './deals-near-you';
 import { HomeFaq } from './home-faq';
@@ -69,7 +70,7 @@ export function Home() {
             .slice(0, HOME_RAIL_SIZE)
             .map((d) => ({
               name: d.title,
-              path: `/deal/${d.id}`,
+              path: dealPath(d),
               price: Number(d.salePrice),
               image: primaryImage(resolveDealMedia(d)) || undefined,
             })),
@@ -139,7 +140,7 @@ export function Home() {
                     tag={therapist.popularTags?.[0]?.name}
                     pricePrefix={price != null ? home.ui.labels.from : undefined}
                     price={price != null ? formatINR(price) : undefined}
-                    href={`/therapist/${therapist.id}`}
+                    href={therapistPath(therapist)}
                   />
                 </swiper-slide>
               );
@@ -160,7 +161,7 @@ export function Home() {
               <swiper-slide key={product.id} className="card-rail__slide">
                 <DealCard
                   deal={toProductCardDeal(product)}
-                  href={`/products/${product.id}`}
+                  href={productPath(product)}
                   favoriteActive={signedIn && has(product.id)}
                   onFavorite={() => handleFavorite(product.id)}
                 />

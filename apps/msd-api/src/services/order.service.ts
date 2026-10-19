@@ -9,8 +9,46 @@ import { env } from '../config/env';
 
 type OrderContactDetails = z.infer<typeof OrderContactDetailsSchema>;
 
+/** Base fields both the customer-facing and admin/vendor-facing entitlement selects need —
+ *  factored out so neither duplicates the other's voucher-identity columns. Never the OTP hash
+ *  (`CompletionOtpChallenge` is a wholly separate model, never selected/joined here at all). */
+const ENTITLEMENT_BASE_SELECT = {
+  id: true,
+  voucherCode: true,
+  fulfilmentKind: true,
+  entitlementStatus: true,
+} as const;
+
+/**
+ * Admin/vendor-facing entitlement columns for the Order Details page's "Service/Delivery/
+ * Voucher" section — adds settlement status + carrier/tracking/delivery-evidence on top of the
+ * shared base. Deliberately still narrow: no `grossAmount`/`commissionAmount`/`memberShareAmount`/
+ * `payoutItemId` (payout internals belong to Member Settlements, not the order view) and, same
+ * discipline as `CUSTOMER_ORDER_INCLUDE` below, never the OTP hash.
+ */
+const ADMIN_ENTITLEMENT_SELECT = {
+  ...ENTITLEMENT_BASE_SELECT,
+  settlementStatus: true,
+  carrier: true,
+  trackingNumber: true,
+  shippedAt: true,
+  deliveryEvidenceStorageKey: true,
+  deliveryEvidenceNote: true,
+} as const;
+
 const ORDER_INCLUDE = {
-  items: true,
+  items: {
+    include: {
+      // Narrow, admin/vendor-facing entitlement view — see ADMIN_ENTITLEMENT_SELECT's own doc
+      // comment. Additive: every existing admin/vendor caller of ORDER_INCLUDE (checkout,
+      // listOrders, getOrderOrThrow, setOrderStatus) now also gets this on each item, unused
+      // unless read.
+      purchaseEntitlements: {
+        orderBy: { sequenceNo: 'asc' as const },
+        select: ADMIN_ENTITLEMENT_SELECT,
+      },
+    },
+  },
   // Minimal, non-sensitive customer summary — only what a vendor/admin actually needs for
   // fulfilment (name + a contact channel). Never session/KYC/audit data.
   customer: { select: { id: true, name: true, phone: true, email: true } },
@@ -70,6 +108,25 @@ const CUSTOMER_ORDER_INCLUDE = {
           },
         },
       },
+      // Voucher/entitlement data for the owning customer only — reachable exclusively via
+      // CUSTOMER_ORDER_INCLUDE (never ORDER_INCLUDE, which admin/vendor callers get), and this
+      // whole include is itself only ever read for the row's own customerId (see
+      // listMyOrders/getMyOrderOrThrow below). Deliberately a narrow `select`, never the raw
+      // PurchaseEntitlement row: no OTP hash, no payout/bank internals, no other customer's data
+      // (every entitlement here belongs to this same order's customer by construction) — just
+      // enough for "see your voucher code + status, raise an issue against it", matching
+      // apps/msd's `OrderItem['entitlements']` shape exactly.
+      purchaseEntitlements: {
+        orderBy: { sequenceNo: 'asc' as const },
+        select: {
+          ...ENTITLEMENT_BASE_SELECT,
+          disputes: {
+            orderBy: { createdAt: 'desc' as const },
+            take: 1,
+            select: { id: true, status: true, resolutionType: true },
+          },
+        },
+      },
     },
   },
 } as const;
@@ -89,7 +146,7 @@ function firstMediaImage(images: { storageKey: string; isPrimary: boolean }[]): 
 function addCustomerOrderItemImages(order: CustomerOrder) {
   return {
     ...order,
-    items: order.items.map(({ deal, product,therapist, ...item }) => {
+    items: order.items.map(({ deal, product, therapist, purchaseEntitlements = [], ...item }) => {
       let imageKey: string | null = null;
 
       if (deal) {
@@ -106,6 +163,13 @@ function addCustomerOrderItemImages(order: CustomerOrder) {
       return {
         ...item,
         image: getPublicImageUrl(imageKey),
+        // Flatten PurchaseEntitlement.disputes (narrowed to the latest one, see
+        // CUSTOMER_ORDER_INCLUDE above) into a single `dispute` to match apps/msd's
+        // `OrderItem['entitlements'][number]` shape exactly.
+        entitlements: purchaseEntitlements.map(({ disputes, ...entitlement }) => ({
+          ...entitlement,
+          dispute: disputes[0] ?? null,
+        })),
       };
     }),
   };
@@ -360,6 +424,7 @@ interface OrderListFilters {
   vendorId?: string;
   branchId?: string;
   customerId?: string;
+  excludeOrderId?: string;
   paymentStatus?: 'CREATED' | 'PAID' | 'FAILED' | 'CANCELLED';
   createdFrom?: string;
   createdTo?: string;
@@ -371,6 +436,50 @@ interface OrderListFilters {
  *  admin/SuperAdmin. Applied to every order returned to a vendor caller in this file. */
 function scopeOrderItemsToVendor<T extends { items: { vendorId: string }[] }>(order: T, vendorId: string): T {
   return { ...order, items: order.items.filter((item) => item.vendorId === vendorId) };
+}
+
+/**
+ * Shared by `listOrders` and `getOrderCounts` — every filter EXCEPT `status`/`paymentStatus`,
+ * which the two callers apply differently (`listOrders` applies both as given; `getOrderCounts`
+ * deliberately drops both from its "total" count and re-applies each as its own separate count —
+ * see that function's own doc comment). Keeping this one builder is what "same where-builder
+ * logic, don't duplicate the filter-building code" (the approved plan) actually means here.
+ */
+function buildBaseOrderWhere(
+  scopedVendorId: string | undefined,
+  opts: Pick<OrderListFilters, 'branchId' | 'customerId' | 'excludeOrderId' | 'createdFrom' | 'createdTo' | 'search'>,
+): Prisma.OrderWhereInput {
+  return {
+    ...(scopedVendorId ? { items: { some: { vendorId: scopedVendorId } } } : {}),
+    ...(opts.branchId ? { items: { some: { branchId: opts.branchId } } } : {}),
+    ...(opts.customerId ? { customerId: opts.customerId } : {}),
+    // "Customer's Other Orders" — excludes the one order currently being viewed.
+    ...(opts.excludeOrderId ? { id: { not: opts.excludeOrderId } } : {}),
+    ...(opts.createdFrom || opts.createdTo
+      ? {
+          createdAt: {
+            ...(opts.createdFrom ? { gte: new Date(opts.createdFrom) } : {}),
+            ...(opts.createdTo ? { lte: new Date(opts.createdTo) } : {}),
+          },
+        }
+      : {}),
+    // Additive: customer phone + the checkout-time `contactPhone` snapshot (relevant for a
+    // legacy/unlinked order — see this app's own "purchase-time contact snapshot" doc comment),
+    // on top of the pre-existing vendor/branch/customer-name/item-name matches.
+    ...(opts.search
+      ? {
+          OR: [
+            { vendorNameSnapshot: { contains: opts.search, mode: 'insensitive' as const } },
+            { branchNameSnapshot: { contains: opts.search, mode: 'insensitive' as const } },
+            { customer: { is: { name: { contains: opts.search, mode: 'insensitive' as const } } } },
+            { customer: { is: { phone: { contains: opts.search } } } },
+            { contactPhone: { contains: opts.search } },
+            { items: { some: { itemName: { contains: opts.search, mode: 'insensitive' as const } } } },
+            { items: { some: { vendorNameSnapshot: { contains: opts.search, mode: 'insensitive' as const } } } },
+          ],
+        }
+      : {}),
+  };
 }
 
 /**
@@ -388,33 +497,12 @@ function scopeOrderItemsToVendor<T extends { items: { vendorId: string }[] }>(or
 export async function listOrders(callerUserId: string, opts: OrderListFilters) {
   const vendor = await getVendorByOwnerUserId(callerUserId);
   const scopedVendorId = vendor ? vendor.id : opts.vendorId;
-  const where = {
-    ...(scopedVendorId ? { items: { some: { vendorId: scopedVendorId } } } : {}),
-    ...(opts.branchId ? { items: { some: { branchId: opts.branchId } } } : {}),
-    ...(opts.customerId ? { customerId: opts.customerId } : {}),
+  const where: Prisma.OrderWhereInput = {
+    ...buildBaseOrderWhere(scopedVendorId, opts),
     ...(opts.status ? { status: opts.status } : {}),
     // Order has no single "payment status" column of its own (Order 1 -> Payment[]) — this
     // matches "has at least one payment attempt in this state", not "the current/latest one".
     ...(opts.paymentStatus ? { payments: { some: { status: opts.paymentStatus } } } : {}),
-    ...(opts.createdFrom || opts.createdTo
-      ? {
-          createdAt: {
-            ...(opts.createdFrom ? { gte: new Date(opts.createdFrom) } : {}),
-            ...(opts.createdTo ? { lte: new Date(opts.createdTo) } : {}),
-          },
-        }
-      : {}),
-    ...(opts.search
-      ? {
-          OR: [
-            { vendorNameSnapshot: { contains: opts.search, mode: 'insensitive' as const } },
-            { branchNameSnapshot: { contains: opts.search, mode: 'insensitive' as const } },
-            { customer: { is: { name: { contains: opts.search, mode: 'insensitive' as const } } } },
-            { items: { some: { itemName: { contains: opts.search, mode: 'insensitive' as const } } } },
-            { items: { some: { vendorNameSnapshot: { contains: opts.search, mode: 'insensitive' as const } } } },
-          ],
-        }
-      : {}),
   };
   const [rawItems, total] = await Promise.all([
     prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (opts.page - 1) * opts.pageSize, take: opts.pageSize, include: ORDER_INCLUDE }),
@@ -422,6 +510,32 @@ export async function listOrders(callerUserId: string, opts: OrderListFilters) {
   ]);
   const items = vendor ? rawItems.map((order) => scopeOrderItemsToVendor(order, vendor.id)) : rawItems;
   return { items, total };
+}
+
+/**
+ * The Order History page's three summary cards (All / Paid / Awaiting Payment) — deliberately
+ * "unfiltered by status": every OTHER filter on the page (vendor/branch/customer/search/date, and
+ * the same vendor-self force-scoping `listOrders` applies) still narrows these three counts, but
+ * whichever `status`/`paymentStatus` the admin currently has selected does NOT — the cards stay a
+ * stable "of everything matching my other filters" context, never collapsing to match the one
+ * status row currently on screen. Always 3 cheap `count()`s, never `findMany` — the visible page
+ * must never be the source of these numbers (a paginated page can't know the true total).
+ */
+export async function getOrderCounts(
+  callerUserId: string,
+  opts: Pick<OrderListFilters, 'vendorId' | 'branchId' | 'customerId' | 'excludeOrderId' | 'createdFrom' | 'createdTo' | 'search'>,
+) {
+  const vendor = await getVendorByOwnerUserId(callerUserId);
+  const scopedVendorId = vendor ? vendor.id : opts.vendorId;
+  const baseWhere = buildBaseOrderWhere(scopedVendorId, opts);
+
+  const [total, paid, pendingPayment] = await Promise.all([
+    prisma.order.count({ where: baseWhere }),
+    prisma.order.count({ where: { ...baseWhere, payments: { some: { status: 'PAID' } } } }),
+    prisma.order.count({ where: { ...baseWhere, status: 'PENDING_PAYMENT' } }),
+  ]);
+
+  return { total, paid, pendingPayment };
 }
 
 /** Same vendor-scoping rule as listOrders — a vendor requesting an order none of its own deals
@@ -435,6 +549,53 @@ export async function getOrderOrThrow(callerUserId: string, id: string) {
   const scoped = scopeOrderItemsToVendor(order, vendor.id);
   if (scoped.items.length === 0) throw new ApiError('NOT_FOUND', 'Order not found');
   return scoped;
+}
+
+/**
+ * Order Details page's "Activity History" — a single chronological feed of every `AuditLog` row
+ * about this order OR any of its own items' entitlements/disputes/refunds, written under four
+ * different `targetType`s by four different call sites (orders.routes.ts's `Order`-targeted
+ * rows; vouchers.routes.ts's/disputes.routes.ts's/refunds.routes.ts's `PurchaseEntitlement`/
+ * `PurchaseDispute`/`Refund`-targeted rows — none of which key by `orderId`). No dedicated table
+ * joins these together, so this aggregates the id sets first, then does ONE `auditLog.findMany`
+ * with an `OR` across the four `(targetType, targetId IN […])` pairs.
+ *
+ * Reuses `getOrderOrThrow`'s existing ownership/vendor-scoping check instead of a parallel one —
+ * same 404-not-403 discipline, and a vendor caller on a multi-vendor order only ever sees activity
+ * for ITS OWN items' entitlements/disputes/refunds (the order-level `Order`-targeted rows are
+ * still included for every caller who can see the order at all, since Order.status/payment
+ * events aren't vendor-split).
+ */
+export async function getOrderActivityHistory(callerUserId: string, id: string) {
+  const order = await getOrderOrThrow(callerUserId, id);
+  const itemIds = order.items.map((item) => item.id);
+
+  const items = itemIds.length
+    ? await prisma.orderItem.findMany({
+        where: { id: { in: itemIds } },
+        select: {
+          id: true,
+          purchaseEntitlements: { select: { id: true, disputes: { select: { id: true } } } },
+          refunds: { select: { id: true } },
+        },
+      })
+    : [];
+
+  const entitlementIds = items.flatMap((item) => item.purchaseEntitlements.map((e) => e.id));
+  const disputeIds = items.flatMap((item) => item.purchaseEntitlements.flatMap((e) => e.disputes.map((d) => d.id)));
+  const refundIds = items.flatMap((item) => item.refunds.map((r) => r.id));
+
+  return prisma.auditLog.findMany({
+    where: {
+      OR: [
+        { targetType: 'Order', targetId: id },
+        ...(entitlementIds.length ? [{ targetType: 'PurchaseEntitlement', targetId: { in: entitlementIds } }] : []),
+        ...(disputeIds.length ? [{ targetType: 'PurchaseDispute', targetId: { in: disputeIds } }] : []),
+        ...(refundIds.length ? [{ targetType: 'Refund', targetId: { in: refundIds } }] : []),
+      ],
+    },
+    orderBy: { createdAt: 'asc' },
+  });
 }
 
 const ADMIN_ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {

@@ -1329,6 +1329,7 @@ export function DealDialog({
               entityType="deal"
               entityId={savedDeal?.id ?? null}
               branchId={savedDeal?.branchId ?? (branches ? branchId : fixedBranchId)}
+              selfService
               existingImages={savedDeal?.mediaImages ?? []}
               existingVideo={savedDeal?.mediaVideo ?? null}
               token={token}

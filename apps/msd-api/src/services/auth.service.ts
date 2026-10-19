@@ -10,14 +10,26 @@ import type { LoginMethod } from '../generated/prisma-client';
  *  account; the calling function's own LoginHistory row is written with `success: false` so a
  *  blocked login attempt is still visible in the account's history, matching the existing
  *  `success: true` write on the happy path. */
+/** Account-level block (`User.status`) and Member suspension (`Vendor.status`) are deliberately
+ *  distinct states (see TASK.md's Member Suspension notes) — a suspended Member's own User
+ *  account otherwise stays `active`, so this is a second, separate check, not a reuse of the
+ *  account-disabled branch above. Both `loginWithIdentifier` (OTP) and `loginWithGoogle` call
+ *  this same function before issuing anything, so suspension can never be bypassed by picking a
+ *  different login method. */
 async function assertUserMayLogIn(
   user: { id: string; status: string },
   meta: { ip?: string; userAgent?: string },
   method: LoginMethod,
 ) {
-  if (user.status === 'active') return;
-  await prisma.loginHistory.create({ data: { userId: user.id, method, success: false, ...meta } });
-  throw new ApiError('FORBIDDEN', 'This account has been disabled. Please contact support.');
+  if (user.status !== 'active') {
+    await prisma.loginHistory.create({ data: { userId: user.id, method, success: false, ...meta } });
+    throw new ApiError('FORBIDDEN', 'This account has been disabled. Please contact support.');
+  }
+  const vendor = await prisma.vendor.findUnique({ where: { ownerUserId: user.id }, select: { status: true } });
+  if (vendor?.status === 'SUSPENDED') {
+    await prisma.loginHistory.create({ data: { userId: user.id, method, success: false, ...meta } });
+    throw new ApiError('FORBIDDEN', 'Your member account is suspended. Please contact support.');
+  }
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

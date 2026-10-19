@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { OutlinedIconButton, FilledTonalIconButton, Icon, FilledButton, } from '@skylabs-monorepo/shared-ui/react';
 import type { Product } from '../../types';
+import { productPath } from '../seo/public-urls';
 import { formatINR } from '../../utils/format';
 import './product-card.css';
 import '@skylabs-monorepo/shared-ui';
@@ -35,7 +36,7 @@ export function ProductCard({
             originalPrice={product.originalPrice !== undefined ? formatINR(product.originalPrice) : undefined}
             price={formatINR(product.price)}
             discount={discount ? `-${discount}%` : undefined}
-            href={`/products/${product.id}`}
+            href={productPath(product)}
         >
             <div slot="media" className="product-card-slider">
                 <swiper-container

@@ -6,6 +6,7 @@ import { resolveDealMedia } from '../../../utils/media';
 import content from '../../../content.json';
 import './wishlist.css';
 import { DealCard, type DealCardDeal } from '../../components/deal-card';
+import { dealPath } from '../../seo/public-urls';
 const { wishlist: wishlistContent } = content;
 /**
  * Real, backend-driven wishlist (`GET /wishlist` via `WishlistProvider`) — same layout, empty
@@ -24,6 +25,7 @@ function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
   const media = resolveDealMedia(deal);
   return {
     id: deal.id,
+    slug: deal.slug,
     title,
     image: media.images[0] ?? '',
     imageAlt: title,
@@ -81,7 +83,7 @@ export function Wishlist() {
                 />
                 <OutlinedButton
                   className="wishlist-grid__add-btn"
-                  onClick={() => navigate(`/deal/${deal.id}`)}
+                  onClick={() => navigate(dealPath(deal))}
                 >
                   <Icon slot="icon" aria-hidden="true">event_available</Icon>
                   {wishlistContent.bookLabel}

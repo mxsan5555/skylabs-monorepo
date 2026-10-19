@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { PaginationQuerySchema } from './common.schema';
+import { PaginationQuerySchema, richTextField } from './common.schema';
 import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 
 extendZodWithOpenApi(z);
@@ -31,6 +31,12 @@ export const CrossVendorDealListQuerySchema = CrossVendorListQuerySchema.extend(
  *  `UuidParamSchema` in `common.schema.ts`, just keyed `vendorId` to match the param name. */
 export const VendorIdParamSchema = z.object({
   vendorId: z.string().uuid(),
+});
+
+/** Route param for the member-scoped `/me/customers/:customerId` lookup — same shape as
+ *  `UuidParamSchema`, just keyed `customerId` to match the param name. */
+export const VendorCustomerIdParamSchema = z.object({
+  customerId: z.string().uuid(),
 });
 
 /** Route param for the real KYC file-upload endpoints — `:documentType` must be one of the
@@ -353,7 +359,7 @@ const TherapistFieldsSchema = z.object({
    *  subcategories) that this vendor has been granted access to; validated in
    *  vendor.service.ts via assertVendorHasCategoryAccess. */
   specializationCategoryId: z.string().uuid().optional(),
-  bio: z.string().max(2000).optional(),
+  bio: richTextField(2000),
   experienceYears: z.number().int().min(0).max(60).optional(),
   /** URL only — matches Vendor.logoUrl/Deal.images' existing validation in this file; no
    *  upload pipeline exists yet. */
@@ -399,17 +405,24 @@ const DealFieldsSchema = z.object({
   subcategoryId: z.string().uuid().optional(),
   title: z.string().min(1).max(200),
   slug: slugString,
+  /** Plain text, deliberately NOT a rich-text field — this is the fallback source for
+   *  `<meta name="description">`/JSON-LD on the public Deal page (see `deal-detail.tsx`), both
+   *  of which require plain text; formatting markup here would either render as literal escaped
+   *  tags or corrupt a meta tag's content attribute. */
   shortDescription: z.string().max(300).optional(),
-  description: z.string().max(5000).optional(),
+  description: richTextField(5000),
   originalPrice: decimalString,
   salePrice: decimalString,
   discountPercent: z.number().int().min(0).max(100).optional(),
   /** Required — every Deal is a service offering (see vendor.service.ts's
    *  assertDurationRequiredForService). */
   durationMinutes: z.number().int().min(1).max(1440).optional(),
-  termsAndConditions: z.string().max(5000).optional(),
-  notes: z.string().max(5000).optional(),
-  policy: z.string().max(5000).optional(),
+  termsAndConditions: richTextField(5000),
+  /** Internal-only (never rendered on any public page — see catalog.service.ts's
+   *  PUBLIC_DEAL_SELECT, which omits it) — stays a rich-text field for the admin's own benefit
+   *  (e.g. a checklist), but its own editor never ships to the storefront. */
+  notes: richTextField(5000),
+  policy: richTextField(5000),
   images: z.array(z.string().url()).optional(),
   maxBookings: z.number().int().min(0).optional(),
   availableBookings: z.number().int().min(0).optional(),

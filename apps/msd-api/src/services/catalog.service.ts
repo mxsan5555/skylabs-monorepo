@@ -152,6 +152,7 @@ const PUBLIC_THERAPIST_PACKAGE_ORDER_BY: Prisma.TherapistPackageOrderByWithRelat
  *  merged into one field — see Therapist's own schema doc comment. */
 const PUBLIC_THERAPIST_SELECT = {
   id: true,
+  slug: true,
   therapistType: true,
   personName: true,
   gender: true,
@@ -223,6 +224,7 @@ const PUBLIC_PRODUCT_SELECT = {
   brand: true,
   description: true,
   summary: true,
+  returnPolicy: true,
   image: true,
   imageAlt: true,
   price: true,
@@ -266,7 +268,9 @@ export const PUBLIC_DEAL_SELECT = {
   shortDescription: true,
   description: true,
   termsAndConditions: true,
-  notes: true,
+  // `notes` deliberately omitted — internal-admin-only (a checklist for staff, not customer
+  // content); it must never reach a public response. `policy`/`termsAndConditions` stay public
+  // (cancellation policy / T&C are genuinely customer-facing).
   policy: true,
   originalPrice: true,
   salePrice: true,
@@ -572,8 +576,13 @@ export async function listPublicLocations() {
   }));
 }
 
-export async function getPublicDealOrThrow(id: string) {
-  const deal = await prisma.deal.findFirst({ where: { id, ...VISIBLE_DEAL_WHERE }, select: PUBLIC_DEAL_SELECT });
+/** Accepts either the canonical slug (`/deal/:slug`) or a legacy UUID (an old bookmarked/shared
+ *  link) — same record either way, gated by the same `VISIBLE_DEAL_WHERE` bar regardless of
+ *  which identifier resolved it, so a legacy UUID link can never see a suspended/inactive deal
+ *  a slug link can't. The frontend compares `idOrSlug` against the returned `slug` and redirects
+ *  to the canonical path when they differ (see `lib/public-urls.ts` on the msd side). */
+export async function getPublicDealOrThrow(idOrSlug: string) {
+  const deal = await prisma.deal.findFirst({ where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }], ...VISIBLE_DEAL_WHERE }, select: PUBLIC_DEAL_SELECT });
   if (!deal) throw new ApiError('NOT_FOUND', 'Deal not found');
   const [withTags] = await withDealPopularTags([deal]);
   return withTags;
@@ -645,8 +654,9 @@ export async function listPublicProducts(opts: {
   return { items, total };
 }
 
-export async function getPublicProductOrThrow(id: string) {
-  const product = await prisma.product.findFirst({ where: { id, ...VISIBLE_PRODUCT_WHERE }, select: PUBLIC_PRODUCT_SELECT });
+/** Same slug-or-legacy-UUID acceptance as `getPublicDealOrThrow` above. */
+export async function getPublicProductOrThrow(idOrSlug: string) {
+  const product = await prisma.product.findFirst({ where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }], ...VISIBLE_PRODUCT_WHERE }, select: PUBLIC_PRODUCT_SELECT });
   if (!product) throw new ApiError('NOT_FOUND', 'Product not found');
   const [withTags] = await withProductPopularTags([product]);
   return withTags;
@@ -763,9 +773,13 @@ export async function listPublicTherapists(opts: {
   return { items, total };
 }
 
-export async function getPublicTherapistOrThrow(id: string) {
+/** Same slug-or-legacy-UUID acceptance as `getPublicDealOrThrow` above — `slug` is nullable on
+ *  Therapist (backfilled separately), so a bare `{ slug: idOrSlug }` clause is safe even for
+ *  not-yet-backfilled rows (never matches since `slug` is `null` there, same as any other
+ *  mismatched value). */
+export async function getPublicTherapistOrThrow(idOrSlug: string) {
   const therapist = await prisma.therapist.findFirst({
-    where: { id, ...VISIBLE_THERAPIST_WHERE },
+    where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }], ...VISIBLE_THERAPIST_WHERE },
     select: PUBLIC_THERAPIST_LISTING_SELECT,
   });
   if (!therapist) throw new ApiError('NOT_FOUND', 'Therapist not found');

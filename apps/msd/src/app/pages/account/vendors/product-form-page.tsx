@@ -1,6 +1,7 @@
-import { createElement, useCallback, useEffect, useState, type ChangeEvent } from 'react';
+import { createElement, useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import '@skylabs-monorepo/shared-ui';
+import '@skylabs-monorepo/shared-ui/editor';
 import { FilledButton } from '@skylabs-monorepo/shared-ui/react';
 import {
   createVendorProduct,
@@ -15,6 +16,7 @@ import {
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
 import { resolveCategoryTiers } from '../../../../utils/category-tree';
+import { MediaUploader } from '../../../components/media-uploader';
 
 interface ProductFormPageProps {
   token: string | null;
@@ -68,6 +70,27 @@ function renderTextField({
     type,
     onInput: (e: DrivenChangeEvent) => onInput(e.currentTarget.value),
   });
+}
+
+/** Raw `<sky-rich-text-editor>` — see `deal-form-page.tsx`'s own doc comment on `RichTextField`
+ *  for why this is a real component (ref + `addEventListener`), not a plain element-returning
+ *  function like `renderTextField`: `onsky-change={...}` never actually wires up as a listener
+ *  for a custom DOM event on a custom element. Value is HTML; the backend sanitizes it
+ *  server-side before persisting — this is UX only. */
+function RichTextField({ label, value, onChange }: { label: string; value: string; onChange: (html: string) => void }) {
+  const ref = useRef<HTMLElement>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const handler = (e: Event) => onChangeRef.current((e as CustomEvent<{ html: string; text: string }>).detail.html);
+    el.addEventListener('sky-change', handler);
+    return () => el.removeEventListener('sky-change', handler);
+  }, []);
+
+  return createElement('sky-rich-text-editor', { ref, label, value });
 }
 
 /** Same convention as `BranchFormPage`/`DealFormPage`/`TherapistFormPage`'s own `vendorDisplayName`. */
@@ -302,9 +325,8 @@ export function ProductFormPage({ token }: ProductFormPageProps) {
         {renderTextField({ label: 'Badge', value: form.badge, onInput: (value) => set('badge', value) })}
 
         {renderTextField({ label: 'Summary', value: form.summary, onInput: (value) => set('summary', value) })}
-        {renderTextField({ label: 'Description', value: form.description, onInput: (value) => set('description', value) })}
+        <p className="field-hint">Summary stays plain text — it also feeds the public page's meta description, which can&apos;t contain formatting.</p>
         {renderTextField({ label: 'Ingredients', value: form.ingredients, onInput: (value) => set('ingredients', value) })}
-        {renderTextField({ label: 'Return policy', value: form.returnPolicy, onInput: (value) => set('returnPolicy', value) })}
 
         <label className="category-grant-grid__option">
           <input type="checkbox" checked={form.isNew} onChange={(e) => set('isNew', e.target.checked)} />
@@ -315,6 +337,27 @@ export function ProductFormPage({ token }: ProductFormPageProps) {
           Featured
         </label>
       </div>
+
+      <div className="form-grid">
+        <p className="field-hint">Description — shown on the product's public page.</p>
+        <RichTextField label="Description" value={form.description} onChange={(html) => set('description', html)} />
+      </div>
+
+      <div className="form-grid">
+        <p className="field-hint">Return policy — shown on the product's public page.</p>
+        <RichTextField label="Return policy" value={form.returnPolicy} onChange={(html) => set('returnPolicy', html)} />
+      </div>
+
+      <p className="field-hint">The product's photos and an optional short video — shown on its public page.</p>
+      <MediaUploader
+        entityType="product"
+        entityId={product?.id ?? null}
+        selfService={false}
+        vendorId={vendorId}
+        existingImages={product?.mediaImages ?? []}
+        existingVideo={product?.mediaVideo ?? null}
+        token={token}
+      />
 
       <div className="form-actions">
         <FilledButton disabled={saving} onClick={() => save()}>

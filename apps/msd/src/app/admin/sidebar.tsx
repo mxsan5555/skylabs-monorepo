@@ -1,9 +1,10 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import type { MenuNode } from '@skylabs-monorepo/shared-types';
 import { Icon, IconButton, TextButton } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { isDualRoleUser, setExperienceMode } from '../../auth/role-routing';
+import { activeMenuLeafId, containsMenuLeaf } from './sidebar-active';
 import logo from '../../assets/logo.jpg';
 import logo2 from '../../assets/logo2.jpg';
 /**
@@ -25,6 +26,7 @@ interface SidebarProps {
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const { bootstrap, isPreviewing, signOut } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const menu = bootstrap?.menu ?? [];
   console.log('SIDEBAR MENU:', menu);
   console.log(
@@ -32,6 +34,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
     menu.find((node) => node.id === 'customers')
   );
   const visibleMenu = isPreviewing ? menu.filter((node) => node.id !== 'administration') : menu;
+  const activeId = activeMenuLeafId(visibleMenu, pathname);
   const initial = (bootstrap?.user.name ?? '?').charAt(0).toUpperCase();
   const dualRole = bootstrap ? isDualRoleUser(bootstrap) : false;
 
@@ -70,7 +73,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
       </div>
 
       <nav className="admin-sidebar__nav" aria-label="Console">
-        {visibleMenu.map((node) => <MenuNodeItem key={node.id} node={node} onLogout={doSignOut} />)}
+        {visibleMenu.map((node) => <MenuNodeItem key={node.id} node={node} activeId={activeId} onLogout={doSignOut} />)}
         {dualRole && (
           <NavLink to="/" onClick={switchToCustomer} className="admin-nav-item">
             <Icon aria-hidden="true">storefront</Icon>
@@ -95,21 +98,18 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 }
 function MenuNodeItem({
   node,
+  activeId,
   onLogout,
   isChild = false,
 }: {
   node: MenuNode;
+  activeId?: string;
   onLogout: () => void;
   isChild?: boolean;
 }) {
-  const location = useLocation();
   const hasChildren = Boolean(node.children?.length);
 
-  const childIsActive =
-    hasChildren &&
-    node.children?.some((child) =>
-      child.route ? location.pathname.startsWith(child.route) : false
-    );
+  const childIsActive = Boolean(activeId && node.children?.some((child) => containsMenuLeaf(child, activeId)));
 
   const [open, setOpen] = useState(Boolean(childIsActive));
 
@@ -145,6 +145,7 @@ function MenuNodeItem({
               <MenuNodeItem
                 key={child.id}
                 node={child}
+                activeId={activeId}
                 onLogout={onLogout}
                 isChild
               />
@@ -173,16 +174,15 @@ function MenuNodeItem({
   if (!node.route) return null;
 
   return (
-    <NavLink
+    <Link
       to={node.route}
-      className={({ isActive }) =>
-        `admin-nav-item${isActive ? ' active' : ''}`
-      }
+      aria-current={node.id === activeId ? 'page' : undefined}
+      className={`admin-nav-item${node.id === activeId ? ' active' : ''}`}
     >
       {node.icon && (
         <Icon aria-hidden="true">{node.icon}</Icon>
       )}
       <span>{node.title}</span>
-    </NavLink>
+    </Link>
   );
 }

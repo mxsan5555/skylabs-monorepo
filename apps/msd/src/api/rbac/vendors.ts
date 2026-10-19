@@ -100,11 +100,20 @@ export interface Vendor extends Omit<VendorFields, 'businessName'> {
   latitude?: number | null;
   longitude?: number | null;
   ownerUserId: string | null;
+  /** Per-vendor commission override for Member Settlements — `null` means "use
+   *  `FinanceSettings.defaultCommissionRatePercent`" (see `api/rbac/settlements.ts`'s
+   *  `setVendorCommissionRate`). Returned as-is by `GET /vendors/:id` (no `select` narrowing on
+   *  the backend — `serializeVendor` spreads every scalar column). */
+  commissionRatePercent?: string | null;
   kycStatus: KycStatus;
   kycRejectionReason: string | null;
   status: VendorStatus;
   statusReason: string | null;
   createdByUserId: string | null;
+  /** The creator's display name, resolved server-side — `null` for self-registered vendors
+   *  (`createdByUserId` itself is `null`) and for any historical row whose creator no longer
+   *  resolves. The UI shows "Not recorded" for either case rather than inventing a creator. */
+  createdByName?: string | null;
   createdAt: string;
   updatedAt: string;
   /** Business modules — bound to the onboarding wizard's Step 2 checkboxes; each `true` module
@@ -642,6 +651,23 @@ export interface CustomerRow {
  *  client-supplied vendorId) — same pattern as every other `/vendors/me/*` self-service route. */
 export function listMyCustomers(token: string | null, opts: { page?: number; pageSize?: number } = {}) {
   return apiGet<CustomerRow[]>(`/vendors/me/customers${toQuery(opts)}`, token);
+}
+
+/** Member-scoped single-customer lookup (name/phone/email + aggregate order/payment stats) for
+ *  the vendor-facing Customer Detail page — `GET /vendors/me/customers/:customerId`, gated
+ *  `vendors:custom`. 404s (never confirms existence) for a customerId unrelated to this vendor —
+ *  see msd-api's `vendor.service.ts#getMyCustomerOrThrow`. */
+export interface MyCustomerDetail {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  totalOrders: number;
+  confirmedPaymentsTotal: number;
+}
+
+export function getMyCustomer(token: string | null, customerId: string) {
+  return apiGet<MyCustomerDetail>(`/vendors/me/customers/${customerId}`, token);
 }
 
 /** A vendor's customers as seen by the admin Vendor Detail view — same shape as the vendor's own

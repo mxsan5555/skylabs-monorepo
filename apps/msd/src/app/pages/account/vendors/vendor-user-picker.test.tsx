@@ -1,14 +1,16 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ApiRequestError } from '../../../../api/rbac/client';
 
 const getVendorOwnerAvailabilityMock = vi.fn();
+const createVendorMock = vi.fn();
 
 vi.mock('../../../../api/rbac/vendors', async () => {
   const actual = await vi.importActual<typeof import('../../../../api/rbac/vendors')>('../../../../api/rbac/vendors');
   return {
     ...actual,
     getVendorOwnerAvailability: (...args: unknown[]) => getVendorOwnerAvailabilityMock(...args),
+    createVendor: (...args: unknown[]) => createVendorMock(...args),
   };
 });
 
@@ -16,120 +18,126 @@ vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   useAuth: () => ({ token: 'test-token' }),
 }));
 
-import { VendorUserPicker } from './vendor-user-picker';
+import { VendorOwnerLoginStep } from './vendor-user-picker';
 
 beforeEach(() => {
   vi.clearAllMocks();
   getVendorOwnerAvailabilityMock.mockResolvedValue({ data: { available: true, conflicts: [] } });
 });
 
+function fields() {
+  return Array.from(document.querySelectorAll('md-outlined-text-field'));
+}
+
+function findButtonByText(text: string): HTMLElement {
+  const button = Array.from(document.querySelectorAll('md-filled-button')).find((el) => el.textContent?.trim() === text);
+  if (!button) throw new Error(`Button "${text}" not found`);
+  return button as HTMLElement;
+}
+
 /**
- * Feature: VendorUserPicker — brand-new owner identity form (no existing-user reuse)
- * Scenario: a single, always-new-owner form — name/email/mobile only. A debounced availability
- * check (`GET /vendors/users/lookup`) shows a blocking "already exists" message when the typed
- * email/mobile is already taken; there is no confirmation dialog, no "use existing account"
- * option, and no search-for-existing-user tab — a Vendor's owner is always a brand-new User.
+ * Feature: VendorOwnerLoginStep — "Add Member" Step 1 of 4 (Owner & Login)
+ * Scenario: a self-contained screen (own submit, not just field collection) — First name and
+ * Mobile are required, Last name/Email stay optional. Mobile is always a plain 10-digit value in
+ * state with `+91` shown as a fixed prefix. Submitting calls `createVendor` directly and hands
+ * the created Member to `onCreated`.
  *
- * Given: an admin filling in "Add Vendor" Step 1
- * When: VendorUserPicker renders / the typed email or mobile is checked for availability
- * Then: available identities report the payload up; a taken identifier blocks reporting up and
- *       shows a clear error instead
- *
- * NOTE: driving the text fields via simulated typing (`fireEvent.input` on the
- * `createComponent`-wrapped `OutlinedTextField`) is not possible under this repo's documented
- * jsdom + `@lit/react` gap (see `vendor-branches.test.tsx`'s own doc comment — onInput/onChange
- * bindings never actually fire, and `label`/other properties never reflect either). This suite
- * instead mounts with a pre-filled `value` prop (the same technique `BranchDialog`'s Map Location
- * tests use for its pre-filled `branch` prop) to exercise the debounced-availability logic
- * without needing to type.
+ * NOTE: per this suite's existing documented jsdom + @lit/react gap (md-outlined-text-field's
+ * onInput never fires via simulated typing), field values are driven by directly mutating the
+ * underlying custom element's `.value` property and dispatching a real `input` event — the same
+ * workaround this repo's other wizard-field suites use.
  */
-describe('VendorUserPicker', () => {
-  it('renders exactly 4 identity fields (First name, Last name, Email, Mobile), no tabs, no existing-user UI', () => {
-    render(<VendorUserPicker value={null} onChange={vi.fn()} />);
-    expect(document.querySelectorAll('md-outlined-text-field').length).toBe(4);
-    expect(screen.queryByText('Enter new details')).toBeNull();
-    expect(screen.queryByText('Search existing user')).toBeNull();
-    expect(screen.queryByText('Use Existing Account')).toBeNull();
-    expect(screen.queryByText('Vendor Account')).toBeNull();
+describe('VendorOwnerLoginStep', () => {
+  it('renders 4 identity fields with a fixed +91 prefix shown next to Mobile', () => {
+    render(<VendorOwnerLoginStep onCreated={vi.fn()} />);
+    expect(fields().length).toBe(4);
+    expect(screen.getByText('+91')).toBeTruthy();
   });
 
-  it('with neither email nor mobile given, reports null and never calls the availability check', async () => {
-    const onChange = vi.fn();
-    render(<VendorUserPicker value={null} onChange={onChange} />);
-    await waitFor(() => expect(onChange).toHaveBeenCalledWith(null));
-    expect(getVendorOwnerAvailabilityMock).not.toHaveBeenCalled();
+  it('blocks submit and shows "Mobile number is required." when mobile is empty', async () => {
+    render(<VendorOwnerLoginStep onCreated={vi.fn()} />);
+    fireEvent.click(findButtonByText('Create Login & Open Details'));
+    await waitFor(() => expect(screen.getByText('Mobile number is required.')).toBeTruthy());
+    expect(createVendorMock).not.toHaveBeenCalled();
   });
 
-  it('an available identity reports the payload up once the debounced check resolves', async () => {
-    getVendorOwnerAvailabilityMock.mockResolvedValue({ data: { available: true, conflicts: [] } });
-    const onChange = vi.fn();
-    render(
-      <VendorUserPicker
-        value={{ ownerFirstName: 'New', ownerEmail: 'brand-new@example.com', ownerMobile: '9111111111' }}
-        onChange={onChange}
-      />,
-    );
-
-    await waitFor(() =>
-      expect(getVendorOwnerAvailabilityMock).toHaveBeenCalledWith('test-token', {
-        email: 'brand-new@example.com',
-        mobile: '9111111111',
-      }),
-    );
-    await waitFor(() =>
-      expect(onChange).toHaveBeenCalledWith({
-        ownerFirstName: 'New',
-        ownerLastName: undefined,
-        ownerEmail: 'brand-new@example.com',
-        ownerMobile: '9111111111',
-      }),
-    );
+  it('blocks submit and shows "First name is required." when first name is empty', async () => {
+    render(<VendorOwnerLoginStep onCreated={vi.fn()} />);
+    fireEvent.click(findButtonByText('Create Login & Open Details'));
+    await waitFor(() => expect(screen.getByText('First name is required.')).toBeTruthy());
+    expect(createVendorMock).not.toHaveBeenCalled();
   });
 
-  it('an email conflict blocks reporting up and shows a clear "already exists" message', async () => {
-    getVendorOwnerAvailabilityMock.mockResolvedValue({ data: { available: false, conflicts: ['email'] } });
-    const onChange = vi.fn();
-    render(<VendorUserPicker value={{ ownerEmail: 'taken@example.com' }} onChange={onChange} />);
-
-    await waitFor(() => expect(screen.getByText(/A user with this email already exists/)).toBeTruthy());
-    // The identity may be optimistically reported up while the check is still in flight, but the
-    // LAST call, once the conflict is known, must retract to null — never leave the taken
-    // identity as the most recent reported value.
-    expect(onChange.mock.calls.at(-1)?.[0]).toBeNull();
+  it('a mobile that is not 10 digits shows "Enter exactly 10 digits." on blur', () => {
+    render(<VendorOwnerLoginStep onCreated={vi.fn()} />);
+    const mobileField = fields()[2];
+    (mobileField as unknown as { value: string }).value = '98765';
+    fireEvent.input(mobileField);
+    fireEvent.blur(mobileField);
+    expect(screen.getByText('Enter exactly 10 digits.')).toBeTruthy();
   });
 
-  it('a phone conflict blocks reporting up and shows a clear "already exists" message', async () => {
-    getVendorOwnerAvailabilityMock.mockResolvedValue({ data: { available: false, conflicts: ['phone'] } });
-    const onChange = vi.fn();
-    render(<VendorUserPicker value={{ ownerMobile: '9876543210' }} onChange={onChange} />);
-
-    await waitFor(() => expect(screen.getByText(/A user with this phone already exists/)).toBeTruthy());
-    expect(onChange).toHaveBeenCalledWith(null);
+  it('a mobile starting with 5 or below shows the "must start with 6, 7, 8 or 9" message on blur', () => {
+    render(<VendorOwnerLoginStep onCreated={vi.fn()} />);
+    const mobileField = fields()[2];
+    (mobileField as unknown as { value: string }).value = '5123456789';
+    fireEvent.input(mobileField);
+    fireEvent.blur(mobileField);
+    expect(screen.getByText('Mobile number must start with 6, 7, 8 or 9.')).toBeTruthy();
   });
 
-  it('a match on BOTH email and phone (even the same existing User) blocks reporting up', async () => {
-    getVendorOwnerAvailabilityMock.mockResolvedValue({ data: { available: false, conflicts: ['email', 'phone'] } });
-    const onChange = vi.fn();
-    render(<VendorUserPicker value={{ ownerEmail: 'vinay@example.com', ownerMobile: '9889259224' }} onChange={onChange} />);
-
-    await waitFor(() => expect(screen.getByText(/A user with this email and phone already exists/)).toBeTruthy());
-    expect(onChange).toHaveBeenCalledWith(null);
-  });
-
-  it('an availability-check error renders a blocking error and never reports anything up', async () => {
-    getVendorOwnerAvailabilityMock.mockRejectedValue(new ApiRequestError('INTERNAL_ERROR', 'Could not verify this email/mobile.', 500));
-    const onChange = vi.fn();
-    render(<VendorUserPicker value={{ ownerEmail: 'a@example.com' }} onChange={onChange} />);
-
-    await waitFor(() => expect(screen.getByText('Could not verify this email/mobile.')).toBeTruthy());
-    expect(onChange).toHaveBeenCalledWith(null);
-  });
-
-  it('an invalid email format shows a validation error and never triggers the availability check for it', async () => {
-    const onChange = vi.fn();
-    render(<VendorUserPicker value={{ ownerEmail: 'not-an-email' }} onChange={onChange} />);
+  it('an invalid email shows "Enter a valid email address." on blur; email stays optional otherwise', () => {
+    render(<VendorOwnerLoginStep onCreated={vi.fn()} />);
+    const emailField = fields()[3];
+    (emailField as unknown as { value: string }).value = 'not-an-email';
+    fireEvent.input(emailField);
+    fireEvent.blur(emailField);
     expect(screen.getByText('Enter a valid email address.')).toBeTruthy();
-    await waitFor(() => expect(onChange).toHaveBeenCalledWith(null));
-    expect(getVendorOwnerAvailabilityMock).not.toHaveBeenCalled();
+  });
+
+  it('submits ownerFirstName/ownerLastName/ownerEmail/ownerMobile (plain 10-digit mobile) and reports the created vendor up', async () => {
+    const created = { id: 'vendor-1', businessName: null };
+    createVendorMock.mockResolvedValue({ data: created });
+    const onCreated = vi.fn();
+    render(<VendorOwnerLoginStep onCreated={onCreated} />);
+
+    const [firstName, lastName, mobileField, emailField] = fields();
+    (firstName as unknown as { value: string }).value = 'Ramesh';
+    fireEvent.input(firstName);
+    (lastName as unknown as { value: string }).value = 'Kumar';
+    fireEvent.input(lastName);
+    (mobileField as unknown as { value: string }).value = '9876543210';
+    fireEvent.input(mobileField);
+    (emailField as unknown as { value: string }).value = 'ramesh@example.com';
+    fireEvent.input(emailField);
+
+    fireEvent.click(findButtonByText('Create Login & Open Details'));
+
+    await waitFor(() => expect(createVendorMock).toHaveBeenCalledOnce());
+    const [, input] = createVendorMock.mock.calls[0];
+    expect(input).toEqual({
+      ownerFirstName: 'Ramesh',
+      ownerLastName: 'Kumar',
+      ownerEmail: 'ramesh@example.com',
+      ownerMobile: '9876543210',
+    });
+    expect(onCreated).toHaveBeenCalledWith(created);
+  });
+
+  it('a 409 phone conflict shows the per-field message and does not call onCreated', async () => {
+    createVendorMock.mockRejectedValue(new ApiRequestError('CONFLICT', 'taken', 409, { conflicts: ['phone'] }));
+    const onCreated = vi.fn();
+    render(<VendorOwnerLoginStep onCreated={onCreated} />);
+
+    const [firstName, , mobileField] = fields();
+    (firstName as unknown as { value: string }).value = 'Ramesh';
+    fireEvent.input(firstName);
+    (mobileField as unknown as { value: string }).value = '9876543210';
+    fireEvent.input(mobileField);
+
+    fireEvent.click(findButtonByText('Create Login & Open Details'));
+
+    await waitFor(() => expect(screen.getByText('This mobile number already belongs to an account.')).toBeTruthy());
+    expect(onCreated).not.toHaveBeenCalled();
   });
 });

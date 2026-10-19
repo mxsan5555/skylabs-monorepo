@@ -7,6 +7,8 @@ import {
 } from '../../../api/catalog';
 import { resolveMediaUrl } from '../../../api/media';
 import { PageSection } from '../../components/page-section/page-section';
+import { dealPath } from '../../seo/public-urls';
+import { categoryHref } from '../../../catalog/catalog-shell';
 import content from '../../../content.json';
 
 const { home } = content;
@@ -19,14 +21,14 @@ function promotionHref(promotion: CatalogPromotion): string {
     promotion.destinationType === 'CATEGORY' &&
     promotion.category
   ) {
-    return `/category/${promotion.category.slug}`;
+    return categoryHref(promotion.category.slug);
   }
 
   if (
     promotion.destinationType === 'DEAL' &&
     promotion.deal
   ) {
-    return `/deal/${promotion.deal.id}`;
+    return dealPath(promotion.deal);
   }
 
   return promotion.destinationRoute ?? '/';

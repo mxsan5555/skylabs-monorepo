@@ -93,6 +93,11 @@ input[type='checkbox'] {
   margin-bottom: 24px;
 }
 
+.member-avatar {
+  width: 56px;
+  flex-shrink: 0;
+}
+
 .page-head h1 {
   margin: 0;
   font-size: 1.5rem;
@@ -108,6 +113,30 @@ input[type='checkbox'] {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.profile-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.profile-completion {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile-completion__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 600;
+}
+
+.profile-completion__percent {
+  color: var(--md-sys-color-primary);
 }
 
 .dashboard-page {
@@ -135,6 +164,12 @@ input[type='checkbox'] {
   grid-template-columns: 7fr 3fr;
   gap: 20px;
   align-items: start;
+}
+
+/* Order Details' Customer | Payment Summary row — same grid/stacking mechanism as
+   `.summary-layout` above, just equal-width columns instead of 7:3. */
+.summary-layout--balanced {
+  grid-template-columns: 1fr 1fr;
 }
 
 .panel {
@@ -542,9 +577,36 @@ input[type='checkbox'] {
   font-size: 0.7rem;
 }
 
+/* The checkmark rendered inside `.wizard-steps__num` for a completed step (Voucher Verification
+   page) — sized to fit the 22px circle, same way the step number itself fits. */
+.wizard-steps__num md-icon {
+  --md-icon-size: 16px;
+}
+
 .wizard-steps__item[aria-current='step'] .wizard-steps__num {
   background-color: var(--md-sys-color-primary);
   color: var(--md-sys-color-on-primary);
+}
+
+.wizard-steps__item--done .wizard-steps__num {
+  background-color: var(--md-sys-color-primary-container, #cee5ff);
+}
+
+/* Voucher Code lookup row (Member Orders page, Verify & Complete tab) — a text field that grows
+   plus a content-sized button that never stretches full-width, same "label above, field + button
+   in one row" shape as the old Verify Purchase panel, just not forced into `.form-grid`'s
+   even-column grid (which would stretch the button too). */
+.voucher-lookup-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.voucher-lookup-row md-outlined-text-field {
+  flex: 1;
+  min-width: 220px;
 }
 
 /* Category Access grant grid (vendor-wizard-modules.tsx) — one checkbox list per enabled

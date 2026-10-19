@@ -112,9 +112,14 @@ describe('media API client — category entity', () => {
 });
 
 describe('media API client — other entity basePaths still behave unchanged (regression)', () => {
-  it('deal nests under /vendors/me/branches/:branchId/deals/:dealId', async () => {
-    await uploadImage('tok', { entityType: 'deal', entityId: 'deal-1', branchId: 'branch-1' }, new Blob(['x']), 'p.png');
+  it('deal (self-service) nests under /vendors/me/branches/:branchId/deals/:dealId', async () => {
+    await uploadImage('tok', { entityType: 'deal', entityId: 'deal-1', branchId: 'branch-1', selfService: true }, new Blob(['x']), 'p.png');
     expect(calledUrl()).toMatch(/\/vendors\/me\/branches\/branch-1\/deals\/deal-1\/images$/);
+  });
+
+  it('deal (admin-on-behalf) nests under /vendors/:vendorId/branches/:branchId/deals/:dealId', async () => {
+    await uploadImage('tok', { entityType: 'deal', entityId: 'deal-1', branchId: 'branch-1', vendorId: 'vendor-9' }, new Blob(['x']), 'p.png');
+    expect(calledUrl()).toMatch(/\/vendors\/vendor-9\/branches\/branch-1\/deals\/deal-1\/images$/);
   });
 
   it('product (self-service) nests under /vendors/me/products/:id', async () => {
@@ -149,5 +154,16 @@ describe('resolveMediaUrl', () => {
   it('does not double a trailing slash on the base URL', () => {
     vi.stubEnv('VITE_MEDIA_BASE_URL', 'https://pub-abc.r2.dev/');
     expect(resolveMediaUrl('deals/d1/x.jpg')).toBe('https://pub-abc.r2.dev/deals/d1/x.jpg');
+  });
+});
+
+describe('Articles media uses its own permission surface', () => {
+  it('keeps article uploads on blog-articles while Pages uploads keep blog-posts', async () => {
+    const blob = new Blob(['image'], { type: 'image/png' });
+    await uploadImage('tok', { entityType: 'blog-article', entityId: 'selected-id' }, blob, 'cover.png');
+    expect(calledUrl()).toMatch(/\/blog-articles\/selected-id\/images$/);
+    fetchMock.mockClear();
+    await uploadImage('tok', { entityType: 'blog', entityId: 'selected-id' }, blob, 'cover.png');
+    expect(calledUrl()).toMatch(/\/blog-posts\/selected-id\/images$/);
   });
 });

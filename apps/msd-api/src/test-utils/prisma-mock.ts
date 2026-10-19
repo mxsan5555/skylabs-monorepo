@@ -368,6 +368,7 @@ export function createPrismaMock() {
     },
     order: {
       findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
@@ -377,6 +378,7 @@ export function createPrismaMock() {
       groupBy: vi.fn(),
     },
     orderItem: {
+      findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       aggregate: vi.fn(),
@@ -399,6 +401,54 @@ export function createPrismaMock() {
       findMany: vi.fn(),
       count: vi.fn(),
       updateMany: vi.fn(),
+    },
+    // ── Accounts, Member Settlements & Purchase Verification ──────────────────────────────
+    financeSettings: {
+      findUnique: vi.fn(),
+      upsert: vi.fn(),
+      update: vi.fn(),
+    },
+    purchaseEntitlement: {
+      findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+      aggregate: vi.fn(),
+      count: vi.fn(),
+    },
+    settlementAdjustment: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+    },
+    completionOtpChallenge: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    purchaseDispute: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      count: vi.fn(),
+    },
+    refund: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    memberPayout: {
+      findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+    },
+    memberPayoutItem: {
+      create: vi.fn(),
     },
     blogPost: {
       findUnique: vi.fn(),
@@ -501,6 +551,12 @@ export function createPrismaMock() {
       delete: vi.fn(),
       count: vi.fn(),
     },
+    // `lib/voucher.ts#nextVoucherCode`'s `nextval('purchase_entitlement_voucher_seq')` call —
+    // defaulted (same "deliberate exception" discipline as `user.findUnique` above) so every
+    // existing test that happens to exercise `createEntitlementsForOrder` (any of
+    // `payment.service.ts`'s 5 CONFIRMED-transition sites) doesn't need to know about voucher
+    // generation at all unless it's specifically asserting on it.
+    $queryRaw: vi.fn().mockResolvedValue([{ nextval: 100000n }]),
     // Default behavior mirrors real Prisma: array-form runs the (already-invoked, since JS
     // evaluates arguments eagerly) promises concurrently; callback-form invokes the callback
     // with the same mock standing in for `tx`. Override with mockResolvedValueOnce/etc. per test.

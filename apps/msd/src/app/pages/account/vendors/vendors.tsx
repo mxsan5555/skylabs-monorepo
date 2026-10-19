@@ -14,7 +14,7 @@ import {
   type VendorFields,
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { VendorList } from './vendor-list';
+import { VendorList, type VendorTableParams } from './vendor-list';
 import { VendorProfileForm, extractVendorFieldErrors, type VendorFieldErrors } from './vendor-profile-form';
 import { VendorBranches } from './vendor-branches';
 
@@ -35,7 +35,7 @@ export function VendorManagement() {
   const canCreate = can('vendors', 'create');
 
   if (canView) {
-    return <AdminVendorManagement canCreate={canCreate} />;
+    return <AdminVendorManagement canCreate={canCreate} canEdit={can('vendors', 'edit')} />;
   }
 
   if (canCustom) {
@@ -45,15 +45,9 @@ export function VendorManagement() {
   return <p className="empty-state">You do not have access to Member Management.</p>;
 }
 
-interface VendorTableParams {
-  page: number;
-  pageSize: number;
-  search: string;
-}
+const DEFAULT_VENDOR_PARAMS: VendorTableParams = { page: 1, pageSize: 10, search: '', status: '' };
 
-const DEFAULT_VENDOR_PARAMS: VendorTableParams = { page: 1, pageSize: 10, search: '' };
-
-function AdminVendorManagement({ canCreate }: { canCreate: boolean }) {
+function AdminVendorManagement({ canCreate, canEdit }: { canCreate: boolean; canEdit: boolean }) {
   const navigate = useNavigate();
   const { token } = useAuth();
   const [searchParams] = useSearchParams();
@@ -64,6 +58,7 @@ function AdminVendorManagement({ canCreate }: { canCreate: boolean }) {
   const [params, setParams] = useState<VendorTableParams>(DEFAULT_VENDOR_PARAMS);
 
   const openMember = useCallback((id: string) => navigate(`/account/vendors/${id}`), [navigate]);
+  const editMember = useCallback((id: string) => navigate(`/account/vendors/${id}/profile`), [navigate]);
 
   const loadVendors = useCallback(async () => {
     setLoading(true);
@@ -73,6 +68,7 @@ function AdminVendorManagement({ canCreate }: { canCreate: boolean }) {
         page: params.page,
         pageSize: params.pageSize,
         search: params.search || undefined,
+        status: params.status || undefined,
       });
       setVendors(data);
       setTotal(meta?.total ?? data.length);
@@ -115,6 +111,7 @@ function AdminVendorManagement({ canCreate }: { canCreate: boolean }) {
         <VendorList
           vendors={vendors}
           onSelect={openMember}
+          onEdit={canEdit ? editMember : undefined}
           total={total}
           page={params.page}
           pageSize={params.pageSize}

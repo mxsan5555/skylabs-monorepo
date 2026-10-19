@@ -117,7 +117,7 @@ router.get('/deals/facets', validateQuery(CatalogDealFacetQuerySchema), async (r
   }
 });
 
-router.get('/deals/:id', validateParams(z.object({ id: z.string().uuid() })), async (req, res, next) => {
+router.get('/deals/:id', validateParams(z.object({ id: z.string().min(1) })), async (req, res, next) => {
   try {
     sendData(res, await catalogService.getPublicDealOrThrow(req.params.id));
   } catch (err) {
@@ -136,7 +136,7 @@ router.get('/products', validateQuery(CatalogProductQuerySchema), async (req, re
   }
 });
 
-router.get('/products/:id', validateParams(z.object({ id: z.string().uuid() })), async (req, res, next) => {
+router.get('/products/:id', validateParams(z.object({ id: z.string().min(1) })), async (req, res, next) => {
   try {
     sendData(res, await catalogService.getPublicProductOrThrow(req.params.id));
   } catch (err) {
@@ -172,7 +172,7 @@ router.get('/therapists', validateQuery(CatalogTherapistQuerySchema), async (req
   }
 });
 
-router.get('/therapists/:id', validateParams(z.object({ id: z.string().uuid() })), async (req, res, next) => {
+router.get('/therapists/:id', validateParams(z.object({ id: z.string().min(1) })), async (req, res, next) => {
   try {
     sendData(res, await catalogService.getPublicTherapistOrThrow(req.params.id));
   } catch (err) {

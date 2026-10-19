@@ -12,6 +12,8 @@ vi.mock('../lib/prisma', async () => {
 
 vi.mock('../services/permission-resolver.service', () => ({
   resolveGrantedPermissionKeys: vi.fn(),
+  invalidatePermissionCache: vi.fn(),
+  isSuperAdminRoleSet: vi.fn().mockResolvedValue(false),
 }));
 
 import app from '../app';
@@ -171,6 +173,181 @@ describe('GET /api/v1/rbac/users', () => {
       }),
     );
   });
+
+  /**
+   * The matrix's own-scoped "Logs (login history)" row applies to `lastLoginAt` in the staff
+   * list too, not just the dedicated login-history endpoint — otherwise Admin's own-only Logs
+   * permission would leak another user's login activity through this list response alone.
+   */
+  it('strips lastLoginAt for every OTHER user when the caller is not a genuine SuperAdmin', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:view']);
+    prismaMock.user.findMany.mockResolvedValue([{ ...nonSuperadminUser, lastLoginAt: new Date('2026-05-01T00:00:00Z') }]);
+    prismaMock.user.count.mockResolvedValue(1);
+    const res = await request(app)
+      .get('/api/v1/rbac/users')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] })); // USER_ID !== TARGET_USER_ID
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].lastLoginAt).toBeNull();
+  });
+
+  it('keeps lastLoginAt visible for a genuine SuperAdmin caller', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:view']);
+    prismaMock.user.findMany.mockResolvedValue([{ ...nonSuperadminUser, lastLoginAt: new Date('2026-05-01T00:00:00Z') }]);
+    prismaMock.user.count.mockResolvedValue(1);
+    const { isSuperAdminRoleSet } = await import('../services/permission-resolver.service');
+    vi.mocked(isSuperAdminRoleSet).mockResolvedValueOnce(true); // Once — `clearAllMocks` in beforeEach doesn't revert a persistent mockResolvedValue, and every other test in this file needs the default `false`.
+    const res = await request(app)
+      .get('/api/v1/rbac/users')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['super_admin'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].lastLoginAt).not.toBeNull();
+  });
+
+  it('keeps lastLoginAt visible for the caller\'s own row within the list', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:view']);
+    prismaMock.user.findMany.mockResolvedValue([{ ...nonSuperadminUser, id: USER_ID, lastLoginAt: new Date('2026-05-01T00:00:00Z') }]);
+    prismaMock.user.count.mockResolvedValue(1);
+    const res = await request(app)
+      .get('/api/v1/rbac/users')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].lastLoginAt).not.toBeNull();
+  });
+});
+
+/**
+ * Feature: Staff Users detail/mutation endpoints must never become a back door onto an account
+ * `listUsers` itself would exclude (customer-only, Vendor-owner, Superadmin) — `User Management
+ * (Internal Staff)` task, section 3/5. `assertStaffUserOrThrow` is the single guard every
+ * admin-on-behalf `:id` route calls before touching anything; these tests prove the guard
+ * actually runs (404, never reaching the mutation) rather than merely existing in the source.
+ */
+describe('Staff Users admin-on-behalf routes reject an excluded account id', () => {
+  it('GET /rbac/users/:id 404s and never calls getUserOrThrow\'s own findFirst a second time usefully', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:view']);
+    prismaMock.user.findFirst.mockResolvedValue(null); // assertStaffUserOrThrow's own lookup
+    const res = await request(app)
+      .get(`/api/v1/rbac/users/${TARGET_USER_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /rbac/users/:id strips lastLoginAt for another user when the caller is not a genuine SuperAdmin', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:view']);
+    prismaMock.user.findFirst
+      .mockResolvedValueOnce({ id: TARGET_USER_ID }) // assertStaffUserOrThrow's own lookup
+      .mockResolvedValueOnce({
+        id: TARGET_USER_ID,
+        name: 'Fellow Staff',
+        email: 'staff@example.com',
+        phone: null,
+        status: 'active',
+        lastLoginAt: new Date('2026-05-01T00:00:00Z'),
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+        updatedAt: new Date('2026-01-01T00:00:00Z'),
+        roles: [],
+      });
+    const res = await request(app)
+      .get(`/api/v1/rbac/users/${TARGET_USER_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data.lastLoginAt).toBeNull();
+  });
+
+  it('PATCH /rbac/users/:id 404s for an excluded account and never calls user.update', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:edit']);
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    const res = await request(app)
+      .patch(`/api/v1/rbac/users/${TARGET_USER_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send({ name: 'Should not apply' });
+    expect(res.status).toBe(404);
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  it('PUT /rbac/users/:id/role 404s for an excluded account and never touches userRole', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:assign']);
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    const res = await request(app)
+      .put(`/api/v1/rbac/users/${TARGET_USER_ID}/role`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send({ roleId: ROLE_ID });
+    expect(res.status).toBe(404);
+    expect(prismaMock.userRole.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('POST /rbac/users/:id/sessions/revoke-all 404s for an excluded account and never revokes anything', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:edit']);
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    const res = await request(app)
+      .post(`/api/v1/rbac/users/${TARGET_USER_ID}/sessions/revoke-all`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
+    expect(res.status).toBe(404);
+    expect(prismaMock.refreshSession.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Feature: "Logs (login history)" is own-scoped for every role except an actual Superadmin —
+ * `GET /rbac/users/:id/login-history` must 404 (not merely 403 — don't confirm existence) when
+ * a non-Superadmin caller with `rbac.users:view` (e.g. Admin) requests a DIFFERENT user's id,
+ * while their OWN id (and any id, for a genuine Superadmin) still works.
+ */
+describe('GET /api/v1/rbac/users/:id/login-history — own-scoped unless Superadmin', () => {
+  const staffFixture = {
+    id: TARGET_USER_ID,
+    name: 'Fellow Staff',
+    email: 'staff@example.com',
+    phone: null,
+    status: 'active',
+    lastLoginAt: null,
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    updatedAt: new Date('2026-01-01T00:00:00Z'),
+  };
+
+  it('404s when Admin requests a DIFFERENT user\'s login history', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:view']);
+    prismaMock.user.findFirst.mockResolvedValue(staffFixture); // passes assertStaffUserOrThrow
+    const res = await request(app)
+      .get(`/api/v1/rbac/users/${TARGET_USER_ID}/login-history`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
+    expect(res.status).toBe(404);
+    expect(prismaMock.loginHistory.findMany).not.toHaveBeenCalled();
+  });
+
+  it('succeeds when the caller requests their OWN login history (id === sub)', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:view']);
+    prismaMock.user.findFirst.mockResolvedValue({ ...staffFixture, id: USER_ID });
+    prismaMock.loginHistory.findMany.mockResolvedValue([]);
+    prismaMock.loginHistory.count.mockResolvedValue(0);
+    const res = await request(app)
+      .get(`/api/v1/rbac/users/${USER_ID}/login-history`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
+    expect(res.status).toBe(200);
+  });
+
+  it('succeeds for a genuine Superadmin requesting a DIFFERENT user\'s login history', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:view']);
+    prismaMock.user.findFirst.mockResolvedValue(staffFixture);
+    prismaMock.loginHistory.findMany.mockResolvedValue([]);
+    prismaMock.loginHistory.count.mockResolvedValue(0);
+    const { isSuperAdminRoleSet } = await import('../services/permission-resolver.service');
+    vi.mocked(isSuperAdminRoleSet).mockResolvedValueOnce(true); // Once — `clearAllMocks` in beforeEach doesn't revert a persistent mockResolvedValue, and every other test in this file needs the default `false`.
+    const res = await request(app)
+      .get(`/api/v1/rbac/users/${TARGET_USER_ID}/login-history`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['super_admin'] }));
+    expect(res.status).toBe(200);
+  });
+
+  it('GET /rbac/users/me/login-history works with no rbac.users:* permission at all', async () => {
+    resolveMock.mockResolvedValue([]); // Marketing/Sales/Support/Member — none of them hold rbac.users:*
+    prismaMock.loginHistory.findMany.mockResolvedValue([]);
+    prismaMock.loginHistory.count.mockResolvedValue(0);
+    const res = await request(app)
+      .get('/api/v1/rbac/users/me/login-history')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['marketing'] }));
+    expect(res.status).toBe(200);
+  });
 });
 
 /**
@@ -240,11 +417,11 @@ describe('GET/PATCH /api/v1/rbac/users/me', () => {
 });
 
 describe('POST /api/v1/rbac/users', () => {
-  const validBody = { name: 'Nikita Sharma', email: 'nikita@example.com', roleIds: [ROLE_ID] };
+  const validBody = { name: 'Nikita Sharma', email: 'nikita@example.com', roleId: ROLE_ID };
 
   it('returns 409 (not a raw 500) when the email/phone unique constraint is hit at the DB, previously an unhandled P2002', async () => {
     resolveMock.mockResolvedValue(['rbac.users:create']);
-    prismaMock.role.count.mockResolvedValue(1);
+    prismaMock.role.findUnique.mockResolvedValue(roleFixture);
     const { Prisma } = await import('../generated/prisma-client');
     prismaMock.user.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' }),
@@ -259,7 +436,7 @@ describe('POST /api/v1/rbac/users', () => {
 
   it('still returns 201 with the created user when the audit-log write itself fails', async () => {
     resolveMock.mockResolvedValue(['rbac.users:create']);
-    prismaMock.role.count.mockResolvedValue(1);
+    prismaMock.role.findUnique.mockResolvedValue(roleFixture);
     prismaMock.user.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: TARGET_USER_ID, ...data, roles: [] }),
     );
@@ -270,6 +447,194 @@ describe('POST /api/v1/rbac/users', () => {
       .send(validBody);
     expect(res.status).toBe(201);
     expect(res.body.data.id).toBe(TARGET_USER_ID);
+  });
+
+  /**
+   * Section 8 regression guard: a staff user created/edited with a bare 10-digit phone must be
+   * stored in the SAME normalized `+91XXXXXXXXXX` form `normalizeIdentifier()` resolves a real
+   * OTP login to (`auth.routes.ts`'s `/otp/request`+`/otp/verify`) — otherwise "9889259224" (as
+   * typed by an Admin here) and "+919889259224" (as normalized at login) would never match the
+   * same `User.phone` row.
+   */
+  it('normalizes a bare 10-digit phone to +91XXXXXXXXXX before it ever reaches the service/DB', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:create']);
+    prismaMock.role.findUnique.mockResolvedValue(roleFixture);
+    prismaMock.user.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: TARGET_USER_ID, ...data, roles: [] }),
+    );
+    const res = await request(app)
+      .post('/api/v1/rbac/users')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send({ ...validBody, phone: '9889259224' });
+    expect(res.status).toBe(201);
+    expect(prismaMock.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ phone: '+919889259224' }) }),
+    );
+  });
+
+  it('rejects a malformed phone (wrong digit count / leading digit) with a 422, never silently storing it as-is', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:create']);
+    const res = await request(app)
+      .post('/api/v1/rbac/users')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send({ ...validBody, phone: '12345' });
+    expect(res.status).toBe(422);
+    expect(prismaMock.user.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a roleId resolving to Customer or Member — only eligible internal roles are assignable here', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:create']);
+    prismaMock.role.findUnique.mockResolvedValue({ ...roleFixture, key: 'vendor' });
+    const res = await request(app)
+      .post('/api/v1/rbac/users')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send(validBody);
+    expect(res.status).toBe(422);
+    expect(prismaMock.user.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a payload shaped for the old multi-role API (roleIds array) with 422, never silently accepting it', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:create']);
+    const res = await request(app)
+      .post('/api/v1/rbac/users')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send({ name: 'Nikita Sharma', email: 'nikita@example.com', roleIds: [ROLE_ID, OTHER_ROLE_ID] });
+    expect(res.status).toBe(422);
+    expect(prismaMock.user.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('PUT /api/v1/rbac/users/:id/role — atomic single-role replace', () => {
+  it('returns 401 with no token', async () => {
+    const res = await request(app).put(`/api/v1/rbac/users/${TARGET_USER_ID}/role`).send({ roleId: ROLE_ID });
+    expect(res.status).toBe(401);
+  });
+
+  it('replaces the user\'s entire role set with exactly the new role (delete-then-create, never additive)', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:assign']);
+    prismaMock.user.findFirst
+      .mockResolvedValueOnce({ id: TARGET_USER_ID }) // assertStaffUserOrThrow
+      .mockResolvedValueOnce({ id: TARGET_USER_ID, roles: [{ role: { id: OTHER_ROLE_ID, key: 'sales', name: 'Sales' } }] }) // getUserOrThrow (before)
+      .mockResolvedValueOnce({ id: TARGET_USER_ID, roles: [{ role: roleFixture }] }); // getUserOrThrow (after, inside setStaffUserRole)
+    prismaMock.role.findUnique.mockResolvedValue(roleFixture);
+    prismaMock.userRole.deleteMany.mockResolvedValue({});
+    prismaMock.userRole.create.mockResolvedValue({});
+    prismaMock.user.update.mockResolvedValue({});
+
+    const res = await request(app)
+      .put(`/api/v1/rbac/users/${TARGET_USER_ID}/role`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send({ roleId: ROLE_ID });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.userRole.deleteMany).toHaveBeenCalledWith({ where: { userId: TARGET_USER_ID } });
+    expect(prismaMock.userRole.create).toHaveBeenCalledWith({ data: { userId: TARGET_USER_ID, roleId: ROLE_ID } });
+  });
+
+  it('rejects assigning the Customer role through staff user management', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:assign']);
+    prismaMock.user.findFirst.mockResolvedValue({ id: TARGET_USER_ID });
+    prismaMock.role.findUnique.mockResolvedValue({ ...roleFixture, key: 'customer' });
+
+    const res = await request(app)
+      .put(`/api/v1/rbac/users/${TARGET_USER_ID}/role`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send({ roleId: ROLE_ID });
+
+    expect(res.status).toBe(422);
+    expect(prismaMock.userRole.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects assigning the Member (vendor) role through staff user management', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:assign']);
+    prismaMock.user.findFirst.mockResolvedValue({ id: TARGET_USER_ID });
+    prismaMock.role.findUnique.mockResolvedValue({ ...roleFixture, key: 'vendor' });
+
+    const res = await request(app)
+      .put(`/api/v1/rbac/users/${TARGET_USER_ID}/role`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send({ roleId: ROLE_ID });
+
+    expect(res.status).toBe(422);
+    expect(prismaMock.userRole.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects a multi-role-shaped payload (roleIds array) with 422', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:assign']);
+    const res = await request(app)
+      .put(`/api/v1/rbac/users/${TARGET_USER_ID}/role`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send({ roleIds: [ROLE_ID, OTHER_ROLE_ID] });
+    expect(res.status).toBe(422);
+  });
+
+  it('returns 403 without rbac.users:assign (e.g. Admin has only rbac.users:view per the matrix)', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:view']);
+    const res = await request(app)
+      .put(`/api/v1/rbac/users/${TARGET_USER_ID}/role`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }))
+      .send({ roleId: ROLE_ID });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('GET/PUT /api/v1/rbac/role-conflicts — legacy multi-role review', () => {
+  it('GET returns 401 with no token', async () => {
+    const res = await request(app).get('/api/v1/rbac/role-conflicts');
+    expect(res.status).toBe(401);
+  });
+
+  it('GET returns every flagged account with its current roles', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:assign']);
+    prismaMock.user.findMany.mockResolvedValue([
+      {
+        id: TARGET_USER_ID,
+        name: 'Conflicted',
+        email: 'c@example.com',
+        phone: null,
+        status: 'active',
+        roles: [{ role: { id: ROLE_ID, key: 'customer', name: 'Customer' } }, { role: { id: OTHER_ROLE_ID, key: 'vendor', name: 'Member' } }],
+        vendorProfile: null,
+      },
+    ]);
+    const res = await request(app)
+      .get('/api/v1/rbac/role-conflicts')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['super_admin'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].roles.map((r: { key: string }) => r.key)).toEqual(['customer', 'vendor']);
+  });
+
+  it('PUT resolves a flagged account to the chosen role and clears the flag', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:assign']);
+    prismaMock.user.findFirst
+      .mockResolvedValueOnce({ id: TARGET_USER_ID, roleConflict: true, roles: [] }) // getUserOrThrow — route-level "before" snapshot
+      .mockResolvedValueOnce({ id: TARGET_USER_ID, roleConflict: true, roles: [] }) // getUserOrThrow — resolveAccountRoleConflict's own roleConflict check
+      .mockResolvedValueOnce({ id: TARGET_USER_ID, roleConflict: false, roles: [{ role: { id: OTHER_ROLE_ID, key: 'vendor', name: 'Member' } }] }); // getUserOrThrow — final re-fetch for the response
+    prismaMock.role.findUnique.mockResolvedValue({ ...roleFixture, key: 'vendor' });
+    prismaMock.userRole.deleteMany.mockResolvedValue({});
+    prismaMock.userRole.create.mockResolvedValue({});
+    prismaMock.user.update.mockResolvedValue({});
+
+    const res = await request(app)
+      .put(`/api/v1/rbac/role-conflicts/${TARGET_USER_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['super_admin'] }))
+      .send({ roleId: OTHER_ROLE_ID });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: TARGET_USER_ID }, data: { roleConflict: false } }),
+    );
+  });
+
+  it('PUT rejects resolving an account that is not actually flagged', async () => {
+    resolveMock.mockResolvedValue(['rbac.users:assign']);
+    prismaMock.user.findFirst.mockResolvedValue({ id: TARGET_USER_ID, roleConflict: false });
+    const res = await request(app)
+      .put(`/api/v1/rbac/role-conflicts/${TARGET_USER_ID}`)
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['super_admin'] }))
+      .send({ roleId: ROLE_ID });
+    expect(res.status).toBe(422);
+    expect(prismaMock.userRole.deleteMany).not.toHaveBeenCalled();
   });
 });
 
@@ -529,6 +894,33 @@ describe('GET /api/v1/rbac/bootstrap', () => {
       .get('/api/v1/rbac/bootstrap')
       .set('Authorization', bearerFor({ sub: USER_ID, roles: ['admin'] }));
     expect(res.status).toBe(404);
+  });
+
+  /** Regression: bootstrap is fetched right after login AND on every refresh/mount, and the
+   *  frontend's own `loadBootstrap` already signs out on a 401/403 — reused here (rather than a
+   *  new frontend mechanism) to actually end a suspended Member's session, not just block their
+   *  next login attempt. */
+  it('403s a suspended Member — their own bootstrap, not an admin\'s', async () => {
+    resolveMock.mockResolvedValue(['dashboard:view']);
+    prismaMock.user.findFirst.mockResolvedValue({ id: USER_ID, name: 'Vendor Owner', email: 'owner@test.com', phone: null, status: 'active' });
+    prismaMock.vendor.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
+    const res = await request(app)
+      .get('/api/v1/rbac/bootstrap')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['vendor'] }));
+    expect(res.status).toBe(403);
+    expect(res.body.error.message).toBe('Your member account is suspended. Please contact support.');
+  });
+
+  it('does not 403 a SuperAdmin previewing a suspended Member (isPreview token)', async () => {
+    resolveMock.mockResolvedValue(['dashboard:view']);
+    prismaMock.user.findFirst.mockResolvedValue({ id: USER_ID, name: 'Vendor Owner', email: 'owner@test.com', phone: null, status: 'active' });
+    prismaMock.vendor.findUnique.mockResolvedValue({ status: 'SUSPENDED' });
+    prismaMock.role.findMany.mockResolvedValue([{ id: ROLE_ID, key: 'vendor', name: 'Vendor', isSuperAdmin: false }]);
+    prismaMock.roleDashboardWidget.findMany.mockResolvedValue([]);
+    const res = await request(app)
+      .get('/api/v1/rbac/bootstrap')
+      .set('Authorization', bearerFor({ sub: USER_ID, roles: ['vendor'], isPreview: true, impersonatedBy: 'admin-1' }));
+    expect(res.status).toBe(200);
   });
 });
 

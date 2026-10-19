@@ -153,6 +153,23 @@ describe('DealsListPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load deals.');
   });
 
+  /** Regression: a genuine load failure (e.g. the real "Member Deal List" 500, root-caused to a
+   *  missing DB migration — see vendors.routes.test.ts's own regression comment) used to render
+   *  BOTH the error alert AND a misleading "No deals yet. Add one for a branch." empty state,
+   *  since the empty-state check only looked at `deals.length === 0`, which is also true right
+   *  after a failed load (deals state never got set). An error must never be presented as "there
+   *  simply aren't any deals yet". */
+  it('never shows the empty-state copy alongside a real load error', async () => {
+    listVendorDealsForAdminMock.mockRejectedValue(new ApiRequestError('INTERNAL_ERROR', 'Could not load deals.', 500));
+    render(
+      <MemoryRouter>
+        <DealsListPage token="tok" vendorId="v1" canEdit canDelete />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load deals.');
+    expect(screen.queryByText(/No deals yet/)).toBeNull();
+  });
+
   it('shows a conflict error from deleteDeal (blocked by real order history) without crashing', async () => {
     deleteDealMock.mockRejectedValue(new ApiRequestError('CONFLICT', 'Cannot delete this deal because it has existing orders or carts referencing it.', 409));
     renderPage();

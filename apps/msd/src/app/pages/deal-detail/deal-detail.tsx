@@ -14,17 +14,26 @@ import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selec
 import { DurationPackageSelector } from '../../components/duration-package-selector';
 import { formatINR } from '../../../utils/format';
 import { resolveDealMedia } from '../../../utils/media';
+import { htmlToPlainText } from '../../../utils/rich-text';
+import { dealPath } from '../../seo/public-urls';
+import { absoluteUrl } from '../../seo/site-url';
 import content from '../../../content.json';
 import './deal-detail.css';
 /**
- * A single Deal — GET /catalog/deals/:id. Deal is always a service offering (Product is a fully
- * independent catalog entity — see msd-api's Product schema doc comment) — Add to Cart always
- * goes through `DealAddToCartDialog`'s package-selection flow.
+ * A single Deal — GET /catalog/deals/:slug (also accepts a legacy UUID, see msd-api's
+ * `getPublicDealOrThrow`). Deal is always a service offering (Product is a fully independent
+ * catalog entity — see msd-api's Product schema doc comment) — Add to Cart always goes through
+ * `DealAddToCartDialog`'s package-selection flow.
  *
- * /category/:slug links service deals here. Products link to /products/:id.
+ * A legacy UUID or stale slug alias resolves to the same deal, then this page client-navigates
+ * to the canonical `/deal/:slug` path (`replace`, no history entry) — this is NOT a real HTTP
+ * 301/308; apps/msd is a static Vite SPA with no server-side routing layer to issue one from (see
+ * TASK.md's SEO follow-up note for the hosting-level change that would be needed).
+ *
+ * /category/:slug links service deals here. Products link to /products/:slug.
  */
 export function DealDetail() {
-  const { id = '' } = useParams<{ id: string }>();
+  const { slug: id = '' } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, token } = useAuth();
@@ -40,6 +49,11 @@ export function DealDetail() {
   const [actionError, setActionError] = useState('');
   const [quantity, setQuantity] = useState(1);
   useEffect(() => {
+    // Guards against a slower, now-stale request (quick back-to-back navigation between deals,
+    // or StrictMode's dev-only double-invoke) landing after a newer one and overwriting fresh
+    // state with old data — the visible symptom is a content→loading→content flicker.
+    let cancelled = false;
+
     if (!id) {
       setDeal(null);
       setError(dealDetail.errors.invalidDeal);
@@ -50,17 +64,32 @@ export function DealDetail() {
     setError('');
     setActiveImg(0);
     getCatalogDeal(id)
-      .then(({ data }) => { setDeal(data); })
+      .then(({ data }) => { if (!cancelled) setDeal(data); })
       .catch((err: unknown) => {
+        if (cancelled) return;
         if (err instanceof ApiRequestError && err.status === 404) {
           setDeal(null);
           return;
         }
         setError(err instanceof ApiRequestError ? err.message : dealDetail.errors.loadDeal);
       })
-      .finally(() => { setLoading(false); });
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
+  // A legacy UUID or stale slug alias resolved to this deal — swap the address bar to the
+  // canonical slug path without adding a history entry (client-side only, see this file's own
+  // doc comment on why this isn't a true HTTP redirect).
   useEffect(() => {
+    if (!deal) return;
+    const canonical = dealPath(deal);
+    if (canonical !== location.pathname) navigate(canonical, { replace: true });
+  }, [deal, location.pathname, navigate]);
+  useEffect(() => {
+    let cancelled = false;
+
     if (!deal?.category?.id) {
       setRelated([]);
       return;
@@ -70,13 +99,18 @@ export function DealDetail() {
       pageSize: 7,
     })
       .then(({ data }) => {
+        if (cancelled) return;
         setRelated(
           data.filter((item) => item.id !== deal.id).slice(0, 6),
         );
       })
       .catch(() => {
-        setRelated([]);
+        if (!cancelled) setRelated([]);
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [deal]);
   const purchaseSelection = useDealPurchaseSelection(deal);
   if (loading) {
@@ -108,7 +142,10 @@ export function DealDetail() {
   const dealMedia = resolveDealMedia(deal);
   const gallery = dealMedia.images;
   const video = dealMedia.video;
+  // `description` may be rich HTML (sanitized server-side) — rendered via dangerouslySetInnerHTML
+  // on-page; `plainDescription` strips tags for meta/JSON-LD, which must never contain markup.
   const description = deal.description ?? deal.shortDescription ?? '';
+  const plainDescription = htmlToPlainText(description);
   const salePrice = purchaseSelection.unitPrice;
   const originalPrice = purchaseSelection.activePackage?.originalPrice != null
     ? Number(purchaseSelection.activePackage.originalPrice)
@@ -162,15 +199,17 @@ export function DealDetail() {
       <title>{`${name} – ${deal.vendor?.businessName ?? 'MSD'} | MSD`}</title>
       <meta
         name="description"
-        content={`${description || `Book ${name} at MSD.`} ${formatINR(salePrice)}${deal.branch?.city ? ` in ${deal.branch.city}` : ''}.`}
+        content={`${plainDescription || `Book ${name} at MSD.`} ${formatINR(salePrice)}${deal.branch?.city ? ` in ${deal.branch.city}` : ''}.`}
       />
+      {absoluteUrl(dealPath(deal)) && <link rel="canonical" href={absoluteUrl(dealPath(deal))} />}
+      {absoluteUrl(dealPath(deal)) && <meta property="og:url" content={absoluteUrl(dealPath(deal))} />}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org', '@type': 'Service',
             name,
-            description,
+            description: plainDescription,
             provider: deal.vendor?.businessName ? { '@type': 'Organization', name: deal.vendor.businessName, } : undefined,
             offers: {
               '@type': 'Offer',
@@ -323,17 +362,15 @@ export function DealDetail() {
           <sky-accordion>
             {description && (
               <sky-accordion-item header={dealDetail.description} open>
-                <p className="deal-detail__desc">{description}</p>
-              </sky-accordion-item>
-            )}
-            {deal.notes && (
-              <sky-accordion-item header="Notes">
-                <p className="deal-detail__desc">{deal.notes}</p>
+                {/* `description` is sanitized HTML from msd-api's `sanitizeRichText` allow-list
+                  (or plain text when it's really the `shortDescription` fallback, which has no
+                  tags to interpret either way) — see api/catalog.ts's own doc comment. */}
+                <div className="deal-detail__desc" dangerouslySetInnerHTML={{ __html: description }} />
               </sky-accordion-item>
             )}
             {deal.policy && (
               <sky-accordion-item header="Policy">
-                <p className="deal-detail__policy">{deal.policy}</p>
+                <div className="deal-detail__policy" dangerouslySetInnerHTML={{ __html: deal.policy }} />
               </sky-accordion-item>
             )}
             <sky-accordion-item header={dealDetail.cancellationPolicy}>
@@ -341,7 +378,7 @@ export function DealDetail() {
             </sky-accordion-item>
             {deal.termsAndConditions && (
               <sky-accordion-item header="Terms & Conditions">
-                <p className="deal-detail__policy">{deal.termsAndConditions}</p>
+                <div className="deal-detail__policy" dangerouslySetInnerHTML={{ __html: deal.termsAndConditions }} />
               </sky-accordion-item>
             )}
           </sky-accordion>
@@ -362,6 +399,7 @@ export function DealDetail() {
                   const media = resolveDealMedia(item);
                   const relatedDeal: DealCardDeal = {
                     id: item.id,
+                    slug: item.slug,
                     title: item.title,
                     image: media.images[0] ?? '',
                     imageAlt: item.title,

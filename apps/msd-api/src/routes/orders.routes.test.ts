@@ -458,6 +458,86 @@ describe('GET /api/v1/orders/:id — vendor isolation', () => {
   });
 });
 
+describe('GET /api/v1/orders/counts', () => {
+  it('403s without orders:view or vendors:custom', async () => {
+    resolveMock.mockResolvedValue([]);
+    const res = await request(app).get('/api/v1/orders/counts').set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(403);
+  });
+
+  it('200s with the three counts for an admin caller', async () => {
+    resolveMock.mockResolvedValue(['orders:view']);
+    prismaMock.vendor.findUnique.mockResolvedValue(null);
+    prismaMock.order.count.mockResolvedValueOnce(42).mockResolvedValueOnce(30).mockResolvedValueOnce(5);
+    const res = await request(app).get('/api/v1/orders/counts').set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ total: 42, paid: 30, pendingPayment: 5 });
+    expect(prismaMock.order.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/v1/orders/:id/activity', () => {
+  beforeEach(() => {
+    prismaMock.vendor.findUnique.mockResolvedValue(null);
+  });
+
+  it('403s without orders:view or vendors:custom', async () => {
+    resolveMock.mockResolvedValue([]);
+    const res = await request(app)
+      .get(`/api/v1/orders/${ORDER_ID}/activity`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(403);
+  });
+
+  it('404s for a non-existent order, same as GET /orders/:id', async () => {
+    resolveMock.mockResolvedValue(['orders:view']);
+    prismaMock.order.findUnique.mockResolvedValue(null);
+    const res = await request(app)
+      .get(`/api/v1/orders/${ORDER_ID}/activity`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(404);
+  });
+
+  it('200s with the chronological aggregate across Order/PurchaseEntitlement/PurchaseDispute/Refund', async () => {
+    resolveMock.mockResolvedValue(['orders:view']);
+    prismaMock.order.findUnique.mockResolvedValue(orderFixture);
+    prismaMock.orderItem.findMany.mockResolvedValue([{ id: 'oi-1', purchaseEntitlements: [], refunds: [] }]);
+    prismaMock.auditLog.findMany.mockResolvedValue([{ id: 'log-1', action: 'order.create_from_cart', createdAt: new Date().toISOString() }]);
+    const res = await request(app)
+      .get(`/api/v1/orders/${ORDER_ID}/activity`)
+      .set('Authorization', bearerFor({ sub: 'admin-1', roles: ['admin'] }));
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([{ id: 'log-1', action: 'order.create_from_cart', createdAt: expect.any(String) }]);
+  });
+
+  // Same guard as `GET /orders/:id` (`requireOrdersOrVendorSelf`) — a vendor caller holding only
+  // `vendors:custom` (never `orders:view`) can see its own order's activity, and the aggregate is
+  // scoped to that vendor's own items (via `getOrderOrThrow`'s existing scoping), never a sibling
+  // vendor's entitlement/dispute/refund ids on the same multi-vendor order.
+  it("a vendor caller holding only 'vendors:custom' (never 'orders:view') can see its own order's activity", async () => {
+    resolveMock.mockResolvedValue(['vendors:custom']);
+    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, ownerUserId: 'vendor-user-1' });
+    prismaMock.order.findUnique.mockResolvedValue(orderFixture); // single-vendor order, all items VENDOR_A_ID
+    prismaMock.orderItem.findMany.mockResolvedValue([{ id: 'oi-1', purchaseEntitlements: [], refunds: [] }]);
+    prismaMock.auditLog.findMany.mockResolvedValue([]);
+    const res = await request(app)
+      .get(`/api/v1/orders/${ORDER_ID}/activity`)
+      .set('Authorization', bearerFor({ sub: 'vendor-user-1', roles: ['vendor'] }));
+    expect(res.status).toBe(200);
+  });
+
+  it("404s (never confirms existence) when a vendor requests another vendor's order's activity", async () => {
+    resolveMock.mockResolvedValue(['orders:view']);
+    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_B_ID, ownerUserId: 'vendor-user-2' });
+    prismaMock.order.findUnique.mockResolvedValue({ ...orderFixture, vendorId: VENDOR_A_ID }); // all items VENDOR_A_ID only
+    const res = await request(app)
+      .get(`/api/v1/orders/${ORDER_ID}/activity`)
+      .set('Authorization', bearerFor({ sub: 'vendor-user-2', roles: ['vendor'] }));
+    expect(res.status).toBe(404);
+    expect(prismaMock.orderItem.findMany).not.toHaveBeenCalled();
+  });
+});
+
 describe('PATCH /api/v1/orders/:id/status — admin', () => {
   // Pre-existing test-order-pollution guard: `vi.clearAllMocks()` (the outer beforeEach) clears
   // call history but NOT a prior test's `.mockResolvedValue()` implementation — a preceding

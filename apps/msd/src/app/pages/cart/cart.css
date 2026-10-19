@@ -130,6 +130,20 @@
   justify-content: space-between;
 }
 
+.cart-vendor-group__entitlements {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.cart-vendor-group__entitlements code {
+  background: var(--md-sys-color-surface-container-high);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
 .cart-item__qty {
   display: flex;
   align-items: center;

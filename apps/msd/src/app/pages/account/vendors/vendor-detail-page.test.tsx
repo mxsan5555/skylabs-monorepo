@@ -169,8 +169,8 @@ describe('VendorDetailPage', () => {
     expect(stepCards().map((c) => [attr(c, 'headline'), attr(c, 'text'), attr(c, 'icon'), attr(c, 'href')])).toEqual([
       ['Branches', '9 added · Edit', 'check_circle', '/account/vendors/v1/branches'],
       ['Deals', '5 of 18 live · Edit', 'check_circle', '/account/vendors/v1/deals'],
-      ['Therapists', '12 added · Edit', 'check_circle', '/account/vendors/v1/therapists'],
       ['Products', '18 added · Edit', 'check_circle', '/account/vendors/v1/products'],
+      ['Therapists', '12 added · Edit', 'check_circle', '/account/vendors/v1/therapists'],
     ]);
   });
 
@@ -183,8 +183,8 @@ describe('VendorDetailPage', () => {
     expect(stepCards().map((c) => [attr(c, 'color'), attr(c, 'href') != null])).toEqual([
       ['primary', true],
       ['tertiary', false],
-      ['tertiary', false],
       ['surface-high', true],
+      ['tertiary', false],
     ]);
   });
 
@@ -194,8 +194,8 @@ describe('VendorDetailPage', () => {
     expect(stepCards().map((c) => [attr(c, 'headline'), attr(c, 'text')])).toEqual([
       ['Branches', 'No branch yet · Start here'],
       ['Deals', 'Add a branch first'],
-      ['Therapists', 'Add a branch first'],
       ['Products', 'No products yet · Add'],
+      ['Therapists', 'Add a branch first'],
     ]);
   });
 
@@ -205,8 +205,8 @@ describe('VendorDetailPage', () => {
     expect(stepCards().map((c) => [attr(c, 'headline'), attr(c, 'text'), attr(c, 'icon'), attr(c, 'href')])).toEqual([
       ['Branches', 'Finish the profile first', 'lock', null],
       ['Deals', 'Add a branch first', 'lock', null],
-      ['Therapists', 'Add a branch first', 'lock', null],
       ['Products', 'Finish the profile first', 'lock', null],
+      ['Therapists', 'Add a branch first', 'lock', null],
     ]);
   });
 
@@ -238,13 +238,14 @@ describe('VendorDetailPage', () => {
     expect(recordsChip('Orders')).toBeTruthy();
   });
 
-  it('puts the owner, contact and KYC status on the right-hand profile card as a list', async () => {
+  it('puts the owner, contact, KYC status and creator on the right-hand profile card as a list', async () => {
     renderPage(COMPLETE);
     await screen.findByRole('heading', { level: 1 });
     expect(summaryListItems(0).map(listItemText)).toEqual([
       { headline: 'Arjun Malhotra', supporting: 'Owner' },
       { headline: '9876501105', supporting: 'Contact' },
       { headline: 'Verified', supporting: 'Identity check (KYC)' },
+      { headline: 'Not recorded', supporting: expect.stringContaining('Created by') },
     ]);
   });
 
@@ -414,6 +415,41 @@ describe('VendorDetailPage', () => {
     await waitFor(() => expect(document.querySelector('sky-feature-card[headline="Reject this member"]')).toBeTruthy());
     expect(promptSpy).not.toHaveBeenCalled();
     promptSpy.mockRestore();
+  });
+
+  it('shows "Not recorded" for the creator when createdByUserId is null', async () => {
+    renderPage(COMPLETE);
+    await screen.findByRole('heading', { level: 1 });
+    expect(document.querySelector('.member-created-by')?.textContent).toContain('Not recorded');
+  });
+
+  it('shows the creator\'s name when recorded', async () => {
+    renderPage({ ...COMPLETE, createdByUserId: 'admin-1', createdByName: 'Priya Sharma' });
+    await screen.findByRole('heading', { level: 1 });
+    expect(document.querySelector('.member-created-by')?.textContent).toContain('Priya Sharma');
+  });
+
+  it('shows one highlighted next action for an incomplete profile, which opens the profile section', async () => {
+    renderPage({
+      ...COMPLETE,
+      ownerMobile: '',
+      _count: { branches: 0, deals: 0, products: 0, therapists: 0 },
+      liveCounts: undefined,
+      status: 'PROFILE_INCOMPLETE',
+    });
+    await screen.findByRole('heading', { level: 1 });
+    const cta = document.querySelector('sky-feature-card[headline="Complete Business Profile"]');
+    expect(cta).toBeTruthy();
+    const button = cta?.querySelector('md-filled-button');
+    if (!button) throw new Error('CTA button not found');
+    fireEvent.click(button);
+    expect(await screen.findByText('pipeline-tab')).toBeTruthy();
+  });
+
+  it('shows no next action once setup is complete and the member is already active', async () => {
+    renderPage(COMPLETE);
+    await screen.findByRole('heading', { level: 1 });
+    expect(document.querySelector('.summary-layout sky-feature-card')).toBeNull();
   });
 
   it('shows a way back when the member cannot be loaded', async () => {

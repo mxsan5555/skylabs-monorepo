@@ -4,8 +4,17 @@ import { permissionKeyFor } from '@skylabs-monorepo/shared-permissions';
 import { getMenuForApp } from '@skylabs-monorepo/shared-menu';
 import { ApiError } from '../lib/http';
 
+/**
+ * Excludes `customer` — Customer is a real, undeletable DB role (every external customer login
+ * still resolves to it) but is never shown in Role Management or offered anywhere a role is
+ * assignable: Customer accounts get it automatically through their own registration/login flow,
+ * never through an admin picking it from a list. Every consumer of this endpoint (Role
+ * Management's role list, the staff Add/Edit role dropdown, the staff list's role filter) wants
+ * exactly the same "visible administrative roles" set, so the exclusion lives here once rather
+ * than being repeated — and forgotten — in three different frontend filters.
+ */
 export async function listRoles() {
-  return prisma.role.findMany({ orderBy: { createdAt: 'asc' } });
+  return prisma.role.findMany({ where: { key: { not: 'customer' } }, orderBy: { createdAt: 'asc' } });
 }
 
 export async function getRole(id: string) {

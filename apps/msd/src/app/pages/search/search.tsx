@@ -41,6 +41,7 @@ import { useCurrentLocation } from '../../../hooks/useCurrentLocation';
 import content from '../../../content.json';
 import './search.css';
 import { DealMap } from '../../components/deal-map/deal-map';
+import { dealPath, productPath, therapistPath } from '../../seo/public-urls';
 
 const { search: searchContent } = content;
 
@@ -292,7 +293,7 @@ export function Search() {
     lng: Number(deal.branch.longitude),
     label: formatINR(Number(deal.salePrice)),
     title: deal.title,
-    href: `/deal/${deal.id}`,
+    href: dealPath(deal),
   }));
 
   return (
@@ -441,7 +442,7 @@ export function Search() {
                       <li key={deal.id} className="search-results-list__item">
                         <article className="search-result-card">
                           <Link
-                            to={`/deal/${deal.id}`}
+                            to={dealPath(deal)}
                             className="search-result-card__img-link"
                             tabIndex={-1}
                             aria-hidden="true"
@@ -461,7 +462,7 @@ export function Search() {
                             <div className="search-result-card__top">
                               <div>
                                 <h3 className="search-result-card__title">
-                                  <Link to={`/deal/${deal.id}`}>{heading}</Link>
+                                  <Link to={dealPath(deal)}>{heading}</Link>
                                 </h3>
                                 {deal.vendor?.businessName && (
                                   <p className="search-result-card__provider">
@@ -527,7 +528,7 @@ export function Search() {
                       {products.map((product) => (
                         <li key={product.id} className="search-results-list__item">
                           <article className="search-result-card">
-                            <Link to={`/products/${product.id}`} className="search-result-card__img-link" tabIndex={-1} aria-hidden="true">
+                            <Link to={productPath(product)} className="search-result-card__img-link" tabIndex={-1} aria-hidden="true">
                               {product.image && (
                                 <img className="search-result-card__img" src={product.image} alt={product.imageAlt ?? product.name} width={140} height={140} loading="lazy" />
                               )}
@@ -536,7 +537,7 @@ export function Search() {
                               <div className="search-result-card__top">
                                 <div>
                                   <h3 className="search-result-card__title">
-                                    <Link to={`/products/${product.id}`}>{product.name}</Link>
+                                    <Link to={productPath(product)}>{product.name}</Link>
                                   </h3>
                                   {product.vendor?.businessName && (
                                     <p className="search-result-card__provider">
@@ -573,7 +574,7 @@ export function Search() {
                         return (
                           <li key={therapist.id} className="search-results-list__item">
                             <article className="search-result-card">
-                              <Link to={`/therapist/${therapist.id}`} className="search-result-card__img-link" tabIndex={-1} aria-hidden="true">
+                              <Link to={therapistPath(therapist)} className="search-result-card__img-link" tabIndex={-1} aria-hidden="true">
                                 {image && (
                                   <img className="search-result-card__img" src={image} alt={therapist.personName} width={140} height={140} loading="lazy" />
                                 )}
@@ -582,7 +583,7 @@ export function Search() {
                                 <div className="search-result-card__top">
                                   <div>
                                     <h3 className="search-result-card__title">
-                                      <Link to={`/therapist/${therapist.id}`}>{therapist.therapistType}</Link>
+                                      <Link to={therapistPath(therapist)}>{therapist.therapistType}</Link>
                                     </h3>
                                     <p className="search-result-card__provider">
                                       {therapist.personName}
@@ -632,7 +633,7 @@ export function Search() {
                         }
                         favorite={true}
                         favoriteActive={wishlistHas(deal.id)}
-                        href={`/deal/${deal.id}`}
+                        href={dealPath(deal)}
                         onFavorite={() => wishlistToggle(deal.id)}
                       />
                     </li>
@@ -653,7 +654,7 @@ export function Search() {
                             ? formatINR(Number(product.originalPrice))
                             : undefined
                         }
-                        href={`/products/${product.id}`}
+                        href={productPath(product)}
                       />
                     </li>
                   ))}
@@ -675,7 +676,7 @@ export function Search() {
                           distance={therapist.distanceKm != null ? `${Math.round(therapist.distanceKm * 10) / 10} km` : undefined}
                           pricePrefix={fromPrice != null ? 'From' : undefined}
                           price={fromPrice != null ? formatINR(fromPrice) : undefined}
-                          href={`/therapist/${therapist.id}`}
+                          href={therapistPath(therapist)}
                         />
                       </li>
                     );
@@ -705,7 +706,7 @@ export function Search() {
                             const imageAlt = heading;
                             return (
                               <li key={deal.id} className="search-map__list-item">
-                                <Link to={`/deal/${deal.id}`} className="search-map__list-link">
+                                <Link to={dealPath(deal)} className="search-map__list-link">
                                   {image && (
                                     <img src={image} alt={imageAlt} width={64} height={64} loading="lazy" />
                                   )}

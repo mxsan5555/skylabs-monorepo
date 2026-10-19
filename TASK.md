@@ -17,7 +17,17 @@ Original plan file: `~/.claude/plans/our-backend-admin-layout-snug-sloth.md`. Ea
       therapist count) — 2026-09-28. Reworked mid-step into a no-tab, card-driven Overview (real routes
       per section, `sky-tile-card` warning-tone setup cards, `setupHint`) — see
       `docs/superpowers/specs/2026-09-28-vendor-branch-management-design.md` for the "why".
-- [ ] 2. Profile page (replaces the "Profile & setup" tab and the six-step pill wizard)
+- [x] **2. Profile page** — replaced the six-step pill wizard with a 4-step Member creation
+      process: Step 1 (Owner & Login, `vendor-user-picker.tsx`'s `VendorOwnerLoginStep`) is its own
+      screen on `/account/vendors/new`, required mobile with a fixed `+91` prefix, exact per-field
+      messages, and submits straight to the existing Member Details page; Steps 2-4 (Business
+      Details → KYC Documents → Branch & Access, `vendor-pipeline.tsx`) continue from Member
+      Details' "Complete Profile"/"Add Profile" button — no Deals/Therapy/Products/Review &
+      Submit steps any more (those stay reachable only from Overview's own cards). Member
+      List/Details also gained Created By (name + date, server-resolved, "Not recorded" for
+      self-registrations), a status filter, and one highlighted next-action card on Overview —
+      2026-10-12. Follow-up: `apps/msd-e2e/src/vendor-onboarding.spec.ts` already targeted the
+      *previous* wizard shape before this change and needs a rewrite for the new 4-step flow.
 - [x] **3a. Branches list + add/edit** — `branches-list-page.tsx` (card grid, outlined/no-fill
       `sky-feature-card`, Edit/Deactivate — branches have no hard delete), `branch-form-page.tsx`
       (state-gated `sky-accordion`: Location → Opening Hours → Category Access) at
@@ -32,6 +42,18 @@ Original plan file: `~/.claude/plans/our-backend-admin-layout-snug-sloth.md`. Ea
       card into the profile wizard until it gets its own page)
 - [ ] 5. Remove the pill wizard + dialogs, dedupe the admin/self-service forms
 - [ ] Open: confirm "live" definition (active branch/product/therapist, ACTIVE + APPROVED deal)
+
+### Fixed — Member Deal List 500 (`/account/vendors/:id/deals`)
+Root cause was a missing migration, not application code: `DealTherapist`/`SupportRequest` existed
+in `schema.prisma` and the generated client, but their migrations
+(`20261004223414_add_deal_therapist_link`, `20261005114440_add_support_requests`) had never been
+applied to the local dev database — `listVendorDealsForAdmin`'s `therapistLinks` include threw
+Prisma P2021 ("table does not exist"), surfaced as a 500. Both migration files also had a
+non-idempotent trailing `RenameIndex` (same index, already renamed on this DB) that made a plain
+`prisma migrate deploy` fail outright — fixed by wrapping that rename in a
+`DO $$ IF EXISTS ... $$` guard in both files so they apply cleanly regardless of whether that
+rename already landed out-of-band. Applied via `prisma migrate deploy` — 2026-10-12. **Any other
+environment that hasn't run these two migrations yet needs the same `prisma migrate deploy`.**
 
 ### Deployment (Vercel) — pipeline live, hardening pending
 - [ ] Attach the bought custom domain to each project's Production (`main`) deploy

@@ -56,6 +56,7 @@ import { CATEGORY_PAGE_SIZE, type CategoryData } from '../../../prerender-data/l
 import { Seo } from '../../seo/seo';
 import { breadcrumbJsonLd } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
+import { dealPath, productPath, therapistPath } from '../../seo/public-urls';
 import content from '../../../content.json';
 
 const t = content.category;
@@ -333,7 +334,7 @@ export function Category() {
     () =>
       deals.flatMap((d) =>
         d.branch?.latitude != null && d.branch?.longitude != null
-          ? [{ id: d.id, lat: Number(d.branch.latitude), lng: Number(d.branch.longitude), label: formatINR(Number(d.salePrice)), title: d.title, href: `/deal/${d.id}` }]
+          ? [{ id: d.id, lat: Number(d.branch.latitude), lng: Number(d.branch.longitude), label: formatINR(Number(d.salePrice)), title: d.title, href: dealPath(d) }]
           : [],
       ),
     [deals],
@@ -491,7 +492,7 @@ export function Category() {
           tag={therapist.popularTags?.[0]?.name}
           pricePrefix={price != null ? t.therapistPricePrefix : undefined}
           price={price != null ? formatINR(price) : undefined}
-          href={`/therapist/${therapist.id}`}
+          href={therapistPath(therapist)}
           layout={cardLayout}
         />
       );
@@ -502,6 +503,7 @@ export function Category() {
           key={product.id}
           deal={{
             id: product.id,
+            slug: product.slug,
             title: product.name,
             image: primaryImage(resolveProductMedia(product)) ?? '',
             imageAlt: product.imageAlt ?? '',
@@ -516,7 +518,7 @@ export function Category() {
             discount: product.discount ?? undefined,
             tag: product.popularTags?.[0]?.name,
           }}
-          href={`/products/${product.id}`}
+          href={productPath(product)}
           eyebrowHref={product.vendor?.slug ? `/vendor/${product.vendor.slug}` : undefined}
           favoriteActive={false}
           onFavorite={() => { }}
@@ -534,6 +536,7 @@ export function Category() {
           key={deal.id}
           deal={{
             id: deal.id,
+            slug: deal.slug,
             title: deal.title,
             image: primaryImage(resolveDealMedia(deal)) ?? '',
             imageAlt: '',

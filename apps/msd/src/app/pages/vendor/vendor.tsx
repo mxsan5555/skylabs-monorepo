@@ -17,6 +17,7 @@ import { useTherapistPurchaseSelection } from '../../../hooks/use-therapist-purc
 import { formatINR, pluralize, formatTime12h } from '../../../utils/format';
 import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
 import { useToast } from '../../../toast/toast-context';
+import { productPath } from '../../seo/public-urls';
 import './vendor.css';
 import content from '../../../content.json';
 
@@ -610,7 +611,7 @@ export function VendorPage() {
                           : undefined
                       }
                       discount={product.discount ? `-${product.discount}%` : undefined}
-                      href={`/products/${product.id}`}
+                      href={productPath(product)}
                     >
                       <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
                         <FilledButton onClick={() => addProductToCart(product)}>

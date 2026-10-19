@@ -23,6 +23,7 @@ import { Breadcrumb } from '../../components/breadcrumb';
 import { formatINR } from '../../../utils/format';
 import { resolveProductMedia, primaryImage } from '../../../utils/media';
 import type { ProductSort } from '../../../types';
+import { productPath } from '../../seo/public-urls';
 
 import content from '../../../content.json';
 
@@ -281,7 +282,7 @@ export function ProductListing() {
                     '@type': 'ListItem',
                     position: index + 1,
                     name: product.name,
-                    url: `${SITE_URL}/products/${product.id}`,
+                    url: `${SITE_URL}${productPath(product)}`,
                   }),
                 ),
             }),
@@ -488,7 +489,7 @@ export function ProductListing() {
     discount: product.discount ?? undefined,
     tag: product.popularTags?.[0]?.name,
   }}
-  href={`/products/${product.id}`}
+  href={productPath(product)}
   favoriteActive={false}
   onFavorite={() => {}}
   actions={

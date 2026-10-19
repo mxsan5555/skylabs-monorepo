@@ -11,6 +11,8 @@ import { SkyProductCardWC } from '../../components/sky-product-card-wc';
 import { Breadcrumb } from '../../components/breadcrumb';
 import { formatINR } from '../../../utils/format';
 import { resolveProductMedia, primaryImage } from '../../../utils/media';
+import { htmlToPlainText } from '../../../utils/rich-text';
+import { productPath } from '../../seo/public-urls';
 import content from '../../../content.json';
 import './product-detail.css';
 
@@ -18,13 +20,18 @@ const { products } = content;
 const SITE_URL = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
 
 /**
- * A single Product — GET /catalog/products/:id. Product is a fully independent,
- * directly-purchasable catalog entity now (see msd-api's Product schema doc comment), never a
- * Deal. Cannot be wishlisted — `WishlistItem` only supports a Deal (see its own schema doc
- * comment), matching today's status quo for a bare Product.
+ * A single Product — GET /catalog/products/:slug (also accepts a legacy UUID, see msd-api's
+ * `getPublicProductOrThrow`). Product is a fully independent, directly-purchasable catalog
+ * entity now (see msd-api's Product schema doc comment), never a Deal. Cannot be wishlisted —
+ * `WishlistItem` only supports a Deal (see its own schema doc comment), matching today's status
+ * quo for a bare Product.
+ *
+ * A legacy UUID or stale slug alias resolves to the same product, then this page
+ * client-navigates to the canonical `/products/:slug` path (`replace`) — see DealDetail's own
+ * doc comment on why this isn't a true HTTP 301/308.
  */
 export function ProductDetail() {
-  const { id = '' } = useParams<{ id: string }>();
+  const { slug: id = '' } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { token, isAuthenticated } = useAuth();
@@ -39,6 +46,12 @@ export function ProductDetail() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    // Guards against a slower, now-stale request (a quick back-to-back navigation between two
+    // products, or React StrictMode's dev-only double-invoke) landing after a newer one and
+    // overwriting fresh state with old data — the visible symptom of that race is exactly the
+    // reported "blinking" (content → stale refetch flips loading back on → content again).
+    let cancelled = false;
+
     if (!id) {
       setProduct(null);
       setError(products.detail.errors.invalidProduct);
@@ -52,9 +65,12 @@ export function ProductDetail() {
 
     getCatalogProduct(id)
       .then(({ data }) => {
+        if (cancelled) return;
         setProduct(data);
       })
       .catch((err: unknown) => {
+        if (cancelled) return;
+
         if (err instanceof ApiRequestError && err.status === 404) {
           setProduct(null);
           return;
@@ -67,11 +83,23 @@ export function ProductDetail() {
         );
       })
       .finally(() => {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   useEffect(() => {
+    if (!product) return;
+    const canonical = productPath(product);
+    if (canonical !== location.pathname) navigate(canonical, { replace: true });
+  }, [product, location.pathname, navigate]);
+
+  useEffect(() => {
+    let cancelled = false;
+
     if (!product?.category?.id) {
       setRelated([]);
       return;
@@ -82,6 +110,8 @@ export function ProductDetail() {
       pageSize: 7,
     })
       .then(({ data }) => {
+        if (cancelled) return;
+
         setRelated(
           data
             .filter((item) => item.id !== product.id)
@@ -89,8 +119,12 @@ export function ProductDetail() {
         );
       })
       .catch(() => {
-        setRelated([]);
+        if (!cancelled) setRelated([]);
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [product]);
 
   if (loading) {
@@ -135,7 +169,10 @@ export function ProductDetail() {
   const gallery = productMedia.images;
   const video = productMedia.video;
 
+  // `description` may be rich HTML (sanitized server-side) — rendered via dangerouslySetInnerHTML
+  // on-page; `plainDescription` strips tags for meta/JSON-LD, which must never contain markup.
   const description = product.description ?? product.summary ?? '';
+  const plainDescription = htmlToPlainText(description);
 
   const salePrice = Number(product.price);
 
@@ -190,12 +227,12 @@ export function ProductDetail() {
       ? `${name.slice(0, 47)}…`
       : name;
 
-  const seoDesc = description
-    ? `${description.slice(0, 120)} Shop now at MSD.`
+  const seoDesc = plainDescription
+    ? `${plainDescription.slice(0, 120)} Shop now at MSD.`
     : `Shop ${name} at MSD.`;
 
   const canonicalUrl =
-    `${SITE_URL}/products/${product.id}`;
+    `${SITE_URL}${productPath(product)}`;
 
   return (
     <div className="product-detail">
@@ -223,7 +260,7 @@ export function ProductDetail() {
 
       <meta
         property="og:description"
-        content={description.slice(0, 155)}
+        content={plainDescription.slice(0, 155)}
       />
 
       {gallery[0] && (
@@ -267,7 +304,7 @@ export function ProductDetail() {
             '@context': 'https://schema.org',
             '@type': 'Product',
             name,
-            description,
+            description: plainDescription,
             image: gallery,
             brand: product.brand
               ? {
@@ -573,7 +610,7 @@ export function ProductDetail() {
             </div>
           </div>
 
-          {description && (
+          {(description || product.returnPolicy) && (
             <>
               <Divider />
 
@@ -581,17 +618,33 @@ export function ProductDetail() {
                 single
                 className="product-detail__accordion"
               >
-                <sky-accordion-item
-                  header={
-                    products.detail
-                      .accordionSummary
-                  }
-                  open
-                >
-                  <p className="product-detail__summary">
-                    {description}
-                  </p>
-                </sky-accordion-item>
+                {description && (
+                  <sky-accordion-item
+                    header={
+                      products.detail
+                        .accordionSummary
+                    }
+                    open
+                  >
+                    {/* `description` is sanitized HTML from msd-api's `sanitizeRichText`
+                      allow-list (or plain text when it's really the `summary` fallback, which
+                      has no tags to interpret either way) — see api/catalog.ts's own doc
+                      comment. */}
+                    <div
+                      className="product-detail__summary"
+                      dangerouslySetInnerHTML={{ __html: description }}
+                    />
+                  </sky-accordion-item>
+                )}
+
+                {product.returnPolicy && (
+                  <sky-accordion-item header="Return Policy">
+                    <div
+                      className="product-detail__summary"
+                      dangerouslySetInnerHTML={{ __html: product.returnPolicy }}
+                    />
+                  </sky-accordion-item>
+                )}
               </sky-accordion>
             </>
           )}
@@ -662,7 +715,7 @@ export function ProductDetail() {
                           ? `${item.discount}% OFF`
                           : undefined
                       }
-                      href={`/products/${item.id}`}
+                      href={productPath(item)}
                     />
                   </swiper-slide>
                 ))}

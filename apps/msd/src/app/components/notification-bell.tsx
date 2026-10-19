@@ -64,7 +64,7 @@ export function NotificationBell() {
       const meta = notification.metadata as { vendorId?: string; branchId?: string } | null;
       navigate(`/account/vendors?vendorId=${meta?.vendorId ?? ''}&branchId=${meta?.branchId ?? ''}&dealId=${notification.entityId ?? ''}`);
     } else if (notification.entityType === 'ORDER') {
-      navigate(`/account/orders?orderId=${notification.entityId ?? ''}`);
+      navigate(`/account/orders/${notification.entityId ?? ''}`);
     } else if (notification.entityType === 'VENDOR') {
       const meta = notification.metadata as { vendorId?: string } | null;
       navigate(`/account/vendors?vendorId=${meta?.vendorId ?? notification.entityId ?? ''}`);

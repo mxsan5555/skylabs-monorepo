@@ -1,4 +1,5 @@
 import { SkyProductCardWC } from './sky-product-card-wc';
+import { dealPath } from '../seo/public-urls';
 import { formatINR } from '../../utils/format';
 import { useRef, type ReactNode } from 'react';
 import '@skylabs-monorepo/shared-ui/carousel';
@@ -14,6 +15,9 @@ import '@skylabs-monorepo/shared-ui';
  */
 export interface DealCardDeal {
   id: string;
+  /** Canonical slug for the card's own stretched link (see `href`'s doc comment below) — mock
+   *  data callers omit it and the card falls back to `/deal/:id`. */
+  slug?: string;
   title: string;
   image: string;
   imageAlt: string;
@@ -43,10 +47,10 @@ interface DealCardProps {
    *  `CatalogDeal.vendor.slug` is always present for a visible deal); mock-data callers omit it
    *  and the vendor name simply renders unlinked, same as before. */
   eyebrowHref?: string;
-  /** Where the card's stretched link goes — defaults to `/deal/:id`. `products.tsx` (the only
-   *  other caller of this shared card presentation) passes `/products/:id` instead — Deal and
-   *  Product are independent catalog entities, never distinguished by a field on the card data
-   *  itself. */
+  /** Where the card's stretched link goes — defaults to `/deal/:slug` (via `dealPath`,
+   *  `/deal/:id` when `deal.slug` is absent). `products.tsx` (the only other caller of this
+   *  shared card presentation) passes a `/products/:slug` override instead — Deal and Product
+   *  are independent catalog entities, never distinguished by a field on the card data itself. */
   href?: string;
   /** Extra action content below the price (e.g. a real "Add to Cart" button) — wrapped in a
    *  stopPropagation/preventDefault div (same pattern as category.tsx's existing card action row)
@@ -94,7 +98,7 @@ export function DealCard({
           : undefined
       }
       priceNote={deal.priceNote}
-      href={href ?? `/deal/${deal.id}`}
+      href={href ?? dealPath(deal)}
     >
 
       <div slot="media" className="deal-card-slider">

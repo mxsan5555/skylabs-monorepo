@@ -8,6 +8,7 @@ import {
   type CatalogCategoryWithChildren,
 } from '../../../api/catalog';
 import type { Coordinates } from '../../../location/geo';
+import { dealPath, productPath, therapistPath } from '../../seo/public-urls';
 import content from '../../../content.json';
 
 const t = content.header.searchSuggestions;
@@ -104,7 +105,7 @@ export function useSearchSuggestions(
                 id: d.id,
                 label: d.title,
                 sublabel: d.category?.name ?? d.branch?.city ?? undefined,
-                href: `/deal/${d.id}`,
+                href: dealPath(d),
               }))
             : [];
         const productItems: SearchSuggestionItem[] =
@@ -113,7 +114,7 @@ export function useSearchSuggestions(
                 id: p.id,
                 label: p.name,
                 sublabel: p.brand ?? p.category?.name ?? undefined,
-                href: `/products/${p.id}`,
+                href: productPath(p),
               }))
             : [];
         const therapistItems: SearchSuggestionItem[] =
@@ -122,7 +123,7 @@ export function useSearchSuggestions(
                 id: th.id,
                 label: th.personName,
                 sublabel: th.therapistType,
-                href: `/therapist/${th.id}`,
+                href: therapistPath(th),
               }))
             : [];
         setGroups((prev) => {

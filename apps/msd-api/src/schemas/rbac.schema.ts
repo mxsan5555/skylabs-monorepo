@@ -2,8 +2,27 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { PERMISSION_ACTIONS, type PermissionAction } from '@skylabs-monorepo/shared-types';
 import { PaginationQuerySchema } from './common.schema';
+import { normalizeIdentifier } from '../lib/normalizeIdentifier';
 
 extendZodWithOpenApi(z);
+
+/**
+ * `User.phone` is a genuine LOGIN IDENTIFIER (unlike Vendor's business/owner contact phones) —
+ * `otp.service.ts`/`auth.service.ts#loginWithIdentifier` only ever look it up by the normalized
+ * `+91XXXXXXXXXX` form (see `normalizeIdentifier`, applied at the `/otp/request`+`/otp/verify`
+ * boundary). Without this same transform here, a staff user created/edited with a bare
+ * `9889259224` would be stored un-normalized, could never match a real login's normalized
+ * `+919889259224`, and would silently fall through to "no account" / a brand-new customer
+ * signup instead of resolving to this same user. Mirrors `vendor.schema.ts`'s `vendorPhoneSchema`
+ * exactly (same transform, same India-mobile regex).
+ */
+const INDIA_MOBILE_REGEX = /^\+91[6-9]\d{9}$/;
+const userPhoneSchema = z
+  .string()
+  .max(30)
+  .transform((v) => (v === '' ? v : normalizeIdentifier(v)))
+  .refine((v) => v === '' || INDIA_MOBILE_REGEX.test(v), { message: 'Enter a valid 10-digit mobile number' })
+  .optional();
 
 export const PermissionActionSchema = z
   .enum(PERMISSION_ACTIONS as [PermissionAction, ...PermissionAction[]])
@@ -88,20 +107,25 @@ export const UserListQuerySchema = PaginationQuerySchema.extend({
   roleKey: z.string().max(100).optional(),
 });
 
+// A staff user now holds exactly one role — `roleId` is a single required uuid, never an array.
+// `.strict()` rejects a payload carrying any unrecognized key (e.g. a stale client still sending
+// `roleIds: [...]`) with a 422 instead of silently ignoring it, so a multi-role-shaped payload is
+// never quietly accepted.
 export const UserCreateSchema = z
   .object({
     name: z.string().min(1).max(150),
     email: z.string().email().optional(),
-    phone: z.string().min(3).max(30).optional(),
-    roleIds: z.array(z.string().uuid()).default([]),
+    phone: userPhoneSchema,
+    roleId: z.string().uuid(),
   })
+  .strict()
   .openapi('UserCreate');
 
 export const UserUpdateSchema = z
   .object({
     name: z.string().min(1).max(150).optional(),
     email: z.string().email().optional(),
-    phone: z.string().min(3).max(30).optional(),
+    phone: userPhoneSchema,
   })
   .openapi('UserUpdate');
 
@@ -110,6 +134,24 @@ export const UserStatusUpdateSchema = z
     status: z.enum(['active', 'inactive', 'blocked']),
   })
   .openapi('UserStatusUpdate');
+
+/** Atomic single-role replace (`PUT /rbac/users/:id/role`) — the only staff role-change payload
+ *  shape; see `user.service.ts#setStaffUserRole`/`replaceUserRole`'s own doc comments. */
+export const UserRoleSetSchema = z
+  .object({
+    roleId: z.string().uuid(),
+  })
+  .strict()
+  .openapi('UserRoleSet');
+
+/** Role Conflicts review resolution (`PUT /rbac/role-conflicts/:id`) — same single-role shape,
+ *  but not restricted to internal staff roles (see `resolveAccountRoleConflict`'s doc comment). */
+export const RoleConflictResolveSchema = z
+  .object({
+    roleId: z.string().uuid(),
+  })
+  .strict()
+  .openapi('RoleConflictResolve');
 
 export const ImpersonateRequestSchema = z
   .object({

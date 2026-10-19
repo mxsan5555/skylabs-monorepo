@@ -4,15 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { OutlinedButton, Icon } from '@skylabs-monorepo/shared-ui/react';
 import type { SkyDataTableParamsDetail } from '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import {
-  deleteBlogPost,
-  listBlogPosts,
-  setBlogPostStatus,
-  updateBlogPost,
-  createBlogPost,
-  type BlogPost,
-  type BlogPostInput,
-} from '../../../../api/rbac/blog-posts';
+import * as blogPostsApi from '../../../../api/rbac/blog-posts';
+import type { BlogPost, BlogPostInput } from '../../../../api/rbac/blog-posts';
 import { listBlogCategories, type BlogCategory } from '../../../../api/rbac/blog-categories';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useToast } from '../../../../toast/toast-context';
@@ -37,23 +30,20 @@ interface TableParams {
 
 const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
 
-/**
- * Blog Posts admin list — mirrors `categories.tsx`'s exact `<sky-data-table>` +
- * add/edit-dialog + `window.confirm` delete pattern, gated throughout on the `cms.blog.pages`
- * menu key (view/create/edit/delete actions) — split out from the old shared `cms.blog` key so
- * this "Pages" row toggles independently of the (currently unimplemented) "Articles" row in the
- * Role Permission Matrix; see blog-posts.routes.ts's own doc comment. Uses `useToast()` for every
- * mutation's outcome, the newer preferred pattern per that context's own doc comment, rather than
- * categories.tsx's older inline-`<p>` message.
- */
-export function BlogList() {
+/** Shared BlogPost list; each menu surface retains its own permission and API namespace. */
+export function BlogList({ scope = 'pages' }: { scope?: 'pages' | 'articles' }) {
+  const { listBlogPosts, createBlogPost, updateBlogPost, deleteBlogPost, setBlogPostStatus } =
+    scope === 'articles' ? blogPostsApi.blogArticlesApi : blogPostsApi;
+  const permissionKey = `cms.blog.${scope}`;
+  const baseRoute = scope === 'articles' ? '/account/cms/blog/articles' : '/account/cms/blog';
+  const heading = scope === 'articles' ? 'Articles' : 'Blog';
   const { token, can } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const canCreate = can('cms.blog.pages', 'create');
-  const canEdit = can('cms.blog.pages', 'edit');
-  const canDelete = can('cms.blog.pages', 'delete');
+  const canCreate = can(permissionKey, 'create');
+  const canEdit = can(permissionKey, 'edit');
+  const canDelete = can(permissionKey, 'delete');
 
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [total, setTotal] = useState(0);
@@ -80,6 +70,11 @@ export function BlogList() {
   const editDialogRef = useRef<MdDialog>(null);
   const tableRef = useRef<HTMLElement>(null);
 
+  // Open the keyed dialog only after React commits its selected article.
+  useEffect(() => {
+    if (editingPost) editDialogRef.current?.show();
+  }, [editingPost]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -96,7 +91,7 @@ export function BlogList() {
     } finally {
       setLoading(false);
     }
-  }, [token, params]);
+  }, [token, params, listBlogPosts]);
 
   useEffect(() => {
     load();
@@ -182,10 +177,9 @@ export function BlogList() {
       const post = posts[detail.rowIndex];
       if (!post) return;
       if (detail.action === 'view') {
-        navigate(`/account/cms/blog/${post.id}`);
+        navigate(`${baseRoute}/${post.id}`);
       } else if (detail.action === 'edit') {
         setEditingPost(post);
-        editDialogRef.current?.show();
       } else if (detail.action === 'toggle-status') {
         toggleStatus(post);
       } else if (detail.action === 'delete') {
@@ -200,15 +194,15 @@ export function BlogList() {
       el.removeEventListener('sky-dt-row-action', onRowAction);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posts]);
+  }, [posts, baseRoute]);
 
   return (
     <div className="admin-page admin-page--wide">
-      <title>Blog · MSD</title>
+      <title>{heading} &middot; MSD</title>
       <meta name="robots" content="noindex" />
       <header className="page-head">
         <div>
-          <h1>Blog</h1>
+          <h1>{heading}</h1>
           <p>Manage articles shown on the public blog.</p>
         </div>
         <div className="page-head__actions">
@@ -225,7 +219,7 @@ export function BlogList() {
 
       <sky-data-table
         ref={tableRef as RefObject<HTMLElement>}
-        caption="Blog"
+        caption={heading}
         columns={COLUMNS}
         rows={rows}
         total={total}
@@ -241,6 +235,7 @@ export function BlogList() {
         <BlogFormDialog
           dialogRef={addDialogRef}
           token={token}
+          scope={scope}
           categories={categories}
           categoriesLoading={categoriesLoading}
           onSave={(input) => save(input)}
@@ -253,6 +248,7 @@ export function BlogList() {
           dialogRef={editDialogRef}
           post={editingPost ?? undefined}
           token={token}
+          scope={scope}
           categories={categories}
           categoriesLoading={categoriesLoading}
           onSave={(input) => save(input, editingPost ?? undefined)}

@@ -1,0 +1,17 @@
+import { chromium } from '@playwright/test';
+import { mkdir, writeFile } from 'node:fs/promises';
+const out = 'apps/msd/artifacts/member-portal';
+await mkdir(out, { recursive: true });
+const browser = await chromium.launch({ headless: true });
+const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, ...(process.env.MSD_MEMBER_STORAGE_STATE ? { storageState: process.env.MSD_MEMBER_STORAGE_STATE } : {}) });
+const page = await context.newPage();
+const errors = [];
+page.on('pageerror', error => errors.push(error.message));
+await page.goto('http://localhost:4207/account/vendor-payments', { waitUntil: 'domcontentloaded', timeout: 120000 });
+await page.locator('h1').first().waitFor({ timeout: 60000 });
+await page.screenshot({ path: `${out}/desktop-access.png`, fullPage: true });
+console.log(JSON.stringify({ url: page.url(), title: await page.title(), body: (await page.locator('body').innerText()).slice(0, 1800), errors }));
+await page.setViewportSize({ width: 390, height: 844 });
+await page.screenshot({ path: `${out}/mobile-access.png`, fullPage: true });
+await writeFile(`${out}/browser-access.json`, JSON.stringify({ requestedRoute: '/account/vendor-payments', actualUrl: page.url(), desktopViewport: { width: 1440, height: 1000 }, mobileViewport: { width: 390, height: 844 }, errors }, null, 2));
+await browser.close();

@@ -22,6 +22,14 @@ model User {
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
   deletedAt              DateTime?
+  /// Set by the single-role migration sweep (`prisma/role-migration.ts`, run from seed.ts) for an
+  /// account whose legacy multiple-role assignment couldn't be converted automatically (e.g. holds
+  /// both `customer` and `vendor` with no actual linked Vendor business) — requires an authorized
+  /// admin to pick one explicit final role via the Role Conflicts review screen. Never set by
+  /// ordinary application code; cleared only by that same resolution action
+  /// (`resolveAccountRoleConflict`). Not a permission flag — purely "this account's role
+  /// assignment still needs human review."
+  roleConflict           Boolean                @default(false)
   auditLogsAsActor       AuditLog[]             @relation("AuditLogActor")
   cart                   Cart?
   impersonationsAsAdmin  ImpersonationSession[] @relation("ImpersonationSuperAdmin")
@@ -34,6 +42,8 @@ model User {
   vendorProfile          Vendor?                @relation("VendorOwner")
   wishlistItems          WishlistItem[]
   supportRequests        SupportRequest[]
+  purchaseEntitlements   PurchaseEntitlement[]  @relation("EntitlementCustomer")
+  purchaseDisputes       PurchaseDispute[]      @relation("DisputeCustomer")
 
   @@index([status])
 }
@@ -311,6 +321,11 @@ model Vendor {
   addressLine2               String?
   ownerFirstName             String?
   ownerLastName              String?
+  /// Per-vendor commission override — null means "use `FinanceSettings.defaultCommissionRatePercent`"
+  /// (see `settlement.service.ts#resolveCommissionRateForVendor`). Snapshotted onto every
+  /// `PurchaseEntitlement` at entitlement-creation time, so editing this later never touches
+  /// already-created entitlements' own `commissionRatePercent` — only future orders see the change.
+  commissionRatePercent      Decimal?               @db.Decimal(5, 2)
   branches                   Branch[]
   deals                      Deal[]
   orders                     Order[]
@@ -322,6 +337,8 @@ model Vendor {
   documents                  VendorDocument[]
   mediaImages                VendorImage[]
   mediaVideo                 VendorVideo?
+  purchaseEntitlements       PurchaseEntitlement[]
+  memberPayouts              MemberPayout[]
 
   @@index([status])
   @@index([ownerUserId])
@@ -412,6 +429,7 @@ model Branch {
   orderItems     OrderItem[]
   therapists     Therapist[]
   categoryAccess BranchCategoryAccess[]
+  purchaseEntitlements PurchaseEntitlement[]
 
   @@index([vendorId])
 }
@@ -445,6 +463,10 @@ model Therapist {
   therapistType            String                @default("Therapist")
   /// Nullable — no non-fabricated default exists for rows that predate this field.
   gender                   String?
+  /// Public storefront URL slug (`/therapist/:slug`). Nullable, same pattern as `Vendor.slug` —
+  /// existing rows predate this field and are backfilled separately (prisma/seed.ts), never
+  /// overwritten in place by the migration itself. Unique so two therapists never collide.
+  slug                     String?               @unique
   /// Restricted choice, added alongside the free-text `specialization` above — validated in
   /// vendor.service.ts's createTherapist/updateTherapist via assertVendorHasCategoryAccess.
   /// Nullable: not required, and every pre-existing Therapist row predates this column.
@@ -1527,6 +1549,9 @@ model OrderItem {
   therapistPackage   TherapistPackage? @relation(fields: [therapistPackageId], references: [id])
   vendor             Vendor            @relation(fields: [vendorId], references: [id])
   product            Product?          @relation(fields: [productId], references: [id])
+  purchaseEntitlements PurchaseEntitlement[]
+  disputes             PurchaseDispute[]
+  refunds              Refund[]
 
   @@index([orderId])
   @@index([dealId])
@@ -1566,6 +1591,7 @@ model Payment {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  refunds           Refund[]
 
   @@index([orderId])
   @@index([status])
@@ -1702,10 +1728,352 @@ enum NotificationType {
   DEAL_PENDING_APPROVAL
   ORDER_RECEIVED
   VENDOR_PENDING_APPROVAL
+  /// A customer raised a dispute on one of this vendor's purchased items — see
+  /// dispute.service.ts#raiseDispute (notifies the vendor owner + every SuperAdmin).
+  DISPUTE_RAISED
+  /// An admin recorded a manual bank-transfer payout for this vendor — see
+  /// settlement.service.ts#recordMemberPayout.
+  PAYOUT_RECORDED
 }
 
 enum VendorDocumentType {
   GST
   PAN
   AADHAAR
+}
+
+// ─── Accounts, Member Settlements & Purchase Verification (net-new domain) ───────────────────
+//
+// Built additively on top of the existing Order/OrderItem/Payment/Vendor data — no change to any
+// existing purchase/payment model's own meaning. See the approved plan
+// (ticklish-marinating-reef.md) for the full design rationale; summarized per-model below.
+
+/// Singleton row (same "id is always the literal string 'singleton'" convention as
+/// AboutUsContent/ContactUsContent elsewhere in this schema) — Super-Admin-managed commission +
+/// hold-period + completion-OTP configuration, reusing the existing `system-settings` menu/
+/// permission node (no new menu node needed — see msd-menu.json). `defaultCommissionRatePercent`
+/// is the fallback whenever a `Vendor.commissionRatePercent` override is null; both are
+/// snapshotted onto every `PurchaseEntitlement` at entitlement-creation time, so editing either
+/// one here never retroactively changes an already-created entitlement's own commission split.
+model FinanceSettings {
+  id                                  String   @id @default("singleton")
+  defaultCommissionRatePercent        Decimal  @db.Decimal(5, 2) @default(10)
+  serviceHoldHours                    Int      @default(24)
+  productReturnHoldHours              Int      @default(168)
+  completionOtpExpiryMinutes          Int      @default(10)
+  completionOtpMaxAttempts            Int      @default(5)
+  completionOtpResendCooldownSeconds  Int      @default(60)
+  updatedByUserId                     String?
+  updatedAt                           DateTime @updatedAt
+}
+
+/// The central unit of this whole domain — one row per redeemable/payable voucher. For a SERVICE
+/// `OrderItem` (Deal or Therapist), one row PER UNIT of `OrderItem.quantity` (so "buy 3x 60-min
+/// massage" becomes 3 independently-completable/payable vouchers — completing one must never
+/// consume or affect its siblings, see `@@unique([orderItemId, sequenceNo])`). For a PRODUCT
+/// `OrderItem`, exactly ONE row regardless of quantity (one shipment/pickup event per line — see
+/// `settlement.service.ts#createEntitlementsForOrder`). `grossAmount`/`commissionRatePercent`/
+/// `commissionAmount`/`memberShareAmount` are a MONEY SNAPSHOT taken once at order-confirmation
+/// time (split evenly across a SERVICE item's units, rounding remainder absorbed by the LAST
+/// unit so the sum always reconciles exactly to `OrderItem.lineTotal`) — changing
+/// `FinanceSettings`/a vendor's commission override later never touches an existing row.
+/// `settlementStatus` is the money-movement state machine; `entitlementStatus` is the
+/// fulfilment/redemption state machine — deliberately two separate fields (see this file's own
+/// plan doc) so "voucher redeemed" and "money payable" can never be conflated. "Ready for
+/// Payout" is NEVER a stored state — it's derived at query time as `settlementStatus === 'ON_HOLD'
+/// && now >= holdUntil` (opening a dispute moves a row OUT of ON_HOLD into DISPUTED_BLOCKED, so an
+/// ON_HOLD row can never have an open dispute) — this keeps eligibility always correct against
+/// real server time with no cron/scheduled job.
+model PurchaseEntitlement {
+  id                          String             @id @default(uuid())
+  orderItemId                 String
+  /// 1-based position within this OrderItem's own set of entitlements — always 1 for a PRODUCT
+  /// line (exactly one row), 1..quantity for a SERVICE line.
+  sequenceNo                  Int
+  /// DB-sequence-generated, base36-encoded, item-type-prefixed (`MSD-DL-…`/`MSD-TH-…`/
+  /// `MSD-PR-…`) — see lib/voucher.ts#nextVoucherCode. True DB-guaranteed uniqueness, no
+  /// collision-retry loop needed.
+  voucherCode                 String             @unique
+  customerId                  String
+  vendorId                    String
+  /// Nullable — a PRODUCT entitlement has no branch (Product is vendor-level, see Product's own
+  /// schema doc comment), mirroring OrderItem.branchId's own nullability.
+  branchId                    String?
+  fulfilmentKind               FulfilmentKind
+  entitlementStatus            EntitlementStatus @default(ACTIVE)
+  /// Service only — set when the member taps "Start Service" (`POST /vouchers/:code/start`).
+  serviceStartedAt             DateTime?
+  completedAt                  DateTime?
+  /// Product-shipped only, set by `POST /vouchers/:code/ship`.
+  carrier                      String?
+  trackingNumber               String?
+  shippedAt                    DateTime?
+  /// Product-shipped only — a manual evidence workflow (photo + note), never an auto "Delivered"
+  /// checkbox. Set by `POST /vouchers/:code/record-delivery-evidence`.
+  deliveryEvidenceStorageKey   String?
+  deliveryEvidenceNote         String?
+  recordedByUserId             String?
+  /// ── Money snapshot, taken once at entitlement-creation time — see this model's own doc
+  /// comment above for the rounding/reconciliation rule. Never recomputed later.
+  grossAmount                  Decimal            @db.Decimal(10, 2)
+  commissionRatePercent        Decimal            @db.Decimal(5, 2)
+  commissionAmount             Decimal            @db.Decimal(10, 2)
+  memberShareAmount            Decimal            @db.Decimal(10, 2)
+  settlementStatus             SettlementStatus   @default(PENDING_FULFILMENT)
+  /// Snapshot of `settlementStatus` taken the moment a dispute forces it to DISPUTED_BLOCKED —
+  /// restored by dispute.service.ts#resolveDispute once the dispute resolves with no refund.
+  preDisputeStatus              SettlementStatus?
+  /// Set on completion: `now + FinanceSettings.serviceHoldHours` (service) or
+  /// `now + FinanceSettings.productReturnHoldHours` (product) — see this model's "Ready for
+  /// Payout" doc comment above for how this is used, never mutated by a cron.
+  holdUntil                     DateTime?
+  /// Denormalized display cache of `MemberPayoutItem.id` once allocated — the REAL "can never be
+  /// double-paid" guarantee is `MemberPayoutItem.entitlementId`'s own `@unique` below, not this
+  /// field (this is only ever read, never the authority).
+  payoutItemId                  String?
+  createdAt                     DateTime           @default(now())
+  updatedAt                     DateTime           @updatedAt
+
+  orderItem      OrderItem                @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  customer       User                     @relation("EntitlementCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  vendor         Vendor                   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  branch         Branch?                  @relation(fields: [branchId], references: [id])
+  adjustments    SettlementAdjustment[]
+  completionOtps CompletionOtpChallenge[]
+  disputes       PurchaseDispute[]
+  payoutItem     MemberPayoutItem?
+
+  @@unique([orderItemId, sequenceNo])
+  @@index([vendorId, settlementStatus])
+  @@index([voucherCode])
+  @@index([customerId])
+  @@index([orderItemId])
+}
+
+enum FulfilmentKind {
+  SERVICE_SESSION
+  PRODUCT_PICKUP
+  PRODUCT_SHIPPED
+}
+
+enum EntitlementStatus {
+  ACTIVE
+  STARTED
+  OTP_REQUESTED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum SettlementStatus {
+  PENDING_FULFILMENT
+  ON_HOLD
+  DISPUTED_BLOCKED
+  PROCESSING
+  PAID
+  FAILED
+  VOID
+}
+
+/// Append-only ledger — refunds/manual corrections/recovery notes NEVER mutate
+/// `PurchaseEntitlement`'s original money snapshot (`memberShareAmount` etc. stay the originally
+/// computed values forever). Current payable for an entitlement = `memberShareAmount +
+/// Σadjustments.amount` (amount is signed — a REFUND/RECOVERY row is negative).
+model SettlementAdjustment {
+  id              String                   @id @default(uuid())
+  entitlementId   String
+  type            SettlementAdjustmentType
+  amount          Decimal                  @db.Decimal(10, 2)
+  reason          String?
+  /// Unique — one Refund can only ever post one ledger adjustment, never duplicated by a retry.
+  refundId        String?                  @unique
+  createdByUserId String
+  createdAt       DateTime                 @default(now())
+
+  entitlement PurchaseEntitlement @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+
+  @@index([entitlementId])
+}
+
+enum SettlementAdjustmentType {
+  REFUND
+  MANUAL_ADJUSTMENT
+  RECOVERY
+}
+
+/// Bound to ONE entitlement (unlike the login `OtpChallenge`, which is identifier-keyed and can't
+/// bind to a specific purchase) — see voucher.service.ts. The member who requests this never
+/// receives the plaintext OTP through any API/route; it's sent directly to the CUSTOMER's own
+/// phone/email via the same provider functions `otp.service.ts` uses for login.
+model CompletionOtpChallenge {
+  id                String              @id @default(uuid())
+  entitlementId     String
+  purpose           CompletionOtpPurpose
+  hashedOtp         String
+  attempts          Int                 @default(0)
+  expiresAt         DateTime
+  verifiedAt        DateTime?
+  resendCount       Int                 @default(0)
+  lastSentAt        DateTime            @default(now())
+  requestedByUserId String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  entitlement PurchaseEntitlement @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+
+  @@index([entitlementId])
+  @@index([expiresAt])
+}
+
+enum CompletionOtpPurpose {
+  SERVICE_COMPLETION
+  PRODUCT_PICKUP
+}
+
+/// Scoped to ONE entitlement (never the whole order/vendor) — opening a dispute forces that
+/// entitlement's `settlementStatus` to DISPUTED_BLOCKED (storing `preDisputeStatus` for restore),
+/// so a dispute on one unit of a multi-quantity SERVICE line never blocks its siblings. `orderItemId`
+/// is kept alongside `entitlementId` for traceability/ownership-checking even if the entitlement
+/// is later deleted (it never is — kept for schema-shape clarity matching this codebase's other
+/// "traceability field alongside the real FK" convention).
+model PurchaseDispute {
+  id                 String                 @id @default(uuid())
+  orderItemId        String
+  entitlementId      String?
+  customerId         String
+  status             DisputeStatus          @default(OPEN)
+  reason             String
+  description        String?
+  evidenceStorageKey String?
+  resolvedAt         DateTime?
+  resolvedByUserId   String?
+  resolutionNotes    String?
+  resolutionType     DisputeResolutionType?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  orderItem   OrderItem            @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  entitlement PurchaseEntitlement? @relation(fields: [entitlementId], references: [id])
+  customer    User                 @relation("DisputeCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  refunds     Refund[]
+
+  @@index([orderItemId])
+  @@index([entitlementId])
+  @@index([customerId])
+  @@index([status])
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+}
+
+enum DisputeResolutionType {
+  NO_ACTION
+  REFUNDED
+  OTHER
+}
+
+/// `type: FULL` requires `amount` to equal the item's full refundable remainder; `PARTIAL`
+/// otherwise. Razorpay refunds go through `payment.service.ts`'s thin `createRazorpayRefund`
+/// wrapper (same uncaught-SDK-error → clear `ApiError` discipline as `createRazorpayOrder`); a COD
+/// payment has no gateway call at all (cash was never collected through Razorpay) — see
+/// refund.service.ts#createRefund.
+model Refund {
+  id                String       @id @default(uuid())
+  orderItemId       String
+  paymentId         String
+  amount            Decimal      @db.Decimal(10, 2)
+  type              RefundType
+  reason            String?
+  disputeId         String?
+  status            RefundStatus @default(REQUESTED)
+  /// Unique — dedupes a Razorpay webhook retry against the same provider refund.
+  providerRefundId  String?      @unique
+  processedByUserId String?
+  processedAt       DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  orderItem OrderItem        @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  payment   Payment          @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  dispute   PurchaseDispute? @relation(fields: [disputeId], references: [id])
+
+  @@index([orderItemId])
+  @@index([paymentId])
+  @@index([disputeId])
+  @@index([status])
+}
+
+enum RefundType {
+  FULL
+  PARTIAL
+}
+
+enum RefundStatus {
+  REQUESTED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+/// One manual bank-transfer record per payout batch — `bankAccountHolderSnapshot`/
+/// `bankAccountNumberSnapshot`/`bankIfscSnapshot`/`bankNameSnapshot`/`upiIdSnapshot` are copied
+/// from `Vendor` at the moment of release, so a vendor editing their bank details afterwards never
+/// retroactively changes an already-recorded payout's own record. No live payout-API integration
+/// exists (no RazorpayX/similar credentials configured) — this is purely a record of a transfer
+/// that already happened outside this system; `idempotencyKey` guards the "admin double-clicks
+/// Record Payment" case the same way `Payment`'s own attempt-reuse guards do elsewhere.
+model MemberPayout {
+  id                         String       @id @default(uuid())
+  vendorId                   String
+  amount                     Decimal      @db.Decimal(10, 2)
+  method                     PayoutMethod @default(MANUAL_BANK_TRANSFER)
+  status                     PayoutStatus @default(PENDING)
+  bankAccountHolderSnapshot  String
+  bankNameSnapshot           String?
+  bankAccountNumberSnapshot  String
+  bankIfscSnapshot           String
+  upiIdSnapshot              String?
+  reference                  String?
+  transferDate               DateTime?
+  proofStorageKey            String?
+  idempotencyKey             String       @unique
+  recordedByUserId           String
+  createdAt                  DateTime     @default(now())
+  updatedAt                  DateTime     @updatedAt
+
+  vendor Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  items  MemberPayoutItem[]
+
+  @@index([vendorId])
+  @@index([status])
+}
+
+enum PayoutMethod {
+  MANUAL_BANK_TRANSFER
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+}
+
+/// `entitlementId @unique` is the REAL "one entitlement can never be allocated to two payouts"
+/// guarantee — enforced by the DB itself even under concurrent payout-recording requests, not
+/// just application-level checking.
+model MemberPayoutItem {
+  id            String   @id @default(uuid())
+  payoutId      String
+  entitlementId String   @unique
+  amount        Decimal  @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+
+  payout      MemberPayout        @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  entitlement PurchaseEntitlement @relation(fields: [entitlementId], references: [id])
+
+  @@index([payoutId])
 }

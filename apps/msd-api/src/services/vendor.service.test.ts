@@ -6,7 +6,8 @@ vi.mock('../lib/prisma', async () => {
 });
 
 import { prisma } from '../lib/prisma';
-import { createVendorOwner, checkVendorOwnerAvailability, createTherapist, createDeal, updateDeal } from './vendor.service';
+import { Prisma } from '../generated/prisma-client';
+import { createVendor, createVendorOwner, checkVendorOwnerAvailability, createTherapist, createDeal, updateDeal, getMyVendorOrThrow, setVendorStatus, updateVendor, getMyCustomerOrThrow } from './vendor.service';
 
 const prismaMock = vi.mocked(prisma, true);
 
@@ -126,8 +127,9 @@ describe('createVendor — double-submit guard scoping (regression: two differen
   const ROLE_FIXTURE = { id: VENDOR_ROLE_ID, key: 'vendor' };
 
   /** Arms every downstream call `createVendor` makes once its own double-submit guard clears —
-   *  `createVendorOwner`'s email/phone availability check, the new User insert, `assignRole`'s
-   *  own `getUserOrThrow` + role grant, and `buildAndInsertVendor`'s slug-uniqueness check +
+   *  `createVendorOwner`'s email/phone availability check, the new User insert,
+   *  `ensureVendorRoleAssigned`'s own `replaceUserRole` transaction (deleteMany + create + the
+   *  user update that clears `roleConflict`), and `buildAndInsertVendor`'s slug-uniqueness check +
    *  insert. Keyed off `where.id` (only `getUserOrThrow` queries by id) so the same
    *  `user.findFirst` mock correctly serves both callers regardless of call order. */
   function armDownstreamSuccess(newUserId: string, vendorRow: { id: string; ownerEmail?: string }) {
@@ -138,7 +140,9 @@ describe('createVendor — double-submit guard scoping (regression: two differen
     });
     prismaMock.user.create.mockResolvedValue({ id: newUserId } as never);
     prismaMock.role.findUnique.mockResolvedValue(ROLE_FIXTURE as never);
-    prismaMock.userRole.upsert.mockResolvedValue({} as never);
+    prismaMock.userRole.deleteMany.mockResolvedValue({} as never);
+    prismaMock.userRole.create.mockResolvedValue({} as never);
+    prismaMock.user.update.mockResolvedValue({} as never);
     prismaMock.vendor.findUnique.mockResolvedValue(null as never); // slug uniqueness check
     prismaMock.vendor.create.mockResolvedValue({ ...vendorRow, owner: null } as never);
   }
@@ -263,6 +267,7 @@ describe('createTherapist — branch-level Therapy access gate', () => {
     prismaMock.branch.findUnique.mockResolvedValue(branchFixture());
     prismaMock.branchCategoryAccess.findFirst.mockResolvedValue({ id: 'bca-1' });
     prismaMock.therapist.findFirst.mockResolvedValue(null);
+    prismaMock.therapist.findUnique.mockResolvedValue(null as never); // slug uniqueness check
     prismaMock.therapist.create.mockResolvedValue({ id: 'th-1' });
 
     const result = await createTherapist(VENDOR_ID, BRANCH_ID, { therapistType: 'Physio', personName: 'Alex' });
@@ -372,5 +377,233 @@ describe('createDeal / updateDeal — therapist linking', () => {
     expect(prismaMock.therapist.findMany).not.toHaveBeenCalled();
     expect(prismaMock.dealTherapist.deleteMany).not.toHaveBeenCalled();
     expect(prismaMock.dealTherapist.createMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Feature: Member suspension blocks the self-service vendor portal
+ * Scenario: `getMyVendorOrThrow` is the one choke point every `/vendors/me/*` route resolves
+ * ownership through — a suspended Member's own access must stop the moment suspension is
+ * committed, not just at their next login, so this re-checks the Vendor's live `status` on
+ * every call rather than only at token-issue time.
+ */
+describe('getMyVendorOrThrow — suspension blocks self-service access', () => {
+  const VENDOR_ID = 'f0f0f0f0-0000-4000-8000-000000000005';
+
+  it('rejects with FORBIDDEN when the caller\'s own vendor is SUSPENDED', async () => {
+    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID, ownerUserId: USER_A_ID, status: 'SUSPENDED' } as never);
+
+    await expect(getMyVendorOrThrow(USER_A_ID)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Your member account is suspended. Please contact support.',
+    });
+  });
+
+  it('a merely INACTIVE (not SUSPENDED) vendor is not blocked here — only SUSPENDED is a portal lockout', async () => {
+    const vendor = { id: VENDOR_ID, ownerUserId: USER_A_ID, status: 'INACTIVE' } as never;
+    prismaMock.vendor.findUnique.mockResolvedValue(vendor);
+
+    await expect(getMyVendorOrThrow(USER_A_ID)).resolves.toEqual(vendor);
+  });
+
+  it('an ACTIVE vendor resolves normally (regression)', async () => {
+    const vendor = { id: VENDOR_ID, ownerUserId: USER_A_ID, status: 'ACTIVE' } as never;
+    prismaMock.vendor.findUnique.mockResolvedValue(vendor);
+
+    await expect(getMyVendorOrThrow(USER_A_ID)).resolves.toEqual(vendor);
+  });
+
+  it('still 404s when the caller has no vendor profile at all (regression)', async () => {
+    prismaMock.vendor.findUnique.mockResolvedValue(null);
+
+    await expect(getMyVendorOrThrow(USER_A_ID)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+});
+
+/**
+ * Feature: Suspending a Member revokes their existing sessions immediately
+ * Scenario: `setVendorStatus('SUSPENDED')` reuses the exact same `revokeAllRefreshTokens` that
+ * `/auth/logout-all` already calls — only on the ACTIVE->SUSPENDED edge, never on a re-save of
+ * an already-suspended row or on any other status transition (status_change/deactivate stay
+ * their own distinct operations, never conflated with suspension).
+ */
+describe('setVendorStatus — suspension revokes existing sessions', () => {
+  const VENDOR_ID = 'f0f0f0f0-0000-4000-8000-000000000005';
+
+  it('revokes all refresh sessions for the owner when transitioning into SUSPENDED', async () => {
+    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID, ownerUserId: USER_A_ID, status: 'ACTIVE' } as never);
+    prismaMock.vendor.update.mockResolvedValue({ id: VENDOR_ID, ownerUserId: USER_A_ID, status: 'SUSPENDED', owner: null } as never);
+    prismaMock.refreshSession.updateMany.mockResolvedValue({ count: 2 } as never);
+
+    await setVendorStatus(VENDOR_ID, 'SUSPENDED', 'Policy violation');
+
+    expect(prismaMock.refreshSession.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ userId: USER_A_ID, revokedAt: null }) }),
+    );
+  });
+
+  it('does not re-revoke sessions when the vendor was already SUSPENDED (no-op re-save)', async () => {
+    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID, ownerUserId: USER_A_ID, status: 'SUSPENDED' } as never);
+    prismaMock.vendor.update.mockResolvedValue({ id: VENDOR_ID, ownerUserId: USER_A_ID, status: 'SUSPENDED', owner: null } as never);
+
+    await setVendorStatus(VENDOR_ID, 'SUSPENDED', 'Still suspended');
+
+    expect(prismaMock.refreshSession.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('does not revoke sessions for an unrelated transition (e.g. ACTIVE -> INACTIVE, a deactivation, not a suspension)', async () => {
+    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID, ownerUserId: USER_A_ID, status: 'ACTIVE' } as never);
+    prismaMock.vendor.update.mockResolvedValue({ id: VENDOR_ID, ownerUserId: USER_A_ID, status: 'INACTIVE', owner: null } as never);
+
+    await setVendorStatus(VENDOR_ID, 'INACTIVE');
+
+    expect(prismaMock.refreshSession.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Feature: "Member User" step edits the REAL linked User account
+ * Scenario: `updateVendor`'s owner-field propagation (`syncOwnerUserFromVendorFields`) — editing
+ * the Vendor's `ownerFirstName`/`ownerLastName`/`ownerEmail`/`ownerMobile` must update that same
+ * `User` row's actual name/email/phone (the identity it logs in with), reusing the exact
+ * duplicate-check shape `createVendorOwner` already uses (never creating a second owner, never
+ * silently colliding with another account).
+ *
+ * Given: a Vendor with a linked `ownerUserId`
+ * When: `updateVendor` is called with one or more owner-identity fields
+ * Then: the linked User's name/email/phone updates to match; a duplicate email/phone on a
+ *       DIFFERENT user is rejected as a clean 409 (never a raw P2002); clearing both email and
+ *       phone at once is rejected (a User must keep at least one); a save that never touches
+ *       owner fields leaves the User alone entirely
+ */
+describe('updateVendor — Member User step syncs the real linked User account', () => {
+  const VENDOR_ID = 'vendor-owner-sync-1';
+  const OWNER_USER_ID = 'owner-user-1';
+
+  function vendorFixture(overrides: Partial<{ ownerUserId: string | null; businessName: string | null }> = {}) {
+    return { id: VENDOR_ID, ownerUserId: OWNER_USER_ID, businessName: 'Existing Business', mapLocationUrl: null, ...overrides };
+  }
+
+  beforeEach(() => {
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorFixture() as never);
+    prismaMock.vendor.update.mockResolvedValue({ ...vendorFixture(), owner: null } as never);
+    prismaMock.user.findFirst.mockResolvedValue(null); // no duplicate by default
+    prismaMock.user.findUnique.mockResolvedValue({ name: 'Old Name', email: 'old@example.com', phone: '+919000000000' } as never);
+    prismaMock.user.update.mockResolvedValue({} as never);
+  });
+
+  it('updates the linked User name/email/phone when owner fields are saved', async () => {
+    await updateVendor(VENDOR_ID, {
+      ownerFirstName: 'New',
+      ownerLastName: 'Name',
+      ownerEmail: 'new@example.com',
+      ownerMobile: '+919876543210',
+    } as never);
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: OWNER_USER_ID },
+      data: { name: 'New Name', email: 'new@example.com', phone: '+919876543210' },
+    });
+  });
+
+  it('never touches the User row when the save has no owner-identity fields', async () => {
+    await updateVendor(VENDOR_ID, { businessName: 'Renamed Business' } as never);
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects with a clean 409 (conflicts detail) when the new email belongs to a different user — never a raw P2002', async () => {
+    prismaMock.user.findFirst.mockImplementation(async (args: never) => {
+      const where = (args as { where: { email?: string } }).where;
+      return where.email ? ({ id: 'someone-else' } as never) : null;
+    });
+
+    await expect(updateVendor(VENDOR_ID, { ownerEmail: 'taken@example.com' } as never)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      details: { conflicts: ['email'] },
+    });
+    expect(prismaMock.vendor.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects clearing both email and mobile at once — a User must keep at least one identifier', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ name: 'Old Name', email: 'old@example.com', phone: null } as never);
+
+    await expect(updateVendor(VENDOR_ID, { ownerEmail: '' } as never)).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+    });
+  });
+
+  it('does not run the owner-sync at all for a vendor with no linked owner yet (draft)', async () => {
+    prismaMock.vendor.findUnique.mockResolvedValue(vendorFixture({ ownerUserId: null }) as never);
+    await updateVendor(VENDOR_ID, { ownerFirstName: 'Solo' } as never);
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Feature: member-scoped single-customer lookup — 404-not-403, never confirms existence of a
+ * customer unrelated to the caller's own vendor; confirmedPaymentsTotal reuses the exact
+ * `Order.status IN (CONFIRMED, COMPLETED)` definition customer.service.ts/settlement.service.ts
+ * already use, scoped additionally to this vendor's own line items.
+ */
+describe('getMyCustomerOrThrow', () => {
+  const CALLER_ID = 'a2a2a2a2-0000-4000-8000-000000000001';
+  const VENDOR_ID = 'b2b2b2b2-0000-4000-8000-000000000002';
+  const CUSTOMER_ID = 'c2c2c2c2-0000-4000-8000-000000000003';
+
+  it('404s when the caller has no vendor profile at all', async () => {
+    prismaMock.vendor.findUnique.mockResolvedValue(null);
+    await expect(getMyCustomerOrThrow(CALLER_ID, CUSTOMER_ID)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(prismaMock.order.count).not.toHaveBeenCalled();
+  });
+
+  it("404s (never confirms existence) when this customer has no Order linking them to the caller's own vendor", async () => {
+    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.order.count.mockResolvedValue(0);
+    prismaMock.order.aggregate.mockResolvedValue({ _sum: { total: null } } as never);
+
+    await expect(getMyCustomerOrThrow(CALLER_ID, CUSTOMER_ID)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('scopes both the count and the confirmed-payments aggregate to items: { some: { vendorId } }, never the bare Order.vendorId', async () => {
+    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.order.count.mockResolvedValue(3);
+    prismaMock.order.aggregate.mockResolvedValue({ _sum: { total: new Prisma.Decimal('1500.00') } } as never);
+    prismaMock.user.findUnique.mockResolvedValue({ id: CUSTOMER_ID, name: 'Priya', phone: '+919876543210', email: 'priya@example.com' } as never);
+
+    const result = await getMyCustomerOrThrow(CALLER_ID, CUSTOMER_ID);
+
+    expect(prismaMock.order.count).toHaveBeenCalledWith({ where: { customerId: CUSTOMER_ID, items: { some: { vendorId: VENDOR_ID } } } });
+    expect(prismaMock.order.aggregate).toHaveBeenCalledWith({
+      where: { customerId: CUSTOMER_ID, items: { some: { vendorId: VENDOR_ID } }, status: { in: ['CONFIRMED', 'COMPLETED'] } },
+      _sum: { total: true },
+    });
+    expect(result).toEqual({
+      id: CUSTOMER_ID,
+      name: 'Priya',
+      phone: '+919876543210',
+      email: 'priya@example.com',
+      totalOrders: 3,
+      confirmedPaymentsTotal: 1500,
+    });
+  });
+
+  it('defaults confirmedPaymentsTotal to 0 when the aggregate sum is null (no confirmed/completed order yet)', async () => {
+    prismaMock.vendor.findUnique.mockResolvedValue({ id: VENDOR_ID } as never);
+    prismaMock.order.count.mockResolvedValue(1);
+    prismaMock.order.aggregate.mockResolvedValue({ _sum: { total: null } } as never);
+    prismaMock.user.findUnique.mockResolvedValue({ id: CUSTOMER_ID, name: 'Priya', phone: null, email: null } as never);
+
+    const result = await getMyCustomerOrThrow(CALLER_ID, CUSTOMER_ID);
+    expect(result.confirmedPaymentsTotal).toBe(0);
+  });
+
+  it("a different vendor's caller never reaches this customer even with the same customerId (isolation via the where clause, not the gate)", async () => {
+    const OTHER_VENDOR_ID = 'd2d2d2d2-0000-4000-8000-000000000004';
+    prismaMock.vendor.findUnique.mockResolvedValue({ id: OTHER_VENDOR_ID } as never);
+    prismaMock.order.count.mockResolvedValue(0);
+
+    await expect(getMyCustomerOrThrow(CALLER_ID, CUSTOMER_ID)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(prismaMock.order.count).toHaveBeenCalledWith({ where: { customerId: CUSTOMER_ID, items: { some: { vendorId: OTHER_VENDOR_ID } } } });
   });
 });

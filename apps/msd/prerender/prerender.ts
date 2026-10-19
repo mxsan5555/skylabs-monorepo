@@ -130,7 +130,20 @@ async function main() {
   }
 
   if (siteUrl) {
-    const paths = [...new Set<string>([...bundle.STATIC_PUBLIC_PATHS, ...rendered])];
+    let catalogPaths: string[] = [];
+    if (!apiDown) {
+      try {
+        const slugs = await withTimeout(bundle.loadSitemapSlugs(), timeoutMs, 'sitemap-slugs');
+        catalogPaths = [
+          ...slugs.deals.map((s) => `/deal/${s}`),
+          ...slugs.products.map((s) => `/products/${s}`),
+          ...slugs.therapists.map((s) => `/therapist/${s}`),
+        ];
+      } catch (err) {
+        warn(`sitemap catalog slugs load failed (${(err as Error).message}); sitemap will omit Deal/Product/Therapist URLs this run`);
+      }
+    }
+    const paths = [...new Set<string>([...bundle.STATIC_PUBLIC_PATHS, ...rendered, ...catalogPaths])];
     write(join(OUT_DIR, 'sitemap.xml'), bundle.sitemapXml(siteUrl, paths));
     write(join(OUT_DIR, 'robots.txt'), bundle.robotsTxt(siteUrl));
     write(join(OUT_DIR, 'llms.txt'), bundle.llmsTxt(siteUrl, shell));

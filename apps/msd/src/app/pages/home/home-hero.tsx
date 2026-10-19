@@ -9,6 +9,7 @@ import { useVisitorLocation } from '../../../location/location-context';
 import { formatINR } from '../../../utils/format';
 import { imageSrcSet, toDealCardDeal } from './home-data';
 import { PageSection } from '../../components/page-section/page-section';
+import { dealPath } from '../../seo/public-urls';
 import content from '../../../content.json';
 import type { DealCardDeal } from '../../components/deal-card';
 
@@ -24,7 +25,7 @@ function SpotlightCard({ dealId, card }: { dealId: string; card: DealCardDeal })
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = Boolean(card.image) && !imgFailed;
   return (
-    <Link to={`/deal/${dealId}`} className="home-spotlight">
+    <Link to={dealPath({ id: dealId, slug: card.slug })} className="home-spotlight">
       {showImage ? (
         <img
           className="home-spotlight__thumb"

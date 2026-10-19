@@ -42,6 +42,7 @@ import {
   VendorDocumentAdminParamSchema,
   VendorImageIdParamSchema,
   VendorProductIdParamSchema,
+  VendorCustomerIdParamSchema,
 } from '../schemas/vendor.schema';
 import { ProductCreateSchema, ProductUpdateSchema, ProductStatusUpdateSchema, ProductListQuerySchema } from '../schemas/product.schema';
 import { MediaReorderSchema } from '../schemas/media.schema';
@@ -371,48 +372,12 @@ router.delete(
   },
 );
 
-router.post(
-  '/me/video',
-  requirePermission('vendors', 'custom'),
-  videoUpload.single('file'),
-  async (req, res, next) => {
-    try {
-      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
-      const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-      const video = await vendorService.replaceVendorVideo(vendor.id, {
-        buffer: req.file.buffer,
-        originalname: req.file.originalname,
-      });
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor_video.upsert',
-        targetType: 'VendorVideo',
-        targetId: video.id,
-        ...requestMeta(req),
-      });
-      sendData(res, video, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.delete('/me/video', requirePermission('vendors', 'custom'), async (req, res, next) => {
-  try {
-    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
-    await vendorService.deleteVendorVideo(vendor.id);
-    await writeAuditLog({
-      actorUserId: req.user!.sub,
-      action: 'vendor_video.delete',
-      targetType: 'VendorVideo',
-      targetId: vendor.id,
-      ...requestMeta(req),
-    });
-    sendData(res, { deleted: true });
-  } catch (err) {
-    next(err);
-  }
-});
+// Member Business Media is a single profile image only, never a video — the old gallery+video
+// `/me/video`/`/:id/video` routes are deliberately removed (not replaced) from this API's active
+// contract; `vendorService.replaceVendorVideo`/`deleteVendorVideo` and the `VendorVideo` table
+// are left in place (historical rows, shared media.service.ts infrastructure untouched), just no
+// longer reachable from any route — see vendor-pipeline.tsx's own doc comment for the frontend
+// side of this removal.
 
 router.post('/me/submit', requirePermission('vendors', 'custom'), async (req, res, next) => {
   try {
@@ -508,6 +473,25 @@ router.get('/me/customers', requirePermission('vendors', 'custom'), validateQuer
     next(err);
   }
 });
+
+/**
+ * Member-scoped single-customer lookup (name/phone/email + aggregate order/payment stats) for
+ * the Customer Detail page a member reaches from Order Details/the Customers list. 404s (never
+ * confirms existence) for a customerId unrelated to this vendor — see
+ * vendor.service.ts#getMyCustomerOrThrow for the actual ownership check.
+ */
+router.get(
+  '/me/customers/:customerId',
+  requirePermission('vendors', 'custom'),
+  validateParams(VendorCustomerIdParamSchema),
+  async (req, res, next) => {
+    try {
+      sendData(res, await vendorService.getMyCustomerOrThrow(req.user!.sub, req.params.customerId));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.post(
   '/me/branches',
@@ -1290,7 +1274,8 @@ router.get('/', requirePermission('vendors', 'view'), validateQuery(VendorListQu
   try {
     const { page, pageSize, search, status } = req.validatedQuery as ReturnType<typeof VendorListQuerySchema.parse>;
     const { items, total } = await vendorService.listVendors({ page, pageSize, search, status });
-    sendData(res, await vendorService.attachLiveCounts(items), { meta: { total, page, pageSize } });
+    const withCounts = await vendorService.attachLiveCounts(items);
+    sendData(res, await vendorService.attachCreatorNames(withCounts), { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);
   }
@@ -1317,7 +1302,8 @@ router.get('/:id', requirePermission('vendors', 'view'), validateParams(UuidPara
   try {
     const vendor = await vendorService.getVendorOrThrow(req.params.id);
     const [withCounts] = await vendorService.attachLiveCounts([vendor]);
-    sendData(res, withCompletion(withCounts));
+    const [withCreator] = await vendorService.attachCreatorNames([withCounts]);
+    sendData(res, withCompletion(withCreator));
   } catch (err) {
     next(err);
   }
@@ -1424,52 +1410,8 @@ router.patch(
   },
 );
 
-router.post(
-  '/:id/video',
-  requirePermission('vendors', 'edit'),
-  validateParams(UuidParamSchema),
-  videoUpload.single('file'),
-  async (req, res, next) => {
-    try {
-      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
-      const video = await vendorService.replaceVendorVideo(req.params.id, {
-        buffer: req.file.buffer,
-        originalname: req.file.originalname,
-      });
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor_video.upsert',
-        targetType: 'VendorVideo',
-        targetId: video.id,
-        ...requestMeta(req),
-      });
-      sendData(res, video, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-router.delete(
-  '/:id/video',
-  requirePermission('vendors', 'edit'),
-  validateParams(UuidParamSchema),
-  async (req, res, next) => {
-    try {
-      await vendorService.deleteVendorVideo(req.params.id);
-      await writeAuditLog({
-        actorUserId: req.user!.sub,
-        action: 'vendor_video.delete',
-        targetType: 'VendorVideo',
-        targetId: req.params.id,
-        ...requestMeta(req),
-      });
-      sendData(res, { deleted: true });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+// Member Business Media is a single profile image only — see this file's `/me/video` removal's
+// own doc comment above for the full rationale (same applies to this admin-on-behalf pair).
 
 // ─── Vendor KYC documents, admin-on-behalf (real file upload) ───────────────────────────────
 
@@ -1992,6 +1934,131 @@ router.delete(
         ...requestMeta(req),
       });
       sendData(res, null);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── Deal media (admin-on-behalf — mirrors the self-service block above exactly, same bug class
+// as Product/Therapist's own previously-fixed gap: these routes never existed at all, so
+// `apps/msd/api/media.ts`'s `basePath()` for `'deal'` had no admin/`vendorId` branch to even
+// target — this was the actual root cause of "Superadmin's Add/Edit Deal form has no image/video
+// upload"). `addDealImage`/etc already resolve ownership via `getDealScopedOrThrow(vendorId,
+// branchId, dealId)` internally, so calling them with the URL's `vendorId` here is exactly as
+// safe as the self-service route calling them with `getMyVendorOrThrow(req.user.sub).id`. ──────
+
+router.post(
+  '/:vendorId/branches/:branchId/deals/:dealId/images',
+  requirePermission('vendors.deals', 'edit'),
+  imageUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const image = await vendorService.addDealImage(req.params.vendorId, req.params.branchId, req.params.dealId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'deal_image.create',
+        targetType: 'DealImage',
+        targetId: image.id,
+        ...requestMeta(req),
+      });
+      sendData(res, image, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/:vendorId/branches/:branchId/deals/:dealId/images/:imageId',
+  requirePermission('vendors.deals', 'edit'),
+  async (req, res, next) => {
+    try {
+      await vendorService.deleteDealImage(req.params.vendorId, req.params.branchId, req.params.dealId, req.params.imageId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'deal_image.delete',
+        targetType: 'DealImage',
+        targetId: req.params.imageId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/:vendorId/branches/:branchId/deals/:dealId/images/reorder',
+  requirePermission('vendors.deals', 'edit'),
+  validateBody(MediaReorderSchema),
+  async (req, res, next) => {
+    try {
+      await vendorService.reorderDealImages(req.params.vendorId, req.params.branchId, req.params.dealId, req.body.imageIds);
+      sendData(res, { reordered: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/:vendorId/branches/:branchId/deals/:dealId/images/:imageId/primary',
+  requirePermission('vendors.deals', 'edit'),
+  async (req, res, next) => {
+    try {
+      await vendorService.setDealPrimaryImage(req.params.vendorId, req.params.branchId, req.params.dealId, req.params.imageId);
+      sendData(res, { primary: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  '/:vendorId/branches/:branchId/deals/:dealId/video',
+  requirePermission('vendors.deals', 'edit'),
+  videoUpload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new ApiError('VALIDATION_ERROR', 'No file was uploaded.');
+      const video = await vendorService.replaceDealVideo(req.params.vendorId, req.params.branchId, req.params.dealId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+      });
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'deal_video.upsert',
+        targetType: 'DealVideo',
+        targetId: video.id,
+        ...requestMeta(req),
+      });
+      sendData(res, video, { status: 201 });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  '/:vendorId/branches/:branchId/deals/:dealId/video',
+  requirePermission('vendors.deals', 'edit'),
+  async (req, res, next) => {
+    try {
+      await vendorService.deleteDealVideo(req.params.vendorId, req.params.branchId, req.params.dealId);
+      await writeAuditLog({
+        actorUserId: req.user!.sub,
+        action: 'deal_video.delete',
+        targetType: 'DealVideo',
+        targetId: req.params.dealId,
+        ...requestMeta(req),
+      });
+      sendData(res, { deleted: true });
     } catch (err) {
       next(err);
     }

@@ -33,6 +33,7 @@ export function toDealCardDeal(deal: CatalogDeal): DealCardDeal {
   const media = resolveDealMedia(deal);
   return {
     id: deal.id,
+    slug: deal.slug,
     title: deal.title,
     image: media.images[0] ?? '',
     imageAlt: deal.title,
@@ -54,6 +55,7 @@ export function toProductCardDeal(product: CatalogProduct): DealCardDeal {
   const originalPrice = product.originalPrice != null ? Number(product.originalPrice) : undefined;
   return {
     id: product.id,
+    slug: product.slug,
     title: product.name,
     image: product.image ?? '',
     imageAlt: product.imageAlt ?? product.name,

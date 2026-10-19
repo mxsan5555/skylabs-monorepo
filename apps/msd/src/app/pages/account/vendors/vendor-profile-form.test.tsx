@@ -213,7 +213,36 @@ describe('VendorProfileForm — Create Vendor button gating', () => {
       />,
     );
     expect(screen.getByText('Approval Status: Pending Approval')).toBeTruthy();
-    expect(screen.getByText('Profile Completion: 100%')).toBeTruthy();
+    expect(screen.getByText('Profile Completion')).toBeTruthy();
+    expect(screen.getByText('100%')).toBeTruthy();
+    expect(screen.getByText('Everything needed is in place.')).toBeTruthy();
+  });
+
+  it('shows a concise "Still needed" line (never a long checklist) naming the incomplete sections', () => {
+    const partialVendor: Vendor = {
+      ...BASE_VENDOR,
+      profileCompletion: {
+        percent: 33,
+        sections: [
+          { key: 'user', label: 'Member User', complete: true },
+          { key: 'business', label: 'Business Information', complete: false },
+          { key: 'kyc', label: 'KYC & Documents', complete: false },
+        ],
+      },
+    };
+    render(
+      <VendorProfileForm
+        vendor={partialVendor}
+        canEdit
+        canReviewKyc={false}
+        saving={false}
+        token="tok"
+        sections={['business']}
+        onSave={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('33%')).toBeTruthy();
+    expect(screen.getByText('Still needed: Business Information, KYC & Documents.')).toBeTruthy();
   });
 
   it('never renders Legal Name / Business Type / GST / PAN text fields — KYC is file upload only', () => {

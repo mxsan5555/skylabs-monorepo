@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MdFilledButton } from '@material/web/button/filled-button.js';
-import { FilledButton, OutlinedButton, OutlinedTextField, Icon } from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, OutlinedButton, OutlinedTextField, Icon, LinearProgress } from '@skylabs-monorepo/shared-ui/react';
 import type { Vendor, VendorFields, VendorDocument, VendorDocumentType } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { VendorDocumentUpload } from '../../../components/vendor-document-upload';
@@ -360,6 +360,10 @@ export function VendorProfileForm({
   const show = (section: VendorFormSection) =>
     sections.includes(section);
 
+  // The owner's mobile was already captured at Step 1 (Owner & Login) and isn't re-editable
+  // here — this is read-only, purely to offer the "same as" copy-once checkbox below.
+  const ownerMobileStripped = vendor?.ownerMobile ? stripIndiaPrefix(vendor.ownerMobile) : '';
+
   // Same double-submit guard used by every other create flow in this app (DealDialog,
   // ProductFormDialog, TherapistFormDialog, categories.tsx) — the `saving` prop alone is a React
   // state re-render and can't stop a second click/tap/Enter that fires before that re-render
@@ -559,19 +563,23 @@ export function VendorProfileForm({
       )}
 
       {vendor?.profileCompletion && (
-        <section aria-label="Profile completion">
-          <h3 className="section-title">
-            Profile Completion:{' '}
-            {vendor.profileCompletion.percent}%
-          </h3>
-
-          <ul className="entity-list">
-            {vendor.profileCompletion.sections.map((s) => (
-              <li key={s.key}>
-                {s.complete ? '✓' : '✗'} {s.label}
-              </li>
-            ))}
-          </ul>
+        <section aria-label="Profile completion" className="profile-completion">
+          <div className="profile-completion__head">
+            <span className="profile-completion__label">Profile Completion</span>
+            <span className="profile-completion__percent">{vendor.profileCompletion.percent}%</span>
+          </div>
+          <LinearProgress
+            value={vendor.profileCompletion.percent / 100}
+            aria-label={`Profile ${vendor.profileCompletion.percent}% complete`}
+          />
+          {(() => {
+            const incomplete = vendor.profileCompletion.sections.filter((s) => !s.complete);
+            return incomplete.length === 0 ? (
+              <p className="field-hint">Everything needed is in place.</p>
+            ) : (
+              <p className="field-hint">Still needed: {incomplete.map((s) => s.label).join(', ')}.</p>
+            );
+          })()}
         </section>
       )}
 
@@ -657,6 +665,20 @@ export function VendorProfileForm({
                 </p>
               )}
             </div>
+
+            {ownerMobileStripped && (
+              <label className="category-grant-grid__option">
+                <input
+                  type="checkbox"
+                  checked={form.businessPhone === ownerMobileStripped}
+                  disabled={!canEdit}
+                  onChange={(e) => {
+                    if (e.target.checked) set('businessPhone', ownerMobileStripped as never);
+                  }}
+                />
+                Business phone same as owner mobile
+              </label>
+            )}
           </div>
         </sky-tile-card>
       )}

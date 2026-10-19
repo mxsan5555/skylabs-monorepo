@@ -534,7 +534,20 @@ describe('GET /api/v1/catalog/products/:id', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.name).toBe('Face Cream');
     expect(prismaMock.product.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ id: PRODUCT_ID, isActive: true, vendor: { status: 'ACTIVE' } }) }),
+      expect.objectContaining({
+        where: expect.objectContaining({ OR: [{ id: PRODUCT_ID }, { slug: PRODUCT_ID }], isActive: true, vendor: { status: 'ACTIVE' } }),
+      }),
+    );
+  });
+
+  it('also resolves by the product\'s own slug (SEO-friendly URL), same visibility bar', async () => {
+    prismaMock.product.findFirst.mockResolvedValue(productFixture);
+    const res = await request(app).get('/api/v1/catalog/products/face-cream');
+    expect(res.status).toBe(200);
+    expect(prismaMock.product.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ OR: [{ id: 'face-cream' }, { slug: 'face-cream' }] }),
+      }),
     );
   });
 });
@@ -552,7 +565,18 @@ describe('GET /api/v1/catalog/deals/:id', () => {
     expect(res.status).toBe(200);
     expect(prismaMock.deal.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ id: DEAL_ID, status: 'ACTIVE', approvalStatus: 'APPROVED' }),
+        where: expect.objectContaining({ OR: [{ id: DEAL_ID }, { slug: DEAL_ID }], status: 'ACTIVE', approvalStatus: 'APPROVED' }),
+      }),
+    );
+  });
+
+  it('also resolves by the deal\'s own slug (SEO-friendly URL), same visibility bar', async () => {
+    prismaMock.deal.findFirst.mockResolvedValue(serviceDealFixture);
+    const res = await request(app).get('/api/v1/catalog/deals/deep-tissue-massage');
+    expect(res.status).toBe(200);
+    expect(prismaMock.deal.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ OR: [{ id: 'deep-tissue-massage' }, { slug: 'deep-tissue-massage' }] }),
       }),
     );
   });
@@ -729,7 +753,12 @@ describe('GET /api/v1/catalog/therapists/:id', () => {
     expect(res.status).toBe(404);
     expect(prismaMock.therapist.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ id: THERAPIST_ID, isActive: true, vendor: { status: 'ACTIVE' }, branch: { isActive: true } }),
+        where: expect.objectContaining({
+          OR: [{ id: THERAPIST_ID }, { slug: THERAPIST_ID }],
+          isActive: true,
+          vendor: { status: 'ACTIVE' },
+          branch: { isActive: true },
+        }),
       }),
     );
   });
@@ -741,10 +770,21 @@ describe('GET /api/v1/catalog/therapists/:id', () => {
     expect(res.body.data).toEqual({ ...therapistFixture, popularTags: [] });
   });
 
-  it('422s a non-uuid :id param', async () => {
-    const res = await request(app).get('/api/v1/catalog/therapists/not-a-uuid');
-    expect(res.status).toBe(422);
-    expect(prismaMock.therapist.findFirst).not.toHaveBeenCalled();
+  it('also resolves by the therapist\'s own slug (SEO-friendly URL), same visibility bar', async () => {
+    prismaMock.therapist.findFirst.mockResolvedValue(therapistFixture);
+    const res = await request(app).get('/api/v1/catalog/therapists/amit-verma');
+    expect(res.status).toBe(200);
+    expect(prismaMock.therapist.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ OR: [{ id: 'amit-verma' }, { slug: 'amit-verma' }] }),
+      }),
+    );
+  });
+
+  it('a plain non-uuid, non-existent identifier 404s rather than 422ing — slugs are not UUIDs by design', async () => {
+    prismaMock.therapist.findFirst.mockResolvedValue(null);
+    const res = await request(app).get('/api/v1/catalog/therapists/no-such-therapist');
+    expect(res.status).toBe(404);
   });
 });
 

@@ -3,8 +3,10 @@ import type { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import { ensureUniqueSlug } from '../lib/slug';
+import { sanitizeRichText } from '../lib/rich-text';
 import { resolveGoogleMapsLocation } from '../providers/maps/googleMapsUrlResolver.provider';
-import { assignRole, serializeUser } from './user.service';
+import { replaceUserRole, serializeUser } from './user.service';
+import { revokeAllRefreshTokens } from './token.service';
 import {
   listActiveCategories,
   assertCategoryChildOf,
@@ -17,7 +19,7 @@ import { getProductScopedOrThrow } from './product.service';
 import * as mediaService from './media.service';
 import type { MediaFile } from './media.service';
 import * as notificationService from './notification.service';
-import { Prisma, type CategoryType, type VendorStatus, type KycStatus, type DealStatus, type DealApprovalStatus } from '../generated/prisma-client';
+import { Prisma, type CategoryType, type VendorStatus, type KycStatus, type DealStatus, type DealApprovalStatus, type OrderStatus } from '../generated/prisma-client';
 import type {
   VendorCreateSchema,
   VendorUpdateSchema,
@@ -43,6 +45,24 @@ type BranchUpdateInput = z.infer<typeof BranchUpdateSchema>;
 type BranchCategoryAccessInput = z.infer<typeof BranchCategoryAccessInputSchema>;
 type DealCreateInput = z.infer<typeof DealCreateSchema>;
 type DealUpdateInput = z.infer<typeof DealUpdateSchema>;
+
+/** Sanitizes every `<sky-rich-text-editor>`-backed field present on a Deal create/update input
+ *  before it ever reaches Prisma — the schema (`richTextField` in vendor.schema.ts) only
+ *  validates *length*, it never trusts the client's HTML as already-clean. Mutates a shallow
+ *  copy; fields absent from `input` (a PATCH touching unrelated fields) stay absent, never
+ *  forced to `null`. */
+function sanitizeDealRichTextFields<T extends { description?: string; notes?: string; policy?: string; termsAndConditions?: string }>(
+  input: T,
+): T {
+  const next = { ...input } as Record<string, unknown>;
+  for (const key of ['description', 'notes', 'policy', 'termsAndConditions'] as const) {
+    // `null` (not `undefined`) when the admin cleared the field — an update must be able to
+    // explicitly clear a rich-text field, not merely "leave it untouched" (Prisma treats
+    // `undefined` as "don't touch this field" on an update, `null` as "set it to NULL").
+    if (key in input) next[key] = sanitizeRichText(input[key]);
+  }
+  return next as T;
+}
 type TherapistCreateInput = z.infer<typeof TherapistCreateSchema>;
 type TherapistUpdateInput = z.infer<typeof TherapistUpdateSchema>;
 type TherapistPackageCreateInput = z.infer<typeof TherapistPackageCreateSchema>;
@@ -150,6 +170,22 @@ export async function attachLiveCounts<T extends { id: string }>(vendors: T[]): 
   }));
 }
 
+/** Resolves `createdByUserId` to the creator's display name for the list/detail responses —
+ *  one batched `User` lookup for the whole page (same spirit as `attachLiveCounts`), not a
+ *  per-row join. Self-registered vendors (`createdByUserId: null`) and any historical row whose
+ *  creator User no longer resolves both come back as `createdByName: null`; the frontend shows
+ *  "Not recorded" rather than inventing a creator. */
+export async function attachCreatorNames<T extends { createdByUserId: string | null }>(
+  vendors: T[],
+): Promise<(T & { createdByName: string | null })[]> {
+  const ids = [...new Set(vendors.map((v) => v.createdByUserId).filter((id): id is string => Boolean(id)))];
+  const creators = ids.length
+    ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })
+    : [];
+  const nameById = new Map(creators.map((c) => [c.id, c.name]));
+  return vendors.map((v) => ({ ...v, createdByName: v.createdByUserId ? nameById.get(v.createdByUserId) ?? null : null }));
+}
+
 function heuristicInitialStatus(input: { gstNumber?: string; panNumber?: string }): VendorStatus {
   return input.gstNumber && input.panNumber ? 'PENDING_VERIFICATION' : 'PROFILE_INCOMPLETE';
 }
@@ -188,6 +224,10 @@ export async function listVendors(opts: {
           OR: [
             { businessName: { contains: opts.search, mode: 'insensitive' as const } },
             { businessEmail: { contains: opts.search, mode: 'insensitive' as const } },
+            { ownerFirstName: { contains: opts.search, mode: 'insensitive' as const } },
+            { ownerLastName: { contains: opts.search, mode: 'insensitive' as const } },
+            { ownerMobile: { contains: opts.search, mode: 'insensitive' as const } },
+            { city: { contains: opts.search, mode: 'insensitive' as const } },
           ],
         }
       : {}),
@@ -230,12 +270,19 @@ async function assertOwnerUserAvailable(ownerUserId: string | undefined, exclude
   }
 }
 
-/** Grants the existing `vendor` role to a newly-linked owner, preserving whatever roles they
- *  already had — idempotent (upsert), and the only way a User gains vendor-portal access. */
+/**
+ * Grants the existing `vendor` ("Member") role to a newly-linked owner — REPLACES whatever role
+ * set they had (never additive), since the single-role model means becoming a Member's owner is
+ * that account's one and only role going forward, same as any other role change. For the normal
+ * case (a brand-new User created moments earlier with zero roles, see `createVendorOwner`) this
+ * is simply "assign Member"; it's written as a replace rather than a plain create so that linking
+ * an EXISTING eligible user (the admin "select existing user" path) can never leave them holding
+ * both their old role and `vendor` at once.
+ */
 async function ensureVendorRoleAssigned(userId: string) {
   const vendorRole = await prisma.role.findUnique({ where: { key: 'vendor' } });
-  if (!vendorRole) return; // defensive — seed.ts always creates the six system roles
-  await assignRole(userId, vendorRole.id);
+  if (!vendorRole) return; // defensive — seed.ts always creates the system roles
+  await replaceUserRole(userId, vendorRole.id);
 }
 
 /**
@@ -296,7 +343,14 @@ export async function createVendorOwner(email: string | undefined, phone: string
     phone ? prisma.user.findFirst({ where: { phone, deletedAt: null }, select: { id: true } }) : Promise.resolve(null),
   ]);
   if (byEmail || byPhone) {
-    throw new ApiError('CONFLICT', 'A user with this email or phone already exists. Please use a different email/phone to create this Vendor.');
+    const conflicts: ('email' | 'phone')[] = [];
+    if (byEmail) conflicts.push('email');
+    if (byPhone) conflicts.push('phone');
+    throw new ApiError(
+      'CONFLICT',
+      'A user with this email or phone already exists. Please use a different email/phone to create this Vendor.',
+      { conflicts },
+    );
   }
   const created = await prisma.user.create({
     data: { name: name?.trim() || email || phone!, email: email || undefined, phone: phone || undefined },
@@ -337,7 +391,7 @@ export async function searchEligibleOwnerCandidates(query: string | undefined, p
     }),
     prisma.user.count({ where }),
   ]);
-  return { items: items.map(serializeUser), total };
+  return { items: items.map((user) => serializeUser(user)), total };
 }
 
 /**
@@ -445,10 +499,73 @@ export async function registerPublicVendor(input: VendorSelfCreateInput) {
   return buildAndInsertVendor(input, ownerUserId, null, 'PENDING_VERIFICATION');
 }
 
+/**
+ * A Vendor's owner is a real `User` row — editing "Member User" must update that SAME linked
+ * account's actual name/email/phone (the identity it logs in with), never just the Vendor row's
+ * own `ownerFirstName`/`ownerLastName`/`ownerEmail`/`ownerMobile` display columns in isolation
+ * (those exist for display/snapshot purposes, kept in sync here, never the source of truth for
+ * login). Deliberately implemented here, not via `userService.updateUser` — that function (and
+ * its `PATCH /rbac/users/:id` route) is the general Users-screen surface, which explicitly
+ * excludes every vendor-owner account by design (see user.service.ts#listUsers's own doc
+ * comment: "a Vendor's owner User is managed exclusively through Vendor List/Management").
+ *
+ * `ownerMobile` arrives already normalized (`vendorPhoneSchema`'s own `normalizeIdentifier`
+ * transform in vendor.schema.ts) — no second normalization needed here. The duplicate check
+ * mirrors `createVendorOwner`'s exact pattern (email/phone uniqueness across `User`), excluding
+ * the owner's own current row so re-saving their own unchanged email/phone is never a false
+ * conflict.
+ */
+async function syncOwnerUserFromVendorFields(ownerUserId: string, input: VendorUpdateInput) {
+  const touchesOwnerIdentity =
+    'ownerFirstName' in input || 'ownerLastName' in input || 'ownerEmail' in input || 'ownerMobile' in input;
+  if (!touchesOwnerIdentity) return;
+
+  const email = input.ownerEmail || undefined;
+  const phone = input.ownerMobile || undefined;
+
+  if (email || phone) {
+    const [byEmail, byPhone] = await Promise.all([
+      email ? prisma.user.findFirst({ where: { email, deletedAt: null, id: { not: ownerUserId } }, select: { id: true } }) : Promise.resolve(null),
+      phone ? prisma.user.findFirst({ where: { phone, deletedAt: null, id: { not: ownerUserId } }, select: { id: true } }) : Promise.resolve(null),
+    ]);
+    if (byEmail || byPhone) {
+      const conflicts: ('email' | 'phone')[] = [];
+      if (byEmail) conflicts.push('email');
+      if (byPhone) conflicts.push('phone');
+      throw new ApiError('CONFLICT', 'A user with this email or phone already exists.', { conflicts });
+    }
+  }
+
+  const owner = await prisma.user.findUnique({ where: { id: ownerUserId }, select: { name: true, email: true, phone: true } });
+  if (!owner) return;
+
+  const firstName = 'ownerFirstName' in input ? input.ownerFirstName ?? '' : undefined;
+  const lastName = 'ownerLastName' in input ? input.ownerLastName ?? '' : undefined;
+  const nextName = firstName !== undefined || lastName !== undefined
+    ? [firstName, lastName].filter((part) => part !== undefined && part !== '').join(' ').trim()
+    : undefined;
+
+  const nextEmail = 'ownerEmail' in input ? (email ?? null) : owner.email;
+  const nextPhone = 'ownerMobile' in input ? (phone ?? null) : owner.phone;
+  if (!nextEmail && !nextPhone) {
+    throw new ApiError('VALIDATION_ERROR', 'The member user needs at least one of email or mobile — clearing both is not allowed.');
+  }
+
+  await prisma.user.update({
+    where: { id: ownerUserId },
+    data: {
+      ...(nextName ? { name: nextName } : {}),
+      ...('ownerEmail' in input ? { email: email ?? null } : {}),
+      ...('ownerMobile' in input ? { phone: phone ?? null } : {}),
+    },
+  });
+}
+
 export async function updateVendor(id: string, input: VendorUpdateInput) {
   const existing = await getVendorOrThrow(id);
   if ('ownerUserId' in input) await assertOwnerUserAvailable(input.ownerUserId, id);
   if (input.ownerUserId) await ensureVendorRoleAssigned(input.ownerUserId);
+  if (existing.ownerUserId) await syncOwnerUserFromVendorFields(existing.ownerUserId, input);
   // The admin-create pipeline's Step 1 persists a Vendor before any businessName is known (see
   // createVendor above), so its slug starts out id-derived rather than name-derived. The FIRST
   // time a real businessName arrives via update, upgrade the slug to reflect it — but never
@@ -484,8 +601,17 @@ export async function rejectVendor(id: string, reason: string) {
 
 /** Generic activate/deactivate/suspend for an already-approved vendor (not the initial approve/reject transition). */
 export async function setVendorStatus(id: string, status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED', reason?: string) {
-  await getVendorOrThrow(id);
+  const before = await getVendorOrThrow(id);
   const vendor = await prisma.vendor.update({ where: { id }, data: { status, statusReason: reason ?? null }, include: OWNER_INCLUDE });
+  // Suspension must end any session already in the owner's hands immediately, not just block
+  // the *next* login (see `assertUserMayLogIn` in auth.service.ts, which only runs at login
+  // time) — reuses the exact same revocation `/auth/logout-all` already uses. Only fires on the
+  // ACTIVE->SUSPENDED edge, never on a re-save of an already-suspended row or on
+  // activate/deactivate (a distinct operation — see TASK.md's Member Suspension notes on why
+  // these stay separate).
+  if (status === 'SUSPENDED' && before.status !== 'SUSPENDED' && vendor.ownerUserId) {
+    await revokeAllRefreshTokens(vendor.ownerUserId);
+  }
   return serializeVendor(vendor);
 }
 
@@ -528,9 +654,19 @@ export async function getVendorByOwnerUserId(ownerUserId: string) {
   });
 }
 
+/** The one choke point every `/vendors/me/*` self-service route resolves ownership through —
+ *  a suspended member's token must stop authorizing portal access the moment suspension is
+ *  committed, not just at next login, and this is where that's enforced: every self-service
+ *  request re-reads the Vendor's live `status` here, so a token issued before suspension is
+ *  rejected on its very next use, with no separate revocation step needed. Admin-on-behalf
+ *  routes (`/vendors/:vendorId/*`) never call this — an admin's own access is never gated by a
+ *  member's suspension (see this function's own callers). */
 export async function getMyVendorOrThrow(ownerUserId: string) {
   const vendor = await getVendorByOwnerUserId(ownerUserId);
   if (!vendor) throw new ApiError('NOT_FOUND', 'Complete your business profile first');
+  if (vendor.status === 'SUSPENDED') {
+    throw new ApiError('FORBIDDEN', 'Your member account is suspended. Please contact support.');
+  }
   return vendor;
 }
 
@@ -1040,8 +1176,19 @@ export async function createTherapist(vendorId: string, branchId: string, input:
     await assertVendorHasCategoryAccess(vendorId, input.specializationCategoryId, 'THERAPY');
     await assertBranchHasSpecializationCategoryAccess(branchId, input.specializationCategoryId);
   }
+  const id = randomUUID();
+  const slug = await ensureUniqueSlug(input.personName || id, id, (candidate) =>
+    prisma.therapist.findUnique({ where: { slug: candidate } }).then(Boolean),
+  );
   return prisma.therapist.create({
-    data: { ...input, vendorId, branchId } as Prisma.TherapistUncheckedCreateInput,
+    data: {
+      ...input,
+      ...('bio' in input ? { bio: sanitizeRichText(input.bio) } : {}),
+      id,
+      slug,
+      vendorId,
+      branchId,
+    } as Prisma.TherapistUncheckedCreateInput,
     include: THERAPIST_MEDIA_INCLUDE,
   });
 }
@@ -1054,7 +1201,11 @@ export async function updateTherapist(vendorId: string, therapistId: string, inp
   }
   return prisma.therapist.update({
     where: { id: therapistId },
-    data: input as Prisma.TherapistUncheckedUpdateInput,
+    // `bio` is a `<sky-rich-text-editor>`-backed field — sanitized server-side before it ever
+    // reaches Prisma (`TherapistUpdateSchema` only validates its plain-text length, see
+    // `richTextField` in common.schema.ts). `null` (not `undefined`) when cleared, so an update
+    // can actually clear it, not merely leave it untouched.
+    data: { ...input, ...('bio' in input ? { bio: sanitizeRichText(input.bio) } : {}) } as Prisma.TherapistUncheckedUpdateInput,
     include: THERAPIST_MEDIA_INCLUDE,
   });
 }
@@ -1242,6 +1393,53 @@ export async function listMyCustomers(vendorId: string, opts: { page: number; pa
   });
 
   return { items, total };
+}
+
+/** An Order only ever reaches CONFIRMED/COMPLETED via a verified payment — same "money actually
+ *  received" definition as `customer.service.ts#loadOrderStats`/`settlement.service.ts#
+ *  customerPaymentsWhere` (never a separate/invented "confirmed" rule), just filtered additionally
+ *  to this vendor's own line items (`items: { some: { vendorId } }`, not `Order.vendorId` —
+ *  same multi-vendor-safe join every vendor-scoped query in this file uses). */
+const CONFIRMED_PAYMENT_ORDER_STATUSES: OrderStatus[] = ['CONFIRMED', 'COMPLETED'];
+
+/**
+ * Member-scoped single-customer lookup for the vendor-facing Customer Detail page. 404s (never
+ * confirms existence) unless at least one Order actually links this `customerId` to the caller's
+ * own vendor via `items: { some: { vendorId } }` — same "404 not 403, never confirm existence of
+ * someone else's data" discipline as `order.service.ts#getMyOrderOrThrow`. `totalOrders`/
+ * `confirmedPaymentsTotal` are each a single aggregate query over that same vendor-scoped
+ * `Order` set — `confirmedPaymentsTotal` sums the whole `Order.total` (not just this vendor's
+ * line items), matching how `loadOrderStats`/`customerPaymentsWhere` already treat a
+ * multi-vendor order's total.
+ */
+export async function getMyCustomerOrThrow(callerUserId: string, customerId: string) {
+  const vendor = await getVendorByOwnerUserId(callerUserId);
+  if (!vendor) throw new ApiError('NOT_FOUND', 'Customer not found');
+
+  const scopeWhere = { customerId, items: { some: { vendorId: vendor.id } } };
+  const [totalOrders, confirmed] = await Promise.all([
+    prisma.order.count({ where: scopeWhere }),
+    prisma.order.aggregate({
+      where: { ...scopeWhere, status: { in: CONFIRMED_PAYMENT_ORDER_STATUSES } },
+      _sum: { total: true },
+    }),
+  ]);
+  if (totalOrders === 0) throw new ApiError('NOT_FOUND', 'Customer not found');
+
+  const customer = await prisma.user.findUnique({
+    where: { id: customerId },
+    select: { id: true, name: true, phone: true, email: true },
+  });
+  if (!customer) throw new ApiError('NOT_FOUND', 'Customer not found');
+
+  return {
+    id: customer.id,
+    name: customer.name,
+    phone: customer.phone,
+    email: customer.email,
+    totalOrders,
+    confirmedPaymentsTotal: Number(confirmed._sum.total ?? 0),
+  };
 }
 
 // ─── Category access gate (replaces the old Service/Product master-row model) ────────────────
@@ -1447,7 +1645,7 @@ export async function createDeal(
   const existingSlug = await prisma.deal.findUnique({ where: { slug: input.slug } });
   if (existingSlug) throw new ApiError('CONFLICT', `Deal slug "${input.slug}" already exists`);
 
-  const { packages, therapistIds, ...dealFields } = input;
+  const { packages, therapistIds, ...dealFields } = sanitizeDealRichTextFields(input);
 
   try {
     return await prisma.$transaction(async (tx) => {
@@ -1529,7 +1727,7 @@ export async function updateDeal(vendorId: string, branchId: string, dealId: str
     await assertTherapistsBelongToBranch(vendorId, branchId, input.therapistIds);
   }
 
-  const { packages, therapistIds, ...dealFields } = input;
+  const { packages, therapistIds, ...dealFields } = sanitizeDealRichTextFields(input);
 
   return prisma.$transaction(async (tx) => {
     await tx.deal.update({ where: { id: dealId }, data: dealFields as unknown as Prisma.DealUncheckedUpdateInput });
@@ -1673,8 +1871,18 @@ export async function deleteDealVideo(vendorId: string, branchId: string, dealId
 // is just "does this Vendor exist" — the self-service route already resolves its own vendorId
 // via getMyVendorOrThrow before calling these, and the admin route can manage any vendor) ────
 
+/** Member Business Media is a single profile image, not a gallery — a vendor-specific cap of 1,
+ *  tighter than the shared `MAX_IMAGES_PER_ENTITY` ceiling every other entity (Deal/Product/
+ *  Therapist) still uses. Enforced here, not in the shared `media.service.ts`, so this stays a
+ *  Vendor-only rule rather than narrowing every entity's gallery. The frontend's `MediaUploader
+ *  maxImages={1}` already hides the "Upload" control once an image exists (replace = remove,
+ *  then add) — this is the real backend backstop, not just a UX nicety. */
 export async function addVendorImage(vendorId: string, file: MediaFile) {
   await getVendorOrThrow(vendorId);
+  const existingCount = await prisma.vendorImage.count({ where: { vendorId } });
+  if (existingCount >= 1) {
+    throw new ApiError('VALIDATION_ERROR', 'A member can only have one profile image — remove the current one before adding a new one.');
+  }
   return mediaService.addImage('vendor', vendorId, file);
 }
 

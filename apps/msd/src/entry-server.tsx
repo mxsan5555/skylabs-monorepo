@@ -5,7 +5,7 @@ import '@skylabs-monorepo/shared-ui';
 import App from './app/app';
 import { PrerenderDataProvider, type PrerenderPayload } from './prerender-data/prerender-data';
 
-export { loadCategoryData, loadHomeData, loadShellData } from './prerender-data/loaders';
+export { loadCategoryData, loadHomeData, loadShellData, loadSitemapSlugs } from './prerender-data/loaders';
 
 /** Server render of one route. Styles are not imported here: the client bundle's CSS
  *  links are already in index.html. */

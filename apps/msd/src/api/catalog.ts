@@ -58,9 +58,10 @@ export interface CatalogDeal {
   title: string;
   slug: string;
   shortDescription: string | null;
+  /** Rich HTML (sky-rich-text-editor), already server-sanitized — render via
+   *  `dangerouslySetInnerHTML`, never as plain text (see deal-detail.tsx). */
   description: string | null;
   termsAndConditions: string | null;
-  notes: string | null;
   policy: string | null;
   /** A synced "from price"/default-duration display cache (kept in sync with the cheapest
    *  active `packages[]` entry server-side — see DealPackage's own schema doc comment in
@@ -115,6 +116,7 @@ export interface CatalogTherapistPackage {
 
 export interface CatalogVendorTherapist {
   id: string;
+  slug: string | null;
   /** The service/role label a customer browses by (e.g. "Legs Therapist") — distinct from
    *  `personName` below, never merged into one field; the customer must see both clearly. */
   therapistType: string;
@@ -122,6 +124,8 @@ export interface CatalogVendorTherapist {
   personName: string;
   gender: string | null;
   specialization: string | null;
+  /** Rich HTML (sky-rich-text-editor), already server-sanitized — render via
+   *  `dangerouslySetInnerHTML`, never as plain text (see therapist-detail.tsx). */
   bio: string | null;
   experienceYears: number | null;
   photoUrl: string | null;
@@ -301,8 +305,13 @@ export interface CatalogProduct {
   name: string;
   slug: string;
   brand: string | null;
+  /** Rich HTML (sky-rich-text-editor), already server-sanitized — render via
+   *  `dangerouslySetInnerHTML`, never as plain text (see product-detail.tsx). */
   description: string | null;
   summary: string | null;
+  /** Rich HTML, same as `description` — previously saved by vendors but never exposed/rendered
+   *  on the public page; now shown in its own accordion section. */
+  returnPolicy: string | null;
   image: string | null;
   imageAlt: string | null;
   price: string;
