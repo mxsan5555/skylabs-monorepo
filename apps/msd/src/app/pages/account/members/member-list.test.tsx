@@ -20,19 +20,8 @@ function table(): HTMLElement {
 }
 
 function renderList(members: Vendor[], onSelect = vi.fn()) {
-  render(
-    <MemberList
-      members={members}
-      onSelect={onSelect}
-      total={members.length}
-      page={1}
-      pageSize={10}
-      loading={false}
-      onParamsChange={vi.fn()}
-    />,
-  );
+  render(<MemberList members={members} onSelect={onSelect} total={members.length} page={1} pageSize={10} loading={false} onParamsChange={vi.fn()} />);
 }
-
 
 describe('formatCount', () => {
   it('reads "live of all" when only some items are live', () => {
@@ -62,27 +51,10 @@ describe('MemberList', () => {
     expect(row['Deal Count']).toBe('5 of 18');
   });
 
-  it('gives each status and documents state its own tonal colour', () => {
-    renderList([MEMBER]);
-    const columns = JSON.parse(table().getAttribute('columns') ?? '[]') as { key: string; statusStyle?: string; statusMap?: Record<string, string> }[];
-    const status = columns.find((c) => c.key === 'Status');
-    const documents = columns.find((c) => c.key === 'Documents');
-    expect(status?.statusStyle).toBe('tonal');
-    expect(status?.statusMap).toEqual({ Active: 'success', Inactive: 'neutral', Suspended: 'error', Archived: 'neutral' });
-    expect(documents?.statusMap).toEqual({ 'Documents complete': 'success', 'Documents incomplete': 'warning' });
-  });
-
-  it('groups every filter in one select: status, documents, review', () => {
-    renderList([]);
-    expect(table().getAttribute('filter-label')).toBe('Filter');
-    const options = JSON.parse(table().getAttribute('filter-options') ?? '[]') as { group: string; label: string }[];
-    expect(options.map((o) => `${o.group}: ${o.label}`)).toEqual([
-      'Status: Active',
-      'Status: Inactive',
-      'Status: Suspended',
-      'Documents: Documents incomplete',
-      'Review: Ready for suspension review',
-    ]);
+  it('maps Suspended to an error badge', () => {
+    renderList([{ ...MEMBER, status: 'SUSPENDED' } as Vendor]);
+    const columns = JSON.parse(table().getAttribute('columns') ?? '[]') as { key: string; statusMap?: Record<string, string> }[];
+    expect(columns.find((c) => c.key === 'Status')?.statusMap?.Suspended).toBe('error');
   });
 
   it('opens a member from the row action', () => {

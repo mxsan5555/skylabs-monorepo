@@ -1,7 +1,6 @@
 import './config/env';
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { env } from './config/env';
 import { passport, configurePassport } from './lib/passport';
@@ -12,7 +11,6 @@ import rbacRoutes from './routes/rbac.routes';
 import customersRoutes from './routes/customers.routes';
 import vendorsRoutes from './routes/vendors.routes';
 import membersRoutes from './routes/members.routes';
-import internalJobsRoutes from './routes/internal-jobs.routes';
 import vendorPublicRoutes from './routes/vendor-public.routes';
 import categoriesRoutes from './routes/categories.routes';
 import blogPostsRoutes from './routes/blog-posts.routes';
@@ -47,20 +45,13 @@ import supportRoutes from './routes/support.routes';
  */
 export function createApp(): express.Express {
   const app = express();
-  app.set('trust proxy', env.trustProxyHops);
 
-  // Swagger UI needs inline scripts, so it is mounted before helmet's Content-Security-Policy.
-  if (env.apiDocsEnabled) {
-    app.use('/docs', swaggerUi.serve, swaggerUi.setup(buildOpenApiDocument()));
-  }
-  app.use(helmet());
   app.use(cors({ origin: env.corsOrigin, credentials: true }));
   // `verify` captures the exact raw bytes onto req.rawBody — payment.routes.ts's webhook needs
   // these (not a re-serialized JSON.stringify of the parsed body) to match Razorpay's HMAC
   // signature, which is computed over the literal request body it sent.
   app.use(
     express.json({
-      limit: '100kb',
       verify: (req, _res, buf) => {
         (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
       },
@@ -70,6 +61,7 @@ export function createApp(): express.Express {
   configurePassport();
   app.use(passport.initialize());
 
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(buildOpenApiDocument()));
   // Uploaded media (Deal/Product/Therapist/Vendor/Category/CMS images+video) lives in
   // Cloudflare R2 and is served directly from R2's public URL — the API no longer serves the
   // bytes. The DB stores the relative `storageKey`; the frontend prefixes `VITE_MEDIA_BASE_URL`
@@ -90,7 +82,6 @@ export function createApp(): express.Express {
   // (no `authenticate`) is matched first — same "public-first" ordering discipline as
   // `catalogRoutes` below, just sharing the `/vendors` prefix instead of its own.
   api.use('/members', membersRoutes);
-  api.use('/internal/jobs', internalJobsRoutes);
   api.use('/vendors/public', vendorPublicRoutes);
   api.use('/vendors', vendorsRoutes);
   api.use('/categories', categoriesRoutes);

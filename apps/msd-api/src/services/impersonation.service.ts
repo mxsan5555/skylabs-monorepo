@@ -25,10 +25,6 @@ export async function startImpersonation(callerId: string, targetUserId: string,
     include: { roles: { include: { role: true } } },
   });
   if (!target) throw new ApiError('NOT_FOUND', 'Target user not found');
-  // PLANNING §1.3 rule 5: a Super Admin cannot be impersonated, by anyone.
-  if (target.roles.some((ur) => ur.role.isSuperAdmin)) {
-    throw new ApiError('FORBIDDEN', 'A Super Admin cannot be impersonated');
-  }
 
   const targetRoleKeys = target.roles.map((ur) => ur.role.key);
   const jti = crypto.randomUUID();

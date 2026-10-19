@@ -5,17 +5,6 @@ import { Prisma } from '../generated/prisma-client';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function errorHandler(err: unknown, req: Request, res: Response, next: NextFunction): void {
-  // body-parser: oversize body (limit in app.ts) and malformed JSON are client errors, not 500s.
-  const bodyErrorType = (err as { type?: string } | null)?.type;
-  if (bodyErrorType === 'entity.too.large') {
-    sendError(res, 'PAYLOAD_TOO_LARGE', 'Request body is too large.');
-    return;
-  }
-  if (bodyErrorType === 'entity.parse.failed') {
-    sendError(res, 'BAD_REQUEST', 'Request body is not valid JSON.');
-    return;
-  }
-
   if (err instanceof ApiError) {
     sendError(res, err.code, err.message, err.details);
     return;

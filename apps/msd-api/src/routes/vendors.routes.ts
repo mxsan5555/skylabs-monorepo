@@ -4,7 +4,7 @@ import type { Request } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { buildMemberAdminRoutes } from './member-admin.routes';
 import { requireAnyPermission, requirePermission } from '../middleware/requirePermission';
-import { uuidParam, validateBody, validateParams, validateQuery } from '../middleware/validate';
+import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
   VendorSelfUpdateSchema,
@@ -43,9 +43,6 @@ import { writeAuditLog } from '../services/audit.service';
 import { sendData, ApiError } from '../lib/http';
 
 const router = Router();
-for (const name of ['id', 'vendorId', 'branchId', 'dealId', 'therapistId', 'productId', 'packageId', 'imageId']) {
-  router.param(name, uuidParam);
-}
 router.use(authenticate);
 
 function requestMeta(req: Request) {
@@ -432,11 +429,8 @@ router.get('/me/branches/:branchId/category-access', requirePermission('members'
 router.get('/me/customers', requirePermission('members', 'custom'), validateQuery(PaginationQuerySchema), async (req, res, next) => {
   try {
     const { page, pageSize } = req.validatedQuery as ReturnType<typeof PaginationQuerySchema.parse>;
-    // A member who has not set up a business yet sees an empty Customers list, not an error.
-    const vendor = await vendorService.getVendorByOwnerUserId(req.user!.sub);
-    const { items, total } = vendor
-      ? await vendorService.listMyCustomers(vendor.id, { page, pageSize })
-      : { items: [], total: 0 };
+    const vendor = await vendorService.getMyVendorOrThrow(req.user!.sub);
+    const { items, total } = await vendorService.listMyCustomers(vendor.id, { page, pageSize });
     sendData(res, items, { meta: { total, page, pageSize } });
   } catch (err) {
     next(err);

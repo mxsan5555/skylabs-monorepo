@@ -1,16 +1,5 @@
 export type DocumentTypeKey = 'GST' | 'PAN' | 'AADHAAR';
 
-/** Names members read in messages and activity. */
-export const DOCUMENT_TYPE_LABEL: Record<DocumentTypeKey, string> = {
-  AADHAAR: 'Aadhaar card',
-  PAN: 'PAN card',
-  GST: 'GST number',
-};
-
-export function documentTypeList(types: readonly DocumentTypeKey[]): string {
-  return types.map((type) => DOCUMENT_TYPE_LABEL[type]).join(', ');
-}
-
 const PAN_RE = /^[A-Z]{5}\d{4}[A-Z]$/;
 const GST_RE = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[A-Z\d]$/;
 const AADHAAR_RE = /^[2-9]\d{11}$/;

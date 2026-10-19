@@ -24,7 +24,7 @@ vi.mock('../../../../api/rbac/vendors', async () => {
 const GST_FILE = {
   id: 'doc-1',
   documentType: 'GST' as const,
-  fileUrl: 'https://signed.example/kyc/vendor-1/gst.pdf',
+  storageKey: 'kyc/vendor-1/gst.pdf',
   originalFilename: 'gst.pdf',
   mimeType: 'application/pdf',
   sizeBytes: 1024,

@@ -34,9 +34,3 @@ export function formatRelativeTime(iso: string): string {
   const diffDays = Math.round(diffHours / 24);
   return `${diffDays} ${pluralize(diffDays, 'day')} ago`;
 }
-
-/** Fills `{key}` placeholders in content.json copy ("Add {title} to cart"). Unknown keys stay as
- *  written, so a missing value is visible instead of silently blank. */
-export function fillTemplate(template: string, values: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (match, key: string) => values[key] ?? match);
-}

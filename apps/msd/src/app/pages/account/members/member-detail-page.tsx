@@ -2,7 +2,7 @@ import { createElement, useCallback, useEffect, useId, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import '@skylabs-monorepo/shared-ui';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { getMember, changeMemberStatus, deleteMember, sendMemberReminder } from '../../../../api/rbac/members';
+import { getMember, changeMemberStatus, deleteMember } from '../../../../api/rbac/members';
 import { updateVendor, type Vendor } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { useSetBreadcrumbs } from '../../../admin/breadcrumb-context';
@@ -15,18 +15,7 @@ import { VendorProfileForm, extractVendorFieldErrors, type VendorFieldErrors } f
 import { MemberHeaderActions } from './member-header-actions';
 import { MemberDocumentsTab } from './member-documents-tab';
 import { MemberActivityTab } from './member-activity-tab';
-import {
-  MEMBER_STATUS_LABEL,
-  MEMBER_STATUS_TONE,
-  REVIEW_FLAG_LABEL,
-  REVIEW_FLAG_REASON,
-  REVIEW_FLAG_TONE,
-  canBeReminded,
-  documentsChipLabel,
-  documentsChipTone,
-  dueDateLabel,
-  reminderOutcome,
-} from './member-status';
+import { MEMBER_STATUS_LABEL, documentsChipLabel, dueDateLabel, statusBadgeVariant } from './member-status';
 
 const TABS = [
   { value: 'profile', label: 'Profile' },
@@ -41,6 +30,8 @@ type Tab = (typeof TABS)[number]['value'];
 
 /** Tabs whose content renders its own `<h2>`; the page adds one for the rest. */
 const OWN_HEADING: ReadonlySet<Tab> = new Set(['branches', 'deals', 'therapists', 'products']);
+
+const REVIEW_REASON = 'Documents not completed';
 
 const STATUS_DONE: Record<'ACTIVE' | 'INACTIVE' | 'SUSPENDED', string> = {
   ACTIVE: 'Member is active again.',
@@ -133,17 +124,6 @@ export function MemberDetailPage() {
     await refreshed(STATUS_DONE[status]);
   };
 
-  // Never throws: the outcome, or the server's reason it could not go (cooldown, no contact), is a snackbar.
-  const onRemind = async () => {
-    try {
-      const { data } = await sendMemberReminder(token, member.id);
-      showSnackbar(reminderOutcome(data), { variant: data.sentAt ? 'success' : 'error' });
-      setActivityKey((k) => k + 1);
-    } catch (err) {
-      showSnackbar(err instanceof ApiRequestError ? err.message : 'The reminder did not go out. Try again.', { variant: 'error' });
-    }
-  };
-
   const onDelete = async (reason: string) => {
     const { data } = await deleteMember(token, member.id, reason);
     showSnackbar(data.outcome === 'ARCHIVED' ? 'Member archived. We kept their records.' : 'Member deleted.');
@@ -180,13 +160,13 @@ export function MemberDetailPage() {
         <div>
           <h1>{name}</h1>
           <p>
-            <sky-badge status={MEMBER_STATUS_TONE[member.status]}>{MEMBER_STATUS_LABEL[member.status]}</sky-badge>{' '}
-            <sky-badge status={documentsChipTone(summary)}>{documentsChipLabel(summary)}</sky-badge>
+            <sky-badge variant={statusBadgeVariant(member.status)}>{MEMBER_STATUS_LABEL[member.status]}</sky-badge>{' '}
+            <sky-badge variant={summary?.complete ? 'primary' : 'tertiary'}>{documentsChipLabel(summary)}</sky-badge>
             {due && <span className="field-hint"> {due}</span>}
           </p>
           {reviewFlagged && member.status !== 'SUSPENDED' && (
             <p>
-              <sky-badge status={REVIEW_FLAG_TONE}>{REVIEW_FLAG_LABEL}</sky-badge>
+              <sky-badge variant="error">Ready for suspension review</sky-badge>
             </p>
           )}
         </div>
@@ -194,10 +174,9 @@ export function MemberDetailPage() {
           status={member.status}
           canStatusChange={canStatusChange}
           canDelete={canDelete}
-          reasonPrefill={reviewFlagged ? REVIEW_FLAG_REASON : ''}
+          reasonPrefill={reviewFlagged ? REVIEW_REASON : ''}
           onChangeStatus={onChangeStatus}
           onDelete={onDelete}
-          {...(canStatusChange && canBeReminded(member.status, summary) ? { onRemind } : {})}
         />
       </header>
 

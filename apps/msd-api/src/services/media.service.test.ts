@@ -6,7 +6,7 @@ vi.mock('../lib/prisma', async () => {
 });
 
 vi.mock('../lib/media-storage', () => ({
-  writeMediaFile: vi.fn(async (_folder: string, buffer: Buffer) => ({
+  writeMediaFile: vi.fn(async (_subdir: string, _parentId: string, buffer: Buffer) => ({
     storageKey: 'deals/deal-1/fake.jpg',
     sizeBytes: buffer.length,
   })),
@@ -33,38 +33,6 @@ function jpegBuffer(size = 50 * 1024): Buffer {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Every deal, therapist and product belongs to member m1 (the upload folder owner).
-  prismaMock.deal.findUnique.mockResolvedValue({ vendorId: 'm1' } as never);
-  prismaMock.therapist.findUnique.mockResolvedValue({ vendorId: 'm1' } as never);
-  prismaMock.product.findUnique.mockResolvedValue({ vendorId: 'm1' } as never);
-});
-
-describe('media.service upload folders (lib/storage-layout.ts)', () => {
-  it("writes a deal image into its member's folder", async () => {
-    prismaMock.dealImage.count.mockResolvedValue(0);
-    prismaMock.dealImage.create.mockResolvedValue({ id: 'img-1' });
-    await mediaService.addImage('deal', 'deal-1', { buffer: jpegBuffer(), originalname: 'a.jpg' });
-    expect(writeMediaFileMock).toHaveBeenCalledWith('members/m1/deals/deal-1', expect.any(Buffer), '.jpg');
-  });
-
-  it('writes a promotion image into cta-banners and a category image into masters', async () => {
-    prismaMock.promotionImage.count.mockResolvedValue(0);
-    prismaMock.promotionImage.create.mockResolvedValue({ id: 'img-1' });
-    await mediaService.addImage('promotion', 'promo-1', { buffer: jpegBuffer(), originalname: 'a.jpg' });
-    expect(writeMediaFileMock).toHaveBeenCalledWith('cta-banners/promo-1', expect.any(Buffer), '.jpg');
-
-    prismaMock.categoryImage.count.mockResolvedValue(0);
-    prismaMock.categoryImage.create.mockResolvedValue({ id: 'img-2' });
-    await mediaService.addImage('category', 'cat-1', { buffer: jpegBuffer(), originalname: 'a.jpg' });
-    expect(writeMediaFileMock).toHaveBeenCalledWith('masters/categories/cat-1', expect.any(Buffer), '.jpg');
-  });
-
-  it('refuses an upload for a deal that does not exist', async () => {
-    prismaMock.dealImage.count.mockResolvedValue(0);
-    prismaMock.deal.findUnique.mockResolvedValue(null);
-    await expect(mediaService.addImage('deal', 'missing', { buffer: jpegBuffer(), originalname: 'a.jpg' })).rejects.toMatchObject({ code: 'NOT_FOUND' });
-    expect(writeMediaFileMock).not.toHaveBeenCalled();
-  });
 });
 
 describe('media.service.addImage', () => {

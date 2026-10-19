@@ -12,7 +12,7 @@ import {
 } from '../../../../api/rbac/vendors';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import { listMembers, type MemberListFilter } from '../../../../api/rbac/members';
-import { DOCUMENTS_FILTER, FILTERABLE_STATUSES, MemberList, REVIEW_FILTER, type MemberTableParams } from './member-list';
+import { MemberList, type MemberTableParams } from './member-list';
 import { VendorProfileForm, extractVendorFieldErrors, type VendorFieldErrors } from './vendor-profile-form';
 import { MEMBER_STATUS_LABEL } from './member-status';
 import { VendorBranches } from './vendor-branches';
@@ -31,14 +31,11 @@ export function MemberManagement() {
   return <p className="empty-state">You do not have access to Member Management.</p>;
 }
 
-const isFilterableStatus = (value: string): value is (typeof FILTERABLE_STATUSES)[number] =>
-  (FILTERABLE_STATUSES as readonly string[]).includes(value);
-
-/** Maps the table's Filter select value ('' = All) to the list query. */
+/** Maps the table's filter select value ('' = All) to the list query. */
 function filterToQuery(filter: string): Pick<MemberListFilter, 'status' | 'documents' | 'reviewFlag'> {
-  if (isFilterableStatus(filter)) return { status: filter };
-  if (filter === DOCUMENTS_FILTER) return { documents: 'incomplete' };
-  if (filter === REVIEW_FILTER) return { reviewFlag: 'true' };
+  if (filter === 'ACTIVE' || filter === 'INACTIVE' || filter === 'SUSPENDED') return { status: filter };
+  if (filter === 'documents') return { documents: 'incomplete' };
+  if (filter === 'review') return { reviewFlag: 'true' };
   return {};
 }
 

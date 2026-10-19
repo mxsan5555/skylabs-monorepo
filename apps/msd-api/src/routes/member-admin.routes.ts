@@ -19,7 +19,6 @@ import * as vendorService from '../services/vendor.service';
 import * as memberDocumentService from '../services/member-document.service';
 import * as memberStatusService from '../services/member-status.service';
 import * as memberActivityService from '../services/member-activity.service';
-import * as memberReminderService from '../services/member-reminder.service';
 import { writeAuditLog } from '../services/audit.service';
 import { sendData, ApiError } from '../lib/http';
 import type { VendorDocumentType } from '../generated/prisma-client';
@@ -161,21 +160,6 @@ export function buildMemberAdminRoutes(opts: { deprecated: boolean }): Router {
       next(err);
     }
   });
-
-  // "Remind now". The service enforces the cooldown and writes the audit row.
-  router.post(
-    '/:id/documents/reminders',
-    mark,
-    requirePermission('members', 'status_change'),
-    validateParams(UuidParamSchema),
-    async (req, res, next) => {
-      try {
-        sendData(res, await memberReminderService.sendManualReminder(req.params.id, { userId: req.user!.sub, ...meta(req) }), { status: 201 });
-      } catch (err) {
-        next(err);
-      }
-    },
-  );
 
   router.get('/:id/activity', mark, requirePermission('members', 'view'), validateParams(UuidParamSchema), async (req, res, next) => {
     try {

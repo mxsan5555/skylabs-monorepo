@@ -10,14 +10,6 @@ export interface MemberNoticeTarget {
   phone?: string | null;
 }
 
-/** Prisma select for the member owner fields a notice needs. */
-export const NOTICE_OWNER_SELECT = { select: { name: true, email: true, phone: true } } as const;
-
-/** Member notices go to the owner's own login email and phone. */
-export function noticeTargetOf(owner: MemberNoticeTarget | null | undefined): MemberNoticeTarget {
-  return { name: owner?.name, email: owner?.email, phone: owner?.phone };
-}
-
 export interface MemberNoticeResult {
   /** null when the member has no email on record. */
   email: boolean | null;
@@ -31,14 +23,7 @@ function build(kind: MemberNoticeKind, target: MemberNoticeTarget, reason?: stri
   return { subject: 'Welcome to MSD', text: welcomeMessage(target.name) };
 }
 
-export type NoticeChannel = 'email' | 'sms';
-
-/** The channels a target can be reached on, in send order. */
-export function noticeChannels(target: MemberNoticeTarget): NoticeChannel[] {
-  return [...(target.email ? (['email'] as const) : []), ...(target.phone ? (['sms'] as const) : [])];
-}
-
-/** One inline retry. Documents reminders also retry across job runs (member-reminder.service.ts). */
+/** One inline retry. A durable retry queue arrives with the reminder job slice. */
 async function attempt(send: () => Promise<boolean>): Promise<boolean> {
   for (let i = 0; i < 2; i += 1) {
     try {
@@ -50,12 +35,6 @@ async function attempt(send: () => Promise<boolean>): Promise<boolean> {
   return false;
 }
 
-/** Sends one text on one channel. Never throws; false when the channel has no address or failed. */
-export function sendOnChannel(channel: NoticeChannel, target: MemberNoticeTarget, subject: string, text: string): Promise<boolean> {
-  if (channel === 'email') return target.email ? attempt(() => sendEmail(target.email as string, subject, text)) : Promise.resolve(false);
-  return target.phone ? attempt(() => sendTextSms(target.phone as string, text)) : Promise.resolve(false);
-}
-
 /** Never throws. The caller records the result; a failed send must not undo a status change. */
 export async function sendMemberNotice(
   kind: MemberNoticeKind,
@@ -63,7 +42,7 @@ export async function sendMemberNotice(
   reason?: string | null,
 ): Promise<MemberNoticeResult> {
   const { subject, text } = build(kind, target, reason);
-  const email = target.email ? await sendOnChannel('email', target, subject, text) : null;
-  const sms = target.phone ? await sendOnChannel('sms', target, subject, text) : null;
+  const email = target.email ? await attempt(() => sendEmail(target.email as string, subject, text)) : null;
+  const sms = target.phone ? await attempt(() => sendTextSms(target.phone as string, text)) : null;
   return { email, sms };
 }

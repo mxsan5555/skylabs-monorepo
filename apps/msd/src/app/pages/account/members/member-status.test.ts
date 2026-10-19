@@ -1,12 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   MEMBER_STATUS_LABEL,
-  MEMBER_STATUS_TONE,
+  statusBadgeVariant,
   documentsChipLabel,
-  documentsChipTone,
-  canBeReminded,
-  reminderOutcome,
-  ACTIVITY_DETAIL_LABEL,
   dueDateLabel,
   availableStatusActions,
 } from './member-status';
@@ -16,13 +12,9 @@ describe('member status helpers', () => {
     expect(MEMBER_STATUS_LABEL).toEqual({ ACTIVE: 'Active', INACTIVE: 'Inactive', SUSPENDED: 'Suspended', ARCHIVED: 'Archived' });
   });
 
-  it('gives each lifecycle state its own tone', () => {
-    expect(MEMBER_STATUS_TONE).toEqual({ ACTIVE: 'success', INACTIVE: 'neutral', SUSPENDED: 'error', ARCHIVED: 'neutral' });
-  });
-
-  it('documents chip tone', () => {
-    expect(documentsChipTone({ complete: true, missing: [], rejected: [], dueAt: null, overdue: false })).toBe('success');
-    expect(documentsChipTone(undefined)).toBe('warning');
+  it('colours Active primary and Suspended error', () => {
+    expect(statusBadgeVariant('ACTIVE')).toBe('primary');
+    expect(statusBadgeVariant('SUSPENDED')).toBe('error');
   });
 
   it('documents chip', () => {
@@ -46,29 +38,5 @@ describe('member status helpers', () => {
     expect(availableStatusActions('ARCHIVED', all)).toEqual([]);
     expect(availableStatusActions('SUSPENDED', { canStatusChange: true, canDelete: false })).toEqual(['reactivate']);
     expect(availableStatusActions('ACTIVE', { canStatusChange: false, canDelete: false })).toEqual([]);
-  });
-});
-
-describe('reminder helpers', () => {
-  const incomplete = { complete: false, missing: ['PAN' as const], rejected: [], dueAt: null, overdue: false };
-  const complete = { ...incomplete, complete: true, missing: [] };
-
-  it('allows Remind now only for active or inactive members with documents still needed', () => {
-    expect(canBeReminded('ACTIVE', incomplete)).toBe(true);
-    expect(canBeReminded('INACTIVE', incomplete)).toBe(true);
-    expect(canBeReminded('SUSPENDED', incomplete)).toBe(false);
-    expect(canBeReminded('ARCHIVED', incomplete)).toBe(false);
-    expect(canBeReminded('ACTIVE', complete)).toBe(false);
-  });
-
-  it('describes what reached the member', () => {
-    expect(reminderOutcome({ emailStatus: 'SENT', smsStatus: 'SENT', sentAt: 'x' })).toBe('Reminder sent by email and SMS.');
-    expect(reminderOutcome({ emailStatus: 'FAILED', smsStatus: 'SENT', sentAt: 'x' })).toBe('Reminder sent by SMS.');
-    expect(reminderOutcome({ emailStatus: null, smsStatus: 'FAILED', sentAt: null })).toMatch(/could not be delivered/);
-  });
-
-  it('labels reminder details as the documents asked for', () => {
-    expect(ACTIVITY_DETAIL_LABEL.reminder).toBe('Documents asked for');
-    expect(ACTIVITY_DETAIL_LABEL.status).toBe('Reason');
   });
 });

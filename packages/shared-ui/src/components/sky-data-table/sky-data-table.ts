@@ -9,10 +9,8 @@ import '@material/web/progress/linear-progress.js';
 import '@material/web/textfield/outlined-text-field.js';
 import '@material/web/select/outlined-select.js';
 import '@material/web/select/select-option.js';
-import '@material/web/divider/divider.js';
 // In-house — status chips use sky-badge
 import '../sky-badge/sky-badge.js';
-import type { SkyStatusTone } from '../sky-badge/sky-badge.js';
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -25,22 +23,10 @@ export interface SkyDataTableColumn {
   type?: 'text' | 'number' | 'date' | 'status' | 'image';
   /** Backwards compatibility for status columns */
   status?: boolean;
-  /** Maps status string → status tone. Used when type === 'status'. */
-  statusMap?: Record<string, SkyStatusTone>;
-  /**
-   * 'filled' (default) keeps the solid badge colours; 'tonal' renders `sky-badge status=<tone>`,
-   * a soft container chip with a distinct colour per tone.
-   */
-  statusStyle?: 'filled' | 'tonal';
+  /** Maps status string → badge variant. Used when type === 'status'. */
+  statusMap?: Record<string, 'success' | 'warning' | 'error' | 'info'>;
   /** Starts the column as hidden in the selector */
   hidden?: boolean;
-}
-
-/** One filter select option. Consecutive options sharing a `group` get a heading and a divider. */
-export interface SkyDataTableFilterOption {
-  label: string;
-  value: string;
-  group?: string;
 }
 
 export interface SkyDataTableAction {
@@ -83,7 +69,7 @@ export interface SkyDataTableParamsDetail {
  * @prop {boolean} searchable        — Renders the search text field in the toolbar.
  * @prop {string}  search-placeholder — Label / placeholder for the search field.
  * @prop {string}  filter-label      — Label for the filter select dropdown.
- * @prop {string}  filter-options    — JSON array of {label, value, group?} objects for the filter.
+ * @prop {string}  filter-options    — JSON array of {label, value} objects for the filter.
  * @prop {boolean} selectable        — Adds a checkbox column for row selection.
  * @prop {string}  actions           — JSON array of SkyDataTableAction.
  * @prop {boolean} exportable        — Shows the PDF export icon button in the toolbar.
@@ -168,17 +154,12 @@ export class SkyDataTable extends LitElement {
   private readonly _pageSizeOptions = [10, 25, 50, 100];
 
   /** Maps internal status variant → sky-badge variant prop. */
-  private readonly _statusVariant: Record<SkyStatusTone, 'primary' | 'secondary' | 'tertiary' | 'error'> = {
+  private readonly _statusVariant: Record<string, 'primary' | 'secondary' | 'tertiary' | 'error'> = {
     success: 'tertiary',
     warning: 'secondary',
     error:   'error',
     info:    'primary',
-    neutral: 'secondary',
   };
-
-  private _isTone(value: string): value is SkyStatusTone {
-    return value in this._statusVariant;
-  }
 
   constructor() {
     super();
@@ -221,7 +202,7 @@ export class SkyDataTable extends LitElement {
   private get _rowData(): Record<string, unknown>[] {
     try { return JSON.parse(this.rows) || []; } catch { return []; }
   }
-  private get _filterOpts(): SkyDataTableFilterOption[] {
+  private get _filterOpts(): { label: string; value: string }[] {
     try { return JSON.parse(this.filterOptions) || []; } catch { return []; }
   }
   private get _actionDefs(): SkyDataTableAction[] {
@@ -479,10 +460,9 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
   private _cellContent(value: unknown, col: SkyDataTableColumn) {
     if (col.status || col.type === 'status') {
       const str = String(value ?? '');
-      const tone = col.statusMap?.[str] ?? (this._isTone(str) ? str : 'info');
-      return col.statusStyle === 'tonal'
-        ? html`<sky-badge status=${tone} size="small">${str}</sky-badge>`
-        : html`<sky-badge variant=${this._statusVariant[tone]} size="small">${str}</sky-badge>`;
+      const statusVariant = col.statusMap?.[str] ?? (['success', 'warning', 'error', 'info'].includes(str) ? str : 'info');
+      const badgeVariant  = this._statusVariant[statusVariant] ?? 'primary';
+      return html`<sky-badge variant=${badgeVariant} size="small">${str}</sky-badge>`;
     }
     if (col.type === 'image') {
       const src = String(value ?? '');
@@ -588,16 +568,6 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
     }
     .filter-select {
       min-inline-size: 150px;
-    }
-    /* Visual group heading in the filter menu; md-select skips it in keyboard navigation. */
-    .filter-group {
-      padding-block: var(--md-menu-item-top-space, 12px) var(--md-menu-item-bottom-space, 4px);
-      padding-inline: var(--md-menu-item-leading-space, 16px);
-      color: var(--md-sys-color-on-surface-variant);
-      font-family: var(--md-sys-typescale-label-medium-font);
-      font-size: var(--md-sys-typescale-label-medium-size);
-      font-weight: var(--md-sys-typescale-label-medium-weight);
-      letter-spacing: var(--md-sys-typescale-label-medium-tracking);
     }
     .rpp-select {
       min-inline-size: 90px;
@@ -1083,11 +1053,7 @@ ${this.caption ? `<h2>${this.caption}</h2>` : ''}
                 <md-select-option value="" ?selected=${this._filter === ''}>
                   All
                 </md-select-option>
-                ${filterOpts.map((o, i) => html`
-                  ${o.group && o.group !== filterOpts[i - 1]?.group ? html`
-                    <md-divider role="separator"></md-divider>
-                    <div class="filter-group" aria-hidden="true">${o.group}</div>
-                  ` : nothing}
+                ${filterOpts.map(o => html`
                   <md-select-option value=${o.value} ?selected=${o.value === this._filter}>
                     ${o.label}
                   </md-select-option>

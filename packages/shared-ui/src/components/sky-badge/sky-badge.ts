@@ -13,21 +13,11 @@ import { srOnly } from '../shared-styles.js';
  * @example
  * <sky-badge>New</sky-badge>
  * <sky-badge variant="tertiary" size="large">12</sky-badge>
- * <sky-badge status="warning">Documents incomplete</sky-badge>
  */
-
-/**
- * Meaning of a status chip. Each maps to an M3 container role pair (tonal chip), so it follows
- * every app's palette and contrast variant: success = primary, warning = tertiary,
- * error = error, info = secondary, neutral = surface-container-highest.
- */
-export type SkyStatusTone = 'success' | 'warning' | 'error' | 'info' | 'neutral';
-
 export class SkyBadge extends LitElement {
   static override properties = {
     variant: { type: String, reflect: true },
     size: { type: String, reflect: true },
-    status: { type: String, reflect: true },
     label: { type: String },
   };
 
@@ -35,8 +25,6 @@ export class SkyBadge extends LitElement {
   declare variant: 'primary' | 'secondary' | 'tertiary' | 'error';
   /** Visual size: 'small' | 'medium' | 'large'. */
   declare size: 'small' | 'medium' | 'large';
-  /** Status meaning; when set it replaces `variant` with a tonal chip (see SkyStatusTone). */
-  declare status?: SkyStatusTone;
   /**
    * Accessible label for icon-only or numeric badges whose meaning is
    * colour-only (e.g. label="12 unread notifications"). When slotted text
@@ -84,27 +72,6 @@ export class SkyBadge extends LitElement {
     :host([variant='error']) {
       --_bg: var(--md-sys-color-error);
       --_fg: var(--md-sys-color-on-error);
-    }
-    /* Status chips: tonal container roles. Declared after the variants so status wins. */
-    :host([status='success']) {
-      --_bg: var(--md-sys-color-primary-container);
-      --_fg: var(--md-sys-color-on-primary-container);
-    }
-    :host([status='warning']) {
-      --_bg: var(--md-sys-color-tertiary-container);
-      --_fg: var(--md-sys-color-on-tertiary-container);
-    }
-    :host([status='error']) {
-      --_bg: var(--md-sys-color-error-container);
-      --_fg: var(--md-sys-color-on-error-container);
-    }
-    :host([status='info']) {
-      --_bg: var(--md-sys-color-secondary-container);
-      --_fg: var(--md-sys-color-on-secondary-container);
-    }
-    :host([status='neutral']) {
-      --_bg: var(--md-sys-color-surface-container-highest);
-      --_fg: var(--md-sys-color-on-surface-variant);
     }
     :host([size='small']) {
       --_size: 1.125rem;

@@ -9,6 +9,7 @@ import {
   type VendorDocumentType,
 } from '../../api/rbac/vendors';
 import { ApiRequestError } from '../../api/rbac/client';
+import { resolveMediaUrl } from '../../api/media';
 import './vendor-document-upload.css';
 
 const DOCUMENT_MAX_BYTES = 5 * 1024 * 1024;
@@ -178,7 +179,7 @@ export function VendorDocumentUpload({
           <div className="vendor-document-upload__actions">
             {document && (
               <OutlinedButton
-                href={document.fileUrl ?? undefined}
+                href={resolveMediaUrl(document.storageKey)}
                 target="_blank"
                 rel="noreferrer"
                 title="View document"

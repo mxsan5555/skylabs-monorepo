@@ -34,14 +34,13 @@ export interface MemberDocumentRow {
   uploadedByUserId: string | null;
   createdAt: string;
   updatedAt: string;
-  /** Present only for roles that may open files: a signed link that expires after 5 minutes. */
-  fileUrl?: string | null;
+  /** Present only for roles that may open files. */
+  storageKey?: string;
   originalFilename?: string | null;
 }
 
 export interface ActivityItem {
-  /** `detail` is the reason for status and document items, the documents asked for on reminders. */
-  kind: 'status' | 'document' | 'reminder' | 'review';
+  kind: 'status' | 'document';
   at: string;
   summary: string;
   detail: string | null;
@@ -74,21 +73,6 @@ export function changeMemberStatus(token: string | null, id: string, status: 'AC
 
 export function deleteMember(token: string | null, id: string, reason: string) {
   return apiDelete<{ outcome: 'DELETED' | 'ARCHIVED' }>(`/members/${id}`, token, { reason });
-}
-
-/** Per channel: SENT, FAILED, or null when the member has no email or phone on record. */
-export type ReminderDelivery = 'SENT' | 'FAILED' | null;
-
-export interface ReminderResult {
-  emailStatus: ReminderDelivery;
-  smsStatus: ReminderDelivery;
-  /** Set when at least one channel delivered. */
-  sentAt: string | null;
-}
-
-/** "Remind now". 429 inside the server's cooldown, 409 when the member cannot be reminded. */
-export function sendMemberReminder(token: string | null, id: string) {
-  return apiPost<ReminderResult>(`/members/${id}/documents/reminders`, token);
 }
 
 export function getMemberActivity(token: string | null, id: string) {

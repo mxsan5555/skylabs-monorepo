@@ -1,8 +1,15 @@
 import { useParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { useEffect, useState, useMemo, createElement } from 'react';
+import { useEffect, useState, useMemo, createElement, type ReactNode } from 'react';
 import { ProductCardGallery } from '../../components/product-card-gallery';
 import { showSnackbar } from '../../../snackbar/snackbar';
-import { Icon, FilledButton } from '@skylabs-monorepo/shared-ui/react';
+import {
+  Icon,
+  Tabs,
+  PrimaryTab,
+  OutlinedTextField,
+  FilledButton,
+  OutlinedButton,
+} from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { signInPathWithReturnTo } from '../../../auth/role-routing';
@@ -20,8 +27,9 @@ import {
   type CatalogTherapist,
 } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
+import { DealCard } from '../../components/deal-card';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
-import { useAddProductToCart } from '../../../hooks/use-add-product-to-cart';
+import { addCartItem } from '../../../api/cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { useHydrated } from '../../../hooks/use-hydrated';
 import { useMediaQuery } from '../../../hooks/use-media-query';
@@ -52,7 +60,6 @@ import { Seo } from '../../seo/seo';
 import { breadcrumbJsonLd } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
 import content from '../../../content.json';
-import { BannerSlot } from '../../components/banner-slot/banner-slot';
 
 const t = content.category;
 
@@ -116,7 +123,7 @@ export function Category() {
   const { slug = '', city: citySlugParam } = useParams<{ slug: string; city?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { token, isAuthenticated } = useAuth();
   // Rendering decisions wait for hydration so they match the prerendered (signed-out) HTML.
   const signedIn = useHydrated() && isAuthenticated;
   const {
@@ -230,17 +237,46 @@ export function Category() {
       { replace: true },
     );
   };
-  const addToCart = useAddProductToCart();
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
     navigate(signInPathWithReturnTo(location));
     return false;
   };
-  const addProductToCart = (product: CatalogProduct) => addToCart(product.id, product.name);
-  const toggleFavorite = (deal: CatalogDeal) => {
+  const addProductToCart = async (product: CatalogProduct) => {
+     console.log('ADD TO CART FUNCTION CALLED', product.name);
     if (!requireAuthOrRedirect()) return;
-    void toggleWishlist(deal.id);
+
+    try {
+      await addCartItem(token, {
+        productId: product.id,
+        quantity: 1,
+      });
+
+      showSnackbar(`Added "${product.name}" to your cart.`, {
+        variant: 'info',
+        actionLabel: 'View Cart',
+        onAction: () => navigate('/cart'),
+      });
+    } catch (err) {
+      const message =
+        err instanceof ApiRequestError
+          ? err.message
+          : content.category.errors.addToCart;
+
+      showSnackbar(message, { variant: 'error' });
+    }
   };
+const toggleFavorite = (deal: CatalogDeal) => {
+  console.log('Deal favorite clicked:', deal.id);
+
+  if (!requireAuthOrRedirect()) {
+    console.log('User is not authenticated');
+    return;
+  }
+
+  console.log('Calling toggleWishlist');
+  void toggleWishlist(deal.id);
+};  
   const toggleProductFavorite = async (productId: string) => {
     if (!requireAuthOrRedirect()) return;
 
@@ -655,7 +691,7 @@ export function Category() {
                     t.messages.addToCartSuccess.replace('{item}', label),
                     {
                       variant: 'info',
-                      actionLabel: content.cartToast.viewCart,
+                      actionLabel: 'View Cart',
                       onAction: () => navigate('/cart'),
                     },
                   );
@@ -714,7 +750,6 @@ export function Category() {
         />
         {pills}
       </PageSection>
-      <BannerSlot slot="CATEGORY_TOP" />
       <PageSection tone="tint" stack aria-label={`${category.name} ${t.dealsAriaLabelSuffix}`}>
         <ListingToolbar
           ariaLabel={t.toolbar.label}

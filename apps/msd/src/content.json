@@ -272,10 +272,7 @@
       "spotlightLabel": "Top deal right now",
       "searchLabel": "Search spas, treatments and locations",
       "spotlightWas": "Was",
-      "spotlightOff": "off",
-      "sliderLabel": "Featured deals and products near you",
-      "prevSlide": "Previous slide",
-      "nextSlide": "Next slide"
+      "spotlightOff": "off"
     },
     "sections": {
       "browseByCategory": {
@@ -336,7 +333,13 @@
       "default": "spa"
     },
     "categoryTileText": "{count} treatments",
-    "categoryTileTextOne": "1 treatment",
+    "memberBanner": {
+      "icon": "payments",
+      "heading": "Unlock member-only pricing",
+      "button": "Sign In",
+      "buttonLink": "/sign-in",
+      "body": "Sign in to save deals, track bookings and see exclusive rates."
+    },
     "searchByDestination": {
       "heading": "Popular treatments",
       "subheading": "Jump straight to the treatment you want.",
@@ -777,20 +780,6 @@
     "ingredients": "Ingredients",
     "shipping": "Shipping",
     "shippingText": "Ships within 3-5 business days."
-  },
-  "offerCard": {
-    "addToCart": "Add to cart",
-    "saveAria": "Save {title} to wishlist",
-    "actionsLabel": "{title} actions",
-    "distance": "{km} km",
-    "discount": "-{percent}%",
-    "serviceTag": "Service",
-    "productTag": "Product"
-  },
-  "cartToast": {
-    "added": "Added \"{item}\" to your cart.",
-    "error": "Could not add to cart. Try again.",
-    "viewCart": "View cart"
   },
   "cart": {
     "title": "My Cart",

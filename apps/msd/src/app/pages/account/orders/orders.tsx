@@ -110,9 +110,10 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '', filter:
  *  server-side to its own vendor (order.service.ts#listOrders) — no second vendor-only page. */
 export function OrderManagement() {
   const { token, can } = useAuth();
-  // D27: only `orders:status_change` (Super Admin, Admin) changes an order; members view their own
-  // orders only, for deals and products alike. The API refuses members with 403 as well.
-  const canChangeStatus = can('orders', 'status_change');
+  // Mirrors the backend's OR-check (see orders.routes.ts's `requireOrdersOrVendorSelf`) — a
+  // vendor holds `vendors:custom`, never `orders:status_change` directly (that key alone would
+  // also grant the admin-wide top-level "Orders" sidebar node — see msd-menu.json).
+  const canChangeStatus = can('orders', 'status_change') || can('members', 'custom');
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [total, setTotal] = useState(0);

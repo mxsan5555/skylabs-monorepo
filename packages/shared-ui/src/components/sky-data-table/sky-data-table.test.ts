@@ -102,54 +102,6 @@ describe('sky-data-table', () => {
       const chip = el.shadowRoot?.querySelector('sky-badge');
       expect(chip).toBeTruthy();
     });
-
-    it('keeps filled variants by default', async () => {
-      const el = createElement();
-      el.columns = COLS;
-      el.rows = ROWS;
-      await el.updateComplete;
-      const chip = el.shadowRoot?.querySelector('sky-badge');
-      expect(chip?.hasAttribute('status')).toBe(false);
-      expect(chip?.getAttribute('variant')).toBeTruthy();
-    });
-
-    it('renders tonal status tones when statusStyle is tonal', async () => {
-      const el = createElement();
-      el.columns = JSON.stringify([
-        { key: 'status', label: 'Status', type: 'status', statusStyle: 'tonal', statusMap: { active: 'success', inactive: 'neutral' } },
-      ]);
-      el.rows = JSON.stringify([{ status: 'active' }, { status: 'inactive' }]);
-      await el.updateComplete;
-      const tones = [...(el.shadowRoot?.querySelectorAll('sky-badge') ?? [])].map((b) => b.getAttribute('status'));
-      expect(tones).toEqual(['success', 'neutral']);
-    });
-  });
-
-  describe('grouped filter options', () => {
-    it('adds one heading and divider per group, none for ungrouped options', async () => {
-      const el = createElement();
-      el.columns = COLS;
-      el.rows = ROWS;
-      el.filterOptions = JSON.stringify([
-        { label: 'Active', value: 'a', group: 'Status' },
-        { label: 'Inactive', value: 'i', group: 'Status' },
-        { label: 'Overdue', value: 'o', group: 'Documents' },
-      ]);
-      await el.updateComplete;
-      const headings = [...(el.shadowRoot?.querySelectorAll('.filter-group') ?? [])];
-      expect(headings.map((h) => h.textContent?.trim())).toEqual(['Status', 'Documents']);
-      expect(headings.every((h) => h.getAttribute('aria-hidden') === 'true')).toBe(true);
-      expect(el.shadowRoot?.querySelectorAll('.filter-select md-divider').length).toBe(2);
-    });
-
-    it('renders plain options without headings', async () => {
-      const el = createElement();
-      el.columns = COLS;
-      el.rows = ROWS;
-      el.filterOptions = JSON.stringify([{ label: 'Active', value: 'a' }]);
-      await el.updateComplete;
-      expect(el.shadowRoot?.querySelector('.filter-group')).toBeNull();
-    });
   });
 
   describe('search', () => {

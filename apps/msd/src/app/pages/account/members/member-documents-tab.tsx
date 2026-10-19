@@ -10,7 +10,7 @@ import {
   type MemberDocumentStatus,
 } from '../../../../api/rbac/members';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import type { SkyStatusTone } from '@skylabs-monorepo/shared-ui';
+import type { BadgeVariant } from './member-status';
 
 const TYPES: { type: VendorDocumentType; label: string; numberLabel: string }[] = [
   { type: 'AADHAAR', label: 'Aadhaar card', numberLabel: 'Aadhaar number' },
@@ -28,12 +28,12 @@ const STATUS_LABEL: Record<DocumentState, string> = {
   EXPIRED: 'Expired',
 };
 
-const STATUS_TONE: Record<DocumentState, SkyStatusTone> = {
-  MISSING: 'neutral',
-  SUBMITTED: 'info',
-  APPROVED: 'success',
+const STATUS_VARIANT: Record<DocumentState, BadgeVariant> = {
+  MISSING: 'tertiary',
+  SUBMITTED: 'secondary',
+  APPROVED: 'primary',
   REJECTED: 'error',
-  EXPIRED: 'warning',
+  EXPIRED: 'error',
 };
 
 // These limits mirror the review schema in msd-api.
@@ -165,7 +165,7 @@ export function MemberDocumentsTab({ token, memberId, canEdit, canApprove, canRe
             <li key={type} className="document-row">
               <div className="document-row__info">
                 <h3>{label}</h3>
-                <sky-badge status={STATUS_TONE[state]}>{STATUS_LABEL[state]}</sky-badge>
+                <sky-badge variant={STATUS_VARIANT[state]}>{STATUS_LABEL[state]}</sky-badge>
                 {row?.numberMasked && <p>{row.numberMasked}</p>}
                 {row?.uploadedOnBehalf && <p className="field-hint">Uploaded by staff for the member</p>}
                 {row?.status === 'REJECTED' && row.rejectionReason && <p className="error-state">Rejected: {row.rejectionReason}</p>}

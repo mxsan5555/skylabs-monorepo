@@ -2,14 +2,9 @@
 
 Guidance for Claude Code when working in this repository.
 
-> Docs: start at **`docs/README.md`**. Each app has the same eight files in `docs/<app>/`
-> (`README`, `PLANNING`, `ARCHITECTURE`, `DATABASE`, `API`, `TASKS`, `TESTING`, `DEPLOYMENT`), with
-> the same module sections in each. Read the app's `README.md` and `PLANNING.md` at the start of a
-> session; tick `TASKS.md` and update the module's sections in `PLANNING`/`DATABASE`/`API`/`TESTING`
-> in the same commit as the work. Never add a new Markdown file: write designs into the module's
-> section of `PLANNING.md`. For every feature, change or bug fix, follow the step-by-step workflow in
-> `docs/README.md` ("How to work on a feature"): rules in `PLANNING.md` first, stop for review before
-> any schema or API change, test cases in `TESTING.md` before code, tick `TASKS.md` last.
+> Companion docs: **`PLANNING.md`** (scope, stack, conventions), **`ARCHITECTURE.md`**
+> (detailed layout + where things go), **`TASK.md`** (what's done / in progress / backlog).
+> Read `PLANNING.md` at the start of a session; update `TASK.md` as work completes.
 
 ## Repo State
 
@@ -19,7 +14,7 @@ shared packages.
 - **`apps/msd`** — React 19 + Vite, port **4200**. Business: **massage deals** (public storefront + the full RBAC admin console under `/account/*`). Theme: green (`#007C2B`).
 - **`apps/mera-driver`** — Angular 21 (standalone) + Tailwind, port **4400**. Business: **driver booking** (same public + admin-console split as msd). Theme: blue (`#1175BC`).
 - **`apps/msd-api`** — Express + TypeScript + Prisma + PostgreSQL (db `msd`), port **3333**, all routes under `/api/v1`. MSD's own RBAC + business modules: Customers, Members (+ KYC documents, branches, therapists), Products, Deals, Orders, Cart, Wishlist, Payments (Razorpay), Reports, Notifications, CMS (blog, FAQs, pages, site content) and the public storefront catalog are real; only **Inventory** is still a permission-gated stub.
-- **`apps/mera-driver-api`** — Express + TypeScript + Prisma + PostgreSQL (db `mera_driver`), port **3334**, routes mounted at root (no `/api/v1` prefix). MeraDriver's own RBAC + business modules: Drivers, Vehicles, Bookings, Trip types, Attendance, Customers and master data are real; **Payments** and **Reports** are still permission-gated stubs (see `docs/mera-driver/ARCHITECTURE.md`).
+- **`apps/mera-driver-api`** — Express + TypeScript + Prisma + PostgreSQL (db `mera_driver`), port **3334**, routes mounted at root (no `/api/v1` prefix). MeraDriver's own RBAC + business modules: Drivers, Vehicles, Bookings, Trip types, Attendance, Customers and master data are real; **Payments** and **Reports** are still permission-gated stubs (see `docs/MERA_DRIVER_ARCHITECTURE.md` §20).
 - **`packages/shared-ui`** (`@skylabs-monorepo/shared-ui`) — Material 3 web components (Material Web + LIT), theme, React wrappers, test helpers. Presentational only and **app-neutral**: mera-driver consumes it with a different design and purpose, so only common components live here. App layout pieces (page bands, grids, filter panels) live in each app.
 - **`packages/shared-types`** — cross-app RBAC domain types (`Role`, `Permission`, `MenuNode`, `BootstrapResponse`, `ApiEnvelope<T>`, …). Types only, no runtime code, no business data.
 - **`packages/shared-permissions`** — pure functions `can()`, `filterMenuByPermissions()`, `permissionKeyFor()`.
@@ -31,7 +26,7 @@ The two apps are **different businesses** with **fully independent** backends �
 own routes/controllers/services/Prisma schema/database/env per API, never a
 shared table or shared identity DB. RBAC is duplicated **by pattern** (same
 Prisma schema template, same `shared-auth`/`shared-permissions` packages),
-never by shared data. See `docs/ARCHITECTURE.md`.
+never by shared data. See `ARCHITECTURE.md`.
 
 ## Commands
 
@@ -75,7 +70,7 @@ If pages render unstyled or an import 500s in dev, it's almost always a **stale
 - **Angular (mera-driver)** uses raw `<md-*>` tags; any component using them needs `schemas: [CUSTOM_ELEMENTS_SCHEMA]`.
 - Custom in-house components live in `packages/shared-ui/src/components/` (e.g. `sky-badge`, `sky-card`), written in LIT **without decorators** for cross-framework source compatibility.
 - **Card components** (compose M3 web components inside, themed by `--md-sys-color-*`, primitive props → same usage in React/Angular):
-  - `sky-product-card` — listing card (image, badge, favorite, rating **stars** via `rating`+`reviews` _or_ a **score badge** via `score`+`score-label`, price/discount, optional `description`); `variant="outlined"` for the bordered look; `price-first` for the offer order (price + one-star rating row, heading, description, eyebrow, location + distance row, slotted actions spanning the card; showcase "Offer card"); `badge-color` (`primary|secondary|tertiary|error`) + `badge-tone="tonal"` draw the badge as a theme-role `sky-badge`; `color` (same `m3-surface` vocabulary as the feature card) colours the body, text, accents and slotted buttons (shared `actionRoles`); `layout="horizontal"` for list rows (media left, content right; stacks under 600px of its own width via a container query).
+  - `sky-product-card` — listing card (image, badge, favorite, rating **stars** via `rating`+`reviews` _or_ a **score badge** via `score`+`score-label`, price/discount); `variant="outlined"` for the bordered look; `layout="horizontal"` for list rows (media left, content right; stacks under 600px of its own width via a container query).
   - `sky-image-card` — full-bleed image with overlay `label` (+ optional `href`, `ratio`).
   - `sky-category-card` — rounded image + `heading`/`subheading` (+ optional `href`).
   - `sky-info-card` — surface card with an illustration (`media` slot) or `icon` + `heading`/`subheading`.
@@ -83,7 +78,7 @@ If pages render unstyled or an import 500s in dev, it's almost always a **stale
 - **M3 surface components** (`sky-image`, `sky-tile-card`, `sky-feature-card`, `sky-cta-banner`) share one option vocabulary from `components/m3-surface.ts`, every value mapped to an M3 token (no brand values in the components): `color` = `none|surface|surface-high|primary|secondary|tertiary|inverse` (container + on-container + accent roles), `variant` = `filled|outlined|elevated`, `shape` = M3 corner scale `none…extra-large|full`, `icon` + `icon-style` (`filled|tonal|surface|plain`) + `icon-shape`. Linked surfaces use `md-ripple` + `md-focus-ring` (M3 state layer).
   - `sky-image` — framed image/logo (`fit="contain"`, `ratio`) with a placeholder icon when `src` is missing or fails; `href` makes it one link.
   - `sky-tile-card` — icon + headline + text tile (category grids); `href` = whole-tile link.
-  - `sky-feature-card` — icon + headline + text + CTA (`cta-label`/`cta-href`/`cta-icon`, accent-tinted `md-filled-button`) or an `actions` slot (its buttons take the card's accent role too); `layout="horizontal"` for a strip; optional `image`/`image-alt` (leading media, decorative without alt, placeholder if it fails to load) and `cta-color` (`primary|secondary|tertiary|inverse` button role).
+  - `sky-feature-card` — icon + headline + text + CTA (`cta-label`/`cta-href`/`cta-icon`, accent-tinted `md-filled-button`) or an `actions` slot; `layout="horizontal"` for a strip.
   - `sky-cta-banner` — `sky-feature-card` preset to horizontal (stacks under 600px of its own width).
   - All four are raw tags in both apps (typed in `apps/msd/src/types/sky-elements.d.ts`). msd's `useShadowLinkNavigation` (in `AppRoutes`) routes same-origin shadow-DOM `href` clicks through React Router, so these links don't reload the page.
 - **Action field** (`sky-action-field`): M3 text field with an attached action button, for any "type, then act" UI (site search, newsletter, coupon, pincode). Options: `icon` (leading), `action-label` → `md-filled-button` / `action-icon` alone → `md-filled-icon-button`, `variant="filled|outlined"`, `shape` (default `full`), `dense` (48dp), plus native `type`/`name`/`autocomplete`/`enterkeyhint`/`required`/`disabled`. Fires `sky-submit` `{ value }` (trimmed); in React 19 bind it with the `onsky-submit` prop. Put `role="search"` on the host for a search landmark. Used by the msd header and home hero.
@@ -115,7 +110,7 @@ Public pages (home, category, explore, ...) are **composition only**: shared-ui 
 msd building blocks below. No page-specific CSS files with hardcoded colours, sizes or copy;
 copy lives in `apps/msd/src/content.json`. Page-level CSS that still exists (`home.css` for
 hero/steps/offers, `category.css` for `/categories`, therapists, orders, invoices, payments) is
-legacy and is being migrated (task ST-21 in `docs/msd/TASKS.md`).
+legacy and is being migrated (see `TASK.md`).
 
 **Colour split (60/30/10, M3 roles only):** 60 = `surface` (page base); 30 = `surface-container`
 bands (`PageSection tone="tint"`) + `secondary-container` fills (category tiles, step markers,
@@ -140,7 +135,6 @@ No hex values in app code; brand colour comes from each app's generated M3 theme
 | `CheckboxFacet` / `PriceRangeField` | Searchable checkbox list with counts / range slider + Min/Max fields. |
 | `CityPickerDialog` | City picker (used by the header `CityChip` and the filter panel). |
 | `DealMap` | Deal price markers on a map (see Maps below). |
-| `OfferCard` | Deal or product as `sky-product-card price-first` (tag, price, two-line title and description, member, place, distance, Add to cart, wishlist; whole card opens the detail page). Options: `tag`, `color`, `variant`, `layout`. Used by the home hero (`color="surface-high" variant="plain"`). |
 
 Hooks: `usePagedList` (page-by-page lists keyed by the filter set, seeded from prerender),
 `useMediaQuery(query, fallback)`, `useVisitorLocation()` (the one visitor location: city +
@@ -315,8 +309,7 @@ stores uploaded media on **Cloudflare R2** (Railway's disk is wiped on redeploy)
 `release → main`, **back-merge into `develop`** (`git checkout develop && git pull
 && git pull origin main --no-edit && git push`) so the release's version bump +
 changelog don't leave `develop` behind. Full detail (Vercel `vercel.json` per app,
-dashboard settings, domains, env vars, back-merge): see **`docs/DEPLOYMENT.md`** and each app's
-`docs/<app>/DEPLOYMENT.md`.
+dashboard settings, domains, env vars, back-merge): see **`DEPLOYMENT.md`**.
 
 ## AI Dev Team
 
@@ -388,8 +381,12 @@ msd map vars: `VITE_MAP_PROVIDER` (`leaflet` default or `google`), optional `VIT
   `git stash`, `git reset`, `git checkout -- <file>`, `git restore`, `git clean`, `git apply`,
   `git worktree`, or delete directories to "compare with an old version". Read old files with
   `git show <rev>:<path> > <temp file>` instead. Stage only the files a task names.
-- Known pre-existing test failures: listed once in `docs/msd/TESTING.md` §3 (msd, msd-api,
-  shared-menu) and `docs/mera-driver/TESTING.md` §3 (12 specs). They must not grow.
+- Known pre-existing test failures (not caused by storefront work): msd 26 tests in 15 files
+  (`permission-matrix` 9, `india-locations` 3, `home` 2, `contact-us` 2, 1 each in `app.spec`,
+  `widget-registry`, `deal-card`, `media-uploader`, `sky-product-card-wc`, `site-footer`,
+  `become-vendor`, `wishlist`, `roles`, `settings`, plus `entry-server.test.tsx` failing to load);
+  msd-api 5 (`rbac.routes` 4, `orders.routes` image 1); shared-menu `index.test.ts` 5;
+  mera-driver RBAC route / users "Login As" / drivers specs (12). Tracked in `TASK.md`.
 
 - `nx.json` `defaultBase` is `"main"` (matches the active branch) — `nx affected`
-  in CI and `nx-ignore` on Vercel both compare against it. See `docs/DEPLOYMENT.md`.
+  in CI and `nx-ignore` on Vercel both compare against it. See `DEPLOYMENT.md`.

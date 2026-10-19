@@ -1,7 +1,5 @@
 import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
-import { permissionKeyFor } from '@skylabs-monorepo/shared-permissions';
-import type { PermissionAction } from '@skylabs-monorepo/shared-types';
 import { Prisma, type NotificationType } from '../generated/prisma-client';
 
 /**
@@ -53,34 +51,6 @@ export async function notifySuperAdmins(tx: Prisma.TransactionClient, input: Not
   for (const admin of superAdmins) {
     await createNotificationRow(tx, admin.id, 'SUPERADMIN', input);
   }
-}
-
-/**
- * One row per active staff user whose roles grant `menuKey:action` (or an `isSuperAdmin` role,
- * which holds every permission). Recipients follow the permission matrix, never a role name.
- */
-export async function notifyPermissionHolders(
-  tx: Prisma.TransactionClient,
-  permission: { menuKey: string; action: PermissionAction },
-  input: NotificationInput,
-) {
-  const key = permissionKeyFor(permission.menuKey, permission.action);
-  const users = await tx.user.findMany({
-    where: {
-      status: 'active',
-      deletedAt: null,
-      roles: {
-        some: {
-          role: { isActive: true, OR: [{ isSuperAdmin: true }, { permissions: { some: { permission: { key } } } }] },
-        },
-      },
-    },
-    select: { id: true },
-  });
-  for (const user of users) {
-    await createNotificationRow(tx, user.id, 'SUPERADMIN', input);
-  }
-  return users.length;
 }
 
 /** No-ops (does not throw) when the vendor has no `ownerUserId` yet (an admin-created, not-yet-

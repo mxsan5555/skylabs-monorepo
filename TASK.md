@@ -1,0 +1,251 @@
+# TASK
+
+Task tracking for the skylabs-monorepo. Scope lives in `PLANNING.md`.
+
+**How to use:** when you start a task move it to _In progress_; when done, check it
+off under _Completed_ with the date. Add new work to _Backlog_. Keep this file current.
+
+---
+
+## In progress
+
+### msd admin — member (vendor) console redesign (plan: one screen, one job, no popups)
+Original plan file: `~/.claude/plans/our-backend-admin-layout-snug-sloth.md`. Each step ships alone.
+- [x] **1. Member page + summary** — `/account/vendors/:vendorId` (summary checklist, Actions menu with
+      inline confirm instead of `window.prompt`, breadcrumb via `admin/breadcrumb-context`), list rows
+      open it, list shows Branches/Deals/Therapists/Products as "live of total" (API adds `liveCounts` +
+      therapist count) — 2026-09-28. Reworked mid-step into a no-tab, card-driven Overview (real routes
+      per section, `sky-tile-card` warning-tone setup cards, `setupHint`) — see
+      `docs/superpowers/specs/2026-09-28-vendor-branch-management-design.md` for the "why".
+- [ ] 2. Profile page (replaces the "Profile & setup" tab and the six-step pill wizard)
+- [x] **3a. Branches list + add/edit** — `branches-list-page.tsx` (card grid, outlined/no-fill
+      `sky-feature-card`, Edit/Deactivate — branches have no hard delete), `branch-form-page.tsx`
+      (state-gated `sky-accordion`: Location → Opening Hours → Category Access) at
+      `/account/vendors/:id/branches`, `/branches/new`, `/branches/:branchId` — 2026-09-28. Design:
+      `docs/superpowers/specs/2026-09-28-vendor-branch-management-design.md`. Plan:
+      `docs/superpowers/plans/2026-09-28-vendor-branches-crud-plan.md`.
+- [ ] 3b. Deals inside a branch — `/branches/:branchId/deals` (list + add/edit), own plan, next.
+- [ ] 3c. Therapists inside a branch — `/branches/:branchId/therapists`, own plan, after 3b. Also drops
+      the Overview's standalone Therapists tab (`TherapistsTab`/`toTherapistRow`) once it ships — that
+      tab still exists today as the only way to see a vendor's therapists.
+- [ ] 4. Products page (still vendor-level, not branch-scoped — reached via the Overview's "Products"
+      card into the profile wizard until it gets its own page)
+- [ ] 5. Remove the pill wizard + dialogs, dedupe the admin/self-service forms
+- [ ] Open: confirm "live" definition (active branch/product/therapist, ACTIVE + APPROVED deal)
+
+### Deployment (Vercel) — pipeline live, hardening pending
+- [ ] Attach the bought custom domain to each project's Production (`main`) deploy
+- [ ] Add env vars in Vercel (msd: `VITE_API_URL`, `VITE_GOOGLE_MAPS_API_KEY`)
+- [ ] Add the CI check as a required status check in branch protection
+- [ ] After each `release → main`, back-merge `main → develop` (recurring — see `DEPLOYMENT.md`)
+
+### Deploy msd-api (Railway + Neon + Cloudflare R2) — see `DEPLOYMENT.md → Deploying msd-api`
+- [x] **Code:** media storage switched from local disk to Cloudflare R2 —
+      `lib/media-storage.ts` (S3 client, lazy init), removed `/media` static mount in
+      `app.ts`, added `R2_*` to `config/env.ts` + `.env.example`, added
+      `@aws-sdk/client-s3`. Frontend `resolveMediaUrl()` now prefixes
+      `VITE_MEDIA_BASE_URL` (images served directly from R2); media tests updated — 2026-09-08
+- [x] **Security:** blanked the real secrets in `apps/msd-api/.env.example` (now a
+      pure template) — 2026-09-08
+- [ ] **Security follow-up:** rotate the previously-committed secrets at each provider
+      (Gmail app password, ConnectExpress SMS key, Razorpay keys, `JWT_SECRET`) — they
+      remain in git history
+- [ ] Locally: point `DATABASE_URL` at Neon, `prisma generate` + `migrate deploy` + `seed`, verify `/docs`
+- [ ] Railway: new service from repo, build `npm ci && npx nx build msd-api`, start `node dist/apps/msd-api/main.js`, deploy step runs `prisma generate` + `migrate deploy`
+- [ ] Railway env vars: `DATABASE_URL` (Neon), JWT/OTP/OAuth/SMTP/SMS/Razorpay, `CORS_ORIGIN` (Vercel domain), `R2_*`
+- [ ] Cloudflare R2: create `msd-media` bucket + API token + public URL
+- [ ] Set `VITE_API_URL` on the msd Vercel project to the Railway origin + redeploy; update Google OAuth redirect URI
+- [ ] Verify: `/docs` on Railway, image upload lands in R2 + survives a redeploy, live msd sign-in with no CORS errors
+
+## Backlog
+
+### MSD — Consumer storefront (pages + shell)
+- [x] Improved web header: logo, responsive nav, search bar, cart badge, auth buttons, mobile hamburger drawer — 2026-07-12
+- [x] SEO/GEO/AEO footer: brand column, quick links, category links, support, newsletter opt-in, trust badges, legal bar — 2026-07-12
+- [x] `content.json`: single file for all static copy across all consumer pages — 2026-07-12
+- [x] Static data: `deals.ts` (15 deals), `categories.ts` (5 categories + subcategories) — 2026-07-12
+- [x] CartContext + WishlistContext (localStorage-backed React contexts) — 2026-07-12
+- [x] Home page: hero + search, featured deals carousel, category grid, hot right now carousel, gift cards CTA, per-category horizontal carousels (Massage, Facial, Nails, Spas, Wellness), welcome offer CTA — 2026-07-12
+- [x] Search / Explore page (`/explore`): 5 filter chips (Price, Suggested, Category, Features, Distance) with Dialogs, list/grid/map view toggle, real-time client-side filtering — 2026-07-12
+- [x] Category page (`/category/:slug`): breadcrumb, hero, subcategory Tabs, sort FilterChips, responsive deal grid — 2026-07-12
+- [x] Deal detail page (`/deal/:id`): breadcrumb, gallery with thumbnails, info panel (provider, rating, price, CTA, features), Accordion (What's Included / How to Use / Cancellation), related deals carousel, JSON-LD LocalBusiness schema — 2026-07-12
+- [x] Cart page (`/cart`): items with qty controls, order summary, gift card input, auth-aware checkout redirect — 2026-07-12
+- [x] Wishlist page (`/wishlist`, RequireAuth): saved deals grid, empty state, add-to-cart action — 2026-07-12
+- [x] Checkout page (`/checkout`, RequireAuth): 3-step flow (Details → Date & Time → Payment) with LinearProgress indicator, success screen — 2026-07-12
+- [x] New type definitions: Deal, Category, Subcategory, CartItem, WishlistItem, SearchFilter, SearchView, PriceLevel, CheckoutStep, DealSort — 2026-07-12
+- [x] Routes: added /explore, /category/:slug, /deal/:id, /cart, /wishlist (RequireAuth), /checkout (RequireAuth) to PublicLayout — 2026-07-12
+- [x] Wired CartProvider + WishlistProvider in main.tsx — 2026-07-12
+- [x] msd shell plan 1: location provider (saved/browser/IP), shared catalog shell, SiteHeader, MobileTabBar — 2026-09-22
+- [x] msd shell plan 2: SiteFooter, Seo component, JSON-LD, city landing pages — 2026-09-23
+- [x] msd shell plan 3: home page (10 fixed sections, CardRail, SectionHead, Seo + ItemList/FAQPage JSON-LD, location-aware catalog fetch) — 2026-09-23
+- [x] msd shell plan 4: build-time prerender (`/`, every `/category/:slug`, deal-category `/category/:slug/:city`) with `__MSD_DATA__` payload hydration, `spa.html` SPA rewrite, timed-out/unreachable-API fallback, sitemap.xml/robots.txt/llms.txt — 2026-09-24
+- [x] msd home 60/30/10 colour pass on M3 roles (tinted bands, secondary-container tiles/steps/gift card, primary for actions only; "How it works" as a numbered sequence) — 2026-09-24
+- [x] msd storefront building blocks `PageSection`, `CardGrid`, `SectionHead as="h1"`; home moved onto `PageSection`; category page rebuilt with no page CSS — 2026-09-24
+- [x] msd category toolbar: subcategory pills, clamped description, sort menu, 12-per-page lazy loading (`usePagedList` + `LoadMore`, prerendered first page + total) — 2026-09-25
+- [x] msd `DealMap`: Leaflet + OpenStreetMap by default, Google behind `VITE_MAP_PROVIDER`; category map view; explore map fixed (was blocked by a missing Google key and a placeholder overlay) — 2026-09-25
+- [x] msd category filter side panel (Your location, Distance, Price, Business, Branches, Clear all; phone side sheet with focus trap), sorts Relevance / Price / Distance, List-Grid-Map switch, `sky-product-card` `layout="horizontal"` — 2026-09-25
+- [x] msd-api catalog: deal sorts `relevance|price_asc|price_desc|distance`, `vendorIds` / `branchIds` / `radiusKm` filters, `GET /catalog/deals/facets`, product price sorts — 2026-09-25
+- [x] Docs aligned with the storefront work and current API status (CLAUDE, ARCHITECTURE, DEPLOYMENT, DEVELOPER_PROCESS §19–21, docs/README, api-schema as-built notes) — 2026-09-26
+
+### Content pages — both apps (`pages/` + route)
+- [ ] Contact page~
+- [ ] Blog category (filtered list)
+
+### msd shell — follow-ups
+- [ ] msd: create `/member` page (header "Become a Member" links to it)
+- [ ] msd: newsletter backend (msd-api table + endpoint) for footer signup
+- [ ] msd: transparent/dark-mode logo asset (`logo.jpg` has a white background)
+- [ ] msd: fix pre-existing lint (~43 errors) and tsc (~28 errors) so CI `nx affected -t lint` passes
+- [ ] msd: staff/admin "Account" on phones lands in admin console without bottom nav (decide UX)
+- [ ] msd: 10 public pages render their own `<main>` inside PublicLayout's `<main>` (about, become-vendor, blog, blog-detail, careers, checkout, contact, how-it-works, showcase, website-page): change page roots to div/article
+- [ ] msd: tell the user when 'Use my current location' fails or is >75 km from any partner city
+- [ ] msd: header/tab bar tests for search submit, signed-in account menu, useAccountLinks role branches
+- [x] msd: pages without their own `<title>`/`Seo`: checked, none missing. account/profile.tsx and my-account/profile.tsx get their titles from `AdminPage`; dashboard-process-flow.tsx, profile-form.tsx and my-account/my-account-layout.tsx are components, not routes
+- [ ] msd: /help and /gifting footer links have no routes (404)
+- [ ] msd: other public pages without a meta description (cart, sign-in, otp, orders, invoice, choose-experience) should move to Seo
+- [ ] msd: footer brand block contact details (phone/email) pending from owner
+- [ ] msd: when the custom domain goes live, set VITE_SITE_URL (the website origin, e.g. https://www.myspadeal.in, not the API) for Vercel Production and redeploy; until then canonicals/OG/most JSON-LD and sitemap/robots/llms are omitted. VITE_API_URL (already set to the Railway msd-api) is used for prerender data; PRERENDER_API_URL is optional. The Vercel build machine must reach the Railway msd-api.
+- [ ] msd: on the first Vercel preview verify /api/geo, that `/category/x/` and `/spa.html` 308 to `/category/x` and `/spa` (trailingSlash/cleanUrls), and that non-prerendered routes get the SPA shell via the `/spa` rewrite
+- [ ] msd: add a Vercel deploy hook (cron or on catalog change) so prerendered pages rebuild when deals change
+- [ ] msd: decide whether /category/product and /category/therapy should be indexable or redirect to /products and /therapists
+- [ ] msd: add prerender/ to a tsconfig so it's type-checked
+- [ ] msd: showcase.tsx and unused product-card.tsx still use camelCase props on raw custom elements (fix if ever prerendered; delete product-card.tsx if unused)
+- [ ] msd: audit app-level CSS in dark theme now that the footer theme switch exposes it
+- [ ] msd: city filter for products/therapists APIs so Product/Therapy city pages and popular searches can include them
+- [ ] msd: popular searches are only in the client render until plan 4 seeds the catalog into the prerender
+- [ ] msd: shared --sky-content-max token for 1280px/16px containers (header, footer, home)
+- [ ] msd: migrate remaining useCurrentLocation callers (category, search, therapists, vendor) to useVisitorLocation
+- [ ] msd: move /categories, therapists, orders, invoices and payments off `category.css` onto PageSection/CardGrid, then delete `category.css`
+- [ ] msd: reviews system (customers rate completed orders) so the category page can add rating sort, rating filter and card ratings
+- [ ] msd: explore page adopts FilterPanel/SidebarLayout and the horizontal card list view
+- [ ] msd: product vendor facet for the product category filter panel
+- [ ] msd: filter panel polish: keep selected Business/Branch options visible when outside the facet list or past "Show more"; clamp URL min/max into the slider bounds when facets narrow
+- [ ] msd: deal page single-location map using DealMap
+- [ ] msd: before traffic grows, move VITE_MAP_TILE_URL off tile.openstreetmap.org to a free-tier tile provider (OSM tile policy: no heavy commercial use)
+- [ ] mera-driver: 12 pre-existing failing specs (app.routes RBAC wiring, users "Login As", drivers page: rbac.permissionsCatalog is not a function)
+
+### msd admin: member management follow-ups (IDs from `docs/msd/ADMIN_RBAC_TASKS.md`)
+- [ ] Before production: register DLT-approved SMS templates for the welcome, suspension and reactivation texts in `apps/msd-api/src/lib/member-messages.ts` (P10-43)
+- [ ] Before production: set `SUPPORT_EMAIL`, `SUPPORT_PHONE`, `FIELD_ENCRYPTION_KEY` and `DOC_HASH_PEPPER` on Railway (P10-44)
+- [ ] Before production: run `apps/msd-api/prisma/member-status-report.ts`, get owner sign-off, then rehearse the `member_lifecycle` migration up and down on a Neon copy (P10-45)
+- [ ] msd-api: rename `vendor.service.ts`, `vendors.routes.ts` and the `Vendor*` Zod schemas to member names (P3-22)
+- [ ] msd: move the member detail page and self-service calls from `/vendors/:id` to `/members/:id` before the alias is removed (P3-23)
+- [ ] msd-api: grant `members:view` and `members:edit` with own scope to role `member`, then retire `members:custom` (P4-13)
+- [ ] msd-api: signed URL download for member documents, replacing the returned `storageKey` (P5-14)
+- [ ] msd-api + msd: documents list returns the uploader name so the row shows "uploaded by <name> for member" (P5-15)
+- [ ] msd-api: durable retry for failed member notices (P6-08)
+- [ ] msd, msd-api, shared-*: fix pre-existing lint config (eslint ignore error in shared-* packages, 31 msd lint errors) and test drift (26 msd tests in 15 files, 5 msd-api, 5 shared-menu) (P10-46)
+
+#### Plan 4 prerender prerequisites
+- [x] (e) decided: gift/member `sky-feature-card` copy stays in shadow DOM. It is promotional, not a search landing target; the crawlable content on home is the h1, tiles, deals JSON-LD, How it works, directory and FAQ. See spec section 8.1.
+
+### Account & admin — both apps (remaining)
+- [ ] Logout from inside the console (currently in the public header)
+- [ ] Admin/marketing/sales feature pages (real content, not stubs)
+- [ ] Real role assignment + enforcement once backends exist (JWT claim + per-request API check); remove the "View as" demo switcher
+- [ ] Replace localStorage account store with profile API
+
+### Backends — one per app
+- [x] `apps/msd-api` built: Express + TS, PostgreSQL + Prisma (35+ migrations), Zod +
+      `zod-to-openapi` + `swagger-ui-express` at `/docs`, OTP/Google/JWT auth, dynamic
+      RBAC, media uploads, business modules (Customers/Vendors/Orders/Products/
+      Inventory/Reports) — see `CLAUDE.md`, `ARCHITECTURE.md`, `DEVELOPER_PROCESS.md`
+- [ ] `apps/mera-driver-api` — same pattern, own DB + bucket (pending)
+
+### Auth integration (after backends)
+- [ ] Wire sign-in / OTP / Google to real endpoints (replace mock token)
+- [ ] Point each frontend `api` client at its API base via env (`VITE_API_URL`, etc.)
+- [ ] Add `authInterceptor` to msd (matching the one already in mera-driver) once msd-api exists
+- [ ] Remove "View as (demo)" role switcher from both sidebars; roles come from JWT
+
+**Key auth files (reference):**
+
+| Concern | msd | mera-driver |
+|---------|-----|-------------|
+| Auth state + roles | `apps/msd/src/auth/auth-context.tsx` | `apps/mera-driver/src/app/core/auth/auth.service.ts` |
+| Auth guard | `apps/msd/src/auth/require-auth.tsx` | `apps/mera-driver/src/app/core/auth/auth.guard.ts` |
+| Role guard | `apps/msd/src/auth/require-role.tsx` | `apps/mera-driver/src/app/core/auth/role.guard.ts` |
+| HTTP interceptor | _(not yet)_ | `apps/mera-driver/src/app/core/auth/auth.interceptor.ts` |
+| Menu / roles config | `apps/msd/src/app/admin/menu.ts` | `apps/mera-driver/src/app/admin/menu.ts` |
+
+### Quality & ops
+- [ ] e2e tests (Playwright) for the auth flow — add `playwright.config.ts` at repo root (config template in `.claude/skills/skylabs-testing.md`)
+- [ ] Error tracking (Sentry free tier)
+- [ ] `.env.example` per app and per API (msd-api, mera-driver-api) — see env var list in `.claude/skills/skylabs-auth.md` and `skylabs-api.md`
+
+### AI dev team (`.claude/`)
+- [ ] Add `playwright.config.ts` at repo root so `skylabs-dev` can run e2e tests against both apps
+- [ ] Add `.env.example` to each API app once scaffolded (msd-api, mera-driver-api)
+- [ ] Run `/skylabs-audit` after each major milestone to catch regressions early
+
+---
+
+## Completed
+
+### MSD: staff member management
+- [x] Member lifecycle slice: `Vendor` model renamed to `Member`, statuses ACTIVE / INACTIVE / SUSPENDED / ARCHIVED with history, suspended and inactive enforcement, document checklist and review, `/members` API with `/vendors` aliases, 7 seeded roles, All members list, short Add member form and tabbed member detail page, done 2026-10-15. Plan: `docs/superpowers/plans/2026-10-15-staff-member-management.md`. Spec: `docs/superpowers/specs/2026-10-15-staff-member-management-design.md`. Task status: `docs/msd/ADMIN_RBAC_TASKS.md`.
+
+### MSD — wishlist product counts
+- [x] Count saved deals and products together in the wishlist heading, desktop badge, and mobile badge; use item-based wishlist copy — 2026-10-07
+- [x] Wire `/category/:slug` PRODUCT cards to product wishlist state/actions; verify heart and count update immediately and persist after reload — 2026-10-07
+- [x] Include uploaded product media in wishlist API results and resolve it to display URLs on wishlist cards — 2026-10-07
+
+### Foundation & design system
+- [x] Nx monorepo with `msd` (React 19 + Vite) and `mera-driver` (Angular 21) — 2026-06
+- [x] `packages/shared-ui`: all 15 Material Web (M3) component groups registered
+- [x] Typed React wrappers (`@lit/react`) for shared-ui components
+- [x] Theme engine: `applyTheme()`, per-app Material Theme Builder exports (msd green / mera-driver blue), light/dark toggle
+- [x] Self-hosted fonts: Material Symbols Outlined + Roboto (no CDN)
+- [x] Custom LIT components: `sky-badge`, `sky-card` (decorator-free)
+- [x] Shared test polyfills (`installMaterialJsdomPolyfills`) and shared `layout.css`
+
+### App structure (both apps)
+- [x] Layouts: `public-layout`, `auth-layout`
+- [x] Shared app components: header (nav + auth action), footer
+- [x] Auth scaffolding: context/service, route guard, HTTP interceptor (Angular), api client, domain models
+- [x] Central routing with lazy loading (Angular) and layout grouping
+
+### Pages (both apps)
+- [x] Home (sample, themed)
+- [x] Sign-in (Email/Phone tabs, field, Send OTP, Google, divider)
+- [x] OTP (code field, verify, resend countdown, back)
+- [x] 404 / not-found (inside shell)
+- [x] Component showcase (kept)
+- [x] Blog list (paginated `?page` previews via `sky-card`/`sky-badge`/M3 buttons) + blog detail (block-rendered body, tags, SEO title/description) — static `blog` data/service that mirrors the future API; composed only from shared-ui — 2026-06
+
+### Account & admin console (both apps)
+- [x] Role-based admin layout (full-height sidebar + collapsible toggle + breadcrumb + centered content), shown after login / "My account" — 2026-06
+- [x] RBAC: `roles` on user, role-filtered sidebar menu (config-driven), `RequireRole` / `roleGuard`, "View as" demo switcher
+- [x] My Account: edit email/phone + full address CRUD (localStorage until backend)
+- [x] Dummy role pages (Dashboard + admin/marketing/sales) demonstrating gating
+- [x] Review pass: semantic breadcrumb (`<ol>` + `aria-current`) & address list (`<ul>/<li>`), config-driven address form, stable React account-store callbacks
+
+### Components (shared-ui)
+- [x] Carousel via Swiper Element (opt-in `/carousel` entry, brand-themed via `--swiper-theme-color`); raw `<swiper-container>`/`<swiper-slide>` in both apps, all 10 features demoed in each showcase — 2026-06
+- [x] Card components: `sky-product-card` (stars/score, outlined variant, favorite), `sky-image-card`, `sky-category-card`, `sky-info-card` — LIT + M3 inside, React wrappers + raw Angular tags, responsive + `align` + semantic/a11y, demoed in both showcases — 2026-06
+- [x] Accordion: `sky-accordion` (+ `single` mode) + `sky-accordion-item` (card panel, rotating md-icon chevron, `aria-expanded`/region, `variant`, `level`) — React wrappers + raw Angular tags, demoed in both showcases — 2026-06
+- [x] Showcase now demos every M3 group with full features: chips (4 types), icon buttons (+toggle), FAB/extended/branded, selection (checkbox/radio/switch), text fields (icons, prefix/suffix, supporting, types, textarea, counter, validation), select, slider (continuous/discrete/range), menu (+submenu, popover), tabs (primary/secondary), progress (linear/circular/indeterminate/four-color), ripple, list (start/end slots) — 2026-06
+
+### Quality passes
+- [x] Accessibility: landmarks, labelled controls, `aria-hidden` icons, `autocomplete`, semantic destination pill, breadcrumb/list semantics
+- [x] SEO: per-route titles, default meta description, `noindex` on auth pages
+- [x] DRY: shared `layout.css` (shell + auth + admin), shared test setup, config-driven menus/forms
+
+### Deployment (Vercel + CI)
+- [x] `nx.json`: `defaultBase` `master` → `main` + `release` config (independent, conventional commits) — 2026-09-04
+- [x] `apps/msd/vercel.json` + `apps/mera-driver/vercel.json` (build/output/`nx-ignore`/SPA rewrite) — 2026-09-04
+- [x] `.github/workflows/ci.yml` — `nx affected -t lint test build` PR gate on develop/release/main — 2026-09-04
+- [x] `DEPLOYMENT.md` (source of truth + Mermaid flowchart) + root `README.md` — 2026-09-04
+- [x] Deployment docs into `CLAUDE.md` / `PLANNING.md` — 2026-09-04
+- [x] Version manifests `apps/{msd,mera-driver}/package.json` so `nx release` has a version to bump — 2026-09-05
+- [x] First `nx release --skip-publish --first-release`: `msd@0.1.0` + `mera-driver@0.1.0` tags + per-app CHANGELOGs — 2026-09-05
+- [x] Validated Vercel preview/staging deploys (SPA rewrite + `nx-ignore` self-select working); documented branch-from-develop + back-merge workflow — 2026-09-05
+
+### Docs
+- [x] `ARCHITECTURE.md`, `PLANNING.md`, `TASK.md`, updated `CLAUDE.md`
+
+### AI Dev Team
+- [x] Project-scoped agent team: 6 agents (`skylabs-abhi`, `skylabs-ravi`, `skylabs-neha`, `skylabs-dev`, `skylabs-udaya`, `skylabs-reena`) in `.claude/agents/` — 2026-07-18
+- [x] 8 skill reference docs in `.claude/skills/` (msd-stack, mera-driver-stack, skylabs-auth, skylabs-api, shared-ui-usage, skylabs-testing, skylabs-seo, skylabs-content) — 2026-07-18
+- [x] 5 command pipelines in `.claude/commands/` (`/msd-feature`, `/mera-driver-feature`, `/new-endpoint`, `/new-shared-component`, `/skylabs-audit`) — 2026-07-18
+- [x] Updated `CLAUDE.md`, `PLANNING.md`, `ARCHITECTURE.md`, `TASK.md` with AI dev team docs — 2026-07-18

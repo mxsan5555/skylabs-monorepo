@@ -2,7 +2,6 @@ import type { ComponentProps } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MemberHeaderActions } from './member-header-actions';
-import { REMIND_NOW_LABEL } from './member-status';
 
 function renderActions(props: Partial<ComponentProps<typeof MemberHeaderActions>> = {}) {
   const onChange = vi.fn().mockResolvedValue(undefined);
@@ -150,26 +149,5 @@ describe('MemberHeaderActions', () => {
     fireEvent.click(mustButton('Confirm make inactive'));
     expect((await screen.findByRole('alert')).textContent).toMatch(/cannot be made inactive/i);
     expect(reasonField()).toBeTruthy();
-  });
-});
-
-describe('MemberHeaderActions Remind now', () => {
-  // The button also holds its md-icon ligature text, so match on the label it contains.
-  const remindButton = () => buttons().find((el) => el.textContent?.includes(REMIND_NOW_LABEL)) as (HTMLElement & { disabled: boolean }) | undefined;
-
-  it('is absent when the page passes no onRemind', () => {
-    renderActions();
-    expect(remindButton()).toBeUndefined();
-  });
-
-  it('calls onRemind and stays disabled until it settles', async () => {
-    let settle: () => void = vi.fn();
-    const onRemind = vi.fn(() => new Promise<void>((resolve) => (settle = resolve)));
-    renderActions({ onRemind });
-    fireEvent.click(remindButton() as HTMLElement);
-    expect(onRemind).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(remindButton()?.disabled).toBe(true));
-    settle();
-    await waitFor(() => expect(remindButton()?.disabled).toBe(false));
   });
 });

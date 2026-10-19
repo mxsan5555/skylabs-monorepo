@@ -9,9 +9,8 @@ vi.mock('../config/env', () => ({
   env: { fieldEncryptionKey: randomBytes(32).toString('base64'), docHashPepper: 'pepper' },
 }));
 vi.mock('../lib/media-storage', () => ({
-  writeMediaFile: vi.fn().mockResolvedValue({ storageKey: 'members/m1/documents/file.pdf', sizeBytes: 10 }),
+  writeMediaFile: vi.fn().mockResolvedValue({ storageKey: 'vendor-documents/m1/file.pdf', sizeBytes: 10 }),
   deleteMediaFile: vi.fn().mockResolvedValue(undefined),
-  signedFileUrl: vi.fn(async (key: string) => `https://signed.example/${key}`),
 }));
 vi.mock('./media-validation.service', () => ({
   validateMediaFile: vi.fn().mockReturnValue({ extension: 'pdf', sniffedType: 'application/pdf' }),
@@ -85,8 +84,7 @@ describe('listMemberDocuments', () => {
   it('includes the file key and masked number for viewers who can open files', async () => {
     prismaMock.memberDocument.findMany.mockResolvedValue([ROW]);
     const [row] = await listMemberDocuments('m1', { includeFiles: true });
-    expect(row.fileUrl).toBe('https://signed.example/k');
-    expect(row).not.toHaveProperty('storageKey');
+    expect(row.storageKey).toBe('k');
     expect(row.numberMasked).toBe('ABXXXXX34F');
     expect(row).not.toHaveProperty('numberHash');
     expect(row).not.toHaveProperty('numberEncrypted');
@@ -147,7 +145,7 @@ describe('uploadMemberDocument', () => {
     }).catch((e) => e);
     expect(err).toMatchObject({ code: 'DOCUMENT_NUMBER_IN_USE' });
     expect(JSON.stringify(err.details ?? null)).not.toContain('m2');
-    expect(vi.mocked(deleteMediaFile)).toHaveBeenCalledWith('members/m1/documents/file.pdf', 'private');
+    expect(vi.mocked(deleteMediaFile)).toHaveBeenCalledWith('vendor-documents/m1/file.pdf');
   });
 
   it('a re-upload without a number clears the old masked number, hash and ciphertext', async () => {

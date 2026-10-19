@@ -4,7 +4,7 @@ import content from '../../../content.json';
 
 const t = content.nav.footer;
 
-/** Newsletter signup. UI only for now: no request is sent (task ST-28 in docs/msd/TASKS.md tracks the backend).
+/** Newsletter signup. UI only for now: no request is sent (TASK.md backlog tracks the backend).
  *  `sky-action-field` uses native email + required validation, so submit only fires when valid.
  *  The field stays mounted (cleared) and focus moves to the always-present live region. */
 export function NewsletterBand() {

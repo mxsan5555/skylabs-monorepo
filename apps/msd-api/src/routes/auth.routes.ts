@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { passport } from '../lib/passport';
 import { authenticate } from '../middleware/authenticate';
 import { validateBody } from '../middleware/validate';
-import { otpIdentifierRateLimiter, otpRequestRateLimiter } from '../middleware/rateLimiter';
+import { otpRequestRateLimiter } from '../middleware/rateLimiter';
 import { OtpRequestSchema, OtpVerifySchema, RefreshRequestSchema } from '../schemas/auth.schema';
 import { requestOtp, verifyOtp } from '../services/otp.service';
 import { loginWithIdentifier } from '../services/auth.service';
@@ -17,7 +17,7 @@ function requestMeta(req: import('express').Request) {
   return { ip: req.ip, userAgent: req.headers['user-agent'] };
 }
 
-router.post('/otp/request', otpRequestRateLimiter, otpIdentifierRateLimiter, validateBody(OtpRequestSchema), async (req, res, next) => {
+router.post('/otp/request', otpRequestRateLimiter, validateBody(OtpRequestSchema), async (req, res, next) => {
   try {
     const { purpose } = req.body as { identifier: string; purpose: 'login' | 'signup' | 'change_phone' | 'change_email' };
     const identifier = normalizeIdentifier(req.body.identifier as string);

@@ -88,18 +88,13 @@ export const alignment = css`
   }
 `;
 
-/** Top-left corner of a media frame, above the image (declarations only; use inside a rule). */
-export const mediaCorner = css`
-  position: absolute;
-  inset-block-start: 10px;
-  inset-inline-start: 10px;
-  z-index: 1;
-`;
-
 /** Primary pill label over media (product-card badge, category-card tag). */
 export const pill = css`
   .pill {
-    ${mediaCorner}
+    position: absolute;
+    inset-block-start: 10px;
+    inset-inline-start: 10px;
+    z-index: 1;
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -131,22 +126,6 @@ export const coverImage = css`
 
 /** M3 type roles as classes. Typography only; colour stays with the component. The same
  *  classes exist globally in `theme/base.css` for light DOM markup. */
-/**
- * Clamp text to N lines (`--_lines`, default 2) with an ellipsis, and reserve those lines so
- * cards side by side keep their rows aligned. The full text stays in the DOM for screen readers.
- * Usage: `class="clamp"` (set `--_lines` on the element for another count).
- */
-export const lineClamp = css`
-  .clamp {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: var(--_lines, 2);
-    line-clamp: var(--_lines, 2);
-    overflow: hidden;
-    min-block-size: calc(var(--_lines, 2) * 1lh);
-  }
-`;
-
 export const typescale = css`
   .title-large,
   .title-medium,

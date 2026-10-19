@@ -1,4 +1,3 @@
-import { JsonLd } from '../../seo/json-ld';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FilledButton, OutlinedIconButton, Icon, Divider, Radio, ChipSet, FilterChip, SuggestionChip, Tabs, PrimaryTab, OutlinedTextField, } from '@skylabs-monorepo/shared-ui/react';
@@ -331,8 +330,10 @@ export function VendorPage() {
       <meta name="twitter:title" content={`${vendor.businessName} | MSD`} />
       <meta name="twitter:description" content={metaDescription.slice(0, 155)} />
       {vendor.logoUrl && <meta name="twitter:image" content={vendor.logoUrl} />}
-      <JsonLd
-        data={{
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'LocalBusiness',
             name: vendor.businessName,
@@ -349,10 +350,13 @@ export function VendorPage() {
             openingHoursSpecification: selectedBranch?.openingHours
               ? buildOpeningHoursSpecification(selectedBranch.openingHours)
               : undefined,
-          }}
+          }),
+        }}
       />
-      <JsonLd
-        data={{
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'BreadcrumbList',
             itemListElement: [
@@ -360,7 +364,8 @@ export function VendorPage() {
               { '@type': 'ListItem', position: 2, name: 'Explore', item: `${SITE_URL}/explore` },
               { '@type': 'ListItem', position: 3, name: vendor.businessName, item: canonicalUrl },
             ],
-          }}
+          }),
+        }}
       />
 
       {/* Breadcrumb */}

@@ -11,12 +11,11 @@ vi.mock('../services/permission-resolver.service', () => ({
 }));
 
 vi.mock('../lib/media-storage', () => ({
-  writeMediaFile: vi.fn(async (folder: string, buffer: Buffer) => ({
-    storageKey: `${folder}/fake.jpg`,
+  writeMediaFile: vi.fn(async (subdir: string, parentId: string, buffer: Buffer) => ({
+    storageKey: `${subdir}/${parentId}/fake.jpg`,
     sizeBytes: buffer.length,
   })),
   deleteMediaFile: vi.fn(async () => undefined),
-  signedFileUrl: vi.fn(async (key: string) => `https://signed.example/${key}`),
 }));
 
 import app from '../app';

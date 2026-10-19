@@ -27,5 +27,5 @@ export function signPreviewToken(payload: AccessTokenPayload, jti: string): stri
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload {
-  return jwt.verify(token, env.jwtSecret, { algorithms: ['HS256'] }) as AccessTokenPayload;
+  return jwt.verify(token, env.jwtSecret) as AccessTokenPayload;
 }
