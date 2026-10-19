@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getMemberActivity, type ActivityItem } from '../../../../api/rbac/members';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { readableActivitySummary } from './member-status';
+import { ACTIVITY_DETAIL_LABEL, readableActivitySummary } from './member-status';
 
 export interface MemberActivityTabProps {
   token: string | null;
@@ -10,7 +10,7 @@ export interface MemberActivityTabProps {
   refreshKey: number;
 }
 
-/** Status changes and document events for one member, newest first (the API orders them). */
+/** Status changes, document events, reminders and the review flag, newest first (the API orders them). */
 export function MemberActivityTab({ token, memberId, refreshKey }: MemberActivityTabProps) {
   const [items, setItems] = useState<ActivityItem[] | null>(null);
   const [error, setError] = useState('');
@@ -46,7 +46,7 @@ export function MemberActivityTab({ token, memberId, refreshKey }: MemberActivit
       {items.map((item, index) => (
         <li key={`${item.at}-${index}`} className="activity-list__item">
           <p>{readableActivitySummary(item.summary)}</p>
-          {item.detail && <p className="field-hint">Reason: {item.detail}</p>}
+          {item.detail && <p className="field-hint">{`${ACTIVITY_DETAIL_LABEL[item.kind]}: ${item.detail}`}</p>}
           <p className="field-hint">
             <time dateTime={item.at}>{new Date(item.at).toLocaleString('en-GB')}</time>
           </p>

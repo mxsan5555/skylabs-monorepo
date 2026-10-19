@@ -310,6 +310,7 @@ model Member {
   reviewFlaggedAt            DateTime?
   welcomeSentAt              DateTime?
   statusHistory              MemberStatusHistory[]
+  documentReminders          MemberDocumentReminder[]
   /// Admin who created this vendor profile, if admin-created (self-registration leaves this null).
   createdByUserId            String?
   createdAt                  DateTime               @default(now())
@@ -393,6 +394,32 @@ model MemberStatusHistory {
   createdAt   DateTime     @default(now())
   member      Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
+  @@index([memberId, createdAt])
+}
+
+/// One documents reminder to a member: a scheduled warning (`sequence` 1 to 3, sent by the daily
+/// job) or a manual "Remind now" from an admin (`sequence` null, `sentByUserId` set). One row
+/// covers both channels; a null channel status means the member has no email or phone on record.
+/// Timeline rules live in `services/member-reminder-policy.ts`.
+model MemberDocumentReminder {
+  id           String               @id @default(uuid())
+  memberId     String
+  sequence     Int?
+  /// Documents still missing, rejected or expired when the reminder was sent.
+  missingTypes VendorDocumentType[]
+  emailStatus  ReminderDelivery?
+  smsStatus    ReminderDelivery?
+  /// Send attempts so far. Claimed with a conditional update, so two runs never send one row twice.
+  attempts     Int                  @default(0)
+  /// First time at least one channel was delivered. Null while nothing has gone out.
+  sentAt       DateTime?
+  sentByUserId String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  member       Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  /// One row per scheduled warning. Postgres treats null as distinct, so manual rows never collide.
+  @@unique([memberId, sequence])
   @@index([memberId, createdAt])
 }
 
@@ -999,6 +1026,11 @@ model Promotion {
   destinationRoute String?
   categoryId       String?
   dealId           String?
+  productId        String?
+  /// null = Global/Default banner, shown where the visitor's state has none for the slot.
+  state            String?
+  backgroundRole   BannerColorRole       @default(PRIMARY)
+  buttonRole       BannerColorRole       @default(PRIMARY)
   sortOrder        Int                   @default(0)
   isActive         Boolean               @default(true)
   startDate        DateTime?
@@ -1007,17 +1039,54 @@ model Promotion {
   updatedAt        DateTime              @updatedAt
   category         Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   deal             Deal?                 @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  product          Product?              @relation(fields: [productId], references: [id], onDelete: SetNull)
   mediaImages      PromotionImage[]
+  placements       PromotionPlacement[]
 
   @@index([sortOrder])
   @@index([categoryId])
   @@index([dealId])
+  @@index([productId])
+  @@index([state])
+}
+
+/// Where a CTA banner shows (docs/msd/PLANNING.md §6, D25). One banner, many slots.
+model PromotionPlacement {
+  promotionId String
+  slot        BannerSlot
+  createdAt   DateTime   @default(now())
+  promotion   Promotion  @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+
+  @@id([promotionId, slot])
+  @@index([slot])
+}
+
+/// Named places on storefront pages that render `<BannerSlot slot="...">`.
+enum BannerSlot {
+  HOME_AFTER_DEALS
+  HOME_AFTER_PRODUCTS
+  CATEGORY_TOP
+  EXPLORE_TOP
+  DEAL_BOTTOM
+  PRODUCT_BOTTOM
+}
+
+/// M3 colour roles (D24); maps 1:1 to the `sky-cta-banner` `color` attribute, so every banner keeps
+/// the theme's paired text colour and contrast.
+enum BannerColorRole {
+  PRIMARY
+  SECONDARY
+  TERTIARY
+  SURFACE
+  SURFACE_HIGH
+  INVERSE
 }
 
 enum PromotionDestination {
   ROUTE
   CATEGORY
   DEAL
+  PRODUCT
 }
 
 /// One uploaded image for a Promotion row — same shared Deal/Product/Therapist/Category/Vendor
@@ -1050,16 +1119,20 @@ model PromotionImage {
 /// `isActive`/fewer than 5 is a valid *draft* state, just never returned by the public read).
 model HomeHeroSlide {
   id        String   @id @default(uuid())
-  dealId    String
+  /// Exactly one of dealId / productId is set (CHECK home_hero_slide_one_item in the migration).
+  dealId    String?
+  productId String?
   state     String?
   sortOrder Int      @default(0)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  deal      Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([state])
   @@index([dealId])
+  @@index([productId])
   @@index([sortOrder])
 }
 
@@ -1321,6 +1394,8 @@ model Product {
   mediaImages     ProductImage[]
   wishlistItems   WishlistItem[]
   mediaVideo      ProductVideo?
+  promotionLinks  Promotion[]
+  heroSlides      HomeHeroSlide[]
 
   @@index([categoryId])
   @@index([vendorId])
@@ -1762,6 +1837,13 @@ enum NotificationType {
   MEMBER_SUSPENDED
   DOCUMENT_APPROVED
   DOCUMENT_REJECTED
+  MEMBER_REVIEW_FLAGGED
+}
+
+enum ReminderDelivery {
+  PENDING
+  SENT
+  FAILED
 }
 
 enum VendorDocumentType {

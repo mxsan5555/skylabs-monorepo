@@ -3,6 +3,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { PermissionAction } from '@skylabs-monorepo/shared-types';
 import { can } from '@skylabs-monorepo/shared-permissions';
 import { authenticate } from '../middleware/authenticate';
+import { requirePermission } from '../middleware/requirePermission';
 import { resolveGrantedPermissionKeys } from '../services/permission-resolver.service';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate';
 import { UuidParamSchema } from '../schemas/common.schema';
@@ -47,6 +48,8 @@ function requireOrdersOrVendorSelf(action: PermissionAction) {
         sendError(res, 'FORBIDDEN', `Missing permission orders:${action}`);
         return;
       }
+      // Without orders:{action} the caller may only ever reach their own business's orders.
+      res.locals.orderScope = can(granted, 'orders', action) ? 'ALL' : 'OWN';
       next();
     } catch (err) {
       next(err);
@@ -223,7 +226,7 @@ router.post('/pay-batch/verify', validateBody(VerifyBatchPaymentSchema), async (
 router.get('/', requireOrdersOrVendorSelf('view'), validateQuery(OrderListQuerySchema), async (req, res, next) => {
   try {
     const { page, pageSize, status, vendorId, branchId, customerId, paymentStatus, createdFrom, createdTo, search } = req.validatedQuery as ReturnType<typeof OrderListQuerySchema.parse>;
-    const { items, total } = await orderService.listOrders(req.user!.sub, {
+    const { items, total } = await orderService.listOrders(req.user!.sub, res.locals.orderScope, {
       page,
       pageSize,
       status,
@@ -243,7 +246,7 @@ router.get('/', requireOrdersOrVendorSelf('view'), validateQuery(OrderListQueryS
 
 router.get('/:id', requireOrdersOrVendorSelf('view'), validateParams(UuidParamSchema), async (req, res, next) => {
   try {
-    sendData(res, await orderService.getOrderOrThrow(req.user!.sub, req.params.id));
+    sendData(res, await orderService.getOrderOrThrow(req.user!.sub, res.locals.orderScope, req.params.id));
   } catch (err) {
     next(err);
   }
@@ -251,12 +254,13 @@ router.get('/:id', requireOrdersOrVendorSelf('view'), validateParams(UuidParamSc
 
 router.patch(
   '/:id/status',
-  requireOrdersOrVendorSelf('status_change'),
+  // D27: members view their own orders only; only orders:status_change (Super Admin, Admin) changes one.
+  requirePermission('orders', 'status_change'),
   validateParams(UuidParamSchema),
   validateBody(OrderStatusUpdateSchema),
   async (req, res, next) => {
     try {
-      const order = await orderService.setOrderStatus(req.user!.sub, req.params.id, req.body.status, req.body.cancellationReason);
+      const order = await orderService.setOrderStatus(req.params.id, req.body.status, req.body.cancellationReason);
       await writeAuditLog({
         actorUserId: req.user!.sub,
         action: 'order.status_change',

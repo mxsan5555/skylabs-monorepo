@@ -1,7 +1,7 @@
 import { createElement, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import '@skylabs-monorepo/shared-ui';
 import type { MemberStatus } from '../../../../api/rbac/members';
-import { availableStatusActions, type StatusAction } from './member-status';
+import { REMIND_NOW_LABEL, availableStatusActions, type StatusAction } from './member-status';
 
 export interface MemberHeaderActionsProps {
   status: MemberStatus;
@@ -13,6 +13,8 @@ export interface MemberHeaderActionsProps {
   reasonPrefill: string;
   onChangeStatus: (status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED', reason: string) => Promise<void>;
   onDelete: (reason: string) => Promise<void>;
+  /** "Remind now" about missing documents. Omitted when the member cannot be reminded. */
+  onRemind?: () => Promise<void>;
 }
 
 const COPY: Record<StatusAction, { button: string; confirm: string; title: string; body: string }> = {
@@ -57,11 +59,12 @@ const MAX = 500;
  * Raw M3 elements: the @lit/react wrappers do not set properties under jsdom, so tests could not
  * drive them. Same convention as member-new-page.tsx.
  */
-export function MemberHeaderActions({ status, canStatusChange, canDelete, reasonPrefill, onChangeStatus, onDelete }: MemberHeaderActionsProps) {
+export function MemberHeaderActions({ status, canStatusChange, canDelete, reasonPrefill, onChangeStatus, onDelete, onRemind }: MemberHeaderActionsProps) {
   const actions = availableStatusActions(status, { canStatusChange, canDelete });
   const [pending, setPending] = useState<StatusAction | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const [reminding, setReminding] = useState(false);
   const [error, setError] = useState('');
   const reasonRef = useRef<HTMLElement | null>(null);
   const triggerRefs = useRef<Partial<Record<StatusAction, HTMLElement | null>>>({});
@@ -143,6 +146,23 @@ export function MemberHeaderActions({ status, canStatusChange, canDelete, reason
             COPY[action].button,
           ),
         )}
+        {onRemind &&
+          createElement(
+            'md-outlined-button',
+            {
+              disabled: reminding,
+              onClick: async () => {
+                setReminding(true);
+                try {
+                  await onRemind();
+                } finally {
+                  setReminding(false);
+                }
+              },
+            },
+            createElement('md-icon', { slot: 'icon', 'aria-hidden': 'true' }, 'notifications_active'),
+            REMIND_NOW_LABEL,
+          )}
       </div>
 
       {copy && pending && (

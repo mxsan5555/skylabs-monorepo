@@ -1,11 +1,12 @@
 import { prisma } from '../lib/prisma';
 import { deleteMediaFile } from '../lib/media-storage';
+import { bucketForKey } from '../lib/storage-layout';
 import { ApiError } from '../lib/http';
 import { Prisma } from '../generated/prisma-client';
 import { auditLogData } from './audit.service';
 import { revokeAllRefreshTokens } from './token.service';
 import { clearMemberAccessCache } from './member-access.service';
-import { sendMemberNotice, type MemberNoticeKind, type MemberNoticeTarget } from './member-notice.service';
+import { NOTICE_OWNER_SELECT, noticeTargetOf, sendMemberNotice, type MemberNoticeKind, type MemberNoticeTarget } from './member-notice.service';
 import {
   assertTransition,
   REASON_MAX,
@@ -25,7 +26,7 @@ const MEMBER_SELECT = {
   status: true,
   ownerUserId: true,
   businessName: true,
-  owner: { select: { name: true, email: true, phone: true } },
+  owner: NOTICE_OWNER_SELECT,
 } as const;
 
 function validReason(raw: string | undefined): string {
@@ -57,7 +58,7 @@ async function memberStorageKeys(memberId: string): Promise<string[]> {
 
 /** Best effort, after commit. Logs a count only, never a key. */
 async function removeStoredFiles(memberId: string, keys: string[]): Promise<void> {
-  const results = await Promise.allSettled(keys.map((key) => deleteMediaFile(key)));
+  const results = await Promise.allSettled(keys.map((key) => deleteMediaFile(key, bucketForKey(key))));
   const failed = results.filter((r) => r.status === 'rejected').length;
   if (failed > 0) {
     console.error({ context: 'deleteMember: stored files left behind', memberId, failed, total: keys.length });
@@ -131,7 +132,7 @@ export async function changeMemberStatus(
 
   if (member.ownerUserId) clearMemberAccessCache(member.ownerUserId);
 
-  const target = { name: member.owner?.name, email: member.owner?.email, phone: member.owner?.phone };
+  const target = noticeTargetOf(member.owner);
   if (to === 'SUSPENDED') {
     await notify('SUSPENDED', target, reason);
   } else if (to === 'ACTIVE' && from !== 'ACTIVE') {

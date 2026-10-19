@@ -46,6 +46,21 @@ describe('sky-badge', () => {
     });
   });
 
+  describe('status prop', () => {
+    it('is unset by default so the filled variant renders', async () => {
+      const el = createElement();
+      await el.updateComplete;
+      expect(el.hasAttribute('status')).toBe(false);
+    });
+
+    it('reflects a status tone on the host', async () => {
+      const el = createElement();
+      el.status = 'warning';
+      await el.updateComplete;
+      expect(el.getAttribute('status')).toBe('warning');
+    });
+  });
+
   describe('variant prop', () => {
     it('accepts secondary variant', async () => {
       const el = createElement();

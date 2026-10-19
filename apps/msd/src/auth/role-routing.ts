@@ -29,6 +29,12 @@ export function isVendorUser(bootstrap: BootstrapResponse): boolean {
   return getRoleKeys(bootstrap).includes('vendor');
 }
 
+/** Who gets the storefront "My Account" area (`/my-dashboard`, `/my-account/*`, `/orders`):
+ *  customers, including customer + member. Staff always use the admin console. */
+export function isCustomerAccountUser(bootstrap: BootstrapResponse): boolean {
+  return isCustomerUser(bootstrap) && !isStaffUser(bootstrap);
+}
+
 /** True only for the "holds both, needs to choose" case — never true for staff. */
 export function isDualRoleUser(bootstrap: BootstrapResponse): boolean {
   return !isStaffUser(bootstrap) && isCustomerUser(bootstrap) && isVendorUser(bootstrap);

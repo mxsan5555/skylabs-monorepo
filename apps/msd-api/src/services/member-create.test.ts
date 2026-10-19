@@ -5,7 +5,8 @@ vi.mock('../lib/prisma', async () => {
   return { prisma: createPrismaMock() };
 });
 
-vi.mock('./member-notice.service', () => ({
+vi.mock('./member-notice.service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./member-notice.service')>()),
   sendMemberNotice: vi.fn(),
 }));
 

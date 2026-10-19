@@ -84,6 +84,14 @@ import { VerifyPaymentSchema, OrderBatchSchema, VerifyBatchPaymentSchema } from 
 import { NotificationListQuerySchema } from '../schemas/notification.schema';
 import { DashboardStatsResponseSchema } from '../schemas/dashboard.schema';
 import { MediaReorderSchema } from '../schemas/media.schema';
+import {
+  HomeHeroReorderSchema,
+  HomeHeroSlideCreateSchema,
+  HomeHeroSlideUpdateSchema,
+  PublicHomeHeroQuerySchema,
+  StateItemSearchQuerySchema,
+} from '../schemas/home-hero.schema';
+import { PromotionCreateSchema, PromotionUpdateSchema, PublicBannerQuerySchema } from '../schemas/promotion.schema';
 import { ReportFiltersQuerySchema, TopListQuerySchema, TopVendorsQuerySchema } from '../schemas/reports.schema';
 
 export function buildOpenApiDocument() {
@@ -952,11 +960,27 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/members/{id}/activity',
-    summary: 'Merged status and document activity, newest first',
+    summary: 'Merged status, document, reminder and review-flag activity, newest first',
     tags: ['Members - Admin'],
     security: bearer,
     request: { params: z.object({ id: z.string().uuid() }) },
     responses: { 200: { description: 'Activity' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/members/{id}/documents/reminders',
+    summary: 'Remind now: email and SMS the member the documents still needed. Once per 24 hours per member.',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: {
+      201: { description: 'Delivery result per channel: emailStatus, smsStatus (SENT, FAILED or null), sentAt' },
+      403: errorResponse,
+      404: errorResponse,
+      409: { ...errorResponse, description: 'Member not active or inactive, documents complete, or no contact on record' },
+      429: { ...errorResponse, description: 'A manual reminder already went out in the last 24 hours' },
+    },
   });
 
   registry.registerPath({
@@ -1583,6 +1607,103 @@ export function buildOpenApiDocument() {
     tags: ['Catalogue (public)'],
     request: { params: z.object({ id: z.string().uuid() }) },
     responses: { 200: { description: 'Product' }, 404: errorResponse },
+  });
+
+  // ─── Home slider and CTA banners (docs/msd/PLANNING.md §6, §7) ─────────────────
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/home-hero',
+    summary: "Home hero slides (deals and products) for the visitor's state with 5+ eligible slides, else Global/Default",
+    tags: ['Catalogue (public)'],
+    request: { query: PublicHomeHeroQuerySchema },
+    responses: { 200: { description: '{ state, slides: [{ id, type, deal?, product? }] }' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/banners',
+    summary: "CTA banners for one slot: the visitor's state's active in-date banners, else Global/Default",
+    tags: ['Catalogue (public)'],
+    request: { query: PublicBannerQuerySchema },
+    responses: { 200: { description: 'Banners' }, 422: errorResponse },
+  });
+
+  for (const base of ['/home-hero', '/promotions'] as const) {
+    registry.registerPath({
+      method: 'get',
+      path: `${base}/search-items`,
+      summary: 'Deals and products of a state (deal: branch state; product: any active member branch in the state)',
+      tags: ['Masters'],
+      security: bearer,
+      request: { query: StateItemSearchQuerySchema },
+      responses: { 200: { description: 'Items' }, 403: errorResponse, 422: errorResponse },
+    });
+  }
+
+  registry.registerPath({
+    method: 'post',
+    path: '/home-hero/slides',
+    summary: "Add a deal or product of the chosen state to that state's slider (masters.home-hero:create)",
+    tags: ['Masters'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: HomeHeroSlideCreateSchema } } } },
+    responses: { 201: { description: 'Slide' }, 409: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/home-hero/overview',
+    summary: 'One row per slider (Global first, then each state): status, eligible count, deals, products, last change',
+    tags: ['Masters'],
+    security: bearer,
+    responses: { 200: { description: 'Sliders' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'put',
+    path: '/home-hero/slides/order',
+    summary: "Save a slider's whole order; slideIds must be exactly that slider's slides (masters.home-hero:edit)",
+    tags: ['Masters'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: HomeHeroReorderSchema } } } },
+    responses: { 200: { description: 'Saved' }, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/home-hero/slides/{id}',
+    summary: "Change a slide's sort order (masters.home-hero:edit)",
+    tags: ['Masters'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: HomeHeroSlideUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Slide' }, 404: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/promotions',
+    summary: 'Create a CTA banner: state, colour roles, slots, destination in that state (masters.promotions:create)',
+    tags: ['Masters'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: PromotionCreateSchema } } } },
+    responses: { 201: { description: 'Banner' }, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/promotions/{id}',
+    summary: 'Update a CTA banner; sending placements replaces its slots (masters.promotions:edit)',
+    tags: ['Masters'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: PromotionUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Banner' }, 404: errorResponse, 422: errorResponse },
   });
 
   registry.registerPath({

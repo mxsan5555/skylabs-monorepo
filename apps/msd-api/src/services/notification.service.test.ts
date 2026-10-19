@@ -8,6 +8,7 @@ vi.mock('../lib/prisma', async () => {
 import { prisma } from '../lib/prisma';
 import {
   notifySuperAdmins,
+  notifyPermissionHolders,
   notifyVendorOwner,
   notifyOrderConfirmed,
   shortOrderNumber,
@@ -147,5 +148,24 @@ describe('listNotificationsForUser', () => {
     expect(prismaMock.notification.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { recipientUserId: 'user-1' } }),
     );
+  });
+});
+
+describe('notifyPermissionHolders', () => {
+  const input = { type: 'MEMBER_REVIEW_FLAGGED' as const, title: 'T', message: 'M', entityType: 'MEMBER', entityId: 'm1' };
+
+  it('finds active users by permission or super admin flag, never by role name', async () => {
+    tx.user.findMany.mockResolvedValue([{ id: 'u1' }, { id: 'u2' }] as never);
+    tx.notification.create.mockResolvedValue({} as never);
+    const count = await notifyPermissionHolders(tx as never, { menuKey: 'members', action: 'status_change' }, input);
+    const { where } = tx.user.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
+    expect(where).toEqual({
+      status: 'active',
+      deletedAt: null,
+      roles: { some: { role: { isActive: true, OR: [{ isSuperAdmin: true }, { permissions: { some: { permission: { key: 'members:status_change' } } } }] } } },
+    });
+    expect(JSON.stringify(where)).not.toMatch(/"key":"(super_admin|admin)"/);
+    expect(tx.notification.create).toHaveBeenCalledTimes(2);
+    expect(count).toBe(2);
   });
 });

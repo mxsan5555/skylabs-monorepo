@@ -1,3 +1,4 @@
+import { JsonLd } from '../../seo/json-ld';
 import { useEffect, useState } from 'react';
 import { showSnackbar } from '../../../snackbar/snackbar';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -15,6 +16,7 @@ import { formatINR } from '../../../utils/format';
 import { resolveProductMedia, primaryImage } from '../../../utils/media';
 import content from '../../../content.json';
 import './product-detail.css';
+import { BannerSlot } from '../../components/banner-slot/banner-slot';
 
 const { products, productDetail } = content;
 const SITE_URL = (import.meta.env['VITE_SITE_URL'] as string | undefined) ?? '';
@@ -142,16 +144,41 @@ export function ProductDetail() {
       <meta property="og:title" content={name} />
       <meta property="og:description" content={description.slice(0, 155)} />
       {gallery[0] && (
-        <meta property="og:image" content={gallery[0]} />)}
-      <meta property="og:url" content={canonicalUrl} />
-      <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content={name} />
-      <meta name="twitter:description" content={description.slice(0, 155)} />
-      {gallery[0] && (<meta name="twitter:image" content={gallery[0]} />)}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+        <meta
+          property="og:image"
+          content={gallery[0]}
+        />
+      )}
+
+      <meta
+        property="og:url"
+        content={canonicalUrl}
+      />
+
+      <meta
+        name="twitter:card"
+        content="summary_large_image"
+      />
+
+      <meta
+        name="twitter:title"
+        content={name}
+      />
+
+      <meta
+        name="twitter:description"
+        content={description.slice(0, 155)}
+      />
+
+      {gallery[0] && (
+        <meta
+          name="twitter:image"
+          content={gallery[0]}
+        />
+      )}
+
+      <JsonLd
+        data={{
             '@context': 'https://schema.org',
             '@type': 'Product',
             name,
@@ -165,13 +192,11 @@ export function ProductDetail() {
               url: canonicalUrl,
               seller: { '@type': 'Organization', name: product.vendor?.businessName ?? 'MySpaDeal', },
             },
-          }),
-        }}
+          }}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+
+      <JsonLd
+        data={{
             '@context': 'https://schema.org',
             '@type': 'BreadcrumbList',
             itemListElement: [
@@ -179,8 +204,7 @@ export function ProductDetail() {
               { '@type': 'ListItem', position: 2, name: 'Products', item: `${SITE_URL}/products`, },
               { '@type': 'ListItem', position: 3, name, item: canonicalUrl, },
             ],
-          }),
-        }}
+          }}
       />
       <Breadcrumb
         className="product-detail__breadcrumb"
@@ -405,6 +429,7 @@ export function ProductDetail() {
           </div>
         </section>
       )}
+      <BannerSlot slot="PRODUCT_BOTTOM" />
     </div>
   );
 }

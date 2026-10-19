@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   FilledButton,
@@ -8,10 +8,7 @@ import {
   Tabs,
 } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { signInPathWithReturnTo } from '../../../auth/role-routing';
-import { useWishlist } from '../../../wishlist/wishlist-context';
-import { useHydrated } from '../../../hooks/use-hydrated';
+import { useWishlistToggle } from '../../../hooks/use-wishlist-toggle';
 import { formatINR } from '../../../utils/format';
 import { primaryImage, resolveProductMedia, resolveDealMedia, resolveTherapistMedia } from '../../../utils/media';
 import { CardRail } from '../../components/card-rail/card-rail';
@@ -25,7 +22,7 @@ import { CategoryTiles } from './category-tiles';
 import { DealsNearYou } from './deals-near-you';
 // import { HomeFaq } from './home-faq';
 import { HomeHero } from './home-hero';
-import { HomeOffers } from './home-offers';
+import { BannerSlot } from '../../components/banner-slot/banner-slot';
 import { HowItWorks } from './how-it-works';
 import { TreatmentDirectory } from './treatment-directory';
 import {
@@ -44,12 +41,7 @@ import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 const { home } = content;
 
 export function Home() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { isAuthenticated } = useAuth();
-  // Rendering decisions wait for hydration so they match the prerendered (signed-out) HTML.
-  const signedIn = useHydrated() && isAuthenticated;
-  const { toggle, has, toggleProduct, hasProduct } = useWishlist();
+  const { isFavorite, toggleFavorite } = useWishlistToggle();
   const { categories } = useCatalogShell();
   const { status: locationStatus, coords } = useVisitorLocation();
   const catalog = useHomeCatalog(locationStatus === 'locating' ? undefined : coords);
@@ -82,21 +74,6 @@ export function Home() {
     return blocks.length > 0 ? blocks : undefined;
   }, [catalog.deals, catalog.faqs]);
 
-  const handleDealFavorite = (id: string) => {
-    if (!isAuthenticated) {
-      navigate(signInPathWithReturnTo(location));
-      return;
-    }
-    toggle(id);
-  };
-
-  const handleProductFavorite = (id: string) => {
-    if (!isAuthenticated) {
-      navigate(signInPathWithReturnTo(location));
-      return;
-    }
-    void toggleProduct(id);
-  };
   const renderDeal = (deal: CatalogDeal) => {
     const media = resolveDealMedia(deal);
     console.log('Deal:', deal.title, {
@@ -110,7 +87,7 @@ return (
       image={undefined}
       imageAlt={deal.title}
       favorite
-      favoriteActive={signedIn && has(deal.id)}
+      favoriteActive={isFavorite('deal', deal.id)}
       badge="Service"
       eyebrow={
         [deal.vendor?.businessName, deal.branch?.name]
@@ -149,7 +126,7 @@ return (
       tag={deal.popularTags?.[0]?.name}
       href={`/deal/${deal.id}`}
       // layout={cardLayout}
-      onFavorite={() => handleDealFavorite(deal.id)}
+      onFavorite={() => toggleFavorite('deal', deal.id)}
     >
       <div slot="media" className="product-card-media">
         <ProductCardGallery
@@ -240,7 +217,7 @@ return (
           </CardRail>
         </PageSection>
       )}
-      <HomeOffers isAuthenticated={signedIn} />
+      <BannerSlot slot="HOME_AFTER_DEALS" />
       {ready && catalog.products.length > 0 && (
         <PageSection tone="tint" aria-labelledby="products-heading">
           <CardRail
@@ -265,7 +242,7 @@ console.log('Product:', product.name, {
                     gallery={media.images}
                     imageAlt={product.imageAlt ?? product.name}
                     favorite
-                    favoriteActive={signedIn && hasProduct(product.id)}
+                    favoriteActive={isFavorite('product', product.id)}
                     eyebrow={product.vendor?.businessName ?? undefined}
                     eyebrowHref={
                       product.vendor?.slug
@@ -287,7 +264,7 @@ console.log('Product:', product.name, {
                         : undefined
                     }
                     href={`/products/${product.id}`}
-                    onFavorite={() => handleProductFavorite(product.id)}
+                    onFavorite={() => toggleFavorite('product', product.id)}
                   />
                 </swiper-slide>
               );
@@ -295,6 +272,7 @@ console.log('Product:', product.name, {
           </CardRail>
         </PageSection>
       )}
+      <BannerSlot slot="HOME_AFTER_PRODUCTS" />
       <TreatmentDirectory groups={catalog.popularTreatments} />
       {/* {ready && <HomeFaq faqs={catalog.faqs} />} */}
       <PageSection flush aria-labelledby="partner-heading">

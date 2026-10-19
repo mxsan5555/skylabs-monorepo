@@ -42,6 +42,7 @@ import { PopularTagManagement } from './pages/account/masters/popular-tags';
 import { PopularTreatmentManagement } from './pages/account/masters/popular-treatments';
 import { PromotionManagement } from './pages/account/masters/promotions';
 import { HomeHeroManagement } from './pages/account/masters/home-hero';
+import { HomeHeroBuilder } from './pages/account/masters/home-hero-builder';
 import { BlogList } from './pages/account/cms/blog-list';
 import { BlogDetailAdmin } from './pages/account/cms/blog-detail-admin';
 import { BlogCategoriesList } from './pages/account/cms/blog-categories-list';
@@ -642,6 +643,14 @@ export function AppRoutes() {
             element={
               <RequirePermission menuKey="masters.home-hero">
                 <HomeHeroManagement />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/account/masters/home-hero/:state"
+            element={
+              <RequirePermission menuKey="masters.home-hero">
+                <HomeHeroBuilder />
               </RequirePermission>
             }
           />

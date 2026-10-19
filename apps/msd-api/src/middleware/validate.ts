@@ -41,3 +41,14 @@ export function validateParams(schema: ZodSchema) {
     next();
   };
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** `router.param` hook: a malformed id is a 422, never a 500 from the database. */
+export function uuidParam(req: Request, res: Response, next: NextFunction, value: string, name: string): void {
+  if (!UUID_RE.test(value)) {
+    sendError(res, 'VALIDATION_ERROR', 'Invalid route parameters', { fieldErrors: { [name]: ['Invalid uuid'] } });
+    return;
+  }
+  next();
+}
