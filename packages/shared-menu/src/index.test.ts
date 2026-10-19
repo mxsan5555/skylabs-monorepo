@@ -63,14 +63,14 @@ describe('msd menu permissionKey independence (regression for the Role Permissio
   // `Permission.id` (Permission.key === `${menuKey}:${action}`), so checking one node's box in
   // the Role Permission Matrix silently checks every node sharing that key too. The admin
   // "Vendor" group and the vendor's own "Business" group both used to collapse their five/seven
-  // children onto one shared key ("vendors" / "vendor-portal") — this pins each child to its own
+  // children onto one shared key ("members" / "vendor-portal") — this pins each child to its own
   // distinct key so that regression can't silently come back.
   const msdMenu = getMenuForApp('msd');
 
   it('gives each child of the admin "Vendor" group its own distinct permissionKey', () => {
     const vendors = msdMenu.find((n) => n.id === 'vendors');
     const keys = vendors?.children?.map((c) => c.permissionKey) ?? [];
-    expect(keys).toEqual(['vendors', 'vendors.branches', 'vendors.deals', 'vendors.products', 'vendors.therapists']);
+    expect(keys).toEqual(['members', 'vendors.branches', 'vendors.deals', 'vendors.products', 'vendors.therapists']);
     expect(new Set(keys).size).toBe(keys.length);
   });
 

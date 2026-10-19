@@ -29,13 +29,5 @@ ALTER TABLE "DealTherapist" ADD CONSTRAINT "DealTherapist_therapistId_fkey" FORE
 -- AddForeignKey
 ALTER TABLE "OrderItem" ADD CONSTRAINT "OrderItem_dealId_fkey" FOREIGN KEY ("dealId") REFERENCES "Deal"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
--- RenameIndex (guarded: some environments already carry this index under its new name —
--- e.g. from an earlier out-of-band schema sync — so the plain rename isn't idempotent there)
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM pg_indexes WHERE indexname = 'BranchSubcategoryAccess_branchCategoryAccessId_subcategoryId_uq'
-  ) THEN
-    ALTER INDEX "BranchSubcategoryAccess_branchCategoryAccessId_subcategoryId_uq" RENAME TO "BranchSubcategoryAccess_branchCategoryAccessId_subcategoryI_key";
-  END IF;
-END $$;
+-- RenameIndex
+ALTER INDEX IF EXISTS "BranchSubcategoryAccess_branchCategoryAccessId_subcategoryId_uq" RENAME TO "BranchSubcategoryAccess_branchCategoryAccessId_subcategoryI_key";

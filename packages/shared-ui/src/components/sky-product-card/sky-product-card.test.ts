@@ -258,13 +258,155 @@ describe('sky-product-card', () => {
     // directly on the component's own stylesheet source rather than a computed value.
     it('default slot rule sits above the stretched link in the stacking order', () => {
       const cssText = SkyProductCard.styles.toString();
-      const slotRuleMatch = cssText.match(/(?<!name-)slot\s*\{[^}]*\}/);
+      const slotRuleMatch = cssText.match(/slot:not\(\[name\]\)\s*\{[^}]*\}/);
       expect(slotRuleMatch).toBeTruthy();
-      const slotRule = slotRuleMatch![0];
+      const slotRule = slotRuleMatch?.[0] ?? '';
       expect(slotRule).toContain('position: relative');
       const zIndexMatch = slotRule.match(/z-index:\s*(\d+)/);
       expect(zIndexMatch).toBeTruthy();
-      expect(Number(zIndexMatch![1])).toBeGreaterThan(1); // above `.heading a::after`'s z-index: 1
+      expect(Number(zIndexMatch?.[1])).toBeGreaterThan(1); // above `.heading a::after`'s z-index: 1
     });
+  });
+});
+
+describe('sky-product-card media', () => {
+  async function card(props: Partial<SkyProductCard>) {
+    const el = document.createElement('sky-product-card') as SkyProductCard;
+    Object.assign(el, props);
+    document.body.appendChild(el);
+    await el.updateComplete;
+    return el;
+  }
+
+  it('styles only the default (action) slot as a block, so the media slot never shrinks the image', () => {
+    const css = SkyProductCard.styles.toString();
+    expect(css).toContain('slot:not([name])');
+    expect(css).not.toMatch(/(^|\s|\})slot \{/);
+  });
+
+  it('swaps a broken image for a neutral placeholder', async () => {
+    const el = await card({ image: '/missing.jpg', imageAlt: 'Designer Nail Art' });
+    const query = (selector: string) => el.shadowRoot?.querySelector(selector) ?? null;
+    query('img')?.dispatchEvent(new Event('error'));
+    await el.updateComplete;
+    expect(query('img')).toBeNull();
+    expect(query('.media__placeholder')).not.toBeNull();
+  });
+
+  it('tries a new image again after a broken one', async () => {
+    const el = await card({ image: '/missing.jpg' });
+    const query = (selector: string) => el.shadowRoot?.querySelector(selector) ?? null;
+    query('img')?.dispatchEvent(new Event('error'));
+    await el.updateComplete;
+    el.image = '/ok.jpg';
+    await el.updateComplete;
+    expect(query('img')?.getAttribute('src')).toBe('/ok.jpg');
+  });
+});
+
+describe('sky-product-card badge-color', () => {
+  async function card(props: Partial<SkyProductCard>) {
+    const el = document.createElement('sky-product-card') as SkyProductCard;
+    Object.assign(el, props);
+    document.body.appendChild(el);
+    await el.updateComplete;
+    return el;
+  }
+
+  it('keeps the default pill without badge-color', async () => {
+    const el = await card({ image: '/a.jpg', badge: 'New' });
+    expect(el.shadowRoot?.querySelector('span.badge.pill')?.textContent).toBe('New');
+    expect(el.shadowRoot?.querySelector('sky-badge')).toBeNull();
+  });
+
+  it('draws the badge as a sky-badge in the chosen theme role', async () => {
+    const el = await card({ image: '/a.jpg', badge: 'Expire soon', badgeColor: 'error' });
+    const badge = el.shadowRoot?.querySelector('sky-badge.badge') as HTMLElement;
+    expect(badge.getAttribute('variant')).toBe('error');
+    expect(badge.textContent).toBe('Expire soon');
+    expect(el.shadowRoot?.querySelector('.pill')).toBeNull();
+  });
+
+  it('uses the role container for badge-tone="tonal"', async () => {
+    const el = await card({ image: '/a.jpg', badge: 'New', badgeColor: 'tertiary', badgeTone: 'tonal' });
+    expect(el.shadowRoot?.querySelector('sky-badge')?.getAttribute('status')).toBe('warning');
+  });
+});
+
+describe('sky-product-card color', () => {
+  it('keeps the default look without color and reflects a chosen role', async () => {
+    const el = document.createElement('sky-product-card') as SkyProductCard;
+    el.heading = 'Kit';
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(el.hasAttribute('color')).toBe(false);
+    el.color = 'secondary';
+    await el.updateComplete;
+    expect(el.getAttribute('color')).toBe('secondary');
+  });
+
+  it('maps the body, text and accents to the shared M3 roles only when color is set', () => {
+    const css = SkyProductCard.styles.toString();
+    expect(css).toContain(':host([color]) .body');
+    expect(css).toMatch(/:host\(\[color\]\) \.price__current[^{]*\{[^}]*--_accent/);
+    expect(css).toContain(":host([color='secondary'])");
+    // Slotted actions (Add to cart, wishlist) follow the role too.
+    expect(css).toMatch(/:host\(\[color\]\) slot:not\(\[name\]\)::slotted\(\*\)[^{]*\{[^}]*--md-outlined-icon-button-outline-color/);
+  });
+});
+
+describe('sky-product-card description and price-first order', () => {
+  async function card(props: Partial<SkyProductCard>) {
+    const el = document.createElement('sky-product-card') as SkyProductCard;
+    Object.assign(el, props);
+    document.body.appendChild(el);
+    await el.updateComplete;
+    return el;
+  }
+  const order = (el: SkyProductCard) =>
+    Array.from(el.shadowRoot?.querySelector('.body')?.children ?? []).map((child) => (child.tagName === 'SLOT' ? 'SLOT' : child.className));
+
+  it('shows the description under the heading', async () => {
+    const el = await card({ heading: 'Hydro massage', description: 'Up to 89% off.' });
+    const heading = el.shadowRoot?.querySelector('h3') as HTMLElement;
+    expect(heading.nextElementSibling?.textContent).toBe('Up to 89% off.');
+  });
+
+  it('keeps the default order when price-first is off', async () => {
+    const el = await card({ heading: 'Kit', eyebrow: 'Serenity', price: '₹25', rating: 4.7, reviews: 10 });
+    expect(order(el)).toEqual(['eyebrow body-medium', 'heading title-medium', 'rating body-medium', 'price', 'SLOT']);
+  });
+
+  it('puts price and rating first, then heading + description + member, then the place row', async () => {
+    const el = await card({
+      priceFirst: true,
+      heading: 'Hydro massage',
+      description: 'Up to 89% off.',
+      eyebrow: 'Delaware Injury Care',
+      location: 'Lucknow',
+      distance: '20 km',
+      price: '₹25',
+      originalPrice: '₹6,500',
+      discount: '-60%',
+      rating: 4.7,
+      reviews: 4273,
+    });
+    expect(el.hasAttribute('price-first')).toBe(true);
+    expect(order(el)).toEqual(['meta', 'group', 'meta body-medium', 'SLOT']);
+    const [priceRow, textGroup, placeRow] = Array.from(el.shadowRoot?.querySelector('.body')?.children ?? []);
+    // Heading and description clamp to two lines (ellipsis) in this order.
+    expect(Array.from(textGroup.children).map((c) => c.className)).toEqual(['heading title-medium clamp', 'body-medium clamp', 'meta']);
+    // The member sits last in its row (pushed to the end by an empty start item).
+    expect(textGroup.lastElementChild?.lastElementChild?.textContent).toBe('Delaware Injury Care');
+    expect(priceRow.querySelector('.price .price__current')?.textContent).toBe('₹25');
+    expect(priceRow.querySelector('.rating')?.getAttribute('aria-label')).toBe('Rated 4.7 out of 5, 4,273 reviews');
+    // Current price first, one star and a grouped review count.
+    expect(priceRow.querySelector('.price')?.firstElementChild?.textContent).toBe('₹25');
+    expect(priceRow.querySelector('.price__current')?.classList.contains('title-large')).toBe(true);
+    // One star and the score; the review count is in the accessible name only.
+    expect(priceRow.querySelectorAll('.stars md-icon')).toHaveLength(1);
+    expect(priceRow.querySelector('.rating')?.textContent?.trim()).toMatch(/4.7$/);
+    expect(placeRow.textContent).toContain('Lucknow');
+    expect(placeRow.querySelector('.distance')?.textContent).toContain('20 km');
   });
 });

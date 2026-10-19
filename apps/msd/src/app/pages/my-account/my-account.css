@@ -1,12 +1,66 @@
+
 .my-account-shell {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  column-gap: 32px;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 32px 20px 32px;
+  padding: 15px 25px;
   align-items: start;
 }
+
+.my-account-shell__breadcrumb {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.my-account-nav {
+  grid-column: 1;
+  grid-row: 2;
+  position: sticky;
+  top: 88px;
+  align-self: start;
+  height: fit-content;
+}
+
+.my-account-shell__content {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .my-account-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+    gap: 16px;
+    padding: 20px 12px 96px;
+  }
+
+  .my-account-shell__breadcrumb {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .my-account-nav {
+    grid-column: 1;
+    grid-row: 2;
+    position: static;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .my-account-shell__content {
+    grid-column: 1;
+    grid-row: 3;
+    width: 100%;
+    min-width: 0;
+  }
+}
+
 
 .my-account-nav {
   position: sticky;
@@ -28,20 +82,53 @@
 .my-account-nav__link {
   text-decoration: none;
 }
-
-.my-account-nav__logout {
-  margin-top: 8px;
-  border-top: 1px solid var(
-    --md-sys-color-outline-variant,
-    #c4c7c5
-  );
-  padding-top: 12px;
+.my-account-nav .role-list__name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
+.my-account-nav .role-list__name md-icon {
+  font-size: 24px;
+}
+.my-account-nav__logout {
+  margin-top: 0;
+}
+.my-account-nav__icon {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  font-size: 24px;
+  line-height: 28px;
+  flex-shrink: 0;
+}
+.my-account-nav__logout .entity-list__item {
+  width: 100%;
+}
+
+/* Routed page content */
 .my-account-shell__content {
   min-width: 0;
 }
+.my-account__breadcrumb{
+  margin-bottom: 10px;
+}
+.my-account-shell__breadcrumb {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
 
+.my-account-nav {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.my-account-shell__content {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+}
 @media (max-width: 768px) {
   .my-account-shell {
     grid-template-columns: 1fr;

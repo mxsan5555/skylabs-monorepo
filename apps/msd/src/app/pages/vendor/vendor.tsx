@@ -1,3 +1,4 @@
+import { JsonLd } from '../../seo/json-ld';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FilledButton, OutlinedIconButton, Icon, Divider, Radio, ChipSet, FilterChip, SuggestionChip, Tabs, PrimaryTab, OutlinedTextField, } from '@skylabs-monorepo/shared-ui/react';
@@ -16,8 +17,7 @@ import { useDealPurchaseSelection } from '../../../hooks/use-deal-purchase-selec
 import { useTherapistPurchaseSelection } from '../../../hooks/use-therapist-purchase-selection';
 import { formatINR, pluralize, formatTime12h } from '../../../utils/format';
 import { resolveDealMedia, resolveProductMedia, resolveTherapistMedia, primaryImage } from '../../../utils/media';
-import { useToast } from '../../../toast/toast-context';
-import { productPath } from '../../seo/public-urls';
+import { showSnackbar } from '../../../snackbar/snackbar';
 import './vendor.css';
 import content from '../../../content.json';
 
@@ -149,7 +149,6 @@ export function VendorPage() {
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   const { has: isWishlisted, toggle: toggleWishlist, isPending: wishlistPending } = useWishlist();
-  const { showToast } = useToast();
 
   const { coords } = useCurrentLocation();
 
@@ -288,11 +287,11 @@ export function VendorPage() {
     try {
       await addCartItem(token, { productId: product.id, quantity: 1 });
       setProductActionMessage(`Added "${product.name}" to your cart.`);
-      showToast(`Added to cart\n${product.name}`);
+      showSnackbar(`Added to cart: ${product.name}`, { variant: 'success' });
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setProductActionError(message);
-      showToast(message, 'error');
+      showSnackbar(message, { variant: 'error' });
     }
   };
 
@@ -332,10 +331,8 @@ export function VendorPage() {
       <meta name="twitter:title" content={`${vendor.businessName} | MSD`} />
       <meta name="twitter:description" content={metaDescription.slice(0, 155)} />
       {vendor.logoUrl && <meta name="twitter:image" content={vendor.logoUrl} />}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+      <JsonLd
+        data={{
             '@context': 'https://schema.org',
             '@type': 'LocalBusiness',
             name: vendor.businessName,
@@ -352,13 +349,10 @@ export function VendorPage() {
             openingHoursSpecification: selectedBranch?.openingHours
               ? buildOpeningHoursSpecification(selectedBranch.openingHours)
               : undefined,
-          }),
-        }}
+          }}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+      <JsonLd
+        data={{
             '@context': 'https://schema.org',
             '@type': 'BreadcrumbList',
             itemListElement: [
@@ -366,8 +360,7 @@ export function VendorPage() {
               { '@type': 'ListItem', position: 2, name: 'Explore', item: `${SITE_URL}/explore` },
               { '@type': 'ListItem', position: 3, name: vendor.businessName, item: canonicalUrl },
             ],
-          }),
-        }}
+          }}
       />
 
       {/* Breadcrumb */}
@@ -741,7 +734,6 @@ function DealSelectionPanel({
   requireAuthOrRedirect: () => boolean;
 }) {
   const { token } = useAuth();
-  const { showToast } = useToast();
   const selection = useDealPurchaseSelection(group.deal);
   const { activePackage, unitPrice, missingSelection } = selection;
 
@@ -771,11 +763,11 @@ function DealSelectionPanel({
       const durationLabel = ` — ${activePackage.durationMinutes} Minutes`;
       setActionMessage(`Added "${group.name}" to your cart.`);
       // Only fires after the API call above has actually resolved — never claims success early.
-      showToast(`Added to cart\n${group.name}${durationLabel}`);
+      showSnackbar(`Added to cart: ${group.name}${durationLabel}`, { variant: 'success' });
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setActionError(message);
-      showToast(message, 'error');
+      showSnackbar(message, { variant: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -887,7 +879,6 @@ function TherapistSelectionPanel({
   requireAuthOrRedirect: () => boolean;
 }) {
   const { token } = useAuth();
-  const { showToast } = useToast();
   const selection = useTherapistPurchaseSelection(therapist.packages);
   const { activePackage, unitPrice, missingSelection } = selection;
 
@@ -918,11 +909,11 @@ function TherapistSelectionPanel({
       setActionMessage(`Added "${displayName}" to your cart.`);
       // Only fires after the API call above has actually resolved — never claims success early.
       const label = `${therapist.personName} — ${activePackage.durationMinutes} Minutes`;
-      showToast(`Added to cart\n${label}`);
+      showSnackbar(`Added to cart: ${label}`, { variant: 'success' });
     } catch (err) {
       const message = err instanceof ApiRequestError ? err.message : 'Unable to add item to cart.';
       setActionError(message);
-      showToast(message, 'error');
+      showSnackbar(message, { variant: 'error' });
     } finally {
       setSubmitting(false);
     }

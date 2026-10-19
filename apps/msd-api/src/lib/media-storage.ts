@@ -1,34 +1,41 @@
 import * as crypto from 'crypto';
 import * as path from 'path';
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from '../config/env';
+import { ApiError } from './http';
 
 /**
- * Cloudflare R2 storage backend for the media-upload system (Deal/Product/Therapist/Vendor/
- * Category/CMS images+video). R2 is S3-compatible, so we drive it with the AWS S3 client pointed
- * at the account's R2 endpoint. Files are validated (media-validation.service.ts) fully in-memory
- * before this module ever uploads — only a validated buffer is sent.
+ * Cloudflare R2 storage backend for every upload. R2 is S3-compatible, so we drive it with the
+ * AWS S3 client pointed at the account's R2 endpoint. Files are validated
+ * (media-validation.service.ts) fully in-memory before this module ever uploads.
  *
- * `storageKey` (what gets persisted on the DB row) is always relative to the bucket root, e.g.
- * "deals/<dealId>/<uuid>.jpg" — it is also the R2 object key. The DB never stores the bucket's
- * public hostname, so the R2 public URL can change without a data migration: the frontend builds
- * the displayable URL by prefixing `VITE_MEDIA_BASE_URL` onto the stored `storageKey`
- * (see apps/msd/src/api/media.ts's `resolveMediaUrl`).
+ * Two buckets (docs/msd/ARCHITECTURE.md §12.3):
+ * - `public` (`R2_BUCKET`): website media. The frontend builds the URL by prefixing
+ *   `VITE_MEDIA_BASE_URL` onto the stored `storageKey` (apps/msd/src/api/media.ts).
+ * - `private` (`R2_PRIVATE_BUCKET`, no public access): member KYC documents, opened only through
+ *   `signedFileUrl` links that expire.
  *
- * Railway's container filesystem is ephemeral (wiped on every redeploy), which is why media lives
- * in R2 and not on local disk — see DEPLOYMENT.md.
+ * `storageKey` (persisted on the DB row) is the object key, relative to the bucket root, built
+ * from a `storageFolder` in lib/storage-layout.ts plus a random UUID file name. The DB never
+ * stores a hostname, so URLs can change without a data migration.
+ *
+ * Railway's container filesystem is wiped on every redeploy, which is why media lives in R2 and
+ * not on local disk — see docs/DEPLOYMENT.md §6.
  */
+export type StorageBucket = 'public' | 'private';
 
-// Content type per extension the validator accepts (media-validation.service.ts). Kept here so
-// writeMediaFile's signature stays (subdir, parentId, buffer, ext) and media.service.ts is
-// untouched — the sniffed MIME the service already stores on the DB row isn't needed for the
-// upload itself.
+/** Signed links for private files expire after this many seconds (PLANNING §2.3). */
+export const SIGNED_URL_TTL_SECONDS = 300;
+
+// Content type per extension the validator accepts (media-validation.service.ts).
 const CONTENT_TYPE_BY_EXT: Record<string, string> = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
   '.webp': 'image/webp',
   '.gif': 'image/gif',
+  '.pdf': 'application/pdf',
   '.mp4': 'video/mp4',
   '.webm': 'video/webm',
   '.mov': 'video/quicktime',
@@ -52,17 +59,26 @@ function r2(): S3Client {
   return client;
 }
 
+function bucketName(bucket: StorageBucket): string {
+  if (bucket === 'public') return env.r2Bucket;
+  // Never fall back to the public bucket: identity documents must not become public by mistake.
+  if (!env.r2PrivateBucket) {
+    throw new ApiError('SERVICE_UNAVAILABLE', 'Private document storage is not configured (R2_PRIVATE_BUCKET).');
+  }
+  return env.r2PrivateBucket;
+}
+
+/** Uploads into `folder` (from `storageFolder`) under a random file name. */
 export async function writeMediaFile(
-  subdir: string,
-  parentId: string,
+  folder: string,
   buffer: Buffer,
   ext: string,
+  bucket: StorageBucket = 'public',
 ): Promise<{ storageKey: string; sizeBytes: number }> {
-  const filename = `${crypto.randomUUID()}${ext}`;
-  const storageKey = path.posix.join(subdir, parentId, filename);
+  const storageKey = path.posix.join(folder, `${crypto.randomUUID()}${ext}`);
   await r2().send(
     new PutObjectCommand({
-      Bucket: env.r2Bucket,
+      Bucket: bucketName(bucket),
       Key: storageKey,
       Body: buffer,
       ContentType: CONTENT_TYPE_BY_EXT[ext.toLowerCase()] ?? 'application/octet-stream',
@@ -71,8 +87,14 @@ export async function writeMediaFile(
   return { storageKey, sizeBytes: buffer.length };
 }
 
-export async function deleteMediaFile(storageKey: string): Promise<void> {
-  // S3/R2 DeleteObject is idempotent — deleting a missing key succeeds, so there's no
-  // "not found" case to swallow (unlike the old local-disk ENOENT handling).
-  await r2().send(new DeleteObjectCommand({ Bucket: env.r2Bucket, Key: storageKey }));
+export async function deleteMediaFile(storageKey: string, bucket: StorageBucket = 'public'): Promise<void> {
+  // S3/R2 DeleteObject is idempotent — deleting a missing key succeeds.
+  await r2().send(new DeleteObjectCommand({ Bucket: bucketName(bucket), Key: storageKey }));
+}
+
+/** A link that opens one file for `SIGNED_URL_TTL_SECONDS`, then stops working. */
+export async function signedFileUrl(storageKey: string, bucket: StorageBucket): Promise<string> {
+  return getSignedUrl(r2(), new GetObjectCommand({ Bucket: bucketName(bucket), Key: storageKey }), {
+    expiresIn: SIGNED_URL_TTL_SECONDS,
+  });
 }

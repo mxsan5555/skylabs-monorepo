@@ -1,13 +1,9 @@
 import { useParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { useEffect, useState, useMemo, createElement, type ReactNode } from 'react';
-import {
-  Icon,
-  Tabs,
-  PrimaryTab,
-  OutlinedTextField,
-  FilledButton,
-  OutlinedButton,
-} from '@skylabs-monorepo/shared-ui/react';
+import { useEffect, useState, useMemo, createElement } from 'react';
+import { ProductCardGallery } from '../../components/product-card-gallery';
+import { showSnackbar } from '../../../snackbar/snackbar';
+import { Icon, FilledButton } from '@skylabs-monorepo/shared-ui/react';
+import '@skylabs-monorepo/shared-ui/carousel';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { signInPathWithReturnTo } from '../../../auth/role-routing';
 import {
@@ -24,9 +20,8 @@ import {
   type CatalogTherapist,
 } from '../../../api/catalog';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { DealCard } from '../../components/deal-card';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
-import { addCartItem } from '../../../api/cart';
+import { useAddProductToCart } from '../../../hooks/use-add-product-to-cart';
 import { useWishlist } from '../../../wishlist/wishlist-context';
 import { useHydrated } from '../../../hooks/use-hydrated';
 import { useMediaQuery } from '../../../hooks/use-media-query';
@@ -58,6 +53,7 @@ import { breadcrumbJsonLd } from '../../seo/jsonld';
 import { SITE_URL } from '../../seo/site-url';
 import { dealPath, productPath, therapistPath } from '../../seo/public-urls';
 import content from '../../../content.json';
+import { BannerSlot } from '../../components/banner-slot/banner-slot';
 
 const t = content.category;
 
@@ -121,12 +117,16 @@ export function Category() {
   const { slug = '', city: citySlugParam } = useParams<{ slug: string; city?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { token, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   // Rendering decisions wait for hydration so they match the prerendered (signed-out) HTML.
   const signedIn = useHydrated() && isAuthenticated;
-  const { has: isWishlisted, toggle: toggleWishlist } = useWishlist();
-  const [actionMessage, setActionMessage] = useState('');
-  const [actionError, setActionError] = useState('');
+  const {
+    has: isWishlisted,
+    toggle: toggleWishlist,
+    hasProduct,
+    toggleProduct,
+    isProductPending,
+  } = useWishlist();
   const { coords, city: visitorCity } = useVisitorLocation();
   const { locationsStatus, locations } = useCatalogShell();
   const cityLocation = citySlugParam ? locations.find((l) => citySlug(l.city) === citySlugParam) : undefined;
@@ -231,27 +231,26 @@ export function Category() {
       { replace: true },
     );
   };
+  const addToCart = useAddProductToCart();
   const requireAuthOrRedirect = () => {
     if (isAuthenticated) return true;
     navigate(signInPathWithReturnTo(location));
     return false;
   };
-  const addProductToCart = async (product: CatalogProduct) => {
-    if (!requireAuthOrRedirect()) return;
-    setActionError('');
-    setActionMessage('');
-    try {
-      await addCartItem(token, { productId: product.id, quantity: 1 });
-      setActionMessage(content.category.messages.addToCartSuccess.replace('{item}', product.name));
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : content.category.errors.addToCart);
-    }
-  };
+  const addProductToCart = (product: CatalogProduct) => addToCart(product.id, product.name);
   const toggleFavorite = (deal: CatalogDeal) => {
     if (!requireAuthOrRedirect()) return;
     void toggleWishlist(deal.id);
   };
+  const toggleProductFavorite = async (productId: string) => {
+    if (!requireAuthOrRedirect()) return;
 
+    const success = await toggleProduct(productId);
+
+    if (!success) {
+      showSnackbar('Unable to update product wishlist. Please try again.', { variant: 'error' });
+    }
+  };
   const isTherapyCategory = category?.type === 'THERAPY';
   const isProductCategory = category?.type === 'PRODUCT';
 
@@ -477,20 +476,32 @@ export function Category() {
     ) : null;
 
   const cardLayout = view === 'list' ? 'horizontal' : undefined;
+
   const cards = isTherapyCategory
     ? therapists.map((therapist) => {
       const price = therapistFromPrice(therapist);
+
       return (
         <SkyProductCardWC
           key={therapist.id}
           image={primaryImage(resolveTherapistMedia(therapist))}
           eyebrow={therapist.personName}
-          eyebrowHref={therapist.vendor?.slug ? `/vendor/${therapist.vendor.slug}` : undefined}
+          eyebrowHref={
+            therapist.vendor?.slug
+              ? `/vendor/${therapist.vendor.slug}`
+              : undefined
+          }
           heading={therapist.therapistType}
           location={therapist.branch?.city ?? undefined}
-          distance={therapist.distanceKm != null ? `${Math.round(therapist.distanceKm * 10) / 10} km` : undefined}
+          distance={
+            therapist.distanceKm != null
+              ? `${Math.round(therapist.distanceKm * 10) / 10} km`
+              : undefined
+          }
           tag={therapist.popularTags?.[0]?.name}
-          pricePrefix={price != null ? t.therapistPricePrefix : undefined}
+          pricePrefix={
+            price != null ? t.therapistPricePrefix : undefined
+          }
           price={price != null ? formatINR(price) : undefined}
           href={therapistPath(therapist)}
           layout={cardLayout}
@@ -498,85 +509,180 @@ export function Category() {
       );
     })
     : isProductCategory
-      ? products.map((product) => (
-        <DealCard
-          key={product.id}
-          deal={{
-            id: product.id,
-            slug: product.slug,
-            title: product.name,
-            image: primaryImage(resolveProductMedia(product)) ?? '',
-            imageAlt: product.imageAlt ?? '',
-            gallery: resolveProductMedia(product).images,
-            badge: t.offeringLabels.product,
-            providerName: product.vendor?.businessName ?? '',
-            price: Number(product.price),
-            originalPrice:
-              product.originalPrice && Number(product.originalPrice) !== Number(product.price)
-                ? Number(product.originalPrice)
-                : undefined,
-            discount: product.discount ?? undefined,
-            tag: product.popularTags?.[0]?.name,
-          }}
-          href={productPath(product)}
-          eyebrowHref={product.vendor?.slug ? `/vendor/${product.vendor.slug}` : undefined}
-          favoriteActive={false}
-          onFavorite={() => { }}
-          layout={cardLayout}
-          actions={
-            <FilledButton onClick={() => addProductToCart(product)}>
-              <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-              {t.actions.addToCart}
-            </FilledButton>
-          }
-        />
-      ))
-      : deals.map((deal) => (
-        <DealCard
-          key={deal.id}
-          deal={{
-            id: deal.id,
-            slug: deal.slug,
-            title: deal.title,
-            image: primaryImage(resolveDealMedia(deal)) ?? '',
-            imageAlt: '',
-            gallery: resolveDealMedia(deal).images,
-            badge: t.offeringLabels.service,
-            providerName: [deal.vendor?.businessName, deal.branch?.name].filter(Boolean).join(' · '),
-            location: deal.branch?.city ?? undefined,
-            distance: deal.distanceKm != null ? Math.round(deal.distanceKm * 10) / 10 : undefined,
-            price: Number(deal.salePrice),
-            originalPrice:
-              deal.originalPrice && Number(deal.originalPrice) !== Number(deal.salePrice)
-                ? Number(deal.originalPrice)
-                : undefined,
-            discount: deal.discountPercent ? Number(deal.discountPercent) : undefined,
-            priceNote: deal.durationMinutes ? `${deal.durationMinutes} ${t.durationSuffix}` : undefined,
-            tag: deal.popularTags?.[0]?.name,
-          }}
-          eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
-          favoriteActive={signedIn && isWishlisted(deal.id)}
-          onFavorite={() => toggleFavorite(deal)}
-          layout={cardLayout}
-          actions={
-            <DealAddToCartDialog
-              deal={deal}
-              onAdded={(label) => setActionMessage(t.messages.addToCartSuccess.replace('{item}', label))}
-              renderTrigger={(open) => (
-                <OutlinedButton
-                  onClick={() => {
-                    if (requireAuthOrRedirect()) open();
-                  }}
-                >
-                  <Icon slot="icon" aria-hidden="true">shopping_bag</Icon>
-                  {t.actions.addToCart}
-                </OutlinedButton>
-              )}
-            />
-          }
-        />
-      ));
+      ? products.map((product) => {
+        const media = resolveProductMedia(product);
+        const images = media.images ?? [];
 
+
+
+        const originalPrice =
+          product.originalPrice != null
+            ? Number(product.originalPrice)
+            : undefined;
+
+        const price = Number(product.price);
+
+        const discount =
+          product.discount ??
+          (originalPrice !== undefined && originalPrice > price
+            ? Math.round(
+              ((originalPrice - price) / originalPrice) * 100,
+            )
+            : 0);
+
+        return (
+          <SkyProductCardWC
+            key={product.id}
+            variant="outlined"
+            image={undefined}
+            imageAlt={product.imageAlt ?? product.name}
+            favorite
+            favoriteActive={signedIn && hasProduct(product.id)}
+            badge={t.offeringLabels.product}
+            eyebrow={product.brand ?? product.vendor?.businessName ?? undefined}
+            eyebrowHref={
+              product.vendor?.slug
+                ? `/vendor/${product.vendor.slug}`
+                : undefined
+            }
+            heading={product.name}
+            originalPrice={
+              originalPrice !== undefined && originalPrice !== price
+                ? formatINR(originalPrice)
+                : undefined
+            }
+            price={formatINR(price)}
+            discount={discount ? `-${discount}%` : undefined}
+            tag={product.popularTags?.[0]?.name}
+            href={`/products/${product.id}`}
+            layout={cardLayout}
+            onFavorite={() => {
+              if (!isProductPending(product.id)) {
+                void toggleProductFavorite(product.id);
+              }
+            }}
+          >
+            <div slot="media" className="product-card-media">
+              <ProductCardGallery
+                images={images}
+                alt={product.imageAlt ?? product.name}
+                layout={cardLayout}
+              />
+            </div>
+
+            <div onClick={(event) => event.stopPropagation()}>
+              <FilledButton
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void addProductToCart(product);
+                }}
+              >
+                <Icon slot="icon" aria-hidden="true">
+                  shopping_bag
+                </Icon>
+                {t.actions.addToCart}
+              </FilledButton>
+            </div>
+          </SkyProductCardWC>
+        );
+      })
+      : deals.map((deal) => {
+        const media = resolveDealMedia(deal);
+        const images = media.images ?? [];
+
+        return (
+          <SkyProductCardWC
+            key={deal.id}
+            variant="outlined"
+            image={undefined}
+            imageAlt={deal.title}
+            favorite
+            favoriteActive={signedIn && isWishlisted(deal.id)}
+            badge={t.offeringLabels.service}
+            eyebrow={[
+              deal.vendor?.businessName,
+              deal.branch?.name,
+            ]
+              .filter(Boolean)
+              .join(' · ') || undefined}
+            eyebrowHref={
+              deal.vendor?.slug
+                ? `/vendor/${deal.vendor.slug}`
+                : undefined
+            }
+            heading={deal.title}
+            location={deal.branch?.city ?? undefined}
+            distance={
+              deal.distanceKm != null
+                ? `${Math.round(deal.distanceKm * 10) / 10} km`
+                : undefined
+            }
+            originalPrice={
+              deal.originalPrice &&
+                Number(deal.originalPrice) !== Number(deal.salePrice)
+                ? formatINR(Number(deal.originalPrice))
+                : undefined
+            }
+            price={formatINR(Number(deal.salePrice))}
+            discount={
+              deal.discountPercent
+                ? `-${Number(deal.discountPercent)}%`
+                : undefined
+            }
+            priceNote={
+              deal.durationMinutes
+                ? `${deal.durationMinutes} ${t.durationSuffix}`
+                : undefined
+            }
+            tag={deal.popularTags?.[0]?.name}
+            href={`/deal/${deal.id}`}
+            layout={cardLayout}
+            onFavorite={() => toggleFavorite(deal)}
+          >
+            <div slot="media" className="product-card-media">
+              <ProductCardGallery
+                images={images}
+                alt={deal.title}
+                layout={cardLayout}
+              />
+            </div>
+
+            <div onClick={(event) => event.stopPropagation()}>
+              <DealAddToCartDialog
+                deal={deal}
+                onAdded={(label) => {
+                  showSnackbar(
+                    t.messages.addToCartSuccess.replace('{item}', label),
+                    {
+                      variant: 'info',
+                      actionLabel: content.cartToast.viewCart,
+                      onAction: () => navigate('/cart'),
+                    },
+                  );
+                }}
+                renderTrigger={(open) => (
+                  <FilledButton
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+
+                      if (requireAuthOrRedirect()) {
+                        open();
+                      }
+                    }}
+                  >
+                    <Icon slot="icon" aria-hidden="true">
+                      shopping_bag
+                    </Icon>
+                    {t.actions.bookNow}
+                  </FilledButton>
+                )}
+              />
+            </div>
+          </SkyProductCardWC>
+        );
+      });
   return (
     <>
       <Seo
@@ -609,6 +715,7 @@ export function Category() {
         />
         {pills}
       </PageSection>
+      <BannerSlot slot="CATEGORY_TOP" />
       <PageSection tone="tint" stack aria-label={`${category.name} ${t.dealsAriaLabelSuffix}`}>
         <ListingToolbar
           ariaLabel={t.toolbar.label}
@@ -665,8 +772,6 @@ export function Category() {
             />
           }
         >
-          {actionMessage && <p className="field-hint" role="status">{actionMessage}</p>}
-          {actionError && <p className="error-state" role="alert">{actionError}</p>}
           {showingMap ? (
             <>
               <DealMap points={mapPoints} ariaLabel={t.map.label} loadingLabel={t.map.loading} />

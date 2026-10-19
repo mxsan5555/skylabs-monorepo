@@ -24,17 +24,25 @@ export function AdminLayout() {
   );
 }
 
+/** Shown on every console screen while the signed in member's account is inactive. */
+export function MemberStatusBanner({ status }: { status?: string }) {
+  if (status !== 'INACTIVE') return null;
+  return (
+    <p className="preview-banner" role="status">
+      <Icon aria-hidden="true">info</Icon>
+      <span>
+        Your account is inactive and view only. You can look at everything, but you cannot change anything. Contact support to
+        reactivate it.
+      </span>
+    </p>
+  );
+}
+
 function AdminShell() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { bootstrap, isPreviewing, returnToSuperAdmin } = useAuth();
-  console.log('PREVIEW BOOTSTRAP:', {
-  isPreviewing,
-  roles: bootstrap?.roles,
-  permissions: bootstrap?.permissions,
-  menu: bootstrap?.menu,
-});
   const current = findMenuNodeByRoute(bootstrap?.menu ?? [], location.pathname);
   const trail = useBreadcrumbTrail();
 
@@ -62,6 +70,7 @@ function AdminShell() {
               <FilledButton onClick={() => returnToSuperAdmin()}>Return to SuperAdmin</FilledButton>
             </div>
           )}
+          <MemberStatusBanner status={bootstrap?.member?.status} />
           <div className="admin-topbar">
             <IconButton
               className="admin-sidebar-toggle"

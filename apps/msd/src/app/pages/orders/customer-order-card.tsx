@@ -1,6 +1,7 @@
-import { FilledButton, AssistChip, OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
+import { OutlinedButton } from '@skylabs-monorepo/shared-ui/react';
 import type { Order } from '../../../api/orders';
-import content from '../../../content.json';
+import { Icon } from '@skylabs-monorepo/shared-ui/react';
+import { ProductOrderTimeline } from './product-order-timeline';
 interface CustomerOrderCardProps {
     order: Order;
     onViewDetails: (order: Order) => void;
@@ -25,23 +26,6 @@ export function CustomerOrderCard({
     //   const shortOrderId = order.id.slice(0, 8);
     return (
         <>
-            {false && (
-                <sky-product-card
-                    className="customer-order-card"
-                    image={order.items?.[0]?.image || ''}
-                    image-alt="Order"
-                    // heading={`Order #${shortOrderId}...`}
-                    heading={`Order #${order.id}`}
-                    eyebrow={getStatusLabel(order.status)}
-                    location={formatDate(order.createdAt)}
-                    price={formatAmount(order.total)}
-                    layout="horizontal"
-                >
-                    <div className="customer-order-card__footer">
-                        <OutlinedButton onClick={() => onViewDetails(order)}>View Details</OutlinedButton>
-                    </div>
-                </sky-product-card>
-            )}
             {/* NEW CARD */}
             <sky-tile-card  >
                 <div className="customer-order-card-new">
@@ -73,6 +57,11 @@ export function CustomerOrderCard({
                                 </div>
                             ))}
                         </div>
+                     
+
+                        {/* {order.type === 'PRODUCT' && (
+                            <ProductOrderTimeline status={order.status} />
+                        )} */}
                         <div className="customer-order-card-new__bottom">
                             <strong className="customer-order-card-new__total">Total: {formatAmount(order.total)}</strong>
                             <OutlinedButton onClick={() => onViewDetails(order)}>View Details</OutlinedButton>

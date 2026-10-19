@@ -9,6 +9,7 @@ import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import {
   assertVendorHasCategoryAccess,
+  assertCategoryOfType,
   assertBranchHasCategoryAccess,
   assertBranchHasSubcategoryAccess,
   resolveTopLevelCategory,
@@ -176,6 +177,19 @@ describe('assertVendorHasCategoryAccess', () => {
   it('rejects a PRODUCT category used for a THERAPY check', async () => {
     prismaMock.category.findUnique.mockResolvedValue(topProductFixture);
     await expect(assertVendorHasCategoryAccess(VENDOR_ID, TOP_PRODUCT_ID, 'THERAPY')).rejects.toThrow(ApiError);
+  });
+});
+
+describe('assertCategoryOfType (no per-member grant, D10)', () => {
+  it('passes a PRODUCT category without reading any vendor grant', async () => {
+    prismaMock.category.findUnique.mockResolvedValue(topProductFixture);
+    await expect(assertCategoryOfType(TOP_PRODUCT_ID, 'PRODUCT')).resolves.toBeUndefined();
+    expect(prismaMock.vendorCategoryAccess.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('rejects a SERVICE category used for a PRODUCT check', async () => {
+    prismaMock.category.findUnique.mockResolvedValue(topServiceFixture);
+    await expect(assertCategoryOfType(TOP_SERVICE_ID, 'PRODUCT')).rejects.toThrow(ApiError);
   });
 });
 

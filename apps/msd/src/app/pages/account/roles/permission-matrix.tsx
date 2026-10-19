@@ -1,74 +1,181 @@
-import type { PermissionAction } from '@skylabs-monorepo/shared-types';
-import type { PermissionCatalogRow } from '../../../../api/rbac/roles';
+import type {
+  PermissionCatalogRow,
+  PermissionScope,
+  Role,
+} from '../../../../api/rbac/roles';
 
 interface PermissionMatrixProps {
   catalog: PermissionCatalogRow[];
-  selectedPermissionIds: ReadonlySet<string>;
-  onToggle: (permissionId: string) => void;
+  role: Role | null;
+  permissions: ReadonlyMap<string, PermissionScope>;
+  onPermissionToggle: (
+    roleId: string,
+    permissionId: string,
+    checked: boolean,
+    scope: PermissionScope,
+  ) => void;
   disabled?: boolean;
 }
 
-/**
- * The Role Permission Matrix only ever exposes these 4 actions — legacy actions (export, import,
- * approve, reject, upload, download, print, assign, restore, permanent_delete, status_change,
- * custom) stay real `Permission` rows in the DB (other gates like `vendors:custom` still depend
- * on them) but are never rendered as columns here.
- */
-const ALLOWED_ACTIONS: PermissionAction[] = ['view', 'create', 'edit', 'delete'];
+const ACTIONS = [
+  { key: 'view', label: 'V', description: 'View' },
+  { key: 'create', label: 'C', description: 'Create' },
+  { key: 'edit', label: 'E', description: 'Edit' },
+  { key: 'delete', label: 'D', description: 'Delete' },
+] as const;
 
-/**
- * Menu x action grid, restricted to View/Create/Edit/Delete. A cell is a checkbox when the
- * catalog has a seeded `Permission` row for that `(menuKey, action)` pair (`permissionId`
- * present); otherwise it renders a disabled dash — that action isn't grantable yet because no
- * Permission row exists to reference (e.g. Branch has no `delete` endpoint, only status_change).
- */
-export function PermissionMatrix({ catalog, selectedPermissionIds, onToggle, disabled }: PermissionMatrixProps) {
-  if (catalog.length === 0) {
-    return <p className="empty-state">The permission catalog is empty.</p>;
+function normalize(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+function getScope(
+  role: Role,
+  resource: PermissionCatalogRow,
+): PermissionScope {
+  const roleKey = normalize(role.key);
+  const resourceKey = normalize(resource.menuKey);
+
+  if (resourceKey === 'my_profile') return 'OWN';
+
+  if (resourceKey === 'logs' && roleKey !== 'super_admin') {
+    return 'OWN';
   }
 
-  const catalogActions = new Set(catalog[0]?.actions.map((a) => a.action) ?? []);
-  const actionKeys = ALLOWED_ACTIONS.filter((action) => catalogActions.has(action));
+  if (
+    roleKey === 'member' &&
+    [
+      'members',
+      'branches',
+      'deals',
+      'therapists',
+      'products',
+      'orders',
+      'payments_payouts',
+      'reports',
+    ].includes(resourceKey)
+  ) {
+    return 'OWN';
+  }
+
+  return 'ALL';
+}
+
+export function PermissionMatrix({
+  catalog,
+  role,
+  permissions,
+  onPermissionToggle,
+  disabled = false,
+}: PermissionMatrixProps) {
+  if (!role) {
+    return (
+      <p className="empty-state">
+        Select a role to view and manage its permissions.
+      </p>
+    );
+  }
+
+  const roleName = role.name;
 
   return (
-    <div className="perm-matrix-wrap">
-      <table className="perm-matrix">
-        <caption className="sr-only">Permission matrix by menu and action</caption>
+    <div>
+      <p className="field-hint">
+        Editing permissions for <strong>{roleName}</strong>. Select a checkbox
+        to grant an action or clear it to remove the action. Changes are saved
+        when you click Save permissions.
+      </p>
+
+      <p>
+        <strong>V</strong> = View&nbsp;&nbsp;
+        <strong>C</strong> = Create&nbsp;&nbsp;
+        <strong>E</strong> = Edit&nbsp;&nbsp;
+        <strong>D</strong> = Delete
+      </p>
+
+      <p>
+        <strong>Own</strong> means the action is restricted to the user's own
+        records. <strong>All</strong> means all permitted records.
+      </p>
+
+      <table>
         <thead>
           <tr>
-            <th scope="col">Menu</th>
-            {actionKeys.map((action) => (
-              <th scope="col" key={action}>
-                {action}
-              </th>
-            ))}
+            <th scope="col">Resource</th>
+            <th scope="col">{roleName}</th>
+          </tr>
+          <tr>
+            <th scope="col">Actions</th>
+            <th scope="col">
+              <div>
+                {ACTIONS.map((action) => (
+                  <span key={action.key}>
+                    {action.label}{' '}
+                  </span>
+                ))}
+              </div>
+            </th>
           </tr>
         </thead>
+
         <tbody>
-          {catalog.map((row) => {
-            const cellByAction = new Map(row.actions.map((cell) => [cell.action, cell]));
+          {catalog.map((resource) => {
+            const scope = getScope(role, resource);
+
             return (
-              <tr key={row.id} data-row-id={row.id}>
-                <th scope="row">{row.title}</th>
-                {actionKeys.map((action) => {
-                  const cell = cellByAction.get(action);
-                  return (
-                    <td key={`${row.id}:${action}`}>
-                      {cell?.permissionId ? (
-                        <input
-                          type="checkbox"
-                          aria-label={`${row.title} — ${action}`}
-                          data-action-key={cell.key}
-                          checked={selectedPermissionIds.has(cell.permissionId)}
-                          disabled={disabled}
-                          onChange={() => cell.permissionId && onToggle(cell.permissionId)}
-                        />
-                      ) : (
-                        <span aria-hidden="true">—</span>
-                      )}
-                    </td>
-                  );
-                })}
+              <tr key={resource.id}>
+                <th scope="row">{resource.title}</th>
+
+                <td>
+                  <div>
+                    {ACTIONS.map((action) => {
+                      const definition = resource.actions.find(
+                        (item) =>
+                          normalize(item.action) === action.key ||
+                          normalize(item.key) === action.key ||
+                          normalize(item.key).endsWith(`:${action.key}`),
+                      );
+
+                      // Do not display actions that aren't defined for a resource.
+                      if (!definition) return null;
+
+                      const permissionId = definition.permissionId;
+                      const checked = permissionId
+                        ? permissions.has(permissionId)
+                        : false;
+
+                      return (
+                        <label key={action.key}>
+                          <input
+                            type="checkbox"
+                            aria-label={`${roleName}: ${resource.title}: ${action.description}`}
+                            checked={checked}
+                            disabled={disabled || !permissionId}
+                            title={
+                              !permissionId
+                                ? 'Permission record is missing. Refresh the permission catalog after backend seeding.'
+                                : `${action.description} — ${scope}`
+                            }
+                            onChange={(event) => {
+                              if (!permissionId) return;
+
+                              onPermissionToggle(
+                                role.id,
+                                permissionId,
+                                event.currentTarget.checked,
+                                scope,
+                              );
+                            }}
+                          />
+                        </label>
+                      );
+                    })}
+
+                    <span>
+                      {' '}
+                      {scope === 'OWN' ? 'Own' : 'All'}
+                    </span>
+                  </div>
+                </td>
               </tr>
             );
           })}
@@ -77,3 +184,5 @@ export function PermissionMatrix({ catalog, selectedPermissionIds, onToggle, dis
     </div>
   );
 }
+
+export default PermissionMatrix;

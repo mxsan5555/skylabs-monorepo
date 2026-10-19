@@ -1,0 +1,67 @@
+import { useAuth } from '@skylabs-monorepo/shared-auth/react';
+import { VendorProfileTabs } from './vendor-profile-tabs';
+import { useMyVendor } from './members';
+import { MEMBER_STATUS_LABEL } from './member-status';
+
+/**
+ * Split-out half of the old combined "My Business" page: just the Business/Owner/Address/
+ * KYC/Bank/Profile-Image profile editor, on its own route/nav item ("Business Profile"). Reuses
+ * `useMyVendor` (the same fetch and save implementation the combined page and "Branches &
+ * Deals" share) and the shared `VendorProfileTabs` (Business/Owner/Address/KYC/Bank/Profile
+ * Image tabs) — the same tabbed editor the admin `VendorPipeline` uses, once the vendor row
+ * exists. Does NOT reuse `VendorPipeline` itself: that component hardcodes the *admin*
+ * `POST /vendors` / `PATCH /vendors/:id` calls (gated server-side by `vendors:create`/
+ * `vendors:edit`), plus an admin-only "Vendor User" picker step. The `vendor` role only ever
+ * holds `vendors:custom` (see `vendors.tsx`'s SuperAdmin note — a role never gets a permission
+ * wider than it needs), so wiring this self-service page to `VendorPipeline` would 403 on every
+ * save — `useMyVendor.save` routes through the correct `/vendors/me*` surface instead.
+ *
+ * Staff create every member, so a missing profile shows a "contact support" message.
+ */
+export function VendorBusinessProfile() {
+  const { token } = useAuth();
+  const { vendor, notFound, loading, saving, message, error, save, fieldErrors } = useMyVendor(token);
+
+  if (loading) {
+    return (
+      <div className="admin-page">
+        <p className="loading-state">Loading your business profile…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="admin-page admin-page--wide">
+      <title>Business Profile · MSD</title>
+      <header className="page-head">
+        <div>
+          <h1>Business Profile</h1>
+          {vendor && <p>{`Status: ${MEMBER_STATUS_LABEL[vendor.status]}`}</p>}
+        </div>
+      </header>
+
+      {message && <p className="field-hint" role="status">{message}</p>}
+      {error && <p className="error-state" role="alert">{error}</p>}
+
+      {vendor ? (
+        <VendorProfileTabs
+          vendor={vendor}
+          token={token}
+          selfService
+          canEdit
+          saving={saving}
+          onSave={save}
+          serverFieldErrors={fieldErrors}
+        />
+      ) : (
+        notFound && (
+          <p className="error-state" role="alert">
+            Your member profile was not found. Please contact support.
+          </p>
+        )
+      )}
+    </div>
+  );
+}
+
+export default VendorBusinessProfile;

@@ -126,89 +126,9 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '', filter:
  *  behaviour unchanged. */
 export function OrderManagement({ scope = 'admin', refreshKey = 0 }: { scope?: 'admin' | 'member'; refreshKey?: number } = {}) {
   const { token, can } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  // Mirrors the backend's OR-check (see orders.routes.ts's `requireOrdersOrVendorSelf`) — a
-  // vendor holds `vendors:custom`, never `orders:status_change` directly (that key alone would
-  // also grant the admin-wide top-level "Orders" sidebar node — see msd-menu.json).
-  const canChangeStatus = can('orders', 'status_change') || can('vendors', 'custom');
-  const canViewCustomers = can('customers', 'view');
-
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  const params = useMemo<TableParams>(
-    () => ({
-      page: Number(searchParams.get('page')) || DEFAULT_PARAMS.page,
-      pageSize: Number(searchParams.get('pageSize')) || DEFAULT_PARAMS.pageSize,
-      search: searchParams.get('search') ?? DEFAULT_PARAMS.search,
-      filter: searchParams.get('filter') ?? DEFAULT_PARAMS.filter,
-    }),
-    [searchParams],
-  );
-  const paymentStatus = (searchParams.get('paymentStatus') as PaymentStatus | null) ?? '';
-  const vendorId = searchParams.get('vendorId') ?? '';
-
-  // "Customer's Other Orders" (from Order Details' Customer card) — `customerId` present-but-
-  // blank is treated as an unavailable filter, never silently widened to the full unfiltered
-  // list (the explicit requirement this guards against).
-  const customerIdParam = searchParams.get('customerId');
-  const hasCustomerFilterParam = customerIdParam !== null;
-  const customerId = customerIdParam?.trim() || '';
-  const customerFilterUnavailable = hasCustomerFilterParam && !customerId;
-  const excludeOrderId = searchParams.get('excludeOrderId') ?? '';
-
-  const backState = location.state as
-    | { fromOrderId?: string; fromOrderBackTo?: string; customerName?: string; customerPhone?: string | null }
-    | null;
-
-  const clearCustomerFilter = useCallback(() => {
-    setSearchParams((prev) => {
-      const usp = new URLSearchParams(prev);
-      usp.delete('customerId');
-      usp.delete('excludeOrderId');
-      usp.set('page', '1');
-      return usp;
-    });
-  }, [setSearchParams]);
-
-  const setParams = useCallback(
-    (next: TableParams) => {
-      setSearchParams(
-        (prev) => {
-          const usp = new URLSearchParams(prev);
-          usp.set('page', String(next.page));
-          usp.set('pageSize', String(next.pageSize));
-          if (next.search) usp.set('search', next.search);
-          else usp.delete('search');
-          if (next.filter) usp.set('filter', next.filter);
-          else usp.delete('filter');
-          return usp;
-        },
-        { replace: true },
-      );
-    },
-    [setSearchParams],
-  );
-
-  const setPaymentStatus = (value: string) => {
-    setSearchParams((prev) => {
-      const usp = new URLSearchParams(prev);
-      if (value) usp.set('paymentStatus', value);
-      else usp.delete('paymentStatus');
-      usp.set('page', '1');
-      return usp;
-    });
-  };
-
-  const setVendorId = (value: string) => {
-    setSearchParams((prev) => {
-      const usp = new URLSearchParams(prev);
-      if (value) usp.set('vendorId', value);
-      else usp.delete('vendorId');
-      usp.set('page', '1');
-      return usp;
-    });
-  };
+  // D27: only `orders:status_change` (Super Admin, Admin) changes an order; members view their own
+  // orders only, for deals and products alike. The API refuses members with 403 as well.
+  const canChangeStatus = can('orders', 'status_change');
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [total, setTotal] = useState(0);

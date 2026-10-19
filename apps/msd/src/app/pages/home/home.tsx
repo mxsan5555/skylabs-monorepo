@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   FilledButton,
@@ -8,12 +8,9 @@ import {
   Tabs,
 } from '@skylabs-monorepo/shared-ui/react';
 import '@skylabs-monorepo/shared-ui/carousel';
-import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { signInPathWithReturnTo } from '../../../auth/role-routing';
-import { useWishlist } from '../../../wishlist/wishlist-context';
-import { useHydrated } from '../../../hooks/use-hydrated';
+import { useWishlistToggle } from '../../../hooks/use-wishlist-toggle';
 import { formatINR } from '../../../utils/format';
-import { primaryImage, resolveDealMedia, resolveTherapistMedia } from '../../../utils/media';
+import { primaryImage, resolveProductMedia, resolveDealMedia, resolveTherapistMedia } from '../../../utils/media';
 import { CardRail } from '../../components/card-rail/card-rail';
 import { DealCard } from '../../components/deal-card';
 import { SkyProductCardWC } from '../../components/sky-product-card-wc';
@@ -26,7 +23,7 @@ import { CategoryTiles } from './category-tiles';
 import { DealsNearYou } from './deals-near-you';
 import { HomeFaq } from './home-faq';
 import { HomeHero } from './home-hero';
-import { HomeOffers } from './home-offers';
+import { BannerSlot } from '../../components/banner-slot/banner-slot';
 import { HowItWorks } from './how-it-works';
 import { TreatmentDirectory } from './treatment-directory';
 import {
@@ -40,15 +37,12 @@ import './home.css';
 import { useCatalogShell } from '../../../catalog/catalog-shell';
 import { useVisitorLocation } from '../../../location/location-context';
 import type { CatalogDeal } from '../../../api/catalog';
+import { ProductCardGallery } from '../../components/product-card-gallery';
+import { DealAddToCartDialog } from '../../components/deal-add-to-cart-dialog';
 const { home } = content;
 
 export function Home() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { isAuthenticated } = useAuth();
-  // Rendering decisions wait for hydration so they match the prerendered (signed-out) HTML.
-  const signedIn = useHydrated() && isAuthenticated;
-  const { toggle, has } = useWishlist();
+  const { isFavorite, toggleFavorite } = useWishlistToggle();
   const { categories } = useCatalogShell();
   const { status: locationStatus, coords } = useVisitorLocation();
   const catalog = useHomeCatalog(locationStatus === 'locating' ? undefined : coords);
@@ -81,25 +75,101 @@ export function Home() {
     return blocks.length > 0 ? blocks : undefined;
   }, [catalog.deals, catalog.faqs]);
 
-  const handleFavorite = (id: string) => {
-    if (!isAuthenticated) {
-      navigate(signInPathWithReturnTo(location));
-      return;
-    }
-    toggle(id);
+  const renderDeal = (deal: CatalogDeal) => {
+    const media = resolveDealMedia(deal);
+    console.log('Deal:', deal.title, {
+  images: media.images,
+});
+   
+return (
+  <swiper-slide key={deal.id} className="card-rail__slide">
+    <SkyProductCardWC
+      // variant="outlined"
+      image={undefined}
+      imageAlt={deal.title}
+      favorite
+      favoriteActive={isFavorite('deal', deal.id)}
+      badge="Service"
+      eyebrow={
+        [deal.vendor?.businessName, deal.branch?.name]
+          .filter(Boolean)
+          .join(' · ') || undefined
+      }
+      eyebrowHref={
+        deal.vendor?.slug
+          ? `/vendor/${deal.vendor.slug}`
+          : undefined
+      }
+      heading={deal.title}
+      location={deal.branch?.city ?? deal.vendor?.city ?? undefined}
+      distance={
+        deal.distanceKm != null
+          ? `${Math.round(deal.distanceKm * 10) / 10} km`
+          : undefined
+      }
+      price={formatINR(Number(deal.salePrice))}
+      originalPrice={
+        deal.originalPrice != null &&
+        Number(deal.originalPrice) !== Number(deal.salePrice)
+          ? formatINR(Number(deal.originalPrice))
+          : undefined
+      }
+      discount={
+        deal.discountPercent != null
+          ? `-${Number(deal.discountPercent)}%`
+          : undefined
+      }
+      priceNote={
+        deal.durationMinutes
+          ? `${deal.durationMinutes} min`
+          : undefined
+      }
+      tag={deal.popularTags?.[0]?.name}
+      href={`/deal/${deal.id}`}
+      // layout={cardLayout}
+      onFavorite={() => toggleFavorite('deal', deal.id)}
+    >
+      <div slot="media" className="product-card-media">
+        <ProductCardGallery
+          images={media.images}
+          alt={deal.title}
+          // layout={cardLayout}
+        />
+      </div>
+
+      {/* <div onClick={(event) => event.stopPropagation()}>
+        <DealAddToCartDialog
+          deal={deal}
+          onAdded={() => {
+            // Category page ke existing success handler ko yahan reuse karo.
+          }}
+          renderTrigger={(open) => (
+            <FilledButton
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (!isAuthenticated) {
+                  navigate(signInPathWithReturnTo(location));
+                  return;
+                }
+
+                open();
+              }}
+            >
+              <Icon slot="icon" aria-hidden="true">
+                shopping_bag
+              </Icon>
+              Book now
+            </FilledButton>
+          )}
+        />
+      </div> */}
+    </SkyProductCardWC>
+  </swiper-slide>
+);
+
   };
-
-  const renderDeal = (deal: CatalogDeal) => (
-    <swiper-slide key={deal.id} className="card-rail__slide">
-      <DealCard
-        deal={toDealCardDeal(deal)}
-        eyebrowHref={deal.vendor?.slug ? `/vendor/${deal.vendor.slug}` : undefined}
-        favoriteActive={signedIn && has(deal.id)}
-        onFavorite={() => handleFavorite(deal.id)}
-      />
-    </swiper-slide>
-  );
-
   return (
     <div className="home">
       <Seo title={content.meta.home.title} description={content.meta.home.description} path="/" jsonLd={jsonLd} />
@@ -148,7 +218,7 @@ export function Home() {
           </CardRail>
         </PageSection>
       )}
-      <HomeOffers isAuthenticated={signedIn} />
+      <BannerSlot slot="HOME_AFTER_DEALS" />
       {ready && catalog.products.length > 0 && (
         <PageSection tone="tint" aria-labelledby="products-heading">
           <CardRail
@@ -157,19 +227,53 @@ export function Home() {
             seeAll={home.sections.featuredProducts.seeAll}
             seeAllTo={home.sections.featuredProducts.seeAllTo}
           >
-            {catalog.products.map((product) => (
-              <swiper-slide key={product.id} className="card-rail__slide">
-                <DealCard
-                  deal={toProductCardDeal(product)}
-                  href={productPath(product)}
-                  favoriteActive={signedIn && has(product.id)}
-                  onFavorite={() => handleFavorite(product.id)}
-                />
-              </swiper-slide>
-            ))}
+            {catalog.products.map((product) => {
+              const media = resolveProductMedia(product);
+console.log('Product:', product.name, {
+  images: media.images,
+});
+              return (
+                <swiper-slide
+                  key={product.id}
+                  className="card-rail__slide"
+                >
+                  <SkyProductCardWC
+                  // variant='outlined'
+                    image={undefined}
+                    gallery={media.images}
+                    imageAlt={product.imageAlt ?? product.name}
+                    favorite
+                    favoriteActive={isFavorite('product', product.id)}
+                    eyebrow={product.vendor?.businessName ?? undefined}
+                    eyebrowHref={
+                      product.vendor?.slug
+                        ? `/vendor/${product.vendor.slug}`
+                        : undefined
+                    }
+                    heading={product.name}
+                    location={product.vendor?.city ?? undefined}
+                    tag={product.popularTags?.[0]?.name}
+                    price={formatINR(Number(product.price))}
+                    originalPrice={
+                      product.originalPrice != null
+                        ? formatINR(Number(product.originalPrice))
+                        : undefined
+                    }
+                    discount={
+                      product.discount != null
+                        ? `${product.discount}% OFF`
+                        : undefined
+                    }
+                    href={`/products/${product.id}`}
+                    onFavorite={() => toggleFavorite('product', product.id)}
+                  />
+                </swiper-slide>
+              );
+            })}
           </CardRail>
         </PageSection>
       )}
+      <BannerSlot slot="HOME_AFTER_PRODUCTS" />
       <TreatmentDirectory groups={catalog.popularTreatments} />
       {ready && <HomeFaq faqs={catalog.faqs} />}
       <PageSection flush aria-labelledby="partner-heading">

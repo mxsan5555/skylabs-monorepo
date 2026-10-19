@@ -208,11 +208,8 @@ describe('POST /api/v1/orders/me/:id/pay-cod', () => {
       prismaMock.order.findUnique.mockResolvedValue(orderFixture);
       prismaMock.payment.create.mockResolvedValue({ ...paymentFixture, provider: 'COD', status: 'CREATED' });
       prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
-      prismaMock.orderItem.findMany.mockResolvedValue([
-        { id: 'item-1', vendorId: 'vendor-1', branchId: 'branch-1', itemType: 'PRODUCT', quantity: 1, lineTotal: '398.00', dealId: null, therapistId: null, productId: 'product-1' },
-      ]);
-      prismaMock.vendor.findUnique.mockResolvedValue({ ownerUserId: 'vendor-1-owner' });
-      prismaMock.vendor.findMany.mockResolvedValue([{ id: 'vendor-1', commissionRatePercent: null }]);
+      prismaMock.orderItem.findMany.mockResolvedValue([{ vendorId: 'vendor-1' }]);
+      prismaMock.member.findUnique.mockResolvedValue({ ownerUserId: 'vendor-1-owner' });
       prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
       // createEntitlementsForOrder's own supporting calls — this test cares about notifications,
       // not voucher generation, so these are harmless no-op-shaped defaults.
@@ -241,12 +238,8 @@ describe('POST /api/v1/orders/me/:id/pay-cod', () => {
       prismaMock.order.findUnique.mockResolvedValue(orderFixture);
       prismaMock.payment.create.mockResolvedValue({ ...paymentFixture, provider: 'COD', status: 'CREATED' });
       prismaMock.order.update.mockResolvedValue({ ...orderFixture, status: 'CONFIRMED' });
-      prismaMock.orderItem.findMany.mockResolvedValue([
-        { id: 'item-A', vendorId: 'vendor-A', branchId: 'branch-A', itemType: 'PRODUCT', quantity: 1, lineTotal: '199.00', dealId: null, therapistId: null, productId: 'product-A' },
-        { id: 'item-A2', vendorId: 'vendor-A', branchId: 'branch-A', itemType: 'PRODUCT', quantity: 1, lineTotal: '99.00', dealId: null, therapistId: null, productId: 'product-A2' },
-        { id: 'item-B', vendorId: 'vendor-B', branchId: 'branch-B', itemType: 'PRODUCT', quantity: 1, lineTotal: '100.00', dealId: null, therapistId: null, productId: 'product-B' },
-      ]);
-      prismaMock.vendor.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
+      prismaMock.orderItem.findMany.mockResolvedValue([{ vendorId: 'vendor-A' }, { vendorId: 'vendor-A' }, { vendorId: 'vendor-B' }]);
+      prismaMock.member.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
         Promise.resolve({ ownerUserId: where.id === 'vendor-A' ? 'owner-A' : 'owner-B' }),
       );
       prismaMock.vendor.findMany.mockResolvedValue([
@@ -604,11 +597,8 @@ describe('POST /api/v1/payments/webhook/razorpay', () => {
     prismaMock.payment.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.order.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.order.findMany.mockResolvedValue([orderFixture]);
-    prismaMock.orderItem.findMany.mockResolvedValue([
-      { id: 'item-1', vendorId: 'vendor-1', branchId: 'branch-1', itemType: 'PRODUCT', quantity: 1, lineTotal: '398.00', dealId: null, therapistId: null, productId: 'product-1' },
-    ]);
-    prismaMock.vendor.findUnique.mockResolvedValue({ ownerUserId: 'vendor-1-owner' });
-    prismaMock.vendor.findMany.mockResolvedValue([{ id: 'vendor-1', commissionRatePercent: null }]);
+    prismaMock.orderItem.findMany.mockResolvedValue([{ vendorId: 'vendor-1' }]);
+    prismaMock.member.findUnique.mockResolvedValue({ ownerUserId: 'vendor-1-owner' });
     prismaMock.user.findMany.mockResolvedValue([{ id: 'superadmin-1' }]);
     // createEntitlementsForOrder's own supporting calls — this test cares about notifications,
     // not voucher generation, so these are harmless no-op-shaped defaults.

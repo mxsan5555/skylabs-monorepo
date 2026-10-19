@@ -18,7 +18,7 @@ import {
   type CareersJobStatus,
 } from '../../../../api/rbac/careers';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { extractSiteContentFieldErrors } from './field-errors';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { CareersJobFormDialog } from './careers-job-form-dialog';
@@ -53,7 +53,6 @@ const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
 export function CareersPage() {
   const { token, can } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
-  const { showToast } = useToast();
   const canEditContent = can('cms.careers', 'edit');
   const canCreate = can('cms.careers', 'create');
   const canEdit = can('cms.careers', 'edit');
@@ -105,7 +104,7 @@ export function CareersPage() {
     try {
       const { data } = await updateCareersContent(token, payload);
       setContent(data);
-      showToast('Careers content saved.');
+      showSnackbar('Careers content saved.', { variant: 'success' });
     } catch (err) {
       const fields = extractSiteContentFieldErrors<ContentFieldKey>(err);
       if (fields) {
@@ -114,7 +113,7 @@ export function CareersPage() {
       } else {
         const msg = err instanceof ApiRequestError ? err.message : 'Could not save Careers content.';
         setContentError(msg);
-        showToast(msg, 'error');
+        showSnackbar(msg, { variant: 'error' });
       }
     } finally {
       contentSubmittingRef.current = false;
@@ -171,7 +170,7 @@ export function CareersPage() {
     }
     setJobs((prev) => (existing ? prev.map((j) => (j.id === data.id ? data : j)) : [...prev, data]));
     if (!existing) setTotal((t) => t + 1);
-    showToast(existing ? 'Job listing updated.' : 'Job listing created.');
+    showSnackbar(existing ? 'Job listing updated.' : 'Job listing created.', { variant: 'success' });
     return data;
   };
 
@@ -181,11 +180,11 @@ export function CareersPage() {
       const nextStatus = job.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED';
       const { data } = await setCareersJobStatus(token, job.id, nextStatus);
       setJobs((prev) => prev.map((j) => (j.id === data.id ? data : j)));
-      showToast(nextStatus === 'PUBLISHED' ? 'Job listing published.' : 'Job listing unpublished.');
+      showSnackbar(nextStatus === 'PUBLISHED' ? 'Job listing published.' : 'Job listing unpublished.', { variant: 'success' });
     } catch (err) {
       const msg = err instanceof ApiRequestError ? err.message : 'Could not change status.';
       setJobsError(msg);
-      showToast(msg, 'error');
+      showSnackbar(msg, { variant: 'error' });
     }
   };
 
@@ -196,11 +195,11 @@ export function CareersPage() {
       await deleteCareersJob(token, job.id);
       setJobs((prev) => prev.filter((j) => j.id !== job.id));
       setTotal((t) => t - 1);
-      showToast('Job listing deleted.');
+      showSnackbar('Job listing deleted.', { variant: 'success' });
     } catch (err) {
       const msg = err instanceof ApiRequestError ? err.message : 'Could not delete job listing.';
       setJobsError(msg);
-      showToast(msg, 'error');
+      showSnackbar(msg, { variant: 'error' });
     }
   };
 

@@ -11,7 +11,7 @@ import { HeaderActions } from './header-actions';
 import { SearchSuggestions, flattenSuggestions } from './search-suggestions';
 import { MIN_QUERY_LENGTH, useSearchSuggestions, type SearchSuggestionItem } from './use-search-suggestions';
 import content from '../../../content.json';
-import logo from '../../../assets/logo.jpg';
+import { LOGO_SRC as logo } from '../../../brand';
 import './site-header.css';
 
 /**

@@ -28,7 +28,7 @@ export async function getDashboardStats(
   userId?: string
 ): Promise<DashboardStats> {
   const vendor = userId
-    ? await prisma.vendor.findUnique({
+    ? await prisma.member.findUnique({
         where: {
           ownerUserId: userId,
         },
@@ -69,7 +69,7 @@ async function getMarketplaceDashboardStats(): Promise<DashboardStats> {
     therapists,
     revenueAgg,
   ] = await Promise.all([
-    prisma.vendor.count(),
+    prisma.member.count(),
 
     prisma.user.count({
       where: {

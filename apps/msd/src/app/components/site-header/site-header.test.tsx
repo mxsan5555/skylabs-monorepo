@@ -23,7 +23,13 @@ const { setCity, shell, listCatalogDealsMock, listCatalogProductsMock, listCatal
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   useAuth: () => ({ isAuthenticated: false, token: null, bootstrap: null, signOut: vi.fn() }),
 }));
-vi.mock('../../../wishlist/wishlist-context', () => ({ useWishlist: () => ({ ids: new Set(['a', 'b']) }) }));
+vi.mock('../../../wishlist/wishlist-context', () => ({
+  useWishlist: () => ({
+    ids: new Set(['a', 'b']),
+    productIds: new Set(['product-1']),
+    itemCount: 3,
+  }),
+}));
 vi.mock('../../../hooks/use-cart-count', () => ({ useCartCount: () => 1 }));
 vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../catalog/catalog-shell')>()),
@@ -208,7 +214,7 @@ describe('SiteHeader', () => {
   // role queries cannot see them; query the host's aria-label instead.
   it('names counted actions for screen readers', () => {
     renderHeader();
-    expect(document.querySelector('[aria-label="Wishlist, 2 items"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Wishlist, 3 items"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Cart, 1 item"]')).toBeTruthy();
   });
 

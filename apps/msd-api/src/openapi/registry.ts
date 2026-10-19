@@ -22,13 +22,14 @@ import {
 } from '../schemas/rbac.schema';
 import { ErrorObjectSchema, PaginationQuerySchema } from '../schemas/common.schema';
 import {
+  MemberCreateSchema,
+  MemberListQuerySchema,
+  MemberDocumentReviewSchema,
   VendorCreateSchema,
   VendorUpdateSchema,
-  VendorSelfCreateSchema,
   VendorSelfUpdateSchema,
-  VendorRejectSchema,
-  VendorStatusUpdateSchema,
-  VendorKycReviewSchema,
+  MemberStatusChangeSchema,
+  MemberDeleteSchema,
   BranchCreateSchema,
   BranchUpdateSchema,
   BranchStatusUpdateSchema,
@@ -83,6 +84,14 @@ import { VerifyPaymentSchema, OrderBatchSchema, VerifyBatchPaymentSchema } from 
 import { NotificationListQuerySchema } from '../schemas/notification.schema';
 import { DashboardStatsResponseSchema } from '../schemas/dashboard.schema';
 import { MediaReorderSchema } from '../schemas/media.schema';
+import {
+  HomeHeroReorderSchema,
+  HomeHeroSlideCreateSchema,
+  HomeHeroSlideUpdateSchema,
+  PublicHomeHeroQuerySchema,
+  StateItemSearchQuerySchema,
+} from '../schemas/home-hero.schema';
+import { PromotionCreateSchema, PromotionUpdateSchema, PublicBannerQuerySchema } from '../schemas/promotion.schema';
 import { ReportFiltersQuerySchema, TopListQuerySchema, TopVendorsQuerySchema } from '../schemas/reports.schema';
 import {
   FinanceSettingsUpdateSchema,
@@ -506,7 +515,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors/branches',
-    summary: 'Cross-vendor branch list for the sidebar Branches page (admin, gated on vendors:view)',
+    summary: 'Cross-vendor branch list for the sidebar Branches page (admin, gated on members:view)',
     tags: ['Vendors - Admin'],
     security: bearer,
     responses: { 200: { description: 'Branches' }, 403: errorResponse },
@@ -515,7 +524,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors/deals',
-    summary: 'Cross-vendor deal list for the sidebar Deals page (admin, gated on vendors:view)',
+    summary: 'Cross-vendor deal list for the sidebar Deals page (admin, gated on members:view)',
     tags: ['Vendors - Admin'],
     security: bearer,
     responses: { 200: { description: 'Deals' }, 403: errorResponse },
@@ -524,7 +533,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors/users/search',
-    summary: "Existing-user typeahead for linking a Vendor's owner (admin, gated on vendors:create)",
+    summary: "Existing-user typeahead for linking a Vendor's owner (admin, gated on members:create)",
     tags: ['Vendors - Admin'],
     security: bearer,
     request: { query: z.object({ q: z.string().optional(), page: z.coerce.number().optional(), pageSize: z.coerce.number().optional() }) },
@@ -534,7 +543,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors/users/lookup',
-    summary: 'Owner-identity preview for "Add Vendor" (admin, gated on vendors:create) — UX only',
+    summary: 'Owner-identity preview for "Add Vendor" (admin, gated on members:create) — UX only',
     tags: ['Vendors - Admin'],
     security: bearer,
     request: { query: z.object({ email: z.string().optional(), mobile: z.string().optional() }) },
@@ -544,10 +553,9 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'post',
     path: '/vendors/public/register',
-    summary: 'Public "Become a Vendor" registration — unauthenticated, always creates PENDING_VERIFICATION',
+    summary: 'Closed: staff create every member, so this always refuses with 403 and a contact-our-team message',
     tags: ['Vendors - Public'],
-    request: { body: { content: { 'application/json': { schema: VendorSelfCreateSchema } } } },
-    responses: { 201: { description: 'Vendor application created' }, 409: errorResponse, 422: errorResponse, 429: errorResponse },
+    responses: { 403: errorResponse, 429: errorResponse },
   });
 
   registry.registerPath({
@@ -560,16 +568,6 @@ export function buildOpenApiDocument() {
   });
 
   registry.registerPath({
-    method: 'post',
-    path: '/vendors/me',
-    summary: 'Self-register a vendor profile for the caller',
-    tags: ['Vendors - Self-service'],
-    security: bearer,
-    request: { body: { content: { 'application/json': { schema: VendorSelfCreateSchema } } } },
-    responses: { 201: { description: 'Created' }, 409: errorResponse },
-  });
-
-  registry.registerPath({
     method: 'patch',
     path: '/vendors/me',
     summary: "Update the caller's own vendor profile",
@@ -577,15 +575,6 @@ export function buildOpenApiDocument() {
     security: bearer,
     request: { body: { content: { 'application/json': { schema: VendorSelfUpdateSchema } } } },
     responses: { 200: { description: 'Updated' } },
-  });
-
-  registry.registerPath({
-    method: 'post',
-    path: '/vendors/me/submit',
-    summary: 'Submit the completed profile for admin verification',
-    tags: ['Vendors - Self-service'],
-    security: bearer,
-    responses: { 200: { description: 'Submitted' }, 422: errorResponse },
   });
 
   registry.registerPath({
@@ -827,6 +816,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors',
+    deprecated: true,
     summary: 'List vendors (admin)',
     tags: ['Vendors - Admin'],
     security: bearer,
@@ -836,6 +826,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'post',
     path: '/vendors',
+    deprecated: true,
     summary: 'Create a vendor (admin)',
     tags: ['Vendors - Admin'],
     security: bearer,
@@ -846,6 +837,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'get',
     path: '/vendors/{id}',
+    deprecated: true,
     summary: 'Get any vendor by id (admin)',
     tags: ['Vendors - Admin'],
     security: bearer,
@@ -856,6 +848,7 @@ export function buildOpenApiDocument() {
   registry.registerPath({
     method: 'patch',
     path: '/vendors/{id}',
+    deprecated: true,
     summary: 'Update any vendor (admin)',
     tags: ['Vendors - Admin'],
     security: bearer,
@@ -868,61 +861,171 @@ export function buildOpenApiDocument() {
 
   registry.registerPath({
     method: 'patch',
-    path: '/vendors/{id}/approve',
-    summary: 'Approve a vendor — jumps straight to ACTIVE',
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: { params: z.object({ id: z.string().uuid() }) },
-    responses: { 200: { description: 'Approved' }, 403: errorResponse },
-  });
-
-  registry.registerPath({
-    method: 'patch',
-    path: '/vendors/{id}/reject',
-    summary: 'Reject a vendor with a mandatory reason',
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: {
-      params: z.object({ id: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: VendorRejectSchema } } },
-    },
-    responses: { 200: { description: 'Rejected' } },
-  });
-
-  registry.registerPath({
-    method: 'patch',
     path: '/vendors/{id}/status',
-    summary: 'Activate / deactivate / suspend an already-approved vendor',
+    deprecated: true,
+    summary: 'Change a member status to ACTIVE, INACTIVE or SUSPENDED with a reason (old alias)',
     tags: ['Vendors - Admin'],
     security: bearer,
     request: {
       params: z.object({ id: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: VendorStatusUpdateSchema } } },
+      body: { content: { 'application/json': { schema: MemberStatusChangeSchema } } },
     },
-    responses: { 200: { description: 'Updated' } },
-  });
-
-  registry.registerPath({
-    method: 'patch',
-    path: '/vendors/{id}/kyc-review',
-    summary: "Verify or reject a vendor's KYC",
-    tags: ['Vendors - Admin'],
-    security: bearer,
-    request: {
-      params: z.object({ id: z.string().uuid() }),
-      body: { content: { 'application/json': { schema: VendorKycReviewSchema } } },
-    },
-    responses: { 200: { description: 'Updated' } },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse, 409: errorResponse, 422: errorResponse },
   });
 
   registry.registerPath({
     method: 'delete',
     path: '/vendors/{id}',
-    summary: 'Hard-delete a vendor (blocked if it has real order history)',
+    deprecated: true,
+    summary: 'Delete a SUSPENDED member, or archive it when order history exists (old alias, Super Admin only)',
     tags: ['Vendors - Admin'],
     security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: MemberDeleteSchema } } },
+    },
+    responses: { 200: { description: 'Deleted or archived' }, 403: errorResponse, 404: errorResponse, 409: errorResponse, 422: errorResponse },
+  });
+
+  // Members (replaces the /vendors admin aliases above, which stay for one release)
+  registry.registerPath({
+    method: 'get',
+    path: '/members',
+    summary: 'List members. Filters: status, documents=incomplete, reviewFlag=true. Sort: sort=businessName|status|documentsDueAt, dir=asc|desc.',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: { query: MemberListQuerySchema },
+    responses: { 200: { description: 'Members' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/members',
+    summary: 'Create a member (short form). Status starts ACTIVE.',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: MemberCreateSchema } } } },
+    responses: { 201: { description: 'Created' }, 403: errorResponse, 409: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/members/{id}',
+    summary: 'Get a member by id',
+    tags: ['Members - Admin'],
+    security: bearer,
     request: { params: z.object({ id: z.string().uuid() }) },
-    responses: { 200: { description: 'Deleted' }, 409: errorResponse },
+    responses: { 200: { description: 'Member' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/members/{id}',
+    summary: 'Update a member profile',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: VendorUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/members/{id}/status',
+    summary: 'Make a member Inactive, Suspended or Active again. Reason 10 to 500 characters.',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: MemberStatusChangeSchema } } },
+    },
+    responses: { 200: { description: 'Updated' }, 403: errorResponse, 404: errorResponse, 409: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/members/{id}',
+    summary: 'Delete a suspended member (Super Admin). Archives when orders exist.',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: MemberDeleteSchema } } },
+    },
+    responses: { 200: { description: 'DELETED or ARCHIVED' }, 403: errorResponse, 404: errorResponse, 409: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/members/{id}/status-history',
+    summary: 'Status changes with who and why',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'History' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/members/{id}/activity',
+    summary: 'Merged status, document, reminder and review-flag activity, newest first',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Activity' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/members/{id}/documents/reminders',
+    summary: 'Remind now: email and SMS the member the documents still needed. Once per 24 hours per member.',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: {
+      201: { description: 'Delivery result per channel: emailStatus, smsStatus (SENT, FAILED or null), sentAt' },
+      403: errorResponse,
+      404: errorResponse,
+      409: { ...errorResponse, description: 'Member not active or inactive, documents complete, or no contact on record' },
+      429: { ...errorResponse, description: 'A manual reminder already went out in the last 24 hours' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/members/{id}/documents',
+    summary: 'Document checklist. File keys only for roles that can edit or approve.',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 200: { description: 'Documents' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/members/{id}/documents/{documentType}',
+    summary: 'Upload a document on behalf of the member (multipart: file, optional number)',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid(), documentType: z.enum(['GST', 'PAN', 'AADHAAR']) }),
+    },
+    responses: { 201: { description: 'Uploaded' }, 403: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/members/{id}/documents/{documentType}/review',
+    summary: 'Approve or reject a submitted document',
+    tags: ['Members - Admin'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid(), documentType: z.enum(['GST', 'PAN', 'AADHAAR']) }),
+      body: { content: { 'application/json': { schema: MemberDocumentReviewSchema } } },
+    },
+    responses: { 200: { description: 'Reviewed' }, 403: errorResponse, 409: errorResponse },
   });
 
   registry.registerPath({
@@ -1514,6 +1617,103 @@ export function buildOpenApiDocument() {
     tags: ['Catalogue (public)'],
     request: { params: z.object({ id: z.string().uuid() }) },
     responses: { 200: { description: 'Product' }, 404: errorResponse },
+  });
+
+  // ─── Home slider and CTA banners (docs/msd/PLANNING.md §6, §7) ─────────────────
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/home-hero',
+    summary: "Home hero slides (deals and products) for the visitor's state with 5+ eligible slides, else Global/Default",
+    tags: ['Catalogue (public)'],
+    request: { query: PublicHomeHeroQuerySchema },
+    responses: { 200: { description: '{ state, slides: [{ id, type, deal?, product? }] }' } },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/catalog/banners',
+    summary: "CTA banners for one slot: the visitor's state's active in-date banners, else Global/Default",
+    tags: ['Catalogue (public)'],
+    request: { query: PublicBannerQuerySchema },
+    responses: { 200: { description: 'Banners' }, 422: errorResponse },
+  });
+
+  for (const base of ['/home-hero', '/promotions'] as const) {
+    registry.registerPath({
+      method: 'get',
+      path: `${base}/search-items`,
+      summary: 'Deals and products of a state (deal: branch state; product: any active member branch in the state)',
+      tags: ['Masters'],
+      security: bearer,
+      request: { query: StateItemSearchQuerySchema },
+      responses: { 200: { description: 'Items' }, 403: errorResponse, 422: errorResponse },
+    });
+  }
+
+  registry.registerPath({
+    method: 'post',
+    path: '/home-hero/slides',
+    summary: "Add a deal or product of the chosen state to that state's slider (masters.home-hero:create)",
+    tags: ['Masters'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: HomeHeroSlideCreateSchema } } } },
+    responses: { 201: { description: 'Slide' }, 409: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/home-hero/overview',
+    summary: 'One row per slider (Global first, then each state): status, eligible count, deals, products, last change',
+    tags: ['Masters'],
+    security: bearer,
+    responses: { 200: { description: 'Sliders' }, 403: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'put',
+    path: '/home-hero/slides/order',
+    summary: "Save a slider's whole order; slideIds must be exactly that slider's slides (masters.home-hero:edit)",
+    tags: ['Masters'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: HomeHeroReorderSchema } } } },
+    responses: { 200: { description: 'Saved' }, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/home-hero/slides/{id}',
+    summary: "Change a slide's sort order (masters.home-hero:edit)",
+    tags: ['Masters'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: HomeHeroSlideUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Slide' }, 404: errorResponse, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/promotions',
+    summary: 'Create a CTA banner: state, colour roles, slots, destination in that state (masters.promotions:create)',
+    tags: ['Masters'],
+    security: bearer,
+    request: { body: { content: { 'application/json': { schema: PromotionCreateSchema } } } },
+    responses: { 201: { description: 'Banner' }, 422: errorResponse },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/promotions/{id}',
+    summary: 'Update a CTA banner; sending placements replaces its slots (masters.promotions:edit)',
+    tags: ['Masters'],
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string().uuid() }),
+      body: { content: { 'application/json': { schema: PromotionUpdateSchema } } },
+    },
+    responses: { 200: { description: 'Banner' }, 404: errorResponse, 422: errorResponse },
   });
 
   registry.registerPath({

@@ -99,3 +99,27 @@ function safeStringify(data: unknown): string {
     return String(data);
   }
 }
+
+/**
+ * Sends a free text SMS. Production senders must have this text registered as a DLT template
+ * with the provider, otherwise the carrier drops it. Returns true only on provider success.
+ */
+export async function sendTextSms(phone: string, message: string): Promise<boolean> {
+  const missing = REQUIRED_ENV.filter(([, value]) => !value).map(([name]) => name);
+  if (missing.length > 0) {
+    console.error(`[sms:connectExpress] cannot send, missing env var(s): ${missing.join(', ')}`);
+    return false;
+  }
+  try {
+    const response = await axios.get(env.smsApiUrl, {
+      params: { method: 'sms', api_key: env.smsApiKey, to: phone, sender: env.smsSender, unicode: 'auto', message, format: 'json' },
+      timeout: 10_000,
+    });
+    const ok = isProviderSuccess(response.data);
+    console.info(`[sms:connectExpress] ${ok ? 'sent' : 'send reported failure'} to=${maskPhone(phone)} response=${safeStringify(response.data)}`);
+    return ok;
+  } catch (err) {
+    console.error(`[sms:connectExpress] request FAILED to=${maskPhone(phone)} error=${(err as Error).message}`);
+    return false;
+  }
+}

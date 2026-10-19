@@ -9,7 +9,6 @@ import {
   type VendorDocumentType,
 } from '../../api/rbac/vendors';
 import { ApiRequestError } from '../../api/rbac/client';
-import { resolveMediaUrl } from '../../api/media';
 import './vendor-document-upload.css';
 
 const DOCUMENT_MAX_BYTES = 5 * 1024 * 1024;
@@ -34,6 +33,7 @@ export function VendorDocumentUpload({
   onUploaded,
   onDeleted,
   onStagedChange,
+  readOnly = false,
 }: {
   documentType: VendorDocumentType;
   label: string;
@@ -47,6 +47,8 @@ export function VendorDocumentUpload({
   /** Reports whether this slot currently has a file — staged (pre-creation) or really uploaded
    *  — so the parent form can compute "at least one KYC document" across all three slots. */
   onStagedChange?: (hasFile: boolean) => void;
+  /** Shows the file without upload, replace or remove (an inactive member, a view-only viewer). */
+  readOnly?: boolean;
 }) {
   const [document, setDocument] = useState<VendorDocument | undefined>(existingDocument);
   const [staged, setStaged] = useState<File | null>(null);
@@ -176,7 +178,7 @@ export function VendorDocumentUpload({
           <div className="vendor-document-upload__actions">
             {document && (
               <OutlinedButton
-                href={resolveMediaUrl(document.storageKey)}
+                href={document.fileUrl ?? undefined}
                 target="_blank"
                 rel="noreferrer"
                 title="View document"
@@ -188,43 +190,53 @@ export function VendorDocumentUpload({
               </OutlinedButton>
             )}
 
-            <OutlinedButton
-              onClick={() => inputRef.current?.click()}
-              disabled={busy}
-              title="Replace document"
-              aria-label="Replace document"
-            >
-              <Icon slot="icon" aria-hidden="true">
-                upload_file
-              </Icon>
-            </OutlinedButton>
+            {!readOnly && (
+              <>
+                <OutlinedButton
+                  onClick={() => inputRef.current?.click()}
+                  disabled={busy}
+                  title="Replace document"
+                  aria-label="Replace document"
+                >
+                  <Icon slot="icon" aria-hidden="true">
+                    upload_file
+                  </Icon>
+                </OutlinedButton>
 
-            <OutlinedButton
-              onClick={remove}
-              disabled={busy}
-              title="Remove document"
-              aria-label="Remove document"
-            >
-              <Icon slot="icon" aria-hidden="true">
-                delete
-              </Icon>
-            </OutlinedButton>
+                <OutlinedButton
+                  onClick={remove}
+                  disabled={busy}
+                  title="Remove document"
+                  aria-label="Remove document"
+                >
+                  <Icon slot="icon" aria-hidden="true">
+                    delete
+                  </Icon>
+                </OutlinedButton>
+              </>
+            )}
           </div>
         </div>
+      ) : readOnly ? (
+        <p className="field-hint">Not uploaded</p>
       ) : (
         <OutlinedButton onClick={() => inputRef.current?.click()} disabled={busy}>
           <Icon slot="icon" aria-hidden="true">upload_file</Icon>
           Upload {label}
         </OutlinedButton>
       )}
-      <input
-        ref={inputRef}
-        type="file"
-        accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png"
-        hidden
-        onChange={(e) => handleFileSelected(e.target.files)}
-      />
-      <p className="field-hint">PDF, JPG, JPEG, or PNG — up to 5 MB.</p>
+      {!readOnly && (
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png"
+            hidden
+            onChange={(e) => handleFileSelected(e.target.files)}
+          />
+          <p className="field-hint">PDF, JPG, JPEG, or PNG — up to 5 MB.</p>
+        </>
+      )}
       {error && <p className="error-state" role="alert">{error}</p>}
     </sky-tile-card>
   );

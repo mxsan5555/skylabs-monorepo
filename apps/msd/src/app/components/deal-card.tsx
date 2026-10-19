@@ -6,7 +6,7 @@ import '@skylabs-monorepo/shared-ui/carousel';
 import { Icon, FilledTonalIconButton } from '@skylabs-monorepo/shared-ui/react';
 import './deal-card.css';
 import '@skylabs-monorepo/shared-ui';
-
+import { ProductCardGallery } from './product-card-gallery';
 /**
  * What `DealCard` actually needs to render — a relaxed superset of the mock `Deal` type (still
  * satisfied by it structurally) that also accepts a real `CatalogDeal` adapted to this shape. Real deals
@@ -71,7 +71,9 @@ export function DealCard({
 }: DealCardProps) {
   const swiperRef = useRef<any>(null);
   return (
+     <div className="deal-card">
     <SkyProductCardWC
+     variant="outlined"
       imageAlt={deal.imageAlt}
       badge={deal.badge}
       tag={deal.tag}
@@ -86,11 +88,12 @@ export function DealCard({
       rating={deal.rating}
       reviews={deal.reviews}
       layout={layout}
-      originalPrice={
-        deal.originalPrice
-          ? formatINR(deal.originalPrice)
-          : undefined
-      }
+     originalPrice={
+  deal.originalPrice !== undefined &&
+  deal.originalPrice !== deal.price
+    ? formatINR(deal.originalPrice)
+    : undefined
+}
       price={formatINR(deal.price)}
       discount={
         deal.discount
@@ -100,55 +103,17 @@ export function DealCard({
       priceNote={deal.priceNote}
       href={href ?? dealPath(deal)}
     >
-
-      <div slot="media" className="deal-card-slider">
-        <swiper-container
-          ref={swiperRef}
-          navigation={false}
-          pagination={false}
-          loop={true}
-          grab-cursor={true}
-        >
-          {(deal.gallery?.length ? deal.gallery : [deal.image]).map((img) => (
-            <swiper-slide key={img}>
-              <img
-                src={img}
-                alt={deal.imageAlt}
-                loading="lazy"
-                decoding="async"
-              />
-            </swiper-slide>
-          ))}
-          {deal.video && (
-            <swiper-slide key={deal.video}>
-              <video src={deal.video} controls muted />
-            </swiper-slide>
-          )}
-        </swiper-container>
-
-        <FilledTonalIconButton
-          className="slider-btn slider-btn--prev"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            swiperRef.current?.swiper.slidePrev();
-          }}
-        >
-          <Icon aria-hidden="true">navigate_before</Icon>
-        </FilledTonalIconButton>
-
-        <FilledTonalIconButton
-          className="slider-btn slider-btn--next"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            swiperRef.current?.swiper.slideNext();
-          }}
-        >
-          <Icon aria-hidden="true">navigate_next</Icon>
-        </FilledTonalIconButton>
-      </div>
-
+<ProductCardGallery
+  slot="media"
+  images={
+    deal.gallery?.length
+      ? deal.gallery
+      : deal.image
+        ? [deal.image]
+        : []
+  }
+  alt={deal.imageAlt}
+/>
       {actions && (
         <div
           className="deal-card__actions"
@@ -162,6 +127,6 @@ export function DealCard({
       )}
 
     </SkyProductCardWC>
-
+</div>
   );
 }

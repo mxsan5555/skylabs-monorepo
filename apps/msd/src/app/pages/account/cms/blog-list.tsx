@@ -8,7 +8,7 @@ import * as blogPostsApi from '../../../../api/rbac/blog-posts';
 import type { BlogPost, BlogPostInput } from '../../../../api/rbac/blog-posts';
 import { listBlogCategories, type BlogCategory } from '../../../../api/rbac/blog-categories';
 import { ApiRequestError } from '../../../../api/rbac/client';
-import { useToast } from '../../../../toast/toast-context';
+import { showSnackbar } from '../../../../snackbar/snackbar';
 import { formatDate } from '../../../../blog/blog';
 import { useConfirmDialog } from '../../../components/confirm-dialog';
 import { BlogFormDialog } from './blog-form-dialog';
@@ -30,20 +30,21 @@ interface TableParams {
 
 const DEFAULT_PARAMS: TableParams = { page: 1, pageSize: 10, search: '' };
 
-/** Shared BlogPost list; each menu surface retains its own permission and API namespace. */
-export function BlogList({ scope = 'pages' }: { scope?: 'pages' | 'articles' }) {
-  const { listBlogPosts, createBlogPost, updateBlogPost, deleteBlogPost, setBlogPostStatus } =
-    scope === 'articles' ? blogPostsApi.blogArticlesApi : blogPostsApi;
-  const permissionKey = `cms.blog.${scope}`;
-  const baseRoute = scope === 'articles' ? '/account/cms/blog/articles' : '/account/cms/blog';
-  const heading = scope === 'articles' ? 'Articles' : 'Blog';
+/**
+ * Blog Posts admin list — mirrors `categories.tsx`'s exact `<sky-data-table>` +
+ * add/edit-dialog + `window.confirm` delete pattern, gated throughout on the `cms.blog.pages`
+ * menu key (view/create/edit/delete actions) — split out from the old shared `cms.blog` key so
+ * this "Pages" row toggles independently of the (currently unimplemented) "Articles" row in the
+ * Role Permission Matrix; see blog-posts.routes.ts's own doc comment. Uses `showSnackbar()` for
+ * every mutation's outcome rather than categories.tsx's older inline-`<p>` message.
+ */
+export function BlogList() {
   const { token, can } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const navigate = useNavigate();
-  const { showToast } = useToast();
-  const canCreate = can(permissionKey, 'create');
-  const canEdit = can(permissionKey, 'edit');
-  const canDelete = can(permissionKey, 'delete');
+  const canCreate = can('cms.blog.pages', 'create');
+  const canEdit = can('cms.blog.pages', 'edit');
+  const canDelete = can('cms.blog.pages', 'delete');
 
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [total, setTotal] = useState(0);
@@ -115,11 +116,11 @@ export function BlogList({ scope = 'pages' }: { scope?: 'pages' | 'articles' }) 
       const nextStatus = post.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED';
       const { data } = await setBlogPostStatus(token, post.id, nextStatus);
       setPosts((prev) => prev.map((p) => (p.id === data.id ? data : p)));
-      showToast(nextStatus === 'PUBLISHED' ? 'Post published.' : 'Post unpublished.');
+      showSnackbar(nextStatus === 'PUBLISHED' ? 'Post published.' : 'Post unpublished.', { variant: 'success' });
     } catch (err) {
       const msg = err instanceof ApiRequestError ? err.message : 'Could not change status.';
       setError(msg);
-      showToast(msg, 'error');
+      showSnackbar(msg, { variant: 'error' });
     }
   };
 
@@ -130,11 +131,11 @@ export function BlogList({ scope = 'pages' }: { scope?: 'pages' | 'articles' }) 
       await deleteBlogPost(token, post.id);
       setPosts((prev) => prev.filter((p) => p.id !== post.id));
       setTotal((t) => t - 1);
-      showToast('Blog post deleted.');
+      showSnackbar('Blog post deleted.', { variant: 'success' });
     } catch (err) {
       const msg = err instanceof ApiRequestError ? err.message : 'Could not delete blog post.';
       setError(msg);
-      showToast(msg, 'error');
+      showSnackbar(msg, { variant: 'error' });
     }
   };
 

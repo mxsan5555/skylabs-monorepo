@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import { prisma } from '../lib/prisma';
 import { env } from '../config/env';
 import { ApiError } from '../lib/http';
+import type { Prisma } from '../generated/prisma-client';
 
 const REFRESH_TOKEN_BYTES = 48;
 const REFRESH_HASH_ROUNDS = 10;
@@ -97,8 +98,12 @@ export async function revokeRefreshToken(presentedToken: string): Promise<void> 
   }
 }
 
-export async function revokeAllRefreshTokens(userId: string): Promise<void> {
-  await prisma.refreshSession.updateMany({
+/** Pass a transaction client to revoke inside a caller's transaction. */
+export async function revokeAllRefreshTokens(
+  userId: string,
+  client: Pick<Prisma.TransactionClient, 'refreshSession'> = prisma,
+): Promise<void> {
+  await client.refreshSession.updateMany({
     where: { userId, revokedAt: null },
     data: { revokedAt: new Date() },
   });

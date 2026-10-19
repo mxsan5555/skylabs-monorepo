@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { ApiError } from '../lib/http';
 import type { Prisma } from '../generated/prisma-client';
 import type { CartAddItemSchema } from '../schemas/cart.schema';
+import { VISIBLE_DEAL_WHERE, VISIBLE_THERAPIST_WHERE } from './catalog-visibility';
 
 type CartAddItemInput = z.infer<typeof CartAddItemSchema>;
 
@@ -129,7 +130,8 @@ async function assertProduct(productId: string) {
  *  vendor, active branch) — same "regression: only Product checked vendor status, Deal/
  *  Therapist did not" fix as `assertTherapist` below. */
 async function assertServiceDeal(dealId: string, dealPackageId: string) {
-  const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { vendor: { select: { status: true } }, branch: { select: { isActive: true } } } });
+  // A deal the storefront hides (draft, unapproved, member not ACTIVE, branch off) 404s like a missing one.
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, ...VISIBLE_DEAL_WHERE } });
   if (!deal) throw new ApiError('NOT_FOUND', 'Deal not found');
   if (deal.status !== 'ACTIVE' || deal.approvalStatus !== 'APPROVED' || deal.vendor.status !== 'ACTIVE' || !deal.branch.isActive) {
     throw new ApiError('VALIDATION_ERROR', 'Selected deal is not currently available');
@@ -146,11 +148,9 @@ async function assertServiceDeal(dealId: string, dealPackageId: string) {
  *  `VISIBLE_THERAPIST_WHERE` bar — same vendor/branch-active check `assertProduct` already had
  *  and this one (and `assertServiceDeal`) was missing. */
 async function assertTherapist(therapistId: string, therapistPackageId: string) {
-  const therapist = await prisma.therapist.findUnique({ where: { id: therapistId }, include: { vendor: { select: { status: true } }, branch: { select: { isActive: true } } } });
+  // A therapist the storefront hides (inactive, member not ACTIVE, branch off) 404s like a missing one.
+  const therapist = await prisma.therapist.findFirst({ where: { id: therapistId, ...VISIBLE_THERAPIST_WHERE } });
   if (!therapist) throw new ApiError('NOT_FOUND', 'Therapist not found');
-  if (!therapist.isActive || therapist.vendor.status !== 'ACTIVE' || !therapist.branch.isActive) {
-    throw new ApiError('VALIDATION_ERROR', 'Selected therapist is not currently available');
-  }
   const pkg = await prisma.therapistPackage.findUnique({ where: { id: therapistPackageId } });
   if (!pkg || pkg.therapistId !== therapist.id) throw new ApiError('NOT_FOUND', 'Therapist package not found');
   if (!pkg.isActive) throw new ApiError('VALIDATION_ERROR', 'Selected package is not currently available');

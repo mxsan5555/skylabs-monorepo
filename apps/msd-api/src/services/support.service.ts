@@ -20,3 +20,24 @@ export async function createSupportRequest(
     },
   });
 }
+
+
+export async function getSupportRequests(customerId: string) {
+  return prisma.supportRequest.findMany({
+    where: {
+      customerId,
+    },
+
+    select: {
+      id: true,
+      subject: true,
+      message: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+}

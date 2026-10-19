@@ -1,10 +1,12 @@
 import { PrismaClient } from '../generated/prisma-client';
 
-// Prisma client singleton — one instance per process, reused across hot reloads in dev.
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+// Keep a single Prisma client per Node process. Re-importing the module (or a hot-reload
+// test script) can otherwise create multiple pools and exhaust the Postgres connection limit.
+const globalForPrisma = globalThis as typeof globalThis & {
+  __meraDriverApiPrisma?: PrismaClient;
+};
 
-export const prisma: PrismaClient = globalForPrisma.prisma ?? new PrismaClient();
+export const prisma: PrismaClient =
+  globalForPrisma.__meraDriverApiPrisma ?? new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+globalForPrisma.__meraDriverApiPrisma = prisma;

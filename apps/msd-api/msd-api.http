@@ -31,6 +31,7 @@
 @targetUserId = 00000000-0000-0000-0000-000000000000
 @widgetKey = sales_summary
 @vendorId = 00000000-0000-0000-0000-000000000000
+@memberId = 00000000-0000-0000-0000-000000000000
 @branchId = 00000000-0000-0000-0000-000000000000
 @dealId = 00000000-0000-0000-0000-000000000000
 @therapistId = 00000000-0000-0000-0000-000000000000
@@ -43,7 +44,7 @@
 @cartItemId = 00000000-0000-0000-0000-000000000000
 @imageId = 00000000-0000-0000-0000-000000000000
 @notificationId = 00000000-0000-0000-0000-000000000000
-@documentType = pan
+@documentType = PAN
 @categorySlug = massage
 @vendorSlug = my-vendor
 @blogSlug = my-post
@@ -875,7 +876,7 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/vendors/categories
 Authorization: Bearer {{accessToken}}
 
-### Search users to attach as a vendor (vendors:create|edit)
+### Search users to attach as a member (members:create|edit)
 GET {{baseUrl}}/vendors/users/search?q=john
 Authorization: Bearer {{accessToken}}
 
@@ -900,14 +901,7 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/vendors/me
 Authorization: Bearer {{accessToken}}
 
-### Create my vendor profile
-POST {{baseUrl}}/vendors/me
-Authorization: Bearer {{accessToken}}
-Content-Type: {{contentType}}
-
-{
-  "businessName": "My Spa"
-}
+# Staff create members (POST /members below); a member cannot create its own profile.
 
 ### Update my vendor profile
 PATCH {{baseUrl}}/vendors/me
@@ -958,10 +952,6 @@ Authorization: Bearer {{accessToken}}
 
 ### Delete my vendor video
 DELETE {{baseUrl}}/vendors/me/video
-Authorization: Bearer {{accessToken}}
-
-### Submit my vendor profile for approval
-POST {{baseUrl}}/vendors/me/submit
 Authorization: Bearer {{accessToken}}
 
 ### My branches
@@ -1194,30 +1184,90 @@ Authorization: Bearer {{accessToken}}
 
 
 ###############################################################################
-# VENDORS — admin  (/vendors/:id and /vendors/:vendorId/*)
+# MEMBERS: admin  (/members). /vendors/:id answers as a deprecated alias.
 ###############################################################################
 
-### List vendors (vendors:view)
-GET {{baseUrl}}/vendors?page=1&pageSize=20
+### List members (members:view). Filters: status, documents=incomplete, reviewFlag=true, search
+GET {{baseUrl}}/members?page=1&pageSize=20&status=ACTIVE
 Authorization: Bearer {{accessToken}}
 
-### Create vendor (vendors:create)
-POST {{baseUrl}}/vendors
-Authorization: Bearer {{accessToken}}
-Content-Type: {{contentType}}
-
-{ "businessName": "New Vendor", "ownerUserId": "{{userId}}" }
-
-### One vendor
-GET {{baseUrl}}/vendors/{{vendorId}}
-Authorization: Bearer {{accessToken}}
-
-### Update vendor
-PATCH {{baseUrl}}/vendors/{{vendorId}}
+### Create member (members:create). Sends the welcome notice.
+POST {{baseUrl}}/members
 Authorization: Bearer {{accessToken}}
 Content-Type: {{contentType}}
 
-{ "businessName": "Renamed Vendor" }
+{
+  "businessName": "New Spa",
+  "ownerFirstName": "Asha",
+  "ownerLastName": "Rao",
+  "ownerEmail": "owner@example.com",
+  "ownerMobile": "9876543210"
+}
+
+### One member
+GET {{baseUrl}}/members/{{memberId}}
+Authorization: Bearer {{accessToken}}
+
+### Update member (members:edit)
+PATCH {{baseUrl}}/members/{{memberId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "businessName": "Renamed Spa" }
+
+### Change member status (members:status_change). status: ACTIVE | INACTIVE | SUSPENDED
+PATCH {{baseUrl}}/members/{{memberId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "status": "INACTIVE", "reason": "Owner asked to pause listings for a month" }
+
+### Delete member (members:delete). SUSPENDED members only; archives when orders exist.
+DELETE {{baseUrl}}/members/{{memberId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "reason": "Duplicate member created by mistake" }
+
+### Member status history (members:view)
+GET {{baseUrl}}/members/{{memberId}}/status-history
+Authorization: Bearer {{accessToken}}
+
+### Member activity (members:view)
+GET {{baseUrl}}/members/{{memberId}}/activity
+Authorization: Bearer {{accessToken}}
+
+### Member documents (members:view; file fields need members:edit or members:approve)
+GET {{baseUrl}}/members/{{memberId}}/documents
+Authorization: Bearer {{accessToken}}
+
+### Upload a member document on behalf (members:edit). Multipart: file + optional number.
+POST {{baseUrl}}/members/{{memberId}}/documents/{{documentType}}
+Authorization: Bearer {{accessToken}}
+# (multipart upload)
+
+### Delete a member document (members:edit)
+DELETE {{baseUrl}}/members/{{memberId}}/documents/{{documentType}}
+Authorization: Bearer {{accessToken}}
+
+### Approve a member document (members:approve)
+PATCH {{baseUrl}}/members/{{memberId}}/documents/{{documentType}}/review
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "decision": "APPROVED" }
+
+### Reject a member document (members:reject)
+PATCH {{baseUrl}}/members/{{memberId}}/documents/{{documentType}}/review
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{ "decision": "REJECTED", "reason": "The PAN image is blurred" }
+
+
+###############################################################################
+# VENDORS: admin sub-resources  (/vendors/:id/* and /vendors/:vendorId/*)
+###############################################################################
 
 ### Upload vendor image (multipart)
 POST {{baseUrl}}/vendors/{{vendorId}}/images
@@ -1247,48 +1297,6 @@ Authorization: Bearer {{accessToken}}
 ### Delete vendor video
 DELETE {{baseUrl}}/vendors/{{vendorId}}/video
 Authorization: Bearer {{accessToken}}
-
-### Vendor KYC documents
-GET {{baseUrl}}/vendors/{{vendorId}}/kyc-documents
-Authorization: Bearer {{accessToken}}
-
-### Upload a vendor KYC document (multipart)
-POST {{baseUrl}}/vendors/{{vendorId}}/kyc-documents/{{documentType}}
-Authorization: Bearer {{accessToken}}
-# (multipart upload)
-
-### Delete a vendor KYC document
-DELETE {{baseUrl}}/vendors/{{vendorId}}/kyc-documents/{{documentType}}
-Authorization: Bearer {{accessToken}}
-
-### Approve vendor (vendors:approve)
-PATCH {{baseUrl}}/vendors/{{vendorId}}/approve
-Authorization: Bearer {{accessToken}}
-
-### Reject vendor (vendors:reject)
-PATCH {{baseUrl}}/vendors/{{vendorId}}/reject
-Authorization: Bearer {{accessToken}}
-Content-Type: {{contentType}}
-
-{ "reason": "Incomplete KYC" }
-
-### Change vendor status
-PATCH {{baseUrl}}/vendors/{{vendorId}}/status
-Authorization: Bearer {{accessToken}}
-Content-Type: {{contentType}}
-
-{ "status": "active" }
-
-### Delete vendor
-DELETE {{baseUrl}}/vendors/{{vendorId}}
-Authorization: Bearer {{accessToken}}
-
-### KYC review (approve/reject specific documents)
-PATCH {{baseUrl}}/vendors/{{vendorId}}/kyc-review
-Authorization: Bearer {{accessToken}}
-Content-Type: {{contentType}}
-
-{ "documentType": "{{documentType}}", "status": "approved" }
 
 ### Vendor branches (admin)
 GET {{baseUrl}}/vendors/{{vendorId}}/branches

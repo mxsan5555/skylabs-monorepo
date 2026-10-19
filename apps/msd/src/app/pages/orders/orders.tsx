@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FilledButton, Tabs, SecondaryTab, } from '@skylabs-monorepo/shared-ui/react';
+import { FilledButton, Tabs, SecondaryTab, ChipSet, FilterChip, } from '@skylabs-monorepo/shared-ui/react';
 import { CustomerOrderCard } from './customer-order-card';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
 import { listMyOrders, type Order, type OrderStatus, } from '../../../api/orders';
@@ -25,17 +25,18 @@ export function Orders() {
   const { orders: ordersContent } = content;
   const [searchParams] = useSearchParams();
   const typeFilter = searchParams.get('type');
-  const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
-      const matchesStatus =
-        selectedStatus === 'ALL' || order.status === selectedStatus;
 
-      const matchesType =
-        !typeFilter || order.type === typeFilter;
+const filteredOrders = useMemo(() => {
+  return orders.filter((order) => {
+    if (selectedStatus === 'CANCELLED') {
+      return order.status === 'CANCELLED';
+    }
 
-      return matchesStatus && matchesType;
-    });
-  }, [orders, selectedStatus, typeFilter]);
+    // All tab: hide orders awaiting payment
+    return order.status !== 'PENDING_PAYMENT';
+  });
+}, [orders, selectedStatus]);
+
   const load = useCallback(() => {
     setLoading(true);
     setError('');
@@ -44,58 +45,33 @@ export function Orders() {
       .catch((err) => setError(err instanceof ApiRequestError ? err.message : ordersContent.errors.load))
       .finally(() => setLoading(false));
   }, [token]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   return (
     <div className="category-page">
       <title>{ordersContent.metaTitle}</title>
       <meta name="robots" content="noindex" />
-
-      <Breadcrumb
-        items={[
-          { label: 'Home', to: '/' },
-          { label: 'Orders' },
-        ]}
-      />
       <div className="customer-orders-filters">
-        <Tabs>
-          <SecondaryTab
-            onClick={() => setSelectedStatus('ALL')}
-          >
-            All
-          </SecondaryTab>
-
-          <SecondaryTab
-            onClick={() => setSelectedStatus('CANCELLED')}
-          >
-            Cancelled
-          </SecondaryTab>
-        </Tabs>
+        <ChipSet className="chip-nav" aria-label="Order status filters">
+          < FilterChip selected={selectedStatus === 'ALL'} onClick={() => setSelectedStatus('ALL')}  >All</ FilterChip>
+          <FilterChip selected={selectedStatus === 'CANCELLED'} onClick={() => setSelectedStatus('CANCELLED')}> Cancelled </ FilterChip>
+        </ChipSet>
       </div>
       <section className="category-page__grid-wrap">
         <div className="category-page__grid-inner">
-          {loading ? (
-            <p className="loading-state">{ordersContent.loading}</p>
-          ) : error ? (
-            <p className="error-state" role="alert">{error || ordersContent.errors.load}</p>
+          {loading ? (<p className="loading-state">{ordersContent.loading}</p>
+          ) : error ? (<p className="error-state" role="alert">{error || ordersContent.errors.load}</p>
           ) : filteredOrders.length === 0 ? (
             <div className="category-page__empty">
               <sky-info-card icon="receipt_long" heading={ordersContent.empty.title} subheading={ordersContent.empty.description} />
-              <FilledButton onClick={() => navigate('/categories')}>{ordersContent.empty.cta}</FilledButton>
+              <FilledButton onClick={() => navigate('/')}>{ordersContent.empty.cta}</FilledButton>
             </div>
           ) : (
-
             <CardGrid layout="list">
               {filteredOrders.map((order) => (
                 <CustomerOrderCard
                   key={order.id}
                   order={order}
-                  onViewDetails={(selectedOrder) =>
-                    navigate(`/orders/${selectedOrder.id}`)
-                  }
+                  onViewDetails={(selectedOrder) => navigate(`/orders/${selectedOrder.id}`)}
                 />
               ))}
             </CardGrid>
@@ -105,5 +81,4 @@ export function Orders() {
     </div>
   );
 }
-
 export default Orders;

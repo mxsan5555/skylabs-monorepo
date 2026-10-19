@@ -49,12 +49,18 @@ export async function getBootstrap(tokenPayload: AccessTokenPayload): Promise<Bo
   }
   const dashboardWidgets = [...dashboardWidgetsByKey.values()].sort((a, b) => a.order - b.order);
 
+  const ownedMember = await prisma.member.findUnique({
+    where: { ownerUserId: user.id },
+    select: { id: true, status: true },
+  });
+
   return {
     user: { id: user.id, name: user.name, email: user.email ?? undefined, phone: user.phone ?? undefined, status: user.status },
     roles: roles.map((r) => ({ id: r.id, key: r.key, name: r.name, isSuperAdmin: r.isSuperAdmin })),
     permissions,
     menu,
     dashboardWidgets,
+    member: ownedMember ?? null,
     ...(tokenPayload.isPreview && tokenPayload.impersonatedBy
       ? { preview: { isPreview: true as const, impersonatedBy: tokenPayload.impersonatedBy } }
       : {}),

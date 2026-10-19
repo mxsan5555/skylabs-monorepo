@@ -1,6 +1,6 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './showcase.css';
-import logo from '../../../assets/logo.jpg';
+import { LOGO_SRC as logo } from '../../../brand';
 // Opt-in: registers <swiper-container> / <swiper-slide> for the carousel demos.
 import '@skylabs-monorepo/shared-ui/carousel';
 // Opt-in: registers <sky-rich-text-editor> (Quill-backed) for the editor demo.
@@ -50,7 +50,14 @@ import {
 } from '@skylabs-monorepo/shared-ui/react';
 // sky-* components are raw LIT web component tags — no React adapter needed.
 // They are registered globally via main.tsx → import '@skylabs-monorepo/shared-ui'.
-import type { SkySnackbar } from '@skylabs-monorepo/shared-ui';
+import type { SkyColor, SkySnackbar } from '@skylabs-monorepo/shared-ui';
+import { CardGrid } from '../../components/card-grid/card-grid';
+import { ListingToolbar } from '../../components/listing-toolbar/listing-toolbar';
+import { ViewSwitch } from '../../components/view-switch/view-switch';
+import { ChipNav } from '../../components/chip-nav/chip-nav';
+import { listCatalogDeals, listCatalogProducts } from '../../../api/catalog';
+import { OfferCard, type OfferItem, type OfferTag } from '../../components/offer-card/offer-card';
+import { useVisitorLocation } from '../../../location/location-context';
 
 // ── Data table demo ──────────────────────────────────────────────────────────
 
@@ -404,6 +411,106 @@ function ShowcaseNav() {
   );
 }
 
+// ── Offer card demo (OfferCard = sky-product-card price-first) ───────────────
+// Two real deals and two real products, so the whole card opens the detail page, Add to cart adds
+// the item (a deal asks for its package first) and the heart saves it to the wishlist. Tags and
+// rating are demo values: there is no review system yet.
+
+const OFFER_VIEWS = [
+  { value: 'grid', label: 'Grid view', icon: 'grid_view' },
+  { value: 'list', label: 'List view', icon: 'view_list' },
+];
+
+/** `color` options to try (the sky-feature-card vocabulary); Default leaves the attribute off. */
+const OFFER_COLORS: { value: SkyColor | ''; label: string }[] = [
+  { value: '', label: 'Default' },
+  { value: 'none', label: 'None' },
+  { value: 'surface', label: 'Surface' },
+  { value: 'surface-high', label: 'Surface high' },
+  { value: 'primary', label: 'Primary' },
+  { value: 'secondary', label: 'Secondary' },
+  { value: 'tertiary', label: 'Tertiary' },
+  { value: 'inverse', label: 'Inverse' },
+];
+
+const OFFER_RATINGS = {
+  deal: { rating: 4.7, reviews: 4273 },
+  product: { rating: 4.5, reviews: 312 },
+};
+
+/** Offer tags: theme role and filled or tonal look. Filled and tonal alternate so the four tags
+ *  stay apart even where the roles are close in hue. */
+const OFFER_TAGS: OfferTag[] = [
+  { label: 'New', color: 'tertiary', tone: 'tonal' },
+  { label: 'Deal', color: 'primary' },
+  { label: 'Hot', color: 'error' },
+  { label: 'Expire soon', color: 'error', tone: 'tonal' },
+];
+
+function OfferCardDemo() {
+  const [view, setView] = useState('grid');
+  const [color, setColor] = useState<SkyColor | ''>('');
+  const [items, setItems] = useState<OfferItem[]>([]);
+  // The visitor's coordinates make the API return each deal's distance (as on the home page).
+  const { status: locationStatus, coords } = useVisitorLocation();
+  const latitude = coords?.latitude;
+  const longitude = coords?.longitude;
+  const list = view === 'list';
+
+  useEffect(() => {
+    if (locationStatus === 'locating') return;
+    let cancelled = false;
+    Promise.all([listCatalogDeals({ pageSize: 2, latitude, longitude }), listCatalogProducts({ pageSize: 2 })])
+      .then(([deals, products]) => {
+        if (cancelled) return;
+        setItems([
+          ...deals.data.slice(0, 2).map((deal) => ({ type: 'deal' as const, deal })),
+          ...products.data.slice(0, 2).map((product) => ({ type: 'product' as const, product })),
+        ]);
+      })
+      .catch(() => setItems([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [locationStatus, latitude, longitude]);
+
+  return (
+    <>
+      <p className="demo-label">
+        OfferCard (sky-product-card price-first): tag (New tertiary tonal, Deal primary, Hot error,
+        Expire soon error tonal), image, price, old price, discount, rating, headline, description (two
+        lines each), member, location and distance (services only), Add to cart and wishlist. The whole
+        card opens the detail page. The home hero uses it with color surface-high, variant plain.
+      </p>
+      <ListingToolbar
+        ariaLabel="Offer card view"
+        start={
+          <ChipNav
+            ariaLabel="Card colour"
+            items={OFFER_COLORS}
+            value={color}
+            onSelect={(value) => setColor(value as SkyColor | '')}
+          />
+        }
+        end={<ViewSwitch label="Card view" options={OFFER_VIEWS} value={view} onChange={setView} />}
+      />
+      <CardGrid layout={list ? 'list' : 'grid'}>
+        {items.map((item, index) => (
+          <OfferCard
+            key={item.type === 'deal' ? item.deal.id : item.product.id}
+            item={item}
+            tag={OFFER_TAGS[index % OFFER_TAGS.length]}
+            {...(color ? { color } : {})}
+            variant="outlined"
+            layout={list ? 'horizontal' : 'vertical'}
+            rating={OFFER_RATINGS[item.type]}
+          />
+        ))}
+      </CardGrid>
+    </>
+  );
+}
+
 /**
  * Demo page for msd. Every control here is a Material 3 web component coming
  * from @skylabs-monorepo/shared-ui, themed by msd's own (green) palette. The
@@ -683,6 +790,11 @@ export function Showcase() {
             </div>
           </sky-product-card>
         </div>
+      </section>
+
+      <section className="showcase__card" id="offer-card">
+        <h2>Offer card</h2>
+        <OfferCardDemo />
       </section>
 
       <section className="showcase__card" id="carousel-swiper-element">

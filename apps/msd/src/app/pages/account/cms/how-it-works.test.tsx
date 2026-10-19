@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 import { ApiRequestError } from '../../../../api/rbac/client';
 import type { HowItWorksContent, HowItWorksStep } from '../../../../api/rbac/how-it-works';
 
@@ -70,9 +70,10 @@ const STEP_2: HowItWorksStep = {
 
 function renderPage() {
   return render(
-    <ToastProvider>
+    <>
       <HowItWorksPage />
-    </ToastProvider>,
+      <SnackbarHost />
+    </>,
   );
 }
 
@@ -141,7 +142,7 @@ describe('HowItWorksPage', () => {
     expect(screen.getByText(/Last saved/)).toBeTruthy();
   });
 
-  it('Save intro calls updateHowItWorksContent and shows a success toast', async () => {
+  it('Save intro calls updateHowItWorksContent and shows a success snackbar', async () => {
     updateHowItWorksContentMock.mockResolvedValue({ data: CONTENT });
     renderPage();
     await screen.findByText('Choose a Deal');
@@ -214,8 +215,8 @@ describe('HowItWorksPage', () => {
 
     fireEvent.click(screen.getByLabelText('Move Book a Slot earlier'));
 
-    // Renders twice by design — once as the inline `error-state` paragraph, once as the toast
-    // (see `moveStep`'s catch block: both `setStepsError(msg)` and `showToast(msg, 'error')`
+    // Renders twice by design — once as the inline `error-state` paragraph, once as the snackbar
+    // (see `moveStep`'s catch block: both `setStepsError(msg)` and `showSnackbar(msg, ...)`
     // fire), same convention as blog-form-dialog.test.tsx's identical doc comment.
     await waitFor(() => expect(screen.getAllByText('Could not reorder steps.').length).toBeGreaterThan(0));
   });

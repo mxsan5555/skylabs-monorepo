@@ -125,6 +125,8 @@ export interface BootstrapResponse {
     isPreview: true;
     impersonatedBy: string;
   };
+  /** Present only when the signed in user owns a member business (msd). */
+  member?: { id: string; status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'ARCHIVED' } | null;
   /** The Driver record linked to this User, if any (mera-driver only — msd never populates
    *  this). This is the ownership signal the driver self-service portal's route guard and
    *  post-login redirect key off, not a role-name check. */

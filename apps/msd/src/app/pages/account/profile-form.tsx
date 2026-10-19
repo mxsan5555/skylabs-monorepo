@@ -1,128 +1,187 @@
-import { useEffect, useState } from 'react';
-import { FilledButton, OutlinedButton, TextButton, IconButton, OutlinedTextField, Icon, } from '@skylabs-monorepo/shared-ui/react';
-import { useAccount } from '../../../account/account-context';
-import type { Address } from '../../../types';
-import { validateEmail, validatePhone } from '../../../utils/validation';
-import content from '../../../content.json';
+
+import { useEffect, useRef, useState } from 'react';
+import { Dialog, OutlinedButton, OutlinedTextField, TextButton, } from '@skylabs-monorepo/shared-ui/react';
 import { useAuth } from '@skylabs-monorepo/shared-auth/react';
-import { getMyProfile, updateMyProfile, } from '../../../api/rbac/me';
+import { getMyProfile, updateMyProfile } from '../../../api/rbac/me';
 import { ApiRequestError } from '../../../api/rbac/client';
-import { useToast } from '../../../toast/toast-context';
-type Draft = Omit<Address, 'id'>;
-const EMPTY: Draft = {
-  label: '',
-  line1: '',
-  line2: '',
-  city: '',
-  state: '',
-  postalCode: '',
-  country: '',
+import { listMyOrders } from '../../../api/orders';
+import type { Order } from '../../../api/orders';
+import { validateEmail } from '../../../utils/validation';
+import { showSnackbar } from '../../../snackbar/snackbar';
+import content from '../../../content.json';
+
+type AddressDraft = {
+  shippingAddress: string;
+  shippingCity: string;
+  shippingState: string;
+  shippingPincode: string;
 };
-/** One source of truth for the address form — add a field by extending this. */
-const ADDRESS_FIELDS: {
-  key: keyof Draft;
-  label: string;
-  span2?: boolean;
-}[] = [
-    { key: 'label', label: 'Label (e.g. Home, Work)', span2: true },
-    { key: 'line1', label: 'Address line 1', span2: true },
-    { key: 'line2', label: 'Address line 2', span2: true },
-    { key: 'city', label: 'City' },
-    { key: 'state', label: 'State' },
-    { key: 'postalCode', label: 'Postal code' },
-    { key: 'country', label: 'Country' },
-  ];
-const value = (e: Event) =>
-  (e.target as HTMLInputElement).value;
-/**
- * The actual "edit email/phone + manage saved addresses" form.
- *
- * Email and phone are loaded/saved through the authenticated user's
- * `/me` API. Addresses still use the existing account store until
- * address APIs are available.
- */
+
+const EMPTY_ADDRESS: AddressDraft = {
+  shippingAddress: '',
+  shippingCity: '',
+  shippingState: '',
+  shippingPincode: '',
+};
+const value = (event: Event) => (event.target as HTMLInputElement).value;
 export function ProfileForm() {
-  const { addresses, addAddress, updateAddress, removeAddress, } = useAccount();
   const { token } = useAuth();
-  const { showToast } = useToast();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [originalPhone, setOriginalPhone] = useState('');
+  const [originalName, setOriginalName] = useState('');
+  const [originalEmail, setOriginalEmail] = useState('');
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [editingId, setEditingId] = useState<string | 'new' | null>(null);
-  const [draft, setDraft] = useState<Draft>(EMPTY);
-
+  const [shippingOrder, setShippingOrder] = useState<Order | null>(null);
+  const [addressLoading, setAddressLoading] = useState(true);
+  const [addressError, setAddressError] = useState('');
+  const [addressSaving, setAddressSaving] = useState(false);
+  const [addressDraft, setAddressDraft] = useState<AddressDraft>(EMPTY_ADDRESS);
+  const [originalAddress, setOriginalAddress] = useState<AddressDraft>(EMPTY_ADDRESS);
+  const dialogRef = useRef<HTMLElement & { show: () => void; close: () => void }>(null);
+  const addressDialogRef = useRef<HTMLElement & { show: () => void; close: () => void }>(null)
   useEffect(() => {
-    setLoading(true);
-    setError('');
-    getMyProfile(token)
-      .then(({ data }) => { setName(data.name ?? ''); setEmail(data.email ?? ''); setPhone(data.phone ?? ''); setOriginalPhone(data.phone ?? ''); })
-      .catch((err) => {
-        setError(err instanceof ApiRequestError ? err.message : 'Could not load your profile.',);
-      })
-      .finally(() => { setLoading(false); });
+    let cancelled = false;
+    async function loadProfile() {
+      setLoading(true);
+      setError('');
+      try {
+        const { data } = await getMyProfile(token);
+        if (cancelled) return;
+        const profileName = data.name ?? '';
+        const profileEmail = data.email ?? '';
+        const profilePhone = data.phone ?? '';
+        setName(profileName);
+        setEmail(profileEmail);
+        setPhone(profilePhone);
+        setOriginalName(profileName);
+        setOriginalEmail(profileEmail);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof ApiRequestError ? err.message : 'Could not load your profile.',);
+        }
+      } finally {
+        if (!cancelled) { setLoading(false); }
+      }
+    }
+    void loadProfile();
+    return () => { cancelled = true; };
   }, [token]);
-  const saveProfile = async () => {
+  useEffect(() => {
+    let cancelled = false;
+    async function loadAddress() {
+      setAddressLoading(true);
+      setAddressError('');
+      try {
+        const { data } = await listMyOrders(token, { page: 1, pageSize: 1, });
+        if (cancelled) return;
+        const latestOrder = [...data].sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() -
+            new Date(a.createdAt).getTime(),
+        )[0];
+        setShippingOrder(latestOrder ?? null);
+      } catch (err) {
+        if (!cancelled) {
+          setAddressError(err instanceof ApiRequestError ? err.message : 'Could not load your address.',);
+        }
+      } finally {
+        if (!cancelled) { setAddressLoading(false); }
+      }
+    }
+    void loadAddress();
+    return () => { cancelled = true; };
+  }, [token]);
+  useEffect(() => {
+    if (!shippingOrder) {
+      setAddressDraft(EMPTY_ADDRESS);
+      setOriginalAddress(EMPTY_ADDRESS);
+      return;
+    }
+    const address: AddressDraft = {
+      shippingAddress: shippingOrder.shippingAddress ?? '',
+      shippingCity: shippingOrder.shippingCity ?? '',
+      shippingState: shippingOrder.shippingState ?? '',
+      shippingPincode: shippingOrder.shippingPincode ?? '',
+    };
+    setAddressDraft(address);
+    setOriginalAddress(address);
+  }, [shippingOrder]);
+  const hasChanges =
+    name.trim() !== originalName.trim() ||
+    email.trim() !== originalEmail.trim();
+  const hasAddressChanges = (Object.keys(addressDraft) as Array<keyof AddressDraft>
+  ).some(
+    (key) => addressDraft[key].trim() !== originalAddress[key].trim(),);
+  const requestProfileUpdate = () => {
     setError('');
-
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
-
     if (!trimmedName) {
       setError('Name is required.');
       return;
     }
-
-    if (trimmedEmail && !validateEmail(trimmedEmail)) {
+    if (
+      trimmedEmail &&
+      !validateEmail(trimmedEmail)
+    ) {
       setError(content.validation.email.invalid);
       return;
     }
-
+    if (!hasChanges || saving) return;
+    dialogRef.current?.show();
+  };
+  const confirmProfileUpdate = async () => {
+    if (saving || !hasChanges) return;
+    setSaving(true);
+    setError('');
     try {
       const { data } = await updateMyProfile(token, {
-        name: trimmedName,
-        email: trimmedEmail || undefined,
+        name: name.trim(),
+        email: email.trim() || undefined,
       });
-
-      setName(data.name ?? '');
-      setEmail(data.email ?? '');
-      setPhone(data.phone ?? '');
-      setEditing(false);
-      showToast('Profile updated successfully.', 'success');
+      const updatedName = data.name ?? '';
+      const updatedEmail = data.email ?? '';
+      const updatedPhone = data.phone ?? '';
+      setName(updatedName);
+      setEmail(updatedEmail);
+      setPhone(updatedPhone);
+      setOriginalName(updatedName);
+      setOriginalEmail(updatedEmail);
+      dialogRef.current?.close();
+      showSnackbar('Your profile was updated successfully.', { variant: 'success' });
     } catch (err) {
-      setError(
-        err instanceof ApiRequestError
-          ? err.message
-          : 'Could not save your profile.',
-      );
-    }
+      setError(err instanceof ApiRequestError ? err.message : 'Could not save your profile.',);
+    } finally { setSaving(false); }
   };
-  const startAdd = () => {
-    setDraft(EMPTY);
-    setEditingId('new');
+  const updateAddressField =
+    (key: keyof AddressDraft) => (event: Event) => {
+      setAddressDraft((previous) => ({
+        ...previous, [key]: value(event),
+      }));
+    };
+  const requestAddressUpdate = () => {
+    setAddressError('');
+    if (!hasAddressChanges || addressSaving) return;
+    addressDialogRef.current?.show();
   };
-  const startEdit = (a: Address) => {
-    const { id, ...rest } = a;
-    void id;
-    setDraft({ line2: '', ...rest, });
-    setEditingId(a.id);
+  const confirmAddressUpdate = () => {
+    if (addressSaving || !hasAddressChanges) return;
+    setAddressSaving(true);
+    try {
+      const updatedAddress = { ...addressDraft };
+      setOriginalAddress(updatedAddress);
+      setShippingOrder((previous) => previous ? { ...previous, ...updatedAddress } : previous,);
+      addressDialogRef.current?.close();
+      showSnackbar('Address updated successfully.', { variant: 'success' });
+    } finally { setAddressSaving(false); }
   };
-  const submitAddress = () => {
-    if (editingId === 'new') {
-      addAddress(draft);
-    } else if (editingId) {
-      updateAddress(editingId, draft);
-    }
-    setEditingId(null);
-  };
-  const patch = (key: keyof Draft) => (e: Event) =>
-    setDraft((d) => ({ ...d, [key]: value(e), }));
   return (
     <>
-      {loading ? (<p className="loading-state">Loading your profile…</p>
+      {loading ? (
+        <p className="loading-state">Loading your profile…</p>
       ) : (
         <>
           {error && (<p className="error-state" role="alert">{error}</p>)}
@@ -131,111 +190,94 @@ export function ProfileForm() {
               <OutlinedTextField
                 label="Name"
                 value={name}
-                readOnly={!editing}
-                onInput={(e: Event) => setName(value(e))}
+                onInput={(event: Event) => setName(value(event))}
               />
-
               <OutlinedTextField
                 label="Email"
                 type="email"
                 autocomplete="email"
                 value={email}
-                readOnly={!editing}
-                onInput={(e: Event) => setEmail(value(e))}
+                onInput={(event: Event) => setEmail(value(event))}
               />
-
               <OutlinedTextField
                 label="Phone"
                 type="tel"
                 autocomplete="tel"
                 value={phone}
+                required
                 readOnly
               />
             </div>
-
             <div className="account-card__actions">
-              {!editing ? (
-                <OutlinedButton onClick={() => setEditing(true)}>
-                  <Icon slot="icon" aria-hidden="true">
-                    edit
-                  </Icon>
-                  Edit
-                </OutlinedButton>
-              ) : (
-                <>
-                  <OutlinedButton onClick={() => setEditing(false)}>
-                    Cancel
-                  </OutlinedButton>
-
-                  <OutlinedButton onClick={saveProfile}>
-                    Update
-                  </OutlinedButton>
-                </>
-              )}
+              <OutlinedButton
+                disabled={!hasChanges || saving}
+                onClick={requestProfileUpdate}
+              >Update</OutlinedButton>
             </div>
-
-
           </section>
-          {/* <section className="account-card">
-            <div className="account-card__head">
-              <h2>Addresses</h2>
-              {editingId === null && (
-                <OutlinedButton onClick={startAdd}>
-                  <Icon slot="icon" aria-hidden="true">add</Icon>Add address
-                </OutlinedButton>
-              )}
+          <Dialog ref={dialogRef}>
+            <div slot="headline">Update profile?</div>
+            <div slot="content">Are you sure you want to update your records?</div>
+            <div slot="actions">
+              <TextButton disabled={saving} onClick={() => dialogRef.current?.close()}>Cancel</TextButton>
+              <TextButton
+                disabled={saving}
+                onClick={() => { void confirmProfileUpdate(); }}
+              >{saving ? 'Updating…' : 'Okay'}</TextButton>
             </div>
-            {editingId !== null && (
-              <div className="address-form">
-                {ADDRESS_FIELDS.map((f) => (
-                  <OutlinedTextField
-                    key={f.key}
-                    className={f.span2 ? 'span-2' : undefined}
-                    label={f.label}
-                    value={draft[f.key] ?? ''}
-                    onInput={patch(f.key)}
-                  />
-                ))}
-                <div className="address-form__actions">
-                  <TextButton onClick={() => setEditingId(null)}>Cancel</TextButton>
-                  <FilledButton onClick={submitAddress}>{editingId === 'new' ? 'Add' : 'Save'}</FilledButton>
-                </div>
-              </div>
-            )}
-            {addresses.length === 0 &&
-              editingId === null ? (
-              <p className="address-empty">No addresses yet.</p>
+          </Dialog>
+          <section className="account-card">
+            <div className="account-card__head">
+              <h2>Delivery Address</h2>
+            </div>
+            {addressLoading ? (<p className="loading-state">Loading address…</p>
+            ) : addressError ? (
+              <p className="error-state" role="alert">{addressError}</p>
             ) : (
-              <ul className="address-list">
-                {addresses.map((a) => (
-                  <li className="address-card" key={a.id}>
-                    <div>
-                      <div className="address-card__label">{a.label}
-                      </div>
-                      <div className="address-card__lines">
-                        {a.line1}
-                        {a.line2 ? `, ${a.line2}` : ''}
-                        <br />
-                        {a.city}, {a.state}{' '}
-                        {a.postalCode}
-                        <br />
-                        {a.country}
-                      </div>
-                    </div>
-                    <div className="address-card__actions">
-                      <IconButton aria-label={`Edit ${a.label} address`}
-                        onClick={() => startEdit(a)}>
-                        <Icon aria-hidden="true">edit</Icon>
-                      </IconButton>
-                      <IconButton aria-label={`Delete ${a.label} address`} onClick={() => removeAddress(a.id)}>
-                        <Icon aria-hidden="true">delete</Icon>
-                      </IconButton>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <div className="account-fields address-fields">
+                  <OutlinedTextField
+                    label="Address"
+                    value={addressDraft.shippingAddress}
+                    onInput={updateAddressField('shippingAddress')}
+                  />
+                  <OutlinedTextField
+                    label="City"
+                    value={addressDraft.shippingCity}
+                    onInput={updateAddressField('shippingCity')}
+                  />
+                  <OutlinedTextField
+                    label="State"
+                    value={addressDraft.shippingState}
+                    onInput={updateAddressField('shippingState')}
+                  />
+                  <OutlinedTextField
+                    label="Pincode"
+                     required
+                    value={addressDraft.shippingPincode}
+                    onInput={updateAddressField('shippingPincode')}
+                  />
+                </div>
+                <div className="account-card__actions">
+                  <OutlinedButton
+                    disabled={!hasAddressChanges || addressSaving}
+                    onClick={requestAddressUpdate}
+                  >{addressSaving ? 'Updating…' : 'Update'}
+                  </OutlinedButton>
+                </div>
+              </>
             )}
-          </section> */}
+          </section>
+          <Dialog ref={addressDialogRef}>
+            <div slot="headline">Update address?</div>
+            <div slot="content">Are you sure you want to update your delivery address?</div>
+            <div slot="actions">
+              <TextButton disabled={addressSaving} onClick={() => addressDialogRef.current?.close()}>Cancel</TextButton>
+              <TextButton disabled={addressSaving} onClick={confirmAddressUpdate}>
+                {addressSaving ? 'Updating…' : 'Okay'}
+              </TextButton>
+            </div>
+          </Dialog>
         </>
       )}
     </>

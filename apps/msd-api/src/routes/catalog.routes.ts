@@ -8,6 +8,8 @@ import * as catalogService from '../services/catalog.service';
 // on why Home Hero's public read is the one deliberate exception to this file's usual pattern.
 import { getPublicHomeHero } from '../services/home-hero.service';
 import { PublicHomeHeroQuerySchema } from '../schemas/home-hero.schema';
+import { PublicBannerQuerySchema } from '../schemas/promotion.schema';
+import { getPublicBanners } from '../services/promotion.service';
 import { sendData } from '../lib/http';
 
 /**
@@ -35,9 +37,22 @@ router.get('/popular-treatments', async (_req, res, next) => {
   }
 });
 
+/** CTA banners for one slot and the visitor's state, else Global/Default (PLANNING §6). */
+router.get('/banners', validateQuery(PublicBannerQuerySchema), async (req, res, next) => {
+  try {
+    const { slot, state } = req.validatedQuery as ReturnType<typeof PublicBannerQuerySchema.parse>;
+    sendData(res, await getPublicBanners({ slot, state: state || null }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Deprecated for one release: the Global/Default banners of `HOME_AFTER_DEALS` (use /banners). */
 router.get('/promotions', async (_req, res, next) => {
   try {
-    sendData(res, await catalogService.getPublicPromotions());
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Link', '</api/v1/catalog/banners?slot=HOME_AFTER_DEALS>; rel="successor-version"');
+    sendData(res, await getPublicBanners({ slot: 'HOME_AFTER_DEALS', state: null }));
   } catch (err) {
     next(err);
   }
@@ -136,13 +151,15 @@ router.get('/products', validateQuery(CatalogProductQuerySchema), async (req, re
   }
 });
 
-router.get('/products/:id', validateParams(z.object({ id: z.string().min(1) })), async (req, res, next) => {
+
+router.get('/products/:id', validateParams(z.object({ id: z.string().uuid() })), async (req, res, next) => {
   try {
     sendData(res, await catalogService.getPublicProductOrThrow(req.params.id));
   } catch (err) {
     next(err);
   }
 });
+
 
 router.get('/locations', async (_req, res, next) => {
   try {

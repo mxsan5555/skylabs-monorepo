@@ -369,3 +369,24 @@ describe('OrderManagement — scope="member" hides the admin-only member picker'
     expect(filterRowSelectCount()).toBe(2); // "Payment Status" + "Member"
   });
 });
+
+describe('OrderManagement — members never change order status (D27)', () => {
+  const tableActions = () => {
+    const table = document.querySelector('sky-data-table') as (HTMLElement & { actions?: string }) | null;
+    return String(table?.actions ?? table?.getAttribute('actions') ?? '');
+  };
+
+  it('offers Change status to staff holding orders:status_change', async () => {
+    listOrdersMock.mockResolvedValue({ data: [], meta: { total: 0 } });
+    renderPage();
+    await waitFor(() => expect(tableActions()).toContain('change-status'));
+  });
+
+  it("never offers it to a member (members:custom only), for deal or product orders", async () => {
+    grantedPermissions = new Set(['members:custom']);
+    listOrdersMock.mockResolvedValue({ data: [], meta: { total: 0 } });
+    renderPage();
+    await waitFor(() => expect(listOrdersMock).toHaveBeenCalled());
+    expect(tableActions()).not.toContain('change-status');
+  });
+});

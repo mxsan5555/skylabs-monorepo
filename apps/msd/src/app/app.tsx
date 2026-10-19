@@ -3,7 +3,7 @@ import { CatalogShellProvider } from '../catalog/catalog-shell';
 import { LocationProvider } from '../location/location-context';
 import { WishlistProvider } from '../wishlist/wishlist-context';
 import { CartCountProvider } from '../hooks/use-cart-count';
-import { ToastProvider } from '../toast/toast-context';
+import { SnackbarHost } from '../snackbar/snackbar';
 import { ErrorBoundary } from './components/error-boundary';
 import { AppRoutes } from './routes';
 
@@ -23,11 +23,11 @@ import { AppRoutes } from './routes';
  * header badge refetches on every mutation — see `subscribeCartUpdated`), never a second
  * client-side store. `CartCountProvider` (also inside `AuthProvider`) holds only the item total
  * for the header and mobile tab bar badges, so both share one `getCart` call.
- * `ToastProvider` doesn't need auth, but sits innermost anyway so its fixed-position stack
- * always mounts closest to the route tree that calls `useToast()`. `ErrorBoundary` wraps only
- * `<AppRoutes />`, inside every provider, so a render-phase crash anywhere in the route tree
- * falls back to a friendly full-page message instead of unmounting the providers themselves
- * (auth state, toasts, wishlist) along with it — see `error-boundary.tsx`'s own doc comment.
+ * `SnackbarHost` renders the app's single `<sky-snackbar>`; screens show messages with
+ * `showSnackbar()` from `snackbar/snackbar.tsx`. `ErrorBoundary` wraps only `<AppRoutes />`,
+ * inside every provider, so a render-phase crash anywhere in the route tree falls back to a
+ * friendly full-page message instead of unmounting the providers themselves (auth state,
+ * wishlist) along with it — see `error-boundary.tsx`'s own doc comment.
  */
 export function App() {
   return (
@@ -36,11 +36,10 @@ export function App() {
         <LocationProvider>
           <WishlistProvider>
             <CartCountProvider>
-              <ToastProvider>
-                <ErrorBoundary>
-                  <AppRoutes />
-                </ErrorBoundary>
-              </ToastProvider>
+              <ErrorBoundary>
+                <AppRoutes />
+              </ErrorBoundary>
+              <SnackbarHost />
             </CartCountProvider>
           </WishlistProvider>
         </LocationProvider>

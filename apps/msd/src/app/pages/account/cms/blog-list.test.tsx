@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ToastProvider } from '../../../../toast/toast-context';
+import { SnackbarHost } from '../../../../snackbar/snackbar';
 import type { BlogPost } from '../../../../api/rbac/blog-posts';
 
 import { BlogList } from './blog-list';
@@ -89,11 +89,12 @@ const POST: BlogPost = {
 describe.each(['pages', 'articles'] as const)('BlogList %s', (scope) => {
 function renderList() {
   return render(
-    <ToastProvider>
+    <>
       <MemoryRouter>
         <BlogList scope={scope} />
       </MemoryRouter>
-    </ToastProvider>,
+      <SnackbarHost />
+    </>,
   );
 }
 

@@ -6,7 +6,6 @@ import type { CatalogShellValue } from '../../../catalog/catalog-shell';
 import content from '../../../content.json';
 import { Category } from './category';
 import { PrerenderDataProvider, categoryDataKey, type PrerenderPayload } from '../../../prerender-data/prerender-data';
-import { ToastProvider } from '../../../toast/toast-context';
 import { ApiRequestError } from '../../../api/rbac/client';
 
 const {
@@ -17,6 +16,8 @@ const {
   getCatalogDealFacetsMock,
   shellState,
   defaultShell,
+  authState,
+  wishlistState,
   VENDOR_A,
   BRANCH_A,
 } = vi.hoisted(() => {
@@ -35,6 +36,14 @@ const {
     listCatalogProductsMock: vi.fn(),
     listCatalogTherapistsMock: vi.fn(),
     getCatalogDealFacetsMock: vi.fn(),
+    authState: { value: { isAuthenticated: false, token: null as string | null } },
+    wishlistState: {
+      toggle: vi.fn(),
+      has: vi.fn(() => false),
+      hasProduct: vi.fn(() => false),
+      toggleProduct: vi.fn(),
+      isProductPending: vi.fn(() => false),
+    },
     VENDOR_A: '11111111-1111-4111-8111-111111111111',
     BRANCH_A: '22222222-2222-4222-8222-222222222222',
   };
@@ -52,10 +61,10 @@ vi.mock('../../../api/catalog', async () => {
   };
 });
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
-  useAuth: () => ({ isAuthenticated: false, token: null }),
+  useAuth: () => authState.value,
 }));
 vi.mock('../../../wishlist/wishlist-context', () => ({
-  useWishlist: () => ({ toggle: vi.fn(), has: () => false }),
+  useWishlist: () => wishlistState,
 }));
 vi.mock('../../../catalog/catalog-shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../catalog/catalog-shell')>()),
@@ -99,14 +108,12 @@ function LocationBar() {
 
 const renderAt = (path: string) =>
   render(
-    <ToastProvider>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/category/:slug" element={<><Category /><LocationBar /></>} />
-          <Route path="/category/:slug/:city" element={<><Category /><LocationBar /></>} />
-        </Routes>
-      </MemoryRouter>
-    </ToastProvider>,
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/category/:slug" element={<><Category /><LocationBar /></>} />
+        <Route path="/category/:slug/:city" element={<><Category /><LocationBar /></>} />
+      </Routes>
+    </MemoryRouter>
   );
 
 const canonical = () => document.head.querySelector('link[rel="canonical"]')?.getAttribute('href');
@@ -156,6 +163,12 @@ beforeEach(() => {
   listCatalogProductsMock.mockResolvedValue({ data: [] });
   listCatalogTherapistsMock.mockResolvedValue({ data: [] });
   getCatalogDealFacetsMock.mockResolvedValue({ data: FACETS_DEFAULT });
+  authState.value = { isAuthenticated: false, token: null };
+  wishlistState.toggle.mockReset();
+  wishlistState.has.mockReset().mockReturnValue(false);
+  wishlistState.hasProduct.mockReset().mockReturnValue(false);
+  wishlistState.toggleProduct.mockReset();
+  wishlistState.isProductPending.mockReset().mockReturnValue(false);
   shellState.value = defaultShell;
   visitor.value = { status: 'none', source: 'none', city: null, state: null, coords: null };
 });
@@ -240,6 +253,44 @@ describe('Category page /:city', () => {
     expect(robots()).toBe('noindex, nofollow');
   });
 
+  it('adds a product from a PRODUCT category to the product wishlist when its heart is clicked', async () => {
+    const product = {
+      id: 'product-1',
+      name: 'Massage Oil',
+      slug: 'massage-oil',
+      brand: null,
+      description: null,
+      summary: null,
+      image: null,
+      imageAlt: null,
+      price: '499',
+      originalPrice: null,
+      discount: null,
+      category: null,
+      subcategory: null,
+      vendor: null,
+      popularTags: [],
+    };
+    authState.value = { isAuthenticated: true, token: 'access-token' };
+    wishlistState.toggleProduct.mockResolvedValue(true);
+    getCatalogCategoryMock.mockResolvedValue({ data: { ...CATEGORY, type: 'PRODUCT' } });
+    listCatalogProductsMock.mockResolvedValue({ data: [product] });
+
+    renderAt('/category/product');
+    const favoriteButton = await waitFor(() => {
+      const card = document.querySelector('sky-product-card');
+      const button = card?.shadowRoot?.querySelector('md-icon-button.favorite');
+      if (!button) throw new Error('Product favorite button did not render');
+      return button;
+    });
+
+    await act(async () => {
+      fireEvent.click(favoriteButton);
+    });
+
+    await waitFor(() => expect(wishlistState.toggleProduct).toHaveBeenCalledWith(product.id));
+  });
+
   it.each([
     ['PRODUCT', listCatalogProductsMock],
     ['THERAPY', listCatalogTherapistsMock],
@@ -274,14 +325,12 @@ describe('Category page with prerendered data', () => {
   const renderWith = (path: string, payload: PrerenderPayload) =>
     render(
       <PrerenderDataProvider payload={payload}>
-        <ToastProvider>
-          <MemoryRouter initialEntries={[path]}>
-            <Routes>
-              <Route path="/category/:slug" element={<Category />} />
-              <Route path="/category/:slug/:city" element={<Category />} />
-            </Routes>
-          </MemoryRouter>
-        </ToastProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path="/category/:slug" element={<Category />} />
+            <Route path="/category/:slug/:city" element={<Category />} />
+          </Routes>
+        </MemoryRouter>
       </PrerenderDataProvider>,
     );
   const countText = () =>

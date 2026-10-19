@@ -1,35 +1,148 @@
-import { apiGet, apiPost, apiDelete } from './rbac/client';
-import type { CatalogDeal } from './catalog';
+import {
+  apiGet,
+  apiPost,
+  apiDelete,
+} from './rbac/client';
 
-/**
- * Customer wishlist — authenticated, self-service only (backend gates on `authenticate` alone,
- * no RBAC permission — same as `api/cart.ts`'s `cart.routes.ts`). Mirrors that file's
- * request/response conventions and always sends the real signed-in token.
- *
- * `WishlistItem.deal` comes from msd-api's `PUBLIC_DEAL_SELECT` — the exact same select used by
- * `GET /catalog/deals`, so it's shaped identically to `CatalogDeal` in `api/catalog.ts`. Reusing
- * that type here (instead of redeclaring it) keeps the two in lockstep and lets every page that
- * already renders a `CatalogDeal` via `SkyProductCardWC` render a wishlisted deal the same way.
- */
+import type {
+  CatalogDeal,
+} from './catalog';
+
+export interface WishlistProduct {
+  id: string;
+  name: string;
+  slug: string;
+  brand: string | null;
+
+  image: string | null;
+  imageAlt: string | null;
+  mediaImages?: Array<{
+    storageKey: string;
+    isPrimary: boolean;
+    sortOrder: number;
+  }>;
+
+  price: string | number;
+  originalPrice: string | number | null;
+  discount: number | null;
+
+  isNew: boolean;
+  isFeatured: boolean;
+  isActive: boolean;
+
+  vendor?: {
+    id: string;
+    businessName: string;
+    slug: string | null;
+  } | null;
+}
+
 export interface WishlistItem {
   id: string;
-  dealId: string;
+
+  customerId: string;
+
+  dealId: string | null;
+  productId: string | null;
+
   createdAt: string;
-  deal: CatalogDeal;
+
+  deal: CatalogDeal | null;
+  product: WishlistProduct | null;
 }
 
-export function getWishlist(token: string | null) {
-  return apiGet<WishlistItem[]>('/wishlist', token);
+/**
+ * Get complete wishlist.
+ */
+export function getWishlist(
+  token: string | null,
+) {
+  return apiGet<WishlistItem[]>(
+    '/wishlist',
+    token,
+  );
 }
 
-export function addToWishlist(token: string | null, dealId: string) {
-  return apiPost<WishlistItem>('/wishlist', token, { dealId });
+/**
+ * Add Deal to wishlist.
+ */
+export function addToWishlist(
+  token: string | null,
+  dealId: string,
+) {
+  return apiPost<WishlistItem>(
+    '/wishlist',
+    token,
+    {
+      dealId,
+    },
+  );
 }
 
-export function removeFromWishlist(token: string | null, dealId: string) {
-  return apiDelete<{ removed: boolean }>(`/wishlist/${dealId}`, token);
+/**
+ * Add Product to wishlist.
+ */
+export function addProductToWishlist(
+  token: string | null,
+  productId: string,
+) {
+  return apiPost<WishlistItem>(
+    '/wishlist',
+    token,
+    {
+      productId,
+    },
+  );
 }
 
-export function checkWishlisted(token: string | null, dealId: string) {
-  return apiGet<{ wishlisted: boolean }>(`/wishlist/check/${dealId}`, token);
+/**
+ * Remove Deal from wishlist.
+ */
+export function removeFromWishlist(
+  token: string | null,
+  dealId: string,
+) {
+  return apiDelete<{ removed: boolean }>(
+    `/wishlist/${dealId}`,
+    token,
+  );
+}
+
+/**
+ * Remove Product from wishlist.
+ */
+export function removeProductFromWishlist(
+  token: string | null,
+  productId: string,
+) {
+  return apiDelete<{ removed: boolean }>(
+    `/wishlist/product/${productId}`,
+    token,
+  );
+}
+
+/**
+ * Check Deal wishlist status.
+ */
+export function checkWishlisted(
+  token: string | null,
+  dealId: string,
+) {
+  return apiGet<{ wishlisted: boolean }>(
+    `/wishlist/check/${dealId}`,
+    token,
+  );
+}
+
+/**
+ * Check Product wishlist status.
+ */
+export function checkProductWishlisted(
+  token: string | null,
+  productId: string,
+) {
+  return apiGet<{ wishlisted: boolean }>(
+    `/wishlist/check/product/${productId}`,
+    token,
+  );
 }

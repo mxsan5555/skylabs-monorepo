@@ -15,7 +15,13 @@ const state = vi.hoisted(() => ({
 vi.mock('@skylabs-monorepo/shared-auth/react', () => ({
   useAuth: () => ({ isAuthenticated: false, token: null, bootstrap: null }),
 }));
-vi.mock('../../../wishlist/wishlist-context', () => ({ useWishlist: () => ({ ids: new Set(['a']) }) }));
+vi.mock('../../../wishlist/wishlist-context', () => ({
+  useWishlist: () => ({
+    ids: new Set(['a']),
+    productIds: new Set(['product-1', 'product-2']),
+    itemCount: 3,
+  }),
+}));
 vi.mock('../../../hooks/use-cart-count', () => ({ useCartCount: () => 0 }));
 // `useCategoryLinks` (same module) calls `useCatalogShell` internally, so mocking only
 // `useCatalogShell` and importing the real `useCategoryLinks` would read the real (unmocked)
@@ -48,7 +54,7 @@ describe('MobileTabBar', () => {
     const nav = screen.getByRole('navigation', { name: 'Primary' });
     expect(within(nav).getByRole('link', { name: 'Home' })).toBeTruthy();
     expect(within(nav).getByRole('button', { name: 'Categories' })).toBeTruthy();
-    expect(within(nav).getByRole('link', { name: 'Wishlist, 1 item' })).toBeTruthy();
+    expect(within(nav).getByRole('link', { name: 'Wishlist, 3 items' })).toBeTruthy();
     expect(within(nav).getByRole('link', { name: 'Cart' })).toBeTruthy();
     expect(within(nav).getByRole('link', { name: 'Account' }).getAttribute('href')).toBe('/sign-in');
   });
